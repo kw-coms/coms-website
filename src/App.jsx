@@ -440,7 +440,7 @@ function App() {
                   </a>
 
                   <a
-                    href="https://github.com/kw-coms/coms-website"
+                    href="https://github.com/kw-coms"
                     target="_blank"
                     rel="noreferrer"
                     className="transition hover:text-[#4f6f9f]"
