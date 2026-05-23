@@ -83,14 +83,14 @@ function App() {
     <div className="min-h-screen bg-black text-white">
       {/* Header */}
       <header className="fixed top-0 left-0 z-50 w-full border-b border-white/10 bg-black/70 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-2">
-          <button type="button" className="flex items-center gap-0" onClick={goHome}>
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2 sm:px-6">
+          <button type="button" className="flex min-w-0 items-center gap-2 sm:gap-3" onClick={goHome}>
             <img
               src="/coms-logo.png"
               alt="KW COM's Logo"
-              className="h-30 w-30 object-contain"
+              className="h-11 w-11 flex-shrink-0 object-contain sm:h-14 sm:w-14"
             />
-            <span className="text-xl font-bold tracking-widest">
+            <span className="hidden truncate text-lg font-bold tracking-widest sm:block sm:text-xl">
               KW COM&apos;s
             </span>
           </button>
@@ -153,7 +153,7 @@ function App() {
           <button
             type="button"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="rounded-lg border border-white/10 px-3 py-2 text-sm text-gray-300 transition hover:bg-white/10 hover:text-white md:hidden"
+            className="rounded-full border border-white/10 px-3 py-2 text-sm text-gray-300 transition hover:bg-white/10 hover:text-white md:hidden"
           >
             {isMenuOpen ? 'Close' : 'Menu'}
           </button>
@@ -161,12 +161,12 @@ function App() {
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <nav className="border-t border-white/10 bg-black px-6 py-5 md:hidden">
-            <div className="flex flex-col gap-4 text-sm text-gray-300">
+          <nav className="border-t border-white/10 bg-black px-4 py-4 md:hidden">
+            <div className="mx-2 flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-4 text-sm text-gray-300 sm:mx-0">
               <button
                 type="button"
                 onClick={() => goSection('about')}
-                className="text-left transition hover:text-white"
+                className="rounded-full px-3 py-2 text-left transition hover:bg-white/10 hover:text-white"
               >
                 About
               </button>
@@ -174,7 +174,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => goSection('activities')}
-                className="text-left transition hover:text-white"
+                className="rounded-full px-3 py-2 text-left transition hover:bg-white/10 hover:text-white"
               >
                 Activities
               </button>
@@ -182,7 +182,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => goSection('projects')}
-                className="text-left transition hover:text-white"
+                className="rounded-full px-3 py-2 text-left transition hover:bg-white/10 hover:text-white"
               >
                 Projects
               </button>
@@ -190,7 +190,7 @@ function App() {
               <button
                 type="button"
                 onClick={goRecruit}
-                className="text-left transition hover:text-white"
+                className="rounded-full px-3 py-2 text-left transition hover:bg-white/10 hover:text-white"
               >
                 Recruit
               </button>
@@ -198,7 +198,7 @@ function App() {
               <button
                 type="button"
                 onClick={openContact}
-                className="text-left transition hover:text-white"
+                className="rounded-full px-3 py-2 text-left transition hover:bg-white/10 hover:text-white"
               >
                 Contact
               </button>
@@ -206,7 +206,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => { setCurrentPage('login'); setIsMenuOpen(false) }}
-                className="text-left transition hover:text-white"
+                className="rounded-full px-3 py-2 text-left transition hover:bg-white/10 hover:text-white"
               >
                 로그인
               </button>
@@ -217,12 +217,12 @@ function App() {
 
       {/* Login Page */}
       {currentPage === 'login' && (
-        <main className="min-h-screen bg-black px-6 pt-36 pb-24 text-white">
-          <div className="mx-auto max-w-md">
+        <main className="min-h-screen bg-black px-4 pt-24 pb-16 text-white sm:px-6 sm:pt-36 sm:pb-24">
+          <div className="mx-auto w-full max-w-md">
             <button
               type="button"
               onClick={goHome}
-              className="mb-8 text-sm text-blue-400 transition hover:text-blue-300"
+              className="mb-6 text-sm text-blue-400 transition hover:text-blue-300 sm:mb-8"
             >
               ← 메인으로 돌아가기
             </button>
@@ -237,12 +237,12 @@ function App() {
 
       {/* Signup Page (placeholder) */}
       {currentPage === 'signup' && (
-        <main className="min-h-screen bg-black px-6 pt-36 pb-24 text-white">
-          <div className="mx-auto max-w-md">
+        <main className="min-h-screen bg-black px-4 pt-24 pb-16 text-white sm:px-6 sm:pt-36 sm:pb-24">
+          <div className="mx-auto w-full max-w-md">
             <button
               type="button"
               onClick={() => setCurrentPage('login')}
-              className="mb-8 text-sm text-blue-400 transition hover:text-blue-300"
+              className="mb-6 text-sm text-blue-400 transition hover:text-blue-300 sm:mb-8"
             >
               ← 로그인으로 돌아가기
             </button>
@@ -254,12 +254,12 @@ function App() {
 
       {/* Recruit Page */}
       {currentPage === 'recruit' && (
-        <main className="min-h-screen bg-black px-6 pt-36 pb-24 text-white">
+        <main className="min-h-screen bg-black px-4 pt-24 pb-16 text-white sm:px-6 sm:pt-36 sm:pb-24">
           <div className="mx-auto max-w-5xl">
             <button
               type="button"
               onClick={goHome}
-              className="mb-8 text-sm text-blue-400 transition hover:text-blue-300"
+              className="mb-6 text-sm text-blue-400 transition hover:text-blue-300 sm:mb-8"
             >
               ← 메인으로 돌아가기
             </button>

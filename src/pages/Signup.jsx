@@ -1,7 +1,7 @@
 export default function Signup({ onBack }) {
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/5 p-8">
-      <h2 className="mb-2 text-2xl font-bold">회원가입</h2>
+    <section className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20 sm:p-8">
+      <h2 className="mb-2 text-xl font-bold sm:text-2xl">회원가입</h2>
       <p className="mb-4 text-sm text-gray-300">회원가입은 추후 백엔드 연동 시 진행됩니다.</p>
 
       <div className="space-y-3">
@@ -11,7 +11,7 @@ export default function Signup({ onBack }) {
         <button
           type="button"
           onClick={onBack}
-          className="mt-4 rounded-full bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 font-semibold"
+          className="mt-4 w-full rounded-full bg-blue-600 px-4 py-2 font-semibold text-white transition hover:bg-blue-500 sm:w-auto"
         >
           로그인으로 돌아가기
         </button>
