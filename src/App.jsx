@@ -1,9 +1,13 @@
 import { useState } from 'react'
+import Login from './pages/Login.jsx'
+import Signup from './pages/Signup.jsx'
 
 function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState('home')
   const [isContactOpen, setIsContactOpen] = useState(false)
+
+  const btnClass = 'rounded-full bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 font-semibold transition'
 
   const activities = [
     {
@@ -134,6 +138,17 @@ function App() {
             </button>
           </nav>
 
+          {/* Login / Auth buttons (desktop) */}
+          <div className="hidden items-center gap-3 md:flex">
+            <button
+              type="button"
+              onClick={() => setCurrentPage('login')}
+              className={btnClass}
+            >
+              login
+            </button>
+          </div>
+
           {/* Mobile Button */}
           <button
             type="button"
@@ -187,10 +202,55 @@ function App() {
               >
                 Contact
               </button>
+
+              <button
+                type="button"
+                onClick={() => { setCurrentPage('login'); setIsMenuOpen(false) }}
+                className="text-left transition hover:text-white"
+              >
+                로그인
+              </button>
             </div>
           </nav>
         )}
       </header>
+
+      {/* Login Page */}
+      {currentPage === 'login' && (
+        <main className="min-h-screen bg-black px-6 pt-36 pb-24 text-white">
+          <div className="mx-auto max-w-md">
+            <button
+              type="button"
+              onClick={goHome}
+              className="mb-8 text-sm text-blue-400 transition hover:text-blue-300"
+            >
+              ← 메인으로 돌아가기
+            </button>
+
+            <Login
+              onBack={goHome}
+              goSignup={() => setCurrentPage('signup')}
+            />
+          </div>
+        </main>
+      )}
+
+      {/* Signup Page (placeholder) */}
+      {currentPage === 'signup' && (
+        <main className="min-h-screen bg-black px-6 pt-36 pb-24 text-white">
+          <div className="mx-auto max-w-md">
+            <button
+              type="button"
+              onClick={() => setCurrentPage('login')}
+              className="mb-8 text-sm text-blue-400 transition hover:text-blue-300"
+            >
+              ← 로그인으로 돌아가기
+            </button>
+
+            <Signup onBack={() => setCurrentPage('login')} />
+          </div>
+        </main>
+      )}
 
       {/* Recruit Page */}
       {currentPage === 'recruit' && (
