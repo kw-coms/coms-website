@@ -33,12 +33,12 @@ export default function Login({ onBack, goSignup }) {
   }
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-white/5 p-8">
-      <div className="mb-6 flex items-center gap-4">
-        <img src="/coms-logo.png" alt="KW COM's" className="h-10 w-10 object-contain flex-shrink-0" />
+    <section className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20 sm:p-8">
+      <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left">
+        <img src="/coms-logo.png" alt="KW COM's" className="h-10 w-10 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
         <div className="min-w-0">
-          <h2 className="text-xl font-bold leading-snug">KW COM's 로그인</h2>
-          <p className="text-sm text-gray-300 truncate">동아리 계정으로 로그인하세요.</p>
+          <h2 className="text-lg font-bold leading-snug sm:text-xl">KW COM's 로그인</h2>
+          <p className="text-sm leading-5 text-gray-300">동아리 계정으로 로그인하세요.</p>
         </div>
       </div>
 
@@ -72,21 +72,21 @@ export default function Login({ onBack, goSignup }) {
           </button>
         </div>
 
-        <div className="flex items-center justify-between text-sm text-gray-300">
-          <button type="button" onClick={goSignup} className="underline">
+        <div className="flex flex-col gap-3 text-sm text-gray-300 sm:flex-row sm:items-center sm:justify-between">
+          <button type="button" onClick={goSignup} className="w-full rounded-full border border-white/10 px-4 py-2 text-center transition hover:bg-white/10 sm:w-auto sm:border-0 sm:px-0 sm:py-0 sm:text-left sm:underline">
             회원가입
           </button>
 
           <button
             type="button"
             onClick={() => alert('비밀번호 분실 문의: coms@example.com')}
-            className="underline"
+            className="w-full rounded-full border border-white/10 px-4 py-2 text-center transition hover:bg-white/10 sm:w-auto sm:border-0 sm:px-0 sm:py-0 sm:text-left sm:underline"
           >
             비밀번호 찾기
           </button>
         </div>
 
-        <p className="mt-4 text-xs text-gray-400">
+        <p className="mt-4 text-xs leading-5 text-gray-400">
           로그인 정보가 기억나지 않거나 계정에 문제가 있는 경우 관리팀에 문의해주세요.
         </p>
       </form>
