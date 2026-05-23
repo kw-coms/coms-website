@@ -230,84 +230,81 @@ function App() {
         </div>
       </section>
 
-      {/* Recruit */}
-      <section id="recruit" className="px-6 py-20 md:py-24">
-        <div className="mx-auto max-w-5xl rounded-3xl border border-blue-400/30 bg-blue-500/10 p-8 text-center md:p-16">
-          <p className="mb-3 text-sm font-semibold tracking-[0.3em] text-blue-400">
-            RECRUIT
-          </p>
-          <h2 className="text-3xl font-bold md:text-4xl">
-            COM&apos;s와 함께할 부원을 모집합니다
-          </h2>
-          <p className="mx-auto mt-6 max-w-2xl leading-8 text-gray-300">
-            개발을 처음 시작하는 학생도 환영합니다. COM&apos;s는 실력보다 함께
-            배우려는 태도와 꾸준함을 중요하게 생각합니다.
-          </p>
+{/* Contact */}
+<footer id="contact" className="bg-linear-to-b from-[#dbe8f7] to-[#cbdced] px-6 py-8 text-[#151922] lg:px-16">
+  <div className="mx-auto max-w-7xl">
+    <div className="flex flex-col gap-4 border-b border-[#151922]/20 pb-5 md:flex-row md:items-center md:justify-between">
+      <p className="text-sm text-[#151922]/80">
+        Copyright © KW COM&apos;s All Rights Reserved.
+      </p>
 
-          <div className="mx-auto mt-10 grid max-w-3xl gap-4 text-left md:grid-cols-3">
-            <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
-              <h3 className="font-bold text-white">모집 대상</h3>
-              <p className="mt-3 text-sm leading-6 text-gray-400">
-                컴퓨터와 개발에 관심 있는 광운대학교 학생
-              </p>
-            </div>
+      <div className="flex flex-wrap items-center gap-4 text-sm font-semibold">
+        <a
+          href="https://www.instagram.com/kw_coms"
+          target="_blank"
+          rel="noreferrer"
+          className="transition hover:opacity-70"
+        >
+          Instagram
+        </a>
 
-            <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
-              <h3 className="font-bold text-white">활동 분야</h3>
-              <p className="mt-3 text-sm leading-6 text-gray-400">
-                프로그래밍, 웹 개발, 알고리즘, 프로젝트
-              </p>
-            </div>
+        <a
+          href="https://github.com/kw-coms"
+          target="_blank"
+          rel="noreferrer"
+          className="transition hover:opacity-70"
+        >
+          GitHub
+        </a>
 
-            <div className="rounded-2xl border border-white/10 bg-black/30 p-5">
-              <h3 className="font-bold text-white">지원 방법</h3>
-              <p className="mt-3 text-sm leading-6 text-gray-400">
-                추후 공지되는 모집 안내 및 지원 폼 확인
-              </p>
-            </div>
-          </div>
+        <a
+          href="https://www.youtube.com/@kw_coms"
+          target="_blank"
+          rel="noreferrer"
+          className="transition hover:opacity-70"
+        >
+          YouTube
+        </a>
+      </div>
+    </div>
 
-          <a
-            href="#contact"
-            className="mt-10 inline-block rounded-full bg-white px-8 py-3 font-semibold text-black transition hover:bg-gray-200"
-          >
-            문의하기
+    <div className="grid gap-8 pt-6 text-sm md:grid-cols-2">
+      <div>
+        <h3 className="text-lg font-bold">
+          Made with ♥ by KW COM&apos;s
+        </h3>
+
+        <p className="mt-3 text-[#151922]/80">2026 Ver.</p>
+        <p className="mt-1 text-[#151922]/80">
+          Created by COM&apos;s Website Team
+        </p>
+
+        <div className="mt-5 space-y-1 text-[#151922]/80">
+          <p>서울특별시 노원구 광운로 20, 광운대학교 복지관 403호</p>
+          <p>광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s</p>
+          <a>
+            kwcoms69@gmail.com
           </a>
         </div>
-      </section>
+      </div>
 
-      {/* Contact */}
-      <footer id="contact" className="border-t border-white/10 px-6 py-10">
-        <div className="mx-auto flex max-w-6xl flex-col justify-between gap-6 text-sm text-gray-400 md:flex-row md:items-center">
-          <div>
-            <p className="font-semibold text-white">KW COM&apos;s</p>
-            <p className="mt-2">
-              광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s
-            </p>
-            <p className="mt-2">© 2026 KW COM&apos;s. All rights reserved.</p>
-          </div>
-
-          <div className="flex gap-5">
-            <a
-              href="https://www.instagram.com/kw_coms"
-              target="_blank"
-              rel="noreferrer"
-              className="transition hover:text-white"
-            >
-              Instagram
-            </a>
-            <a href="#" className="transition hover:text-white">
-              GitHub
-            </a>
-            <a href="mailto:coms@example.com" className="transition hover:text-white">
-              Email
-            </a>
-          </div>
+      <div className="space-y-5 md:text-right">
+        <div>
+          <h4 className="font-bold">회장</h4>
+          <p className="mt-2 text-[#151922]/80">이름 010-0000-0000</p>
         </div>
-      </footer>
+
+        <div>
+          <h4 className="font-bold">부회장</h4>
+          <p className="mt-2 text-[#151922]/80">이름 010-0000-0000</p>
+          <p className="mt-1 text-[#151922]/80">이름 010-0000-0000</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
     </div>
   )
 }
 
 export default App
-
