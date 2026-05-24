@@ -1,7 +1,64 @@
 @import "tailwindcss";
 
+@font-face {
+	font-family: 'Orbitron';
+	src: url('./assets/fonts/orbitron/Orbitron-Regular.ttf') format('truetype');
+	font-weight: 400;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Orbitron';
+	src: url('./assets/fonts/orbitron/Orbitron-Medium.ttf') format('truetype');
+	font-weight: 500;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Orbitron';
+	src: url('./assets/fonts/orbitron/Orbitron-SemiBold.ttf') format('truetype');
+	font-weight: 600;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Orbitron';
+	src: url('./assets/fonts/orbitron/Orbitron-Bold.ttf') format('truetype');
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Orbitron';
+	src: url('./assets/fonts/orbitron/Orbitron-ExtraBold.ttf') format('truetype');
+	font-weight: 800;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'Orbitron';
+	src: url('./assets/fonts/orbitron/Orbitron-Black.ttf') format('truetype');
+	font-weight: 900;
+	font-style: normal;
+	font-display: swap;
+}
+
+@font-face {
+	font-family: 'LexendThin';
+	src: url('./assets/fonts/lexend/Lexend-Thin.ttf') format('truetype');
+	font-weight: 100;
+	font-style: normal;
+	font-display: swap;
+}
+
 :root {
 	color-scheme: dark;
+	font-family: 'LexendThin', 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 }
 
 html {
@@ -18,6 +75,8 @@ body {
 	overflow-x: hidden;
 	background: #222831;
 	color: #eeeeee;
+	font-family: inherit;
+	font-weight: 100;
 }
 
 #root {
