@@ -405,14 +405,13 @@ COM's는 광운대학교 중앙 컴퓨터 학술동아리입니다.
 - Instagram: @kw_coms
 - GitHub Organization: kw-coms
 - Frontend Repository: coms-website
-- 
+  
 ## License
 본 프로젝트는 COM's 동아리 웹사이트 제작 및 운영을 목적으로 제작되었습니다.
 무단 복제 및 상업적 사용을 금지합니다.
-``` README
-수정 후 올릴 때는 이렇게 하시면 됩니다.
 
-```bash
+## 수정 후 올릴 때는 이렇게 하시면 됩니다.
+```Bash
 git checkout main
 git pull origin main
 git checkout -b docs/update-readme
@@ -422,3 +421,4 @@ git checkout -b docs/update-readme
 git add README.md
 git commit -m "docs: README 프로젝트 현황 업데이트"
 git push -u origin docs/update-readme
+```
