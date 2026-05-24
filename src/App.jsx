@@ -1,622 +1,474 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  ArrowUpRight,
+  Binary,
+  CircuitBoard,
+  Github,
+  Instagram,
+  LogIn,
+  Mail,
+  MapPinned,
+  Rocket,
+  Sparkles,
+  Youtube,
+  X,
+} from 'lucide-react'
+import SplitLogoCard from './components/common/SplitLogoCard.jsx'
 import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
+import { getLogoAsset } from './utils/logoAssets.js'
+
+const tabs = [
+  { id: 'about', label: 'About', hint: '정체성', icon: Binary, accent: 'text-cyan-200' },
+  { id: 'activities', label: 'Activities', hint: '세미나·스터디', icon: Sparkles, accent: 'text-rose-200' },
+  { id: 'projects', label: 'Projects', hint: '실전 제작', icon: CircuitBoard, accent: 'text-violet-200' },
+  { id: 'recruit', label: 'Recruit', hint: '지원 안내', icon: Rocket, accent: 'text-emerald-200' },
+]
+
+const activities = [
+  '정기 세미나: 프로그래밍, 웹 개발, 알고리즘, 컴퓨터 기초 주제 진행',
+  '스터디: 신입 부원부터 기존 부원까지 참여 가능한 수준별 운영',
+  '프로젝트: 웹사이트, 앱, 아두이노, 소프트웨어 개발 팀 제작',
+  '교류 활동: 선후배 간 경험 공유와 진로·학습 정보 교환',
+]
+
+const projects = [
+  'COM\'s Official Website - React · Vite · Tailwind CSS 기반 공식 웹사이트',
+  'Arduino Basic Class - 초급자를 위한 아두이노 기초 교육 프로젝트',
+  'Web Development Study - HTML · CSS · JavaScript · React 학습 스터디',
+]
 
 function App() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState('home')
-  const [isContactOpen, setIsContactOpen] = useState(false)
+  const [expandedId, setExpandedId] = useState(null)
+  const [lastExpandedId, setLastExpandedId] = useState(null)
+  const closeTimerRef = useRef(null)
 
-  const btnClass = 'rounded-full bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 font-semibold transition'
+  useEffect(() => {
+    if (expandedId) {
+      setLastExpandedId(expandedId)
 
-  const activities = [
-    {
-      title: '정기 세미나',
-      desc: '프로그래밍, 웹 개발, 알고리즘, 컴퓨터 기초 등 다양한 주제로 정기 세미나를 진행합니다.',
-    },
-    {
-      title: '스터디',
-      desc: '신입 부원부터 기존 부원까지 함께 참여할 수 있는 수준별 스터디를 운영합니다.',
-    },
-    {
-      title: '프로젝트',
-      desc: '웹사이트, 앱, 아두이노, 소프트웨어 개발 등 팀 기반 프로젝트를 기획하고 제작합니다.',
-    },
-    {
-      title: '교류 활동',
-      desc: '선후배 간 개발 경험을 공유하고, 진로·학습·프로젝트 관련 정보를 함께 나눕니다.',
-    },
-  ]
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current)
+        closeTimerRef.current = null
+      }
+    }
+  }, [expandedId])
 
-  const projects = [
-    {
-      name: "COM's Official Website",
-      tech: 'React · Vite · Tailwind CSS',
-      desc: 'COM’s의 소개, 활동, 프로젝트, 모집 정보를 안내하기 위한 공식 웹사이트 제작 프로젝트입니다.',
-    },
-    {
-      name: 'Arduino Basic Class',
-      tech: 'Arduino · C/C++ · Circuit',
-      desc: '초급자를 위한 아두이노 기초 교육 자료와 실습 예제를 제작하는 교육 프로젝트입니다.',
-    },
-    {
-      name: 'Web Development Study',
-      tech: 'HTML · CSS · JavaScript · React',
-      desc: '웹 개발 기초부터 프론트엔드 프로젝트까지 학습하고 결과물을 정리하는 스터디입니다.',
-    },
-  ]
+  useEffect(() => {
+    if (expandedId) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
 
-  const closeMenu = () => {
-    setIsMenuOpen(false)
+      if (lastExpandedId) {
+        if (closeTimerRef.current) {
+          window.clearTimeout(closeTimerRef.current)
+        }
+
+        closeTimerRef.current = window.setTimeout(() => {
+          setLastExpandedId(null)
+          closeTimerRef.current = null
+        }, 280)
+      }
+    }
+
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [expandedId, lastExpandedId])
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current)
+      }
+    }
+  }, [])
+
+  const openPanel = (id) => {
+    if (expandedId === id) {
+      setExpandedId(null)
+      return
+    }
+
+    setCurrentPage('home')
+    setExpandedId(id)
+  }
+
+  const closePanel = () => {
+    setExpandedId(null)
   }
 
   const goHome = () => {
     setCurrentPage('home')
-    setIsMenuOpen(false)
+    setExpandedId(null)
+    setLastExpandedId(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const goRecruit = () => {
+  const goLogin = () => {
+    setCurrentPage('login')
+    setExpandedId(null)
+    setLastExpandedId(null)
+  }
+
+  const goSignup = () => {
+    setCurrentPage('signup')
+    setExpandedId(null)
+    setLastExpandedId(null)
+  }
+
+  const goRecruitPage = () => {
     setCurrentPage('recruit')
-    setIsMenuOpen(false)
+    setExpandedId(null)
+    setLastExpandedId(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const openContact = () => {
-    setIsContactOpen(true)
-    setIsMenuOpen(false)
+  const activePanelId = expandedId ?? lastExpandedId
+  const isPanelOpen = Boolean(expandedId)
+  const ActiveIcon = activePanelId ? tabs.find((item) => item.id === activePanelId)?.icon : null
+
+  const renderPanelContent = () => {
+    if (!activePanelId) {
+      return null
+    }
+
+    if (activePanelId === 'about') {
+      return (
+        <div className="space-y-6">
+          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-cyan-200">About Signal</p>
+          <h3 className="text-2xl font-semibold sm:text-3xl">COM&apos;s는 어떤 동아리인가요?</h3>
+          <p className="max-w-3xl leading-8 text-white/75">
+            COM&apos;s는 컴퓨터와 소프트웨어에 관심 있는 광운대학교 학생들이 모여 함께 공부하고 프로젝트를
+            진행하는 중앙 컴퓨터 학술동아리입니다.
+          </p>
+          <p className="max-w-3xl leading-8 text-white/65">
+            프로그래밍 기초부터 웹 개발, 알고리즘, 아두이노, 프로젝트 협업까지 다양한 활동을 통해 실력을 키우고
+            서로의 성장을 돕습니다.
+          </p>
+          <p className="max-w-3xl leading-8 text-white/65">
+            개발을 처음 시작하는 학생도 부담 없이 참여할 수 있으며, 함께 배우고 직접 만들어보는 경험을 중요하게
+            생각합니다.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={goRecruitPage} className="shape-cut-sm bg-[#EEEEEE] px-4 py-2 text-sm font-semibold text-[#222831] transition hover:scale-[1.02]">
+              지원 화면으로 이동
+            </button>
+            <button type="button" onClick={goLogin} className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/20">
+              로그인
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    if (activePanelId === 'activities') {
+      return (
+        <div className="space-y-6">
+          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-rose-200">Activities Signal</p>
+          <h3 className="text-2xl font-semibold sm:text-3xl">주요 활동</h3>
+          <div className="space-y-4">
+            {activities.map((item) => (
+              <div key={item} className="border-b border-white/10 pb-4 text-white/70 last:border-b-0 last:pb-0">
+                {item}
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={goRecruitPage} className="shape-cut-sm bg-[#EEEEEE] px-4 py-2 text-sm font-semibold text-[#222831] transition hover:scale-[1.02]">
+              지원하기
+            </button>
+            <button type="button" onClick={goLogin} className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/20">
+              로그인
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    if (activePanelId === 'projects') {
+      return (
+        <div className="space-y-6">
+          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-violet-200">Projects Signal</p>
+          <h3 className="text-2xl font-semibold sm:text-3xl">프로젝트</h3>
+          <div className="space-y-4">
+            {projects.map((item) => (
+              <div key={item} className="border-b border-white/10 pb-4 text-white/70 last:border-b-0 last:pb-0">
+                {item}
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <button type="button" onClick={goRecruitPage} className="shape-cut-sm bg-[#EEEEEE] px-4 py-2 text-sm font-semibold text-[#222831] transition hover:scale-[1.02]">
+              모집 안내 보기
+            </button>
+            <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/20">
+              GitHub 확인
+            </a>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-6">
+        <p className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Recruit Signal</p>
+        <h3 className="text-2xl font-semibold sm:text-3xl">COM&apos;s 지원하기</h3>
+        <p className="max-w-3xl leading-8 text-white/70">
+          광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장할 부원을 모집합니다. 개발을
+          처음 시작하는 학생도 부담 없이 지원할 수 있습니다.
+        </p>
+        <div className="space-y-3 text-sm leading-7 text-white/70">
+          <div>1. 지원 폼 작성</div>
+          <div>2. 내부 확인 후 개별 연락</div>
+          <div>3. 오리엔테이션 및 정기 활동 참여</div>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <button type="button" onClick={goRecruitPage} className="shape-cut-sm bg-[#EEEEEE] px-4 py-2 text-sm font-semibold text-[#222831] transition hover:scale-[1.02]">
+            지원 페이지 열기
+          </button>
+          <button type="button" onClick={goLogin} className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/20">
+            로그인
+          </button>
+        </div>
+      </div>
+    )
   }
 
-  const goSection = (sectionId) => {
-    setCurrentPage('home')
-    setIsMenuOpen(false)
+  if (currentPage === 'login') {
+    return (
+      <PageShell>
+        <button type="button" onClick={goHome} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/15">
+          메인으로 돌아가기
+        </button>
+        <Login onBack={goHome} goSignup={goSignup} />
+      </PageShell>
+    )
+  }
 
-    setTimeout(() => {
-      const section = document.getElementById(sectionId)
-      if (section) {
-        section.scrollIntoView({ behavior: 'smooth' })
-      }
-    }, 0)
+  if (currentPage === 'signup') {
+    return (
+      <PageShell>
+        <button type="button" onClick={() => setCurrentPage('login')} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/15">
+          로그인으로 돌아가기
+        </button>
+        <Signup onBack={() => setCurrentPage('login')} />
+      </PageShell>
+    )
+  }
+
+  if (currentPage === 'recruit') {
+    return (
+      <div className="relative min-h-screen overflow-hidden bg-[#222831] text-[#EEEEEE]">
+        <BackgroundLayers />
+        <div className="relative mx-auto flex min-h-screen max-w-4xl items-center px-4 py-28 sm:px-6">
+          <div className="w-full">
+            <button type="button" onClick={goHome} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/15">
+              메인으로 돌아가기
+            </button>
+            <section className="shape-cut border border-white/10 bg-white/5 p-6 backdrop-blur-md sm:p-8">
+              <p className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Recruit</p>
+              <h1 className="mt-4 text-4xl font-semibold sm:text-5xl">COM&apos;s 지원하기</h1>
+              <p className="mt-6 max-w-3xl leading-8 text-white/70">
+                광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장할 부원을 모집합니다.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <button type="button" onClick={goLogin} className="shape-cut-sm bg-[#EEEEEE] px-4 py-2 text-sm font-semibold text-[#222831] transition hover:scale-[1.02]">
+                  로그인
+                </button>
+                <button type="button" onClick={() => setCurrentPage('home')} className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/20">
+                  홈으로
+                </button>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <header className="fixed top-0 left-0 z-50 w-full border-b border-white/10 bg-black/70 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2 sm:px-6">
-          <button type="button" className="flex min-w-0 items-center gap-2 sm:gap-3" onClick={goHome}>
-            <img
-              src="/coms-logo.png"
-              alt="KW COM's Logo"
-              className="h-11 w-11 flex-shrink-0 object-contain sm:h-14 sm:w-14"
-            />
-            <span className="hidden truncate text-lg font-bold tracking-widest sm:block sm:text-xl">
-              KW COM&apos;s
-            </span>
-          </button>
+    <div className="relative min-h-screen overflow-hidden bg-[#222831] text-[#EEEEEE] selection:bg-[#FFD369]/35 selection:text-[#EEEEEE]">
+      <BackgroundLayers />
 
-          {/* PC Menu */}
-          <nav className="hidden gap-8 text-sm text-gray-300 md:flex">
-            <button
-              type="button"
-              onClick={() => goSection('about')}
-              className="transition hover:text-white"
-            >
-              About
-            </button>
-
-            <button
-              type="button"
-              onClick={() => goSection('activities')}
-              className="transition hover:text-white"
-            >
-              Activities
-            </button>
-
-            <button
-              type="button"
-              onClick={() => goSection('projects')}
-              className="transition hover:text-white"
-            >
-              Projects
-            </button>
-
-            <button
-              type="button"
-              onClick={goRecruit}
-              className="transition hover:text-white"
-            >
-              Recruit
-            </button>
-
-            <button
-              type="button"
-              onClick={openContact}
-              className="transition hover:text-white"
-            >
-              Contact
-            </button>
-          </nav>
-
-          {/* Login / Auth buttons (desktop) */}
-          <div className="hidden items-center gap-3 md:flex">
-            <button
-              type="button"
-              onClick={() => setCurrentPage('login')}
-              className={btnClass}
-            >
-              login
-            </button>
-          </div>
-
-          {/* Mobile Button */}
-          <button
-            type="button"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="rounded-full border border-white/10 px-3 py-2 text-sm text-gray-300 transition hover:bg-white/10 hover:text-white md:hidden"
-          >
-            {isMenuOpen ? 'Close' : 'Menu'}
-          </button>
-        </div>
-
-        {/* Mobile Menu */}
-        {isMenuOpen && (
-          <nav className="border-t border-white/10 bg-black px-4 py-4 md:hidden">
-            <div className="mx-2 flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/5 p-4 text-sm text-gray-300 sm:mx-0">
-              <button
-                type="button"
-                onClick={() => goSection('about')}
-                className="rounded-full px-3 py-2 text-left transition hover:bg-white/10 hover:text-white"
-              >
-                About
-              </button>
-
-              <button
-                type="button"
-                onClick={() => goSection('activities')}
-                className="rounded-full px-3 py-2 text-left transition hover:bg-white/10 hover:text-white"
-              >
-                Activities
-              </button>
-
-              <button
-                type="button"
-                onClick={() => goSection('projects')}
-                className="rounded-full px-3 py-2 text-left transition hover:bg-white/10 hover:text-white"
-              >
-                Projects
-              </button>
-
-              <button
-                type="button"
-                onClick={goRecruit}
-                className="rounded-full px-3 py-2 text-left transition hover:bg-white/10 hover:text-white"
-              >
-                Recruit
-              </button>
-
-              <button
-                type="button"
-                onClick={openContact}
-                className="rounded-full px-3 py-2 text-left transition hover:bg-white/10 hover:text-white"
-              >
-                Contact
-              </button>
-
-              <button
-                type="button"
-                onClick={() => { setCurrentPage('login'); setIsMenuOpen(false) }}
-                className="rounded-full px-3 py-2 text-left transition hover:bg-white/10 hover:text-white"
-              >
-                로그인
-              </button>
+      <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 shape-cut border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-md sm:px-5">
+          <button type="button" onClick={goHome} className="flex items-center gap-3 text-left">
+            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="logo-emboss h-11 w-11 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.45em] text-cyan-200">KWANGWOON UNIVERSITY</p>
+              <h1 className="mt-1 text-sm font-semibold sm:text-base">KW COM&apos;s</h1>
             </div>
+          </button>
+
+          <nav className="hidden items-center gap-2 md:flex">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => openPanel(tab.id)}
+                className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-[#EEEEEE] hover:text-[#222831]"
+              >
+                {tab.label}
+              </button>
+            ))}
+            <button type="button" onClick={goLogin} className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-[#EEEEEE] hover:text-[#222831]">
+              Login
+            </button>
           </nav>
-        )}
+        </div>
       </header>
 
-      {/* Login Page */}
-      {currentPage === 'login' && (
-        <main className="min-h-screen bg-black px-4 pt-24 pb-16 text-white sm:px-6 sm:pt-36 sm:pb-24">
-          <div className="mx-auto w-full max-w-md">
-            <button
-              type="button"
-              onClick={goHome}
-              className="mb-6 text-sm text-blue-400 transition hover:text-blue-300 sm:mb-8"
-            >
-              ← 메인으로 돌아가기
-            </button>
-
-            <Login
-              onBack={goHome}
-              goSignup={() => setCurrentPage('signup')}
-            />
+      <aside className="fixed right-4 top-1/2 z-40 hidden -translate-y-1/2 md:block">
+        <div className="shape-cut border border-white/10 bg-white/5 p-2 backdrop-blur-md">
+          <div className="flex flex-col gap-2">
+            <SocialLink href="https://www.instagram.com/kw_coms" label="Instagram" icon={Instagram} />
+            <SocialLink href="https://github.com/kw-coms" label="GitHub" icon={Github} />
+            <SocialLink href="https://www.youtube.com/@kw_coms" label="YouTube" icon={Youtube} />
+            <SocialLink href="mailto:kwcoms69@gmail.com" label="Mail" icon={Mail} />
           </div>
-        </main>
-      )}
+        </div>
+      </aside>
 
-      {/* Signup Page (placeholder) */}
-      {currentPage === 'signup' && (
-        <main className="min-h-screen bg-black px-4 pt-24 pb-16 text-white sm:px-6 sm:pt-36 sm:pb-24">
-          <div className="mx-auto w-full max-w-md">
-            <button
-              type="button"
-              onClick={() => setCurrentPage('login')}
-              className="mb-6 text-sm text-blue-400 transition hover:text-blue-300 sm:mb-8"
-            >
-              ← 로그인으로 돌아가기
-            </button>
+      <main className="relative mx-auto flex min-h-[100svh] max-w-7xl items-center px-4 py-20 sm:px-6 lg:px-8">
+        <section className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center text-center">
+          <div className={`relative w-full transition-all duration-300 ${isPanelOpen ? 'opacity-10 blur-sm scale-95' : 'opacity-100'}`}>
+            <div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300/15 blur-[100px] mix-blend-screen" />
+            <div className="absolute left-1/2 top-1/2 h-80 w-80 -translate-x-[52%] -translate-y-[48%] rounded-full bg-rose-300/10 blur-[110px] mix-blend-screen" />
+            <div className="absolute left-1/2 top-1/2 h-96 w-96 -translate-x-[48%] -translate-y-[52%] rounded-full bg-violet-300/10 blur-[120px] mix-blend-screen" />
 
-            <Signup onBack={() => setCurrentPage('login')} />
-          </div>
-        </main>
-      )}
-
-      {/* Recruit Page */}
-      {currentPage === 'recruit' && (
-        <main className="min-h-screen bg-black px-4 pt-24 pb-16 text-white sm:px-6 sm:pt-36 sm:pb-24">
-          <div className="mx-auto max-w-5xl">
-            <button
-              type="button"
-              onClick={goHome}
-              className="mb-6 text-sm text-blue-400 transition hover:text-blue-300 sm:mb-8"
-            >
-              ← 메인으로 돌아가기
-            </button>
-
-            <section className="rounded-3xl border border-white/10 bg-white/5 p-8 md:p-14">
-              <p className="mb-3 text-sm font-semibold tracking-[0.3em] text-blue-400">
-                RECRUIT
-              </p>
-
-              <h1 className="text-4xl font-bold md:text-5xl">
-                COM&apos;s 지원하기
-              </h1>
-
-              <p className="mt-6 max-w-3xl leading-8 text-gray-300">
-                광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고,
-                만들고, 성장할 부원을 모집합니다. 개발을 처음 시작하는 학생도
-                부담 없이 지원할 수 있습니다.
-              </p>
-
-              <div className="mt-10 grid gap-5 md:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-black/40 p-6">
-                  <h3 className="font-bold">지원 대상</h3>
-                  <p className="mt-3 text-sm leading-6 text-gray-400">
-                    컴퓨터와 개발에 관심 있는 광운대학교 학생
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-black/40 p-6">
-                  <h3 className="font-bold">활동 분야</h3>
-                  <p className="mt-3 text-sm leading-6 text-gray-400">
-                    웹 개발, 알고리즘, 아두이노, 프로젝트, 세미나
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-black/40 p-6">
-                  <h3 className="font-bold">지원 조건</h3>
-                  <p className="mt-3 text-sm leading-6 text-gray-400">
-                    꾸준히 활동할 의지가 있고 함께 성장하고 싶은 학생
-                  </p>
-                </div>
+            <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center justify-center py-6 sm:py-8">
+              <SplitLogoCard />
+              <div className="mt-8 space-y-4">
+                <p className="mx-auto max-w-2xl leading-8 text-white/70 sm:text-lg">
+                  광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장하는 개발 커뮤니티입니다.
+                </p>
               </div>
 
-              <div className="mt-10 rounded-2xl border border-blue-400/30 bg-blue-500/10 p-6">
-                <h2 className="text-xl font-bold">지원 절차</h2>
-                <ul className="mt-4 space-y-2 text-sm leading-7 text-gray-300">
-                  <li>1. 지원 폼 작성</li>
-                  <li>2. 내부 확인 후 개별 연락</li>
-                  <li>3. 오리엔테이션 및 정기 활동 참여</li>
-                </ul>
-              </div>
-
-              <div className="mt-10 rounded-2xl border border-white/10 bg-black/30 p-6">
-                <h2 className="text-xl font-bold">지원 전 확인사항</h2>
-                <ul className="mt-4 space-y-2 text-sm leading-7 text-gray-300">
-                  <li>• 프로그래밍 경험이 없어도 지원 가능합니다.</li>
-                  <li>• 정기 세미나와 스터디에 성실히 참여할 수 있어야 합니다.</li>
-                  <li>• 팀 프로젝트와 동아리 활동에 적극적으로 참여하는 것을 권장합니다.</li>
-                </ul>
-              </div>
-
-              <a
-                href="#"
-                className="mt-10 inline-block rounded-full bg-blue-500 px-8 py-3 font-semibold text-white transition hover:bg-blue-400"
-              >
-                지원 폼 준비 중
-              </a>
-            </section>
-          </div>
-        </main>
-      )}
-
-      {/* Home Page */}
-      {currentPage === 'home' && (
-        <>
-          {/* Hero */}
-          <section className="flex min-h-screen items-center justify-center px-6 pt-20">
-            <div className="mx-auto max-w-5xl text-center">
-              <p className="mb-5 text-xs font-semibold tracking-[0.35em] text-blue-400 sm:text-sm">
-                KWANGWOON UNIVERSITY
-              </p>
-
-              <h2 className="text-5xl font-extrabold tracking-tight sm:text-6xl md:text-7xl">
-                KW COM&apos;s
-              </h2>
-
-              <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-gray-300 sm:text-lg md:text-xl">
-                광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고,
-                만들고, 성장하는 개발 커뮤니티입니다.
-              </p>
-
-              <div className="mt-10 flex flex-col justify-center gap-4 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => goSection('about')}
-                  className="rounded-full bg-blue-500 px-8 py-3 font-semibold text-white transition hover:bg-blue-400"
-                >
-                  동아리 소개 보기
+              <div className="mt-7 flex flex-wrap justify-center gap-3">
+                <button type="button" onClick={() => openPanel('about')} className="shape-cut-sm bg-[#EEEEEE] px-5 py-3 text-sm font-semibold text-[#222831] transition hover:translate-y-[-1px]">
+                  소개 보기
                 </button>
-
-                <button
-                  type="button"
-                  onClick={goRecruit}
-                  className="rounded-full border border-white/20 px-8 py-3 font-semibold text-white transition hover:bg-white hover:text-black"
-                >
+                <button type="button" onClick={goRecruitPage} className="shape-cut-sm border border-white/10 bg-white/10 px-5 py-3 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/20">
                   지원하기
                 </button>
+                <button type="button" onClick={goLogin} className="shape-cut-sm border border-white/10 bg-white/10 px-5 py-3 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/20">
+                  로그인
+                </button>
               </div>
             </div>
-          </section>
+          </div>
+        </section>
+      </main>
 
-          {/* About */}
-          <section id="about" className="border-t border-white/10 px-6 py-20 md:py-24">
-            <div className="mx-auto grid max-w-6xl gap-12 md:grid-cols-2">
-              <div>
-                <p className="mb-3 text-sm font-semibold tracking-[0.3em] text-blue-400">
-                  ABOUT
-                </p>
-                <h2 className="text-3xl font-bold md:text-4xl">
-                  COM&apos;s는 어떤 동아리인가요?
-                </h2>
-              </div>
+      <nav className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-5xl shape-cut border border-white/10 bg-white/5 backdrop-blur-md">
+        <div className="grid grid-cols-2 divide-x divide-y divide-white/10 md:grid-cols-4 md:divide-y-0">
+          {tabs.map((tab) => {
+            const Icon = tab.icon
+            const active = expandedId === tab.id
 
-              <div className="text-base leading-8 text-gray-300 md:text-lg">
-                <p>
-                  COM&apos;s는 컴퓨터와 소프트웨어에 관심 있는 광운대학교 학생들이
-                  모여 함께 공부하고 프로젝트를 진행하는 중앙 컴퓨터
-                  학술동아리입니다.
-                </p>
-                <p className="mt-5">
-                  프로그래밍 기초부터 웹 개발, 알고리즘, 아두이노, 프로젝트 협업까지
-                  다양한 활동을 통해 실력을 키우고 서로의 성장을 돕습니다.
-                </p>
-                <p className="mt-5">
-                  개발을 처음 시작하는 학생도 부담 없이 참여할 수 있으며, 함께
-                  배우고 직접 만들어보는 경험을 중요하게 생각합니다.
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* Activities */}
-          <section id="activities" className="px-6 py-20 md:py-24">
-            <div className="mx-auto max-w-6xl">
-              <p className="mb-3 text-sm font-semibold tracking-[0.3em] text-blue-400">
-                ACTIVITIES
-              </p>
-              <h2 className="text-3xl font-bold md:text-4xl">주요 활동</h2>
-              <p className="mt-5 max-w-2xl leading-8 text-gray-400">
-                COM&apos;s는 세미나, 스터디, 프로젝트, 교류 활동을 중심으로
-                부원들이 지속적으로 성장할 수 있는 활동을 운영합니다.
-              </p>
-
-              <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                {activities.map((item) => (
-                  <div
-                    key={item.title}
-                    className="rounded-2xl border border-white/10 bg-white/3 p-6 transition hover:-translate-y-1 hover:bg-white/6"
-                  >
-                    <h3 className="text-xl font-bold text-white">{item.title}</h3>
-                    <p className="mt-4 leading-7 text-gray-400">{item.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Projects */}
-          <section id="projects" className="border-t border-white/10 px-6 py-20 md:py-24">
-            <div className="mx-auto max-w-6xl">
-              <p className="mb-3 text-sm font-semibold tracking-[0.3em] text-blue-400">
-                PROJECTS
-              </p>
-              <h2 className="text-3xl font-bold md:text-4xl">프로젝트</h2>
-              <p className="mt-5 max-w-2xl leading-8 text-gray-400">
-                COM&apos;s는 단순한 학습을 넘어 실제 결과물을 만드는 프로젝트
-                활동을 통해 실전 개발 경험을 쌓습니다.
-              </p>
-
-              <div className="mt-12 grid gap-6 md:grid-cols-3">
-                {projects.map((project) => (
-                  <div
-                    key={project.name}
-                    className="rounded-2xl border border-white/10 bg-linear-to-b from-white/8 to-white/2 p-6 transition hover:-translate-y-1"
-                  >
-                    <h3 className="text-xl font-bold">{project.name}</h3>
-                    <p className="mt-2 text-sm font-semibold text-blue-400">
-                      {project.tech}
-                    </p>
-                    <p className="mt-5 leading-7 text-gray-400">{project.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Recruit Preview */}
-          <section id="recruit" className="px-6 py-20 md:py-24">
-            <div className="mx-auto max-w-5xl rounded-3xl border border-blue-400/30 bg-blue-500/10 p-8 text-center md:p-16">
-              <p className="mb-3 text-sm font-semibold tracking-[0.3em] text-blue-400">
-                RECRUIT
-              </p>
-
-              <h2 className="text-3xl font-bold md:text-4xl">
-                COM&apos;s와 함께할 부원을 모집합니다
-              </h2>
-
-              <p className="mx-auto mt-6 max-w-2xl leading-8 text-gray-300">
-                개발을 처음 시작하는 학생도 환영합니다. COM&apos;s는 실력보다 함께
-                배우려는 태도와 꾸준함을 중요하게 생각합니다.
-              </p>
-
+            return (
               <button
+                key={tab.id}
                 type="button"
-                onClick={goRecruit}
-                className="mt-10 inline-block rounded-full bg-white px-8 py-3 font-semibold text-black transition hover:bg-gray-200"
+                onClick={() => openPanel(tab.id)}
+                className={`flex min-h-24 flex-col items-start justify-between p-4 text-left transition md:min-h-28 ${active ? 'bg-[#EEEEEE] text-[#222831]' : 'bg-white/10 text-[#EEEEEE] hover:bg-white/15'}`}
               >
-                지원 화면으로 이동
-              </button>
-            </div>
-          </section>
-
-          {/* Contact Footer */}
-          <footer id="contact" className="bg-linear-to-b from-[#dbe8f7] to-[#cbdced] px-6 py-8 text-[#151922] lg:px-16">
-            <div className="mx-auto max-w-7xl">
-              <div className="flex flex-col gap-4 border-b border-[#151922]/20 pb-5 md:flex-row md:items-center md:justify-between">
-                <p className="text-sm text-[#151922]/80">
-                  Copyright © KW COM&apos;s All Rights Reserved.
-                </p>
-
-                <div className="flex flex-wrap items-center gap-4 text-sm font-semibold">
-                  <a
-                    href="https://www.instagram.com/kw_coms"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="transition hover:text-[#4f6f9f]"
-                  >
-                    Instagram
-                  </a>
-
-                  <a
-                    href="https://github.com/kw-coms"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="transition hover:text-[#4f6f9f]"
-                  >
-                    GitHub
-                  </a>
-
-                  <a
-                    href="https://www.youtube.com/@kw_coms"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="transition hover:text-[#4f6f9f]"
-                  >
-                    YouTube
-                  </a>
+                <div className="flex w-full items-start justify-between gap-3">
+                  <div className={`shape-cut-sm border p-2 ${active ? 'border-[#222831]/15 bg-[#222831]/5' : 'border-white/10 bg-white/10'}`}>
+                    <Icon size={18} />
+                  </div>
+                  <ArrowUpRight size={16} className={active ? 'text-[#222831]/50' : 'text-white/45'} />
                 </div>
-              </div>
-
-              <div className="grid gap-8 pt-6 text-sm md:grid-cols-2">
                 <div>
-                  <h3 className="text-lg font-bold">
-                    Made with ♥ by KW COM&apos;s
-                  </h3>
-
-                  <p className="mt-3 text-[#151922]/80">2026 Ver.</p>
-                  <p className="mt-1 text-[#151922]/80">
-                    Created by COM&apos;s Website Team
-                  </p>
-
-                  <div className="mt-5 space-y-1 text-[#151922]/80">
-                    <p>광운대학교 복지관 403호</p>
-                    <p>광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s</p>
-                    <a
-                      href="mailto:kwcoms69@gmail.com"
-                      className="inline-block transition hover:text-[#4f6f9f]"
-                    >
-                      kwcoms69@gmail.com
-                    </a>
-                  </div>
+                  <p className={`text-xs font-semibold uppercase tracking-[0.3em] ${active ? 'text-[#222831]/60' : tab.accent}`}>{tab.hint}</p>
+                  <h3 className="mt-2 text-lg font-semibold">{tab.label}</h3>
                 </div>
-
-                <div className="space-y-5 md:text-right">
-                  <div>
-                    <h4 className="font-bold">회장</h4>
-                    <p className="mt-2 text-[#151922]/80">김주찬 010-3436-4630</p>
-                  </div>
-
-                  <div>
-                    <h4 className="font-bold">부회장</h4>
-                    <p className="mt-2 text-[#151922]/80">김찬진 010-0000-0000</p>
-                    <p className="mt-1 text-[#151922]/80">김근형 010-0000-0000</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </footer>
-        </>
-      )}
-
-      {/* Contact Modal */}
-      {isContactOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
-          <div className="w-full max-w-lg rounded-3xl bg-[#dbe8f7] p-8 text-[#151922] shadow-2xl">
-            <div className="flex items-start justify-between gap-6">
-              <div>
-                <p className="text-sm font-semibold tracking-[0.25em] text-[#4f6f9f]">
-                  CONTACT
-                </p>
-                <h2 className="mt-3 text-2xl font-bold">COM&apos;s 문의하기</h2>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsContactOpen(false)}
-                className="rounded-full px-3 py-1 text-xl font-bold transition hover:bg-black/10"
-              >
-                ×
               </button>
-            </div>
+            )
+          })}
+        </div>
+      </nav>
 
-            <div className="mt-8 space-y-5 text-sm leading-7">
-              <div>
-                <h3 className="font-bold">위치</h3>
-                <p className="mt-1 text-[#151922]/80">
-                  광운대학교 복지관 403호
-                </p>
-              </div>
+      {activePanelId && (
+        <div
+          className={`fixed inset-0 z-40 flex items-center justify-center bg-black/55 px-4 pt-20 backdrop-blur-sm transition-opacity duration-300 ${isPanelOpen ? 'opacity-100' : 'opacity-0'}`}
+          onClick={closePanel}
+          role="presentation"
+        >
+          <div
+            className={`shape-cut relative w-full max-w-4xl border border-white/10 bg-white/10 p-4 backdrop-blur-md transition-all duration-300 sm:p-5 ${isPanelOpen ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}
+            onClick={(event) => event.stopPropagation()}
+            role="presentation"
+          >
+            <div className="shape-cut border border-white/10 bg-[#222831]/92 p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="shape-cut-sm border border-white/10 bg-white/10 p-3 text-[#EEEEEE]">
+                    {ActiveIcon ? <ActiveIcon size={20} /> : null}
+                  </div>
+                  <div>
+                    <p className={`text-xs font-semibold uppercase tracking-[0.35em] ${tabs.find((item) => item.id === activePanelId)?.accent ?? 'text-cyan-200'}`}>{activePanelId.toUpperCase()}</p>
+                    <h2 className="mt-2 text-2xl font-semibold sm:text-3xl">{activePanelId === 'about' ? 'ABOUT' : activePanelId === 'activities' ? 'ACTIVITIES' : activePanelId === 'projects' ? 'PROJECTS' : 'RECRUIT'}</h2>
+                  </div>
+                </div>
 
-              <div>
-                <h3 className="font-bold">이메일</h3>
-                <a
-                  href="mailto:kwcoms69@gmail.com"
-                  className="mt-1 inline-block text-[#4f6f9f] hover:underline"
+                <button
+                  type="button"
+                  onClick={closePanel}
+                  className="shape-cut-sm border border-white/10 bg-white/10 p-3 text-[#EEEEEE] transition hover:bg-[#EEEEEE] hover:text-[#222831]"
+                  aria-label="Close panel"
                 >
-                  kwcoms69@gmail.com
-                </a>
+                  <X size={18} />
+                </button>
               </div>
 
-              <div>
-                <h3 className="font-bold">문의 가능 내용</h3>
-                <p className="mt-1 text-[#151922]/80">
-                  동아리 가입, 세미나, 프로젝트, 스터디, 협업 문의
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-bold">운영 안내</h3>
-                <p className="mt-1 text-[#151922]/80">
-                  문의 사항은 이메일 또는 COM&apos;s 공식 SNS를 통해 남겨주세요.
-                </p>
-              </div>
+              <div className="mt-6">{renderPanelContent()}</div>
             </div>
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+function PageShell({ children }) {
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-[#222831] text-[#EEEEEE]">
+      <BackgroundLayers />
+      <main className="relative mx-auto flex min-h-screen max-w-4xl items-center px-4 py-28 sm:px-6">{children}</main>
+    </div>
+  )
+}
+
+function BackgroundLayers() {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="tech-grid absolute inset-0 opacity-100" />
+      <div className="absolute left-[14%] top-[16%] h-72 w-72 rounded-full bg-cyan-300/20 blur-[100px] mix-blend-screen animate-blob" style={{ animationDelay: '0s' }} />
+      <div className="absolute right-[10%] top-[28%] h-80 w-80 rounded-full bg-rose-300/15 blur-[100px] mix-blend-screen animate-blob" style={{ animationDelay: '2.8s' }} />
+      <div className="absolute bottom-[10%] left-[42%] h-96 w-96 rounded-full bg-[#b26dff]/15 blur-[120px] mix-blend-screen animate-blob" style={{ animationDelay: '5.4s' }} />
+      <div className="absolute left-0 top-[24%] h-px w-full bg-linear-to-r from-transparent via-white/15 to-transparent" />
+      <div className="absolute left-[8%] top-0 h-full w-px bg-linear-to-b from-transparent via-cyan-200/15 to-transparent" />
+      <div className="absolute left-0 top-[68%] h-px w-full bg-linear-to-r from-transparent via-white/10 to-transparent" />
+    </div>
+  )
+}
+
+function SocialLink({ href, label, icon: Icon }) {
+  return (
+    <a
+      href={href}
+      target={href.startsWith('mailto:') ? undefined : '_blank'}
+      rel={href.startsWith('mailto:') ? undefined : 'noreferrer'}
+      className="shape-cut-sm flex items-center gap-2 border border-white/10 bg-white/10 px-3 py-2 text-sm text-[#EEEEEE] transition hover:bg-[#EEEEEE] hover:text-[#222831]"
+      aria-label={label}
+    >
+      <Icon size={16} />
+      <span className="hidden xl:inline">{label}</span>
+    </a>
   )
 }
 

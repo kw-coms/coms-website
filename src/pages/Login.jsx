@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getLogoAsset } from '../utils/logoAssets.js'
 
 export default function Login({ onBack, goSignup }) {
   const [identifier, setIdentifier] = useState('')
@@ -35,7 +36,7 @@ export default function Login({ onBack, goSignup }) {
   return (
     <section className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-lg shadow-black/20 sm:p-8">
       <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left">
-        <img src="/coms-logo.png" alt="KW COM's" className="h-10 w-10 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
+        <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="h-10 w-10 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
         <div className="min-w-0">
           <h2 className="text-lg font-bold leading-snug sm:text-xl">KW COM's 로그인</h2>
           <p className="text-sm leading-5 text-gray-300">동아리 계정으로 로그인하세요.</p>
