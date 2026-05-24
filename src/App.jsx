@@ -37,10 +37,13 @@ const projects = [
   'Web Development Study - HTML · CSS · JavaScript · React 학습 스터디',
 ]
 
+const floatingBarBaseClass = 'shape-cut border border-white/70 bg-white/96 shadow-[0_22px_70px_rgba(255,255,255,0.24)] backdrop-blur-3xl supports-[backdrop-filter]:bg-white/94'
+
 function App() {
   const [currentPage, setCurrentPage] = useState('home')
   const [expandedId, setExpandedId] = useState(null)
   const [lastExpandedId, setLastExpandedId] = useState(null)
+  const [cursorDot, setCursorDot] = useState({ x: 0, y: 0, visible: false })
   const closeTimerRef = useRef(null)
 
   useEffect(() => {
@@ -82,6 +85,30 @@ function App() {
       if (closeTimerRef.current) {
         window.clearTimeout(closeTimerRef.current)
       }
+    }
+  }, [])
+
+  useEffect(() => {
+    const handlePointerMove = (event) => {
+      if (event.pointerType === 'touch') {
+        return
+      }
+
+      setCursorDot({ x: event.clientX, y: event.clientY, visible: true })
+    }
+
+    const hideCursorDot = () => {
+      setCursorDot((prev) => ({ ...prev, visible: false }))
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    document.addEventListener('pointerleave', hideCursorDot)
+    window.addEventListener('blur', hideCursorDot)
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      document.removeEventListener('pointerleave', hideCursorDot)
+      window.removeEventListener('blur', hideCursorDot)
     }
   }, [])
 
@@ -289,11 +316,20 @@ function App() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#222831] text-[#EEEEEE] selection:bg-[#FFD369]/35 selection:text-[#EEEEEE]">
+    <div className="cursor-dot-mode relative min-h-screen overflow-hidden bg-[#222831] text-[#EEEEEE] selection:bg-[#FFD369]/35 selection:text-[#EEEEEE]">
+      <div
+        className={`pointer-events-none fixed z-[120] hidden h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center mix-blend-difference transition-opacity duration-150 md:flex ${cursorDot.visible ? 'opacity-95' : 'opacity-0'}`}
+        style={{ left: cursorDot.x, top: cursorDot.y }}
+        aria-hidden="true"
+      >
+        <span className="absolute inset-0 rounded-full border border-white/90" />
+        <span className="h-3 w-3 rounded-full bg-white" />
+      </div>
+
       <BackgroundLayers />
 
       <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
-        <div className="shape-cut mx-auto flex max-w-7xl items-center justify-between gap-4 border border-white/45 bg-white/75 px-4 py-3 shadow-[0_18px_60px_rgba(255,255,255,0.18)] backdrop-blur-2xl supports-[backdrop-filter]:bg-white/72 sm:px-5">
+        <div className={`${floatingBarBaseClass} relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-5`}>
           <button type="button" onClick={goHome} className="flex items-center gap-3 text-left">
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="logo-emboss h-11 w-11 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
             <div>
@@ -302,67 +338,55 @@ function App() {
             </div>
           </button>
 
-          <nav className="hidden items-center gap-2 md:flex">
+          <nav className="pointer-events-auto absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-6 md:flex">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => openPanel(tab.id)}
-                className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[#1f2329] transition hover:bg-white/78"
+                className="px-1 text-sm font-semibold text-[#1f2329]/85 transition hover:text-[#1f2329]"
               >
                 {tab.label}
               </button>
             ))}
-            <button type="button" onClick={goLogin} className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[#1f2329] transition hover:bg-white/78">
-              Login
-            </button>
           </nav>
+
+          <button type="button" onClick={goLogin} className="shape-cut-sm ml-auto hidden border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[#1f2329] transition hover:bg-white/78 md:inline-flex">
+            Login
+          </button>
         </div>
       </header>
 
-      <aside className="fixed right-4 top-1/2 z-40 hidden -translate-y-1/2 md:block">
-        <div className="shape-cut border border-white/30 bg-white/38 p-2 shadow-[0_10px_30px_rgba(255,255,255,0.08)] backdrop-blur-md supports-[backdrop-filter]:bg-white/34">
-          <div className="flex flex-col gap-2">
-            <SocialLink href="https://www.instagram.com/kw_coms" label="Instagram" icon={Instagram} />
-            <SocialLink href="https://github.com/kw-coms" label="GitHub" icon={Github} />
-            <SocialLink href="https://www.youtube.com/@kw_coms" label="YouTube" icon={Youtube} />
-            <SocialLink href="mailto:kwcoms69@gmail.com" label="Mail" icon={Mail} />
-          </div>
+      <aside className="fixed right-3 top-[80%] z-40 hidden -translate-y-1/2 md:block">
+        <div className="flex flex-col gap-2">
+          <SocialLink href="https://www.instagram.com/kw_coms" label="Instagram" icon={Instagram} />
+          <SocialLink href="https://github.com/kw-coms" label="GitHub" icon={Github} />
+          <SocialLink href="https://www.youtube.com/@kw_coms" label="YouTube" icon={Youtube} />
+          <SocialLink href="mailto:kwcoms69@gmail.com" label="Mail" icon={Mail} />
         </div>
       </aside>
 
-      <main className="relative mx-auto flex min-h-[100svh] max-w-7xl items-center px-4 py-20 sm:px-6 lg:px-8">
+      <main className="relative mx-auto flex min-h-[100svh] max-w-7xl items-center px-4 py-16 sm:px-6 sm:py-18 lg:px-8">
         <section className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center text-center">
           <div className={`relative w-full transition-all duration-300 ${isPanelOpen ? 'opacity-10 blur-sm scale-95' : 'opacity-100'}`}>
             <div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300/15 blur-[100px] mix-blend-screen" />
             <div className="absolute left-1/2 top-1/2 h-80 w-80 -translate-x-[52%] -translate-y-[48%] rounded-full bg-rose-300/10 blur-[110px] mix-blend-screen" />
             <div className="absolute left-1/2 top-1/2 h-96 w-96 -translate-x-[48%] -translate-y-[52%] rounded-full bg-violet-300/10 blur-[120px] mix-blend-screen" />
 
-            <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center justify-center py-6 sm:py-8">
+            <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center justify-center py-4 sm:py-6">
               <SplitLogoCard />
-              <div className="mt-8 space-y-4">
-                <p className="mx-auto max-w-2xl leading-8 text-white/70 sm:text-lg">
+
+              <div className="mt-5 space-y-3">
+                <p className="mx-auto whitespace-nowrap px-2 leading-8 text-white/72 text-[clamp(0.68rem,1.55vw,1.125rem)]">
                   광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장하는 개발 커뮤니티입니다.
                 </p>
-              </div>
-
-              <div className="mt-7 flex flex-wrap justify-center gap-3">
-                <button type="button" onClick={() => openPanel('about')} className="shape-cut-sm bg-[#EEEEEE] px-5 py-3 text-sm font-semibold text-[#222831] transition hover:translate-y-[-1px]">
-                  소개 보기
-                </button>
-                <button type="button" onClick={goRecruitPage} className="shape-cut-sm border border-white/10 bg-white/10 px-5 py-3 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/20">
-                  지원하기
-                </button>
-                <button type="button" onClick={goLogin} className="shape-cut-sm border border-white/10 bg-white/10 px-5 py-3 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/20">
-                  로그인
-                </button>
               </div>
             </div>
           </div>
         </section>
       </main>
 
-      <nav className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-5xl shape-cut border border-white/45 bg-white/75 shadow-[0_18px_60px_rgba(255,255,255,0.18)] backdrop-blur-2xl supports-[backdrop-filter]:bg-white/72">
+      <nav className={`${floatingBarBaseClass} fixed inset-x-4 bottom-4 z-50 mx-auto max-w-5xl`}>
         <div className="grid grid-cols-2 divide-x divide-y divide-black/10 md:grid-cols-4 md:divide-y-0">
           {tabs.map((tab) => {
             const active = expandedId === tab.id
@@ -372,7 +396,7 @@ function App() {
                 key={tab.id}
                 type="button"
                 onClick={() => openPanel(tab.id)}
-                className={`flex min-h-24 flex-col items-start justify-center p-4 text-left transition md:min-h-28 ${active ? 'bg-white/80 text-[#1f2329]' : 'bg-white/62 text-[#2a3038] hover:bg-white/72'}`}
+                className={`flex min-h-24 flex-col items-start justify-center p-4 text-left transition md:min-h-28 ${active ? 'bg-white/88 text-[#1f2329]' : 'bg-white/76 text-[#2a3038] hover:bg-white/84'}`}
               >
                 <div>
                   <p className={`text-xs font-semibold uppercase tracking-[0.28em] ${active ? 'text-[#313844]/75' : 'text-[#3a4350]/75'}`}>{tab.hint}</p>
@@ -385,39 +409,44 @@ function App() {
       </nav>
 
       {activePanelId && (
-        <div
-          className={`fixed inset-0 z-40 flex items-center justify-center bg-black/55 px-4 pt-20 backdrop-blur-sm transition-opacity duration-300 ${isPanelOpen ? 'opacity-100' : 'opacity-0'}`}
-          onClick={closePanel}
-          role="presentation"
-        >
-          <div
-            className={`shape-cut relative w-full max-w-4xl border border-white/10 bg-white/10 p-4 backdrop-blur-md transition-all duration-300 sm:p-5 ${isPanelOpen ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}
-            onClick={(event) => event.stopPropagation()}
-            role="presentation"
-          >
-            <div className="shape-cut border border-white/10 bg-[#222831]/92 p-5 sm:p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="shape-cut-sm border border-white/10 bg-white/10 p-3 text-[#EEEEEE]">
-                    {ActiveIcon ? <ActiveIcon size={20} /> : null}
+        <div className="fixed inset-0 z-40" role="presentation">
+          <button
+            type="button"
+            onClick={closePanel}
+            className={`absolute inset-0 bg-transparent transition-opacity duration-300 ${isPanelOpen ? 'opacity-100' : 'opacity-0'}`}
+            aria-label="Close panel overlay"
+          />
+
+          <div className="pointer-events-none absolute inset-x-4 bottom-[8.4rem] z-10 mx-auto w-full max-w-5xl md:bottom-[6.9rem]">
+            <div
+              className={`shape-cut-top pointer-events-auto min-h-[21rem] border border-white/24 bg-white/22 p-3 shadow-[0_8px_24px_rgba(0,0,0,0.16)] backdrop-blur-sm transition-all duration-300 sm:min-h-[24rem] sm:p-4 ${isPanelOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}
+              onClick={(event) => event.stopPropagation()}
+              role="presentation"
+            >
+              <div className="shape-cut-top h-full border border-white/20 bg-white/14 p-5 sm:p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="shape-cut-sm border border-white/10 bg-white/10 p-3 text-[#EEEEEE]">
+                      {ActiveIcon ? <ActiveIcon size={20} /> : null}
+                    </div>
+                    <div>
+                      <p className={`text-xs font-semibold uppercase tracking-[0.35em] ${tabs.find((item) => item.id === activePanelId)?.accent ?? 'text-cyan-200'}`}>{activePanelId.toUpperCase()}</p>
+                      <h2 className="mt-2 text-2xl font-semibold sm:text-3xl">{activePanelId === 'about' ? 'ABOUT' : activePanelId === 'activities' ? 'ACTIVITIES' : activePanelId === 'projects' ? 'PROJECTS' : 'RECRUIT'}</h2>
+                    </div>
                   </div>
-                  <div>
-                    <p className={`text-xs font-semibold uppercase tracking-[0.35em] ${tabs.find((item) => item.id === activePanelId)?.accent ?? 'text-cyan-200'}`}>{activePanelId.toUpperCase()}</p>
-                    <h2 className="mt-2 text-2xl font-semibold sm:text-3xl">{activePanelId === 'about' ? 'ABOUT' : activePanelId === 'activities' ? 'ACTIVITIES' : activePanelId === 'projects' ? 'PROJECTS' : 'RECRUIT'}</h2>
-                  </div>
+
+                  <button
+                    type="button"
+                    onClick={closePanel}
+                    className="shape-cut-sm border border-white/10 bg-white/10 p-3 text-[#EEEEEE] transition hover:bg-[#EEEEEE] hover:text-[#222831]"
+                    aria-label="Close panel"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={closePanel}
-                  className="shape-cut-sm border border-white/10 bg-white/10 p-3 text-[#EEEEEE] transition hover:bg-[#EEEEEE] hover:text-[#222831]"
-                  aria-label="Close panel"
-                >
-                  <X size={18} />
-                </button>
+                <div className="mt-6 pb-10">{renderPanelContent()}</div>
               </div>
-
-              <div className="mt-6">{renderPanelContent()}</div>
             </div>
           </div>
         </div>
@@ -455,7 +484,7 @@ function SocialLink({ href, label, icon: Icon }) {
       href={href}
       target={href.startsWith('mailto:') ? undefined : '_blank'}
       rel={href.startsWith('mailto:') ? undefined : 'noreferrer'}
-      className="shape-cut-sm flex items-center gap-2 border border-black/10 bg-white/62 px-3 py-2 text-sm text-[#1f2329] transition hover:bg-white/78"
+      className="shape-cut-sm flex items-center gap-2 border border-white/70 bg-white/96 px-3 py-2 text-sm text-[#1f2329] shadow-[0_22px_70px_rgba(255,255,255,0.24)] backdrop-blur-3xl supports-[backdrop-filter]:bg-white/94 transition hover:bg-white"
       aria-label={label}
     >
       <Icon size={16} />
