@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  ArrowUpRight,
   Binary,
   CircuitBoard,
   Github,
@@ -294,12 +293,12 @@ function App() {
       <BackgroundLayers />
 
       <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 shape-cut border border-white/10 bg-white/5 px-4 py-3 backdrop-blur-md sm:px-5">
+        <div className="shape-cut mx-auto flex max-w-7xl items-center justify-between gap-4 border border-white/45 bg-white/75 px-4 py-3 shadow-[0_18px_60px_rgba(255,255,255,0.18)] backdrop-blur-2xl supports-[backdrop-filter]:bg-white/72 sm:px-5">
           <button type="button" onClick={goHome} className="flex items-center gap-3 text-left">
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="logo-emboss h-11 w-11 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.45em] text-cyan-200">KWANGWOON UNIVERSITY</p>
-              <h1 className="mt-1 text-sm font-semibold sm:text-base">KW COM&apos;s</h1>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.45em] text-[#3a4350]">KWANGWOON UNIVERSITY</p>
+              <h1 className="mt-1 text-sm font-semibold text-[#1a1f27] sm:text-base">KW COM&apos;s</h1>
             </div>
           </button>
 
@@ -309,12 +308,12 @@ function App() {
                 key={tab.id}
                 type="button"
                 onClick={() => openPanel(tab.id)}
-                className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-[#EEEEEE] hover:text-[#222831]"
+                className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[#1f2329] transition hover:bg-white/78"
               >
                 {tab.label}
               </button>
             ))}
-            <button type="button" onClick={goLogin} className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-[#EEEEEE] hover:text-[#222831]">
+            <button type="button" onClick={goLogin} className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[#1f2329] transition hover:bg-white/78">
               Login
             </button>
           </nav>
@@ -322,7 +321,7 @@ function App() {
       </header>
 
       <aside className="fixed right-4 top-1/2 z-40 hidden -translate-y-1/2 md:block">
-        <div className="shape-cut border border-white/10 bg-white/5 p-2 backdrop-blur-md">
+        <div className="shape-cut border border-white/30 bg-white/38 p-2 shadow-[0_10px_30px_rgba(255,255,255,0.08)] backdrop-blur-md supports-[backdrop-filter]:bg-white/34">
           <div className="flex flex-col gap-2">
             <SocialLink href="https://www.instagram.com/kw_coms" label="Instagram" icon={Instagram} />
             <SocialLink href="https://github.com/kw-coms" label="GitHub" icon={Github} />
@@ -363,10 +362,9 @@ function App() {
         </section>
       </main>
 
-      <nav className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-5xl shape-cut border border-white/10 bg-white/5 backdrop-blur-md">
-        <div className="grid grid-cols-2 divide-x divide-y divide-white/10 md:grid-cols-4 md:divide-y-0">
+      <nav className="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-5xl shape-cut border border-white/45 bg-white/75 shadow-[0_18px_60px_rgba(255,255,255,0.18)] backdrop-blur-2xl supports-[backdrop-filter]:bg-white/72">
+        <div className="grid grid-cols-2 divide-x divide-y divide-black/10 md:grid-cols-4 md:divide-y-0">
           {tabs.map((tab) => {
-            const Icon = tab.icon
             const active = expandedId === tab.id
 
             return (
@@ -374,17 +372,11 @@ function App() {
                 key={tab.id}
                 type="button"
                 onClick={() => openPanel(tab.id)}
-                className={`flex min-h-24 flex-col items-start justify-between p-4 text-left transition md:min-h-28 ${active ? 'bg-[#EEEEEE] text-[#222831]' : 'bg-white/10 text-[#EEEEEE] hover:bg-white/15'}`}
+                className={`flex min-h-24 flex-col items-start justify-center p-4 text-left transition md:min-h-28 ${active ? 'bg-white/80 text-[#1f2329]' : 'bg-white/62 text-[#2a3038] hover:bg-white/72'}`}
               >
-                <div className="flex w-full items-start justify-between gap-3">
-                  <div className={`shape-cut-sm border p-2 ${active ? 'border-[#222831]/15 bg-[#222831]/5' : 'border-white/10 bg-white/10'}`}>
-                    <Icon size={18} />
-                  </div>
-                  <ArrowUpRight size={16} className={active ? 'text-[#222831]/50' : 'text-white/45'} />
-                </div>
                 <div>
-                  <p className={`text-xs font-semibold uppercase tracking-[0.3em] ${active ? 'text-[#222831]/60' : tab.accent}`}>{tab.hint}</p>
-                  <h3 className="mt-2 text-lg font-semibold">{tab.label}</h3>
+                  <p className={`text-xs font-semibold uppercase tracking-[0.28em] ${active ? 'text-[#313844]/75' : 'text-[#3a4350]/75'}`}>{tab.hint}</p>
+                  <h3 className="mt-2 text-lg font-semibold text-[#1a1f27]">{tab.label}</h3>
                 </div>
               </button>
             )
@@ -463,7 +455,7 @@ function SocialLink({ href, label, icon: Icon }) {
       href={href}
       target={href.startsWith('mailto:') ? undefined : '_blank'}
       rel={href.startsWith('mailto:') ? undefined : 'noreferrer'}
-      className="shape-cut-sm flex items-center gap-2 border border-white/10 bg-white/10 px-3 py-2 text-sm text-[#EEEEEE] transition hover:bg-[#EEEEEE] hover:text-[#222831]"
+      className="shape-cut-sm flex items-center gap-2 border border-black/10 bg-white/62 px-3 py-2 text-sm text-[#1f2329] transition hover:bg-white/78"
       aria-label={label}
     >
       <Icon size={16} />
