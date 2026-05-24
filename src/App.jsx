@@ -88,7 +88,7 @@ function App() {
             <img
               src="/coms-logo.png"
               alt="KW COM's Logo"
-              className="h-11 w-11 flex-shrink-0 object-contain sm:h-14 sm:w-14"
+              className="h-11 w-11 shrink-0 object-contain sm:h-14 sm:w-14"
             />
             <span className="hidden truncate text-lg font-bold tracking-widest sm:block sm:text-xl">
               KW COM&apos;s
