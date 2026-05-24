@@ -110,6 +110,10 @@ body {
 	clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
 }
 
+.shape-cut-top {
+	clip-path: polygon(20px 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%, 0 20px);
+}
+
 @keyframes blob {
 	0%,
 	100% {
@@ -139,4 +143,11 @@ body {
 	filter: brightness(1.2) contrast(1.15) drop-shadow(0 0 20px rgba(51, 255, 255, 0.18))
 		drop-shadow(0 0 60px rgba(178, 109, 255, 0.14));
 	opacity: 0.92;
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.cursor-dot-mode,
+	.cursor-dot-mode * {
+		cursor: none !important;
+	}
 }
