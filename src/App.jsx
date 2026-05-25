@@ -334,7 +334,7 @@ function App() {
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="logo-emboss h-11 w-11 shrink-0 object-contain sm:h-12 sm:w-12" />
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.45em] text-[#3a4350]">KWANGWOON UNIVERSITY</p>
-              <h1 className="mt-1 text-sm font-semibold text-[#1a1f27] sm:text-base">COM&apos;s</h1>
+              <h1 className="mt-1 text-sm font-semibold text-[#1a1f27] sm:text-base">KW COM&apos;s</h1>
             </div>
           </button>
 
