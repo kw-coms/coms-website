@@ -37,7 +37,9 @@ const projects = [
   'Web Development Study - HTML · CSS · JavaScript · React 학습 스터디',
 ]
 
-const floatingBarBaseClass = 'shape-cut border border-white/70 bg-white/96 shadow-[0_22px_70px_rgba(255,255,255,0.24)] backdrop-blur-3xl supports-[backdrop-filter]:bg-white/94'
+const floatingBarBaseClass = 'shape-cut border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-3xl supports-[backdrop-filter]:bg-[var(--theme-surface-94)]'
+const solidActionBtnClass = 'shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] transition hover:scale-[1.02]'
+const ghostActionBtnClass = 'shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/20'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home')
@@ -179,10 +181,10 @@ function App() {
             생각합니다.
           </p>
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={goRecruitPage} className="shape-cut-sm bg-[#EEEEEE] px-4 py-2 text-sm font-semibold text-[#222831] transition hover:scale-[1.02]">
+            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
               지원 화면으로 이동
             </button>
-            <button type="button" onClick={goLogin} className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/20">
+            <button type="button" onClick={goLogin} className={ghostActionBtnClass}>
               로그인
             </button>
           </div>
@@ -203,10 +205,10 @@ function App() {
             ))}
           </div>
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={goRecruitPage} className="shape-cut-sm bg-[#EEEEEE] px-4 py-2 text-sm font-semibold text-[#222831] transition hover:scale-[1.02]">
+            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
               지원하기
             </button>
-            <button type="button" onClick={goLogin} className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/20">
+            <button type="button" onClick={goLogin} className={ghostActionBtnClass}>
               로그인
             </button>
           </div>
@@ -227,10 +229,10 @@ function App() {
             ))}
           </div>
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={goRecruitPage} className="shape-cut-sm bg-[#EEEEEE] px-4 py-2 text-sm font-semibold text-[#222831] transition hover:scale-[1.02]">
+            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
               모집 안내 보기
             </button>
-            <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/20">
+            <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className={ghostActionBtnClass}>
               GitHub 확인
             </a>
           </div>
@@ -252,10 +254,10 @@ function App() {
           <div>3. 오리엔테이션 및 정기 활동 참여</div>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button type="button" onClick={goRecruitPage} className="shape-cut-sm bg-[#EEEEEE] px-4 py-2 text-sm font-semibold text-[#222831] transition hover:scale-[1.02]">
+          <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
             지원 페이지 열기
           </button>
-          <button type="button" onClick={goLogin} className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/20">
+          <button type="button" onClick={goLogin} className={ghostActionBtnClass}>
             로그인
           </button>
         </div>
@@ -266,9 +268,6 @@ function App() {
   if (currentPage === 'login') {
     return (
       <PageShell>
-        <button type="button" onClick={goHome} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/15">
-          메인으로 돌아가기
-        </button>
         <Login onBack={goHome} goSignup={goSignup} />
       </PageShell>
     )
@@ -277,7 +276,7 @@ function App() {
   if (currentPage === 'signup') {
     return (
       <PageShell>
-        <button type="button" onClick={() => setCurrentPage('login')} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/15">
+        <button type="button" onClick={() => setCurrentPage('login')} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15">
           로그인으로 돌아가기
         </button>
         <Signup onBack={() => setCurrentPage('login')} />
@@ -287,11 +286,11 @@ function App() {
 
   if (currentPage === 'recruit') {
     return (
-      <div className="relative min-h-screen overflow-hidden bg-[#222831] text-[#EEEEEE]">
+      <div className="relative min-h-screen overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)]">
         <BackgroundLayers />
         <div className="relative mx-auto flex min-h-screen max-w-4xl items-center px-4 py-28 sm:px-6">
           <div className="w-full">
-            <button type="button" onClick={goHome} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/15">
+            <button type="button" onClick={goHome} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15">
               메인으로 돌아가기
             </button>
             <section className="shape-cut border border-white/10 bg-white/5 p-6 backdrop-blur-md sm:p-8">
@@ -301,10 +300,10 @@ function App() {
                 광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장할 부원을 모집합니다.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <button type="button" onClick={goLogin} className="shape-cut-sm bg-[#EEEEEE] px-4 py-2 text-sm font-semibold text-[#222831] transition hover:scale-[1.02]">
+                <button type="button" onClick={goLogin} className={solidActionBtnClass}>
                   로그인
                 </button>
-                <button type="button" onClick={() => setCurrentPage('home')} className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[#EEEEEE] transition hover:bg-white/20">
+                <button type="button" onClick={() => setCurrentPage('home')} className={ghostActionBtnClass}>
                   홈으로
                 </button>
               </div>
@@ -316,7 +315,7 @@ function App() {
   }
 
   return (
-    <div className="cursor-dot-mode relative min-h-screen overflow-hidden bg-[#222831] text-[#EEEEEE] selection:bg-[#FFD369]/35 selection:text-[#EEEEEE]">
+    <div className="cursor-dot-mode relative min-h-screen overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)] selection:bg-[color-mix(in_srgb,var(--theme-accent)_35%,transparent)] selection:text-[var(--theme-text)]">
       <div
         className={`pointer-events-none fixed z-[120] hidden h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center mix-blend-difference transition-opacity duration-150 md:flex ${cursorDot.visible ? 'opacity-95' : 'opacity-0'}`}
         style={{ left: cursorDot.x, top: cursorDot.y }}
@@ -333,8 +332,8 @@ function App() {
           <button type="button" onClick={goHome} className="flex items-center gap-3 text-left">
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="logo-emboss h-11 w-11 shrink-0 object-contain sm:h-12 sm:w-12" />
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.45em] text-[#3a4350]">KWANGWOON UNIVERSITY</p>
-              <h1 className="mt-1 text-sm font-semibold text-[#1a1f27] sm:text-base">KW COM&apos;s</h1>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.45em] text-[var(--theme-body-muted)]">KWANGWOON UNIVERSITY</p>
+              <h1 className="mt-1 text-sm font-semibold text-[var(--theme-title)] sm:text-base">KW COM&apos;s</h1>
             </div>
           </button>
 
@@ -344,14 +343,14 @@ function App() {
                 key={tab.id}
                 type="button"
                 onClick={() => openPanel(tab.id)}
-                className="px-1 text-sm font-semibold text-[#1f2329]/85 transition hover:text-[#1f2329]"
+                className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]"
               >
                 {tab.label}
               </button>
             ))}
           </nav>
 
-          <button type="button" onClick={goLogin} className="shape-cut-sm ml-auto hidden border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[#1f2329] transition hover:bg-white/78 md:inline-flex">
+          <button type="button" onClick={goLogin} className="shape-cut-sm ml-auto hidden border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78 md:inline-flex">
             Login
           </button>
         </div>
@@ -396,11 +395,11 @@ function App() {
                 key={tab.id}
                 type="button"
                 onClick={() => openPanel(tab.id)}
-                className={`flex min-h-24 flex-col items-start justify-center p-4 text-left transition md:min-h-28 ${active ? 'bg-white/88 text-[#1f2329]' : 'bg-white/76 text-[#2a3038] hover:bg-white/84'}`}
+                className={`flex min-h-24 flex-col items-start justify-center p-4 text-left transition md:min-h-28 ${active ? 'bg-white/88 text-[var(--theme-body-dark)]' : 'bg-white/76 text-[var(--theme-body-mid)] hover:bg-white/84'}`}
               >
                 <div>
-                  <p className={`text-xs font-semibold uppercase tracking-[0.28em] ${active ? 'text-[#313844]/75' : 'text-[#3a4350]/75'}`}>{tab.hint}</p>
-                  <h3 className="mt-2 text-lg font-semibold text-[#1a1f27]">{tab.label}</h3>
+                  <p className={`text-xs font-semibold uppercase tracking-[0.28em] ${active ? 'text-[var(--theme-body-soft)]/75' : 'text-[var(--theme-body-muted)]/75'}`}>{tab.hint}</p>
+                  <h3 className="mt-2 text-lg font-semibold text-[var(--theme-title)]">{tab.label}</h3>
                 </div>
               </button>
             )
@@ -426,7 +425,7 @@ function App() {
               <div className="shape-cut-top h-full border border-white/20 bg-white/14 p-5 sm:p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <div className="shape-cut-sm border border-white/10 bg-white/10 p-3 text-[#EEEEEE]">
+                    <div className="shape-cut-sm border border-white/10 bg-white/10 p-3 text-[var(--theme-text)]">
                       {ActiveIcon ? <ActiveIcon size={20} /> : null}
                     </div>
                     <div>
@@ -438,7 +437,7 @@ function App() {
                   <button
                     type="button"
                     onClick={closePanel}
-                    className="shape-cut-sm border border-white/10 bg-white/10 p-3 text-[#EEEEEE] transition hover:bg-[#EEEEEE] hover:text-[#222831]"
+                    className="shape-cut-sm border border-white/10 bg-white/10 p-3 text-[var(--theme-text)] transition hover:bg-[var(--theme-text)] hover:text-[var(--theme-bg)]"
                     aria-label="Close panel"
                   >
                     <X size={18} />
@@ -457,9 +456,11 @@ function App() {
 
 function PageShell({ children }) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#222831] text-[#EEEEEE]">
+    <div className="relative min-h-screen overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)]">
       <BackgroundLayers />
-      <main className="relative mx-auto flex min-h-screen max-w-4xl items-center px-4 py-28 sm:px-6">{children}</main>
+      <main className="relative mx-auto flex min-h-screen max-w-4xl items-center justify-center px-4 py-28 sm:px-6">
+        <div className="w-full max-w-xl">{children}</div>
+      </main>
     </div>
   )
 }
@@ -470,7 +471,7 @@ function BackgroundLayers() {
       <div className="tech-grid absolute inset-0 opacity-100" />
       <div className="absolute left-[14%] top-[16%] h-72 w-72 rounded-full bg-cyan-300/20 blur-[100px] mix-blend-screen animate-blob" style={{ animationDelay: '0s' }} />
       <div className="absolute right-[10%] top-[28%] h-80 w-80 rounded-full bg-rose-300/15 blur-[100px] mix-blend-screen animate-blob" style={{ animationDelay: '2.8s' }} />
-      <div className="absolute bottom-[10%] left-[42%] h-96 w-96 rounded-full bg-[#b26dff]/15 blur-[120px] mix-blend-screen animate-blob" style={{ animationDelay: '5.4s' }} />
+      <div className="absolute bottom-[10%] left-[42%] h-96 w-96 rounded-full bg-[var(--theme-glow-violet)]/15 blur-[120px] mix-blend-screen animate-blob" style={{ animationDelay: '5.4s' }} />
       <div className="absolute left-0 top-[24%] h-px w-full bg-linear-to-r from-transparent via-white/15 to-transparent" />
       <div className="absolute left-[8%] top-0 h-full w-px bg-linear-to-b from-transparent via-cyan-200/15 to-transparent" />
       <div className="absolute left-0 top-[68%] h-px w-full bg-linear-to-r from-transparent via-white/10 to-transparent" />
@@ -484,7 +485,7 @@ function SocialLink({ href, label, icon: Icon }) {
       href={href}
       target={href.startsWith('mailto:') ? undefined : '_blank'}
       rel={href.startsWith('mailto:') ? undefined : 'noreferrer'}
-      className="shape-cut-sm flex items-center gap-2 border border-white/70 bg-white/96 px-3 py-2 text-sm text-[#1f2329] shadow-[0_22px_70px_rgba(255,255,255,0.24)] backdrop-blur-3xl supports-[backdrop-filter]:bg-white/94 transition hover:bg-white"
+      className="shape-cut-sm flex items-center gap-2 border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-3 py-2 text-sm text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-3xl supports-[backdrop-filter]:bg-[var(--theme-surface-94)] transition hover:bg-white"
       aria-label={label}
     >
       <Icon size={16} />

@@ -59,10 +59,25 @@
 :root {
 	color-scheme: dark;
 	font-family: 'LexendThin', 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+	--theme-bg: #222831;
+	--theme-text: #eeeeee;
+	--theme-accent: #ffd369;
+	--theme-title: #1a1f27;
+	--theme-body-dark: #1f2329;
+	--theme-body-mid: #2a3038;
+	--theme-body-soft: #313844;
+	--theme-body-muted: #3a4350;
+	--theme-white: #ffffff;
+	--theme-glow-violet: #b26dff;
+	--theme-surface-96: rgba(255, 255, 255, 0.96);
+	--theme-surface-94: rgba(255, 255, 255, 0.94);
+	--theme-surface-70: rgba(255, 255, 255, 0.7);
+	--theme-border-soft: rgba(255, 255, 255, 0.7);
+	--theme-shadow-glass: rgba(255, 255, 255, 0.24);
 }
 
 html {
-	background: #222831;
+	background: var(--theme-bg);
 	scroll-behavior: smooth;
 	scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 	scrollbar-width: thin;
@@ -73,8 +88,8 @@ body {
 	min-height: 100vh;
 	overflow: hidden;
 	overflow-x: hidden;
-	background: #222831;
-	color: #eeeeee;
+	background: var(--theme-bg);
+	color: var(--theme-text);
 	font-family: inherit;
 	font-weight: 100;
 }
@@ -84,8 +99,8 @@ body {
 }
 
 ::selection {
-	background: rgba(255, 211, 105, 0.35);
-	color: #eeeeee;
+	background: color-mix(in srgb, var(--theme-accent) 35%, transparent);
+	color: var(--theme-text);
 }
 
 ::-webkit-scrollbar {
