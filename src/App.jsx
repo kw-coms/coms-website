@@ -551,7 +551,6 @@ function App() {
                   <div>
                     <h4 className="font-bold">부회장</h4>
                     <p className="mt-2 text-[#151922]/80">김찬진 010-8596-2680</p>
-                    <p className="mt-1 text-[#151922]/80">김근형 010-0000-0000</p>
                   </div>
                 </div>
               </div>
