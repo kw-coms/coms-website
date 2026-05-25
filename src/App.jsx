@@ -79,21 +79,6 @@ function App() {
       document.body.style.overflow = ''
     }
   }, [expandedId, lastExpandedId])
-  return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <header className="fixed top-0 left-0 z-50 w-full border-b border-white/10 bg-black/70 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2 sm:px-6">
-          <button type="button" className="flex min-w-0 items-center gap-2 sm:gap-3" onClick={goHome}>
-            <img
-              src="/coms-logo.png"
-              alt="KW COM's Logo"
-              className="h-11 w-11 shrink-0 object-contain sm:h-14 sm:w-14"
-            />
-            <span className="hidden truncate text-lg font-bold tracking-widest sm:block sm:text-xl">
-              KW COM&apos;s
-            </span>
-          </button>
 
   useEffect(() => {
     return () => {
@@ -346,10 +331,10 @@ function App() {
       <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
         <div className={`${floatingBarBaseClass} relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-5`}>
           <button type="button" onClick={goHome} className="flex items-center gap-3 text-left">
-            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="logo-emboss h-11 w-11 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
+            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="logo-emboss h-11 w-11 shrink-0 object-contain sm:h-12 sm:w-12" />
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.45em] text-[#3a4350]">KWANGWOON UNIVERSITY</p>
-              <h1 className="mt-1 text-sm font-semibold text-[#1a1f27] sm:text-base">KW COM&apos;s</h1>
+              <h1 className="mt-1 text-sm font-semibold text-[#1a1f27] sm:text-base">COM&apos;s</h1>
             </div>
           </button>
 
@@ -390,16 +375,6 @@ function App() {
 
             <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center justify-center py-4 sm:py-6">
               <SplitLogoCard />
-                  <div>
-                    <h4 className="font-bold">부회장</h4>
-                    <p className="mt-2 text-[#151922]/80">김찬진 010-8596-2680</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </footer>
-        </>
-      )}
 
               <div className="mt-5 space-y-3">
                 <p className="mx-auto whitespace-nowrap px-2 leading-8 text-white/72 text-[clamp(0.68rem,1.55vw,1.125rem)]">
