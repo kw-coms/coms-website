@@ -56,9 +56,29 @@
 	font-display: swap;
 }
 
+@font-face {
+	font-family: 'Pretendard';
+	src: url('./assets/fonts/pretendard/Pretendard-Thin.otf') format('opentype');
+	font-weight: 100;
+	font-style: normal;
+	font-display: swap;
+	/* Restrict this face to Hangul ranges so Pretendard is used only for Korean glyphs */
+	unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7AF, U+D7B0-D7FF;
+}
+
+@font-face {
+	font-family: 'Freesentation';
+	src: url('./assets/fonts/freesentation/Freesentation-1Thin.ttf') format('truetype');
+	font-weight: 100;
+	font-style: normal;
+	font-display: swap;
+	/* Apply only to Hangul ranges */
+	unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7AF, U+D7B0-D7FF;
+}
+
 :root {
 	color-scheme: dark;
-	font-family: 'LexendThin', 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+	font-family: 'Freesentation', 'Pretendard', 'LexendThin', 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
 	--theme-bg: #222831;
 	--theme-text: #eeeeee;
 	--theme-accent: #ffd369;
