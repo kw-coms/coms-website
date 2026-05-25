@@ -318,7 +318,7 @@ function App() {
   return (
     <div className="cursor-dot-mode relative min-h-screen overflow-hidden bg-[#222831] text-[#EEEEEE] selection:bg-[#FFD369]/35 selection:text-[#EEEEEE]">
       <div
-        className={`pointer-events-none fixed z-[120] hidden h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center mix-blend-difference transition-opacity duration-150 md:flex ${cursorDot.visible ? 'opacity-95' : 'opacity-0'}`}
+        className={`pointer-events-none fixed z-120 hidden h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center mix-blend-difference transition-opacity duration-150 md:flex ${cursorDot.visible ? 'opacity-95' : 'opacity-0'}`}
         style={{ left: cursorDot.x, top: cursorDot.y }}
         aria-hidden="true"
       >
@@ -366,12 +366,12 @@ function App() {
         </div>
       </aside>
 
-      <main className="relative mx-auto flex min-h-[100svh] max-w-7xl items-center px-4 py-16 sm:px-6 sm:py-18 lg:px-8">
+      <main className="relative mx-auto flex min-h-svh max-w-7xl items-center px-4 py-16 sm:px-6 sm:py-18 lg:px-8">
         <section className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center text-center">
           <div className={`relative w-full transition-all duration-300 ${isPanelOpen ? 'opacity-10 blur-sm scale-95' : 'opacity-100'}`}>
             <div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300/15 blur-[100px] mix-blend-screen" />
-            <div className="absolute left-1/2 top-1/2 h-80 w-80 -translate-x-[52%] -translate-y-[48%] rounded-full bg-rose-300/10 blur-[110px] mix-blend-screen" />
-            <div className="absolute left-1/2 top-1/2 h-96 w-96 -translate-x-[48%] -translate-y-[52%] rounded-full bg-violet-300/10 blur-[120px] mix-blend-screen" />
+            <div className="absolute left-1/2 top-1/2 h-80 w-80 translate-x-[-52%] translate-y-[-48%] rounded-full bg-rose-300/10 blur-[110px] mix-blend-screen" />
+            <div className="absolute left-1/2 top-1/2 h-96 w-96 translate-x-[-48%] translate-y-[-52%] rounded-full bg-violet-300/10 blur-[120px] mix-blend-screen" />
 
             <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center justify-center py-4 sm:py-6">
               <SplitLogoCard />
@@ -419,7 +419,7 @@ function App() {
 
           <div className="pointer-events-none absolute inset-x-4 bottom-[8.4rem] z-10 mx-auto w-full max-w-5xl md:bottom-[6.9rem]">
             <div
-              className={`shape-cut-top pointer-events-auto min-h-[21rem] border border-white/24 bg-white/22 p-3 shadow-[0_8px_24px_rgba(0,0,0,0.16)] backdrop-blur-sm transition-all duration-300 sm:min-h-[24rem] sm:p-4 ${isPanelOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}
+              className={`shape-cut-top pointer-events-auto min-h-84 border border-white/24 bg-white/22 p-3 shadow-[0_8px_24px_rgba(0,0,0,0.16)] backdrop-blur-sm transition-all duration-300 sm:min-h-96 sm:p-4 ${isPanelOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}
               onClick={(event) => event.stopPropagation()}
               role="presentation"
             >
@@ -484,7 +484,7 @@ function SocialLink({ href, label, icon: Icon }) {
       href={href}
       target={href.startsWith('mailto:') ? undefined : '_blank'}
       rel={href.startsWith('mailto:') ? undefined : 'noreferrer'}
-      className="shape-cut-sm flex items-center gap-2 border border-white/70 bg-white/96 px-3 py-2 text-sm text-[#1f2329] shadow-[0_22px_70px_rgba(255,255,255,0.24)] backdrop-blur-3xl supports-[backdrop-filter]:bg-white/94 transition hover:bg-white"
+      className="shape-cut-sm flex items-center gap-2 border border-white/70 bg-white/96 px-3 py-2 text-sm text-[#1f2329] shadow-[0_22px_70px_rgba(255,255,255,0.24)] backdrop-blur-3xl supports-backdrop-filter:bg-white/94 transition hover:bg-white"
       aria-label={label}
     >
       <Icon size={16} />
