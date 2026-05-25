@@ -88,7 +88,7 @@ function App() {
             <img
               src="/coms-logo.png"
               alt="KW COM's Logo"
-              className="h-11 w-11 flex-shrink-0 object-contain sm:h-14 sm:w-14"
+              className="h-11 w-11 shrink-0 object-contain sm:h-14 sm:w-14"
             />
             <span className="hidden truncate text-lg font-bold tracking-widest sm:block sm:text-xl">
               KW COM&apos;s
@@ -550,8 +550,7 @@ function App() {
 
                   <div>
                     <h4 className="font-bold">부회장</h4>
-                    <p className="mt-2 text-[#151922]/80">김찬진 010-0000-0000</p>
-                    <p className="mt-1 text-[#151922]/80">김근형 010-0000-0000</p>
+                    <p className="mt-2 text-[#151922]/80">김찬진 010-8596-2680</p>
                   </div>
                 </div>
               </div>
