@@ -37,7 +37,7 @@ const projects = [
   'Web Development Study - HTML · CSS · JavaScript · React 학습 스터디',
 ]
 
-const floatingBarBaseClass = 'shape-cut border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-3xl supports-[backdrop-filter]:bg-[var(--theme-surface-94)]'
+const floatingBarBaseClass = 'shape-cut border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)]'
 const solidActionBtnClass = 'shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] transition hover:scale-[1.02]'
 const ghostActionBtnClass = 'shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/20'
 
@@ -45,8 +45,8 @@ function App() {
   const [currentPage, setCurrentPage] = useState('home')
   const [expandedId, setExpandedId] = useState(null)
   const [lastExpandedId, setLastExpandedId] = useState(null)
-  const [cursorDot, setCursorDot] = useState({ x: 0, y: 0, visible: false })
   const closeTimerRef = useRef(null)
+  const cursorDotRef = useRef(null)
 
   useEffect(() => {
     if (expandedId) {
@@ -92,15 +92,18 @@ function App() {
 
   useEffect(() => {
     const handlePointerMove = (event) => {
-      if (event.pointerType === 'touch') {
-        return
-      }
-
-      setCursorDot({ x: event.clientX, y: event.clientY, visible: true })
+      if (event.pointerType === 'touch') return
+      const el = cursorDotRef.current
+      if (!el) return
+      el.style.left = `${event.clientX}px`
+      el.style.top = `${event.clientY}px`
+      el.style.opacity = '0.95'
     }
 
     const hideCursorDot = () => {
-      setCursorDot((prev) => ({ ...prev, visible: false }))
+      const el = cursorDotRef.current
+      if (!el) return
+      el.style.opacity = '0'
     }
 
     window.addEventListener('pointermove', handlePointerMove)
@@ -317,8 +320,8 @@ function App() {
   return (
     <div className="cursor-dot-mode relative min-h-screen overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)] selection:bg-[color-mix(in_srgb,var(--theme-accent)_35%,transparent)] selection:text-[var(--theme-text)]">
       <div
-        className={`pointer-events-none fixed z-[120] hidden h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center mix-blend-difference transition-opacity duration-150 md:flex ${cursorDot.visible ? 'opacity-95' : 'opacity-0'}`}
-        style={{ left: cursorDot.x, top: cursorDot.y }}
+        ref={cursorDotRef}
+        className="pointer-events-none fixed z-[120] hidden h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center mix-blend-difference opacity-0 transition-opacity duration-150 md:flex"
         aria-hidden="true"
       >
         <span className="absolute inset-0 rounded-full border border-white/90" />
@@ -469,9 +472,9 @@ function BackgroundLayers() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       <div className="tech-grid absolute inset-0 opacity-100" />
-      <div className="absolute left-[14%] top-[16%] h-72 w-72 rounded-full bg-cyan-300/20 blur-[100px] mix-blend-screen animate-blob" style={{ animationDelay: '0s' }} />
-      <div className="absolute right-[10%] top-[28%] h-80 w-80 rounded-full bg-rose-300/15 blur-[100px] mix-blend-screen animate-blob" style={{ animationDelay: '2.8s' }} />
-      <div className="absolute bottom-[10%] left-[42%] h-96 w-96 rounded-full bg-[var(--theme-glow-violet)]/15 blur-[120px] mix-blend-screen animate-blob" style={{ animationDelay: '5.4s' }} />
+      <div className="absolute left-[14%] top-[16%] h-72 w-72 rounded-full bg-cyan-300/20 blur-[100px] mix-blend-screen animate-blob" style={{ animationDelay: '0s', willChange: 'transform' }} />
+      <div className="absolute right-[10%] top-[28%] h-80 w-80 rounded-full bg-rose-300/15 blur-[100px] mix-blend-screen animate-blob" style={{ animationDelay: '2.8s', willChange: 'transform' }} />
+      <div className="absolute bottom-[10%] left-[42%] h-96 w-96 rounded-full bg-[var(--theme-glow-violet)]/15 blur-[120px] mix-blend-screen animate-blob" style={{ animationDelay: '5.4s', willChange: 'transform' }} />
       <div className="absolute left-0 top-[24%] h-px w-full bg-linear-to-r from-transparent via-white/15 to-transparent" />
       <div className="absolute left-[8%] top-0 h-full w-px bg-linear-to-b from-transparent via-cyan-200/15 to-transparent" />
       <div className="absolute left-0 top-[68%] h-px w-full bg-linear-to-r from-transparent via-white/10 to-transparent" />
@@ -485,7 +488,7 @@ function SocialLink({ href, label, icon: Icon }) {
       href={href}
       target={href.startsWith('mailto:') ? undefined : '_blank'}
       rel={href.startsWith('mailto:') ? undefined : 'noreferrer'}
-      className="shape-cut-sm flex items-center gap-2 border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-3 py-2 text-sm text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-3xl supports-[backdrop-filter]:bg-[var(--theme-surface-94)] transition hover:bg-white"
+      className="shape-cut-sm flex items-center gap-2 border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-3 py-2 text-sm text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] transition hover:bg-white"
       aria-label={label}
     >
       <Icon size={16} />
