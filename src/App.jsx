@@ -45,8 +45,8 @@ function App() {
   const [currentPage, setCurrentPage] = useState('home')
   const [expandedId, setExpandedId] = useState(null)
   const [lastExpandedId, setLastExpandedId] = useState(null)
-  const [cursorDot, setCursorDot] = useState({ x: 0, y: 0, visible: false })
   const closeTimerRef = useRef(null)
+  const cursorDotRef = useRef(null)
 
   useEffect(() => {
     if (expandedId) {
@@ -92,15 +92,18 @@ function App() {
 
   useEffect(() => {
     const handlePointerMove = (event) => {
-      if (event.pointerType === 'touch') {
-        return
-      }
-
-      setCursorDot({ x: event.clientX, y: event.clientY, visible: true })
+      if (event.pointerType === 'touch') return
+      const el = cursorDotRef.current
+      if (!el) return
+      el.style.left = `${event.clientX}px`
+      el.style.top = `${event.clientY}px`
+      el.style.opacity = '0.95'
     }
 
     const hideCursorDot = () => {
-      setCursorDot((prev) => ({ ...prev, visible: false }))
+      const el = cursorDotRef.current
+      if (!el) return
+      el.style.opacity = '0'
     }
 
     window.addEventListener('pointermove', handlePointerMove)
@@ -317,8 +320,8 @@ function App() {
   return (
     <div className="cursor-dot-mode relative min-h-screen overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)] selection:bg-[color-mix(in_srgb,var(--theme-accent)_35%,transparent)] selection:text-[var(--theme-text)]">
       <div
-        className={`pointer-events-none fixed z-[120] hidden h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center mix-blend-difference transition-opacity duration-150 md:flex ${cursorDot.visible ? 'opacity-95' : 'opacity-0'}`}
-        style={{ left: cursorDot.x, top: cursorDot.y }}
+        ref={cursorDotRef}
+        className="pointer-events-none fixed z-[120] hidden h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center mix-blend-difference opacity-0 transition-opacity duration-150 md:flex"
         aria-hidden="true"
       >
         <span className="absolute inset-0 rounded-full border border-white/90" />
