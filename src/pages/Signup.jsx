@@ -1,6 +1,6 @@
 export default function Signup({ onBack }) {
   return (
-    <section className="shape-cut border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] p-5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-3xl supports-[backdrop-filter]:bg-[var(--theme-surface-94)] sm:p-8">
+    <section className="shape-cut border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] p-5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] sm:p-8">
       <h2 className="mb-2 text-xl font-bold sm:text-2xl">회원가입</h2>
       <p className="mb-4 text-sm text-[var(--theme-body-muted)]/85">회원가입은 추후 백엔드 연동 시 진행됩니다.</p>
 
