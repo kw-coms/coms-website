@@ -181,10 +181,6 @@ body {
 }
 
 @media (hover: hover) and (pointer: fine) {
-	.cursor-dot-mode,
-	.cursor-dot-mode * {
-		cursor: none !important;
-	}
 }
 html,
 body,
