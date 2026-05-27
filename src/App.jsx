@@ -46,7 +46,6 @@ function App() {
   const [expandedId, setExpandedId] = useState(null)
   const [lastExpandedId, setLastExpandedId] = useState(null)
   const closeTimerRef = useRef(null)
-  const cursorDotRef = useRef(null)
 
   useEffect(() => {
     if (expandedId) {
@@ -87,33 +86,6 @@ function App() {
       if (closeTimerRef.current) {
         window.clearTimeout(closeTimerRef.current)
       }
-    }
-  }, [])
-
-  useEffect(() => {
-    const handlePointerMove = (event) => {
-      if (event.pointerType === 'touch') return
-      const el = cursorDotRef.current
-      if (!el) return
-      el.style.left = `${event.clientX}px`
-      el.style.top = `${event.clientY}px`
-      el.style.opacity = '0.95'
-    }
-
-    const hideCursorDot = () => {
-      const el = cursorDotRef.current
-      if (!el) return
-      el.style.opacity = '0'
-    }
-
-    window.addEventListener('pointermove', handlePointerMove)
-    document.addEventListener('pointerleave', hideCursorDot)
-    window.addEventListener('blur', hideCursorDot)
-
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove)
-      document.removeEventListener('pointerleave', hideCursorDot)
-      window.removeEventListener('blur', hideCursorDot)
     }
   }, [])
 
@@ -318,16 +290,7 @@ function App() {
   }
 
   return (
-    <div className="cursor-dot-mode relative min-h-screen  bg-[var(--theme-bg)] text-[var(--theme-text)] selection:bg-[color-mix(in_srgb,var(--theme-accent)_35%,transparent)] selection:text-[var(--theme-text)]">
-      <div
-        ref={cursorDotRef}
-        className="pointer-events-none fixed z-[120] hidden h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center mix-blend-difference opacity-0 transition-opacity duration-150 md:flex"
-        aria-hidden="true"
-      >
-        <span className="absolute inset-0 rounded-full border border-white/90" />
-        <span className="h-3 w-3 rounded-full bg-white" />
-      </div>
-
+    <div className="relative min-h-screen  bg-[var(--theme-bg)] text-[var(--theme-text)] selection:bg-[color-mix(in_srgb,var(--theme-accent)_35%,transparent)] selection:text-[var(--theme-text)]">
       <BackgroundLayers />
 
       <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
