@@ -186,3 +186,13 @@ body {
 		cursor: none !important;
 	}
 }
+html,
+body,
+#root {
+  min-height: 100%;
+  overflow-y: auto;
+}
+
+body {
+  margin: 0;
+}
