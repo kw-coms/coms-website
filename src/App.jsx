@@ -318,7 +318,7 @@ function App() {
   }
 
   return (
-    <div className="cursor-dot-mode relative min-h-screen overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)] selection:bg-[color-mix(in_srgb,var(--theme-accent)_35%,transparent)] selection:text-[var(--theme-text)]">
+    <div className="cursor-dot-mode relative min-h-screen  bg-[var(--theme-bg)] text-[var(--theme-text)] selection:bg-[color-mix(in_srgb,var(--theme-accent)_35%,transparent)] selection:text-[var(--theme-text)]">
       <div
         ref={cursorDotRef}
         className="pointer-events-none fixed z-[120] hidden h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center mix-blend-difference opacity-0 transition-opacity duration-150 md:flex"
@@ -456,7 +456,7 @@ function App() {
 
 function PageShell({ children }) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)]">
+    <div className="relative min-h-screen  bg-[var(--theme-bg)] text-[var(--theme-text)]">
       <BackgroundLayers />
       <main className="relative mx-auto flex min-h-screen max-w-4xl items-center justify-center px-4 py-28 sm:px-6">
         <div className="w-full max-w-xl">{children}</div>
@@ -467,7 +467,7 @@ function PageShell({ children }) {
 
 function BackgroundLayers() {
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div className="pointer-events-none absolute inset-0 ">
       <div className="tech-grid absolute inset-0 opacity-100" />
       <div className="absolute left-[14%] top-[16%] h-72 w-72 rounded-full bg-cyan-300/35 blur-[100px] animate-blob" style={{ animationDelay: '0s', willChange: 'transform' }} />
       <div className="absolute right-[10%] top-[28%] h-80 w-80 rounded-full bg-rose-300/25 blur-[100px] animate-blob" style={{ animationDelay: '2.8s', willChange: 'transform' }} />
