@@ -20,17 +20,17 @@ export default function SplitLogoCard() {
     >
       <div className="absolute inset-0 -translate-x-[5.2%] translate-y-[2.8%]">
         <div
-          className="pointer-events-none absolute left-1/2 top-[37.5%] z-30 w-[180vw] -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-center font-black uppercase tracking-[-0.1em] text-[var(--theme-white)]"
+          className="pointer-events-none absolute left-1/2 top-[37.5%] z-30 w-full -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-center font-black uppercase tracking-[-0.08em] text-[var(--theme-white)]"
           style={{
-            WebkitTextStroke: '1.5px rgba(255, 255, 255, 0.32)',
-            //textShadow: '0 0 12px rgba(255, 255, 255, 0.36), 0 0 36px rgba(255, 255, 255, 0.18)',
-            filter: 'drop-shadow(0 0 24px rgba(255, 255, 255, 0.18))',
+            WebkitTextStroke: '1px rgba(255, 255, 255, 0.28)',
+            filter: 'drop-shadow(0 0 16px rgba(255, 255, 255, 0.14))',
             fontFamily: 'Orbitron, Segoe UI, sans-serif',
-            fontSize: 'clamp(10.8rem, 15.2vw, 16.8rem)',
-            lineHeight: '0.72',
+            fontSize: 'clamp(3.2rem, 5vw, 4.8rem)',
+            lineHeight: '1.05',
+            letterSpacing: '-0.03em',
           }}
         >
-            .K W  C O M &apos; s
+          .KW COM&apos;s
         </div>
 
         <img
