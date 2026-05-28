@@ -25,9 +25,9 @@ export default function Login({ onBack, goSignup }) {
     setLoading(true)
     try {
       const data = await loginUser({ identifier, password })
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('studentId', data.studentId)
-      localStorage.setItem('name', data.name)
+      // Token is stored in HttpOnly cookie by the server — not accessible from JS
+      sessionStorage.setItem('studentId', data.studentId)
+      sessionStorage.setItem('name', data.name)
       onBack()
     } catch (err) {
       setError(err.message || '로그인 중 오류가 발생했습니다.')
