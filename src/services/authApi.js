@@ -1,8 +1,14 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
+export function clearAuth() {
+  sessionStorage.removeItem('studentId')
+  sessionStorage.removeItem('name')
+}
+
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: 'include', // send/receive HttpOnly cookie automatically
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
@@ -31,4 +37,8 @@ export async function loginUser(payload) {
     method: 'POST',
     body: JSON.stringify(payload),
   })
+}
+
+export async function logoutUser() {
+  return request('/api/auth/logout', { method: 'POST' })
 }

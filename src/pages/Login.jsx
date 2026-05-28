@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { loginUser } from '../services/authApi.js'
 import { getLogoAsset } from '../utils/logoAssets.js'
 
 export default function Login({ onBack, goSignup }) {
@@ -23,14 +24,13 @@ export default function Login({ onBack, goSignup }) {
 
     setLoading(true)
     try {
-      // TODO: 실제 로그인 API 연동 지점
-      // 예: await api.post('/auth/login', { identifier, password })
-      await new Promise((r) => setTimeout(r, 600))
-
-      // 현재는 항상 실패 예시를 보여줍니다. 백엔드 연동 시 성공 처리로 교체하세요.
-      setError('로그인에 실패했습니다. 아이디/비밀번호를 확인해주세요.')
+      const data = await loginUser({ identifier, password })
+      // Token is stored in HttpOnly cookie by the server — not accessible from JS
+      sessionStorage.setItem('studentId', data.studentId)
+      sessionStorage.setItem('name', data.name)
+      onBack()
     } catch (err) {
-      setError('로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+      setError(err.message || '로그인 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }
