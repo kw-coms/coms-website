@@ -186,7 +186,8 @@ html,
 body,
 #root {
   min-height: 100%;
-  overflow-y: auto;
+	overflow-y: auto;
+	overflow-x: hidden;
 }
 
 body {

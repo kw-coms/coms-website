@@ -10,12 +10,12 @@ import {
   Rocket,
   Sparkles,
   Youtube,
-  X,
 } from 'lucide-react'
 import SplitLogoCard from './components/common/SplitLogoCard.jsx'
 import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
 import { getLogoAsset } from './utils/logoAssets.js'
+import FixedBrackets from './components/common/FixedBrackets.jsx'
 
 const tabs = [
   { id: 'about', label: 'About', hint: '정체성', icon: Binary, accent: 'text-cyan-200' },
@@ -37,123 +37,184 @@ const projects = [
   'Web Development Study - HTML · CSS · JavaScript · React 학습 스터디',
 ]
 
+const sectionMeta = {
+  about: {
+    accent: 'text-cyan-100',
+    glow: 'rgba(103, 232, 249, 0.22)',
+    bracket: '#67e8f9',
+    background: 'linear-gradient(135deg, rgba(6,182,212,0.96), rgba(14,165,233,0.92), rgba(34,211,238,0.84))',
+  },
+  activities: {
+    accent: 'text-rose-100',
+    glow: 'rgba(251, 113, 133, 0.22)',
+    bracket: '#fda4af',
+    background: 'linear-gradient(135deg, rgba(236,72,153,0.96), rgba(244,114,182,0.92), rgba(251,113,133,0.84))',
+  },
+  projects: {
+    accent: 'text-violet-100',
+    glow: 'rgba(196, 181, 253, 0.22)',
+    bracket: '#c4b5fd',
+    background: 'linear-gradient(135deg, rgba(124,58,237,0.96), rgba(168,85,247,0.92), rgba(139,92,246,0.84))',
+  },
+  recruit: {
+    accent: 'text-emerald-100',
+    glow: 'rgba(74, 222, 128, 0.22)',
+    bracket: '#6ee7b7',
+    background: 'linear-gradient(135deg, rgba(16,185,129,0.96), rgba(34,197,94,0.92), rgba(52,211,153,0.84))',
+  },
+}
+
 const floatingBarBaseClass = 'shape-cut border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)]'
 const solidActionBtnClass = 'shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] transition hover:scale-[1.02]'
 const ghostActionBtnClass = 'shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/20'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home')
-  const [expandedId, setExpandedId] = useState(null)
-  const [lastExpandedId, setLastExpandedId] = useState(null)
-  const closeTimerRef = useRef(null)
+  const [activeSection, setActiveSection] = useState(null)
+  const [bracketPositions, setBracketPositions] = useState({ leftX: null, rightX: null })
+  const aboutRef = useRef(null)
+  const activitiesRef = useRef(null)
+  const projectsRef = useRef(null)
+  const recruitRef = useRef(null)
+  const logoRef = useRef(null)
+  const [bottomHidden, setBottomHidden] = useState(false)
 
-  useEffect(() => {
-    if (expandedId) {
-      setLastExpandedId(expandedId)
-
-      if (closeTimerRef.current) {
-        window.clearTimeout(closeTimerRef.current)
-        closeTimerRef.current = null
-      }
+  const updateBracketPositions = (sectionId) => {
+    const map = {
+      about: aboutRef,
+      activities: activitiesRef,
+      projects: projectsRef,
+      recruit: recruitRef,
     }
-  }, [expandedId])
+
+    const ref = map[sectionId] || aboutRef
+    const sectionEl = ref.current
+    if (!sectionEl) return
+
+    const panelEl = sectionEl.querySelector?.('[data-panel]') || sectionEl
+    const rect = panelEl.getBoundingClientRect()
+    const gap = 20
+    setBracketPositions({
+      leftX: Math.max(12, Math.round(rect.left - gap)),
+      rightX: Math.round(rect.right + gap),
+    })
+  }
 
   useEffect(() => {
-    if (expandedId) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
+    const onScroll = () => {
+      const y = window.scrollY || window.pageYOffset
+      // hide bottom nav when user scrolls down past hero area
+      setBottomHidden(y > 120)
 
-      if (lastExpandedId) {
-        if (closeTimerRef.current) {
-          window.clearTimeout(closeTimerRef.current)
+      // set active section based on scroll position
+      const sections = [
+        { id: 'about', ref: aboutRef },
+        { id: 'activities', ref: activitiesRef },
+        { id: 'projects', ref: projectsRef },
+        { id: 'recruit', ref: recruitRef },
+      ]
+
+      // determine the section centered in the viewport
+      let found = false
+      let foundSectionId = null
+      const centerY = window.innerHeight / 2
+      for (const s of sections) {
+        const sectionEl = s.ref.current
+        if (!sectionEl) continue
+        const panelEl = sectionEl.querySelector?.('[data-panel]') || sectionEl
+        const rect = panelEl.getBoundingClientRect()
+        const isCentered = rect.top <= centerY && rect.bottom >= centerY
+        if (isCentered) {
+          setActiveSection(s.id)
+          foundSectionId = s.id
+          found = true
+          break
         }
+      }
 
-        closeTimerRef.current = window.setTimeout(() => {
-          setLastExpandedId(null)
-          closeTimerRef.current = null
-        }, 280)
+      updateBracketPositions(foundSectionId || 'about')
+
+      if (!found) {
+        if (y < 140) {
+          setActiveSection(null)
+        }
       }
     }
 
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    onScroll()
     return () => {
-      document.body.style.overflow = ''
-    }
-  }, [expandedId, lastExpandedId])
-
-  useEffect(() => {
-    return () => {
-      if (closeTimerRef.current) {
-        window.clearTimeout(closeTimerRef.current)
-      }
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
     }
   }, [])
 
   const openPanel = (id) => {
-    if (expandedId === id) {
-      setExpandedId(null)
-      return
+    setCurrentPage('home')
+    // scroll to the section instead of opening overlay
+    const map = {
+      about: aboutRef,
+      activities: activitiesRef,
+      projects: projectsRef,
+      recruit: recruitRef,
     }
 
-    setCurrentPage('home')
-    setExpandedId(id)
+    const ref = map[id]
+    if (ref && ref.current) {
+      const rect = ref.current.getBoundingClientRect()
+      const targetY = Math.max(0, window.scrollY + rect.top - (window.innerHeight / 2) + (rect.height / 2))
+      window.scrollTo({ top: targetY, behavior: 'smooth' })
+      setActiveSection(id)
+      updateBracketPositions(id)
+    }
   }
 
   const closePanel = () => {
-    setExpandedId(null)
+    // noop for compatibility; panels are in-page now
+    setActiveSection(null)
   }
 
   const goHome = () => {
     setCurrentPage('home')
-    setExpandedId(null)
-    setLastExpandedId(null)
+    setActiveSection(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const goLogin = () => {
     setCurrentPage('login')
-    setExpandedId(null)
-    setLastExpandedId(null)
+    setActiveSection(null)
   }
 
   const goSignup = () => {
     setCurrentPage('signup')
-    setExpandedId(null)
-    setLastExpandedId(null)
+    setActiveSection(null)
   }
 
   const goRecruitPage = () => {
     setCurrentPage('recruit')
-    setExpandedId(null)
-    setLastExpandedId(null)
+    setActiveSection(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const activePanelId = expandedId ?? lastExpandedId
-  const isPanelOpen = Boolean(expandedId)
+  const activePanelId = activeSection
+  const isPanelOpen = false
   const ActiveIcon = activePanelId ? tabs.find((item) => item.id === activePanelId)?.icon : null
+  const bracketColor = activeSection ? sectionMeta[activeSection]?.bracket : sectionMeta.about.bracket
 
-  const renderPanelContent = () => {
-    if (!activePanelId) {
-      return null
-    }
-
-    if (activePanelId === 'about') {
+  const renderSectionContent = (id) => {
+    if (id === 'about') {
       return (
         <div className="space-y-6">
           <p className="text-sm font-semibold uppercase tracking-[0.35em] text-cyan-200">About Signal</p>
           <h3 className="text-2xl font-semibold sm:text-3xl">COM&apos;s는 어떤 동아리인가요?</h3>
-          <p className="max-w-3xl leading-8 text-white/75">
+          <p className="max-w-3xl leading-8 text-white/85">
             COM&apos;s는 컴퓨터와 소프트웨어에 관심 있는 광운대학교 학생들이 모여 함께 공부하고 프로젝트를
             진행하는 중앙 컴퓨터 학술동아리입니다.
           </p>
-          <p className="max-w-3xl leading-8 text-white/65">
+          <p className="max-w-3xl leading-8 text-white/75">
             프로그래밍 기초부터 웹 개발, 알고리즘, 아두이노, 프로젝트 협업까지 다양한 활동을 통해 실력을 키우고
             서로의 성장을 돕습니다.
-          </p>
-          <p className="max-w-3xl leading-8 text-white/65">
-            개발을 처음 시작하는 학생도 부담 없이 참여할 수 있으며, 함께 배우고 직접 만들어보는 경험을 중요하게
-            생각합니다.
           </p>
           <div className="flex flex-wrap gap-3">
             <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
@@ -167,14 +228,14 @@ function App() {
       )
     }
 
-    if (activePanelId === 'activities') {
+    if (id === 'activities') {
       return (
         <div className="space-y-6">
           <p className="text-sm font-semibold uppercase tracking-[0.35em] text-rose-200">Activities Signal</p>
           <h3 className="text-2xl font-semibold sm:text-3xl">주요 활동</h3>
           <div className="space-y-4">
             {activities.map((item) => (
-              <div key={item} className="border-b border-white/10 pb-4 text-white/70 last:border-b-0 last:pb-0">
+              <div key={item} className="border-b border-white/10 pb-4 text-white/80 last:border-b-0 last:pb-0">
                 {item}
               </div>
             ))}
@@ -191,14 +252,14 @@ function App() {
       )
     }
 
-    if (activePanelId === 'projects') {
+    if (id === 'projects') {
       return (
         <div className="space-y-6">
           <p className="text-sm font-semibold uppercase tracking-[0.35em] text-violet-200">Projects Signal</p>
           <h3 className="text-2xl font-semibold sm:text-3xl">프로젝트</h3>
           <div className="space-y-4">
             {projects.map((item) => (
-              <div key={item} className="border-b border-white/10 pb-4 text-white/70 last:border-b-0 last:pb-0">
+              <div key={item} className="border-b border-white/10 pb-4 text-white/80 last:border-b-0 last:pb-0">
                 {item}
               </div>
             ))}
@@ -219,11 +280,11 @@ function App() {
       <div className="space-y-6">
         <p className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Recruit Signal</p>
         <h3 className="text-2xl font-semibold sm:text-3xl">COM&apos;s 지원하기</h3>
-        <p className="max-w-3xl leading-8 text-white/70">
+        <p className="max-w-3xl leading-8 text-white/80">
           광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장할 부원을 모집합니다. 개발을
           처음 시작하는 학생도 부담 없이 지원할 수 있습니다.
         </p>
-        <div className="space-y-3 text-sm leading-7 text-white/70">
+        <div className="space-y-3 text-sm leading-7 text-white/80">
           <div>1. 지원 폼 작성</div>
           <div>2. 내부 확인 후 개별 연락</div>
           <div>3. 오리엔테이션 및 정기 활동 참여</div>
@@ -235,6 +296,20 @@ function App() {
           <button type="button" onClick={goLogin} className={ghostActionBtnClass}>
             로그인
           </button>
+        </div>
+      </div>
+    )
+  }
+
+  const renderSectionPanel = (id) => {
+    const meta = sectionMeta[id]
+
+    return (
+      <div className="relative mx-auto flex w-full max-w-5xl items-center justify-center overflow-visible px-14 sm:px-20 lg:px-28">
+        <div data-panel="true" className="relative z-10 w-full overflow-hidden rounded-2xl border border-white/12 shadow-lg" style={{ background: meta.background, boxShadow: `0 24px 80px ${meta.glow}` }}>
+          <div className="px-12 py-8 sm:px-18 sm:py-12 lg:px-20">
+            {renderSectionContent(id)}
+          </div>
         </div>
       </div>
     )
@@ -293,6 +368,12 @@ function App() {
     <div className="relative min-h-screen  bg-[var(--theme-bg)] text-[var(--theme-text)] selection:bg-[color-mix(in_srgb,var(--theme-accent)_35%,transparent)] selection:text-[var(--theme-text)]">
       <BackgroundLayers />
 
+      {/* Fixed brackets component: gap controlled by measured element widths */}
+      <FixedBrackets color={bracketColor} leftX={bracketPositions.leftX} rightX={bracketPositions.rightX} />
+
+      {/* Small centered site label that sits between brackets */}
+      {/* removed centered KW COM's label per request */}
+
       <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
         <div className={`${floatingBarBaseClass} relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-5`}>
           <button type="button" onClick={goHome} className="flex items-center gap-3 text-left">
@@ -336,7 +417,9 @@ function App() {
           <div className={`relative w-full transition-all duration-300 ${isPanelOpen ? 'opacity-10 blur-sm scale-95' : 'opacity-100'}`}>
 
             <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center justify-center py-4 sm:py-6">
-              <SplitLogoCard />
+                    <div ref={logoRef} style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                      <SplitLogoCard />
+                    </div>
 
               <div className="mt-5 space-y-3">
                 <p className="mx-auto whitespace-nowrap px-2 leading-8 text-white/72 text-[clamp(0.68rem,1.55vw,1.125rem)]">
@@ -348,10 +431,13 @@ function App() {
         </section>
       </main>
 
-      <nav className={`${floatingBarBaseClass} fixed inset-x-4 bottom-4 z-50 mx-auto max-w-5xl`}>
+      <nav
+        className={`${floatingBarBaseClass} fixed inset-x-4 bottom-4 z-50 mx-auto max-w-5xl`}
+        style={{ transform: bottomHidden ? 'translateY(48px)' : 'translateY(0)', opacity: bottomHidden ? 0 : 1, transition: 'transform .35s, opacity .35s' }}
+      >
         <div className="grid grid-cols-2 divide-x divide-y divide-black/10 md:grid-cols-4 md:divide-y-0">
           {tabs.map((tab) => {
-            const active = expandedId === tab.id
+            const active = activeSection === tab.id
 
             return (
               <button
@@ -370,49 +456,32 @@ function App() {
         </div>
       </nav>
 
-      {activePanelId && (
-        <div className="fixed inset-0 z-40" role="presentation">
-          <button
-            type="button"
-            onClick={closePanel}
-            className={`absolute inset-0 bg-transparent transition-opacity duration-300 ${isPanelOpen ? 'opacity-100' : 'opacity-0'}`}
-            aria-label="Close panel overlay"
-          />
-
-          <div className="pointer-events-none absolute inset-x-4 bottom-[8.4rem] z-10 mx-auto w-full max-w-5xl md:bottom-[6.9rem]">
-            <div
-              className={`shape-cut-top pointer-events-auto min-h-[21rem] border border-white/24 bg-white/22 p-3 shadow-[0_8px_24px_rgba(0,0,0,0.16)] backdrop-blur-sm transition-all duration-300 sm:min-h-[24rem] sm:p-4 ${isPanelOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'}`}
-              onClick={(event) => event.stopPropagation()}
-              role="presentation"
-            >
-              <div className="shape-cut-top h-full border border-white/20 bg-white/14 p-5 sm:p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="shape-cut-sm border border-white/10 bg-white/10 p-3 text-[var(--theme-text)]">
-                      {ActiveIcon ? <ActiveIcon size={20} /> : null}
-                    </div>
-                    <div>
-                      <p className={`text-xs font-semibold uppercase tracking-[0.35em] ${tabs.find((item) => item.id === activePanelId)?.accent ?? 'text-cyan-200'}`}>{activePanelId.toUpperCase()}</p>
-                      <h2 className="mt-2 text-2xl font-semibold sm:text-3xl">{activePanelId === 'about' ? 'ABOUT' : activePanelId === 'activities' ? 'ACTIVITIES' : activePanelId === 'projects' ? 'PROJECTS' : 'RECRUIT'}</h2>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={closePanel}
-                    className="shape-cut-sm border border-white/10 bg-white/10 p-3 text-[var(--theme-text)] transition hover:bg-[var(--theme-text)] hover:text-[var(--theme-bg)]"
-                    aria-label="Close panel"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-
-                <div className="mt-6 pb-10">{renderPanelContent()}</div>
-              </div>
-            </div>
+      {/* In-page sections replacing overlay panels */}
+      <div className="mt-8">
+        <section ref={aboutRef} id="about" className="relative py-24">
+          <div className="mx-auto max-w-5xl px-4">
+            {renderSectionPanel('about')}
           </div>
-        </div>
-      )}
+        </section>
+
+        <section ref={activitiesRef} id="activities" className="relative py-24">
+          <div className="mx-auto max-w-5xl px-4">
+            {renderSectionPanel('activities')}
+          </div>
+        </section>
+
+        <section ref={projectsRef} id="projects" className="relative py-24">
+          <div className="mx-auto max-w-5xl px-4">
+            {renderSectionPanel('projects')}
+          </div>
+        </section>
+
+        <section ref={recruitRef} id="recruit" className="relative py-24">
+          <div className="mx-auto max-w-5xl px-4">
+            {renderSectionPanel('recruit')}
+          </div>
+        </section>
+      </div>
     </div>
   )
 }
