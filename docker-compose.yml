@@ -43,9 +43,11 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - ./backend-data:/app/data
+      - backend-uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
 
 volumes:
   pgdata:
+  backend-uploads:
