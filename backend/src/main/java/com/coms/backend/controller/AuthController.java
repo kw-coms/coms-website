@@ -2,6 +2,7 @@ package com.coms.backend.controller;
 
 import com.coms.backend.dto.AuthResponse;
 import com.coms.backend.dto.LoginRequest;
+import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.service.AuthService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,6 +12,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
@@ -64,5 +66,13 @@ public class AuthController {
 
         response.addHeader(HttpHeaders.SET_COOKIE, clearCookie.toString());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<MemberResponse> me(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(authService.getMe(authentication.getName()));
     }
 }
