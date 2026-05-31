@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.AuthResponse;
 import com.coms.backend.dto.LoginRequest;
+import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.security.JwtTokenProvider;
@@ -61,6 +62,19 @@ public class AuthService implements UserDetailsService {
 
         String token = jwtTokenProvider.generateToken(member.getStudentId());
         return new AuthResponse(token, member.getStudentId(), member.getName(), "로그인 성공");
+    }
+
+    public MemberResponse getMe(String studentId) {
+        Member member = memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        return new MemberResponse(
+                member.getStudentId(),
+                member.getName(),
+                member.getEmail(),
+                member.getDepartment(),
+                member.getPhone(),
+                member.getRole().name()
+        );
     }
 
     @Override
