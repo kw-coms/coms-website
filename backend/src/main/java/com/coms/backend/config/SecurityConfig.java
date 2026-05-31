@@ -75,12 +75,12 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-	    "https://coms.kw.ac.kr",
-	    "http://localhost:5173",
-	    "http://coms.kw.ac.kr",
-            "https://main.d2y2jv10z2f3v2.amplifyapp.com"
-        ));
+	config.setAllowedOrigins(
+		Arrays.stream(corsAllowedOrigins.split(","))
+			.map(String::trim)
+			.filter(origin -> !origin.isEmpty())
+			.toList()
+	);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

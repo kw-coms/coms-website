@@ -17,11 +17,8 @@ services:
     container_name: coms-backend
     restart: unless-stopped
     env_file:
-      - /etc/coms/backend.env
-    environment:
-      SERVER_PORT: 8080
-      CORS_ALLOWED_ORIGINS: "https://coms.kw.ac.kr,http://coms.kw.ac.kr,http://localhost:5173"
+      - .env
     ports:
       - "127.0.0.1:8080:8080"
     volumes:
-      - /opt/coms/backend-data:/app/data
+      - ./backend-data:/app/data
