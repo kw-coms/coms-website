@@ -1,0 +1,24 @@
+services:
+  coms-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: coms-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:80"
+    depends_on:
+      - coms-backend
+
+  coms-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: coms-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./backend-data:/app/data
