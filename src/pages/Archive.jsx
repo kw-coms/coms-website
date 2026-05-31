@@ -47,30 +47,8 @@ export default function Archive({ onBack, user }) {
   }, [])
 
   useEffect(() => {
-    let cancelled = false
-
-    getFiles()
-      .then((data) => {
-        if (!cancelled) {
-          setFiles(Array.isArray(data) ? data : [])
-          setError(null)
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err.message || '자료실 목록을 불러오지 못했습니다.')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    loadFiles()
+  }, [loadFiles])
 
   const handleDownload = async (file) => {
     setNotice('')
