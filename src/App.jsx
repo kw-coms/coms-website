@@ -1,17 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  Archive as ArchiveIcon,
   Binary,
   CircuitBoard,
   Github,
   Instagram,
   LogIn,
+  LogOut,
   Mail,
-  MapPinned,
   Rocket,
   Sparkles,
   Youtube,
 } from 'lucide-react'
 import SplitLogoCard from './components/common/SplitLogoCard.jsx'
+import { useAuth } from './contexts/AuthContext.jsx'
+import Archive from './pages/Archive.jsx'
 import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
 import { getLogoAsset } from './utils/logoAssets.js'
@@ -69,6 +72,7 @@ const solidActionBtnClass = 'shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-
 const ghostActionBtnClass = 'shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/20'
 
 function App() {
+  const { user, logout, isLoading } = useAuth()
   const [currentPage, setCurrentPage] = useState('home')
   const [activeSection, setActiveSection] = useState(null)
   const [bracketPositions, setBracketPositions] = useState({ leftX: null, rightX: null })
@@ -170,11 +174,6 @@ function App() {
     }
   }
 
-  const closePanel = () => {
-    // noop for compatibility; panels are in-page now
-    setActiveSection(null)
-  }
-
   const goHome = () => {
     setCurrentPage('home')
     setActiveSection(null)
@@ -184,6 +183,25 @@ function App() {
   const goLogin = () => {
     setCurrentPage('login')
     setActiveSection(null)
+  }
+
+  const goArchive = () => {
+    if (user === undefined) return
+    if (user === null) {
+      goLogin()
+      return
+    }
+
+    setCurrentPage('archive')
+    setActiveSection(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    setCurrentPage('home')
+    setActiveSection(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const goSignup = () => {
@@ -197,9 +215,7 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const activePanelId = activeSection
   const isPanelOpen = false
-  const ActiveIcon = activePanelId ? tabs.find((item) => item.id === activePanelId)?.icon : null
   const bracketColor = activeSection ? sectionMeta[activeSection]?.bracket : sectionMeta.about.bracket
 
   const renderSectionContent = (id) => {
@@ -323,6 +339,32 @@ function App() {
     )
   }
 
+  if (currentPage === 'archive') {
+    if (user === undefined) {
+      return (
+        <PageShell>
+          <div className="shape-cut border border-white/10 bg-white/5 p-8 text-center text-white/70 backdrop-blur-md">
+            로그인 상태를 확인하는 중...
+          </div>
+        </PageShell>
+      )
+    }
+
+    if (user === null) {
+      return (
+        <PageShell>
+          <Login onBack={goHome} goSignup={goSignup} />
+        </PageShell>
+      )
+    }
+
+    return (
+      <PageShell wide>
+        <Archive onBack={goHome} user={user} />
+      </PageShell>
+    )
+  }
+
   if (currentPage === 'signup') {
     return (
       <PageShell>
@@ -395,11 +437,52 @@ function App() {
                 {tab.label}
               </button>
             ))}
+            {user && (
+              <button
+                type="button"
+                onClick={goArchive}
+                className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]"
+              >
+                자료실
+              </button>
+            )}
           </nav>
 
-          <button type="button" onClick={goLogin} className="shape-cut-sm ml-auto hidden border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78 md:inline-flex">
-            Login
-          </button>
+          <div className="ml-auto hidden items-center gap-2 md:inline-flex">
+            {user ? (
+              <>
+                <button
+                  type="button"
+                  onClick={goArchive}
+                  className="shape-cut-sm inline-flex items-center gap-2 border border-black/10 bg-white/45 px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/70"
+                >
+                  <ArchiveIcon size={16} />
+                  자료실
+                </button>
+                <span className="max-w-28 truncate text-sm font-semibold text-[var(--theme-body-dark)]/78">
+                  {user.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="shape-cut-sm inline-flex items-center gap-2 border border-black/10 bg-white/60 px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78"
+                >
+                  <LogOut size={16} />
+                  로그아웃
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={goLogin}
+                disabled={isLoading}
+                className="shape-cut-sm inline-flex items-center gap-2 border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78 disabled:cursor-wait disabled:opacity-70"
+              >
+                <LogIn size={16} />
+                Login
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -486,12 +569,12 @@ function App() {
   )
 }
 
-function PageShell({ children }) {
+function PageShell({ children, wide = false }) {
   return (
     <div className="relative min-h-screen  bg-[var(--theme-bg)] text-[var(--theme-text)]">
       <BackgroundLayers />
-      <main className="relative mx-auto flex min-h-screen max-w-4xl items-center justify-center px-4 py-28 sm:px-6">
-        <div className="w-full max-w-xl">{children}</div>
+      <main className={`relative mx-auto flex min-h-screen items-center justify-center px-4 py-28 sm:px-6 ${wide ? 'max-w-6xl' : 'max-w-4xl'}`}>
+        <div className={`w-full ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
       </main>
     </div>
   )
