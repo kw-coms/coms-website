@@ -16,13 +16,9 @@ FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
-RUN addgroup --system spring && adduser --system --ingroup spring spring
-
 COPY --from=build /app/build/libs/*.jar app.jar
 
-RUN mkdir -p /app/data && chown -R spring:spring /app
-
-USER spring
+RUN mkdir -p /app/data
 
 EXPOSE 8080
 

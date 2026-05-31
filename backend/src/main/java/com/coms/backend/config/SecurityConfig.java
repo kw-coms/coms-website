@@ -17,6 +17,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -27,6 +28,9 @@ public class SecurityConfig {
 
     @Value("${spring.h2.console.enabled:false}")
     private boolean h2ConsoleEnabled;
+
+    @Value("${cors.allowed-origins:http://localhost:5173}")
+    private String corsAllowedOrigins;
 
     public SecurityConfig(JwtTokenProvider jwtTokenProvider) {
         this.jwtTokenProvider = jwtTokenProvider;
