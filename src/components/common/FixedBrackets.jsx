@@ -1,21 +1,18 @@
-import React from 'react'
+const bracketImgStyle = {
+  display: 'block',
+  height: 'clamp(130px, 10vw, 200px)',
+  width: 'clamp(88px, 8vw, 136px)',
+  maxWidth: 'none',
+  filter: 'drop-shadow(0 0 8px rgba(0,0,0,0.18))',
+  willChange: 'transform',
+}
 
-export default function FixedBrackets({ color = '#67e8f9', leftX, rightX } = {}) {
-
-  const imgStyle = {
-    display: 'block',
-    height: 'clamp(130px, 10vw, 200px)',
-    width: 'auto',
-    maxWidth: 'none',
-    filter: 'drop-shadow(0 0 8px rgba(0,0,0,0.18))',
-    willChange: 'transform',
-  }
-
-  const BracketSvg = ({ mirrored = false }) => (
+function BracketSvg({ mirrored = false }) {
+  return (
     <svg
       viewBox="0 0 187 560"
       aria-hidden="true"
-      style={{ ...imgStyle, width: 'clamp(88px, 8vw, 136px)', transform: `${mirrored ? 'scaleX(-1) ' : ''}scaleX(1.55) scaleY(2.5)`, transformOrigin: 'center center' }}
+      style={{ ...bracketImgStyle, transform: `${mirrored ? 'scaleX(-1) ' : ''}scaleX(1.55) scaleY(2.5)`, transformOrigin: 'center center' }}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -30,7 +27,9 @@ export default function FixedBrackets({ color = '#67e8f9', leftX, rightX } = {})
       <rect y="258.776" width="29.1902" height="45.7143" fill="currentColor" />
     </svg>
   )
+}
 
+export default function FixedBrackets({ color = '#67e8f9', leftX, rightX } = {}) {
   return (
     <>
       <div

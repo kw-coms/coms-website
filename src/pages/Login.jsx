@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { loginUser } from '../services/authApi.js'
+import { getMe, loginUser } from '../services/authApi.js'
+import { useAuth } from '../contexts/AuthContext.jsx'
 import { getLogoAsset } from '../utils/logoAssets.js'
 
 export default function Login({ onBack, goSignup }) {
+  const { setUser } = useAuth()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -25,6 +27,12 @@ export default function Login({ onBack, goSignup }) {
     setLoading(true)
     try {
       const data = await loginUser({ identifier, password })
+      const user = await getMe().catch(() => ({
+        studentId: data.studentId,
+        name: data.name,
+        role: 'USER',
+      }))
+      setUser(user)
       // Token is stored in HttpOnly cookie by the server — not accessible from JS
       sessionStorage.setItem('studentId', data.studentId)
       sessionStorage.setItem('name', data.name)
