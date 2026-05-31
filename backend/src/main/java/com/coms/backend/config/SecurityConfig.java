@@ -72,7 +72,9 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(
-            "http://localhost:5173",
+	    "https://coms.kw.ac.kr",
+	    "http://localhost:5173",
+	    "http://coms.kw.ac.kr",
             "https://main.d2y2jv10z2f3v2.amplifyapp.com"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
