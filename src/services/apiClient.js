@@ -12,13 +12,18 @@ export function apiUrl(path) {
 }
 
 export async function request(path, options = {}) {
+  const isFormData = options.body instanceof FormData
+  const headers = isFormData
+    ? options.headers
+    : {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      }
+
   const response = await fetch(apiUrl(path), {
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
     ...options,
+    headers,
   })
 
   const data = await response.json().catch(() => null)

@@ -20,13 +20,16 @@ import org.springframework.web.server.ResponseStatusException;
 public class AuthService implements UserDetailsService {
 
     private final MemberRepository memberRepository;
+    private final EligibleMemberService eligibleMemberService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
     public AuthService(MemberRepository memberRepository,
+                       EligibleMemberService eligibleMemberService,
                        PasswordEncoder passwordEncoder,
                        JwtTokenProvider jwtTokenProvider) {
         this.memberRepository = memberRepository;
+        this.eligibleMemberService = eligibleMemberService;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
     }
@@ -38,14 +41,15 @@ public class AuthService implements UserDetailsService {
         if (memberRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다.");
         }
+        eligibleMemberService.validateSignup(request.studentId(), request.name(), request.phone());
 
         Member member = new Member();
-        member.setStudentId(request.studentId());
-        member.setName(request.name());
-        member.setEmail(request.email());
+        member.setStudentId(request.studentId().trim());
+        member.setName(request.name().trim());
+        member.setEmail(request.email().trim());
         member.setPassword(passwordEncoder.encode(request.password()));
-        member.setDepartment(request.department());
-        member.setPhone(request.phone());
+        member.setDepartment(request.department() == null ? null : request.department().trim());
+        member.setPhone(request.phone() == null ? null : request.phone().trim());
         memberRepository.save(member);
 
         return new AuthResponse(null, member.getStudentId(), member.getName(), "회원가입 신청이 완료되었습니다.");

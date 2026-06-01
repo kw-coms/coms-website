@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { listMembers, updateMemberRole, deleteMember } from '../services/adminApi.js'
+import { listMembers, updateMemberRole, deleteMember, importEligibleMembers } from '../services/adminApi.js'
 import { listFiles, uploadFile, deleteFile } from '../services/archiveApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 
@@ -42,6 +42,7 @@ export default function Admin({ onBack }) {
           <div className="mb-6 flex gap-2">
             {[
               { id: 'members', label: '회원 관리' },
+              { id: 'roster', label: '명부 인증' },
               { id: 'files', label: '파일 관리' },
             ].map((tab) => (
               <button
@@ -60,9 +61,73 @@ export default function Admin({ onBack }) {
           </div>
 
           {activeTab === 'members' && <MembersTab currentUser={user} />}
+          {activeTab === 'roster' && <RosterTab />}
           {activeTab === 'files' && <FilesTab />}
         </section>
       </div>
+    </div>
+  )
+}
+
+function RosterTab() {
+  const fileInputRef = useRef(null)
+  const [uploading, setUploading] = useState(false)
+  const [result, setResult] = useState(null)
+  const [error, setError] = useState('')
+
+  const handleUpload = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setResult(null)
+    setError('')
+    try {
+      const data = await importEligibleMembers(file)
+      setResult(data)
+    } catch (err) {
+      setError(err.message || '명부를 가져오지 못했습니다.')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-black/10 bg-black/5 p-4">
+        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">회원가입 인증 명부</p>
+        <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
+          엑셀 명부를 업로드하면 회원가입 시 이름, 전화번호, 학번을 서버에서 대조합니다.
+          현재 명부에 학번 열이 없으면 이름과 전화번호를 기준으로 검증합니다.
+        </p>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx"
+        className="hidden"
+        onChange={handleUpload}
+      />
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={uploading}
+        className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
+      >
+        {uploading ? '명부 가져오는 중...' : '엑셀 명부 업로드'}
+      </button>
+
+      {result && (
+        <p className="shape-cut-sm bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-700">
+          {result.message} 가져온 행: {result.imported}, 건너뜀: {result.skipped}
+        </p>
+      )}
+      {error && (
+        <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">
+          {error}
+        </p>
+      )}
     </div>
   )
 }

@@ -16,6 +16,7 @@ import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
 import Notices from './pages/Notices.jsx'
 import Admin from './pages/Admin.jsx'
+import Community from './pages/Community.jsx'
 import { getLogoAsset } from './utils/logoAssets.js'
 import FixedBrackets from './components/common/FixedBrackets.jsx'
 import { useAuth } from './contexts/useAuth.js'
@@ -192,6 +193,18 @@ function App() {
     }
 
     setCurrentPage('archive')
+    setActiveSection(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const goCommunity = () => {
+    if (authLoading) return
+    if (!user) {
+      goLogin()
+      return
+    }
+
+    setCurrentPage('community')
     setActiveSection(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -373,6 +386,32 @@ function App() {
     )
   }
 
+  if (currentPage === 'community') {
+    if (authLoading) {
+      return (
+        <PageShell>
+          <div className="shape-cut border border-white/10 bg-white/5 p-8 text-center text-white/70 backdrop-blur-md">
+            로그인 상태를 확인하는 중...
+          </div>
+        </PageShell>
+      )
+    }
+
+    if (!user) {
+      return (
+        <PageShell>
+          <Login onBack={goHome} goSignup={goSignup} />
+        </PageShell>
+      )
+    }
+
+    return (
+      <PageShell wide>
+        <Community onBack={goHome} />
+      </PageShell>
+    )
+  }
+
   if (currentPage === 'signup') {
     return (
       <PageShell>
@@ -473,6 +512,15 @@ function App() {
                 자료실
               </button>
             )}
+            {user && (
+              <button
+                type="button"
+                onClick={goCommunity}
+                className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]"
+              >
+                커뮤니티
+              </button>
+            )}
           </nav>
 
           {user ? (
@@ -534,9 +582,12 @@ function App() {
                   광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장하는 개발 커뮤니티입니다.
                 </p>
                 {user && (
-                  <div className="flex justify-center pt-3">
+                  <div className="flex flex-wrap justify-center gap-3 pt-3">
                     <button type="button" onClick={goArchive} className={ghostActionBtnClass}>
                       자료실로 이동
+                    </button>
+                    <button type="button" onClick={goCommunity} className={ghostActionBtnClass}>
+                      커뮤니티
                     </button>
                   </div>
                 )}
