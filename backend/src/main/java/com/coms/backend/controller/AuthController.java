@@ -70,9 +70,6 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<MemberResponse> me(Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         return ResponseEntity.ok(authService.getMe(authentication.getName()));
     }
 }
