@@ -25,9 +25,17 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  const login = async () => {
-    const data = await getCurrentUser()
-    setUser(data)
+  const login = async (data) => {
+    if (data) {
+      setUser(data)
+    }
+
+    try {
+      const currentUser = await getCurrentUser()
+      setUser(currentUser)
+    } catch {
+      // The login response is already authoritative for the visible session state.
+    }
   }
 
   const logout = async () => {
