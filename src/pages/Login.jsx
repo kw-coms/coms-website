@@ -29,8 +29,8 @@ export default function Login({ onBack, goSignup }) {
 
     setLoading(true)
     try {
-      await loginUser({ identifier: trimmedIdentifier, password: trimmedPassword })
-      await login()
+      const data = await loginUser({ identifier: trimmedIdentifier, password: trimmedPassword })
+      await login(data)
       onBack()
     } catch (err) {
       setError(err.message || '로그인 중 오류가 발생했습니다.')
