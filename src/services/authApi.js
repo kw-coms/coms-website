@@ -1,10 +1,4 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || '/api'
-
-export function clearAuth() {
-  sessionStorage.removeItem('studentId')
-  sessionStorage.removeItem('name')
-}
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -41,4 +35,8 @@ export async function loginUser(payload) {
 
 export async function logoutUser() {
   return request('/api/auth/logout', { method: 'POST' })
+}
+
+export async function getCurrentUser() {
+  return request('/api/auth/me')
 }
