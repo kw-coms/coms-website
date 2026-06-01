@@ -43,7 +43,7 @@ public class ArchiveService {
 
     @Transactional(readOnly = true)
     public List<ArchiveFileResponse> list() {
-        return repo.findAll().stream().map(this::toResponse).toList();
+        return repo.findAllByOrderByUploadedAtDesc().stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)

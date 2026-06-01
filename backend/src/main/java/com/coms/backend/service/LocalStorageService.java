@@ -44,7 +44,7 @@ public class LocalStorageService implements StorageService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid filename.");
         }
 
-        Files.copy(file.getInputStream(), destination, StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(file.getInputStream(), destination);
         return stored;
     }
 
