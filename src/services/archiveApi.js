@@ -1,15 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
-
-async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-    ...options,
-  })
-  const data = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(data?.message || '요청 처리 중 오류가 발생했습니다.')
-  return data
-}
+import { apiUrl, request, requestNoContent } from './apiClient.js'
 
 export async function listFiles() {
   return request('/api/files')
@@ -18,7 +7,7 @@ export async function listFiles() {
 export async function uploadFile(file) {
   const formData = new FormData()
   formData.append('file', file)
-  const response = await fetch(`${API_BASE_URL}/api/files`, {
+  const response = await fetch(apiUrl('/api/files'), {
     method: 'POST',
     credentials: 'include',
     body: formData,
@@ -29,16 +18,11 @@ export async function uploadFile(file) {
 }
 
 export function downloadUrl(id) {
-  return `${API_BASE_URL}/api/files/${id}/download`
+  return apiUrl(`/api/files/${id}/download`)
 }
 
 export async function deleteFile(id) {
-  const response = await fetch(`${API_BASE_URL}/api/files/${id}`, {
+  return requestNoContent(`/api/files/${id}`, {
     method: 'DELETE',
-    credentials: 'include',
   })
-  if (!response.ok) {
-    const data = await response.json().catch(() => null)
-    throw new Error(data?.message || '삭제 중 오류가 발생했습니다.')
-  }
 }

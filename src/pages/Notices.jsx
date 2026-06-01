@@ -15,15 +15,30 @@ export default function Notices({ onBack }) {
 
   const isAdmin = user?.role === 'ADMIN'
 
-  const load = () => {
-    setLoading(true)
+  const load = ({ showLoading = true } = {}) => {
+    if (showLoading) setLoading(true)
     listNotices()
       .then(setNotices)
       .catch((err) => setError(err.message || '공지사항을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }
 
-  useEffect(load, [])
+  useEffect(() => {
+    let mounted = true
+    listNotices()
+      .then((data) => {
+        if (mounted) setNotices(data)
+      })
+      .catch((err) => {
+        if (mounted) setError(err.message || '공지사항을 불러오지 못했습니다.')
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   const openCreate = () => {
     setEditTarget(null)

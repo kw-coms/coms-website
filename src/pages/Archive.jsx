@@ -13,8 +13,8 @@ export default function Archive({ onBack }) {
 
   const isAdmin = user?.role === 'ADMIN'
 
-  const loadFiles = () => {
-    setLoading(true)
+  const loadFiles = ({ showLoading = true } = {}) => {
+    if (showLoading) setLoading(true)
     setError('')
     listFiles()
       .then(setFiles)
@@ -22,7 +22,22 @@ export default function Archive({ onBack }) {
       .finally(() => setLoading(false))
   }
 
-  useEffect(loadFiles, [])
+  useEffect(() => {
+    let mounted = true
+    listFiles()
+      .then((data) => {
+        if (mounted) setFiles(data)
+      })
+      .catch((err) => {
+        if (mounted) setError(err.message || '자료실을 불러오지 못했습니다.')
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
 
   const handleUpload = async (e) => {
     const file = e.target.files?.[0]

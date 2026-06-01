@@ -80,7 +80,6 @@ function App() {
   const activitiesRef = useRef(null)
   const projectsRef = useRef(null)
   const recruitRef = useRef(null)
-  const logoRef = useRef(null)
   const [bottomHidden, setBottomHidden] = useState(false)
 
   const updateBracketPositions = (sectionId) => {
@@ -220,7 +219,6 @@ function App() {
     goHome()
   }
 
-  const isPanelOpen = false
   const bracketColor = activeSection ? sectionMeta[activeSection]?.bracket : sectionMeta.about.bracket
 
   const renderSectionContent = (id) => {
@@ -413,11 +411,7 @@ function App() {
     <div className="relative min-h-screen  bg-[var(--theme-bg)] text-[var(--theme-text)] selection:bg-[color-mix(in_srgb,var(--theme-accent)_35%,transparent)] selection:text-[var(--theme-text)]">
       <BackgroundLayers />
 
-      {/* Fixed brackets component: gap controlled by measured element widths */}
       <FixedBrackets color={bracketColor} leftX={bracketPositions.leftX} rightX={bracketPositions.rightX} />
-
-      {/* Small centered site label that sits between brackets */}
-      {/* removed centered KW COM's label per request */}
 
       <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
         <div className={`${floatingBarBaseClass} relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-5`}>
@@ -496,10 +490,10 @@ function App() {
 
       <main className="relative mx-auto flex min-h-[100svh] max-w-7xl items-center px-4 py-16 sm:px-6 sm:py-18 lg:px-8">
         <section className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center text-center">
-          <div className={`relative w-full transition-all duration-300 ${isPanelOpen ? 'opacity-10 blur-sm scale-95' : 'opacity-100'}`}>
+          <div className="relative w-full transition-all duration-300 opacity-100">
 
             <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center justify-center py-4 sm:py-6">
-                    <div ref={logoRef} style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                       <SplitLogoCard />
                     </div>
 
@@ -545,7 +539,6 @@ function App() {
         </div>
       </nav>
 
-      {/* In-page sections replacing overlay panels */}
       <div className="mt-8">
         <section ref={aboutRef} id="about" className="relative py-24">
           <div className="mx-auto max-w-5xl px-4">
