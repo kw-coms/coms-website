@@ -49,7 +49,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> {
-                auth.requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/logout", "/hello", "/api/server/time").permitAll();
+                auth.requestMatchers("/error", "/api/auth/signup", "/api/auth/login", "/api/auth/logout", "/hello", "/api/server/time").permitAll();
                 auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/**").permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/api/notices").hasRole("ADMIN");
