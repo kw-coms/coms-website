@@ -35,7 +35,6 @@ jobs:
             docker compose -f docker-compose.yml up -d --build --remove-orphans
             docker image prune -f
 
-            curl -fI https://coms.kw.ac.kr/
             for attempt in 1 2 3 4 5 6 7 8 9 10; do
               if curl -fsS http://127.0.0.1:8080/actuator/health; then
                 break
@@ -47,5 +46,17 @@ jobs:
               fi
               sleep 3
             done
-            curl -f https://coms.kw.ac.kr/api/server/time
+
+            for attempt in 1 2 3 4 5 6 7 8 9 10; do
+              if curl -fI https://coms.kw.ac.kr/ && curl -f https://coms.kw.ac.kr/api/server/time; then
+                break
+              fi
+              if [ "$attempt" -eq 10 ]; then
+                docker compose -f docker-compose.yml ps
+                docker logs --tail=200 coms-backend
+                docker logs --tail=100 coms-frontend
+                exit 1
+              fi
+              sleep 3
+            done
           REMOTE
