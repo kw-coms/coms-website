@@ -19,14 +19,17 @@ export default function Login({ onBack, goSignup }) {
     e.preventDefault()
     setError('')
 
-    if (!identifier || !password) {
+    const trimmedIdentifier = identifier.trim()
+    const trimmedPassword = password.trim()
+
+    if (!trimmedIdentifier || !trimmedPassword) {
       setError('아이디와 비밀번호를 모두 입력해주세요.')
       return
     }
 
     setLoading(true)
     try {
-      await loginUser({ identifier, password })
+      await loginUser({ identifier: trimmedIdentifier, password: trimmedPassword })
       await login()
       onBack()
     } catch (err) {
