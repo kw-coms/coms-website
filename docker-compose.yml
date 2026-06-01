@@ -13,6 +13,33 @@ services:
       timeout: 5s
       retries: 5
 
+  coms-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: coms-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: db
+      DB_NAME: ${DB_NAME:-comsdb}
+      DB_USER: ${DB_USER:-coms}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      COOKIE_SECURE: "true"
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO:-validate}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./backend-data:/app/data
+      - backend-uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
   coms-frontend:
     build:
       context: .
@@ -23,30 +50,6 @@ services:
       - "127.0.0.1:3000:80"
     depends_on:
       - coms-backend
-
-  coms-backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: coms-backend
-    restart: unless-stopped
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      DB_HOST: db
-      DB_NAME: ${DB_NAME:-comsdb}
-      DB_USER: ${DB_USER:-coms}
-      DB_PASSWORD: ${DB_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
-      COOKIE_SECURE: "true"
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
-    ports:
-      - "127.0.0.1:8080:8080"
-    volumes:
-      - ./backend-data:/app/data
-      - backend-uploads:/app/uploads
-    depends_on:
-      db:
-        condition: service_healthy
 
 volumes:
   pgdata:

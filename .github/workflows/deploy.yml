@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -23,7 +24,7 @@ jobs:
 
           ssh-keyscan -p "$DEPLOY_PORT" "$DEPLOY_HOST" >> ~/.ssh/known_hosts
 
-          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" << 'EOF'
+          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" << 'REMOTE'
             set -e
 
             cd ~/apps/coms-website
@@ -31,9 +32,13 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            docker compose -f docker-compose.yml up -d --build --remove-orphans
+            docker compose up -d --build
             docker image prune -f
 
-            curl -I https://coms.kw.ac.kr/
-            curl -i https://coms.kw.ac.kr/api/ || true
-          EOF
+            sudo nginx -t
+            sudo systemctl reload nginx
+
+            curl -fI https://coms.kw.ac.kr/
+            curl -f http://127.0.0.1:8080/actuator/health
+            curl -f https://coms.kw.ac.kr/api/server/time
+          REMOTE
