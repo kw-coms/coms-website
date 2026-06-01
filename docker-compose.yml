@@ -19,8 +19,6 @@ services:
       dockerfile: Dockerfile
     container_name: coms-backend
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_HOST: db
@@ -30,6 +28,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       COOKIE_SECURE: "true"
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      SPRING_FLYWAY_ENABLED: "true"
       SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO:-validate}
     ports:
       - "127.0.0.1:8080:8080"
