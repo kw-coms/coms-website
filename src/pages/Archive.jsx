@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Download, RefreshCw, UploadCloud } from 'lucide-react'
-import { downloadFile, getFiles, uploadFile } from '../services/archiveApi.js'
+import { useEffect, useRef, useState } from 'react'
+import { Download, RefreshCw, Trash2, UploadCloud } from 'lucide-react'
+import { deleteFile, downloadUrl, listFiles, uploadFile } from '../services/archiveApi.js'
+import { useAuth } from '../contexts/useAuth.js'
 
 function formatSize(bytes) {
   if (!Number.isFinite(bytes)) return '-'
@@ -22,43 +23,43 @@ function formatDate(value) {
   }).format(date)
 }
 
-export default function Archive({ onBack, user }) {
+export default function Archive({ onBack }) {
+  const { user } = useAuth()
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
-  const [notice, setNotice] = useState('')
   const fileInputRef = useRef(null)
 
   const isAdmin = user?.role === 'ADMIN'
 
-  const loadFiles = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await getFiles()
-      setFiles(Array.isArray(data) ? data : [])
-    } catch (err) {
-      setError(err.message || '자료실 목록을 불러오지 못했습니다.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const loadFiles = ({ showLoading = true } = {}) => {
+    if (showLoading) setLoading(true)
+    setError('')
+    listFiles()
+      .then((data) => setFiles(Array.isArray(data) ? data : []))
+      .catch((err) => setError(err.message || '자료실 목록을 불러오지 못했습니다.'))
+      .finally(() => setLoading(false))
+  }
 
   useEffect(() => {
-    loadFiles()
-  }, [loadFiles])
-
-  const handleDownload = async (file) => {
-    setNotice('')
-    setError(null)
-    try {
-      await downloadFile(file.id, file.originalName)
-    } catch (err) {
-      setError(err.message || '다운로드 실패')
+    let mounted = true
+    listFiles()
+      .then((data) => {
+        if (mounted) setFiles(Array.isArray(data) ? data : [])
+      })
+      .catch((err) => {
+        if (mounted) setError(err.message || '자료실 목록을 불러오지 못했습니다.')
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+    return () => {
+      mounted = false
     }
-  }
+  }, [])
 
   const handleUpload = async () => {
     if (!selectedFile) {
@@ -67,21 +68,33 @@ export default function Archive({ onBack, user }) {
     }
 
     setUploading(true)
-    setError(null)
+    setError('')
     setNotice('')
 
     try {
       await uploadFile(selectedFile)
       setSelectedFile(null)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
+      if (fileInputRef.current) fileInputRef.current.value = ''
       setNotice('파일이 업로드되었습니다.')
-      await loadFiles()
+      loadFiles({ showLoading: false })
     } catch (err) {
       setError(err.message || '업로드 실패')
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('파일을 삭제하시겠습니까?')) return
+    setError('')
+    setNotice('')
+
+    try {
+      await deleteFile(id)
+      setFiles((prev) => prev.filter((file) => file.id !== id))
+      setNotice('파일이 삭제되었습니다.')
+    } catch (err) {
+      setError(err.message || '삭제 중 오류가 발생했습니다.')
     }
   }
 
@@ -144,7 +157,7 @@ export default function Archive({ onBack, user }) {
             <span>{error}</span>
             <button
               type="button"
-              onClick={loadFiles}
+              onClick={() => loadFiles()}
               className="inline-flex items-center justify-center gap-2 shape-cut-sm border border-white/10 bg-white/10 px-3 py-2 font-semibold text-white transition hover:bg-white/15"
             >
               <RefreshCw size={15} />
@@ -182,14 +195,25 @@ export default function Archive({ onBack, user }) {
                       <td className="px-4 py-4">{file.uploadedBy || '-'}</td>
                       <td className="px-4 py-4">{formatDate(file.uploadedAt)}</td>
                       <td className="px-4 py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleDownload(file)}
-                          className="shape-cut-sm inline-flex items-center justify-center gap-2 border border-white/10 bg-white/10 px-3 py-2 font-semibold text-white transition hover:bg-white/15"
-                        >
-                          <Download size={15} />
-                          다운로드
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <a
+                            href={downloadUrl(file.id)}
+                            className="shape-cut-sm inline-flex items-center justify-center gap-2 border border-white/10 bg-white/10 px-3 py-2 font-semibold text-white transition hover:bg-white/15"
+                          >
+                            <Download size={15} />
+                            다운로드
+                          </a>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(file.id)}
+                              className="shape-cut-sm inline-flex items-center justify-center gap-2 border border-red-300/20 bg-red-400/10 px-3 py-2 font-semibold text-red-100 transition hover:bg-red-400/20"
+                            >
+                              <Trash2 size={15} />
+                              삭제
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

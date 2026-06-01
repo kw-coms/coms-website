@@ -1,31 +1,44 @@
-import { createContext, useContext, useEffect, useState } from 'react'
-import { clearAuth, getMe, logoutUser } from '../services/authApi.js'
-
-const AuthContext = createContext(null)
+import { useEffect, useMemo, useState } from 'react'
+import { getCurrentUser, logoutUser } from '../services/authApi.js'
+import { AuthContext } from './useAuth.js'
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(undefined)
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getMe()
-      .then(setUser)
-      .catch(() => setUser(null))
+    let mounted = true
+
+    getCurrentUser()
+      .then((data) => {
+        if (mounted) setUser(data)
+      })
+      .catch(() => {
+        if (mounted) setUser(null)
+      })
+      .finally(() => {
+        if (mounted) setLoading(false)
+      })
+
+    return () => {
+      mounted = false
+    }
   }, [])
 
-  const logout = async () => {
-    await logoutUser().catch(() => {})
-    clearAuth()
-    setUser(null)
+  const login = async () => {
+    const data = await getCurrentUser()
+    setUser(data)
   }
 
-  return (
-    <AuthContext.Provider value={{ user, setUser, logout, isLoading: user === undefined }}>
-      {children}
-    </AuthContext.Provider>
-  )
-}
+  const logout = async () => {
+    try {
+      await logoutUser()
+    } finally {
+      setUser(null)
+    }
+  }
 
-// eslint-disable-next-line react-refresh/only-export-components
-export function useAuth() {
-  return useContext(AuthContext)
+  const value = useMemo(() => ({ user, loading, login, logout }), [user, loading])
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
