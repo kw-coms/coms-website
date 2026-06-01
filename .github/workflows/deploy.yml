@@ -32,13 +32,20 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            docker compose up -d --build
+            docker compose -f docker-compose.yml up -d --build --remove-orphans
             docker image prune -f
 
-            sudo nginx -t
-            sudo systemctl reload nginx
-
             curl -fI https://coms.kw.ac.kr/
-            curl -f http://127.0.0.1:8080/actuator/health
+            for attempt in 1 2 3 4 5 6 7 8 9 10; do
+              if curl -fsS http://127.0.0.1:8080/actuator/health; then
+                break
+              fi
+              if [ "$attempt" -eq 10 ]; then
+                docker compose -f docker-compose.yml ps
+                docker logs --tail=200 coms-backend
+                exit 1
+              fi
+              sleep 3
+            done
             curl -f https://coms.kw.ac.kr/api/server/time
           REMOTE
