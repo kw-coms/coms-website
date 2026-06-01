@@ -1,6 +1,4 @@
 services:
-<<<<<<< HEAD
-=======
   db:
     image: postgres:16-alpine
     environment:
@@ -42,7 +40,6 @@ services:
       db:
         condition: service_healthy
 
->>>>>>> a100910 (fix: stabilize docker deployment health checks)
   coms-frontend:
     build:
       context: .
@@ -54,21 +51,6 @@ services:
     depends_on:
       - coms-backend
 
-<<<<<<< HEAD
-  coms-backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: coms-backend
-    restart: unless-stopped
-    env_file:
-      - .env
-    ports:
-      - "127.0.0.1:8080:8080"
-    volumes:
-      - ./backend-data:/app/data
-=======
 volumes:
   pgdata:
   backend-uploads:
->>>>>>> a100910 (fix: stabilize docker deployment health checks)
