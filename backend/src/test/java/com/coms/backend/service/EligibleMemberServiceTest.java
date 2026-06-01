@@ -46,15 +46,11 @@ class EligibleMemberServiceTest {
     }
 
     @Test
-    void supportsCurrentRosterShapeWithoutStudentIdColumn() throws Exception {
+    void rejectsRosterWithoutStudentIdColumn() throws Exception {
         MockMultipartFile file = workbookFile(new String[]{"이름", "전화번호", "기수", "참석 여부"},
                 new String[]{"김철수", "010-1111-2222", "2기", "참석"});
 
-        var response = eligibleMemberService.importRoster(file);
-
-        assertThat(response.imported()).isEqualTo(1);
-        eligibleMemberService.validateSignup("2024999999", "김철수", "01011112222");
-        assertThatThrownBy(() -> eligibleMemberService.validateSignup("2024999999", "김철수", "010-0000-0000"))
+        assertThatThrownBy(() -> eligibleMemberService.importRoster(file))
                 .isInstanceOf(ResponseStatusException.class);
     }
 

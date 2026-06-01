@@ -97,8 +97,8 @@ function RosterTab() {
       <div className="rounded-lg border border-black/10 bg-black/5 p-4">
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">회원가입 인증 명부</p>
         <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
-          엑셀 명부를 업로드하면 회원가입 시 이름, 전화번호, 학번을 서버에서 대조합니다.
-          현재 명부에 학번 열이 없으면 이름과 전화번호를 기준으로 검증합니다.
+          엑셀 명부를 업로드하면 회원가입 시 학번, 이름, 전화번호를 서버에서 대조합니다.
+          학번 열이 없는 파일은 가져올 수 없습니다.
         </p>
       </div>
 

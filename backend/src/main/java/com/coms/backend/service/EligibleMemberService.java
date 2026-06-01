@@ -38,14 +38,16 @@ public class EligibleMemberService {
         }
 
         EligibleMember eligibleMember = match.orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 이름과 전화번호를 확인해주세요."));
+                new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번, 이름, 전화번호를 확인해주세요."));
 
-        if (eligibleMember.getStudentId() != null && !eligibleMember.getStudentId().isBlank()
-                && !eligibleMember.getStudentId().equals(normalizedStudentId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번을 확인해주세요.");
+        if (eligibleMember.getStudentId() == null || eligibleMember.getStudentId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "학번이 포함된 명부가 필요합니다.");
+        }
+        if (!eligibleMember.getStudentId().equals(normalizedStudentId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번, 이름, 전화번호를 확인해주세요.");
         }
         if (!eligibleMember.getName().equals(normalizedName) || !eligibleMember.getPhone().equals(normalizedPhone)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 이름과 전화번호를 확인해주세요.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번, 이름, 전화번호를 확인해주세요.");
         }
     }
 
@@ -60,8 +62,8 @@ public class EligibleMemberService {
              Workbook workbook = WorkbookFactory.create(inputStream)) {
             Sheet sheet = workbook.getSheetAt(0);
             Map<String, Integer> header = findHeader(sheet);
-            if (!header.containsKey("name") || !header.containsKey("phone")) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부에는 이름, 전화번호 컬럼이 필요합니다.");
+            if (!header.containsKey("studentId") || !header.containsKey("name") || !header.containsKey("phone")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부에는 학번, 이름, 전화번호 컬럼이 필요합니다.");
             }
 
             int headerRow = findHeaderRowIndex(sheet);
