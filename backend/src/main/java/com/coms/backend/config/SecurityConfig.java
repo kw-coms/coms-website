@@ -5,6 +5,7 @@ import com.coms.backend.security.JwtTokenProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -49,6 +50,14 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> {
                 auth.requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/logout", "/hello", "/api/server/time").permitAll();
+                auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/**").permitAll();
+                auth.requestMatchers(HttpMethod.POST, "/api/notices").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.PUT, "/api/notices/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.DELETE, "/api/notices/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.POST, "/api/files").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.DELETE, "/api/files/**").hasRole("ADMIN");
+                auth.requestMatchers("/api/files", "/api/files/**").authenticated();
                 // Actuator: health and info public, everything else requires ADMIN
                 auth.requestMatchers("/actuator/health", "/actuator/info").permitAll();
                 auth.requestMatchers("/actuator/**").hasRole("ADMIN");
@@ -81,7 +90,7 @@ public class SecurityConfig {
 			.filter(origin -> !origin.isEmpty())
 			.toList()
 	);
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
 

@@ -4,18 +4,21 @@ import {
   CircuitBoard,
   Github,
   Instagram,
-  LogIn,
+  LogOut,
   Mail,
-  MapPinned,
   Rocket,
   Sparkles,
   Youtube,
 } from 'lucide-react'
 import SplitLogoCard from './components/common/SplitLogoCard.jsx'
+import Archive from './pages/Archive.jsx'
 import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
+import Notices from './pages/Notices.jsx'
+import Admin from './pages/Admin.jsx'
 import { getLogoAsset } from './utils/logoAssets.js'
 import FixedBrackets from './components/common/FixedBrackets.jsx'
+import { useAuth } from './contexts/useAuth.js'
 
 const tabs = [
   { id: 'about', label: 'About', hint: '정체성', icon: Binary, accent: 'text-cyan-200' },
@@ -69,6 +72,7 @@ const solidActionBtnClass = 'shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-
 const ghostActionBtnClass = 'shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/20'
 
 function App() {
+  const { user, loading: authLoading, logout } = useAuth()
   const [currentPage, setCurrentPage] = useState('home')
   const [activeSection, setActiveSection] = useState(null)
   const [bracketPositions, setBracketPositions] = useState({ leftX: null, rightX: null })
@@ -76,7 +80,6 @@ function App() {
   const activitiesRef = useRef(null)
   const projectsRef = useRef(null)
   const recruitRef = useRef(null)
-  const logoRef = useRef(null)
   const [bottomHidden, setBottomHidden] = useState(false)
 
   const updateBracketPositions = (sectionId) => {
@@ -170,11 +173,6 @@ function App() {
     }
   }
 
-  const closePanel = () => {
-    // noop for compatibility; panels are in-page now
-    setActiveSection(null)
-  }
-
   const goHome = () => {
     setCurrentPage('home')
     setActiveSection(null)
@@ -184,6 +182,23 @@ function App() {
   const goLogin = () => {
     setCurrentPage('login')
     setActiveSection(null)
+  }
+
+  const goArchive = () => {
+    if (authLoading) return
+    if (!user) {
+      goLogin()
+      return
+    }
+
+    setCurrentPage('archive')
+    setActiveSection(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    goHome()
   }
 
   const goSignup = () => {
@@ -197,9 +212,18 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const activePanelId = activeSection
-  const isPanelOpen = false
-  const ActiveIcon = activePanelId ? tabs.find((item) => item.id === activePanelId)?.icon : null
+  const goNotices = () => {
+    setCurrentPage('notices')
+    setActiveSection(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const goAdmin = () => {
+    setCurrentPage('admin')
+    setActiveSection(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const bracketColor = activeSection ? sectionMeta[activeSection]?.bracket : sectionMeta.about.bracket
 
   const renderSectionContent = (id) => {
@@ -323,6 +347,32 @@ function App() {
     )
   }
 
+  if (currentPage === 'archive') {
+    if (authLoading) {
+      return (
+        <PageShell>
+          <div className="shape-cut border border-white/10 bg-white/5 p-8 text-center text-white/70 backdrop-blur-md">
+            로그인 상태를 확인하는 중...
+          </div>
+        </PageShell>
+      )
+    }
+
+    if (!user) {
+      return (
+        <PageShell>
+          <Login onBack={goHome} goSignup={goSignup} />
+        </PageShell>
+      )
+    }
+
+    return (
+      <PageShell wide>
+        <Archive onBack={goHome} />
+      </PageShell>
+    )
+  }
+
   if (currentPage === 'signup') {
     return (
       <PageShell>
@@ -330,6 +380,22 @@ function App() {
           로그인으로 돌아가기
         </button>
         <Signup onBack={() => setCurrentPage('login')} />
+      </PageShell>
+    )
+  }
+
+  if (currentPage === 'notices') {
+    return (
+      <PageShell>
+        <Notices onBack={goHome} />
+      </PageShell>
+    )
+  }
+
+  if (currentPage === 'admin') {
+    return (
+      <PageShell>
+        <Admin onBack={goHome} />
       </PageShell>
     )
   }
@@ -368,11 +434,7 @@ function App() {
     <div className="relative min-h-screen  bg-[var(--theme-bg)] text-[var(--theme-text)] selection:bg-[color-mix(in_srgb,var(--theme-accent)_35%,transparent)] selection:text-[var(--theme-text)]">
       <BackgroundLayers />
 
-      {/* Fixed brackets component: gap controlled by measured element widths */}
       <FixedBrackets color={bracketColor} leftX={bracketPositions.leftX} rightX={bracketPositions.rightX} />
-
-      {/* Small centered site label that sits between brackets */}
-      {/* removed centered KW COM's label per request */}
 
       <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
         <div className={`${floatingBarBaseClass} relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-5`}>
@@ -395,11 +457,57 @@ function App() {
                 {tab.label}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={goNotices}
+              className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]"
+            >
+              공지사항
+            </button>
+            {user && (
+              <button
+                type="button"
+                onClick={goArchive}
+                className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]"
+              >
+                자료실
+              </button>
+            )}
           </nav>
 
-          <button type="button" onClick={goLogin} className="shape-cut-sm ml-auto hidden border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78 md:inline-flex">
-            Login
-          </button>
+          {user ? (
+            <div className="ml-auto hidden items-center gap-2 md:flex">
+              <span className="shape-cut-sm border border-black/10 bg-white/50 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)]">
+                {user.name}
+              </span>
+              {user.role === 'ADMIN' && (
+                <button
+                  type="button"
+                  onClick={goAdmin}
+                  className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78"
+                >
+                  관리자
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="shape-cut-sm inline-flex items-center gap-2 border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78"
+              >
+                <LogOut size={15} />
+                Logout
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={goLogin}
+              disabled={authLoading}
+              className="shape-cut-sm ml-auto hidden border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78 disabled:cursor-wait disabled:opacity-70 md:inline-flex"
+            >
+              Login
+            </button>
+          )}
         </div>
       </header>
 
@@ -414,10 +522,10 @@ function App() {
 
       <main className="relative mx-auto flex min-h-[100svh] max-w-7xl items-center px-4 py-16 sm:px-6 sm:py-18 lg:px-8">
         <section className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center text-center">
-          <div className={`relative w-full transition-all duration-300 ${isPanelOpen ? 'opacity-10 blur-sm scale-95' : 'opacity-100'}`}>
+          <div className="relative w-full transition-all duration-300 opacity-100">
 
             <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center justify-center py-4 sm:py-6">
-                    <div ref={logoRef} style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                       <SplitLogoCard />
                     </div>
 
@@ -425,6 +533,13 @@ function App() {
                 <p className="mx-auto whitespace-nowrap px-2 leading-8 text-white/72 text-[clamp(0.68rem,1.55vw,1.125rem)]">
                   광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장하는 개발 커뮤니티입니다.
                 </p>
+                {user && (
+                  <div className="flex justify-center pt-3">
+                    <button type="button" onClick={goArchive} className={ghostActionBtnClass}>
+                      자료실로 이동
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -456,7 +571,6 @@ function App() {
         </div>
       </nav>
 
-      {/* In-page sections replacing overlay panels */}
       <div className="mt-8">
         <section ref={aboutRef} id="about" className="relative py-24">
           <div className="mx-auto max-w-5xl px-4">
@@ -486,12 +600,12 @@ function App() {
   )
 }
 
-function PageShell({ children }) {
+function PageShell({ children, wide = false }) {
   return (
     <div className="relative min-h-screen  bg-[var(--theme-bg)] text-[var(--theme-text)]">
       <BackgroundLayers />
-      <main className="relative mx-auto flex min-h-screen max-w-4xl items-center justify-center px-4 py-28 sm:px-6">
-        <div className="w-full max-w-xl">{children}</div>
+      <main className={`relative mx-auto flex min-h-screen items-center justify-center px-4 py-28 sm:px-6 ${wide ? 'max-w-6xl' : 'max-w-4xl'}`}>
+        <div className={`w-full ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
       </main>
     </div>
   )

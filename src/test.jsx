@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 function TestPage() {
-  const [count, setCount] = useState(0)
   const [serverTime, setServerTime] = useState('')
 
   useEffect(() => {
