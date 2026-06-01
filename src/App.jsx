@@ -11,9 +11,9 @@ import {
   Youtube,
 } from 'lucide-react'
 import SplitLogoCard from './components/common/SplitLogoCard.jsx'
+import Archive from './pages/Archive.jsx'
 import Login from './pages/Login.jsx'
 import Signup from './pages/Signup.jsx'
-import Archive from './pages/Archive.jsx'
 import Notices from './pages/Notices.jsx'
 import Admin from './pages/Admin.jsx'
 import { getLogoAsset } from './utils/logoAssets.js'
@@ -184,16 +184,26 @@ function App() {
     setActiveSection(null)
   }
 
-  const goSignup = () => {
-    setCurrentPage('signup')
-    setActiveSection(null)
-  }
-
   const goArchive = () => {
-    if (!user) return
+    if (authLoading) return
+    if (!user) {
+      goLogin()
+      return
+    }
+
     setCurrentPage('archive')
     setActiveSection(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    goHome()
+  }
+
+  const goSignup = () => {
+    setCurrentPage('signup')
+    setActiveSection(null)
   }
 
   const goRecruitPage = () => {
@@ -212,11 +222,6 @@ function App() {
     setCurrentPage('admin')
     setActiveSection(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const handleLogout = async () => {
-    await logout()
-    goHome()
   }
 
   const bracketColor = activeSection ? sectionMeta[activeSection]?.bracket : sectionMeta.about.bracket
@@ -342,6 +347,32 @@ function App() {
     )
   }
 
+  if (currentPage === 'archive') {
+    if (authLoading) {
+      return (
+        <PageShell>
+          <div className="shape-cut border border-white/10 bg-white/5 p-8 text-center text-white/70 backdrop-blur-md">
+            로그인 상태를 확인하는 중...
+          </div>
+        </PageShell>
+      )
+    }
+
+    if (!user) {
+      return (
+        <PageShell>
+          <Login onBack={goHome} goSignup={goSignup} />
+        </PageShell>
+      )
+    }
+
+    return (
+      <PageShell wide>
+        <Archive onBack={goHome} />
+      </PageShell>
+    )
+  }
+
   if (currentPage === 'signup') {
     return (
       <PageShell>
@@ -349,14 +380,6 @@ function App() {
           로그인으로 돌아가기
         </button>
         <Signup onBack={() => setCurrentPage('login')} />
-      </PageShell>
-    )
-  }
-
-  if (currentPage === 'archive') {
-    return (
-      <PageShell>
-        <Archive onBack={goHome} />
       </PageShell>
     )
   }
@@ -441,6 +464,15 @@ function App() {
             >
               공지사항
             </button>
+            {user && (
+              <button
+                type="button"
+                onClick={goArchive}
+                className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]"
+              >
+                자료실
+              </button>
+            )}
           </nav>
 
           {user ? (
@@ -568,12 +600,12 @@ function App() {
   )
 }
 
-function PageShell({ children }) {
+function PageShell({ children, wide = false }) {
   return (
     <div className="relative min-h-screen  bg-[var(--theme-bg)] text-[var(--theme-text)]">
       <BackgroundLayers />
-      <main className="relative mx-auto flex min-h-screen max-w-4xl items-center justify-center px-4 py-28 sm:px-6">
-        <div className="w-full max-w-xl">{children}</div>
+      <main className={`relative mx-auto flex min-h-screen items-center justify-center px-4 py-28 sm:px-6 ${wide ? 'max-w-6xl' : 'max-w-4xl'}`}>
+        <div className={`w-full ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
       </main>
     </div>
   )

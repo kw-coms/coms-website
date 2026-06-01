@@ -1,14 +1,36 @@
 import { useEffect, useRef, useState } from 'react'
-import { listFiles, uploadFile, downloadUrl, deleteFile } from '../services/archiveApi.js'
+import { Download, RefreshCw, Trash2, UploadCloud } from 'lucide-react'
+import { deleteFile, downloadUrl, listFiles, uploadFile } from '../services/archiveApi.js'
 import { useAuth } from '../contexts/useAuth.js'
+
+function formatSize(bytes) {
+  if (!Number.isFinite(bytes)) return '-'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function formatDate(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
 
 export default function Archive({ onBack }) {
   const { user } = useAuth()
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState('')
+  const [selectedFile, setSelectedFile] = useState(null)
   const fileInputRef = useRef(null)
 
   const isAdmin = user?.role === 'ADMIN'
@@ -17,8 +39,8 @@ export default function Archive({ onBack }) {
     if (showLoading) setLoading(true)
     setError('')
     listFiles()
-      .then(setFiles)
-      .catch((err) => setError(err.message || '자료실을 불러오지 못했습니다.'))
+      .then((data) => setFiles(Array.isArray(data) ? data : []))
+      .catch((err) => setError(err.message || '자료실 목록을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }
 
@@ -26,10 +48,10 @@ export default function Archive({ onBack }) {
     let mounted = true
     listFiles()
       .then((data) => {
-        if (mounted) setFiles(data)
+        if (mounted) setFiles(Array.isArray(data) ? data : [])
       })
       .catch((err) => {
-        if (mounted) setError(err.message || '자료실을 불러오지 못했습니다.')
+        if (mounted) setError(err.message || '자료실 목록을 불러오지 못했습니다.')
       })
       .finally(() => {
         if (mounted) setLoading(false)
@@ -39,122 +61,168 @@ export default function Archive({ onBack }) {
     }
   }, [])
 
-  const handleUpload = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      setError('업로드할 파일을 선택해주세요.')
+      return
+    }
+
     setUploading(true)
-    setUploadError('')
+    setError('')
+    setNotice('')
+
     try {
-      await uploadFile(file)
-      loadFiles()
+      await uploadFile(selectedFile)
+      setSelectedFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      setNotice('파일이 업로드되었습니다.')
+      loadFiles({ showLoading: false })
     } catch (err) {
-      setUploadError(err.message || '업로드 중 오류가 발생했습니다.')
+      setError(err.message || '업로드 실패')
     } finally {
       setUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
   const handleDelete = async (id) => {
     if (!window.confirm('파일을 삭제하시겠습니까?')) return
+    setError('')
+    setNotice('')
+
     try {
       await deleteFile(id)
-      setFiles((prev) => prev.filter((f) => f.id !== id))
+      setFiles((prev) => prev.filter((file) => file.id !== id))
+      setNotice('파일이 삭제되었습니다.')
     } catch (err) {
-      alert(err.message || '삭제 중 오류가 발생했습니다.')
+      setError(err.message || '삭제 중 오류가 발생했습니다.')
     }
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="w-full space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <button
           type="button"
           onClick={onBack}
-          className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] shadow-[0_18px_40px_rgba(255,255,255,0.2)] transition hover:bg-white"
+          className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15"
         >
           메인으로 돌아가기
         </button>
-        {user && (
-          <span className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white/80">
-            {user.name}님
-          </span>
-        )}
+        <div className="text-sm text-white/55">
+          {user?.name ? `${user.name}님` : 'COM\'s 자료실'}
+        </div>
       </div>
 
-      <section className="shape-cut border border-white/10 bg-white/8 p-6 text-white shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md sm:p-8">
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <section className="shape-cut border border-white/10 bg-white/5 p-5 shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md sm:p-7">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.35em] text-cyan-200">Archive</p>
-            <h1 className="mt-3 text-3xl font-semibold sm:text-4xl">자료실</h1>
-            <p className="mt-3 text-sm leading-6 text-white/70">COM&apos;s 부원 자료를 확인하고 내려받을 수 있습니다.</p>
+            <h1 className="mt-4 text-3xl font-semibold sm:text-4xl">자료실</h1>
+            <p className="mt-3 max-w-2xl leading-7 text-white/68">
+              COM&apos;s 활동 자료와 공지 파일을 확인하고 다운로드할 수 있습니다.
+            </p>
           </div>
+
           {isAdmin && (
-            <div>
-              <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:opacity-50"
-              >
-                {uploading ? '업로드 중...' : '파일 업로드'}
-              </button>
-              {uploadError && <p className="mt-2 text-xs text-red-300">{uploadError}</p>}
+            <div className="shape-cut-sm border border-white/10 bg-black/20 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
+                  className="max-w-full text-sm text-white/70 file:mr-3 file:shape-cut-sm file:border-0 file:bg-white/82 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[var(--theme-body-dark)]"
+                />
+                <button
+                  type="button"
+                  onClick={handleUpload}
+                  disabled={uploading}
+                  className="shape-cut-sm inline-flex items-center justify-center gap-2 bg-white/85 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <UploadCloud size={16} />
+                  {uploading ? '업로드 중...' : '업로드'}
+                </button>
+              </div>
             </div>
           )}
         </div>
 
-        {loading && <p className="text-sm text-white/70">자료실을 불러오는 중...</p>}
-        {error && <p className="text-sm text-red-200">{error}</p>}
-        {!loading && !error && files.length === 0 && (
-          <p className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-5 text-sm text-white/70">
-            등록된 자료가 없습니다.
-          </p>
-        )}
-
-        {!loading && !error && files.length > 0 && (
-          <div className="space-y-3">
-            {files.map((file) => (
-              <div
-                key={file.id}
-                className="shape-cut-sm flex flex-col gap-2 border border-white/10 bg-white/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <span>
-                  <span className="block font-semibold text-white">{file.originalName}</span>
-                  <span className="text-xs text-white/60">
-                    {file.uploadedBy} · {formatFileSize(file.fileSize)}
-                  </span>
-                </span>
-                <div className="flex items-center gap-3">
-                  <a
-                    href={downloadUrl(file.id)}
-                    className="text-sm font-semibold text-cyan-100 transition hover:text-cyan-200"
-                  >
-                    Download
-                  </a>
-                  {isAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(file.id)}
-                      className="text-sm font-semibold text-red-300 transition hover:text-red-200"
-                    >
-                      삭제
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+        {notice && (
+          <div className="mt-5 shape-cut-sm border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100">
+            {notice}
           </div>
         )}
+
+        {error && (
+          <div className="mt-5 flex flex-col gap-3 shape-cut-sm border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100 sm:flex-row sm:items-center sm:justify-between">
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => loadFiles()}
+              className="inline-flex items-center justify-center gap-2 shape-cut-sm border border-white/10 bg-white/10 px-3 py-2 font-semibold text-white transition hover:bg-white/15"
+            >
+              <RefreshCw size={15} />
+              다시 시도
+            </button>
+          </div>
+        )}
+
+        <div className="mt-6 overflow-hidden shape-cut-sm border border-white/10 bg-black/18">
+          {loading ? (
+            <div className="px-5 py-16 text-center text-white/65">자료를 불러오는 중...</div>
+          ) : files.length === 0 ? (
+            <div className="px-5 py-16 text-center text-white/65">등록된 자료가 없습니다.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left text-sm">
+                <thead className="border-b border-white/10 bg-white/8 text-xs uppercase tracking-[0.24em] text-white/45">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">파일명</th>
+                    <th className="px-4 py-3 font-semibold">크기</th>
+                    <th className="px-4 py-3 font-semibold">업로드</th>
+                    <th className="px-4 py-3 font-semibold">날짜</th>
+                    <th className="px-4 py-3 text-right font-semibold">동작</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {files.map((file) => (
+                    <tr key={file.id} className="text-white/75 transition hover:bg-white/5">
+                      <td className="max-w-[320px] px-4 py-4 font-semibold text-white">
+                        <span className="block truncate" title={file.originalName}>
+                          {file.originalName}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4">{formatSize(file.fileSize)}</td>
+                      <td className="px-4 py-4">{file.uploadedBy || '-'}</td>
+                      <td className="px-4 py-4">{formatDate(file.uploadedAt)}</td>
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex justify-end gap-2">
+                          <a
+                            href={downloadUrl(file.id)}
+                            className="shape-cut-sm inline-flex items-center justify-center gap-2 border border-white/10 bg-white/10 px-3 py-2 font-semibold text-white transition hover:bg-white/15"
+                          >
+                            <Download size={15} />
+                            다운로드
+                          </a>
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(file.id)}
+                              className="shape-cut-sm inline-flex items-center justify-center gap-2 border border-red-300/20 bg-red-400/10 px-3 py-2 font-semibold text-red-100 transition hover:bg-red-400/20"
+                            >
+                              <Trash2 size={15} />
+                              삭제
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </section>
     </div>
   )
-}
-
-function formatFileSize(size) {
-  if (!Number.isFinite(size)) return '알 수 없음'
-  if (size < 1024) return `${size} B`
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
-  return `${(size / 1024 / 1024).toFixed(1)} MB`
 }

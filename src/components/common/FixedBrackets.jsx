@@ -1,7 +1,7 @@
 const bracketImgStyle = {
   display: 'block',
   height: 'clamp(130px, 10vw, 200px)',
-  width: 'auto',
+  width: 'clamp(88px, 8vw, 136px)',
   maxWidth: 'none',
   filter: 'drop-shadow(0 0 8px rgba(0,0,0,0.18))',
   willChange: 'transform',
@@ -12,7 +12,7 @@ function BracketSvg({ mirrored = false }) {
     <svg
       viewBox="0 0 187 560"
       aria-hidden="true"
-      style={{ ...bracketImgStyle, width: 'clamp(88px, 8vw, 136px)', transform: `${mirrored ? 'scaleX(-1) ' : ''}scaleX(1.55) scaleY(2.5)`, transformOrigin: 'center center' }}
+      style={{ ...bracketImgStyle, transform: `${mirrored ? 'scaleX(-1) ' : ''}scaleX(1.55) scaleY(2.5)`, transformOrigin: 'center center' }}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -30,7 +30,6 @@ function BracketSvg({ mirrored = false }) {
 }
 
 export default function FixedBrackets({ color = '#67e8f9', leftX, rightX } = {}) {
-
   return (
     <>
       <div

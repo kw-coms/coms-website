@@ -32,8 +32,12 @@ dependencies {
 
 	// H2 Database (file-based, no external DB needed)
 	runtimeOnly 'com.h2database:h2'
-	runtimeOnly 'org.flywaydb:flyway-database-postgresql'
+
+	// PostgreSQL driver (prod)
 	runtimeOnly 'org.postgresql:postgresql'
+
+	// Flyway for schema migrations
+	implementation 'org.flywaydb:flyway-database-postgresql'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
 	testImplementation 'org.springframework.security:spring-security-test'
