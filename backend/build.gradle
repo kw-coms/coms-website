@@ -24,6 +24,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.flywaydb:flyway-core'
+	implementation 'org.apache.poi:poi-ooxml:5.4.0'
 
 	// JWT
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'

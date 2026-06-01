@@ -58,6 +58,7 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.POST, "/api/files").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/files/**").hasRole("ADMIN");
                 auth.requestMatchers("/api/files", "/api/files/**").authenticated();
+                auth.requestMatchers("/api/community/**").authenticated();
                 // Actuator: health and info public, everything else requires ADMIN
                 auth.requestMatchers("/actuator/health", "/actuator/info").permitAll();
                 auth.requestMatchers("/actuator/**").hasRole("ADMIN");

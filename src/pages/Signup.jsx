@@ -36,6 +36,7 @@ export default function Signup() {
     if (!form.name.trim()) return '이름을 입력해주세요.'
     if (!form.email.trim()) return '이메일을 입력해주세요.'
     if (!form.email.includes('@')) return '올바른 이메일 형식이 아닙니다.'
+    if (!form.phone.trim()) return '전화번호를 입력해주세요.'
     if (!form.password) return '비밀번호를 입력해주세요.'
     if (form.password.length < 8) return '비밀번호는 8자 이상이어야 합니다.'
     if (form.password !== form.passwordConfirm) {
@@ -93,7 +94,7 @@ export default function Signup() {
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight">회원가입</h1>
           <p className="mt-3 text-base text-[var(--theme-body-muted)]">
-            COM&apos;s 동아리 계정 생성을 위해 정보를 입력해주세요.
+            COM&apos;s 명부에 등록된 정보와 일치해야 계정을 만들 수 있습니다.
           </p>
         </div>
 

@@ -16,3 +16,14 @@ export async function deleteMember(id) {
     method: 'DELETE',
   })
 }
+
+export async function importEligibleMembers(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  return request('/api/admin/eligible-members/import', {
+    method: 'POST',
+    headers: {},
+    body: formData,
+  })
+}
