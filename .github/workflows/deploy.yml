@@ -35,5 +35,7 @@ jobs:
             docker image prune -f
 
             curl -I https://coms.kw.ac.kr/
-            curl -i https://coms.kw.ac.kr/api/ || true
+            curl -fI https://coms.kw.ac.kr/
+            curl -f http://127.0.0.1:8080/actuator/health
+            curl -f https://coms.kw.ac.kr/api/server/time
           EOF

@@ -1,4 +1,48 @@
 services:
+<<<<<<< HEAD
+=======
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-comsdb}
+      POSTGRES_USER: ${DB_USER:-coms}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-coms}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  coms-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: coms-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: db
+      DB_NAME: ${DB_NAME:-comsdb}
+      DB_USER: ${DB_USER:-coms}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      COOKIE_SECURE: "true"
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO:-validate}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./backend-data:/app/data
+      - backend-uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+>>>>>>> a100910 (fix: stabilize docker deployment health checks)
   coms-frontend:
     build:
       context: .
@@ -10,6 +54,7 @@ services:
     depends_on:
       - coms-backend
 
+<<<<<<< HEAD
   coms-backend:
     build:
       context: ./backend
@@ -22,3 +67,8 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - ./backend-data:/app/data
+=======
+volumes:
+  pgdata:
+  backend-uploads:
+>>>>>>> a100910 (fix: stabilize docker deployment health checks)
