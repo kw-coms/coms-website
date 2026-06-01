@@ -51,6 +51,10 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> {
                 auth.requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/logout", "/hello", "/api/server/time").permitAll();
                 auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/**").permitAll();
+                auth.requestMatchers(HttpMethod.POST, "/api/notices").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.PUT, "/api/notices/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.DELETE, "/api/notices/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.POST, "/api/files").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/files/**").hasRole("ADMIN");
                 auth.requestMatchers("/api/files", "/api/files/**").authenticated();

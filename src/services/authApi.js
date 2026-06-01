@@ -1,48 +1,23 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || '/api'
-
-export function clearAuth() {
-  sessionStorage.removeItem('studentId')
-  sessionStorage.removeItem('name')
-}
-
-export async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    credentials: 'include', // send/receive HttpOnly cookie automatically
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  })
-
-  const data = await response.json().catch(() => null)
-
-  if (!response.ok) {
-    throw new Error(data?.message || '요청 처리 중 오류가 발생했습니다.')
-  }
-
-  return data
-}
+import { request } from './apiClient.js'
 
 export async function signupUser(payload) {
-  return request('/auth/signup', {
+  return request('/api/auth/signup', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
 }
 
 export async function loginUser(payload) {
-  return request('/auth/login', {
+  return request('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
 }
 
 export async function logoutUser() {
-  return request('/auth/logout', { method: 'POST' })
+  return request('/api/auth/logout', { method: 'POST' })
 }
 
-export async function getMe() {
-  return request('/auth/me', { method: 'GET' })
+export async function getCurrentUser() {
+  return request('/api/auth/me')
 }

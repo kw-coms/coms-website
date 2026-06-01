@@ -47,6 +47,7 @@ public class AdminService {
 
     private MemberResponse toResponse(Member member) {
         return new MemberResponse(
+                member.getId(),
                 member.getStudentId(),
                 member.getName(),
                 member.getEmail(),

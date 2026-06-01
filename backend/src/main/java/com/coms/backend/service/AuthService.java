@@ -68,6 +68,7 @@ public class AuthService implements UserDetailsService {
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         return new MemberResponse(
+                member.getId(),
                 member.getStudentId(),
                 member.getName(),
                 member.getEmail(),
