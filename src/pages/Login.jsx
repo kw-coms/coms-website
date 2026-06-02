@@ -63,12 +63,12 @@ export default function Login({ onBack, goSignup }) {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">아이디</label>
+              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">학번 (Student ID)</label>
               <div className={frameClass}>
                 <input
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="아이디를 입력하세요"
+                  placeholder="학번을 입력하세요"
                   className={inputClass}
                 />
               </div>

@@ -16,7 +16,6 @@ public class EligibleMember {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false)
     private String phone;
 
     private String generation;
