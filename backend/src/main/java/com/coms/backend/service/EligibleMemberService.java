@@ -3,6 +3,9 @@ package com.coms.backend.service;
 import com.coms.backend.domain.EligibleMember;
 import com.coms.backend.dto.EligibleMemberImportResponse;
 import com.coms.backend.repository.EligibleMemberRepository;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -12,42 +15,42 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @Transactional
 public class EligibleMemberService {
+
     private final EligibleMemberRepository eligibleMemberRepository;
+
+    private static final Pattern STUDENT_ID_PATTERN = Pattern.compile("\\d{10}");
+    private static final Pattern NAME_PATTERN = Pattern.compile("[가-힣]{3}");
 
     public EligibleMemberService(EligibleMemberRepository eligibleMemberRepository) {
         this.eligibleMemberRepository = eligibleMemberRepository;
     }
 
     @Transactional(readOnly = true)
-    public void validateSignup(String studentId, String name, String phone) {
+    public void validateSignup(String studentId, String name) {
         String normalizedStudentId = normalize(studentId);
         String normalizedName = normalize(name);
-        String normalizedPhone = normalizePhone(phone);
 
-        Optional<EligibleMember> match = Optional.empty();
-        if (!normalizedStudentId.isBlank()) {
-            match = eligibleMemberRepository.findByStudentId(normalizedStudentId);
+        if (!STUDENT_ID_PATTERN.matcher(normalizedStudentId).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
         }
-        if (match.isEmpty()) {
-            match = eligibleMemberRepository.findByNameAndPhone(normalizedName, normalizedPhone);
+        if (!NAME_PATTERN.matcher(normalizedName).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름은 한글 3자리여야 합니다.");
         }
 
-        EligibleMember eligibleMember = match.orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번, 이름, 전화번호를 확인해주세요."));
+        EligibleMember eligibleMember = eligibleMemberRepository.findByStudentId(normalizedStudentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번과 이름을 확인해주세요."));
 
-        if (eligibleMember.getStudentId() == null || eligibleMember.getStudentId().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "학번이 포함된 명부가 필요합니다.");
-        }
-        if (!eligibleMember.getStudentId().equals(normalizedStudentId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번, 이름, 전화번호를 확인해주세요.");
-        }
-        if (!eligibleMember.getName().equals(normalizedName) || !eligibleMember.getPhone().equals(normalizedPhone)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번, 이름, 전화번호를 확인해주세요.");
+        if (!eligibleMember.getName().equals(normalizedName)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번과 이름을 확인해주세요.");
         }
     }
 
@@ -56,40 +59,132 @@ public class EligibleMemberService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부 파일을 선택해주세요.");
         }
 
+        String filename = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(Locale.ROOT);
+        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+
+        if (filename.endsWith(".csv") || contentType.contains("csv") || contentType.contains("text/plain")) {
+            return importFromCsv(file);
+        }
+        return importFromXlsx(file);
+    }
+
+    // ── CSV (Google Forms export) ─────────────────────────────────────────────
+
+    private EligibleMemberImportResponse importFromCsv(MultipartFile file) {
         int imported = 0;
         int skipped = 0;
-        try (InputStream inputStream = file.getInputStream();
-             Workbook workbook = WorkbookFactory.create(inputStream)) {
-            Sheet sheet = workbook.getSheetAt(0);
-            Map<String, Integer> header = findHeader(sheet);
-            if (!header.containsKey("studentId") || !header.containsKey("name") || !header.containsKey("phone")) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부에는 학번, 이름, 전화번호 컬럼이 필요합니다.");
+
+        try (InputStreamReader reader = new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8);
+             CSVParser parser = CSVFormat.DEFAULT.builder()
+                     .setHeader()
+                     .setSkipHeaderRecord(true)
+                     .setTrim(true)
+                     .setIgnoreEmptyLines(true)
+                     .build()
+                     .parse(reader)) {
+
+            Map<String, String> colMap = buildCsvColumnMap(parser.getHeaderNames());
+
+            if (!colMap.containsKey("name") || !colMap.containsKey("studentId")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CSV에 이름 또는 학번 컬럼이 없습니다.");
             }
 
-            int headerRow = findHeaderRowIndex(sheet);
-            for (int i = headerRow + 1; i <= sheet.getLastRowNum(); i++) {
-                Row row = sheet.getRow(i);
-                if (row == null) continue;
-                String name = normalize(readCell(row, header.get("name")));
-                String phone = normalizePhone(readCell(row, header.get("phone")));
-                if (name.isBlank() || phone.isBlank()) {
+            for (CSVRecord record : parser) {
+                String name = normalize(safeGet(record, colMap.get("name")));
+                if (name.isBlank()) {
                     skipped++;
                     continue;
                 }
 
-                String studentId = normalize(readCell(row, header.get("studentId")));
-                String generation = normalize(readCell(row, header.get("generation")));
-                String note = normalize(readCell(row, header.get("note")));
+                String studentId = extractStudentId(normalize(safeGet(record, colMap.get("studentId"))));
+                String phone = colMap.containsKey("phone")
+                        ? normalizePhone(safeGet(record, colMap.get("phone")))
+                        : null;
+                String generation = extractGeneration(normalize(safeGet(record, colMap.get("generation"))));
 
-                EligibleMember eligibleMember = findExisting(studentId, name, phone).orElseGet(EligibleMember::new);
-                eligibleMember.setStudentId(studentId.isBlank() ? null : studentId);
-                eligibleMember.setName(name);
-                eligibleMember.setPhone(phone);
-                eligibleMember.setGeneration(generation.isBlank() ? null : generation);
-                eligibleMember.setNote(note.isBlank() ? null : note);
-                eligibleMemberRepository.save(eligibleMember);
+                EligibleMember member = findExisting(studentId, name, phone).orElseGet(EligibleMember::new);
+                member.setStudentId(studentId.isBlank() ? null : studentId);
+                member.setName(name);
+                member.setPhone(phone == null || phone.isBlank() ? null : phone);
+                member.setGeneration(generation);
+                eligibleMemberRepository.save(member);
                 imported++;
             }
+
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CSV 파일을 읽지 못했습니다.");
+        }
+
+        return new EligibleMemberImportResponse(imported, skipped, "명부를 가져왔습니다.");
+    }
+
+    private Map<String, String> buildCsvColumnMap(List<String> headerNames) {
+        Map<String, String> map = new HashMap<>();
+        for (String header : headerNames) {
+            String flat = normalize(header).toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+            if (flat.equals("이름") || flat.startsWith("이름")) map.putIfAbsent("name", header);
+            if (flat.contains("학번")) map.putIfAbsent("studentId", header);
+            if (flat.equals("studentid") || flat.equals("student_id")) map.putIfAbsent("studentId", header);
+            if (flat.contains("기수")) map.putIfAbsent("generation", header);
+            if (flat.contains("전화")) map.putIfAbsent("phone", header);
+            if (flat.equalsIgnoreCase("phone")) map.putIfAbsent("phone", header);
+        }
+        return map;
+    }
+
+    private String safeGet(CSVRecord record, String header) {
+        if (header == null) return "";
+        try {
+            return record.isMapped(header) ? record.get(header) : "";
+        } catch (IllegalArgumentException e) {
+            return "";
+        }
+    }
+
+    // ── XLSX ─────────────────────────────────────────────────────────────────
+
+    private EligibleMemberImportResponse importFromXlsx(MultipartFile file) {
+        int imported = 0;
+        int skipped = 0;
+
+        try (InputStream inputStream = file.getInputStream();
+             Workbook workbook = WorkbookFactory.create(inputStream)) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+            int headerRowIndex = findXlsxHeaderRowIndex(sheet);
+            Map<String, Integer> header = buildXlsxHeaderMap(sheet.getRow(headerRowIndex));
+
+            if (!header.containsKey("name") || !header.containsKey("studentId")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부에는 학번, 이름 컬럼이 필요합니다.");
+            }
+
+            for (int i = headerRowIndex + 1; i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
+
+                String name = normalize(readCell(row, header.get("name")));
+                if (name.isBlank()) {
+                    skipped++;
+                    continue;
+                }
+
+                String phone = header.containsKey("phone")
+                        ? normalizePhone(readCell(row, header.get("phone")))
+                        : null;
+                String studentId = extractStudentId(normalize(readCell(row, header.get("studentId"))));
+                String generation = extractGeneration(normalize(readCell(row, header.get("generation"))));
+                String note = normalize(readCell(row, header.get("note")));
+
+                EligibleMember member = findExisting(studentId, name, phone).orElseGet(EligibleMember::new);
+                member.setStudentId(studentId.isBlank() ? null : studentId);
+                member.setName(name);
+                member.setPhone(phone == null || phone.isBlank() ? null : phone);
+                member.setGeneration(generation);
+                member.setNote(note.isBlank() ? null : note);
+                eligibleMemberRepository.save(member);
+                imported++;
+            }
+
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부 파일을 읽지 못했습니다.");
         }
@@ -97,40 +192,27 @@ public class EligibleMemberService {
         return new EligibleMemberImportResponse(imported, skipped, "명부를 가져왔습니다.");
     }
 
-    private Optional<EligibleMember> findExisting(String studentId, String name, String phone) {
-        if (studentId != null && !studentId.isBlank()) {
-            Optional<EligibleMember> byStudentId = eligibleMemberRepository.findByStudentId(studentId);
-            if (byStudentId.isPresent()) return byStudentId;
-        }
-        return eligibleMemberRepository.findByNameAndPhone(name, phone);
-    }
-
-    private Map<String, Integer> findHeader(Sheet sheet) {
-        Row row = sheet.getRow(findHeaderRowIndex(sheet));
+    private Map<String, Integer> buildXlsxHeaderMap(Row row) {
         Map<String, Integer> header = new HashMap<>();
         for (Cell cell : row) {
-            String label = normalize(cell.getStringCellValue());
-            if (List.of("학번", "studentid", "student_id").contains(label.toLowerCase(Locale.ROOT))) header.put("studentId", cell.getColumnIndex());
-            if (label.equals("이름") || label.equalsIgnoreCase("name")) header.put("name", cell.getColumnIndex());
-            if (label.equals("전화번호") || label.equals("전화") || label.equalsIgnoreCase("phone")) header.put("phone", cell.getColumnIndex());
-            if (label.equals("기수")) header.put("generation", cell.getColumnIndex());
-            if (label.equals("특이사항") || label.equals("비고")) header.put("note", cell.getColumnIndex());
+            String label = normalize(cell.getStringCellValue()).toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+            if (label.contains("학번") || label.equals("studentid") || label.equals("student_id")) header.putIfAbsent("studentId", cell.getColumnIndex());
+            if (label.equals("이름") || label.equalsIgnoreCase("name")) header.putIfAbsent("name", cell.getColumnIndex());
+            if (label.equals("전화번호") || label.contains("전화") || label.equalsIgnoreCase("phone")) header.putIfAbsent("phone", cell.getColumnIndex());
+            if (label.contains("기수")) header.putIfAbsent("generation", cell.getColumnIndex());
+            if (label.equals("특이사항") || label.equals("비고")) header.putIfAbsent("note", cell.getColumnIndex());
         }
         return header;
     }
 
-    private int findHeaderRowIndex(Sheet sheet) {
+    private int findXlsxHeaderRowIndex(Sheet sheet) {
         for (int i = 0; i <= Math.min(sheet.getLastRowNum(), 10); i++) {
             Row row = sheet.getRow(i);
             if (row == null) continue;
-            boolean hasName = false;
-            boolean hasPhone = false;
             for (Cell cell : row) {
-                String value = normalize(readCell(row, cell.getColumnIndex()));
-                hasName = hasName || value.equals("이름");
-                hasPhone = hasPhone || value.equals("전화번호") || value.equals("전화");
+                String value = normalize(readCell(row, cell.getColumnIndex())).toLowerCase(Locale.ROOT);
+                if (value.equals("이름") || value.equalsIgnoreCase("name")) return i;
             }
-            if (hasName && hasPhone) return i;
         }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부 헤더를 찾지 못했습니다.");
     }
@@ -141,6 +223,32 @@ public class EligibleMemberService {
         if (cell == null) return "";
         DataFormatter formatter = new DataFormatter(Locale.KOREA);
         return formatter.formatCellValue(cell);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private Optional<EligibleMember> findExisting(String studentId, String name, String phone) {
+        if (studentId != null && !studentId.isBlank()) {
+            Optional<EligibleMember> byStudentId = eligibleMemberRepository.findByStudentId(studentId);
+            if (byStudentId.isPresent()) return byStudentId;
+        }
+        if (phone != null && !phone.isBlank()) {
+            return eligibleMemberRepository.findByNameAndPhone(name, phone);
+        }
+        return Optional.empty();
+    }
+
+    /** Extract the first 8–10 digit sequence from a raw student ID string. */
+    private String extractStudentId(String raw) {
+        if (raw == null || raw.isBlank()) return "";
+        Matcher m = STUDENT_ID_PATTERN.matcher(raw.replaceAll("\\s+", ""));
+        return m.find() ? m.group() : raw.trim();
+    }
+
+    /** Strip trailing "기" suffix from generation strings like "60기" → "60". */
+    private String extractGeneration(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        return raw.replaceAll("기$", "").trim();
     }
 
     private String normalize(String value) {
