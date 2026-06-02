@@ -41,7 +41,7 @@ public class AuthService implements UserDetailsService {
         if (memberRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다.");
         }
-        eligibleMemberService.validateSignup(request.studentId(), request.name(), request.phone());
+        eligibleMemberService.validateSignup(request.studentId(), request.name());
 
         Member member = new Member();
         member.setStudentId(request.studentId().trim());
