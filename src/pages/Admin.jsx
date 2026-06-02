@@ -97,15 +97,15 @@ function RosterTab() {
       <div className="rounded-lg border border-black/10 bg-black/5 p-4">
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">회원가입 인증 명부</p>
         <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
-          엑셀 명부를 업로드하면 회원가입 시 학번, 이름, 전화번호를 서버에서 대조합니다.
-          학번 열이 없는 파일은 가져올 수 없습니다.
+          엑셀(.xlsx) 또는 구글 폼 CSV를 업로드하면 회원가입 시 학번·이름을 대조합니다.
+          전화번호 열이 있으면 함께 검증합니다. 학번 열이 없는 파일은 가져올 수 없습니다.
         </p>
       </div>
 
       <input
         ref={fileInputRef}
         type="file"
-        accept=".xlsx"
+        accept=".xlsx,.csv"
         className="hidden"
         onChange={handleUpload}
       />
@@ -115,7 +115,7 @@ function RosterTab() {
         disabled={uploading}
         className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
       >
-        {uploading ? '명부 가져오는 중...' : '엑셀 명부 업로드'}
+        {uploading ? '명부 가져오는 중...' : '명부 업로드 (.xlsx / .csv)'}
       </button>
 
       {result && (

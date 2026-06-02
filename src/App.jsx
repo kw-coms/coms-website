@@ -501,7 +501,7 @@ function App() {
               onClick={goNotices}
               className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]"
             >
-              공지사항
+              Notices
             </button>
             {user && (
               <button
