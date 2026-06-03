@@ -1,6 +1,7 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.EligibleMember;
+import com.coms.backend.dto.EligibleMemberResponse;
 import com.coms.backend.dto.EligibleMemberImportResponse;
 import com.coms.backend.repository.EligibleMemberRepository;
 import org.apache.commons.csv.CSVFormat;
@@ -40,6 +41,19 @@ public class EligibleMemberService {
         member.setStudentId(studentId);
         member.setName(name);
         eligibleMemberRepository.save(member);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EligibleMemberResponse> listRoster() {
+        return eligibleMemberRepository.findAllByOrderByStudentIdAscNameAsc()
+                .stream()
+                .map(member -> new EligibleMemberResponse(
+                        member.getId(),
+                        member.getStudentId(),
+                        member.getName(),
+                        member.getGeneration()
+                ))
+                .toList();
     }
 
     @Transactional(readOnly = true)

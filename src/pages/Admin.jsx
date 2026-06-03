@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember } from '../services/adminApi.js'
+import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers } from '../services/adminApi.js'
 import { listFiles, uploadFile, deleteFile } from '../services/archiveApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 
@@ -82,10 +82,34 @@ function RosterTab() {
   const [uploading, setUploading] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
+  const [roster, setRoster] = useState([])
+  const [loadingRoster, setLoadingRoster] = useState(true)
+  const [rosterError, setRosterError] = useState('')
   const [addForm, setAddForm] = useState({ studentId: '', name: '' })
   const [adding, setAdding] = useState(false)
   const [addResult, setAddResult] = useState('')
   const [addError, setAddError] = useState('')
+
+  const loadRoster = async () => {
+    setRosterError('')
+    try {
+      const data = await listEligibleMembers()
+      setRoster(data)
+    } catch (err) {
+      setRosterError(err.message || '명부를 불러오지 못했습니다.')
+    } finally {
+      setLoadingRoster(false)
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true
+    listEligibleMembers()
+      .then((data) => { if (mounted) setRoster(data) })
+      .catch((err) => { if (mounted) setRosterError(err.message || '명부를 불러오지 못했습니다.') })
+      .finally(() => { if (mounted) setLoadingRoster(false) })
+    return () => { mounted = false }
+  }, [])
 
   const handleUpload = async (event) => {
     const file = event.target.files?.[0]
@@ -96,6 +120,7 @@ function RosterTab() {
     try {
       const data = await importEligibleMembers(file)
       setResult(data)
+      await loadRoster()
     } catch (err) {
       setError(err.message || '명부를 가져오지 못했습니다.')
     } finally {
@@ -114,6 +139,7 @@ function RosterTab() {
       await addEligibleMember(addForm.studentId.trim(), addForm.name.trim())
       setAddResult(`${addForm.name} (${addForm.studentId}) 명부에 추가됐습니다.`)
       setAddForm({ studentId: '', name: '' })
+      await loadRoster()
     } catch (err) {
       setAddError(err.message || '추가 중 오류가 발생했습니다.')
     } finally {
@@ -151,6 +177,53 @@ function RosterTab() {
         </form>
         {addResult && <p className="mt-2 text-xs font-semibold text-emerald-700">{addResult}</p>}
         {addError && <p className="mt-2 text-xs font-semibold text-red-600">{addError}</p>}
+      </div>
+
+      <div className="rounded-lg border border-black/10 bg-black/5 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[var(--theme-body-dark)]">명부 확인</p>
+            <p className="mt-1 text-xs text-[var(--theme-body-muted)]">가입 허용 명부에 등록된 학번과 이름을 확인합니다.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setLoadingRoster(true)
+              loadRoster()
+            }}
+            className="shape-cut-sm border border-black/10 bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
+          >
+            새로고침
+          </button>
+        </div>
+
+        {loadingRoster && <p className="mt-4 text-sm text-[var(--theme-body-muted)]">명부를 불러오는 중...</p>}
+        {rosterError && <p className="mt-4 shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{rosterError}</p>}
+        {!loadingRoster && !rosterError && roster.length === 0 && (
+          <p className="mt-4 text-sm text-[var(--theme-body-muted)]">등록된 명부가 없습니다.</p>
+        )}
+        {!loadingRoster && !rosterError && roster.length > 0 && (
+          <div className="mt-4 max-h-96 overflow-auto rounded-lg border border-black/10">
+            <table className="min-w-full divide-y divide-black/10 text-left text-sm">
+              <thead className="sticky top-0 bg-white text-xs font-semibold text-[var(--theme-body-muted)]">
+                <tr>
+                  <th className="px-4 py-3">학번</th>
+                  <th className="px-4 py-3">이름</th>
+                  <th className="px-4 py-3">기수</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/10 bg-white/50">
+                {roster.map((member) => (
+                  <tr key={member.id}>
+                    <td className="px-4 py-3 font-mono text-xs text-[var(--theme-body-dark)]">{member.studentId || '-'}</td>
+                    <td className="px-4 py-3 font-semibold text-[var(--theme-body-dark)]">{member.name}</td>
+                    <td className="px-4 py-3 text-xs text-[var(--theme-body-muted)]">{member.generation || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="rounded-lg border border-black/10 bg-black/5 p-4">
