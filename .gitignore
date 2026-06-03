@@ -25,3 +25,10 @@ dist-ssr
 .env*
 !.env.example
 backend-data/
+backend/uploads/
+uploads/
+*.xlsx
+*.xls
+*.csv
+!*sample*.csv
+!*sample*.xlsx

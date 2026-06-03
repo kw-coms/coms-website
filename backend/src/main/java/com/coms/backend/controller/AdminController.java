@@ -2,6 +2,7 @@ package com.coms.backend.controller;
 
 import com.coms.backend.dto.AddEligibleMemberRequest;
 import com.coms.backend.dto.EligibleMemberImportResponse;
+import com.coms.backend.dto.EligibleMemberResponse;
 import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.RoleUpdateRequest;
 import com.coms.backend.service.AdminService;
@@ -46,6 +47,11 @@ public class AdminController {
     public ResponseEntity<Void> addEligibleMember(@Valid @RequestBody AddEligibleMemberRequest request) {
         eligibleMemberService.addSingle(request.studentId(), request.name());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/eligible-members")
+    public ResponseEntity<List<EligibleMemberResponse>> eligibleMembers() {
+        return ResponseEntity.ok(eligibleMemberService.listRoster());
     }
 
     @PostMapping("/eligible-members/import")
