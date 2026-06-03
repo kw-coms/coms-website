@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +24,9 @@ public class MaintenanceController {
     private final MemberRepository memberRepository;
     private final EligibleMemberRepository eligibleMemberRepository;
     private final PasswordEncoder passwordEncoder;
+
+    @Value("${bootstrap.secret:}")
+    private String bootstrapSecret;
 
     public MaintenanceController(MemberRepository memberRepository,
                                   EligibleMemberRepository eligibleMemberRepository,
@@ -43,7 +47,12 @@ public class MaintenanceController {
      * One-time admin bootstrap. Disabled permanently once any admin account exists.
      */
     @PostMapping("/bootstrap")
-    public ResponseEntity<Map<String, String>> bootstrap(@Valid @RequestBody BootstrapRequest req) {
+    public ResponseEntity<Map<String, String>> bootstrap(
+            @RequestHeader(value = "X-Bootstrap-Secret", required = false) String providedSecret,
+            @Valid @RequestBody BootstrapRequest req) {
+        if (bootstrapSecret.isEmpty() || !bootstrapSecret.equals(providedSecret)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         boolean adminExists = memberRepository.findAll().stream()
                 .anyMatch(m -> m.getRole() == Member.Role.ADMIN);
         if (adminExists) {
