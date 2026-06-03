@@ -19,7 +19,10 @@ import java.io.ByteArrayOutputStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest(properties = "jwt.secret=test-secret-key-with-at-least-32-chars")
+@SpringBootTest(properties = {
+        "jwt.secret=test-secret-key-with-at-least-32-chars",
+        "spring.datasource.url=jdbc:h2:mem:eligible-member-service-test;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1"
+})
 @Transactional
 class EligibleMemberServiceTest {
     @Autowired
@@ -41,6 +44,13 @@ class EligibleMemberServiceTest {
         var response = eligibleMemberService.importRoster(file);
 
         assertThat(response.imported()).isEqualTo(1);
+        assertThat(eligibleMemberService.listRoster())
+                .singleElement()
+                .satisfies(member -> {
+                    assertThat(member.studentId()).isEqualTo("2024123456");
+                    assertThat(member.name()).isEqualTo("홍길동");
+                    assertThat(member.generation()).isEqualTo("1");
+                });
         eligibleMemberService.validateSignup("2024123456", "홍길동");
         assertThatThrownBy(() -> eligibleMemberService.validateSignup("2024000000", "홍길동"))
                 .isInstanceOf(ResponseStatusException.class)
