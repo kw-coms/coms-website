@@ -17,6 +17,13 @@ export async function deleteMember(id) {
   })
 }
 
+export async function addEligibleMember(studentId, name) {
+  return request('/api/admin/eligible-members', {
+    method: 'POST',
+    body: JSON.stringify({ studentId, name }),
+  })
+}
+
 export async function importEligibleMembers(file) {
   const formData = new FormData()
   formData.append('file', file)

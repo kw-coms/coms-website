@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { listMembers, updateMemberRole, deleteMember, importEligibleMembers } from '../services/adminApi.js'
+import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember } from '../services/adminApi.js'
 import { listFiles, uploadFile, deleteFile } from '../services/archiveApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 
@@ -69,11 +69,23 @@ export default function Admin({ onBack }) {
   )
 }
 
+function parseInterests(raw) {
+  if (!raw) return []
+  return raw.split(',').map((item) => {
+    if (item.startsWith('기타:')) return `기타 (${item.slice(3)})`
+    return item
+  })
+}
+
 function RosterTab() {
   const fileInputRef = useRef(null)
   const [uploading, setUploading] = useState(false)
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
+  const [addForm, setAddForm] = useState({ studentId: '', name: '' })
+  const [adding, setAdding] = useState(false)
+  const [addResult, setAddResult] = useState('')
+  const [addError, setAddError] = useState('')
 
   const handleUpload = async (event) => {
     const file = event.target.files?.[0]
@@ -92,42 +104,89 @@ function RosterTab() {
     }
   }
 
+  const handleAdd = async (e) => {
+    e.preventDefault()
+    if (!addForm.studentId.trim() || !addForm.name.trim()) return
+    setAdding(true)
+    setAddResult('')
+    setAddError('')
+    try {
+      await addEligibleMember(addForm.studentId.trim(), addForm.name.trim())
+      setAddResult(`${addForm.name} (${addForm.studentId}) 명부에 추가됐습니다.`)
+      setAddForm({ studentId: '', name: '' })
+    } catch (err) {
+      setAddError(err.message || '추가 중 오류가 발생했습니다.')
+    } finally {
+      setAdding(false)
+    }
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="rounded-lg border border-black/10 bg-black/5 p-4">
-        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">회원가입 인증 명부</p>
+        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">개별 회원 추가</p>
+        <p className="mt-1 text-xs text-[var(--theme-body-muted)]">학번과 이름을 입력해 명부에 직접 추가합니다.</p>
+        <form onSubmit={handleAdd} className="mt-3 flex flex-wrap gap-2">
+          <input
+            value={addForm.studentId}
+            onChange={(e) => setAddForm((p) => ({ ...p, studentId: e.target.value }))}
+            placeholder="학번 (10자리)"
+            maxLength={10}
+            className="shape-cut-sm w-40 border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+          />
+          <input
+            value={addForm.name}
+            onChange={(e) => setAddForm((p) => ({ ...p, name: e.target.value }))}
+            placeholder="이름"
+            maxLength={20}
+            className="shape-cut-sm w-32 border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+          />
+          <button
+            type="submit"
+            disabled={adding || !addForm.studentId.trim() || !addForm.name.trim()}
+            className="shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] transition hover:opacity-90 disabled:opacity-50"
+          >
+            {adding ? '추가 중...' : '추가'}
+          </button>
+        </form>
+        {addResult && <p className="mt-2 text-xs font-semibold text-emerald-700">{addResult}</p>}
+        {addError && <p className="mt-2 text-xs font-semibold text-red-600">{addError}</p>}
+      </div>
+
+      <div className="rounded-lg border border-black/10 bg-black/5 p-4">
+        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">명부 일괄 업로드</p>
         <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
           엑셀(.xlsx) 또는 구글 폼 CSV를 업로드하면 회원가입 시 학번·이름을 대조합니다.
           전화번호 열이 있으면 함께 검증합니다. 학번 열이 없는 파일은 가져올 수 없습니다.
         </p>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx,.csv"
+          className="hidden"
+          onChange={handleUpload}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="mt-3 shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
+        >
+          {uploading ? '명부 가져오는 중...' : '명부 업로드 (.xlsx / .csv)'}
+        </button>
+
+        {result && (
+          <p className="mt-3 shape-cut-sm bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-700">
+            {result.message} 가져온 행: {result.imported}, 건너뜀: {result.skipped}
+          </p>
+        )}
+        {error && (
+          <p className="mt-3 shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">
+            {error}
+          </p>
+        )}
       </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".xlsx,.csv"
-        className="hidden"
-        onChange={handleUpload}
-      />
-      <button
-        type="button"
-        onClick={() => fileInputRef.current?.click()}
-        disabled={uploading}
-        className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
-      >
-        {uploading ? '명부 가져오는 중...' : '명부 업로드 (.xlsx / .csv)'}
-      </button>
-
-      {result && (
-        <p className="shape-cut-sm bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-700">
-          {result.message} 가져온 행: {result.imported}, 건너뜀: {result.skipped}
-        </p>
-      )}
-      {error && (
-        <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">
-          {error}
-        </p>
-      )}
     </div>
   )
 }
@@ -136,6 +195,7 @@ function MembersTab({ currentUser }) {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [expanded, setExpanded] = useState(null)
 
   useEffect(() => {
     let mounted = true
@@ -174,37 +234,74 @@ function MembersTab({ currentUser }) {
     <div className="space-y-2">
       {members.map((member) => {
         const isSelf = member.studentId === currentUser.studentId
+        const isExpanded = expanded === member.id
+        const interests = parseInterests(member.interests)
+        const hasExtra = member.aspiration || interests.length > 0
+
         return (
-          <div
-            key={member.id}
-            className="shape-cut-sm flex flex-wrap items-center justify-between gap-3 border border-black/10 bg-black/5 px-4 py-3"
-          >
-            <div>
-              <span className="font-semibold text-[var(--theme-body-dark)]">{member.name}</span>
-              <span className="ml-2 text-xs text-[var(--theme-body-muted)]">{member.studentId}</span>
-              {member.role === 'ADMIN' && (
-                <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-700">
-                  관리자
-                </span>
-              )}
-              <p className="mt-0.5 text-xs text-[var(--theme-body-muted)]">{member.email}</p>
+          <div key={member.id} className="shape-cut-sm border border-black/10 bg-black/5">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-semibold text-[var(--theme-body-dark)]">{member.name}</span>
+                  <span className="text-xs text-[var(--theme-body-muted)]">{member.studentId}</span>
+                  {member.role === 'ADMIN' && (
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-700">관리자</span>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-[var(--theme-body-muted)]">{member.email}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                {hasExtra && (
+                  <button
+                    type="button"
+                    onClick={() => setExpanded(isExpanded ? null : member.id)}
+                    className="text-xs font-semibold text-blue-500 transition hover:underline"
+                  >
+                    {isExpanded ? '접기' : '상세'}
+                  </button>
+                )}
+                {!isSelf && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleRoleUpdate(member)}
+                      className="text-xs font-semibold text-blue-500 transition hover:underline"
+                    >
+                      {member.role === 'ADMIN' ? '일반 회원으로' : '관리자 지정'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(member)}
+                      className="text-xs font-semibold text-red-500 transition hover:underline"
+                    >
+                      삭제
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-            {!isSelf && (
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => handleRoleUpdate(member)}
-                  className="text-xs font-semibold text-blue-500 transition hover:underline"
-                >
-                  {member.role === 'ADMIN' ? '일반 회원으로' : '관리자 지정'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(member)}
-                  className="text-xs font-semibold text-red-500 transition hover:underline"
-                >
-                  삭제
-                </button>
+
+            {isExpanded && hasExtra && (
+              <div className="border-t border-black/10 px-4 py-3 space-y-2 bg-black/3">
+                {interests.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-[var(--theme-body-muted)] uppercase tracking-wide">관심 분야</p>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {interests.map((item) => (
+                        <span key={item} className="rounded bg-black/8 px-2 py-0.5 text-xs font-semibold text-[var(--theme-body-dark)]">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {member.aspiration && (
+                  <div>
+                    <p className="text-xs font-semibold text-[var(--theme-body-muted)] uppercase tracking-wide">포부</p>
+                    <p className="mt-1 text-sm leading-6 text-[var(--theme-body-dark)] whitespace-pre-wrap">{member.aspiration}</p>
+                  </div>
+                )}
               </div>
             )}
           </div>

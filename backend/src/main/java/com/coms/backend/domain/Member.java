@@ -27,6 +27,11 @@ public class Member {
 
     private String phone;
 
+    @Column(columnDefinition = "TEXT")
+    private String aspiration;
+
+    private String interests;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role = Role.USER;
@@ -51,6 +56,10 @@ public class Member {
     public void setDepartment(String department) { this.department = department; }
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
+    public String getAspiration() { return aspiration; }
+    public void setAspiration(String aspiration) { this.aspiration = aspiration; }
+    public String getInterests() { return interests; }
+    public void setInterests(String interests) { this.interests = interests; }
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }
     public LocalDateTime getCreatedAt() { return createdAt; }
