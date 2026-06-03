@@ -509,7 +509,7 @@ function App() {
                 onClick={goArchive}
                 className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]"
               >
-                자료실
+                Resources
               </button>
             )}
             {user && (
@@ -518,7 +518,7 @@ function App() {
                 onClick={goCommunity}
                 className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]"
               >
-                커뮤니티
+                Community
               </button>
             )}
           </nav>
@@ -584,10 +584,10 @@ function App() {
                 {user && (
                   <div className="flex flex-wrap justify-center gap-3 pt-3">
                     <button type="button" onClick={goArchive} className={ghostActionBtnClass}>
-                      자료실로 이동
+                      Resources
                     </button>
                     <button type="button" onClick={goCommunity} className={ghostActionBtnClass}>
-                      커뮤니티
+                      Community
                     </button>
                   </div>
                 )}
