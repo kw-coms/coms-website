@@ -20,16 +20,16 @@ export default function Login({ onBack, goSignup }) {
     setError('')
 
     const trimmedIdentifier = identifier.trim()
-    const trimmedPassword = password.trim()
+    const submittedPassword = password
 
-    if (!trimmedIdentifier || !trimmedPassword) {
+    if (!trimmedIdentifier || !submittedPassword) {
       setError('아이디와 비밀번호를 모두 입력해주세요.')
       return
     }
 
     setLoading(true)
     try {
-      const data = await loginUser({ identifier: trimmedIdentifier, password: trimmedPassword })
+      const data = await loginUser({ identifier: trimmedIdentifier, password: submittedPassword })
       await login(data)
       onBack()
     } catch (err) {
