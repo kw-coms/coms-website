@@ -43,6 +43,11 @@ public class MaintenanceController {
         @NotBlank @Size(min = 8) String password
     ) {}
 
+    record EligibleRequest(
+        @NotBlank String studentId,
+        @NotBlank String name
+    ) {}
+
     /**
      * One-time admin bootstrap. Disabled permanently once any admin account exists.
      */
@@ -88,5 +93,28 @@ public class MaintenanceController {
         memberRepository.save(admin);
 
         return ResponseEntity.ok(Map.of("message", "Admin account created. Bootstrap complete."));
+    }
+
+    /**
+     * Add or verify a single eligible member. Requires bootstrap secret.
+     */
+    @PostMapping("/add-eligible")
+    public ResponseEntity<Map<String, String>> addEligible(
+            @RequestHeader(value = "X-Bootstrap-Secret", required = false) String providedSecret,
+            @Valid @RequestBody EligibleRequest req) {
+        if (bootstrapSecret.isEmpty() || !bootstrapSecret.equals(providedSecret)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        boolean exists = eligibleMemberRepository.findByStudentId(req.studentId())
+                .map(e -> e.getName().equals(req.name()))
+                .orElse(false);
+        if (exists) {
+            return ResponseEntity.ok(Map.of("message", "Already in roster."));
+        }
+        EligibleMember e = new EligibleMember();
+        e.setStudentId(req.studentId());
+        e.setName(req.name());
+        eligibleMemberRepository.save(e);
+        return ResponseEntity.ok(Map.of("message", "Added to roster."));
     }
 }
