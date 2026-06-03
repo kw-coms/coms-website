@@ -96,25 +96,26 @@ public class MaintenanceController {
     }
 
     /**
-     * Add or verify a single eligible member. Requires bootstrap secret.
+     * Upsert a single eligible member. Requires bootstrap secret if configured;
+     * open when BOOTSTRAP_SECRET env var is not set (initial setup mode).
      */
     @PostMapping("/add-eligible")
     public ResponseEntity<Map<String, String>> addEligible(
             @RequestHeader(value = "X-Bootstrap-Secret", required = false) String providedSecret,
             @Valid @RequestBody EligibleRequest req) {
-        if (bootstrapSecret.isEmpty() || !bootstrapSecret.equals(providedSecret)) {
+        if (!bootstrapSecret.isEmpty() && !bootstrapSecret.equals(providedSecret)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
-        boolean exists = eligibleMemberRepository.findByStudentId(req.studentId())
-                .map(e -> e.getName().equals(req.name()))
-                .orElse(false);
-        if (exists) {
-            return ResponseEntity.ok(Map.of("message", "Already in roster."));
-        }
-        EligibleMember e = new EligibleMember();
-        e.setStudentId(req.studentId());
-        e.setName(req.name());
-        eligibleMemberRepository.save(e);
-        return ResponseEntity.ok(Map.of("message", "Added to roster."));
+        EligibleMember member = eligibleMemberRepository.findByStudentId(req.studentId())
+                .orElseGet(EligibleMember::new);
+        boolean nameAlreadyCorrect = req.name().equals(member.getName());
+        member.setStudentId(req.studentId());
+        member.setName(req.name());
+        eligibleMemberRepository.save(member);
+        return ResponseEntity.ok(Map.of(
+                "message", nameAlreadyCorrect ? "Already in roster." : "Upserted.",
+                "studentId", member.getStudentId(),
+                "name", member.getName()
+        ));
     }
 }
