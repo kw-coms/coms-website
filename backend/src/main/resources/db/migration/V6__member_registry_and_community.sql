@@ -1,4 +1,4 @@
-CREATE TABLE eligible_members (
+CREATE TABLE IF NOT EXISTS eligible_members (
   id BIGSERIAL PRIMARY KEY,
   student_id VARCHAR(255),
   name VARCHAR(255) NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE eligible_members (
   CONSTRAINT uk_eligible_members_name_phone UNIQUE (name, phone)
 );
 
-CREATE TABLE community_posts (
+CREATE TABLE IF NOT EXISTS community_posts (
   id BIGSERIAL PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   content TEXT NOT NULL,
@@ -21,4 +21,4 @@ CREATE TABLE community_posts (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_community_posts_created_at ON community_posts (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_community_posts_created_at ON community_posts (created_at DESC);
