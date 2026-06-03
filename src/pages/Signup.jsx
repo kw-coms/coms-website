@@ -1,6 +1,60 @@
 import { useState } from 'react'
 import { signupUser } from '../services/authApi.js'
 
+const INTEREST_OPTIONS = ['보안', '웹', '앱']
+
+function InterestsSelector({ selected, onChange, otherText, onOtherChange }) {
+  const toggle = (option) => {
+    const next = selected.includes(option)
+      ? selected.filter((o) => o !== option)
+      : [...selected, option]
+    onChange(next)
+  }
+
+  const hasOther = selected.includes('기타')
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        {INTEREST_OPTIONS.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => toggle(option)}
+            className={`shape-cut-sm px-4 py-2 text-sm font-semibold transition ${
+              selected.includes(option)
+                ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]'
+                : 'border border-black/10 bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/80'
+            }`}
+          >
+            {option}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => toggle('기타')}
+          className={`shape-cut-sm px-4 py-2 text-sm font-semibold transition ${
+            hasOther
+              ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]'
+              : 'border border-black/10 bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/80'
+          }`}
+        >
+          기타
+        </button>
+      </div>
+      {hasOther && (
+        <input
+          value={otherText}
+          onChange={(e) => onOtherChange(e.target.value)}
+          placeholder="기타 관심 분야를 입력하세요"
+          maxLength={100}
+          className="w-full shape-cut-sm border border-black/10 bg-white/70 px-4 py-3 text-[15px] text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/60 transition focus:bg-white focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+        />
+      )}
+    </div>
+  )
+}
+
 export default function Signup() {
   const [form, setForm] = useState({
     studentId: '',
@@ -10,7 +64,10 @@ export default function Signup() {
     passwordConfirm: '',
     department: '',
     phone: '',
+    aspiration: '',
   })
+  const [selectedInterests, setSelectedInterests] = useState([])
+  const [otherInterest, setOtherInterest] = useState('')
 
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -19,16 +76,11 @@ export default function Signup() {
   const inputClass =
     'w-full shape-cut-sm border border-black/10 bg-white/70 px-4 py-3 text-[15px] text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/60 transition focus:bg-white focus:ring-2 focus:ring-[var(--theme-accent)]/50'
 
-  const labelClass =
-    'mb-2 block text-sm font-semibold text-[var(--theme-body-dark)]'
+  const labelClass = 'mb-2 block text-sm font-semibold text-[var(--theme-body-dark)]'
 
   const handleChange = (event) => {
     const { name, value } = event.target
-
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
+    setForm((prev) => ({ ...prev, [name]: value }))
   }
 
   const validateForm = () => {
@@ -40,11 +92,16 @@ export default function Signup() {
     if (!form.email.includes('@')) return '올바른 이메일 형식이 아닙니다.'
     if (!form.password) return '비밀번호를 입력해주세요.'
     if (form.password.length < 8) return '비밀번호는 8자 이상이어야 합니다.'
-    if (form.password !== form.passwordConfirm) {
-      return '비밀번호 확인이 일치하지 않습니다.'
-    }
-
+    if (form.password !== form.passwordConfirm) return '비밀번호 확인이 일치하지 않습니다.'
+    if (selectedInterests.includes('기타') && !otherInterest.trim()) return '기타 관심 분야를 입력해주세요.'
     return ''
+  }
+
+  const buildInterestsString = () => {
+    if (selectedInterests.length === 0) return ''
+    return selectedInterests
+      .map((i) => (i === '기타' ? `기타:${otherInterest.trim()}` : i))
+      .join(',')
   }
 
   const handleSubmit = async (event) => {
@@ -53,14 +110,12 @@ export default function Signup() {
     setSuccess('')
 
     const validationMessage = validateForm()
-
     if (validationMessage) {
       setError(validationMessage)
       return
     }
 
     setLoading(true)
-
     try {
       await signupUser({
         studentId: form.studentId.trim(),
@@ -69,19 +124,14 @@ export default function Signup() {
         password: form.password,
         department: form.department.trim(),
         phone: form.phone.trim(),
+        aspiration: form.aspiration.trim() || null,
+        interests: buildInterestsString() || null,
       })
 
       setSuccess('회원가입 신청이 완료되었습니다.')
-
-      setForm({
-        studentId: '',
-        name: '',
-        email: '',
-        password: '',
-        passwordConfirm: '',
-        department: '',
-        phone: '',
-      })
+      setForm({ studentId: '', name: '', email: '', password: '', passwordConfirm: '', department: '', phone: '', aspiration: '' })
+      setSelectedInterests([])
+      setOtherInterest('')
     } catch (err) {
       setError(err.message || '회원가입 중 오류가 발생했습니다.')
     } finally {
@@ -102,127 +152,75 @@ export default function Signup() {
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className={labelClass} htmlFor="studentId">
-                학번
-              </label>
-              <input
-                id="studentId"
-                name="studentId"
-                value={form.studentId}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="학번을 입력하세요"
-                autoComplete="username"
-              />
+              <label className={labelClass} htmlFor="studentId">학번</label>
+              <input id="studentId" name="studentId" value={form.studentId} onChange={handleChange} className={inputClass} placeholder="학번을 입력하세요" autoComplete="username" />
             </div>
-
             <div>
-              <label className={labelClass} htmlFor="name">
-                이름
-              </label>
-              <input
-                id="name"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="이름을 입력하세요"
-                autoComplete="name"
-              />
+              <label className={labelClass} htmlFor="name">이름</label>
+              <input id="name" name="name" value={form.name} onChange={handleChange} className={inputClass} placeholder="이름을 입력하세요" autoComplete="name" />
             </div>
           </div>
 
           <div>
-            <label className={labelClass} htmlFor="email">
-              이메일
+            <label className={labelClass} htmlFor="email">이메일</label>
+            <input id="email" name="email" type="email" value={form.email} onChange={handleChange} className={inputClass} placeholder="이메일을 입력하세요" autoComplete="email" />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className={labelClass} htmlFor="department">학과</label>
+              <input id="department" name="department" value={form.department} onChange={handleChange} className={inputClass} placeholder="학과를 입력하세요" />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="phone">전화번호</label>
+              <input id="phone" name="phone" value={form.phone} onChange={handleChange} className={inputClass} placeholder="전화번호를 입력하세요" autoComplete="tel" />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className={labelClass} htmlFor="password">비밀번호</label>
+              <input id="password" name="password" type="password" value={form.password} onChange={handleChange} className={inputClass} placeholder="8자 이상 입력하세요" autoComplete="new-password" />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="passwordConfirm">비밀번호 확인</label>
+              <input id="passwordConfirm" name="passwordConfirm" type="password" value={form.passwordConfirm} onChange={handleChange} className={inputClass} placeholder="비밀번호를 다시 입력하세요" autoComplete="new-password" />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>
+              관심 분야 <span className="font-normal text-[var(--theme-body-muted)]">(선택사항, 복수 선택 가능)</span>
             </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              value={form.email}
-              onChange={handleChange}
-              className={inputClass}
-              placeholder="이메일을 입력하세요"
-              autoComplete="email"
+            <InterestsSelector
+              selected={selectedInterests}
+              onChange={setSelectedInterests}
+              otherText={otherInterest}
+              onOtherChange={setOtherInterest}
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className={labelClass} htmlFor="department">
-                학과
-              </label>
-              <input
-                id="department"
-                name="department"
-                value={form.department}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="학과를 입력하세요"
-              />
-            </div>
-
-            <div>
-              <label className={labelClass} htmlFor="phone">
-                전화번호
-              </label>
-              <input
-                id="phone"
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="전화번호를 입력하세요"
-                autoComplete="tel"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className={labelClass} htmlFor="password">
-                비밀번호
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                value={form.password}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="8자 이상 입력하세요"
-                autoComplete="new-password"
-              />
-            </div>
-
-            <div>
-              <label className={labelClass} htmlFor="passwordConfirm">
-                비밀번호 확인
-              </label>
-              <input
-                id="passwordConfirm"
-                name="passwordConfirm"
-                type="password"
-                value={form.passwordConfirm}
-                onChange={handleChange}
-                className={inputClass}
-                placeholder="비밀번호를 다시 입력하세요"
-                autoComplete="new-password"
-              />
-            </div>
+          <div>
+            <label className={labelClass} htmlFor="aspiration">
+              포부 <span className="font-normal text-[var(--theme-body-muted)]">(선택사항)</span>
+            </label>
+            <textarea
+              id="aspiration"
+              name="aspiration"
+              value={form.aspiration}
+              onChange={handleChange}
+              rows={3}
+              maxLength={500}
+              placeholder="동아리에서 이루고 싶은 목표나 포부를 적어주세요."
+              className="w-full shape-cut-sm resize-none border border-black/10 bg-white/70 px-4 py-3 text-[15px] text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/60 transition focus:bg-white focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+            />
           </div>
 
           {error && (
-            <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">
-              {error}
-            </p>
+            <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>
           )}
-
           {success && (
-            <p className="shape-cut-sm bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-700">
-              {success}
-            </p>
+            <p className="shape-cut-sm bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-700">{success}</p>
           )}
 
           <button
