@@ -24,9 +24,7 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, String>> handleUnexpected(Exception ex) {
-        // TODO: remove debug info after diagnosing add-eligible 500
-        String debug = ex.getClass().getSimpleName() + ": " + (ex.getMessage() != null ? ex.getMessage().substring(0, Math.min(200, ex.getMessage().length())) : "null");
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", debug));
+    public ResponseEntity<Map<String, String>> handleUnexpected() {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "요청 처리 중 오류가 발생했습니다."));
     }
 }
