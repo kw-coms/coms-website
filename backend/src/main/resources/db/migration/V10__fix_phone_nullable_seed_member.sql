@@ -1,0 +1,1 @@
+ALTER TABLE eligible_members ALTER COLUMN phone DROP NOT NULL;
