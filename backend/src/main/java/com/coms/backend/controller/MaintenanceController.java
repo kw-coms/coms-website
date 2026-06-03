@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +25,9 @@ public class MaintenanceController {
     private final EligibleMemberRepository eligibleMemberRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Value("${bootstrap.secret:}")
+    private String bootstrapSecret;
+
     public MaintenanceController(MemberRepository memberRepository,
                                   EligibleMemberRepository eligibleMemberRepository,
                                   PasswordEncoder passwordEncoder) {
@@ -39,11 +43,21 @@ public class MaintenanceController {
         @NotBlank @Size(min = 8) String password
     ) {}
 
+    record EligibleRequest(
+        @NotBlank String studentId,
+        @NotBlank String name
+    ) {}
+
     /**
      * One-time admin bootstrap. Disabled permanently once any admin account exists.
      */
     @PostMapping("/bootstrap")
-    public ResponseEntity<Map<String, String>> bootstrap(@Valid @RequestBody BootstrapRequest req) {
+    public ResponseEntity<Map<String, String>> bootstrap(
+            @RequestHeader(value = "X-Bootstrap-Secret", required = false) String providedSecret,
+            @Valid @RequestBody BootstrapRequest req) {
+        if (bootstrapSecret.isEmpty() || !bootstrapSecret.equals(providedSecret)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         boolean adminExists = memberRepository.findAll().stream()
                 .anyMatch(m -> m.getRole() == Member.Role.ADMIN);
         if (adminExists) {
@@ -79,5 +93,28 @@ public class MaintenanceController {
         memberRepository.save(admin);
 
         return ResponseEntity.ok(Map.of("message", "Admin account created. Bootstrap complete."));
+    }
+
+    /**
+     * Add or verify a single eligible member. Requires bootstrap secret.
+     */
+    @PostMapping("/add-eligible")
+    public ResponseEntity<Map<String, String>> addEligible(
+            @RequestHeader(value = "X-Bootstrap-Secret", required = false) String providedSecret,
+            @Valid @RequestBody EligibleRequest req) {
+        if (bootstrapSecret.isEmpty() || !bootstrapSecret.equals(providedSecret)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        boolean exists = eligibleMemberRepository.findByStudentId(req.studentId())
+                .map(e -> e.getName().equals(req.name()))
+                .orElse(false);
+        if (exists) {
+            return ResponseEntity.ok(Map.of("message", "Already in roster."));
+        }
+        EligibleMember e = new EligibleMember();
+        e.setStudentId(req.studentId());
+        e.setName(req.name());
+        eligibleMemberRepository.save(e);
+        return ResponseEntity.ok(Map.of("message", "Added to roster."));
     }
 }
