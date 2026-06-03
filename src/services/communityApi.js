@@ -11,6 +11,13 @@ export async function createCommunityPost(body) {
   })
 }
 
+export async function updateCommunityPost(id, body) {
+  return request(`/api/community/posts/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
 export async function deleteCommunityPost(id) {
   return requestNoContent(`/api/community/posts/${id}`, {
     method: 'DELETE',

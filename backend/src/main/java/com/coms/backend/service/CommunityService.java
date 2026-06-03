@@ -42,6 +42,18 @@ public class CommunityService {
         return toResponse(communityPostRepository.save(post), member);
     }
 
+    public CommunityPostResponse update(String studentId, Long id, CommunityPostRequest request) {
+        Member member = findMember(studentId);
+        CommunityPost post = communityPostRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!post.getAuthorStudentId().equals(member.getStudentId()) && member.getRole() != Member.Role.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        post.setTitle(request.title().trim());
+        post.setContent(request.content().trim());
+        return toResponse(communityPostRepository.save(post), member);
+    }
+
     public void delete(String studentId, Long id) {
         Member member = findMember(studentId);
         CommunityPost post = communityPostRepository.findById(id)
