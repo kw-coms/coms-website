@@ -53,7 +53,9 @@ public class AdminService {
                 member.getEmail(),
                 member.getDepartment(),
                 member.getPhone(),
-                member.getRole().name()
+                member.getRole().name(),
+                member.getAspiration(),
+                member.getInterests()
         );
     }
 }

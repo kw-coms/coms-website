@@ -1,7 +1,8 @@
 package com.coms.backend.controller;
 
-import com.coms.backend.dto.MemberResponse;
+import com.coms.backend.dto.AddEligibleMemberRequest;
 import com.coms.backend.dto.EligibleMemberImportResponse;
+import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.RoleUpdateRequest;
 import com.coms.backend.service.AdminService;
 import com.coms.backend.service.EligibleMemberService;
@@ -38,6 +39,12 @@ public class AdminController {
     @DeleteMapping("/members/{id}")
     public ResponseEntity<Void> deleteMember(@PathVariable Long id) {
         adminService.deleteMember(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/eligible-members")
+    public ResponseEntity<Void> addEligibleMember(@Valid @RequestBody AddEligibleMemberRequest request) {
+        eligibleMemberService.addSingle(request.studentId(), request.name());
         return ResponseEntity.noContent().build();
     }
 
