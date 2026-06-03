@@ -31,6 +31,13 @@ public class CommunityController {
         return ResponseEntity.status(HttpStatus.CREATED).body(communityService.create(authentication.getName(), request));
     }
 
+    @PatchMapping("/{id}")
+    public ResponseEntity<CommunityPostResponse> update(Authentication authentication,
+                                                        @PathVariable Long id,
+                                                        @Valid @RequestBody CommunityPostRequest request) {
+        return ResponseEntity.ok(communityService.update(authentication.getName(), id, request));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(Authentication authentication, @PathVariable Long id) {
         communityService.delete(authentication.getName(), id);
