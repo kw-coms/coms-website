@@ -33,10 +33,11 @@ export default function Signup() {
 
   const validateForm = () => {
     if (!form.studentId.trim()) return '학번을 입력해주세요.'
+    if (!/^\d{10}$/.test(form.studentId.trim())) return '학번은 숫자 10자리여야 합니다.'
     if (!form.name.trim()) return '이름을 입력해주세요.'
+    if (!/^[가-힣]{3}$/.test(form.name.trim())) return '이름은 한글 3자리여야 합니다.'
     if (!form.email.trim()) return '이메일을 입력해주세요.'
     if (!form.email.includes('@')) return '올바른 이메일 형식이 아닙니다.'
-    if (!form.phone.trim()) return '전화번호를 입력해주세요.'
     if (!form.password) return '비밀번호를 입력해주세요.'
     if (form.password.length < 8) return '비밀번호는 8자 이상이어야 합니다.'
     if (form.password !== form.passwordConfirm) {
