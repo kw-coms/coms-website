@@ -17,6 +17,10 @@ export async function deleteMember(id) {
   })
 }
 
+export async function listEligibleMembers() {
+  return request('/api/admin/eligible-members')
+}
+
 export async function addEligibleMember(studentId, name) {
   return request('/api/admin/eligible-members', {
     method: 'POST',
