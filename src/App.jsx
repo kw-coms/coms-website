@@ -503,24 +503,22 @@ function App() {
             >
               Notices
             </button>
-            {user && (
-              <button
-                type="button"
-                onClick={goArchive}
-                className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]"
-              >
-                Resources
-              </button>
-            )}
-            {user && (
-              <button
-                type="button"
-                onClick={goCommunity}
-                className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]"
-              >
-                Community
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={goArchive}
+              disabled={authLoading}
+              className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)] disabled:cursor-wait disabled:opacity-60"
+            >
+              Resources
+            </button>
+            <button
+              type="button"
+              onClick={goCommunity}
+              disabled={authLoading}
+              className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)] disabled:cursor-wait disabled:opacity-60"
+            >
+              Community
+            </button>
           </nav>
 
           {user ? (
@@ -581,16 +579,14 @@ function App() {
                 <p className="mx-auto whitespace-nowrap px-2 leading-8 text-white/72 text-[clamp(0.68rem,1.55vw,1.125rem)]">
                   광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장하는 개발 커뮤니티입니다.
                 </p>
-                {user && (
-                  <div className="flex flex-wrap justify-center gap-3 pt-3">
-                    <button type="button" onClick={goArchive} className={ghostActionBtnClass}>
-                      Resources
-                    </button>
-                    <button type="button" onClick={goCommunity} className={ghostActionBtnClass}>
-                      Community
-                    </button>
-                  </div>
-                )}
+                <div className="flex flex-wrap justify-center gap-3 pt-3">
+                  <button type="button" onClick={goArchive} disabled={authLoading} className={ghostActionBtnClass}>
+                    Resources
+                  </button>
+                  <button type="button" onClick={goCommunity} disabled={authLoading} className={ghostActionBtnClass}>
+                    Community
+                  </button>
+                </div>
               </div>
             </div>
           </div>
