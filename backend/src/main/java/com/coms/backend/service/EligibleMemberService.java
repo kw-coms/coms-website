@@ -34,6 +34,14 @@ public class EligibleMemberService {
         this.eligibleMemberRepository = eligibleMemberRepository;
     }
 
+    public void addSingle(String studentId, String name) {
+        EligibleMember member = eligibleMemberRepository.findByStudentId(studentId)
+                .orElseGet(EligibleMember::new);
+        member.setStudentId(studentId);
+        member.setName(name);
+        eligibleMemberRepository.save(member);
+    }
+
     @Transactional(readOnly = true)
     public void validateSignup(String studentId, String name) {
         String normalizedStudentId = normalize(studentId);

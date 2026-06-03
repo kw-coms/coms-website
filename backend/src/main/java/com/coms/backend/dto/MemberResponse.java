@@ -7,6 +7,8 @@ public record MemberResponse(
         String email,
         String department,
         String phone,
-        String role
+        String role,
+        String aspiration,
+        String interests
 ) {
 }

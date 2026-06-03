@@ -50,6 +50,8 @@ public class AuthService implements UserDetailsService {
         member.setPassword(passwordEncoder.encode(request.password()));
         member.setDepartment(request.department() == null ? null : request.department().trim());
         member.setPhone(request.phone() == null ? null : request.phone().trim());
+        member.setAspiration(request.aspiration() == null ? null : request.aspiration().trim());
+        member.setInterests(request.interests() == null ? null : request.interests().trim());
         memberRepository.save(member);
 
         return new AuthResponse(null, member.getStudentId(), member.getName(), "회원가입 신청이 완료되었습니다.");
@@ -78,7 +80,9 @@ public class AuthService implements UserDetailsService {
                 member.getEmail(),
                 member.getDepartment(),
                 member.getPhone(),
-                member.getRole().name()
+                member.getRole().name(),
+                null,
+                null
         );
     }
 
