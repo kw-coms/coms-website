@@ -8,6 +8,8 @@ public record CommunityPostResponse(
         String content,
         String authorStudentId,
         String authorName,
+        String authorDisplayName,
+        boolean authorAdmin,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         boolean editable
