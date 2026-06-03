@@ -29,6 +29,7 @@ function PostCard({ post, onDelete, onUpdate }) {
   const displayContent = expanded || !needsExpand
     ? post.content
     : lines.slice(0, CONTENT_PREVIEW_LINES).join('\n').slice(0, 280)
+  const authorLabel = post.authorDisplayName || post.authorName
 
   const handleUpdate = async (e) => {
     e.preventDefault()
@@ -56,7 +57,7 @@ function PostCard({ post, onDelete, onUpdate }) {
   }
 
   return (
-    <article className="rounded-lg border border-black/10 bg-black/5 px-4 py-4">
+    <article className="border-b border-black/10 bg-white/45 px-3 py-3 transition hover:bg-white/70 sm:px-4">
       {editing ? (
         <form onSubmit={handleUpdate} className="space-y-3">
           <input
@@ -95,38 +96,52 @@ function PostCard({ post, onDelete, onUpdate }) {
         </form>
       ) : (
         <>
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <h2 className="font-semibold text-[var(--theme-body-dark)]">{post.title}</h2>
-              <p className="mt-1 text-xs text-[var(--theme-body-muted)]">
-                {post.authorName} · <span title={new Date(post.createdAt).toLocaleString('ko-KR')}>{relativeTime(post.createdAt)}</span>
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px_88px_auto] sm:items-start">
+            <div className="min-w-0">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <h2 className="min-w-0 truncate text-sm font-semibold text-[var(--theme-body-dark)] sm:text-[15px]">{post.title}</h2>
+                {post.authorAdmin && (
+                  <span className="shrink-0 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">
+                    주딱
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-[var(--theme-body-muted)] sm:hidden">
+                <span className="font-semibold text-[var(--theme-body-mid)]">{authorLabel}</span>
+                <span className="mx-1">·</span>
+                <span title={new Date(post.createdAt).toLocaleString('ko-KR')}>{relativeTime(post.createdAt)}</span>
                 {post.updatedAt !== post.createdAt && (
                   <span className="ml-1 opacity-60">(수정됨)</span>
                 )}
               </p>
             </div>
+            <span className="hidden truncate text-xs font-semibold text-[var(--theme-body-mid)] sm:block">{authorLabel}</span>
+            <span className="hidden text-right text-xs text-[var(--theme-body-muted)] sm:block" title={new Date(post.createdAt).toLocaleString('ko-KR')}>
+              {relativeTime(post.createdAt)}
+              {post.updatedAt !== post.createdAt && <span className="ml-1 opacity-60">수정</span>}
+            </span>
             {post.editable && (
-              <div className="flex shrink-0 gap-1">
+              <div className="flex shrink-0 gap-1 sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setEditing(true)}
-                  className="shape-cut-sm inline-flex items-center gap-1 border border-black/10 bg-white/60 px-2.5 py-1.5 text-xs font-semibold text-[var(--theme-body-mid)] transition hover:bg-white/80"
+                  className="shape-cut-sm inline-flex h-8 w-8 items-center justify-center border border-black/10 bg-white/60 text-[var(--theme-body-mid)] transition hover:bg-white/80"
+                  title="수정"
                 >
                   <Pencil size={12} />
-                  수정
                 </button>
                 <button
                   type="button"
                   onClick={() => onDelete(post)}
-                  className="shape-cut-sm inline-flex items-center gap-1 border border-black/10 bg-white/60 px-2.5 py-1.5 text-xs font-semibold text-red-500 transition hover:bg-white/80"
+                  className="shape-cut-sm inline-flex h-8 w-8 items-center justify-center border border-black/10 bg-white/60 text-red-500 transition hover:bg-white/80"
+                  title="삭제"
                 >
                   <Trash2 size={12} />
-                  삭제
                 </button>
               </div>
             )}
           </div>
-          <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--theme-body-mid)]">
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--theme-body-mid)]">
             {displayContent}
             {needsExpand && !expanded && '…'}
           </p>
@@ -208,13 +223,13 @@ export default function Community({ onBack }) {
         </button>
       </div>
 
-      <section className="shape-cut bg-[var(--theme-surface-96)] p-5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] sm:p-8">
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <section className="shape-cut bg-[var(--theme-surface-96)] p-4 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] sm:p-6">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4 border-b border-black/10 pb-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[var(--theme-body-muted)]/80">Community</p>
-            <h1 className="mt-2 text-2xl font-bold sm:text-3xl">COM&apos;s 커뮤니티</h1>
+            <h1 className="mt-2 text-2xl font-bold sm:text-3xl">COM&apos;s 게시판</h1>
             <p className="mt-2 text-sm text-[var(--theme-body-muted)]/85">
-              명부 인증을 통과한 회원만 글을 남길 수 있는 내부 공간입니다.
+              명부 인증 회원만 글을 남기고, 작성자는 기수와 이름으로 표시됩니다.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -229,7 +244,7 @@ export default function Community({ onBack }) {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="mb-6 space-y-3 rounded-lg border border-black/10 bg-black/5 p-4">
+        <form onSubmit={handleSubmit} className="mb-4 space-y-3 border-b border-black/10 bg-black/5 p-3 sm:p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-[var(--theme-body-dark)]">
             <MessageSquarePlus size={16} />
             새 글 작성
@@ -246,7 +261,7 @@ export default function Community({ onBack }) {
               value={form.content}
               onChange={(event) => setForm((prev) => ({ ...prev, content: event.target.value }))}
               placeholder="스터디 모집, 질문, 공유할 내용을 적어주세요."
-              rows={5}
+              rows={4}
               maxLength={5000}
               className="w-full shape-cut-sm resize-none bg-white/72 px-4 py-2.5 text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/70 focus:ring-2 focus:ring-[var(--theme-accent)]/55"
             />
@@ -282,7 +297,15 @@ export default function Community({ onBack }) {
           </p>
         )}
 
-        <div className="space-y-3">
+        <div className="overflow-hidden border border-black/10 bg-black/5">
+          {!loading && posts.length > 0 && (
+            <div className="grid grid-cols-[1fr_auto] border-b border-black/10 bg-black/8 px-3 py-2 text-xs font-bold text-[var(--theme-body-muted)] sm:grid-cols-[minmax(0,1fr)_150px_88px_72px]">
+              <span>제목</span>
+              <span className="hidden sm:block">작성자</span>
+              <span className="text-right">시간</span>
+              <span className="hidden text-right sm:block">관리</span>
+            </div>
+          )}
           {visiblePosts.map((post) => (
             <PostCard key={post.id} post={post} onDelete={handleDelete} onUpdate={handleUpdate} />
           ))}
