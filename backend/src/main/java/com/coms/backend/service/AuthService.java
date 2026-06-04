@@ -8,6 +8,8 @@ import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.dto.UpdateProfileRequest;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.security.JwtTokenProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -25,6 +27,7 @@ import java.time.LocalDateTime;
 @Transactional
 public class AuthService implements UserDetailsService {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final MemberRepository memberRepository;
@@ -65,6 +68,16 @@ public class AuthService implements UserDetailsService {
         member.setAspiration(request.aspiration() == null ? null : request.aspiration().trim());
         member.setInterests(request.interests() == null ? null : request.interests().trim());
         memberRepository.save(member);
+
+        try {
+            String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+            member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
+            member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(10));
+            memberRepository.save(member);
+            emailVerificationSender.sendVerificationCode(member.getEmail(), code);
+        } catch (Exception e) {
+            log.warn("Failed to auto-send verification email during signup for {}", member.getEmail(), e);
+        }
 
         return new AuthResponse(null, member.getStudentId(), member.getName(), "회원가입 신청이 완료되었습니다.");
     }
@@ -128,6 +141,24 @@ public class AuthService implements UserDetailsService {
                 member.getAspiration(),
                 member.getInterests()
         );
+    }
+
+    public boolean requestSignupEmailVerification(String studentId) {
+        Member member = memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+        if (member.isEmailVerified()) {
+            return true;
+        }
+        String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
+        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(10));
+        memberRepository.save(member);
+        emailVerificationSender.sendVerificationCode(member.getEmail(), code);
+        return false;
+    }
+
+    public boolean confirmSignupEmailVerification(String studentId, String code) {
+        return confirmEmailVerification(studentId, code);
     }
 
     public boolean requestEmailVerification(String studentId) {

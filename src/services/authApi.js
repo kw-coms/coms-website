@@ -46,3 +46,17 @@ export async function confirmEmailVerification(code) {
     body: JSON.stringify({ code }),
   })
 }
+
+export async function requestSignupEmailVerification(studentId) {
+  return request('/api/auth/email-verification/request-signup', {
+    method: 'POST',
+    body: JSON.stringify({ studentId }),
+  })
+}
+
+export async function confirmSignupEmailVerification(studentId, code) {
+  return request('/api/auth/email-verification/confirm-signup', {
+    method: 'POST',
+    body: JSON.stringify({ studentId, code }),
+  })
+}
