@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers } from '../services/adminApi.js'
+import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember } from '../services/adminApi.js'
 import { listFiles, uploadFile, deleteFile } from '../services/archiveApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 
@@ -89,6 +89,9 @@ function RosterTab() {
   const [adding, setAdding] = useState(false)
   const [addResult, setAddResult] = useState('')
   const [addError, setAddError] = useState('')
+  const [editingId, setEditingId] = useState(null)
+  const [editForm, setEditForm] = useState({ studentId: '', name: '' })
+  const [editSaving, setEditSaving] = useState(false)
 
   const loadRoster = async () => {
     setRosterError('')
@@ -147,6 +150,37 @@ function RosterTab() {
     }
   }
 
+  const startEdit = (member) => {
+    setEditingId(member.id)
+    setEditForm({ studentId: member.studentId || '', name: member.name })
+  }
+
+  const handleEditSave = async (id) => {
+    if (!editForm.studentId.trim() || !editForm.name.trim()) return
+    setEditSaving(true)
+    try {
+      await updateEligibleMember(id, editForm.studentId.trim(), editForm.name.trim())
+      setEditingId(null)
+      await loadRoster()
+    } catch (err) {
+      alert(err.message || '수정 중 오류가 발생했습니다.')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  const handleDelete = async (member) => {
+    if (!window.confirm(`${member.name} (${member.studentId}) 항목을 명부에서 삭제하시겠습니까?`)) return
+    try {
+      await deleteEligibleMember(member.id)
+      setRoster((prev) => prev.filter((m) => m.id !== member.id))
+    } catch (err) {
+      alert(err.message || '삭제 중 오류가 발생했습니다.')
+    }
+  }
+
+  const inputCls = 'shape-cut-sm border border-black/10 bg-white/70 px-2 py-1 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
+
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-black/10 bg-black/5 p-4">
@@ -182,15 +216,12 @@ function RosterTab() {
       <div className="rounded-lg border border-black/10 bg-black/5 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-[var(--theme-body-dark)]">명부 확인</p>
-            <p className="mt-1 text-xs text-[var(--theme-body-muted)]">가입 허용 명부에 등록된 학번과 이름을 확인합니다.</p>
+            <p className="text-sm font-semibold text-[var(--theme-body-dark)]">명부 확인 · 편집</p>
+            <p className="mt-1 text-xs text-[var(--theme-body-muted)]">가입 허용 명부에 등록된 학번과 이름을 확인하고 수정합니다.</p>
           </div>
           <button
             type="button"
-            onClick={() => {
-              setLoadingRoster(true)
-              loadRoster()
-            }}
+            onClick={() => { setLoadingRoster(true); loadRoster() }}
             className="shape-cut-sm border border-black/10 bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
           >
             새로고침
@@ -207,17 +238,47 @@ function RosterTab() {
             <table className="min-w-full divide-y divide-black/10 text-left text-sm">
               <thead className="sticky top-0 bg-white text-xs font-semibold text-[var(--theme-body-muted)]">
                 <tr>
-                  <th className="px-4 py-3">학번</th>
-                  <th className="px-4 py-3">이름</th>
-                  <th className="px-4 py-3">기수</th>
+                  <th className="px-3 py-3">학번</th>
+                  <th className="px-3 py-3">이름</th>
+                  <th className="px-3 py-3">기수</th>
+                  <th className="px-3 py-3">전화번호</th>
+                  <th className="px-3 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/10 bg-white/50">
                 {roster.map((member) => (
                   <tr key={member.id}>
-                    <td className="px-4 py-3 font-mono text-xs text-[var(--theme-body-dark)]">{member.studentId || '-'}</td>
-                    <td className="px-4 py-3 font-semibold text-[var(--theme-body-dark)]">{member.name}</td>
-                    <td className="px-4 py-3 text-xs text-[var(--theme-body-muted)]">{member.generation || '-'}</td>
+                    {editingId === member.id ? (
+                      <>
+                        <td className="px-3 py-2">
+                          <input value={editForm.studentId} onChange={(e) => setEditForm((p) => ({ ...p, studentId: e.target.value }))} maxLength={10} className={`${inputCls} w-32`} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} maxLength={20} className={`${inputCls} w-24`} />
+                        </td>
+                        <td className="px-3 py-2 text-xs text-[var(--theme-body-muted)]">자동계산</td>
+                        <td className="px-3 py-2 text-xs text-[var(--theme-body-muted)]">{member.phone || '-'}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => handleEditSave(member.id)} disabled={editSaving} className="text-xs font-semibold text-emerald-600 hover:underline disabled:opacity-50">저장</button>
+                            <button type="button" onClick={() => setEditingId(null)} className="text-xs font-semibold text-[var(--theme-body-muted)] hover:underline">취소</button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-3 py-3 font-mono text-xs text-[var(--theme-body-dark)]">{member.studentId || '-'}</td>
+                        <td className="px-3 py-3 font-semibold text-[var(--theme-body-dark)]">{member.name}</td>
+                        <td className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{member.generation ? `${member.generation}기` : '-'}</td>
+                        <td className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{member.phone || '-'}</td>
+                        <td className="px-3 py-3">
+                          <div className="flex gap-3">
+                            <button type="button" onClick={() => startEdit(member)} className="text-xs font-semibold text-blue-500 hover:underline">편집</button>
+                            <button type="button" onClick={() => handleDelete(member)} className="text-xs font-semibold text-red-500 hover:underline">삭제</button>
+                          </div>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -230,7 +291,7 @@ function RosterTab() {
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">명부 일괄 업로드</p>
         <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
           엑셀(.xlsx) 또는 구글 폼 CSV를 업로드하면 회원가입 시 학번·이름을 대조합니다.
-          전화번호 열이 있으면 함께 검증합니다. 학번 열이 없는 파일은 가져올 수 없습니다.
+          전화번호 열이 있으면 저장해 관리자가 확인할 수 있습니다. 기수는 학번에서 자동 계산됩니다.
         </p>
 
         <input
