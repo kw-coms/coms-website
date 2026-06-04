@@ -1,8 +1,10 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.ArchiveFile;
+import com.coms.backend.domain.Member;
 import com.coms.backend.dto.ArchiveFileResponse;
 import com.coms.backend.repository.ArchiveFileRepository;
+import com.coms.backend.repository.MemberRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,22 +39,29 @@ public class ArchiveService {
 
     private final ArchiveFileRepository repo;
     private final StorageService storage;
+    private final MemberRepository memberRepository;
 
-    public ArchiveService(ArchiveFileRepository repo, StorageService storage) {
+    public ArchiveService(ArchiveFileRepository repo, StorageService storage, MemberRepository memberRepository) {
         this.repo = repo;
         this.storage = storage;
+        this.memberRepository = memberRepository;
     }
 
-    public ArchiveFileResponse upload(MultipartFile file, String uploaderStudentId) throws IOException {
+    public ArchiveFileResponse upload(String title, String description, MultipartFile file, String uploaderStudentId) throws IOException {
         validateUpload(file);
         String stored = storage.store(file);
         try {
+            Member member = memberRepository.findByStudentId(uploaderStudentId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
             ArchiveFile entity = new ArchiveFile();
+            entity.setTitle(title != null && !title.isBlank() ? title.trim() : cleanOriginalFilename(file));
+            entity.setDescription(description != null && !description.isBlank() ? description.trim() : null);
             entity.setOriginalName(cleanOriginalFilename(file));
             entity.setStoredName(stored);
             entity.setMimeType(file.getContentType() == null ? "application/octet-stream" : file.getContentType());
             entity.setFileSize(file.getSize());
             entity.setUploadedBy(uploaderStudentId);
+            entity.setUploaderName(member.getName());
             return toResponse(repo.save(entity));
         } catch (RuntimeException e) {
             storage.delete(stored);
@@ -80,10 +89,13 @@ public class ArchiveService {
     private ArchiveFileResponse toResponse(ArchiveFile file) {
         return new ArchiveFileResponse(
                 file.getId(),
+                file.getTitle() != null ? file.getTitle() : file.getOriginalName(),
+                file.getDescription(),
                 file.getOriginalName(),
                 file.getMimeType(),
                 file.getFileSize(),
                 file.getUploadedBy(),
+                file.getUploaderName(),
                 file.getUploadedAt()
         );
     }
