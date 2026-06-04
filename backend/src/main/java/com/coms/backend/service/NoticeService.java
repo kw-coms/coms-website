@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @Transactional
@@ -57,6 +58,18 @@ public class NoticeService {
         notice.setContent(request.content());
         notice.setAuthor(request.author());
         notice.setPinned(request.pinned());
+        notice.setCategory(parseCategory(request.category()));
+    }
+
+    private Notice.Category parseCategory(String value) {
+        if (value == null || value.isBlank()) {
+            return Notice.Category.GENERAL;
+        }
+        try {
+            return Notice.Category.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid notice category.");
+        }
     }
 
     private NoticeResponse toResponse(Notice notice) {
@@ -66,6 +79,7 @@ public class NoticeService {
                 notice.getContent(),
                 notice.getAuthor(),
                 notice.isPinned(),
+                notice.getCategory().name(),
                 notice.getCreatedAt(),
                 notice.getUpdatedAt()
         );
