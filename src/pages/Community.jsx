@@ -38,6 +38,12 @@ function openRowWithKeyboard(event, open) {
   }
 }
 
+function clickableCell(open) {
+  return {
+    onClick: open,
+  }
+}
+
 function PostForm({ initialPost, onCancel, onSave }) {
   const [form, setForm] = useState({
     title: initialPost?.title || '',
@@ -239,11 +245,13 @@ export default function Community({ onBack }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-center sm:justify-start">
-        <button type="button" onClick={onBack} className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white">
-          메인으로 돌아가기
-        </button>
-      </div>
+      {mode === 'list' && (
+        <div className="flex justify-center sm:justify-start">
+          <button type="button" onClick={onBack} className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white">
+            메인으로 돌아가기
+          </button>
+        </div>
+      )}
 
       <section className="overflow-hidden shape-cut border border-white/10 bg-white/5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md">
         {mode === 'list' && (
@@ -299,30 +307,33 @@ export default function Community({ onBack }) {
                   {!loading && filteredPosts.length === 0 && (
                     <tr><td colSpan="7" className="px-4 py-16 text-center text-white/65">등록된 글이 없습니다.</td></tr>
                   )}
-                  {visiblePosts.map((post) => (
+                  {visiblePosts.map((post) => {
+                    const open = () => openPost(post)
+                    return (
                     <tr
                       key={post.id}
                       tabIndex={0}
                       role="button"
-                      onClick={() => openPost(post)}
-                      onKeyDown={(event) => openRowWithKeyboard(event, () => openPost(post))}
+                      onClick={open}
+                      onKeyDown={(event) => openRowWithKeyboard(event, open)}
                       className="cursor-pointer text-white/75 transition hover:bg-white/5 focus:bg-white/10 focus:outline-none"
                     >
-                      <td className="px-4 py-4 text-center text-xs text-white/45">{post.id}</td>
-                      <td className="px-4 py-4 text-center text-xs font-bold text-cyan-100">{categoryLabel(post.category || 'GENERAL')}</td>
-                      <td className="px-4 py-4">
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{post.id}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-cyan-100">{categoryLabel(post.category || 'GENERAL')}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
                         <span className="block max-w-[520px] truncate text-left font-semibold text-white">
                           {post.title}
                         </span>
                         {post.imageUrl && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
                         {post.authorAdmin && <span className="ml-1 rounded bg-red-600 px-1 py-0.5 text-[10px] font-black text-white">주딱</span>}
                       </td>
-                      <td className="px-4 py-4 text-center text-xs font-semibold">{post.authorDisplayName || post.authorName}</td>
-                      <td className="px-4 py-4 text-center text-xs text-white/45">{shortDate(post.createdAt)}</td>
-                      <td className="px-4 py-4 text-center text-xs">{post.viewCount}</td>
-                      <td className="px-4 py-4 text-center text-xs">{post.upvotes - post.downvotes}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-semibold">{post.authorDisplayName || post.authorName}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{shortDate(post.createdAt)}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{post.viewCount}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{post.upvotes - post.downvotes}</td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

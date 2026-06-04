@@ -15,6 +15,12 @@ function openRowWithKeyboard(event, open) {
   }
 }
 
+function clickableCell(open) {
+  return {
+    onClick: open,
+  }
+}
+
 function NoticeForm({ initialNotice, defaultCategory, user, onCancel, onSave }) {
   const [formData, setFormData] = useState({
     title: initialNotice?.title || '',
@@ -150,11 +156,13 @@ export default function Notices({ onBack }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-center sm:justify-start">
-        <button type="button" onClick={onBack} className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white">
-          메인으로 돌아가기
-        </button>
-      </div>
+      {mode === 'list' && (
+        <div className="flex justify-center sm:justify-start">
+          <button type="button" onClick={onBack} className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white">
+            메인으로 돌아가기
+          </button>
+        </div>
+      )}
 
       <section className="overflow-hidden shape-cut border border-white/10 bg-white/5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md">
         <div className="border-b border-white/10 bg-black/20 px-5 py-5 sm:px-7">
@@ -245,26 +253,29 @@ export default function Notices({ onBack }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/10">
-                    {filteredNotices.map((notice) => (
+                    {filteredNotices.map((notice) => {
+                      const open = () => openNotice(notice)
+                      return (
                       <tr
                         key={notice.id}
                         tabIndex={0}
                         role="button"
-                        onClick={() => openNotice(notice)}
-                        onKeyDown={(event) => openRowWithKeyboard(event, () => openNotice(notice))}
+                        onClick={open}
+                        onKeyDown={(event) => openRowWithKeyboard(event, open)}
                         className="cursor-pointer text-white/75 transition hover:bg-white/5 focus:bg-white/10 focus:outline-none"
                       >
-                        <td className="px-4 py-4 text-center text-xs text-white/45">{notice.id}</td>
-                        <td className="px-4 py-4 text-center text-xs font-bold text-cyan-100">{(notice.category || 'GENERAL') === 'JOB' ? '취업' : '공지'}</td>
-                        <td className="px-4 py-4">
+                        <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{notice.id}</td>
+                        <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-cyan-100">{(notice.category || 'GENERAL') === 'JOB' ? '취업' : '공지'}</td>
+                        <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
                           <span className="block max-w-[520px] truncate text-left font-semibold text-white">
                             {notice.title}
                           </span>
                         </td>
-                        <td className="px-4 py-4 text-center text-xs">{notice.author}</td>
-                        <td className="px-4 py-4 text-center text-xs text-white/45">{formatDate(notice.createdAt)}</td>
+                        <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{notice.author}</td>
+                        <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{formatDate(notice.createdAt)}</td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
