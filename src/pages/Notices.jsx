@@ -8,6 +8,13 @@ function formatDate(iso) {
   return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('ko-KR')
 }
 
+function openRowWithKeyboard(event, open) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    open()
+  }
+}
+
 function NoticeForm({ initialNotice, defaultCategory, user, onCancel, onSave }) {
   const [formData, setFormData] = useState({
     title: initialNotice?.title || '',
@@ -103,6 +110,19 @@ export default function Notices({ onBack }) {
       ? notices
       : notices.filter((notice) => (notice.category || 'GENERAL') === activeCategory)
   ), [activeCategory, notices])
+  const featuredNotice = useMemo(
+    () => notices.find((notice) => (notice.category || 'GENERAL') === 'GENERAL'),
+    [notices],
+  )
+  const featuredJob = useMemo(
+    () => notices.find((notice) => (notice.category || 'GENERAL') === 'JOB'),
+    [notices],
+  )
+
+  const openNotice = (notice) => {
+    setSelectedNotice(notice)
+    setMode('detail')
+  }
 
   const mergeNotice = (notice) => {
     setNotices((prev) => {
@@ -157,6 +177,32 @@ export default function Notices({ onBack }) {
 
         {mode === 'list' && (
           <>
+            {(featuredNotice || featuredJob) && (
+              <div className="grid gap-3 border-b border-white/10 bg-white/8 px-5 py-4 sm:px-7 lg:grid-cols-2">
+                {[
+                  ['최신 공지', featuredNotice, Megaphone],
+                  ['최신 취업공고', featuredJob, BriefcaseBusiness],
+                ].map(([label, notice, Icon]) => (
+                  notice && (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => openNotice(notice)}
+                      className="shape-cut-sm group flex min-h-24 items-center gap-4 border border-white/10 bg-black/18 px-4 py-3 text-left transition hover:bg-white/12"
+                    >
+                      <span className="flex size-11 shrink-0 items-center justify-center rounded border border-cyan-200/20 bg-cyan-200/10 text-cyan-100">
+                        <Icon size={20} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-xs font-black uppercase tracking-[0.18em] text-cyan-100">{label}</span>
+                        <span className="mt-2 block truncate text-base font-black text-white group-hover:underline">{notice.title}</span>
+                        <span className="mt-1 block text-xs font-semibold text-white/45">{formatDate(notice.createdAt)} · {notice.author}</span>
+                      </span>
+                    </button>
+                  )
+                ))}
+              </div>
+            )}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-black/18 px-5 py-3 sm:px-7">
               <div className="flex flex-wrap gap-2 text-sm font-bold">
               {[
@@ -200,13 +246,20 @@ export default function Notices({ onBack }) {
                   </thead>
                   <tbody className="divide-y divide-white/10">
                     {filteredNotices.map((notice) => (
-                      <tr key={notice.id} className="text-white/75 transition hover:bg-white/5">
+                      <tr
+                        key={notice.id}
+                        tabIndex={0}
+                        role="button"
+                        onClick={() => openNotice(notice)}
+                        onKeyDown={(event) => openRowWithKeyboard(event, () => openNotice(notice))}
+                        className="cursor-pointer text-white/75 transition hover:bg-white/5 focus:bg-white/10 focus:outline-none"
+                      >
                         <td className="px-4 py-4 text-center text-xs text-white/45">{notice.id}</td>
                         <td className="px-4 py-4 text-center text-xs font-bold text-cyan-100">{(notice.category || 'GENERAL') === 'JOB' ? '취업' : '공지'}</td>
                         <td className="px-4 py-4">
-                          <button type="button" onClick={() => { setSelectedNotice(notice); setMode('detail') }} className="max-w-[520px] truncate text-left font-semibold text-white hover:underline">
+                          <span className="block max-w-[520px] truncate text-left font-semibold text-white">
                             {notice.title}
-                          </button>
+                          </span>
                         </td>
                         <td className="px-4 py-4 text-center text-xs">{notice.author}</td>
                         <td className="px-4 py-4 text-center text-xs text-white/45">{formatDate(notice.createdAt)}</td>

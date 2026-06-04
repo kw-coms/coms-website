@@ -143,6 +143,28 @@ class CommunityServiceTest {
                 .isEqualTo(CommunityPost.Category.QUESTION);
     }
 
+    @Test
+    void adminCanDeleteAnyCommunityPostButOtherUsersCannot() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member otherUser = member("2024123456", "다른회원", Member.Role.USER);
+        Member admin = member("2026123456", "관리자", Member.Role.ADMIN);
+        memberRepository.save(author);
+        memberRepository.save(otherUser);
+        memberRepository.save(admin);
+        var created = communityService.create(
+                author.getStudentId(),
+                new CommunityPostRequest("삭제 권한", "내용", "GENERAL", false),
+                null
+        );
+
+        assertThatThrownBy(() -> communityService.delete(otherUser.getStudentId(), created.id()))
+                .isInstanceOf(ResponseStatusException.class);
+
+        communityService.delete(admin.getStudentId(), created.id());
+
+        assertThat(communityPostRepository.findById(created.id())).isEmpty();
+    }
+
     private Member member(String studentId, String name, Member.Role role) {
         Member member = new Member();
         member.setStudentId(studentId);
