@@ -189,9 +189,10 @@ public class EligibleMemberService {
         try (InputStream inputStream = file.getInputStream();
              Workbook workbook = WorkbookFactory.create(inputStream)) {
 
+            FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
             Sheet sheet = workbook.getSheetAt(0);
-            int headerRowIndex = findXlsxHeaderRowIndex(sheet);
-            Map<String, Integer> header = buildXlsxHeaderMap(sheet.getRow(headerRowIndex));
+            int headerRowIndex = findXlsxHeaderRowIndex(sheet, evaluator);
+            Map<String, Integer> header = buildXlsxHeaderMap(sheet.getRow(headerRowIndex), evaluator);
 
             if (!header.containsKey("name") || !header.containsKey("studentId")) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부에는 학번, 이름 컬럼이 필요합니다.");
@@ -201,17 +202,17 @@ public class EligibleMemberService {
                 Row row = sheet.getRow(i);
                 if (row == null) continue;
 
-                String name = normalize(readCell(row, header.get("name")));
+                String name = normalize(readCell(row, header.get("name"), evaluator));
                 if (name.isBlank()) {
                     skipped++;
                     continue;
                 }
 
                 String phone = header.containsKey("phone")
-                        ? normalizePhone(readCell(row, header.get("phone")))
+                        ? normalizePhone(readCell(row, header.get("phone"), evaluator))
                         : null;
-                String studentId = extractStudentId(normalize(readCell(row, header.get("studentId"))));
-                String note = normalize(readCell(row, header.get("note")));
+                String studentId = extractStudentId(normalize(readCell(row, header.get("studentId"), evaluator)));
+                String note = normalize(readCell(row, header.get("note"), evaluator));
 
                 EligibleMember member = findExisting(studentId).orElseGet(EligibleMember::new);
                 member.setStudentId(studentId.isBlank() ? null : studentId);
@@ -230,10 +231,10 @@ public class EligibleMemberService {
         return new EligibleMemberImportResponse(imported, skipped, "명부를 가져왔습니다.");
     }
 
-    private Map<String, Integer> buildXlsxHeaderMap(Row row) {
+    private Map<String, Integer> buildXlsxHeaderMap(Row row, FormulaEvaluator evaluator) {
         Map<String, Integer> header = new HashMap<>();
         for (Cell cell : row) {
-            String label = normalize(cell.getStringCellValue()).toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+            String label = normalize(readCell(row, cell.getColumnIndex(), evaluator)).toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
             if (label.contains("학번") || label.equals("studentid") || label.equals("student_id")) header.putIfAbsent("studentId", cell.getColumnIndex());
             if (label.equals("이름") || label.equalsIgnoreCase("name")) header.putIfAbsent("name", cell.getColumnIndex());
             if (label.equals("전화번호") || label.contains("전화") || label.equalsIgnoreCase("phone")) header.putIfAbsent("phone", cell.getColumnIndex());
@@ -243,24 +244,24 @@ public class EligibleMemberService {
         return header;
     }
 
-    private int findXlsxHeaderRowIndex(Sheet sheet) {
+    private int findXlsxHeaderRowIndex(Sheet sheet, FormulaEvaluator evaluator) {
         for (int i = 0; i <= Math.min(sheet.getLastRowNum(), 10); i++) {
             Row row = sheet.getRow(i);
             if (row == null) continue;
             for (Cell cell : row) {
-                String value = normalize(readCell(row, cell.getColumnIndex())).toLowerCase(Locale.ROOT);
+                String value = normalize(readCell(row, cell.getColumnIndex(), evaluator)).toLowerCase(Locale.ROOT);
                 if (value.equals("이름") || value.equalsIgnoreCase("name")) return i;
             }
         }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부 헤더를 찾지 못했습니다.");
     }
 
-    private String readCell(Row row, Integer index) {
+    private String readCell(Row row, Integer index, FormulaEvaluator evaluator) {
         if (index == null) return "";
         Cell cell = row.getCell(index);
         if (cell == null) return "";
         DataFormatter formatter = new DataFormatter(Locale.KOREA);
-        return formatter.formatCellValue(cell);
+        return formatter.formatCellValue(cell, evaluator);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
