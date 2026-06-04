@@ -83,6 +83,7 @@ function App() {
   const projectsRef = useRef(null)
   const recruitRef = useRef(null)
   const [bottomHidden, setBottomHidden] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
 
   const updateBracketPositions = (sectionId) => {
     const map = {
@@ -182,6 +183,10 @@ function App() {
   }
 
   const goLogin = () => {
+    if (user) {
+      alert('이미 로그인 되어있습니다.')
+      return
+    }
     setCurrentPage('login')
     setActiveSection(null)
   }
@@ -537,26 +542,47 @@ function App() {
           </nav>
 
           {user ? (
-            <div className="ml-auto hidden items-center gap-2 md:flex">
-              <span className="shape-cut-sm border border-black/10 bg-white/50 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)]">
-                {user.name}
-              </span>
-              {user.role === 'ADMIN' && (
-                <button
-                  type="button"
-                  onClick={goAdmin}
-                  className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78"
-                >
-                  관리자
-                </button>
-              )}
+            <div className="relative ml-auto hidden items-center gap-2 md:flex">
               <button
                 type="button"
-                onClick={goChangePassword}
-                className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78"
+                onClick={() => setShowUserMenu((v) => !v)}
+                className="shape-cut-sm border border-black/10 bg-white/50 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/70"
               >
-                비밀번호 변경
+                {user.name}
               </button>
+              {showUserMenu && (
+                <div className="absolute right-0 top-full z-50 mt-2 w-52 shape-cut border border-black/10 bg-[var(--theme-surface-96)] shadow-[0_12px_40px_rgba(0,0,0,0.15)] backdrop-blur-md">
+                  <div className="border-b border-black/10 px-4 py-3">
+                    <p className="text-sm font-semibold text-[var(--theme-body-dark)]">{user.name}</p>
+                    <p className="text-xs text-[var(--theme-body-muted)]">{user.studentId}</p>
+                  </div>
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      onClick={() => { setShowUserMenu(false); goChangePassword() }}
+                      className="w-full px-4 py-2.5 text-left text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-black/5"
+                    >
+                      비밀번호 변경
+                    </button>
+                    {user.role === 'ADMIN' && (
+                      <button
+                        type="button"
+                        onClick={() => { setShowUserMenu(false); goAdmin() }}
+                        className="w-full px-4 py-2.5 text-left text-sm font-semibold text-amber-700 transition hover:bg-black/5"
+                      >
+                        관리자 패널
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { setShowUserMenu(false); handleLogout() }}
+                      className="w-full px-4 py-2.5 text-left text-sm font-semibold text-red-500 transition hover:bg-black/5"
+                    >
+                      로그아웃
+                    </button>
+                  </div>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={handleLogout}
