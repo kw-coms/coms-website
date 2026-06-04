@@ -173,6 +173,7 @@ export default function Community({ onBack }) {
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
   const [activeCategory, setActiveCategory] = useState('ALL')
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     let mounted = true
@@ -183,9 +184,15 @@ export default function Community({ onBack }) {
     return () => { mounted = false }
   }, [])
 
-  const filteredPosts = useMemo(() => (
-    activeCategory === 'ALL' ? posts : posts.filter((post) => (post.category || 'GENERAL') === activeCategory)
-  ), [activeCategory, posts])
+  const filteredPosts = useMemo(() => {
+    const byCategory = activeCategory === 'ALL' ? posts : posts.filter((post) => (post.category || 'GENERAL') === activeCategory)
+    if (!searchQuery.trim()) return byCategory
+    const q = searchQuery.toLowerCase()
+    return byCategory.filter((post) =>
+      post.title.toLowerCase().includes(q) ||
+      (post.authorDisplayName || post.authorName || '').toLowerCase().includes(q)
+    )
+  }, [activeCategory, posts, searchQuery])
   const visiblePosts = useMemo(() => filteredPosts.slice(0, page * PAGE_SIZE), [filteredPosts, page])
   const hasMore = visiblePosts.length < filteredPosts.length
 
@@ -281,9 +288,18 @@ export default function Community({ onBack }) {
                   </button>
                 ))}
               </div>
-              <div className="inline-flex items-center gap-2 text-xs font-semibold text-white/45">
-                <Search size={14} />
-                {filteredPosts.length}개
+              <div className="flex items-center gap-3">
+                <div className="relative flex items-center">
+                  <Search size={14} className="pointer-events-none absolute left-3 text-white/45" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => { setSearchQuery(e.target.value); setPage(1) }}
+                    placeholder="제목, 작성자 검색"
+                    className="shape-cut-sm w-48 border border-white/10 bg-black/20 py-2 pl-8 pr-3 text-sm text-white placeholder-white/35 outline-none focus:border-white/25"
+                  />
+                </div>
+                <span className="text-xs font-semibold text-white/45">{filteredPosts.length}개</span>
               </div>
             </div>
             {error && <p className="mx-5 mt-5 shape-cut-sm border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-100 sm:mx-7">{error}</p>}
