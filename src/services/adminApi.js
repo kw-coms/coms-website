@@ -41,6 +41,23 @@ export async function deleteEligibleMember(id) {
   })
 }
 
+export async function listBannedStudents() {
+  return request('/api/admin/banned-students')
+}
+
+export async function banStudent(studentId) {
+  return requestNoContent('/api/admin/banned-students', {
+    method: 'POST',
+    body: JSON.stringify({ studentId }),
+  })
+}
+
+export async function unbanStudent(studentId) {
+  return requestNoContent(`/api/admin/banned-students/${studentId}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function importEligibleMembers(file) {
   const formData = new FormData()
   formData.append('file', file)

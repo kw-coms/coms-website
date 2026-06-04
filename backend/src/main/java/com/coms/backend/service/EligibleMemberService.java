@@ -27,12 +27,15 @@ import java.util.regex.Pattern;
 public class EligibleMemberService {
 
     private final EligibleMemberRepository eligibleMemberRepository;
+    private final com.coms.backend.repository.BannedStudentRepository bannedStudentRepository;
 
     private static final Pattern STUDENT_ID_PATTERN = Pattern.compile("\\d{10}");
     private static final Pattern NAME_PATTERN = Pattern.compile("[가-힣]{3}");
 
-    public EligibleMemberService(EligibleMemberRepository eligibleMemberRepository) {
+    public EligibleMemberService(EligibleMemberRepository eligibleMemberRepository,
+                                  com.coms.backend.repository.BannedStudentRepository bannedStudentRepository) {
         this.eligibleMemberRepository = eligibleMemberRepository;
+        this.bannedStudentRepository = bannedStudentRepository;
     }
 
     public void addSingle(String studentId, String name) {
@@ -86,6 +89,10 @@ public class EligibleMemberService {
         }
         if (!NAME_PATTERN.matcher(normalizedName).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름은 한글 3자리여야 합니다.");
+        }
+
+        if (bannedStudentRepository.existsByStudentId(normalizedStudentId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "가입이 제한된 학번입니다.");
         }
 
         EligibleMember eligibleMember = eligibleMemberRepository.findByStudentId(normalizedStudentId)
