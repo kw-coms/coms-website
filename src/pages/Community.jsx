@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ImagePlus, Pencil, ThumbsDown, ThumbsUp, Trash2, X } from 'lucide-react'
+import { ArrowLeft, ImagePlus, Pencil, Search, ThumbsDown, ThumbsUp, Trash2, X } from 'lucide-react'
 import {
   createCommunityPost,
   deleteCommunityPost,
@@ -11,6 +11,16 @@ import {
 import { apiUrl } from '../services/apiClient.js'
 
 const PAGE_SIZE = 30
+const CATEGORY_OPTIONS = [
+  { value: 'ALL', label: '전체글' },
+  { value: 'GENERAL', label: '일반' },
+  { value: 'QUESTION', label: '질문' },
+  { value: 'INFO', label: '정보' },
+]
+
+function categoryLabel(value) {
+  return CATEGORY_OPTIONS.find((item) => item.value === value)?.label || '일반'
+}
 
 function shortDate(iso) {
   const date = new Date(iso)
@@ -25,6 +35,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
   const [form, setForm] = useState({
     title: initialPost?.title || '',
     content: initialPost?.content || '',
+    category: initialPost?.category || 'GENERAL',
     removeImage: false,
   })
   const [image, setImage] = useState(null)
@@ -40,6 +51,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
       const payload = {
         title: form.title.trim(),
         content: form.content.trim(),
+        category: form.category,
         removeImage: form.removeImage,
       }
       const saved = initialPost
@@ -54,13 +66,22 @@ function PostForm({ initialPost, onCancel, onSave }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3 border border-black/10 bg-white/50 p-4">
+    <form onSubmit={submit} className="space-y-4 rounded-lg border border-white/10 bg-white/80 p-5 shadow-[0_18px_50px_rgba(0,0,0,0.12)]">
+      <select
+        value={form.category}
+        onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
+        className="w-full max-w-48 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+      >
+        {CATEGORY_OPTIONS.filter((item) => item.value !== 'ALL').map((item) => (
+          <option key={item.value} value={item.value}>{item.label}</option>
+        ))}
+      </select>
       <input
         value={form.title}
         onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
         maxLength={200}
         placeholder="제목"
-        className="w-full border border-black/15 bg-white px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+        className="w-full rounded border border-black/15 bg-white px-4 py-3 text-sm text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
       />
       <textarea
         value={form.content}
@@ -68,10 +89,10 @@ function PostForm({ initialPost, onCancel, onSave }) {
         rows={14}
         maxLength={5000}
         placeholder="내용을 입력하세요."
-        className="w-full resize-y border border-black/15 bg-white px-3 py-2 text-sm leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+        className="w-full resize-y rounded border border-black/15 bg-white px-4 py-3 text-sm leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
       />
       <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--theme-body-muted)]">
-        <label className="inline-flex cursor-pointer items-center gap-2 border border-black/15 bg-white px-3 py-2 font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded border border-black/15 bg-white px-3 py-2 font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
           <ImagePlus size={15} />
           사진 선택
           <input
@@ -98,14 +119,14 @@ function PostForm({ initialPost, onCancel, onSave }) {
         <button
           type="submit"
           disabled={saving || !form.title.trim() || !form.content.trim()}
-          className="bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] disabled:opacity-50"
+          className="rounded bg-[var(--theme-text)] px-5 py-2.5 text-sm font-semibold text-[var(--theme-bg)] disabled:opacity-50"
         >
           {saving ? '저장 중...' : initialPost ? '수정 완료' : '글 등록'}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="inline-flex items-center gap-1 border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)]"
+          className="inline-flex items-center gap-1 rounded border border-black/15 bg-white px-4 py-2.5 text-sm font-semibold text-[var(--theme-body-mid)]"
         >
           <X size={14} />
           취소
@@ -123,6 +144,7 @@ export default function Community({ onBack }) {
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
+  const [activeCategory, setActiveCategory] = useState('ALL')
 
   useEffect(() => {
     let mounted = true
@@ -133,8 +155,11 @@ export default function Community({ onBack }) {
     return () => { mounted = false }
   }, [])
 
-  const visiblePosts = useMemo(() => posts.slice(0, page * PAGE_SIZE), [posts, page])
-  const hasMore = visiblePosts.length < posts.length
+  const filteredPosts = useMemo(() => (
+    activeCategory === 'ALL' ? posts : posts.filter((post) => (post.category || 'GENERAL') === activeCategory)
+  ), [activeCategory, posts])
+  const visiblePosts = useMemo(() => filteredPosts.slice(0, page * PAGE_SIZE), [filteredPosts, page])
+  const hasMore = visiblePosts.length < filteredPosts.length
 
   const mergePost = (post) => {
     setPosts((prev) => {
@@ -191,11 +216,12 @@ export default function Community({ onBack }) {
   }
 
   const BoardHeader = ({ title = "COM's 게시판", children }) => (
-    <div className="border-b border-black/20 bg-white px-4 py-3">
+    <div className="border-b border-white/10 bg-black/20 px-5 py-5 sm:px-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--theme-body-muted)]">Community</p>
-          <h1 className="mt-1 text-2xl font-black text-[var(--theme-body-dark)]">{title}</h1>
+          <p className="text-xs font-bold uppercase tracking-[0.28em] text-cyan-200">Community</p>
+          <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">{title}</h1>
+          <p className="mt-2 text-sm leading-6 text-white/60">말머리별로 글을 보고, 게시글은 별도 화면처럼 열립니다.</p>
         </div>
         {children}
       </div>
@@ -210,64 +236,83 @@ export default function Community({ onBack }) {
         </button>
       </div>
 
-      <section className="overflow-hidden border border-black/20 bg-[#f7f7f7] text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)]">
+      <section className="overflow-hidden shape-cut border border-white/10 bg-white/5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md">
         {mode === 'list' && (
           <>
             <BoardHeader>
-              <button type="button" onClick={() => setMode('write')} className="bg-[#3b4890] px-4 py-2 text-sm font-bold text-white">
+              <button type="button" onClick={() => setMode('write')} className="shape-cut-sm bg-white/85 px-5 py-2.5 text-sm font-bold text-[var(--theme-body-dark)] transition hover:bg-white">
                 글쓰기
               </button>
             </BoardHeader>
-            <div className="flex flex-wrap gap-1 border-b border-black/15 bg-[#f1f3f8] px-3 py-2 text-xs font-bold">
-              <span className="bg-white px-3 py-1 text-[#3b4890]">전체글</span>
-              <span className="px-3 py-1 text-[var(--theme-body-muted)]">일반</span>
-              <span className="px-3 py-1 text-[var(--theme-body-muted)]">질문</span>
-              <span className="px-3 py-1 text-[var(--theme-body-muted)]">정보</span>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-black/18 px-5 py-3 sm:px-7">
+              <div className="flex flex-wrap gap-2 text-sm font-bold">
+                {CATEGORY_OPTIONS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => {
+                      setActiveCategory(item.value)
+                      setPage(1)
+                    }}
+                    className={`shape-cut-sm px-4 py-2 transition ${
+                      activeCategory === item.value
+                        ? 'bg-white text-[var(--theme-body-dark)]'
+                        : 'border border-white/10 bg-white/10 text-white/68 hover:bg-white/15'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <div className="inline-flex items-center gap-2 text-xs font-semibold text-white/45">
+                <Search size={14} />
+                {filteredPosts.length}개
+              </div>
             </div>
-            {error && <p className="px-4 py-3 text-sm font-semibold text-red-500">{error}</p>}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] border-collapse text-sm">
-                <thead className="border-b border-[#29367c] bg-white text-xs text-[#333]">
+            {error && <p className="mx-5 mt-5 shape-cut-sm border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-100 sm:mx-7">{error}</p>}
+            <div className="m-5 overflow-hidden shape-cut-sm border border-white/10 bg-black/18 sm:m-7">
+              <table className="w-full min-w-[860px] border-collapse text-sm">
+                <thead className="border-b border-white/10 bg-white/8 text-xs uppercase tracking-[0.16em] text-white/45">
                   <tr>
-                    <th className="w-20 px-2 py-2 font-bold">번호</th>
-                    <th className="w-24 px-2 py-2 font-bold">말머리</th>
-                    <th className="px-2 py-2 text-left font-bold">제목</th>
-                    <th className="w-32 px-2 py-2 font-bold">글쓴이</th>
-                    <th className="w-24 px-2 py-2 font-bold">작성일</th>
-                    <th className="w-16 px-2 py-2 font-bold">조회</th>
-                    <th className="w-16 px-2 py-2 font-bold">추천</th>
+                    <th className="w-20 px-4 py-3 font-semibold">번호</th>
+                    <th className="w-24 px-4 py-3 font-semibold">말머리</th>
+                    <th className="px-4 py-3 text-left font-semibold">제목</th>
+                    <th className="w-36 px-4 py-3 font-semibold">글쓴이</th>
+                    <th className="w-28 px-4 py-3 font-semibold">작성일</th>
+                    <th className="w-20 px-4 py-3 font-semibold">조회</th>
+                    <th className="w-20 px-4 py-3 font-semibold">추천</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-black/10 bg-white">
+                <tbody className="divide-y divide-white/10">
                   {loading && (
-                    <tr><td colSpan="7" className="px-4 py-12 text-center text-[var(--theme-body-muted)]">불러오는 중...</td></tr>
+                    <tr><td colSpan="7" className="px-4 py-16 text-center text-white/65">불러오는 중...</td></tr>
                   )}
-                  {!loading && posts.length === 0 && (
-                    <tr><td colSpan="7" className="px-4 py-12 text-center text-[var(--theme-body-muted)]">아직 등록된 글이 없습니다.</td></tr>
+                  {!loading && filteredPosts.length === 0 && (
+                    <tr><td colSpan="7" className="px-4 py-16 text-center text-white/65">등록된 글이 없습니다.</td></tr>
                   )}
                   {visiblePosts.map((post) => (
-                    <tr key={post.id} className="hover:bg-[#f8f8f8]">
-                      <td className="px-2 py-2 text-center text-xs text-[var(--theme-body-muted)]">{post.id}</td>
-                      <td className="px-2 py-2 text-center text-xs text-[#3b4890]">일반</td>
-                      <td className="px-2 py-2">
-                        <button type="button" onClick={() => openPost(post)} className="max-w-[420px] truncate text-left font-semibold hover:underline">
+                    <tr key={post.id} className="text-white/75 transition hover:bg-white/5">
+                      <td className="px-4 py-4 text-center text-xs text-white/45">{post.id}</td>
+                      <td className="px-4 py-4 text-center text-xs font-bold text-cyan-100">{categoryLabel(post.category || 'GENERAL')}</td>
+                      <td className="px-4 py-4">
+                        <button type="button" onClick={() => openPost(post)} className="max-w-[520px] truncate text-left font-semibold text-white hover:underline">
                           {post.title}
                         </button>
-                        {post.imageUrl && <span className="ml-1 text-xs text-[#3b4890]">[사진]</span>}
+                        {post.imageUrl && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
                         {post.authorAdmin && <span className="ml-1 rounded bg-red-600 px-1 py-0.5 text-[10px] font-black text-white">주딱</span>}
                       </td>
-                      <td className="px-2 py-2 text-center text-xs font-semibold">{post.authorDisplayName || post.authorName}</td>
-                      <td className="px-2 py-2 text-center text-xs text-[var(--theme-body-muted)]">{shortDate(post.createdAt)}</td>
-                      <td className="px-2 py-2 text-center text-xs">{post.viewCount}</td>
-                      <td className="px-2 py-2 text-center text-xs">{post.upvotes - post.downvotes}</td>
+                      <td className="px-4 py-4 text-center text-xs font-semibold">{post.authorDisplayName || post.authorName}</td>
+                      <td className="px-4 py-4 text-center text-xs text-white/45">{shortDate(post.createdAt)}</td>
+                      <td className="px-4 py-4 text-center text-xs">{post.viewCount}</td>
+                      <td className="px-4 py-4 text-center text-xs">{post.upvotes - post.downvotes}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             {hasMore && (
-              <button type="button" onClick={() => setPage((p) => p + 1)} className="w-full border-t border-black/10 bg-white py-3 text-sm font-bold text-[#3b4890]">
-                더 보기 ({posts.length - visiblePosts.length}개)
+              <button type="button" onClick={() => setPage((p) => p + 1)} className="w-full border-t border-white/10 bg-white/8 py-3 text-sm font-bold text-white transition hover:bg-white/12">
+                더 보기 ({filteredPosts.length - visiblePosts.length}개)
               </button>
             )}
           </>
@@ -276,12 +321,12 @@ export default function Community({ onBack }) {
         {mode === 'write' && (
           <>
             <BoardHeader title="글쓰기">
-              <button type="button" onClick={backToList} className="inline-flex items-center gap-1 border border-black/20 bg-white px-3 py-2 text-sm font-bold">
+              <button type="button" onClick={backToList} className="shape-cut-sm inline-flex items-center gap-1 border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold text-white">
                 <ArrowLeft size={14} />
                 목록
               </button>
             </BoardHeader>
-            <div className="p-4">
+            <div className="p-5 sm:p-7">
               <PostForm onCancel={backToList} onSave={handleSave} />
             </div>
           </>
@@ -290,12 +335,12 @@ export default function Community({ onBack }) {
         {mode === 'edit' && currentPost && (
           <>
             <BoardHeader title="글 수정">
-              <button type="button" onClick={() => setMode('detail')} className="inline-flex items-center gap-1 border border-black/20 bg-white px-3 py-2 text-sm font-bold">
+              <button type="button" onClick={() => setMode('detail')} className="shape-cut-sm inline-flex items-center gap-1 border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold text-white">
                 <ArrowLeft size={14} />
                 본문
               </button>
             </BoardHeader>
-            <div className="p-4">
+            <div className="p-5 sm:p-7">
               <PostForm initialPost={currentPost} onCancel={() => setMode('detail')} onSave={handleSave} />
             </div>
           </>
@@ -304,7 +349,7 @@ export default function Community({ onBack }) {
         {mode === 'detail' && (
           <>
             <BoardHeader title={detailLoading ? '글 여는 중...' : currentPost?.title || '게시글'}>
-              <button type="button" onClick={backToList} className="inline-flex items-center gap-1 border border-black/20 bg-white px-3 py-2 text-sm font-bold">
+              <button type="button" onClick={backToList} className="shape-cut-sm inline-flex items-center gap-1 border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold text-white">
                 <ArrowLeft size={14} />
                 목록
               </button>
@@ -312,10 +357,11 @@ export default function Community({ onBack }) {
             {detailLoading || !currentPost ? (
               <p className="px-4 py-16 text-center text-sm text-[var(--theme-body-muted)]">글을 여는 중...</p>
             ) : (
-              <article className="bg-white">
-                <div className="border-b border-black/10 px-4 py-3">
-                  <h2 className="break-words text-xl font-black">{currentPost.title}</h2>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--theme-body-muted)]">
+              <article className="m-5 overflow-hidden rounded-lg bg-white shadow-[0_18px_50px_rgba(0,0,0,0.14)] sm:m-7">
+                <div className="border-b border-black/10 px-5 py-5">
+                  <div className="mb-2 text-xs font-black text-[#3b4890]">{categoryLabel(currentPost.category || 'GENERAL')}</div>
+                  <h2 className="break-words text-2xl font-black">{currentPost.title}</h2>
+                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--theme-body-muted)]">
                     <span className="font-bold text-[var(--theme-body-mid)]">{currentPost.authorDisplayName || currentPost.authorName}</span>
                     {currentPost.authorAdmin && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">주딱</span>}
                     <span>{new Date(currentPost.createdAt).toLocaleString('ko-KR')}</span>
