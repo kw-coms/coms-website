@@ -58,7 +58,7 @@ public class AdminController {
     @PatchMapping("/eligible-members/{id}")
     public ResponseEntity<Void> updateEligibleMember(@PathVariable Long id,
                                                      @Valid @RequestBody UpdateEligibleMemberRequest request) {
-        eligibleMemberService.updateEligibleMember(id, request.studentId(), request.name());
+        eligibleMemberService.updateEligibleMember(id, request.studentId(), request.name(), request.phone());
         return ResponseEntity.noContent().build();
     }
 

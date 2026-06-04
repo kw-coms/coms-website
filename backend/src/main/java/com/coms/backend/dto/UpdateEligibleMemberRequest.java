@@ -4,5 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 
 public record UpdateEligibleMemberRequest(
     @NotBlank String studentId,
-    @NotBlank String name
+    @NotBlank String name,
+    String phone
 ) {}
