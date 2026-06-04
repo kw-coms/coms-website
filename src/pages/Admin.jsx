@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent } from '../services/adminApi.js'
+import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword } from '../services/adminApi.js'
 import { listFiles, uploadFile, deleteFile } from '../services/archiveApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 
@@ -364,6 +364,17 @@ function MembersTab({ currentUser }) {
     }
   }
 
+  const handlePasswordReset = async (member) => {
+    const newPassword = window.prompt(`${member.name} (${member.studentId}) 회원의 새 비밀번호를 입력하세요.\n(8자 이상, 영문·숫자·특수문자 포함, 공백 불가)`)
+    if (!newPassword) return
+    try {
+      await resetMemberPassword(member.id, newPassword)
+      alert('비밀번호가 초기화되었습니다.')
+    } catch (err) {
+      alert(err.message || '비밀번호 초기화 중 오류가 발생했습니다.')
+    }
+  }
+
   if (loading) return <p className="text-sm text-[var(--theme-body-muted)]">불러오는 중...</p>
   if (error) return <p className="text-sm text-red-500">{error}</p>
   if (members.length === 0) return <p className="text-sm text-[var(--theme-body-muted)]">회원이 없습니다.</p>
@@ -407,6 +418,13 @@ function MembersTab({ currentUser }) {
                       className="text-xs font-semibold text-blue-500 transition hover:underline"
                     >
                       {member.role === 'ADMIN' ? '일반 회원으로' : '관리자 지정'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePasswordReset(member)}
+                      className="text-xs font-semibold text-amber-600 transition hover:underline"
+                    >
+                      비번 초기화
                     </button>
                     <button
                       type="button"

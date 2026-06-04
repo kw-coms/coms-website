@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { loginUser } from '../services/authApi.js'
-import { useAuth } from '../contexts/useAuth.js'
+import { changePassword } from '../services/authApi.js'
 import { getLogoAsset } from '../utils/logoAssets.js'
 
-export default function Login({ onBack, goSignup }) {
-  const { login } = useAuth()
-  const [identifier, setIdentifier] = useState('')
-  const [password, setPassword] = useState('')
+const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?])(?!.*\s).{8,}$/
+
+export default function ChangePassword({ onBack }) {
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -19,21 +20,22 @@ export default function Login({ onBack, goSignup }) {
     e.preventDefault()
     setError('')
 
-    const trimmedIdentifier = identifier.trim()
-    const submittedPassword = password
-
-    if (!trimmedIdentifier || !submittedPassword) {
-      setError('아이디와 비밀번호를 모두 입력해주세요.')
+    if (!PASSWORD_PATTERN.test(newPassword)) {
+      setError('비밀번호는 8자 이상, 영문·숫자·특수문자를 모두 포함하고 공백이 없어야 합니다.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setError('새 비밀번호가 일치하지 않습니다.')
       return
     }
 
     setLoading(true)
     try {
-      const data = await loginUser({ identifier: trimmedIdentifier, password: submittedPassword })
-      await login(data)
+      await changePassword(currentPassword, newPassword)
+      alert('비밀번호가 변경되었습니다.')
       onBack()
     } catch (err) {
-      setError(err.message || '로그인 중 오류가 발생했습니다.')
+      setError(err.message || '비밀번호 변경 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }
@@ -47,7 +49,7 @@ export default function Login({ onBack, goSignup }) {
           onClick={onBack}
           className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] shadow-[0_18px_40px_rgba(255,255,255,0.2)] transition hover:bg-white"
         >
-          메인으로 돌아가기
+          돌아가기
         </button>
       </div>
 
@@ -56,32 +58,46 @@ export default function Login({ onBack, goSignup }) {
           <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left">
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="h-10 w-10 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
             <div className="min-w-0">
-              <h2 className="text-lg font-bold leading-snug sm:text-xl">KW COM's 로그인</h2>
-              <p className="text-sm leading-5 text-[var(--theme-body-muted)]/85">동아리 계정으로 로그인하세요.</p>
+              <h2 className="text-lg font-bold leading-snug sm:text-xl">비밀번호 변경</h2>
+              <p className="text-sm leading-5 text-[var(--theme-body-muted)]/85">현재 비밀번호를 확인 후 새 비밀번호로 변경합니다.</p>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">학번 (Student ID)</label>
+              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">현재 비밀번호</label>
               <div className={frameClass}>
                 <input
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="학번을 입력하세요"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="현재 비밀번호를 입력하세요"
                   className={inputClass}
                 />
               </div>
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">비밀번호</label>
+              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">새 비밀번호</label>
               <div className={frameClass}>
                 <input
                   type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="비밀번호를 입력하세요"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="8자 이상, 영문·숫자·특수문자 포함"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">새 비밀번호 확인</label>
+              <div className={frameClass}>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="새 비밀번호를 다시 입력하세요"
                   className={inputClass}
                 />
               </div>
@@ -92,27 +108,13 @@ export default function Login({ onBack, goSignup }) {
             <div>
               <div className={frameClass}>
                 <button type="submit" className={btnClass} disabled={loading}>
-                  {loading ? '로그인 중...' : '로그인'}
+                  {loading ? '변경 중...' : '비밀번호 변경'}
                 </button>
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 text-sm text-[var(--theme-body-muted)]/90 sm:flex-row sm:items-center sm:justify-between">
-              <button type="button" onClick={goSignup} className="w-full rounded-full border border-black/10 bg-white/60 px-4 py-2 text-center font-semibold transition hover:bg-white/80 sm:w-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-left sm:underline">
-                회원가입
-              </button>
-
-              <button
-                type="button"
-                onClick={() => alert('비밀번호 분실 문의: kwcoms69@gmail.com')}
-                className="w-full rounded-full border border-black/10 bg-white/60 px-4 py-2 text-center font-semibold transition hover:bg-white/80 sm:w-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-left sm:underline"
-              >
-                비밀번호 찾기
-              </button>
-            </div>
-
-            <p className="mt-4 text-xs leading-5 text-[var(--theme-body-muted)]/80">
-              로그인 정보가 기억나지 않거나 계정에 문제가 있는 경우 관리팀에 문의해주세요.
+            <p className="mt-2 text-xs leading-5 text-[var(--theme-body-muted)]/80">
+              비밀번호는 8자 이상, 영문·숫자·특수문자를 모두 포함해야 하며 공백은 사용할 수 없습니다.
             </p>
           </form>
         </section>
