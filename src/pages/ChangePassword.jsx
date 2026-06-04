@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import {
   changePassword,
   confirmEmailVerification,
@@ -12,7 +12,7 @@ const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\
 
 export default function ChangePassword({ onBack }) {
   const { user, refreshUser, setUser } = useAuth()
-  const [profileForm, setProfileForm] = useState({ phone: '', aspiration: '', interests: '' })
+  const [profileDraft, setProfileDraft] = useState({})
   const [verificationCode, setVerificationCode] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -23,14 +23,11 @@ export default function ChangePassword({ onBack }) {
   const [error, setError] = useState('')
   const [loadingAction, setLoadingAction] = useState('')
 
-  useEffect(() => {
-    if (!user) return
-    setProfileForm({
-      phone: user.phone || '',
-      aspiration: user.aspiration || '',
-      interests: user.interests || '',
-    })
-  }, [user])
+  const profileForm = {
+    phone: profileDraft.phone ?? user?.phone ?? '',
+    aspiration: profileDraft.aspiration ?? user?.aspiration ?? '',
+    interests: profileDraft.interests ?? user?.interests ?? '',
+  }
 
   const panelClass = 'shape-cut bg-[var(--theme-surface-96)] p-5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] sm:p-8'
   const frameClass = 'shape-cut-sm bg-black/12 p-px'
@@ -58,6 +55,7 @@ export default function ChangePassword({ onBack }) {
         interests: profileForm.interests.trim() || null,
       })
       setUser(updated)
+      setProfileDraft({})
       setProfileMessage('회원 정보가 저장되었습니다.')
     } catch (err) {
       setError(err.message || '회원 정보 저장 중 오류가 발생했습니다.')
@@ -175,7 +173,7 @@ export default function ChangePassword({ onBack }) {
               <div className={frameClass}>
                 <input
                   value={profileForm.phone}
-                  onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  onChange={(e) => setProfileDraft((prev) => ({ ...prev, phone: e.target.value }))}
                   placeholder="01012345678"
                   autoComplete="tel"
                   maxLength={20}
@@ -189,7 +187,7 @@ export default function ChangePassword({ onBack }) {
               <div className={frameClass}>
                 <input
                   value={profileForm.interests}
-                  onChange={(e) => setProfileForm((prev) => ({ ...prev, interests: e.target.value }))}
+                  onChange={(e) => setProfileDraft((prev) => ({ ...prev, interests: e.target.value }))}
                   placeholder="웹, AI, 알고리즘"
                   maxLength={500}
                   className={inputClass}
@@ -202,7 +200,7 @@ export default function ChangePassword({ onBack }) {
               <div className={frameClass}>
                 <textarea
                   value={profileForm.aspiration}
-                  onChange={(e) => setProfileForm((prev) => ({ ...prev, aspiration: e.target.value }))}
+                  onChange={(e) => setProfileDraft((prev) => ({ ...prev, aspiration: e.target.value }))}
                   placeholder="COM's에서 해보고 싶은 활동이나 목표를 적어주세요"
                   maxLength={2000}
                   className={textareaClass}
