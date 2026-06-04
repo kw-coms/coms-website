@@ -40,6 +40,7 @@ public class EligibleMemberService {
                 .orElseGet(EligibleMember::new);
         member.setStudentId(studentId);
         member.setName(name);
+        member.setGeneration(calculateGeneration(studentId));
         eligibleMemberRepository.save(member);
     }
 
@@ -51,9 +52,26 @@ public class EligibleMemberService {
                         member.getId(),
                         member.getStudentId(),
                         member.getName(),
-                        member.getGeneration()
+                        member.getGeneration(),
+                        member.getPhone()
                 ))
                 .toList();
+    }
+
+    public void updateEligibleMember(Long id, String studentId, String name) {
+        EligibleMember member = eligibleMemberRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "명부에서 해당 항목을 찾을 수 없습니다."));
+        member.setStudentId(studentId.trim());
+        member.setName(name.trim());
+        member.setGeneration(calculateGeneration(studentId.trim()));
+        eligibleMemberRepository.save(member);
+    }
+
+    public void deleteEligibleMember(Long id) {
+        if (!eligibleMemberRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "명부에서 해당 항목을 찾을 수 없습니다.");
+        }
+        eligibleMemberRepository.deleteById(id);
     }
 
     @Transactional(readOnly = true)
@@ -122,13 +140,12 @@ public class EligibleMemberService {
                 String phone = colMap.containsKey("phone")
                         ? normalizePhone(safeGet(record, colMap.get("phone")))
                         : null;
-                String generation = extractGeneration(normalize(safeGet(record, colMap.get("generation"))));
 
-                EligibleMember member = findExisting(studentId, name, phone).orElseGet(EligibleMember::new);
+                EligibleMember member = findExisting(studentId).orElseGet(EligibleMember::new);
                 member.setStudentId(studentId.isBlank() ? null : studentId);
                 member.setName(name);
                 member.setPhone(phone == null || phone.isBlank() ? null : phone);
-                member.setGeneration(generation);
+                member.setGeneration(calculateGeneration(studentId));
                 eligibleMemberRepository.save(member);
                 imported++;
             }
@@ -194,14 +211,13 @@ public class EligibleMemberService {
                         ? normalizePhone(readCell(row, header.get("phone")))
                         : null;
                 String studentId = extractStudentId(normalize(readCell(row, header.get("studentId"))));
-                String generation = extractGeneration(normalize(readCell(row, header.get("generation"))));
                 String note = normalize(readCell(row, header.get("note")));
 
-                EligibleMember member = findExisting(studentId, name, phone).orElseGet(EligibleMember::new);
+                EligibleMember member = findExisting(studentId).orElseGet(EligibleMember::new);
                 member.setStudentId(studentId.isBlank() ? null : studentId);
                 member.setName(name);
                 member.setPhone(phone == null || phone.isBlank() ? null : phone);
-                member.setGeneration(generation);
+                member.setGeneration(calculateGeneration(studentId));
                 member.setNote(note.isBlank() ? null : note);
                 eligibleMemberRepository.save(member);
                 imported++;
@@ -249,28 +265,29 @@ public class EligibleMemberService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private Optional<EligibleMember> findExisting(String studentId, String name, String phone) {
+    private Optional<EligibleMember> findExisting(String studentId) {
         if (studentId != null && !studentId.isBlank()) {
-            Optional<EligibleMember> byStudentId = eligibleMemberRepository.findByStudentId(studentId);
-            if (byStudentId.isPresent()) return byStudentId;
-        }
-        if (phone != null && !phone.isBlank()) {
-            return eligibleMemberRepository.findByNameAndPhone(name, phone);
+            return eligibleMemberRepository.findByStudentId(studentId);
         }
         return Optional.empty();
     }
 
-    /** Extract the first 8–10 digit sequence from a raw student ID string. */
+    /** Extract the first 10 digit sequence from a raw student ID string. */
     private String extractStudentId(String raw) {
         if (raw == null || raw.isBlank()) return "";
         Matcher m = STUDENT_ID_PATTERN.matcher(raw.replaceAll("\\s+", ""));
         return m.find() ? m.group() : raw.trim();
     }
 
-    /** Strip trailing "기" suffix from generation strings like "60기" → "60". */
-    private String extractGeneration(String raw) {
-        if (raw == null || raw.isBlank()) return null;
-        return raw.replaceAll("기$", "").trim();
+    /** Calculate generation from student ID: first 4 digits (year) - 1966. e.g. 2026 → 60 */
+    private String calculateGeneration(String studentId) {
+        if (studentId == null || studentId.length() < 4) return null;
+        try {
+            int year = Integer.parseInt(studentId.substring(0, 4));
+            return String.valueOf(year - 1966);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private String normalize(String value) {
