@@ -1,0 +1,3 @@
+ALTER TABLE members ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS email_verification_code_hash VARCHAR(255);
+ALTER TABLE members ADD COLUMN IF NOT EXISTS email_verification_expires_at TIMESTAMP;
