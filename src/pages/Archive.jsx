@@ -23,6 +23,13 @@ function formatDate(value) {
   }).format(date)
 }
 
+function openRowWithKeyboard(event, open) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    open()
+  }
+}
+
 export default function Archive({ onBack }) {
   const { user } = useAuth()
   const [files, setFiles] = useState([])
@@ -102,6 +109,11 @@ export default function Archive({ onBack }) {
     } catch (err) {
       setError(err.message || '삭제 중 오류가 발생했습니다.')
     }
+  }
+
+  const openFile = (file) => {
+    setDetailFile(file)
+    setMode('detail')
   }
 
   return (
@@ -251,17 +263,19 @@ export default function Archive({ onBack }) {
                 </thead>
                 <tbody className="divide-y divide-white/10">
                   {files.map((file) => (
-                    <tr key={file.id} className="text-white/75 transition hover:bg-white/5">
+                    <tr
+                      key={file.id}
+                      tabIndex={0}
+                      role="button"
+                      onClick={() => openFile(file)}
+                      onKeyDown={(event) => openRowWithKeyboard(event, () => openFile(file))}
+                      className="cursor-pointer text-white/75 transition hover:bg-white/5 focus:bg-white/10 focus:outline-none"
+                    >
                       <td className="px-4 py-4 text-white/45">{file.id}</td>
                       <td className="max-w-[320px] px-4 py-4 font-semibold text-white">
-                        <button
-                          type="button"
-                          onClick={() => { setDetailFile(file); setMode('detail') }}
-                          className="block max-w-full truncate text-left hover:underline"
-                          title={file.originalName}
-                        >
+                        <span className="block max-w-full truncate text-left" title={file.originalName}>
                           {file.originalName}
-                        </button>
+                        </span>
                       </td>
                       <td className="px-4 py-4">{formatSize(file.fileSize)}</td>
                       <td className="px-4 py-4">{file.uploadedBy || '-'}</td>
@@ -270,6 +284,7 @@ export default function Archive({ onBack }) {
                         <div className="flex justify-end gap-2">
                           <a
                             href={downloadUrl(file.id)}
+                            onClick={(event) => event.stopPropagation()}
                             className="shape-cut-sm inline-flex items-center justify-center gap-2 border border-white/10 bg-white/10 px-3 py-2 font-semibold text-white transition hover:bg-white/15"
                           >
                             <Download size={15} />
