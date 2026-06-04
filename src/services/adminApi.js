@@ -28,6 +28,19 @@ export async function addEligibleMember(studentId, name) {
   })
 }
 
+export async function updateEligibleMember(id, studentId, name) {
+  return requestNoContent(`/api/admin/eligible-members/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ studentId, name }),
+  })
+}
+
+export async function deleteEligibleMember(id) {
+  return requestNoContent(`/api/admin/eligible-members/${id}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function importEligibleMembers(file) {
   const formData = new FormData()
   formData.append('file', file)
