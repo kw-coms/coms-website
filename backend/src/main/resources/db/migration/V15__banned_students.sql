@@ -1,0 +1,5 @@
+CREATE TABLE banned_students (
+    id BIGSERIAL PRIMARY KEY,
+    student_id VARCHAR(10) NOT NULL UNIQUE,
+    banned_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
