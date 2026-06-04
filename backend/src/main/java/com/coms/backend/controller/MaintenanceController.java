@@ -96,14 +96,14 @@ public class MaintenanceController {
     }
 
     /**
-     * Upsert a single eligible member. Requires bootstrap secret if configured;
-     * open when BOOTSTRAP_SECRET env var is not set (initial setup mode).
+     * Upsert a single eligible member. Admin-only via Spring Security and never open
+     * when BOOTSTRAP_SECRET is missing.
      */
     @PostMapping("/add-eligible")
     public ResponseEntity<Map<String, String>> addEligible(
             @RequestHeader(value = "X-Bootstrap-Secret", required = false) String providedSecret,
             @Valid @RequestBody EligibleRequest req) {
-        if (!bootstrapSecret.isEmpty() && !bootstrapSecret.equals(providedSecret)) {
+        if (bootstrapSecret.isEmpty() || !bootstrapSecret.equals(providedSecret)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         EligibleMember member = eligibleMemberRepository.findByStudentId(req.studentId())

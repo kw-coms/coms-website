@@ -22,6 +22,15 @@ public class CommunityPost {
     @Column(nullable = false)
     private String authorName;
 
+    private String imageStoredName;
+
+    private String imageOriginalName;
+
+    private String imageMimeType;
+
+    @Column(nullable = false)
+    private long viewCount = 0;
+
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -42,6 +51,15 @@ public class CommunityPost {
     public void setAuthorStudentId(String authorStudentId) { this.authorStudentId = authorStudentId; }
     public String getAuthorName() { return authorName; }
     public void setAuthorName(String authorName) { this.authorName = authorName; }
+    public String getImageStoredName() { return imageStoredName; }
+    public void setImageStoredName(String imageStoredName) { this.imageStoredName = imageStoredName; }
+    public String getImageOriginalName() { return imageOriginalName; }
+    public void setImageOriginalName(String imageOriginalName) { this.imageOriginalName = imageOriginalName; }
+    public String getImageMimeType() { return imageMimeType; }
+    public void setImageMimeType(String imageMimeType) { this.imageMimeType = imageMimeType; }
+    public long getViewCount() { return viewCount; }
+    public void setViewCount(long viewCount) { this.viewCount = viewCount; }
+    public void incrementViewCount() { this.viewCount++; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 }

@@ -10,6 +10,12 @@ public record CommunityPostResponse(
         String authorName,
         String authorDisplayName,
         boolean authorAdmin,
+        String imageUrl,
+        String imageOriginalName,
+        long viewCount,
+        long upvotes,
+        long downvotes,
+        int myVote,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         boolean editable
