@@ -2,6 +2,7 @@ package com.coms.backend.controller;
 
 import com.coms.backend.dto.AddEligibleMemberRequest;
 import com.coms.backend.dto.BannedStudentResponse;
+import com.coms.backend.dto.ResetPasswordRequest;
 import com.coms.backend.dto.EligibleMemberImportResponse;
 import com.coms.backend.dto.EligibleMemberResponse;
 import com.coms.backend.dto.MemberResponse;
@@ -77,6 +78,13 @@ public class AdminController {
     @PostMapping("/eligible-members/import")
     public ResponseEntity<EligibleMemberImportResponse> importEligibleMembers(@RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(eligibleMemberService.importRoster(file));
+    }
+
+    @PutMapping("/members/{id}/password")
+    public ResponseEntity<Void> resetMemberPassword(@PathVariable Long id,
+                                                    @Valid @RequestBody ResetPasswordRequest request) {
+        adminService.resetPassword(id, request.password());
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/banned-students")

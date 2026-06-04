@@ -86,6 +86,16 @@ public class AuthService implements UserDetailsService {
         );
     }
 
+    public void changePassword(String studentId, String currentPassword, String newPassword) {
+        Member member = memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!passwordEncoder.matches(currentPassword, member.getPassword())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "현재 비밀번호가 올바르지 않습니다.");
+        }
+        member.setPassword(passwordEncoder.encode(newPassword));
+        memberRepository.save(member);
+    }
+
     @Override
     public UserDetails loadUserByUsername(String studentId) throws UsernameNotFoundException {
         Member member = memberRepository.findByStudentId(studentId)
