@@ -546,7 +546,7 @@ function App() {
                 type="button"
                 onClick={goChangePassword}
                 className="shape-cut-sm border border-black/10 bg-white/50 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/70"
-                title="비밀번호 변경"
+                title="계정 설정"
               >
                 {user.name}
               </button>
