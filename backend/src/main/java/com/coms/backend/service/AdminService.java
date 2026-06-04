@@ -5,6 +5,7 @@ import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.RoleUpdateRequest;
 import com.coms.backend.repository.MemberRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -17,9 +18,11 @@ import java.util.Locale;
 public class AdminService {
 
     private final MemberRepository memberRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public AdminService(MemberRepository memberRepository) {
+    public AdminService(MemberRepository memberRepository, PasswordEncoder passwordEncoder) {
         this.memberRepository = memberRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Transactional(readOnly = true)
@@ -43,6 +46,13 @@ public class AdminService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         memberRepository.deleteById(id);
+    }
+
+    public void resetPassword(Long id, String newPassword) {
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        member.setPassword(passwordEncoder.encode(newPassword));
+        memberRepository.save(member);
     }
 
     private MemberResponse toResponse(Member member) {

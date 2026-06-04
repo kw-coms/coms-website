@@ -21,3 +21,10 @@ export async function logoutUser() {
 export async function getCurrentUser() {
   return request('/api/auth/me')
 }
+
+export async function changePassword(currentPassword, newPassword) {
+  return request('/api/auth/password', {
+    method: 'PATCH',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  })
+}

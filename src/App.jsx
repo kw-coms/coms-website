@@ -17,6 +17,7 @@ import Signup from './pages/Signup.jsx'
 import Notices from './pages/Notices.jsx'
 import Admin from './pages/Admin.jsx'
 import Community from './pages/Community.jsx'
+import ChangePassword from './pages/ChangePassword.jsx'
 import { getLogoAsset } from './utils/logoAssets.js'
 import FixedBrackets from './components/common/FixedBrackets.jsx'
 import { useAuth } from './contexts/useAuth.js'
@@ -237,6 +238,12 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const goChangePassword = () => {
+    setCurrentPage('changePassword')
+    setActiveSection(null)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const bracketColor = activeSection ? sectionMeta[activeSection]?.bracket : sectionMeta.about.bracket
 
   const renderSectionContent = (id) => {
@@ -439,6 +446,14 @@ function App() {
     )
   }
 
+  if (currentPage === 'changePassword') {
+    return (
+      <PageShell>
+        <ChangePassword onBack={goHome} />
+      </PageShell>
+    )
+  }
+
   if (currentPage === 'recruit') {
     return (
       <div className="relative min-h-screen overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)]">
@@ -535,6 +550,13 @@ function App() {
                   관리자
                 </button>
               )}
+              <button
+                type="button"
+                onClick={goChangePassword}
+                className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78"
+              >
+                비밀번호 변경
+              </button>
               <button
                 type="button"
                 onClick={handleLogout}

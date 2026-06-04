@@ -104,7 +104,7 @@ export default function Login({ onBack, goSignup }) {
 
               <button
                 type="button"
-                onClick={() => alert('비밀번호 분실 문의: coms@example.com')}
+                onClick={() => alert('비밀번호 분실 문의: kwcoms69@gmail.com')}
                 className="w-full rounded-full border border-black/10 bg-white/60 px-4 py-2 text-center font-semibold transition hover:bg-white/80 sm:w-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-left sm:underline"
               >
                 비밀번호 찾기
