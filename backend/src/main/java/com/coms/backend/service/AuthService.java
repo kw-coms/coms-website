@@ -5,6 +5,7 @@ import com.coms.backend.dto.AuthResponse;
 import com.coms.backend.dto.LoginRequest;
 import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.SignupRequest;
+import com.coms.backend.dto.UpdateProfileRequest;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.security.JwtTokenProvider;
 import org.springframework.http.HttpStatus;
@@ -14,24 +15,34 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
+
 @Service
+@Transactional
 public class AuthService implements UserDetailsService {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final MemberRepository memberRepository;
     private final EligibleMemberService eligibleMemberService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final EmailVerificationSender emailVerificationSender;
 
     public AuthService(MemberRepository memberRepository,
                        EligibleMemberService eligibleMemberService,
                        PasswordEncoder passwordEncoder,
-                       JwtTokenProvider jwtTokenProvider) {
+                       JwtTokenProvider jwtTokenProvider,
+                       EmailVerificationSender emailVerificationSender) {
         this.memberRepository = memberRepository;
         this.eligibleMemberService = eligibleMemberService;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.emailVerificationSender = emailVerificationSender;
     }
 
     public AuthResponse signup(SignupRequest request) {
@@ -47,6 +58,7 @@ public class AuthService implements UserDetailsService {
         member.setStudentId(request.studentId().trim());
         member.setName(request.name().trim());
         member.setEmail(request.email().trim());
+        member.setEmailVerified(false);
         member.setPassword(passwordEncoder.encode(request.password()));
         member.setDepartment(request.department() == null ? null : request.department().trim());
         member.setPhone(request.phone() == null ? null : request.phone().trim());
@@ -78,11 +90,12 @@ public class AuthService implements UserDetailsService {
                 member.getStudentId(),
                 member.getName(),
                 member.getEmail(),
+                member.isEmailVerified(),
                 member.getDepartment(),
                 member.getPhone(),
                 member.getRole().name(),
-                null,
-                null
+                member.getAspiration(),
+                member.getInterests()
         );
     }
 
@@ -94,6 +107,79 @@ public class AuthService implements UserDetailsService {
         }
         member.setPassword(passwordEncoder.encode(newPassword));
         memberRepository.save(member);
+    }
+
+    public MemberResponse updateProfile(String studentId, UpdateProfileRequest request) {
+        Member member = memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        member.setPhone(normalizeNullable(request.phone()));
+        member.setAspiration(normalizeNullable(request.aspiration()));
+        member.setInterests(normalizeNullable(request.interests()));
+        memberRepository.save(member);
+        return new MemberResponse(
+                member.getId(),
+                member.getStudentId(),
+                member.getName(),
+                member.getEmail(),
+                member.isEmailVerified(),
+                member.getDepartment(),
+                member.getPhone(),
+                member.getRole().name(),
+                member.getAspiration(),
+                member.getInterests()
+        );
+    }
+
+    public boolean requestEmailVerification(String studentId) {
+        Member member = memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (member.isEmailVerified()) {
+            return true;
+        }
+
+        String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
+        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(10));
+        memberRepository.save(member);
+        emailVerificationSender.sendVerificationCode(member.getEmail(), code);
+        return false;
+    }
+
+    public boolean confirmEmailVerification(String studentId, String code) {
+        Member member = memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        if (member.isEmailVerified()) {
+            return true;
+        }
+        if (member.getEmailVerificationCodeHash() == null || member.getEmailVerificationExpiresAt() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "먼저 이메일 인증코드를 요청해주세요.");
+        }
+        if (member.getEmailVerificationExpiresAt().isBefore(LocalDateTime.now())) {
+            clearEmailVerificationCode(member);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이메일 인증코드가 만료되었습니다.");
+        }
+        if (!passwordEncoder.matches(code, member.getEmailVerificationCodeHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이메일 인증코드가 올바르지 않습니다.");
+        }
+
+        member.setEmailVerified(true);
+        clearEmailVerificationCode(member);
+        memberRepository.save(member);
+        return true;
+    }
+
+    private void clearEmailVerificationCode(Member member) {
+        member.setEmailVerificationCodeHash(null);
+        member.setEmailVerificationExpiresAt(null);
+    }
+
+    private String normalizeNullable(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     @Override

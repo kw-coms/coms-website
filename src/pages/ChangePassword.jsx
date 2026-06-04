@@ -1,24 +1,111 @@
-import { useState } from 'react'
-import { changePassword } from '../services/authApi.js'
+import { useEffect, useState } from 'react'
+import {
+  changePassword,
+  confirmEmailVerification,
+  requestEmailVerification,
+  updateProfile,
+} from '../services/authApi.js'
+import { useAuth } from '../contexts/useAuth.js'
 import { getLogoAsset } from '../utils/logoAssets.js'
 
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?])(?!.*\s).{8,}$/
 
 export default function ChangePassword({ onBack }) {
+  const { user, refreshUser, setUser } = useAuth()
+  const [profileForm, setProfileForm] = useState({ phone: '', aspiration: '', interests: '' })
+  const [verificationCode, setVerificationCode] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [profileMessage, setProfileMessage] = useState('')
+  const [emailMessage, setEmailMessage] = useState('')
+  const [passwordMessage, setPasswordMessage] = useState('')
   const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [loadingAction, setLoadingAction] = useState('')
+
+  useEffect(() => {
+    if (!user) return
+    setProfileForm({
+      phone: user.phone || '',
+      aspiration: user.aspiration || '',
+      interests: user.interests || '',
+    })
+  }, [user])
 
   const panelClass = 'shape-cut bg-[var(--theme-surface-96)] p-5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] sm:p-8'
   const frameClass = 'shape-cut-sm bg-black/12 p-px'
   const inputClass = 'w-full shape-cut-sm bg-white/72 px-4 py-2.5 text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/70 transition focus:bg-white/82 focus:ring-2 focus:ring-[var(--theme-accent)]/55'
-  const btnClass = 'w-full shape-cut-sm bg-white/66 px-4 py-2.5 font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/82'
+  const textareaClass = `${inputClass} min-h-28 resize-y leading-6`
+  const btnClass = 'shape-cut-sm bg-white/66 px-4 py-2.5 font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/82 disabled:cursor-wait disabled:opacity-60'
+  const sectionClass = 'border-t border-[var(--theme-border-soft)] pt-5'
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const resetMessages = () => {
     setError('')
+    setProfileMessage('')
+    setEmailMessage('')
+    setPasswordMessage('')
+  }
+
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault()
+    resetMessages()
+    setLoadingAction('profile')
+
+    try {
+      const updated = await updateProfile({
+        phone: profileForm.phone.trim() || null,
+        aspiration: profileForm.aspiration.trim() || null,
+        interests: profileForm.interests.trim() || null,
+      })
+      setUser(updated)
+      setProfileMessage('회원 정보가 저장되었습니다.')
+    } catch (err) {
+      setError(err.message || '회원 정보 저장 중 오류가 발생했습니다.')
+    } finally {
+      setLoadingAction('')
+    }
+  }
+
+  const handleRequestEmailCode = async () => {
+    resetMessages()
+    setLoadingAction('emailRequest')
+
+    try {
+      const result = await requestEmailVerification()
+      setEmailMessage(result.message || '인증코드를 이메일로 보냈습니다.')
+      await refreshUser()
+    } catch (err) {
+      setError(err.message || '이메일 인증코드 요청 중 오류가 발생했습니다.')
+    } finally {
+      setLoadingAction('')
+    }
+  }
+
+  const handleConfirmEmailCode = async (e) => {
+    e.preventDefault()
+    resetMessages()
+
+    if (!/^\d{6}$/.test(verificationCode.trim())) {
+      setError('인증코드는 숫자 6자리로 입력해주세요.')
+      return
+    }
+
+    setLoadingAction('emailConfirm')
+    try {
+      const result = await confirmEmailVerification(verificationCode.trim())
+      setEmailMessage(result.message || '이메일 인증이 완료되었습니다.')
+      setVerificationCode('')
+      await refreshUser()
+    } catch (err) {
+      setError(err.message || '이메일 인증 중 오류가 발생했습니다.')
+    } finally {
+      setLoadingAction('')
+    }
+  }
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault()
+    resetMessages()
 
     if (!PASSWORD_PATTERN.test(newPassword)) {
       setError('비밀번호는 8자 이상, 영문·숫자·특수문자를 모두 포함하고 공백이 없어야 합니다.')
@@ -29,15 +116,17 @@ export default function ChangePassword({ onBack }) {
       return
     }
 
-    setLoading(true)
+    setLoadingAction('password')
     try {
       await changePassword(currentPassword, newPassword)
-      alert('비밀번호가 변경되었습니다.')
-      onBack()
+      setPasswordMessage('비밀번호가 변경되었습니다.')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
     } catch (err) {
       setError(err.message || '비밀번호 변경 중 오류가 발생했습니다.')
     } finally {
-      setLoading(false)
+      setLoadingAction('')
     }
   }
 
@@ -58,12 +147,113 @@ export default function ChangePassword({ onBack }) {
           <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left">
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="h-10 w-10 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
             <div className="min-w-0">
-              <h2 className="text-lg font-bold leading-snug sm:text-xl">비밀번호 변경</h2>
-              <p className="text-sm leading-5 text-[var(--theme-body-muted)]/85">현재 비밀번호를 확인 후 새 비밀번호로 변경합니다.</p>
+              <h2 className="text-lg font-bold leading-snug sm:text-xl">계정 설정</h2>
+              <p className="text-sm leading-5 text-[var(--theme-body-muted)]/85">회원 정보, 이메일 인증, 비밀번호를 관리합니다.</p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {error && <div className="mb-4 text-sm text-red-500">{error}</div>}
+
+          <form onSubmit={handleProfileSubmit} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">이름</label>
+                <div className={frameClass}>
+                  <input value={user?.name || ''} className={inputClass} disabled />
+                </div>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">학번</label>
+                <div className={frameClass}>
+                  <input value={user?.studentId || ''} className={inputClass} disabled />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">전화번호</label>
+              <div className={frameClass}>
+                <input
+                  value={profileForm.phone}
+                  onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  placeholder="01012345678"
+                  autoComplete="tel"
+                  maxLength={20}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">관심 분야</label>
+              <div className={frameClass}>
+                <input
+                  value={profileForm.interests}
+                  onChange={(e) => setProfileForm((prev) => ({ ...prev, interests: e.target.value }))}
+                  placeholder="웹, AI, 알고리즘"
+                  maxLength={500}
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">포부</label>
+              <div className={frameClass}>
+                <textarea
+                  value={profileForm.aspiration}
+                  onChange={(e) => setProfileForm((prev) => ({ ...prev, aspiration: e.target.value }))}
+                  placeholder="COM's에서 해보고 싶은 활동이나 목표를 적어주세요"
+                  maxLength={2000}
+                  className={textareaClass}
+                />
+              </div>
+            </div>
+
+            {profileMessage && <div className="text-sm text-emerald-600">{profileMessage}</div>}
+
+            <button type="submit" className={btnClass} disabled={loadingAction === 'profile'}>
+              {loadingAction === 'profile' ? '저장 중...' : '회원 정보 저장'}
+            </button>
+          </form>
+
+          <div className={sectionClass}>
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="font-semibold">이메일 인증</h3>
+                <p className="text-sm text-[var(--theme-body-muted)]/85">{user?.email || '-'}</p>
+              </div>
+              <span className={`shape-cut-sm px-3 py-1 text-xs font-semibold ${user?.emailVerified ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                {user?.emailVerified ? '인증 완료' : '미인증'}
+              </span>
+            </div>
+
+            {!user?.emailVerified && (
+              <form onSubmit={handleConfirmEmailCode} className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+                <div className={frameClass}>
+                  <input
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value)}
+                    placeholder="6자리 인증코드"
+                    inputMode="numeric"
+                    maxLength={6}
+                    className={inputClass}
+                  />
+                </div>
+                <button type="button" onClick={handleRequestEmailCode} className={btnClass} disabled={loadingAction === 'emailRequest'}>
+                  {loadingAction === 'emailRequest' ? '발송 중...' : '코드 받기'}
+                </button>
+                <button type="submit" className={btnClass} disabled={loadingAction === 'emailConfirm'}>
+                  {loadingAction === 'emailConfirm' ? '확인 중...' : '인증 확인'}
+                </button>
+              </form>
+            )}
+
+            {emailMessage && <div className="mt-3 text-sm text-emerald-600">{emailMessage}</div>}
+          </div>
+
+          <form onSubmit={handlePasswordSubmit} className={`${sectionClass} space-y-4`}>
+            <h3 className="font-semibold">비밀번호 변경</h3>
             <div>
               <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">현재 비밀번호</label>
               <div className={frameClass}>
@@ -72,48 +262,48 @@ export default function ChangePassword({ onBack }) {
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="현재 비밀번호를 입력하세요"
+                  autoComplete="current-password"
                   className={inputClass}
                 />
               </div>
             </div>
 
-            <div>
-              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">새 비밀번호</label>
-              <div className={frameClass}>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="8자 이상, 영문·숫자·특수문자 포함"
-                  className={inputClass}
-                />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">새 비밀번호</label>
+                <div className={frameClass}>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="8자 이상, 영문·숫자·특수문자 포함"
+                    autoComplete="new-password"
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">새 비밀번호 확인</label>
+                <div className={frameClass}>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="새 비밀번호를 다시 입력하세요"
+                    autoComplete="new-password"
+                    className={inputClass}
+                  />
+                </div>
               </div>
             </div>
 
-            <div>
-              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">새 비밀번호 확인</label>
-              <div className={frameClass}>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="새 비밀번호를 다시 입력하세요"
-                  className={inputClass}
-                />
-              </div>
-            </div>
+            {passwordMessage && <div className="text-sm text-emerald-600">{passwordMessage}</div>}
 
-            {error && <div className="text-sm text-red-400">{error}</div>}
+            <button type="submit" className={btnClass} disabled={loadingAction === 'password'}>
+              {loadingAction === 'password' ? '변경 중...' : '비밀번호 변경'}
+            </button>
 
-            <div>
-              <div className={frameClass}>
-                <button type="submit" className={btnClass} disabled={loading}>
-                  {loading ? '변경 중...' : '비밀번호 변경'}
-                </button>
-              </div>
-            </div>
-
-            <p className="mt-2 text-xs leading-5 text-[var(--theme-body-muted)]/80">
+            <p className="text-xs leading-5 text-[var(--theme-body-muted)]/80">
               비밀번호는 8자 이상, 영문·숫자·특수문자를 모두 포함해야 하며 공백은 사용할 수 없습니다.
             </p>
           </form>

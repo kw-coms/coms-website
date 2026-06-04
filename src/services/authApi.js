@@ -28,3 +28,21 @@ export async function changePassword(currentPassword, newPassword) {
     body: JSON.stringify({ currentPassword, newPassword }),
   })
 }
+
+export async function updateProfile(payload) {
+  return request('/api/auth/profile', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function requestEmailVerification() {
+  return request('/api/auth/email-verification/request', { method: 'POST' })
+}
+
+export async function confirmEmailVerification(code) {
+  return request('/api/auth/email-verification/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  })
+}
