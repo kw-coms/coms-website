@@ -9,7 +9,7 @@ public record SignupRequest(
         @NotBlank @Pattern(regexp = "[가-힣]{3}", message = "이름은 한글 3자리여야 합니다.") String name,
         @NotBlank @Email String email,
         @NotBlank @Pattern(
-            regexp = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?]).{8,}$",
+            regexp = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?])(?!.*\\s).{8,}$",
             message = "비밀번호는 8자 이상, 영문·숫자·특수문자를 모두 포함해야 합니다."
         ) String password,
         String department,
