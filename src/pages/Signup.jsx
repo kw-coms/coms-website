@@ -129,7 +129,7 @@ export default function Signup() {
         interests: buildInterestsString() || null,
       })
 
-      setSuccess('회원가입 신청이 완료되었습니다.')
+      setSuccess('회원가입이 완료되었습니다.')
       setForm({ studentId: '', name: '', email: '', password: '', passwordConfirm: '', department: '', phone: '', aspiration: '' })
       setSelectedInterests([])
       setOtherInterest('')
@@ -229,7 +229,7 @@ export default function Signup() {
             disabled={loading}
             className="shape-cut-sm mt-1 w-full bg-white/70 px-4 py-3 text-base font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? '가입 처리 중...' : '회원가입 신청'}
+            {loading ? '가입 처리 중...' : '회원가입'}
           </button>
         </form>
       </section>
