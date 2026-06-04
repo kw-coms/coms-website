@@ -61,6 +61,7 @@ public class AdminService {
                 member.getStudentId(),
                 member.getName(),
                 member.getEmail(),
+                member.isEmailVerified(),
                 member.getDepartment(),
                 member.getPhone(),
                 member.getRole().name(),

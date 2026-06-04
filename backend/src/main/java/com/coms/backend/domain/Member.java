@@ -23,6 +23,13 @@ public class Member {
     @Column(nullable = false)
     private String password;
 
+    @Column(nullable = false)
+    private boolean emailVerified = false;
+
+    private String emailVerificationCodeHash;
+
+    private LocalDateTime emailVerificationExpiresAt;
+
     private String department;
 
     private String phone;
@@ -52,6 +59,12 @@ public class Member {
     public void setEmail(String email) { this.email = email; }
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
+    public boolean isEmailVerified() { return emailVerified; }
+    public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
+    public String getEmailVerificationCodeHash() { return emailVerificationCodeHash; }
+    public void setEmailVerificationCodeHash(String emailVerificationCodeHash) { this.emailVerificationCodeHash = emailVerificationCodeHash; }
+    public LocalDateTime getEmailVerificationExpiresAt() { return emailVerificationExpiresAt; }
+    public void setEmailVerificationExpiresAt(LocalDateTime emailVerificationExpiresAt) { this.emailVerificationExpiresAt = emailVerificationExpiresAt; }
     public String getDepartment() { return department; }
     public void setDepartment(String department) { this.department = department; }
     public String getPhone() { return phone; }

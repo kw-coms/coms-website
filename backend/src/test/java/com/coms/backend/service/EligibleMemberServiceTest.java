@@ -49,7 +49,7 @@ class EligibleMemberServiceTest {
                 .satisfies(member -> {
                     assertThat(member.studentId()).isEqualTo("2024123456");
                     assertThat(member.name()).isEqualTo("홍길동");
-                    assertThat(member.generation()).isEqualTo("1");
+                    assertThat(member.generation()).isEqualTo("58");
                 });
         eligibleMemberService.validateSignup("2024123456", "홍길동");
         assertThatThrownBy(() -> eligibleMemberService.validateSignup("2024000000", "홍길동"))

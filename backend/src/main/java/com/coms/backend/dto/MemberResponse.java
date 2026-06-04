@@ -5,6 +5,7 @@ public record MemberResponse(
         String studentId,
         String name,
         String email,
+        boolean emailVerified,
         String department,
         String phone,
         String role,
