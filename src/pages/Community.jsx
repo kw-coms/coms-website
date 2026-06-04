@@ -31,6 +31,13 @@ function shortDate(iso) {
   return date.toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })
 }
 
+function openRowWithKeyboard(event, open) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    open()
+  }
+}
+
 function PostForm({ initialPost, onCancel, onSave }) {
   const [form, setForm] = useState({
     title: initialPost?.title || '',
@@ -136,6 +143,21 @@ function PostForm({ initialPost, onCancel, onSave }) {
   )
 }
 
+function BoardHeader({ title = "COM's 게시판", children }) {
+  return (
+    <div className="border-b border-white/10 bg-black/20 px-5 py-5 sm:px-7">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.28em] text-cyan-200">Community</p>
+          <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">{title}</h1>
+          <p className="mt-2 text-sm leading-6 text-white/60">말머리별로 글을 보고, 게시글은 별도 화면처럼 열립니다.</p>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
 export default function Community({ onBack }) {
   const [posts, setPosts] = useState([])
   const [currentPost, setCurrentPost] = useState(null)
@@ -215,19 +237,6 @@ export default function Community({ onBack }) {
     }
   }
 
-  const BoardHeader = ({ title = "COM's 게시판", children }) => (
-    <div className="border-b border-white/10 bg-black/20 px-5 py-5 sm:px-7">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.28em] text-cyan-200">Community</p>
-          <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">{title}</h1>
-          <p className="mt-2 text-sm leading-6 text-white/60">말머리별로 글을 보고, 게시글은 별도 화면처럼 열립니다.</p>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-
   return (
     <div className="space-y-4">
       <div className="flex justify-center sm:justify-start">
@@ -291,13 +300,20 @@ export default function Community({ onBack }) {
                     <tr><td colSpan="7" className="px-4 py-16 text-center text-white/65">등록된 글이 없습니다.</td></tr>
                   )}
                   {visiblePosts.map((post) => (
-                    <tr key={post.id} className="text-white/75 transition hover:bg-white/5">
+                    <tr
+                      key={post.id}
+                      tabIndex={0}
+                      role="button"
+                      onClick={() => openPost(post)}
+                      onKeyDown={(event) => openRowWithKeyboard(event, () => openPost(post))}
+                      className="cursor-pointer text-white/75 transition hover:bg-white/5 focus:bg-white/10 focus:outline-none"
+                    >
                       <td className="px-4 py-4 text-center text-xs text-white/45">{post.id}</td>
                       <td className="px-4 py-4 text-center text-xs font-bold text-cyan-100">{categoryLabel(post.category || 'GENERAL')}</td>
                       <td className="px-4 py-4">
-                        <button type="button" onClick={() => openPost(post)} className="max-w-[520px] truncate text-left font-semibold text-white hover:underline">
+                        <span className="block max-w-[520px] truncate text-left font-semibold text-white">
                           {post.title}
-                        </button>
+                        </span>
                         {post.imageUrl && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
                         {post.authorAdmin && <span className="ml-1 rounded bg-red-600 px-1 py-0.5 text-[10px] font-black text-white">주딱</span>}
                       </td>
