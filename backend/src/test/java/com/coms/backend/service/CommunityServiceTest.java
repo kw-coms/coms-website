@@ -4,14 +4,18 @@ import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.repository.CommunityPostRepository;
+import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = {
         "jwt.secret=test-secret-key-with-at-least-32-chars",
@@ -28,8 +32,12 @@ class CommunityServiceTest {
     @Autowired
     private CommunityPostRepository communityPostRepository;
 
+    @Autowired
+    private CommunityPostVoteRepository voteRepository;
+
     @BeforeEach
     void setUp() {
+        voteRepository.deleteAll();
         communityPostRepository.deleteAll();
         memberRepository.deleteAll();
     }
@@ -49,7 +57,7 @@ class CommunityServiceTest {
         memberRepository.save(admin);
         memberRepository.save(user);
 
-        communityService.create(admin.getStudentId(), new CommunityPostRequest("공지", "관리자 글"));
+        communityService.create(admin.getStudentId(), new CommunityPostRequest("공지", "관리자 글", false), null);
         CommunityPost post = new CommunityPost();
         post.setTitle("질문");
         post.setContent("일반 회원 글");
@@ -66,6 +74,57 @@ class CommunityServiceTest {
                 .filteredOn(postResponse -> postResponse.authorDisplayName().equals("60기관리자"))
                 .singleElement()
                 .satisfies(postResponse -> assertThat(postResponse.authorAdmin()).isTrue());
+    }
+
+    @Test
+    void detailViewIncrementsViewCount() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("질문", "내용", false), null);
+
+        var detail = communityService.get(user.getStudentId(), created.id());
+
+        assertThat(detail.viewCount()).isEqualTo(1);
+        assertThat(communityPostRepository.findById(created.id()).orElseThrow().getViewCount()).isEqualTo(1);
+    }
+
+    @Test
+    void voteTogglesAndReplacesCurrentVote() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("질문", "내용", false), null);
+
+        var upvoted = communityService.vote(user.getStudentId(), created.id(), 1);
+        var downvoted = communityService.vote(user.getStudentId(), created.id(), -1);
+        var cleared = communityService.vote(user.getStudentId(), created.id(), -1);
+
+        assertThat(upvoted.upvotes()).isEqualTo(1);
+        assertThat(upvoted.downvotes()).isZero();
+        assertThat(upvoted.myVote()).isEqualTo(1);
+        assertThat(downvoted.upvotes()).isZero();
+        assertThat(downvoted.downvotes()).isEqualTo(1);
+        assertThat(downvoted.myVote()).isEqualTo(-1);
+        assertThat(cleared.upvotes()).isZero();
+        assertThat(cleared.downvotes()).isZero();
+        assertThat(cleared.myVote()).isZero();
+    }
+
+    @Test
+    void rejectsUnsupportedImageTypes() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        MockMultipartFile svg = new MockMultipartFile(
+                "image",
+                "bad.svg",
+                "image/svg+xml",
+                "<svg></svg>".getBytes()
+        );
+
+        assertThatThrownBy(() -> communityService.create(
+                user.getStudentId(),
+                new CommunityPostRequest("사진", "내용", false),
+                svg
+        )).isInstanceOf(ResponseStatusException.class);
     }
 
     private Member member(String studentId, String name, Member.Role role) {

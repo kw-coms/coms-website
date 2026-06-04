@@ -1,31 +1,48 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.CommunityPost;
+import com.coms.backend.domain.CommunityPostVote;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
 import com.coms.backend.repository.CommunityPostRepository;
+import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.MemberRepository;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
 @Transactional
 public class CommunityService {
-    private final CommunityPostRepository communityPostRepository;
-    private final MemberRepository memberRepository;
+    private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
+    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
 
-    public CommunityService(CommunityPostRepository communityPostRepository, MemberRepository memberRepository) {
+    private final CommunityPostRepository communityPostRepository;
+    private final CommunityPostVoteRepository voteRepository;
+    private final MemberRepository memberRepository;
+    private final StorageService storageService;
+
+    public CommunityService(CommunityPostRepository communityPostRepository,
+                            CommunityPostVoteRepository voteRepository,
+                            MemberRepository memberRepository,
+                            StorageService storageService) {
         this.communityPostRepository = communityPostRepository;
+        this.voteRepository = voteRepository;
         this.memberRepository = memberRepository;
+        this.storageService = storageService;
     }
 
     @Transactional(readOnly = true)
@@ -38,23 +55,38 @@ public class CommunityService {
                         .collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(Member::getStudentId, Function.identity()));
+        Map<Long, VoteSummary> stats = voteStats(posts);
         return posts.stream()
-                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId())))
+                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, false))
                 .toList();
     }
 
-    public CommunityPostResponse create(String studentId, CommunityPostRequest request) {
+    public CommunityPostResponse get(String studentId, Long id) {
         Member member = findMember(studentId);
+        CommunityPost post = communityPostRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        post.incrementViewCount();
+        CommunityPost saved = communityPostRepository.save(post);
+        return toResponse(saved, member, memberRepository.findByStudentId(saved.getAuthorStudentId()).orElse(null),
+                voteStats(List.of(saved)), true);
+    }
+
+    public CommunityPostResponse create(String studentId, CommunityPostRequest request, MultipartFile image) {
+        Member member = findMember(studentId);
+        validateRequest(request);
         CommunityPost post = new CommunityPost();
         post.setTitle(request.title().trim());
         post.setContent(request.content().trim());
         post.setAuthorStudentId(member.getStudentId());
         post.setAuthorName(member.getName());
-        return toResponse(communityPostRepository.save(post), member, member);
+        attachImage(post, image);
+        CommunityPost saved = communityPostRepository.save(post);
+        return toResponse(saved, member, member, voteStats(List.of(saved)), true);
     }
 
-    public CommunityPostResponse update(String studentId, Long id, CommunityPostRequest request) {
+    public CommunityPostResponse update(String studentId, Long id, CommunityPostRequest request, MultipartFile image) {
         Member member = findMember(studentId);
+        validateRequest(request);
         CommunityPost post = communityPostRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (!post.getAuthorStudentId().equals(member.getStudentId()) && member.getRole() != Member.Role.ADMIN) {
@@ -62,8 +94,14 @@ public class CommunityService {
         }
         post.setTitle(request.title().trim());
         post.setContent(request.content().trim());
-        return toResponse(communityPostRepository.save(post), member,
-                memberRepository.findByStudentId(post.getAuthorStudentId()).orElse(null));
+        if (request.removeImage()) {
+            clearImage(post);
+        }
+        attachImage(post, image);
+        CommunityPost saved = communityPostRepository.save(post);
+        return toResponse(saved, member,
+                memberRepository.findByStudentId(saved.getAuthorStudentId()).orElse(null),
+                voteStats(List.of(saved)), true);
     }
 
     public void delete(String studentId, Long id) {
@@ -73,7 +111,54 @@ public class CommunityService {
         if (!post.getAuthorStudentId().equals(member.getStudentId()) && member.getRole() != Member.Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
+        clearImage(post);
+        voteRepository.deleteByPost(post);
         communityPostRepository.delete(post);
+    }
+
+    public CommunityPostResponse vote(String studentId, Long id, int value) {
+        if (value < -1 || value > 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid vote value.");
+        }
+        Member member = findMember(studentId);
+        CommunityPost post = communityPostRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        Optional<CommunityPostVote> existing = voteRepository.findByPostAndStudentId(post, member.getStudentId());
+        if (value == 0) {
+            existing.ifPresent(voteRepository::delete);
+        } else if (existing.isPresent()) {
+            CommunityPostVote vote = existing.get();
+            if (vote.getValue() == value) {
+                voteRepository.delete(vote);
+            } else {
+                vote.setValue(value);
+                voteRepository.save(vote);
+            }
+        } else {
+            CommunityPostVote vote = new CommunityPostVote();
+            vote.setPost(post);
+            vote.setStudentId(member.getStudentId());
+            vote.setValue(value);
+            voteRepository.save(vote);
+        }
+        return toResponse(post, member, memberRepository.findByStudentId(post.getAuthorStudentId()).orElse(null),
+                voteStats(List.of(post)), true);
+    }
+
+    @Transactional(readOnly = true)
+    public CommunityPost imagePost(Long id) {
+        CommunityPost post = communityPostRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (post.getImageStoredName() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return post;
+    }
+
+    @Transactional(readOnly = true)
+    public Resource loadImage(Long id) {
+        CommunityPost post = imagePost(id);
+        return storageService.load(post.getImageStoredName());
     }
 
     private Member findMember(String studentId) {
@@ -81,19 +166,37 @@ public class CommunityService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
-    private CommunityPostResponse toResponse(CommunityPost post, Member currentMember, Member author) {
+    private void validateRequest(CommunityPostRequest request) {
+        if (request.title() == null || request.title().trim().isEmpty()
+                || request.content() == null || request.content().trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "제목과 내용을 입력해주세요.");
+        }
+    }
+
+    private CommunityPostResponse toResponse(CommunityPost post,
+                                             Member currentMember,
+                                             Member author,
+                                             Map<Long, VoteSummary> voteStats,
+                                             boolean includeContent) {
         boolean editable = post.getAuthorStudentId().equals(currentMember.getStudentId())
                 || currentMember.getRole() == Member.Role.ADMIN;
         boolean authorAdmin = author != null && author.getRole() == Member.Role.ADMIN;
         String authorName = author != null ? author.getName() : post.getAuthorName();
+        VoteSummary votes = voteStats.getOrDefault(post.getId(), VoteSummary.EMPTY);
         return new CommunityPostResponse(
                 post.getId(),
                 post.getTitle(),
-                post.getContent(),
+                includeContent ? post.getContent() : preview(post.getContent()),
                 post.getAuthorStudentId(),
                 authorName,
                 displayName(post.getAuthorStudentId(), authorName),
                 authorAdmin,
+                post.getImageStoredName() == null ? null : "/api/community/posts/" + post.getId() + "/image",
+                post.getImageOriginalName(),
+                post.getViewCount(),
+                votes.upvotes(),
+                votes.downvotes(),
+                votes.myVote(currentMember.getStudentId()),
                 post.getCreatedAt(),
                 post.getUpdatedAt(),
                 editable
@@ -113,5 +216,70 @@ public class CommunityService {
         int admissionYear = Integer.parseInt(studentId.substring(0, 4));
         int generation = admissionYear - 1966;
         return generation > 0 ? generation + "기" : "";
+    }
+
+    private void attachImage(CommunityPost post, MultipartFile image) {
+        if (image == null || image.isEmpty()) {
+            return;
+        }
+        String contentType = image.getContentType() == null ? "" : image.getContentType();
+        if (!ALLOWED_IMAGE_TYPES.contains(contentType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "JPG, PNG, GIF, WebP 이미지만 업로드할 수 있습니다.");
+        }
+        if (image.getSize() > MAX_IMAGE_BYTES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지는 5MB 이하만 업로드할 수 있습니다.");
+        }
+        clearImage(post);
+        try {
+            post.setImageStoredName(storageService.store(image));
+            post.setImageOriginalName(image.getOriginalFilename());
+            post.setImageMimeType(contentType);
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 저장에 실패했습니다.");
+        }
+    }
+
+    private void clearImage(CommunityPost post) {
+        if (post.getImageStoredName() != null) {
+            storageService.delete(post.getImageStoredName());
+        }
+        post.setImageStoredName(null);
+        post.setImageOriginalName(null);
+        post.setImageMimeType(null);
+    }
+
+    private String preview(String content) {
+        if (content == null || content.length() <= 160) {
+            return content;
+        }
+        return content.substring(0, 160);
+    }
+
+    private Map<Long, VoteSummary> voteStats(List<CommunityPost> posts) {
+        List<Long> postIds = posts.stream().map(CommunityPost::getId).filter(Objects::nonNull).toList();
+        if (postIds.isEmpty()) {
+            return Map.of();
+        }
+        return voteRepository.findByPostIdIn(postIds).stream()
+                .collect(Collectors.groupingBy(
+                        vote -> vote.getPost().getId(),
+                        Collectors.collectingAndThen(Collectors.toList(), VoteSummary::from)
+                ));
+    }
+
+    private record VoteSummary(long upvotes, long downvotes, Map<String, Integer> byStudent) {
+        static final VoteSummary EMPTY = new VoteSummary(0, 0, Map.of());
+
+        static VoteSummary from(List<CommunityPostVote> votes) {
+            long upvotes = votes.stream().filter(vote -> vote.getValue() > 0).count();
+            long downvotes = votes.stream().filter(vote -> vote.getValue() < 0).count();
+            Map<String, Integer> byStudent = votes.stream()
+                    .collect(Collectors.toMap(CommunityPostVote::getStudentId, CommunityPostVote::getValue, (a, b) -> b));
+            return new VoteSummary(upvotes, downvotes, byStudent);
+        }
+
+        int myVote(String studentId) {
+            return byStudent.getOrDefault(studentId, 0);
+        }
     }
 }
