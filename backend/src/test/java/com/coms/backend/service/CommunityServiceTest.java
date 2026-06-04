@@ -57,7 +57,7 @@ class CommunityServiceTest {
         memberRepository.save(admin);
         memberRepository.save(user);
 
-        communityService.create(admin.getStudentId(), new CommunityPostRequest("공지", "관리자 글", false), null);
+        communityService.create(admin.getStudentId(), new CommunityPostRequest("공지", "관리자 글", "GENERAL", false), null);
         CommunityPost post = new CommunityPost();
         post.setTitle("질문");
         post.setContent("일반 회원 글");
@@ -80,7 +80,7 @@ class CommunityServiceTest {
     void detailViewIncrementsViewCount() {
         Member user = member("2025123456", "회원", Member.Role.USER);
         memberRepository.save(user);
-        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("질문", "내용", false), null);
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("질문", "내용", "GENERAL", false), null);
 
         var detail = communityService.get(user.getStudentId(), created.id());
 
@@ -92,7 +92,7 @@ class CommunityServiceTest {
     void voteTogglesAndReplacesCurrentVote() {
         Member user = member("2025123456", "회원", Member.Role.USER);
         memberRepository.save(user);
-        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("질문", "내용", false), null);
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("질문", "내용", "GENERAL", false), null);
 
         var upvoted = communityService.vote(user.getStudentId(), created.id(), 1);
         var downvoted = communityService.vote(user.getStudentId(), created.id(), -1);
@@ -122,9 +122,25 @@ class CommunityServiceTest {
 
         assertThatThrownBy(() -> communityService.create(
                 user.getStudentId(),
-                new CommunityPostRequest("사진", "내용", false),
+                new CommunityPostRequest("사진", "내용", "GENERAL", false),
                 svg
         )).isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void createsPostWithSelectedCategory() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+
+        var created = communityService.create(
+                user.getStudentId(),
+                new CommunityPostRequest("질문", "내용", "QUESTION", false),
+                null
+        );
+
+        assertThat(created.category()).isEqualTo("QUESTION");
+        assertThat(communityPostRepository.findById(created.id()).orElseThrow().getCategory())
+                .isEqualTo(CommunityPost.Category.QUESTION);
     }
 
     private Member member(String studentId, String name, Member.Role role) {
