@@ -13,6 +13,7 @@ export async function createCommunityPost(body, image) {
     const form = new FormData()
     form.append('title', body.title)
     form.append('content', body.content)
+    form.append('category', body.category || 'GENERAL')
     form.append('image', image)
     return request('/api/community/posts', {
       method: 'POST',
@@ -31,6 +32,7 @@ export async function updateCommunityPost(id, body, image) {
     const form = new FormData()
     form.append('title', body.title)
     form.append('content', body.content)
+    form.append('category', body.category || 'GENERAL')
     form.append('removeImage', body.removeImage ? 'true' : 'false')
     form.append('image', image)
     return request(`/api/community/posts/${id}`, {

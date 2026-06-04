@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Trash2 } from 'lucide-react'
 import { listNotices, createNotice, updateNotice, deleteNotice } from '../services/noticeApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 
@@ -12,7 +12,6 @@ function NoticeForm({ initialNotice, defaultCategory, user, onCancel, onSave }) 
   const [formData, setFormData] = useState({
     title: initialNotice?.title || '',
     content: initialNotice?.content || '',
-    pinned: initialNotice?.pinned || false,
     category: initialNotice?.category || defaultCategory || 'GENERAL',
   })
   const [saving, setSaving] = useState(false)
@@ -21,7 +20,7 @@ function NoticeForm({ initialNotice, defaultCategory, user, onCancel, onSave }) 
     if (!formData.title.trim() || !formData.content.trim()) return
     setSaving(true)
     try {
-      const body = { ...formData, author: user.name }
+      const body = { ...formData, pinned: false, author: user.name }
       const saved = initialNotice
         ? await updateNotice(initialNotice.id, body)
         : await createNotice(body)
@@ -34,43 +33,35 @@ function NoticeForm({ initialNotice, defaultCategory, user, onCancel, onSave }) 
   }
 
   return (
-    <div className="space-y-3 border border-black/10 bg-white/55 p-4">
+    <div className="space-y-4 rounded-lg border border-white/10 bg-white/82 p-5 shadow-[0_18px_50px_rgba(0,0,0,0.12)]">
       <input
         value={formData.title}
         onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
         placeholder="제목"
-        className="w-full border border-black/15 bg-white px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+        className="w-full rounded border border-black/15 bg-white px-4 py-3 text-sm text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
       />
       <textarea
         value={formData.content}
         onChange={(e) => setFormData((p) => ({ ...p, content: e.target.value }))}
         placeholder="내용"
         rows={14}
-        className="w-full resize-y border border-black/15 bg-white px-3 py-2 text-sm leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+        className="w-full resize-y rounded border border-black/15 bg-white px-4 py-3 text-sm leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
       />
       <div className="flex flex-wrap items-center gap-3">
         <select
           value={formData.category}
           onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value }))}
-          className="border border-black/15 bg-white px-3 py-2 text-sm font-semibold"
+          className="rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold"
         >
           <option value="GENERAL">공지</option>
           <option value="JOB">취업공고</option>
         </select>
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--theme-body-muted)]">
-          <input
-            type="checkbox"
-            checked={formData.pinned}
-            onChange={(e) => setFormData((p) => ({ ...p, pinned: e.target.checked }))}
-          />
-          고정
-        </label>
       </div>
       <div className="flex gap-2">
-        <button type="button" onClick={save} disabled={saving} className="bg-[var(--theme-text)] px-4 py-2 text-sm font-bold text-[var(--theme-bg)] disabled:opacity-50">
+        <button type="button" onClick={save} disabled={saving} className="rounded bg-[var(--theme-text)] px-5 py-2.5 text-sm font-bold text-[var(--theme-bg)] disabled:opacity-50">
           {saving ? '저장 중...' : '저장'}
         </button>
-        <button type="button" onClick={onCancel} className="border border-black/15 bg-white px-4 py-2 text-sm font-bold">
+        <button type="button" onClick={onCancel} className="rounded border border-black/15 bg-white px-4 py-2.5 text-sm font-bold">
           취소
         </button>
       </div>
@@ -145,17 +136,18 @@ export default function Notices({ onBack }) {
         </button>
       </div>
 
-      <section className="overflow-hidden border border-black/20 bg-[#f7f7f7] text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)]">
-        <div className="border-b border-black/20 bg-white px-4 py-3">
+      <section className="overflow-hidden shape-cut border border-white/10 bg-white/5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md">
+        <div className="border-b border-white/10 bg-black/20 px-5 py-5 sm:px-7">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--theme-body-muted)]">Notice</p>
-              <h1 className="mt-1 text-2xl font-black">{headerTitle}</h1>
+              <p className="text-xs font-bold uppercase tracking-[0.28em] text-cyan-200">Notice</p>
+              <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">{headerTitle}</h1>
+              <p className="mt-2 text-sm leading-6 text-white/60">공지와 취업공고를 분리해서 확인합니다.</p>
             </div>
             {mode === 'list' ? (
-              isAdmin && <button type="button" onClick={() => setMode('write')} className="bg-[#3b4890] px-4 py-2 text-sm font-bold text-white">공지 작성</button>
+              isAdmin && <button type="button" onClick={() => setMode('write')} className="shape-cut-sm bg-white/85 px-5 py-2.5 text-sm font-bold text-[var(--theme-body-dark)] transition hover:bg-white">공지 작성</button>
             ) : (
-              <button type="button" onClick={() => setMode('list')} className="inline-flex items-center gap-1 border border-black/20 bg-white px-3 py-2 text-sm font-bold">
+              <button type="button" onClick={() => setMode('list')} className="shape-cut-sm inline-flex items-center gap-1 border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold text-white">
                 <ArrowLeft size={14} />
                 목록
               </button>
@@ -165,7 +157,8 @@ export default function Notices({ onBack }) {
 
         {mode === 'list' && (
           <>
-            <div className="flex flex-wrap gap-1 border-b border-black/15 bg-[#f1f3f8] px-3 py-2 text-xs font-bold">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-black/18 px-5 py-3 sm:px-7">
+              <div className="flex flex-wrap gap-2 text-sm font-bold">
               {[
                 ['ALL', '전체'],
                 ['GENERAL', '공지'],
@@ -175,42 +168,48 @@ export default function Notices({ onBack }) {
                   key={value}
                   type="button"
                   onClick={() => setActiveCategory(value)}
-                  className={activeCategory === value ? 'bg-white px-3 py-1 text-[#3b4890]' : 'px-3 py-1 text-[var(--theme-body-muted)]'}
+                  className={`shape-cut-sm inline-flex items-center gap-2 px-4 py-2 transition ${
+                    activeCategory === value
+                      ? 'bg-white text-[var(--theme-body-dark)]'
+                      : 'border border-white/10 bg-white/10 text-white/68 hover:bg-white/15'
+                  }`}
                 >
+                  {value === 'JOB' ? <BriefcaseBusiness size={14} /> : <Megaphone size={14} />}
                   {label}
                 </button>
               ))}
+              </div>
+              <div className="text-xs font-semibold text-white/45">{filteredNotices.length}개</div>
             </div>
-            {loading && <p className="px-4 py-12 text-center text-sm text-[var(--theme-body-muted)]">불러오는 중...</p>}
-            {error && <p className="px-4 py-3 text-sm text-red-500">{error}</p>}
+            {loading && <p className="px-4 py-16 text-center text-sm text-white/65">불러오는 중...</p>}
+            {error && <p className="mx-5 mt-5 shape-cut-sm border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100 sm:mx-7">{error}</p>}
             {!loading && !error && filteredNotices.length === 0 && (
-              <p className="px-4 py-12 text-center text-sm text-[var(--theme-body-muted)]">등록된 글이 없습니다.</p>
+              <p className="px-4 py-16 text-center text-sm text-white/65">등록된 글이 없습니다.</p>
             )}
             {!loading && !error && filteredNotices.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] border-collapse text-sm">
-                  <thead className="border-b border-[#29367c] bg-white text-xs">
+              <div className="m-5 overflow-hidden shape-cut-sm border border-white/10 bg-black/18 sm:m-7">
+                <table className="w-full min-w-[760px] border-collapse text-sm">
+                  <thead className="border-b border-white/10 bg-white/8 text-xs uppercase tracking-[0.16em] text-white/45">
                     <tr>
-                      <th className="w-20 px-2 py-2">번호</th>
-                      <th className="w-24 px-2 py-2">분류</th>
-                      <th className="px-2 py-2 text-left">제목</th>
-                      <th className="w-28 px-2 py-2">작성자</th>
-                      <th className="w-24 px-2 py-2">작성일</th>
+                      <th className="w-20 px-4 py-3">번호</th>
+                      <th className="w-28 px-4 py-3">분류</th>
+                      <th className="px-4 py-3 text-left">제목</th>
+                      <th className="w-32 px-4 py-3">작성자</th>
+                      <th className="w-28 px-4 py-3">작성일</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-black/10 bg-white">
+                  <tbody className="divide-y divide-white/10">
                     {filteredNotices.map((notice) => (
-                      <tr key={notice.id} className="hover:bg-[#f8f8f8]">
-                        <td className="px-2 py-2 text-center text-xs text-[var(--theme-body-muted)]">{notice.id}</td>
-                        <td className="px-2 py-2 text-center text-xs text-[#3b4890]">{(notice.category || 'GENERAL') === 'JOB' ? '취업' : '공지'}</td>
-                        <td className="px-2 py-2">
-                          <button type="button" onClick={() => { setSelectedNotice(notice); setMode('detail') }} className="max-w-[440px] truncate text-left font-semibold hover:underline">
-                            {notice.pinned && <span className="mr-1 text-red-600">[고정]</span>}
+                      <tr key={notice.id} className="text-white/75 transition hover:bg-white/5">
+                        <td className="px-4 py-4 text-center text-xs text-white/45">{notice.id}</td>
+                        <td className="px-4 py-4 text-center text-xs font-bold text-cyan-100">{(notice.category || 'GENERAL') === 'JOB' ? '취업' : '공지'}</td>
+                        <td className="px-4 py-4">
+                          <button type="button" onClick={() => { setSelectedNotice(notice); setMode('detail') }} className="max-w-[520px] truncate text-left font-semibold text-white hover:underline">
                             {notice.title}
                           </button>
                         </td>
-                        <td className="px-2 py-2 text-center text-xs">{notice.author}</td>
-                        <td className="px-2 py-2 text-center text-xs text-[var(--theme-body-muted)]">{formatDate(notice.createdAt)}</td>
+                        <td className="px-4 py-4 text-center text-xs">{notice.author}</td>
+                        <td className="px-4 py-4 text-center text-xs text-white/45">{formatDate(notice.createdAt)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -221,7 +220,7 @@ export default function Notices({ onBack }) {
         )}
 
         {mode === 'write' && (
-          <div className="p-4">
+          <div className="p-5 sm:p-7">
             <NoticeForm
               user={user}
               defaultCategory={activeCategory === 'JOB' ? 'JOB' : 'GENERAL'}
@@ -232,7 +231,7 @@ export default function Notices({ onBack }) {
         )}
 
         {mode === 'edit' && selectedNotice && (
-          <div className="p-4">
+          <div className="p-5 sm:p-7">
             <NoticeForm
               initialNotice={selectedNotice}
               user={user}
@@ -243,29 +242,28 @@ export default function Notices({ onBack }) {
         )}
 
         {mode === 'detail' && selectedNotice && (
-          <article className="bg-white">
-            <div className="border-b border-black/10 px-4 py-3">
+          <article className="m-5 overflow-hidden rounded-lg bg-white shadow-[0_18px_50px_rgba(0,0,0,0.14)] sm:m-7">
+            <div className="border-b border-black/10 px-5 py-5">
               <div className="mb-2 text-xs font-bold text-[#3b4890]">{(selectedNotice.category || 'GENERAL') === 'JOB' ? '취업공고' : '공지'}</div>
-              <h2 className="break-words text-xl font-black">
-                {selectedNotice.pinned && <span className="mr-2 text-red-600">[고정]</span>}
+              <h2 className="break-words text-2xl font-black">
                 {selectedNotice.title}
               </h2>
-              <p className="mt-2 text-xs text-[var(--theme-body-muted)]">
+              <p className="mt-3 text-xs text-[var(--theme-body-muted)]">
                 작성자 {selectedNotice.author} · {new Date(selectedNotice.createdAt).toLocaleString('ko-KR')}
               </p>
             </div>
-            <div className="min-h-[320px] whitespace-pre-wrap px-4 py-6 text-[15px] leading-8">{selectedNotice.content}</div>
-            <div className="flex flex-wrap justify-between gap-2 border-t border-black/10 px-4 py-4">
-              <button type="button" onClick={() => setMode('list')} className="border border-black/15 bg-white px-4 py-2 text-sm font-bold">
+            <div className="min-h-[360px] whitespace-pre-wrap px-5 py-7 text-[15px] leading-8">{selectedNotice.content}</div>
+            <div className="flex flex-wrap justify-between gap-2 border-t border-black/10 px-5 py-4">
+              <button type="button" onClick={() => setMode('list')} className="rounded border border-black/15 bg-white px-4 py-2 text-sm font-bold">
                 목록
               </button>
               {isAdmin && (
                 <div className="flex gap-2">
-                  <button type="button" onClick={() => setMode('edit')} className="inline-flex items-center gap-1 border border-black/15 bg-white px-4 py-2 text-sm font-bold">
+                  <button type="button" onClick={() => setMode('edit')} className="inline-flex items-center gap-1 rounded border border-black/15 bg-white px-4 py-2 text-sm font-bold">
                     <Pencil size={14} />
                     수정
                   </button>
-                  <button type="button" onClick={deleteSelected} className="inline-flex items-center gap-1 border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600">
+                  <button type="button" onClick={deleteSelected} className="inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600">
                     <Trash2 size={14} />
                     삭제
                   </button>
