@@ -10,7 +10,8 @@ export default function Notices({ onBack }) {
   const [expandedId, setExpandedId] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
-  const [formData, setFormData] = useState({ title: '', content: '', pinned: false })
+  const [formData, setFormData] = useState({ title: '', content: '', pinned: false, category: 'GENERAL' })
+  const [activeCategory, setActiveCategory] = useState('ALL')
   const [saving, setSaving] = useState(false)
 
   const isAdmin = user?.role === 'ADMIN'
@@ -42,13 +43,13 @@ export default function Notices({ onBack }) {
 
   const openCreate = () => {
     setEditTarget(null)
-    setFormData({ title: '', content: '', pinned: false })
+    setFormData({ title: '', content: '', pinned: false, category: activeCategory === 'JOB' ? 'JOB' : 'GENERAL' })
     setShowForm(true)
   }
 
   const openEdit = (notice) => {
     setEditTarget(notice)
-    setFormData({ title: notice.title, content: notice.content, pinned: notice.pinned })
+    setFormData({ title: notice.title, content: notice.content, pinned: notice.pinned, category: notice.category || 'GENERAL' })
     setShowForm(true)
     setExpandedId(null)
   }
@@ -84,6 +85,9 @@ export default function Notices({ onBack }) {
   }
 
   const formatDate = (iso) => new Date(iso).toLocaleDateString('ko-KR')
+  const filteredNotices = activeCategory === 'ALL'
+    ? notices
+    : notices.filter((notice) => (notice.category || 'GENERAL') === activeCategory)
 
   return (
     <div className="space-y-4">
@@ -103,6 +107,7 @@ export default function Notices({ onBack }) {
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[var(--theme-body-muted)]/80">Notice</p>
               <h1 className="mt-2 text-2xl font-bold sm:text-3xl">공지사항</h1>
+              <p className="mt-2 text-sm text-[var(--theme-body-muted)]/85">전체 공지와 취업공고를 분리해서 확인합니다.</p>
             </div>
             {isAdmin && !showForm && (
               <button
@@ -113,6 +118,27 @@ export default function Notices({ onBack }) {
                 공지 작성
               </button>
             )}
+          </div>
+
+          <div className="mb-5 flex flex-wrap gap-2">
+            {[
+              ['ALL', '전체'],
+              ['GENERAL', '공지'],
+              ['JOB', '취업공고'],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setActiveCategory(value)}
+                className={`shape-cut-sm px-4 py-2 text-sm font-semibold transition ${
+                  activeCategory === value
+                    ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]'
+                    : 'border border-black/10 bg-white/55 text-[var(--theme-body-mid)] hover:bg-white/80'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
           {showForm && (
@@ -130,6 +156,14 @@ export default function Notices({ onBack }) {
                 rows={5}
                 className="w-full shape-cut-sm bg-white/72 px-4 py-2.5 text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/70 focus:ring-2 focus:ring-[var(--theme-accent)]/55 resize-none"
               />
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value }))}
+                className="shape-cut-sm bg-white/72 px-4 py-2.5 text-sm font-semibold text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/55"
+              >
+                <option value="GENERAL">공지</option>
+                <option value="JOB">취업공고</option>
+              </select>
               <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--theme-body-muted)]">
                 <input
                   type="checkbox"
@@ -160,15 +194,15 @@ export default function Notices({ onBack }) {
 
           {loading && <p className="text-sm text-[var(--theme-body-muted)]">불러오는 중...</p>}
           {error && <p className="text-sm text-red-500">{error}</p>}
-          {!loading && !error && notices.length === 0 && (
+          {!loading && !error && filteredNotices.length === 0 && (
             <p className="rounded-lg border border-black/10 bg-black/5 px-4 py-5 text-sm text-[var(--theme-body-muted)]">
-              등록된 공지사항이 없습니다.
+              등록된 글이 없습니다.
             </p>
           )}
 
-          {!loading && !error && notices.length > 0 && (
+          {!loading && !error && filteredNotices.length > 0 && (
             <div className="space-y-2">
-              {notices.map((notice) => (
+              {filteredNotices.map((notice) => (
                 <div key={notice.id} className="overflow-hidden rounded-lg border border-black/10 bg-black/5">
                   <button
                     type="button"
@@ -179,6 +213,11 @@ export default function Notices({ onBack }) {
                       {notice.pinned && (
                         <span className="shrink-0 rounded bg-cyan-100 px-1.5 py-0.5 text-xs font-bold text-cyan-700">
                           고정
+                        </span>
+                      )}
+                      {(notice.category || 'GENERAL') === 'JOB' && (
+                        <span className="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-emerald-700">
+                          취업
                         </span>
                       )}
                       {notice.title}

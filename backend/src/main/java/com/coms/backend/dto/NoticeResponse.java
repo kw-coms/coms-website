@@ -8,6 +8,7 @@ public record NoticeResponse(
         String content,
         String author,
         boolean pinned,
+        String category,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
