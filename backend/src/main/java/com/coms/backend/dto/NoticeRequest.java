@@ -7,6 +7,7 @@ public record NoticeRequest(
         @NotBlank @Size(max = 255) String title,
         @NotBlank String content,
         @NotBlank @Size(max = 255) String author,
-        boolean pinned
+        boolean pinned,
+        String category
 ) {
 }

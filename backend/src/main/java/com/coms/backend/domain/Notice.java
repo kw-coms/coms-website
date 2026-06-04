@@ -5,6 +5,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
@@ -30,6 +32,10 @@ public class Notice {
     @Column(nullable = false)
     private boolean pinned = false;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Category category = Category.GENERAL;
+
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -41,6 +47,10 @@ public class Notice {
         updatedAt = LocalDateTime.now();
     }
 
+    public enum Category {
+        GENERAL, JOB
+    }
+
     public Long getId() { return id; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
@@ -50,6 +60,8 @@ public class Notice {
     public void setAuthor(String author) { this.author = author; }
     public boolean isPinned() { return pinned; }
     public void setPinned(boolean pinned) { this.pinned = pinned; }
+    public Category getCategory() { return category; }
+    public void setCategory(Category category) { this.category = category; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
 }
