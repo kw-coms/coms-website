@@ -1,12 +1,14 @@
 package com.coms.backend.controller;
 
 import com.coms.backend.dto.AddEligibleMemberRequest;
+import com.coms.backend.dto.BannedStudentResponse;
 import com.coms.backend.dto.EligibleMemberImportResponse;
 import com.coms.backend.dto.EligibleMemberResponse;
 import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.RoleUpdateRequest;
 import com.coms.backend.dto.UpdateEligibleMemberRequest;
 import com.coms.backend.service.AdminService;
+import com.coms.backend.service.BannedStudentService;
 import com.coms.backend.service.EligibleMemberService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -21,10 +24,13 @@ public class AdminController {
 
     private final AdminService adminService;
     private final EligibleMemberService eligibleMemberService;
+    private final BannedStudentService bannedStudentService;
 
-    public AdminController(AdminService adminService, EligibleMemberService eligibleMemberService) {
+    public AdminController(AdminService adminService, EligibleMemberService eligibleMemberService,
+                           BannedStudentService bannedStudentService) {
         this.adminService = adminService;
         this.eligibleMemberService = eligibleMemberService;
+        this.bannedStudentService = bannedStudentService;
     }
 
     @GetMapping("/members")
@@ -71,5 +77,22 @@ public class AdminController {
     @PostMapping("/eligible-members/import")
     public ResponseEntity<EligibleMemberImportResponse> importEligibleMembers(@RequestParam("file") MultipartFile file) {
         return ResponseEntity.ok(eligibleMemberService.importRoster(file));
+    }
+
+    @GetMapping("/banned-students")
+    public ResponseEntity<List<BannedStudentResponse>> listBanned() {
+        return ResponseEntity.ok(bannedStudentService.listBanned());
+    }
+
+    @PostMapping("/banned-students")
+    public ResponseEntity<Void> banStudent(@RequestBody Map<String, String> body) {
+        bannedStudentService.ban(body.get("studentId"));
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/banned-students/{studentId}")
+    public ResponseEntity<Void> unbanStudent(@PathVariable String studentId) {
+        bannedStudentService.unban(studentId);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember } from '../services/adminApi.js'
+import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent } from '../services/adminApi.js'
 import { listFiles, uploadFile, deleteFile } from '../services/archiveApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 
@@ -44,6 +44,7 @@ export default function Admin({ onBack }) {
               { id: 'members', label: '회원 관리' },
               { id: 'roster', label: '명부 인증' },
               { id: 'files', label: '파일 관리' },
+              { id: 'ban', label: '차단 관리' },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -63,6 +64,7 @@ export default function Admin({ onBack }) {
           {activeTab === 'members' && <MembersTab currentUser={user} />}
           {activeTab === 'roster' && <RosterTab />}
           {activeTab === 'files' && <FilesTab />}
+          {activeTab === 'ban' && <BanTab />}
         </section>
       </div>
     </div>
@@ -527,6 +529,97 @@ function FilesTab() {
               </button>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BanTab() {
+  const [banned, setBanned] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [input, setInput] = useState('')
+  const [error, setError] = useState('')
+
+  const load = () => {
+    listBannedStudents()
+      .then(setBanned)
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(load, [])
+
+  const handleBan = async (e) => {
+    e.preventDefault()
+    const id = input.trim()
+    if (!id) return
+    setError('')
+    try {
+      await banStudent(id)
+      setInput('')
+      await load()
+    } catch (err) {
+      setError(err.message || '차단 중 오류가 발생했습니다.')
+    }
+  }
+
+  const handleUnban = async (studentId) => {
+    if (!window.confirm(`${studentId} 차단을 해제하시겠습니까?`)) return
+    try {
+      await unbanStudent(studentId)
+      await load()
+    } catch (err) {
+      alert(err.message || '해제 중 오류가 발생했습니다.')
+    }
+  }
+
+  const inputCls = 'rounded border border-black/15 bg-white px-2 py-1 text-sm outline-none focus:border-black/40'
+
+  return (
+    <div className="space-y-6">
+      <form onSubmit={handleBan} className="flex items-center gap-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="학번 10자리"
+          maxLength={10}
+          className={`${inputCls} w-40`}
+        />
+        <button type="submit" className="shape-cut-sm bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">
+          영구 차단
+        </button>
+        {error && <span className="text-xs text-red-500">{error}</span>}
+      </form>
+
+      {loading ? (
+        <p className="text-sm text-[var(--theme-body-muted)]">불러오는 중...</p>
+      ) : banned.length === 0 ? (
+        <p className="text-sm text-[var(--theme-body-muted)]">차단된 학번이 없습니다.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-black/10 text-left text-xs font-semibold uppercase tracking-wide text-[var(--theme-body-muted)]">
+                <th className="px-3 py-2">학번</th>
+                <th className="px-3 py-2">차단일</th>
+                <th className="px-3 py-2"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-black/10 bg-white/50">
+              {banned.map((b) => (
+                <tr key={b.id}>
+                  <td className="px-3 py-3 font-mono text-xs text-[var(--theme-body-dark)]">{b.studentId}</td>
+                  <td className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{new Date(b.bannedAt).toLocaleDateString('ko-KR')}</td>
+                  <td className="px-3 py-3">
+                    <button type="button" onClick={() => handleUnban(b.studentId)} className="text-xs font-semibold text-blue-500 hover:underline">
+                      차단 해제
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
