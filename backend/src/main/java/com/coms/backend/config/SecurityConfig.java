@@ -52,7 +52,8 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> {
-                auth.requestMatchers("/error", "/api/auth/signup", "/api/auth/login", "/api/auth/logout", "/hello", "/api/server/time").permitAll();
+                auth.requestMatchers("/error", "/api/auth/signup", "/api/auth/login", "/api/auth/logout", "/hello", "/api/server/time",
+                        "/api/auth/email-verification/request-signup", "/api/auth/email-verification/confirm-signup").permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/api/maintenance/bootstrap").permitAll();
                 auth.requestMatchers("/api/maintenance/**").hasRole("ADMIN");
                 auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
