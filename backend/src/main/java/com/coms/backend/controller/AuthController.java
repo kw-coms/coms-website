@@ -3,9 +3,11 @@ package com.coms.backend.controller;
 import com.coms.backend.dto.AuthResponse;
 import com.coms.backend.dto.ChangePasswordRequest;
 import com.coms.backend.dto.ConfirmEmailVerificationRequest;
+import com.coms.backend.dto.ConfirmSignupEmailRequest;
 import com.coms.backend.dto.EmailVerificationStatusResponse;
 import com.coms.backend.dto.LoginRequest;
 import com.coms.backend.dto.MemberResponse;
+import com.coms.backend.dto.RequestSignupEmailRequest;
 import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.dto.UpdateProfileRequest;
 import com.coms.backend.service.AuthService;
@@ -88,6 +90,21 @@ public class AuthController {
     public ResponseEntity<MemberResponse> updateProfile(@Valid @RequestBody UpdateProfileRequest request,
                                                         Authentication authentication) {
         return ResponseEntity.ok(authService.updateProfile(authentication.getName(), request));
+    }
+
+    @PostMapping("/email-verification/request-signup")
+    public ResponseEntity<EmailVerificationStatusResponse> requestSignupEmail(
+            @Valid @RequestBody RequestSignupEmailRequest request) {
+        boolean verified = authService.requestSignupEmailVerification(request.studentId());
+        String message = verified ? "이미 이메일 인증이 완료되었습니다." : "인증코드를 이메일로 보냈습니다.";
+        return ResponseEntity.ok(new EmailVerificationStatusResponse(message, verified));
+    }
+
+    @PostMapping("/email-verification/confirm-signup")
+    public ResponseEntity<EmailVerificationStatusResponse> confirmSignupEmail(
+            @Valid @RequestBody ConfirmSignupEmailRequest request) {
+        boolean verified = authService.confirmSignupEmailVerification(request.studentId(), request.code());
+        return ResponseEntity.ok(new EmailVerificationStatusResponse("이메일 인증이 완료되었습니다.", verified));
     }
 
     @PostMapping("/email-verification/request")
