@@ -383,7 +383,7 @@ function MembersTab({ currentUser }) {
                     <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-700">관리자</span>
                   )}
                 </div>
-                <p className="mt-0.5 text-xs text-[var(--theme-body-muted)]">{member.email}</p>
+                <p className="mt-0.5 text-xs text-[var(--theme-body-muted)]">{member.email}{member.phone && ` · ${member.phone}`}</p>
               </div>
               <div className="flex items-center gap-3">
                 {hasExtra && (

@@ -235,7 +235,8 @@ public class EligibleMemberService {
         Map<String, Integer> header = new HashMap<>();
         for (Cell cell : row) {
             String label = normalize(readCell(row, cell.getColumnIndex(), evaluator)).toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
-            if (label.contains("학번") || label.equals("studentid") || label.equals("student_id")) header.putIfAbsent("studentId", cell.getColumnIndex());
+            if (label.equals("학번") || label.equals("학번1") || label.equals("studentid") || label.equals("student_id")) header.put("studentId", cell.getColumnIndex());
+            else if (label.contains("학번")) header.putIfAbsent("studentId", cell.getColumnIndex());
             if (label.equals("이름") || label.equalsIgnoreCase("name")) header.putIfAbsent("name", cell.getColumnIndex());
             if (label.equals("전화번호") || label.contains("전화") || label.equalsIgnoreCase("phone")) header.putIfAbsent("phone", cell.getColumnIndex());
             if (label.contains("기수")) header.putIfAbsent("generation", cell.getColumnIndex());
