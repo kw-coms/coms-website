@@ -91,7 +91,7 @@ export default function Signup() {
     if (!form.email.trim()) return '이메일을 입력해주세요.'
     if (!form.email.includes('@')) return '올바른 이메일 형식이 아닙니다.'
     if (!form.password) return '비밀번호를 입력해주세요.'
-    if (form.password.length < 8) return '비밀번호는 8자 이상이어야 합니다.'
+    if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/.test(form.password)) return '비밀번호는 8자 이상, 영문·숫자·특수문자(!@#$ 등)를 모두 포함해야 합니다.'
     if (form.password !== form.passwordConfirm) return '비밀번호 확인이 일치하지 않습니다.'
     if (selectedInterests.includes('기타') && !otherInterest.trim()) return '기타 관심 분야를 입력해주세요.'
     return ''
@@ -180,7 +180,7 @@ export default function Signup() {
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className={labelClass} htmlFor="password">비밀번호</label>
-              <input id="password" name="password" type="password" value={form.password} onChange={handleChange} className={inputClass} placeholder="8자 이상 입력하세요" autoComplete="new-password" />
+              <input id="password" name="password" type="password" value={form.password} onChange={handleChange} className={inputClass} placeholder="영문+숫자+특수문자 8자 이상" autoComplete="new-password" />
             </div>
             <div>
               <label className={labelClass} htmlFor="passwordConfirm">비밀번호 확인</label>
