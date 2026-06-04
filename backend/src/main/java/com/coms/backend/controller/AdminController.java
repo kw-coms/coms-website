@@ -5,6 +5,7 @@ import com.coms.backend.dto.EligibleMemberImportResponse;
 import com.coms.backend.dto.EligibleMemberResponse;
 import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.RoleUpdateRequest;
+import com.coms.backend.dto.UpdateEligibleMemberRequest;
 import com.coms.backend.service.AdminService;
 import com.coms.backend.service.EligibleMemberService;
 import jakarta.validation.Valid;
@@ -52,6 +53,19 @@ public class AdminController {
     @GetMapping("/eligible-members")
     public ResponseEntity<List<EligibleMemberResponse>> eligibleMembers() {
         return ResponseEntity.ok(eligibleMemberService.listRoster());
+    }
+
+    @PatchMapping("/eligible-members/{id}")
+    public ResponseEntity<Void> updateEligibleMember(@PathVariable Long id,
+                                                     @Valid @RequestBody UpdateEligibleMemberRequest request) {
+        eligibleMemberService.updateEligibleMember(id, request.studentId(), request.name());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/eligible-members/{id}")
+    public ResponseEntity<Void> deleteEligibleMember(@PathVariable Long id) {
+        eligibleMemberService.deleteEligibleMember(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/eligible-members/import")
