@@ -90,7 +90,7 @@ function RosterTab() {
   const [addResult, setAddResult] = useState('')
   const [addError, setAddError] = useState('')
   const [editingId, setEditingId] = useState(null)
-  const [editForm, setEditForm] = useState({ studentId: '', name: '' })
+  const [editForm, setEditForm] = useState({ studentId: '', name: '', phone: '' })
   const [editSaving, setEditSaving] = useState(false)
 
   const loadRoster = async () => {
@@ -152,14 +152,14 @@ function RosterTab() {
 
   const startEdit = (member) => {
     setEditingId(member.id)
-    setEditForm({ studentId: member.studentId || '', name: member.name })
+    setEditForm({ studentId: member.studentId || '', name: member.name, phone: member.phone || '' })
   }
 
   const handleEditSave = async (id) => {
     if (!editForm.studentId.trim() || !editForm.name.trim()) return
     setEditSaving(true)
     try {
-      await updateEligibleMember(id, editForm.studentId.trim(), editForm.name.trim())
+      await updateEligibleMember(id, editForm.studentId.trim(), editForm.name.trim(), editForm.phone.trim())
       setEditingId(null)
       await loadRoster()
     } catch (err) {
@@ -257,7 +257,9 @@ function RosterTab() {
                           <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} maxLength={20} className={`${inputCls} w-24`} />
                         </td>
                         <td className="px-3 py-2 text-xs text-[var(--theme-body-muted)]">자동계산</td>
-                        <td className="px-3 py-2 text-xs text-[var(--theme-body-muted)]">{member.phone || '-'}</td>
+                        <td className="px-3 py-2">
+                          <input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} maxLength={11} placeholder="01012345678" className={`${inputCls} w-32`} />
+                        </td>
                         <td className="px-3 py-2">
                           <div className="flex gap-2">
                             <button type="button" onClick={() => handleEditSave(member.id)} disabled={editSaving} className="text-xs font-semibold text-emerald-600 hover:underline disabled:opacity-50">저장</button>

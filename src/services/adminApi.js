@@ -28,10 +28,10 @@ export async function addEligibleMember(studentId, name) {
   })
 }
 
-export async function updateEligibleMember(id, studentId, name) {
+export async function updateEligibleMember(id, studentId, name, phone) {
   return requestNoContent(`/api/admin/eligible-members/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ studentId, name }),
+    body: JSON.stringify({ studentId, name, phone: phone || null }),
   })
 }
 
