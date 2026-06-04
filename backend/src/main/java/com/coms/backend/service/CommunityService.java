@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.Locale;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -77,6 +78,7 @@ public class CommunityService {
         CommunityPost post = new CommunityPost();
         post.setTitle(request.title().trim());
         post.setContent(request.content().trim());
+        post.setCategory(parseCategory(request.category()));
         post.setAuthorStudentId(member.getStudentId());
         post.setAuthorName(member.getName());
         attachImage(post, image);
@@ -94,6 +96,7 @@ public class CommunityService {
         }
         post.setTitle(request.title().trim());
         post.setContent(request.content().trim());
+        post.setCategory(parseCategory(request.category()));
         if (request.removeImage()) {
             clearImage(post);
         }
@@ -191,6 +194,7 @@ public class CommunityService {
                 authorName,
                 displayName(post.getAuthorStudentId(), authorName),
                 authorAdmin,
+                post.getCategory().name(),
                 post.getImageStoredName() == null ? null : "/api/community/posts/" + post.getId() + "/image",
                 post.getImageOriginalName(),
                 post.getViewCount(),
@@ -236,6 +240,17 @@ public class CommunityService {
             post.setImageMimeType(contentType);
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 저장에 실패했습니다.");
+        }
+    }
+
+    private CommunityPost.Category parseCategory(String value) {
+        if (value == null || value.isBlank()) {
+            return CommunityPost.Category.GENERAL;
+        }
+        try {
+            return CommunityPost.Category.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid community category.");
         }
     }
 

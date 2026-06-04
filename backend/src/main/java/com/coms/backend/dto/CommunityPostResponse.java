@@ -10,6 +10,7 @@ public record CommunityPostResponse(
         String authorName,
         String authorDisplayName,
         boolean authorAdmin,
+        String category,
         String imageUrl,
         String imageOriginalName,
         long viewCount,

@@ -22,6 +22,10 @@ public class CommunityPost {
     @Column(nullable = false)
     private String authorName;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Category category = Category.GENERAL;
+
     private String imageStoredName;
 
     private String imageOriginalName;
@@ -42,6 +46,10 @@ public class CommunityPost {
         updatedAt = LocalDateTime.now();
     }
 
+    public enum Category {
+        GENERAL, QUESTION, INFO
+    }
+
     public Long getId() { return id; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
@@ -51,6 +59,8 @@ public class CommunityPost {
     public void setAuthorStudentId(String authorStudentId) { this.authorStudentId = authorStudentId; }
     public String getAuthorName() { return authorName; }
     public void setAuthorName(String authorName) { this.authorName = authorName; }
+    public Category getCategory() { return category; }
+    public void setCategory(Category category) { this.category = category; }
     public String getImageStoredName() { return imageStoredName; }
     public void setImageStoredName(String imageStoredName) { this.imageStoredName = imageStoredName; }
     public String getImageOriginalName() { return imageOriginalName; }

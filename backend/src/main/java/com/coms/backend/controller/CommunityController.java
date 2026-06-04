@@ -50,9 +50,10 @@ public class CommunityController {
     public ResponseEntity<CommunityPostResponse> createWithImage(Authentication authentication,
                                                                  @RequestParam String title,
                                                                  @RequestParam String content,
+                                                                 @RequestParam(defaultValue = "GENERAL") String category,
                                                                  @RequestParam(value = "image", required = false) MultipartFile image) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(communityService.create(authentication.getName(), new CommunityPostRequest(title, content, false), image));
+                .body(communityService.create(authentication.getName(), new CommunityPostRequest(title, content, category, false), image));
     }
 
     @PatchMapping("/{id}")
@@ -67,12 +68,13 @@ public class CommunityController {
                                                                  @PathVariable Long id,
                                                                  @RequestParam String title,
                                                                  @RequestParam String content,
+                                                                 @RequestParam(defaultValue = "GENERAL") String category,
                                                                  @RequestParam(defaultValue = "false") boolean removeImage,
                                                                  @RequestParam(value = "image", required = false) MultipartFile image) {
         return ResponseEntity.ok(communityService.update(
                 authentication.getName(),
                 id,
-                new CommunityPostRequest(title, content, removeImage),
+                new CommunityPostRequest(title, content, category, removeImage),
                 image
         ));
     }
