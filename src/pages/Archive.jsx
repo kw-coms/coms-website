@@ -30,6 +30,12 @@ function openRowWithKeyboard(event, open) {
   }
 }
 
+function clickableCell(open) {
+  return {
+    onClick: open,
+  }
+}
+
 export default function Archive({ onBack }) {
   const { user } = useAuth()
   const [files, setFiles] = useState([])
@@ -118,18 +124,20 @@ export default function Archive({ onBack }) {
 
   return (
     <div className="w-full space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15"
-        >
-          메인으로 돌아가기
-        </button>
-        <div className="text-sm text-white/55">
-          {user?.name ? `${user.name}님` : 'COM\'s 자료실'}
+      {mode === 'list' && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <button
+            type="button"
+            onClick={onBack}
+            className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15"
+          >
+            메인으로 돌아가기
+          </button>
+          <div className="text-sm text-white/55">
+            {user?.name ? `${user.name}님` : 'COM\'s 자료실'}
+          </div>
         </div>
-      </div>
+      )}
 
       <section className="overflow-hidden border border-white/10 bg-white/5 shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md">
         <div className="border-b border-white/10 bg-black/20 px-5 py-4 sm:px-7">
@@ -262,25 +270,27 @@ export default function Archive({ onBack }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
-                  {files.map((file) => (
+                  {files.map((file) => {
+                    const open = () => openFile(file)
+                    return (
                     <tr
                       key={file.id}
                       tabIndex={0}
                       role="button"
-                      onClick={() => openFile(file)}
-                      onKeyDown={(event) => openRowWithKeyboard(event, () => openFile(file))}
+                      onClick={open}
+                      onKeyDown={(event) => openRowWithKeyboard(event, open)}
                       className="cursor-pointer text-white/75 transition hover:bg-white/5 focus:bg-white/10 focus:outline-none"
                     >
-                      <td className="px-4 py-4 text-white/45">{file.id}</td>
-                      <td className="max-w-[320px] px-4 py-4 font-semibold text-white">
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-white/45">{file.id}</td>
+                      <td {...clickableCell(open)} className="max-w-[320px] cursor-pointer px-4 py-4 font-semibold text-white">
                         <span className="block max-w-full truncate text-left" title={file.originalName}>
                           {file.originalName}
                         </span>
                       </td>
-                      <td className="px-4 py-4">{formatSize(file.fileSize)}</td>
-                      <td className="px-4 py-4">{file.uploadedBy || '-'}</td>
-                      <td className="px-4 py-4">{formatDate(file.uploadedAt)}</td>
-                      <td className="px-4 py-4 text-right">
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">{formatSize(file.fileSize)}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">{file.uploadedBy || '-'}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">{formatDate(file.uploadedAt)}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-right">
                         <div className="flex justify-end gap-2">
                           <a
                             href={downloadUrl(file.id)}
@@ -293,7 +303,8 @@ export default function Archive({ onBack }) {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
