@@ -173,7 +173,7 @@ export default function Signup() {
             </div>
             <div>
               <label className={labelClass} htmlFor="phone">전화번호</label>
-              <input id="phone" name="phone" value={form.phone} onChange={handleChange} className={inputClass} placeholder="전화번호를 입력하세요" autoComplete="tel" />
+              <input id="phone" name="phone" value={form.phone} onChange={handleChange} className={inputClass} placeholder="01012345678 (하이픈 없이)" autoComplete="tel" />
             </div>
           </div>
 

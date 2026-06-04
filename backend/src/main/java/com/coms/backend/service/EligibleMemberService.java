@@ -58,12 +58,14 @@ public class EligibleMemberService {
                 .toList();
     }
 
-    public void updateEligibleMember(Long id, String studentId, String name) {
+    public void updateEligibleMember(Long id, String studentId, String name, String phone) {
         EligibleMember member = eligibleMemberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "명부에서 해당 항목을 찾을 수 없습니다."));
         member.setStudentId(studentId.trim());
         member.setName(name.trim());
         member.setGeneration(calculateGeneration(studentId.trim()));
+        String normalizedPhone = normalizePhone(phone);
+        member.setPhone(normalizedPhone.isBlank() ? null : normalizedPhone);
         eligibleMemberRepository.save(member);
     }
 
@@ -137,11 +139,17 @@ public class EligibleMemberService {
                 }
 
                 String studentId = extractStudentId(normalize(safeGet(record, colMap.get("studentId"))));
+
+                if (findExisting(studentId).isPresent()) {
+                    skipped++;
+                    continue;
+                }
+
                 String phone = colMap.containsKey("phone")
                         ? normalizePhone(safeGet(record, colMap.get("phone")))
                         : null;
 
-                EligibleMember member = findExisting(studentId).orElseGet(EligibleMember::new);
+                EligibleMember member = new EligibleMember();
                 member.setStudentId(studentId.isBlank() ? null : studentId);
                 member.setName(name);
                 member.setPhone(phone == null || phone.isBlank() ? null : phone);
@@ -208,13 +216,19 @@ public class EligibleMemberService {
                     continue;
                 }
 
+                String studentId = extractStudentId(normalize(readCell(row, header.get("studentId"), evaluator)));
+
+                if (findExisting(studentId).isPresent()) {
+                    skipped++;
+                    continue;
+                }
+
                 String phone = header.containsKey("phone")
                         ? normalizePhone(readCell(row, header.get("phone"), evaluator))
                         : null;
-                String studentId = extractStudentId(normalize(readCell(row, header.get("studentId"), evaluator)));
                 String note = normalize(readCell(row, header.get("note"), evaluator));
 
-                EligibleMember member = findExisting(studentId).orElseGet(EligibleMember::new);
+                EligibleMember member = new EligibleMember();
                 member.setStudentId(studentId.isBlank() ? null : studentId);
                 member.setName(name);
                 member.setPhone(phone == null || phone.isBlank() ? null : phone);
