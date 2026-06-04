@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword } from '../services/adminApi.js'
-import { listFiles, uploadFile, deleteFile } from '../services/archiveApi.js'
+import { listFiles, createPost, deleteFile } from '../services/archiveApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 
 export default function Admin({ onBack }) {
@@ -491,7 +491,7 @@ function FilesTab() {
     if (!file) return
     setUploading(true)
     try {
-      await uploadFile(file)
+      await createPost({ title: file.name, file })
       loadFiles()
     } catch (err) {
       alert(err.message || '업로드 중 오류가 발생했습니다.')

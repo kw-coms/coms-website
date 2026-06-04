@@ -32,6 +32,15 @@ public class ArchiveFile {
     @Column(nullable = false)
     private String uploadedBy;
 
+    @Column
+    private String uploaderName;
+
+    @Column
+    private String title;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
     @Column(nullable = false)
     private LocalDateTime uploadedAt = LocalDateTime.now();
 
@@ -46,6 +55,12 @@ public class ArchiveFile {
     public void setFileSize(Long fileSize) { this.fileSize = fileSize; }
     public String getUploadedBy() { return uploadedBy; }
     public void setUploadedBy(String uploadedBy) { this.uploadedBy = uploadedBy; }
+    public String getUploaderName() { return uploaderName; }
+    public void setUploaderName(String uploaderName) { this.uploaderName = uploaderName; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
     public LocalDateTime getUploadedAt() { return uploadedAt; }
     public void setUploadedAt(LocalDateTime uploadedAt) { this.uploadedAt = uploadedAt; }
 }

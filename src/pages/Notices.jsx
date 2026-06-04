@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Search, Trash2 } from 'lucide-react'
 import { listNotices, createNotice, updateNotice, deleteNotice } from '../services/noticeApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 
@@ -88,6 +88,7 @@ export default function Notices({ onBack }) {
   const [mode, setMode] = useState('list')
   const [selectedNotice, setSelectedNotice] = useState(null)
   const [activeCategory, setActiveCategory] = useState('ALL')
+  const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -111,11 +112,18 @@ export default function Notices({ onBack }) {
     return () => { mounted = false }
   }, [])
 
-  const filteredNotices = useMemo(() => (
-    activeCategory === 'ALL'
+  const filteredNotices = useMemo(() => {
+    const byCategory = activeCategory === 'ALL'
       ? notices
       : notices.filter((notice) => (notice.category || 'GENERAL') === activeCategory)
-  ), [activeCategory, notices])
+    if (!searchQuery.trim()) return byCategory
+    const q = searchQuery.toLowerCase()
+    return byCategory.filter((notice) =>
+      notice.title.toLowerCase().includes(q) ||
+      (notice.content || '').toLowerCase().includes(q) ||
+      (notice.author || '').toLowerCase().includes(q)
+    )
+  }, [activeCategory, notices, searchQuery])
   const featuredNotice = useMemo(
     () => notices.find((notice) => (notice.category || 'GENERAL') === 'GENERAL'),
     [notices],
@@ -233,7 +241,19 @@ export default function Notices({ onBack }) {
                 </button>
               ))}
               </div>
-              <div className="text-xs font-semibold text-white/45">{filteredNotices.length}개</div>
+              <div className="flex items-center gap-3">
+                <div className="relative flex items-center">
+                  <Search size={14} className="pointer-events-none absolute left-3 text-white/45" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="제목, 작성자 검색"
+                    className="shape-cut-sm w-48 border border-white/10 bg-black/20 py-2 pl-8 pr-3 text-sm text-white placeholder-white/35 outline-none focus:border-white/25"
+                  />
+                </div>
+                <span className="text-xs font-semibold text-white/45">{filteredNotices.length}개</span>
+              </div>
             </div>
             {loading && <p className="px-4 py-16 text-center text-sm text-white/65">불러오는 중...</p>}
             {error && <p className="mx-5 mt-5 shape-cut-sm border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100 sm:mx-7">{error}</p>}

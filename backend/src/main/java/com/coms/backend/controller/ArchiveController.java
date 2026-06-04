@@ -37,9 +37,12 @@ public class ArchiveController {
     }
 
     @PostMapping
-    public ResponseEntity<ArchiveFileResponse> upload(@RequestParam("file") MultipartFile file,
-                                                      Authentication authentication) throws IOException {
-        return ResponseEntity.ok(archiveService.upload(file, authentication.getName()));
+    public ResponseEntity<ArchiveFileResponse> upload(
+            @RequestParam("title") String title,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) throws IOException {
+        return ResponseEntity.ok(archiveService.upload(title, description, file, authentication.getName()));
     }
 
     @GetMapping
