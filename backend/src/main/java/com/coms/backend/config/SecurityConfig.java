@@ -70,12 +70,26 @@ public class SecurityConfig {
                 }
                 auth.anyRequest().authenticated();
             })
-            // Keep frameOptions sameOrigin globally; H2 console needs it relaxed
-            .headers(headers -> headers.frameOptions(frame -> {
-                if (h2ConsoleEnabled) {
-                    frame.sameOrigin();
-                }
-            }))
+            .headers(headers -> headers
+                .frameOptions(frame -> {
+                    if (h2ConsoleEnabled) {
+                        frame.sameOrigin();
+                    } else {
+                        frame.deny();
+                    }
+                })
+                .contentTypeOptions(ct -> {})
+                .xssProtection(xss -> {})
+                .contentSecurityPolicy(csp -> csp.policyDirectives(
+                    "default-src 'self'; " +
+                    "script-src 'self'; " +
+                    "style-src 'self' 'unsafe-inline'; " +
+                    "img-src 'self' data: blob:; " +
+                    "font-src 'self'; " +
+                    "connect-src 'self'; " +
+                    "frame-ancestors 'none';"
+                ))
+            )
             .addFilterBefore(
                 new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService),
                 UsernamePasswordAuthenticationFilter.class

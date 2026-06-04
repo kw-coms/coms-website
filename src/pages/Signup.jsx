@@ -91,6 +91,7 @@ export default function Signup() {
     if (!form.email.trim()) return '이메일을 입력해주세요.'
     if (!form.email.includes('@')) return '올바른 이메일 형식이 아닙니다.'
     if (!form.password) return '비밀번호를 입력해주세요.'
+    if (/\s/.test(form.password)) return '비밀번호에 공백을 사용할 수 없습니다.'
     if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/.test(form.password)) return '비밀번호는 8자 이상, 영문·숫자·특수문자(!@#$ 등)를 모두 포함해야 합니다.'
     if (form.password !== form.passwordConfirm) return '비밀번호 확인이 일치하지 않습니다.'
     if (selectedInterests.includes('기타') && !otherInterest.trim()) return '기타 관심 분야를 입력해주세요.'
