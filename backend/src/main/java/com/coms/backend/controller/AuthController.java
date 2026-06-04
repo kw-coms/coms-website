@@ -1,6 +1,7 @@
 package com.coms.backend.controller;
 
 import com.coms.backend.dto.AuthResponse;
+import com.coms.backend.dto.ChangePasswordRequest;
 import com.coms.backend.dto.LoginRequest;
 import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.SignupRequest;
@@ -71,5 +72,12 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<MemberResponse> me(Authentication authentication) {
         return ResponseEntity.ok(authService.getMe(authentication.getName()));
+    }
+
+    @PatchMapping("/password")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request,
+                                               Authentication authentication) {
+        authService.changePassword(authentication.getName(), request.currentPassword(), request.newPassword());
+        return ResponseEntity.noContent().build();
     }
 }

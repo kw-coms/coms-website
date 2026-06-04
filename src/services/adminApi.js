@@ -41,6 +41,13 @@ export async function deleteEligibleMember(id) {
   })
 }
 
+export async function resetMemberPassword(id, password) {
+  return request(`/api/admin/members/${id}/password`, {
+    method: 'PUT',
+    body: JSON.stringify({ password }),
+  })
+}
+
 export async function listBannedStudents() {
   return request('/api/admin/banned-students')
 }
