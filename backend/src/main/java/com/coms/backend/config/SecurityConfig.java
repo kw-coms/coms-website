@@ -60,7 +60,7 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.POST, "/api/notices").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.PUT, "/api/notices/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/notices/**").hasRole("ADMIN");
-                auth.requestMatchers(HttpMethod.POST, "/api/files").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.POST, "/api/files").authenticated();
                 auth.requestMatchers(HttpMethod.DELETE, "/api/files/**").hasRole("ADMIN");
                 auth.requestMatchers("/api/files", "/api/files/**").authenticated();
                 auth.requestMatchers("/api/community/**").authenticated();
