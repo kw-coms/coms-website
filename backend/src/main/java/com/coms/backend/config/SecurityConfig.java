@@ -2,6 +2,7 @@ package com.coms.backend.config;
 
 import com.coms.backend.security.JwtAuthenticationFilter;
 import com.coms.backend.security.JwtTokenProvider;
+import com.coms.backend.security.OriginValidationFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -43,7 +44,9 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, UserDetailsService userDetailsService) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           UserDetailsService userDetailsService,
+                                           OriginValidationFilter originValidationFilter) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
@@ -90,6 +93,7 @@ public class SecurityConfig {
                     "frame-ancestors 'none';"
                 ))
             )
+            .addFilterBefore(originValidationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(
                 new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService),
                 UsernamePasswordAuthenticationFilter.class

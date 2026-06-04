@@ -12,10 +12,28 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 @Service
 @Transactional
 public class ArchiveService {
+
+    private static final long MAX_ARCHIVE_FILE_BYTES = 20L * 1024 * 1024;
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+            "pdf", "txt", "md", "csv",
+            "doc", "docx", "ppt", "pptx", "xls", "xlsx", "hwp", "hwpx",
+            "zip", "jpg", "jpeg", "png", "gif", "webp"
+    );
+    private static final Set<String> BLOCKED_MIME_TYPES = Set.of(
+            "text/html",
+            "image/svg+xml",
+            "application/javascript",
+            "text/javascript",
+            "application/x-msdownload",
+            "application/x-sh",
+            "application/x-csh"
+    );
 
     private final ArchiveFileRepository repo;
     private final StorageService storage;
@@ -26,6 +44,7 @@ public class ArchiveService {
     }
 
     public ArchiveFileResponse upload(MultipartFile file, String uploaderStudentId) throws IOException {
+        validateUpload(file);
         String stored = storage.store(file);
         try {
             ArchiveFile entity = new ArchiveFile();
@@ -73,5 +92,23 @@ public class ArchiveService {
         String rawName = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().replace("\\", "/");
         String filename = StringUtils.getFilename(rawName);
         return StringUtils.cleanPath(filename == null ? "" : filename);
+    }
+
+    private void validateUpload(MultipartFile file) {
+        String filename = cleanOriginalFilename(file);
+        if (file.isEmpty() || filename.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일이 비어 있거나 파일명이 없습니다.");
+        }
+        if (file.getSize() > MAX_ARCHIVE_FILE_BYTES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "자료실 파일은 20MB 이하만 업로드할 수 있습니다.");
+        }
+        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        if (BLOCKED_MIME_TYPES.contains(contentType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 파일 형식입니다.");
+        }
+        String extension = StringUtils.getFilenameExtension(filename);
+        if (extension == null || !ALLOWED_EXTENSIONS.contains(extension.toLowerCase(Locale.ROOT))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "허용되지 않는 자료실 파일 확장자입니다.");
+        }
     }
 }
