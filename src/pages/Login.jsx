@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { loginUser, requestSignupEmailVerification } from '../services/authApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 import { getLogoAsset } from '../utils/logoAssets.js'
+import { EmailVerifyStep } from '../components/EmailVerifyStep.jsx'
 
 export default function Login({ onBack, goSignup }) {
   const { login } = useAuth()
@@ -9,8 +10,9 @@ export default function Login({ onBack, goSignup }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [showResend, setShowResend] = useState(false)
-  const [resendStatus, setResendStatus] = useState('')
+  const [step, setStep] = useState('login')
+  const [verifyStudentId, setVerifyStudentId] = useState('')
+  const [verifyError, setVerifyError] = useState('')
 
   const panelClass = 'shape-cut bg-[var(--theme-surface-96)] p-5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] sm:p-8'
   const frameClass = 'shape-cut-sm bg-black/12 p-px'
@@ -30,40 +32,55 @@ export default function Login({ onBack, goSignup }) {
     }
 
     setLoading(true)
-    setShowResend(false)
-    setResendStatus('')
     try {
       const data = await loginUser({ identifier: trimmedIdentifier, password: submittedPassword })
       await login(data)
       onBack()
     } catch (err) {
       const msg = err.message || '로그인 중 오류가 발생했습니다.'
-      setError(msg)
-      if (msg.includes('이메일 인증')) setShowResend(true)
+      if (msg.includes('이메일 인증')) {
+        setVerifyStudentId(trimmedIdentifier)
+        try {
+          await requestSignupEmailVerification(trimmedIdentifier)
+        } catch {
+          // 429 cooldown: existing code still valid; other errors: user can resend when ready
+        }
+        setStep('verify')
+        setVerifyError('')
+      } else {
+        setError(msg)
+      }
     } finally {
       setLoading(false)
     }
   }
 
-  const handleResendVerification = async () => {
-    setResendStatus('sending')
+  const handleVerified = async () => {
+    setLoading(true)
+    setVerifyError('')
     try {
-      await requestSignupEmailVerification(identifier.trim())
-      setResendStatus('sent')
-    } catch {
-      setResendStatus('error')
+      const data = await loginUser({ identifier: verifyStudentId, password })
+      await login(data)
+      onBack()
+    } catch (err) {
+      // Stay on verify step — verification succeeded, login failure is likely transient
+      setVerifyError(err.message || '로그인 중 오류가 발생했습니다. 다시 시도해주세요.')
+    } finally {
+      setLoading(false)
     }
   }
+
+  const isVerifyStep = step === 'verify'
 
   return (
     <div className="space-y-4">
       <div className="flex justify-center sm:justify-start">
         <button
           type="button"
-          onClick={onBack}
+          onClick={isVerifyStep ? () => setStep('login') : onBack}
           className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] shadow-[0_18px_40px_rgba(255,255,255,0.2)] transition hover:bg-white"
         >
-          메인으로 돌아가기
+          {isVerifyStep ? '로그인으로 돌아가기' : '메인으로 돌아가기'}
         </button>
       </div>
 
@@ -72,84 +89,76 @@ export default function Login({ onBack, goSignup }) {
           <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left">
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="h-10 w-10 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
             <div className="min-w-0">
-              <h2 className="text-lg font-bold leading-snug sm:text-xl">KW COM's 로그인</h2>
-              <p className="text-sm leading-5 text-[var(--theme-body-muted)]/85">동아리 계정으로 로그인하세요.</p>
+              <h2 className="text-lg font-bold leading-snug sm:text-xl">
+                {isVerifyStep ? '이메일 인증' : 'KW COM\'s 로그인'}
+              </h2>
+              <p className="text-sm leading-5 text-[var(--theme-body-muted)]/85">
+                {isVerifyStep ? '가입하신 이메일로 발송된 인증코드를 입력해주세요.' : '동아리 계정으로 로그인하세요.'}
+              </p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">학번 (Student ID)</label>
-              <div className={frameClass}>
-                <input
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="학번을 입력하세요"
-                  className={inputClass}
-                />
-              </div>
+          {isVerifyStep ? (
+            <div className="space-y-4">
+              {verifyError && <div className="text-sm text-red-400">{verifyError}</div>}
+              <EmailVerifyStep studentId={verifyStudentId} onDone={handleVerified} />
             </div>
-
-            <div>
-              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">비밀번호</label>
-              <div className={frameClass}>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="비밀번호를 입력하세요"
-                  className={inputClass}
-                />
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">학번 (Student ID)</label>
+                <div className={frameClass}>
+                  <input
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="학번을 입력하세요"
+                    className={inputClass}
+                  />
+                </div>
               </div>
-            </div>
 
-            {error && <div className="text-sm text-red-400">{error}</div>}
-            {showResend && (
-              <div className="shape-cut-sm border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm">
-                <p className="font-semibold text-amber-700">인증 이메일을 다시 받으시겠어요?</p>
-                {resendStatus === 'sent' ? (
-                  <p className="mt-1 text-emerald-700">인증 이메일을 발송했습니다. 받은편지함을 확인해주세요.</p>
-                ) : resendStatus === 'error' ? (
-                  <p className="mt-1 text-red-600">전송 실패. 잠시 후 다시 시도해주세요.</p>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleResendVerification}
-                    disabled={resendStatus === 'sending'}
-                    className="mt-1 font-semibold text-amber-800 underline disabled:opacity-60"
-                  >
-                    {resendStatus === 'sending' ? '전송 중...' : '인증 이메일 재전송'}
+              <div>
+                <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">비밀번호</label>
+                <div className={frameClass}>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="비밀번호를 입력하세요"
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+
+              {error && <div className="text-sm text-red-400">{error}</div>}
+
+              <div>
+                <div className={frameClass}>
+                  <button type="submit" className={btnClass} disabled={loading}>
+                    {loading ? '로그인 중...' : '로그인'}
                   </button>
-                )}
+                </div>
               </div>
-            )}
 
-            <div>
-              <div className={frameClass}>
-                <button type="submit" className={btnClass} disabled={loading}>
-                  {loading ? '로그인 중...' : '로그인'}
+              <div className="flex flex-col gap-3 text-sm text-[var(--theme-body-muted)]/90 sm:flex-row sm:items-center sm:justify-between">
+                <button type="button" onClick={goSignup} className="w-full rounded-full border border-black/10 bg-white/60 px-4 py-2 text-center font-semibold transition hover:bg-white/80 sm:w-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-left sm:underline">
+                  회원가입
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => alert('비밀번호 분실 문의: kwcoms69@gmail.com')}
+                  className="w-full rounded-full border border-black/10 bg-white/60 px-4 py-2 text-center font-semibold transition hover:bg-white/80 sm:w-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-left sm:underline"
+                >
+                  비밀번호 찾기
                 </button>
               </div>
-            </div>
 
-            <div className="flex flex-col gap-3 text-sm text-[var(--theme-body-muted)]/90 sm:flex-row sm:items-center sm:justify-between">
-              <button type="button" onClick={goSignup} className="w-full rounded-full border border-black/10 bg-white/60 px-4 py-2 text-center font-semibold transition hover:bg-white/80 sm:w-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-left sm:underline">
-                회원가입
-              </button>
-
-              <button
-                type="button"
-                onClick={() => alert('비밀번호 분실 문의: kwcoms69@gmail.com')}
-                className="w-full rounded-full border border-black/10 bg-white/60 px-4 py-2 text-center font-semibold transition hover:bg-white/80 sm:w-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-left sm:underline"
-              >
-                비밀번호 찾기
-              </button>
-            </div>
-
-            <p className="mt-4 text-xs leading-5 text-[var(--theme-body-muted)]/80">
-              로그인 정보가 기억나지 않거나 계정에 문제가 있는 경우 관리팀에 문의해주세요.
-            </p>
-          </form>
+              <p className="mt-4 text-xs leading-5 text-[var(--theme-body-muted)]/80">
+                로그인 정보가 기억나지 않거나 계정에 문제가 있는 경우 관리팀에 문의해주세요.
+              </p>
+            </form>
+          )}
         </section>
       </div>
     </div>
