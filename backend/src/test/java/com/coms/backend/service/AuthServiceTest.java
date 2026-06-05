@@ -140,7 +140,7 @@ class AuthServiceTest {
     void loginRejectsUnverifiedEmailWithUnauthorizedStatus() {
         saveMember("2026123460", false);
 
-        assertThatThrownBy(() -> authService.login(new com.coms.backend.dto.LoginRequest("2026123460", "Password1!")))
+        assertThatThrownBy(() -> authService.login(new com.coms.backend.dto.LoginRequest("2026123460", "Password1!"), "127.0.0.1"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
                     assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
                     assertThat(ex.getReason()).contains("이메일 인증");
@@ -151,7 +151,7 @@ class AuthServiceTest {
     void loginSucceedsAfterEmailIsVerified() {
         saveMember("2026123461", true);
 
-        var response = authService.login(new com.coms.backend.dto.LoginRequest("2026123461", "Password1!"));
+        var response = authService.login(new com.coms.backend.dto.LoginRequest("2026123461", "Password1!"), "127.0.0.1");
 
         assertThat(response.token()).isNotBlank();
         assertThat(response.studentId()).isEqualTo("2026123461");
@@ -161,7 +161,7 @@ class AuthServiceTest {
     void loginAllowsUnverifiedAdminAccount() {
         saveMember("admin", false, Member.Role.ADMIN);
 
-        var response = authService.login(new com.coms.backend.dto.LoginRequest("admin", "Password1!"));
+        var response = authService.login(new com.coms.backend.dto.LoginRequest("admin", "Password1!"), "127.0.0.1");
 
         assertThat(response.token()).isNotBlank();
         assertThat(response.studentId()).isEqualTo("admin");
