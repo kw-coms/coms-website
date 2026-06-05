@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 @Transactional
 public class CommunityService {
     private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
+    private static final long CONCEPT_POST_SCORE_THRESHOLD = 10;
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
 
     private final CommunityPostRepository communityPostRepository;
@@ -208,6 +209,7 @@ public class CommunityService {
                 votes.upvotes(),
                 votes.downvotes(),
                 votes.myVote(currentMember.getStudentId()),
+                votes.netScore() >= CONCEPT_POST_SCORE_THRESHOLD,
                 post.getCreatedAt(),
                 post.getUpdatedAt(),
                 editable
@@ -341,6 +343,10 @@ public class CommunityService {
 
         int myVote(String studentId) {
             return byStudent.getOrDefault(studentId, 0);
+        }
+
+        long netScore() {
+            return upvotes - downvotes;
         }
     }
 }

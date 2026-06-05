@@ -110,6 +110,20 @@ class CommunityServiceTest {
     }
 
     @Test
+    void marksPostAsConceptPostAfterNetUpvotesReachThreshold() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        memberRepository.save(author);
+        var created = communityService.create(author.getStudentId(), new CommunityPostRequest("개념 후보", "내용", "GENERAL", false), null);
+
+        for (int i = 0; i < 10; i++) {
+            Member voter = member(String.format("20261234%02d", i), "회원" + i, Member.Role.USER);
+            memberRepository.save(voter);
+            var voted = communityService.vote(voter.getStudentId(), created.id(), 1);
+            assertThat(voted.conceptPost()).isEqualTo(i >= 9);
+        }
+    }
+
+    @Test
     void rejectsUnsupportedImageTypes() {
         Member user = member("2025123456", "회원", Member.Role.USER);
         memberRepository.save(user);
