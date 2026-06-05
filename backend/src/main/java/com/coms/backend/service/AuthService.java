@@ -86,7 +86,7 @@ public class AuthService implements UserDetailsService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
 
-        if (!member.isEmailVerified()) {
+        if (requiresEmailVerification(member)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일 인증이 완료되지 않았습니다. 가입 시 받은 인증 이메일을 확인해주세요.");
         }
 
@@ -204,6 +204,10 @@ public class AuthService implements UserDetailsService {
     private void clearEmailVerificationCode(Member member) {
         member.setEmailVerificationCodeHash(null);
         member.setEmailVerificationExpiresAt(null);
+    }
+
+    private boolean requiresEmailVerification(Member member) {
+        return member.getRole() != Member.Role.ADMIN && !member.isEmailVerified();
     }
 
     private void enforceEmailVerificationResendCooldown(Member member) {
