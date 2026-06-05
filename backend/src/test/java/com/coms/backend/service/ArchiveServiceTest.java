@@ -9,13 +9,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {
         "jwt.secret=test-secret-key-with-at-least-32-chars",
@@ -74,11 +71,17 @@ class ArchiveServiceTest {
 
     @Test
     void rejectsOversizedUpload() {
-        MultipartFile large = mock(MultipartFile.class);
-        when(large.isEmpty()).thenReturn(false);
-        when(large.getOriginalFilename()).thenReturn("large.pdf");
-        when(large.getContentType()).thenReturn("application/pdf");
-        when(large.getSize()).thenReturn(500L * 1024 * 1024 + 1);
+        MockMultipartFile large = new MockMultipartFile(
+                "file",
+                "large.pdf",
+                "application/pdf",
+                "%PDF-1.4".getBytes()
+        ) {
+            @Override
+            public long getSize() {
+                return 500L * 1024 * 1024 + 1;
+            }
+        };
 
         assertThatThrownBy(() -> archiveService.upload("큰 파일", null, large, "2026123456"))
                 .isInstanceOf(ResponseStatusException.class);

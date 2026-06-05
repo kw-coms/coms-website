@@ -23,10 +23,10 @@ import Notices from './pages/Notices.jsx'
 import Admin from './pages/Admin.jsx'
 import Community from './pages/Community.jsx'
 import ChangePassword from './pages/ChangePassword.jsx'
+import RecruitApply from './pages/RecruitApply.jsx'
 import { getLogoAsset } from './utils/logoAssets.js'
 import FixedBrackets from './components/common/FixedBrackets.jsx'
 import { useAuth } from './contexts/useAuth.js'
-import { submitRecruitApplication } from './services/recruitApi.js'
 
 const tabs = [
   { id: 'about', label: 'About', hint: '정체성', icon: Binary, accent: 'text-cyan-200' },
@@ -117,20 +117,17 @@ const floatingBarBaseClass = 'shape-cut border border-[var(--theme-border-soft)]
 const solidActionBtnClass = 'shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] transition hover:scale-[1.02]'
 const ghostActionBtnClass = 'shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/20'
 
-const recruitInitialForm = {
-  name: '',
-  studentId: '',
-  department: '',
-  grade: '',
-  phone: '',
-  email: '',
-  interests: '',
-  motivation: '',
-  experience: '',
-  expectedActivities: '',
-}
-
 // ─── Auth guards ───────────────────────────────────────────────────────────
+
+function ScrollToTop() {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [pathname])
+
+  return null
+}
 
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -232,176 +229,10 @@ function SettingsPage() {
 
 function RecruitPage() {
   const navigate = useNavigate()
-  const location = useLocation()
-  const [formOpen, setFormOpen] = useState(() => new URLSearchParams(location.search).get('apply') === '1')
-  const [form, setForm] = useState(recruitInitialForm)
-  const [submitting, setSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState('')
-  const [submitMessage, setSubmitMessage] = useState('')
-
-  useEffect(() => {
-    if (new URLSearchParams(location.search).get('apply') === '1') {
-      setFormOpen(true)
-    }
-  }, [location.search])
-
-  const inputClass = 'w-full shape-cut-sm border border-white/10 bg-white/90 px-4 py-3 text-[15px] text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/60 transition focus:bg-white focus:ring-2 focus:ring-emerald-300/55'
-  const labelClass = 'mb-2 block text-sm font-semibold text-white/88'
-
-  const handleChange = (event) => {
-    const { name, value } = event.target
-    setForm((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const validateRecruitForm = () => {
-    if (!form.name.trim()) return '이름을 입력해주세요.'
-    if (!/^\d{10}$/.test(form.studentId.trim())) return '학번은 숫자 10자리로 입력해주세요.'
-    if (!form.department.trim()) return '학과를 입력해주세요.'
-    if (!form.grade.trim()) return '학년을 입력해주세요.'
-    if (!form.phone.trim()) return '전화번호를 입력해주세요.'
-    if (!form.email.trim() || !form.email.includes('@')) return '올바른 이메일을 입력해주세요.'
-    if (!form.interests.trim()) return '관심 분야를 입력해주세요.'
-    if (!form.motivation.trim()) return '지원 동기를 입력해주세요.'
-    if (!form.experience.trim()) return '관련 경험을 입력해주세요.'
-    if (!form.expectedActivities.trim()) return '기대하는 활동을 입력해주세요.'
-    return ''
-  }
-
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    setSubmitError('')
-    setSubmitMessage('')
-
-    const validationMessage = validateRecruitForm()
-    if (validationMessage) {
-      setSubmitError(validationMessage)
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      const result = await submitRecruitApplication({
-        name: form.name.trim(),
-        studentId: form.studentId.trim(),
-        department: form.department.trim(),
-        grade: form.grade.trim(),
-        phone: form.phone.trim(),
-        email: form.email.trim(),
-        interests: form.interests.trim(),
-        motivation: form.motivation.trim(),
-        experience: form.experience.trim(),
-        expectedActivities: form.expectedActivities.trim(),
-      })
-      setSubmitMessage(result.message || '지원서가 접수되었습니다.')
-      setForm(recruitInitialForm)
-    } catch (err) {
-      setSubmitError(err.message || '지원서 제출 중 오류가 발생했습니다.')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)]">
-      <BackgroundLayers />
-      <div className="relative mx-auto flex min-h-screen max-w-5xl items-center px-4 py-28 sm:px-6">
-        <div className="w-full">
-          <button type="button" onClick={() => navigate('/')} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15">
-            메인으로 돌아가기
-          </button>
-          <section className="shape-cut border border-white/10 bg-white/5 p-6 backdrop-blur-md sm:p-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Recruit</p>
-            <h1 className="mt-4 text-4xl font-semibold sm:text-5xl">COM&apos;s 지원하기</h1>
-            <p className="mt-6 max-w-3xl leading-8 text-white/70">
-              광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장할 부원을 모집합니다.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <button type="button" onClick={() => setFormOpen(true)} className={solidActionBtnClass}>
-                지원서 작성하기
-              </button>
-              <button type="button" onClick={() => navigate('/notices')} className={ghostActionBtnClass}>
-                모집 공지 보기
-              </button>
-            </div>
-          </section>
-
-          {formOpen && (
-            <section className="shape-cut mt-6 border border-white/10 bg-white/7 p-6 backdrop-blur-md sm:p-8">
-              <div className="mb-6">
-                <p className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Application</p>
-                <h2 className="mt-3 text-3xl font-semibold">COM&apos;s 지원서</h2>
-              </div>
-
-              <form onSubmit={handleSubmit} className="grid gap-5">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className={labelClass} htmlFor="recruit-name">이름</label>
-                    <input id="recruit-name" name="name" value={form.name} onChange={handleChange} className={inputClass} placeholder="이름을 입력하세요" autoComplete="name" />
-                  </div>
-                  <div>
-                    <label className={labelClass} htmlFor="recruit-student-id">학번</label>
-                    <input id="recruit-student-id" name="studentId" value={form.studentId} onChange={handleChange} className={inputClass} placeholder="숫자 10자리" inputMode="numeric" autoComplete="username" />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className={labelClass} htmlFor="recruit-department">학과</label>
-                    <input id="recruit-department" name="department" value={form.department} onChange={handleChange} className={inputClass} placeholder="학과를 입력하세요" />
-                  </div>
-                  <div>
-                    <label className={labelClass} htmlFor="recruit-grade">학년</label>
-                    <input id="recruit-grade" name="grade" value={form.grade} onChange={handleChange} className={inputClass} placeholder="예: 1학년" />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className={labelClass} htmlFor="recruit-phone">전화번호</label>
-                    <input id="recruit-phone" name="phone" value={form.phone} onChange={handleChange} className={inputClass} placeholder="01012345678" autoComplete="tel" />
-                  </div>
-                  <div>
-                    <label className={labelClass} htmlFor="recruit-email">이메일</label>
-                    <input id="recruit-email" name="email" type="email" value={form.email} onChange={handleChange} className={inputClass} placeholder="답장 받을 이메일" autoComplete="email" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className={labelClass} htmlFor="recruit-interests">관심 분야</label>
-                  <input id="recruit-interests" name="interests" value={form.interests} onChange={handleChange} className={inputClass} placeholder="예: 웹, 앱, 보안, 아두이노" />
-                </div>
-
-                <div>
-                  <label className={labelClass} htmlFor="recruit-motivation">지원 동기</label>
-                  <textarea id="recruit-motivation" name="motivation" value={form.motivation} onChange={handleChange} rows={4} maxLength={1000} className={`${inputClass} resize-none`} placeholder="COM's에 지원하게 된 이유를 적어주세요." />
-                </div>
-
-                <div>
-                  <label className={labelClass} htmlFor="recruit-experience">관련 경험</label>
-                  <textarea id="recruit-experience" name="experience" value={form.experience} onChange={handleChange} rows={4} maxLength={1000} className={`${inputClass} resize-none`} placeholder="프로그래밍, 프로젝트, 학습 경험 등을 자유롭게 적어주세요." />
-                </div>
-
-                <div>
-                  <label className={labelClass} htmlFor="recruit-expected">기대하는 활동</label>
-                  <textarea id="recruit-expected" name="expectedActivities" value={form.expectedActivities} onChange={handleChange} rows={4} maxLength={1000} className={`${inputClass} resize-none`} placeholder="동아리에서 해보고 싶은 활동을 적어주세요." />
-                </div>
-
-                {submitError && (
-                  <p className="shape-cut-sm bg-red-400/12 px-4 py-3 text-sm font-semibold text-red-100">{submitError}</p>
-                )}
-                {submitMessage && (
-                  <p className="shape-cut-sm bg-emerald-300/14 px-4 py-3 text-sm font-semibold text-emerald-100">{submitMessage}</p>
-                )}
-
-                <button type="submit" disabled={submitting} className="shape-cut-sm bg-[var(--theme-text)] px-5 py-3 text-base font-semibold text-[var(--theme-bg)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
-                  {submitting ? '지원서 제출 중...' : '지원서 제출하기'}
-                </button>
-              </form>
-            </section>
-          )}
-        </div>
-      </div>
-    </div>
+    <PageShell wide>
+      <RecruitApply onBack={() => navigate('/')} />
+    </PageShell>
   )
 }
 
@@ -409,20 +240,23 @@ function RecruitPage() {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<HomeView />} />
-      <Route path="/notices" element={<NoticesPage />} />
-      <Route path="/notices/:id" element={<NoticesPage />} />
-      <Route path="/resources" element={<RequireAuth><ArchivePage /></RequireAuth>} />
-      <Route path="/community" element={<RequireAuth><CommunityPage /></RequireAuth>} />
-      <Route path="/community/:id" element={<RequireAuth><CommunityPage /></RequireAuth>} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
-      <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
-      <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
-      <Route path="/recruit" element={<RecruitPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route path="/" element={<HomeView />} />
+        <Route path="/notices" element={<NoticesPage />} />
+        <Route path="/notices/:id" element={<NoticesPage />} />
+        <Route path="/resources" element={<RequireAuth><ArchivePage /></RequireAuth>} />
+        <Route path="/community" element={<RequireAuth><CommunityPage /></RequireAuth>} />
+        <Route path="/community/:id" element={<RequireAuth><CommunityPage /></RequireAuth>} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
+        <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
+        <Route path="/recruit" element={<RecruitPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }
 
@@ -531,7 +365,7 @@ function HomeView() {
   const goNotices = () => navigate('/notices')
   const goAdmin = () => navigate('/admin')
   const goChangePassword = () => navigate('/settings')
-  const goRecruitForm = () => navigate('/recruit?apply=1')
+  const goRecruitPage = () => navigate('/recruit')
 
   const bracketColor = activeSection ? sectionMeta[activeSection]?.bracket : sectionMeta.about.bracket
 
@@ -626,8 +460,12 @@ function HomeView() {
           <div>3. 오리엔테이션 및 정기 활동 참여</div>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button type="button" onClick={goRecruitForm} className={solidActionBtnClass}>지원서 작성하기</button>
-          <button type="button" onClick={goNotices} className={ghostActionBtnClass}>모집 공지 보기</button>
+          <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
+            지원서 작성하기
+          </button>
+          <button type="button" onClick={goNotices} className={ghostActionBtnClass}>
+            모집 공지 보기
+          </button>
         </div>
       </div>
     )
