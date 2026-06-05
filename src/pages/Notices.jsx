@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { linkify } from '../utils/linkify.jsx'
 import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Search, Trash2 } from 'lucide-react'
 import { listNotices, createNotice, updateNotice, deleteNotice } from '../services/noticeApi.js'
 import { useAuth } from '../contexts/useAuth.js'
@@ -364,7 +365,7 @@ export default function Notices({ onBack }) {
                 작성자 {selectedNotice.author} · {new Date(selectedNotice.createdAt).toLocaleString('ko-KR')}
               </p>
             </div>
-            <div className="min-h-[360px] whitespace-pre-wrap px-5 py-7 text-[15px] leading-8">{selectedNotice.content}</div>
+            <div className="min-h-[360px] whitespace-pre-wrap break-words px-5 py-7 text-[15px] leading-8">{linkify(selectedNotice.content)}</div>
             <div className="flex flex-wrap justify-between gap-2 border-t border-black/10 px-5 py-4">
               <button type="button" onClick={() => setMode('list')} className="rounded border border-black/15 bg-white px-4 py-2 text-sm font-bold">
                 목록
