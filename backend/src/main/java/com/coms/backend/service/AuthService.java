@@ -1,11 +1,13 @@
 package com.coms.backend.service;
 
+import com.coms.backend.domain.LoginFailure;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.AuthResponse;
 import com.coms.backend.dto.LoginRequest;
 import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.dto.UpdateProfileRequest;
+import com.coms.backend.repository.LoginFailureRepository;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.security.JwtTokenProvider;
 import org.springframework.http.HttpStatus;
@@ -28,19 +30,24 @@ public class AuthService implements UserDetailsService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int EMAIL_VERIFICATION_EXPIRES_MINUTES = 10;
     private static final int EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES = 1;
+    private static final int MAX_FAILURES_PER_ID = 5;
+    private static final int LOCKOUT_WINDOW_MINUTES = 15;
 
     private final MemberRepository memberRepository;
+    private final LoginFailureRepository loginFailureRepository;
     private final EligibleMemberService eligibleMemberService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailVerificationSender emailVerificationSender;
 
     public AuthService(MemberRepository memberRepository,
+                       LoginFailureRepository loginFailureRepository,
                        EligibleMemberService eligibleMemberService,
                        PasswordEncoder passwordEncoder,
                        JwtTokenProvider jwtTokenProvider,
                        EmailVerificationSender emailVerificationSender) {
         this.memberRepository = memberRepository;
+        this.loginFailureRepository = loginFailureRepository;
         this.eligibleMemberService = eligibleMemberService;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
@@ -78,11 +85,16 @@ public class AuthService implements UserDetailsService {
     }
 
     public AuthResponse login(LoginRequest request, String clientIp) {
+        checkLoginLockout(request.identifier(), clientIp);
+
         Member member = memberRepository.findByStudentId(request.identifier())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다."));
+                .orElseGet(() -> {
+                    loginFailureRepository.save(new LoginFailure(request.identifier(), clientIp));
+                    throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
+                });
 
         if (!passwordEncoder.matches(request.password(), member.getPassword())) {
+            loginFailureRepository.save(new LoginFailure(request.identifier(), clientIp));
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
 
@@ -99,7 +111,17 @@ public class AuthService implements UserDetailsService {
         }
 
         String token = jwtTokenProvider.generateToken(member.getStudentId());
-        return new AuthResponse(token, member.getStudentId(), member.getName(), "로그인 성공");
+        String refreshToken = jwtTokenProvider.generateRefreshToken(member.getStudentId());
+        return new AuthResponse(token, member.getStudentId(), member.getName(), "로그인 성공", refreshToken);
+    }
+
+    private void checkLoginLockout(String studentId, String clientIp) {
+        LocalDateTime windowStart = LocalDateTime.now().minusMinutes(LOCKOUT_WINDOW_MINUTES);
+        long failures = loginFailureRepository.countByStudentIdAndAttemptedAtAfter(studentId, windowStart);
+        if (failures >= MAX_FAILURES_PER_ID) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "로그인 시도 횟수가 초과되었습니다. " + LOCKOUT_WINDOW_MINUTES + "분 후 다시 시도해주세요.");
+        }
     }
 
     public MemberResponse getMe(String studentId) {
