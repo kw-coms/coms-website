@@ -64,10 +64,10 @@ export async function listComments(postId) {
   return request(`/api/community/posts/${postId}/comments`)
 }
 
-export async function createComment(postId, content) {
+export async function createComment(postId, content, parentCommentId = null) {
   return request(`/api/community/posts/${postId}/comments`, {
     method: 'POST',
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, parentCommentId }),
   })
 }
 

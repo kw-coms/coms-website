@@ -39,19 +39,22 @@ public class AuthService implements UserDetailsService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailVerificationSender emailVerificationSender;
+    private final FontService fontService;
 
     public AuthService(MemberRepository memberRepository,
                        LoginFailureRepository loginFailureRepository,
                        EligibleMemberService eligibleMemberService,
                        PasswordEncoder passwordEncoder,
                        JwtTokenProvider jwtTokenProvider,
-                       EmailVerificationSender emailVerificationSender) {
+                       EmailVerificationSender emailVerificationSender,
+                       FontService fontService) {
         this.memberRepository = memberRepository;
         this.loginFailureRepository = loginFailureRepository;
         this.eligibleMemberService = eligibleMemberService;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
         this.emailVerificationSender = emailVerificationSender;
+        this.fontService = fontService;
     }
 
     public AuthResponse signup(SignupRequest request) {
@@ -137,7 +140,8 @@ public class AuthService implements UserDetailsService {
                 member.getPhone(),
                 member.getRole().name(),
                 member.getAspiration(),
-                member.getInterests()
+                member.getInterests(),
+                member.getSelectedFontId()
         );
     }
 
@@ -157,6 +161,10 @@ public class AuthService implements UserDetailsService {
         member.setPhone(normalizeNullable(request.phone()));
         member.setAspiration(normalizeNullable(request.aspiration()));
         member.setInterests(normalizeNullable(request.interests()));
+        if (!fontService.isSelectable(request.selectedFontId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selected font is not available.");
+        }
+        member.setSelectedFontId(request.selectedFontId());
         memberRepository.save(member);
         return new MemberResponse(
                 member.getId(),
@@ -168,7 +176,8 @@ public class AuthService implements UserDetailsService {
                 member.getPhone(),
                 member.getRole().name(),
                 member.getAspiration(),
-                member.getInterests()
+                member.getInterests(),
+                member.getSelectedFontId()
         );
     }
 

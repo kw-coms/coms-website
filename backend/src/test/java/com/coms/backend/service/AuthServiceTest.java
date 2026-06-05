@@ -54,7 +54,7 @@ class AuthServiceTest {
 
         var response = authService.updateProfile(
                 "2026123456",
-                new UpdateProfileRequest(" 01012345678 ", " 프로젝트를 만들고 싶습니다. ", " 웹, AI ")
+                new UpdateProfileRequest(" 01012345678 ", " 프로젝트를 만들고 싶습니다. ", " 웹, AI ", null)
         );
 
         assertThat(response.phone()).isEqualTo("01012345678");
@@ -176,7 +176,9 @@ class AuthServiceTest {
         EligibleMemberService eligible = mock(EligibleMemberService.class);
         JwtTokenProvider jwt = mock(JwtTokenProvider.class);
         EmailVerificationSender sender = mock(EmailVerificationSender.class);
-        AuthService service = new AuthService(repo, loginFailures, eligible, passwordEncoder, jwt, sender);
+        FontService fontService = mock(FontService.class);
+        when(fontService.isSelectable(null)).thenReturn(true);
+        AuthService service = new AuthService(repo, loginFailures, eligible, passwordEncoder, jwt, sender, fontService);
 
         when(repo.existsByStudentId("2026123462")).thenReturn(false);
         when(repo.existsByEmail("new@example.com")).thenReturn(false);
