@@ -20,5 +20,6 @@ public record CommunityPostResponse(
         boolean conceptPost,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
+        boolean edited,
         boolean editable
 ) {}
