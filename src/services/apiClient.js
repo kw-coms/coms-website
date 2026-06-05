@@ -37,7 +37,11 @@ export async function request(path, options = {}) {
 }
 
 export async function requestNoContent(path, options = {}) {
-  const fetchOnce = () => fetch(apiUrl(path), { credentials: 'include', ...options })
+  const isFormData = options.body instanceof FormData
+  const headers = (options.body && !isFormData)
+    ? { 'Content-Type': 'application/json', ...options.headers }
+    : options.headers
+  const fetchOnce = () => fetch(apiUrl(path), { credentials: 'include', ...options, headers })
 
   let response = await fetchOnce()
   if (response.status === 401 && !path.includes('/api/auth/')) {
