@@ -91,6 +91,10 @@ public class AuthService implements UserDetailsService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
 
+        if (!member.isEmailVerified()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "이메일 인증이 완료되지 않았습니다. 가입 시 받은 인증 이메일을 확인해주세요.");
+        }
+
         String token = jwtTokenProvider.generateToken(member.getStudentId());
         return new AuthResponse(token, member.getStudentId(), member.getName(), "로그인 성공");
     }
