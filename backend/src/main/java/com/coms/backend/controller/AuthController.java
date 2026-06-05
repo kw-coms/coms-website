@@ -10,7 +10,9 @@ import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.RequestSignupEmailRequest;
 import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.dto.UpdateProfileRequest;
+import com.coms.backend.security.JwtTokenProvider;
 import com.coms.backend.service.AuthService;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -29,11 +31,14 @@ import java.time.Duration;
 public class AuthController {
 
     private final AuthService authService;
+    private final JwtTokenProvider jwtTokenProvider;
     private final boolean cookieSecure;
 
     public AuthController(AuthService authService,
+                          JwtTokenProvider jwtTokenProvider,
                           @Value("${cookie.secure:false}") boolean cookieSecure) {
         this.authService = authService;
+        this.jwtTokenProvider = jwtTokenProvider;
         this.cookieSecure = cookieSecure;
     }
 
@@ -49,31 +54,46 @@ public class AuthController {
         String clientIp = resolveClientIp(servletRequest);
         AuthResponse auth = authService.login(request, clientIp);
 
-        ResponseCookie cookie = ResponseCookie.from("token", auth.token())
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .sameSite("Lax")
-                .maxAge(Duration.ofDays(1))
-                .path("/")
-                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("token", auth.token())
+                .httpOnly(true).secure(cookieSecure).sameSite("Lax")
+                .maxAge(Duration.ofHours(2)).path("/").build().toString());
 
-        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("refreshToken", auth.refreshToken())
+                .httpOnly(true).secure(cookieSecure).sameSite("Lax")
+                .maxAge(Duration.ofDays(7)).path("/api/auth/refresh").build().toString());
 
-        // Do not expose raw token in response body
         return ResponseEntity.ok(new AuthResponse(null, auth.studentId(), auth.name(), auth.message()));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<Void> refresh(HttpServletRequest servletRequest, HttpServletResponse response) {
+        String refreshToken = null;
+        if (servletRequest.getCookies() != null) {
+            for (Cookie c : servletRequest.getCookies()) {
+                if ("refreshToken".equals(c.getName())) { refreshToken = c.getValue(); break; }
+            }
+        }
+        if (refreshToken == null || !jwtTokenProvider.validateToken(refreshToken) || !jwtTokenProvider.isRefreshToken(refreshToken)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String studentId = jwtTokenProvider.getStudentId(refreshToken);
+        String newAccessToken = jwtTokenProvider.generateToken(studentId);
+
+        response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("token", newAccessToken)
+                .httpOnly(true).secure(cookieSecure).sameSite("Lax")
+                .maxAge(Duration.ofHours(2)).path("/").build().toString());
+
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletResponse response) {
-        ResponseCookie clearCookie = ResponseCookie.from("token", "")
-                .httpOnly(true)
-                .secure(cookieSecure)
-                .sameSite("Lax")
-                .maxAge(Duration.ZERO)
-                .path("/")
-                .build();
-
-        response.addHeader(HttpHeaders.SET_COOKIE, clearCookie.toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("token", "")
+                .httpOnly(true).secure(cookieSecure).sameSite("Lax")
+                .maxAge(Duration.ZERO).path("/").build().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("refreshToken", "")
+                .httpOnly(true).secure(cookieSecure).sameSite("Lax")
+                .maxAge(Duration.ZERO).path("/api/auth/refresh").build().toString());
         return ResponseEntity.noContent().build();
     }
 
