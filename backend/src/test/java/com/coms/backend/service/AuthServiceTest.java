@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.dto.UpdateProfileRequest;
+import com.coms.backend.repository.LoginFailureRepository;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.security.JwtTokenProvider;
 import org.junit.jupiter.api.DisplayName;
@@ -171,10 +172,11 @@ class AuthServiceTest {
     @DisplayName("signup fails instead of creating a stuck unverified account when email sending is unavailable")
     void signupPropagatesEmailSendFailure() {
         MemberRepository repo = mock(MemberRepository.class);
+        LoginFailureRepository loginFailures = mock(LoginFailureRepository.class);
         EligibleMemberService eligible = mock(EligibleMemberService.class);
         JwtTokenProvider jwt = mock(JwtTokenProvider.class);
         EmailVerificationSender sender = mock(EmailVerificationSender.class);
-        AuthService service = new AuthService(repo, eligible, passwordEncoder, jwt, sender);
+        AuthService service = new AuthService(repo, loginFailures, eligible, passwordEncoder, jwt, sender);
 
         when(repo.existsByStudentId("2026123462")).thenReturn(false);
         when(repo.existsByEmail("new@example.com")).thenReturn(false);

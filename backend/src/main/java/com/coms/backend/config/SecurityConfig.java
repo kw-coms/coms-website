@@ -54,6 +54,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> {
                 auth.requestMatchers("/error", "/api/auth/signup", "/api/auth/login", "/api/auth/logout", "/api/auth/refresh", "/hello", "/api/server/time",
                         "/api/auth/email-verification/request-signup", "/api/auth/email-verification/confirm-signup").permitAll();
+                auth.requestMatchers(HttpMethod.POST, "/api/recruit/applications").permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/api/maintenance/bootstrap").permitAll();
                 auth.requestMatchers("/api/maintenance/**").hasRole("ADMIN");
                 auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
