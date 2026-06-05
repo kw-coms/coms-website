@@ -21,11 +21,12 @@ import java.util.Set;
 @Transactional
 public class ArchiveService {
 
-    private static final long MAX_ARCHIVE_FILE_BYTES = 20L * 1024 * 1024;
+    private static final long MAX_ARCHIVE_FILE_BYTES = 500L * 1024 * 1024;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "pdf", "txt", "md", "csv",
             "doc", "docx", "ppt", "pptx", "xls", "xlsx", "hwp", "hwpx",
-            "zip", "jpg", "jpeg", "png", "gif", "webp"
+            "zip", "jpg", "jpeg", "png", "gif", "webp",
+            "mp4", "mov", "avi", "mkv", "webm", "m4v"
     );
     private static final Set<String> BLOCKED_MIME_TYPES = Set.of(
             "text/html",
