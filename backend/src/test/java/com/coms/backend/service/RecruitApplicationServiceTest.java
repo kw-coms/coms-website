@@ -19,59 +19,84 @@ import static org.mockito.Mockito.verify;
 class RecruitApplicationServiceTest {
 
     @Test
-    void submitSendsClubMailAndApplicantConfirmation() {
+    void sendApplicationSendsMailToRecruitRecipient() {
         JavaMailSender mailSender = mock(JavaMailSender.class);
         RecruitApplicationService service = new RecruitApplicationService(
                 mailSender,
                 true,
                 "no-reply@coms.kw.ac.kr",
-                "kwcoms69@gmail.com"
+                "recruit@coms.kw.ac.kr"
         );
 
-        service.submit(request());
+        service.sendApplication(sampleRequest(), "127.0.0.1");
 
         ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
         verify(mailSender, times(2)).send(captor.capture());
-        List<SimpleMailMessage> messages = captor.getAllValues();
 
-        SimpleMailMessage clubMessage = messages.get(0);
-        assertThat(clubMessage.getTo()).containsExactly("kwcoms69@gmail.com");
-        assertThat(clubMessage.getReplyTo()).isEqualTo("applicant@example.com");
-        assertThat(clubMessage.getSubject()).isEqualTo("[COM's 지원] 홍길동");
-        assertThat(clubMessage.getText()).contains("학번: 2026123456", "[지원 동기]", "열심히 배우고 싶습니다.");
+        SimpleMailMessage message = captor.getAllValues().get(0);
+        assertThat(message.getFrom()).isEqualTo("no-reply@coms.kw.ac.kr");
+        assertThat(message.getTo()).containsExactly("recruit@coms.kw.ac.kr");
+        assertThat(message.getReplyTo()).isEqualTo("applicant@example.com");
+        assertThat(message.getSubject()).isEqualTo("[COM's 지원] 홍길동");
+        assertThat(message.getText())
+                .contains("학번: 2026123456")
+                .contains("관심 분야: 웹, 기타: AI")
+                .contains("[지원 동기]\n함께 만들고 싶습니다.");
 
-        SimpleMailMessage applicantMessage = messages.get(1);
-        assertThat(applicantMessage.getTo()).containsExactly("applicant@example.com");
-        assertThat(applicantMessage.getSubject()).isEqualTo("[COM's] 지원서가 접수되었습니다");
-        assertThat(applicantMessage.getText()).contains("COM's 지원서가 정상적으로 접수되었습니다.");
+        SimpleMailMessage confirmation = captor.getAllValues().get(1);
+        assertThat(confirmation.getFrom()).isEqualTo("no-reply@coms.kw.ac.kr");
+        assertThat(confirmation.getTo()).containsExactly("applicant@example.com");
+        assertThat(confirmation.getSubject()).isEqualTo("[COM's] 지원서가 접수되었습니다");
+        assertThat(confirmation.getText())
+                .contains("COM's 지원서가 정상적으로 접수되었습니다.")
+                .contains("학번: 2026123456")
+                .contains("관심 분야: 웹, 기타: AI");
     }
 
     @Test
-    void submitRejectsWhenMailIsDisabled() {
+    void sendApplicationFailsWhenMailIsDisabled() {
         RecruitApplicationService service = new RecruitApplicationService(
                 mock(JavaMailSender.class),
                 false,
                 "no-reply@coms.kw.ac.kr",
-                "kwcoms69@gmail.com"
+                "recruit@coms.kw.ac.kr"
         );
 
-        assertThatThrownBy(() -> service.submit(request()))
+        assertThatThrownBy(() -> service.sendApplication(sampleRequest(), "127.0.0.1"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
     }
 
-    private RecruitApplicationRequest request() {
+    @Test
+    void sendApplicationRateLimitsRepeatedSubmissionsFromSameClient() {
+        RecruitApplicationService service = new RecruitApplicationService(
+                mock(JavaMailSender.class),
+                true,
+                "no-reply@coms.kw.ac.kr",
+                "recruit@coms.kw.ac.kr"
+        );
+
+        for (int i = 0; i < 5; i++) {
+            service.sendApplication(sampleRequest(), "127.0.0.1");
+        }
+
+        assertThatThrownBy(() -> service.sendApplication(sampleRequest(), "127.0.0.1"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+    }
+
+    private static RecruitApplicationRequest sampleRequest() {
         return new RecruitApplicationRequest(
                 "홍길동",
                 "2026123456",
-                "컴퓨터정보공학부",
+                "컴퓨터공학과",
                 "1학년",
                 "01012345678",
                 "applicant@example.com",
-                "웹",
-                "열심히 배우고 싶습니다.",
-                "HTML을 공부했습니다.",
-                "프로젝트를 해보고 싶습니다."
+                List.of("웹", "기타: AI"),
+                "함께 만들고 싶습니다.",
+                "",
+                "프로젝트와 스터디를 해보고 싶습니다."
         );
     }
 }

@@ -32,7 +32,11 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class CommunityService {
+    private static final int MAX_TITLE_LENGTH = 120;
+    private static final int MAX_CONTENT_LENGTH = 5000;
+    private static final int MAX_COMMENT_LENGTH = 1000;
     private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
+    private static final long CONCEPT_POST_SCORE_THRESHOLD = 5;
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
 
     private final CommunityPostRepository communityPostRepository;
@@ -81,11 +85,11 @@ public class CommunityService {
 
     public CommunityPostResponse create(String studentId, CommunityPostRequest request, MultipartFile image) {
         Member member = findMember(studentId);
-        validateRequest(request);
+        SanitizedPost sanitized = validateRequest(request, null);
         CommunityPost post = new CommunityPost();
-        post.setTitle(request.title().trim());
-        post.setContent(request.content().trim());
-        post.setCategory(parseCategory(request.category()));
+        post.setTitle(sanitized.title());
+        post.setContent(sanitized.content());
+        post.setCategory(sanitized.category());
         post.setAuthorStudentId(member.getStudentId());
         post.setAuthorName(member.getName());
         attachImage(post, image);
@@ -95,19 +99,19 @@ public class CommunityService {
 
     public CommunityPostResponse update(String studentId, Long id, CommunityPostRequest request, MultipartFile image) {
         Member member = findMember(studentId);
-        validateRequest(request);
         CommunityPost post = communityPostRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (!post.getAuthorStudentId().equals(member.getStudentId()) && member.getRole() != Member.Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        post.setTitle(request.title().trim());
-        post.setContent(request.content().trim());
-        post.setCategory(parseCategory(request.category()));
+        SanitizedPost sanitized = validateRequest(request, post.getTitle());
+        post.setContent(sanitized.content());
+        post.setCategory(sanitized.category());
         if (request.removeImage()) {
             clearImage(post);
         }
         attachImage(post, image);
+        post.markEdited();
         CommunityPost saved = communityPostRepository.save(post);
         return toResponse(saved, member,
                 memberRepository.findByStudentId(saved.getAuthorStudentId()).orElse(null),
@@ -176,10 +180,37 @@ public class CommunityService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
-    private void validateRequest(CommunityPostRequest request) {
-        if (request.title() == null || request.title().trim().isEmpty()
-                || request.content() == null || request.content().trim().isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "제목과 내용을 입력해주세요.");
+    private SanitizedPost validateRequest(CommunityPostRequest request, String existingTitle) {
+        String title = normalizeBounded(request.title(), "제목", MAX_TITLE_LENGTH);
+        String content = normalizeBounded(request.content(), "내용", MAX_CONTENT_LENGTH);
+        if (existingTitle != null && !title.equals(existingTitle)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "제목은 수정할 수 없습니다.");
+        }
+        rejectUnsafeText(title);
+        rejectUnsafeText(content);
+        return new SanitizedPost(title, content, parseCategory(request.category()));
+    }
+
+    private String normalizeBounded(String value, String fieldName, int maxLength) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + "을 입력해주세요.");
+        }
+        if (normalized.length() > maxLength) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + "은 " + maxLength + "자 이하로 입력해주세요.");
+        }
+        if (normalized.chars().anyMatch(ch -> Character.isISOControl(ch) && ch != '\n' && ch != '\r' && ch != '\t')) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "허용되지 않는 제어 문자가 포함되어 있습니다.");
+        }
+        return normalized;
+    }
+
+    private void rejectUnsafeText(String value) {
+        String lower = value.toLowerCase(Locale.ROOT);
+        if (lower.contains("<script") || lower.contains("</script")
+                || lower.contains("<iframe") || lower.contains("javascript:")
+                || lower.matches(".*\\son[a-z]+\\s*=.*")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 내용이 포함되어 있습니다.");
         }
     }
 
@@ -208,8 +239,10 @@ public class CommunityService {
                 votes.upvotes(),
                 votes.downvotes(),
                 votes.myVote(currentMember.getStudentId()),
+                votes.netScore() >= CONCEPT_POST_SCORE_THRESHOLD,
                 post.getCreatedAt(),
                 post.getUpdatedAt(),
+                post.isEdited(),
                 editable
         );
     }
@@ -270,6 +303,8 @@ public class CommunityService {
         post.setImageMimeType(null);
     }
 
+    private record SanitizedPost(String title, String content, CommunityPost.Category category) {}
+
     private String preview(String content) {
         if (content == null || content.length() <= 160) {
             return content;
@@ -310,8 +345,10 @@ public class CommunityService {
         }
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        String content = normalizeBounded(request.content(), "댓글", MAX_COMMENT_LENGTH);
+        rejectUnsafeText(content);
         CommunityComment saved = commentRepository.save(
-                new CommunityComment(postId, studentId, member.getName(), request.content().trim()));
+                new CommunityComment(postId, studentId, member.getName(), content));
         return new CommunityCommentResponse(saved.getId(), saved.getPostId(), saved.getAuthorName(),
                 saved.getContent(), saved.getCreatedAt(), true);
     }
@@ -341,6 +378,10 @@ public class CommunityService {
 
         int myVote(String studentId) {
             return byStudent.getOrDefault(studentId, 0);
+        }
+
+        long netScore() {
+            return upvotes - downvotes;
         }
     }
 }
