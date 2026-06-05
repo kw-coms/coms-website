@@ -22,14 +22,15 @@ public class DevDataInitializer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (memberRepository.existsByStudentId("admin")) return;
-
-        Member admin = new Member();
+        Member admin = memberRepository.findByStudentId("admin").orElseGet(Member::new);
         admin.setStudentId("admin");
         admin.setName("COM's 관리자");
         admin.setEmail("admin@coms.kw.ac.kr");
         admin.setPassword(passwordEncoder.encode("admin1234"));
         admin.setRole(Member.Role.ADMIN);
+        admin.setEmailVerified(true);
+        admin.setEmailVerificationCodeHash(null);
+        admin.setEmailVerificationExpiresAt(null);
         memberRepository.save(admin);
     }
 }
