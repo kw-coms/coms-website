@@ -80,6 +80,16 @@ const ghostActionBtnClass = 'shape-cut-sm border border-white/10 bg-white/10 px-
 
 // ─── Auth guards ───────────────────────────────────────────────────────────
 
+function ScrollToTop() {
+  const { pathname } = useLocation()
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  }, [pathname])
+
+  return null
+}
+
 function RequireAuth({ children }) {
   const { user, loading } = useAuth()
   const location = useLocation()
@@ -213,20 +223,23 @@ function RecruitPage() {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<HomeView />} />
-      <Route path="/notices" element={<NoticesPage />} />
-      <Route path="/notices/:id" element={<NoticesPage />} />
-      <Route path="/resources" element={<RequireAuth><ArchivePage /></RequireAuth>} />
-      <Route path="/community" element={<RequireAuth><CommunityPage /></RequireAuth>} />
-      <Route path="/community/:id" element={<RequireAuth><CommunityPage /></RequireAuth>} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
-      <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
-      <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
-      <Route path="/recruit" element={<RecruitPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route path="/" element={<HomeView />} />
+        <Route path="/notices" element={<NoticesPage />} />
+        <Route path="/notices/:id" element={<NoticesPage />} />
+        <Route path="/resources" element={<RequireAuth><ArchivePage /></RequireAuth>} />
+        <Route path="/community" element={<RequireAuth><CommunityPage /></RequireAuth>} />
+        <Route path="/community/:id" element={<RequireAuth><CommunityPage /></RequireAuth>} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
+        <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
+        <Route path="/recruit" element={<RecruitPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }
 
