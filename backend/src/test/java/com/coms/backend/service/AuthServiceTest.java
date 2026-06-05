@@ -158,6 +158,16 @@ class AuthServiceTest {
     }
 
     @Test
+    void loginAllowsUnverifiedAdminAccount() {
+        saveMember("admin", false, Member.Role.ADMIN);
+
+        var response = authService.login(new com.coms.backend.dto.LoginRequest("admin", "Password1!"));
+
+        assertThat(response.token()).isNotBlank();
+        assertThat(response.studentId()).isEqualTo("admin");
+    }
+
+    @Test
     @DisplayName("signup fails instead of creating a stuck unverified account when email sending is unavailable")
     void signupPropagatesEmailSendFailure() {
         MemberRepository repo = mock(MemberRepository.class);
@@ -188,12 +198,17 @@ class AuthServiceTest {
     }
 
     private Member saveMember(String studentId, boolean emailVerified) {
+        return saveMember(studentId, emailVerified, Member.Role.USER);
+    }
+
+    private Member saveMember(String studentId, boolean emailVerified, Member.Role role) {
         Member member = new Member();
         member.setStudentId(studentId);
         member.setName("홍길동");
         member.setEmail(studentId + "@example.com");
         member.setEmailVerified(emailVerified);
         member.setPassword(passwordEncoder.encode("Password1!"));
+        member.setRole(role);
         return memberRepository.save(member);
     }
 }
