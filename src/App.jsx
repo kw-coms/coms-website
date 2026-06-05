@@ -22,6 +22,7 @@ import Notices from './pages/Notices.jsx'
 import Admin from './pages/Admin.jsx'
 import Community from './pages/Community.jsx'
 import ChangePassword from './pages/ChangePassword.jsx'
+import RecruitApply from './pages/RecruitApply.jsx'
 import { getLogoAsset } from './utils/logoAssets.js'
 import FixedBrackets from './components/common/FixedBrackets.jsx'
 import { useAuth } from './contexts/useAuth.js'
@@ -358,10 +359,10 @@ function App() {
         </div>
         <div className="flex flex-wrap gap-3">
           <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
-            지원 페이지 열기
+            지원서 작성하기
           </button>
-          <button type="button" onClick={goLogin} className={ghostActionBtnClass}>
-            로그인
+          <button type="button" onClick={goNotices} className={ghostActionBtnClass}>
+            모집 공지 보기
           </button>
         </div>
       </div>
@@ -479,31 +480,9 @@ function App() {
 
   if (currentPage === 'recruit') {
     return (
-      <div className="relative min-h-screen overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)]">
-        <BackgroundLayers />
-        <div className="relative mx-auto flex min-h-screen max-w-4xl items-center px-4 py-28 sm:px-6">
-          <div className="w-full">
-            <button type="button" onClick={goHome} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15">
-              메인으로 돌아가기
-            </button>
-            <section className="shape-cut border border-white/10 bg-white/5 p-6 backdrop-blur-md sm:p-8">
-              <p className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Recruit</p>
-              <h1 className="mt-4 text-4xl font-semibold sm:text-5xl">COM&apos;s 지원하기</h1>
-              <p className="mt-6 max-w-3xl leading-8 text-white/70">
-                광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장할 부원을 모집합니다.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <button type="button" onClick={goLogin} className={solidActionBtnClass}>
-                  로그인
-                </button>
-                <button type="button" onClick={() => setCurrentPage('home')} className={ghostActionBtnClass}>
-                  홈으로
-                </button>
-              </div>
-            </section>
-          </div>
-        </div>
-      </div>
+      <PageShell wide>
+        <RecruitApply onBack={goHome} />
+      </PageShell>
     )
   }
 
