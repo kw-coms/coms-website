@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import {
   Binary,
@@ -33,6 +33,8 @@ const tabs = [
   { id: 'projects', label: 'Projects', hint: '실전 제작', icon: CircuitBoard, accent: 'text-violet-200' },
   { id: 'recruit', label: 'Recruit', hint: '지원 안내', icon: Rocket, accent: 'text-emerald-200' },
 ]
+
+const sectionIds = new Set(tabs.map((tab) => tab.id))
 
 const activities = [
   '정기 세미나: 프로그래밍, 웹 개발, 알고리즘, 컴퓨터 기초 주제 진행',
@@ -235,6 +237,7 @@ function App() {
 function HomeView() {
   const { user, loading: authLoading, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [activeSection, setActiveSection] = useState(null)
   const [bracketPositions, setBracketPositions] = useState({ leftX: null, rightX: null })
   const aboutRef = useRef(null)
@@ -245,7 +248,7 @@ function HomeView() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [latestNotice, setLatestNotice] = useState(null)
 
-  const updateBracketPositions = (sectionId) => {
+  const updateBracketPositions = useCallback((sectionId) => {
     const map = { about: aboutRef, activities: activitiesRef, projects: projectsRef, recruit: recruitRef }
     const ref = map[sectionId] || aboutRef
     const sectionEl = ref.current
@@ -257,7 +260,19 @@ function HomeView() {
       leftX: Math.max(12, Math.round(rect.left - gap)),
       rightX: Math.round(rect.right + gap),
     })
-  }
+  }, [])
+
+  const scrollToSection = useCallback((sectionId, behavior = 'smooth') => {
+    const map = { about: aboutRef, activities: activitiesRef, projects: projectsRef, recruit: recruitRef }
+    const ref = map[sectionId]
+    if (!ref?.current) return
+
+    const rect = ref.current.getBoundingClientRect()
+    const targetY = Math.max(0, window.scrollY + rect.top - (window.innerHeight / 2) + (rect.height / 2))
+    window.scrollTo({ top: targetY, behavior })
+    setActiveSection(sectionId)
+    updateBracketPositions(sectionId)
+  }, [updateBracketPositions])
 
   useEffect(() => {
     const onScroll = () => {
@@ -295,7 +310,21 @@ function HomeView() {
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
     }
-  }, [])
+  }, [updateBracketPositions])
+
+  useEffect(() => {
+    const sectionId = decodeURIComponent(location.hash.replace(/^#/, ''))
+    if (!sectionIds.has(sectionId)) {
+      if (!location.hash) {
+        const frame = window.requestAnimationFrame(() => setActiveSection(null))
+        return () => window.cancelAnimationFrame(frame)
+      }
+      return undefined
+    }
+
+    const frame = window.requestAnimationFrame(() => scrollToSection(sectionId, 'auto'))
+    return () => window.cancelAnimationFrame(frame)
+  }, [location.hash, scrollToSection])
 
   useEffect(() => {
     let mounted = true
@@ -311,15 +340,8 @@ function HomeView() {
   }, [])
 
   const openPanel = (id) => {
-    const map = { about: aboutRef, activities: activitiesRef, projects: projectsRef, recruit: recruitRef }
-    const ref = map[id]
-    if (ref && ref.current) {
-      const rect = ref.current.getBoundingClientRect()
-      const targetY = Math.max(0, window.scrollY + rect.top - (window.innerHeight / 2) + (rect.height / 2))
-      window.scrollTo({ top: targetY, behavior: 'smooth' })
-      setActiveSection(id)
-      updateBracketPositions(id)
-    }
+    navigate({ pathname: '/', hash: `#${id}` })
+    scrollToSection(id)
   }
 
   const handleLogout = async () => {
