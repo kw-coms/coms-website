@@ -75,8 +75,13 @@ class ArchiveServiceTest {
                 "file",
                 "large.pdf",
                 "application/pdf",
-                new byte[20 * 1024 * 1024 + 1]
-        );
+                "%PDF-1.4".getBytes()
+        ) {
+            @Override
+            public long getSize() {
+                return 500L * 1024 * 1024 + 1;
+            }
+        };
 
         assertThatThrownBy(() -> archiveService.upload("큰 파일", null, large, "2026123456"))
                 .isInstanceOf(ResponseStatusException.class);
