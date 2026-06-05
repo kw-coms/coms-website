@@ -10,17 +10,26 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class RecruitApplicationService {
 
     private static final Logger log = LoggerFactory.getLogger(RecruitApplicationService.class);
+    private static final int MAX_APPLICATIONS_PER_WINDOW = 5;
+    private static final Duration RATE_LIMIT_WINDOW = Duration.ofMinutes(10);
 
     private final JavaMailSender mailSender;
     private final boolean mailEnabled;
     private final String from;
     private final String to;
+    private final Map<String, Deque<LocalDateTime>> submissionAttemptsByClient = new ConcurrentHashMap<>();
 
     public RecruitApplicationService(JavaMailSender mailSender,
                                      @Value("${mail.enabled:false}") boolean mailEnabled,
@@ -32,7 +41,8 @@ public class RecruitApplicationService {
         this.to = to;
     }
 
-    public void sendApplication(RecruitApplicationRequest request) {
+    public void sendApplication(RecruitApplicationRequest request, String clientIp) {
+        enforceRateLimit(clientIp);
         if (!mailEnabled) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "메일 발송 설정이 아직 완료되지 않았습니다.");
         }
@@ -48,6 +58,23 @@ public class RecruitApplicationService {
         } catch (RuntimeException e) {
             log.warn("Failed to send recruit application for studentId={}", request.studentId(), e);
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "지원서 메일 발송에 실패했습니다.");
+        }
+    }
+
+    private void enforceRateLimit(String clientIp) {
+        String key = clientIp == null || clientIp.isBlank() ? "unknown" : clientIp;
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime cutoff = now.minus(RATE_LIMIT_WINDOW);
+        Deque<LocalDateTime> attempts = submissionAttemptsByClient.computeIfAbsent(key, ignored -> new ArrayDeque<>());
+
+        synchronized (attempts) {
+            while (!attempts.isEmpty() && attempts.peekFirst().isBefore(cutoff)) {
+                attempts.removeFirst();
+            }
+            if (attempts.size() >= MAX_APPLICATIONS_PER_WINDOW) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "지원서 제출 요청이 많습니다. 잠시 후 다시 시도해주세요.");
+            }
+            attempts.addLast(now);
         }
     }
 
