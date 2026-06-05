@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { linkify } from '../utils/linkify.jsx'
-import { ArrowLeft, ImagePlus, Pencil, Search, ThumbsDown, ThumbsUp, Trash2, X } from 'lucide-react'
+import { ArrowLeft, ImagePlus, MessageSquare, Pencil, Search, Send, ThumbsDown, ThumbsUp, Trash2, X } from 'lucide-react'
 import {
   createCommunityPost,
+  createComment,
+  deleteComment,
   deleteCommunityPost,
   getCommunityPost,
+  listComments,
   listCommunityPosts,
   updateCommunityPost,
   voteCommunityPost,
@@ -175,6 +178,9 @@ export default function Community({ onBack }) {
   const [page, setPage] = useState(1)
   const [activeCategory, setActiveCategory] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
+  const [comments, setComments] = useState([])
+  const [commentInput, setCommentInput] = useState('')
+  const [commentSaving, setCommentSaving] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -209,9 +215,15 @@ export default function Community({ onBack }) {
   const openPost = async (post) => {
     setDetailLoading(true)
     setError('')
+    setComments([])
+    setCommentInput('')
     try {
-      const detail = await getCommunityPost(post.id)
+      const [detail, commentList] = await Promise.all([
+        getCommunityPost(post.id),
+        listComments(post.id).catch(() => []),
+      ])
       mergePost(detail)
+      setComments(Array.isArray(commentList) ? commentList : [])
       setMode('detail')
     } catch (err) {
       setError(err.message || '글을 불러오지 못했습니다.')
@@ -220,9 +232,35 @@ export default function Community({ onBack }) {
     }
   }
 
+  const handleAddComment = async () => {
+    if (!commentInput.trim() || !currentPost) return
+    setCommentSaving(true)
+    try {
+      const comment = await createComment(currentPost.id, commentInput.trim())
+      setComments((prev) => [...prev, comment])
+      setCommentInput('')
+    } catch (err) {
+      alert(err.message || '댓글 등록 실패')
+    } finally {
+      setCommentSaving(false)
+    }
+  }
+
+  const handleDeleteComment = async (commentId) => {
+    if (!currentPost || !window.confirm('댓글을 삭제하시겠습니까?')) return
+    try {
+      await deleteComment(currentPost.id, commentId)
+      setComments((prev) => prev.filter((c) => c.id !== commentId))
+    } catch (err) {
+      alert(err.message || '댓글 삭제 실패')
+    }
+  }
+
   const backToList = () => {
     setMode('list')
     setCurrentPost(null)
+    setComments([])
+    setCommentInput('')
   }
 
   const handleSave = (saved) => {
@@ -445,6 +483,60 @@ export default function Community({ onBack }) {
                       </button>
                     </div>
                   )}
+                </div>
+
+                {/* 댓글 섹션 */}
+                <div className="border-t border-black/10">
+                  <div className="flex items-center gap-2 bg-[#f5f5f5] px-4 py-3">
+                    <MessageSquare size={15} className="text-[#3b4890]" />
+                    <span className="text-sm font-black text-[#3b4890]">댓글 {comments.length}</span>
+                  </div>
+                  {comments.length > 0 && (
+                    <div className="divide-y divide-black/8">
+                      {comments.map((c) => (
+                        <div key={c.id} className="flex items-start gap-3 px-4 py-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-bold text-[var(--theme-body-dark)]">{c.authorName}</span>
+                              <span className="text-[11px] text-[var(--theme-body-muted)]">{new Date(c.createdAt).toLocaleString('ko-KR')}</span>
+                            </div>
+                            <p className="text-sm leading-6 text-[var(--theme-body-dark)] whitespace-pre-wrap break-words">{linkify(c.content)}</p>
+                          </div>
+                          {c.deletable && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteComment(c.id)}
+                              className="shrink-0 text-[var(--theme-body-muted)] hover:text-red-500 transition"
+                              aria-label="댓글 삭제"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 border-t border-black/8 bg-white px-4 py-3">
+                    <input
+                      type="text"
+                      value={commentInput}
+                      onChange={(e) => setCommentInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComment() } }}
+                      placeholder="댓글을 입력하세요"
+                      maxLength={2000}
+                      className="flex-1 rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-sm outline-none focus:border-[#3b4890] focus:bg-white"
+                      disabled={commentSaving}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddComment}
+                      disabled={commentSaving || !commentInput.trim()}
+                      className="inline-flex items-center gap-1.5 rounded bg-[#3b4890] px-4 py-2 text-sm font-bold text-white disabled:opacity-40 transition hover:bg-[#2d3a7a]"
+                    >
+                      <Send size={13} />
+                      등록
+                    </button>
+                  </div>
                 </div>
               </article>
             )}
