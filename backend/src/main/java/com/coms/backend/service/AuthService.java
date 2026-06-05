@@ -90,9 +90,13 @@ public class AuthService implements UserDetailsService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일 인증이 완료되지 않았습니다. 가입 시 받은 인증 이메일을 확인해주세요.");
         }
 
-        member.setLastLoginAt(LocalDateTime.now());
-        member.setLastLoginIp(clientIp);
-        memberRepository.save(member);
+        try {
+            member.setLastLoginAt(LocalDateTime.now());
+            member.setLastLoginIp(clientIp);
+            memberRepository.save(member);
+        } catch (Exception ignored) {
+            // audit write failure must not block login
+        }
 
         String token = jwtTokenProvider.generateToken(member.getStudentId());
         return new AuthResponse(token, member.getStudentId(), member.getName(), "로그인 성공");
