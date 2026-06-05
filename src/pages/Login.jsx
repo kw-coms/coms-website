@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { loginUser } from '../services/authApi.js'
+import { loginUser, requestSignupEmailVerification } from '../services/authApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 import { getLogoAsset } from '../utils/logoAssets.js'
 
@@ -9,6 +9,8 @@ export default function Login({ onBack, goSignup }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showResend, setShowResend] = useState(false)
+  const [resendStatus, setResendStatus] = useState('')
 
   const panelClass = 'shape-cut bg-[var(--theme-surface-96)] p-5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] sm:p-8'
   const frameClass = 'shape-cut-sm bg-black/12 p-px'
@@ -28,14 +30,28 @@ export default function Login({ onBack, goSignup }) {
     }
 
     setLoading(true)
+    setShowResend(false)
+    setResendStatus('')
     try {
       const data = await loginUser({ identifier: trimmedIdentifier, password: submittedPassword })
       await login(data)
       onBack()
     } catch (err) {
-      setError(err.message || '로그인 중 오류가 발생했습니다.')
+      const msg = err.message || '로그인 중 오류가 발생했습니다.'
+      setError(msg)
+      if (msg.includes('이메일 인증')) setShowResend(true)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleResendVerification = async () => {
+    setResendStatus('sending')
+    try {
+      await requestSignupEmailVerification(identifier.trim())
+      setResendStatus('sent')
+    } catch {
+      setResendStatus('error')
     }
   }
 
@@ -88,6 +104,25 @@ export default function Login({ onBack, goSignup }) {
             </div>
 
             {error && <div className="text-sm text-red-400">{error}</div>}
+            {showResend && (
+              <div className="shape-cut-sm border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm">
+                <p className="font-semibold text-amber-700">인증 이메일을 다시 받으시겠어요?</p>
+                {resendStatus === 'sent' ? (
+                  <p className="mt-1 text-emerald-700">인증 이메일을 발송했습니다. 받은편지함을 확인해주세요.</p>
+                ) : resendStatus === 'error' ? (
+                  <p className="mt-1 text-red-600">전송 실패. 잠시 후 다시 시도해주세요.</p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={resendStatus === 'sending'}
+                    className="mt-1 font-semibold text-amber-800 underline disabled:opacity-60"
+                  >
+                    {resendStatus === 'sending' ? '전송 중...' : '인증 이메일 재전송'}
+                  </button>
+                )}
+              </div>
+            )}
 
             <div>
               <div className={frameClass}>
