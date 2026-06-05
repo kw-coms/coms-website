@@ -172,7 +172,7 @@ class CommunityServiceTest {
         assertThatThrownBy(() -> communityService.addComment(
                 created.id(),
                 user.getStudentId(),
-                new com.coms.backend.dto.CommunityCommentRequest("javascript:alert(1)")
+                new com.coms.backend.dto.CommunityCommentRequest("javascript:alert(1)", null)
         )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                 assertThat(ex.getReason()).contains("보안"));
     }

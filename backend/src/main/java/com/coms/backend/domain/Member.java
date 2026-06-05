@@ -51,6 +51,8 @@ public class Member {
     @Column(length = 45)
     private String lastLoginIp;
 
+    private Long selectedFontId;
+
     public enum Role {
         USER, ADMIN
     }
@@ -85,4 +87,6 @@ public class Member {
     public void setLastLoginAt(LocalDateTime lastLoginAt) { this.lastLoginAt = lastLoginAt; }
     public String getLastLoginIp() { return lastLoginIp; }
     public void setLastLoginIp(String lastLoginIp) { this.lastLoginIp = lastLoginIp; }
+    public Long getSelectedFontId() { return selectedFontId; }
+    public void setSelectedFontId(Long selectedFontId) { this.selectedFontId = selectedFontId; }
 }

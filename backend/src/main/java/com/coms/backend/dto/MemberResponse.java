@@ -10,6 +10,7 @@ public record MemberResponse(
         String phone,
         String role,
         String aspiration,
-        String interests
+        String interests,
+        Long selectedFontId
 ) {
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword } from '../services/adminApi.js'
 import { listFiles, createPost, deleteFile } from '../services/archiveApi.js'
+import { listAdminFonts, setFontActive, uploadFont } from '../services/fontApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 
 export default function Admin({ onBack }) {
@@ -44,6 +45,7 @@ export default function Admin({ onBack }) {
               { id: 'members', label: '회원 관리' },
               { id: 'roster', label: '명부 인증' },
               { id: 'files', label: '파일 관리' },
+              { id: 'fonts', label: '폰트 관리' },
               { id: 'ban', label: '차단 관리' },
             ].map((tab) => (
               <button
@@ -64,6 +66,7 @@ export default function Admin({ onBack }) {
           {activeTab === 'members' && <MembersTab currentUser={user} />}
           {activeTab === 'roster' && <RosterTab />}
           {activeTab === 'files' && <FilesTab />}
+          {activeTab === 'fonts' && <FontsTab />}
           {activeTab === 'ban' && <BanTab />}
         </section>
       </div>
@@ -548,6 +551,107 @@ function FilesTab() {
                 className="text-xs font-semibold text-red-500 transition hover:underline"
               >
                 삭제
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FontsTab() {
+  const [fonts, setFonts] = useState([])
+  const [name, setName] = useState('')
+  const [file, setFile] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let mounted = true
+    listAdminFonts()
+      .then((data) => { if (mounted) setFonts(data) })
+      .catch((err) => { if (mounted) setError(err.message || '폰트 목록을 불러오지 못했습니다.') })
+      .finally(() => { if (mounted) setLoading(false) })
+    return () => { mounted = false }
+  }, [])
+
+  const submit = async (event) => {
+    event.preventDefault()
+    if (!name.trim() || !file) return
+    setSaving(true)
+    setError('')
+    try {
+      const uploaded = await uploadFont(name.trim(), file)
+      setFonts((prev) => [uploaded, ...prev])
+      setName('')
+      setFile(null)
+      event.currentTarget.reset()
+    } catch (err) {
+      setError(err.message || '폰트 업로드에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggle = async (font) => {
+    try {
+      const updated = await setFontActive(font.id, !font.active)
+      setFonts((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+    } catch (err) {
+      alert(err.message || '폰트 상태를 변경하지 못했습니다.')
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <form onSubmit={submit} className="rounded-lg border border-black/10 bg-black/5 p-4">
+        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">폰트 업로드</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="폰트 이름"
+            maxLength={100}
+            className="shape-cut-sm border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none"
+          />
+          <input
+            type="file"
+            accept=".woff,.woff2,.ttf,.otf,font/woff,font/woff2,font/ttf,font/otf"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
+            className="text-sm text-[var(--theme-body-dark)]"
+          />
+          <button
+            type="submit"
+            disabled={saving || !name.trim() || !file}
+            className="shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] disabled:opacity-50"
+          >
+            {saving ? '업로드 중...' : '업로드'}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-[var(--theme-body-muted)]">woff, woff2 우선 지원. ttf, otf도 허용하며 최대 2MB입니다.</p>
+        {error && <p className="mt-2 text-sm font-semibold text-red-600">{error}</p>}
+      </form>
+
+      {loading ? (
+        <p className="text-sm text-[var(--theme-body-muted)]">폰트를 불러오는 중...</p>
+      ) : fonts.length === 0 ? (
+        <p className="text-sm text-[var(--theme-body-muted)]">등록된 폰트가 없습니다.</p>
+      ) : (
+        <div className="space-y-2">
+          {fonts.map((font) => (
+            <div key={font.id} className="shape-cut-sm flex flex-wrap items-center justify-between gap-3 border border-black/10 bg-black/5 px-4 py-3">
+              <div>
+                <p className="font-semibold text-[var(--theme-body-dark)]">{font.name}</p>
+                <p className="text-xs text-[var(--theme-body-muted)]">{new Date(font.createdAt).toLocaleString('ko-KR')}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => toggle(font)}
+                className={`shape-cut-sm px-3 py-1.5 text-xs font-bold ${font.active ? 'bg-emerald-100 text-emerald-700' : 'bg-black/10 text-[var(--theme-body-muted)]'}`}
+              >
+                {font.active ? '활성' : '비활성'}
               </button>
             </div>
           ))}
