@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify.jsx'
 import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Search, Trash2 } from 'lucide-react'
 import { listNotices, createNotice, updateNotice, deleteNotice } from '../services/noticeApi.js'
@@ -83,7 +84,9 @@ function NoticeForm({ initialNotice, defaultCategory, user, onCancel, onSave }) 
   )
 }
 
-export default function Notices({ onBack }) {
+export default function Notices() {
+  const { id: urlId } = useParams()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const [notices, setNotices] = useState([])
   const [mode, setMode] = useState('list')
@@ -134,9 +137,20 @@ export default function Notices({ onBack }) {
     [notices],
   )
 
+  useEffect(() => {
+    if (!urlId) return
+    const numId = Number(urlId)
+    if (isNaN(numId)) { navigate('/notices', { replace: true }); return }
+    if (loading) return
+    const found = notices.find((n) => n.id === numId)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (found) setSelectedNotice(found)
+    else navigate('/notices', { replace: true })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlId, loading, notices.length])
+
   const openNotice = (notice) => {
-    setSelectedNotice(notice)
-    setMode('detail')
+    navigate('/notices/' + notice.id)
   }
 
   const mergeNotice = (notice) => {
@@ -146,7 +160,7 @@ export default function Notices({ onBack }) {
       return prev.map((item) => (item.id === notice.id ? notice : item))
     })
     setSelectedNotice(notice)
-    setMode('detail')
+    navigate('/notices/' + notice.id, { replace: true })
   }
 
   const deleteSelected = async () => {
@@ -155,19 +169,20 @@ export default function Notices({ onBack }) {
       await deleteNotice(selectedNotice.id)
       setNotices((prev) => prev.filter((notice) => notice.id !== selectedNotice.id))
       setSelectedNotice(null)
-      setMode('list')
+      navigate('/notices', { replace: true })
     } catch (err) {
       alert(err.message || '삭제 중 오류가 발생했습니다.')
     }
   }
 
+  const isDetail = !!urlId && !!selectedNotice && mode === 'list'
   const headerTitle = mode === 'write' ? '공지 작성' : mode === 'edit' ? '공지 수정' : '공지사항'
 
   return (
     <div className="space-y-4">
-      {mode === 'list' && (
+      {!urlId && mode === 'list' && (
         <div className="flex justify-center sm:justify-start">
-          <button type="button" onClick={onBack} className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white">
+          <button type="button" onClick={() => navigate('/')} className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white">
             메인으로 돌아가기
           </button>
         </div>
@@ -181,10 +196,10 @@ export default function Notices({ onBack }) {
               <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">{headerTitle}</h1>
               <p className="mt-2 text-sm leading-6 text-white/60">공지와 취업공고를 분리해서 확인합니다.</p>
             </div>
-            {mode === 'list' ? (
+            {(!urlId && mode === 'list') ? (
               isAdmin && <button type="button" onClick={() => setMode('write')} className="shape-cut-sm bg-white/85 px-5 py-2.5 text-sm font-bold text-[var(--theme-body-dark)] transition hover:bg-white">공지 작성</button>
             ) : (
-              <button type="button" onClick={() => setMode('list')} className="shape-cut-sm inline-flex items-center gap-1 border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold text-white">
+              <button type="button" onClick={() => navigate('/notices')} className="shape-cut-sm inline-flex items-center gap-1 border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold text-white">
                 <ArrowLeft size={14} />
                 목록
               </button>
@@ -192,7 +207,7 @@ export default function Notices({ onBack }) {
           </div>
         </div>
 
-        {mode === 'list' && (
+        {!urlId && mode === 'list' && (
           <>
             {(featuredNotice || featuredJob) && (
               <div className="grid gap-3 border-b border-white/10 bg-white/8 px-5 py-4 sm:px-7 lg:grid-cols-2">
@@ -348,13 +363,13 @@ export default function Notices({ onBack }) {
             <NoticeForm
               initialNotice={selectedNotice}
               user={user}
-              onCancel={() => setMode('detail')}
+              onCancel={() => { setMode('list'); navigate('/notices/' + selectedNotice?.id) }}
               onSave={(notice) => { mergeNotice(notice); load({ showLoading: false }) }}
             />
           </div>
         )}
 
-        {mode === 'detail' && selectedNotice && (
+        {isDetail && (
           <article className="m-5 overflow-hidden rounded-lg bg-white shadow-[0_18px_50px_rgba(0,0,0,0.14)] sm:m-7">
             <div className="border-b border-black/10 px-5 py-5">
               <div className="mb-2 text-xs font-bold text-[#3b4890]">{(selectedNotice.category || 'GENERAL') === 'JOB' ? '취업공고' : '공지'}</div>
@@ -367,7 +382,7 @@ export default function Notices({ onBack }) {
             </div>
             <div className="min-h-[360px] whitespace-pre-wrap break-words px-5 py-7 text-[15px] leading-8">{linkify(selectedNotice.content)}</div>
             <div className="flex flex-wrap justify-between gap-2 border-t border-black/10 px-5 py-4">
-              <button type="button" onClick={() => setMode('list')} className="rounded border border-black/15 bg-white px-4 py-2 text-sm font-bold">
+              <button type="button" onClick={() => navigate('/notices')} className="rounded border border-black/15 bg-white px-4 py-2 text-sm font-bold">
                 목록
               </button>
               {isAdmin && (
