@@ -8,9 +8,12 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.Map;
 
 @Component
 public class JwtTokenProvider {
+
+    private static final long REFRESH_EXPIRATION = 7L * 24 * 60 * 60 * 1000; // 7 days
 
     private final SecretKey key;
     private final long expiration;
@@ -29,8 +32,19 @@ public class JwtTokenProvider {
     public String generateToken(String studentId) {
         return Jwts.builder()
                 .subject(studentId)
+                .claims(Map.of("type", "access"))
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(key)
+                .compact();
+    }
+
+    public String generateRefreshToken(String studentId) {
+        return Jwts.builder()
+                .subject(studentId)
+                .claims(Map.of("type", "refresh"))
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + REFRESH_EXPIRATION))
                 .signWith(key)
                 .compact();
     }
@@ -48,6 +62,16 @@ public class JwtTokenProvider {
         try {
             Jwts.parser().verifyWith(key).build().parseSignedClaims(token);
             return true;
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    public boolean isRefreshToken(String token) {
+        try {
+            Object type = Jwts.parser().verifyWith(key).build()
+                    .parseSignedClaims(token).getPayload().get("type");
+            return "refresh".equals(type);
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
