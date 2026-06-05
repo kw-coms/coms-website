@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   changePassword,
   confirmEmailVerification,
   requestEmailVerification,
   updateProfile,
 } from '../services/authApi.js'
+import { listFonts } from '../services/fontApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 import { getLogoAsset } from '../utils/logoAssets.js'
 
@@ -22,11 +23,21 @@ export default function ChangePassword({ onBack }) {
   const [passwordMessage, setPasswordMessage] = useState('')
   const [error, setError] = useState('')
   const [loadingAction, setLoadingAction] = useState('')
+  const [fonts, setFonts] = useState([])
+
+  useEffect(() => {
+    let mounted = true
+    listFonts()
+      .then((data) => { if (mounted) setFonts(data) })
+      .catch(() => { if (mounted) setFonts([]) })
+    return () => { mounted = false }
+  }, [])
 
   const profileForm = {
     phone: profileDraft.phone ?? user?.phone ?? '',
     aspiration: profileDraft.aspiration ?? user?.aspiration ?? '',
     interests: profileDraft.interests ?? user?.interests ?? '',
+    selectedFontId: profileDraft.selectedFontId ?? user?.selectedFontId ?? '',
   }
 
   const panelClass = 'shape-cut bg-[var(--theme-surface-96)] p-5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] sm:p-8'
@@ -53,6 +64,7 @@ export default function ChangePassword({ onBack }) {
         phone: profileForm.phone.trim() || null,
         aspiration: profileForm.aspiration.trim() || null,
         interests: profileForm.interests.trim() || null,
+        selectedFontId: profileForm.selectedFontId ? Number(profileForm.selectedFontId) : null,
       })
       setUser(updated)
       setProfileDraft({})
@@ -192,6 +204,22 @@ export default function ChangePassword({ onBack }) {
                   maxLength={500}
                   className={inputClass}
                 />
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">사이트 폰트</label>
+              <div className={frameClass}>
+                <select
+                  value={profileForm.selectedFontId}
+                  onChange={(e) => setProfileDraft((prev) => ({ ...prev, selectedFontId: e.target.value }))}
+                  className={inputClass}
+                >
+                  <option value="">기본 고딕체</option>
+                  {fonts.map((font) => (
+                    <option key={font.id} value={font.id}>{font.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
