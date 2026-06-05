@@ -41,8 +41,11 @@ public class CommunityPost {
     @Column(nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
 
-    @PreUpdate
-    void touch() {
+    @Column(nullable = false)
+    private boolean edited = false;
+
+    public void markEdited() {
+        edited = true;
         updatedAt = LocalDateTime.now();
     }
 
@@ -72,4 +75,5 @@ public class CommunityPost {
     public void incrementViewCount() { this.viewCount++; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public boolean isEdited() { return edited; }
 }

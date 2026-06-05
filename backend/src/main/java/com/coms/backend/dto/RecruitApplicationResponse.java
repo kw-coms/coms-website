@@ -1,3 +1,4 @@
 package com.coms.backend.dto;
 
-public record RecruitApplicationResponse(String message) {}
+public record RecruitApplicationResponse(String message) {
+}

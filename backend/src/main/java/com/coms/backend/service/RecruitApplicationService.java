@@ -10,108 +10,144 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 @Service
 public class RecruitApplicationService {
 
     private static final Logger log = LoggerFactory.getLogger(RecruitApplicationService.class);
+    private static final int MAX_APPLICATIONS_PER_WINDOW = 5;
+    private static final Duration RATE_LIMIT_WINDOW = Duration.ofMinutes(10);
 
     private final JavaMailSender mailSender;
     private final boolean mailEnabled;
     private final String from;
-    private final String recruitTo;
+    private final String to;
+    private final Map<String, Deque<LocalDateTime>> submissionAttemptsByClient = new ConcurrentHashMap<>();
 
     public RecruitApplicationService(JavaMailSender mailSender,
                                      @Value("${mail.enabled:false}") boolean mailEnabled,
                                      @Value("${mail.from:no-reply@coms.kw.ac.kr}") String from,
-                                     @Value("${mail.recruit-to:kwcoms69@gmail.com}") String recruitTo) {
+                                     @Value("${recruit.mail.to:kwcoms69@gmail.com}") String to) {
         this.mailSender = mailSender;
         this.mailEnabled = mailEnabled;
         this.from = from;
-        this.recruitTo = recruitTo;
+        this.to = to;
     }
 
-    public void submit(RecruitApplicationRequest request) {
+    public void sendApplication(RecruitApplicationRequest request, String clientIp) {
+        enforceRateLimit(clientIp);
         if (!mailEnabled) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "이메일 발송 설정이 아직 완료되지 않았습니다.");
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "메일 발송 설정이 아직 완료되지 않았습니다.");
         }
 
         try {
-            mailSender.send(buildClubMessage(request));
-            mailSender.send(buildApplicantMessage(request));
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(from);
+            message.setTo(to);
+            message.setReplyTo(oneLine(request.email()));
+            message.setSubject("[COM's 지원] " + oneLine(request.name()));
+            message.setText(buildBody(request));
+            mailSender.send(message);
+            mailSender.send(buildApplicantConfirmationMessage(request));
         } catch (RuntimeException e) {
-            log.warn("Failed to send recruit application mail for {}", request.email(), e);
+            log.warn("Failed to send recruit application for studentId={}", request.studentId(), e);
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "지원서 메일 발송에 실패했습니다.");
         }
     }
 
-    private SimpleMailMessage buildClubMessage(RecruitApplicationRequest request) {
+    private void enforceRateLimit(String clientIp) {
+        String key = clientIp == null || clientIp.isBlank() ? "unknown" : clientIp;
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime cutoff = now.minus(RATE_LIMIT_WINDOW);
+        Deque<LocalDateTime> attempts = submissionAttemptsByClient.computeIfAbsent(key, ignored -> new ArrayDeque<>());
+
+        synchronized (attempts) {
+            while (!attempts.isEmpty() && attempts.peekFirst().isBefore(cutoff)) {
+                attempts.removeFirst();
+            }
+            if (attempts.size() >= MAX_APPLICATIONS_PER_WINDOW) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "지원서 제출 요청이 많습니다. 잠시 후 다시 시도해주세요.");
+            }
+            attempts.addLast(now);
+        }
+    }
+
+    private static String buildBody(RecruitApplicationRequest request) {
+        return String.join("\n",
+                "[COM's 지원서]",
+                "",
+                "이름: " + trim(request.name()),
+                "학번: " + trim(request.studentId()),
+                "학과: " + trim(request.department()),
+                "학년: " + optional(request.grade(), "선택 안 함"),
+                "전화번호: " + trim(request.phone()),
+                "이메일: " + trim(request.email()),
+                "관심 분야: " + interestsText(request.interests()),
+                "",
+                "[지원 동기]",
+                trim(request.motive()),
+                "",
+                "[관련 경험]",
+                optional(request.experience(), "없음"),
+                "",
+                "[기대하는 활동]",
+                trim(request.expectation())
+        );
+    }
+
+    private static String interestsText(List<String> interests) {
+        if (interests == null || interests.isEmpty()) {
+            return "미선택";
+        }
+
+        return interests.stream()
+                .map(RecruitApplicationService::trim)
+                .filter(value -> !value.isBlank())
+                .reduce((left, right) -> left + ", " + right)
+                .orElse("미선택");
+    }
+
+    private SimpleMailMessage buildApplicantConfirmationMessage(RecruitApplicationRequest request) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
-        message.setReplyTo(request.email().trim());
-        message.setTo(recruitTo);
-        message.setSubject("[COM's 지원] " + request.name().trim());
-        message.setText("""
-                [COM's 지원서]
-
-                이름: %s
-                학번: %s
-                학과: %s
-                학년: %s
-                전화번호: %s
-                이메일: %s
-                관심 분야: %s
-
-                [지원 동기]
-                %s
-
-                [관련 경험]
-                %s
-
-                [기대하는 활동]
-                %s
-                """.formatted(
-                request.name().trim(),
-                request.studentId().trim(),
-                request.department().trim(),
-                request.grade().trim(),
-                request.phone().trim(),
-                request.email().trim(),
-                request.interests().trim(),
-                request.motivation().trim(),
-                request.experience().trim(),
-                request.expectedActivities().trim()
+        message.setTo(oneLine(request.email()));
+        message.setSubject("[COM's] 지원서가 접수되었습니다");
+        message.setText(String.join("\n",
+                "안녕하세요, " + trim(request.name()) + "님.",
+                "",
+                "COM's 지원서가 정상적으로 접수되었습니다.",
+                "내부 확인 후 입력하신 연락처 또는 이메일로 개별 연락드리겠습니다.",
+                "",
+                "[접수 내용 요약]",
+                "이름: " + trim(request.name()),
+                "학번: " + trim(request.studentId()),
+                "학과: " + trim(request.department()),
+                "학년: " + optional(request.grade(), "선택 안 함"),
+                "관심 분야: " + interestsText(request.interests()),
+                "",
+                "지원해주셔서 감사합니다.",
+                "COM's"
         ));
         return message;
     }
 
-    private SimpleMailMessage buildApplicantMessage(RecruitApplicationRequest request) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(from);
-        message.setTo(request.email().trim());
-        message.setSubject("[COM's] 지원서가 접수되었습니다");
-        message.setText("""
-                안녕하세요, %s님.
+    private static String optional(String value, String fallback) {
+        String trimmed = trim(value);
+        return trimmed.isBlank() ? fallback : trimmed;
+    }
 
-                COM's 지원서가 정상적으로 접수되었습니다.
-                내부 확인 후 입력하신 연락처 또는 이메일로 개별 연락드리겠습니다.
+    private static String trim(String value) {
+        return value == null ? "" : value.trim();
+    }
 
-                [접수 내용 요약]
-                이름: %s
-                학번: %s
-                학과: %s
-                학년: %s
-                관심 분야: %s
-
-                지원해주셔서 감사합니다.
-                COM's
-                """.formatted(
-                request.name().trim(),
-                request.name().trim(),
-                request.studentId().trim(),
-                request.department().trim(),
-                request.grade().trim(),
-                request.interests().trim()
-        ));
-        return message;
+    private static String oneLine(String value) {
+        return trim(value).replaceAll("[\\r\\n]+", " ");
     }
 }

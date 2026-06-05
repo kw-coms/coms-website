@@ -29,6 +29,7 @@ services:
       MAIL_ENABLED: ${MAIL_ENABLED:-false}
       MAIL_LOG_VERIFICATION_CODES: ${MAIL_LOG_VERIFICATION_CODES:-false}
       MAIL_FROM: ${MAIL_FROM:-no-reply@coms.kw.ac.kr}
+      RECRUIT_MAIL_TO: ${RECRUIT_MAIL_TO:-kwcoms69@gmail.com}
       SMTP_HOST: ${SMTP_HOST:-localhost}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME:-}

@@ -17,7 +17,9 @@ public record CommunityPostResponse(
         long upvotes,
         long downvotes,
         int myVote,
+        boolean conceptPost,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
+        boolean edited,
         boolean editable
 ) {}

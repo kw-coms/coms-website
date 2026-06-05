@@ -14,17 +14,38 @@ import {
   voteCommunityPost,
 } from '../services/communityApi.js'
 import { apiUrl } from '../services/apiClient.js'
+import { useAuth } from '../contexts/useAuth.js'
 
 const PAGE_SIZE = 30
+const CONCEPT_POST_SCORE_THRESHOLD = 5
+const MAX_TITLE_LENGTH = 120
+const MAX_CONTENT_LENGTH = 5000
+const MAX_COMMENT_LENGTH = 1000
 const CATEGORY_OPTIONS = [
-  { value: 'ALL', label: '전체글' },
   { value: 'GENERAL', label: '일반' },
   { value: 'QUESTION', label: '질문' },
   { value: 'INFO', label: '정보' },
 ]
+const BOARD_FILTER_OPTIONS = [
+  { value: 'ALL', label: '전체글' },
+  { value: 'CONCEPT', label: '개념글' },
+  ...CATEGORY_OPTIONS,
+]
 
 function categoryLabel(value) {
   return CATEGORY_OPTIONS.find((item) => item.value === value)?.label || '일반'
+}
+
+function postScore(post) {
+  return (post.upvotes || 0) - (post.downvotes || 0)
+}
+
+function isConceptPost(post) {
+  return post.conceptPost ?? postScore(post) >= CONCEPT_POST_SCORE_THRESHOLD
+}
+
+function isEdited(post) {
+  return Boolean(post?.edited)
 }
 
 function shortDate(iso) {
@@ -50,6 +71,7 @@ function clickableCell(open) {
 }
 
 function PostForm({ initialPost, onCancel, onSave }) {
+  const isEditing = Boolean(initialPost)
   const [form, setForm] = useState({
     title: initialPost?.title || '',
     content: initialPost?.content || '',
@@ -97,18 +119,22 @@ function PostForm({ initialPost, onCancel, onSave }) {
       <input
         value={form.title}
         onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
-        maxLength={200}
+        maxLength={MAX_TITLE_LENGTH}
         placeholder="제목"
-        className="w-full rounded border border-black/15 bg-white px-4 py-3 text-sm text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+        readOnly={isEditing}
+        className={`w-full rounded border border-black/15 px-4 py-3 text-sm text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)] ${isEditing ? 'bg-black/5 text-[var(--theme-body-muted)]' : 'bg-white'}`}
       />
       <textarea
         value={form.content}
         onChange={(event) => setForm((prev) => ({ ...prev, content: event.target.value }))}
         rows={14}
-        maxLength={5000}
+        maxLength={MAX_CONTENT_LENGTH}
         placeholder="내용을 입력하세요."
         className="w-full resize-y rounded border border-black/15 bg-white px-4 py-3 text-sm leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
       />
+      <div className="flex justify-end text-xs font-semibold text-[var(--theme-body-muted)]">
+        {form.content.length.toLocaleString('ko-KR')} / {MAX_CONTENT_LENGTH.toLocaleString('ko-KR')}
+      </div>
       <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--theme-body-muted)]">
         <label className="inline-flex cursor-pointer items-center gap-2 rounded border border-black/15 bg-white px-3 py-2 font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
           <ImagePlus size={15} />
@@ -170,6 +196,7 @@ function BoardHeader({ title = "COM's 게시판", children }) {
 }
 
 export default function Community({ onBack }) {
+  const { user } = useAuth()
   const { id: urlId } = useParams()
   const navigate = useNavigate()
   const [posts, setPosts] = useState([])
@@ -195,7 +222,11 @@ export default function Community({ onBack }) {
   }, [])
 
   const filteredPosts = useMemo(() => {
-    const byCategory = activeCategory === 'ALL' ? posts : posts.filter((post) => (post.category || 'GENERAL') === activeCategory)
+    const byCategory = activeCategory === 'ALL'
+      ? posts
+      : activeCategory === 'CONCEPT'
+        ? posts.filter(isConceptPost)
+        : posts.filter((post) => (post.category || 'GENERAL') === activeCategory)
     if (!searchQuery.trim()) return byCategory
     const q = searchQuery.toLowerCase()
     return byCategory.filter((post) =>
@@ -216,14 +247,20 @@ export default function Community({ onBack }) {
   }
 
   useEffect(() => {
-    if (!urlId) return
+    if (!urlId) {
+      /* eslint-disable react-hooks/set-state-in-effect */
+      setMode('list')
+      setCurrentPost(null)
+      setComments([])
+      setCommentInput('')
+      /* eslint-enable react-hooks/set-state-in-effect */
+      return
+    }
     const numId = Number(urlId)
     if (isNaN(numId)) { navigate('/community', { replace: true }); return }
-    /* eslint-disable react-hooks/set-state-in-effect */
     setDetailLoading(true)
     setComments([])
     setCommentInput('')
-    /* eslint-enable react-hooks/set-state-in-effect */
     let mounted = true
     Promise.all([
       getCommunityPost(numId),
@@ -270,12 +307,17 @@ export default function Community({ onBack }) {
   }
 
   const backToList = () => {
-    navigate('/community')
+    setMode('list')
+    setCurrentPost(null)
+    setComments([])
+    setCommentInput('')
+    if (urlId) navigate('/community')
   }
 
   const handleSave = (saved) => {
     mergePost(saved)
     setMode('detail')
+    navigate('/community/' + saved.id)
   }
 
   const handleDelete = async (post) => {
@@ -289,15 +331,22 @@ export default function Community({ onBack }) {
     }
   }
 
+  const handleAdminDeleteFromList = async (event, post) => {
+    event.stopPropagation()
+    await handleDelete(post)
+  }
+
   const handleVote = async (value) => {
     if (!currentPost) return
     try {
       const updated = await voteCommunityPost(currentPost.id, value)
       mergePost(updated)
     } catch (err) {
-      alert(err.message || '추천 처리 중 오류가 발생했습니다.')
+      alert(err.message || '투표 처리 중 오류가 발생했습니다.')
     }
   }
+
+  const currentPostConcept = currentPost ? isConceptPost(currentPost) : false
 
   return (
     <div className="space-y-4">
@@ -319,7 +368,7 @@ export default function Community({ onBack }) {
             </BoardHeader>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-black/18 px-5 py-3 sm:px-7">
               <div className="flex flex-wrap gap-2 text-sm font-bold">
-                {CATEGORY_OPTIONS.map((item) => (
+                {BOARD_FILTER_OPTIONS.map((item) => (
                   <button
                     key={item.value}
                     type="button"
@@ -362,7 +411,7 @@ export default function Community({ onBack }) {
                     <th className="w-36 px-4 py-3 font-semibold">글쓴이</th>
                     <th className="w-28 px-4 py-3 font-semibold">작성일</th>
                     <th className="w-20 px-4 py-3 font-semibold">조회</th>
-                    <th className="w-20 px-4 py-3 font-semibold">추천</th>
+                    <th className="w-20 px-4 py-3 font-semibold">개추</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
@@ -374,6 +423,7 @@ export default function Community({ onBack }) {
                   )}
                   {visiblePosts.map((post) => {
                     const open = () => openPost(post)
+                    const concept = isConceptPost(post)
                     return (
                     <tr
                       key={post.id}
@@ -381,21 +431,34 @@ export default function Community({ onBack }) {
                       role="button"
                       onClick={open}
                       onKeyDown={(event) => openRowWithKeyboard(event, open)}
-                      className="cursor-pointer text-white/75 transition hover:bg-white/5 focus:bg-white/10 focus:outline-none"
+                      className={`cursor-pointer text-white/75 transition hover:bg-white/5 focus:bg-white/10 focus:outline-none ${concept ? 'bg-yellow-200/5' : ''}`}
                     >
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{post.id}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-cyan-100">{categoryLabel(post.category || 'GENERAL')}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
                         <span className="block max-w-[520px] truncate text-left font-semibold text-white">
+                          {concept && <span className="mr-1 rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
                           {post.title}
                         </span>
                         {post.imageUrl && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
+                        {isEdited(post) && <span className="ml-1 text-[10px] font-bold text-white/45">수정</span>}
                         {post.authorAdmin && <span className="ml-1 rounded bg-red-600 px-1 py-0.5 text-[10px] font-black text-white">주딱</span>}
                       </td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-semibold">{post.authorDisplayName || post.authorName}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-semibold">
+                        <span>{post.authorDisplayName || post.authorName}</span>
+                        {user?.role === 'ADMIN' && (
+                          <button
+                            type="button"
+                            onClick={(event) => handleAdminDeleteFromList(event, post)}
+                            className="ml-2 rounded border border-red-300/30 px-2 py-1 text-[10px] font-black text-red-200 hover:bg-red-500/20"
+                          >
+                            삭제
+                          </button>
+                        )}
+                      </td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{shortDate(post.createdAt)}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{post.viewCount}</td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{post.upvotes - post.downvotes}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{postScore(post)}</td>
                     </tr>
                     )
                   })}
@@ -451,14 +514,18 @@ export default function Community({ onBack }) {
             ) : (
               <article className="m-5 overflow-hidden rounded-lg bg-white shadow-[0_18px_50px_rgba(0,0,0,0.14)] sm:m-7">
                 <div className="border-b border-black/10 px-5 py-5">
-                  <div className="mb-2 text-xs font-black text-[#3b4890]">{categoryLabel(currentPost.category || 'GENERAL')}</div>
+                  <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[#3b4890]">
+                    <span>{categoryLabel(currentPost.category || 'GENERAL')}</span>
+                    {currentPostConcept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
+                  </div>
                   <h2 className="break-words text-2xl font-black">{currentPost.title}</h2>
                   <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--theme-body-muted)]">
                     <span className="font-bold text-[var(--theme-body-mid)]">{currentPost.authorDisplayName || currentPost.authorName}</span>
                     {currentPost.authorAdmin && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">주딱</span>}
                     <span>{new Date(currentPost.createdAt).toLocaleString('ko-KR')}</span>
+                    {isEdited(currentPost) && <span>수정 {new Date(currentPost.updatedAt).toLocaleString('ko-KR')}</span>}
                     <span>조회 {currentPost.viewCount}</span>
-                    <span>추천 {currentPost.upvotes - currentPost.downvotes}</span>
+                    <span>개추 {postScore(currentPost)}</span>
                   </div>
                 </div>
                 {currentPost.imageUrl && (
@@ -470,11 +537,11 @@ export default function Community({ onBack }) {
                 <div className="flex flex-wrap items-center justify-center gap-3 border-y border-black/10 bg-[#fafafa] px-4 py-5">
                   <button type="button" onClick={() => handleVote(1)} className={`inline-flex items-center gap-2 border px-5 py-3 text-sm font-black ${currentPost.myVote === 1 ? 'border-[#3b4890] bg-[#3b4890] text-white' : 'border-black/15 bg-white text-[#3b4890]'}`}>
                     <ThumbsUp size={16} />
-                    추천 {currentPost.upvotes}
+                    개추 {currentPost.upvotes}
                   </button>
                   <button type="button" onClick={() => handleVote(-1)} className={`inline-flex items-center gap-2 border px-5 py-3 text-sm font-black ${currentPost.myVote === -1 ? 'border-red-600 bg-red-600 text-white' : 'border-black/15 bg-white text-red-600'}`}>
                     <ThumbsDown size={16} />
-                    비추천 {currentPost.downvotes}
+                    비추 {currentPost.downvotes}
                   </button>
                 </div>
                 <div className="flex flex-wrap justify-between gap-2 px-4 py-4">
@@ -533,7 +600,7 @@ export default function Community({ onBack }) {
                       onChange={(e) => setCommentInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComment() } }}
                       placeholder="댓글을 입력하세요"
-                      maxLength={2000}
+                      maxLength={MAX_COMMENT_LENGTH}
                       className="flex-1 rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-sm outline-none focus:border-[#3b4890] focus:bg-white"
                       disabled={commentSaving}
                     />
