@@ -80,6 +80,7 @@ public class MaintenanceController {
         if (memberRepository.existsByStudentId(req.studentId())) {
             Member existing = memberRepository.findByStudentId(req.studentId()).get();
             existing.setRole(Member.Role.ADMIN);
+            existing.setEmailVerified(true);
             memberRepository.save(existing);
             return ResponseEntity.ok(Map.of("message", "Existing account promoted to ADMIN."));
         }
@@ -90,6 +91,7 @@ public class MaintenanceController {
         admin.setEmail(req.email());
         admin.setPassword(passwordEncoder.encode(req.password()));
         admin.setRole(Member.Role.ADMIN);
+        admin.setEmailVerified(true);
         memberRepository.save(admin);
 
         return ResponseEntity.ok(Map.of("message", "Admin account created. Bootstrap complete."));
