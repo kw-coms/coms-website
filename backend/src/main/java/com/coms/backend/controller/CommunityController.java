@@ -1,5 +1,7 @@
 package com.coms.backend.controller;
 
+import com.coms.backend.dto.CommunityCommentRequest;
+import com.coms.backend.dto.CommunityCommentResponse;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
 import com.coms.backend.dto.CommunityVoteRequest;
@@ -103,6 +105,28 @@ public class CommunityController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(Authentication authentication, @PathVariable Long id) {
         communityService.delete(authentication.getName(), id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/comments")
+    public ResponseEntity<List<CommunityCommentResponse>> listComments(Authentication authentication,
+                                                                        @PathVariable Long id) {
+        return ResponseEntity.ok(communityService.listComments(id, authentication.getName()));
+    }
+
+    @PostMapping("/{id}/comments")
+    public ResponseEntity<CommunityCommentResponse> addComment(Authentication authentication,
+                                                               @PathVariable Long id,
+                                                               @Valid @RequestBody CommunityCommentRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(communityService.addComment(id, authentication.getName(), request));
+    }
+
+    @DeleteMapping("/{id}/comments/{commentId}")
+    public ResponseEntity<Void> deleteComment(Authentication authentication,
+                                              @PathVariable Long id,
+                                              @PathVariable Long commentId) {
+        communityService.deleteComment(id, commentId, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 

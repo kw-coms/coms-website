@@ -1,10 +1,14 @@
 package com.coms.backend.service;
 
+import com.coms.backend.domain.CommunityComment;
 import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.domain.CommunityPostVote;
 import com.coms.backend.domain.Member;
+import com.coms.backend.dto.CommunityCommentRequest;
+import com.coms.backend.dto.CommunityCommentResponse;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
+import com.coms.backend.repository.CommunityCommentRepository;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.MemberRepository;
@@ -35,14 +39,17 @@ public class CommunityService {
     private final CommunityPostVoteRepository voteRepository;
     private final MemberRepository memberRepository;
     private final StorageService storageService;
+    private final CommunityCommentRepository commentRepository;
 
     public CommunityService(CommunityPostRepository communityPostRepository,
                             CommunityPostVoteRepository voteRepository,
                             MemberRepository memberRepository,
-                            StorageService storageService) {
+                            StorageService storageService,
+                            CommunityCommentRepository commentRepository) {
         this.communityPostRepository = communityPostRepository;
         this.voteRepository = voteRepository;
         this.memberRepository = memberRepository;
+        this.commentRepository = commentRepository;
         this.storageService = storageService;
     }
 
@@ -280,6 +287,45 @@ public class CommunityService {
                         vote -> vote.getPost().getId(),
                         Collectors.collectingAndThen(Collectors.toList(), VoteSummary::from)
                 ));
+    }
+
+    @Transactional(readOnly = true)
+    public List<CommunityCommentResponse> listComments(Long postId, String studentId) {
+        if (!communityPostRepository.existsById(postId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        Member member = memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        boolean isAdmin = member.getRole() == Member.Role.ADMIN;
+        return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
+                .map(c -> new CommunityCommentResponse(
+                        c.getId(), c.getPostId(), c.getAuthorName(), c.getContent(), c.getCreatedAt(),
+                        isAdmin || c.getStudentId().equals(studentId)))
+                .toList();
+    }
+
+    public CommunityCommentResponse addComment(Long postId, String studentId, CommunityCommentRequest request) {
+        if (!communityPostRepository.existsById(postId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        Member member = memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        CommunityComment saved = commentRepository.save(
+                new CommunityComment(postId, studentId, member.getName(), request.content().trim()));
+        return new CommunityCommentResponse(saved.getId(), saved.getPostId(), saved.getAuthorName(),
+                saved.getContent(), saved.getCreatedAt(), true);
+    }
+
+    public void deleteComment(Long postId, Long commentId, String studentId) {
+        CommunityComment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!comment.getPostId().equals(postId)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        Member member = memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        if (!comment.getStudentId().equals(studentId) && member.getRole() != Member.Role.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        commentRepository.delete(comment);
     }
 
     private record VoteSummary(long upvotes, long downvotes, Map<String, Integer> byStudent) {
