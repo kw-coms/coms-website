@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import {
   Binary,
   CircuitBoard,
@@ -77,9 +78,163 @@ const floatingBarBaseClass = 'shape-cut border border-[var(--theme-border-soft)]
 const solidActionBtnClass = 'shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] transition hover:scale-[1.02]'
 const ghostActionBtnClass = 'shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/20'
 
+// ─── Auth guards ───────────────────────────────────────────────────────────
+
+function RequireAuth({ children }) {
+  const { user, loading } = useAuth()
+  const location = useLocation()
+  if (loading) return (
+    <PageShell>
+      <div className="shape-cut border border-white/10 bg-white/5 p-8 text-center text-white/70 backdrop-blur-md">
+        로그인 상태를 확인하는 중...
+      </div>
+    </PageShell>
+  )
+  if (!user) return <Navigate to="/login" state={{ from: location }} replace />
+  return children
+}
+
+function RequireAdmin({ children }) {
+  const { user, loading } = useAuth()
+  const location = useLocation()
+  if (loading) return (
+    <PageShell>
+      <div className="shape-cut border border-white/10 bg-white/5 p-8 text-center text-white/70 backdrop-blur-md">
+        로그인 상태를 확인하는 중...
+      </div>
+    </PageShell>
+  )
+  if (!user) return <Navigate to="/login" state={{ from: location }} replace />
+  if (user.role !== 'ADMIN') return <Navigate to="/" replace />
+  return children
+}
+
+// ─── Page route wrappers ────────────────────────────────────────────────────
+
+function LoginPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const from = location.state?.from?.pathname || '/'
+  return (
+    <PageShell>
+      <Login onBack={() => navigate(from)} goSignup={() => navigate('/signup')} />
+    </PageShell>
+  )
+}
+
+function SignupPage() {
+  const navigate = useNavigate()
+  return (
+    <PageShell>
+      <button type="button" onClick={() => navigate('/login')} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15">
+        로그인으로 돌아가기
+      </button>
+      <Signup onBack={() => navigate('/login')} />
+    </PageShell>
+  )
+}
+
+function NoticesPage() {
+  return (
+    <PageShell>
+      <Notices />
+    </PageShell>
+  )
+}
+
+function ArchivePage() {
+  const navigate = useNavigate()
+  return (
+    <PageShell wide>
+      <Archive onBack={() => navigate('/')} />
+    </PageShell>
+  )
+}
+
+function CommunityPage() {
+  const navigate = useNavigate()
+  return (
+    <PageShell wide>
+      <Community onBack={() => navigate('/')} />
+    </PageShell>
+  )
+}
+
+function AdminPage() {
+  const navigate = useNavigate()
+  return (
+    <PageShell>
+      <Admin onBack={() => navigate('/')} />
+    </PageShell>
+  )
+}
+
+function SettingsPage() {
+  const navigate = useNavigate()
+  return (
+    <PageShell>
+      <ChangePassword onBack={() => navigate('/')} />
+    </PageShell>
+  )
+}
+
+function RecruitPage() {
+  const navigate = useNavigate()
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)]">
+      <BackgroundLayers />
+      <div className="relative mx-auto flex min-h-screen max-w-4xl items-center px-4 py-28 sm:px-6">
+        <div className="w-full">
+          <button type="button" onClick={() => navigate('/')} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15">
+            메인으로 돌아가기
+          </button>
+          <section className="shape-cut border border-white/10 bg-white/5 p-6 backdrop-blur-md sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Recruit</p>
+            <h1 className="mt-4 text-4xl font-semibold sm:text-5xl">COM&apos;s 지원하기</h1>
+            <p className="mt-6 max-w-3xl leading-8 text-white/70">
+              광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장할 부원을 모집합니다.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <button type="button" onClick={() => navigate('/login')} className={solidActionBtnClass}>
+                로그인
+              </button>
+              <button type="button" onClick={() => navigate('/')} className={ghostActionBtnClass}>
+                홈으로
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Root router ────────────────────────────────────────────────────────────
+
 function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<HomeView />} />
+      <Route path="/notices" element={<NoticesPage />} />
+      <Route path="/notices/:id" element={<NoticesPage />} />
+      <Route path="/resources" element={<RequireAuth><ArchivePage /></RequireAuth>} />
+      <Route path="/community" element={<RequireAuth><CommunityPage /></RequireAuth>} />
+      <Route path="/community/:id" element={<RequireAuth><CommunityPage /></RequireAuth>} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
+      <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
+      <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
+      <Route path="/recruit" element={<RecruitPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
+
+// ─── Home page ──────────────────────────────────────────────────────────────
+
+function HomeView() {
   const { user, loading: authLoading, logout } = useAuth()
-  const [currentPage, setCurrentPage] = useState('home')
+  const navigate = useNavigate()
   const [activeSection, setActiveSection] = useState(null)
   const [bracketPositions, setBracketPositions] = useState({ leftX: null, rightX: null })
   const aboutRef = useRef(null)
@@ -91,17 +246,10 @@ function App() {
   const [latestNotice, setLatestNotice] = useState(null)
 
   const updateBracketPositions = (sectionId) => {
-    const map = {
-      about: aboutRef,
-      activities: activitiesRef,
-      projects: projectsRef,
-      recruit: recruitRef,
-    }
-
+    const map = { about: aboutRef, activities: activitiesRef, projects: projectsRef, recruit: recruitRef }
     const ref = map[sectionId] || aboutRef
     const sectionEl = ref.current
     if (!sectionEl) return
-
     const panelEl = sectionEl.querySelector?.('[data-panel]') || sectionEl
     const rect = panelEl.getBoundingClientRect()
     const gap = 20
@@ -114,18 +262,13 @@ function App() {
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY || window.pageYOffset
-      // hide bottom nav when user scrolls down past hero area
       setBottomHidden(y > 120)
-
-      // set active section based on scroll position
       const sections = [
         { id: 'about', ref: aboutRef },
         { id: 'activities', ref: activitiesRef },
         { id: 'projects', ref: projectsRef },
         { id: 'recruit', ref: recruitRef },
       ]
-
-      // determine the section centered in the viewport
       let found = false
       let foundSectionId = null
       const centerY = window.innerHeight / 2
@@ -142,16 +285,9 @@ function App() {
           break
         }
       }
-
       updateBracketPositions(foundSectionId || 'about')
-
-      if (!found) {
-        if (y < 140) {
-          setActiveSection(null)
-        }
-      }
+      if (!found && y < 140) setActiveSection(null)
     }
-
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onScroll)
     onScroll()
@@ -175,15 +311,7 @@ function App() {
   }, [])
 
   const openPanel = (id) => {
-    setCurrentPage('home')
-    // scroll to the section instead of opening overlay
-    const map = {
-      about: aboutRef,
-      activities: activitiesRef,
-      projects: projectsRef,
-      recruit: recruitRef,
-    }
-
+    const map = { about: aboutRef, activities: activitiesRef, projects: projectsRef, recruit: recruitRef }
     const ref = map[id]
     if (ref && ref.current) {
       const rect = ref.current.getBoundingClientRect()
@@ -194,78 +322,19 @@ function App() {
     }
   }
 
-  const goHome = () => {
-    setCurrentPage('home')
-    setActiveSection(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const goLogin = () => {
-    if (user) {
-      alert('이미 로그인 되어있습니다.')
-      return
-    }
-    setCurrentPage('login')
-    setActiveSection(null)
-  }
-
-  const goArchive = () => {
-    if (authLoading) return
-    if (!user) {
-      goLogin()
-      return
-    }
-
-    setCurrentPage('archive')
-    setActiveSection(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const goCommunity = () => {
-    if (authLoading) return
-    if (!user) {
-      goLogin()
-      return
-    }
-
-    setCurrentPage('community')
-    setActiveSection(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
   const handleLogout = async () => {
     await logout()
-    goHome()
-  }
-
-  const goSignup = () => {
-    setCurrentPage('signup')
-    setActiveSection(null)
-  }
-
-  const goRecruitPage = () => {
-    setCurrentPage('recruit')
-    setActiveSection(null)
+    navigate('/')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const goNotices = () => {
-    setCurrentPage('notices')
-    setActiveSection(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const goAdmin = () => {
-    setCurrentPage('admin')
-    setActiveSection(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const goChangePassword = () => {
-    setCurrentPage('changePassword')
-    setActiveSection(null)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+  const goArchive = () => { if (!authLoading) navigate('/resources') }
+  const goCommunity = () => { if (!authLoading) navigate('/community') }
+  const goNotices = () => navigate('/notices')
+  const goAdmin = () => navigate('/admin')
+  const goChangePassword = () => navigate('/settings')
+  const goLogin = () => navigate('/login')
+  const goRecruitPage = () => navigate('/recruit')
 
   const bracketColor = activeSection ? sectionMeta[activeSection]?.bracket : sectionMeta.about.bracket
 
@@ -284,17 +353,12 @@ function App() {
             서로의 성장을 돕습니다.
           </p>
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
-              지원 화면으로 이동
-            </button>
-            <button type="button" onClick={goLogin} className={ghostActionBtnClass}>
-              로그인
-            </button>
+            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>지원 화면으로 이동</button>
+            <button type="button" onClick={goLogin} className={ghostActionBtnClass}>로그인</button>
           </div>
         </div>
       )
     }
-
     if (id === 'activities') {
       return (
         <div className="space-y-6">
@@ -302,23 +366,16 @@ function App() {
           <h3 className="text-2xl font-semibold sm:text-3xl">주요 활동</h3>
           <div className="space-y-4">
             {activities.map((item) => (
-              <div key={item} className="border-b border-white/10 pb-4 text-white/80 last:border-b-0 last:pb-0">
-                {item}
-              </div>
+              <div key={item} className="border-b border-white/10 pb-4 text-white/80 last:border-b-0 last:pb-0">{item}</div>
             ))}
           </div>
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
-              지원하기
-            </button>
-            <button type="button" onClick={goLogin} className={ghostActionBtnClass}>
-              로그인
-            </button>
+            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>지원하기</button>
+            <button type="button" onClick={goLogin} className={ghostActionBtnClass}>로그인</button>
           </div>
         </div>
       )
     }
-
     if (id === 'projects') {
       return (
         <div className="space-y-6">
@@ -326,23 +383,16 @@ function App() {
           <h3 className="text-2xl font-semibold sm:text-3xl">프로젝트</h3>
           <div className="space-y-4">
             {projects.map((item) => (
-              <div key={item} className="border-b border-white/10 pb-4 text-white/80 last:border-b-0 last:pb-0">
-                {item}
-              </div>
+              <div key={item} className="border-b border-white/10 pb-4 text-white/80 last:border-b-0 last:pb-0">{item}</div>
             ))}
           </div>
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
-              모집 안내 보기
-            </button>
-            <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className={ghostActionBtnClass}>
-              GitHub 확인
-            </a>
+            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>모집 안내 보기</button>
+            <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className={ghostActionBtnClass}>GitHub 확인</a>
           </div>
         </div>
       )
     }
-
     return (
       <div className="space-y-6">
         <p className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Recruit Signal</p>
@@ -357,12 +407,8 @@ function App() {
           <div>3. 오리엔테이션 및 정기 활동 참여</div>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
-            지원 페이지 열기
-          </button>
-          <button type="button" onClick={goLogin} className={ghostActionBtnClass}>
-            로그인
-          </button>
+          <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>지원 페이지 열기</button>
+          <button type="button" onClick={goLogin} className={ghostActionBtnClass}>로그인</button>
         </div>
       </div>
     )
@@ -370,7 +416,6 @@ function App() {
 
   const renderSectionPanel = (id) => {
     const meta = sectionMeta[id]
-
     return (
       <div className="relative mx-auto flex w-full max-w-5xl items-center justify-center overflow-visible px-4 sm:px-14 lg:px-28">
         <div data-panel="true" className="relative z-10 w-full overflow-hidden rounded-2xl border border-white/12 shadow-lg" style={{ background: meta.background, boxShadow: `0 24px 80px ${meta.glow}` }}>
@@ -382,140 +427,14 @@ function App() {
     )
   }
 
-  if (currentPage === 'login') {
-    return (
-      <PageShell>
-        <Login onBack={goHome} goSignup={goSignup} />
-      </PageShell>
-    )
-  }
-
-  if (currentPage === 'archive') {
-    if (authLoading) {
-      return (
-        <PageShell>
-          <div className="shape-cut border border-white/10 bg-white/5 p-8 text-center text-white/70 backdrop-blur-md">
-            로그인 상태를 확인하는 중...
-          </div>
-        </PageShell>
-      )
-    }
-
-    if (!user) {
-      return (
-        <PageShell>
-          <Login onBack={goHome} goSignup={goSignup} />
-        </PageShell>
-      )
-    }
-
-    return (
-      <PageShell wide>
-        <Archive onBack={goHome} />
-      </PageShell>
-    )
-  }
-
-  if (currentPage === 'community') {
-    if (authLoading) {
-      return (
-        <PageShell>
-          <div className="shape-cut border border-white/10 bg-white/5 p-8 text-center text-white/70 backdrop-blur-md">
-            로그인 상태를 확인하는 중...
-          </div>
-        </PageShell>
-      )
-    }
-
-    if (!user) {
-      return (
-        <PageShell>
-          <Login onBack={goHome} goSignup={goSignup} />
-        </PageShell>
-      )
-    }
-
-    return (
-      <PageShell wide>
-        <Community onBack={goHome} />
-      </PageShell>
-    )
-  }
-
-  if (currentPage === 'signup') {
-    return (
-      <PageShell>
-        <button type="button" onClick={() => setCurrentPage('login')} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15">
-          로그인으로 돌아가기
-        </button>
-        <Signup onBack={() => setCurrentPage('login')} />
-      </PageShell>
-    )
-  }
-
-  if (currentPage === 'notices') {
-    return (
-      <PageShell>
-        <Notices onBack={goHome} />
-      </PageShell>
-    )
-  }
-
-  if (currentPage === 'admin') {
-    return (
-      <PageShell>
-        <Admin onBack={goHome} />
-      </PageShell>
-    )
-  }
-
-  if (currentPage === 'changePassword') {
-    return (
-      <PageShell>
-        <ChangePassword onBack={goHome} />
-      </PageShell>
-    )
-  }
-
-  if (currentPage === 'recruit') {
-    return (
-      <div className="relative min-h-screen overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)]">
-        <BackgroundLayers />
-        <div className="relative mx-auto flex min-h-screen max-w-4xl items-center px-4 py-28 sm:px-6">
-          <div className="w-full">
-            <button type="button" onClick={goHome} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15">
-              메인으로 돌아가기
-            </button>
-            <section className="shape-cut border border-white/10 bg-white/5 p-6 backdrop-blur-md sm:p-8">
-              <p className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Recruit</p>
-              <h1 className="mt-4 text-4xl font-semibold sm:text-5xl">COM&apos;s 지원하기</h1>
-              <p className="mt-6 max-w-3xl leading-8 text-white/70">
-                광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장할 부원을 모집합니다.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <button type="button" onClick={goLogin} className={solidActionBtnClass}>
-                  로그인
-                </button>
-                <button type="button" onClick={() => setCurrentPage('home')} className={ghostActionBtnClass}>
-                  홈으로
-                </button>
-              </div>
-            </section>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="relative min-h-screen  bg-[var(--theme-bg)] text-[var(--theme-text)] selection:bg-[color-mix(in_srgb,var(--theme-accent)_35%,transparent)] selection:text-[var(--theme-text)]">
+    <div className="relative min-h-screen bg-[var(--theme-bg)] text-[var(--theme-text)] selection:bg-[color-mix(in_srgb,var(--theme-accent)_35%,transparent)] selection:text-[var(--theme-text)]">
       <BackgroundLayers />
-
       <FixedBrackets color={bracketColor} leftX={bracketPositions.leftX} rightX={bracketPositions.rightX} />
 
       <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
         <div className={`${floatingBarBaseClass} relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-5`}>
-          <button type="button" onClick={goHome} className="flex items-center gap-3 text-left">
+          <button type="button" onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="flex items-center gap-3 text-left">
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="logo-emboss h-11 w-11 shrink-0 object-contain sm:h-12 sm:w-12" />
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.45em] text-[var(--theme-body-muted)]">KWANGWOON UNIVERSITY</p>
@@ -525,75 +444,28 @@ function App() {
 
           <nav className="pointer-events-auto absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-6 md:flex">
             {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => openPanel(tab.id)}
-                className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]"
-              >
+              <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]">
                 {tab.label}
               </button>
             ))}
-            <button
-              type="button"
-              onClick={goNotices}
-              className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]"
-            >
-              Notices
-            </button>
-            <button
-              type="button"
-              onClick={goArchive}
-              disabled={authLoading}
-              className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)] disabled:cursor-wait disabled:opacity-60"
-            >
-              Resources
-            </button>
-            <button
-              type="button"
-              onClick={goCommunity}
-              disabled={authLoading}
-              className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)] disabled:cursor-wait disabled:opacity-60"
-            >
-              Community
-            </button>
+            <button type="button" onClick={goNotices} className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]">Notices</button>
+            <button type="button" onClick={goArchive} disabled={authLoading} className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)] disabled:cursor-wait disabled:opacity-60">Resources</button>
+            <button type="button" onClick={goCommunity} disabled={authLoading} className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)] disabled:cursor-wait disabled:opacity-60">Community</button>
           </nav>
 
           {user ? (
             <div className="ml-auto hidden items-center gap-2 md:flex">
-              <button
-                type="button"
-                onClick={goChangePassword}
-                className="shape-cut-sm border border-black/10 bg-white/50 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/70"
-                title="계정 설정"
-              >
-                {user.name}
-              </button>
+              <button type="button" onClick={goChangePassword} className="shape-cut-sm border border-black/10 bg-white/50 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/70" title="계정 설정">{user.name}</button>
               {user.role === 'ADMIN' && (
-                <button
-                  type="button"
-                  onClick={goAdmin}
-                  className="shape-cut-sm border border-amber-300/45 bg-amber-100/70 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
-                >
-                  관리자
-                </button>
+                <button type="button" onClick={goAdmin} className="shape-cut-sm border border-amber-300/45 bg-amber-100/70 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100">관리자</button>
               )}
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="shape-cut-sm inline-flex items-center gap-2 border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78"
-              >
+              <button type="button" onClick={handleLogout} className="shape-cut-sm inline-flex items-center gap-2 border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78">
                 <LogOut size={15} />
                 Logout
               </button>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={goLogin}
-              disabled={authLoading}
-              className="shape-cut-sm ml-auto hidden border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78 disabled:cursor-wait disabled:opacity-70 md:inline-flex"
-            >
+            <button type="button" onClick={goLogin} disabled={authLoading} className="shape-cut-sm ml-auto hidden border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78 disabled:cursor-wait disabled:opacity-70 md:inline-flex">
               Login
             </button>
           )}
@@ -615,42 +487,23 @@ function App() {
           <div id="mobile-menu" role="menu" className={`${floatingBarBaseClass} mx-auto mt-2 max-w-7xl overflow-hidden md:hidden`}>
             <div className="flex flex-col divide-y divide-black/8">
               {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => { openPanel(tab.id); setMobileMenuOpen(false) }}
-                  className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60"
-                >
+                <button key={tab.id} type="button" onClick={() => { openPanel(tab.id); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
                   <tab.icon size={15} className={tab.accent} />
                   <span>{tab.label}</span>
                   <span className="ml-auto text-xs text-[var(--theme-body-muted)]">{tab.hint}</span>
                 </button>
               ))}
-              <button
-                type="button"
-                onClick={() => { goNotices(); setMobileMenuOpen(false) }}
-                className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60"
-              >
+              <button type="button" onClick={() => { goNotices(); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
                 <Megaphone size={15} className="text-cyan-500" />
                 <span>Notices</span>
                 <span className="ml-auto text-xs text-[var(--theme-body-muted)]">공지사항</span>
               </button>
-              <button
-                type="button"
-                onClick={() => { goArchive(); setMobileMenuOpen(false) }}
-                disabled={authLoading}
-                className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60 disabled:opacity-50"
-              >
+              <button type="button" onClick={() => { goArchive(); setMobileMenuOpen(false) }} disabled={authLoading} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60 disabled:opacity-50">
                 <CircuitBoard size={15} className="text-violet-400" />
                 <span>Resources</span>
                 <span className="ml-auto text-xs text-[var(--theme-body-muted)]">자료실</span>
               </button>
-              <button
-                type="button"
-                onClick={() => { goCommunity(); setMobileMenuOpen(false) }}
-                disabled={authLoading}
-                className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60 disabled:opacity-50"
-              >
+              <button type="button" onClick={() => { goCommunity(); setMobileMenuOpen(false) }} disabled={authLoading} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60 disabled:opacity-50">
                 <Sparkles size={15} className="text-rose-400" />
                 <span>Community</span>
                 <span className="ml-auto text-xs text-[var(--theme-body-muted)]">커뮤니티</span>
@@ -658,40 +511,24 @@ function App() {
               <div className="border-t border-black/10">
                 {user ? (
                   <div className="flex flex-col divide-y divide-black/8">
-                    <button
-                      type="button"
-                      onClick={() => { goChangePassword(); setMobileMenuOpen(false) }}
-                      className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60"
-                    >
+                    <button type="button" onClick={() => { goChangePassword(); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
                       <span className="size-5 flex items-center justify-center rounded-full bg-black/10 text-[10px] font-black">{user.name?.[0] ?? '?'}</span>
                       <span>{user.name}</span>
                       <span className="ml-auto text-xs text-[var(--theme-body-muted)]">계정 설정</span>
                     </button>
                     {user.role === 'ADMIN' && (
-                      <button
-                        type="button"
-                        onClick={() => { goAdmin(); setMobileMenuOpen(false) }}
-                        className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-50/60"
-                      >
+                      <button type="button" onClick={() => { goAdmin(); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-50/60">
                         <span className="text-sm">⚙</span>
                         <span>관리자 패널</span>
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => { handleLogout(); setMobileMenuOpen(false) }}
-                      className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60"
-                    >
+                    <button type="button" onClick={() => { handleLogout(); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
                       <LogOut size={15} />
                       <span>로그아웃</span>
                     </button>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => { goLogin(); setMobileMenuOpen(false) }}
-                    className="flex w-full items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60"
-                  >
+                  <button type="button" onClick={() => { goLogin(); setMobileMenuOpen(false) }} className="flex w-full items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
                     <span>로그인</span>
                   </button>
                 )}
@@ -713,30 +550,20 @@ function App() {
       <main className="relative mx-auto flex min-h-[100svh] max-w-7xl items-center px-4 py-16 sm:px-6 sm:py-18 lg:px-8">
         <section className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center text-center">
           <div className="relative w-full transition-all duration-300 opacity-100">
-
             <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center justify-center py-4 sm:py-6">
-                    <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-                      <SplitLogoCard />
-                    </div>
-
+              <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                <SplitLogoCard />
+              </div>
               <div className="mt-5 space-y-3">
                 <p className="mx-auto whitespace-nowrap px-2 leading-8 text-white/72 text-[clamp(0.68rem,1.55vw,1.125rem)]">
                   광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장하는 개발 커뮤니티입니다.
                 </p>
                 <div className="flex flex-wrap justify-center gap-3 pt-3">
-                  <button type="button" onClick={goArchive} disabled={authLoading} className={ghostActionBtnClass}>
-                    Resources
-                  </button>
-                  <button type="button" onClick={goCommunity} disabled={authLoading} className={ghostActionBtnClass}>
-                    Community
-                  </button>
+                  <button type="button" onClick={goArchive} disabled={authLoading} className={ghostActionBtnClass}>Resources</button>
+                  <button type="button" onClick={goCommunity} disabled={authLoading} className={ghostActionBtnClass}>Community</button>
                 </div>
                 {latestNotice && (
-                  <button
-                    type="button"
-                    onClick={goNotices}
-                    className="mx-auto mt-4 flex max-w-sm items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/8 px-4 py-2 text-left transition hover:bg-cyan-300/14"
-                  >
+                  <button type="button" onClick={goNotices} className="mx-auto mt-4 flex max-w-sm items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/8 px-4 py-2 text-left transition hover:bg-cyan-300/14">
                     <Megaphone size={13} className="shrink-0 text-cyan-300" />
                     <span className="truncate text-xs font-semibold text-cyan-100">{latestNotice.title}</span>
                     <span className="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wider text-cyan-300/60">공지</span>
@@ -755,14 +582,8 @@ function App() {
         <div className="grid grid-cols-2 divide-x divide-y divide-black/10 md:grid-cols-4 md:divide-y-0">
           {tabs.map((tab) => {
             const active = activeSection === tab.id
-
             return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => openPanel(tab.id)}
-                className={`flex min-h-24 flex-col items-start justify-center p-4 text-left transition md:min-h-28 ${active ? 'bg-white/88 text-[var(--theme-body-dark)]' : 'bg-white/76 text-[var(--theme-body-mid)] hover:bg-white/84'}`}
-              >
+              <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className={`flex min-h-24 flex-col items-start justify-center p-4 text-left transition md:min-h-28 ${active ? 'bg-white/88 text-[var(--theme-body-dark)]' : 'bg-white/76 text-[var(--theme-body-mid)] hover:bg-white/84'}`}>
                 <div>
                   <p className={`text-xs font-semibold uppercase tracking-[0.28em] ${active ? 'text-[var(--theme-body-soft)]/75' : 'text-[var(--theme-body-muted)]/75'}`}>{tab.hint}</p>
                   <h3 className="mt-2 text-lg font-semibold text-[var(--theme-title)]">{tab.label}</h3>
@@ -775,36 +596,27 @@ function App() {
 
       <div className="mt-8">
         <section ref={aboutRef} id="about" className="relative py-24">
-          <div className="mx-auto max-w-5xl px-4">
-            {renderSectionPanel('about')}
-          </div>
+          <div className="mx-auto max-w-5xl px-4">{renderSectionPanel('about')}</div>
         </section>
-
         <section ref={activitiesRef} id="activities" className="relative py-24">
-          <div className="mx-auto max-w-5xl px-4">
-            {renderSectionPanel('activities')}
-          </div>
+          <div className="mx-auto max-w-5xl px-4">{renderSectionPanel('activities')}</div>
         </section>
-
         <section ref={projectsRef} id="projects" className="relative py-24">
-          <div className="mx-auto max-w-5xl px-4">
-            {renderSectionPanel('projects')}
-          </div>
+          <div className="mx-auto max-w-5xl px-4">{renderSectionPanel('projects')}</div>
         </section>
-
         <section ref={recruitRef} id="recruit" className="relative py-24">
-          <div className="mx-auto max-w-5xl px-4">
-            {renderSectionPanel('recruit')}
-          </div>
+          <div className="mx-auto max-w-5xl px-4">{renderSectionPanel('recruit')}</div>
         </section>
       </div>
     </div>
   )
 }
 
+// ─── Shared helpers ─────────────────────────────────────────────────────────
+
 function PageShell({ children, wide = false }) {
   return (
-    <div className="relative min-h-screen  bg-[var(--theme-bg)] text-[var(--theme-text)]">
+    <div className="relative min-h-screen bg-[var(--theme-bg)] text-[var(--theme-text)]">
       <BackgroundLayers />
       <main className={`relative mx-auto flex min-h-screen items-center justify-center px-4 py-28 sm:px-6 ${wide ? 'max-w-6xl' : 'max-w-4xl'}`}>
         <div className={`w-full ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
@@ -815,7 +627,7 @@ function PageShell({ children, wide = false }) {
 
 function BackgroundLayers() {
   return (
-    <div className="pointer-events-none absolute inset-0 ">
+    <div className="pointer-events-none absolute inset-0">
       <div className="tech-grid absolute inset-0 opacity-100" />
       <div className="absolute left-[14%] top-[16%] h-72 w-72 rounded-full bg-cyan-300/35 blur-[100px] animate-blob" style={{ animationDelay: '0s', willChange: 'transform' }} />
       <div className="absolute right-[10%] top-[28%] h-80 w-80 rounded-full bg-rose-300/25 blur-[100px] animate-blob" style={{ animationDelay: '2.8s', willChange: 'transform' }} />
