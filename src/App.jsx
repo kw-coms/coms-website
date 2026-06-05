@@ -26,6 +26,7 @@ import ChangePassword from './pages/ChangePassword.jsx'
 import { getLogoAsset } from './utils/logoAssets.js'
 import FixedBrackets from './components/common/FixedBrackets.jsx'
 import { useAuth } from './contexts/useAuth.js'
+import { submitRecruitApplication } from './services/recruitApi.js'
 
 const tabs = [
   { id: 'about', label: 'About', hint: '정체성', icon: Binary, accent: 'text-cyan-200' },
@@ -41,10 +42,48 @@ const activities = [
   '교류 활동: 선후배 간 경험 공유와 진로·학습 정보 교환',
 ]
 
+const activityDetails = [
+  {
+    title: '정기 세미나',
+    description: '프로그래밍 기초, 웹 개발, 알고리즘, 컴퓨터 구조처럼 학기 중 꾸준히 다루기 좋은 주제를 정해 함께 학습합니다.',
+  },
+  {
+    title: '수준별 스터디',
+    description: '처음 시작하는 부원은 기초 문법과 개발 환경부터 익히고, 기존 부원은 관심 분야별로 심화 스터디를 운영합니다.',
+  },
+  {
+    title: '팀 프로젝트',
+    description: '웹사이트, 앱, 아두이노, 자동화 도구 등 실제로 사용할 수 있는 결과물을 목표로 기획부터 구현까지 경험합니다.',
+  },
+  {
+    title: '선후배 교류',
+    description: '수강 과목, 공모전, 진로, 개발 학습 방법에 대한 경험을 공유하며 서로의 성장을 돕는 커뮤니티를 만듭니다.',
+  },
+]
+
 const projects = [
   'COM\'s Official Website - React · Vite · Tailwind CSS 기반 공식 웹사이트',
   'Arduino Basic Class - 초급자를 위한 아두이노 기초 교육 프로젝트',
   'Web Development Study - HTML · CSS · JavaScript · React 학습 스터디',
+]
+
+const projectDetails = [
+  {
+    title: 'COM\'s Official Website',
+    description: '동아리 소개, 공지사항, 자료실, 커뮤니티를 담는 공식 웹사이트입니다. React, Vite, Tailwind CSS를 활용해 실제 서비스 형태로 개발합니다.',
+  },
+  {
+    title: 'Arduino Basic Class',
+    description: '아두이노를 처음 접하는 부원을 위해 회로 연결, 센서 입력, 간단한 제어 로직을 단계별로 익히는 교육형 프로젝트입니다.',
+  },
+  {
+    title: 'Web Development Study',
+    description: 'HTML, CSS, JavaScript, React를 기반으로 화면 설계와 컴포넌트 구현을 연습하고, 작은 기능을 직접 완성해 봅니다.',
+  },
+  {
+    title: '자유 주제 제작',
+    description: '부원들이 관심 있는 아이디어를 팀으로 발전시켜 웹 서비스, 앱, 자동화 프로그램, 학습 도구 등 다양한 결과물을 제작합니다.',
+  },
 ]
 
 const sectionMeta = {
@@ -77,6 +116,19 @@ const sectionMeta = {
 const floatingBarBaseClass = 'shape-cut border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)]'
 const solidActionBtnClass = 'shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] transition hover:scale-[1.02]'
 const ghostActionBtnClass = 'shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/20'
+
+const recruitInitialForm = {
+  name: '',
+  studentId: '',
+  department: '',
+  grade: '',
+  phone: '',
+  email: '',
+  interests: '',
+  motivation: '',
+  experience: '',
+  expectedActivities: '',
+}
 
 // ─── Auth guards ───────────────────────────────────────────────────────────
 
@@ -180,10 +232,79 @@ function SettingsPage() {
 
 function RecruitPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const [formOpen, setFormOpen] = useState(() => new URLSearchParams(location.search).get('apply') === '1')
+  const [form, setForm] = useState(recruitInitialForm)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
+  const [submitMessage, setSubmitMessage] = useState('')
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get('apply') === '1') {
+      setFormOpen(true)
+    }
+  }, [location.search])
+
+  const inputClass = 'w-full shape-cut-sm border border-white/10 bg-white/90 px-4 py-3 text-[15px] text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/60 transition focus:bg-white focus:ring-2 focus:ring-emerald-300/55'
+  const labelClass = 'mb-2 block text-sm font-semibold text-white/88'
+
+  const handleChange = (event) => {
+    const { name, value } = event.target
+    setForm((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const validateRecruitForm = () => {
+    if (!form.name.trim()) return '이름을 입력해주세요.'
+    if (!/^\d{10}$/.test(form.studentId.trim())) return '학번은 숫자 10자리로 입력해주세요.'
+    if (!form.department.trim()) return '학과를 입력해주세요.'
+    if (!form.grade.trim()) return '학년을 입력해주세요.'
+    if (!form.phone.trim()) return '전화번호를 입력해주세요.'
+    if (!form.email.trim() || !form.email.includes('@')) return '올바른 이메일을 입력해주세요.'
+    if (!form.interests.trim()) return '관심 분야를 입력해주세요.'
+    if (!form.motivation.trim()) return '지원 동기를 입력해주세요.'
+    if (!form.experience.trim()) return '관련 경험을 입력해주세요.'
+    if (!form.expectedActivities.trim()) return '기대하는 활동을 입력해주세요.'
+    return ''
+  }
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    setSubmitError('')
+    setSubmitMessage('')
+
+    const validationMessage = validateRecruitForm()
+    if (validationMessage) {
+      setSubmitError(validationMessage)
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const result = await submitRecruitApplication({
+        name: form.name.trim(),
+        studentId: form.studentId.trim(),
+        department: form.department.trim(),
+        grade: form.grade.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        interests: form.interests.trim(),
+        motivation: form.motivation.trim(),
+        experience: form.experience.trim(),
+        expectedActivities: form.expectedActivities.trim(),
+      })
+      setSubmitMessage(result.message || '지원서가 접수되었습니다.')
+      setForm(recruitInitialForm)
+    } catch (err) {
+      setSubmitError(err.message || '지원서 제출 중 오류가 발생했습니다.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[var(--theme-bg)] text-[var(--theme-text)]">
       <BackgroundLayers />
-      <div className="relative mx-auto flex min-h-screen max-w-4xl items-center px-4 py-28 sm:px-6">
+      <div className="relative mx-auto flex min-h-screen max-w-5xl items-center px-4 py-28 sm:px-6">
         <div className="w-full">
           <button type="button" onClick={() => navigate('/')} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15">
             메인으로 돌아가기
@@ -195,14 +316,89 @@ function RecruitPage() {
               광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장할 부원을 모집합니다.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <button type="button" onClick={() => navigate('/login')} className={solidActionBtnClass}>
-                로그인
+              <button type="button" onClick={() => setFormOpen(true)} className={solidActionBtnClass}>
+                지원서 작성하기
               </button>
-              <button type="button" onClick={() => navigate('/')} className={ghostActionBtnClass}>
-                홈으로
+              <button type="button" onClick={() => navigate('/notices')} className={ghostActionBtnClass}>
+                모집 공지 보기
               </button>
             </div>
           </section>
+
+          {formOpen && (
+            <section className="shape-cut mt-6 border border-white/10 bg-white/7 p-6 backdrop-blur-md sm:p-8">
+              <div className="mb-6">
+                <p className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Application</p>
+                <h2 className="mt-3 text-3xl font-semibold">COM&apos;s 지원서</h2>
+              </div>
+
+              <form onSubmit={handleSubmit} className="grid gap-5">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className={labelClass} htmlFor="recruit-name">이름</label>
+                    <input id="recruit-name" name="name" value={form.name} onChange={handleChange} className={inputClass} placeholder="이름을 입력하세요" autoComplete="name" />
+                  </div>
+                  <div>
+                    <label className={labelClass} htmlFor="recruit-student-id">학번</label>
+                    <input id="recruit-student-id" name="studentId" value={form.studentId} onChange={handleChange} className={inputClass} placeholder="숫자 10자리" inputMode="numeric" autoComplete="username" />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className={labelClass} htmlFor="recruit-department">학과</label>
+                    <input id="recruit-department" name="department" value={form.department} onChange={handleChange} className={inputClass} placeholder="학과를 입력하세요" />
+                  </div>
+                  <div>
+                    <label className={labelClass} htmlFor="recruit-grade">학년</label>
+                    <input id="recruit-grade" name="grade" value={form.grade} onChange={handleChange} className={inputClass} placeholder="예: 1학년" />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className={labelClass} htmlFor="recruit-phone">전화번호</label>
+                    <input id="recruit-phone" name="phone" value={form.phone} onChange={handleChange} className={inputClass} placeholder="01012345678" autoComplete="tel" />
+                  </div>
+                  <div>
+                    <label className={labelClass} htmlFor="recruit-email">이메일</label>
+                    <input id="recruit-email" name="email" type="email" value={form.email} onChange={handleChange} className={inputClass} placeholder="답장 받을 이메일" autoComplete="email" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass} htmlFor="recruit-interests">관심 분야</label>
+                  <input id="recruit-interests" name="interests" value={form.interests} onChange={handleChange} className={inputClass} placeholder="예: 웹, 앱, 보안, 아두이노" />
+                </div>
+
+                <div>
+                  <label className={labelClass} htmlFor="recruit-motivation">지원 동기</label>
+                  <textarea id="recruit-motivation" name="motivation" value={form.motivation} onChange={handleChange} rows={4} maxLength={1000} className={`${inputClass} resize-none`} placeholder="COM's에 지원하게 된 이유를 적어주세요." />
+                </div>
+
+                <div>
+                  <label className={labelClass} htmlFor="recruit-experience">관련 경험</label>
+                  <textarea id="recruit-experience" name="experience" value={form.experience} onChange={handleChange} rows={4} maxLength={1000} className={`${inputClass} resize-none`} placeholder="프로그래밍, 프로젝트, 학습 경험 등을 자유롭게 적어주세요." />
+                </div>
+
+                <div>
+                  <label className={labelClass} htmlFor="recruit-expected">기대하는 활동</label>
+                  <textarea id="recruit-expected" name="expectedActivities" value={form.expectedActivities} onChange={handleChange} rows={4} maxLength={1000} className={`${inputClass} resize-none`} placeholder="동아리에서 해보고 싶은 활동을 적어주세요." />
+                </div>
+
+                {submitError && (
+                  <p className="shape-cut-sm bg-red-400/12 px-4 py-3 text-sm font-semibold text-red-100">{submitError}</p>
+                )}
+                {submitMessage && (
+                  <p className="shape-cut-sm bg-emerald-300/14 px-4 py-3 text-sm font-semibold text-emerald-100">{submitMessage}</p>
+                )}
+
+                <button type="submit" disabled={submitting} className="shape-cut-sm bg-[var(--theme-text)] px-5 py-3 text-base font-semibold text-[var(--theme-bg)] transition hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-60">
+                  {submitting ? '지원서 제출 중...' : '지원서 제출하기'}
+                </button>
+              </form>
+            </section>
+          )}
         </div>
       </div>
     </div>
@@ -244,6 +440,8 @@ function HomeView() {
   const [bottomHidden, setBottomHidden] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [latestNotice, setLatestNotice] = useState(null)
+  const [activitiesExpanded, setActivitiesExpanded] = useState(false)
+  const [projectsExpanded, setProjectsExpanded] = useState(false)
 
   const updateBracketPositions = (sectionId) => {
     const map = { about: aboutRef, activities: activitiesRef, projects: projectsRef, recruit: recruitRef }
@@ -333,8 +531,7 @@ function HomeView() {
   const goNotices = () => navigate('/notices')
   const goAdmin = () => navigate('/admin')
   const goChangePassword = () => navigate('/settings')
-  const goLogin = () => navigate('/login')
-  const goRecruitPage = () => navigate('/recruit')
+  const goRecruitForm = () => navigate('/recruit?apply=1')
 
   const bracketColor = activeSection ? sectionMeta[activeSection]?.bracket : sectionMeta.about.bracket
 
@@ -353,8 +550,7 @@ function HomeView() {
             서로의 성장을 돕습니다.
           </p>
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>지원 화면으로 이동</button>
-            <button type="button" onClick={goLogin} className={ghostActionBtnClass}>로그인</button>
+            <button type="button" onClick={() => openPanel('recruit')} className={solidActionBtnClass}>지원 화면으로 이동</button>
           </div>
         </div>
       )
@@ -369,9 +565,20 @@ function HomeView() {
               <div key={item} className="border-b border-white/10 pb-4 text-white/80 last:border-b-0 last:pb-0">{item}</div>
             ))}
           </div>
+          {activitiesExpanded && (
+            <div className="space-y-4 border-t border-white/14 pt-5">
+              {activityDetails.map((item) => (
+                <div key={item.title} className="space-y-1.5 border-b border-white/10 pb-4 last:border-b-0 last:pb-0">
+                  <h4 className="text-base font-semibold text-white">{item.title}</h4>
+                  <p className="leading-7 text-white/78">{item.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>지원하기</button>
-            <button type="button" onClick={goLogin} className={ghostActionBtnClass}>로그인</button>
+            <button type="button" onClick={() => setActivitiesExpanded((open) => !open)} className={solidActionBtnClass}>
+              {activitiesExpanded ? '활동 요약 보기' : '주요 활동 더 알아보기'}
+            </button>
           </div>
         </div>
       )
@@ -386,8 +593,20 @@ function HomeView() {
               <div key={item} className="border-b border-white/10 pb-4 text-white/80 last:border-b-0 last:pb-0">{item}</div>
             ))}
           </div>
+          {projectsExpanded && (
+            <div className="space-y-4 border-t border-white/14 pt-5">
+              {projectDetails.map((item) => (
+                <div key={item.title} className="space-y-1.5 border-b border-white/10 pb-4 last:border-b-0 last:pb-0">
+                  <h4 className="text-base font-semibold text-white">{item.title}</h4>
+                  <p className="leading-7 text-white/78">{item.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>모집 안내 보기</button>
+            <button type="button" onClick={() => setProjectsExpanded((open) => !open)} className={solidActionBtnClass}>
+              {projectsExpanded ? '프로젝트 요약 보기' : '프로젝트 더 알아보기'}
+            </button>
             <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className={ghostActionBtnClass}>GitHub 확인</a>
           </div>
         </div>
@@ -407,8 +626,8 @@ function HomeView() {
           <div>3. 오리엔테이션 및 정기 활동 참여</div>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>지원 페이지 열기</button>
-          <button type="button" onClick={goLogin} className={ghostActionBtnClass}>로그인</button>
+          <button type="button" onClick={goRecruitForm} className={solidActionBtnClass}>지원서 작성하기</button>
+          <button type="button" onClick={goNotices} className={ghostActionBtnClass}>모집 공지 보기</button>
         </div>
       </div>
     )
@@ -465,9 +684,7 @@ function HomeView() {
               </button>
             </div>
           ) : (
-            <button type="button" onClick={goLogin} disabled={authLoading} className="shape-cut-sm ml-auto hidden border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78 disabled:cursor-wait disabled:opacity-70 md:inline-flex">
-              Login
-            </button>
+            <div className="ml-auto hidden w-16 md:block" aria-hidden="true" />
           )}
 
           <button
@@ -508,8 +725,8 @@ function HomeView() {
                 <span>Community</span>
                 <span className="ml-auto text-xs text-[var(--theme-body-muted)]">커뮤니티</span>
               </button>
-              <div className="border-t border-black/10">
-                {user ? (
+              {user && (
+                <div className="border-t border-black/10">
                   <div className="flex flex-col divide-y divide-black/8">
                     <button type="button" onClick={() => { goChangePassword(); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
                       <span className="size-5 flex items-center justify-center rounded-full bg-black/10 text-[10px] font-black">{user.name?.[0] ?? '?'}</span>
@@ -527,12 +744,8 @@ function HomeView() {
                       <span>로그아웃</span>
                     </button>
                   </div>
-                ) : (
-                  <button type="button" onClick={() => { goLogin(); setMobileMenuOpen(false) }} className="flex w-full items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
-                    <span>로그인</span>
-                  </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         )}
