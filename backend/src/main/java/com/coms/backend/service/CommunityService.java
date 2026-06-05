@@ -44,17 +44,20 @@ public class CommunityService {
     private final MemberRepository memberRepository;
     private final StorageService storageService;
     private final CommunityCommentRepository commentRepository;
+    private final NotificationService notificationService;
 
     public CommunityService(CommunityPostRepository communityPostRepository,
                             CommunityPostVoteRepository voteRepository,
                             MemberRepository memberRepository,
                             StorageService storageService,
-                            CommunityCommentRepository commentRepository) {
+                            CommunityCommentRepository commentRepository,
+                            NotificationService notificationService) {
         this.communityPostRepository = communityPostRepository;
         this.voteRepository = voteRepository;
         this.memberRepository = memberRepository;
         this.commentRepository = commentRepository;
         this.storageService = storageService;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -334,22 +337,40 @@ public class CommunityService {
         boolean isAdmin = member.getRole() == Member.Role.ADMIN;
         return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
                 .map(c -> new CommunityCommentResponse(
-                        c.getId(), c.getPostId(), c.getAuthorName(), c.getContent(), c.getCreatedAt(),
+                        c.getId(), c.getPostId(), c.getParentCommentId(), c.getDepth(),
+                        c.getAuthorName(), c.getContent(), c.getCreatedAt(),
                         isAdmin || c.getStudentId().equals(studentId)))
                 .toList();
     }
 
     public CommunityCommentResponse addComment(Long postId, String studentId, CommunityCommentRequest request) {
-        if (!communityPostRepository.existsById(postId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
+        CommunityPost post = communityPostRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         String content = normalizeBounded(request.content(), "댓글", MAX_COMMENT_LENGTH);
         rejectUnsafeText(content);
+        CommunityComment parent = null;
+        int depth = 0;
+        if (request.parentCommentId() != null) {
+            parent = commentRepository.findById(request.parentCommentId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+            if (!parent.getPostId().equals(postId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reply parent does not belong to this post.");
+            }
+            if (parent.getDepth() >= 1) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Replies are limited to one nested level.");
+            }
+            depth = parent.getDepth() + 1;
+        }
         CommunityComment saved = commentRepository.save(
-                new CommunityComment(postId, studentId, member.getName(), content));
-        return new CommunityCommentResponse(saved.getId(), saved.getPostId(), saved.getAuthorName(),
+                new CommunityComment(postId, studentId, member.getName(), content, request.parentCommentId(), depth));
+        if (parent == null) {
+            notificationService.notifyPostComment(post, saved);
+        } else {
+            notificationService.notifyCommentReply(post, parent, saved);
+        }
+        return new CommunityCommentResponse(saved.getId(), saved.getPostId(), saved.getParentCommentId(), saved.getDepth(), saved.getAuthorName(),
                 saved.getContent(), saved.getCreatedAt(), true);
     }
 

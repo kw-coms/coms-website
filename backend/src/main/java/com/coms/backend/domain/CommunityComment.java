@@ -23,16 +23,23 @@ public class CommunityComment {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    private Long parentCommentId;
+
+    @Column(nullable = false)
+    private int depth = 0;
+
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public CommunityComment() {}
 
-    public CommunityComment(Long postId, String studentId, String authorName, String content) {
+    public CommunityComment(Long postId, String studentId, String authorName, String content, Long parentCommentId, int depth) {
         this.postId = postId;
         this.studentId = studentId;
         this.authorName = authorName;
         this.content = content;
+        this.parentCommentId = parentCommentId;
+        this.depth = depth;
     }
 
     public Long getId() { return id; }
@@ -40,5 +47,7 @@ public class CommunityComment {
     public String getStudentId() { return studentId; }
     public String getAuthorName() { return authorName; }
     public String getContent() { return content; }
+    public Long getParentCommentId() { return parentCommentId; }
+    public int getDepth() { return depth; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 }

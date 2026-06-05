@@ -33,4 +33,6 @@ uploads/
 !*sample*.csv
 !*sample*.xlsx
 .omc/
+.omx/
 .playwright-mcp/
+.tools/

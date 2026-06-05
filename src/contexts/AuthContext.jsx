@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getCurrentUser, logoutUser } from '../services/authApi.js'
+import { apiUrl } from '../services/apiClient.js'
+import { listFonts } from '../services/fontApi.js'
 import { AuthContext } from './useAuth.js'
 
 export function AuthProvider({ children }) {
@@ -24,6 +26,43 @@ export function AuthProvider({ children }) {
       mounted = false
     }
   }, [])
+
+  useEffect(() => {
+    let mounted = true
+    const styleId = 'user-site-font-style'
+
+    async function applySelectedFont() {
+      const selectedFontId = user?.selectedFontId
+      const existing = document.getElementById(styleId)
+      if (existing) existing.remove()
+
+      if (!selectedFontId) {
+        document.documentElement.style.removeProperty('--user-font-family')
+        return
+      }
+
+      try {
+        const fonts = await listFonts()
+        if (!mounted) return
+        const font = fonts.find((item) => item.id === selectedFontId)
+        if (!font) {
+          document.documentElement.style.removeProperty('--user-font-family')
+          return
+        }
+        const family = `UserFont${font.id}`
+        const style = document.createElement('style')
+        style.id = styleId
+        style.textContent = `@font-face{font-family:${family};src:url("${apiUrl(font.fileUrl)}");font-display:swap;}`
+        document.head.appendChild(style)
+        document.documentElement.style.setProperty('--user-font-family', `${family}, 'Freesentation', 'Pretendard', 'LexendThin', 'Segoe UI', sans-serif`)
+      } catch {
+        document.documentElement.style.removeProperty('--user-font-family')
+      }
+    }
+
+    applySelectedFont()
+    return () => { mounted = false }
+  }, [user?.selectedFontId])
 
   const login = async (data) => {
     if (data) {
