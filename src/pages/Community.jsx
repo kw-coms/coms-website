@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify.jsx'
 import { ArrowLeft, ImagePlus, MessageSquare, Pencil, Search, Send, ThumbsDown, ThumbsUp, Trash2, X } from 'lucide-react'
 import {
@@ -169,6 +170,8 @@ function BoardHeader({ title = "COM's 게시판", children }) {
 }
 
 export default function Community({ onBack }) {
+  const { id: urlId } = useParams()
+  const navigate = useNavigate()
   const [posts, setPosts] = useState([])
   const [currentPost, setCurrentPost] = useState(null)
   const [mode, setMode] = useState('list')
@@ -212,24 +215,34 @@ export default function Community({ onBack }) {
     setCurrentPost(post)
   }
 
-  const openPost = async (post) => {
+  useEffect(() => {
+    if (!urlId) return
+    const numId = Number(urlId)
+    if (isNaN(numId)) { navigate('/community', { replace: true }); return }
+    /* eslint-disable react-hooks/set-state-in-effect */
     setDetailLoading(true)
-    setError('')
     setComments([])
     setCommentInput('')
-    try {
-      const [detail, commentList] = await Promise.all([
-        getCommunityPost(post.id),
-        listComments(post.id).catch(() => []),
-      ])
-      mergePost(detail)
-      setComments(Array.isArray(commentList) ? commentList : [])
-      setMode('detail')
-    } catch (err) {
-      setError(err.message || '글을 불러오지 못했습니다.')
-    } finally {
-      setDetailLoading(false)
-    }
+    /* eslint-enable react-hooks/set-state-in-effect */
+    let mounted = true
+    Promise.all([
+      getCommunityPost(numId),
+      listComments(numId).catch(() => []),
+    ])
+      .then(([detail, commentList]) => {
+        if (!mounted) return
+        mergePost(detail)
+        setComments(Array.isArray(commentList) ? commentList : [])
+        setMode('detail')
+      })
+      .catch(() => { if (mounted) navigate('/community', { replace: true }) })
+      .finally(() => { if (mounted) setDetailLoading(false) })
+    return () => { mounted = false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlId])
+
+  const openPost = (post) => {
+    navigate('/community/' + post.id)
   }
 
   const handleAddComment = async () => {
@@ -257,10 +270,7 @@ export default function Community({ onBack }) {
   }
 
   const backToList = () => {
-    setMode('list')
-    setCurrentPost(null)
-    setComments([])
-    setCommentInput('')
+    navigate('/community')
   }
 
   const handleSave = (saved) => {
