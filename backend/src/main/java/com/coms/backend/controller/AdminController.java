@@ -5,6 +5,7 @@ import com.coms.backend.dto.BannedStudentResponse;
 import com.coms.backend.dto.ResetPasswordRequest;
 import com.coms.backend.dto.EligibleMemberImportResponse;
 import com.coms.backend.dto.EligibleMemberResponse;
+import com.coms.backend.dto.LoginAuditResponse;
 import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.RoleUpdateRequest;
 import com.coms.backend.dto.UpdateEligibleMemberRequest;
@@ -102,5 +103,10 @@ public class AdminController {
     public ResponseEntity<Void> unbanStudent(@PathVariable String studentId) {
         bannedStudentService.unban(studentId);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/login-audit")
+    public ResponseEntity<List<LoginAuditResponse>> loginAudit() {
+        return ResponseEntity.ok(adminService.listLoginAudit());
     }
 }

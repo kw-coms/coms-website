@@ -1,6 +1,7 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.Member;
+import com.coms.backend.dto.LoginAuditResponse;
 import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.RoleUpdateRequest;
 import com.coms.backend.repository.MemberRepository;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -53,6 +55,22 @@ public class AdminService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         member.setPassword(passwordEncoder.encode(newPassword));
         memberRepository.save(member);
+    }
+
+    @Transactional(readOnly = true)
+    public List<LoginAuditResponse> listLoginAudit() {
+        return memberRepository.findAll().stream()
+                .filter(m -> m.getLastLoginAt() != null)
+                .sorted(Comparator.comparing(Member::getLastLoginAt).reversed())
+                .map(m -> new LoginAuditResponse(
+                        m.getId(),
+                        m.getStudentId(),
+                        m.getName(),
+                        m.getRole().name(),
+                        m.getLastLoginAt(),
+                        m.getLastLoginIp()
+                ))
+                .toList();
     }
 
     private MemberResponse toResponse(Member member) {
