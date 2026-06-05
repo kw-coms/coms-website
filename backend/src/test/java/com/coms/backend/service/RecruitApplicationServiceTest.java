@@ -27,7 +27,7 @@ class RecruitApplicationServiceTest {
                 "recruit@coms.kw.ac.kr"
         );
 
-        service.sendApplication(sampleRequest());
+        service.sendApplication(sampleRequest(), "127.0.0.1");
 
         ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
         verify(mailSender).send(captor.capture());
@@ -52,9 +52,27 @@ class RecruitApplicationServiceTest {
                 "recruit@coms.kw.ac.kr"
         );
 
-        assertThatThrownBy(() -> service.sendApplication(sampleRequest()))
+        assertThatThrownBy(() -> service.sendApplication(sampleRequest(), "127.0.0.1"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
+    }
+
+    @Test
+    void sendApplicationRateLimitsRepeatedSubmissionsFromSameClient() {
+        RecruitApplicationService service = new RecruitApplicationService(
+                mock(JavaMailSender.class),
+                true,
+                "no-reply@coms.kw.ac.kr",
+                "recruit@coms.kw.ac.kr"
+        );
+
+        for (int i = 0; i < 5; i++) {
+            service.sendApplication(sampleRequest(), "127.0.0.1");
+        }
+
+        assertThatThrownBy(() -> service.sendApplication(sampleRequest(), "127.0.0.1"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
     }
 
     private static RecruitApplicationRequest sampleRequest() {
