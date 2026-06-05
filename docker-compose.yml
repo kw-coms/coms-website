@@ -26,6 +26,15 @@ services:
       DB_USER: ${DB_USER:-coms}
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
+      MAIL_ENABLED: ${MAIL_ENABLED:-false}
+      MAIL_LOG_VERIFICATION_CODES: ${MAIL_LOG_VERIFICATION_CODES:-false}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@coms.kw.ac.kr}
+      SMTP_HOST: ${SMTP_HOST:-localhost}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_AUTH: ${SMTP_AUTH:-true}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       COOKIE_SECURE: "true"
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://coms.kw.ac.kr,http://coms.kw.ac.kr,http://localhost:3000}
       SPRING_FLYWAY_ENABLED: "true"
