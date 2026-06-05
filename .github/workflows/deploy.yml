@@ -32,7 +32,7 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
-            docker compose -f docker-compose.yml up -d --build --remove-orphans
+            docker compose --env-file .env -f docker-compose.yml up -d --build --remove-orphans
             docker image prune -f
 
             for attempt in 1 2 3 4 5 6 7 8 9 10; do
@@ -40,7 +40,7 @@ jobs:
                 break
               fi
               if [ "$attempt" -eq 10 ]; then
-                docker compose -f docker-compose.yml ps
+                docker compose --env-file .env -f docker-compose.yml ps
                 docker logs --tail=200 coms-backend
                 exit 1
               fi
@@ -52,7 +52,7 @@ jobs:
                 break
               fi
               if [ "$attempt" -eq 10 ]; then
-                docker compose -f docker-compose.yml ps
+                docker compose --env-file .env -f docker-compose.yml ps
                 docker logs --tail=200 coms-backend
                 docker logs --tail=100 coms-frontend
                 exit 1
