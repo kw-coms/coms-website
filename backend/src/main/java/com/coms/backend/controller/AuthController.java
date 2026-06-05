@@ -11,6 +11,7 @@ import com.coms.backend.dto.RequestSignupEmailRequest;
 import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.dto.UpdateProfileRequest;
 import com.coms.backend.service.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,8 +44,10 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
+                                              HttpServletRequest servletRequest,
                                               HttpServletResponse response) {
-        AuthResponse auth = authService.login(request);
+        String clientIp = resolveClientIp(servletRequest);
+        AuthResponse auth = authService.login(request, clientIp);
 
         ResponseCookie cookie = ResponseCookie.from("token", auth.token())
                 .httpOnly(true)
@@ -90,6 +93,18 @@ public class AuthController {
     public ResponseEntity<MemberResponse> updateProfile(@Valid @RequestBody UpdateProfileRequest request,
                                                         Authentication authentication) {
         return ResponseEntity.ok(authService.updateProfile(authentication.getName(), request));
+    }
+
+    private static String resolveClientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        return request.getRemoteAddr();
     }
 
     @PostMapping("/email-verification/request-signup")
