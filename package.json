@@ -14,7 +14,8 @@
     "aws-amplify": "^6.17.0",
     "lucide-react": "^0.542.0",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "react-router-dom": "^7.17.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
