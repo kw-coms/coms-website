@@ -165,7 +165,7 @@ function VerifyStep({ studentId, email, onDone }) {
   )
 }
 
-export default function Signup() {
+export default function Signup({ onBack }) {
   const [step, setStep] = useState('form')
   const [signedUpStudentId, setSignedUpStudentId] = useState('')
   const [signedUpEmail, setSignedUpEmail] = useState('')
@@ -360,12 +360,13 @@ export default function Signup() {
               ✓
             </div>
             <p className="text-base font-semibold text-emerald-700">이메일 인증이 완료되었습니다!</p>
-            <a
-              href="/login"
+            <button
+              type="button"
+              onClick={onBack}
               className="shape-cut-sm inline-block w-full bg-white/70 px-4 py-3 text-base font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/90"
             >
               로그인하러 가기
-            </a>
+            </button>
           </div>
         )}
       </section>
