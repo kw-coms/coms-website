@@ -8,8 +8,6 @@ import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.dto.UpdateProfileRequest;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.security.JwtTokenProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -27,8 +25,9 @@ import java.time.LocalDateTime;
 @Transactional
 public class AuthService implements UserDetailsService {
 
-    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final int EMAIL_VERIFICATION_EXPIRES_MINUTES = 10;
+    private static final int EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES = 1;
 
     private final MemberRepository memberRepository;
     private final EligibleMemberService eligibleMemberService;
@@ -69,15 +68,11 @@ public class AuthService implements UserDetailsService {
         member.setInterests(request.interests() == null ? null : request.interests().trim());
         memberRepository.save(member);
 
-        try {
-            String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
-            member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
-            member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(10));
-            memberRepository.save(member);
-            emailVerificationSender.sendVerificationCode(member.getEmail(), code);
-        } catch (Exception e) {
-            log.warn("Failed to auto-send verification email during signup for {}", member.getEmail(), e);
-        }
+        String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
+        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
+        memberRepository.save(member);
+        emailVerificationSender.sendVerificationCode(member.getEmail(), code);
 
         return new AuthResponse(null, member.getStudentId(), member.getName(), "회원가입 신청이 완료되었습니다.");
     }
@@ -153,9 +148,10 @@ public class AuthService implements UserDetailsService {
         if (member.isEmailVerified()) {
             return true;
         }
+        enforceEmailVerificationResendCooldown(member);
         String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
         member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
-        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(10));
+        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
         memberRepository.save(member);
         emailVerificationSender.sendVerificationCode(member.getEmail(), code);
         return false;
@@ -172,9 +168,10 @@ public class AuthService implements UserDetailsService {
             return true;
         }
 
+        enforceEmailVerificationResendCooldown(member);
         String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
         member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
-        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(10));
+        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
         memberRepository.save(member);
         emailVerificationSender.sendVerificationCode(member.getEmail(), code);
         return false;
@@ -207,6 +204,19 @@ public class AuthService implements UserDetailsService {
     private void clearEmailVerificationCode(Member member) {
         member.setEmailVerificationCodeHash(null);
         member.setEmailVerificationExpiresAt(null);
+    }
+
+    private void enforceEmailVerificationResendCooldown(Member member) {
+        LocalDateTime expiresAt = member.getEmailVerificationExpiresAt();
+        if (member.getEmailVerificationCodeHash() == null || expiresAt == null) {
+            return;
+        }
+
+        LocalDateTime cooldownBoundary = LocalDateTime.now()
+                .plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES - EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES);
+        if (expiresAt.isAfter(cooldownBoundary)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "이메일 인증코드는 1분 후 다시 요청할 수 있습니다.");
+        }
     }
 
     private String normalizeNullable(String value) {
