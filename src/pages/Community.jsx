@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { linkify } from '../utils/linkify.jsx'
 import { ArrowLeft, ImagePlus, Pencil, Search, ThumbsDown, ThumbsUp, Trash2, X } from 'lucide-react'
 import {
   createCommunityPost,
@@ -417,7 +418,7 @@ export default function Community({ onBack }) {
                     <img src={apiUrl(currentPost.imageUrl)} alt={currentPost.imageOriginalName || currentPost.title} className="mx-auto max-h-[560px] max-w-full object-contain" />
                   </div>
                 )}
-                <div className="min-h-[280px] whitespace-pre-wrap px-4 py-6 text-[15px] leading-8">{currentPost.content}</div>
+                <div className="min-h-[280px] whitespace-pre-wrap break-words px-4 py-6 text-[15px] leading-8">{linkify(currentPost.content)}</div>
                 <div className="flex flex-wrap items-center justify-center gap-3 border-y border-black/10 bg-[#fafafa] px-4 py-5">
                   <button type="button" onClick={() => handleVote(1)} className={`inline-flex items-center gap-2 border px-5 py-3 text-sm font-black ${currentPost.myVote === 1 ? 'border-[#3b4890] bg-[#3b4890] text-white' : 'border-black/15 bg-white text-[#3b4890]'}`}>
                     <ThumbsUp size={16} />
