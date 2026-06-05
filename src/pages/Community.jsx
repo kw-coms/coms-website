@@ -15,15 +15,28 @@ import {
 import { apiUrl } from '../services/apiClient.js'
 
 const PAGE_SIZE = 30
+const CONCEPT_POST_SCORE_THRESHOLD = 10
 const CATEGORY_OPTIONS = [
-  { value: 'ALL', label: '전체글' },
   { value: 'GENERAL', label: '일반' },
   { value: 'QUESTION', label: '질문' },
   { value: 'INFO', label: '정보' },
 ]
+const BOARD_FILTER_OPTIONS = [
+  { value: 'ALL', label: '전체글' },
+  { value: 'CONCEPT', label: '개념글' },
+  ...CATEGORY_OPTIONS,
+]
 
 function categoryLabel(value) {
   return CATEGORY_OPTIONS.find((item) => item.value === value)?.label || '일반'
+}
+
+function postScore(post) {
+  return (post.upvotes || 0) - (post.downvotes || 0)
+}
+
+function isConceptPost(post) {
+  return post.conceptPost ?? postScore(post) >= CONCEPT_POST_SCORE_THRESHOLD
 }
 
 function shortDate(iso) {
@@ -192,7 +205,11 @@ export default function Community({ onBack }) {
   }, [])
 
   const filteredPosts = useMemo(() => {
-    const byCategory = activeCategory === 'ALL' ? posts : posts.filter((post) => (post.category || 'GENERAL') === activeCategory)
+    const byCategory = activeCategory === 'ALL'
+      ? posts
+      : activeCategory === 'CONCEPT'
+        ? posts.filter(isConceptPost)
+        : posts.filter((post) => (post.category || 'GENERAL') === activeCategory)
     if (!searchQuery.trim()) return byCategory
     const q = searchQuery.toLowerCase()
     return byCategory.filter((post) =>
@@ -285,9 +302,11 @@ export default function Community({ onBack }) {
       const updated = await voteCommunityPost(currentPost.id, value)
       mergePost(updated)
     } catch (err) {
-      alert(err.message || '추천 처리 중 오류가 발생했습니다.')
+      alert(err.message || '투표 처리 중 오류가 발생했습니다.')
     }
   }
+
+  const currentPostConcept = currentPost ? isConceptPost(currentPost) : false
 
   return (
     <div className="space-y-4">
@@ -309,7 +328,7 @@ export default function Community({ onBack }) {
             </BoardHeader>
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-black/18 px-5 py-3 sm:px-7">
               <div className="flex flex-wrap gap-2 text-sm font-bold">
-                {CATEGORY_OPTIONS.map((item) => (
+                {BOARD_FILTER_OPTIONS.map((item) => (
                   <button
                     key={item.value}
                     type="button"
@@ -352,7 +371,7 @@ export default function Community({ onBack }) {
                     <th className="w-36 px-4 py-3 font-semibold">글쓴이</th>
                     <th className="w-28 px-4 py-3 font-semibold">작성일</th>
                     <th className="w-20 px-4 py-3 font-semibold">조회</th>
-                    <th className="w-20 px-4 py-3 font-semibold">추천</th>
+                    <th className="w-20 px-4 py-3 font-semibold">개추</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
@@ -364,6 +383,7 @@ export default function Community({ onBack }) {
                   )}
                   {visiblePosts.map((post) => {
                     const open = () => openPost(post)
+                    const concept = isConceptPost(post)
                     return (
                     <tr
                       key={post.id}
@@ -371,12 +391,13 @@ export default function Community({ onBack }) {
                       role="button"
                       onClick={open}
                       onKeyDown={(event) => openRowWithKeyboard(event, open)}
-                      className="cursor-pointer text-white/75 transition hover:bg-white/5 focus:bg-white/10 focus:outline-none"
+                      className={`cursor-pointer text-white/75 transition hover:bg-white/5 focus:bg-white/10 focus:outline-none ${concept ? 'bg-yellow-200/5' : ''}`}
                     >
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{post.id}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-cyan-100">{categoryLabel(post.category || 'GENERAL')}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
                         <span className="block max-w-[520px] truncate text-left font-semibold text-white">
+                          {concept && <span className="mr-1 rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
                           {post.title}
                         </span>
                         {post.imageUrl && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
@@ -385,7 +406,7 @@ export default function Community({ onBack }) {
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-semibold">{post.authorDisplayName || post.authorName}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{shortDate(post.createdAt)}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{post.viewCount}</td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{post.upvotes - post.downvotes}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{postScore(post)}</td>
                     </tr>
                     )
                   })}
@@ -441,14 +462,17 @@ export default function Community({ onBack }) {
             ) : (
               <article className="m-5 overflow-hidden rounded-lg bg-white shadow-[0_18px_50px_rgba(0,0,0,0.14)] sm:m-7">
                 <div className="border-b border-black/10 px-5 py-5">
-                  <div className="mb-2 text-xs font-black text-[#3b4890]">{categoryLabel(currentPost.category || 'GENERAL')}</div>
+                  <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[#3b4890]">
+                    <span>{categoryLabel(currentPost.category || 'GENERAL')}</span>
+                    {currentPostConcept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
+                  </div>
                   <h2 className="break-words text-2xl font-black">{currentPost.title}</h2>
                   <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--theme-body-muted)]">
                     <span className="font-bold text-[var(--theme-body-mid)]">{currentPost.authorDisplayName || currentPost.authorName}</span>
                     {currentPost.authorAdmin && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">주딱</span>}
                     <span>{new Date(currentPost.createdAt).toLocaleString('ko-KR')}</span>
                     <span>조회 {currentPost.viewCount}</span>
-                    <span>추천 {currentPost.upvotes - currentPost.downvotes}</span>
+                    <span>개추 {postScore(currentPost)}</span>
                   </div>
                 </div>
                 {currentPost.imageUrl && (
@@ -460,11 +484,11 @@ export default function Community({ onBack }) {
                 <div className="flex flex-wrap items-center justify-center gap-3 border-y border-black/10 bg-[#fafafa] px-4 py-5">
                   <button type="button" onClick={() => handleVote(1)} className={`inline-flex items-center gap-2 border px-5 py-3 text-sm font-black ${currentPost.myVote === 1 ? 'border-[#3b4890] bg-[#3b4890] text-white' : 'border-black/15 bg-white text-[#3b4890]'}`}>
                     <ThumbsUp size={16} />
-                    추천 {currentPost.upvotes}
+                    개추 {currentPost.upvotes}
                   </button>
                   <button type="button" onClick={() => handleVote(-1)} className={`inline-flex items-center gap-2 border px-5 py-3 text-sm font-black ${currentPost.myVote === -1 ? 'border-red-600 bg-red-600 text-white' : 'border-black/15 bg-white text-red-600'}`}>
                     <ThumbsDown size={16} />
-                    비추천 {currentPost.downvotes}
+                    비추 {currentPost.downvotes}
                   </button>
                 </div>
                 <div className="flex flex-wrap justify-between gap-2 px-4 py-4">
