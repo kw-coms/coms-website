@@ -29,7 +29,7 @@ export async function request(path, options = {}) {
   const data = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new Error(data?.message || '요청 처리 중 오류가 발생했습니다.')
+    throw new Error(data?.message || data?.detail || data?.error || '요청 처리 중 오류가 발생했습니다.')
   }
 
   return data
@@ -43,6 +43,6 @@ export async function requestNoContent(path, options = {}) {
 
   if (!response.ok) {
     const data = await response.json().catch(() => null)
-    throw new Error(data?.message || '요청 처리 중 오류가 발생했습니다.')
+    throw new Error(data?.message || data?.detail || data?.error || '요청 처리 중 오류가 발생했습니다.')
   }
 }

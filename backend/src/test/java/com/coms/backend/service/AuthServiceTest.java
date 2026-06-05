@@ -1,12 +1,16 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.Member;
+import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.dto.UpdateProfileRequest;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.security.JwtTokenProvider;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -14,6 +18,12 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {
         "jwt.secret=test-secret-key-with-at-least-32-chars",
@@ -70,6 +80,34 @@ class AuthServiceTest {
     }
 
     @Test
+    void requestEmailVerificationRejectsImmediateResend() {
+        Member member = saveMember("2026123463", false);
+        member.setEmailVerificationCodeHash(passwordEncoder.encode("123456"));
+        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(10));
+        memberRepository.save(member);
+
+        assertThatThrownBy(() -> authService.requestEmailVerification("2026123463"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
+                    assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+                    assertThat(ex.getReason()).contains("1분 후");
+                });
+    }
+
+    @Test
+    void requestEmailVerificationAllowsResendAfterCooldown() {
+        Member member = saveMember("2026123464", false);
+        member.setEmailVerificationCodeHash(passwordEncoder.encode("123456"));
+        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(8));
+        memberRepository.save(member);
+
+        boolean alreadyVerified = authService.requestEmailVerification("2026123464");
+
+        Member saved = memberRepository.findByStudentId("2026123464").orElseThrow();
+        assertThat(alreadyVerified).isFalse();
+        assertThat(saved.getEmailVerificationExpiresAt()).isAfter(LocalDateTime.now().plusMinutes(9));
+    }
+
+    @Test
     void confirmEmailVerificationRejectsWrongCode() {
         Member member = saveMember("2026123458", false);
         member.setEmailVerificationCodeHash(passwordEncoder.encode("123456"));
@@ -96,6 +134,57 @@ class AuthServiceTest {
         assertThat(saved.isEmailVerified()).isTrue();
         assertThat(saved.getEmailVerificationCodeHash()).isNull();
         assertThat(saved.getEmailVerificationExpiresAt()).isNull();
+    }
+
+    @Test
+    void loginRejectsUnverifiedEmailWithUnauthorizedStatus() {
+        saveMember("2026123460", false);
+
+        assertThatThrownBy(() -> authService.login(new com.coms.backend.dto.LoginRequest("2026123460", "Password1!")))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
+                    assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+                    assertThat(ex.getReason()).contains("이메일 인증");
+                });
+    }
+
+    @Test
+    void loginSucceedsAfterEmailIsVerified() {
+        saveMember("2026123461", true);
+
+        var response = authService.login(new com.coms.backend.dto.LoginRequest("2026123461", "Password1!"));
+
+        assertThat(response.token()).isNotBlank();
+        assertThat(response.studentId()).isEqualTo("2026123461");
+    }
+
+    @Test
+    @DisplayName("signup fails instead of creating a stuck unverified account when email sending is unavailable")
+    void signupPropagatesEmailSendFailure() {
+        MemberRepository repo = mock(MemberRepository.class);
+        EligibleMemberService eligible = mock(EligibleMemberService.class);
+        JwtTokenProvider jwt = mock(JwtTokenProvider.class);
+        EmailVerificationSender sender = mock(EmailVerificationSender.class);
+        AuthService service = new AuthService(repo, eligible, passwordEncoder, jwt, sender);
+
+        when(repo.existsByStudentId("2026123462")).thenReturn(false);
+        when(repo.existsByEmail("new@example.com")).thenReturn(false);
+        doNothing().when(eligible).validateSignup("2026123462", "홍길동");
+        when(repo.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "이메일 발송에 실패했습니다."))
+                .when(sender).sendVerificationCode(anyString(), anyString());
+
+        assertThatThrownBy(() -> service.signup(new SignupRequest(
+                "2026123462",
+                "홍길동",
+                "new@example.com",
+                "Password1!",
+                "컴퓨터공학과",
+                "01012345678",
+                null,
+                null
+        )))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
     }
 
     private Member saveMember(String studentId, boolean emailVerified) {

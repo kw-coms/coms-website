@@ -19,13 +19,13 @@ class SecurityConfigSourceTest {
     }
 
     @Test
-    void noticeAndArchiveMutationsRequireAdmin() throws Exception {
+    void noticeMutationsRequireAdminAndArchiveUploadRequiresLogin() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/coms/backend/config/SecurityConfig.java"));
 
         assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/notices\").hasRole(\"ADMIN\")");
         assertThat(source).contains("auth.requestMatchers(HttpMethod.PUT, \"/api/notices/**\").hasRole(\"ADMIN\")");
         assertThat(source).contains("auth.requestMatchers(HttpMethod.DELETE, \"/api/notices/**\").hasRole(\"ADMIN\")");
-        assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/files\").hasRole(\"ADMIN\")");
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/files\").authenticated()");
         assertThat(source).contains("auth.requestMatchers(HttpMethod.DELETE, \"/api/files/**\").hasRole(\"ADMIN\")");
     }
 }

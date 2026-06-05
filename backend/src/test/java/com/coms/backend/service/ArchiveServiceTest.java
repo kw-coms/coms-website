@@ -1,6 +1,8 @@
 package com.coms.backend.service;
 
+import com.coms.backend.domain.Member;
 import com.coms.backend.repository.ArchiveFileRepository;
+import com.coms.backend.repository.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,9 +28,14 @@ class ArchiveServiceTest {
     @Autowired
     private ArchiveFileRepository archiveFileRepository;
 
+    @Autowired
+    private MemberRepository memberRepository;
+
     @BeforeEach
     void setUp() {
         archiveFileRepository.deleteAll();
+        memberRepository.deleteAll();
+        saveMember("2026123456", "홍길동");
     }
 
     @Test
@@ -40,10 +47,13 @@ class ArchiveServiceTest {
                 "%PDF-1.4".getBytes()
         );
 
-        var response = archiveService.upload(pdf, "2026123456");
+        var response = archiveService.upload("강의 자료", "1주차 PDF", pdf, "2026123456");
 
+        assertThat(response.title()).isEqualTo("강의 자료");
+        assertThat(response.description()).isEqualTo("1주차 PDF");
         assertThat(response.originalName()).isEqualTo("guide.pdf");
         assertThat(response.fileSize()).isEqualTo(pdf.getSize());
+        assertThat(response.uploaderName()).isEqualTo("홍길동");
     }
 
     @Test
@@ -55,7 +65,7 @@ class ArchiveServiceTest {
                 "<script>alert(1)</script>".getBytes()
         );
 
-        assertThatThrownBy(() -> archiveService.upload(html, "2026123456"))
+        assertThatThrownBy(() -> archiveService.upload("위험 파일", null, html, "2026123456"))
                 .isInstanceOf(ResponseStatusException.class);
     }
 
@@ -68,7 +78,17 @@ class ArchiveServiceTest {
                 new byte[20 * 1024 * 1024 + 1]
         );
 
-        assertThatThrownBy(() -> archiveService.upload(large, "2026123456"))
+        assertThatThrownBy(() -> archiveService.upload("큰 파일", null, large, "2026123456"))
                 .isInstanceOf(ResponseStatusException.class);
+    }
+
+    private void saveMember(String studentId, String name) {
+        Member member = new Member();
+        member.setStudentId(studentId);
+        member.setName(name);
+        member.setEmail(studentId + "@example.com");
+        member.setPassword("encoded");
+        member.setEmailVerified(true);
+        memberRepository.save(member);
     }
 }
