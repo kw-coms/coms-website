@@ -86,6 +86,7 @@ class CommunityServiceTest {
 
         assertThat(detail.viewCount()).isEqualTo(1);
         assertThat(communityPostRepository.findById(created.id()).orElseThrow().getViewCount()).isEqualTo(1);
+        assertThat(communityPostRepository.findById(created.id()).orElseThrow().isEdited()).isFalse();
     }
 
     @Test
@@ -115,12 +116,65 @@ class CommunityServiceTest {
         memberRepository.save(author);
         var created = communityService.create(author.getStudentId(), new CommunityPostRequest("개념 후보", "내용", "GENERAL", false), null);
 
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 5; i++) {
             Member voter = member(String.format("20261234%02d", i), "회원" + i, Member.Role.USER);
             memberRepository.save(voter);
             var voted = communityService.vote(voter.getStudentId(), created.id(), 1);
-            assertThat(voted.conceptPost()).isEqualTo(i >= 9);
+            assertThat(voted.conceptPost()).isEqualTo(i >= 4);
         }
+    }
+
+    @Test
+    void updateRejectsTitleTamperingAndMarksRealContentEdits() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("원제목", "내용", "GENERAL", false), null);
+
+        assertThatThrownBy(() -> communityService.update(
+                user.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("바뀐제목", "내용 수정", "GENERAL", false),
+                null
+        )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                assertThat(ex.getReason()).contains("제목"));
+
+        var updated = communityService.update(
+                user.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("원제목", "내용 수정", "INFO", false),
+                null
+        );
+
+        assertThat(updated.title()).isEqualTo("원제목");
+        assertThat(updated.content()).isEqualTo("내용 수정");
+        assertThat(updated.edited()).isTrue();
+    }
+
+    @Test
+    void rejectsOversizedOrUnsafePostTextAndComments() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+
+        assertThatThrownBy(() -> communityService.create(
+                user.getStudentId(),
+                new CommunityPostRequest("x".repeat(121), "내용", "GENERAL", false),
+                null
+        )).isInstanceOf(ResponseStatusException.class);
+
+        assertThatThrownBy(() -> communityService.create(
+                user.getStudentId(),
+                new CommunityPostRequest("제목", "<script>alert(1)</script>", "GENERAL", false),
+                null
+        )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                assertThat(ex.getReason()).contains("보안"));
+
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("댓글", "내용", "GENERAL", false), null);
+        assertThatThrownBy(() -> communityService.addComment(
+                created.id(),
+                user.getStudentId(),
+                new com.coms.backend.dto.CommunityCommentRequest("javascript:alert(1)")
+        )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                assertThat(ex.getReason()).contains("보안"));
     }
 
     @Test
