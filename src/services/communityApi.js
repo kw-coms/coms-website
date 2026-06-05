@@ -59,3 +59,20 @@ export async function deleteCommunityPost(id) {
     method: 'DELETE',
   })
 }
+
+export async function listComments(postId) {
+  return request(`/api/community/posts/${postId}/comments`)
+}
+
+export async function createComment(postId, content) {
+  return request(`/api/community/posts/${postId}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  })
+}
+
+export async function deleteComment(postId, commentId) {
+  return requestNoContent(`/api/community/posts/${postId}/comments/${commentId}`, {
+    method: 'DELETE',
+  })
+}
