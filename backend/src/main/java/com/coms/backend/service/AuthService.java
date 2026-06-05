@@ -92,7 +92,7 @@ public class AuthService implements UserDetailsService {
         }
 
         if (!member.isEmailVerified()) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "이메일 인증이 완료되지 않았습니다. 가입 시 받은 인증 이메일을 확인해주세요.");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일 인증이 완료되지 않았습니다. 가입 시 받은 인증 이메일을 확인해주세요.");
         }
 
         String token = jwtTokenProvider.generateToken(member.getStudentId());
