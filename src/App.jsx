@@ -6,10 +6,14 @@ import {
   Instagram,
   LogOut,
   Mail,
+  Menu,
+  Megaphone,
   Rocket,
   Sparkles,
+  X,
   Youtube,
 } from 'lucide-react'
+import { listNotices } from './services/noticeApi.js'
 import SplitLogoCard from './components/common/SplitLogoCard.jsx'
 import Archive from './pages/Archive.jsx'
 import Login from './pages/Login.jsx'
@@ -83,6 +87,8 @@ function App() {
   const projectsRef = useRef(null)
   const recruitRef = useRef(null)
   const [bottomHidden, setBottomHidden] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [latestNotice, setLatestNotice] = useState(null)
 
   const updateBracketPositions = (sectionId) => {
     const map = {
@@ -153,6 +159,19 @@ function App() {
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
     }
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+    listNotices()
+      .then((data) => {
+        if (!mounted) return
+        const notices = Array.isArray(data) ? data : []
+        const general = notices.find((n) => (n.category || 'GENERAL') === 'GENERAL')
+        if (general) setLatestNotice(general)
+      })
+      .catch((err) => console.warn('Failed to load latest notice', err))
+    return () => { mounted = false }
   }, [])
 
   const openPanel = (id) => {
@@ -353,7 +372,7 @@ function App() {
     const meta = sectionMeta[id]
 
     return (
-      <div className="relative mx-auto flex w-full max-w-5xl items-center justify-center overflow-visible px-14 sm:px-20 lg:px-28">
+      <div className="relative mx-auto flex w-full max-w-5xl items-center justify-center overflow-visible px-4 sm:px-14 lg:px-28">
         <div data-panel="true" className="relative z-10 w-full overflow-hidden rounded-2xl border border-white/12 shadow-lg" style={{ background: meta.background, boxShadow: `0 24px 80px ${meta.glow}` }}>
           <div className="px-12 py-8 sm:px-18 sm:py-12 lg:px-20">
             {renderSectionContent(id)}
@@ -578,7 +597,108 @@ function App() {
               Login
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((o) => !o)}
+            className="shape-cut-sm ml-auto flex items-center justify-center border border-black/10 bg-white/60 p-2 text-[var(--theme-body-dark)] transition hover:bg-white/78 md:hidden"
+            aria-label="메뉴"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-menu"
+            aria-haspopup="menu"
+          >
+            {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
         </div>
+
+        {mobileMenuOpen && (
+          <div id="mobile-menu" role="menu" className={`${floatingBarBaseClass} mx-auto mt-2 max-w-7xl overflow-hidden md:hidden`}>
+            <div className="flex flex-col divide-y divide-black/8">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => { openPanel(tab.id); setMobileMenuOpen(false) }}
+                  className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60"
+                >
+                  <tab.icon size={15} className={tab.accent} />
+                  <span>{tab.label}</span>
+                  <span className="ml-auto text-xs text-[var(--theme-body-muted)]">{tab.hint}</span>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => { goNotices(); setMobileMenuOpen(false) }}
+                className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60"
+              >
+                <Megaphone size={15} className="text-cyan-500" />
+                <span>Notices</span>
+                <span className="ml-auto text-xs text-[var(--theme-body-muted)]">공지사항</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { goArchive(); setMobileMenuOpen(false) }}
+                disabled={authLoading}
+                className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60 disabled:opacity-50"
+              >
+                <CircuitBoard size={15} className="text-violet-400" />
+                <span>Resources</span>
+                <span className="ml-auto text-xs text-[var(--theme-body-muted)]">자료실</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { goCommunity(); setMobileMenuOpen(false) }}
+                disabled={authLoading}
+                className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60 disabled:opacity-50"
+              >
+                <Sparkles size={15} className="text-rose-400" />
+                <span>Community</span>
+                <span className="ml-auto text-xs text-[var(--theme-body-muted)]">커뮤니티</span>
+              </button>
+              <div className="border-t border-black/10">
+                {user ? (
+                  <div className="flex flex-col divide-y divide-black/8">
+                    <button
+                      type="button"
+                      onClick={() => { goChangePassword(); setMobileMenuOpen(false) }}
+                      className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60"
+                    >
+                      <span className="size-5 flex items-center justify-center rounded-full bg-black/10 text-[10px] font-black">{user.name?.[0] ?? '?'}</span>
+                      <span>{user.name}</span>
+                      <span className="ml-auto text-xs text-[var(--theme-body-muted)]">계정 설정</span>
+                    </button>
+                    {user.role === 'ADMIN' && (
+                      <button
+                        type="button"
+                        onClick={() => { goAdmin(); setMobileMenuOpen(false) }}
+                        className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-50/60"
+                      >
+                        <span className="text-sm">⚙</span>
+                        <span>관리자 패널</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => { handleLogout(); setMobileMenuOpen(false) }}
+                      className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60"
+                    >
+                      <LogOut size={15} />
+                      <span>로그아웃</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => { goLogin(); setMobileMenuOpen(false) }}
+                    className="flex w-full items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60"
+                  >
+                    <span>로그인</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       <aside className="fixed right-3 top-[80%] z-40 hidden -translate-y-1/2 md:block">
@@ -611,6 +731,17 @@ function App() {
                     Community
                   </button>
                 </div>
+                {latestNotice && (
+                  <button
+                    type="button"
+                    onClick={goNotices}
+                    className="mx-auto mt-4 flex max-w-sm items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/8 px-4 py-2 text-left transition hover:bg-cyan-300/14"
+                  >
+                    <Megaphone size={13} className="shrink-0 text-cyan-300" />
+                    <span className="truncate text-xs font-semibold text-cyan-100">{latestNotice.title}</span>
+                    <span className="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wider text-cyan-300/60">공지</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

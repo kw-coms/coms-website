@@ -119,7 +119,7 @@ export default function Notices({ onBack }) {
     if (!searchQuery.trim()) return byCategory
     const q = searchQuery.toLowerCase()
     return byCategory.filter((notice) =>
-      notice.title.toLowerCase().includes(q) ||
+      (notice.title || '').toLowerCase().includes(q) ||
       (notice.content || '').toLowerCase().includes(q) ||
       (notice.author || '').toLowerCase().includes(q)
     )
@@ -261,44 +261,72 @@ export default function Notices({ onBack }) {
               <p className="px-4 py-16 text-center text-sm text-white/65">등록된 글이 없습니다.</p>
             )}
             {!loading && !error && filteredNotices.length > 0 && (
-              <div className="m-5 overflow-hidden shape-cut-sm border border-white/10 bg-black/18 sm:m-7">
-                <table className="w-full min-w-[760px] border-collapse text-sm">
-                  <thead className="border-b border-white/10 bg-white/8 text-xs uppercase tracking-[0.16em] text-white/45">
-                    <tr>
-                      <th className="w-20 px-4 py-3">번호</th>
-                      <th className="w-28 px-4 py-3">분류</th>
-                      <th className="px-4 py-3 text-left">제목</th>
-                      <th className="w-32 px-4 py-3">작성자</th>
-                      <th className="w-28 px-4 py-3">작성일</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/10">
-                    {filteredNotices.map((notice) => {
-                      const open = () => openNotice(notice)
-                      return (
-                      <tr
+              <>
+                {/* 모바일 카드 목록 */}
+                <div className="mx-5 mb-5 hidden flex-col divide-y divide-white/10 overflow-hidden shape-cut-sm border border-white/10 bg-black/18 max-md:flex sm:mx-7">
+                  {filteredNotices.map((notice) => {
+                    const open = () => openNotice(notice)
+                    const isJob = (notice.category || 'GENERAL') === 'JOB'
+                    return (
+                      <button
                         key={notice.id}
-                        tabIndex={0}
-                        role="button"
+                        type="button"
                         onClick={open}
-                        onKeyDown={(event) => openRowWithKeyboard(event, open)}
-                        className="cursor-pointer text-white/75 transition hover:bg-white/5 focus:bg-white/10 focus:outline-none"
+                        className="flex flex-col gap-1.5 px-4 py-4 text-left transition hover:bg-white/5 focus:bg-white/10 focus:outline-none"
                       >
-                        <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{notice.id}</td>
-                        <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-cyan-100">{(notice.category || 'GENERAL') === 'JOB' ? '취업' : '공지'}</td>
-                        <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
-                          <span className="block max-w-[520px] truncate text-left font-semibold text-white">
-                            {notice.title}
+                        <div className="flex items-center gap-2">
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${isJob ? 'bg-amber-300/15 text-amber-200' : 'bg-cyan-300/15 text-cyan-200'}`}>
+                            {isJob ? '취업공고' : '공지'}
                           </span>
-                        </td>
-                        <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{notice.author}</td>
-                        <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{formatDate(notice.createdAt)}</td>
+                          <span className="ml-auto text-[11px] text-white/40">{formatDate(notice.createdAt)}</span>
+                        </div>
+                        <span className="line-clamp-2 text-sm font-semibold leading-6 text-white">{notice.title}</span>
+                        <span className="text-xs text-white/45">{notice.author}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* 데스크탑 테이블 */}
+                <div className="m-5 hidden overflow-hidden shape-cut-sm border border-white/10 bg-black/18 sm:m-7 md:block">
+                  <table className="w-full min-w-[760px] border-collapse text-sm">
+                    <thead className="border-b border-white/10 bg-white/8 text-xs uppercase tracking-[0.16em] text-white/45">
+                      <tr>
+                        <th className="w-20 px-4 py-3">번호</th>
+                        <th className="w-28 px-4 py-3">분류</th>
+                        <th className="px-4 py-3 text-left">제목</th>
+                        <th className="w-32 px-4 py-3">작성자</th>
+                        <th className="w-28 px-4 py-3">작성일</th>
                       </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {filteredNotices.map((notice) => {
+                        const open = () => openNotice(notice)
+                        return (
+                          <tr
+                            key={notice.id}
+                            tabIndex={0}
+                            role="button"
+                            onClick={open}
+                            onKeyDown={(event) => openRowWithKeyboard(event, open)}
+                            className="cursor-pointer text-white/75 transition hover:bg-white/5 focus:bg-white/10 focus:outline-none"
+                          >
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{notice.id}</td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-cyan-100">{(notice.category || 'GENERAL') === 'JOB' ? '취업' : '공지'}</td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
+                              <span className="block max-w-[520px] truncate text-left font-semibold text-white">
+                                {notice.title}
+                              </span>
+                            </td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{notice.author}</td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{formatDate(notice.createdAt)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </>
         )}
