@@ -95,16 +95,32 @@ public class AuthController {
         return ResponseEntity.ok(authService.updateProfile(authentication.getName(), request));
     }
 
+    private static final java.util.Set<String> TRUSTED_PROXIES = java.util.Set.of("127.0.0.1", "::1", "0:0:0:0:0:0:0:1");
+
     private static String resolveClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+        String remoteAddr = request.getRemoteAddr();
+        if (TRUSTED_PROXIES.contains(remoteAddr)) {
+            String forwarded = request.getHeader("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isBlank()) {
+                String candidate = forwarded.split(",")[0].trim();
+                if (isValidIp(candidate)) return candidate;
+            }
+            String realIp = request.getHeader("X-Real-IP");
+            if (realIp != null && !realIp.isBlank() && isValidIp(realIp.trim())) {
+                return realIp.trim();
+            }
         }
-        String realIp = request.getHeader("X-Real-IP");
-        if (realIp != null && !realIp.isBlank()) {
-            return realIp.trim();
+        return remoteAddr;
+    }
+
+    private static boolean isValidIp(String ip) {
+        if (ip == null || ip.length() > 45) return false;
+        try {
+            java.net.InetAddress.getByName(ip);
+            return !ip.contains(" ");
+        } catch (java.net.UnknownHostException e) {
+            return false;
         }
-        return request.getRemoteAddr();
     }
 
     @PostMapping("/email-verification/request-signup")
