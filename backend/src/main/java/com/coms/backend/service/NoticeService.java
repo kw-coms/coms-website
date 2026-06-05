@@ -17,9 +17,11 @@ import java.util.Locale;
 public class NoticeService {
 
     private final NoticeRepository repo;
+    private final NotificationService notificationService;
 
-    public NoticeService(NoticeRepository repo) {
+    public NoticeService(NoticeRepository repo, NotificationService notificationService) {
         this.repo = repo;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -35,7 +37,9 @@ public class NoticeService {
     public NoticeResponse create(NoticeRequest request) {
         Notice notice = new Notice();
         applyRequest(notice, request);
-        return toResponse(repo.save(notice));
+        Notice saved = repo.save(notice);
+        notificationService.notifyNoticeCreated(saved);
+        return toResponse(saved);
     }
 
     public NoticeResponse update(Long id, NoticeRequest request) {

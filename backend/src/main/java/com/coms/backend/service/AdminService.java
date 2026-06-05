@@ -84,7 +84,8 @@ public class AdminService {
                 member.getPhone(),
                 member.getRole().name(),
                 member.getAspiration(),
-                member.getInterests()
+                member.getInterests(),
+                member.getSelectedFontId()
         );
     }
 }

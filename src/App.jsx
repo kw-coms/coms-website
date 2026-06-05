@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import {
   Binary,
+  Bell,
   CircuitBoard,
   Github,
   Instagram,
@@ -15,6 +16,7 @@ import {
   Youtube,
 } from 'lucide-react'
 import { listNotices } from './services/noticeApi.js'
+import { getNotificationSummary, listNotifications, markAllNotificationsRead, markNotificationRead } from './services/notificationApi.js'
 import SplitLogoCard from './components/common/SplitLogoCard.jsx'
 import Archive from './pages/Archive.jsx'
 import Login from './pages/Login.jsx'
@@ -195,6 +197,108 @@ function RecruitPage() {
     <PageShell wide>
       <RecruitApply onBack={() => navigate('/')} />
     </PageShell>
+  )
+}
+
+function NotificationButton() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const [items, setItems] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  const load = async () => {
+    if (!user) return
+    try {
+      const [list, summary] = await Promise.all([listNotifications(), getNotificationSummary()])
+      setItems(Array.isArray(list) ? list : [])
+      setUnreadCount(summary?.unreadCount || 0)
+    } catch {
+      setItems([])
+      setUnreadCount(0)
+    }
+  }
+
+  useEffect(() => {
+    if (!user) return
+    let mounted = true
+    Promise.all([listNotifications(), getNotificationSummary()])
+      .then(([list, summary]) => {
+        if (!mounted) return
+        setItems(Array.isArray(list) ? list : [])
+        setUnreadCount(summary?.unreadCount || 0)
+      })
+      .catch(() => {
+        if (!mounted) return
+        setItems([])
+        setUnreadCount(0)
+      })
+    return () => { mounted = false }
+  }, [user])
+
+  if (!user) return null
+
+  const openNotification = async (item) => {
+    try {
+      await markNotificationRead(item.id)
+      setUnreadCount((count) => Math.max(0, count - (item.read ? 0 : 1)))
+      setItems((prev) => prev.map((n) => (n.id === item.id ? { ...n, read: true } : n)))
+    } catch {
+      // Navigation should still work if the read marker fails.
+    }
+    setOpen(false)
+    if (item.noticeId) {
+      navigate(`/notices/${item.noticeId}`)
+    } else if (item.postId) {
+      navigate(`/community/${item.postId}${item.commentId ? `#comment-${item.commentId}` : ''}`)
+    }
+  }
+
+  const readAll = async () => {
+    await markAllNotificationsRead()
+    setUnreadCount(0)
+    setItems((prev) => prev.map((item) => ({ ...item, read: true })))
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => { setOpen((value) => !value); load() }}
+        className="shape-cut-sm relative inline-flex items-center gap-2 border border-black/10 bg-white/60 px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78"
+        aria-label="notifications"
+      >
+        <Bell size={15} />
+        {unreadCount > 0 && (
+          <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 z-60 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-black/10 bg-white text-[var(--theme-body-dark)] shadow-2xl">
+          <div className="flex items-center justify-between border-b border-black/10 px-4 py-3">
+            <span className="text-sm font-black">알림</span>
+            <button type="button" onClick={readAll} className="text-xs font-bold text-[#3b4890] hover:underline">모두 읽음</button>
+          </div>
+          <div className="max-h-80 overflow-auto">
+            {items.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-[var(--theme-body-muted)]">새 알림이 없습니다.</p>
+            ) : items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => openNotification(item)}
+                className={`block w-full border-b border-black/8 px-4 py-3 text-left text-sm last:border-b-0 hover:bg-black/5 ${item.read ? 'bg-white' : 'bg-cyan-50'}`}
+              >
+                <span className="block font-semibold">{item.message}</span>
+                <span className="mt-1 block text-[11px] text-[var(--theme-body-muted)]">{new Date(item.createdAt).toLocaleString('ko-KR')}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -451,6 +555,7 @@ function HomeView() {
 
           {user ? (
             <div className="ml-auto hidden items-center gap-2 md:flex">
+              <NotificationButton />
               <button type="button" onClick={goChangePassword} className="shape-cut-sm border border-black/10 bg-white/50 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/70" title="계정 설정">{user.name}</button>
               {user.role === 'ADMIN' && (
                 <button type="button" onClick={goAdmin} className="shape-cut-sm border border-amber-300/45 bg-amber-100/70 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100">관리자</button>
@@ -518,6 +623,9 @@ function HomeView() {
                         <span>관리자 패널</span>
                       </button>
                     )}
+                    <div className="px-5 py-3.5">
+                      <NotificationButton />
+                    </div>
                     <button type="button" onClick={() => { handleLogout(); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
                       <LogOut size={15} />
                       <span>로그아웃</span>
@@ -614,6 +722,9 @@ function PageShell({ children, wide = false }) {
   return (
     <div className="relative min-h-screen bg-[var(--theme-bg)] text-[var(--theme-text)]">
       <BackgroundLayers />
+      <div className="fixed right-4 top-4 z-50">
+        <NotificationButton />
+      </div>
       <main className={`relative mx-auto flex min-h-screen items-center justify-center px-4 py-28 sm:px-6 ${wide ? 'max-w-6xl' : 'max-w-4xl'}`}>
         <div className={`w-full ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
       </main>

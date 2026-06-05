@@ -210,6 +210,8 @@ export default function Community({ onBack }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [comments, setComments] = useState([])
   const [commentInput, setCommentInput] = useState('')
+  const [replyTo, setReplyTo] = useState(null)
+  const [replyInput, setReplyInput] = useState('')
   const [commentSaving, setCommentSaving] = useState(false)
 
   useEffect(() => {
@@ -253,6 +255,8 @@ export default function Community({ onBack }) {
       setCurrentPost(null)
       setComments([])
       setCommentInput('')
+      setReplyTo(null)
+      setReplyInput('')
       /* eslint-enable react-hooks/set-state-in-effect */
       return
     }
@@ -261,6 +265,8 @@ export default function Community({ onBack }) {
     setDetailLoading(true)
     setComments([])
     setCommentInput('')
+    setReplyTo(null)
+    setReplyInput('')
     let mounted = true
     Promise.all([
       getCommunityPost(numId),
@@ -271,6 +277,10 @@ export default function Community({ onBack }) {
         mergePost(detail)
         setComments(Array.isArray(commentList) ? commentList : [])
         setMode('detail')
+        window.setTimeout(() => {
+          const targetId = window.location.hash?.slice(1)
+          if (targetId) document.getElementById(targetId)?.scrollIntoView({ block: 'center' })
+        }, 60)
       })
       .catch(() => { if (mounted) navigate('/community', { replace: true }) })
       .finally(() => { if (mounted) setDetailLoading(false) })
@@ -296,6 +306,21 @@ export default function Community({ onBack }) {
     }
   }
 
+  const handleAddReply = async (parentId) => {
+    if (!replyInput.trim() || !currentPost) return
+    setCommentSaving(true)
+    try {
+      const comment = await createComment(currentPost.id, replyInput.trim(), parentId)
+      setComments((prev) => [...prev, comment])
+      setReplyInput('')
+      setReplyTo(null)
+    } catch (err) {
+      alert(err.message || '?볤? ?깅줉 ?ㅽ뙣')
+    } finally {
+      setCommentSaving(false)
+    }
+  }
+
   const handleDeleteComment = async (commentId) => {
     if (!currentPost || !window.confirm('댓글을 삭제하시겠습니까?')) return
     try {
@@ -311,6 +336,8 @@ export default function Community({ onBack }) {
     setCurrentPost(null)
     setComments([])
     setCommentInput('')
+    setReplyTo(null)
+    setReplyInput('')
     if (urlId) navigate('/community')
   }
 
@@ -347,6 +374,18 @@ export default function Community({ onBack }) {
   }
 
   const currentPostConcept = currentPost ? isConceptPost(currentPost) : false
+  const threadedComments = useMemo(() => {
+    const roots = comments.filter((comment) => !comment.parentCommentId)
+    const replies = comments.reduce((acc, comment) => {
+      if (comment.parentCommentId) {
+        const list = acc.get(comment.parentCommentId) || []
+        list.push(comment)
+        acc.set(comment.parentCommentId, list)
+      }
+      return acc
+    }, new Map())
+    return roots.flatMap((root) => [root, ...(replies.get(root.id) || [])])
+  }, [comments])
 
   return (
     <div className="space-y-4">
@@ -533,7 +572,7 @@ export default function Community({ onBack }) {
                     <img src={apiUrl(currentPost.imageUrl)} alt={currentPost.imageOriginalName || currentPost.title} className="mx-auto max-h-[560px] max-w-full object-contain" />
                   </div>
                 )}
-                <div className="min-h-[280px] whitespace-pre-wrap break-words px-4 py-6 text-[15px] leading-8">{linkify(currentPost.content)}</div>
+                <div className="text-size-container min-h-[280px] whitespace-pre-wrap break-words px-4 py-6 auto-text-post">{linkify(currentPost.content)}</div>
                 <div className="flex flex-wrap items-center justify-center gap-3 border-y border-black/10 bg-[#fafafa] px-4 py-5">
                   <button type="button" onClick={() => handleVote(1)} className={`inline-flex items-center gap-2 border px-5 py-3 text-sm font-black ${currentPost.myVote === 1 ? 'border-[#3b4890] bg-[#3b4890] text-white' : 'border-black/15 bg-white text-[#3b4890]'}`}>
                     <ThumbsUp size={16} />
@@ -570,14 +609,51 @@ export default function Community({ onBack }) {
                   </div>
                   {comments.length > 0 && (
                     <div className="divide-y divide-black/8">
-                      {comments.map((c) => (
-                        <div key={c.id} className="flex items-start gap-3 px-4 py-3">
+                      {threadedComments.map((c) => (
+                        <div
+                          key={c.id}
+                          id={`comment-${c.id}`}
+                          className={`scroll-mt-28 flex items-start gap-3 px-4 py-3 ${c.depth > 0 ? 'ml-6 border-l-2 border-[#3b4890]/20 bg-black/[0.02] sm:ml-10' : ''}`}
+                        >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-xs font-bold text-[var(--theme-body-dark)]">{c.authorName}</span>
                               <span className="text-[11px] text-[var(--theme-body-muted)]">{new Date(c.createdAt).toLocaleString('ko-KR')}</span>
                             </div>
-                            <p className="text-sm leading-6 text-[var(--theme-body-dark)] whitespace-pre-wrap break-words">{linkify(c.content)}</p>
+                            <p className="text-size-container auto-text-comment text-[var(--theme-body-dark)] whitespace-pre-wrap break-words">{linkify(c.content)}</p>
+                            {c.depth === 0 && (
+                              <div className="mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => { setReplyTo(replyTo === c.id ? null : c.id); setReplyInput('') }}
+                                  className="text-xs font-bold text-[#3b4890] hover:underline"
+                                >
+                                  답글 달기
+                                </button>
+                                {replyTo === c.id && (
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <input
+                                      type="text"
+                                      value={replyInput}
+                                      onChange={(e) => setReplyInput(e.target.value)}
+                                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddReply(c.id) } }}
+                                      placeholder="답글을 입력하세요"
+                                      maxLength={MAX_COMMENT_LENGTH}
+                                      className="flex-1 rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-sm outline-none focus:border-[#3b4890] focus:bg-white"
+                                      disabled={commentSaving}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleAddReply(c.id)}
+                                      disabled={commentSaving || !replyInput.trim()}
+                                      className="rounded bg-[#3b4890] px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                                    >
+                                      등록
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                           {c.deletable && (
                             <button

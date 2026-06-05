@@ -380,7 +380,7 @@ export default function Notices() {
                 작성자 {selectedNotice.author} · {new Date(selectedNotice.createdAt).toLocaleString('ko-KR')}
               </p>
             </div>
-            <div className="min-h-[360px] whitespace-pre-wrap break-words px-5 py-7 text-[15px] leading-8">{linkify(selectedNotice.content)}</div>
+            <div className="text-size-container min-h-[360px] whitespace-pre-wrap break-words px-5 py-7 auto-text-notice">{linkify(selectedNotice.content)}</div>
             <div className="flex flex-wrap justify-between gap-2 border-t border-black/10 px-5 py-4">
               <button type="button" onClick={() => navigate('/notices')} className="rounded border border-black/15 bg-white px-4 py-2 text-sm font-bold">
                 목록
