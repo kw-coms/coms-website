@@ -196,7 +196,7 @@ function SignupPage() {
 
 function NoticesPage() {
   return (
-    <PageShell full>
+    <PageShell wide full>
       <Notices />
     </PageShell>
   )

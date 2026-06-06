@@ -14,6 +14,7 @@ import java.util.UUID;
 public class JwtTokenProvider {
 
     private static final long REFRESH_EXPIRATION = 7L * 24 * 60 * 60 * 1000;
+    private static final long REMEMBERED_REFRESH_EXPIRATION = 30L * 24 * 60 * 60 * 1000;
     private static final String ISSUER = "coms-backend";
     private static final String AUDIENCE = "coms-app";
 
@@ -44,15 +45,17 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    public String generateRefreshToken(String studentId) {
+    public String generateRefreshToken(String studentId, boolean rememberMe) {
+        long refreshExpiration = rememberMe ? REMEMBERED_REFRESH_EXPIRATION : REFRESH_EXPIRATION;
         return Jwts.builder()
                 .subject(studentId)
                 .issuer(ISSUER)
                 .audience().add(AUDIENCE).and()
                 .id(UUID.randomUUID().toString())
                 .claim("type", "refresh")
+                .claim("remember", rememberMe)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + REFRESH_EXPIRATION))
+                .expiration(new Date(System.currentTimeMillis() + refreshExpiration))
                 .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
@@ -74,6 +77,15 @@ public class JwtTokenProvider {
         try {
             Object type = parser().parseSignedClaims(token).getPayload().get("type");
             return "refresh".equals(type);
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    public boolean isRememberedRefreshToken(String token) {
+        try {
+            Object remember = parser().parseSignedClaims(token).getPayload().get("remember");
+            return Boolean.TRUE.equals(remember);
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }

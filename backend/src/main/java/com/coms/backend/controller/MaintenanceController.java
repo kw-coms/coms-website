@@ -4,6 +4,7 @@ import com.coms.backend.domain.EligibleMember;
 import com.coms.backend.domain.Member;
 import com.coms.backend.repository.EligibleMemberRepository;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.service.EligibleMemberService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -24,16 +25,19 @@ public class MaintenanceController {
     private final MemberRepository memberRepository;
     private final EligibleMemberRepository eligibleMemberRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EligibleMemberService eligibleMemberService;
 
     @Value("${bootstrap.secret:}")
     private String bootstrapSecret;
 
     public MaintenanceController(MemberRepository memberRepository,
                                   EligibleMemberRepository eligibleMemberRepository,
-                                  PasswordEncoder passwordEncoder) {
+                                  PasswordEncoder passwordEncoder,
+                                  EligibleMemberService eligibleMemberService) {
         this.memberRepository = memberRepository;
         this.eligibleMemberRepository = eligibleMemberRepository;
         this.passwordEncoder = passwordEncoder;
+        this.eligibleMemberService = eligibleMemberService;
     }
 
     record BootstrapRequest(
@@ -116,16 +120,14 @@ public class MaintenanceController {
             @RequestHeader(value = "X-Bootstrap-Secret", required = false) String providedSecret,
             @Valid @RequestBody EligibleRequest req) {
         verifyBootstrapSecret(providedSecret);
-        EligibleMember member = eligibleMemberRepository.findByStudentId(req.studentId())
-                .orElseGet(EligibleMember::new);
-        boolean nameAlreadyCorrect = req.name().equals(member.getName());
-        member.setStudentId(req.studentId());
-        member.setName(req.name());
-        eligibleMemberRepository.save(member);
+        boolean nameAlreadyCorrect = eligibleMemberRepository.findByStudentId(req.studentId())
+                .map(member -> req.name().equals(member.getName()))
+                .orElse(false);
+        eligibleMemberService.addSingle(req.studentId(), req.name());
         return ResponseEntity.ok(Map.of(
                 "message", nameAlreadyCorrect ? "Already in roster." : "Upserted.",
-                "studentId", member.getStudentId(),
-                "name", member.getName()
+                "studentId", req.studentId(),
+                "name", req.name()
         ));
     }
 }

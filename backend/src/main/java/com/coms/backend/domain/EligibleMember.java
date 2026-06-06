@@ -20,6 +20,11 @@ public class EligibleMember {
 
     private String generation;
 
+    private Integer admissionYear;
+
+    @Column(unique = true)
+    private String verificationKey;
+
     @Column(columnDefinition = "TEXT")
     private String note;
 
@@ -43,6 +48,10 @@ public class EligibleMember {
     public void setPhone(String phone) { this.phone = phone; }
     public String getGeneration() { return generation; }
     public void setGeneration(String generation) { this.generation = generation; }
+    public Integer getAdmissionYear() { return admissionYear; }
+    public void setAdmissionYear(Integer admissionYear) { this.admissionYear = admissionYear; }
+    public String getVerificationKey() { return verificationKey; }
+    public void setVerificationKey(String verificationKey) { this.verificationKey = verificationKey; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
     public LocalDateTime getCreatedAt() { return createdAt; }

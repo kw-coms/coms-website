@@ -30,6 +30,8 @@ import java.time.Duration;
 @RequestMapping("/api/auth")
 public class AuthController {
 
+    private static final Duration REMEMBERED_REFRESH_COOKIE_AGE = Duration.ofDays(30);
+
     private final AuthService authService;
     private final JwtTokenProvider jwtTokenProvider;
     private final boolean cookieSecure;
@@ -54,13 +56,8 @@ public class AuthController {
         String clientIp = resolveClientIp(servletRequest);
         AuthResponse auth = authService.login(request, clientIp);
 
-        response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("token", auth.token())
-                .httpOnly(true).secure(cookieSecure).sameSite("Lax")
-                .maxAge(Duration.ofHours(2)).path("/").build().toString());
-
-        response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("refreshToken", auth.refreshToken())
-                .httpOnly(true).secure(cookieSecure).sameSite("Lax")
-                .maxAge(Duration.ofDays(7)).path("/api/auth/refresh").build().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, accessCookie(auth.token()).toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(auth.refreshToken(), request.rememberMe()).toString());
 
         return ResponseEntity.ok(new AuthResponse(null, auth.studentId(), auth.name(), auth.message()));
     }
@@ -80,9 +77,7 @@ public class AuthController {
         authService.ensureAccountNotBanned(studentId);
         String newAccessToken = jwtTokenProvider.generateToken(studentId);
 
-        response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("token", newAccessToken)
-                .httpOnly(true).secure(cookieSecure).sameSite("Lax")
-                .maxAge(Duration.ofHours(2)).path("/").build().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, accessCookie(newAccessToken).toString());
 
         return ResponseEntity.noContent().build();
     }
@@ -117,6 +112,22 @@ public class AuthController {
     }
 
     private static final java.util.Set<String> TRUSTED_PROXIES = java.util.Set.of("127.0.0.1", "::1", "0:0:0:0:0:0:0:1");
+
+    private ResponseCookie accessCookie(String token) {
+        return ResponseCookie.from("token", token)
+                .httpOnly(true).secure(cookieSecure).sameSite("Lax")
+                .path("/").build();
+    }
+
+    private ResponseCookie refreshCookie(String token, boolean rememberMe) {
+        ResponseCookie.ResponseCookieBuilder cookie = ResponseCookie.from("refreshToken", token)
+                .httpOnly(true).secure(cookieSecure).sameSite("Lax")
+                .path("/api/auth/refresh");
+        if (rememberMe) {
+            cookie.maxAge(REMEMBERED_REFRESH_COOKIE_AGE);
+        }
+        return cookie.build();
+    }
 
     private static String resolveClientIp(HttpServletRequest request) {
         String remoteAddr = request.getRemoteAddr();
