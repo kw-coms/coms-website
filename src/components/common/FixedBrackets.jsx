@@ -30,6 +30,8 @@ function BracketSvg({ mirrored = false }) {
 }
 
 export default function FixedBrackets({ color = '#67e8f9', leftX, rightX } = {}) {
+  if (typeof leftX !== 'number' || typeof rightX !== 'number') return null
+
   return (
     <>
       <div
@@ -37,8 +39,8 @@ export default function FixedBrackets({ color = '#67e8f9', leftX, rightX } = {})
         style={{
           position: 'fixed',
           top: '50vh',
-          left: typeof leftX === 'number' ? `${leftX}px` : '50%',
-          transform: typeof leftX === 'number' ? 'translate(-100%, -50%)' : 'translate(-50%, -50%)',
+          left: `${leftX}px`,
+          transform: 'translate(-100%, -50%)',
           color,
           zIndex: 40,
           pointerEvents: 'none',
@@ -53,8 +55,8 @@ export default function FixedBrackets({ color = '#67e8f9', leftX, rightX } = {})
         style={{
           position: 'fixed',
           top: '50vh',
-          left: typeof rightX === 'number' ? `${rightX}px` : '50%',
-          transform: typeof rightX === 'number' ? 'translate(0, -50%)' : 'translate(-50%, -50%)',
+          left: `${rightX}px`,
+          transform: 'translate(0, -50%)',
           color,
           zIndex: 40,
           pointerEvents: 'none',
