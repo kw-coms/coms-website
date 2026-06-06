@@ -56,7 +56,11 @@ public class AdminController {
 
     @PostMapping("/eligible-members")
     public ResponseEntity<Void> addEligibleMember(@Valid @RequestBody AddEligibleMemberRequest request) {
-        eligibleMemberService.addSingle(request.studentId(), request.name());
+        if (request.studentId() != null && !request.studentId().isBlank()) {
+            eligibleMemberService.addSingle(request.studentId(), request.name());
+        } else {
+            eligibleMemberService.addGraduateSingle(request.name(), request.admissionYear(), request.generation());
+        }
         return ResponseEntity.noContent().build();
     }
 
