@@ -606,7 +606,7 @@ function HomeView() {
       <BackgroundLayers />
       <FixedBrackets color={bracketColor} leftX={bracketPositions.leftX} rightX={bracketPositions.rightX} />
 
-      <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
+      <header className="fixed inset-x-0 top-0 z-[70] px-4 pt-4 sm:px-6 lg:px-8">
         <div className={`${floatingBarBaseClass} relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-5`}>
           <button type="button" onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="flex items-center gap-3 text-left">
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="logo-emboss h-11 w-11 shrink-0 object-contain sm:h-12 sm:w-12" />
