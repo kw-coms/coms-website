@@ -13,6 +13,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 class RecruitApplicationServiceTest {
@@ -30,9 +31,9 @@ class RecruitApplicationServiceTest {
         service.sendApplication(sampleRequest(), "127.0.0.1");
 
         ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-        verify(mailSender).send(captor.capture());
+        verify(mailSender, times(2)).send(captor.capture());
 
-        SimpleMailMessage message = captor.getValue();
+        SimpleMailMessage message = captor.getAllValues().get(0);
         assertThat(message.getFrom()).isEqualTo("no-reply@coms.kw.ac.kr");
         assertThat(message.getTo()).containsExactly("recruit@coms.kw.ac.kr");
         assertThat(message.getReplyTo()).isEqualTo("applicant@example.com");
@@ -41,6 +42,15 @@ class RecruitApplicationServiceTest {
                 .contains("학번: 2026123456")
                 .contains("관심 분야: 웹, 기타: AI")
                 .contains("[지원 동기]\n함께 만들고 싶습니다.");
+
+        SimpleMailMessage confirmation = captor.getAllValues().get(1);
+        assertThat(confirmation.getFrom()).isEqualTo("no-reply@coms.kw.ac.kr");
+        assertThat(confirmation.getTo()).containsExactly("applicant@example.com");
+        assertThat(confirmation.getSubject()).isEqualTo("[COM's] 지원서가 접수되었습니다");
+        assertThat(confirmation.getText())
+                .contains("COM's 지원서가 정상적으로 접수되었습니다.")
+                .contains("학번: 2026123456")
+                .contains("관심 분야: 웹, 기타: AI");
     }
 
     @Test

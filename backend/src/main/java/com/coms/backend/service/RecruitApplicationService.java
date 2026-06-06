@@ -55,6 +55,7 @@ public class RecruitApplicationService {
             message.setSubject("[COM's 지원] " + oneLine(request.name()));
             message.setText(buildBody(request));
             mailSender.send(message);
+            mailSender.send(buildApplicantConfirmationMessage(request));
         } catch (RuntimeException e) {
             log.warn("Failed to send recruit application for studentId={}", request.studentId(), e);
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "지원서 메일 발송에 실패했습니다.");
@@ -111,6 +112,30 @@ public class RecruitApplicationService {
                 .filter(value -> !value.isBlank())
                 .reduce((left, right) -> left + ", " + right)
                 .orElse("미선택");
+    }
+
+    private SimpleMailMessage buildApplicantConfirmationMessage(RecruitApplicationRequest request) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(from);
+        message.setTo(oneLine(request.email()));
+        message.setSubject("[COM's] 지원서가 접수되었습니다");
+        message.setText(String.join("\n",
+                "안녕하세요, " + trim(request.name()) + "님.",
+                "",
+                "COM's 지원서가 정상적으로 접수되었습니다.",
+                "내부 확인 후 입력하신 연락처 또는 이메일로 개별 연락드리겠습니다.",
+                "",
+                "[접수 내용 요약]",
+                "이름: " + trim(request.name()),
+                "학번: " + trim(request.studentId()),
+                "학과: " + trim(request.department()),
+                "학년: " + optional(request.grade(), "선택 안 함"),
+                "관심 분야: " + interestsText(request.interests()),
+                "",
+                "지원해주셔서 감사합니다.",
+                "COM's"
+        ));
+        return message;
     }
 
     private static String optional(String value, String fallback) {

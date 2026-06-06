@@ -44,10 +44,48 @@ const activities = [
   '교류 활동: 선후배 간 경험 공유와 진로·학습 정보 교환',
 ]
 
+const activityDetails = [
+  {
+    title: '정기 세미나',
+    description: '프로그래밍 기초, 웹 개발, 알고리즘, 컴퓨터 구조처럼 학기 중 꾸준히 다루기 좋은 주제를 정해 함께 학습합니다.',
+  },
+  {
+    title: '수준별 스터디',
+    description: '처음 시작하는 부원은 기초 문법과 개발 환경부터 익히고, 기존 부원은 관심 분야별로 심화 스터디를 운영합니다.',
+  },
+  {
+    title: '팀 프로젝트',
+    description: '웹사이트, 앱, 아두이노, 자동화 도구 등 실제로 사용할 수 있는 결과물을 목표로 기획부터 구현까지 경험합니다.',
+  },
+  {
+    title: '선후배 교류',
+    description: '수강 과목, 공모전, 진로, 개발 학습 방법에 대한 경험을 공유하며 서로의 성장을 돕는 커뮤니티를 만듭니다.',
+  },
+]
+
 const projects = [
   'COM\'s Official Website - React · Vite · Tailwind CSS 기반 공식 웹사이트',
   'Arduino Basic Class - 초급자를 위한 아두이노 기초 교육 프로젝트',
   'Web Development Study - HTML · CSS · JavaScript · React 학습 스터디',
+]
+
+const projectDetails = [
+  {
+    title: 'COM\'s Official Website',
+    description: '동아리 소개, 공지사항, 자료실, 커뮤니티를 담는 공식 웹사이트입니다. React, Vite, Tailwind CSS를 활용해 실제 서비스 형태로 개발합니다.',
+  },
+  {
+    title: 'Arduino Basic Class',
+    description: '아두이노를 처음 접하는 부원을 위해 회로 연결, 센서 입력, 간단한 제어 로직을 단계별로 익히는 교육형 프로젝트입니다.',
+  },
+  {
+    title: 'Web Development Study',
+    description: 'HTML, CSS, JavaScript, React를 기반으로 화면 설계와 컴포넌트 구현을 연습하고, 작은 기능을 직접 완성해 봅니다.',
+  },
+  {
+    title: '자유 주제 제작',
+    description: '부원들이 관심 있는 아이디어를 팀으로 발전시켜 웹 서비스, 앱, 자동화 프로그램, 학습 도구 등 다양한 결과물을 제작합니다.',
+  },
 ]
 
 const sectionMeta = {
@@ -340,6 +378,8 @@ function HomeView() {
   const [bottomHidden, setBottomHidden] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [latestNotice, setLatestNotice] = useState(null)
+  const [activitiesExpanded, setActivitiesExpanded] = useState(false)
+  const [projectsExpanded, setProjectsExpanded] = useState(false)
 
   const updateBracketPositions = (sectionId) => {
     const map = { about: aboutRef, activities: activitiesRef, projects: projectsRef, recruit: recruitRef }
@@ -429,7 +469,6 @@ function HomeView() {
   const goNotices = () => navigate('/notices')
   const goAdmin = () => navigate('/admin')
   const goChangePassword = () => navigate('/settings')
-  const goLogin = () => navigate('/login')
   const goRecruitPage = () => navigate('/recruit')
 
   const bracketColor = activeSection ? sectionMeta[activeSection]?.bracket : sectionMeta.about.bracket
@@ -449,8 +488,7 @@ function HomeView() {
             서로의 성장을 돕습니다.
           </p>
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>지원 화면으로 이동</button>
-            <button type="button" onClick={goLogin} className={ghostActionBtnClass}>로그인</button>
+            <button type="button" onClick={() => openPanel('recruit')} className={solidActionBtnClass}>지원 화면으로 이동</button>
           </div>
         </div>
       )
@@ -465,9 +503,20 @@ function HomeView() {
               <div key={item} className="border-b border-white/10 pb-4 text-white/80 last:border-b-0 last:pb-0">{item}</div>
             ))}
           </div>
+          {activitiesExpanded && (
+            <div className="space-y-4 border-t border-white/14 pt-5">
+              {activityDetails.map((item) => (
+                <div key={item.title} className="space-y-1.5 border-b border-white/10 pb-4 last:border-b-0 last:pb-0">
+                  <h4 className="text-base font-semibold text-white">{item.title}</h4>
+                  <p className="leading-7 text-white/78">{item.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>지원하기</button>
-            <button type="button" onClick={goLogin} className={ghostActionBtnClass}>로그인</button>
+            <button type="button" onClick={() => setActivitiesExpanded((open) => !open)} className={solidActionBtnClass}>
+              {activitiesExpanded ? '활동 요약 보기' : '주요 활동 더 알아보기'}
+            </button>
           </div>
         </div>
       )
@@ -482,8 +531,20 @@ function HomeView() {
               <div key={item} className="border-b border-white/10 pb-4 text-white/80 last:border-b-0 last:pb-0">{item}</div>
             ))}
           </div>
+          {projectsExpanded && (
+            <div className="space-y-4 border-t border-white/14 pt-5">
+              {projectDetails.map((item) => (
+                <div key={item.title} className="space-y-1.5 border-b border-white/10 pb-4 last:border-b-0 last:pb-0">
+                  <h4 className="text-base font-semibold text-white">{item.title}</h4>
+                  <p className="leading-7 text-white/78">{item.description}</p>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>모집 안내 보기</button>
+            <button type="button" onClick={() => setProjectsExpanded((open) => !open)} className={solidActionBtnClass}>
+              {projectsExpanded ? '프로젝트 요약 보기' : '프로젝트 더 알아보기'}
+            </button>
             <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className={ghostActionBtnClass}>GitHub 확인</a>
           </div>
         </div>
@@ -566,9 +627,7 @@ function HomeView() {
               </button>
             </div>
           ) : (
-            <button type="button" onClick={goLogin} disabled={authLoading} className="shape-cut-sm ml-auto hidden border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78 disabled:cursor-wait disabled:opacity-70 md:inline-flex">
-              Login
-            </button>
+            <div className="ml-auto hidden w-16 md:block" aria-hidden="true" />
           )}
 
           <button
@@ -609,8 +668,8 @@ function HomeView() {
                 <span>Community</span>
                 <span className="ml-auto text-xs text-[var(--theme-body-muted)]">커뮤니티</span>
               </button>
-              <div className="border-t border-black/10">
-                {user ? (
+              {user && (
+                <div className="border-t border-black/10">
                   <div className="flex flex-col divide-y divide-black/8">
                     <button type="button" onClick={() => { goChangePassword(); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
                       <span className="size-5 flex items-center justify-center rounded-full bg-black/10 text-[10px] font-black">{user.name?.[0] ?? '?'}</span>
@@ -631,12 +690,8 @@ function HomeView() {
                       <span>로그아웃</span>
                     </button>
                   </div>
-                ) : (
-                  <button type="button" onClick={() => { goLogin(); setMobileMenuOpen(false) }} className="flex w-full items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
-                    <span>로그인</span>
-                  </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         )}
