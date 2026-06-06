@@ -474,6 +474,25 @@ Nginx
 
 ## 자체 서버 배포 흐름
 
+### GitHub Actions 자동 배포
+
+`.github/workflows/deploy.yml`은 `main` 브랜치에 push되거나 Actions에서 수동 실행하면 COM's 서버에 접속해 Docker Compose로 서비스를 재배포합니다.
+
+GitHub 저장소 `Settings > Secrets and variables > Actions`에 아래 시크릿을 설정합니다.
+
+| Secret | 설명 |
+| ------ | ---- |
+| `DEPLOY_HOST` | 배포 서버 IP 또는 도메인 |
+| `DEPLOY_USER` | SSH 접속 사용자 |
+| `DEPLOY_PORT` | SSH 포트. 미설정 시 22 사용 |
+| `DEPLOY_SSH_KEY` | 서버 접속용 private key |
+| `DEPLOY_PATH` | 서버의 프로젝트 경로. 미설정 시 `~/apps/coms-website` |
+| `PUBLIC_BASE_URL` | 배포 후 외부 헬스체크 주소. 미설정 시 `https://coms.kw.ac.kr` |
+
+서버에는 Docker, Docker Compose, Git이 설치되어 있어야 합니다. 첫 배포 전 서버의 `DEPLOY_PATH` 위치에 `.env.example`을 참고해 `.env` 파일을 만들어 둡니다.
+
+수동 배포가 필요할 때는 GitHub Actions의 `Deploy COMS Website` 워크플로를 실행하고 `deploy_ref`에 배포할 브랜치명, 태그, 커밋 SHA를 입력합니다. 비워두면 `main`을 배포합니다.
+
 ### 1. 서버 접속
 
 ```bash
