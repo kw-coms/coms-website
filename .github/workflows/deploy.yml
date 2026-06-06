@@ -5,6 +5,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      deploy_ref:
+        description: "Branch, tag, or commit SHA to deploy"
+        required: false
+        default: main
 
 jobs:
   deploy:
@@ -15,24 +20,70 @@ jobs:
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '~/apps/coms-website' }}
+          DEPLOY_REPO: https://github.com/kw-coms/coms-website.git
+          DEPLOY_REF: ${{ github.event.inputs.deploy_ref || github.ref_name }}
+          PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL || 'https://coms.kw.ac.kr' }}
         run: |
+          set -euo pipefail
+
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_SSH_KEY" ]; then
+            echo "Missing deploy secrets. Set DEPLOY_HOST, DEPLOY_USER, and DEPLOY_SSH_KEY." >&2
+            exit 1
+          fi
+
           mkdir -p ~/.ssh
           echo "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
           ssh-keyscan -p "$DEPLOY_PORT" "$DEPLOY_HOST" >> ~/.ssh/known_hosts
 
-          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" << 'REMOTE'
-            set -e
+          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH=${DEPLOY_PATH@Q} DEPLOY_REPO=${DEPLOY_REPO@Q} DEPLOY_REF=${DEPLOY_REF@Q} PUBLIC_BASE_URL=${PUBLIC_BASE_URL@Q} bash -s" << 'REMOTE'
+            set -euo pipefail
 
-            cd ~/apps/coms-website
+            DEPLOY_PATH="${DEPLOY_PATH/#\~/$HOME}"
+            PUBLIC_BASE_URL="${PUBLIC_BASE_URL%/}"
 
-            git fetch origin main
-            git reset --hard origin/main
+            if ! command -v git >/dev/null 2>&1; then
+              echo "git is required on the server." >&2
+              exit 1
+            fi
 
-            docker compose --env-file .env -f docker-compose.yml up -d --build --remove-orphans
+            if docker compose version >/dev/null 2>&1; then
+              COMPOSE="docker compose"
+            elif command -v docker-compose >/dev/null 2>&1; then
+              COMPOSE="docker-compose"
+            else
+              echo "Docker Compose is required on the server." >&2
+              exit 1
+            fi
+
+            mkdir -p "$(dirname "$DEPLOY_PATH")"
+            if [ ! -d "$DEPLOY_PATH/.git" ]; then
+              git clone "$DEPLOY_REPO" "$DEPLOY_PATH"
+            fi
+
+            cd "$DEPLOY_PATH"
+            git remote set-url origin "$DEPLOY_REPO"
+            git fetch --prune origin "+refs/heads/*:refs/remotes/origin/*" "+refs/tags/*:refs/tags/*"
+            if git rev-parse --verify --quiet "origin/$DEPLOY_REF^{commit}" >/dev/null; then
+              git reset --hard "origin/$DEPLOY_REF"
+            elif git rev-parse --verify --quiet "$DEPLOY_REF^{commit}" >/dev/null; then
+              git reset --hard "$DEPLOY_REF"
+            else
+              git fetch origin "$DEPLOY_REF"
+              git reset --hard FETCH_HEAD
+            fi
+
+            if [ ! -f .env ]; then
+              echo "Missing $DEPLOY_PATH/.env on the server. Create it from .env.example before deploying." >&2
+              exit 1
+            fi
+
+            $COMPOSE --env-file .env -f docker-compose.yml up -d --build --remove-orphans
             docker image prune -f
 
             for attempt in 1 2 3 4 5 6 7 8 9 10; do
@@ -40,7 +91,7 @@ jobs:
                 break
               fi
               if [ "$attempt" -eq 10 ]; then
-                docker compose --env-file .env -f docker-compose.yml ps
+                $COMPOSE --env-file .env -f docker-compose.yml ps
                 docker logs --tail=200 coms-backend
                 exit 1
               fi
@@ -48,11 +99,11 @@ jobs:
             done
 
             for attempt in 1 2 3 4 5 6 7 8 9 10; do
-              if curl -fI https://coms.kw.ac.kr/ && curl -f https://coms.kw.ac.kr/api/server/time; then
+              if curl -fI "$PUBLIC_BASE_URL/" && curl -f "$PUBLIC_BASE_URL/api/server/time"; then
                 break
               fi
               if [ "$attempt" -eq 10 ]; then
-                docker compose --env-file .env -f docker-compose.yml ps
+                $COMPOSE --env-file .env -f docker-compose.yml ps
                 docker logs --tail=200 coms-backend
                 docker logs --tail=100 coms-frontend
                 exit 1
