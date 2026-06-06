@@ -3,8 +3,11 @@ package com.coms.backend.service;
 import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.CommunityPostRequest;
+import com.coms.backend.dto.CommunityPostResponse;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVoteRepository;
+import com.coms.backend.repository.CommunityCommentRepository;
+import com.coms.backend.repository.CommunityPostImageRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,8 +38,16 @@ class CommunityServiceTest {
     @Autowired
     private CommunityPostVoteRepository voteRepository;
 
+    @Autowired
+    private CommunityCommentRepository commentRepository;
+
+    @Autowired
+    private CommunityPostImageRepository imageRepository;
+
     @BeforeEach
     void setUp() {
+        imageRepository.deleteAll();
+        commentRepository.deleteAll();
         voteRepository.deleteAll();
         communityPostRepository.deleteAll();
         memberRepository.deleteAll();
@@ -175,6 +186,19 @@ class CommunityServiceTest {
                 new com.coms.backend.dto.CommunityCommentRequest("javascript:alert(1)", null)
         )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                 assertThat(ex.getReason()).contains("보안"));
+    }
+
+    @Test
+    void rejectsImageMutationByNonAuthor() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member other = member("2024123456", "다른회원", Member.Role.USER);
+        memberRepository.save(author);
+        memberRepository.save(other);
+        var created = communityService.create(author.getStudentId(), new CommunityPostRequest("이미지", "내용", "GENERAL", false), null);
+        MockMultipartFile image = new MockMultipartFile("images", "ok.png", "image/png", "png".getBytes());
+
+        assertThatThrownBy(() -> communityService.addImages(other.getStudentId(), created.id(), java.util.List.of(image)))
+                .isInstanceOf(ResponseStatusException.class);
     }
 
     @Test

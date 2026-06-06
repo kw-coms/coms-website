@@ -16,13 +16,18 @@ public class BannedStudent {
     @Column(name = "banned_at", nullable = false)
     private LocalDateTime bannedAt = LocalDateTime.now();
 
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     public BannedStudent() {}
 
-    public BannedStudent(String studentId) {
+    public BannedStudent(String studentId, LocalDateTime expiresAt) {
         this.studentId = studentId;
+        this.expiresAt = expiresAt;
     }
 
     public Long getId() { return id; }
     public String getStudentId() { return studentId; }
     public LocalDateTime getBannedAt() { return bannedAt; }
+    public LocalDateTime getExpiresAt() { return expiresAt; }
 }
