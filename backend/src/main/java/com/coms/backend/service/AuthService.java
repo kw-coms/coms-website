@@ -100,12 +100,12 @@ public class AuthService implements UserDetailsService {
                     throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
                 });
 
+        bannedStudentService.ensureNotBanned(member.getStudentId());
+
         if (!passwordEncoder.matches(request.password(), member.getPassword())) {
             loginFailureRepository.save(new LoginFailure(request.identifier(), clientIp));
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
-
-        bannedStudentService.ensureNotBanned(member.getStudentId());
 
         if (requiresEmailVerification(member)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일 인증이 완료되지 않았습니다. 가입 시 받은 인증 이메일을 확인해주세요.");

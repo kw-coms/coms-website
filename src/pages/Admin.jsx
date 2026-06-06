@@ -500,7 +500,14 @@ function FilesTab() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(loadFiles, [])
+  useEffect(() => {
+    let mounted = true
+    listFiles()
+      .then(d => { if (mounted) setFiles(d) })
+      .catch(() => {})
+      .finally(() => { if (mounted) setLoading(false) })
+    return () => { mounted = false }
+  }, [])
 
   const handleUpload = async (e) => {
     const file = e.target.files?.[0]
@@ -688,7 +695,14 @@ function BanTab() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(load, [])
+  useEffect(() => {
+    let mounted = true
+    listBannedStudents()
+      .then(d => { if (mounted) setBanned(d) })
+      .catch(() => {})
+      .finally(() => { if (mounted) setLoading(false) })
+    return () => { mounted = false }
+  }, [])
 
   const handleBan = async (e) => {
     e.preventDefault()

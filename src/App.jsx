@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import {
   Binary,
@@ -18,14 +18,14 @@ import {
 import { listNotices } from './services/noticeApi.js'
 import { getNotificationSummary, listNotifications, markAllNotificationsRead, markNotificationRead } from './services/notificationApi.js'
 import SplitLogoCard from './components/common/SplitLogoCard.jsx'
-import Archive from './pages/Archive.jsx'
-import Login from './pages/Login.jsx'
-import Signup from './pages/Signup.jsx'
-import Notices from './pages/Notices.jsx'
-import Admin from './pages/Admin.jsx'
-import Community from './pages/Community.jsx'
-import ChangePassword from './pages/ChangePassword.jsx'
-import RecruitApply from './pages/RecruitApply.jsx'
+const Archive = lazy(() => import('./pages/Archive.jsx'))
+const Login = lazy(() => import('./pages/Login.jsx'))
+const Signup = lazy(() => import('./pages/Signup.jsx'))
+const Notices = lazy(() => import('./pages/Notices.jsx'))
+const Admin = lazy(() => import('./pages/Admin.jsx'))
+const Community = lazy(() => import('./pages/Community.jsx'))
+const ChangePassword = lazy(() => import('./pages/ChangePassword.jsx'))
+const RecruitApply = lazy(() => import('./pages/RecruitApply.jsx'))
 import { getLogoAsset } from './utils/logoAssets.js'
 import FixedBrackets from './components/common/FixedBrackets.jsx'
 import { useAuth } from './contexts/useAuth.js'
@@ -361,9 +361,17 @@ function NotificationButton({ alignLeft = false, padded = false }) {
 
 // ─── Root router ────────────────────────────────────────────────────────────
 
+function PageFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[var(--theme-bg)]">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-white/80" />
+    </div>
+  )
+}
+
 function App() {
   return (
-    <>
+    <Suspense fallback={<PageFallback />}>
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<HomeView />} />
@@ -379,7 +387,7 @@ function App() {
         <Route path="/recruit" element={<RecruitPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </>
+    </Suspense>
   )
 }
 
@@ -415,40 +423,46 @@ function HomeView() {
   }
 
   useEffect(() => {
+    let rafId = null
     const onScroll = () => {
-      const y = window.scrollY || window.pageYOffset
-      setBottomHidden(y > 120)
-      const sections = [
-        { id: 'about', ref: aboutRef },
-        { id: 'activities', ref: activitiesRef },
-        { id: 'projects', ref: projectsRef },
-        { id: 'recruit', ref: recruitRef },
-      ]
-      let found = false
-      let foundSectionId = null
-      const centerY = window.innerHeight / 2
-      for (const s of sections) {
-        const sectionEl = s.ref.current
-        if (!sectionEl) continue
-        const panelEl = sectionEl.querySelector?.('[data-panel]') || sectionEl
-        const rect = panelEl.getBoundingClientRect()
-        const isCentered = rect.top <= centerY && rect.bottom >= centerY
-        if (isCentered) {
-          setActiveSection(s.id)
-          foundSectionId = s.id
-          found = true
-          break
+      if (rafId !== null) return
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        const y = window.scrollY || window.pageYOffset
+        setBottomHidden(y > 120)
+        const sections = [
+          { id: 'about', ref: aboutRef },
+          { id: 'activities', ref: activitiesRef },
+          { id: 'projects', ref: projectsRef },
+          { id: 'recruit', ref: recruitRef },
+        ]
+        let found = false
+        let foundSectionId = null
+        const centerY = window.innerHeight / 2
+        for (const s of sections) {
+          const sectionEl = s.ref.current
+          if (!sectionEl) continue
+          const panelEl = sectionEl.querySelector?.('[data-panel]') || sectionEl
+          const rect = panelEl.getBoundingClientRect()
+          const isCentered = rect.top <= centerY && rect.bottom >= centerY
+          if (isCentered) {
+            setActiveSection(s.id)
+            foundSectionId = s.id
+            found = true
+            break
+          }
         }
-      }
-      updateBracketPositions(foundSectionId || 'about')
-      if (!found && y < 140) setActiveSection(null)
+        updateBracketPositions(foundSectionId || 'about')
+        if (!found && y < 140) setActiveSection(null)
+      })
     }
     window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', onScroll)
+    window.addEventListener('resize', onScroll, { passive: true })
     onScroll()
     return () => {
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
+      if (rafId !== null) cancelAnimationFrame(rafId)
     }
   }, [])
 
