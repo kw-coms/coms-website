@@ -187,9 +187,10 @@ function SignupPage() {
 }
 
 function NoticesPage() {
+  const navigate = useNavigate()
   return (
     <PageShell>
-      <Notices />
+      <Notices onBack={() => navigate('/')} />
     </PageShell>
   )
 }
