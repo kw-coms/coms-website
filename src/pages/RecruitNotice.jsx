@@ -33,7 +33,7 @@ export default function RecruitNotice({ onBack, onApply }) {
         className="shape-cut-sm inline-flex items-center gap-2 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15"
       >
         <ArrowLeft size={15} />
-        창 닫기
+        이전 화면으로
       </button>
 
       <section className="shape-cut overflow-hidden border border-white/12 bg-[var(--theme-surface-96)] text-[var(--theme-body-dark)] shadow-[0_30px_90px_rgba(0,0,0,0.32)]">
@@ -47,7 +47,7 @@ export default function RecruitNotice({ onBack, onApply }) {
             type="button"
             onClick={onBack}
             className="shape-cut-sm shrink-0 border border-white/12 bg-white/10 p-2 text-white transition hover:bg-white/18"
-            aria-label="창 닫기"
+            aria-label="이전 화면으로"
           >
             <X size={20} />
           </button>
