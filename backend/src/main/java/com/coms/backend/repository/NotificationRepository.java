@@ -9,4 +9,5 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findTop30ByRecipientStudentIdOrderByCreatedAtDesc(String recipientStudentId);
     List<Notification> findByRecipientStudentIdAndReadAtIsNull(String recipientStudentId);
     long countByRecipientStudentIdAndReadAtIsNull(String recipientStudentId);
+    long deleteByRecipientStudentIdAndReadAtIsNotNull(String recipientStudentId);
 }
