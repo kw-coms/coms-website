@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/useAuth.js'
 import { getLogoAsset } from '../utils/logoAssets.js'
 import { EmailVerifyStep } from '../components/EmailVerifyStep.jsx'
 
-export default function Login({ onBack, goSignup }) {
+export default function Login({ onCancel, onSuccess, goSignup }) {
   const { login } = useAuth()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -35,7 +35,7 @@ export default function Login({ onBack, goSignup }) {
     try {
       const data = await loginUser({ identifier: trimmedIdentifier, password: submittedPassword })
       await login(data)
-      onBack()
+      onSuccess()
     } catch (err) {
       const msg = err.message || '로그인 중 오류가 발생했습니다.'
       if (msg.includes('이메일 인증')) {
@@ -61,7 +61,7 @@ export default function Login({ onBack, goSignup }) {
     try {
       const data = await loginUser({ identifier: verifyStudentId, password })
       await login(data)
-      onBack()
+      onSuccess()
     } catch (err) {
       // Stay on verify step — verification succeeded, login failure is likely transient
       setVerifyError(err.message || '로그인 중 오류가 발생했습니다. 다시 시도해주세요.')
@@ -77,7 +77,7 @@ export default function Login({ onBack, goSignup }) {
       <div className="flex justify-center sm:justify-start">
         <button
           type="button"
-          onClick={isVerifyStep ? () => setStep('login') : onBack}
+          onClick={isVerifyStep ? () => setStep('login') : onCancel}
           className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] shadow-[0_18px_40px_rgba(255,255,255,0.2)] transition hover:bg-white"
         >
           {isVerifyStep ? '로그인으로 돌아가기' : '메인으로 돌아가기'}
