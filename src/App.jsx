@@ -16,7 +16,7 @@ import {
   Youtube,
 } from 'lucide-react'
 import { listNotices } from './services/noticeApi.js'
-import { getNotificationSummary, listNotifications, markAllNotificationsRead, markNotificationRead } from './services/notificationApi.js'
+import { clearReadNotifications, getNotificationSummary, listNotifications, markAllNotificationsRead, markNotificationRead } from './services/notificationApi.js'
 import SplitLogoCard from './components/common/SplitLogoCard.jsx'
 const Archive = lazy(() => import('./pages/Archive.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
@@ -315,6 +315,11 @@ function NotificationButton({ alignLeft = false, padded = false }) {
     setItems((prev) => prev.map((item) => ({ ...item, read: true })))
   }
 
+  const clearRead = async () => {
+    await clearReadNotifications()
+    setItems((prev) => prev.filter((item) => !item.read))
+  }
+
   const toggle = () => {
     if (!open && btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect()
@@ -336,6 +341,7 @@ function NotificationButton({ alignLeft = false, padded = false }) {
         onClick={toggle}
         className="shape-cut-sm relative inline-flex items-center gap-2 border border-black/10 bg-white/60 px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78"
         aria-label="notifications"
+        aria-expanded={open}
       >
         <Bell size={15} />
         {unreadCount > 0 && (
@@ -349,9 +355,20 @@ function NotificationButton({ alignLeft = false, padded = false }) {
           className="fixed z-[9999] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-black/10 bg-white text-[var(--theme-body-dark)] shadow-2xl"
           style={dropdownStyle}
         >
-          <div className="flex items-center justify-between border-b border-black/10 px-4 py-3">
+          <div className="flex items-center justify-between gap-3 border-b border-black/10 px-4 py-3">
             <span className="text-sm font-black">알림</span>
-            <button type="button" onClick={readAll} className="text-xs font-bold text-[#3b4890] hover:underline">모두 읽음</button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={clearRead}
+                disabled={!items.some((item) => item.read)}
+                aria-label="clear-read-notifications"
+                className="text-xs font-bold text-[var(--theme-body-muted)] hover:underline disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                읽은 알림 지우기
+              </button>
+              <button type="button" onClick={readAll} aria-label="mark-all-notifications-read" className="text-xs font-bold text-[#3b4890] hover:underline">모두 읽음</button>
+            </div>
           </div>
           <div className="max-h-80 overflow-auto">
             {items.length === 0 ? (

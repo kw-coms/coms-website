@@ -94,6 +94,10 @@ public class NotificationService {
                 .forEach(Notification::markRead);
     }
 
+    public void clearRead(String studentId) {
+        notificationRepository.deleteByRecipientStudentIdAndReadAtIsNotNull(studentId);
+    }
+
     private void createIfDifferent(String recipientStudentId,
                                    String actorStudentId,
                                    Notification.Type type,

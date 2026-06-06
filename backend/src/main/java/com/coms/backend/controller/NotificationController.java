@@ -38,4 +38,10 @@ public class NotificationController {
         notificationService.markAllRead(authentication.getName());
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping("/read")
+    public ResponseEntity<Void> clearRead(Authentication authentication) {
+        notificationService.clearRead(authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
 }
