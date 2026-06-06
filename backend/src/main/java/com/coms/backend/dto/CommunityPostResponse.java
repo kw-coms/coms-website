@@ -1,6 +1,7 @@
 package com.coms.backend.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record CommunityPostResponse(
         Long id,
@@ -13,6 +14,7 @@ public record CommunityPostResponse(
         String category,
         String imageUrl,
         String imageOriginalName,
+        List<String> imageUrls,
         long viewCount,
         long upvotes,
         long downvotes,

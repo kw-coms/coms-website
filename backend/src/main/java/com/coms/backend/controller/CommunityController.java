@@ -102,6 +102,24 @@ public class CommunityController {
                 .body(resource);
     }
 
+    @PostMapping(path = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Void> uploadImages(Authentication authentication,
+                                             @PathVariable Long id,
+                                             @RequestParam("images") List<MultipartFile> images) {
+        communityService.addImages(authentication.getName(), id, images);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/images/{imageId}")
+    public ResponseEntity<Resource> getImage(@PathVariable Long id, @PathVariable Long imageId) {
+        Resource resource = communityService.loadExtraImage(id, imageId);
+        String mimeType = communityService.getExtraImageMimeType(id, imageId);
+        return ResponseEntity.ok()
+                .contentType(mediaType(mimeType))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename("image", StandardCharsets.UTF_8).build().toString())
+                .body(resource);
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(Authentication authentication, @PathVariable Long id) {
         communityService.delete(authentication.getName(), id);

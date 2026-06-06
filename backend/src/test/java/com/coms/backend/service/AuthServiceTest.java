@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.dto.UpdateProfileRequest;
+import com.coms.backend.repository.BannedStudentRepository;
 import com.coms.backend.repository.LoginFailureRepository;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.security.JwtTokenProvider;
@@ -14,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import java.time.LocalDateTime;
 
@@ -41,10 +43,17 @@ class AuthServiceTest {
     private MemberRepository memberRepository;
 
     @Autowired
+    private BannedStudentService bannedStudentService;
+
+    @Autowired
+    private BannedStudentRepository bannedStudentRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setUp() {
+        bannedStudentRepository.deleteAll();
         memberRepository.deleteAll();
     }
 
@@ -169,6 +178,28 @@ class AuthServiceTest {
     }
 
     @Test
+    void loginRejectsTemporarilyBannedMember() {
+        saveMember("2026123465", true);
+        bannedStudentService.ban("2026123465", "6H");
+
+        assertThatThrownBy(() -> authService.login(new com.coms.backend.dto.LoginRequest("2026123465", "Password1!"), "127.0.0.1"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
+                    assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                    assertThat(ex.getReason()).contains("차단");
+                });
+    }
+
+    @Test
+    void loadUserByUsernameRejectsBannedMemberToStopExistingJwtSessions() {
+        saveMember("2026123466", true);
+        bannedStudentService.ban("2026123466", "6H");
+
+        assertThatThrownBy(() -> authService.loadUserByUsername("2026123466"))
+                .isInstanceOf(UsernameNotFoundException.class)
+                .hasMessageContaining("차단");
+    }
+
+    @Test
     @DisplayName("signup fails instead of creating a stuck unverified account when email sending is unavailable")
     void signupPropagatesEmailSendFailure() {
         MemberRepository repo = mock(MemberRepository.class);
@@ -178,7 +209,8 @@ class AuthServiceTest {
         EmailVerificationSender sender = mock(EmailVerificationSender.class);
         FontService fontService = mock(FontService.class);
         when(fontService.isSelectable(null)).thenReturn(true);
-        AuthService service = new AuthService(repo, loginFailures, eligible, passwordEncoder, jwt, sender, fontService);
+        BannedStudentService banned = mock(BannedStudentService.class);
+        AuthService service = new AuthService(repo, loginFailures, eligible, passwordEncoder, jwt, sender, fontService, banned);
 
         when(repo.existsByStudentId("2026123462")).thenReturn(false);
         when(repo.existsByEmail("new@example.com")).thenReturn(false);

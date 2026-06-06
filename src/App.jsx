@@ -187,7 +187,7 @@ function SignupPage() {
 
 function NoticesPage() {
   return (
-    <PageShell>
+    <PageShell full>
       <Notices />
     </PageShell>
   )
@@ -196,7 +196,7 @@ function NoticesPage() {
 function ArchivePage() {
   const navigate = useNavigate()
   return (
-    <PageShell wide>
+    <PageShell wide full>
       <Archive onBack={() => navigate('/')} />
     </PageShell>
   )
@@ -205,7 +205,7 @@ function ArchivePage() {
 function CommunityPage() {
   const navigate = useNavigate()
   return (
-    <PageShell wide>
+    <PageShell wide full>
       <Community onBack={() => navigate('/')} />
     </PageShell>
   )
@@ -244,6 +244,8 @@ function NotificationButton({ alignLeft = false, padded = false }) {
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const [dropdownStyle, setDropdownStyle] = useState({})
+  const btnRef = useRef(null)
 
   const load = async () => {
     if (!user) return
@@ -298,11 +300,25 @@ function NotificationButton({ alignLeft = false, padded = false }) {
     setItems((prev) => prev.map((item) => ({ ...item, read: true })))
   }
 
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      setDropdownStyle(
+        alignLeft
+          ? { top: rect.bottom + 8, left: rect.left }
+          : { top: rect.bottom + 8, right: window.innerWidth - rect.right }
+      )
+    }
+    setOpen((v) => !v)
+    load()
+  }
+
   return (
-    <div className={`relative ${padded ? 'px-5' : ''}`}>
+    <div className={padded ? 'px-5' : ''}>
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => { setOpen((value) => !value); load() }}
+        onClick={toggle}
         className="shape-cut-sm relative inline-flex items-center gap-2 border border-black/10 bg-white/60 px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78"
         aria-label="notifications"
       >
@@ -314,7 +330,10 @@ function NotificationButton({ alignLeft = false, padded = false }) {
         )}
       </button>
       {open && (
-        <div className={`absolute ${alignLeft ? 'left-0' : 'right-0'} z-60 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-black/10 bg-white text-[var(--theme-body-dark)] shadow-2xl`}>
+        <div
+          className="fixed z-[9999] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-black/10 bg-white text-[var(--theme-body-dark)] shadow-2xl"
+          style={dropdownStyle}
+        >
           <div className="flex items-center justify-between border-b border-black/10 px-4 py-3">
             <span className="text-sm font-black">알림</span>
             <button type="button" onClick={readAll} className="text-xs font-bold text-[#3b4890] hover:underline">모두 읽음</button>
@@ -784,14 +803,14 @@ function HomeView() {
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
-function PageShell({ children, wide = false }) {
+function PageShell({ children, wide = false, full = false }) {
   return (
     <div className="relative min-h-screen bg-[var(--theme-bg)] text-[var(--theme-text)]">
       <BackgroundLayers />
       <div className="fixed right-4 top-4 z-50">
         <NotificationButton />
       </div>
-      <main className={`relative mx-auto flex min-h-screen items-center justify-center px-4 py-28 sm:px-6 ${wide ? 'max-w-6xl' : 'max-w-4xl'}`}>
+      <main className={`relative mx-auto flex min-h-screen px-4 sm:px-6 ${full ? 'items-start pt-24 pb-16' : 'items-center justify-center py-28'} ${wide ? 'max-w-6xl' : 'max-w-4xl'}`}>
         <div className={`w-full ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
       </main>
     </div>
