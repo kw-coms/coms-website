@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import {
   Binary,
@@ -166,10 +167,17 @@ function RequireAdmin({ children }) {
 function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const from = location.state?.from?.pathname || '/'
+  const fromLocation = location.state?.from
+  const successPath = fromLocation
+    ? `${fromLocation.pathname || '/'}${fromLocation.search || ''}${fromLocation.hash || ''}`
+    : '/'
   return (
     <PageShell>
-      <Login onBack={() => navigate(from)} goSignup={() => navigate('/signup')} />
+      <Login
+        onCancel={() => navigate('/', { replace: true })}
+        onSuccess={() => navigate(successPath, { replace: true })}
+        goSignup={() => navigate('/signup')}
+      />
     </PageShell>
   )
 }
@@ -241,14 +249,12 @@ function RecruitPage() {
 
 function RecruitNoticePage() {
   const navigate = useNavigate()
-  const closeWindow = () => {
-    window.close()
-    navigate('/')
-  }
+  const location = useLocation()
+  const from = location.state?.from || '/'
 
   return (
     <PageShell wide full>
-      <RecruitNotice onBack={closeWindow} onApply={() => navigate('/recruit')} />
+      <RecruitNotice onBack={() => navigate(from, { replace: true })} onApply={() => navigate('/recruit')} />
     </PageShell>
   )
 }
@@ -261,6 +267,8 @@ function NotificationButton({ alignLeft = false, padded = false }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [dropdownStyle, setDropdownStyle] = useState({})
   const btnRef = useRef(null)
+  const dropdownRef = useRef(null)
+  const effectiveOpen = open && Boolean(user)
 
   const load = async () => {
     if (!user) return
@@ -291,8 +299,6 @@ function NotificationButton({ alignLeft = false, padded = false }) {
     return () => { mounted = false }
   }, [user])
 
-  if (!user) return null
-
   const openNotification = async (item) => {
     try {
       await markNotificationRead(item.id)
@@ -315,18 +321,38 @@ function NotificationButton({ alignLeft = false, padded = false }) {
     setItems((prev) => prev.map((item) => ({ ...item, read: true })))
   }
 
-  const toggle = () => {
-    if (!open && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect()
-      setDropdownStyle(
-        alignLeft
-          ? { top: rect.bottom + 8, left: rect.left }
-          : { top: rect.bottom + 8, right: window.innerWidth - rect.right }
-      )
+  const positionDropdown = useCallback(() => {
+    if (!btnRef.current) return
+    const rect = btnRef.current.getBoundingClientRect()
+    const dropdownWidth = dropdownRef.current?.offsetWidth || Math.min(352, window.innerWidth - 32)
+    const dropdownHeight = dropdownRef.current?.offsetHeight || 0
+    const left = alignLeft
+      ? Math.min(Math.max(16, rect.left), window.innerWidth - dropdownWidth - 16)
+      : Math.min(Math.max(16, rect.right - dropdownWidth), window.innerWidth - dropdownWidth - 16)
+    const below = rect.bottom + 8
+    const top = below + dropdownHeight <= window.innerHeight - 16
+      ? below
+      : Math.max(16, rect.top - dropdownHeight - 8)
+    setDropdownStyle({ top, left })
+  }, [alignLeft])
+
+  useEffect(() => {
+    if (!effectiveOpen) return undefined
+    positionDropdown()
+    window.addEventListener('scroll', positionDropdown, true)
+    window.addEventListener('resize', positionDropdown)
+    return () => {
+      window.removeEventListener('scroll', positionDropdown, true)
+      window.removeEventListener('resize', positionDropdown)
     }
+  }, [effectiveOpen, positionDropdown])
+
+  const toggle = () => {
     setOpen((v) => !v)
     load()
   }
+
+  if (!user) return null
 
   return (
     <div className={padded ? 'px-5' : ''}>
@@ -344,8 +370,9 @@ function NotificationButton({ alignLeft = false, padded = false }) {
           </span>
         )}
       </button>
-      {open && (
+      {effectiveOpen && createPortal(
         <div
+          ref={dropdownRef}
           className="fixed z-[9999] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-black/10 bg-white text-[var(--theme-body-dark)] shadow-2xl"
           style={dropdownStyle}
         >
@@ -368,7 +395,8 @@ function NotificationButton({ alignLeft = false, padded = false }) {
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
@@ -412,6 +440,7 @@ function App() {
 function HomeView() {
   const { user, loading: authLoading, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [activeSection, setActiveSection] = useState(null)
   const [bracketPositions, setBracketPositions] = useState({ leftX: null, rightX: null })
   const aboutRef = useRef(null)
@@ -519,6 +548,7 @@ function HomeView() {
   const goAdmin = () => navigate('/admin')
   const goChangePassword = () => navigate('/settings')
   const goRecruitPage = () => navigate('/recruit')
+  const locationPath = () => `${location.pathname}${location.search}${location.hash}`
 
   const bracketColor = activeSection ? sectionMeta[activeSection]?.bracket : sectionMeta.about.bracket
 
@@ -616,9 +646,13 @@ function HomeView() {
           <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
             지원서 작성하기
           </button>
-          <a href="/recruit-notice" target="_blank" rel="noreferrer" className={ghostActionBtnClass}>
+          <button
+            type="button"
+            onClick={() => navigate('/recruit-notice', { state: { from: `${locationPath()}#recruit` } })}
+            className={ghostActionBtnClass}
+          >
             모집 공지 보기
-          </a>
+          </button>
         </div>
       </div>
     )
