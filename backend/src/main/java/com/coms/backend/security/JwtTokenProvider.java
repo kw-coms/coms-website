@@ -8,12 +8,14 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.util.Map;
+import java.util.UUID;
 
 @Component
 public class JwtTokenProvider {
 
-    private static final long REFRESH_EXPIRATION = 7L * 24 * 60 * 60 * 1000; // 7 days
+    private static final long REFRESH_EXPIRATION = 7L * 24 * 60 * 60 * 1000;
+    private static final String ISSUER = "coms-backend";
+    private static final String AUDIENCE = "coms-app";
 
     private final SecretKey key;
     private final long expiration;
@@ -32,35 +34,36 @@ public class JwtTokenProvider {
     public String generateToken(String studentId) {
         return Jwts.builder()
                 .subject(studentId)
-                .claims(Map.of("type", "access"))
+                .issuer(ISSUER)
+                .audience().add(AUDIENCE).and()
+                .id(UUID.randomUUID().toString())
+                .claim("type", "access")
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(key)
+                .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
 
     public String generateRefreshToken(String studentId) {
         return Jwts.builder()
                 .subject(studentId)
-                .claims(Map.of("type", "refresh"))
+                .issuer(ISSUER)
+                .audience().add(AUDIENCE).and()
+                .id(UUID.randomUUID().toString())
+                .claim("type", "refresh")
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + REFRESH_EXPIRATION))
-                .signWith(key)
+                .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
 
     public String getStudentId(String token) {
-        return Jwts.parser()
-                .verifyWith(key)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
+        return parser().parseSignedClaims(token).getPayload().getSubject();
     }
 
     public boolean validateToken(String token) {
         try {
-            Jwts.parser().verifyWith(key).build().parseSignedClaims(token);
+            parser().parseSignedClaims(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             return false;
@@ -69,11 +72,17 @@ public class JwtTokenProvider {
 
     public boolean isRefreshToken(String token) {
         try {
-            Object type = Jwts.parser().verifyWith(key).build()
-                    .parseSignedClaims(token).getPayload().get("type");
+            Object type = parser().parseSignedClaims(token).getPayload().get("type");
             return "refresh".equals(type);
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
+    }
+
+    private JwtParser parser() {
+        return Jwts.parser()
+                .verifyWith(key)
+                .requireIssuer(ISSUER)
+                .build();
     }
 }
