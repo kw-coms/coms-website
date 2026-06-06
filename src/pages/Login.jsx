@@ -8,6 +8,7 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
   const { login } = useAuth()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState('login')
@@ -33,7 +34,7 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
 
     setLoading(true)
     try {
-      const data = await loginUser({ identifier: trimmedIdentifier, password: submittedPassword })
+      const data = await loginUser({ identifier: trimmedIdentifier, password: submittedPassword, rememberMe })
       await login(data)
       onSuccess()
     } catch (err) {
@@ -59,7 +60,7 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
     setLoading(true)
     setVerifyError('')
     try {
-      const data = await loginUser({ identifier: verifyStudentId, password })
+      const data = await loginUser({ identifier: verifyStudentId, password, rememberMe })
       await login(data)
       onSuccess()
     } catch (err) {
@@ -129,6 +130,16 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
                   />
                 </div>
               </div>
+
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-[var(--theme-body-muted)]/90">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="size-4 accent-[var(--theme-accent)]"
+                />
+                자동 로그인
+              </label>
 
               {error && <div className="text-sm text-red-400">{error}</div>}
 
