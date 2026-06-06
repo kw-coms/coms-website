@@ -373,7 +373,7 @@ export default function Notices() {
           <article className="m-5 overflow-hidden rounded-lg bg-white shadow-[0_18px_50px_rgba(0,0,0,0.14)] sm:m-7">
             <div className="border-b border-black/10 px-5 py-5">
               <div className="mb-2 text-xs font-bold text-[#3b4890]">{(selectedNotice.category || 'GENERAL') === 'JOB' ? '취업공고' : '공지'}</div>
-              <h2 className="break-words text-2xl font-black">
+              <h2 className="break-words text-3xl font-black leading-tight sm:text-4xl">
                 {selectedNotice.title}
               </h2>
               <p className="mt-3 text-xs text-[var(--theme-body-muted)]">
