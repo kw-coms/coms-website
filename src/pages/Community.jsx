@@ -440,8 +440,8 @@ export default function Community({ onBack }) {
   }
 
   const renderPagination = (placement = 'top') => {
-    const disabledClass = 'cursor-not-allowed opacity-35'
-    const iconButtonClass = 'shape-cut-sm flex size-10 items-center justify-center border border-white/10 bg-white/8 text-white/68 transition hover:bg-white/14 disabled:hover:bg-white/8 sm:size-9'
+    const disabledClass = 'opacity-35'
+    const iconButtonClass = 'shape-cut-sm flex size-10 items-center justify-center border border-white/10 bg-white/8 text-white/68 transition enabled:hover:bg-white/14 disabled:pointer-events-none sm:size-9'
 
     return (
       <div className={`flex flex-col gap-3 ${placement === 'bottom' ? 'items-center' : 'lg:flex-row lg:items-center lg:justify-between'}`}>
