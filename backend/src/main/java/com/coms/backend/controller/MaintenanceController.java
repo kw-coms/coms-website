@@ -48,6 +48,18 @@ public class MaintenanceController {
         @NotBlank String name
     ) {}
 
+    private void verifyBootstrapSecret(String providedSecret) {
+        if (bootstrapSecret.length() < 32) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        byte[] expected = bootstrapSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] provided = (providedSecret == null ? "" : providedSecret)
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        if (!java.security.MessageDigest.isEqual(expected, provided)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+    }
+
     /**
      * One-time admin bootstrap. Disabled permanently once any admin account exists.
      */
@@ -55,9 +67,7 @@ public class MaintenanceController {
     public ResponseEntity<Map<String, String>> bootstrap(
             @RequestHeader(value = "X-Bootstrap-Secret", required = false) String providedSecret,
             @Valid @RequestBody BootstrapRequest req) {
-        if (bootstrapSecret.isEmpty() || !bootstrapSecret.equals(providedSecret)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
+        verifyBootstrapSecret(providedSecret);
         boolean adminExists = memberRepository.findAll().stream()
                 .anyMatch(m -> m.getRole() == Member.Role.ADMIN);
         if (adminExists) {
@@ -105,9 +115,7 @@ public class MaintenanceController {
     public ResponseEntity<Map<String, String>> addEligible(
             @RequestHeader(value = "X-Bootstrap-Secret", required = false) String providedSecret,
             @Valid @RequestBody EligibleRequest req) {
-        if (bootstrapSecret.isEmpty() || !bootstrapSecret.equals(providedSecret)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
+        verifyBootstrapSecret(providedSecret);
         EligibleMember member = eligibleMemberRepository.findByStudentId(req.studentId())
                 .orElseGet(EligibleMember::new);
         boolean nameAlreadyCorrect = req.name().equals(member.getName());

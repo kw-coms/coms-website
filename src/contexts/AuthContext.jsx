@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getCurrentUser, logoutUser } from '../services/authApi.js'
 import { apiUrl } from '../services/apiClient.js'
 import { listFonts } from '../services/fontApi.js'
 import { AuthContext } from './useAuth.js'
+
+let cachedFonts = null
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -42,9 +44,9 @@ export function AuthProvider({ children }) {
       }
 
       try {
-        const fonts = await listFonts()
+        if (!cachedFonts) cachedFonts = await listFonts()
         if (!mounted) return
-        const font = fonts.find((item) => item.id === selectedFontId)
+        const font = cachedFonts.find((item) => item.id === selectedFontId)
         if (!font) {
           document.documentElement.style.removeProperty('--user-font-family')
           return
@@ -64,34 +66,36 @@ export function AuthProvider({ children }) {
     return () => { mounted = false }
   }, [user?.selectedFontId])
 
-  const login = async (data) => {
+  const login = useCallback(async (data) => {
     if (data) {
       setUser(data)
     }
-
     try {
       const currentUser = await getCurrentUser()
       setUser(currentUser)
     } catch {
       // The login response is already authoritative for the visible session state.
     }
-  }
+  }, [])
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await logoutUser()
     } finally {
       setUser(null)
     }
-  }
+  }, [])
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     const currentUser = await getCurrentUser()
     setUser(currentUser)
     return currentUser
-  }
+  }, [])
 
-  const value = useMemo(() => ({ user, loading, login, logout, refreshUser, setUser }), [user, loading])
+  const value = useMemo(
+    () => ({ user, loading, login, logout, refreshUser, setUser }),
+    [user, loading, login, logout, refreshUser]
+  )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
