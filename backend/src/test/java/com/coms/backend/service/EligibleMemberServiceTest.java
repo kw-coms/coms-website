@@ -156,6 +156,61 @@ class EligibleMemberServiceTest {
     }
 
     @Test
+    void addGraduateSingleAcceptsTwoDigitYear() {
+        // clock fixed at 2026-06-06; cutoff = 2019; "19" → 2019 ≤ 2019 → valid
+        eligibleMemberService.addGraduateSingle("김철수", "19", null);
+
+        var roster = eligibleMemberService.listRoster();
+        assertThat(roster).singleElement().satisfies(m -> {
+            assertThat(m.name()).isEqualTo("김철수");
+            assertThat(m.generation()).isEqualTo("53");
+            assertThat(m.studentId()).isNull();
+        });
+    }
+
+    @Test
+    void addGraduateSingleAcceptsGeneration() {
+        // generation 53 → 1966+53=2019 ≤ 2019 → valid
+        eligibleMemberService.addGraduateSingle("홍길동", null, "53");
+
+        var roster = eligibleMemberService.listRoster();
+        assertThat(roster).singleElement().satisfies(m -> {
+            assertThat(m.name()).isEqualTo("홍길동");
+            assertThat(m.generation()).isEqualTo("53");
+        });
+    }
+
+    @Test
+    void addGraduateSingleRejectsCurrentStudentYear() {
+        // "20" → 2020 > 2019 cutoff → BAD_REQUEST
+        assertThatThrownBy(() -> eligibleMemberService.addGraduateSingle("김철수", "20", null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
+                .isEqualTo(HttpStatus.BAD_REQUEST.value());
+    }
+
+    @Test
+    void addGraduateSingleIsIdempotentOnDuplicate() {
+        eligibleMemberService.addGraduateSingle("홍길동", "19", null);
+        eligibleMemberService.addGraduateSingle("홍길동", "19", null);
+
+        assertThat(eligibleMemberService.listRoster()).hasSize(1);
+    }
+
+    @Test
+    void addGraduateSingleRejectsInvalidFormat() {
+        assertThatThrownBy(() -> eligibleMemberService.addGraduateSingle("홍길동", "abc", null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
+                .isEqualTo(HttpStatus.BAD_REQUEST.value());
+
+        assertThatThrownBy(() -> eligibleMemberService.addGraduateSingle("홍길동", null, null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
+                .isEqualTo(HttpStatus.BAD_REQUEST.value());
+    }
+
+    @Test
     void adminUpdateKeepsClaimKeyAlignedWithEditedIdentity() throws Exception {
         eligibleMemberService.importRoster(workbookFile(new String[]{"이름", "기수"}, new String[]{"홍길동", "53기"}));
         eligibleMemberService.validateAndClaimSignup("2019123456", "홍길동", "YEAR", "19");
