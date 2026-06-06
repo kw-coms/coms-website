@@ -794,11 +794,26 @@ function HomeView() {
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
 function PageShell({ children, wide = false }) {
+  const { user, loading } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const showLogin = !loading && !user && location.pathname !== '/login'
+
   return (
     <div className="relative min-h-screen bg-[var(--theme-bg)] text-[var(--theme-text)]">
       <BackgroundLayers />
-      <div className="fixed right-4 top-4 z-50">
-        <NotificationButton />
+      <div className="fixed right-4 top-4 z-[80]">
+        {user ? (
+          <NotificationButton />
+        ) : showLogin ? (
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] shadow-[0_18px_40px_rgba(255,255,255,0.2)] transition hover:bg-white"
+          >
+            로그인
+          </button>
+        ) : null}
       </div>
       <main className={`relative mx-auto flex min-h-screen items-center justify-center px-4 py-28 sm:px-6 ${wide ? 'max-w-6xl' : 'max-w-4xl'}`}>
         <div className={`w-full ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
