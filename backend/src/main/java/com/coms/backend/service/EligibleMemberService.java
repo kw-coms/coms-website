@@ -48,10 +48,60 @@ public class EligibleMemberService {
     }
 
     public void addSingle(String studentId, String name) {
-        EligibleMember member = eligibleMemberRepository.findByStudentId(studentId)
+        String normalized = normalize(studentId);
+        if (!STUDENT_ID_PATTERN.matcher(normalized).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
+        }
+        EligibleMember member = eligibleMemberRepository.findByStudentId(normalized)
                 .orElseGet(EligibleMember::new);
-        applyExactStudentIdentity(member, studentId, name);
+        applyExactStudentIdentity(member, normalized, name);
         eligibleMemberRepository.save(member);
+    }
+
+    public void addGraduateSingle(String name, String twoDigitYearStr, String generationStr) {
+        String normalizedName = normalize(name);
+
+        Integer admissionYear = null;
+        if (twoDigitYearStr != null && !twoDigitYearStr.isBlank()) {
+            String digits = normalizeGeneration(twoDigitYearStr);
+            if (!digits.matches("\\d{2}")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "입학연도는 2자리 숫자여야 합니다. (예: 19)");
+            }
+            admissionYear = resolveAdmissionYear(Integer.parseInt(digits));
+        } else if (generationStr != null && !generationStr.isBlank()) {
+            String digits = normalizeGeneration(generationStr);
+            if (!digits.matches("\\d{1,3}")) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "기수는 숫자여야 합니다.");
+            }
+            admissionYear = Integer.parseInt(digits) + FIRST_GENERATION_YEAR;
+        } else {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "입학연도 또는 기수를 입력해주세요.");
+        }
+
+        if (!isGraduate(admissionYear)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "졸업생 입학연도를 입력해주세요. (현재 연도 기준 7년 이전)");
+        }
+
+        String generation = String.valueOf(admissionYear - FIRST_GENERATION_YEAR);
+        String verificationKey = verificationKey(normalizedName, admissionYear);
+
+        if (eligibleMemberRepository.findByVerificationKey(verificationKey).isPresent()) {
+            return;
+        }
+
+        EligibleMember member = new EligibleMember();
+        member.setName(normalizedName);
+        member.setStudentId(null);
+        member.setAdmissionYear(admissionYear);
+        member.setGeneration(generation);
+        member.setVerificationKey(verificationKey);
+        eligibleMemberRepository.save(member);
+    }
+
+    /** Two-digit year to full year: twoDigit <= currentYear%100 → 2000s, else → 1900s. */
+    private int resolveAdmissionYear(int twoDigit) {
+        int currentTwoDigit = Year.now(clock).getValue() % 100;
+        return twoDigit <= currentTwoDigit ? 2000 + twoDigit : 1900 + twoDigit;
     }
 
     @Transactional(readOnly = true)
