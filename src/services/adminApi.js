@@ -52,10 +52,10 @@ export async function listBannedStudents() {
   return request('/api/admin/banned-students')
 }
 
-export async function banStudent(studentId) {
+export async function banStudent(studentId, duration) {
   return requestNoContent('/api/admin/banned-students', {
     method: 'POST',
-    body: JSON.stringify({ studentId }),
+    body: JSON.stringify({ studentId, duration }),
   })
 }
 

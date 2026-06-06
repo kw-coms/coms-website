@@ -77,6 +77,7 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         String studentId = jwtTokenProvider.getStudentId(refreshToken);
+        authService.ensureAccountNotBanned(studentId);
         String newAccessToken = jwtTokenProvider.generateToken(studentId);
 
         response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("token", newAccessToken)

@@ -4,6 +4,19 @@ import { listFiles, createPost, deleteFile } from '../services/archiveApi.js'
 import { listAdminFonts, setFontActive, uploadFont } from '../services/fontApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 
+const BAN_DURATIONS = [
+  { value: '6H', label: '6시간' },
+  { value: '12H', label: '12시간' },
+  { value: '24H', label: '24시간' },
+  { value: '3D', label: '3일' },
+  { value: '7D', label: '7일' },
+  { value: '31D', label: '31일' },
+  { value: '3M', label: '3달' },
+  { value: '6M', label: '6달' },
+  { value: '1Y', label: '1년' },
+  { value: '3Y', label: '3년' },
+]
+
 export default function Admin({ onBack }) {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState('members')
@@ -665,6 +678,7 @@ function BanTab() {
   const [banned, setBanned] = useState([])
   const [loading, setLoading] = useState(true)
   const [input, setInput] = useState('')
+  const [duration, setDuration] = useState(BAN_DURATIONS[0].value)
   const [error, setError] = useState('')
 
   const load = () => {
@@ -682,7 +696,7 @@ function BanTab() {
     if (!id) return
     setError('')
     try {
-      await banStudent(id)
+      await banStudent(id, duration)
       setInput('')
       await load()
     } catch (err) {
@@ -704,7 +718,7 @@ function BanTab() {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleBan} className="flex items-center gap-2">
+      <form onSubmit={handleBan} className="flex flex-wrap items-center gap-2">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -712,8 +726,17 @@ function BanTab() {
           maxLength={10}
           className={`${inputCls} w-40`}
         />
+        <select
+          value={duration}
+          onChange={(e) => setDuration(e.target.value)}
+          className={`${inputCls} w-28`}
+        >
+          {BAN_DURATIONS.map((item) => (
+            <option key={item.value} value={item.value}>{item.label}</option>
+          ))}
+        </select>
         <button type="submit" className="shape-cut-sm bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">
-          영구 차단
+          임시 차단
         </button>
         {error && <span className="text-xs text-red-500">{error}</span>}
       </form>
@@ -729,6 +752,7 @@ function BanTab() {
               <tr className="border-b border-black/10 text-left text-xs font-semibold uppercase tracking-wide text-[var(--theme-body-muted)]">
                 <th className="px-3 py-2">학번</th>
                 <th className="px-3 py-2">차단일</th>
+                <th className="px-3 py-2">만료</th>
                 <th className="px-3 py-2"></th>
               </tr>
             </thead>
@@ -736,7 +760,8 @@ function BanTab() {
               {banned.map((b) => (
                 <tr key={b.id}>
                   <td className="px-3 py-3 font-mono text-xs text-[var(--theme-body-dark)]">{b.studentId}</td>
-                  <td className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{new Date(b.bannedAt).toLocaleDateString('ko-KR')}</td>
+                  <td className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{formatDateTime(b.bannedAt)}</td>
+                  <td className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{formatDateTime(b.expiresAt)}</td>
                   <td className="px-3 py-3">
                     <button type="button" onClick={() => handleUnban(b.studentId)} className="text-xs font-semibold text-blue-500 hover:underline">
                       차단 해제
@@ -757,4 +782,17 @@ function formatFileSize(size) {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
+function formatDateTime(value) {
+  if (!value) return '영구'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '알 수 없음'
+  return date.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }

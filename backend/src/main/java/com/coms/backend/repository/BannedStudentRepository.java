@@ -10,4 +10,5 @@ public interface BannedStudentRepository extends JpaRepository<BannedStudent, Lo
     boolean existsByStudentId(String studentId);
     Optional<BannedStudent> findByStudentId(String studentId);
     List<BannedStudent> findAllByOrderByBannedAtDesc();
+    void deleteByExpiresAtLessThanEqual(java.time.LocalDateTime expiresAt);
 }
