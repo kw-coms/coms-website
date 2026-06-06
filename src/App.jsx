@@ -26,6 +26,7 @@ const Admin = lazy(() => import('./pages/Admin.jsx'))
 const Community = lazy(() => import('./pages/Community.jsx'))
 const ChangePassword = lazy(() => import('./pages/ChangePassword.jsx'))
 const RecruitApply = lazy(() => import('./pages/RecruitApply.jsx'))
+const RecruitNotice = lazy(() => import('./pages/RecruitNotice.jsx'))
 import { getLogoAsset } from './utils/logoAssets.js'
 import FixedBrackets from './components/common/FixedBrackets.jsx'
 import { useAuth } from './contexts/useAuth.js'
@@ -238,6 +239,20 @@ function RecruitPage() {
   )
 }
 
+function RecruitNoticePage() {
+  const navigate = useNavigate()
+  const closeWindow = () => {
+    window.close()
+    navigate('/')
+  }
+
+  return (
+    <PageShell wide full>
+      <RecruitNotice onBack={closeWindow} onApply={() => navigate('/recruit')} />
+    </PageShell>
+  )
+}
+
 function NotificationButton({ alignLeft = false, padded = false }) {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -385,6 +400,7 @@ function App() {
         <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
         <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
         <Route path="/recruit" element={<RecruitPage />} />
+        <Route path="/recruit-notice" element={<RecruitNoticePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
@@ -600,9 +616,9 @@ function HomeView() {
           <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
             지원서 작성하기
           </button>
-          <button type="button" onClick={goNotices} className={ghostActionBtnClass}>
+          <a href="/recruit-notice" target="_blank" rel="noreferrer" className={ghostActionBtnClass}>
             모집 공지 보기
-          </button>
+          </a>
         </div>
       </div>
     )
