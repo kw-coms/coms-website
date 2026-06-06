@@ -2,6 +2,7 @@ package com.coms.backend.service;
 
 import com.coms.backend.domain.CommunityComment;
 import com.coms.backend.domain.CommunityPost;
+import com.coms.backend.domain.CommunityPostImage;
 import com.coms.backend.domain.CommunityPostVote;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.CommunityCommentRequest;
@@ -9,6 +10,7 @@ import com.coms.backend.dto.CommunityCommentResponse;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
 import com.coms.backend.repository.CommunityCommentRepository;
+import com.coms.backend.repository.CommunityPostImageRepository;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.MemberRepository;
@@ -37,6 +39,7 @@ public class CommunityService {
     private static final int MAX_COMMENT_LENGTH = 1000;
     private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
     private static final long CONCEPT_POST_SCORE_THRESHOLD = 5;
+    private static final int MAX_EXTRA_IMAGES_PER_POST = 5;
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
 
     private final CommunityPostRepository communityPostRepository;
@@ -45,19 +48,22 @@ public class CommunityService {
     private final StorageService storageService;
     private final CommunityCommentRepository commentRepository;
     private final NotificationService notificationService;
+    private final CommunityPostImageRepository imageRepository;
 
     public CommunityService(CommunityPostRepository communityPostRepository,
                             CommunityPostVoteRepository voteRepository,
                             MemberRepository memberRepository,
                             StorageService storageService,
                             CommunityCommentRepository commentRepository,
-                            NotificationService notificationService) {
+                            NotificationService notificationService,
+                            CommunityPostImageRepository imageRepository) {
         this.communityPostRepository = communityPostRepository;
         this.voteRepository = voteRepository;
         this.memberRepository = memberRepository;
         this.commentRepository = commentRepository;
         this.storageService = storageService;
         this.notificationService = notificationService;
+        this.imageRepository = imageRepository;
     }
 
     @Transactional(readOnly = true)
@@ -129,7 +135,9 @@ public class CommunityService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         clearImage(post);
+        clearExtraImages(post.getId());
         voteRepository.deleteByPost(post);
+        commentRepository.deleteByPostId(post.getId());
         communityPostRepository.delete(post);
     }
 
@@ -227,6 +235,10 @@ public class CommunityService {
         boolean authorAdmin = author != null && author.getRole() == Member.Role.ADMIN;
         String authorName = author != null ? author.getName() : post.getAuthorName();
         VoteSummary votes = voteStats.getOrDefault(post.getId(), VoteSummary.EMPTY);
+        List<String> imageUrls = imageRepository.findByPostIdOrderByPositionAsc(post.getId())
+                .stream()
+                .map(img -> "/api/community/posts/" + post.getId() + "/images/" + img.getId())
+                .toList();
         return new CommunityPostResponse(
                 post.getId(),
                 post.getTitle(),
@@ -238,6 +250,7 @@ public class CommunityService {
                 post.getCategory().name(),
                 post.getImageStoredName() == null ? null : "/api/community/posts/" + post.getId() + "/image",
                 post.getImageOriginalName(),
+                imageUrls,
                 post.getViewCount(),
                 votes.upvotes(),
                 votes.downvotes(),
@@ -265,6 +278,51 @@ public class CommunityService {
         return generation > 0 ? generation + "기" : "";
     }
 
+    public void addImages(String studentId, Long postId, List<MultipartFile> images) {
+        if (images == null || images.isEmpty()) return;
+        Member member = findMember(studentId);
+        CommunityPost post = communityPostRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostOwnerOrAdmin(post, member);
+        List<CommunityPostImage> existing = imageRepository.findByPostIdOrderByPositionAsc(postId);
+        long uploadCount = images.stream().filter(image -> image != null && !image.isEmpty()).count();
+        if (existing.size() + uploadCount > MAX_EXTRA_IMAGES_PER_POST) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "게시글 이미지는 최대 5개까지 업로드할 수 있습니다.");
+        }
+        int startPos = existing.size();
+        for (int i = 0; i < images.size(); i++) {
+            MultipartFile image = images.get(i);
+            if (image == null || image.isEmpty()) continue;
+            String contentType = image.getContentType() == null ? "" : image.getContentType();
+            if (!ALLOWED_IMAGE_TYPES.contains(contentType)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "JPG, PNG, GIF, WebP 이미지만 업로드할 수 있습니다.");
+            }
+            if (image.getSize() > MAX_IMAGE_BYTES) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지는 5MB 이하만 업로드할 수 있습니다.");
+            }
+            try {
+                String stored = storageService.store(image);
+                imageRepository.save(new CommunityPostImage(postId, stored, image.getOriginalFilename(), contentType, startPos + i));
+            } catch (IOException e) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 저장에 실패했습니다.");
+            }
+        }
+    }
+
+    public Resource loadExtraImage(Long postId, Long imageId) {
+        CommunityPostImage img = imageRepository.findById(imageId)
+                .filter(i -> i.getPostId().equals(postId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        return storageService.load(img.getStoredName());
+    }
+
+    public String getExtraImageMimeType(Long postId, Long imageId) {
+        return imageRepository.findById(imageId)
+                .filter(i -> i.getPostId().equals(postId))
+                .map(CommunityPostImage::getMimeType)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
     private void attachImage(CommunityPost post, MultipartFile image) {
         if (image == null || image.isEmpty()) {
             return;
@@ -286,6 +344,46 @@ public class CommunityService {
         }
     }
 
+    private void requirePostOwnerOrAdmin(CommunityPost post, Member member) {
+        if (!post.getAuthorStudentId().equals(member.getStudentId()) && member.getRole() != Member.Role.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+    }
+
+    private SanitizedPost validateRequest(CommunityPostRequest request, String existingTitle) {
+        String title = normalizeBounded(request.title(), "제목", MAX_TITLE_LENGTH);
+        String content = normalizeBounded(request.content(), "내용", MAX_CONTENT_LENGTH);
+        if (existingTitle != null && !title.equals(existingTitle)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "제목은 수정할 수 없습니다.");
+        }
+        rejectUnsafeText(title);
+        rejectUnsafeText(content);
+        return new SanitizedPost(title, content, parseCategory(request.category()));
+    }
+
+    private String normalizeBounded(String value, String fieldName, int maxLength) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + "을 입력해주세요.");
+        }
+        if (normalized.length() > maxLength) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + "은 " + maxLength + "자 이하로 입력해주세요.");
+        }
+        if (normalized.chars().anyMatch(ch -> Character.isISOControl(ch) && ch != '\n' && ch != '\r' && ch != '\t')) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "허용되지 않는 제어 문자가 포함되어 있습니다.");
+        }
+        return normalized;
+    }
+
+    private void rejectUnsafeText(String value) {
+        String lower = value.toLowerCase(Locale.ROOT);
+        if (lower.contains("<script") || lower.contains("</script")
+                || lower.contains("<iframe") || lower.contains("javascript:")
+                || lower.matches(".*\\son[a-z]+\\s*=.*")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 내용이 포함되어 있습니다.");
+        }
+    }
+
     private CommunityPost.Category parseCategory(String value) {
         if (value == null || value.isBlank()) {
             return CommunityPost.Category.GENERAL;
@@ -304,6 +402,12 @@ public class CommunityService {
         post.setImageStoredName(null);
         post.setImageOriginalName(null);
         post.setImageMimeType(null);
+    }
+
+    private void clearExtraImages(Long postId) {
+        List<CommunityPostImage> images = imageRepository.findByPostIdOrderByPositionAsc(postId);
+        images.forEach(image -> storageService.delete(image.getStoredName()));
+        imageRepository.deleteByPostId(postId);
     }
 
     private record SanitizedPost(String title, String content, CommunityPost.Category category) {}

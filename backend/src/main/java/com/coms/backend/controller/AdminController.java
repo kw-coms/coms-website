@@ -1,6 +1,7 @@
 package com.coms.backend.controller;
 
 import com.coms.backend.dto.AddEligibleMemberRequest;
+import com.coms.backend.dto.BanStudentRequest;
 import com.coms.backend.dto.BannedStudentResponse;
 import com.coms.backend.dto.ResetPasswordRequest;
 import com.coms.backend.dto.EligibleMemberImportResponse;
@@ -18,7 +19,6 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -94,8 +94,8 @@ public class AdminController {
     }
 
     @PostMapping("/banned-students")
-    public ResponseEntity<Void> banStudent(@RequestBody Map<String, String> body) {
-        bannedStudentService.ban(body.get("studentId"));
+    public ResponseEntity<Void> banStudent(@Valid @RequestBody BanStudentRequest request) {
+        bannedStudentService.ban(request.studentId(), request.duration());
         return ResponseEntity.noContent().build();
     }
 

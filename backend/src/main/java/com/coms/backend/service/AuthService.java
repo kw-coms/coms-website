@@ -40,6 +40,7 @@ public class AuthService implements UserDetailsService {
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailVerificationSender emailVerificationSender;
     private final FontService fontService;
+    private final BannedStudentService bannedStudentService;
 
     public AuthService(MemberRepository memberRepository,
                        LoginFailureRepository loginFailureRepository,
@@ -47,7 +48,8 @@ public class AuthService implements UserDetailsService {
                        PasswordEncoder passwordEncoder,
                        JwtTokenProvider jwtTokenProvider,
                        EmailVerificationSender emailVerificationSender,
-                       FontService fontService) {
+                       FontService fontService,
+                       BannedStudentService bannedStudentService) {
         this.memberRepository = memberRepository;
         this.loginFailureRepository = loginFailureRepository;
         this.eligibleMemberService = eligibleMemberService;
@@ -55,9 +57,11 @@ public class AuthService implements UserDetailsService {
         this.jwtTokenProvider = jwtTokenProvider;
         this.emailVerificationSender = emailVerificationSender;
         this.fontService = fontService;
+        this.bannedStudentService = bannedStudentService;
     }
 
     public AuthResponse signup(SignupRequest request) {
+        bannedStudentService.ensureNotBanned(request.studentId().trim());
         if (memberRepository.existsByStudentId(request.studentId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 가입된 학번입니다.");
         }
@@ -101,6 +105,8 @@ public class AuthService implements UserDetailsService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
 
+        bannedStudentService.ensureNotBanned(member.getStudentId());
+
         if (requiresEmailVerification(member)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일 인증이 완료되지 않았습니다. 가입 시 받은 인증 이메일을 확인해주세요.");
         }
@@ -128,6 +134,7 @@ public class AuthService implements UserDetailsService {
     }
 
     public MemberResponse getMe(String studentId) {
+        bannedStudentService.ensureNotBanned(studentId);
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         return new MemberResponse(
@@ -146,6 +153,7 @@ public class AuthService implements UserDetailsService {
     }
 
     public void changePassword(String studentId, String currentPassword, String newPassword) {
+        bannedStudentService.ensureNotBanned(studentId);
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (!passwordEncoder.matches(currentPassword, member.getPassword())) {
@@ -156,6 +164,7 @@ public class AuthService implements UserDetailsService {
     }
 
     public MemberResponse updateProfile(String studentId, UpdateProfileRequest request) {
+        bannedStudentService.ensureNotBanned(studentId);
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         member.setPhone(normalizeNullable(request.phone()));
@@ -182,6 +191,7 @@ public class AuthService implements UserDetailsService {
     }
 
     public boolean requestSignupEmailVerification(String studentId) {
+        bannedStudentService.ensureNotBanned(studentId);
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
         if (member.isEmailVerified()) {
@@ -197,10 +207,12 @@ public class AuthService implements UserDetailsService {
     }
 
     public boolean confirmSignupEmailVerification(String studentId, String code) {
+        bannedStudentService.ensureNotBanned(studentId);
         return confirmEmailVerification(studentId, code);
     }
 
     public boolean requestEmailVerification(String studentId) {
+        bannedStudentService.ensureNotBanned(studentId);
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (member.isEmailVerified()) {
@@ -217,6 +229,7 @@ public class AuthService implements UserDetailsService {
     }
 
     public boolean confirmEmailVerification(String studentId, String code) {
+        bannedStudentService.ensureNotBanned(studentId);
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
@@ -249,6 +262,10 @@ public class AuthService implements UserDetailsService {
         return member.getRole() != Member.Role.ADMIN && !member.isEmailVerified();
     }
 
+    public void ensureAccountNotBanned(String studentId) {
+        bannedStudentService.ensureNotBanned(studentId);
+    }
+
     private void enforceEmailVerificationResendCooldown(Member member) {
         LocalDateTime expiresAt = member.getEmailVerificationExpiresAt();
         if (member.getEmailVerificationCodeHash() == null || expiresAt == null) {
@@ -272,6 +289,9 @@ public class AuthService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String studentId) throws UsernameNotFoundException {
+        if (bannedStudentService.isBanned(studentId)) {
+            throw new UsernameNotFoundException("차단된 계정입니다: " + studentId);
+        }
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다: " + studentId));
 
