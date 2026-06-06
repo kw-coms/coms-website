@@ -1,11 +1,13 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.Member;
+import com.coms.backend.domain.EligibleMember;
 import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.dto.UpdateProfileRequest;
 import com.coms.backend.repository.BannedStudentRepository;
 import com.coms.backend.repository.LoginFailureRepository;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.EligibleMemberRepository;
 import com.coms.backend.security.JwtTokenProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 
@@ -26,6 +29,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {
@@ -51,10 +55,18 @@ class AuthServiceTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private EligibleMemberRepository eligibleMemberRepository;
+
+    @MockitoBean
+    private EmailVerificationSender emailVerificationSender;
+
     @BeforeEach
     void setUp() {
+        reset(emailVerificationSender);
         bannedStudentRepository.deleteAll();
         memberRepository.deleteAll();
+        eligibleMemberRepository.deleteAll();
     }
 
     @Test
@@ -150,7 +162,7 @@ class AuthServiceTest {
     void loginRejectsUnverifiedEmailWithUnauthorizedStatus() {
         saveMember("2026123460", false);
 
-        assertThatThrownBy(() -> authService.login(new com.coms.backend.dto.LoginRequest("2026123460", "Password1!"), "127.0.0.1"))
+        assertThatThrownBy(() -> authService.login(new com.coms.backend.dto.LoginRequest("2026123460", "Password1!", false), "127.0.0.1"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
                     assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
                     assertThat(ex.getReason()).contains("이메일 인증");
@@ -161,7 +173,7 @@ class AuthServiceTest {
     void loginSucceedsAfterEmailIsVerified() {
         saveMember("2026123461", true);
 
-        var response = authService.login(new com.coms.backend.dto.LoginRequest("2026123461", "Password1!"), "127.0.0.1");
+        var response = authService.login(new com.coms.backend.dto.LoginRequest("2026123461", "Password1!", false), "127.0.0.1");
 
         assertThat(response.token()).isNotBlank();
         assertThat(response.studentId()).isEqualTo("2026123461");
@@ -171,7 +183,7 @@ class AuthServiceTest {
     void loginAllowsUnverifiedAdminAccount() {
         saveMember("admin", false, Member.Role.ADMIN);
 
-        var response = authService.login(new com.coms.backend.dto.LoginRequest("admin", "Password1!"), "127.0.0.1");
+        var response = authService.login(new com.coms.backend.dto.LoginRequest("admin", "Password1!", false), "127.0.0.1");
 
         assertThat(response.token()).isNotBlank();
         assertThat(response.studentId()).isEqualTo("admin");
@@ -182,7 +194,7 @@ class AuthServiceTest {
         saveMember("2026123465", true);
         bannedStudentService.ban("2026123465", "6H");
 
-        assertThatThrownBy(() -> authService.login(new com.coms.backend.dto.LoginRequest("2026123465", "Password1!"), "127.0.0.1"))
+        assertThatThrownBy(() -> authService.login(new com.coms.backend.dto.LoginRequest("2026123465", "Password1!", false), "127.0.0.1"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
                     assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
                     assertThat(ex.getReason()).contains("차단");
@@ -214,7 +226,7 @@ class AuthServiceTest {
 
         when(repo.existsByStudentId("2026123462")).thenReturn(false);
         when(repo.existsByEmail("new@example.com")).thenReturn(false);
-        doNothing().when(eligible).validateSignup("2026123462", "홍길동");
+        doNothing().when(eligible).validateAndClaimSignup("2026123462", "홍길동", null, null);
         when(repo.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
         doThrow(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "이메일 발송에 실패했습니다."))
                 .when(sender).sendVerificationCode(anyString(), anyString());
@@ -222,6 +234,8 @@ class AuthServiceTest {
         assertThatThrownBy(() -> service.signup(new SignupRequest(
                 "2026123462",
                 "홍길동",
+                null,
+                null,
                 "new@example.com",
                 "Password1!",
                 "컴퓨터공학과",
@@ -231,6 +245,35 @@ class AuthServiceTest {
         )))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
+    }
+
+    @Test
+    void signupFailureRollsBackGraduateRosterClaim() {
+        EligibleMember eligible = new EligibleMember();
+        eligible.setName("홍길동");
+        eligible.setGeneration("53");
+        eligible.setAdmissionYear(2019);
+        eligible.setVerificationKey("홍길동|2019");
+        eligibleMemberRepository.save(eligible);
+        doThrow(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "이메일 발송 실패"))
+                .when(emailVerificationSender).sendVerificationCode(anyString(), anyString());
+
+        assertThatThrownBy(() -> authService.signup(new SignupRequest(
+                "2019123462",
+                "홍길동",
+                "GENERATION",
+                "53",
+                "graduate@example.com",
+                "Password1!",
+                null,
+                null,
+                null,
+                null
+        ))).isInstanceOf(ResponseStatusException.class);
+
+        EligibleMember rolledBack = eligibleMemberRepository.findByVerificationKey("홍길동|2019").orElseThrow();
+        assertThat(rolledBack.getStudentId()).isNull();
+        assertThat(memberRepository.existsByStudentId("2019123462")).isFalse();
     }
 
     private Member saveMember(String studentId, boolean emailVerified) {
