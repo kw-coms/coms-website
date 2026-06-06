@@ -223,19 +223,24 @@ export default function Community({ onBack }) {
     return () => { mounted = false }
   }, [])
 
+  const indexedPosts = useMemo(
+    () => posts.map((post) => ({
+      ...post,
+      _searchKey: `${post.title} ${post.authorDisplayName || post.authorName || ''}`.toLowerCase(),
+    })),
+    [posts]
+  )
+
   const filteredPosts = useMemo(() => {
     const byCategory = activeCategory === 'ALL'
-      ? posts
+      ? indexedPosts
       : activeCategory === 'CONCEPT'
-        ? posts.filter(isConceptPost)
-        : posts.filter((post) => (post.category || 'GENERAL') === activeCategory)
+        ? indexedPosts.filter(isConceptPost)
+        : indexedPosts.filter((post) => (post.category || 'GENERAL') === activeCategory)
     if (!searchQuery.trim()) return byCategory
     const q = searchQuery.toLowerCase()
-    return byCategory.filter((post) =>
-      post.title.toLowerCase().includes(q) ||
-      (post.authorDisplayName || post.authorName || '').toLowerCase().includes(q)
-    )
-  }, [activeCategory, posts, searchQuery])
+    return byCategory.filter((post) => post._searchKey.includes(q))
+  }, [activeCategory, indexedPosts, searchQuery])
   const visiblePosts = useMemo(() => filteredPosts.slice(0, page * PAGE_SIZE), [filteredPosts, page])
   const hasMore = visiblePosts.length < filteredPosts.length
 
