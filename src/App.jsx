@@ -830,7 +830,12 @@ function HomeView() {
 
       <nav
         className={`${floatingBarBaseClass} fixed inset-x-4 bottom-4 z-50 mx-auto max-w-5xl`}
-        style={{ transform: bottomHidden ? 'translateY(48px)' : 'translateY(0)', opacity: bottomHidden ? 0 : 1, transition: 'transform .35s, opacity .35s' }}
+        style={{
+          transform: bottomHidden ? 'translateY(48px)' : 'translateY(0)',
+          opacity: bottomHidden ? 0 : 1,
+          pointerEvents: bottomHidden ? 'none' : 'auto',
+          transition: 'transform .35s, opacity .35s',
+        }}
       >
         <div className="grid grid-cols-2 divide-x divide-y divide-black/10 md:grid-cols-4 md:divide-y-0">
           {tabs.map((tab) => {
