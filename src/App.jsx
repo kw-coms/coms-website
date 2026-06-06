@@ -238,7 +238,7 @@ function RecruitPage() {
   )
 }
 
-function NotificationButton() {
+function NotificationButton({ alignLeft = false, padded = false }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -299,7 +299,7 @@ function NotificationButton() {
   }
 
   return (
-    <div className="relative">
+    <div className={`relative ${padded ? 'px-5' : ''}`}>
       <button
         type="button"
         onClick={() => { setOpen((value) => !value); load() }}
@@ -314,7 +314,7 @@ function NotificationButton() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 z-60 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-black/10 bg-white text-[var(--theme-body-dark)] shadow-2xl">
+        <div className={`absolute ${alignLeft ? 'left-0' : 'right-0'} z-60 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-black/10 bg-white text-[var(--theme-body-dark)] shadow-2xl`}>
           <div className="flex items-center justify-between border-b border-black/10 px-4 py-3">
             <span className="text-sm font-black">알림</span>
             <button type="button" onClick={readAll} className="text-xs font-bold text-[#3b4890] hover:underline">모두 읽음</button>
@@ -593,13 +593,13 @@ function HomeView() {
       <BackgroundLayers />
       <FixedBrackets color={bracketColor} leftX={bracketPositions.leftX} rightX={bracketPositions.rightX} />
 
-      <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6 lg:px-8">
+      <header className="fixed inset-x-0 top-0 z-60 px-4 pt-4 sm:px-6 lg:px-8">
         <div className={`${floatingBarBaseClass} relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-5`}>
-          <button type="button" onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="flex items-center gap-3 text-left">
+          <button type="button" onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="flex min-w-0 items-center gap-3 text-left">
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="logo-emboss h-11 w-11 shrink-0 object-contain sm:h-12 sm:w-12" />
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.45em] text-[var(--theme-body-muted)]">KWANGWOON UNIVERSITY</p>
-              <h1 className="mt-1 text-sm font-semibold text-[var(--theme-title)] sm:text-base">KW COM&apos;s</h1>
+            <div className="min-w-0">
+              <p className="hidden text-[10px] font-semibold uppercase tracking-[0.45em] text-[var(--theme-body-muted)] min-[400px]:block">KWANGWOON UNIVERSITY</p>
+              <h1 className="mt-1 whitespace-nowrap text-sm font-semibold text-[var(--theme-title)] sm:text-base">KW COM&apos;s</h1>
             </div>
           </button>
 
@@ -627,13 +627,20 @@ function HomeView() {
               </button>
             </div>
           ) : (
-            <div className="ml-auto hidden w-16 md:block" aria-hidden="true" />
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              disabled={authLoading}
+              className="shape-cut-sm ml-auto inline-flex shrink-0 whitespace-nowrap border border-black/10 bg-white/60 px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78 disabled:cursor-wait disabled:opacity-70 sm:px-4"
+            >
+              로그인
+            </button>
           )}
 
           <button
             type="button"
             onClick={() => setMobileMenuOpen((o) => !o)}
-            className="shape-cut-sm ml-auto flex items-center justify-center border border-black/10 bg-white/60 p-2 text-[var(--theme-body-dark)] transition hover:bg-white/78 md:hidden"
+            className={`shape-cut-sm ${user ? 'ml-auto' : 'ml-0'} flex shrink-0 items-center justify-center border border-black/10 bg-white/60 p-2 text-[var(--theme-body-dark)] transition hover:bg-white/78 md:hidden`}
             aria-label="메뉴"
             aria-expanded={mobileMenuOpen}
             aria-controls="mobile-menu"
@@ -644,7 +651,11 @@ function HomeView() {
         </div>
 
         {mobileMenuOpen && (
-          <div id="mobile-menu" role="menu" className={`${floatingBarBaseClass} mx-auto mt-2 max-w-7xl overflow-hidden md:hidden`}>
+          <div
+            id="mobile-menu"
+            role="menu"
+            className="mx-auto mt-2 max-w-7xl border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] md:hidden"
+          >
             <div className="flex flex-col divide-y divide-black/8">
               {tabs.map((tab) => (
                 <button key={tab.id} type="button" onClick={() => { openPanel(tab.id); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
@@ -682,8 +693,8 @@ function HomeView() {
                         <span>관리자 패널</span>
                       </button>
                     )}
-                    <div className="px-5 py-3.5">
-                      <NotificationButton />
+                    <div className="py-3.5">
+                      <NotificationButton alignLeft padded />
                     </div>
                     <button type="button" onClick={() => { handleLogout(); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
                       <LogOut size={15} />
