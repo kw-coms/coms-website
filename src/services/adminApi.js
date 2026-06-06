@@ -21,10 +21,10 @@ export async function listEligibleMembers() {
   return request('/api/admin/eligible-members')
 }
 
-export async function addEligibleMember(studentId, name) {
+export async function addEligibleMember(payload) {
   return request('/api/admin/eligible-members', {
     method: 'POST',
-    body: JSON.stringify({ studentId, name }),
+    body: JSON.stringify(payload),
   })
 }
 
