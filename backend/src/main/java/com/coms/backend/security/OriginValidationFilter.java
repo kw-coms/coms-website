@@ -52,7 +52,7 @@ public class OriginValidationFilter extends OncePerRequestFilter {
             return isAllowedReferer(referer);
         }
 
-        return true;
+        return false;
     }
 
     private boolean isAllowedReferer(String referer) {
