@@ -25,7 +25,8 @@ export async function request(path, options = {}) {
   const fetchOnce = () => fetch(apiUrl(path), { credentials: 'include', ...options, headers })
 
   let response = await fetchOnce()
-  if (response.status === 401 && !path.includes('/api/auth/')) {
+  const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
+  if (response.status === 401 && canRefresh) {
     if (await tryRefreshToken()) response = await fetchOnce()
   }
 
@@ -44,7 +45,8 @@ export async function requestNoContent(path, options = {}) {
   const fetchOnce = () => fetch(apiUrl(path), { credentials: 'include', ...options, headers })
 
   let response = await fetchOnce()
-  if (response.status === 401 && !path.includes('/api/auth/')) {
+  const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
+  if (response.status === 401 && canRefresh) {
     if (await tryRefreshToken()) response = await fetchOnce()
   }
 

@@ -18,6 +18,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Year;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -28,22 +30,27 @@ public class EligibleMemberService {
 
     private final EligibleMemberRepository eligibleMemberRepository;
     private final com.coms.backend.repository.BannedStudentRepository bannedStudentRepository;
+    private final Clock clock;
 
     private static final Pattern STUDENT_ID_PATTERN = Pattern.compile("\\d{10}");
     private static final Pattern NAME_PATTERN = Pattern.compile("[가-힣]{3}");
+    private static final Pattern TWO_DIGIT_YEAR_PATTERN = Pattern.compile("\\d{2}");
+    private static final Pattern GENERATION_PATTERN = Pattern.compile("\\d{1,3}");
+    private static final int GRADUATE_AFTER_YEARS = 7;
+    private static final int FIRST_GENERATION_YEAR = 1966;
 
     public EligibleMemberService(EligibleMemberRepository eligibleMemberRepository,
-                                  com.coms.backend.repository.BannedStudentRepository bannedStudentRepository) {
+                                  com.coms.backend.repository.BannedStudentRepository bannedStudentRepository,
+                                  Clock clock) {
         this.eligibleMemberRepository = eligibleMemberRepository;
         this.bannedStudentRepository = bannedStudentRepository;
+        this.clock = clock;
     }
 
     public void addSingle(String studentId, String name) {
         EligibleMember member = eligibleMemberRepository.findByStudentId(studentId)
                 .orElseGet(EligibleMember::new);
-        member.setStudentId(studentId);
-        member.setName(name);
-        member.setGeneration(calculateGeneration(studentId));
+        applyExactStudentIdentity(member, studentId, name);
         eligibleMemberRepository.save(member);
     }
 
@@ -64,9 +71,7 @@ public class EligibleMemberService {
     public void updateEligibleMember(Long id, String studentId, String name, String phone) {
         EligibleMember member = eligibleMemberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "명부에서 해당 항목을 찾을 수 없습니다."));
-        member.setStudentId(studentId.trim());
-        member.setName(name.trim());
-        member.setGeneration(calculateGeneration(studentId.trim()));
+        applyExactStudentIdentity(member, studentId, name);
         String normalizedPhone = normalizePhone(phone);
         member.setPhone(normalizedPhone.isBlank() ? null : normalizedPhone);
         eligibleMemberRepository.save(member);
@@ -79,8 +84,7 @@ public class EligibleMemberService {
         eligibleMemberRepository.deleteById(id);
     }
 
-    @Transactional(readOnly = true)
-    public void validateSignup(String studentId, String name) {
+    public void validateAndClaimSignup(String studentId, String name, String verificationType, String verificationValue) {
         String normalizedStudentId = normalize(studentId);
         String normalizedName = normalize(name);
 
@@ -95,15 +99,36 @@ public class EligibleMemberService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "가입이 제한된 학번입니다.");
         }
 
-        EligibleMember eligibleMember = eligibleMemberRepository.findByStudentId(normalizedStudentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번과 이름을 확인해주세요."));
-
-        if (!eligibleMember.getName().equals(normalizedName)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번과 이름을 확인해주세요.");
+        Optional<EligibleMember> exact = eligibleMemberRepository.findByStudentId(normalizedStudentId);
+        if (exact.isPresent()) {
+            if (!exact.get().getName().equals(normalizedName)) {
+                throw invalidRoster();
+            }
+            return;
         }
+
+        int admissionYear = Integer.parseInt(normalizedStudentId.substring(0, 4));
+        if (!isGraduate(admissionYear)) {
+            throw invalidRoster();
+        }
+
+        validateGraduateVerification(verificationType, verificationValue, admissionYear);
+
+        List<EligibleMember> matches = eligibleMemberRepository.findAllByNameAndAdmissionYear(normalizedName, admissionYear);
+        if (matches.size() != 1) {
+            throw invalidRoster();
+        }
+
+        EligibleMember match = matches.getFirst();
+        if (match.getStudentId() != null && !match.getStudentId().isBlank()
+                && !normalizedStudentId.equals(match.getStudentId())) {
+            throw invalidRoster();
+        }
+        match.setStudentId(normalizedStudentId);
+        eligibleMemberRepository.save(match);
     }
 
-    public EligibleMemberImportResponse importRoster(MultipartFile file) {
+    public synchronized EligibleMemberImportResponse importRoster(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부 파일을 선택해주세요.");
         }
@@ -134,8 +159,8 @@ public class EligibleMemberService {
 
             Map<String, String> colMap = buildCsvColumnMap(parser.getHeaderNames());
 
-            if (!colMap.containsKey("name") || !colMap.containsKey("studentId")) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CSV에 이름 또는 학번 컬럼이 없습니다.");
+            if (!colMap.containsKey("name") || (!colMap.containsKey("studentId") && !colMap.containsKey("generation"))) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CSV에는 이름과 학번 또는 기수 컬럼이 필요합니다.");
             }
 
             for (CSVRecord record : parser) {
@@ -146,8 +171,17 @@ public class EligibleMemberService {
                 }
 
                 String studentId = extractStudentId(normalize(safeGet(record, colMap.get("studentId"))));
+                String generation = studentId.isBlank()
+                        ? normalizeGeneration(safeGet(record, colMap.get("generation")))
+                        : calculateGeneration(studentId);
+                Integer admissionYear = admissionYear(studentId, generation);
+                if (admissionYear == null) {
+                    skipped++;
+                    continue;
+                }
+                String verificationKey = studentId.isBlank() ? verificationKey(name, admissionYear) : null;
 
-                if (findExisting(studentId).isPresent()) {
+                if (findExisting(studentId, verificationKey).isPresent()) {
                     skipped++;
                     continue;
                 }
@@ -160,7 +194,9 @@ public class EligibleMemberService {
                 member.setStudentId(studentId.isBlank() ? null : studentId);
                 member.setName(name);
                 member.setPhone(phone == null || phone.isBlank() ? null : phone);
-                member.setGeneration(calculateGeneration(studentId));
+                member.setGeneration(generation);
+                member.setAdmissionYear(admissionYear);
+                member.setVerificationKey(verificationKey);
                 eligibleMemberRepository.save(member);
                 imported++;
             }
@@ -209,8 +245,8 @@ public class EligibleMemberService {
             int headerRowIndex = findXlsxHeaderRowIndex(sheet, evaluator);
             Map<String, Integer> header = buildXlsxHeaderMap(sheet.getRow(headerRowIndex), evaluator);
 
-            if (!header.containsKey("name") || !header.containsKey("studentId")) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부에는 학번, 이름 컬럼이 필요합니다.");
+            if (!header.containsKey("name") || (!header.containsKey("studentId") && !header.containsKey("generation"))) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부에는 이름과 학번 또는 기수 컬럼이 필요합니다.");
             }
 
             for (int i = headerRowIndex + 1; i <= sheet.getLastRowNum(); i++) {
@@ -224,8 +260,17 @@ public class EligibleMemberService {
                 }
 
                 String studentId = extractStudentId(normalize(readCell(row, header.get("studentId"), evaluator)));
+                String generation = studentId.isBlank()
+                        ? normalizeGeneration(readCell(row, header.get("generation"), evaluator))
+                        : calculateGeneration(studentId);
+                Integer admissionYear = admissionYear(studentId, generation);
+                if (admissionYear == null) {
+                    skipped++;
+                    continue;
+                }
+                String verificationKey = studentId.isBlank() ? verificationKey(name, admissionYear) : null;
 
-                if (findExisting(studentId).isPresent()) {
+                if (findExisting(studentId, verificationKey).isPresent()) {
                     skipped++;
                     continue;
                 }
@@ -239,7 +284,9 @@ public class EligibleMemberService {
                 member.setStudentId(studentId.isBlank() ? null : studentId);
                 member.setName(name);
                 member.setPhone(phone == null || phone.isBlank() ? null : phone);
-                member.setGeneration(calculateGeneration(studentId));
+                member.setGeneration(generation);
+                member.setAdmissionYear(admissionYear);
+                member.setVerificationKey(verificationKey);
                 member.setNote(note.isBlank() ? null : note);
                 eligibleMemberRepository.save(member);
                 imported++;
@@ -288,9 +335,12 @@ public class EligibleMemberService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private Optional<EligibleMember> findExisting(String studentId) {
+    private Optional<EligibleMember> findExisting(String studentId, String verificationKey) {
         if (studentId != null && !studentId.isBlank()) {
             return eligibleMemberRepository.findByStudentId(studentId);
+        }
+        if (verificationKey != null && !verificationKey.isBlank()) {
+            return eligibleMemberRepository.findByVerificationKey(verificationKey);
         }
         return Optional.empty();
     }
@@ -307,7 +357,7 @@ public class EligibleMemberService {
         if (studentId == null || studentId.length() < 4) return null;
         try {
             int year = Integer.parseInt(studentId.substring(0, 4));
-            return String.valueOf(year - 1966);
+            return String.valueOf(year - FIRST_GENERATION_YEAR);
         } catch (NumberFormatException e) {
             return null;
         }
@@ -319,5 +369,67 @@ public class EligibleMemberService {
 
     private String normalizePhone(String value) {
         return normalize(value).replaceAll("[^0-9]", "");
+    }
+
+    private boolean isGraduate(int admissionYear) {
+        return admissionYear <= Year.now(clock).getValue() - GRADUATE_AFTER_YEARS;
+    }
+
+    private void validateGraduateVerification(String type, String value, int admissionYear) {
+        String normalizedType = normalize(type).toUpperCase(Locale.ROOT);
+        String normalizedValue = normalizeGeneration(value);
+        if ("YEAR".equals(normalizedType)) {
+            String expectedYear = String.format(Locale.ROOT, "%02d", admissionYear % 100);
+            if (!TWO_DIGIT_YEAR_PATTERN.matcher(normalizedValue).matches() || !expectedYear.equals(normalizedValue)) {
+                throw invalidRoster();
+            }
+            return;
+        }
+        if ("GENERATION".equals(normalizedType)) {
+            String expectedGeneration = String.valueOf(admissionYear - FIRST_GENERATION_YEAR);
+            if (!GENERATION_PATTERN.matcher(normalizedValue).matches() || !expectedGeneration.equals(normalizedValue)) {
+                throw invalidRoster();
+            }
+            return;
+        }
+        throw invalidRoster();
+    }
+
+    private String normalizeGeneration(String value) {
+        return normalize(value).replaceAll("[^0-9]", "");
+    }
+
+    private Integer admissionYear(String studentId, String generation) {
+        try {
+            if (studentId != null && STUDENT_ID_PATTERN.matcher(studentId).matches()) {
+                return Integer.parseInt(studentId.substring(0, 4));
+            }
+            if (generation != null && GENERATION_PATTERN.matcher(generation).matches()) {
+                return Integer.parseInt(generation) + FIRST_GENERATION_YEAR;
+            }
+            return null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private String verificationKey(String name, Integer admissionYear) {
+        if (admissionYear == null) return null;
+        return normalize(name).toLowerCase(Locale.ROOT) + "|" + admissionYear;
+    }
+
+    private void applyExactStudentIdentity(EligibleMember member, String studentId, String name) {
+        String normalizedStudentId = normalize(studentId);
+        member.setStudentId(normalizedStudentId);
+        member.setName(normalize(name));
+        member.setGeneration(calculateGeneration(normalizedStudentId));
+        member.setAdmissionYear(admissionYear(normalizedStudentId, null));
+        if (member.getVerificationKey() != null) {
+            member.setVerificationKey(verificationKey(member.getName(), member.getAdmissionYear()));
+        }
+    }
+
+    private ResponseStatusException invalidRoster() {
+        return new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번 또는 졸업생 인증 정보와 이름을 확인해주세요.");
     }
 }

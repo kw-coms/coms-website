@@ -65,6 +65,8 @@ export default function Signup({ onBack }) {
   const [form, setForm] = useState({
     studentId: '',
     name: '',
+    graduateVerificationType: 'YEAR',
+    graduateVerificationValue: '',
     email: '',
     password: '',
     passwordConfirm: '',
@@ -81,6 +83,11 @@ export default function Signup({ onBack }) {
     'w-full shape-cut-sm border border-black/10 bg-white/70 px-4 py-3 text-[15px] text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/60 transition focus:bg-white focus:ring-2 focus:ring-[var(--theme-accent)]/50'
 
   const labelClass = 'mb-2 block text-sm font-semibold text-[var(--theme-body-dark)]'
+  const admissionYear = /^\d{4}/.test(form.studentId.trim())
+    ? Number(form.studentId.trim().slice(0, 4))
+    : null
+  const graduateCutoffYear = new Date().getFullYear() - 7
+  const isGraduate = admissionYear !== null && admissionYear <= graduateCutoffYear
 
   const handleChange = (event) => {
     const { name, value } = event.target
@@ -92,6 +99,19 @@ export default function Signup({ onBack }) {
     if (!/^\d{10}$/.test(form.studentId.trim())) return '학번은 숫자 10자리여야 합니다.'
     if (!form.name.trim()) return '이름을 입력해주세요.'
     if (!/^[가-힣]{3}$/.test(form.name.trim())) return '이름은 한글 3자리여야 합니다.'
+    if (isGraduate) {
+      const verificationValue = form.graduateVerificationValue.trim().replace(/[^0-9]/g, '')
+      if (!verificationValue) return '졸업생 인증 정보를 입력해주세요.'
+      if (form.graduateVerificationType === 'YEAR') {
+        const expectedYear = String(admissionYear).slice(-2)
+        if (!/^\d{2}$/.test(verificationValue) || verificationValue !== expectedYear) {
+          return '학번 연도 두 자리는 입학연도 끝 두 자리와 같아야 합니다.'
+        }
+      } else {
+        const expectedGeneration = String(admissionYear - 1966)
+        if (verificationValue !== expectedGeneration) return '기수가 학번의 입학연도와 일치하지 않습니다.'
+      }
+    }
     if (!form.email.trim()) return '이메일을 입력해주세요.'
     if (!form.email.includes('@')) return '올바른 이메일 형식이 아닙니다.'
     if (!form.password) return '비밀번호를 입력해주세요.'
@@ -124,6 +144,8 @@ export default function Signup({ onBack }) {
       await signupUser({
         studentId: form.studentId.trim(),
         name: form.name.trim(),
+        graduateVerificationType: isGraduate ? form.graduateVerificationType : null,
+        graduateVerificationValue: isGraduate ? form.graduateVerificationValue.trim() : null,
         email: form.email.trim(),
         password: form.password,
         department: form.department.trim(),
@@ -168,6 +190,41 @@ export default function Signup({ onBack }) {
                 <input id="name" name="name" value={form.name} onChange={handleChange} className={inputClass} placeholder="이름을 입력하세요" autoComplete="name" />
               </div>
             </div>
+
+            {isGraduate && (
+              <div className="shape-cut-sm grid gap-3 border border-cyan-300/20 bg-cyan-300/8 p-4 md:grid-cols-[180px_1fr]">
+                <div>
+                  <label className={labelClass} htmlFor="graduateVerificationType">졸업생 인증 방식</label>
+                  <select
+                    id="graduateVerificationType"
+                    name="graduateVerificationType"
+                    value={form.graduateVerificationType}
+                    onChange={handleChange}
+                    className={inputClass}
+                  >
+                    <option value="YEAR">학번 연도 두 자리</option>
+                    <option value="GENERATION">기수</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass} htmlFor="graduateVerificationValue">
+                    {form.graduateVerificationType === 'YEAR' ? '입학연도 끝 두 자리' : '기수'}
+                  </label>
+                  <input
+                    id="graduateVerificationValue"
+                    name="graduateVerificationValue"
+                    value={form.graduateVerificationValue}
+                    onChange={handleChange}
+                    className={inputClass}
+                    inputMode="numeric"
+                    placeholder={form.graduateVerificationType === 'YEAR' ? '예: 19' : '예: 53기'}
+                  />
+                </div>
+                <p className="text-sm leading-6 text-[var(--theme-body-muted)] md:col-span-2">
+                  {graduateCutoffYear}학번 이전 졸업생은 명부의 이름과 학번 연도 두 자리(예: 19학번의 19) 또는 기수로 인증합니다.
+                </p>
+              </div>
+            )}
 
             <div>
               <label className={labelClass} htmlFor="email">이메일</label>
