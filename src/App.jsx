@@ -26,7 +26,6 @@ import Admin from './pages/Admin.jsx'
 import Community from './pages/Community.jsx'
 import ChangePassword from './pages/ChangePassword.jsx'
 import RecruitApply from './pages/RecruitApply.jsx'
-import RecruitNotice from './pages/RecruitNotice.jsx'
 import { getLogoAsset } from './utils/logoAssets.js'
 import FixedBrackets from './components/common/FixedBrackets.jsx'
 import { useAuth } from './contexts/useAuth.js'
@@ -239,15 +238,6 @@ function RecruitPage() {
   )
 }
 
-function RecruitNoticePage() {
-  const navigate = useNavigate()
-  return (
-    <PageShell wide>
-      <RecruitNotice onBack={() => navigate('/')} onApply={() => navigate('/recruit')} />
-    </PageShell>
-  )
-}
-
 function NotificationButton() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -368,7 +358,6 @@ function App() {
         <Route path="/admin" element={<RequireAdmin><AdminPage /></RequireAdmin>} />
         <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
         <Route path="/recruit" element={<RecruitPage />} />
-        <Route path="/recruit-notice" element={<RecruitNoticePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
@@ -481,7 +470,6 @@ function HomeView() {
   const goAdmin = () => navigate('/admin')
   const goChangePassword = () => navigate('/settings')
   const goRecruitPage = () => navigate('/recruit')
-  const goRecruitNotice = () => navigate('/recruit-notice')
 
   const bracketColor = activeSection ? sectionMeta[activeSection]?.bracket : sectionMeta.about.bracket
 
@@ -579,7 +567,7 @@ function HomeView() {
           <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
             지원서 작성하기
           </button>
-          <button type="button" onClick={goRecruitNotice} className={ghostActionBtnClass}>
+          <button type="button" onClick={goNotices} className={ghostActionBtnClass}>
             모집 공지 보기
           </button>
         </div>
@@ -639,20 +627,13 @@ function HomeView() {
               </button>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => navigate('/login')}
-              disabled={authLoading}
-              className="shape-cut-sm ml-auto inline-flex border border-black/10 bg-white/60 px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78 disabled:cursor-wait disabled:opacity-70 sm:px-4"
-            >
-              로그인
-            </button>
+            <div className="ml-auto hidden w-16 md:block" aria-hidden="true" />
           )}
 
           <button
             type="button"
             onClick={() => setMobileMenuOpen((o) => !o)}
-            className={`shape-cut-sm ${user ? 'ml-auto' : 'ml-0'} flex items-center justify-center border border-black/10 bg-white/60 p-2 text-[var(--theme-body-dark)] transition hover:bg-white/78 md:hidden`}
+            className="shape-cut-sm ml-auto flex items-center justify-center border border-black/10 bg-white/60 p-2 text-[var(--theme-body-dark)] transition hover:bg-white/78 md:hidden"
             aria-label="메뉴"
             aria-expanded={mobileMenuOpen}
             aria-controls="mobile-menu"
