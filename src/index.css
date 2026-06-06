@@ -149,6 +149,41 @@ body {
 	clip-path: polygon(20px 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%, 0 20px);
 }
 
+button,
+a,
+label,
+[role="button"] {
+	touch-action: manipulation;
+	-webkit-tap-highlight-color: rgba(255, 211, 105, 0.18);
+}
+
+@media (hover: none), (pointer: coarse) {
+	button,
+	a,
+	label,
+	[role="button"] {
+		min-height: 44px;
+	}
+
+	button.shape-cut,
+	button.shape-cut-sm,
+	a.shape-cut,
+	a.shape-cut-sm,
+	label.shape-cut,
+	label.shape-cut-sm,
+	[role="button"].shape-cut,
+	[role="button"].shape-cut-sm {
+		clip-path: none;
+		border-radius: 8px;
+	}
+
+	button:disabled,
+	[aria-disabled="true"] {
+		cursor: default;
+		pointer-events: none;
+	}
+}
+
 @keyframes blob {
 	0%,
 	100% {
@@ -180,8 +215,6 @@ body {
 	opacity: 0.92;
 }
 
-@media (hover: hover) and (pointer: fine) {
-}
 html,
 body,
 #root {
