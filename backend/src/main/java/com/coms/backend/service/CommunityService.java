@@ -350,40 +350,6 @@ public class CommunityService {
         }
     }
 
-    private SanitizedPost validateRequest(CommunityPostRequest request, String existingTitle) {
-        String title = normalizeBounded(request.title(), "제목", MAX_TITLE_LENGTH);
-        String content = normalizeBounded(request.content(), "내용", MAX_CONTENT_LENGTH);
-        if (existingTitle != null && !title.equals(existingTitle)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "제목은 수정할 수 없습니다.");
-        }
-        rejectUnsafeText(title);
-        rejectUnsafeText(content);
-        return new SanitizedPost(title, content, parseCategory(request.category()));
-    }
-
-    private String normalizeBounded(String value, String fieldName, int maxLength) {
-        String normalized = value == null ? "" : value.trim();
-        if (normalized.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + "을 입력해주세요.");
-        }
-        if (normalized.length() > maxLength) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + "은 " + maxLength + "자 이하로 입력해주세요.");
-        }
-        if (normalized.chars().anyMatch(ch -> Character.isISOControl(ch) && ch != '\n' && ch != '\r' && ch != '\t')) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "허용되지 않는 제어 문자가 포함되어 있습니다.");
-        }
-        return normalized;
-    }
-
-    private void rejectUnsafeText(String value) {
-        String lower = value.toLowerCase(Locale.ROOT);
-        if (lower.contains("<script") || lower.contains("</script")
-                || lower.contains("<iframe") || lower.contains("javascript:")
-                || lower.matches(".*\\son[a-z]+\\s*=.*")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 내용이 포함되어 있습니다.");
-        }
-    }
-
     private CommunityPost.Category parseCategory(String value) {
         if (value == null || value.isBlank()) {
             return CommunityPost.Category.GENERAL;
