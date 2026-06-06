@@ -68,7 +68,12 @@ public class AuthService implements UserDetailsService {
         if (memberRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다.");
         }
-        eligibleMemberService.validateSignup(request.studentId(), request.name());
+        eligibleMemberService.validateAndClaimSignup(
+                request.studentId(),
+                request.name(),
+                request.graduateVerificationType(),
+                request.graduateVerificationValue()
+        );
 
         Member member = new Member();
         member.setStudentId(request.studentId().trim());
@@ -120,7 +125,7 @@ public class AuthService implements UserDetailsService {
         }
 
         String token = jwtTokenProvider.generateToken(member.getStudentId());
-        String refreshToken = jwtTokenProvider.generateRefreshToken(member.getStudentId());
+        String refreshToken = jwtTokenProvider.generateRefreshToken(member.getStudentId(), request.rememberMe());
         return new AuthResponse(token, member.getStudentId(), member.getName(), "로그인 성공", refreshToken);
     }
 
