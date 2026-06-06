@@ -113,7 +113,7 @@ public class ArchiveService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일이 비어 있거나 파일명이 없습니다.");
         }
         if (file.getSize() > MAX_ARCHIVE_FILE_BYTES) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "자료실 파일은 20MB 이하만 업로드할 수 있습니다.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "자료실 파일은 500MB 이하만 업로드할 수 있습니다.");
         }
         String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
         if (BLOCKED_MIME_TYPES.contains(contentType)) {
