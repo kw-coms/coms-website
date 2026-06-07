@@ -193,10 +193,10 @@ function RosterTab() {
   }
 
   const handleEditSave = async (id) => {
-    if (!editForm.studentId.trim() || !editForm.name.trim()) return
+    if (!editForm.name.trim()) return
     setEditSaving(true)
     try {
-      await updateEligibleMember(id, editForm.studentId.trim(), editForm.name.trim(), editForm.phone.trim())
+      await updateEligibleMember(id, editForm.studentId.trim() || null, editForm.name.trim(), editForm.phone.trim())
       setEditingId(null)
       await loadRoster()
     } catch (err) {
@@ -361,7 +361,9 @@ function RosterTab() {
                     {editingId === member.id ? (
                       <>
                         <td className="px-3 py-2">
-                          <input value={editForm.studentId} onChange={(e) => setEditForm((p) => ({ ...p, studentId: e.target.value }))} maxLength={10} className={`${inputCls} w-32`} />
+                          {editForm.studentId
+                            ? <input value={editForm.studentId} onChange={(e) => setEditForm((p) => ({ ...p, studentId: e.target.value }))} maxLength={10} className={`${inputCls} w-32`} />
+                            : <span className="text-xs italic text-[var(--theme-body-muted)]">졸업생</span>}
                         </td>
                         <td className="px-3 py-2">
                           <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} maxLength={20} className={`${inputCls} w-24`} />
