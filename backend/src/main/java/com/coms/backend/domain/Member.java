@@ -30,6 +30,10 @@ public class Member {
 
     private LocalDateTime emailVerificationExpiresAt;
 
+    private String passwordResetCodeHash;
+
+    private LocalDateTime passwordResetExpiresAt;
+
     private String department;
 
     private String phone;
@@ -72,6 +76,10 @@ public class Member {
     public void setEmailVerificationCodeHash(String emailVerificationCodeHash) { this.emailVerificationCodeHash = emailVerificationCodeHash; }
     public LocalDateTime getEmailVerificationExpiresAt() { return emailVerificationExpiresAt; }
     public void setEmailVerificationExpiresAt(LocalDateTime emailVerificationExpiresAt) { this.emailVerificationExpiresAt = emailVerificationExpiresAt; }
+    public String getPasswordResetCodeHash() { return passwordResetCodeHash; }
+    public void setPasswordResetCodeHash(String passwordResetCodeHash) { this.passwordResetCodeHash = passwordResetCodeHash; }
+    public LocalDateTime getPasswordResetExpiresAt() { return passwordResetExpiresAt; }
+    public void setPasswordResetExpiresAt(LocalDateTime passwordResetExpiresAt) { this.passwordResetExpiresAt = passwordResetExpiresAt; }
     public String getDepartment() { return department; }
     public void setDepartment(String department) { this.department = department; }
     public String getPhone() { return phone; }
