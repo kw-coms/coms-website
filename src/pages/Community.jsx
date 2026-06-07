@@ -139,6 +139,17 @@ function isEdited(post) {
   return Boolean(post?.edited)
 }
 
+function postImageUrls(post) {
+  return [post?.imageUrl, ...(post?.imageUrls || [])]
+    .filter(Boolean)
+    .filter((url, index, urls) => urls.indexOf(url) === index)
+}
+
+function postHasImages(post) {
+  return postImageUrls(post).length > 0
+}
+
+
 function paginationRange(currentPage, totalPages) {
   const pages = new Set([1, totalPages])
   for (let page = currentPage - 1; page <= currentPage + 1; page += 1) {
@@ -1093,7 +1104,7 @@ export default function Community({ onBack }) {
               <span className="text-white/38">#{post.id}</span>
               <span className="shape-cut-sm border border-cyan-200/15 bg-cyan-200/10 px-2 py-1 text-cyan-100">{categoryLabel(post.category || 'GENERAL')}</span>
               {concept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] text-[#3a2b00]">개념글</span>}
-              {(post.imageUrl || (post.imageInfos?.length > 0)) && <span className="text-cyan-200">[사진]</span>}
+              {postHasImages(post) && <span className="text-cyan-200">[사진]</span>}
               {(post.videoInfos?.length > 0) && <span className="text-cyan-200">[영상]</span>}
               {isEdited(post) && <span className="text-white/42">수정</span>}
               {post.authorAdmin && <span className="rounded bg-red-600 px-1 py-0.5 text-[10px] text-white">주딱</span>}
@@ -1232,7 +1243,7 @@ export default function Community({ onBack }) {
                           {concept && <span className="mr-1 rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
                           {post.title}
                         </span>
-                        {(post.imageUrl || (post.imageInfos?.length > 0)) && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
+                        {postHasImages(post) && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
                         {(post.videoInfos?.length > 0) && <span className="ml-1 text-xs text-cyan-200">[영상]</span>}
                         {isEdited(post) && <span className="ml-1 text-[10px] font-bold text-white/45">수정</span>}
                         {post.authorAdmin && <span className="ml-1 rounded bg-red-600 px-1 py-0.5 text-[10px] font-black text-white">주딱</span>}

@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
 public record SignupRequest(
-        @NotBlank @Pattern(regexp = "\\d{10}", message = "학번은 숫자 10자리여야 합니다.") String studentId,
+        String studentId,
         @NotBlank @Pattern(regexp = "[가-힣]{3}", message = "이름은 한글 3자리여야 합니다.") String name,
         String graduateVerificationType,
         String graduateVerificationValue,
