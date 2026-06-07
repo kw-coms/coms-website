@@ -6,6 +6,7 @@ import com.coms.backend.service.NoticeService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,14 +39,16 @@ public class NoticeController {
     }
 
     @PostMapping
-    public ResponseEntity<NoticeResponse> create(@Valid @RequestBody NoticeRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(noticeService.create(request));
+    public ResponseEntity<NoticeResponse> create(Authentication authentication,
+                                                 @Valid @RequestBody NoticeRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(noticeService.create(authentication.getName(), request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<NoticeResponse> update(@PathVariable Long id,
+    public ResponseEntity<NoticeResponse> update(Authentication authentication,
+                                                 @PathVariable Long id,
                                                  @Valid @RequestBody NoticeRequest request) {
-        return ResponseEntity.ok(noticeService.update(id, request));
+        return ResponseEntity.ok(noticeService.update(authentication.getName(), id, request));
     }
 
     @DeleteMapping("/{id}")
