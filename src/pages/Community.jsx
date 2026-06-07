@@ -25,8 +25,6 @@ import {
   createComment,
   deleteComment,
   deleteCommunityPost,
-  deletePostImage,
-  deletePostVideo,
   getCommunityPost,
   listComments,
   listCommunityPosts,
@@ -49,9 +47,19 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
 const MAX_EXTRA_IMAGES = 5
 const MAX_VIDEOS = 3
+const MEDIA_WIDTH_OPTIONS = [
+  { value: 'small', label: '작게', className: 'max-w-xs' },
+  { value: 'medium', label: '중간', className: 'max-w-md' },
+  { value: 'large', label: '크게', className: 'max-w-2xl' },
+  { value: 'full', label: '가득', className: 'max-w-full' },
+]
 
 let _localIdCounter = 0
 function localId() { return `blk-${++_localIdCounter}` }
+
+function mediaWidthClass(width) {
+  return MEDIA_WIDTH_OPTIONS.find((option) => option.value === width)?.className || MEDIA_WIDTH_OPTIONS[2].className
+}
 
 function parsePostBlocks(post) {
   if (!post) return [{ type: 'text', content: '', id: localId() }]
@@ -61,16 +69,18 @@ function parsePostBlocks(post) {
       return parsed.map((block) => {
         if (block.type === 'image') {
           const info = (post.imageInfos || []).find((i) => i.id === block.mediaId)
-          return { type: 'image', status: 'saved', mediaId: block.mediaId, name: block.name || info?.originalName, url: info?.url, id: localId() }
+          return { type: 'image', status: 'saved', mediaId: block.mediaId, name: block.name || info?.originalName, url: info?.url, width: block.width || 'large', id: localId() }
         }
         if (block.type === 'video') {
           const info = (post.videoInfos || []).find((v) => v.id === block.mediaId)
-          return { type: 'video', status: 'saved', mediaId: block.mediaId, name: block.name || info?.originalName, url: info?.url, id: localId() }
+          return { type: 'video', status: 'saved', mediaId: block.mediaId, name: block.name || info?.originalName, url: info?.url, width: block.width || 'large', id: localId() }
         }
         return { type: 'text', content: block.content || '', id: localId() }
       })
     }
-  } catch {}
+  } catch {
+    return [{ type: 'text', content: post.content || '', id: localId() }]
+  }
   return [{ type: 'text', content: post.content || '', id: localId() }]
 }
 const CATEGORY_OPTIONS = [
@@ -139,7 +149,7 @@ function renderPostBlocks(post) {
       if (!src) return null
       return (
         <div key={i} className="bg-[#f7f7f7] px-3 py-4 sm:px-4 sm:py-5">
-          <img src={src} alt={block.name || '이미지'} className="mx-auto max-h-[560px] max-w-full object-contain" />
+          <img src={src} alt={block.name || '이미지'} className={`mx-auto max-h-[560px] w-full object-contain ${mediaWidthClass(block.width)}`} />
         </div>
       )
     }
@@ -149,7 +159,7 @@ function renderPostBlocks(post) {
       const downloadUrl = apiUrl(block.url.replace(/\/videos\/(\d+)$/, '/videos/$1/download'))
       return (
         <div key={i} className="bg-[#f7f7f7] px-3 py-4 sm:px-4 sm:py-5">
-          <video controls src={src} className="mx-auto max-h-[480px] max-w-full rounded" />
+          <video controls src={src} className={`mx-auto max-h-[480px] w-full rounded ${mediaWidthClass(block.width)}`} />
           <div className="mt-3 flex justify-center">
             <a
               href={downloadUrl}
@@ -234,6 +244,37 @@ function MediaInsertZone({ onFiles, dragOverId, setDragOverId, zoneId }) {
   )
 }
 
+function MediaSizeControls({ value, onChange }) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+      <span className="mr-1 text-xs font-semibold text-[var(--theme-body-muted)]">크기</span>
+      {MEDIA_WIDTH_OPTIONS.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition ${value === option.value ? 'border-[var(--theme-text)] bg-[var(--theme-text)] text-[var(--theme-bg)]' : 'border-black/10 bg-white text-[var(--theme-body-muted)] hover:border-black/25 hover:text-[var(--theme-body-dark)]'}`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function MediaStatus({ block }) {
+  if (block.status === 'uploading') {
+    return <p className="mt-1 text-xs font-semibold text-[var(--theme-accent)]">업로드 중...</p>
+  }
+  if (block.status === 'failed') {
+    return <p className="mt-1 text-xs font-semibold text-red-500">{block.error || '업로드 실패'}</p>
+  }
+  if (block.status === 'pending') {
+    return <p className="mt-1 text-xs text-[var(--theme-body-muted)]">등록하면 업로드됩니다</p>
+  }
+  return <p className="mt-1 text-xs text-emerald-600">저장됨</p>
+}
+
 function PostForm({ initialPost, onCancel, onSave }) {
   const isEditing = Boolean(initialPost)
   const [title, setTitle] = useState(initialPost?.title || '')
@@ -244,17 +285,14 @@ function PostForm({ initialPost, onCancel, onSave }) {
   const [error, setError] = useState('')
   const [dragOverId, setDragOverId] = useState(null)
 
-  const imageCount = blocks.filter((b) => b.type === 'image').length
-  const videoCount = blocks.filter((b) => b.type === 'video').length
-
-  const validateFile = (file) => {
+  const validateFile = (file, nextImageCount, nextVideoCount) => {
     if (ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      if (imageCount >= MAX_EXTRA_IMAGES) return '이미지는 최대 5개까지 추가할 수 있습니다.'
+      if (nextImageCount > MAX_EXTRA_IMAGES) return '이미지는 최대 5개까지 추가할 수 있습니다.'
       if (file.size > MAX_IMAGE_BYTES) return '이미지는 5MB 이하만 업로드할 수 있습니다.'
       return null
     }
     if (ALLOWED_VIDEO_TYPES.includes(file.type)) {
-      if (videoCount >= MAX_VIDEOS) return '영상은 최대 3개까지 추가할 수 있습니다.'
+      if (nextVideoCount > MAX_VIDEOS) return '영상은 최대 3개까지 추가할 수 있습니다.'
       if (file.size > MAX_VIDEO_BYTES) return '영상은 100MB 이하만 업로드할 수 있습니다.'
       return null
     }
@@ -271,11 +309,17 @@ function PostForm({ initialPost, onCancel, onSave }) {
 
   const addFiles = (files, afterIndex) => {
     const toAdd = []
+    let nextImageCount = blocks.filter((b) => b.type === 'image').length
+    let nextVideoCount = blocks.filter((b) => b.type === 'video').length
     for (const file of files) {
-      const err = validateFile(file)
+      const isImage = ALLOWED_IMAGE_TYPES.includes(file.type)
+      const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type)
+      const err = validateFile(file, nextImageCount + (isImage ? 1 : 0), nextVideoCount + (isVideo ? 1 : 0))
       if (err) { setError(err); return }
-      const type = ALLOWED_IMAGE_TYPES.includes(file.type) ? 'image' : 'video'
-      toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), id: localId() })
+      const type = isImage ? 'image' : 'video'
+      if (type === 'image') nextImageCount += 1
+      if (type === 'video') nextVideoCount += 1
+      toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 'large', id: localId() })
     }
     if (toAdd.length === 0) return
     setError('')
@@ -305,6 +349,14 @@ function PostForm({ initialPost, onCancel, onSave }) {
 
   const updateText = (id, content) => {
     setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, content } : b))
+  }
+
+  const updateMediaWidth = (id, width) => {
+    setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, width } : b))
+  }
+
+  const updateMediaStatus = (id, status, extra = {}) => {
+    setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, status, ...extra } : b))
   }
 
   const handlePaste = (e, blockIdx) => {
@@ -339,13 +391,18 @@ function PostForm({ initialPost, onCancel, onSave }) {
       for (const block of blocks) {
         if (block.type === 'text') {
           uploadedBlocks.push(block)
-        } else if (block.status === 'pending') {
+        } else if (block.status !== 'saved' && block.file) {
           setSavingStep(`업로드 중: ${block.name}`)
+          updateMediaStatus(block.id, 'uploading', { error: null })
           if (block.type === 'image') {
             const ids = await uploadPostImages(postId, [block.file])
+            if (!Array.isArray(ids) || !ids[0]) throw new Error(`${block.name} 이미지 업로드 응답이 올바르지 않습니다.`)
+            updateMediaStatus(block.id, 'saved', { mediaId: ids[0] })
             uploadedBlocks.push({ ...block, status: 'saved', mediaId: ids[0] })
           } else {
             const videoId = await uploadPostVideo(postId, block.file)
+            if (!videoId) throw new Error(`${block.name} 영상 업로드 응답이 올바르지 않습니다.`)
+            updateMediaStatus(block.id, 'saved', { mediaId: videoId })
             uploadedBlocks.push({ ...block, status: 'saved', mediaId: videoId })
           }
         } else {
@@ -356,8 +413,8 @@ function PostForm({ initialPost, onCancel, onSave }) {
       const contentJson = JSON.stringify(
         uploadedBlocks.map((b) => {
           if (b.type === 'text') return { type: 'text', content: b.content }
-          if (b.type === 'image') return { type: 'image', mediaId: b.mediaId, name: b.name }
-          if (b.type === 'video') return { type: 'video', mediaId: b.mediaId, name: b.name }
+          if (b.type === 'image' && b.mediaId) return { type: 'image', mediaId: b.mediaId, name: b.name, width: b.width || 'large' }
+          if (b.type === 'video' && b.mediaId) return { type: 'video', mediaId: b.mediaId, name: b.name, width: b.width || 'large' }
           return null
         }).filter(Boolean)
       )
@@ -369,6 +426,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
       onSave(saved)
     } catch (err) {
       setError(err.message || '저장 중 오류가 발생했습니다.')
+      setBlocks((prev) => prev.map((b) => b.status === 'uploading' ? { ...b, status: 'failed', error: err.message || '업로드에 실패했습니다.' } : b))
     } finally {
       setSaving(false)
       setSavingStep('')
@@ -398,87 +456,89 @@ function PostForm({ initialPost, onCancel, onSave }) {
         className={`w-full rounded border border-black/15 px-4 py-3 text-base text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)] sm:text-sm ${isEditing ? 'bg-black/5 text-[var(--theme-body-muted)]' : 'bg-white'}`}
       />
 
-      <div className="text-xs text-[var(--theme-body-muted)]">
-        사진/영상을 드래그하거나 Ctrl+V로 붙여넣어 삽입할 수 있습니다. (사진 최대 5개 · 5MB, 영상 최대 3개 · 100MB)
-      </div>
+      <div className="overflow-hidden rounded border border-black/15 bg-white">
+        <div className="flex flex-wrap items-center gap-2 border-b border-black/10 bg-black/[0.03] px-3 py-2">
+          <span className="mr-1 text-xs font-black uppercase tracking-[0.2em] text-[var(--theme-body-muted)]">Editor</span>
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+            <ImagePlus size={14} />
+            이미지
+            <input type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp" className="hidden"
+              onChange={(e) => addFiles(Array.from(e.target.files), blocks.length - 1)} />
+          </label>
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+            <Video size={14} />
+            동영상
+            <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
+              onChange={(e) => addFiles(Array.from(e.target.files), blocks.length - 1)} />
+          </label>
+          <span className="text-xs text-[var(--theme-body-muted)]">드래그하거나 Ctrl+V로 이미지 붙여넣기</span>
+        </div>
 
-      {blocks.map((block, idx) => (
-        <div key={block.id}>
-          {block.type === 'text' ? (
-            <div className="relative">
-              <textarea
-                value={block.content}
-                onChange={(e) => updateText(block.id, e.target.value)}
-                onPaste={(e) => handlePaste(e, idx)}
-                maxLength={MAX_CONTENT_LENGTH}
-                placeholder={idx === 0 ? '내용을 입력하세요. (Ctrl+V로 사진 붙여넣기 가능)' : '내용을 이어서 입력하세요.'}
-                rows={idx === 0 ? 8 : 3}
-                className="min-h-[80px] w-full resize-y rounded border border-black/15 bg-white px-4 py-3 text-sm leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
-              />
-              {blocks.length > 1 && (
-                <div className="absolute right-2 top-2 flex gap-1">
-                  <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="rounded bg-black/5 p-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↑</button>
-                  <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="rounded bg-black/5 p-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↓</button>
-                  <button type="button" onClick={() => removeBlock(block.id)} className="rounded bg-red-50 p-1 text-xs text-red-400 hover:bg-red-100"><X size={12} /></button>
+        <div className="min-h-[360px] space-y-3 bg-white p-3 sm:p-4">
+          {blocks.map((block, idx) => (
+            <div key={block.id}>
+              {block.type === 'text' ? (
+                <div className="relative">
+                  <textarea
+                    value={block.content}
+                    onChange={(e) => updateText(block.id, e.target.value)}
+                    onPaste={(e) => handlePaste(e, idx)}
+                    maxLength={MAX_CONTENT_LENGTH}
+                    placeholder={idx === 0 ? '내용을 입력하세요. 이미지는 붙여넣거나 위 버튼으로 본문에 바로 넣을 수 있습니다.' : '내용을 이어서 입력하세요.'}
+                    rows={idx === 0 ? 10 : 3}
+                    className="min-h-[80px] w-full resize-y rounded border border-transparent bg-white px-2 py-2 text-sm leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+                  />
+                  {blocks.length > 1 && (
+                    <div className="absolute right-2 top-2 flex gap-1">
+                      <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="rounded bg-black/5 p-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↑</button>
+                      <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="rounded bg-black/5 p-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↓</button>
+                      <button type="button" onClick={() => removeBlock(block.id)} className="rounded bg-red-50 p-1 text-xs text-red-400 hover:bg-red-100"><X size={12} /></button>
+                    </div>
+                  )}
+                </div>
+              ) : block.type === 'image' ? (
+                <div className="relative rounded border border-black/10 bg-[#f7f7f7] p-3">
+                  <img src={block.preview || apiUrl(block.url)} alt={block.name} className={`mx-auto max-h-[420px] w-full rounded object-contain ${mediaWidthClass(block.width)}`} />
+                  <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-semibold text-[var(--theme-body-dark)]">{block.name}</p>
+                      <MediaStatus block={block} />
+                      <MediaSizeControls value={block.width || 'large'} onChange={(width) => updateMediaWidth(block.id, width)} />
+                    </div>
+                    <div className="flex gap-1">
+                      <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="rounded bg-white px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/5 disabled:opacity-30">↑</button>
+                      <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="rounded bg-white px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/5 disabled:opacity-30">↓</button>
+                      <button type="button" onClick={() => removeBlock(block.id)} className="rounded bg-red-50 px-2 py-1 text-xs text-red-400 hover:bg-red-100"><X size={12} /></button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative rounded border border-black/10 bg-[#f7f7f7] p-3">
+                  <video src={block.preview || apiUrl(block.url)} controls className={`mx-auto max-h-[380px] w-full rounded ${mediaWidthClass(block.width)}`} />
+                  <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-semibold text-[var(--theme-body-dark)]">{block.name}</p>
+                      <MediaStatus block={block} />
+                      <MediaSizeControls value={block.width || 'large'} onChange={(width) => updateMediaWidth(block.id, width)} />
+                    </div>
+                    <div className="flex gap-1">
+                      <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="rounded bg-white px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/5 disabled:opacity-30">↑</button>
+                      <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="rounded bg-white px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/5 disabled:opacity-30">↓</button>
+                      <button type="button" onClick={() => removeBlock(block.id)} className="rounded bg-red-50 px-2 py-1 text-xs text-red-400 hover:bg-red-100"><X size={12} /></button>
+                    </div>
+                  </div>
                 </div>
               )}
-            </div>
-          ) : block.type === 'image' ? (
-            <div className="relative flex items-start gap-3 rounded border border-black/10 bg-black/3 p-3">
-              <img src={block.preview || apiUrl(block.url)} alt={block.name} className="max-h-48 max-w-xs rounded object-contain" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-[var(--theme-body-dark)]">{block.name}</p>
-                {block.status === 'pending' && <p className="mt-1 text-xs text-amber-600">업로드 대기 중</p>}
-              </div>
-              <div className="flex flex-col gap-1">
-                <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="rounded bg-black/5 px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↑</button>
-                <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="rounded bg-black/5 px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↓</button>
-                <button type="button" onClick={() => removeBlock(block.id)} className="rounded bg-red-50 px-2 py-1 text-xs text-red-400 hover:bg-red-100"><X size={12} /></button>
-              </div>
-            </div>
-          ) : (
-            <div className="relative flex items-start gap-3 rounded border border-black/10 bg-black/3 p-3">
-              <Video size={32} className="shrink-0 text-[var(--theme-body-muted)]" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-[var(--theme-body-dark)]">{block.name}</p>
-                {block.preview && <video src={block.preview} controls className="mt-2 max-h-40 max-w-full rounded" />}
-                {block.status === 'pending' && <p className="mt-1 text-xs text-amber-600">업로드 대기 중</p>}
-              </div>
-              <div className="flex flex-col gap-1">
-                <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="rounded bg-black/5 px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↑</button>
-                <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="rounded bg-black/5 px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↓</button>
-                <button type="button" onClick={() => removeBlock(block.id)} className="rounded bg-red-50 px-2 py-1 text-xs text-red-400 hover:bg-red-100"><X size={12} /></button>
-              </div>
-            </div>
-          )}
 
-          <MediaInsertZone
-            zoneId={`zone-${idx}`}
-            dragOverId={dragOverId}
-            setDragOverId={setDragOverId}
-            onFiles={(files) => addFiles(files, idx)}
-          />
+              <MediaInsertZone
+                zoneId={`zone-${idx}`}
+                dragOverId={dragOverId}
+                setDragOverId={setDragOverId}
+                onFiles={(files) => addFiles(files, idx)}
+              />
+            </div>
+          ))}
         </div>
-      ))}
-
-      <div className="flex flex-wrap gap-2">
-        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
-          <ImagePlus size={14} />
-          사진 추가
-          <input type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp" className="hidden"
-            onChange={(e) => addFiles(Array.from(e.target.files), blocks.length - 1)} />
-        </label>
-        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
-          <Video size={14} />
-          영상 추가
-          <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
-            onChange={(e) => addFiles(Array.from(e.target.files), blocks.length - 1)} />
-        </label>
-        <button type="button"
-          onClick={() => insertBlocksAfter(blocks.length - 1, [{ type: 'text', content: '', id: localId() }])}
-          className="inline-flex items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
-          + 텍스트 블록 추가
-        </button>
       </div>
 
       {error && <p className="text-sm font-semibold text-red-500">{error}</p>}
