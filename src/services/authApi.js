@@ -29,6 +29,20 @@ export async function changePassword(currentPassword, newPassword) {
   })
 }
 
+export async function requestPasswordReset(payload) {
+  return request('/api/auth/password-reset/request', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function confirmPasswordReset(payload) {
+  return request('/api/auth/password-reset/confirm', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
 export async function updateProfile(payload) {
   return request('/api/auth/profile', {
     method: 'PATCH',
