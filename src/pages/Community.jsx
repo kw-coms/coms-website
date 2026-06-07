@@ -275,7 +275,37 @@ function MediaStatus({ block }) {
   return <p className="mt-1 text-xs text-emerald-600">저장됨</p>
 }
 
-function PlainTextEditor({ value, onChange, onPaste, placeholder, minRows = 3, maxLength }) {
+function selectionOffsetWithin(element) {
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return element.textContent?.length || 0
+  const range = selection.getRangeAt(0)
+  if (!element.contains(range.endContainer)) return element.textContent?.length || 0
+  const before = range.cloneRange()
+  before.selectNodeContents(element)
+  before.setEnd(range.endContainer, range.endOffset)
+  return before.toString().length
+}
+
+function pointOffsetWithin(element, clientX, clientY) {
+  let range = null
+  if (document.caretPositionFromPoint) {
+    const position = document.caretPositionFromPoint(clientX, clientY)
+    if (position) {
+      range = document.createRange()
+      range.setStart(position.offsetNode, position.offset)
+      range.collapse(true)
+    }
+  } else if (document.caretRangeFromPoint) {
+    range = document.caretRangeFromPoint(clientX, clientY)
+  }
+  if (!range || !element.contains(range.startContainer)) return element.textContent?.length || 0
+  const before = range.cloneRange()
+  before.selectNodeContents(element)
+  before.setEnd(range.startContainer, range.startOffset)
+  return before.toString().length
+}
+
+function PlainTextEditor({ value, onChange, onPaste, onFilesAtOffset, onCaretChange, placeholder, minRows = 3, maxLength }) {
   const editorRef = useRef(null)
   const minHeight = `${Math.max(minRows, 2) * 1.75 + 1}rem`
 
@@ -299,10 +329,11 @@ function PlainTextEditor({ value, onChange, onPaste, placeholder, minRows = 3, m
       selection.addRange(range)
     }
     onChange(next)
+    onCaretChange?.(selectionOffsetWithin(element))
   }
 
   const handlePlainPaste = (e) => {
-    onPaste?.(e)
+    onPaste?.(e, selectionOffsetWithin(e.currentTarget))
     if (e.defaultPrevented) return
     const text = e.clipboardData?.getData('text/plain')
     if (!text) return
@@ -326,7 +357,21 @@ function PlainTextEditor({ value, onChange, onPaste, placeholder, minRows = 3, m
         contentEditable
         suppressContentEditableWarning
         onInput={(e) => syncContent(e.currentTarget)}
+        onFocus={(e) => onCaretChange?.(selectionOffsetWithin(e.currentTarget))}
+        onKeyUp={(e) => onCaretChange?.(selectionOffsetWithin(e.currentTarget))}
+        onMouseUp={(e) => onCaretChange?.(selectionOffsetWithin(e.currentTarget))}
         onPaste={handlePlainPaste}
+        onDragOver={(e) => {
+          if (Array.from(e.dataTransfer?.items || []).some((item) => item.kind === 'file')) {
+            e.preventDefault()
+          }
+        }}
+        onDrop={(e) => {
+          const files = Array.from(e.dataTransfer?.files || [])
+          if (files.length === 0) return
+          e.preventDefault()
+          onFilesAtOffset?.(files, pointOffsetWithin(e.currentTarget, e.clientX, e.clientY))
+        }}
         onBlur={(e) => {
           if ((e.currentTarget.textContent || '') !== value) {
             e.currentTarget.textContent = value
@@ -348,6 +393,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
   const [savingStep, setSavingStep] = useState('')
   const [error, setError] = useState('')
   const [dragOverId, setDragOverId] = useState(null)
+  const [activeTextTarget, setActiveTextTarget] = useState(null)
 
   const validateFile = (file, nextImageCount, nextVideoCount) => {
     if (ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -423,13 +469,65 @@ function PostForm({ initialPost, onCancel, onSave }) {
     setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, status, ...extra } : b))
   }
 
-  const handlePaste = (e, blockIdx) => {
+  const insertFilesAtTextOffset = (blockId, offset, files) => {
+    setError('')
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === blockId)
+      if (idx < 0) return prev
+
+      const toAdd = []
+      let nextImageCount = prev.filter((b) => b.type === 'image').length
+      let nextVideoCount = prev.filter((b) => b.type === 'video').length
+      for (const file of files) {
+        const isImage = ALLOWED_IMAGE_TYPES.includes(file.type)
+        const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type)
+        const err = validateFile(file, nextImageCount + (isImage ? 1 : 0), nextVideoCount + (isVideo ? 1 : 0))
+        if (err) {
+          setError(err)
+          return prev
+        }
+        const type = isImage ? 'image' : 'video'
+        if (type === 'image') nextImageCount += 1
+        if (type === 'video') nextVideoCount += 1
+        toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 'large', id: localId() })
+      }
+      if (toAdd.length === 0) return prev
+
+      const block = prev[idx]
+      const content = block.content || ''
+      const safeOffset = Math.max(0, Math.min(offset ?? content.length, content.length))
+      const before = content.slice(0, safeOffset)
+      const after = content.slice(safeOffset)
+      const replacement = [
+        ...(before ? [{ ...block, content: before }] : []),
+        ...toAdd,
+        { type: 'text', content: after, id: localId() },
+      ]
+      return [...prev.slice(0, idx), ...replacement, ...prev.slice(idx + 1)]
+    })
+  }
+
+  const handlePaste = (e, blockId, offset) => {
     const items = Array.from(e.clipboardData?.items || [])
     const imageItem = items.find((i) => i.kind === 'file' && i.type.startsWith('image/'))
     if (!imageItem) return
     e.preventDefault()
     const file = imageItem.getAsFile()
-    if (file) addFiles([file], blockIdx)
+    if (file) insertFilesAtTextOffset(blockId, offset, [file])
+  }
+
+  const insertFilesAtActiveText = (files) => {
+    const target = activeTextTarget && blocks.some((b) => b.id === activeTextTarget.blockId)
+      ? activeTextTarget
+      : (() => {
+          const firstText = blocks.find((b) => b.type === 'text')
+          return firstText ? { blockId: firstText.id, offset: firstText.content?.length || 0 } : null
+        })()
+    if (target) {
+      insertFilesAtTextOffset(target.blockId, target.offset, files)
+      return
+    }
+    addFiles(files, blocks.length - 1)
   }
 
   const submit = async (e) => {
@@ -527,13 +625,13 @@ function PostForm({ initialPost, onCancel, onSave }) {
             <ImagePlus size={14} />
             이미지
             <input type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp" className="hidden"
-              onChange={(e) => addFiles(Array.from(e.target.files), blocks.length - 1)} />
+              onChange={(e) => insertFilesAtActiveText(Array.from(e.target.files))} />
           </label>
           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
             <Video size={14} />
             동영상
             <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
-              onChange={(e) => addFiles(Array.from(e.target.files), blocks.length - 1)} />
+              onChange={(e) => insertFilesAtActiveText(Array.from(e.target.files))} />
           </label>
           <span className="text-xs text-[var(--theme-body-muted)]">드래그하거나 Ctrl+V로 이미지 붙여넣기</span>
         </div>
@@ -546,7 +644,9 @@ function PostForm({ initialPost, onCancel, onSave }) {
                   <PlainTextEditor
                     value={block.content}
                     onChange={(content) => updateText(block.id, content)}
-                    onPaste={(e) => handlePaste(e, idx)}
+                    onPaste={(e, offset) => handlePaste(e, block.id, offset)}
+                    onFilesAtOffset={(files, offset) => insertFilesAtTextOffset(block.id, offset, files)}
+                    onCaretChange={(offset) => setActiveTextTarget({ blockId: block.id, offset })}
                     placeholder={idx === 0 ? '내용을 입력하세요. 이미지나 동영상을 이 영역 안에 바로 넣을 수 있습니다.' : '내용을 이어서 입력하세요.'}
                     minRows={idx === 0 ? 10 : 3}
                     maxLength={MAX_CONTENT_LENGTH}

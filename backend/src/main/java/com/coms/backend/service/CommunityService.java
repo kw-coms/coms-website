@@ -124,7 +124,7 @@ public class CommunityService {
         SanitizedPost sanitized = validateRequest(request, post.getTitle());
         post.setContent(sanitized.content());
         post.setCategory(sanitized.category());
-        if (request.removeImage()) {
+        if (Boolean.TRUE.equals(request.removeImage())) {
             clearImage(post);
         }
         attachImage(post, image);
