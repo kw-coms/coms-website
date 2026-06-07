@@ -60,6 +60,36 @@ export async function deleteCommunityPost(id) {
   })
 }
 
+export async function uploadPostImages(postId, files) {
+  const form = new FormData()
+  files.forEach((f) => form.append('images', f))
+  return request(`/api/community/posts/${postId}/images`, {
+    method: 'POST',
+    body: form,
+  })
+}
+
+export async function deletePostImage(postId, imageId) {
+  return requestNoContent(`/api/community/posts/${postId}/images/${imageId}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function uploadPostVideo(postId, file) {
+  const form = new FormData()
+  form.append('video', file)
+  return request(`/api/community/posts/${postId}/videos`, {
+    method: 'POST',
+    body: form,
+  })
+}
+
+export async function deletePostVideo(postId, videoId) {
+  return requestNoContent(`/api/community/posts/${postId}/videos/${videoId}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function listComments(postId) {
   return request(`/api/community/posts/${postId}/comments`)
 }
