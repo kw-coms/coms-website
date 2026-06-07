@@ -94,6 +94,7 @@ export default function Signup({ onBack }) {
     : null
   const graduateCutoffYear = new Date().getFullYear() - 7
   const isGraduateSignup = signupType === 'graduate'
+  const isCurrentSignup = signupType === 'current'
   const isGraduateStudentId = admissionYear !== null && admissionYear <= graduateCutoffYear
 
   const handleChange = (event) => {
@@ -132,9 +133,9 @@ export default function Signup({ onBack }) {
     if (/\s/.test(form.password)) return '비밀번호에 공백을 사용할 수 없습니다.'
     if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/.test(form.password)) return '비밀번호는 8자 이상, 영문·숫자·특수문자(!@#$ 등)를 모두 포함해야 합니다.'
     if (form.password !== form.passwordConfirm) return '비밀번호 확인이 일치하지 않습니다.'
-    if (isGraduateSignup && selectedInterests.length === 0) return '졸업생 관심 분야를 하나 이상 선택해주세요.'
-    if (isGraduateSignup && selectedInterests.includes('기타') && !otherInterest.trim()) return '기타 관심 분야를 입력해주세요.'
-    if (isGraduateSignup && !form.aspiration.trim()) return '졸업생 포부를 입력해주세요.'
+    if (isCurrentSignup && selectedInterests.length === 0) return '재학생 관심 분야를 하나 이상 선택해주세요.'
+    if (isCurrentSignup && selectedInterests.includes('기타') && !otherInterest.trim()) return '기타 관심 분야를 입력해주세요.'
+    if (isCurrentSignup && !form.aspiration.trim()) return '재학생 포부를 입력해주세요.'
     return ''
   }
 
@@ -167,8 +168,8 @@ export default function Signup({ onBack }) {
         password: form.password,
         department: form.department.trim(),
         phone: form.phone.trim(),
-        aspiration: isGraduateSignup ? form.aspiration.trim() : null,
-        interests: isGraduateSignup ? buildInterestsString() : null,
+        aspiration: isCurrentSignup ? form.aspiration.trim() : null,
+        interests: isCurrentSignup ? buildInterestsString() : null,
       })
       setSignedUpStudentId(form.studentId.trim())
       setSignedUpEmail(form.email.trim())
@@ -186,8 +187,8 @@ export default function Signup({ onBack }) {
     : step === 'done'
     ? '이메일 인증이 완료되었습니다. 로그인하시면 됩니다.'
     : isGraduateSignup
-    ? "졸업생 명부 인증 후 관심 분야와 포부를 함께 등록합니다."
-    : "COM's 명부에 등록된 정보와 일치해야 계정을 만들 수 있습니다."
+    ? "졸업생 명부 인증 정보와 일치해야 계정을 만들 수 있습니다."
+    : "COM's 명부 확인 후 관심 분야와 포부를 함께 등록합니다."
 
   return (
     <main className="w-full px-0 pb-6 pt-0 text-[var(--theme-text)] sm:pb-8">
@@ -292,7 +293,7 @@ export default function Signup({ onBack }) {
               </div>
             </div>
 
-            {isGraduateSignup && (
+            {isCurrentSignup && (
               <>
                 <div>
                   <label className={labelClass}>
