@@ -342,6 +342,9 @@ function ResizableMedia({
     e.stopPropagation()
     const el = ref.current
     if (!el) return
+    // Disable HTML5 drag on outer div while resizing so browser doesn't
+    // intercept mousemove events as a drag operation
+    el.draggable = false
     const startX = e.clientX
     const startW = el.offsetWidth
     const parentW = el.parentElement?.offsetWidth || el.offsetWidth
@@ -351,6 +354,7 @@ function ResizableMedia({
       onWidthChange(pct)
     }
     const onUp = () => {
+      if (el) el.draggable = true
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
     }
@@ -1012,8 +1016,8 @@ function PostForm({ initialPost, onCancel, onSave }) {
                     onPaste={(e, offset) => handlePaste(e, block.id, offset)}
                     onFilesAtOffset={(files, offset) => insertFilesAtTextOffset(block.id, offset, files)}
                     onCaretChange={(offset) => setActiveTextTarget({ blockId: block.id, offset })}
-                    placeholder={idx === 0 ? '내용을 입력하세요. 이미지나 동영상을 이 영역 안에 바로 넣을 수 있습니다.' : '내용을 이어서 입력하세요.'}
-                    minRows={idx === 0 && blocks.length === 1 ? 10 : 1}
+                    placeholder={idx === 0 ? '내용을 입력하세요. 이미지나 동영상을 이 영역 안에 바로 넣을 수 있습니다.' : '여기에 내용을 입력하세요.'}
+                    minRows={idx === 0 && blocks.length === 1 ? 10 : 3}
                     maxLength={MAX_CONTENT_LENGTH}
                   />
                 </div>
