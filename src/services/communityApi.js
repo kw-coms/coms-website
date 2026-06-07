@@ -23,7 +23,7 @@ export async function createCommunityPost(body, image) {
 
   return request('/api/community/posts', {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, removeImage: Boolean(body.removeImage) }),
   })
 }
 
@@ -43,7 +43,7 @@ export async function updateCommunityPost(id, body, image) {
 
   return request(`/api/community/posts/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, removeImage: Boolean(body.removeImage) }),
   })
 }
 

@@ -7,5 +7,5 @@ public record CommunityPostRequest(
         @NotBlank @Size(max = 120) String title,
         @NotBlank @Size(max = 50000) String content,
         String category,
-        boolean removeImage
+        Boolean removeImage
 ) {}
