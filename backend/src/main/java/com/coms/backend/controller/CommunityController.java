@@ -103,11 +103,11 @@ public class CommunityController {
     }
 
     @PostMapping(path = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<Void> uploadImages(Authentication authentication,
-                                             @PathVariable Long id,
-                                             @RequestParam("images") List<MultipartFile> images) {
-        communityService.addImages(authentication.getName(), id, images);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<List<Long>> uploadImages(Authentication authentication,
+                                                   @PathVariable Long id,
+                                                   @RequestParam("images") List<MultipartFile> images) {
+        List<Long> ids = communityService.addImages(authentication.getName(), id, images);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ids);
     }
 
     @GetMapping("/{id}/images/{imageId}")
@@ -118,6 +118,54 @@ public class CommunityController {
                 .contentType(mediaType(mimeType))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename("image", StandardCharsets.UTF_8).build().toString())
                 .body(resource);
+    }
+
+    @DeleteMapping("/{id}/images/{imageId}")
+    public ResponseEntity<Void> deleteImage(Authentication authentication,
+                                            @PathVariable Long id,
+                                            @PathVariable Long imageId) {
+        communityService.deleteImage(authentication.getName(), id, imageId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping(path = "/{id}/videos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Long> uploadVideo(Authentication authentication,
+                                            @PathVariable Long id,
+                                            @RequestParam("video") MultipartFile video) {
+        Long videoId = communityService.addVideo(authentication.getName(), id, video);
+        return ResponseEntity.status(HttpStatus.CREATED).body(videoId);
+    }
+
+    @GetMapping("/{id}/videos/{videoId}")
+    public ResponseEntity<Resource> streamVideo(@PathVariable Long id, @PathVariable Long videoId) {
+        com.coms.backend.domain.CommunityPostVideo meta = communityService.loadVideoMeta(id, videoId);
+        Resource resource = communityService.loadVideo(id, videoId);
+        String filename = meta.getOriginalName() == null ? "video" : meta.getOriginalName();
+        return ResponseEntity.ok()
+                .contentType(mediaType(meta.getMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(filename, StandardCharsets.UTF_8).build().toString())
+                .body(resource);
+    }
+
+    @GetMapping("/{id}/videos/{videoId}/download")
+    public ResponseEntity<Resource> downloadVideo(@PathVariable Long id, @PathVariable Long videoId) {
+        com.coms.backend.domain.CommunityPostVideo meta = communityService.loadVideoMeta(id, videoId);
+        Resource resource = communityService.loadVideo(id, videoId);
+        String filename = meta.getOriginalName() == null ? "video" : meta.getOriginalName();
+        return ResponseEntity.ok()
+                .contentType(mediaType(meta.getMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(filename, StandardCharsets.UTF_8).build().toString())
+                .body(resource);
+    }
+
+    @DeleteMapping("/{id}/videos/{videoId}")
+    public ResponseEntity<Void> deleteVideo(Authentication authentication,
+                                            @PathVariable Long id,
+                                            @PathVariable Long videoId) {
+        communityService.deleteVideo(authentication.getName(), id, videoId);
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}")

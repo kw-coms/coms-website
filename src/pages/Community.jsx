@@ -7,14 +7,17 @@ import {
   ChevronsRight,
   ChevronLeft,
   ChevronRight,
+  Download,
   ImagePlus,
   MessageSquare,
+  Paperclip,
   Pencil,
   Search,
   Send,
   ThumbsDown,
   ThumbsUp,
   Trash2,
+  Video,
   X,
 } from 'lucide-react'
 import {
@@ -22,10 +25,14 @@ import {
   createComment,
   deleteComment,
   deleteCommunityPost,
+  deletePostImage,
+  deletePostVideo,
   getCommunityPost,
   listComments,
   listCommunityPosts,
   updateCommunityPost,
+  uploadPostImages,
+  uploadPostVideo,
   voteCommunityPost,
 } from '../services/communityApi.js'
 import { apiUrl } from '../services/apiClient.js'
@@ -36,6 +43,36 @@ const CONCEPT_POST_SCORE_THRESHOLD = 5
 const MAX_TITLE_LENGTH = 120
 const MAX_CONTENT_LENGTH = 5000
 const MAX_COMMENT_LENGTH = 1000
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
+const MAX_EXTRA_IMAGES = 5
+const MAX_VIDEOS = 3
+
+let _localIdCounter = 0
+function localId() { return `blk-${++_localIdCounter}` }
+
+function parsePostBlocks(post) {
+  if (!post) return [{ type: 'text', content: '', id: localId() }]
+  try {
+    const parsed = JSON.parse(post.content)
+    if (Array.isArray(parsed)) {
+      return parsed.map((block) => {
+        if (block.type === 'image') {
+          const info = (post.imageInfos || []).find((i) => i.id === block.mediaId)
+          return { type: 'image', status: 'saved', mediaId: block.mediaId, name: block.name || info?.originalName, url: info?.url, id: localId() }
+        }
+        if (block.type === 'video') {
+          const info = (post.videoInfos || []).find((v) => v.id === block.mediaId)
+          return { type: 'video', status: 'saved', mediaId: block.mediaId, name: block.name || info?.originalName, url: info?.url, id: localId() }
+        }
+        return { type: 'text', content: block.content || '', id: localId() }
+      })
+    }
+  } catch {}
+  return [{ type: 'text', content: post.content || '', id: localId() }]
+}
 const CATEGORY_OPTIONS = [
   { value: 'GENERAL', label: '일반' },
   { value: 'QUESTION', label: '질문' },
@@ -86,6 +123,90 @@ function shortDate(iso) {
   return date.toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })
 }
 
+function renderPostBlocks(post) {
+  const blocks = parsePostBlocks(post)
+  return blocks.map((block, i) => {
+    if (block.type === 'text') {
+      if (!block.content.trim()) return null
+      return (
+        <div key={i} className="text-size-container whitespace-pre-wrap break-words px-4 py-5 auto-text-post sm:px-5">
+          {linkify(block.content)}
+        </div>
+      )
+    }
+    if (block.type === 'image') {
+      const src = block.url ? apiUrl(block.url) : null
+      if (!src) return null
+      return (
+        <div key={i} className="bg-[#f7f7f7] px-3 py-4 sm:px-4 sm:py-5">
+          <img src={src} alt={block.name || '이미지'} className="mx-auto max-h-[560px] max-w-full object-contain" />
+        </div>
+      )
+    }
+    if (block.type === 'video') {
+      const src = block.url ? apiUrl(block.url) : null
+      if (!src) return null
+      const downloadUrl = apiUrl(block.url.replace(/\/videos\/(\d+)$/, '/videos/$1/download'))
+      return (
+        <div key={i} className="bg-[#f7f7f7] px-3 py-4 sm:px-4 sm:py-5">
+          <video controls src={src} className="mx-auto max-h-[480px] max-w-full rounded" />
+          <div className="mt-3 flex justify-center">
+            <a
+              href={downloadUrl}
+              download={block.name}
+              className="inline-flex items-center gap-1.5 rounded border border-black/15 bg-white px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] hover:bg-black/5"
+            >
+              <Download size={14} />
+              다운로드
+            </a>
+          </div>
+        </div>
+      )
+    }
+    return null
+  })
+}
+
+function renderAttachments(post) {
+  const imageInfos = post.imageInfos || []
+  const videoInfos = post.videoInfos || []
+  if (imageInfos.length === 0 && videoInfos.length === 0) return null
+  return (
+    <div className="border-t border-black/10 px-4 py-4 sm:px-5">
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-black text-[var(--theme-body-muted)]">
+        <Paperclip size={12} />
+        원본 첨부파일
+      </div>
+      <ul className="space-y-1">
+        {imageInfos.map((info) => (
+          <li key={`img-${info.id}`}>
+            <a
+              href={apiUrl(info.url)}
+              download={info.originalName}
+              className="inline-flex items-center gap-1.5 text-xs text-[var(--theme-body-muted)] hover:text-[var(--theme-body-dark)] hover:underline"
+            >
+              <ImagePlus size={11} />
+              {info.originalName || '이미지'}
+            </a>
+          </li>
+        ))}
+        {videoInfos.map((info) => (
+          <li key={`vid-${info.id}`}>
+            <a
+              href={apiUrl(info.url.replace(/\/videos\/(\d+)$/, '/videos/$1/download'))}
+              download={info.originalName}
+              className="inline-flex items-center gap-1.5 text-xs text-[var(--theme-body-muted)] hover:text-[var(--theme-body-dark)] hover:underline"
+            >
+              <Video size={11} />
+              {info.originalName || '영상'}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function openRowWithKeyboard(event, open) {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
@@ -99,102 +220,276 @@ function clickableCell(open) {
   }
 }
 
+function MediaInsertZone({ onFiles, dragOverId, setDragOverId, zoneId }) {
+  const isOver = dragOverId === zoneId
+  return (
+    <div
+      className={`my-1 flex items-center gap-2 rounded border-2 border-dashed px-3 py-2 transition ${isOver ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/8' : 'border-black/10 hover:border-black/25'}`}
+      onDragOver={(e) => { e.preventDefault(); setDragOverId(zoneId) }}
+      onDragLeave={() => setDragOverId(null)}
+      onDrop={(e) => { e.preventDefault(); setDragOverId(null); onFiles(Array.from(e.dataTransfer.files)) }}
+    >
+      <span className="text-xs text-[var(--theme-body-muted)]">여기에 파일을 드래그</span>
+    </div>
+  )
+}
+
 function PostForm({ initialPost, onCancel, onSave }) {
   const isEditing = Boolean(initialPost)
-  const [form, setForm] = useState({
-    title: initialPost?.title || '',
-    content: initialPost?.content || '',
-    category: initialPost?.category || 'GENERAL',
-    removeImage: false,
-  })
-  const [image, setImage] = useState(null)
+  const [title, setTitle] = useState(initialPost?.title || '')
+  const [category, setCategory] = useState(initialPost?.category || 'GENERAL')
+  const [blocks, setBlocks] = useState(() => isEditing ? parsePostBlocks(initialPost) : [{ type: 'text', content: '', id: localId() }])
   const [saving, setSaving] = useState(false)
+  const [savingStep, setSavingStep] = useState('')
   const [error, setError] = useState('')
+  const [dragOverId, setDragOverId] = useState(null)
 
-  const submit = async (event) => {
-    event.preventDefault()
-    if (!form.title.trim() || !form.content.trim()) return
+  const imageCount = blocks.filter((b) => b.type === 'image').length
+  const videoCount = blocks.filter((b) => b.type === 'video').length
+
+  const validateFile = (file) => {
+    if (ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      if (imageCount >= MAX_EXTRA_IMAGES) return '이미지는 최대 5개까지 추가할 수 있습니다.'
+      if (file.size > MAX_IMAGE_BYTES) return '이미지는 5MB 이하만 업로드할 수 있습니다.'
+      return null
+    }
+    if (ALLOWED_VIDEO_TYPES.includes(file.type)) {
+      if (videoCount >= MAX_VIDEOS) return '영상은 최대 3개까지 추가할 수 있습니다.'
+      if (file.size > MAX_VIDEO_BYTES) return '영상은 100MB 이하만 업로드할 수 있습니다.'
+      return null
+    }
+    return '지원하지 않는 파일 형식입니다. (이미지: JPG/PNG/GIF/WebP, 영상: MP4/WebM/MOV)'
+  }
+
+  const insertBlocksAfter = (afterIndex, newBlocks) => {
+    setBlocks((prev) => {
+      const updated = [...prev]
+      updated.splice(afterIndex + 1, 0, ...newBlocks)
+      return updated
+    })
+  }
+
+  const addFiles = (files, afterIndex) => {
+    const toAdd = []
+    for (const file of files) {
+      const err = validateFile(file)
+      if (err) { setError(err); return }
+      const type = ALLOWED_IMAGE_TYPES.includes(file.type) ? 'image' : 'video'
+      toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), id: localId() })
+    }
+    if (toAdd.length === 0) return
+    setError('')
+    insertBlocksAfter(afterIndex, toAdd)
+  }
+
+  const removeBlock = (id) => {
+    setBlocks((prev) => {
+      const block = prev.find((b) => b.id === id)
+      if (block?.preview) URL.revokeObjectURL(block.preview)
+      const filtered = prev.filter((b) => b.id !== id)
+      return filtered.length === 0 ? [{ type: 'text', content: '', id: localId() }] : filtered
+    })
+  }
+
+  const moveBlock = (id, dir) => {
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === id)
+      if (idx < 0) return prev
+      const next = idx + dir
+      if (next < 0 || next >= prev.length) return prev
+      const arr = [...prev]
+      ;[arr[idx], arr[next]] = [arr[next], arr[idx]]
+      return arr
+    })
+  }
+
+  const updateText = (id, content) => {
+    setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, content } : b))
+  }
+
+  const handlePaste = (e, blockIdx) => {
+    const items = Array.from(e.clipboardData?.items || [])
+    const imageItem = items.find((i) => i.kind === 'file' && i.type.startsWith('image/'))
+    if (!imageItem) return
+    e.preventDefault()
+    const file = imageItem.getAsFile()
+    if (file) addFiles([file], blockIdx)
+  }
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!title.trim()) { setError('제목을 입력해주세요.'); return }
+    const hasContent = blocks.some((b) => (b.type === 'text' && b.content.trim()) || b.type === 'image' || b.type === 'video')
+    if (!hasContent) { setError('내용을 입력하거나 사진/영상을 추가해주세요.'); return }
+
     setSaving(true)
     setError('')
     try {
-      const payload = {
-        title: form.title.trim(),
-        content: form.content.trim(),
-        category: form.category,
-        removeImage: form.removeImage,
+      let postId
+      if (isEditing) {
+        postId = initialPost.id
+      } else {
+        setSavingStep('글 등록 중...')
+        const placeholder = blocks.find((b) => b.type === 'text' && b.content.trim())?.content.trim() || '...'
+        const created = await createCommunityPost({ title: title.trim(), content: placeholder, category })
+        postId = created.id
       }
-      const saved = initialPost
-        ? await updateCommunityPost(initialPost.id, payload, image)
-        : await createCommunityPost(payload, image)
+
+      const uploadedBlocks = []
+      for (const block of blocks) {
+        if (block.type === 'text') {
+          uploadedBlocks.push(block)
+        } else if (block.status === 'pending') {
+          setSavingStep(`업로드 중: ${block.name}`)
+          if (block.type === 'image') {
+            const ids = await uploadPostImages(postId, [block.file])
+            uploadedBlocks.push({ ...block, status: 'saved', mediaId: ids[0] })
+          } else {
+            const videoId = await uploadPostVideo(postId, block.file)
+            uploadedBlocks.push({ ...block, status: 'saved', mediaId: videoId })
+          }
+        } else {
+          uploadedBlocks.push(block)
+        }
+      }
+
+      const contentJson = JSON.stringify(
+        uploadedBlocks.map((b) => {
+          if (b.type === 'text') return { type: 'text', content: b.content }
+          if (b.type === 'image') return { type: 'image', mediaId: b.mediaId, name: b.name }
+          if (b.type === 'video') return { type: 'video', mediaId: b.mediaId, name: b.name }
+          return null
+        }).filter(Boolean)
+      )
+
+      setSavingStep('저장 중...')
+      const saved = await updateCommunityPost(postId, { title: title.trim(), content: contentJson, category })
+
+      uploadedBlocks.forEach((b) => { if (b.preview) URL.revokeObjectURL(b.preview) })
       onSave(saved)
     } catch (err) {
       setError(err.message || '저장 중 오류가 발생했습니다.')
     } finally {
       setSaving(false)
+      setSavingStep('')
     }
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4 rounded-lg border border-white/10 bg-white/80 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.12)] sm:p-5">
-      <select
-        value={form.category}
-        onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
-        className="w-full rounded border border-black/15 bg-white px-3 py-3 text-base font-semibold text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)] sm:max-w-48 sm:py-2 sm:text-sm"
-      >
-        {CATEGORY_OPTIONS.filter((item) => item.value !== 'ALL').map((item) => (
-          <option key={item.value} value={item.value}>{item.label}</option>
-        ))}
-      </select>
+    <form onSubmit={submit} className="space-y-3 rounded-lg border border-white/10 bg-white/80 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.12)] sm:p-5">
+      <div className="flex flex-wrap gap-2">
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+        >
+          {CATEGORY_OPTIONS.map((item) => (
+            <option key={item.value} value={item.value}>{item.label}</option>
+          ))}
+        </select>
+      </div>
+
       <input
-        value={form.title}
-        onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
         maxLength={MAX_TITLE_LENGTH}
         placeholder="제목"
         readOnly={isEditing}
         className={`w-full rounded border border-black/15 px-4 py-3 text-base text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)] sm:text-sm ${isEditing ? 'bg-black/5 text-[var(--theme-body-muted)]' : 'bg-white'}`}
       />
-      <textarea
-        value={form.content}
-        onChange={(event) => setForm((prev) => ({ ...prev, content: event.target.value }))}
-        rows={14}
-        maxLength={MAX_CONTENT_LENGTH}
-        placeholder="내용을 입력하세요."
-        className="min-h-[260px] w-full resize-y rounded border border-black/15 bg-white px-4 py-3 text-base leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)] sm:min-h-[340px] sm:text-sm"
-      />
-      <div className="flex justify-end text-xs font-semibold text-[var(--theme-body-muted)]">
-        {form.content.length.toLocaleString('ko-KR')} / {MAX_CONTENT_LENGTH.toLocaleString('ko-KR')}
+
+      <div className="text-xs text-[var(--theme-body-muted)]">
+        사진/영상을 드래그하거나 Ctrl+V로 붙여넣어 삽입할 수 있습니다. (사진 최대 5개 · 5MB, 영상 최대 3개 · 100MB)
       </div>
-      <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--theme-body-muted)]">
-        <label className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded border border-black/15 bg-white px-3 py-2 font-semibold text-[var(--theme-body-mid)] hover:bg-black/5 sm:w-auto">
-          <ImagePlus size={15} />
-          사진 선택
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
-            className="hidden"
-            onChange={(event) => setImage(event.target.files?.[0] || null)}
+
+      {blocks.map((block, idx) => (
+        <div key={block.id}>
+          {block.type === 'text' ? (
+            <div className="relative">
+              <textarea
+                value={block.content}
+                onChange={(e) => updateText(block.id, e.target.value)}
+                onPaste={(e) => handlePaste(e, idx)}
+                maxLength={MAX_CONTENT_LENGTH}
+                placeholder={idx === 0 ? '내용을 입력하세요. (Ctrl+V로 사진 붙여넣기 가능)' : '내용을 이어서 입력하세요.'}
+                rows={idx === 0 ? 8 : 3}
+                className="min-h-[80px] w-full resize-y rounded border border-black/15 bg-white px-4 py-3 text-sm leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+              />
+              {blocks.length > 1 && (
+                <div className="absolute right-2 top-2 flex gap-1">
+                  <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="rounded bg-black/5 p-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↑</button>
+                  <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="rounded bg-black/5 p-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↓</button>
+                  <button type="button" onClick={() => removeBlock(block.id)} className="rounded bg-red-50 p-1 text-xs text-red-400 hover:bg-red-100"><X size={12} /></button>
+                </div>
+              )}
+            </div>
+          ) : block.type === 'image' ? (
+            <div className="relative flex items-start gap-3 rounded border border-black/10 bg-black/3 p-3">
+              <img src={block.preview || apiUrl(block.url)} alt={block.name} className="max-h-48 max-w-xs rounded object-contain" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold text-[var(--theme-body-dark)]">{block.name}</p>
+                {block.status === 'pending' && <p className="mt-1 text-xs text-amber-600">업로드 대기 중</p>}
+              </div>
+              <div className="flex flex-col gap-1">
+                <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="rounded bg-black/5 px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↑</button>
+                <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="rounded bg-black/5 px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↓</button>
+                <button type="button" onClick={() => removeBlock(block.id)} className="rounded bg-red-50 px-2 py-1 text-xs text-red-400 hover:bg-red-100"><X size={12} /></button>
+              </div>
+            </div>
+          ) : (
+            <div className="relative flex items-start gap-3 rounded border border-black/10 bg-black/3 p-3">
+              <Video size={32} className="shrink-0 text-[var(--theme-body-muted)]" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold text-[var(--theme-body-dark)]">{block.name}</p>
+                {block.preview && <video src={block.preview} controls className="mt-2 max-h-40 max-w-full rounded" />}
+                {block.status === 'pending' && <p className="mt-1 text-xs text-amber-600">업로드 대기 중</p>}
+              </div>
+              <div className="flex flex-col gap-1">
+                <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="rounded bg-black/5 px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↑</button>
+                <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="rounded bg-black/5 px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↓</button>
+                <button type="button" onClick={() => removeBlock(block.id)} className="rounded bg-red-50 px-2 py-1 text-xs text-red-400 hover:bg-red-100"><X size={12} /></button>
+              </div>
+            </div>
+          )}
+
+          <MediaInsertZone
+            zoneId={`zone-${idx}`}
+            dragOverId={dragOverId}
+            setDragOverId={setDragOverId}
+            onFiles={(files) => addFiles(files, idx)}
           />
+        </div>
+      ))}
+
+      <div className="flex flex-wrap gap-2">
+        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+          <ImagePlus size={14} />
+          사진 추가
+          <input type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp" className="hidden"
+            onChange={(e) => addFiles(Array.from(e.target.files), blocks.length - 1)} />
         </label>
-        <span className="min-w-0 truncate">{image ? image.name : initialPost?.imageOriginalName || '선택된 사진 없음'}</span>
-        {initialPost?.imageUrl && !image && (
-          <label className="inline-flex items-center gap-2 text-xs font-semibold">
-            <input
-              type="checkbox"
-              checked={form.removeImage}
-              onChange={(event) => setForm((prev) => ({ ...prev, removeImage: event.target.checked }))}
-            />
-            기존 사진 삭제
-          </label>
-        )}
+        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+          <Video size={14} />
+          영상 추가
+          <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
+            onChange={(e) => addFiles(Array.from(e.target.files), blocks.length - 1)} />
+        </label>
+        <button type="button"
+          onClick={() => insertBlocksAfter(blocks.length - 1, [{ type: 'text', content: '', id: localId() }])}
+          className="inline-flex items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+          + 텍스트 블록 추가
+        </button>
       </div>
+
       {error && <p className="text-sm font-semibold text-red-500">{error}</p>}
+
       <div className="flex flex-col gap-2 sm:flex-row">
         <button
           type="submit"
-          disabled={saving || !form.title.trim() || !form.content.trim()}
+          disabled={saving || !title.trim()}
           className="min-h-11 rounded bg-[var(--theme-text)] px-5 py-2.5 text-sm font-semibold text-[var(--theme-bg)] disabled:opacity-50 sm:min-h-0"
         >
-          {saving ? '저장 중...' : initialPost ? '수정 완료' : '글 등록'}
+          {saving ? (savingStep || '저장 중...') : isEditing ? '수정 완료' : '글 등록'}
         </button>
         <button
           type="button"
@@ -538,7 +833,8 @@ export default function Community({ onBack }) {
               <span className="text-white/38">#{post.id}</span>
               <span className="shape-cut-sm border border-cyan-200/15 bg-cyan-200/10 px-2 py-1 text-cyan-100">{categoryLabel(post.category || 'GENERAL')}</span>
               {concept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] text-[#3a2b00]">개념글</span>}
-              {post.imageUrl && <span className="text-cyan-200">[사진]</span>}
+              {(post.imageUrl || (post.imageInfos?.length > 0)) && <span className="text-cyan-200">[사진]</span>}
+              {(post.videoInfos?.length > 0) && <span className="text-cyan-200">[영상]</span>}
               {isEdited(post) && <span className="text-white/42">수정</span>}
               {post.authorAdmin && <span className="rounded bg-red-600 px-1 py-0.5 text-[10px] text-white">주딱</span>}
             </div>
@@ -676,7 +972,8 @@ export default function Community({ onBack }) {
                           {concept && <span className="mr-1 rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
                           {post.title}
                         </span>
-                        {post.imageUrl && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
+                        {(post.imageUrl || (post.imageInfos?.length > 0)) && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
+                        {(post.videoInfos?.length > 0) && <span className="ml-1 text-xs text-cyan-200">[영상]</span>}
                         {isEdited(post) && <span className="ml-1 text-[10px] font-bold text-white/45">수정</span>}
                         {post.authorAdmin && <span className="ml-1 rounded bg-red-600 px-1 py-0.5 text-[10px] font-black text-white">주딱</span>}
                       </td>
@@ -763,12 +1060,10 @@ export default function Community({ onBack }) {
                     <span>개추 {postScore(currentPost)}</span>
                   </div>
                 </div>
-                {currentPost.imageUrl && (
-                  <div className="border-b border-black/10 bg-[#f7f7f7] px-3 py-4 sm:px-4 sm:py-5">
-                    <img src={apiUrl(currentPost.imageUrl)} alt={currentPost.imageOriginalName || currentPost.title} className="mx-auto max-h-[560px] max-w-full object-contain" />
-                  </div>
-                )}
-                <div className="text-size-container min-h-[220px] whitespace-pre-wrap break-words px-4 py-6 auto-text-post sm:min-h-[280px] sm:px-5">{linkify(currentPost.content)}</div>
+                <div className="min-h-[220px] divide-y divide-black/6 sm:min-h-[280px]">
+                  {renderPostBlocks(currentPost)}
+                </div>
+                {renderAttachments(currentPost)}
                 <div className="grid grid-cols-2 gap-2 border-y border-black/10 bg-[#fafafa] px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-3 sm:py-5">
                   <button type="button" onClick={() => handleVote(1)} className={`inline-flex min-h-12 items-center justify-center gap-2 border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === 1 ? 'border-[#3b4890] bg-[#3b4890] text-white' : 'border-black/15 bg-white text-[#3b4890]'}`}>
                     <ThumbsUp size={16} />
