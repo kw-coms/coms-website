@@ -162,6 +162,22 @@ class CommunityServiceTest {
     }
 
     @Test
+    void initialPlaceholderFinalizationDoesNotMarkEdited() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("원제목", "...", "GENERAL", false), null);
+
+        var updated = communityService.update(
+                user.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("원제목", "업로드 완료 본문", "GENERAL", false),
+                null
+        );
+
+        assertThat(updated.edited()).isFalse();
+    }
+
+    @Test
     void rejectsOversizedOrUnsafePostTextAndComments() {
         Member user = member("2025123456", "회원", Member.Role.USER);
         memberRepository.save(user);

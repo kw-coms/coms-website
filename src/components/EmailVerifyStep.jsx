@@ -29,7 +29,7 @@ export function EmailVerifyStep({ studentId, email, onDone }) {
     setResending(true)
     setError('')
     try {
-      await requestSignupEmailVerification(studentId)
+      await requestSignupEmailVerification(studentId || null, email)
       setCooldown(RESEND_COOLDOWN_SECONDS)
       clearInterval(timerRef.current)
       timerRef.current = setInterval(() => {
@@ -51,7 +51,7 @@ export function EmailVerifyStep({ studentId, email, onDone }) {
     setVerifying(true)
     setError('')
     try {
-      await confirmSignupEmailVerification(studentId, code.trim())
+      await confirmSignupEmailVerification(studentId || null, code.trim(), email)
       onDone()
     } catch (err) {
       setError(err.message || '인증코드가 올바르지 않습니다.')
