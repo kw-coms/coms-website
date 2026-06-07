@@ -400,17 +400,18 @@ public class CommunityService {
     }
 
     public Resource loadExtraImage(Long postId, Long imageId) {
-        CommunityPostImage img = imageRepository.findById(imageId)
-                .filter(i -> i.getPostId().equals(postId))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        CommunityPostImage img = loadExtraImageMeta(postId, imageId);
         return storageService.load(img.getStoredName());
     }
 
-    public String getExtraImageMimeType(Long postId, Long imageId) {
+    public CommunityPostImage loadExtraImageMeta(Long postId, Long imageId) {
         return imageRepository.findById(imageId)
                 .filter(i -> i.getPostId().equals(postId))
-                .map(CommunityPostImage::getMimeType)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    public String getExtraImageMimeType(Long postId, Long imageId) {
+        return loadExtraImageMeta(postId, imageId).getMimeType();
     }
 
     private void attachImage(CommunityPost post, MultipartFile image) {
