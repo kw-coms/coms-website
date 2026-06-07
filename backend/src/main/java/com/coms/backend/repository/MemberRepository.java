@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface MemberRepository extends JpaRepository<Member, Long> {
     Optional<Member> findByStudentId(String studentId);
     Optional<Member> findByEmail(String email);
+    Optional<Member> findByEmailIgnoreCase(String email);
     List<Member> findByStudentIdIn(Collection<String> studentIds);
     boolean existsByStudentId(String studentId);
     boolean existsByEmail(String email);

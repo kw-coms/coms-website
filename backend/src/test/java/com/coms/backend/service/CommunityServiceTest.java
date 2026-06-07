@@ -202,6 +202,23 @@ class CommunityServiceTest {
     }
 
     @Test
+    void detailIncludesExtraImageUrls() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("이미지", "내용", "GENERAL", false), null);
+        MockMultipartFile image = new MockMultipartFile("images", "ok.png", "image/png", "png".getBytes());
+
+        communityService.addImages(user.getStudentId(), created.id(), java.util.List.of(image));
+
+        CommunityPostResponse detail = communityService.get(user.getStudentId(), created.id());
+
+        assertThat(detail.imageUrls())
+                .singleElement()
+                .asString()
+                .startsWith("/api/community/posts/" + created.id() + "/images/");
+    }
+
+    @Test
     void rejectsUnsupportedImageTypes() {
         Member user = member("2025123456", "회원", Member.Role.USER);
         memberRepository.save(user);
