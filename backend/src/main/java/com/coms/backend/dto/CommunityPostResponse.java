@@ -17,6 +17,7 @@ public record CommunityPostResponse(
         List<String> imageUrls,
         List<MediaInfo> imageInfos,
         List<MediaInfo> videoInfos,
+        List<MediaInfo> fileInfos,
         long viewCount,
         long upvotes,
         long downvotes,
