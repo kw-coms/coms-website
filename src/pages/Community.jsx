@@ -685,7 +685,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
       )
 
       setSavingStep('저장 중...')
-      const saved = await updateCommunityPost(postId, { title: title.trim(), content: contentJson, category, removeImage: removeLegacyImage, firstUpdate: !isEditing })
+      const saved = await updateCommunityPost(postId, { title: title.trim(), content: contentJson, category, removeImage: removeLegacyImage })
 
       uploadedBlocks.forEach((b) => { if (b.preview) URL.revokeObjectURL(b.preview) })
       onSave(saved)
