@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.CommunityComment;
 import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.domain.CommunityPostImage;
+import com.coms.backend.domain.CommunityPostVideo;
 import com.coms.backend.domain.CommunityPostVote;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.CommunityCommentRequest;
@@ -12,6 +13,7 @@ import com.coms.backend.dto.CommunityPostResponse;
 import com.coms.backend.repository.CommunityCommentRepository;
 import com.coms.backend.repository.CommunityPostImageRepository;
 import com.coms.backend.repository.CommunityPostRepository;
+import com.coms.backend.repository.CommunityPostVideoRepository;
 import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.springframework.core.io.Resource;
@@ -35,12 +37,15 @@ import java.util.stream.Collectors;
 @Transactional
 public class CommunityService {
     private static final int MAX_TITLE_LENGTH = 120;
-    private static final int MAX_CONTENT_LENGTH = 5000;
+    private static final int MAX_CONTENT_LENGTH = 50000;
     private static final int MAX_COMMENT_LENGTH = 1000;
     private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
+    private static final long MAX_VIDEO_BYTES = 100L * 1024 * 1024;
     private static final long CONCEPT_POST_SCORE_THRESHOLD = 5;
     private static final int MAX_EXTRA_IMAGES_PER_POST = 5;
+    private static final int MAX_VIDEOS_PER_POST = 3;
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
+    private static final Set<String> ALLOWED_VIDEO_TYPES = Set.of("video/mp4", "video/webm", "video/quicktime");
 
     private final CommunityPostRepository communityPostRepository;
     private final CommunityPostVoteRepository voteRepository;
@@ -49,6 +54,7 @@ public class CommunityService {
     private final CommunityCommentRepository commentRepository;
     private final NotificationService notificationService;
     private final CommunityPostImageRepository imageRepository;
+    private final CommunityPostVideoRepository videoRepository;
 
     public CommunityService(CommunityPostRepository communityPostRepository,
                             CommunityPostVoteRepository voteRepository,
@@ -56,7 +62,8 @@ public class CommunityService {
                             StorageService storageService,
                             CommunityCommentRepository commentRepository,
                             NotificationService notificationService,
-                            CommunityPostImageRepository imageRepository) {
+                            CommunityPostImageRepository imageRepository,
+                            CommunityPostVideoRepository videoRepository) {
         this.communityPostRepository = communityPostRepository;
         this.voteRepository = voteRepository;
         this.memberRepository = memberRepository;
@@ -64,6 +71,7 @@ public class CommunityService {
         this.storageService = storageService;
         this.notificationService = notificationService;
         this.imageRepository = imageRepository;
+        this.videoRepository = videoRepository;
     }
 
     @Transactional(readOnly = true)
@@ -114,13 +122,18 @@ public class CommunityService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         SanitizedPost sanitized = validateRequest(request, post.getTitle());
+        boolean isInitialFinalization = "...".equals(post.getContent())
+                && !post.isEdited()
+                && java.time.Duration.between(post.getCreatedAt(), java.time.LocalDateTime.now()).toMinutes() < 5;
         post.setContent(sanitized.content());
         post.setCategory(sanitized.category());
-        if (request.removeImage()) {
+        if (Boolean.TRUE.equals(request.removeImage())) {
             clearImage(post);
         }
         attachImage(post, image);
-        post.markEdited();
+        if (!isInitialFinalization) {
+            post.markEdited();
+        }
         CommunityPost saved = communityPostRepository.save(post);
         return toResponse(saved, member,
                 memberRepository.findByStudentId(saved.getAuthorStudentId()).orElse(null),
@@ -235,9 +248,22 @@ public class CommunityService {
         boolean authorAdmin = author != null && author.getRole() == Member.Role.ADMIN;
         String authorName = author != null ? author.getName() : post.getAuthorName();
         VoteSummary votes = voteStats.getOrDefault(post.getId(), VoteSummary.EMPTY);
-        List<String> imageUrls = imageRepository.findByPostIdOrderByPositionAsc(post.getId())
-                .stream()
+        List<CommunityPostImage> extraImages = imageRepository.findByPostIdOrderByPositionAsc(post.getId());
+        List<String> imageUrls = extraImages.stream()
                 .map(img -> "/api/community/posts/" + post.getId() + "/images/" + img.getId())
+                .toList();
+        List<CommunityPostResponse.MediaInfo> imageInfos = extraImages.stream()
+                .map(img -> new CommunityPostResponse.MediaInfo(
+                        img.getId(),
+                        "/api/community/posts/" + post.getId() + "/images/" + img.getId(),
+                        img.getOriginalName()))
+                .toList();
+        List<CommunityPostResponse.MediaInfo> videoInfos = videoRepository.findByPostIdOrderByPositionAsc(post.getId())
+                .stream()
+                .map(vid -> new CommunityPostResponse.MediaInfo(
+                        vid.getId(),
+                        "/api/community/posts/" + post.getId() + "/videos/" + vid.getId(),
+                        vid.getOriginalName()))
                 .toList();
         return new CommunityPostResponse(
                 post.getId(),
@@ -251,6 +277,8 @@ public class CommunityService {
                 post.getImageStoredName() == null ? null : "/api/community/posts/" + post.getId() + "/image",
                 post.getImageOriginalName(),
                 imageUrls,
+                imageInfos,
+                videoInfos,
                 post.getViewCount(),
                 votes.upvotes(),
                 votes.downvotes(),
@@ -278,8 +306,8 @@ public class CommunityService {
         return generation > 0 ? generation + "기" : "";
     }
 
-    public void addImages(String studentId, Long postId, List<MultipartFile> images) {
-        if (images == null || images.isEmpty()) return;
+    public List<Long> addImages(String studentId, Long postId, List<MultipartFile> images) {
+        if (images == null || images.isEmpty()) return List.of();
         Member member = findMember(studentId);
         CommunityPost post = communityPostRepository.findById(postId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -290,6 +318,7 @@ public class CommunityService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "게시글 이미지는 최대 5개까지 업로드할 수 있습니다.");
         }
         int startPos = existing.size();
+        List<Long> createdIds = new java.util.ArrayList<>();
         for (int i = 0; i < images.size(); i++) {
             MultipartFile image = images.get(i);
             if (image == null || image.isEmpty()) continue;
@@ -302,25 +331,92 @@ public class CommunityService {
             }
             try {
                 String stored = storageService.store(image);
-                imageRepository.save(new CommunityPostImage(postId, stored, image.getOriginalFilename(), contentType, startPos + i));
+                CommunityPostImage saved = imageRepository.save(new CommunityPostImage(postId, stored, image.getOriginalFilename(), contentType, startPos + i));
+                createdIds.add(saved.getId());
             } catch (IOException e) {
                 throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 저장에 실패했습니다.");
             }
         }
+        return createdIds;
     }
 
-    public Resource loadExtraImage(Long postId, Long imageId) {
+    public void deleteImage(String studentId, Long postId, Long imageId) {
+        Member member = findMember(studentId);
+        CommunityPost post = communityPostRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostOwnerOrAdmin(post, member);
         CommunityPostImage img = imageRepository.findById(imageId)
                 .filter(i -> i.getPostId().equals(postId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        storageService.delete(img.getStoredName());
+        imageRepository.delete(img);
+    }
+
+    public Long addVideo(String studentId, Long postId, MultipartFile video) {
+        Member member = findMember(studentId);
+        CommunityPost post = communityPostRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostOwnerOrAdmin(post, member);
+        if (video == null || video.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "영상 파일을 선택해주세요.");
+        }
+        String contentType = video.getContentType() == null ? "" : video.getContentType();
+        if (!ALLOWED_VIDEO_TYPES.contains(contentType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "MP4, WebM, MOV 영상만 업로드할 수 있습니다.");
+        }
+        if (video.getSize() > MAX_VIDEO_BYTES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "영상은 100MB 이하만 업로드할 수 있습니다.");
+        }
+        long existing = videoRepository.findByPostIdOrderByPositionAsc(postId).size();
+        if (existing >= MAX_VIDEOS_PER_POST) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "게시글 영상은 최대 3개까지 업로드할 수 있습니다.");
+        }
+        try {
+            String stored = storageService.store(video);
+            CommunityPostVideo saved = videoRepository.save(
+                    new CommunityPostVideo(postId, stored, video.getOriginalFilename(), contentType, (int) existing));
+            return saved.getId();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "영상 저장에 실패했습니다.");
+        }
+    }
+
+    public void deleteVideo(String studentId, Long postId, Long videoId) {
+        Member member = findMember(studentId);
+        CommunityPost post = communityPostRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostOwnerOrAdmin(post, member);
+        CommunityPostVideo vid = videoRepository.findById(videoId)
+                .filter(v -> v.getPostId().equals(postId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        storageService.delete(vid.getStoredName());
+        videoRepository.delete(vid);
+    }
+
+    public CommunityPostVideo loadVideoMeta(Long postId, Long videoId) {
+        return videoRepository.findById(videoId)
+                .filter(v -> v.getPostId().equals(postId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    public Resource loadVideo(Long postId, Long videoId) {
+        CommunityPostVideo vid = loadVideoMeta(postId, videoId);
+        return storageService.load(vid.getStoredName());
+    }
+
+    public Resource loadExtraImage(Long postId, Long imageId) {
+        CommunityPostImage img = loadExtraImageMeta(postId, imageId);
         return storageService.load(img.getStoredName());
     }
 
-    public String getExtraImageMimeType(Long postId, Long imageId) {
+    public CommunityPostImage loadExtraImageMeta(Long postId, Long imageId) {
         return imageRepository.findById(imageId)
                 .filter(i -> i.getPostId().equals(postId))
-                .map(CommunityPostImage::getMimeType)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    public String getExtraImageMimeType(Long postId, Long imageId) {
+        return loadExtraImageMeta(postId, imageId).getMimeType();
     }
 
     private void attachImage(CommunityPost post, MultipartFile image) {
@@ -374,6 +470,9 @@ public class CommunityService {
         List<CommunityPostImage> images = imageRepository.findByPostIdOrderByPositionAsc(postId);
         images.forEach(image -> storageService.delete(image.getStoredName()));
         imageRepository.deleteByPostId(postId);
+        List<CommunityPostVideo> videos = videoRepository.findByPostIdOrderByPositionAsc(postId);
+        videos.forEach(video -> storageService.delete(video.getStoredName()));
+        videoRepository.deleteByPostId(postId);
     }
 
     private record SanitizedPost(String title, String content, CommunityPost.Category category) {}

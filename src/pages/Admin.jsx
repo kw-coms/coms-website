@@ -105,7 +105,7 @@ function RosterTab() {
   const [roster, setRoster] = useState([])
   const [loadingRoster, setLoadingRoster] = useState(true)
   const [rosterError, setRosterError] = useState('')
-  const [addForm, setAddForm] = useState({ mode: 'current', studentId: '', name: '', admissionYear: '', generation: '', graduateBy: 'year' })
+  const [addForm, setAddForm] = useState({ mode: 'current', studentId: '', name: '', admissionYear: '', generation: '' })
   const [adding, setAdding] = useState(false)
   const [addResult, setAddResult] = useState('')
   const [addError, setAddError] = useState('')
@@ -157,8 +157,8 @@ function RosterTab() {
     const isGraduate = addForm.mode === 'graduate'
     if (!addForm.name.trim()) return
     if (!isGraduate && !addForm.studentId.trim()) return
-    if (isGraduate && addForm.graduateBy === 'year' && !addForm.admissionYear.trim()) return
-    if (isGraduate && addForm.graduateBy === 'generation' && !addForm.generation.trim()) return
+    if (isGraduate && !addForm.admissionYear.trim() && !addForm.generation.trim()) return
+    if (isGraduate && !addForm.admissionYear.trim() && parseInt(addForm.generation.trim(), 10) < 1) return
     setAdding(true)
     setAddResult('')
     setAddError('')
@@ -166,7 +166,7 @@ function RosterTab() {
       const payload = { name: addForm.name.trim() }
       if (!isGraduate) {
         payload.studentId = addForm.studentId.trim()
-      } else if (addForm.graduateBy === 'year') {
+      } else if (addForm.admissionYear.trim()) {
         payload.admissionYear = addForm.admissionYear.trim()
       } else {
         payload.generation = addForm.generation.trim()
@@ -174,7 +174,7 @@ function RosterTab() {
       await addEligibleMember(payload)
       const label = !isGraduate
         ? `${addForm.name} (${addForm.studentId})`
-        : addForm.graduateBy === 'year'
+        : addForm.admissionYear.trim()
           ? `${addForm.name} (${addForm.admissionYear}학번)`
           : `${addForm.name} (${addForm.generation}기)`
       setAddResult(`${label} 명부에 추가됐습니다.`)
@@ -193,10 +193,10 @@ function RosterTab() {
   }
 
   const handleEditSave = async (id) => {
-    if (!editForm.studentId.trim() || !editForm.name.trim()) return
+    if (!editForm.name.trim()) return
     setEditSaving(true)
     try {
-      await updateEligibleMember(id, editForm.studentId.trim(), editForm.name.trim(), editForm.phone.trim())
+      await updateEligibleMember(id, editForm.studentId.trim() || null, editForm.name.trim(), editForm.phone.trim())
       setEditingId(null)
       await loadRoster()
     } catch (err) {
@@ -216,13 +216,44 @@ function RosterTab() {
     }
   }
 
+  const GRAD_BASE_YEAR = 1966
+  const currentYY = new Date().getFullYear() % 100
+
+  const thisYear = new Date().getFullYear()
+
+  const handleAdmissionYearChange = (raw) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 2)
+    setAddForm((p) => {
+      if (digits.length === 2) {
+        const n = parseInt(digits, 10)
+        const fullYear = n <= currentYY ? 2000 + n : 1900 + n
+        if (fullYear >= GRAD_BASE_YEAR && fullYear <= thisYear) {
+          return { ...p, admissionYear: digits, generation: String(fullYear - GRAD_BASE_YEAR) }
+        }
+      }
+      return { ...p, admissionYear: digits }
+    })
+  }
+
+  const handleGenerationChange = (raw) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 2)
+    setAddForm((p) => {
+      const gen = parseInt(digits, 10)
+      if (!isNaN(gen) && gen > 0 && gen + GRAD_BASE_YEAR <= thisYear) {
+        const twoDigit = String(gen + GRAD_BASE_YEAR).slice(-2)
+        return { ...p, generation: digits, admissionYear: twoDigit }
+      }
+      return { ...p, generation: digits }
+    })
+  }
+
   const inputCls = 'shape-cut-sm border border-black/10 bg-white/70 px-2 py-1 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
 
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-black/10 bg-black/5 p-4">
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">개별 회원 추가</p>
-        <p className="mt-1 text-xs text-[var(--theme-body-muted)]">명부에 직접 추가합니다. 재학생은 10자리 학번, 졸업생은 2자리 입학연도 또는 기수로 추가합니다.</p>
+        <p className="mt-1 text-xs text-[var(--theme-body-muted)]">명부에 직접 추가합니다. 재학생은 10자리 학번, 졸업생은 입학년도 끝 두자리 또는 기수로 추가합니다. 둘 중 하나 입력 시 나머지 자동 계산됩니다.</p>
         <div className="mt-3 flex gap-1">
           {[{ id: 'current', label: '재학생' }, { id: 'graduate', label: '졸업생' }].map((m) => (
             <button
@@ -250,39 +281,22 @@ function RosterTab() {
             />
           ) : (
             <div className="flex flex-wrap gap-2">
-              <div className="flex gap-1">
-                {[{ id: 'year', label: '입학연도' }, { id: 'generation', label: '기수' }].map((g) => (
-                  <button
-                    key={g.id}
-                    type="button"
-                    onClick={() => setAddForm((p) => ({ ...p, graduateBy: g.id }))}
-                    className={`shape-cut-sm px-2 py-1 text-xs font-semibold transition ${
-                      addForm.graduateBy === g.id
-                        ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]'
-                        : 'border border-black/10 bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/80'
-                    }`}
-                  >
-                    {g.label}
-                  </button>
-                ))}
-              </div>
-              {addForm.graduateBy === 'year' ? (
-                <input
-                  value={addForm.admissionYear}
-                  onChange={(e) => setAddForm((p) => ({ ...p, admissionYear: e.target.value }))}
-                  placeholder="입학연도 2자리 (예: 19)"
-                  maxLength={2}
-                  className="shape-cut-sm w-44 border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
-                />
-              ) : (
-                <input
-                  value={addForm.generation}
-                  onChange={(e) => setAddForm((p) => ({ ...p, generation: e.target.value }))}
-                  placeholder="기수 (예: 53)"
-                  maxLength={3}
-                  className="shape-cut-sm w-32 border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
-                />
-              )}
+              <input
+                value={addForm.admissionYear}
+                onChange={(e) => handleAdmissionYearChange(e.target.value)}
+                placeholder="입학년도 끝 두자리 (예: 19)"
+                maxLength={2}
+                inputMode="numeric"
+                className="shape-cut-sm w-44 border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+              />
+              <input
+                value={addForm.generation}
+                onChange={(e) => handleGenerationChange(e.target.value)}
+                placeholder="기수 (예: 53)"
+                maxLength={2}
+                inputMode="numeric"
+                className="shape-cut-sm w-32 border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+              />
             </div>
           )}
           <input
@@ -298,9 +312,7 @@ function RosterTab() {
               adding || !addForm.name.trim() ||
               (addForm.mode === 'current'
                 ? !addForm.studentId.trim()
-                : addForm.graduateBy === 'year'
-                  ? !addForm.admissionYear.trim()
-                  : !addForm.generation.trim())
+                : !addForm.admissionYear.trim() && !addForm.generation.trim())
             }
             className="shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] transition hover:opacity-90 disabled:opacity-50"
           >
@@ -333,13 +345,20 @@ function RosterTab() {
         )}
         {!loadingRoster && !rosterError && roster.length > 0 && (
           <div className="mt-4 max-h-96 overflow-auto rounded-lg border border-black/10">
-            <table className="min-w-full divide-y divide-black/10 text-left text-sm">
+            <table className="w-max min-w-full table-fixed divide-y divide-black/10 text-left text-sm">
+              <colgroup>
+                <col style={{ width: '136px' }} />
+                <col style={{ width: '88px' }} />
+                <col style={{ width: '64px' }} />
+                <col style={{ width: '124px' }} />
+                <col style={{ width: '88px' }} />
+              </colgroup>
               <thead className="sticky top-0 bg-white text-xs font-semibold text-[var(--theme-body-muted)]">
                 <tr>
-                  <th className="px-3 py-3">학번</th>
-                  <th className="px-3 py-3">이름</th>
-                  <th className="px-3 py-3">기수</th>
-                  <th className="px-3 py-3">전화번호</th>
+                  <th className="px-3 py-3 whitespace-nowrap">학번</th>
+                  <th className="px-3 py-3 whitespace-nowrap">이름</th>
+                  <th className="px-3 py-3 whitespace-nowrap">기수</th>
+                  <th className="px-3 py-3 whitespace-nowrap">전화번호</th>
                   <th className="px-3 py-3"></th>
                 </tr>
               </thead>
@@ -347,24 +366,30 @@ function RosterTab() {
                 {roster.map((member) => (
                   <tr key={member.id}>
                     {editingId === member.id ? (
-                      <>
-                        <td className="px-3 py-2">
-                          <input value={editForm.studentId} onChange={(e) => setEditForm((p) => ({ ...p, studentId: e.target.value }))} maxLength={10} className={`${inputCls} w-32`} />
-                        </td>
-                        <td className="px-3 py-2">
-                          <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} maxLength={20} className={`${inputCls} w-24`} />
-                        </td>
-                        <td className="px-3 py-2 text-xs text-[var(--theme-body-muted)]">자동계산</td>
-                        <td className="px-3 py-2">
-                          <input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} maxLength={11} placeholder="01012345678" className={`${inputCls} w-32`} />
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex gap-2">
-                            <button type="button" onClick={() => handleEditSave(member.id)} disabled={editSaving} className="text-xs font-semibold text-emerald-600 hover:underline disabled:opacity-50">저장</button>
+                      <td colSpan={5} className="px-3 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {editForm.studentId ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] text-[var(--theme-body-muted)]">학번</span>
+                              <input value={editForm.studentId} onChange={(e) => setEditForm((p) => ({ ...p, studentId: e.target.value }))} maxLength={10} className={`${inputCls} w-36`} />
+                            </div>
+                          ) : (
+                            <span className="text-xs italic text-[var(--theme-body-muted)]">졸업생 (학번 없음)</span>
+                          )}
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] text-[var(--theme-body-muted)]">이름</span>
+                            <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} maxLength={20} className={`${inputCls} w-28`} />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] text-[var(--theme-body-muted)]">전화번호</span>
+                            <input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} maxLength={11} placeholder="01012345678" className={`${inputCls} w-36`} />
+                          </div>
+                          <div className="flex items-end gap-2 self-end pb-px">
+                            <button type="button" onClick={() => handleEditSave(member.id)} disabled={editSaving} className="shape-cut-sm bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">저장</button>
                             <button type="button" onClick={() => setEditingId(null)} className="text-xs font-semibold text-[var(--theme-body-muted)] hover:underline">취소</button>
                           </div>
-                        </td>
-                      </>
+                        </div>
+                      </td>
                     ) : (
                       <>
                         <td className="px-3 py-3 font-mono text-xs text-[var(--theme-body-dark)]">{member.studentId || '-'}</td>
