@@ -128,7 +128,9 @@ public class CommunityService {
             clearImage(post);
         }
         attachImage(post, image);
-        post.markEdited();
+        if (!Boolean.TRUE.equals(request.firstUpdate())) {
+            post.markEdited();
+        }
         CommunityPost saved = communityPostRepository.save(post);
         return toResponse(saved, member,
                 memberRepository.findByStudentId(saved.getAuthorStudentId()).orElse(null),
