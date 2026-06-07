@@ -171,10 +171,12 @@ function renderPostBlocks(post) {
     if (url.endsWith('/image')) return apiUrl(`${url}/download`)
     return apiUrl(url.replace(/\/images\/(\d+)$/, '/images/$1/download'))
   }
-  const alignMarginStyle = (align) =>
-    align === 'left' ? { marginRight: 'auto' }
-    : align === 'right' ? { marginLeft: 'auto' }
-    : { marginLeft: 'auto', marginRight: 'auto' }
+  const mediaContainerStyle = (width, align) =>
+    align === 'left'
+      ? { float: 'left', width: `${mediaWidthPercent(width)}%`, marginRight: '1rem', marginBottom: '0.25rem' }
+      : align === 'right'
+      ? { float: 'right', width: `${mediaWidthPercent(width)}%`, marginLeft: '1rem', marginBottom: '0.25rem' }
+      : { display: 'block', width: `${mediaWidthPercent(width)}%`, marginLeft: 'auto', marginRight: 'auto' }
   return (
     <div className="px-4 py-5 sm:px-5">
       {blocks.map((block, i) => {
@@ -190,7 +192,7 @@ function renderPostBlocks(post) {
           const src = block.url ? apiUrl(block.url) : null
           if (!src) return null
           return (
-            <div key={i} className="group relative my-3" style={{ width: `${mediaWidthPercent(block.width)}%`, ...alignMarginStyle(block.align) }}>
+            <div key={i} className="group relative my-2" style={mediaContainerStyle(block.width, block.align)}>
               <img src={src} alt={block.name || '이미지'} className="block w-full max-h-[560px] object-contain" />
               <a
                 href={imageDownloadUrl(block.url)}
@@ -208,7 +210,7 @@ function renderPostBlocks(post) {
           if (!src) return null
           const downloadUrl = apiUrl(block.url.replace(/\/videos\/(\d+)$/, '/videos/$1/download'))
           return (
-            <div key={i} className="group relative my-3" style={{ width: `${mediaWidthPercent(block.width)}%`, ...alignMarginStyle(block.align) }}>
+            <div key={i} className="group relative my-2" style={mediaContainerStyle(block.width, block.align)}>
               <video controls src={src} className="block w-full max-h-[480px] rounded" />
               <a
                 href={downloadUrl}
@@ -223,6 +225,7 @@ function renderPostBlocks(post) {
         }
         return null
       })}
+      <div style={{ clear: 'both' }} />
     </div>
   )
 }
@@ -271,7 +274,7 @@ function MediaStatus({ block }) {
   return <p className="mt-1 text-xs text-emerald-600">저장됨</p>
 }
 
-function ResizableMedia({ block, onWidthChange, onAlignChange, onDelete }) {
+function ResizableMedia({ block, onWidthChange, onAlignChange, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
   const [selected, setSelected] = useState(false)
   const ref = useRef(null)
 
@@ -307,42 +310,54 @@ function ResizableMedia({ block, onWidthChange, onAlignChange, onDelete }) {
 
   const src = block.preview || (block.url ? apiUrl(block.url) : null)
   const wPct = mediaWidthPercent(block.width)
-  const marginStyle = block.align === 'left' ? { marginRight: 'auto' }
-    : block.align === 'right' ? { marginLeft: 'auto' }
-    : { marginLeft: 'auto', marginRight: 'auto' }
+  const containerStyle = block.align === 'left'
+    ? { float: 'left', width: `${wPct}%`, marginRight: '1rem', marginBottom: '0.25rem' }
+    : block.align === 'right'
+    ? { float: 'right', width: `${wPct}%`, marginLeft: '1rem', marginBottom: '0.25rem' }
+    : { display: 'block', width: `${wPct}%`, marginLeft: 'auto', marginRight: 'auto' }
 
   return (
-    <div
-      ref={ref}
-      className="relative my-1"
-      style={{ width: `${wPct}%`, ...marginStyle }}
-      onClick={(e) => { e.stopPropagation(); setSelected(true) }}
-    >
-      {block.type === 'image'
-        ? <img src={src} alt={block.name} className="block w-full max-h-[460px] object-contain" />
-        : <video src={src} controls className="block w-full max-h-[420px]" />
-      }
-      {selected && (
-        <>
-          <div className="pointer-events-none absolute inset-0 border-2 border-blue-500" />
-          <div className="absolute -top-9 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded border border-black/10 bg-white px-2 py-1 shadow">
-            <MediaAlignControls value={block.align || 'center'} onChange={onAlignChange} />
-            <span className="mx-0.5 h-3 w-px bg-black/15" />
-            <button type="button" onClick={(e) => { e.stopPropagation(); onDelete() }}
-              className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-red-500 hover:bg-red-50">
-              삭제
-            </button>
-          </div>
-          <span className="absolute left-0 top-0 z-20 block h-3 w-3 -translate-x-1/2 -translate-y-1/2 cursor-nw-resize border-2 border-blue-500 bg-white"
-            onMouseDown={(e) => startDrag(e, false)} />
-          <span className="absolute right-0 top-0 z-20 block h-3 w-3 translate-x-1/2 -translate-y-1/2 cursor-ne-resize border-2 border-blue-500 bg-white"
-            onMouseDown={(e) => startDrag(e, true)} />
-          <span className="absolute bottom-0 left-0 z-20 block h-3 w-3 -translate-x-1/2 translate-y-1/2 cursor-sw-resize border-2 border-blue-500 bg-white"
-            onMouseDown={(e) => startDrag(e, false)} />
-          <span className="absolute bottom-0 right-0 z-20 block h-3 w-3 translate-x-1/2 translate-y-1/2 cursor-se-resize border-2 border-blue-500 bg-white"
-            onMouseDown={(e) => startDrag(e, true)} />
-        </>
-      )}
+    <div ref={ref} className="my-1" style={containerStyle}>
+      {/* Inner wrapper: handles and border anchor to actual image corners, not MediaStatus */}
+      <div className="relative" onClick={(e) => { e.stopPropagation(); setSelected(true) }}>
+        {block.type === 'image'
+          ? <img src={src} alt={block.name} className="block w-full max-h-[460px] object-contain" />
+          : <video src={src} controls className="block w-full max-h-[420px]" />
+        }
+        {selected && (
+          <>
+            <div className="pointer-events-none absolute inset-0 border-2 border-blue-500" />
+            {/* Toolbar inside image — avoids overflow-hidden clipping from editor wrapper */}
+            <div className="absolute top-1.5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded border border-black/10 bg-white/90 px-2 py-1 shadow backdrop-blur-sm">
+              <MediaAlignControls value={block.align || 'center'} onChange={onAlignChange} />
+              <span className="mx-0.5 h-3 w-px bg-black/15" />
+              <button type="button" onClick={(e) => { e.stopPropagation(); onMoveUp?.() }}
+                disabled={!canMoveUp}
+                className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-[var(--theme-body-muted)] hover:bg-black/5 disabled:opacity-30">
+                위
+              </button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); onMoveDown?.() }}
+                disabled={!canMoveDown}
+                className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-[var(--theme-body-muted)] hover:bg-black/5 disabled:opacity-30">
+                아래
+              </button>
+              <span className="mx-0.5 h-3 w-px bg-black/15" />
+              <button type="button" onClick={(e) => { e.stopPropagation(); onDelete() }}
+                className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-red-500 hover:bg-red-50">
+                삭제
+              </button>
+            </div>
+            <span className="absolute left-0 top-0 z-20 block h-3 w-3 -translate-x-1/2 -translate-y-1/2 cursor-nw-resize border-2 border-blue-500 bg-white"
+              onMouseDown={(e) => startDrag(e, false)} />
+            <span className="absolute right-0 top-0 z-20 block h-3 w-3 translate-x-1/2 -translate-y-1/2 cursor-ne-resize border-2 border-blue-500 bg-white"
+              onMouseDown={(e) => startDrag(e, true)} />
+            <span className="absolute bottom-0 left-0 z-20 block h-3 w-3 -translate-x-1/2 translate-y-1/2 cursor-sw-resize border-2 border-blue-500 bg-white"
+              onMouseDown={(e) => startDrag(e, false)} />
+            <span className="absolute bottom-0 right-0 z-20 block h-3 w-3 translate-x-1/2 translate-y-1/2 cursor-se-resize border-2 border-blue-500 bg-white"
+              onMouseDown={(e) => startDrag(e, true)} />
+          </>
+        )}
+      </div>
       <MediaStatus block={block} />
     </div>
   )
@@ -520,6 +535,17 @@ function PostForm({ initialPost, onCancel, onSave }) {
     })
   }
 
+  const moveBlock = (id, dir) => {
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === id)
+      if (idx < 0) return prev
+      const next = idx + dir
+      if (next < 0 || next >= prev.length) return prev
+      const arr = [...prev]
+      ;[arr[idx], arr[next]] = [arr[next], arr[idx]]
+      return arr
+    })
+  }
 
   const updateText = (id, content) => {
     setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, content } : b))
@@ -748,10 +774,15 @@ function PostForm({ initialPost, onCancel, onSave }) {
                   onWidthChange={(w) => updateMediaWidth(block.id, w)}
                   onAlignChange={(a) => updateMediaAlign(block.id, a)}
                   onDelete={() => removeBlock(block.id)}
+                  onMoveUp={() => moveBlock(block.id, -1)}
+                  onMoveDown={() => moveBlock(block.id, 1)}
+                  canMoveUp={idx > 0}
+                  canMoveDown={idx < blocks.length - 1}
                 />
               )}
             </div>
           ))}
+          <div style={{ clear: 'both' }} />
         </div>
       </div>
 
