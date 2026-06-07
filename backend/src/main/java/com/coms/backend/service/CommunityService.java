@@ -11,6 +11,8 @@ import com.coms.backend.dto.CommunityCommentRequest;
 import com.coms.backend.dto.CommunityCommentResponse;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.coms.backend.repository.CommunityCommentRepository;
 import com.coms.backend.repository.CommunityPostImageRepository;
 import com.coms.backend.repository.CommunityPostFileRepository;
@@ -38,6 +40,7 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class CommunityService {
+    private static final ObjectMapper JSON = new ObjectMapper();
     private static final int MAX_TITLE_LENGTH = 120;
     private static final int MAX_CONTENT_LENGTH = 50000;
     private static final int MAX_COMMENT_LENGTH = 1000;
@@ -134,9 +137,7 @@ public class CommunityService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         SanitizedPost sanitized = validateRequest(request, post.getTitle());
-        boolean isInitialFinalization = "...".equals(post.getContent())
-                && !post.isEdited()
-                && java.time.Duration.between(post.getCreatedAt(), java.time.LocalDateTime.now()).toMinutes() < 5;
+        boolean isInitialFinalization = isInitialFinalization(post, sanitized.content());
         post.setContent(sanitized.content());
         post.setCategory(sanitized.category());
         if (Boolean.TRUE.equals(request.removeImage())) {
@@ -248,6 +249,40 @@ public class CommunityService {
                 || lower.matches(".*\\son[a-z]+\\s*=.*")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 내용이 포함되어 있습니다.");
         }
+    }
+
+    private boolean isInitialFinalization(CommunityPost post, String nextContent) {
+        return !post.isEdited()
+                && java.time.Duration.between(post.getCreatedAt(), java.time.LocalDateTime.now()).toMinutes() < 5
+                && isUploadFinalizationContent(post.getContent(), nextContent);
+    }
+
+    private boolean isUploadFinalizationContent(String currentContent, String nextContent) {
+        if ("...".equals(currentContent)) return true;
+        try {
+            JsonNode root = JSON.readTree(nextContent);
+            if (!root.isArray()) return false;
+            for (JsonNode block : root) {
+                if ("text".equals(block.path("type").asText())) {
+                    return currentContent.equals(stripHtml(block.path("content").asText("")).trim());
+                }
+            }
+            return false;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private String stripHtml(String value) {
+        return value == null ? "" : value
+                .replaceAll("(?i)<br\\s*/?>", "\n")
+                .replaceAll("<[^>]+>", "")
+                .replace("&nbsp;", " ")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&amp;", "&")
+                .replace("&quot;", "\"")
+                .replace("&#39;", "'");
     }
 
     private CommunityPostResponse toResponse(CommunityPost post,

@@ -183,6 +183,54 @@ class CommunityServiceTest {
     }
 
     @Test
+    void initialUploadFinalizationWithOriginalTextDoesNotMarkEdited() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("원제목", "처음 내용", "GENERAL", false), null);
+
+        var updated = communityService.update(
+                user.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("원제목", "[{\"type\":\"text\",\"content\":\"처음 내용\"},{\"type\":\"image\",\"mediaId\":1,\"name\":\"image.webp\",\"width\":75,\"align\":\"left\"}]", "GENERAL", false),
+                null
+        );
+
+        assertThat(updated.edited()).isFalse();
+    }
+
+    @Test
+    void initialUploadFinalizationWithFormattedOriginalTextDoesNotMarkEdited() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("원제목", "처음 내용", "GENERAL", false), null);
+
+        var updated = communityService.update(
+                user.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("원제목", "[{\"type\":\"text\",\"content\":\"<b>처음</b> 내용\"},{\"type\":\"image\",\"mediaId\":1,\"name\":\"image.webp\",\"width\":75,\"align\":\"left\"}]", "GENERAL", false),
+                null
+        );
+
+        assertThat(updated.edited()).isFalse();
+    }
+
+    @Test
+    void immediateDifferentContentUpdateStillMarksEdited() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("원제목", "처음 내용", "GENERAL", false), null);
+
+        var updated = communityService.update(
+                user.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("원제목", "[{\"type\":\"text\",\"content\":\"바꾼 내용\"}]", "GENERAL", false),
+                null
+        );
+
+        assertThat(updated.edited()).isTrue();
+    }
+
+    @Test
     void rejectsOversizedOrUnsafePostTextAndComments() {
         Member user = member("2025123456", "회원", Member.Role.USER);
         memberRepository.save(user);
