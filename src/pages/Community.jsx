@@ -171,6 +171,17 @@ function renderPostBlocks(post) {
     if (url.endsWith('/image')) return apiUrl(`${url}/download`)
     return apiUrl(url.replace(/\/images\/(\d+)$/, '/images/$1/download'))
   }
+  const videoDownloadUrl = (url) => (
+    url ? apiUrl(url.replace(/\/videos\/(\d+)$/, '/videos/$1/download')) : null
+  )
+  const attachments = blocks
+    .filter((block) => (block.type === 'image' || block.type === 'video') && block.url)
+    .map((block) => ({
+      key: `${block.type}-${block.url}`,
+      name: block.name || (block.type === 'image' ? 'image' : 'video'),
+      href: block.type === 'image' ? imageDownloadUrl(block.url) : videoDownloadUrl(block.url),
+    }))
+    .filter((item, index, items) => item.href && items.findIndex((candidate) => candidate.href === item.href) === index)
   const mediaContainerStyle = (width, align) =>
     align === 'left'
       ? { float: 'left', width: `${mediaWidthPercent(width)}%`, marginRight: '1rem', marginBottom: '0.25rem' }
@@ -208,7 +219,7 @@ function renderPostBlocks(post) {
         if (block.type === 'video') {
           const src = block.url ? apiUrl(block.url) : null
           if (!src) return null
-          const downloadUrl = apiUrl(block.url.replace(/\/videos\/(\d+)$/, '/videos/$1/download'))
+          const downloadUrl = videoDownloadUrl(block.url)
           return (
             <div key={i} className="group relative my-2" style={mediaContainerStyle(block.width, block.align)}>
               <video controls src={src} className="block h-auto w-full rounded" />
@@ -226,6 +237,24 @@ function renderPostBlocks(post) {
         return null
       })}
       <div style={{ clear: 'both' }} />
+      {attachments.length > 0 && (
+        <div className="mt-5 border-t border-black/10 pt-4">
+          <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-[var(--theme-body-muted)]">첨부파일</p>
+          <div className="flex flex-col gap-2">
+            {attachments.map((attachment) => (
+              <a
+                key={attachment.key}
+                href={attachment.href}
+                download={attachment.name}
+                className="inline-flex min-h-10 items-center gap-2 rounded border border-black/10 bg-black/[0.03] px-3 py-2 text-sm font-semibold text-[#3b4890] transition hover:bg-black/[0.06] hover:underline"
+              >
+                <Download size={14} />
+                <span className="break-all">{attachment.name}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -106,7 +106,7 @@ public class CommunityController {
     public ResponseEntity<Resource> downloadImage(@PathVariable Long id) {
         CommunityPost post = communityService.imagePost(id);
         Resource resource = communityService.loadImage(id);
-        String filename = post.getImageOriginalName() == null ? "community-image" : post.getImageOriginalName();
+        String filename = filenameOrFallback(post.getImageOriginalName(), post.getImageMimeType(), "community-image");
         return ResponseEntity.ok()
                 .contentType(mediaType(post.getImageMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
@@ -139,7 +139,7 @@ public class CommunityController {
     public ResponseEntity<Resource> downloadExtraImage(@PathVariable Long id, @PathVariable Long imageId) {
         com.coms.backend.domain.CommunityPostImage meta = communityService.loadExtraImageMeta(id, imageId);
         Resource resource = communityService.loadExtraImage(id, imageId);
-        String filename = meta.getOriginalName() == null ? "image" : meta.getOriginalName();
+        String filename = filenameOrFallback(meta.getOriginalName(), meta.getMimeType(), "image");
         return ResponseEntity.ok()
                 .contentType(mediaType(meta.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
@@ -179,7 +179,7 @@ public class CommunityController {
     public ResponseEntity<Resource> downloadVideo(@PathVariable Long id, @PathVariable Long videoId) {
         com.coms.backend.domain.CommunityPostVideo meta = communityService.loadVideoMeta(id, videoId);
         Resource resource = communityService.loadVideo(id, videoId);
-        String filename = meta.getOriginalName() == null ? "video" : meta.getOriginalName();
+        String filename = filenameOrFallback(meta.getOriginalName(), meta.getMimeType(), "video");
         return ResponseEntity.ok()
                 .contentType(mediaType(meta.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
@@ -229,5 +229,26 @@ public class CommunityController {
         } catch (InvalidMediaTypeException e) {
             return MediaType.APPLICATION_OCTET_STREAM;
         }
+    }
+
+    private String filenameOrFallback(String originalName, String mimeType, String fallbackBase) {
+        if (originalName != null && !originalName.isBlank()) {
+            return originalName;
+        }
+        return fallbackBase + extensionFor(mimeType);
+    }
+
+    private String extensionFor(String mimeType) {
+        if (mimeType == null) return "";
+        return switch (mimeType) {
+            case "image/jpeg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/gif" -> ".gif";
+            case "image/webp" -> ".webp";
+            case "video/mp4" -> ".mp4";
+            case "video/webm" -> ".webm";
+            case "video/quicktime" -> ".mov";
+            default -> "";
+        };
     }
 }
