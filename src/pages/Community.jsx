@@ -193,7 +193,7 @@ function renderPostBlocks(post) {
           if (!src) return null
           return (
             <div key={i} className="group relative my-2" style={mediaContainerStyle(block.width, block.align)}>
-              <img src={src} alt={block.name || '이미지'} className="block w-full max-h-[560px] object-contain" />
+              <img src={src} alt={block.name || '이미지'} className="block h-auto w-full" />
               <a
                 href={imageDownloadUrl(block.url)}
                 download={block.name}
@@ -211,7 +211,7 @@ function renderPostBlocks(post) {
           const downloadUrl = apiUrl(block.url.replace(/\/videos\/(\d+)$/, '/videos/$1/download'))
           return (
             <div key={i} className="group relative my-2" style={mediaContainerStyle(block.width, block.align)}>
-              <video controls src={src} className="block w-full max-h-[480px] rounded" />
+              <video controls src={src} className="block h-auto w-full rounded" />
               <a
                 href={downloadUrl}
                 download={block.name}
@@ -274,7 +274,7 @@ function MediaStatus({ block }) {
   return <p className="mt-1 text-xs text-emerald-600">저장됨</p>
 }
 
-function ResizableMedia({ block, onWidthChange, onAlignChange, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
+function ResizableMedia({ block, onWidthChange, onAlignChange, onDelete, onDragStart, onDragEnd }) {
   const [selected, setSelected] = useState(false)
   const ref = useRef(null)
 
@@ -317,12 +317,20 @@ function ResizableMedia({ block, onWidthChange, onAlignChange, onDelete, onMoveU
     : { display: 'block', width: `${wPct}%`, marginLeft: 'auto', marginRight: 'auto' }
 
   return (
-    <div ref={ref} className="my-1" style={containerStyle}>
+    <div
+      ref={ref}
+      className="my-1 cursor-grab active:cursor-grabbing"
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      style={containerStyle}
+      title="드래그해서 위치 변경"
+    >
       {/* Inner wrapper: handles and border anchor to actual image corners, not MediaStatus */}
       <div className="relative" onClick={(e) => { e.stopPropagation(); setSelected(true) }}>
         {block.type === 'image'
-          ? <img src={src} alt={block.name} className="block w-full max-h-[460px] object-contain" />
-          : <video src={src} controls className="block w-full max-h-[420px]" />
+          ? <img src={src} alt={block.name} draggable={false} className="block h-auto w-full select-none" />
+          : <video src={src} controls className="block h-auto w-full" />
         }
         {selected && (
           <>
@@ -331,16 +339,7 @@ function ResizableMedia({ block, onWidthChange, onAlignChange, onDelete, onMoveU
             <div className="absolute top-1.5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded border border-black/10 bg-white/90 px-2 py-1 shadow backdrop-blur-sm">
               <MediaAlignControls value={block.align || 'center'} onChange={onAlignChange} />
               <span className="mx-0.5 h-3 w-px bg-black/15" />
-              <button type="button" onClick={(e) => { e.stopPropagation(); onMoveUp?.() }}
-                disabled={!canMoveUp}
-                className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-[var(--theme-body-muted)] hover:bg-black/5 disabled:opacity-30">
-                위
-              </button>
-              <button type="button" onClick={(e) => { e.stopPropagation(); onMoveDown?.() }}
-                disabled={!canMoveDown}
-                className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-[var(--theme-body-muted)] hover:bg-black/5 disabled:opacity-30">
-                아래
-              </button>
+              <span className="px-1 text-[11px] font-semibold text-[var(--theme-body-muted)]">드래그 이동</span>
               <span className="mx-0.5 h-3 w-px bg-black/15" />
               <button type="button" onClick={(e) => { e.stopPropagation(); onDelete() }}
                 className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-red-500 hover:bg-red-50">
@@ -483,6 +482,8 @@ function PostForm({ initialPost, onCancel, onSave }) {
   const [error, setError] = useState('')
   const [activeTextTarget, setActiveTextTarget] = useState(null)
   const [removeLegacyImage, setRemoveLegacyImage] = useState(false)
+  const [draggingBlockId, setDraggingBlockId] = useState(null)
+  const [dragOverBlockId, setDragOverBlockId] = useState(null)
 
   const validateFile = (file, nextImageCount, nextVideoCount) => {
     if (ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -535,16 +536,48 @@ function PostForm({ initialPost, onCancel, onSave }) {
     })
   }
 
-  const moveBlock = (id, dir) => {
+  const reorderBlock = (dragId, targetId, placeAfter = false) => {
     setBlocks((prev) => {
-      const idx = prev.findIndex((b) => b.id === id)
-      if (idx < 0) return prev
-      const next = idx + dir
-      if (next < 0 || next >= prev.length) return prev
+      const idx = prev.findIndex((b) => b.id === dragId)
+      const next = prev.findIndex((b) => b.id === targetId)
+      if (idx < 0 || next < 0 || idx === next) return prev
       const arr = [...prev]
-      ;[arr[idx], arr[next]] = [arr[next], arr[idx]]
+      const [moved] = arr.splice(idx, 1)
+      let insertIndex = next + (placeAfter ? 1 : 0)
+      if (idx < insertIndex) insertIndex -= 1
+      arr.splice(insertIndex, 0, moved)
       return arr
     })
+  }
+
+  const moveBlockToEnd = (dragId) => {
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === dragId)
+      if (idx < 0 || idx === prev.length - 1) return prev
+      const arr = [...prev]
+      const [moved] = arr.splice(idx, 1)
+      arr.push(moved)
+      return arr
+    })
+  }
+
+  const isFileDrag = (event) => Array.from(event.dataTransfer?.types || []).includes('Files')
+
+  const handleBlockDragOver = (event, blockId) => {
+    if (!draggingBlockId || isFileDrag(event)) return
+    event.preventDefault()
+    event.stopPropagation()
+    if (draggingBlockId !== blockId) setDragOverBlockId(blockId)
+  }
+
+  const handleBlockDrop = (event, blockId) => {
+    if (!draggingBlockId || isFileDrag(event)) return
+    event.preventDefault()
+    event.stopPropagation()
+    const rect = event.currentTarget.getBoundingClientRect()
+    reorderBlock(draggingBlockId, blockId, event.clientY > rect.top + rect.height / 2)
+    setDraggingBlockId(null)
+    setDragOverBlockId(null)
   }
 
   const updateText = (id, content) => {
@@ -742,19 +775,39 @@ function PostForm({ initialPost, onCancel, onSave }) {
         <div
           className="min-h-[420px] bg-white px-4 py-5 sm:px-5"
           onDragOver={(e) => {
+            if (draggingBlockId && !isFileDrag(e)) {
+              e.preventDefault()
+              return
+            }
             if (Array.from(e.dataTransfer?.items || []).some((item) => item.kind === 'file')) {
               e.preventDefault()
             }
           }}
           onDrop={(e) => {
             const files = Array.from(e.dataTransfer?.files || [])
-            if (files.length === 0) return
+            if (files.length === 0) {
+              if (!draggingBlockId || isFileDrag(e)) return
+              e.preventDefault()
+              moveBlockToEnd(draggingBlockId)
+              setDraggingBlockId(null)
+              setDragOverBlockId(null)
+              return
+            }
             e.preventDefault()
             insertFilesAtCanvasPoint(files, e.currentTarget, e.clientY)
           }}
         >
           {blocks.map((block, idx) => (
-            <div key={block.id} data-editor-block-id={block.id}>
+            <div
+              key={block.id}
+              data-editor-block-id={block.id}
+              onDragOver={(e) => handleBlockDragOver(e, block.id)}
+              onDrop={(e) => handleBlockDrop(e, block.id)}
+              onDragLeave={() => {
+                if (dragOverBlockId === block.id) setDragOverBlockId(null)
+              }}
+              className={dragOverBlockId === block.id && draggingBlockId !== block.id ? 'rounded outline outline-2 outline-[var(--theme-accent)]/70' : ''}
+            >
               {block.type === 'text' ? (
                 <div className="relative bg-white">
                   <PlainTextEditor
@@ -774,10 +827,16 @@ function PostForm({ initialPost, onCancel, onSave }) {
                   onWidthChange={(w) => updateMediaWidth(block.id, w)}
                   onAlignChange={(a) => updateMediaAlign(block.id, a)}
                   onDelete={() => removeBlock(block.id)}
-                  onMoveUp={() => moveBlock(block.id, -1)}
-                  onMoveDown={() => moveBlock(block.id, 1)}
-                  canMoveUp={idx > 0}
-                  canMoveDown={idx < blocks.length - 1}
+                  onDragStart={(e) => {
+                    e.stopPropagation()
+                    e.dataTransfer.effectAllowed = 'move'
+                    e.dataTransfer.setData('text/plain', block.id)
+                    setDraggingBlockId(block.id)
+                  }}
+                  onDragEnd={() => {
+                    setDraggingBlockId(null)
+                    setDragOverBlockId(null)
+                  }}
                 />
               )}
             </div>
