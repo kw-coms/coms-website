@@ -5,7 +5,6 @@ import { EmailVerifyStep } from '../components/EmailVerifyStep.jsx'
 const CURRENT_SIGNUP = 'current'
 const GRADUATE_SIGNUP = 'graduate'
 const OTHER_INTEREST = '기타'
-const FIRST_GENERATION_YEAR = 1966
 
 const INTEREST_OPTIONS = ['보안', '웹', '앱']
 const SIGNUP_TYPES = [
@@ -16,6 +15,7 @@ const SIGNUP_TYPES = [
 const STUDENT_ID_PATTERN = /^\d{10}$/
 const NAME_PATTERN = /^[가-힣]{3}$/
 const TWO_DIGIT_PATTERN = /^\d{2}$/
+const GENERATION_PATTERN = /^\d{1,3}$/
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/
 
 const inputClass =
@@ -183,23 +183,18 @@ export default function Signup({ onBack }) {
     const name = form.name.trim()
     const graduateValue = normalizeGraduateValue(form.graduateVerificationValue)
 
-    if (!studentId) return '학번을 입력해주세요.'
-    if (!STUDENT_ID_PATTERN.test(studentId)) return '학번은 숫자 10자리여야 합니다.'
+    if (isCurrentSignup && !studentId) return '학번을 입력해주세요.'
+    if (isCurrentSignup && !STUDENT_ID_PATTERN.test(studentId)) return '학번은 숫자 10자리여야 합니다.'
     if (!name) return '이름을 입력해주세요.'
     if (!NAME_PATTERN.test(name)) return '이름은 한글 3자리여야 합니다.'
-    if (isGraduateSignup && !isGraduateStudentId) return `졸업생은 ${graduateCutoffYear}학번 이전 학번으로 가입해주세요.`
     if (isCurrentSignup && isGraduateStudentId) return '졸업생은 졸업생 회원가입을 선택해주세요.'
 
     if (isGraduateSignup) {
       if (!graduateValue) return '졸업생 인증 정보를 입력해주세요.'
       if (form.graduateVerificationType === 'YEAR') {
-        const expectedYear = String(admissionYear).slice(-2)
-        if (!TWO_DIGIT_PATTERN.test(graduateValue) || graduateValue !== expectedYear) {
-          return '학번 연도 두 자리는 입학연도 끝 두 자리와 같아야 합니다.'
-        }
+        if (!TWO_DIGIT_PATTERN.test(graduateValue)) return '입학연도 끝 두 자리는 숫자 2자리여야 합니다.'
       } else {
-        const expectedGeneration = String(admissionYear - FIRST_GENERATION_YEAR)
-        if (graduateValue !== expectedGeneration) return '기수가 학번의 입학연도와 일치하지 않습니다.'
+        if (!GENERATION_PATTERN.test(graduateValue)) return '기수는 숫자로 입력해주세요.'
       }
     }
 
@@ -226,14 +221,14 @@ export default function Signup({ onBack }) {
       return
     }
 
-    const studentId = form.studentId.trim()
+    const studentId = isGraduateSignup ? '' : form.studentId.trim()
     const email = form.email.trim()
 
     setLoading(true)
     try {
-      await signupUser({
+      const result = await signupUser({
         signupType: isGraduateSignup ? 'GRADUATE' : 'CURRENT',
-        studentId,
+        studentId: isGraduateSignup ? null : studentId,
         name: form.name.trim(),
         graduateVerificationType: isGraduateSignup ? form.graduateVerificationType : null,
         graduateVerificationValue: isGraduateSignup ? form.graduateVerificationValue.trim() : null,
@@ -244,7 +239,7 @@ export default function Signup({ onBack }) {
         aspiration: isCurrentSignup ? form.aspiration.trim() : null,
         interests: isCurrentSignup ? buildInterestsString() : null,
       })
-      setSignedUpStudentId(studentId)
+      setSignedUpStudentId(result.studentId || studentId || email)
       setSignedUpEmail(email)
       setStep('verify')
     } catch (err) {
@@ -277,17 +272,19 @@ export default function Signup({ onBack }) {
             <form onSubmit={handleSubmit} className="grid min-w-0 gap-4 sm:gap-5">
               <SignupTypeSelector value={signupType} onChange={handleSignupTypeChange} />
 
-              <div className={fieldGridClass}>
-                <TextField
-                  id="studentId"
-                  label={isGraduateSignup ? '졸업 당시 학번' : '학번'}
-                  value={form.studentId}
-                  onChange={handleChange}
-                  placeholder={isGraduateSignup ? '졸업 당시 학번 10자리' : '학번을 입력하세요'}
-                  inputMode="numeric"
-                  maxLength={10}
-                  autoComplete="username"
-                />
+              <div className={isCurrentSignup ? fieldGridClass : 'grid min-w-0 gap-3 sm:gap-4'}>
+                {isCurrentSignup && (
+                  <TextField
+                    id="studentId"
+                    label="학번"
+                    value={form.studentId}
+                    onChange={handleChange}
+                    placeholder="학번을 입력하세요"
+                    inputMode="numeric"
+                    maxLength={10}
+                    autoComplete="username"
+                  />
+                )}
                 <TextField
                   id="name"
                   label="이름"
@@ -309,7 +306,7 @@ export default function Signup({ onBack }) {
                       onChange={handleChange}
                       className={inputClass}
                     >
-                      <option value="YEAR">학번 연도 두 자리</option>
+                      <option value="YEAR">입학연도 끝 두 자리</option>
                       <option value="GENERATION">기수</option>
                     </select>
                   </div>
@@ -322,7 +319,7 @@ export default function Signup({ onBack }) {
                     inputMode="numeric"
                   />
                   <p className="text-sm leading-6 text-[var(--theme-body-muted)] sm:col-span-2">
-                    {graduateCutoffYear}학번 이전 졸업생은 명부의 이름과 학번 연도 두 자리(예: 19학번의 19) 또는 기수로 인증합니다.
+                    졸업생은 명부의 이름과 입학연도 끝 두 자리 또는 기수로 인증합니다.
                   </p>
                 </div>
               )}
