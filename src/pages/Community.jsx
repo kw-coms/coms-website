@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify.jsx'
 import {
@@ -40,7 +41,6 @@ import { useAuth } from '../contexts/useAuth.js'
 const PAGE_SIZE = 30
 const CONCEPT_POST_SCORE_THRESHOLD = 5
 const MAX_TITLE_LENGTH = 120
-const MAX_CONTENT_LENGTH = 5000
 const MAX_COMMENT_LENGTH = 1000
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024
@@ -303,58 +303,88 @@ function MediaAlignControls({ value, onChange }) {
   )
 }
 
-function MediaStatus({ block }) {
-  if (block.status === 'uploading') {
-    return <p className="mt-1 text-xs font-semibold text-[var(--theme-accent)]">업로드 중...</p>
-  }
-  if (block.status === 'failed') {
-    return <p className="mt-1 text-xs font-semibold text-red-500">{block.error || '업로드 실패'}</p>
-  }
-  return null
+
+function figureInlineStyle(wPct, align) {
+  if (align === 'left') return `float:left;width:${wPct}%;margin-right:1rem;margin-bottom:0.25rem`
+  if (align === 'right') return `float:right;width:${wPct}%;margin-left:1rem;margin-bottom:0.25rem`
+  return `display:block;width:${wPct}%;margin-left:auto;margin-right:auto;clear:both`
 }
 
-function ResizableMedia({
-  block,
-  onWidthChange,
-  onAlignChange,
-  onDelete,
-  onDragStart,
-  onDragEnd,
-  onBlockDragOver,
-  onBlockDrop,
-  onBlockDragLeave,
-  isDropTarget,
-}) {
-  const [selected, setSelected] = useState(false)
-  const ref = useRef(null)
+function domToBlocks(editorEl, figMeta) {
+  const blocks = []
+  let text = ''
+  const flushText = () => {
+    const clean = text.replace(/^\n+|\n+$/g, '')
+    if (clean) blocks.push({ type: 'text', content: clean, id: localId() })
+    text = ''
+  }
+  const walk = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) { text += node.textContent; return }
+    if (node.nodeName === 'BR') { text += '\n'; return }
+    if (node.nodeName === 'FIGURE') {
+      flushText()
+      const id = node.dataset.blockId
+      const meta = figMeta.get(id)
+      if (meta) {
+        const m = (node.style.width || '').match(/^(\d+(?:\.\d+)?)%$/)
+        const wPct = m ? Math.round(Number(m[1])) : (meta.width || 75)
+        blocks.push({ ...meta, id, width: wPct, align: node.dataset.align || meta.align || 'center' })
+      }
+      return
+    }
+    const isBlock = ['DIV', 'P', 'H1', 'H2', 'H3'].includes(node.nodeName)
+    if (isBlock && text && !text.endsWith('\n')) text += '\n'
+    for (const child of node.childNodes) walk(child)
+    if (isBlock && text && !text.endsWith('\n')) text += '\n'
+  }
+  for (const child of editorEl.childNodes) walk(child)
+  flushText()
+  return blocks
+}
+
+function FigureToolbar({ editorRef, figId, meta, onResize, onAlign, onDelete, onDeselect }) {
+  const toolbarRef = useRef(null)
+  const [rect, setRect] = useState(null)
 
   useEffect(() => {
-    if (!selected) return
-    const onDown = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setSelected(false)
+    const el = editorRef.current
+    if (!el || !figId) return
+    const figEl = el.querySelector(`[data-block-id="${figId}"]`)
+    if (!figEl) return
+    const measure = () => setRect(figEl.getBoundingClientRect())
+    measure()
+    window.addEventListener('scroll', measure, true)
+    window.addEventListener('resize', measure)
+    return () => {
+      window.removeEventListener('scroll', measure, true)
+      window.removeEventListener('resize', measure)
     }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [selected])
+  }, [editorRef, figId])
 
-  const startDrag = (e, fromRight) => {
+  useEffect(() => {
+    const handleDown = (e) => {
+      const figEl = editorRef.current?.querySelector(`[data-block-id="${figId}"]`)
+      if (figEl && !figEl.contains(e.target) && !toolbarRef.current?.contains(e.target)) onDeselect()
+    }
+    document.addEventListener('mousedown', handleDown)
+    return () => document.removeEventListener('mousedown', handleDown)
+  }, [editorRef, figId, onDeselect])
+
+  const startResize = (e, fromRight) => {
     e.preventDefault()
     e.stopPropagation()
-    const el = ref.current
-    if (!el) return
-    // Disable HTML5 drag on outer div while resizing so browser doesn't
-    // intercept mousemove events as a drag operation
-    el.draggable = false
+    const figEl = editorRef.current?.querySelector(`[data-block-id="${figId}"]`)
+    if (!figEl) return
     const startX = e.clientX
-    const startW = el.offsetWidth
-    const parentW = el.parentElement?.offsetWidth || el.offsetWidth
+    const startW = figEl.offsetWidth
+    const parentW = figEl.parentElement?.offsetWidth || startW
     const onMove = (ev) => {
       const delta = fromRight ? ev.clientX - startX : startX - ev.clientX
       const pct = Math.max(25, Math.min(100, Math.round(((startW + delta) / parentW) * 100 / 5) * 5))
-      onWidthChange(pct)
+      onResize(pct)
+      setRect(figEl.getBoundingClientRect())
     }
     const onUp = () => {
-      if (el) el.draggable = true
       document.removeEventListener('mousemove', onMove)
       document.removeEventListener('mouseup', onUp)
     }
@@ -362,207 +392,261 @@ function ResizableMedia({
     document.addEventListener('mouseup', onUp)
   }
 
-  const src = block.preview || (block.url ? apiUrl(block.url) : null)
-  const wPct = mediaWidthPercent(block.width)
-  const containerStyle = block.align === 'left'
-    ? { float: 'left', width: `${wPct}%`, marginRight: '1rem', marginBottom: '0.25rem' }
-    : block.align === 'right'
-    ? { float: 'right', width: `${wPct}%`, marginLeft: '1rem', marginBottom: '0.25rem' }
-    : { display: 'block', width: `${wPct}%`, marginLeft: 'auto', marginRight: 'auto' }
+  if (!rect) return null
+  const hCls = 'fixed z-50 block h-3 w-3 -translate-x-1/2 -translate-y-1/2 border-2 border-blue-500 bg-white'
 
-  return (
-    <div
-      ref={ref}
-      data-editor-block-id={block.id}
-      className={`my-1 cursor-grab active:cursor-grabbing ${isDropTarget ? 'rounded outline outline-2 outline-[var(--theme-accent)]/70' : ''}`}
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragOver={onBlockDragOver}
-      onDrop={onBlockDrop}
-      onDragLeave={onBlockDragLeave}
-      style={containerStyle}
-      title="드래그해서 위치 변경"
-    >
-      {/* Inner wrapper: handles and border anchor to actual image corners, not MediaStatus */}
-      <div className="relative" onClick={(e) => { e.stopPropagation(); setSelected(true) }}>
-        {block.type === 'image'
-          ? <img src={src} alt={block.name} draggable={false} className="block h-auto w-full select-none" />
-          : <video src={src} controls preload="metadata" className="block h-auto w-full" />
-        }
-        {selected && (
-          <>
-            <div className="pointer-events-none absolute inset-0 border-2 border-blue-500" />
-            {/* Toolbar inside image — avoids overflow-hidden clipping from editor wrapper */}
-            <div className="absolute top-1.5 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded border border-black/10 bg-white/90 px-2 py-1 shadow backdrop-blur-sm">
-              <MediaAlignControls value={block.align || 'center'} onChange={onAlignChange} />
-              <span className="mx-0.5 h-3 w-px bg-black/15" />
-              <span className="px-1 text-[11px] font-semibold text-[var(--theme-body-muted)]">드래그 이동</span>
-              <span className="mx-0.5 h-3 w-px bg-black/15" />
-              <button type="button" onClick={(e) => { e.stopPropagation(); onDelete() }}
-                className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-red-500 hover:bg-red-50">
-                삭제
-              </button>
-            </div>
-            <span className="absolute left-0 top-0 z-20 block h-3 w-3 -translate-x-1/2 -translate-y-1/2 cursor-nw-resize border-2 border-blue-500 bg-white"
-              onMouseDown={(e) => startDrag(e, false)} />
-            <span className="absolute right-0 top-0 z-20 block h-3 w-3 translate-x-1/2 -translate-y-1/2 cursor-ne-resize border-2 border-blue-500 bg-white"
-              onMouseDown={(e) => startDrag(e, true)} />
-            <span className="absolute bottom-0 left-0 z-20 block h-3 w-3 -translate-x-1/2 translate-y-1/2 cursor-sw-resize border-2 border-blue-500 bg-white"
-              onMouseDown={(e) => startDrag(e, false)} />
-            <span className="absolute bottom-0 right-0 z-20 block h-3 w-3 translate-x-1/2 translate-y-1/2 cursor-se-resize border-2 border-blue-500 bg-white"
-              onMouseDown={(e) => startDrag(e, true)} />
-          </>
-        )}
-      </div>
-      <MediaStatus block={block} />
-    </div>
-  )
-}
-
-function FileAttachmentBlock({
-  block,
-  onDelete,
-  onDragStart,
-  onDragEnd,
-  onBlockDragOver,
-  onBlockDrop,
-  onBlockDragLeave,
-  isDropTarget,
-}) {
-  return (
-    <div
-      data-editor-block-id={block.id}
-      className={`my-1 inline-flex max-w-full cursor-grab items-center gap-2 rounded border border-black/10 bg-black/[0.03] px-3 py-2 text-sm active:cursor-grabbing ${isDropTarget ? 'outline outline-2 outline-[var(--theme-accent)]/70' : ''}`}
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragOver={onBlockDragOver}
-      onDrop={onBlockDrop}
-      onDragLeave={onBlockDragLeave}
-      title="드래그해서 위치 변경"
-    >
-      <Paperclip size={15} className="shrink-0 text-[var(--theme-body-muted)]" />
-      <span className="min-w-0 break-all font-semibold text-[var(--theme-body-mid)]">{block.name}</span>
-      <MediaStatus block={block} />
-      <button
-        type="button"
-        onClick={onDelete}
-        className="ml-1 shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold text-red-500 hover:bg-red-50"
+  return createPortal(
+    <>
+      <div className="pointer-events-none fixed z-40 border-2 border-blue-500"
+        style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }} />
+      <div ref={toolbarRef}
+        className="fixed z-50 flex items-center gap-1 whitespace-nowrap rounded border border-black/10 bg-white/95 px-2 py-1 shadow backdrop-blur-sm"
+        style={{ left: rect.left + rect.width / 2, top: Math.max(4, rect.top - 36), transform: 'translateX(-50%)' }}
       >
-        삭제
-      </button>
-    </div>
+        <MediaAlignControls value={meta?.align || 'center'} onChange={onAlign} />
+        <span className="mx-0.5 h-3 w-px bg-black/15" />
+        <button type="button" onClick={onDelete}
+          className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-red-500 hover:bg-red-50">삭제</button>
+      </div>
+      <span className={`${hCls} cursor-nw-resize`} style={{ left: rect.left, top: rect.top }} onMouseDown={(e) => startResize(e, false)} />
+      <span className={`${hCls} cursor-ne-resize`} style={{ left: rect.left + rect.width, top: rect.top }} onMouseDown={(e) => startResize(e, true)} />
+      <span className={`${hCls} cursor-sw-resize`} style={{ left: rect.left, top: rect.top + rect.height }} onMouseDown={(e) => startResize(e, false)} />
+      <span className={`${hCls} cursor-se-resize`} style={{ left: rect.left + rect.width, top: rect.top + rect.height }} onMouseDown={(e) => startResize(e, true)} />
+    </>,
+    document.body
   )
 }
 
-function selectionOffsetWithin(element) {
-  const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0) return element.textContent?.length || 0
-  const range = selection.getRangeAt(0)
-  if (!element.contains(range.endContainer)) return element.textContent?.length || 0
-  const before = range.cloneRange()
-  before.selectNodeContents(element)
-  before.setEnd(range.endContainer, range.endOffset)
-  return before.toString().length
-}
-
-function pointOffsetWithin(element, clientX, clientY) {
-  let range = null
-  if (document.caretPositionFromPoint) {
-    const position = document.caretPositionFromPoint(clientX, clientY)
-    if (position) {
-      range = document.createRange()
-      range.setStart(position.offsetNode, position.offset)
-      range.collapse(true)
-    }
-  } else if (document.caretRangeFromPoint) {
-    range = document.caretRangeFromPoint(clientX, clientY)
-  }
-  if (!range || !element.contains(range.startContainer)) return element.textContent?.length || 0
-  const before = range.cloneRange()
-  before.selectNodeContents(element)
-  before.setEnd(range.startContainer, range.startOffset)
-  return before.toString().length
-}
-
-function PlainTextEditor({ value, editorId, onChange, onPaste, onFilesAtOffset, onCaretChange, placeholder, minRows = 3, maxLength }) {
-  const editorRef = useRef(null)
-  const minHeight = `${Math.max(minRows, 1) * 1.75}rem`
+function RichEditor({ initialBlocks, apiRef, onError }) {
+  const divRef = useRef(null)
+  const figMeta = useRef(new Map())
+  const savedRange = useRef(null)
+  const [selectedFigId, setSelectedFigId] = useState(null)
+  const [selectedMeta, setSelectedMeta] = useState(null)
+  const initialized = useRef(false)
 
   useEffect(() => {
-    const editor = editorRef.current
-    if (editor && editor.textContent !== value) {
-      editor.textContent = value
-    }
-  }, [value])
+    setSelectedMeta(selectedFigId ? (figMeta.current.get(selectedFigId) ?? null) : null)
+  }, [selectedFigId])
 
-  const syncContent = (element) => {
-    let next = element.textContent || ''
-    if (maxLength && next.length > maxLength) {
-      next = next.slice(0, maxLength)
-      element.textContent = next
-      const range = document.createRange()
-      range.selectNodeContents(element)
-      range.collapse(false)
-      const selection = window.getSelection()
-      selection.removeAllRanges()
-      selection.addRange(range)
-    }
-    onChange(next)
-    onCaretChange?.(selectionOffsetWithin(element))
+  const escH = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  const safeSrc = (url) => (url && /^(https?:|blob:|\/)/i.test(url) ? url : '')
+
+  const attachFigureClick = (fig) => {
+    fig.addEventListener('click', (e) => {
+      e.stopPropagation()
+      setSelectedFigId(fig.dataset.blockId)
+    })
   }
 
-  const handlePlainPaste = (e) => {
-    onPaste?.(e, selectionOffsetWithin(e.currentTarget))
-    if (e.defaultPrevented) return
-    const text = e.clipboardData?.getData('text/plain')
-    if (!text) return
-    e.preventDefault()
-    document.execCommand('insertText', false, text)
-    syncContent(e.currentTarget)
+  useEffect(() => {
+    const el = divRef.current
+    if (!el || initialized.current) return
+    initialized.current = true
+    figMeta.current = new Map()
+    let html = ''
+    for (const block of initialBlocks) {
+      if (block.type === 'text') {
+        html += escH(block.content || '').replace(/\n/g, '<br>')
+      } else if (block.type === 'image' || block.type === 'video') {
+        const id = block.id || localId()
+        const wPct = mediaWidthPercent(block.width)
+        const align = block.align || 'center'
+        figMeta.current.set(id, { type: block.type, status: block.status || 'saved', mediaId: block.mediaId, file: block.file, preview: block.preview, name: block.name, url: block.url, width: wPct, align, legacy: block.legacy })
+        const src = safeSrc(block.preview || (block.url ? apiUrl(block.url) : ''))
+        const inner = block.type === 'image'
+          ? `<img src="${escH(src)}" alt="" style="display:block;width:100%;height:auto">`
+          : `<video src="${escH(src)}" controls style="display:block;width:100%;height:auto"></video>`
+        html += `<figure contenteditable="false" data-block-id="${id}" data-type="${block.type}" data-align="${align}" style="${figureInlineStyle(wPct, align)}">${inner}</figure>`
+      } else if (block.type === 'file') {
+        const id = block.id || localId()
+        figMeta.current.set(id, { type: 'file', status: block.status || 'saved', fileId: block.fileId, file: block.file, name: block.name, url: block.url })
+        html += `<figure contenteditable="false" data-block-id="${id}" data-type="file" style="display:inline-block;clear:both"><span style="display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.1);border-radius:4px;background:rgba(0,0,0,0.03);padding:6px 10px;font-size:13px;font-weight:600">📎 ${escH(block.name || '파일')}</span></figure>`
+      }
+    }
+    el.innerHTML = html || ''
+    el.querySelectorAll('figure').forEach(attachFigureClick)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const saveSelection = () => {
+    const sel = window.getSelection()
+    if (sel?.rangeCount > 0 && divRef.current?.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+      savedRange.current = sel.getRangeAt(0).cloneRange()
+    }
+  }
+
+  const insertAtCursor = (node) => {
+    const sel = window.getSelection()
+    let range = savedRange.current ? savedRange.current.cloneRange() : (sel?.rangeCount > 0 && divRef.current?.contains(sel.getRangeAt(0).commonAncestorContainer) ? sel.getRangeAt(0) : null)
+    if (range) {
+      let container = range.commonAncestorContainer
+      if (container.nodeType === Node.TEXT_NODE) container = container.parentNode
+      if (container.closest?.('figure')) {
+        const fig = container.closest('figure')
+        range = document.createRange()
+        range.setStartAfter(fig)
+        range.collapse(true)
+      }
+      range.deleteContents()
+      range.insertNode(node)
+      const after = document.createRange()
+      after.setStartAfter(node)
+      after.collapse(true)
+      sel.removeAllRanges()
+      sel.addRange(after)
+      savedRange.current = after.cloneRange()
+    } else {
+      divRef.current?.appendChild(node)
+    }
+  }
+
+  const insertFile = (file) => {
+    const isImage = ALLOWED_IMAGE_TYPES.includes(file.type)
+    const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type)
+    const isFileType = isAllowedArchiveFile(file)
+    if (!isImage && !isVideo && !isFileType) { onError?.('지원하지 않는 파일 형식입니다.'); return }
+    const blocks = divRef.current ? domToBlocks(divRef.current, figMeta.current) : []
+    if (isImage && blocks.filter(b => b.type === 'image').length >= MAX_EXTRA_IMAGES) { onError?.('이미지는 최대 5개까지 추가할 수 있습니다.'); return }
+    if (isVideo && blocks.filter(b => b.type === 'video').length >= MAX_VIDEOS) { onError?.('영상은 최대 3개까지 추가할 수 있습니다.'); return }
+    if (isFileType && blocks.filter(b => b.type === 'file').length >= MAX_FILES) { onError?.('첨부파일은 최대 5개까지 추가할 수 있습니다.'); return }
+    if (isImage && file.size > MAX_IMAGE_BYTES) { onError?.('이미지는 5MB 이하만 업로드할 수 있습니다.'); return }
+    if (isVideo && file.size > MAX_VIDEO_BYTES) { onError?.('영상은 100MB 이하만 업로드할 수 있습니다.'); return }
+    if (isFileType && file.size > MAX_FILE_BYTES) { onError?.('첨부파일은 50MB 이하만 업로드할 수 있습니다.'); return }
+    onError?.('')
+    const type = isImage ? 'image' : isVideo ? 'video' : 'file'
+    const id = localId()
+    const preview = type !== 'file' ? URL.createObjectURL(file) : null
+    figMeta.current.set(id, { type, status: 'pending', file, preview, name: file.name, width: 75, align: 'center' })
+    const figure = document.createElement('figure')
+    figure.contentEditable = 'false'
+    figure.dataset.blockId = id
+    figure.dataset.type = type
+    figure.dataset.align = 'center'
+    if (type === 'image') {
+      figure.setAttribute('style', figureInlineStyle(75, 'center'))
+      const img = document.createElement('img')
+      img.src = preview
+      img.setAttribute('style', 'display:block;width:100%;height:auto')
+      figure.appendChild(img)
+    } else if (type === 'video') {
+      figure.setAttribute('style', figureInlineStyle(75, 'center'))
+      const vid = document.createElement('video')
+      vid.src = preview
+      vid.controls = true
+      vid.setAttribute('style', 'display:block;width:100%;height:auto')
+      figure.appendChild(vid)
+    } else {
+      figure.setAttribute('style', 'display:inline-block;clear:both')
+      const span = document.createElement('span')
+      span.setAttribute('style', 'display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.1);border-radius:4px;background:rgba(0,0,0,0.03);padding:6px 10px;font-size:13px;font-weight:600')
+      span.textContent = `📎 ${file.name}`
+      figure.appendChild(span)
+    }
+    attachFigureClick(figure)
+    insertAtCursor(figure)
+  }
+
+  useEffect(() => {
+    if (!apiRef) return
+    apiRef.current = {
+      insertFiles: (files) => { saveSelection(); files.forEach(insertFile) },
+      saveSelection,
+      getBlocks: () => divRef.current ? domToBlocks(divRef.current, figMeta.current) : [],
+      getFigMeta: () => figMeta.current,
+      updateFigureMeta: (id, changes) => {
+        const meta = figMeta.current.get(id)
+        if (meta) figMeta.current.set(id, { ...meta, ...changes })
+      },
+    }
+  })
+
+  const handleFigureResize = (wPct) => {
+    const el = divRef.current
+    if (!selectedFigId || !el) return
+    const figEl = el.querySelector(`[data-block-id="${selectedFigId}"]`)
+    if (!figEl) return
+    const meta = figMeta.current.get(selectedFigId)
+    const align = meta?.align || 'center'
+    figEl.setAttribute('style', figureInlineStyle(wPct, align))
+    figMeta.current.set(selectedFigId, { ...meta, width: wPct })
+  }
+
+  const handleFigureAlign = (align) => {
+    const el = divRef.current
+    if (!selectedFigId || !el) return
+    const figEl = el.querySelector(`[data-block-id="${selectedFigId}"]`)
+    if (!figEl) return
+    const meta = figMeta.current.get(selectedFigId)
+    const wPct = meta?.width || 75
+    figEl.dataset.align = align
+    figEl.setAttribute('style', figureInlineStyle(wPct, align))
+    figMeta.current.set(selectedFigId, { ...meta, align })
+    setSelectedMeta({ ...meta, align })
+  }
+
+  const handleFigureDelete = () => {
+    const el = divRef.current
+    if (!selectedFigId || !el) return
+    const figEl = el.querySelector(`[data-block-id="${selectedFigId}"]`)
+    const meta = figMeta.current.get(selectedFigId)
+    if (meta?.preview) URL.revokeObjectURL(meta.preview)
+    figMeta.current.delete(selectedFigId)
+    figEl?.remove()
+    setSelectedFigId(null)
   }
 
   return (
     <div className="relative">
-      {!value && (
-        <span className="pointer-events-none absolute left-0 top-0 text-sm leading-7 text-[var(--theme-body-muted)]/70">
-          {placeholder}
-        </span>
-      )}
       <div
-        ref={editorRef}
-        data-editor-text-id={editorId}
-        role="textbox"
-        aria-multiline="true"
-        tabIndex={0}
+        ref={divRef}
         contentEditable
         suppressContentEditableWarning
-        onInput={(e) => syncContent(e.currentTarget)}
-        onFocus={(e) => onCaretChange?.(selectionOffsetWithin(e.currentTarget))}
-        onKeyUp={(e) => onCaretChange?.(selectionOffsetWithin(e.currentTarget))}
-        onMouseUp={(e) => onCaretChange?.(selectionOffsetWithin(e.currentTarget))}
-        onPaste={handlePlainPaste}
-        onDragOver={(e) => {
-          if (Array.from(e.dataTransfer?.items || []).some((item) => item.kind === 'file')) {
+        onMouseUp={saveSelection}
+        onKeyUp={saveSelection}
+        onFocus={saveSelection}
+        onClick={(e) => { if (!e.target.closest?.('figure')) setSelectedFigId(null); saveSelection() }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
+            document.execCommand('insertLineBreak')
           }
         }}
+        onDragOver={(e) => { if (Array.from(e.dataTransfer?.items || []).some(i => i.kind === 'file')) e.preventDefault() }}
         onDrop={(e) => {
           const files = Array.from(e.dataTransfer?.files || [])
-          if (files.length === 0) return
+          if (!files.length) return
           e.preventDefault()
-          e.stopPropagation()
-          onFilesAtOffset?.(files, pointOffsetWithin(e.currentTarget, e.clientX, e.clientY))
+          saveSelection()
+          files.forEach(insertFile)
         }}
-        onBlur={(e) => {
-          if ((e.currentTarget.textContent || '') !== value) {
-            e.currentTarget.textContent = value
+        onPaste={(e) => {
+          const items = Array.from(e.clipboardData?.items || [])
+          const fileItem = items.find(i => i.kind === 'file')
+          if (fileItem) {
+            e.preventDefault()
+            const file = fileItem.getAsFile()
+            if (file) insertFile(file)
+            return
           }
+          e.preventDefault()
+          const text = e.clipboardData?.getData('text/plain') || ''
+          document.execCommand('insertText', false, text)
         }}
-        className="min-h-7 w-full whitespace-pre-wrap break-words bg-transparent text-sm leading-7 text-[var(--theme-body-dark)] outline-none"
-        style={{ minHeight }}
+        className="min-h-[420px] w-full whitespace-pre-wrap break-words bg-white px-4 py-5 text-sm leading-7 text-[var(--theme-body-dark)] outline-none sm:px-5"
+        placeholder="내용을 입력하세요. 이미지, 동영상을 드래그하거나 툴바에서 삽입할 수 있습니다."
       />
+      {selectedFigId && (
+        <FigureToolbar
+          editorRef={divRef}
+          figId={selectedFigId}
+          meta={selectedMeta}
+          onResize={handleFigureResize}
+          onAlign={handleFigureAlign}
+          onDelete={handleFigureDelete}
+          onDeselect={() => setSelectedFigId(null)}
+        />
+      )}
     </div>
   )
 }
@@ -609,252 +693,18 @@ function PostForm({ initialPost, onCancel, onSave }) {
   const isEditing = Boolean(initialPost)
   const [title, setTitle] = useState(initialPost?.title || '')
   const [category, setCategory] = useState(initialPost?.category || 'GENERAL')
-  const [blocks, setBlocks] = useState(() => isEditing ? parsePostBlocks(initialPost) : [{ type: 'text', content: '', id: localId() }])
   const [saving, setSaving] = useState(false)
   const [savingStep, setSavingStep] = useState('')
   const [error, setError] = useState('')
-  const [activeTextTarget, setActiveTextTarget] = useState(null)
-  const [removeLegacyImage, setRemoveLegacyImage] = useState(false)
-  const [draggingBlockId, setDraggingBlockId] = useState(null)
-  const [dragOverBlockId, setDragOverBlockId] = useState(null)
-
-  const validateFile = (file, nextImageCount, nextVideoCount, nextFileCount) => {
-    if (ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      if (nextImageCount > MAX_EXTRA_IMAGES) return '이미지는 최대 5개까지 추가할 수 있습니다.'
-      if (file.size > MAX_IMAGE_BYTES) return '이미지는 5MB 이하만 업로드할 수 있습니다.'
-      return null
-    }
-    if (ALLOWED_VIDEO_TYPES.includes(file.type)) {
-      if (nextVideoCount > MAX_VIDEOS) return '영상은 최대 3개까지 추가할 수 있습니다.'
-      if (file.size > MAX_VIDEO_BYTES) return '영상은 100MB 이하만 업로드할 수 있습니다.'
-      return null
-    }
-    if (isAllowedArchiveFile(file)) {
-      if (nextFileCount > MAX_FILES) return '첨부파일은 최대 5개까지 추가할 수 있습니다.'
-      if (file.size > MAX_FILE_BYTES) return '첨부파일은 50MB 이하만 업로드할 수 있습니다.'
-      return null
-    }
-    return '지원하지 않는 파일 형식입니다. (이미지: JPG/PNG/GIF/WebP, 영상: MP4/WebM/MOV, 압축: ZIP)'
-  }
-
-  const editorBlocksFromFiles = (files, existingBlocks) => {
-    const toAdd = []
-    let nextImageCount = existingBlocks.filter((b) => b.type === 'image').length
-    let nextVideoCount = existingBlocks.filter((b) => b.type === 'video').length
-    let nextFileCount = existingBlocks.filter((b) => b.type === 'file').length
-    for (const file of files) {
-      const isImage = ALLOWED_IMAGE_TYPES.includes(file.type)
-      const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type)
-      const isFile = isAllowedArchiveFile(file)
-      const err = validateFile(file, nextImageCount + (isImage ? 1 : 0), nextVideoCount + (isVideo ? 1 : 0), nextFileCount + (isFile ? 1 : 0))
-      if (err) { setError(err); return [] }
-      const type = isImage ? 'image' : isVideo ? 'video' : 'file'
-      if (type === 'image') nextImageCount += 1
-      if (type === 'video') nextVideoCount += 1
-      if (type === 'file') nextFileCount += 1
-      toAdd.push({
-        type,
-        status: 'pending',
-        file,
-        name: file.name,
-        preview: type === 'file' ? null : URL.createObjectURL(file),
-        width: 75,
-        align: 'left',
-        id: localId(),
-      })
-    }
-    return toAdd
-  }
-
-  const ensureTextAfterInserted = (nextBlocks, insertIndex, insertedCount) => {
-    const afterInsertedIndex = insertIndex + insertedCount
-    const nextBlock = nextBlocks[afterInsertedIndex]
-    if (nextBlock?.type === 'text') return ensureTrailingTextBlock(nextBlocks)
-    return ensureTrailingTextBlock([
-      ...nextBlocks.slice(0, afterInsertedIndex),
-      { type: 'text', content: '', id: localId() },
-      ...nextBlocks.slice(afterInsertedIndex),
-    ])
-  }
-
-  const ensureTrailingTextBlock = (nextBlocks) => {
-    const last = nextBlocks[nextBlocks.length - 1]
-    if (last?.type === 'text') return nextBlocks
-    return [...nextBlocks, { type: 'text', content: '', id: localId() }]
-  }
-
-  const insertFilesAtBlockIndex = (files, insertIndex) => {
-    setBlocks((prev) => {
-      const toAdd = editorBlocksFromFiles(files, prev)
-      if (toAdd.length === 0) return prev
-      setError('')
-      const safeIndex = Math.max(0, Math.min(insertIndex, prev.length))
-      return ensureTextAfterInserted([...prev.slice(0, safeIndex), ...toAdd, ...prev.slice(safeIndex)], safeIndex, toAdd.length)
-    })
-  }
-
-  const removeBlock = (id) => {
-    setBlocks((prev) => {
-      const block = prev.find((b) => b.id === id)
-      if (block?.preview) URL.revokeObjectURL(block.preview)
-      if (block?.legacy) setRemoveLegacyImage(true)
-      const filtered = prev.filter((b) => b.id !== id)
-      return filtered.length === 0 ? [{ type: 'text', content: '', id: localId() }] : ensureTrailingTextBlock(filtered)
-    })
-  }
-
-  const reorderBlock = (dragId, targetId, placeAfter = false) => {
-    setBlocks((prev) => {
-      const idx = prev.findIndex((b) => b.id === dragId)
-      const next = prev.findIndex((b) => b.id === targetId)
-      if (idx < 0 || next < 0 || idx === next) return prev
-      const arr = [...prev]
-      const [moved] = arr.splice(idx, 1)
-      let insertIndex = next + (placeAfter ? 1 : 0)
-      if (idx < insertIndex) insertIndex -= 1
-      arr.splice(insertIndex, 0, moved)
-      return ensureTrailingTextBlock(arr)
-    })
-  }
-
-  const moveBlockToEnd = (dragId) => {
-    setBlocks((prev) => {
-      const idx = prev.findIndex((b) => b.id === dragId)
-      if (idx < 0 || idx === prev.length - 1) return prev
-      const arr = [...prev]
-      const [moved] = arr.splice(idx, 1)
-      arr.push(moved)
-      return ensureTrailingTextBlock(arr)
-    })
-  }
-
-  const isFileDrag = (event) => Array.from(event.dataTransfer?.types || []).includes('Files')
-
-  const handleBlockDragOver = (event, blockId) => {
-    if (!draggingBlockId || isFileDrag(event)) return
-    event.preventDefault()
-    event.stopPropagation()
-    if (draggingBlockId !== blockId) setDragOverBlockId(blockId)
-  }
-
-  const handleBlockDrop = (event, blockId) => {
-    if (!draggingBlockId || isFileDrag(event)) return
-    event.preventDefault()
-    event.stopPropagation()
-    const rect = event.currentTarget.getBoundingClientRect()
-    reorderBlock(draggingBlockId, blockId, event.clientY > rect.top + rect.height / 2)
-    setDraggingBlockId(null)
-    setDragOverBlockId(null)
-  }
-
-  const updateText = (id, content) => {
-    setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, content } : b))
-  }
-
-  const updateMediaWidth = (id, width) => {
-    setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, width } : b))
-  }
-
-  const updateMediaAlign = (id, align) => {
-    setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, align } : b))
-  }
-
-  const updateMediaStatus = (id, status, extra = {}) => {
-    setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, status, ...extra } : b))
-  }
-
-  const insertFilesAtTextOffset = (blockId, offset, files) => {
-    setError('')
-    setBlocks((prev) => {
-      const idx = prev.findIndex((b) => b.id === blockId)
-      if (idx < 0) return prev
-
-      const toAdd = []
-      let nextImageCount = prev.filter((b) => b.type === 'image').length
-      let nextVideoCount = prev.filter((b) => b.type === 'video').length
-      let nextFileCount = prev.filter((b) => b.type === 'file').length
-      for (const file of files) {
-        const isImage = ALLOWED_IMAGE_TYPES.includes(file.type)
-        const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type)
-        const isFile = isAllowedArchiveFile(file)
-        const err = validateFile(file, nextImageCount + (isImage ? 1 : 0), nextVideoCount + (isVideo ? 1 : 0), nextFileCount + (isFile ? 1 : 0))
-        if (err) {
-          setError(err)
-          return prev
-        }
-        const type = isImage ? 'image' : isVideo ? 'video' : 'file'
-        if (type === 'image') nextImageCount += 1
-        if (type === 'video') nextVideoCount += 1
-        if (type === 'file') nextFileCount += 1
-        toAdd.push({
-          type,
-          status: 'pending',
-          file,
-          name: file.name,
-          preview: type === 'file' ? null : URL.createObjectURL(file),
-          width: 75,
-          align: 'left',
-          id: localId(),
-        })
-      }
-      if (toAdd.length === 0) return prev
-
-      const block = prev[idx]
-      const content = block.content || ''
-      const safeOffset = Math.max(0, Math.min(offset ?? content.length, content.length))
-      const before = content.slice(0, safeOffset)
-      const after = content.slice(safeOffset)
-      const replacement = [
-        ...(before ? [{ ...block, content: before }] : []),
-        ...toAdd,
-        { type: 'text', content: after, id: localId() },
-      ]
-      return ensureTrailingTextBlock([...prev.slice(0, idx), ...replacement, ...prev.slice(idx + 1)])
-    })
-  }
-
-  const handlePaste = (e, blockId, offset) => {
-    const items = Array.from(e.clipboardData?.items || [])
-    const imageItem = items.find((i) => i.kind === 'file' && i.type.startsWith('image/'))
-    const fileItem = imageItem || items.find((i) => i.kind === 'file')
-    if (!fileItem) return
-    e.preventDefault()
-    const file = fileItem.getAsFile()
-    if (file) insertFilesAtTextOffset(blockId, offset, [file])
-  }
-
-  const insertFilesAtActiveText = (files) => {
-    const target = activeTextTarget && blocks.some((b) => b.id === activeTextTarget.blockId)
-      ? activeTextTarget
-      : (() => {
-          const firstText = blocks.find((b) => b.type === 'text')
-          return firstText ? { blockId: firstText.id, offset: firstText.content?.length || 0 } : null
-        })()
-    if (target) {
-      insertFilesAtTextOffset(target.blockId, target.offset, files)
-      return
-    }
-    insertFilesAtBlockIndex(files, blocks.length)
-  }
-
-  const insertFilesAtCanvasPoint = (files, canvas, clientX, clientY) => {
-    const textNode = document.elementFromPoint(clientX, clientY)?.closest('[data-editor-text-id]')
-    if (textNode && canvas.contains(textNode)) {
-      insertFilesAtTextOffset(textNode.dataset.editorTextId, pointOffsetWithin(textNode, clientX, clientY), files)
-      return
-    }
-    const nodes = Array.from(canvas.querySelectorAll('[data-editor-block-id]'))
-    const targetIndex = nodes.findIndex((node) => {
-      const rect = node.getBoundingClientRect()
-      return clientY < rect.top + rect.height / 2
-    })
-    insertFilesAtBlockIndex(files, targetIndex === -1 ? blocks.length : targetIndex)
-  }
+  const editorApiRef = useRef(null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const initialBlocks = useMemo(() => isEditing ? parsePostBlocks(initialPost) : [], [])
 
   const submit = async (e) => {
     e.preventDefault()
     if (!title.trim()) { setError('제목을 입력해주세요.'); return }
-    const hasContent = blocks.some((b) => (b.type === 'text' && b.content.trim()) || b.type === 'image' || b.type === 'video' || b.type === 'file')
+    const blocks = editorApiRef.current?.getBlocks() || []
+    const hasContent = blocks.some(b => (b.type === 'text' && b.content.trim()) || b.type === 'image' || b.type === 'video' || b.type === 'file')
     if (!hasContent) { setError('내용을 입력하거나 사진/영상/첨부파일을 추가해주세요.'); return }
 
     setSaving(true)
@@ -865,7 +715,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
         postId = initialPost.id
       } else {
         setSavingStep('글 등록 중...')
-        const placeholder = blocks.find((b) => b.type === 'text' && b.content.trim())?.content.trim() || '...'
+        const placeholder = blocks.find(b => b.type === 'text' && b.content.trim())?.content.trim() || '...'
         const created = await createCommunityPost({ title: title.trim(), content: placeholder, category })
         postId = created.id
       }
@@ -876,23 +726,22 @@ function PostForm({ initialPost, onCancel, onSave }) {
           uploadedBlocks.push(block)
         } else if (block.status !== 'saved' && block.file) {
           setSavingStep(`업로드 중: ${block.name}`)
-          updateMediaStatus(block.id, 'uploading', { error: null })
           if (block.type === 'image') {
             setSavingStep(`이미지 최적화 중: ${block.name}`)
             const uploadFile = await optimizeImageFile(block.file)
             const ids = await uploadPostImages(postId, [uploadFile])
             if (!Array.isArray(ids) || !ids[0]) throw new Error(`${block.name} 이미지 업로드 응답이 올바르지 않습니다.`)
-            updateMediaStatus(block.id, 'saved', { mediaId: ids[0] })
+            editorApiRef.current?.updateFigureMeta(block.id, { status: 'saved', mediaId: ids[0] })
             uploadedBlocks.push({ ...block, status: 'saved', mediaId: ids[0], name: uploadFile.name })
           } else if (block.type === 'video') {
             const videoId = await uploadPostVideo(postId, block.file)
             if (!videoId) throw new Error(`${block.name} 영상 업로드 응답이 올바르지 않습니다.`)
-            updateMediaStatus(block.id, 'saved', { mediaId: videoId })
+            editorApiRef.current?.updateFigureMeta(block.id, { status: 'saved', mediaId: videoId })
             uploadedBlocks.push({ ...block, status: 'saved', mediaId: videoId })
           } else if (block.type === 'file') {
             const fileId = await uploadPostFile(postId, block.file)
             if (!fileId) throw new Error(`${block.name} 첨부파일 업로드 응답이 올바르지 않습니다.`)
-            updateMediaStatus(block.id, 'saved', { fileId })
+            editorApiRef.current?.updateFigureMeta(block.id, { status: 'saved', fileId })
             uploadedBlocks.push({ ...block, status: 'saved', fileId })
           }
         } else {
@@ -901,23 +750,21 @@ function PostForm({ initialPost, onCancel, onSave }) {
       }
 
       const contentJson = JSON.stringify(
-        uploadedBlocks.map((b) => {
+        uploadedBlocks.map(b => {
           if (b.type === 'text') return { type: 'text', content: b.content }
-          if (b.type === 'image' && b.mediaId) return { type: 'image', mediaId: b.mediaId, name: b.name, width: b.width || 'large', align: b.align || 'center' }
-          if (b.type === 'video' && b.mediaId) return { type: 'video', mediaId: b.mediaId, name: b.name, width: b.width || 'large', align: b.align || 'center' }
+          if (b.type === 'image' && b.mediaId) return { type: 'image', mediaId: b.mediaId, name: b.name, width: b.width || 75, align: b.align || 'center' }
+          if (b.type === 'video' && b.mediaId) return { type: 'video', mediaId: b.mediaId, name: b.name, width: b.width || 75, align: b.align || 'center' }
           if (b.type === 'file' && b.fileId) return { type: 'file', fileId: b.fileId, name: b.name }
           return null
         }).filter(Boolean)
       )
 
+      const removeLegacyImage = Boolean(initialPost?.imageUrl && !uploadedBlocks.some(b => b.legacy))
       setSavingStep('저장 중...')
       const saved = await updateCommunityPost(postId, { title: title.trim(), content: contentJson, category, removeImage: removeLegacyImage })
-
-      uploadedBlocks.forEach((b) => { if (b.preview) URL.revokeObjectURL(b.preview) })
       onSave(saved)
     } catch (err) {
       setError(err.message || '저장 중 오류가 발생했습니다.')
-      setBlocks((prev) => prev.map((b) => b.status === 'uploading' ? { ...b, status: 'failed', error: err.message || '업로드에 실패했습니다.' } : b))
     } finally {
       setSaving(false)
       setSavingStep('')
@@ -927,9 +774,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
   return (
     <form onSubmit={submit} className="space-y-3 rounded-lg border border-white/10 bg-white/80 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.12)] sm:p-5">
       <div className="flex flex-wrap gap-2">
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
+        <select value={category} onChange={(e) => setCategory(e.target.value)}
           className="rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
         >
           {CATEGORY_OPTIONS.map((item) => (
@@ -938,12 +783,8 @@ function PostForm({ initialPost, onCancel, onSave }) {
         </select>
       </div>
 
-      <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        maxLength={MAX_TITLE_LENGTH}
-        placeholder="제목"
-        readOnly={isEditing}
+      <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={MAX_TITLE_LENGTH}
+        placeholder="제목" readOnly={isEditing}
         className={`w-full rounded border border-black/15 px-4 py-3 text-base text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)] sm:text-sm ${isEditing ? 'bg-black/5 text-[var(--theme-body-muted)]' : 'bg-white'}`}
       />
 
@@ -951,146 +792,37 @@ function PostForm({ initialPost, onCancel, onSave }) {
         <div className="flex flex-wrap items-center gap-2 border-b border-black/10 bg-black/[0.03] px-3 py-2">
           <span className="mr-1 text-xs font-black uppercase tracking-[0.2em] text-[var(--theme-body-muted)]">Editor</span>
           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
-            <ImagePlus size={14} />
-            이미지
+            <ImagePlus size={14} />이미지
             <input type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp" className="hidden"
-              onChange={(e) => { insertFilesAtActiveText(Array.from(e.target.files)); e.target.value = '' }} />
+              onChange={(e) => { editorApiRef.current?.insertFiles(Array.from(e.target.files)); e.target.value = '' }} />
           </label>
           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
-            <Video size={14} />
-            동영상
+            <Video size={14} />동영상
             <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
-              onChange={(e) => { insertFilesAtActiveText(Array.from(e.target.files)); e.target.value = '' }} />
+              onChange={(e) => { editorApiRef.current?.insertFiles(Array.from(e.target.files)); e.target.value = '' }} />
           </label>
           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
-            <Paperclip size={14} />
-            압축파일
+            <Paperclip size={14} />압축파일
             <input type="file" multiple accept=".zip,application/zip,application/x-zip-compressed" className="hidden"
-              onChange={(e) => { insertFilesAtActiveText(Array.from(e.target.files)); e.target.value = '' }} />
+              onChange={(e) => { editorApiRef.current?.insertFiles(Array.from(e.target.files)); e.target.value = '' }} />
           </label>
           <span className="text-xs text-[var(--theme-body-muted)]">본문 칸에 드래그하거나 Ctrl+V로 바로 삽입 · 큰 이미지는 저장할 때 자동 최적화</span>
         </div>
-
-        <div
-          className="min-h-[420px] bg-white px-4 py-5 sm:px-5"
-          onDragOver={(e) => {
-            if (draggingBlockId && !isFileDrag(e)) {
-              e.preventDefault()
-              return
-            }
-            if (Array.from(e.dataTransfer?.items || []).some((item) => item.kind === 'file')) {
-              e.preventDefault()
-            }
-          }}
-          onDrop={(e) => {
-            const files = Array.from(e.dataTransfer?.files || [])
-            if (files.length === 0) {
-              if (!draggingBlockId || isFileDrag(e)) return
-              e.preventDefault()
-              moveBlockToEnd(draggingBlockId)
-              setDraggingBlockId(null)
-              setDragOverBlockId(null)
-              return
-            }
-            e.preventDefault()
-            insertFilesAtCanvasPoint(files, e.currentTarget, e.clientX, e.clientY)
-          }}
-        >
-          {blocks.map((block, idx) => (
-            block.type === 'text' ? (
-              <div
-                key={block.id}
-                data-editor-block-id={block.id}
-                onDragOver={(e) => handleBlockDragOver(e, block.id)}
-                onDrop={(e) => handleBlockDrop(e, block.id)}
-                onDragLeave={() => {
-                  if (dragOverBlockId === block.id) setDragOverBlockId(null)
-                }}
-                className={dragOverBlockId === block.id && draggingBlockId !== block.id ? 'rounded outline outline-2 outline-[var(--theme-accent)]/70' : ''}
-              >
-                <div className="relative min-w-0">
-                  <PlainTextEditor
-                    value={block.content}
-                    editorId={block.id}
-                    onChange={(content) => updateText(block.id, content)}
-                    onPaste={(e, offset) => handlePaste(e, block.id, offset)}
-                    onFilesAtOffset={(files, offset) => insertFilesAtTextOffset(block.id, offset, files)}
-                    onCaretChange={(offset) => setActiveTextTarget({ blockId: block.id, offset })}
-                    placeholder={idx === 0 ? '내용을 입력하세요. 이미지나 동영상을 이 영역 안에 바로 넣을 수 있습니다.' : '여기에 내용을 입력하세요.'}
-                    minRows={idx === 0 && blocks.length === 1 ? 10 : 3}
-                    maxLength={MAX_CONTENT_LENGTH}
-                  />
-                </div>
-              </div>
-            ) : block.type === 'file' ? (
-              <FileAttachmentBlock
-                key={block.id}
-                block={block}
-                onDelete={() => removeBlock(block.id)}
-                onDragStart={(e) => {
-                  e.stopPropagation()
-                  e.dataTransfer.effectAllowed = 'move'
-                  e.dataTransfer.setData('text/plain', block.id)
-                  setDraggingBlockId(block.id)
-                }}
-                onDragEnd={() => {
-                  setDraggingBlockId(null)
-                  setDragOverBlockId(null)
-                }}
-                onBlockDragOver={(e) => handleBlockDragOver(e, block.id)}
-                onBlockDrop={(e) => handleBlockDrop(e, block.id)}
-                onBlockDragLeave={() => {
-                  if (dragOverBlockId === block.id) setDragOverBlockId(null)
-                }}
-                isDropTarget={dragOverBlockId === block.id && draggingBlockId !== block.id}
-              />
-            ) : (
-              <ResizableMedia
-                key={block.id}
-                block={block}
-                onWidthChange={(w) => updateMediaWidth(block.id, w)}
-                onAlignChange={(a) => updateMediaAlign(block.id, a)}
-                onDelete={() => removeBlock(block.id)}
-                onDragStart={(e) => {
-                  e.stopPropagation()
-                  e.dataTransfer.effectAllowed = 'move'
-                  e.dataTransfer.setData('text/plain', block.id)
-                  setDraggingBlockId(block.id)
-                }}
-                onDragEnd={() => {
-                  setDraggingBlockId(null)
-                  setDragOverBlockId(null)
-                }}
-                onBlockDragOver={(e) => handleBlockDragOver(e, block.id)}
-                onBlockDrop={(e) => handleBlockDrop(e, block.id)}
-                onBlockDragLeave={() => {
-                  if (dragOverBlockId === block.id) setDragOverBlockId(null)
-                }}
-                isDropTarget={dragOverBlockId === block.id && draggingBlockId !== block.id}
-              />
-            )
-          ))}
-          <div className="clear-both" />
-        </div>
+        <RichEditor initialBlocks={initialBlocks} apiRef={editorApiRef} onError={(msg) => setError(msg)} />
       </div>
 
       {error && <p className="text-sm font-semibold text-red-500">{error}</p>}
 
       <div className="flex flex-col gap-2 sm:flex-row">
-        <button
-          type="submit"
-          disabled={saving || !title.trim()}
+        <button type="submit" disabled={saving || !title.trim()}
           className="min-h-11 rounded bg-[var(--theme-text)] px-5 py-2.5 text-sm font-semibold text-[var(--theme-bg)] disabled:opacity-50 sm:min-h-0"
         >
           {saving ? (savingStep || '저장 중...') : isEditing ? '수정 완료' : '글 등록'}
         </button>
-        <button
-          type="button"
-          onClick={onCancel}
+        <button type="button" onClick={onCancel}
           className="inline-flex min-h-11 items-center justify-center gap-1 rounded border border-black/15 bg-white px-4 py-2.5 text-sm font-semibold text-[var(--theme-body-mid)] sm:min-h-0"
         >
-          <X size={14} />
-          취소
+          <X size={14} />취소
         </button>
       </div>
     </form>
