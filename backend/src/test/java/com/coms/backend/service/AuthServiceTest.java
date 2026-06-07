@@ -27,10 +27,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {
@@ -160,6 +163,40 @@ class AuthServiceTest {
         assertThat(saved.isEmailVerified()).isTrue();
         assertThat(saved.getEmailVerificationCodeHash()).isNull();
         assertThat(saved.getEmailVerificationExpiresAt()).isNull();
+    }
+
+    @Test
+    void requestPasswordResetStoresHashedCodeAndSendsEmail() {
+        Member member = saveMember("2026123472", true);
+
+        authService.requestPasswordReset("2026123472", member.getEmail());
+
+        Member saved = memberRepository.findByStudentId("2026123472").orElseThrow();
+        assertThat(saved.getPasswordResetCodeHash()).isNotBlank();
+        assertThat(saved.getPasswordResetExpiresAt()).isAfter(LocalDateTime.now());
+        verify(emailVerificationSender).sendPasswordResetCode(eq(member.getEmail()), anyString());
+    }
+
+    @Test
+    void requestPasswordResetDoesNotRevealUnknownAccount() {
+        authService.requestPasswordReset("2026123473", "missing@example.com");
+
+        verify(emailVerificationSender, never()).sendPasswordResetCode(anyString(), anyString());
+    }
+
+    @Test
+    void confirmPasswordResetChangesPasswordAndClearsCode() {
+        Member member = saveMember("2026123474", true);
+        member.setPasswordResetCodeHash(passwordEncoder.encode("123456"));
+        member.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(10));
+        memberRepository.save(member);
+
+        authService.confirmPasswordReset("2026123474", member.getEmail(), "123456", "NewPassword1!");
+
+        Member saved = memberRepository.findByStudentId("2026123474").orElseThrow();
+        assertThat(passwordEncoder.matches("NewPassword1!", saved.getPassword())).isTrue();
+        assertThat(saved.getPasswordResetCodeHash()).isNull();
+        assertThat(saved.getPasswordResetExpiresAt()).isNull();
     }
 
     @Test
