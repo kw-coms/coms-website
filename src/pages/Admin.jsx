@@ -359,26 +359,31 @@ function RosterTab() {
                 {roster.map((member) => (
                   <tr key={member.id}>
                     {editingId === member.id ? (
-                      <>
-                        <td className="px-3 py-2">
+                      <td colSpan={5} className="px-3 py-3">
+                        <div className="flex flex-wrap items-center gap-2">
                           {editForm.studentId
-                            ? <input value={editForm.studentId} onChange={(e) => setEditForm((p) => ({ ...p, studentId: e.target.value }))} maxLength={10} className={`${inputCls} w-32`} />
-                            : <span className="text-xs italic text-[var(--theme-body-muted)]">졸업생</span>}
-                        </td>
-                        <td className="px-3 py-2">
-                          <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} maxLength={20} className={`${inputCls} w-24`} />
-                        </td>
-                        <td className="px-3 py-2 text-xs text-[var(--theme-body-muted)]">자동계산</td>
-                        <td className="px-3 py-2">
-                          <input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} maxLength={11} placeholder="01012345678" className={`${inputCls} w-32`} />
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex gap-2">
-                            <button type="button" onClick={() => handleEditSave(member.id)} disabled={editSaving} className="text-xs font-semibold text-emerald-600 hover:underline disabled:opacity-50">저장</button>
+                            ? (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="text-[10px] text-[var(--theme-body-muted)]">학번</span>
+                                <input value={editForm.studentId} onChange={(e) => setEditForm((p) => ({ ...p, studentId: e.target.value }))} maxLength={10} className={`${inputCls} w-36`} />
+                              </div>
+                            ) : (
+                              <span className="text-xs italic text-[var(--theme-body-muted)]">졸업생 (학번 없음)</span>
+                            )}
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] text-[var(--theme-body-muted)]">이름</span>
+                            <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} maxLength={20} className={`${inputCls} w-28`} />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] text-[var(--theme-body-muted)]">전화번호</span>
+                            <input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} maxLength={11} placeholder="01012345678" className={`${inputCls} w-36`} />
+                          </div>
+                          <div className="flex items-end gap-2 self-end pb-px">
+                            <button type="button" onClick={() => handleEditSave(member.id)} disabled={editSaving} className="shape-cut-sm bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">저장</button>
                             <button type="button" onClick={() => setEditingId(null)} className="text-xs font-semibold text-[var(--theme-body-muted)] hover:underline">취소</button>
                           </div>
-                        </td>
-                      </>
+                        </div>
+                      </td>
                     ) : (
                       <>
                         <td className="px-3 py-3 font-mono text-xs text-[var(--theme-body-dark)]">{member.studentId || '-'}</td>
