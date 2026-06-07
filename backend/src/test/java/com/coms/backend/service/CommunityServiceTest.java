@@ -7,6 +7,7 @@ import com.coms.backend.dto.CommunityPostResponse;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.CommunityCommentRepository;
+import com.coms.backend.repository.CommunityPostFileRepository;
 import com.coms.backend.repository.CommunityPostImageRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,8 +45,12 @@ class CommunityServiceTest {
     @Autowired
     private CommunityPostImageRepository imageRepository;
 
+    @Autowired
+    private CommunityPostFileRepository fileRepository;
+
     @BeforeEach
     void setUp() {
+        fileRepository.deleteAll();
         imageRepository.deleteAll();
         commentRepository.deleteAll();
         voteRepository.deleteAll();
@@ -232,6 +237,37 @@ class CommunityServiceTest {
                 .singleElement()
                 .asString()
                 .startsWith("/api/community/posts/" + created.id() + "/images/");
+    }
+
+    @Test
+    void acceptsZipAttachmentsAndExposesDownloadUrl() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("첨부", "내용", "GENERAL", false), null);
+        MockMultipartFile zip = new MockMultipartFile("file", "source.zip", "application/zip", "zip".getBytes());
+
+        Long fileId = communityService.addFile(user.getStudentId(), created.id(), zip);
+        CommunityPostResponse detail = communityService.get(user.getStudentId(), created.id());
+
+        assertThat(fileId).isNotNull();
+        assertThat(detail.fileInfos())
+                .singleElement()
+                .satisfies(file -> {
+                    assertThat(file.originalName()).isEqualTo("source.zip");
+                    assertThat(file.url()).isEqualTo("/api/community/posts/" + created.id() + "/files/" + fileId + "/download");
+                });
+    }
+
+    @Test
+    void rejectsNonZipCommunityAttachments() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("첨부", "내용", "GENERAL", false), null);
+        MockMultipartFile text = new MockMultipartFile("file", "note.txt", "text/plain", "bad".getBytes());
+
+        assertThatThrownBy(() -> communityService.addFile(user.getStudentId(), created.id(), text))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getReason()).contains("ZIP"));
     }
 
     @Test

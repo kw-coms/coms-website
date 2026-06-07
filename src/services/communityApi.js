@@ -84,6 +84,15 @@ export async function uploadPostVideo(postId, file) {
   })
 }
 
+export async function uploadPostFile(postId, file) {
+  const form = new FormData()
+  form.append('file', file)
+  return request(`/api/community/posts/${postId}/files`, {
+    method: 'POST',
+    body: form,
+  })
+}
+
 export async function deletePostVideo(postId, videoId) {
   return requestNoContent(`/api/community/posts/${postId}/videos/${videoId}`, {
     method: 'DELETE',
