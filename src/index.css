@@ -232,6 +232,26 @@ body {
 	line-height: 1.85;
 }
 
+.inline-image,
+.inline-icon {
+	display: inline-block;
+	width: 1em;
+	height: 1em;
+	vertical-align: -0.125em;
+	object-fit: contain;
+	margin: 0 0.15em;
+	-webkit-user-drag: none;
+	user-select: none;
+}
+
+.community-inline-media-image {
+	display: block;
+	width: 100%;
+	height: auto;
+	-webkit-user-drag: none;
+	user-select: none;
+}
+
 .auto-text-comment {
 	font-size: clamp(0.84rem, 0.8rem + 0.18cqw, 0.98rem);
 	line-height: 1.65;
