@@ -23,7 +23,7 @@ function clickableCell(open) {
   }
 }
 
-function NoticeForm({ initialNotice, defaultCategory, user, onCancel, onSave }) {
+function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }) {
   const [formData, setFormData] = useState({
     title: initialNotice?.title || '',
     content: initialNotice?.content || '',
@@ -35,7 +35,7 @@ function NoticeForm({ initialNotice, defaultCategory, user, onCancel, onSave }) 
     if (!formData.title.trim() || !formData.content.trim()) return
     setSaving(true)
     try {
-      const body = { ...formData, pinned: false, author: user.name }
+      const body = { ...formData, pinned: false }
       const saved = initialNotice
         ? await updateNotice(initialNotice.id, body)
         : await createNotice(body)
@@ -62,7 +62,7 @@ function NoticeForm({ initialNotice, defaultCategory, user, onCancel, onSave }) 
         rows={10}
         className="w-full resize-y rounded border border-black/15 bg-white px-4 py-3 text-base leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)] sm:rows-14 sm:text-sm"
       />
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
         <select
           value={formData.category}
           onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value }))}
@@ -148,7 +148,15 @@ export default function Notices() {
   }, [urlId, loading, notices.length])
 
   const openNotice = (notice) => {
+    setMode('list')
+    setSelectedNotice(notice)
     navigate('/notices/' + notice.id)
+  }
+
+  const backToList = () => {
+    setMode('list')
+    setSelectedNotice(null)
+    navigate('/notices')
   }
 
   const mergeNotice = (notice) => {
@@ -158,6 +166,7 @@ export default function Notices() {
       return prev.map((item) => (item.id === notice.id ? notice : item))
     })
     setSelectedNotice(notice)
+    setMode('list')
     navigate('/notices/' + notice.id, { replace: true })
   }
 
@@ -166,19 +175,19 @@ export default function Notices() {
     try {
       await deleteNotice(selectedNotice.id)
       setNotices((prev) => prev.filter((notice) => notice.id !== selectedNotice.id))
-      setSelectedNotice(null)
-      navigate('/notices', { replace: true })
+      backToList()
     } catch (err) {
       alert(err.message || '삭제 중 오류가 발생했습니다.')
     }
   }
 
-  const isDetail = !!urlId && !!selectedNotice && mode === 'list'
-  const headerTitle = mode === 'write' ? '공지 작성' : mode === 'edit' ? '공지 수정' : '공지사항'
+  const visibleMode = !urlId && mode === 'edit' ? 'list' : mode
+  const isDetail = !!urlId && !!selectedNotice && visibleMode === 'list'
+  const headerTitle = visibleMode === 'write' ? '공지 작성' : visibleMode === 'edit' ? '공지 수정' : '공지사항'
 
   return (
     <div className="space-y-4">
-      {!urlId && mode === 'list' && (
+      {!urlId && visibleMode === 'list' && (
         <div className="flex justify-center sm:justify-start">
           <button type="button" onClick={() => navigate('/')} className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white">
             메인으로 돌아가기
@@ -194,10 +203,10 @@ export default function Notices() {
               <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">{headerTitle}</h1>
               <p className="mt-2 text-sm leading-6 text-white/60">공지와 취업공고를 분리해서 확인합니다.</p>
             </div>
-            {(!urlId && mode === 'list') ? (
+            {(!urlId && visibleMode === 'list') ? (
               isAdmin && <button type="button" onClick={() => setMode('write')} className="shape-cut-sm bg-white/85 px-5 py-2.5 text-sm font-bold text-[var(--theme-body-dark)] transition hover:bg-white">공지 작성</button>
             ) : (
-              <button type="button" onClick={() => navigate('/notices')} className="shape-cut-sm inline-flex items-center gap-1 border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold text-white">
+              <button type="button" onClick={backToList} className="shape-cut-sm inline-flex items-center gap-1 border border-white/10 bg-white/10 px-4 py-2 text-sm font-bold text-white">
                 <ArrowLeft size={14} />
                 목록
               </button>
@@ -205,7 +214,7 @@ export default function Notices() {
           </div>
         </div>
 
-        {!urlId && mode === 'list' && (
+        {!urlId && visibleMode === 'list' && (
           <>
             {(featuredNotice || featuredJob) && (
               <div className="grid gap-3 border-b border-white/10 bg-white/8 px-5 py-4 sm:px-7 lg:grid-cols-2">
@@ -345,23 +354,24 @@ export default function Notices() {
           </>
         )}
 
-        {mode === 'write' && (
+        {visibleMode === 'write' && (
           <div className="p-5 sm:p-7">
             <NoticeForm
-              user={user}
               defaultCategory={activeCategory === 'JOB' ? 'JOB' : 'GENERAL'}
-              onCancel={() => setMode('list')}
+              onCancel={backToList}
               onSave={(notice) => { mergeNotice(notice); load({ showLoading: false }) }}
             />
           </div>
         )}
 
-        {mode === 'edit' && selectedNotice && (
+        {visibleMode === 'edit' && selectedNotice && (
           <div className="p-5 sm:p-7">
             <NoticeForm
               initialNotice={selectedNotice}
-              user={user}
-              onCancel={() => { setMode('list'); navigate('/notices/' + selectedNotice?.id) }}
+              onCancel={() => {
+                setMode('list')
+                navigate('/notices/' + selectedNotice.id)
+              }}
               onSave={(notice) => { mergeNotice(notice); load({ showLoading: false }) }}
             />
           </div>
@@ -380,7 +390,7 @@ export default function Notices() {
             </div>
             <div className="text-size-container min-h-[200px] whitespace-pre-wrap break-words px-4 py-5 auto-text-notice sm:min-h-[360px] sm:px-5 sm:py-7">{linkify(selectedNotice.content)}</div>
             <div className="flex flex-col gap-2 border-t border-black/10 px-4 py-4 sm:flex-row sm:flex-wrap sm:justify-between sm:px-5">
-              <button type="button" onClick={() => navigate('/notices')} className="min-h-11 rounded border border-black/15 bg-white px-4 py-2 text-sm font-bold sm:min-h-0">
+              <button type="button" onClick={backToList} className="min-h-11 rounded border border-black/15 bg-white px-4 py-2 text-sm font-bold sm:min-h-0">
                 목록
               </button>
               {isAdmin && (
