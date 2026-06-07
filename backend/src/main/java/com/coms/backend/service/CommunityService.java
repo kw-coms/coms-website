@@ -128,7 +128,9 @@ public class CommunityService {
             clearImage(post);
         }
         attachImage(post, image);
-        if (!Boolean.TRUE.equals(request.firstUpdate())) {
+        boolean isInitialFinalization = !post.isEdited()
+                && java.time.Duration.between(post.getCreatedAt(), java.time.LocalDateTime.now()).toMinutes() < 5;
+        if (!isInitialFinalization) {
             post.markEdited();
         }
         CommunityPost saved = communityPostRepository.save(post);
