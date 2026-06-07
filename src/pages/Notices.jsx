@@ -48,35 +48,33 @@ function NoticeForm({ initialNotice, defaultCategory, user, onCancel, onSave }) 
   }
 
   return (
-    <div className="space-y-4 rounded-lg border border-white/10 bg-white/82 p-5 shadow-[0_18px_50px_rgba(0,0,0,0.12)]">
+    <div className="space-y-3 rounded-lg border border-white/10 bg-white/90 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.12)] sm:space-y-4 sm:p-5">
       <input
         value={formData.title}
         onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
         placeholder="제목"
-        className="w-full rounded border border-black/15 bg-white px-4 py-3 text-sm text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+        className="w-full rounded border border-black/15 bg-white px-4 py-3 text-base text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)] sm:text-sm"
       />
       <textarea
         value={formData.content}
         onChange={(e) => setFormData((p) => ({ ...p, content: e.target.value }))}
         placeholder="내용"
-        rows={14}
-        className="w-full resize-y rounded border border-black/15 bg-white px-4 py-3 text-sm leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+        rows={10}
+        className="w-full resize-y rounded border border-black/15 bg-white px-4 py-3 text-base leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)] sm:rows-14 sm:text-sm"
       />
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <select
           value={formData.category}
           onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value }))}
-          className="rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold"
+          className="flex-1 rounded border border-black/15 bg-white px-3 py-3 text-sm font-semibold sm:flex-none sm:py-2"
         >
           <option value="GENERAL">공지</option>
           <option value="JOB">취업공고</option>
         </select>
-      </div>
-      <div className="flex gap-2">
-        <button type="button" onClick={save} disabled={saving} className="rounded bg-[var(--theme-text)] px-5 py-2.5 text-sm font-bold text-[var(--theme-bg)] disabled:opacity-50">
+        <button type="button" onClick={save} disabled={saving} className="min-h-12 flex-1 rounded bg-[var(--theme-text)] px-5 text-sm font-bold text-[var(--theme-bg)] disabled:opacity-50 sm:min-h-0 sm:flex-none sm:py-2.5">
           {saving ? '저장 중...' : '저장'}
         </button>
-        <button type="button" onClick={onCancel} className="rounded border border-black/15 bg-white px-4 py-2.5 text-sm font-bold">
+        <button type="button" onClick={onCancel} className="min-h-12 flex-1 rounded border border-black/15 bg-white px-4 text-sm font-bold sm:min-h-0 sm:flex-none sm:py-2.5">
           취소
         </button>
       </div>
@@ -235,40 +233,40 @@ export default function Notices() {
                 ))}
               </div>
             )}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-black/18 px-5 py-3 sm:px-7">
+            <div className="flex flex-col gap-3 border-b border-white/10 bg-black/18 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-7">
               <div className="flex flex-wrap gap-2 text-sm font-bold">
-              {[
-                ['ALL', '전체'],
-                ['GENERAL', '공지'],
-                ['JOB', '취업공고'],
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setActiveCategory(value)}
-                  className={`shape-cut-sm inline-flex items-center gap-2 px-4 py-2 transition ${
-                    activeCategory === value
-                      ? 'bg-white text-[var(--theme-body-dark)]'
-                      : 'border border-white/10 bg-white/10 text-white/68 hover:bg-white/15'
-                  }`}
-                >
-                  {value === 'JOB' ? <BriefcaseBusiness size={14} /> : <Megaphone size={14} />}
-                  {label}
-                </button>
-              ))}
+                {[
+                  ['ALL', '전체'],
+                  ['GENERAL', '공지'],
+                  ['JOB', '취업공고'],
+                ].map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setActiveCategory(value)}
+                    className={`shape-cut-sm inline-flex items-center gap-2 px-4 py-2 transition ${
+                      activeCategory === value
+                        ? 'bg-white text-[var(--theme-body-dark)]'
+                        : 'border border-white/10 bg-white/10 text-white/68 hover:bg-white/15'
+                    }`}
+                  >
+                    {value === 'JOB' ? <BriefcaseBusiness size={14} /> : <Megaphone size={14} />}
+                    {label}
+                  </button>
+                ))}
               </div>
               <div className="flex items-center gap-3">
-                <div className="relative flex items-center">
+                <div className="relative flex flex-1 items-center sm:flex-none">
                   <Search size={14} className="pointer-events-none absolute left-3 text-white/45" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="제목, 작성자 검색"
-                    className="shape-cut-sm w-48 border border-white/10 bg-black/20 py-2 pl-8 pr-3 text-sm text-white placeholder-white/35 outline-none focus:border-white/25"
+                    className="shape-cut-sm w-full border border-white/10 bg-black/20 py-2 pl-8 pr-3 text-sm text-white placeholder-white/35 outline-none focus:border-white/25 sm:w-48"
                   />
                 </div>
-                <span className="text-xs font-semibold text-white/45">{filteredNotices.length}개</span>
+                <span className="shrink-0 text-xs font-semibold text-white/45">{filteredNotices.length}개</span>
               </div>
             </div>
             {loading && <p className="px-4 py-16 text-center text-sm text-white/65">불러오는 중...</p>}
@@ -370,28 +368,28 @@ export default function Notices() {
         )}
 
         {isDetail && (
-          <article className="m-5 overflow-hidden rounded-lg bg-white shadow-[0_18px_50px_rgba(0,0,0,0.14)] sm:m-7">
-            <div className="border-b border-black/10 px-5 py-5">
+          <article className="m-3 overflow-hidden rounded-lg bg-white shadow-[0_18px_50px_rgba(0,0,0,0.14)] sm:m-7">
+            <div className="border-b border-black/10 px-4 py-5 sm:px-5">
               <div className="mb-2 text-xs font-bold text-[#3b4890]">{(selectedNotice.category || 'GENERAL') === 'JOB' ? '취업공고' : '공지'}</div>
-              <h2 className="break-words text-3xl font-black leading-tight sm:text-4xl">
+              <h2 className="break-words text-xl font-black leading-tight sm:text-3xl md:text-4xl">
                 {selectedNotice.title}
               </h2>
               <p className="mt-3 text-xs text-[var(--theme-body-muted)]">
                 작성자 {selectedNotice.author} · {new Date(selectedNotice.createdAt).toLocaleString('ko-KR')}
               </p>
             </div>
-            <div className="text-size-container min-h-[360px] whitespace-pre-wrap break-words px-5 py-7 auto-text-notice">{linkify(selectedNotice.content)}</div>
-            <div className="flex flex-wrap justify-between gap-2 border-t border-black/10 px-5 py-4">
-              <button type="button" onClick={() => navigate('/notices')} className="rounded border border-black/15 bg-white px-4 py-2 text-sm font-bold">
+            <div className="text-size-container min-h-[200px] whitespace-pre-wrap break-words px-4 py-5 auto-text-notice sm:min-h-[360px] sm:px-5 sm:py-7">{linkify(selectedNotice.content)}</div>
+            <div className="flex flex-col gap-2 border-t border-black/10 px-4 py-4 sm:flex-row sm:flex-wrap sm:justify-between sm:px-5">
+              <button type="button" onClick={() => navigate('/notices')} className="min-h-11 rounded border border-black/15 bg-white px-4 py-2 text-sm font-bold sm:min-h-0">
                 목록
               </button>
               {isAdmin && (
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => setMode('edit')} className="inline-flex items-center gap-1 rounded border border-black/15 bg-white px-4 py-2 text-sm font-bold">
+                <div className="grid grid-cols-2 gap-2 sm:flex">
+                  <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-11 items-center justify-center gap-1 rounded border border-black/15 bg-white px-4 py-2 text-sm font-bold sm:min-h-0">
                     <Pencil size={14} />
                     수정
                   </button>
-                  <button type="button" onClick={deleteSelected} className="inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600">
+                  <button type="button" onClick={deleteSelected} className="inline-flex min-h-11 items-center justify-center gap-1 rounded border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600 sm:min-h-0">
                     <Trash2 size={14} />
                     삭제
                   </button>
