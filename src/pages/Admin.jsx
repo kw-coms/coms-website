@@ -53,27 +53,29 @@ export default function Admin({ onBack }) {
           <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[var(--theme-body-muted)]/80">Admin</p>
           <h1 className="mt-2 mb-6 text-2xl font-bold sm:text-3xl">관리자 패널</h1>
 
-          <div className="mb-6 flex gap-2">
-            {[
-              { id: 'members', label: '회원 관리' },
-              { id: 'roster', label: '명부 인증' },
-              { id: 'files', label: '파일 관리' },
-              { id: 'fonts', label: '폰트 관리' },
-              { id: 'ban', label: '차단 관리' },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`shape-cut-sm px-4 py-2 text-sm font-semibold transition ${
-                  activeTab === tab.id
-                    ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]'
-                    : 'border border-black/10 bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/80'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <div className="-mx-1 mb-6 overflow-x-auto pb-1">
+            <div className="flex min-w-max gap-2 px-1">
+              {[
+                { id: 'members', label: '회원 관리' },
+                { id: 'roster', label: '명부 인증' },
+                { id: 'files', label: '파일 관리' },
+                { id: 'fonts', label: '폰트 관리' },
+                { id: 'ban', label: '차단 관리' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`shape-cut-sm shrink-0 px-4 py-2 text-sm font-semibold transition ${
+                    activeTab === tab.id
+                      ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]'
+                      : 'border border-black/10 bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/80'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {activeTab === 'members' && <MembersTab currentUser={user} />}

@@ -20,16 +20,20 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {
@@ -57,6 +61,9 @@ class AuthServiceTest {
 
     @Autowired
     private EligibleMemberRepository eligibleMemberRepository;
+
+    @Autowired
+    private EligibleMemberService eligibleMemberService;
 
     @MockitoBean
     private EmailVerificationSender emailVerificationSender;
@@ -159,6 +166,40 @@ class AuthServiceTest {
     }
 
     @Test
+    void requestPasswordResetStoresHashedCodeAndSendsEmail() {
+        Member member = saveMember("2026123472", true);
+
+        authService.requestPasswordReset("2026123472", member.getEmail());
+
+        Member saved = memberRepository.findByStudentId("2026123472").orElseThrow();
+        assertThat(saved.getPasswordResetCodeHash()).isNotBlank();
+        assertThat(saved.getPasswordResetExpiresAt()).isAfter(LocalDateTime.now());
+        verify(emailVerificationSender).sendPasswordResetCode(eq(member.getEmail()), anyString());
+    }
+
+    @Test
+    void requestPasswordResetDoesNotRevealUnknownAccount() {
+        authService.requestPasswordReset("2026123473", "missing@example.com");
+
+        verify(emailVerificationSender, never()).sendPasswordResetCode(anyString(), anyString());
+    }
+
+    @Test
+    void confirmPasswordResetChangesPasswordAndClearsCode() {
+        Member member = saveMember("2026123474", true);
+        member.setPasswordResetCodeHash(passwordEncoder.encode("123456"));
+        member.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(10));
+        memberRepository.save(member);
+
+        authService.confirmPasswordReset("2026123474", member.getEmail(), "123456", "NewPassword1!");
+
+        Member saved = memberRepository.findByStudentId("2026123474").orElseThrow();
+        assertThat(passwordEncoder.matches("NewPassword1!", saved.getPassword())).isTrue();
+        assertThat(saved.getPasswordResetCodeHash()).isNull();
+        assertThat(saved.getPasswordResetExpiresAt()).isNull();
+    }
+
+    @Test
     void loginRejectsUnverifiedEmailWithUnauthorizedStatus() {
         saveMember("2026123460", false);
 
@@ -222,7 +263,7 @@ class AuthServiceTest {
         FontService fontService = mock(FontService.class);
         when(fontService.isSelectable(null)).thenReturn(true);
         BannedStudentService banned = mock(BannedStudentService.class);
-        AuthService service = new AuthService(repo, loginFailures, eligible, passwordEncoder, jwt, sender, fontService, banned);
+        AuthService service = new AuthService(repo, loginFailures, eligible, passwordEncoder, jwt, sender, fontService, banned, Clock.systemDefaultZone());
 
         when(repo.existsByStudentId("2026123462")).thenReturn(false);
         when(repo.existsByEmail("new@example.com")).thenReturn(false);
@@ -240,8 +281,9 @@ class AuthServiceTest {
                 "Password1!",
                 "컴퓨터공학과",
                 "01012345678",
-                null,
-                null
+                "동아리에서 프로젝트를 만들고 싶습니다.",
+                "웹",
+                "CURRENT"
         )))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
@@ -268,12 +310,108 @@ class AuthServiceTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                "GRADUATE"
         ))).isInstanceOf(ResponseStatusException.class);
 
         EligibleMember rolledBack = eligibleMemberRepository.findByVerificationKey("홍길동|2019").orElseThrow();
         assertThat(rolledBack.getStudentId()).isNull();
         assertThat(memberRepository.existsByStudentId("2019123462")).isFalse();
+    }
+
+    @Test
+    void currentSignupRequiresInterestsAndAspiration() {
+        eligibleMemberService.addSingle("2026123463", "홍길동");
+
+        assertThatThrownBy(() -> authService.signup(new SignupRequest(
+                "2026123463",
+                "홍길동",
+                null,
+                null,
+                "current-missing-profile@example.com",
+                "Password1!",
+                null,
+                null,
+                null,
+                null,
+                "CURRENT"
+        ))).isInstanceOf(ResponseStatusException.class);
+
+        assertThat(memberRepository.existsByStudentId("2026123463")).isFalse();
+    }
+
+    @Test
+    void currentSignupPersistsInterestsAndAspiration() {
+        eligibleMemberService.addSingle("2026123467", "홍길동");
+
+        var response = authService.signup(new SignupRequest(
+                "2026123467",
+                "홍길동",
+                null,
+                null,
+                "current-profile@example.com",
+                "Password1!",
+                "컴퓨터공학과",
+                "01012345678",
+                "신입 부원으로 열심히 활동하겠습니다.",
+                "보안,웹",
+                "CURRENT"
+        ));
+
+        assertThat(response.studentId()).isEqualTo("2026123467");
+        Member saved = memberRepository.findByStudentId("2026123467").orElseThrow();
+        assertThat(saved.getAspiration()).isEqualTo("신입 부원으로 열심히 활동하겠습니다.");
+        assertThat(saved.getInterests()).isEqualTo("보안,웹");
+    }
+
+    @Test
+    void graduateAddedByTwoDigitYearCanSignup() {
+        eligibleMemberService.addGraduateSingle("홍길동", "19", null);
+
+        var response = authService.signup(new SignupRequest(
+                "2019123470",
+                "홍길동",
+                "YEAR",
+                "19",
+                "graduate-year@example.com",
+                "Password1!",
+                null,
+                null,
+                "이 값은 졸업생 가입에서 저장되지 않아야 합니다.",
+                "웹",
+                "GRADUATE"
+        ));
+
+        assertThat(response.studentId()).isEqualTo("2019123470");
+        Member saved = memberRepository.findByStudentId("2019123470").orElseThrow();
+        assertThat(saved.getAspiration()).isNull();
+        assertThat(saved.getInterests()).isNull();
+        EligibleMember claimed = eligibleMemberRepository.findByStudentId("2019123470").orElseThrow();
+        assertThat(claimed.getVerificationKey()).isEqualTo("홍길동|2019");
+    }
+
+    @Test
+    void graduateAddedByGenerationCanSignup() {
+        eligibleMemberService.addGraduateSingle("김철수", null, "53기");
+
+        var response = authService.signup(new SignupRequest(
+                "2019123471",
+                "김철수",
+                "GENERATION",
+                "53",
+                "graduate-generation@example.com",
+                "Password1!",
+                null,
+                null,
+                null,
+                null,
+                "GRADUATE"
+        ));
+
+        assertThat(response.studentId()).isEqualTo("2019123471");
+        assertThat(memberRepository.findByStudentId("2019123471")).isPresent();
+        EligibleMember claimed = eligibleMemberRepository.findByStudentId("2019123471").orElseThrow();
+        assertThat(claimed.getGeneration()).isEqualTo("53");
     }
 
     private Member saveMember(String studentId, boolean emailVerified) {

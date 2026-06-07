@@ -21,7 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.Year;
+import java.util.Locale;
 
 @Service
 @Transactional
@@ -30,8 +33,15 @@ public class AuthService implements UserDetailsService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int EMAIL_VERIFICATION_EXPIRES_MINUTES = 10;
     private static final int EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES = 1;
+    private static final int PASSWORD_RESET_EXPIRES_MINUTES = 10;
+    private static final int PASSWORD_RESET_RESEND_COOLDOWN_MINUTES = 1;
     private static final int MAX_FAILURES_PER_ID = 5;
     private static final int LOCKOUT_WINDOW_MINUTES = 15;
+    private static final int GRADUATE_AFTER_YEARS = 7;
+
+    private enum SignupType {
+        CURRENT, GRADUATE
+    }
 
     private final MemberRepository memberRepository;
     private final LoginFailureRepository loginFailureRepository;
@@ -41,6 +51,7 @@ public class AuthService implements UserDetailsService {
     private final EmailVerificationSender emailVerificationSender;
     private final FontService fontService;
     private final BannedStudentService bannedStudentService;
+    private final Clock clock;
 
     public AuthService(MemberRepository memberRepository,
                        LoginFailureRepository loginFailureRepository,
@@ -49,7 +60,8 @@ public class AuthService implements UserDetailsService {
                        JwtTokenProvider jwtTokenProvider,
                        EmailVerificationSender emailVerificationSender,
                        FontService fontService,
-                       BannedStudentService bannedStudentService) {
+                       BannedStudentService bannedStudentService,
+                       Clock clock) {
         this.memberRepository = memberRepository;
         this.loginFailureRepository = loginFailureRepository;
         this.eligibleMemberService = eligibleMemberService;
@@ -58,6 +70,7 @@ public class AuthService implements UserDetailsService {
         this.emailVerificationSender = emailVerificationSender;
         this.fontService = fontService;
         this.bannedStudentService = bannedStudentService;
+        this.clock = clock;
     }
 
     public AuthResponse signup(SignupRequest request) {
@@ -68,6 +81,9 @@ public class AuthService implements UserDetailsService {
         if (memberRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다.");
         }
+        SignupType signupType = resolveSignupType(request);
+        validateSignupType(request, signupType);
+        validateCurrentProfile(request, signupType);
         eligibleMemberService.validateAndClaimSignup(
                 request.studentId(),
                 request.name(),
@@ -83,11 +99,11 @@ public class AuthService implements UserDetailsService {
         member.setPassword(passwordEncoder.encode(request.password()));
         member.setDepartment(request.department() == null ? null : request.department().trim());
         member.setPhone(request.phone() == null ? null : request.phone().trim());
-        member.setAspiration(request.aspiration() == null ? null : request.aspiration().trim());
-        member.setInterests(request.interests() == null ? null : request.interests().trim());
+        member.setAspiration(signupType == SignupType.CURRENT ? normalizeNullable(request.aspiration()) : null);
+        member.setInterests(signupType == SignupType.CURRENT ? normalizeNullable(request.interests()) : null);
         memberRepository.save(member);
 
-        String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        String code = newSixDigitCode();
         member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
         member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
         memberRepository.save(member);
@@ -168,6 +184,57 @@ public class AuthService implements UserDetailsService {
         memberRepository.save(member);
     }
 
+    public void requestPasswordReset(String studentId, String email) {
+        String normalizedStudentId = normalizeNullable(studentId);
+        String normalizedEmail = normalizeNullable(email);
+        if (normalizedStudentId == null || normalizedEmail == null) {
+            return;
+        }
+
+        memberRepository.findByStudentId(normalizedStudentId)
+                .filter(member -> emailMatches(member, normalizedEmail))
+                .filter(member -> !bannedStudentService.isBanned(member.getStudentId()))
+                .ifPresent(member -> {
+                    if (isPasswordResetResendOnCooldown(member)) {
+                        return;
+                    }
+                    String code = newSixDigitCode();
+                    member.setPasswordResetCodeHash(passwordEncoder.encode(code));
+                    member.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(PASSWORD_RESET_EXPIRES_MINUTES));
+                    memberRepository.save(member);
+                    emailVerificationSender.sendPasswordResetCode(member.getEmail(), code);
+                });
+    }
+
+    public void confirmPasswordReset(String studentId, String email, String code, String newPassword) {
+        String normalizedStudentId = normalizeNullable(studentId);
+        String normalizedEmail = normalizeNullable(email);
+        if (normalizedStudentId == null || normalizedEmail == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "인증 정보가 올바르지 않습니다.");
+        }
+
+        Member member = memberRepository.findByStudentId(normalizedStudentId)
+                .filter(candidate -> emailMatches(candidate, normalizedEmail))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "인증 정보가 올바르지 않습니다."));
+        bannedStudentService.ensureNotBanned(member.getStudentId());
+
+        if (member.getPasswordResetCodeHash() == null || member.getPasswordResetExpiresAt() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "먼저 비밀번호 재설정 인증코드를 요청해주세요.");
+        }
+        if (member.getPasswordResetExpiresAt().isBefore(LocalDateTime.now())) {
+            clearPasswordResetCode(member);
+            memberRepository.save(member);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호 재설정 인증코드가 만료되었습니다.");
+        }
+        if (!passwordEncoder.matches(code, member.getPasswordResetCodeHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호 재설정 인증코드가 올바르지 않습니다.");
+        }
+
+        member.setPassword(passwordEncoder.encode(newPassword));
+        clearPasswordResetCode(member);
+        memberRepository.save(member);
+    }
+
     public MemberResponse updateProfile(String studentId, UpdateProfileRequest request) {
         bannedStudentService.ensureNotBanned(studentId);
         Member member = memberRepository.findByStudentId(studentId)
@@ -203,7 +270,7 @@ public class AuthService implements UserDetailsService {
             return true;
         }
         enforceEmailVerificationResendCooldown(member);
-        String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        String code = newSixDigitCode();
         member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
         member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
         memberRepository.save(member);
@@ -225,7 +292,7 @@ public class AuthService implements UserDetailsService {
         }
 
         enforceEmailVerificationResendCooldown(member);
-        String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        String code = newSixDigitCode();
         member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
         member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
         memberRepository.save(member);
@@ -263,6 +330,11 @@ public class AuthService implements UserDetailsService {
         member.setEmailVerificationExpiresAt(null);
     }
 
+    private void clearPasswordResetCode(Member member) {
+        member.setPasswordResetCodeHash(null);
+        member.setPasswordResetExpiresAt(null);
+    }
+
     private boolean requiresEmailVerification(Member member) {
         return member.getRole() != Member.Role.ADMIN && !member.isEmailVerified();
     }
@@ -284,12 +356,79 @@ public class AuthService implements UserDetailsService {
         }
     }
 
+    private boolean isPasswordResetResendOnCooldown(Member member) {
+        LocalDateTime expiresAt = member.getPasswordResetExpiresAt();
+        if (member.getPasswordResetCodeHash() == null || expiresAt == null) {
+            return false;
+        }
+
+        LocalDateTime cooldownBoundary = LocalDateTime.now()
+                .plusMinutes(PASSWORD_RESET_EXPIRES_MINUTES - PASSWORD_RESET_RESEND_COOLDOWN_MINUTES);
+        return expiresAt.isAfter(cooldownBoundary);
+    }
+
+    private boolean emailMatches(Member member, String email) {
+        return member.getEmail() != null && member.getEmail().equalsIgnoreCase(email);
+    }
+
+    private String newSixDigitCode() {
+        return String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+    }
+
     private String normalizeNullable(String value) {
         if (value == null) {
             return null;
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private SignupType resolveSignupType(SignupRequest request) {
+        String raw = normalizeNullable(request.signupType());
+        if (raw == null) {
+            return hasGraduateVerification(request) ? SignupType.GRADUATE : SignupType.CURRENT;
+        }
+        return switch (raw.toUpperCase(Locale.ROOT)) {
+            case "CURRENT", "STUDENT" -> SignupType.CURRENT;
+            case "GRADUATE", "ALUMNI" -> SignupType.GRADUATE;
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "가입 구분이 올바르지 않습니다.");
+        };
+    }
+
+    private boolean hasGraduateVerification(SignupRequest request) {
+        return normalizeNullable(request.graduateVerificationType()) != null
+                || normalizeNullable(request.graduateVerificationValue()) != null;
+    }
+
+    private void validateSignupType(SignupRequest request, SignupType signupType) {
+        String studentId = request.studentId() == null ? "" : request.studentId().trim();
+        if (!studentId.matches("\\d{10}")) {
+            return;
+        }
+        boolean graduateStudentId = isGraduateStudentId(studentId);
+        if (signupType == SignupType.GRADUATE && !graduateStudentId) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "졸업생 가입은 졸업생 학번으로만 신청할 수 있습니다.");
+        }
+        if (signupType == SignupType.CURRENT && graduateStudentId) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "졸업생은 졸업생 회원가입을 선택해주세요.");
+        }
+    }
+
+    private boolean isGraduateStudentId(String studentId) {
+        int admissionYear = Integer.parseInt(studentId.substring(0, 4));
+        return admissionYear <= Year.now(clock).getValue() - GRADUATE_AFTER_YEARS;
+    }
+
+    private void validateCurrentProfile(SignupRequest request, SignupType signupType) {
+        if (signupType != SignupType.CURRENT) {
+            return;
+        }
+        if (normalizeNullable(request.interests()) == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "재학생은 관심 분야를 입력해주세요.");
+        }
+        if (normalizeNullable(request.aspiration()) == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "재학생은 포부를 입력해주세요.");
+        }
     }
 
     @Override

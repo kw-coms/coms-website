@@ -185,7 +185,7 @@ function LoginPage() {
 function SignupPage() {
   const navigate = useNavigate()
   return (
-    <PageShell>
+    <PageShell wide full>
       <button type="button" onClick={() => navigate('/login')} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15">
         로그인으로 돌아가기
       </button>
@@ -829,8 +829,15 @@ function HomeView() {
       </main>
 
       <nav
+        aria-hidden={bottomHidden}
         className={`${floatingBarBaseClass} fixed inset-x-4 bottom-4 z-50 mx-auto max-w-5xl`}
-        style={{ transform: bottomHidden ? 'translateY(48px)' : 'translateY(0)', opacity: bottomHidden ? 0 : 1, transition: 'transform .35s, opacity .35s' }}
+        style={{
+          transform: bottomHidden ? 'translateY(48px)' : 'translateY(0)',
+          opacity: bottomHidden ? 0 : 1,
+          pointerEvents: bottomHidden ? 'none' : 'auto',
+          visibility: bottomHidden ? 'hidden' : 'visible',
+          transition: 'transform .35s, opacity .35s, visibility .35s',
+        }}
       >
         <div className="grid grid-cols-2 divide-x divide-y divide-black/10 md:grid-cols-4 md:divide-y-0">
           {tabs.map((tab) => {
