@@ -17,5 +17,6 @@ public record SignupRequest(
         String department,
         String phone,
         String aspiration,
-        String interests
+        String interests,
+        String signupType
 ) {}

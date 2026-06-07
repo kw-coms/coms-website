@@ -185,7 +185,7 @@ function LoginPage() {
 function SignupPage() {
   const navigate = useNavigate()
   return (
-    <PageShell>
+    <PageShell wide full>
       <button type="button" onClick={() => navigate('/login')} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15">
         로그인으로 돌아가기
       </button>
