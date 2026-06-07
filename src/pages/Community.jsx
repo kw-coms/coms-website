@@ -28,7 +28,7 @@ import {
   updateCommunityPost,
   voteCommunityPost,
 } from '../services/communityApi.js'
-import { apiUrl } from '../services/apiClient.js'
+import { apiUrl, requestBlob } from '../services/apiClient.js'
 import { useAuth } from '../contexts/useAuth.js'
 
 const PAGE_SIZE = 30
@@ -61,6 +61,67 @@ function isConceptPost(post) {
 
 function isEdited(post) {
   return Boolean(post?.edited)
+}
+
+function postImageUrls(post) {
+  return [post?.imageUrl, ...(post?.imageUrls || [])]
+    .filter(Boolean)
+    .filter((url, index, urls) => urls.indexOf(url) === index)
+}
+
+function postHasImages(post) {
+  return postImageUrls(post).length > 0
+}
+
+function CommunityImage({ src, alt, className }) {
+  const [imageState, setImageState] = useState({ src: '', objectUrl: '', failed: false })
+
+  useEffect(() => {
+    if (!src) return undefined
+    let active = true
+    let nextObjectUrl = ''
+
+    requestBlob(src)
+      .then((blob) => {
+        nextObjectUrl = URL.createObjectURL(blob)
+        if (active) {
+          setImageState({ src, objectUrl: nextObjectUrl, failed: false })
+        } else {
+          URL.revokeObjectURL(nextObjectUrl)
+        }
+      })
+      .catch(() => {
+        if (active) setImageState({ src, objectUrl: '', failed: true })
+      })
+
+    return () => {
+      active = false
+      if (nextObjectUrl) URL.revokeObjectURL(nextObjectUrl)
+    }
+  }, [src])
+
+  if (imageState.src === src && imageState.failed) {
+    return (
+      <a
+        href={apiUrl(src)}
+        target="_blank"
+        rel="noreferrer"
+        className="mx-auto block max-w-full rounded border border-black/10 bg-white px-4 py-6 text-center text-sm font-semibold text-[var(--theme-body-muted)]"
+      >
+        사진을 열 수 없습니다. 새 창에서 보기
+      </a>
+    )
+  }
+
+  if (imageState.src !== src || !imageState.objectUrl) {
+    return (
+      <div className="mx-auto flex min-h-40 max-w-full items-center justify-center rounded border border-black/10 bg-white/70 text-sm font-semibold text-[var(--theme-body-muted)]">
+        사진 불러오는 중...
+      </div>
+    )
+  }
+
+  return <img src={imageState.objectUrl} alt={alt} className={className} />
 }
 
 function paginationRange(currentPage, totalPages) {
@@ -538,7 +599,7 @@ export default function Community({ onBack }) {
               <span className="text-white/38">#{post.id}</span>
               <span className="shape-cut-sm border border-cyan-200/15 bg-cyan-200/10 px-2 py-1 text-cyan-100">{categoryLabel(post.category || 'GENERAL')}</span>
               {concept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] text-[#3a2b00]">개념글</span>}
-              {post.imageUrl && <span className="text-cyan-200">[사진]</span>}
+              {postHasImages(post) && <span className="text-cyan-200">[사진]</span>}
               {isEdited(post) && <span className="text-white/42">수정</span>}
               {post.authorAdmin && <span className="rounded bg-red-600 px-1 py-0.5 text-[10px] text-white">주딱</span>}
             </div>
@@ -676,7 +737,7 @@ export default function Community({ onBack }) {
                           {concept && <span className="mr-1 rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
                           {post.title}
                         </span>
-                        {post.imageUrl && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
+                        {postHasImages(post) && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
                         {isEdited(post) && <span className="ml-1 text-[10px] font-bold text-white/45">수정</span>}
                         {post.authorAdmin && <span className="ml-1 rounded bg-red-600 px-1 py-0.5 text-[10px] font-black text-white">주딱</span>}
                       </td>
@@ -763,9 +824,18 @@ export default function Community({ onBack }) {
                     <span>개추 {postScore(currentPost)}</span>
                   </div>
                 </div>
-                {currentPost.imageUrl && (
+                {postHasImages(currentPost) && (
                   <div className="border-b border-black/10 bg-[#f7f7f7] px-3 py-4 sm:px-4 sm:py-5">
-                    <img src={apiUrl(currentPost.imageUrl)} alt={currentPost.imageOriginalName || currentPost.title} className="mx-auto max-h-[560px] max-w-full object-contain" />
+                    <div className="space-y-4">
+                      {postImageUrls(currentPost).map((imageUrl, index) => (
+                        <CommunityImage
+                          key={imageUrl}
+                          src={imageUrl}
+                          alt={index === 0 ? currentPost.imageOriginalName || currentPost.title : `${currentPost.title} 사진 ${index + 1}`}
+                          className="mx-auto max-h-[560px] max-w-full object-contain"
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
                 <div className="text-size-container min-h-[220px] whitespace-pre-wrap break-words px-4 py-6 auto-text-post sm:min-h-[280px] sm:px-5">{linkify(currentPost.content)}</div>

@@ -55,3 +55,19 @@ export async function requestNoContent(path, options = {}) {
     throw new Error(data?.message || data?.detail || data?.error || '요청 처리 중 오류가 발생했습니다.')
   }
 }
+
+export async function requestBlob(path, options = {}) {
+  const fetchOnce = () => fetch(apiUrl(path), { credentials: 'include', ...options })
+
+  let response = await fetchOnce()
+  const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
+  if (response.status === 401 && canRefresh) {
+    if (await tryRefreshToken()) response = await fetchOnce()
+  }
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null)
+    throw new Error(data?.message || data?.detail || data?.error || '요청 처리 중 오류가 발생했습니다.')
+  }
+  return response.blob()
+}
