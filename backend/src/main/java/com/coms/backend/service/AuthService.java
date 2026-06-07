@@ -21,7 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.Year;
+import java.util.Locale;
 
 @Service
 @Transactional
@@ -32,6 +35,11 @@ public class AuthService implements UserDetailsService {
     private static final int EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES = 1;
     private static final int MAX_FAILURES_PER_ID = 5;
     private static final int LOCKOUT_WINDOW_MINUTES = 15;
+    private static final int GRADUATE_AFTER_YEARS = 7;
+
+    private enum SignupType {
+        CURRENT, GRADUATE
+    }
 
     private final MemberRepository memberRepository;
     private final LoginFailureRepository loginFailureRepository;
@@ -41,6 +49,7 @@ public class AuthService implements UserDetailsService {
     private final EmailVerificationSender emailVerificationSender;
     private final FontService fontService;
     private final BannedStudentService bannedStudentService;
+    private final Clock clock;
 
     public AuthService(MemberRepository memberRepository,
                        LoginFailureRepository loginFailureRepository,
@@ -49,7 +58,8 @@ public class AuthService implements UserDetailsService {
                        JwtTokenProvider jwtTokenProvider,
                        EmailVerificationSender emailVerificationSender,
                        FontService fontService,
-                       BannedStudentService bannedStudentService) {
+                       BannedStudentService bannedStudentService,
+                       Clock clock) {
         this.memberRepository = memberRepository;
         this.loginFailureRepository = loginFailureRepository;
         this.eligibleMemberService = eligibleMemberService;
@@ -58,6 +68,7 @@ public class AuthService implements UserDetailsService {
         this.emailVerificationSender = emailVerificationSender;
         this.fontService = fontService;
         this.bannedStudentService = bannedStudentService;
+        this.clock = clock;
     }
 
     public AuthResponse signup(SignupRequest request) {
@@ -68,6 +79,9 @@ public class AuthService implements UserDetailsService {
         if (memberRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다.");
         }
+        SignupType signupType = resolveSignupType(request);
+        validateSignupType(request, signupType);
+        validateGraduateProfile(request, signupType);
         eligibleMemberService.validateAndClaimSignup(
                 request.studentId(),
                 request.name(),
@@ -290,6 +304,54 @@ public class AuthService implements UserDetailsService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private SignupType resolveSignupType(SignupRequest request) {
+        String raw = normalizeNullable(request.signupType());
+        if (raw == null) {
+            return hasGraduateVerification(request) ? SignupType.GRADUATE : SignupType.CURRENT;
+        }
+        return switch (raw.toUpperCase(Locale.ROOT)) {
+            case "CURRENT", "STUDENT" -> SignupType.CURRENT;
+            case "GRADUATE", "ALUMNI" -> SignupType.GRADUATE;
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "가입 구분이 올바르지 않습니다.");
+        };
+    }
+
+    private boolean hasGraduateVerification(SignupRequest request) {
+        return normalizeNullable(request.graduateVerificationType()) != null
+                || normalizeNullable(request.graduateVerificationValue()) != null;
+    }
+
+    private void validateSignupType(SignupRequest request, SignupType signupType) {
+        String studentId = request.studentId() == null ? "" : request.studentId().trim();
+        if (!studentId.matches("\\d{10}")) {
+            return;
+        }
+        boolean graduateStudentId = isGraduateStudentId(studentId);
+        if (signupType == SignupType.GRADUATE && !graduateStudentId) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "졸업생 가입은 졸업생 학번으로만 신청할 수 있습니다.");
+        }
+        if (signupType == SignupType.CURRENT && graduateStudentId) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "졸업생은 졸업생 회원가입을 선택해주세요.");
+        }
+    }
+
+    private boolean isGraduateStudentId(String studentId) {
+        int admissionYear = Integer.parseInt(studentId.substring(0, 4));
+        return admissionYear <= Year.now(clock).getValue() - GRADUATE_AFTER_YEARS;
+    }
+
+    private void validateGraduateProfile(SignupRequest request, SignupType signupType) {
+        if (signupType != SignupType.GRADUATE) {
+            return;
+        }
+        if (normalizeNullable(request.interests()) == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "졸업생은 관심 분야를 입력해주세요.");
+        }
+        if (normalizeNullable(request.aspiration()) == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "졸업생은 포부를 입력해주세요.");
+        }
     }
 
     @Override
