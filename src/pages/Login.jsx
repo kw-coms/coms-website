@@ -23,7 +23,6 @@ const linkButtonClass =
   'w-full rounded-full border border-black/10 bg-white/60 px-4 py-2 text-center font-semibold transition hover:bg-white/80 sm:w-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-left sm:underline'
 
 const emptyResetForm = {
-  studentId: '',
   email: '',
   code: '',
   newPassword: '',
@@ -85,7 +84,7 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
   const stepDescription = isVerifyStep
     ? '가입하신 이메일로 발송된 인증코드를 입력해주세요.'
     : isResetStep
-      ? '가입된 학번과 이메일로 인증코드를 받아 새 비밀번호를 설정하세요.'
+      ? '가입 이메일로 인증코드를 받아 새 비밀번호를 설정하세요.'
       : '동아리 계정으로 로그인하세요.'
 
   const handleSubmit = async (e) => {
@@ -149,8 +148,7 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
     setResetRequested(false)
     setResetForm((current) => ({
       ...emptyResetForm,
-      studentId: identifier.trim() || current.studentId,
-      email: current.email,
+      email: identifier.includes('@') ? identifier.trim() : current.email,
     }))
   }
 
@@ -159,11 +157,10 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
   }
 
   const requestResetCode = async () => {
-    const studentId = resetForm.studentId.trim()
     const email = resetForm.email.trim()
 
-    if (!studentId || !email) {
-      setResetError('학번과 이메일을 모두 입력해주세요.')
+    if (!email) {
+      setResetError('가입 이메일을 입력해주세요.')
       return
     }
     if (!email.includes('@')) {
@@ -174,7 +171,7 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
     setResetLoading(true)
     setResetError('')
     try {
-      const result = await requestPasswordReset({ studentId, email })
+      const result = await requestPasswordReset({ email })
       setResetRequested(true)
       setResetMessage(result.message || '입력 정보와 일치하는 계정이 있다면 인증코드를 이메일로 보냈습니다.')
     } catch (err) {
@@ -185,7 +182,6 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
   }
 
   const confirmResetCode = async () => {
-    const studentId = resetForm.studentId.trim()
     const email = resetForm.email.trim()
     const code = resetForm.code.trim()
     const newPassword = resetForm.newPassword
@@ -206,8 +202,8 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
     setResetLoading(true)
     setResetError('')
     try {
-      await confirmPasswordReset({ studentId, email, code, newPassword })
-      setIdentifier(studentId)
+      await confirmPasswordReset({ email, code, newPassword })
+      setIdentifier(email)
       setPassword('')
       setStep('login')
       setResetForm(emptyResetForm)
@@ -267,15 +263,6 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
             </div>
           ) : isResetStep ? (
             <form onSubmit={handleResetSubmit} className="space-y-4">
-              <TextInput
-                id="resetStudentId"
-                label="학번 (Student ID)"
-                value={resetForm.studentId}
-                onChange={updateResetForm('studentId')}
-                placeholder="학번을 입력하세요"
-                autoComplete="username"
-                inputMode="numeric"
-              />
               <TextInput
                 id="resetEmail"
                 label="가입 이메일"
@@ -341,12 +328,11 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
             <form onSubmit={handleSubmit} className="space-y-4">
               <TextInput
                 id="identifier"
-                label="학번 (Student ID)"
+                label="학번 또는 이메일"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="학번을 입력하세요"
+                placeholder="학번 또는 이메일을 입력하세요"
                 autoComplete="username"
-                inputMode="numeric"
               />
 
               <TextInput
@@ -393,7 +379,7 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
               </div>
 
               <p className="mt-4 text-xs leading-5 text-[var(--theme-body-muted)]/80">
-                로그인 정보가 기억나지 않거나 계정에 문제가 있는 경우 가입 이메일로 비밀번호를 재설정할 수 있습니다.
+                학번이 기억나지 않는 졸업생은 가입 이메일로 로그인하거나 비밀번호를 재설정할 수 있습니다.
               </p>
             </form>
           )}
