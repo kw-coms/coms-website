@@ -52,6 +52,11 @@ const LEGACY_MEDIA_WIDTHS = {
   large: 75,
   full: 100,
 }
+const MEDIA_ALIGN_OPTIONS = [
+  { value: 'left', label: '왼쪽' },
+  { value: 'center', label: '가운데' },
+  { value: 'right', label: '오른쪽' },
+]
 
 let _localIdCounter = 0
 function localId() { return `blk-${++_localIdCounter}` }
@@ -66,6 +71,12 @@ function mediaWidthStyle(width) {
   return { width: `${mediaWidthPercent(width)}%` }
 }
 
+function mediaAlignClass(align) {
+  if (align === 'left') return 'mr-auto'
+  if (align === 'right') return 'ml-auto'
+  return 'mx-auto'
+}
+
 function hasInlineImageBlock(blocks, imageUrl) {
   return Boolean(imageUrl) && blocks.some((block) => block.type === 'image' && block.url === imageUrl)
 }
@@ -76,7 +87,7 @@ function parsePostBlocks(post) {
     if (post.imageUrl && !hasInlineImageBlock(blocks, post.imageUrl)) {
       return [
         ...blocks,
-        { type: 'image', status: 'saved', legacy: true, name: post.imageOriginalName || '이미지', url: post.imageUrl, width: 'large', id: localId() },
+        { type: 'image', status: 'saved', legacy: true, name: post.imageOriginalName || '이미지', url: post.imageUrl, width: 'large', align: 'center', id: localId() },
       ]
     }
     return blocks
@@ -87,11 +98,11 @@ function parsePostBlocks(post) {
       return withLegacyImage(parsed.map((block) => {
         if (block.type === 'image') {
           const info = (post.imageInfos || []).find((i) => i.id === block.mediaId)
-          return { type: 'image', status: 'saved', mediaId: block.mediaId, name: block.name || info?.originalName, url: info?.url, width: block.width || 'large', id: localId() }
+          return { type: 'image', status: 'saved', mediaId: block.mediaId, name: block.name || info?.originalName, url: info?.url, width: block.width || 'large', align: block.align || 'center', id: localId() }
         }
         if (block.type === 'video') {
           const info = (post.videoInfos || []).find((v) => v.id === block.mediaId)
-          return { type: 'video', status: 'saved', mediaId: block.mediaId, name: block.name || info?.originalName, url: info?.url, width: block.width || 'large', id: localId() }
+          return { type: 'video', status: 'saved', mediaId: block.mediaId, name: block.name || info?.originalName, url: info?.url, width: block.width || 'large', align: block.align || 'center', id: localId() }
         }
         return { type: 'text', content: block.content || '', id: localId() }
       }))
@@ -167,7 +178,7 @@ function renderPostBlocks(post) {
       if (!src) return null
       return (
         <div key={i} className="px-4 py-3 sm:px-5">
-          <img src={src} alt={block.name || '이미지'} className="mx-auto max-h-[560px] max-w-full object-contain" style={mediaWidthStyle(block.width)} />
+          <img src={src} alt={block.name || '이미지'} className={`${mediaAlignClass(block.align)} max-h-[560px] max-w-full object-contain`} style={mediaWidthStyle(block.width)} />
         </div>
       )
     }
@@ -177,7 +188,7 @@ function renderPostBlocks(post) {
       const downloadUrl = apiUrl(block.url.replace(/\/videos\/(\d+)$/, '/videos/$1/download'))
       return (
         <div key={i} className="px-4 py-3 sm:px-5">
-          <video controls src={src} className="mx-auto max-h-[480px] max-w-full rounded" style={mediaWidthStyle(block.width)} />
+          <video controls src={src} className={`${mediaAlignClass(block.align)} max-h-[480px] max-w-full rounded`} style={mediaWidthStyle(block.width)} />
           <div className="mt-3 flex justify-center">
             <a
               href={downloadUrl}
@@ -224,6 +235,23 @@ function MediaSizeControls({ value, onChange }) {
         aria-label="미디어 크기"
       />
       <span className="w-9 text-right text-[11px] font-semibold text-[var(--theme-body-muted)]">{percent}%</span>
+    </div>
+  )
+}
+
+function MediaAlignControls({ value, onChange }) {
+  return (
+    <div className="flex items-center gap-1 rounded-full border border-black/10 bg-white/85 px-2 py-1 shadow-sm">
+      {MEDIA_ALIGN_OPTIONS.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          className={`rounded-full px-2 py-0.5 text-[11px] font-semibold transition ${value === option.value ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]' : 'text-[var(--theme-body-muted)] hover:bg-black/5 hover:text-[var(--theme-body-dark)]'}`}
+        >
+          {option.label}
+        </button>
+      ))}
     </div>
   )
 }
@@ -388,7 +416,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
       const type = isImage ? 'image' : 'video'
       if (type === 'image') nextImageCount += 1
       if (type === 'video') nextVideoCount += 1
-      toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 75, id: localId() })
+      toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 75, align: 'center', id: localId() })
     }
     return toAdd
   }
@@ -413,12 +441,28 @@ function PostForm({ initialPost, onCancel, onSave }) {
     })
   }
 
+  const moveBlock = (id, dir) => {
+    setBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === id)
+      if (idx < 0) return prev
+      const next = idx + dir
+      if (next < 0 || next >= prev.length) return prev
+      const arr = [...prev]
+      ;[arr[idx], arr[next]] = [arr[next], arr[idx]]
+      return arr
+    })
+  }
+
   const updateText = (id, content) => {
     setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, content } : b))
   }
 
   const updateMediaWidth = (id, width) => {
     setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, width } : b))
+  }
+
+  const updateMediaAlign = (id, align) => {
+    setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, align } : b))
   }
 
   const updateMediaStatus = (id, status, extra = {}) => {
@@ -445,7 +489,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
         const type = isImage ? 'image' : 'video'
         if (type === 'image') nextImageCount += 1
         if (type === 'video') nextVideoCount += 1
-        toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 75, id: localId() })
+        toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 75, align: 'center', id: localId() })
       }
       if (toAdd.length === 0) return prev
 
@@ -540,8 +584,8 @@ function PostForm({ initialPost, onCancel, onSave }) {
       const contentJson = JSON.stringify(
         uploadedBlocks.map((b) => {
           if (b.type === 'text') return { type: 'text', content: b.content }
-          if (b.type === 'image' && b.mediaId) return { type: 'image', mediaId: b.mediaId, name: b.name, width: b.width || 'large' }
-          if (b.type === 'video' && b.mediaId) return { type: 'video', mediaId: b.mediaId, name: b.name, width: b.width || 'large' }
+          if (b.type === 'image' && b.mediaId) return { type: 'image', mediaId: b.mediaId, name: b.name, width: b.width || 'large', align: b.align || 'center' }
+          if (b.type === 'video' && b.mediaId) return { type: 'video', mediaId: b.mediaId, name: b.name, width: b.width || 'large', align: b.align || 'center' }
           return null
         }).filter(Boolean)
       )
@@ -635,11 +679,18 @@ function PostForm({ initialPost, onCancel, onSave }) {
                   <img
                     src={block.preview || apiUrl(block.url)}
                     alt={block.name}
-                    className="mx-auto max-h-[460px] max-w-full rounded object-contain"
+                    className={`${mediaAlignClass(block.align)} max-h-[460px] max-w-full rounded object-contain`}
                     style={mediaWidthStyle(block.width)}
                   />
                   <div className="mx-auto mt-1 flex max-w-full flex-wrap items-center justify-center gap-2">
                     <MediaSizeControls value={block.width || 75} onChange={(width) => updateMediaWidth(block.id, width)} />
+                    <MediaAlignControls value={block.align || 'center'} onChange={(align) => updateMediaAlign(block.id, align)} />
+                    <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--theme-body-muted)] ring-1 ring-black/10 hover:bg-black/5 disabled:opacity-30">
+                      위로
+                    </button>
+                    <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--theme-body-muted)] ring-1 ring-black/10 hover:bg-black/5 disabled:opacity-30">
+                      아래로
+                    </button>
                     <button type="button" onClick={() => removeBlock(block.id)} className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-500 hover:bg-red-100">
                       삭제
                     </button>
@@ -651,11 +702,18 @@ function PostForm({ initialPost, onCancel, onSave }) {
                   <video
                     src={block.preview || apiUrl(block.url)}
                     controls
-                    className="mx-auto max-h-[420px] max-w-full rounded"
+                    className={`${mediaAlignClass(block.align)} max-h-[420px] max-w-full rounded`}
                     style={mediaWidthStyle(block.width)}
                   />
                   <div className="mx-auto mt-1 flex max-w-full flex-wrap items-center justify-center gap-2">
                     <MediaSizeControls value={block.width || 75} onChange={(width) => updateMediaWidth(block.id, width)} />
+                    <MediaAlignControls value={block.align || 'center'} onChange={(align) => updateMediaAlign(block.id, align)} />
+                    <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--theme-body-muted)] ring-1 ring-black/10 hover:bg-black/5 disabled:opacity-30">
+                      위로
+                    </button>
+                    <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[var(--theme-body-muted)] ring-1 ring-black/10 hover:bg-black/5 disabled:opacity-30">
+                      아래로
+                    </button>
                     <button type="button" onClick={() => removeBlock(block.id)} className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-500 hover:bg-red-100">
                       삭제
                     </button>
