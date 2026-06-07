@@ -3,10 +3,13 @@ package com.coms.backend.controller;
 import com.coms.backend.dto.AuthResponse;
 import com.coms.backend.dto.ChangePasswordRequest;
 import com.coms.backend.dto.ConfirmEmailVerificationRequest;
+import com.coms.backend.dto.ConfirmPasswordResetRequest;
 import com.coms.backend.dto.ConfirmSignupEmailRequest;
 import com.coms.backend.dto.EmailVerificationStatusResponse;
 import com.coms.backend.dto.LoginRequest;
 import com.coms.backend.dto.MemberResponse;
+import com.coms.backend.dto.PasswordResetStatusResponse;
+import com.coms.backend.dto.RequestPasswordResetRequest;
 import com.coms.backend.dto.RequestSignupEmailRequest;
 import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.dto.UpdateProfileRequest;
@@ -103,6 +106,20 @@ public class AuthController {
                                                Authentication authentication) {
         authService.changePassword(authentication.getName(), request.currentPassword(), request.newPassword());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/password-reset/request")
+    public ResponseEntity<PasswordResetStatusResponse> requestPasswordReset(
+            @Valid @RequestBody RequestPasswordResetRequest request) {
+        authService.requestPasswordReset(request.studentId(), request.email());
+        return ResponseEntity.ok(new PasswordResetStatusResponse("입력 정보와 일치하는 계정이 있다면 인증코드를 이메일로 보냈습니다."));
+    }
+
+    @PostMapping("/password-reset/confirm")
+    public ResponseEntity<PasswordResetStatusResponse> confirmPasswordReset(
+            @Valid @RequestBody ConfirmPasswordResetRequest request) {
+        authService.confirmPasswordReset(request.studentId(), request.email(), request.code(), request.newPassword());
+        return ResponseEntity.ok(new PasswordResetStatusResponse("비밀번호가 재설정되었습니다."));
     }
 
     @PatchMapping("/profile")

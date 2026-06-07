@@ -33,6 +33,8 @@ public class AuthService implements UserDetailsService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int EMAIL_VERIFICATION_EXPIRES_MINUTES = 10;
     private static final int EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES = 1;
+    private static final int PASSWORD_RESET_EXPIRES_MINUTES = 10;
+    private static final int PASSWORD_RESET_RESEND_COOLDOWN_MINUTES = 1;
     private static final int MAX_FAILURES_PER_ID = 5;
     private static final int LOCKOUT_WINDOW_MINUTES = 15;
     private static final int GRADUATE_AFTER_YEARS = 7;
@@ -101,7 +103,7 @@ public class AuthService implements UserDetailsService {
         member.setInterests(signupType == SignupType.CURRENT ? normalizeNullable(request.interests()) : null);
         memberRepository.save(member);
 
-        String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        String code = newSixDigitCode();
         member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
         member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
         memberRepository.save(member);
@@ -182,6 +184,57 @@ public class AuthService implements UserDetailsService {
         memberRepository.save(member);
     }
 
+    public void requestPasswordReset(String studentId, String email) {
+        String normalizedStudentId = normalizeNullable(studentId);
+        String normalizedEmail = normalizeNullable(email);
+        if (normalizedStudentId == null || normalizedEmail == null) {
+            return;
+        }
+
+        memberRepository.findByStudentId(normalizedStudentId)
+                .filter(member -> emailMatches(member, normalizedEmail))
+                .filter(member -> !bannedStudentService.isBanned(member.getStudentId()))
+                .ifPresent(member -> {
+                    if (isPasswordResetResendOnCooldown(member)) {
+                        return;
+                    }
+                    String code = newSixDigitCode();
+                    member.setPasswordResetCodeHash(passwordEncoder.encode(code));
+                    member.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(PASSWORD_RESET_EXPIRES_MINUTES));
+                    memberRepository.save(member);
+                    emailVerificationSender.sendPasswordResetCode(member.getEmail(), code);
+                });
+    }
+
+    public void confirmPasswordReset(String studentId, String email, String code, String newPassword) {
+        String normalizedStudentId = normalizeNullable(studentId);
+        String normalizedEmail = normalizeNullable(email);
+        if (normalizedStudentId == null || normalizedEmail == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "인증 정보가 올바르지 않습니다.");
+        }
+
+        Member member = memberRepository.findByStudentId(normalizedStudentId)
+                .filter(candidate -> emailMatches(candidate, normalizedEmail))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "인증 정보가 올바르지 않습니다."));
+        bannedStudentService.ensureNotBanned(member.getStudentId());
+
+        if (member.getPasswordResetCodeHash() == null || member.getPasswordResetExpiresAt() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "먼저 비밀번호 재설정 인증코드를 요청해주세요.");
+        }
+        if (member.getPasswordResetExpiresAt().isBefore(LocalDateTime.now())) {
+            clearPasswordResetCode(member);
+            memberRepository.save(member);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호 재설정 인증코드가 만료되었습니다.");
+        }
+        if (!passwordEncoder.matches(code, member.getPasswordResetCodeHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호 재설정 인증코드가 올바르지 않습니다.");
+        }
+
+        member.setPassword(passwordEncoder.encode(newPassword));
+        clearPasswordResetCode(member);
+        memberRepository.save(member);
+    }
+
     public MemberResponse updateProfile(String studentId, UpdateProfileRequest request) {
         bannedStudentService.ensureNotBanned(studentId);
         Member member = memberRepository.findByStudentId(studentId)
@@ -217,7 +270,7 @@ public class AuthService implements UserDetailsService {
             return true;
         }
         enforceEmailVerificationResendCooldown(member);
-        String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        String code = newSixDigitCode();
         member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
         member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
         memberRepository.save(member);
@@ -239,7 +292,7 @@ public class AuthService implements UserDetailsService {
         }
 
         enforceEmailVerificationResendCooldown(member);
-        String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        String code = newSixDigitCode();
         member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
         member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
         memberRepository.save(member);
@@ -277,6 +330,11 @@ public class AuthService implements UserDetailsService {
         member.setEmailVerificationExpiresAt(null);
     }
 
+    private void clearPasswordResetCode(Member member) {
+        member.setPasswordResetCodeHash(null);
+        member.setPasswordResetExpiresAt(null);
+    }
+
     private boolean requiresEmailVerification(Member member) {
         return member.getRole() != Member.Role.ADMIN && !member.isEmailVerified();
     }
@@ -296,6 +354,25 @@ public class AuthService implements UserDetailsService {
         if (expiresAt.isAfter(cooldownBoundary)) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "이메일 인증코드는 1분 후 다시 요청할 수 있습니다.");
         }
+    }
+
+    private boolean isPasswordResetResendOnCooldown(Member member) {
+        LocalDateTime expiresAt = member.getPasswordResetExpiresAt();
+        if (member.getPasswordResetCodeHash() == null || expiresAt == null) {
+            return false;
+        }
+
+        LocalDateTime cooldownBoundary = LocalDateTime.now()
+                .plusMinutes(PASSWORD_RESET_EXPIRES_MINUTES - PASSWORD_RESET_RESEND_COOLDOWN_MINUTES);
+        return expiresAt.isAfter(cooldownBoundary);
+    }
+
+    private boolean emailMatches(Member member, String email) {
+        return member.getEmail() != null && member.getEmail().equalsIgnoreCase(email);
+    }
+
+    private String newSixDigitCode() {
+        return String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
     }
 
     private String normalizeNullable(String value) {

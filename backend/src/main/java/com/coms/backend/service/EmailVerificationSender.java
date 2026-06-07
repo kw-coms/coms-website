@@ -30,9 +30,29 @@ public class EmailVerificationSender {
     }
 
     public void sendVerificationCode(String to, String code) {
+        sendCode(
+                to,
+                code,
+                "COM's 이메일 인증코드",
+                "COM's 이메일 인증코드: " + code + "\n\n10분 안에 입력해주세요.",
+                "Email verification code"
+        );
+    }
+
+    public void sendPasswordResetCode(String to, String code) {
+        sendCode(
+                to,
+                code,
+                "COM's 비밀번호 재설정 인증코드",
+                "COM's 비밀번호 재설정 인증코드: " + code + "\n\n10분 안에 입력해주세요.",
+                "Password reset code"
+        );
+    }
+
+    private void sendCode(String to, String code, String subject, String text, String logLabel) {
         if (!mailEnabled) {
             if (logVerificationCodes) {
-                log.info("Email verification code for {} is {}. Set MAIL_ENABLED=true with SMTP_* env vars to send mail.", to, code);
+                log.info("{} for {} is {}. Set MAIL_ENABLED=true with SMTP_* env vars to send mail.", logLabel, to, code);
                 return;
             }
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "이메일 발송 설정이 아직 완료되지 않았습니다.");
@@ -42,11 +62,11 @@ public class EmailVerificationSender {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(from);
             message.setTo(to);
-            message.setSubject("COM's 이메일 인증코드");
-            message.setText("COM's 이메일 인증코드: " + code + "\n\n10분 안에 입력해주세요.");
+            message.setSubject(subject);
+            message.setText(text);
             mailSender.send(message);
         } catch (RuntimeException e) {
-            log.warn("Failed to send email verification code to {}", to, e);
+            log.warn("Failed to send {} to {}", logLabel, to, e);
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "이메일 발송에 실패했습니다.");
         }
     }
