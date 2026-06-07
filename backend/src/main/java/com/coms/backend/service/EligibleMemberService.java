@@ -121,7 +121,15 @@ public class EligibleMemberService {
     public void updateEligibleMember(Long id, String studentId, String name, String phone) {
         EligibleMember member = eligibleMemberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "명부에서 해당 항목을 찾을 수 없습니다."));
-        applyExactStudentIdentity(member, studentId, name);
+        String normalizedStudentId = normalize(studentId);
+        if (!normalizedStudentId.isBlank()) {
+            applyExactStudentIdentity(member, normalizedStudentId, name);
+        } else {
+            member.setName(normalize(name));
+            if (member.getVerificationKey() != null) {
+                member.setVerificationKey(verificationKey(member.getName(), member.getAdmissionYear()));
+            }
+        }
         String normalizedPhone = normalizePhone(phone);
         member.setPhone(normalizedPhone.isBlank() ? null : normalizedPhone);
         eligibleMemberRepository.save(member);
