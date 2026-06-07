@@ -97,8 +97,8 @@ public class AuthService implements UserDetailsService {
         member.setPassword(passwordEncoder.encode(request.password()));
         member.setDepartment(request.department() == null ? null : request.department().trim());
         member.setPhone(request.phone() == null ? null : request.phone().trim());
-        member.setAspiration(request.aspiration() == null ? null : request.aspiration().trim());
-        member.setInterests(request.interests() == null ? null : request.interests().trim());
+        member.setAspiration(signupType == SignupType.CURRENT ? normalizeNullable(request.aspiration()) : null);
+        member.setInterests(signupType == SignupType.CURRENT ? normalizeNullable(request.interests()) : null);
         memberRepository.save(member);
 
         String code = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
