@@ -10,7 +10,6 @@ import {
   Download,
   ImagePlus,
   MessageSquare,
-  Paperclip,
   Pencil,
   Search,
   Send,
@@ -47,26 +46,45 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
 const MAX_EXTRA_IMAGES = 5
 const MAX_VIDEOS = 3
-const MEDIA_WIDTH_OPTIONS = [
-  { value: 'small', label: '작게', className: 'max-w-xs' },
-  { value: 'medium', label: '중간', className: 'max-w-md' },
-  { value: 'large', label: '크게', className: 'max-w-2xl' },
-  { value: 'full', label: '가득', className: 'max-w-full' },
-]
+const LEGACY_MEDIA_WIDTHS = {
+  small: 35,
+  medium: 55,
+  large: 75,
+  full: 100,
+}
 
 let _localIdCounter = 0
 function localId() { return `blk-${++_localIdCounter}` }
 
-function mediaWidthClass(width) {
-  return MEDIA_WIDTH_OPTIONS.find((option) => option.value === width)?.className || MEDIA_WIDTH_OPTIONS[2].className
+function mediaWidthPercent(width) {
+  const numeric = Number(width)
+  if (Number.isFinite(numeric)) return Math.min(100, Math.max(25, numeric))
+  return LEGACY_MEDIA_WIDTHS[width] || LEGACY_MEDIA_WIDTHS.large
+}
+
+function mediaWidthStyle(width) {
+  return { width: `${mediaWidthPercent(width)}%` }
+}
+
+function hasInlineImageBlock(blocks, imageUrl) {
+  return Boolean(imageUrl) && blocks.some((block) => block.type === 'image' && block.url === imageUrl)
 }
 
 function parsePostBlocks(post) {
   if (!post) return [{ type: 'text', content: '', id: localId() }]
+  const withLegacyImage = (blocks) => {
+    if (post.imageUrl && !hasInlineImageBlock(blocks, post.imageUrl)) {
+      return [
+        ...blocks,
+        { type: 'image', status: 'saved', legacy: true, name: post.imageOriginalName || '이미지', url: post.imageUrl, width: 'large', id: localId() },
+      ]
+    }
+    return blocks
+  }
   try {
     const parsed = JSON.parse(post.content)
     if (Array.isArray(parsed)) {
-      return parsed.map((block) => {
+      return withLegacyImage(parsed.map((block) => {
         if (block.type === 'image') {
           const info = (post.imageInfos || []).find((i) => i.id === block.mediaId)
           return { type: 'image', status: 'saved', mediaId: block.mediaId, name: block.name || info?.originalName, url: info?.url, width: block.width || 'large', id: localId() }
@@ -76,12 +94,12 @@ function parsePostBlocks(post) {
           return { type: 'video', status: 'saved', mediaId: block.mediaId, name: block.name || info?.originalName, url: info?.url, width: block.width || 'large', id: localId() }
         }
         return { type: 'text', content: block.content || '', id: localId() }
-      })
+      }))
     }
   } catch {
-    return [{ type: 'text', content: post.content || '', id: localId() }]
+    return withLegacyImage([{ type: 'text', content: post.content || '', id: localId() }])
   }
-  return [{ type: 'text', content: post.content || '', id: localId() }]
+  return withLegacyImage([{ type: 'text', content: post.content || '', id: localId() }])
 }
 const CATEGORY_OPTIONS = [
   { value: 'GENERAL', label: '일반' },
@@ -148,8 +166,8 @@ function renderPostBlocks(post) {
       const src = block.url ? apiUrl(block.url) : null
       if (!src) return null
       return (
-        <div key={i} className="bg-[#f7f7f7] px-3 py-4 sm:px-4 sm:py-5">
-          <img src={src} alt={block.name || '이미지'} className={`mx-auto max-h-[560px] w-full object-contain ${mediaWidthClass(block.width)}`} />
+        <div key={i} className="px-4 py-3 sm:px-5">
+          <img src={src} alt={block.name || '이미지'} className="mx-auto max-h-[560px] max-w-full object-contain" style={mediaWidthStyle(block.width)} />
         </div>
       )
     }
@@ -158,8 +176,8 @@ function renderPostBlocks(post) {
       if (!src) return null
       const downloadUrl = apiUrl(block.url.replace(/\/videos\/(\d+)$/, '/videos/$1/download'))
       return (
-        <div key={i} className="bg-[#f7f7f7] px-3 py-4 sm:px-4 sm:py-5">
-          <video controls src={src} className={`mx-auto max-h-[480px] w-full rounded ${mediaWidthClass(block.width)}`} />
+        <div key={i} className="px-4 py-3 sm:px-5">
+          <video controls src={src} className="mx-auto max-h-[480px] max-w-full rounded" style={mediaWidthStyle(block.width)} />
           <div className="mt-3 flex justify-center">
             <a
               href={downloadUrl}
@@ -177,46 +195,6 @@ function renderPostBlocks(post) {
   })
 }
 
-function renderAttachments(post) {
-  const imageInfos = post.imageInfos || []
-  const videoInfos = post.videoInfos || []
-  if (imageInfos.length === 0 && videoInfos.length === 0) return null
-  return (
-    <div className="border-t border-black/10 px-4 py-4 sm:px-5">
-      <div className="mb-2 flex items-center gap-1.5 text-xs font-black text-[var(--theme-body-muted)]">
-        <Paperclip size={12} />
-        원본 첨부파일
-      </div>
-      <ul className="space-y-1">
-        {imageInfos.map((info) => (
-          <li key={`img-${info.id}`}>
-            <a
-              href={apiUrl(info.url)}
-              download={info.originalName}
-              className="inline-flex items-center gap-1.5 text-xs text-[var(--theme-body-muted)] hover:text-[var(--theme-body-dark)] hover:underline"
-            >
-              <ImagePlus size={11} />
-              {info.originalName || '이미지'}
-            </a>
-          </li>
-        ))}
-        {videoInfos.map((info) => (
-          <li key={`vid-${info.id}`}>
-            <a
-              href={apiUrl(info.url.replace(/\/videos\/(\d+)$/, '/videos/$1/download'))}
-              download={info.originalName}
-              className="inline-flex items-center gap-1.5 text-xs text-[var(--theme-body-muted)] hover:text-[var(--theme-body-dark)] hover:underline"
-            >
-              <Video size={11} />
-              {info.originalName || '영상'}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
 function openRowWithKeyboard(event, open) {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
@@ -230,34 +208,22 @@ function clickableCell(open) {
   }
 }
 
-function MediaInsertZone({ onFiles, dragOverId, setDragOverId, zoneId }) {
-  const isOver = dragOverId === zoneId
-  return (
-    <div
-      className={`my-1 flex items-center gap-2 rounded border-2 border-dashed px-3 py-2 transition ${isOver ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/8' : 'border-black/10 hover:border-black/25'}`}
-      onDragOver={(e) => { e.preventDefault(); setDragOverId(zoneId) }}
-      onDragLeave={() => setDragOverId(null)}
-      onDrop={(e) => { e.preventDefault(); setDragOverId(null); onFiles(Array.from(e.dataTransfer.files)) }}
-    >
-      <span className="text-xs text-[var(--theme-body-muted)]">여기에 파일을 드래그</span>
-    </div>
-  )
-}
-
 function MediaSizeControls({ value, onChange }) {
+  const percent = mediaWidthPercent(value)
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1.5">
-      <span className="mr-1 text-xs font-semibold text-[var(--theme-body-muted)]">크기</span>
-      {MEDIA_WIDTH_OPTIONS.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          onClick={() => onChange(option.value)}
-          className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition ${value === option.value ? 'border-[var(--theme-text)] bg-[var(--theme-text)] text-[var(--theme-bg)]' : 'border-black/10 bg-white text-[var(--theme-body-muted)] hover:border-black/25 hover:text-[var(--theme-body-dark)]'}`}
-        >
-          {option.label}
-        </button>
-      ))}
+    <div className="mt-2 flex max-w-xs items-center gap-2 rounded-full border border-black/10 bg-white/85 px-3 py-1.5 shadow-sm">
+      <span className="text-[11px] font-black text-[var(--theme-body-muted)]">크기</span>
+      <input
+        type="range"
+        min="25"
+        max="100"
+        step="5"
+        value={percent}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="h-1 flex-1 accent-[var(--theme-text)]"
+        aria-label="미디어 크기"
+      />
+      <span className="w-9 text-right text-[11px] font-semibold text-[var(--theme-body-muted)]">{percent}%</span>
     </div>
   )
 }
@@ -370,6 +336,7 @@ function PlainTextEditor({ value, onChange, onPaste, onFilesAtOffset, onCaretCha
           const files = Array.from(e.dataTransfer?.files || [])
           if (files.length === 0) return
           e.preventDefault()
+          e.stopPropagation()
           onFilesAtOffset?.(files, pointOffsetWithin(e.currentTarget, e.clientX, e.clientY))
         }}
         onBlur={(e) => {
@@ -392,8 +359,8 @@ function PostForm({ initialPost, onCancel, onSave }) {
   const [saving, setSaving] = useState(false)
   const [savingStep, setSavingStep] = useState('')
   const [error, setError] = useState('')
-  const [dragOverId, setDragOverId] = useState(null)
   const [activeTextTarget, setActiveTextTarget] = useState(null)
+  const [removeLegacyImage, setRemoveLegacyImage] = useState(false)
 
   const validateFile = (file, nextImageCount, nextVideoCount) => {
     if (ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -409,51 +376,40 @@ function PostForm({ initialPost, onCancel, onSave }) {
     return '지원하지 않는 파일 형식입니다. (이미지: JPG/PNG/GIF/WebP, 영상: MP4/WebM/MOV)'
   }
 
-  const insertBlocksAfter = (afterIndex, newBlocks) => {
-    setBlocks((prev) => {
-      const updated = [...prev]
-      updated.splice(afterIndex + 1, 0, ...newBlocks)
-      return updated
-    })
-  }
-
-  const addFiles = (files, afterIndex) => {
+  const mediaBlocksFromFiles = (files, existingBlocks) => {
     const toAdd = []
-    let nextImageCount = blocks.filter((b) => b.type === 'image').length
-    let nextVideoCount = blocks.filter((b) => b.type === 'video').length
+    let nextImageCount = existingBlocks.filter((b) => b.type === 'image').length
+    let nextVideoCount = existingBlocks.filter((b) => b.type === 'video').length
     for (const file of files) {
       const isImage = ALLOWED_IMAGE_TYPES.includes(file.type)
       const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type)
       const err = validateFile(file, nextImageCount + (isImage ? 1 : 0), nextVideoCount + (isVideo ? 1 : 0))
-      if (err) { setError(err); return }
+      if (err) { setError(err); return [] }
       const type = isImage ? 'image' : 'video'
       if (type === 'image') nextImageCount += 1
       if (type === 'video') nextVideoCount += 1
-      toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 'large', id: localId() })
+      toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 75, id: localId() })
     }
-    if (toAdd.length === 0) return
-    setError('')
-    insertBlocksAfter(afterIndex, toAdd)
+    return toAdd
+  }
+
+  const insertFilesAtBlockIndex = (files, insertIndex) => {
+    setBlocks((prev) => {
+      const toAdd = mediaBlocksFromFiles(files, prev)
+      if (toAdd.length === 0) return prev
+      setError('')
+      const safeIndex = Math.max(0, Math.min(insertIndex, prev.length))
+      return [...prev.slice(0, safeIndex), ...toAdd, ...prev.slice(safeIndex)]
+    })
   }
 
   const removeBlock = (id) => {
     setBlocks((prev) => {
       const block = prev.find((b) => b.id === id)
       if (block?.preview) URL.revokeObjectURL(block.preview)
+      if (block?.legacy) setRemoveLegacyImage(true)
       const filtered = prev.filter((b) => b.id !== id)
       return filtered.length === 0 ? [{ type: 'text', content: '', id: localId() }] : filtered
-    })
-  }
-
-  const moveBlock = (id, dir) => {
-    setBlocks((prev) => {
-      const idx = prev.findIndex((b) => b.id === id)
-      if (idx < 0) return prev
-      const next = idx + dir
-      if (next < 0 || next >= prev.length) return prev
-      const arr = [...prev]
-      ;[arr[idx], arr[next]] = [arr[next], arr[idx]]
-      return arr
     })
   }
 
@@ -489,7 +445,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
         const type = isImage ? 'image' : 'video'
         if (type === 'image') nextImageCount += 1
         if (type === 'video') nextVideoCount += 1
-        toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 'large', id: localId() })
+        toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 75, id: localId() })
       }
       if (toAdd.length === 0) return prev
 
@@ -527,7 +483,16 @@ function PostForm({ initialPost, onCancel, onSave }) {
       insertFilesAtTextOffset(target.blockId, target.offset, files)
       return
     }
-    addFiles(files, blocks.length - 1)
+    insertFilesAtBlockIndex(files, blocks.length)
+  }
+
+  const insertFilesAtCanvasPoint = (files, canvas, clientY) => {
+    const nodes = Array.from(canvas.querySelectorAll('[data-editor-block-id]'))
+    const targetIndex = nodes.findIndex((node) => {
+      const rect = node.getBoundingClientRect()
+      return clientY < rect.top + rect.height / 2
+    })
+    insertFilesAtBlockIndex(files, targetIndex === -1 ? blocks.length : targetIndex)
   }
 
   const submit = async (e) => {
@@ -582,7 +547,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
       )
 
       setSavingStep('저장 중...')
-      const saved = await updateCommunityPost(postId, { title: title.trim(), content: contentJson, category })
+      const saved = await updateCommunityPost(postId, { title: title.trim(), content: contentJson, category, removeImage: removeLegacyImage })
 
       uploadedBlocks.forEach((b) => { if (b.preview) URL.revokeObjectURL(b.preview) })
       onSave(saved)
@@ -625,22 +590,35 @@ function PostForm({ initialPost, onCancel, onSave }) {
             <ImagePlus size={14} />
             이미지
             <input type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp" className="hidden"
-              onChange={(e) => insertFilesAtActiveText(Array.from(e.target.files))} />
+              onChange={(e) => { insertFilesAtActiveText(Array.from(e.target.files)); e.target.value = '' }} />
           </label>
           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
             <Video size={14} />
             동영상
             <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
-              onChange={(e) => insertFilesAtActiveText(Array.from(e.target.files))} />
+              onChange={(e) => { insertFilesAtActiveText(Array.from(e.target.files)); e.target.value = '' }} />
           </label>
-          <span className="text-xs text-[var(--theme-body-muted)]">드래그하거나 Ctrl+V로 이미지 붙여넣기</span>
+          <span className="text-xs text-[var(--theme-body-muted)]">본문 칸에 드래그하거나 Ctrl+V로 바로 삽입</span>
         </div>
 
-        <div className="min-h-[360px] space-y-3 bg-white p-3 sm:p-4">
+        <div
+          className="min-h-[420px] bg-white px-4 py-5 sm:px-5"
+          onDragOver={(e) => {
+            if (Array.from(e.dataTransfer?.items || []).some((item) => item.kind === 'file')) {
+              e.preventDefault()
+            }
+          }}
+          onDrop={(e) => {
+            const files = Array.from(e.dataTransfer?.files || [])
+            if (files.length === 0) return
+            e.preventDefault()
+            insertFilesAtCanvasPoint(files, e.currentTarget, e.clientY)
+          }}
+        >
           {blocks.map((block, idx) => (
-            <div key={block.id}>
+            <div key={block.id} data-editor-block-id={block.id}>
               {block.type === 'text' ? (
-                <div className="relative rounded border border-black/5 bg-white">
+                <div className="relative bg-white">
                   <PlainTextEditor
                     value={block.content}
                     onChange={(content) => updateText(block.id, content)}
@@ -651,54 +629,40 @@ function PostForm({ initialPost, onCancel, onSave }) {
                     minRows={idx === 0 ? 10 : 3}
                     maxLength={MAX_CONTENT_LENGTH}
                   />
-                  {blocks.length > 1 && (
-                    <div className="absolute right-2 top-2 flex gap-1">
-                      <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="rounded bg-black/5 p-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↑</button>
-                      <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="rounded bg-black/5 p-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/10 disabled:opacity-30">↓</button>
-                      <button type="button" onClick={() => removeBlock(block.id)} className="rounded bg-red-50 p-1 text-xs text-red-400 hover:bg-red-100"><X size={12} /></button>
-                    </div>
-                  )}
                 </div>
               ) : block.type === 'image' ? (
-                <div className="relative rounded border border-black/10 bg-[#f7f7f7] p-3">
-                  <img src={block.preview || apiUrl(block.url)} alt={block.name} className={`mx-auto max-h-[420px] w-full rounded object-contain ${mediaWidthClass(block.width)}`} />
-                  <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-[var(--theme-body-dark)]">{block.name}</p>
-                      <MediaStatus block={block} />
-                      <MediaSizeControls value={block.width || 'large'} onChange={(width) => updateMediaWidth(block.id, width)} />
-                    </div>
-                    <div className="flex gap-1">
-                      <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="rounded bg-white px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/5 disabled:opacity-30">↑</button>
-                      <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="rounded bg-white px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/5 disabled:opacity-30">↓</button>
-                      <button type="button" onClick={() => removeBlock(block.id)} className="rounded bg-red-50 px-2 py-1 text-xs text-red-400 hover:bg-red-100"><X size={12} /></button>
-                    </div>
+                <div className="group relative py-2">
+                  <img
+                    src={block.preview || apiUrl(block.url)}
+                    alt={block.name}
+                    className="mx-auto max-h-[460px] max-w-full rounded object-contain"
+                    style={mediaWidthStyle(block.width)}
+                  />
+                  <div className="mx-auto mt-1 flex max-w-full flex-wrap items-center justify-center gap-2">
+                    <MediaSizeControls value={block.width || 75} onChange={(width) => updateMediaWidth(block.id, width)} />
+                    <button type="button" onClick={() => removeBlock(block.id)} className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-500 hover:bg-red-100">
+                      삭제
+                    </button>
                   </div>
+                  <MediaStatus block={block} />
                 </div>
               ) : (
-                <div className="relative rounded border border-black/10 bg-[#f7f7f7] p-3">
-                  <video src={block.preview || apiUrl(block.url)} controls className={`mx-auto max-h-[380px] w-full rounded ${mediaWidthClass(block.width)}`} />
-                  <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-[var(--theme-body-dark)]">{block.name}</p>
-                      <MediaStatus block={block} />
-                      <MediaSizeControls value={block.width || 'large'} onChange={(width) => updateMediaWidth(block.id, width)} />
-                    </div>
-                    <div className="flex gap-1">
-                      <button type="button" onClick={() => moveBlock(block.id, -1)} disabled={idx === 0} className="rounded bg-white px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/5 disabled:opacity-30">↑</button>
-                      <button type="button" onClick={() => moveBlock(block.id, 1)} disabled={idx === blocks.length - 1} className="rounded bg-white px-2 py-1 text-xs text-[var(--theme-body-muted)] hover:bg-black/5 disabled:opacity-30">↓</button>
-                      <button type="button" onClick={() => removeBlock(block.id)} className="rounded bg-red-50 px-2 py-1 text-xs text-red-400 hover:bg-red-100"><X size={12} /></button>
-                    </div>
+                <div className="group relative py-2">
+                  <video
+                    src={block.preview || apiUrl(block.url)}
+                    controls
+                    className="mx-auto max-h-[420px] max-w-full rounded"
+                    style={mediaWidthStyle(block.width)}
+                  />
+                  <div className="mx-auto mt-1 flex max-w-full flex-wrap items-center justify-center gap-2">
+                    <MediaSizeControls value={block.width || 75} onChange={(width) => updateMediaWidth(block.id, width)} />
+                    <button type="button" onClick={() => removeBlock(block.id)} className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-500 hover:bg-red-100">
+                      삭제
+                    </button>
                   </div>
+                  <MediaStatus block={block} />
                 </div>
               )}
-
-              <MediaInsertZone
-                zoneId={`zone-${idx}`}
-                dragOverId={dragOverId}
-                setDragOverId={setDragOverId}
-                onFiles={(files) => addFiles(files, idx)}
-              />
             </div>
           ))}
         </div>
@@ -1283,10 +1247,9 @@ export default function Community({ onBack }) {
                     <span>개추 {postScore(currentPost)}</span>
                   </div>
                 </div>
-                <div className="min-h-[220px] divide-y divide-black/6 sm:min-h-[280px]">
+                <div className="min-h-[220px] sm:min-h-[280px]">
                   {renderPostBlocks(currentPost)}
                 </div>
-                {renderAttachments(currentPost)}
                 <div className="grid grid-cols-2 gap-2 border-y border-black/10 bg-[#fafafa] px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-3 sm:py-5">
                   <button type="button" onClick={() => handleVote(1)} className={`inline-flex min-h-12 items-center justify-center gap-2 border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === 1 ? 'border-[#3b4890] bg-[#3b4890] text-white' : 'border-black/15 bg-white text-[#3b4890]'}`}>
                     <ThumbsUp size={16} />
