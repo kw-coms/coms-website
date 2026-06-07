@@ -15,6 +15,8 @@ public record CommunityPostResponse(
         String imageUrl,
         String imageOriginalName,
         List<String> imageUrls,
+        List<MediaInfo> imageInfos,
+        List<MediaInfo> videoInfos,
         long viewCount,
         long upvotes,
         long downvotes,
@@ -24,4 +26,6 @@ public record CommunityPostResponse(
         LocalDateTime updatedAt,
         boolean edited,
         boolean editable
-) {}
+) {
+    public record MediaInfo(Long id, String url, String originalName) {}
+}
