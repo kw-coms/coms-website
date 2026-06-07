@@ -194,26 +194,31 @@ function renderPostBlocks(post) {
     }))
     .filter((item, index, items) => item.href && items.findIndex((candidate) => candidate.href === item.href) === index)
   const allAttachments = attachments
-  const mediaContainerStyle = (width, align) =>
-    ({
-      display: 'inline-block',
+  const mediaContainerStyle = (width, align) => {
+    const base = {
       width: `${mediaWidthPercent(width)}%`,
       maxWidth: '100%',
-      margin: '0 0.2rem',
-      verticalAlign: 'middle',
       userSelect: 'none',
       WebkitUserDrag: 'none',
       textAlign: align === 'right' ? 'right' : align === 'center' ? 'center' : 'left',
-    })
+    }
+    if (align === 'left') {
+      return { ...base, display: 'block', float: 'left', margin: '0.25rem 1rem 0.75rem 0' }
+    }
+    if (align === 'right') {
+      return { ...base, display: 'block', float: 'right', margin: '0.25rem 0 0.75rem 1rem' }
+    }
+    return { ...base, display: 'inline-block', margin: '0.15rem 0.2rem', verticalAlign: 'top' }
+  }
   return (
     <div className="px-4 py-5 sm:px-5">
       {blocks.map((block, i) => {
         if (block.type === 'text') {
           if (!block.content.trim()) return null
           return (
-            <div key={i} className="text-size-container whitespace-pre-wrap break-words auto-text-post">
+            <span key={i} className="text-size-container whitespace-pre-wrap break-words auto-text-post">
               {linkify(block.content)}
-            </div>
+            </span>
           )
         }
         if (block.type === 'image') {
@@ -310,10 +315,10 @@ function MediaAlignControls({ value, onChange }) {
 
 
 function figureInlineStyle(wPct, align) {
-  const base = 'display:inline-block;vertical-align:middle;max-width:100%;margin:0 0.2rem;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;cursor:grab'
-  if (align === 'left') return `${base};width:${wPct}%;`
-  if (align === 'right') return `${base};width:${wPct}%;`
-  return `${base};width:${wPct}%;`
+  const base = 'max-width:100%;user-select:none;-webkit-user-select:none;-webkit-user-drag:element;cursor:grab'
+  if (align === 'left') return `${base};display:block;float:left;width:${wPct}%;margin:0.25rem 1rem 0.75rem 0;`
+  if (align === 'right') return `${base};display:block;float:right;width:${wPct}%;margin:0.25rem 0 0.75rem 1rem;`
+  return `${base};display:inline-block;vertical-align:top;width:${wPct}%;margin:0.15rem 0.2rem;`
 }
 
 function domToBlocks(editorEl, figMeta) {
@@ -499,13 +504,17 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
   }
 
   const attachFigureClick = (fig) => {
+    if (fig.dataset.editorBound === 'true') return
+    fig.dataset.editorBound = 'true'
     fig.draggable = true
+    fig.style.webkitUserDrag = 'element'
     fig.addEventListener('dragstart', (e) => {
+      e.stopPropagation()
       const id = fig.dataset.blockId
       dragFigureId.current = id
       e.dataTransfer.effectAllowed = 'move'
       e.dataTransfer.setData('application/x-coms-editor-figure', id)
-      e.dataTransfer.setData('text/plain', '')
+      e.dataTransfer.setData('text/plain', '\u200B')
       setSelectedFigId(id)
     })
     fig.addEventListener('dragend', () => {
@@ -539,7 +548,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
       } else if (block.type === 'file') {
         const id = block.id || localId()
         figMeta.current.set(id, { type: 'file', status: block.status || 'saved', fileId: block.fileId, file: block.file, name: block.name, url: block.url })
-        html += `<figure contenteditable="false" draggable="true" data-block-id="${id}" data-type="file" style="display:inline-block;vertical-align:middle;margin:0 0.2rem;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;cursor:grab"><span style="display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.1);border-radius:4px;background:rgba(0,0,0,0.03);padding:6px 10px;font-size:13px;font-weight:600;pointer-events:none">📎 ${escH(block.name || '파일')}</span></figure>\u200B`
+        html += `<figure contenteditable="false" draggable="true" data-block-id="${id}" data-type="file" style="display:inline-block;vertical-align:top;margin:0.15rem 0.2rem;user-select:none;-webkit-user-select:none;-webkit-user-drag:element;cursor:grab"><span style="display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.1);border-radius:4px;background:rgba(0,0,0,0.03);padding:6px 10px;font-size:13px;font-weight:600;pointer-events:none">📎 ${escH(block.name || '파일')}</span></figure>\u200B`
       }
     }
     el.innerHTML = html || ''
@@ -614,7 +623,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
       vid.setAttribute('style', 'display:block;width:100%;height:auto')
       figure.appendChild(vid)
     } else {
-      figure.setAttribute('style', 'display:inline-block;vertical-align:middle;margin:0 0.2rem;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;cursor:grab')
+      figure.setAttribute('style', 'display:inline-block;vertical-align:top;margin:0.15rem 0.2rem;user-select:none;-webkit-user-select:none;-webkit-user-drag:element;cursor:grab')
       const span = document.createElement('span')
       span.setAttribute('style', 'display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.1);border-radius:4px;background:rgba(0,0,0,0.03);padding:6px 10px;font-size:13px;font-weight:600')
       span.textContent = `📎 ${file.name}`
