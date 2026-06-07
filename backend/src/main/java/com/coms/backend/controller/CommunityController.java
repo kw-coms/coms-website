@@ -102,6 +102,18 @@ public class CommunityController {
                 .body(resource);
     }
 
+    @GetMapping("/{id}/image/download")
+    public ResponseEntity<Resource> downloadImage(@PathVariable Long id) {
+        CommunityPost post = communityService.imagePost(id);
+        Resource resource = communityService.loadImage(id);
+        String filename = post.getImageOriginalName() == null ? "community-image" : post.getImageOriginalName();
+        return ResponseEntity.ok()
+                .contentType(mediaType(post.getImageMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(filename, StandardCharsets.UTF_8).build().toString())
+                .body(resource);
+    }
+
     @PostMapping(path = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<List<Long>> uploadImages(Authentication authentication,
                                                    @PathVariable Long id,
@@ -119,6 +131,18 @@ public class CommunityController {
         return ResponseEntity.ok()
                 .contentType(mediaType(mimeType))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(filename, StandardCharsets.UTF_8).build().toString())
+                .body(resource);
+    }
+
+    @GetMapping("/{id}/images/{imageId}/download")
+    public ResponseEntity<Resource> downloadExtraImage(@PathVariable Long id, @PathVariable Long imageId) {
+        com.coms.backend.domain.CommunityPostImage meta = communityService.loadExtraImageMeta(id, imageId);
+        Resource resource = communityService.loadExtraImage(id, imageId);
+        String filename = meta.getOriginalName() == null ? "image" : meta.getOriginalName();
+        return ResponseEntity.ok()
+                .contentType(mediaType(meta.getMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                         .filename(filename, StandardCharsets.UTF_8).build().toString())
                 .body(resource);
     }

@@ -164,6 +164,11 @@ function shortDate(iso) {
 
 function renderPostBlocks(post) {
   const blocks = parsePostBlocks(post)
+  const imageDownloadUrl = (url) => {
+    if (!url) return null
+    if (url.endsWith('/image')) return apiUrl(`${url}/download`)
+    return apiUrl(url.replace(/\/images\/(\d+)$/, '/images/$1/download'))
+  }
   return blocks.map((block, i) => {
     if (block.type === 'text') {
       if (!block.content.trim()) return null
@@ -179,6 +184,16 @@ function renderPostBlocks(post) {
       return (
         <div key={i} className="px-4 py-3 sm:px-5">
           <img src={src} alt={block.name || '이미지'} className={`${mediaAlignClass(block.align)} max-h-[560px] max-w-full object-contain`} style={mediaWidthStyle(block.width)} />
+          <div className="mt-3 flex justify-center">
+            <a
+              href={imageDownloadUrl(block.url)}
+              download={block.name}
+              className="inline-flex items-center gap-1.5 rounded border border-black/15 bg-white px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] hover:bg-black/5"
+            >
+              <Download size={14} />
+              다운로드
+            </a>
+          </div>
         </div>
       )
     }
