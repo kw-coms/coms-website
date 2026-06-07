@@ -64,9 +64,86 @@ const MEDIA_ALIGN_OPTIONS = [
   { value: 'center', label: '가운데' },
   { value: 'right', label: '오른쪽' },
 ]
+const FORMATTED_TEXT_RE = /<\/?(strong|b|em|i|u|span|font|br|div|p)\b/i
 
 let _localIdCounter = 0
 function localId() { return `blk-${++_localIdCounter}` }
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function appendCleanChildren(source, target) {
+  for (const child of Array.from(source.childNodes)) {
+    const clean = cleanEditorNode(child)
+    if (clean) target.appendChild(clean)
+  }
+}
+
+function cleanEditorNode(node) {
+  if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.textContent.replace(/\u200B/g, ''))
+  if (node.nodeType !== Node.ELEMENT_NODE) return document.createTextNode('')
+
+  const tag = node.tagName.toLowerCase()
+  if (tag === 'br') return document.createElement('br')
+  if (['b', 'strong', 'i', 'em', 'u'].includes(tag)) {
+    const el = document.createElement(tag)
+    appendCleanChildren(node, el)
+    return el
+  }
+  if (tag === 'span' || tag === 'font') {
+    const el = document.createElement('span')
+    const style = []
+    const color = node.style?.color || node.getAttribute('color')
+    const backgroundColor = node.style?.backgroundColor
+    if (color && !/url|expression|javascript/i.test(color)) style.push(`color:${color}`)
+    if (backgroundColor && !/url|expression|javascript/i.test(backgroundColor)) style.push(`background-color:${backgroundColor}`)
+    if (style.length) el.setAttribute('style', style.join(';'))
+    appendCleanChildren(node, el)
+    return el
+  }
+  if (tag === 'div' || tag === 'p') {
+    const fragment = document.createDocumentFragment()
+    appendCleanChildren(node, fragment)
+    fragment.appendChild(document.createElement('br'))
+    return fragment
+  }
+  const fragment = document.createDocumentFragment()
+  appendCleanChildren(node, fragment)
+  return fragment
+}
+
+function sanitizeEditorHtml(value) {
+  if (typeof document === 'undefined') return escapeHtml(value)
+  const template = document.createElement('template')
+  template.innerHTML = String(value || '')
+  const container = document.createElement('div')
+  appendCleanChildren(template.content, container)
+  return container.innerHTML
+    .replace(/\u200B/g, '')
+    .replace(/(<br\s*\/?>\s*)+$/gi, '')
+}
+
+function textToEditorHtml(value) {
+  const raw = String(value || '')
+  if (FORMATTED_TEXT_RE.test(raw)) return sanitizeEditorHtml(raw)
+  return escapeHtml(raw).replace(/\n/g, '<br>')
+}
+
+function hasFormattedText(value) {
+  return FORMATTED_TEXT_RE.test(String(value || ''))
+}
+
+function textContentForSearch(value) {
+  if (!hasFormattedText(value) || typeof document === 'undefined') return String(value || '')
+  const template = document.createElement('template')
+  template.innerHTML = sanitizeEditorHtml(value)
+  return template.content.textContent || ''
+}
 
 function mediaWidthPercent(width) {
   const numeric = Number(width)
@@ -215,6 +292,15 @@ function renderPostBlocks(post) {
       {blocks.map((block, i) => {
         if (block.type === 'text') {
           if (!block.content.trim()) return null
+          if (hasFormattedText(block.content)) {
+            return (
+              <span
+                key={i}
+                className="text-size-container whitespace-pre-wrap break-words auto-text-post"
+                dangerouslySetInnerHTML={{ __html: sanitizeEditorHtml(block.content) }}
+              />
+            )
+          }
           return (
             <span key={i} className="text-size-container whitespace-pre-wrap break-words auto-text-post">
               {linkify(block.content)}
@@ -323,15 +409,15 @@ function figureInlineStyle(wPct, align) {
 
 function domToBlocks(editorEl, figMeta) {
   const blocks = []
-  let text = ''
+  let html = ''
   const flushText = () => {
-    const clean = text.replace(/^\n+|\n+$/g, '')
+    const clean = sanitizeEditorHtml(html)
     if (clean) blocks.push({ type: 'text', content: clean, id: localId() })
-    text = ''
+    html = ''
   }
   const walk = (node) => {
-    if (node.nodeType === Node.TEXT_NODE) { text += node.textContent.replace(/\u200B/g, ''); return }
-    if (node.nodeName === 'BR') { text += '\n'; return }
+    if (node.nodeType === Node.TEXT_NODE) { html += escapeHtml(node.textContent.replace(/\u200B/g, '')); return }
+    if (node.nodeName === 'BR') { html += '<br>'; return }
     if (node.nodeName === 'FIGURE') {
       flushText()
       const id = node.dataset.blockId
@@ -344,9 +430,13 @@ function domToBlocks(editorEl, figMeta) {
       return
     }
     const isBlock = ['DIV', 'P', 'H1', 'H2', 'H3'].includes(node.nodeName)
-    if (isBlock && text && !text.endsWith('\n')) text += '\n'
+    if (isBlock && html && !html.endsWith('<br>')) html += '<br>'
+    if (!isBlock && node.nodeType === Node.ELEMENT_NODE) {
+      html += sanitizeEditorHtml(node.outerHTML)
+      return
+    }
     for (const child of node.childNodes) walk(child)
-    if (isBlock && text && !text.endsWith('\n')) text += '\n'
+    if (isBlock && html && !html.endsWith('<br>')) html += '<br>'
   }
   for (const child of editorEl.childNodes) walk(child)
   flushText()
@@ -434,6 +524,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
   const savedRange = useRef(null)
   const [selectedFigId, setSelectedFigId] = useState(null)
   const [selectedMeta, setSelectedMeta] = useState(null)
+  const [dropIndicator, setDropIndicator] = useState(null)
   const initialized = useRef(false)
 
   useEffect(() => {
@@ -480,6 +571,35 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
     return null
   }
 
+  const rangeRect = (range) => {
+    if (!range) return null
+    const rect = range.getBoundingClientRect()
+    if (rect.width || rect.height) return rect
+    const marker = document.createElement('span')
+    marker.textContent = '\u200B'
+    range.insertNode(marker)
+    const markerRect = marker.getBoundingClientRect()
+    marker.remove()
+    return markerRect
+  }
+
+  const updateDropIndicator = (clientX, clientY) => {
+    const editor = divRef.current
+    const range = rangeFromPoint(clientX, clientY)
+    const rect = rangeRect(range)
+    const editorRect = editor?.getBoundingClientRect()
+    if (!rect || !editorRect) {
+      setDropIndicator(null)
+      return range
+    }
+    setDropIndicator({
+      left: Math.max(0, rect.left - editorRect.left),
+      top: Math.max(0, rect.top - editorRect.top),
+      height: Math.max(24, rect.height || 24),
+    })
+    return range
+  }
+
   const insertAtRange = (node, range) => {
     const editor = divRef.current
     if (!editor) return
@@ -519,6 +639,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
     })
     fig.addEventListener('dragend', () => {
       dragFigureId.current = null
+      setDropIndicator(null)
     })
     fig.addEventListener('pointerdown', (e) => {
       e.stopPropagation()
@@ -534,11 +655,11 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
     let html = ''
     for (const block of initialBlocks) {
       if (block.type === 'text') {
-        html += escH(block.content || '').replace(/\n/g, '<br>')
+        html += textToEditorHtml(block.content)
       } else if (block.type === 'image' || block.type === 'video') {
         const id = block.id || localId()
         const wPct = mediaWidthPercent(block.width)
-        const align = block.align || 'center'
+        const align = block.align || 'left'
         figMeta.current.set(id, { type: block.type, status: block.status || 'saved', mediaId: block.mediaId, file: block.file, preview: block.preview, name: block.name, url: block.url, width: wPct, align, legacy: block.legacy })
         const src = safeSrc(block.preview || (block.url ? apiUrl(block.url) : ''))
         const inner = block.type === 'image'
@@ -561,6 +682,22 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
     if (sel?.rangeCount > 0 && divRef.current?.contains(sel.getRangeAt(0).commonAncestorContainer)) {
       savedRange.current = sel.getRangeAt(0).cloneRange()
     }
+  }
+
+  const restoreSelection = () => {
+    const sel = window.getSelection()
+    const range = savedRange.current
+    if (!sel || !range || !divRef.current?.contains(range.commonAncestorContainer)) return false
+    sel.removeAllRanges()
+    sel.addRange(range)
+    return true
+  }
+
+  const formatBlock = (command, value = null) => {
+    divRef.current?.focus()
+    restoreSelection()
+    document.execCommand(command, false, value)
+    saveSelection()
   }
 
   const insertAtCursor = (node) => {
@@ -599,15 +736,15 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
     const type = isImage ? 'image' : isVideo ? 'video' : 'file'
     const id = localId()
     const preview = type !== 'file' ? URL.createObjectURL(file) : null
-    figMeta.current.set(id, { type, status: 'pending', file, preview, name: file.name, width: 75, align: 'center' })
+    figMeta.current.set(id, { type, status: 'pending', file, preview, name: file.name, width: 75, align: type === 'file' ? 'center' : 'left' })
     const figure = document.createElement('figure')
     figure.contentEditable = 'false'
     figure.draggable = true
     figure.dataset.blockId = id
     figure.dataset.type = type
-    figure.dataset.align = 'center'
+    figure.dataset.align = type === 'file' ? 'center' : 'left'
     if (type === 'image') {
-      figure.setAttribute('style', figureInlineStyle(75, 'center'))
+      figure.setAttribute('style', figureInlineStyle(75, 'left'))
       const img = document.createElement('img')
       img.src = preview
       img.className = 'community-inline-media-image'
@@ -615,7 +752,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
       img.draggable = false
       figure.appendChild(img)
     } else if (type === 'video') {
-      figure.setAttribute('style', figureInlineStyle(75, 'center'))
+      figure.setAttribute('style', figureInlineStyle(75, 'left'))
       const vid = document.createElement('video')
       vid.src = preview
       vid.controls = true
@@ -637,6 +774,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
     if (!apiRef) return
     apiRef.current = {
       insertFiles: (files) => { saveSelection(); files.forEach(insertFile) },
+      formatBlock,
       saveSelection,
       getBlocks: () => divRef.current ? domToBlocks(divRef.current, figMeta.current) : [],
       getFigMeta: () => figMeta.current,
@@ -703,7 +841,11 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
             || Array.from(e.dataTransfer?.items || []).some(i => i.kind === 'file')) {
             e.preventDefault()
             e.dataTransfer.dropEffect = e.dataTransfer.types.includes('application/x-coms-editor-figure') ? 'move' : 'copy'
+            updateDropIndicator(e.clientX, e.clientY)
           }
+        }}
+        onDragLeave={(e) => {
+          if (!(e.relatedTarget instanceof Node) || !divRef.current?.contains(e.relatedTarget)) setDropIndicator(null)
         }}
         onDrop={(e) => {
           const movingFigId = e.dataTransfer?.getData('application/x-coms-editor-figure') || dragFigureId.current
@@ -711,19 +853,21 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
             e.preventDefault()
             const fig = divRef.current?.querySelector(`[data-block-id="${movingFigId}"]`)
             if (!fig) return
-            const range = rangeFromPoint(e.clientX, e.clientY)
+            const range = updateDropIndicator(e.clientX, e.clientY)
             insertAtRange(fig, range)
             attachFigureClick(fig)
             setSelectedFigId(movingFigId)
             dragFigureId.current = null
+            setDropIndicator(null)
             return
           }
           const files = Array.from(e.dataTransfer?.files || [])
           if (!files.length) return
           e.preventDefault()
-          const range = rangeFromPoint(e.clientX, e.clientY)
+          const range = updateDropIndicator(e.clientX, e.clientY)
           savedRange.current = range
           files.forEach(insertFile)
+          setDropIndicator(null)
         }}
         onPaste={(e) => {
           const items = Array.from(e.clipboardData?.items || [])
@@ -741,6 +885,12 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
         className="min-h-[420px] w-full whitespace-pre-wrap break-words bg-white px-4 py-5 text-sm leading-7 text-[var(--theme-body-dark)] outline-none sm:px-5"
         placeholder="내용을 입력하세요. 이미지, 동영상을 드래그하거나 툴바에서 삽입할 수 있습니다."
       />
+      {dropIndicator && (
+        <div
+          className="community-drop-indicator pointer-events-none absolute z-10 w-1 rounded-full bg-[#3b4890] shadow-[0_0_0_3px_rgba(59,72,144,0.18)]"
+          style={{ left: dropIndicator.left, top: dropIndicator.top, height: dropIndicator.height }}
+        />
+      )}
       {selectedFigId && (
         <FigureToolbar
           editorRef={divRef}
@@ -804,12 +954,15 @@ function PostForm({ initialPost, onCancel, onSave }) {
   const editorApiRef = useRef(null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const initialBlocks = useMemo(() => isEditing ? parsePostBlocks(initialPost) : [], [])
+  const applyFormat = (command, value = null) => {
+    editorApiRef.current?.formatBlock(command, value)
+  }
 
   const submit = async (e) => {
     e.preventDefault()
     if (!title.trim()) { setError('제목을 입력해주세요.'); return }
     const blocks = editorApiRef.current?.getBlocks() || []
-    const hasContent = blocks.some(b => (b.type === 'text' && b.content.trim()) || b.type === 'image' || b.type === 'video' || b.type === 'file')
+    const hasContent = blocks.some(b => (b.type === 'text' && textContentForSearch(b.content).trim()) || b.type === 'image' || b.type === 'video' || b.type === 'file')
     if (!hasContent) { setError('내용을 입력하거나 사진/영상/첨부파일을 추가해주세요.'); return }
 
     setSaving(true)
@@ -820,7 +973,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
         postId = initialPost.id
       } else {
         setSavingStep('글 등록 중...')
-        const placeholder = blocks.find(b => b.type === 'text' && b.content.trim())?.content.trim() || '...'
+        const placeholder = textContentForSearch(blocks.find(b => b.type === 'text' && textContentForSearch(b.content).trim())?.content || '').trim() || '...'
         const created = await createCommunityPost({ title: title.trim(), content: placeholder, category })
         postId = created.id
       }
@@ -896,6 +1049,24 @@ function PostForm({ initialPost, onCancel, onSave }) {
       <div className="overflow-hidden rounded border border-black/15 bg-white">
         <div className="flex flex-wrap items-center gap-2 border-b border-black/10 bg-black/[0.03] px-3 py-2">
           <span className="mr-1 text-xs font-black uppercase tracking-[0.2em] text-[var(--theme-body-muted)]">Editor</span>
+          <div className="inline-flex overflow-hidden rounded border border-black/15 bg-white">
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('bold')}
+              className="min-h-9 px-3 text-sm font-black text-[var(--theme-body-dark)] hover:bg-black/5">B</button>
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('italic')}
+              className="min-h-9 px-3 text-sm italic text-[var(--theme-body-dark)] hover:bg-black/5">I</button>
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('underline')}
+              className="min-h-9 px-3 text-sm underline text-[var(--theme-body-dark)] hover:bg-black/5">U</button>
+          </div>
+          <label className="inline-flex min-h-9 items-center gap-1.5 rounded border border-black/15 bg-white px-2 text-xs font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+            글자색
+            <input type="color" defaultValue="#111827" className="h-6 w-7 cursor-pointer border-0 bg-transparent p-0"
+              onMouseDown={(e) => e.preventDefault()} onChange={(e) => applyFormat('foreColor', e.target.value)} />
+          </label>
+          <label className="inline-flex min-h-9 items-center gap-1.5 rounded border border-black/15 bg-white px-2 text-xs font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+            배경
+            <input type="color" defaultValue="#fff3a3" className="h-6 w-7 cursor-pointer border-0 bg-transparent p-0"
+              onMouseDown={(e) => e.preventDefault()} onChange={(e) => applyFormat('hiliteColor', e.target.value)} />
+          </label>
           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
             <ImagePlus size={14} />이미지
             <input type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp" className="hidden"
