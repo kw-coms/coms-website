@@ -268,9 +268,6 @@ function MediaStatus({ block }) {
   if (block.status === 'failed') {
     return <p className="mt-1 text-xs font-semibold text-red-500">{block.error || '업로드 실패'}</p>
   }
-  if (block.status === 'pending') {
-    return <p className="mt-1 text-xs text-[var(--theme-body-muted)]">등록하면 업로드됩니다</p>
-  }
   return null
 }
 
@@ -407,7 +404,7 @@ function pointOffsetWithin(element, clientX, clientY) {
   return before.toString().length
 }
 
-function PlainTextEditor({ value, onChange, onPaste, onFilesAtOffset, onCaretChange, placeholder, minRows = 3, maxLength }) {
+function PlainTextEditor({ value, editorId, onChange, onPaste, onFilesAtOffset, onCaretChange, placeholder, minRows = 3, maxLength }) {
   const editorRef = useRef(null)
   const minHeight = `${Math.max(minRows, 1) * 1.75}rem`
 
@@ -453,6 +450,7 @@ function PlainTextEditor({ value, onChange, onPaste, onFilesAtOffset, onCaretCha
       )}
       <div
         ref={editorRef}
+        data-editor-text-id={editorId}
         role="textbox"
         aria-multiline="true"
         tabIndex={0}
@@ -531,13 +529,24 @@ function PostForm({ initialPost, onCancel, onSave }) {
     return toAdd
   }
 
+  const ensureTextAfterMedia = (nextBlocks, insertIndex, mediaCount) => {
+    const afterMediaIndex = insertIndex + mediaCount
+    const nextBlock = nextBlocks[afterMediaIndex]
+    if (nextBlock?.type === 'text') return nextBlocks
+    return [
+      ...nextBlocks.slice(0, afterMediaIndex),
+      { type: 'text', content: '', id: localId() },
+      ...nextBlocks.slice(afterMediaIndex),
+    ]
+  }
+
   const insertFilesAtBlockIndex = (files, insertIndex) => {
     setBlocks((prev) => {
       const toAdd = mediaBlocksFromFiles(files, prev)
       if (toAdd.length === 0) return prev
       setError('')
       const safeIndex = Math.max(0, Math.min(insertIndex, prev.length))
-      return [...prev.slice(0, safeIndex), ...toAdd, ...prev.slice(safeIndex)]
+      return ensureTextAfterMedia([...prev.slice(0, safeIndex), ...toAdd, ...prev.slice(safeIndex)], safeIndex, toAdd.length)
     })
   }
 
@@ -672,7 +681,12 @@ function PostForm({ initialPost, onCancel, onSave }) {
     insertFilesAtBlockIndex(files, blocks.length)
   }
 
-  const insertFilesAtCanvasPoint = (files, canvas, clientY) => {
+  const insertFilesAtCanvasPoint = (files, canvas, clientX, clientY) => {
+    const textNode = document.elementFromPoint(clientX, clientY)?.closest('[data-editor-text-id]')
+    if (textNode && canvas.contains(textNode)) {
+      insertFilesAtTextOffset(textNode.dataset.editorTextId, pointOffsetWithin(textNode, clientX, clientY), files)
+      return
+    }
     const nodes = Array.from(canvas.querySelectorAll('[data-editor-block-id]'))
     const targetIndex = nodes.findIndex((node) => {
       const rect = node.getBoundingClientRect()
@@ -809,7 +823,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
               return
             }
             e.preventDefault()
-            insertFilesAtCanvasPoint(files, e.currentTarget, e.clientY)
+            insertFilesAtCanvasPoint(files, e.currentTarget, e.clientX, e.clientY)
           }}
         >
           {blocks.map((block, idx) => (
@@ -827,6 +841,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
                 <div className="relative min-w-0">
                   <PlainTextEditor
                     value={block.content}
+                    editorId={block.id}
                     onChange={(content) => updateText(block.id, content)}
                     onPaste={(e, offset) => handlePaste(e, block.id, offset)}
                     onFilesAtOffset={(files, offset) => insertFilesAtTextOffset(block.id, offset, files)}
