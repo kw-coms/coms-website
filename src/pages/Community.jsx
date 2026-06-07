@@ -195,11 +195,16 @@ function renderPostBlocks(post) {
     .filter((item, index, items) => item.href && items.findIndex((candidate) => candidate.href === item.href) === index)
   const allAttachments = attachments
   const mediaContainerStyle = (width, align) =>
-    align === 'left'
-      ? { float: 'left', width: `${mediaWidthPercent(width)}%`, marginRight: '1rem', marginBottom: '0.25rem' }
-      : align === 'right'
-      ? { float: 'right', width: `${mediaWidthPercent(width)}%`, marginLeft: '1rem', marginBottom: '0.25rem' }
-      : { display: 'block', width: `${mediaWidthPercent(width)}%`, marginLeft: 'auto', marginRight: 'auto' }
+    ({
+      display: 'inline-block',
+      width: `${mediaWidthPercent(width)}%`,
+      maxWidth: '100%',
+      margin: '0 0.2rem',
+      verticalAlign: 'middle',
+      userSelect: 'none',
+      WebkitUserDrag: 'none',
+      textAlign: align === 'right' ? 'right' : align === 'center' ? 'center' : 'left',
+    })
   return (
     <div className="px-4 py-5 sm:px-5">
       {blocks.map((block, i) => {
@@ -216,7 +221,7 @@ function renderPostBlocks(post) {
           if (!src) return null
           return (
             <div key={i} className="group relative my-2" style={mediaContainerStyle(block.width, block.align)}>
-              <img src={src} alt={block.name || '이미지'} className="block h-auto w-full" />
+              <img src={src} alt={block.name || '이미지'} draggable={false} className="community-inline-media-image" />
               <a
                 href={imageDownloadUrl(block.url)}
                 download={block.name}
@@ -305,10 +310,10 @@ function MediaAlignControls({ value, onChange }) {
 
 
 function figureInlineStyle(wPct, align) {
-  const base = 'user-select:none;-webkit-user-select:none;cursor:default'
-  if (align === 'left') return `float:left;width:${wPct}%;margin-right:1rem;margin-bottom:0.25rem;${base}`
-  if (align === 'right') return `float:right;width:${wPct}%;margin-left:1rem;margin-bottom:0.25rem;${base}`
-  return `display:block;width:${wPct}%;margin-left:auto;margin-right:auto;clear:both;${base}`
+  const base = 'display:inline-block;vertical-align:middle;max-width:100%;margin:0 0.2rem;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;cursor:grab'
+  if (align === 'left') return `${base};width:${wPct}%;`
+  if (align === 'right') return `${base};width:${wPct}%;`
+  return `${base};width:${wPct}%;`
 }
 
 function domToBlocks(editorEl, figMeta) {
@@ -320,7 +325,7 @@ function domToBlocks(editorEl, figMeta) {
     text = ''
   }
   const walk = (node) => {
-    if (node.nodeType === Node.TEXT_NODE) { text += node.textContent; return }
+    if (node.nodeType === Node.TEXT_NODE) { text += node.textContent.replace(/\u200B/g, ''); return }
     if (node.nodeName === 'BR') { text += '\n'; return }
     if (node.nodeName === 'FIGURE') {
       flushText()
@@ -432,12 +437,81 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
 
   const escH = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
   const safeSrc = (url) => (url && /^(https?:|blob:|\/)/i.test(url) ? url : '')
+  const dragFigureId = useRef(null)
+
+  const trailingTypingNode = () => document.createTextNode('\u200B')
+
+  const setCaretAfter = (node) => {
+    const sel = window.getSelection()
+    if (!sel) return
+    const after = document.createRange()
+    after.setStartAfter(node)
+    after.collapse(true)
+    sel.removeAllRanges()
+    sel.addRange(after)
+    savedRange.current = after.cloneRange()
+  }
+
+  const ensureTypingSpaceAfter = (node) => {
+    if (!node?.parentNode) return null
+    const next = node.nextSibling
+    if (next?.nodeType === Node.TEXT_NODE && next.textContent?.startsWith('\u200B')) return next
+    const spacer = trailingTypingNode()
+    node.parentNode.insertBefore(spacer, next)
+    return spacer
+  }
+
+  const rangeFromPoint = (clientX, clientY) => {
+    if (document.caretPositionFromPoint) {
+      const position = document.caretPositionFromPoint(clientX, clientY)
+      if (position) {
+        const range = document.createRange()
+        range.setStart(position.offsetNode, position.offset)
+        range.collapse(true)
+        return range
+      }
+    }
+    if (document.caretRangeFromPoint) return document.caretRangeFromPoint(clientX, clientY)
+    return null
+  }
+
+  const insertAtRange = (node, range) => {
+    const editor = divRef.current
+    if (!editor) return
+    let targetRange = range
+    if (!targetRange || !editor.contains(targetRange.commonAncestorContainer)) {
+      targetRange = document.createRange()
+      targetRange.selectNodeContents(editor)
+      targetRange.collapse(false)
+    }
+    let container = targetRange.commonAncestorContainer
+    if (container.nodeType === Node.TEXT_NODE) container = container.parentNode
+    if (container.closest?.('figure')) {
+      const fig = container.closest('figure')
+      targetRange = document.createRange()
+      targetRange.setStartAfter(fig)
+      targetRange.collapse(true)
+    }
+    targetRange.deleteContents()
+    targetRange.insertNode(node)
+    const spacer = ensureTypingSpaceAfter(node)
+    setCaretAfter(spacer || node)
+  }
 
   const attachFigureClick = (fig) => {
-    fig.draggable = false
-    fig.addEventListener('dragstart', (e) => e.preventDefault())
+    fig.draggable = true
+    fig.addEventListener('dragstart', (e) => {
+      const id = fig.dataset.blockId
+      dragFigureId.current = id
+      e.dataTransfer.effectAllowed = 'move'
+      e.dataTransfer.setData('application/x-coms-editor-figure', id)
+      e.dataTransfer.setData('text/plain', '')
+      setSelectedFigId(id)
+    })
+    fig.addEventListener('dragend', () => {
+      dragFigureId.current = null
+    })
     fig.addEventListener('pointerdown', (e) => {
-      e.preventDefault()
       e.stopPropagation()
       setSelectedFigId(fig.dataset.blockId)
     })
@@ -459,13 +533,13 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
         figMeta.current.set(id, { type: block.type, status: block.status || 'saved', mediaId: block.mediaId, file: block.file, preview: block.preview, name: block.name, url: block.url, width: wPct, align, legacy: block.legacy })
         const src = safeSrc(block.preview || (block.url ? apiUrl(block.url) : ''))
         const inner = block.type === 'image'
-          ? `<img src="${escH(src)}" alt="" draggable="false" style="display:block;width:100%;height:auto;pointer-events:none">`
-          : `<video src="${escH(src)}" controls draggable="false" style="display:block;width:100%;height:auto"></video>`
-        html += `<figure contenteditable="false" data-block-id="${id}" data-type="${block.type}" data-align="${align}" style="${figureInlineStyle(wPct, align)}">${inner}</figure>`
+          ? `<img src="${escH(src)}" alt="" draggable="false" class="community-inline-media-image" style="pointer-events:none">`
+          : `<video src="${escH(src)}" controls preload="metadata" draggable="false" style="display:block;width:100%;height:auto"></video>`
+        html += `<figure contenteditable="false" data-block-id="${id}" data-type="${block.type}" data-align="${align}" style="${figureInlineStyle(wPct, align)}">${inner}</figure>\u200B`
       } else if (block.type === 'file') {
         const id = block.id || localId()
         figMeta.current.set(id, { type: 'file', status: block.status || 'saved', fileId: block.fileId, file: block.file, name: block.name, url: block.url })
-        html += `<figure contenteditable="false" draggable="false" data-block-id="${id}" data-type="file" style="display:inline-block;clear:both;user-select:none;-webkit-user-select:none;cursor:default"><span style="display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.1);border-radius:4px;background:rgba(0,0,0,0.03);padding:6px 10px;font-size:13px;font-weight:600;pointer-events:none">📎 ${escH(block.name || '파일')}</span></figure>`
+        html += `<figure contenteditable="false" draggable="true" data-block-id="${id}" data-type="file" style="display:inline-block;vertical-align:middle;margin:0 0.2rem;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;cursor:grab"><span style="display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.1);border-radius:4px;background:rgba(0,0,0,0.03);padding:6px 10px;font-size:13px;font-weight:600;pointer-events:none">📎 ${escH(block.name || '파일')}</span></figure>\u200B`
       }
     }
     el.innerHTML = html || ''
@@ -492,16 +566,11 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
         range.setStartAfter(fig)
         range.collapse(true)
       }
-      range.deleteContents()
-      range.insertNode(node)
-      const after = document.createRange()
-      after.setStartAfter(node)
-      after.collapse(true)
-      sel.removeAllRanges()
-      sel.addRange(after)
-      savedRange.current = after.cloneRange()
+      insertAtRange(node, range)
     } else {
       divRef.current?.appendChild(node)
+      const spacer = ensureTypingSpaceAfter(node)
+      setCaretAfter(spacer || node)
     }
   }
 
@@ -524,6 +593,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
     figMeta.current.set(id, { type, status: 'pending', file, preview, name: file.name, width: 75, align: 'center' })
     const figure = document.createElement('figure')
     figure.contentEditable = 'false'
+    figure.draggable = true
     figure.dataset.blockId = id
     figure.dataset.type = type
     figure.dataset.align = 'center'
@@ -531,7 +601,8 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
       figure.setAttribute('style', figureInlineStyle(75, 'center'))
       const img = document.createElement('img')
       img.src = preview
-      img.setAttribute('style', 'display:block;width:100%;height:auto;pointer-events:none')
+      img.className = 'community-inline-media-image'
+      img.setAttribute('style', 'pointer-events:none')
       img.draggable = false
       figure.appendChild(img)
     } else if (type === 'video') {
@@ -539,10 +610,11 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
       const vid = document.createElement('video')
       vid.src = preview
       vid.controls = true
+      vid.preload = 'metadata'
       vid.setAttribute('style', 'display:block;width:100%;height:auto')
       figure.appendChild(vid)
     } else {
-      figure.setAttribute('style', 'display:inline-block;clear:both;user-select:none;-webkit-user-select:none;cursor:default')
+      figure.setAttribute('style', 'display:inline-block;vertical-align:middle;margin:0 0.2rem;user-select:none;-webkit-user-select:none;-webkit-user-drag:none;cursor:grab')
       const span = document.createElement('span')
       span.setAttribute('style', 'display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.1);border-radius:4px;background:rgba(0,0,0,0.03);padding:6px 10px;font-size:13px;font-weight:600')
       span.textContent = `📎 ${file.name}`
@@ -617,13 +689,31 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
             document.execCommand('insertLineBreak')
           }
         }}
-        onDragStart={(e) => { if (e.target.closest?.('figure')) e.preventDefault() }}
-        onDragOver={(e) => { if (Array.from(e.dataTransfer?.items || []).some(i => i.kind === 'file')) e.preventDefault() }}
+        onDragOver={(e) => {
+          if (e.dataTransfer?.types?.includes('application/x-coms-editor-figure')
+            || Array.from(e.dataTransfer?.items || []).some(i => i.kind === 'file')) {
+            e.preventDefault()
+            e.dataTransfer.dropEffect = e.dataTransfer.types.includes('application/x-coms-editor-figure') ? 'move' : 'copy'
+          }
+        }}
         onDrop={(e) => {
+          const movingFigId = e.dataTransfer?.getData('application/x-coms-editor-figure') || dragFigureId.current
+          if (movingFigId) {
+            e.preventDefault()
+            const fig = divRef.current?.querySelector(`[data-block-id="${movingFigId}"]`)
+            if (!fig) return
+            const range = rangeFromPoint(e.clientX, e.clientY)
+            insertAtRange(fig, range)
+            attachFigureClick(fig)
+            setSelectedFigId(movingFigId)
+            dragFigureId.current = null
+            return
+          }
           const files = Array.from(e.dataTransfer?.files || [])
           if (!files.length) return
           e.preventDefault()
-          saveSelection()
+          const range = rangeFromPoint(e.clientX, e.clientY)
+          savedRange.current = range
           files.forEach(insertFile)
         }}
         onPaste={(e) => {
