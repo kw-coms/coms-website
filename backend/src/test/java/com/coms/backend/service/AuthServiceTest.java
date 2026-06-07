@@ -340,8 +340,8 @@ class AuthServiceTest {
                 "Password1!",
                 null,
                 null,
-                null,
-                null,
+                "이 값은 졸업생 가입에서 저장되지 않아야 합니다.",
+                "웹",
                 "GRADUATE"
         ));
 
