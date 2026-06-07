@@ -20,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -225,7 +226,7 @@ class AuthServiceTest {
         FontService fontService = mock(FontService.class);
         when(fontService.isSelectable(null)).thenReturn(true);
         BannedStudentService banned = mock(BannedStudentService.class);
-        AuthService service = new AuthService(repo, loginFailures, eligible, passwordEncoder, jwt, sender, fontService, banned);
+        AuthService service = new AuthService(repo, loginFailures, eligible, passwordEncoder, jwt, sender, fontService, banned, Clock.systemDefaultZone());
 
         when(repo.existsByStudentId("2026123462")).thenReturn(false);
         when(repo.existsByEmail("new@example.com")).thenReturn(false);
@@ -243,6 +244,7 @@ class AuthServiceTest {
                 "Password1!",
                 "컴퓨터공학과",
                 "01012345678",
+                null,
                 null,
                 null
         )))
@@ -270,13 +272,36 @@ class AuthServiceTest {
                 "Password1!",
                 null,
                 null,
-                null,
-                null
+                "졸업생으로 다시 함께하고 싶습니다.",
+                "웹",
+                "GRADUATE"
         ))).isInstanceOf(ResponseStatusException.class);
 
         EligibleMember rolledBack = eligibleMemberRepository.findByVerificationKey("홍길동|2019").orElseThrow();
         assertThat(rolledBack.getStudentId()).isNull();
         assertThat(memberRepository.existsByStudentId("2019123462")).isFalse();
+    }
+
+    @Test
+    void graduateSignupRequiresInterestsAndAspiration() {
+        eligibleMemberService.addGraduateSingle("홍길동", "19", null);
+
+        assertThatThrownBy(() -> authService.signup(new SignupRequest(
+                "2019123463",
+                "홍길동",
+                "YEAR",
+                "19",
+                "graduate-missing-profile@example.com",
+                "Password1!",
+                null,
+                null,
+                null,
+                null,
+                "GRADUATE"
+        ))).isInstanceOf(ResponseStatusException.class);
+
+        assertThat(eligibleMemberRepository.findByStudentId("2019123463")).isEmpty();
+        assertThat(memberRepository.existsByStudentId("2019123463")).isFalse();
     }
 
     @Test
@@ -292,12 +317,15 @@ class AuthServiceTest {
                 "Password1!",
                 null,
                 null,
-                null,
-                null
+                "프로젝트로 후배들과 함께하고 싶습니다.",
+                "웹,기타:AI",
+                "GRADUATE"
         ));
 
         assertThat(response.studentId()).isEqualTo("2019123470");
-        assertThat(memberRepository.findByStudentId("2019123470")).isPresent();
+        Member saved = memberRepository.findByStudentId("2019123470").orElseThrow();
+        assertThat(saved.getAspiration()).isEqualTo("프로젝트로 후배들과 함께하고 싶습니다.");
+        assertThat(saved.getInterests()).isEqualTo("웹,기타:AI");
         EligibleMember claimed = eligibleMemberRepository.findByStudentId("2019123470").orElseThrow();
         assertThat(claimed.getVerificationKey()).isEqualTo("홍길동|2019");
     }
@@ -315,8 +343,9 @@ class AuthServiceTest {
                 "Password1!",
                 null,
                 null,
-                null,
-                null
+                "졸업생 네트워크 활동에 참여하겠습니다.",
+                "보안",
+                "GRADUATE"
         ));
 
         assertThat(response.studentId()).isEqualTo("2019123471");
