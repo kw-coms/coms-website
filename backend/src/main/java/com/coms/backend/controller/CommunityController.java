@@ -112,11 +112,14 @@ public class CommunityController {
 
     @GetMapping("/{id}/images/{imageId}")
     public ResponseEntity<Resource> getImage(@PathVariable Long id, @PathVariable Long imageId) {
+        com.coms.backend.domain.CommunityPostImage meta = communityService.loadExtraImageMeta(id, imageId);
         Resource resource = communityService.loadExtraImage(id, imageId);
-        String mimeType = communityService.getExtraImageMimeType(id, imageId);
+        String mimeType = meta.getMimeType();
+        String filename = meta.getOriginalName() == null ? "image" : meta.getOriginalName();
         return ResponseEntity.ok()
                 .contentType(mediaType(mimeType))
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().filename("image", StandardCharsets.UTF_8).build().toString())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(filename, StandardCharsets.UTF_8).build().toString())
                 .body(resource);
     }
 
