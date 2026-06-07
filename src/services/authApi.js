@@ -47,16 +47,16 @@ export async function confirmEmailVerification(code) {
   })
 }
 
-export async function requestSignupEmailVerification(studentId) {
+export async function requestSignupEmailVerification(studentId, email) {
   return request('/api/auth/email-verification/request-signup', {
     method: 'POST',
-    body: JSON.stringify({ studentId }),
+    body: JSON.stringify(studentId ? { studentId } : { email }),
   })
 }
 
-export async function confirmSignupEmailVerification(studentId, code) {
+export async function confirmSignupEmailVerification(studentId, code, email) {
   return request('/api/auth/email-verification/confirm-signup', {
     method: 'POST',
-    body: JSON.stringify({ studentId, code }),
+    body: JSON.stringify(studentId ? { studentId, code } : { email, code }),
   })
 }
