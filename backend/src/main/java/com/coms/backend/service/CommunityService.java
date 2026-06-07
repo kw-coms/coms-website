@@ -122,14 +122,15 @@ public class CommunityService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         SanitizedPost sanitized = validateRequest(request, post.getTitle());
+        boolean isInitialFinalization = "...".equals(post.getContent())
+                && !post.isEdited()
+                && java.time.Duration.between(post.getCreatedAt(), java.time.LocalDateTime.now()).toMinutes() < 5;
         post.setContent(sanitized.content());
         post.setCategory(sanitized.category());
         if (Boolean.TRUE.equals(request.removeImage())) {
             clearImage(post);
         }
         attachImage(post, image);
-        boolean isInitialFinalization = !post.isEdited()
-                && java.time.Duration.between(post.getCreatedAt(), java.time.LocalDateTime.now()).toMinutes() < 5;
         if (!isInitialFinalization) {
             post.markEdited();
         }
