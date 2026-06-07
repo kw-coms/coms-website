@@ -271,10 +271,21 @@ function MediaStatus({ block }) {
   if (block.status === 'pending') {
     return <p className="mt-1 text-xs text-[var(--theme-body-muted)]">등록하면 업로드됩니다</p>
   }
-  return <p className="mt-1 text-xs text-emerald-600">저장됨</p>
+  return null
 }
 
-function ResizableMedia({ block, onWidthChange, onAlignChange, onDelete, onDragStart, onDragEnd }) {
+function ResizableMedia({
+  block,
+  onWidthChange,
+  onAlignChange,
+  onDelete,
+  onDragStart,
+  onDragEnd,
+  onBlockDragOver,
+  onBlockDrop,
+  onBlockDragLeave,
+  isDropTarget,
+}) {
   const [selected, setSelected] = useState(false)
   const ref = useRef(null)
 
@@ -319,10 +330,14 @@ function ResizableMedia({ block, onWidthChange, onAlignChange, onDelete, onDragS
   return (
     <div
       ref={ref}
-      className="my-1 cursor-grab active:cursor-grabbing"
+      data-editor-block-id={block.id}
+      className={`my-1 cursor-grab active:cursor-grabbing ${isDropTarget ? 'rounded outline outline-2 outline-[var(--theme-accent)]/70' : ''}`}
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onDragOver={onBlockDragOver}
+      onDrop={onBlockDrop}
+      onDragLeave={onBlockDragLeave}
       style={containerStyle}
       title="드래그해서 위치 변경"
     >
@@ -394,7 +409,7 @@ function pointOffsetWithin(element, clientX, clientY) {
 
 function PlainTextEditor({ value, onChange, onPaste, onFilesAtOffset, onCaretChange, placeholder, minRows = 3, maxLength }) {
   const editorRef = useRef(null)
-  const minHeight = `${Math.max(minRows, 2) * 1.75 + 1}rem`
+  const minHeight = `${Math.max(minRows, 1) * 1.75}rem`
 
   useEffect(() => {
     const editor = editorRef.current
@@ -432,7 +447,7 @@ function PlainTextEditor({ value, onChange, onPaste, onFilesAtOffset, onCaretCha
   return (
     <div className="relative">
       {!value && (
-        <span className="pointer-events-none absolute left-2 top-2 text-sm leading-7 text-[var(--theme-body-muted)]/70">
+        <span className="pointer-events-none absolute left-0 top-0 text-sm leading-7 text-[var(--theme-body-muted)]/70">
           {placeholder}
         </span>
       )}
@@ -465,7 +480,7 @@ function PlainTextEditor({ value, onChange, onPaste, onFilesAtOffset, onCaretCha
             e.currentTarget.textContent = value
           }
         }}
-        className="min-h-[80px] w-full whitespace-pre-wrap break-words rounded border border-transparent bg-white px-2 py-2 text-sm leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+        className="min-h-7 w-full whitespace-pre-wrap break-words bg-transparent text-sm leading-7 text-[var(--theme-body-dark)] outline-none"
         style={{ minHeight }}
       />
     </div>
@@ -511,7 +526,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
       const type = isImage ? 'image' : 'video'
       if (type === 'image') nextImageCount += 1
       if (type === 'video') nextVideoCount += 1
-      toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 75, align: 'center', id: localId() })
+      toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 75, align: 'left', id: localId() })
     }
     return toAdd
   }
@@ -616,7 +631,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
         const type = isImage ? 'image' : 'video'
         if (type === 'image') nextImageCount += 1
         if (type === 'video') nextVideoCount += 1
-        toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 75, align: 'center', id: localId() })
+        toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 75, align: 'left', id: localId() })
       }
       if (toAdd.length === 0) return prev
 
@@ -798,18 +813,18 @@ function PostForm({ initialPost, onCancel, onSave }) {
           }}
         >
           {blocks.map((block, idx) => (
-            <div
-              key={block.id}
-              data-editor-block-id={block.id}
-              onDragOver={(e) => handleBlockDragOver(e, block.id)}
-              onDrop={(e) => handleBlockDrop(e, block.id)}
-              onDragLeave={() => {
-                if (dragOverBlockId === block.id) setDragOverBlockId(null)
-              }}
-              className={dragOverBlockId === block.id && draggingBlockId !== block.id ? 'rounded outline outline-2 outline-[var(--theme-accent)]/70' : ''}
-            >
-              {block.type === 'text' ? (
-                <div className="relative bg-white">
+            block.type === 'text' ? (
+              <div
+                key={block.id}
+                data-editor-block-id={block.id}
+                onDragOver={(e) => handleBlockDragOver(e, block.id)}
+                onDrop={(e) => handleBlockDrop(e, block.id)}
+                onDragLeave={() => {
+                  if (dragOverBlockId === block.id) setDragOverBlockId(null)
+                }}
+                className={dragOverBlockId === block.id && draggingBlockId !== block.id ? 'rounded outline outline-2 outline-[var(--theme-accent)]/70' : ''}
+              >
+                <div className="relative min-w-0">
                   <PlainTextEditor
                     value={block.content}
                     onChange={(content) => updateText(block.id, content)}
@@ -817,31 +832,38 @@ function PostForm({ initialPost, onCancel, onSave }) {
                     onFilesAtOffset={(files, offset) => insertFilesAtTextOffset(block.id, offset, files)}
                     onCaretChange={(offset) => setActiveTextTarget({ blockId: block.id, offset })}
                     placeholder={idx === 0 ? '내용을 입력하세요. 이미지나 동영상을 이 영역 안에 바로 넣을 수 있습니다.' : '내용을 이어서 입력하세요.'}
-                    minRows={idx === 0 ? 10 : 3}
+                    minRows={idx === 0 && blocks.length === 1 ? 10 : 1}
                     maxLength={MAX_CONTENT_LENGTH}
                   />
                 </div>
-              ) : (
-                <ResizableMedia
-                  block={block}
-                  onWidthChange={(w) => updateMediaWidth(block.id, w)}
-                  onAlignChange={(a) => updateMediaAlign(block.id, a)}
-                  onDelete={() => removeBlock(block.id)}
-                  onDragStart={(e) => {
-                    e.stopPropagation()
-                    e.dataTransfer.effectAllowed = 'move'
-                    e.dataTransfer.setData('text/plain', block.id)
-                    setDraggingBlockId(block.id)
-                  }}
-                  onDragEnd={() => {
-                    setDraggingBlockId(null)
-                    setDragOverBlockId(null)
-                  }}
-                />
-              )}
-            </div>
+              </div>
+            ) : (
+              <ResizableMedia
+                key={block.id}
+                block={block}
+                onWidthChange={(w) => updateMediaWidth(block.id, w)}
+                onAlignChange={(a) => updateMediaAlign(block.id, a)}
+                onDelete={() => removeBlock(block.id)}
+                onDragStart={(e) => {
+                  e.stopPropagation()
+                  e.dataTransfer.effectAllowed = 'move'
+                  e.dataTransfer.setData('text/plain', block.id)
+                  setDraggingBlockId(block.id)
+                }}
+                onDragEnd={() => {
+                  setDraggingBlockId(null)
+                  setDragOverBlockId(null)
+                }}
+                onBlockDragOver={(e) => handleBlockDragOver(e, block.id)}
+                onBlockDrop={(e) => handleBlockDrop(e, block.id)}
+                onBlockDragLeave={() => {
+                  if (dragOverBlockId === block.id) setDragOverBlockId(null)
+                }}
+                isDropTarget={dragOverBlockId === block.id && draggingBlockId !== block.id}
+              />
+            )
           ))}
-          <div style={{ clear: 'both' }} />
+          <div className="clear-both" />
         </div>
       </div>
 
