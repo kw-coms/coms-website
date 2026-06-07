@@ -10,6 +10,7 @@ import {
   Download,
   ImagePlus,
   MessageSquare,
+  Paperclip,
   Pencil,
   Search,
   Send,
@@ -29,6 +30,7 @@ import {
   listCommunityPosts,
   updateCommunityPost,
   uploadPostImages,
+  uploadPostFile,
   uploadPostVideo,
   voteCommunityPost,
 } from '../services/communityApi.js'
@@ -42,10 +44,15 @@ const MAX_CONTENT_LENGTH = 5000
 const MAX_COMMENT_LENGTH = 1000
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024
+const MAX_FILE_BYTES = 50 * 1024 * 1024
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/quicktime']
+const ALLOWED_FILE_TYPES = ['application/zip', 'application/x-zip-compressed', 'application/octet-stream']
 const MAX_EXTRA_IMAGES = 5
 const MAX_VIDEOS = 3
+const MAX_FILES = 5
+const IMAGE_OPTIMIZE_MAX_EDGE = 1920
+const IMAGE_OPTIMIZE_QUALITY = 0.82
 const LEGACY_MEDIA_WIDTHS = {
   small: 35,
   medium: 55,
@@ -94,6 +101,10 @@ function parsePostBlocks(post) {
         if (block.type === 'video') {
           const info = (post.videoInfos || []).find((v) => v.id === block.mediaId)
           return { type: 'video', status: 'saved', mediaId: block.mediaId, name: block.name || info?.originalName, url: info?.url, width: block.width || 'large', align: block.align || 'center', id: localId() }
+        }
+        if (block.type === 'file') {
+          const info = (post.fileInfos || []).find((f) => f.id === block.fileId)
+          return { type: 'file', status: 'saved', fileId: block.fileId, name: block.name || info?.originalName, url: info?.url, id: localId() }
         }
         return { type: 'text', content: block.content || '', id: localId() }
       }))
@@ -175,13 +186,14 @@ function renderPostBlocks(post) {
     url ? apiUrl(url.replace(/\/videos\/(\d+)$/, '/videos/$1/download')) : null
   )
   const attachments = blocks
-    .filter((block) => (block.type === 'image' || block.type === 'video') && block.url)
+    .filter((block) => (block.type === 'image' || block.type === 'video' || block.type === 'file') && block.url)
     .map((block) => ({
       key: `${block.type}-${block.url}`,
-      name: block.name || (block.type === 'image' ? 'image' : 'video'),
-      href: block.type === 'image' ? imageDownloadUrl(block.url) : videoDownloadUrl(block.url),
+      name: block.name || (block.type === 'image' ? 'image' : block.type === 'video' ? 'video' : 'attachment.zip'),
+      href: block.type === 'image' ? imageDownloadUrl(block.url) : block.type === 'video' ? videoDownloadUrl(block.url) : apiUrl(block.url),
     }))
     .filter((item, index, items) => item.href && items.findIndex((candidate) => candidate.href === item.href) === index)
+  const allAttachments = attachments
   const mediaContainerStyle = (width, align) =>
     align === 'left'
       ? { float: 'left', width: `${mediaWidthPercent(width)}%`, marginRight: '1rem', marginBottom: '0.25rem' }
@@ -222,7 +234,7 @@ function renderPostBlocks(post) {
           const downloadUrl = videoDownloadUrl(block.url)
           return (
             <div key={i} className="group relative my-2" style={mediaContainerStyle(block.width, block.align)}>
-              <video controls src={src} className="block h-auto w-full rounded" />
+              <video controls preload="metadata" src={src} className="block h-auto w-full rounded" />
               <a
                 href={downloadUrl}
                 download={block.name}
@@ -234,14 +246,15 @@ function renderPostBlocks(post) {
             </div>
           )
         }
+        if (block.type === 'file') return null
         return null
       })}
       <div style={{ clear: 'both' }} />
-      {attachments.length > 0 && (
+      {allAttachments.length > 0 && (
         <div className="mt-5 border-t border-black/10 pt-4">
           <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-[var(--theme-body-muted)]">첨부파일</p>
           <div className="flex flex-col gap-2">
-            {attachments.map((attachment) => (
+            {allAttachments.map((attachment) => (
               <a
                 key={attachment.key}
                 href={attachment.href}
@@ -371,7 +384,7 @@ function ResizableMedia({
       <div className="relative" onClick={(e) => { e.stopPropagation(); setSelected(true) }}>
         {block.type === 'image'
           ? <img src={src} alt={block.name} draggable={false} className="block h-auto w-full select-none" />
-          : <video src={src} controls className="block h-auto w-full" />
+          : <video src={src} controls preload="metadata" className="block h-auto w-full" />
         }
         {selected && (
           <>
@@ -399,6 +412,42 @@ function ResizableMedia({
         )}
       </div>
       <MediaStatus block={block} />
+    </div>
+  )
+}
+
+function FileAttachmentBlock({
+  block,
+  onDelete,
+  onDragStart,
+  onDragEnd,
+  onBlockDragOver,
+  onBlockDrop,
+  onBlockDragLeave,
+  isDropTarget,
+}) {
+  return (
+    <div
+      data-editor-block-id={block.id}
+      className={`my-1 inline-flex max-w-full cursor-grab items-center gap-2 rounded border border-black/10 bg-black/[0.03] px-3 py-2 text-sm active:cursor-grabbing ${isDropTarget ? 'outline outline-2 outline-[var(--theme-accent)]/70' : ''}`}
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragOver={onBlockDragOver}
+      onDrop={onBlockDrop}
+      onDragLeave={onBlockDragLeave}
+      title="드래그해서 위치 변경"
+    >
+      <Paperclip size={15} className="shrink-0 text-[var(--theme-body-muted)]" />
+      <span className="min-w-0 break-all font-semibold text-[var(--theme-body-mid)]">{block.name}</span>
+      <MediaStatus block={block} />
+      <button
+        type="button"
+        onClick={onDelete}
+        className="ml-1 shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold text-red-500 hover:bg-red-50"
+      >
+        삭제
+      </button>
     </div>
   )
 }
@@ -514,6 +563,44 @@ function PlainTextEditor({ value, editorId, onChange, onPaste, onFilesAtOffset, 
   )
 }
 
+function isAllowedArchiveFile(file) {
+  return file?.name?.toLowerCase().endsWith('.zip') && ALLOWED_FILE_TYPES.includes(file.type || 'application/octet-stream')
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve) => canvas.toBlob(resolve, type, quality))
+}
+
+async function optimizeImageFile(file) {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type) || file.type === 'image/gif') return file
+  if (typeof createImageBitmap !== 'function') return file
+
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, IMAGE_OPTIMIZE_MAX_EDGE / Math.max(bitmap.width, bitmap.height))
+  if (scale >= 1 && file.size <= MAX_IMAGE_BYTES * 0.75) {
+    bitmap.close?.()
+    return file
+  }
+
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    bitmap.close?.()
+    return file
+  }
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  bitmap.close?.()
+
+  const outputType = file.type === 'image/png' ? 'image/webp' : file.type
+  const blob = await canvasToBlob(canvas, outputType, IMAGE_OPTIMIZE_QUALITY)
+  if (!blob || blob.size >= file.size) return file
+
+  const nextName = outputType === file.type ? file.name : file.name.replace(/\.[^.]+$/, '.webp')
+  return new File([blob], nextName, { type: outputType, lastModified: Date.now() })
+}
+
 function PostForm({ initialPost, onCancel, onSave }) {
   const isEditing = Boolean(initialPost)
   const [title, setTitle] = useState(initialPost?.title || '')
@@ -527,7 +614,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
   const [draggingBlockId, setDraggingBlockId] = useState(null)
   const [dragOverBlockId, setDragOverBlockId] = useState(null)
 
-  const validateFile = (file, nextImageCount, nextVideoCount) => {
+  const validateFile = (file, nextImageCount, nextVideoCount, nextFileCount) => {
     if (ALLOWED_IMAGE_TYPES.includes(file.type)) {
       if (nextImageCount > MAX_EXTRA_IMAGES) return '이미지는 최대 5개까지 추가할 수 있습니다.'
       if (file.size > MAX_IMAGE_BYTES) return '이미지는 5MB 이하만 업로드할 수 있습니다.'
@@ -538,44 +625,67 @@ function PostForm({ initialPost, onCancel, onSave }) {
       if (file.size > MAX_VIDEO_BYTES) return '영상은 100MB 이하만 업로드할 수 있습니다.'
       return null
     }
-    return '지원하지 않는 파일 형식입니다. (이미지: JPG/PNG/GIF/WebP, 영상: MP4/WebM/MOV)'
+    if (isAllowedArchiveFile(file)) {
+      if (nextFileCount > MAX_FILES) return '첨부파일은 최대 5개까지 추가할 수 있습니다.'
+      if (file.size > MAX_FILE_BYTES) return '첨부파일은 50MB 이하만 업로드할 수 있습니다.'
+      return null
+    }
+    return '지원하지 않는 파일 형식입니다. (이미지: JPG/PNG/GIF/WebP, 영상: MP4/WebM/MOV, 압축: ZIP)'
   }
 
-  const mediaBlocksFromFiles = (files, existingBlocks) => {
+  const editorBlocksFromFiles = (files, existingBlocks) => {
     const toAdd = []
     let nextImageCount = existingBlocks.filter((b) => b.type === 'image').length
     let nextVideoCount = existingBlocks.filter((b) => b.type === 'video').length
+    let nextFileCount = existingBlocks.filter((b) => b.type === 'file').length
     for (const file of files) {
       const isImage = ALLOWED_IMAGE_TYPES.includes(file.type)
       const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type)
-      const err = validateFile(file, nextImageCount + (isImage ? 1 : 0), nextVideoCount + (isVideo ? 1 : 0))
+      const isFile = isAllowedArchiveFile(file)
+      const err = validateFile(file, nextImageCount + (isImage ? 1 : 0), nextVideoCount + (isVideo ? 1 : 0), nextFileCount + (isFile ? 1 : 0))
       if (err) { setError(err); return [] }
-      const type = isImage ? 'image' : 'video'
+      const type = isImage ? 'image' : isVideo ? 'video' : 'file'
       if (type === 'image') nextImageCount += 1
       if (type === 'video') nextVideoCount += 1
-      toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 75, align: 'left', id: localId() })
+      if (type === 'file') nextFileCount += 1
+      toAdd.push({
+        type,
+        status: 'pending',
+        file,
+        name: file.name,
+        preview: type === 'file' ? null : URL.createObjectURL(file),
+        width: 75,
+        align: 'left',
+        id: localId(),
+      })
     }
     return toAdd
   }
 
-  const ensureTextAfterMedia = (nextBlocks, insertIndex, mediaCount) => {
-    const afterMediaIndex = insertIndex + mediaCount
-    const nextBlock = nextBlocks[afterMediaIndex]
-    if (nextBlock?.type === 'text') return nextBlocks
-    return [
-      ...nextBlocks.slice(0, afterMediaIndex),
+  const ensureTextAfterInserted = (nextBlocks, insertIndex, insertedCount) => {
+    const afterInsertedIndex = insertIndex + insertedCount
+    const nextBlock = nextBlocks[afterInsertedIndex]
+    if (nextBlock?.type === 'text') return ensureTrailingTextBlock(nextBlocks)
+    return ensureTrailingTextBlock([
+      ...nextBlocks.slice(0, afterInsertedIndex),
       { type: 'text', content: '', id: localId() },
-      ...nextBlocks.slice(afterMediaIndex),
-    ]
+      ...nextBlocks.slice(afterInsertedIndex),
+    ])
+  }
+
+  const ensureTrailingTextBlock = (nextBlocks) => {
+    const last = nextBlocks[nextBlocks.length - 1]
+    if (last?.type === 'text') return nextBlocks
+    return [...nextBlocks, { type: 'text', content: '', id: localId() }]
   }
 
   const insertFilesAtBlockIndex = (files, insertIndex) => {
     setBlocks((prev) => {
-      const toAdd = mediaBlocksFromFiles(files, prev)
+      const toAdd = editorBlocksFromFiles(files, prev)
       if (toAdd.length === 0) return prev
       setError('')
       const safeIndex = Math.max(0, Math.min(insertIndex, prev.length))
-      return ensureTextAfterMedia([...prev.slice(0, safeIndex), ...toAdd, ...prev.slice(safeIndex)], safeIndex, toAdd.length)
+      return ensureTextAfterInserted([...prev.slice(0, safeIndex), ...toAdd, ...prev.slice(safeIndex)], safeIndex, toAdd.length)
     })
   }
 
@@ -585,7 +695,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
       if (block?.preview) URL.revokeObjectURL(block.preview)
       if (block?.legacy) setRemoveLegacyImage(true)
       const filtered = prev.filter((b) => b.id !== id)
-      return filtered.length === 0 ? [{ type: 'text', content: '', id: localId() }] : filtered
+      return filtered.length === 0 ? [{ type: 'text', content: '', id: localId() }] : ensureTrailingTextBlock(filtered)
     })
   }
 
@@ -599,7 +709,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
       let insertIndex = next + (placeAfter ? 1 : 0)
       if (idx < insertIndex) insertIndex -= 1
       arr.splice(insertIndex, 0, moved)
-      return arr
+      return ensureTrailingTextBlock(arr)
     })
   }
 
@@ -610,7 +720,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
       const arr = [...prev]
       const [moved] = arr.splice(idx, 1)
       arr.push(moved)
-      return arr
+      return ensureTrailingTextBlock(arr)
     })
   }
 
@@ -658,18 +768,30 @@ function PostForm({ initialPost, onCancel, onSave }) {
       const toAdd = []
       let nextImageCount = prev.filter((b) => b.type === 'image').length
       let nextVideoCount = prev.filter((b) => b.type === 'video').length
+      let nextFileCount = prev.filter((b) => b.type === 'file').length
       for (const file of files) {
         const isImage = ALLOWED_IMAGE_TYPES.includes(file.type)
         const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type)
-        const err = validateFile(file, nextImageCount + (isImage ? 1 : 0), nextVideoCount + (isVideo ? 1 : 0))
+        const isFile = isAllowedArchiveFile(file)
+        const err = validateFile(file, nextImageCount + (isImage ? 1 : 0), nextVideoCount + (isVideo ? 1 : 0), nextFileCount + (isFile ? 1 : 0))
         if (err) {
           setError(err)
           return prev
         }
-        const type = isImage ? 'image' : 'video'
+        const type = isImage ? 'image' : isVideo ? 'video' : 'file'
         if (type === 'image') nextImageCount += 1
         if (type === 'video') nextVideoCount += 1
-        toAdd.push({ type, status: 'pending', file, name: file.name, preview: URL.createObjectURL(file), width: 75, align: 'left', id: localId() })
+        if (type === 'file') nextFileCount += 1
+        toAdd.push({
+          type,
+          status: 'pending',
+          file,
+          name: file.name,
+          preview: type === 'file' ? null : URL.createObjectURL(file),
+          width: 75,
+          align: 'left',
+          id: localId(),
+        })
       }
       if (toAdd.length === 0) return prev
 
@@ -683,16 +805,17 @@ function PostForm({ initialPost, onCancel, onSave }) {
         ...toAdd,
         { type: 'text', content: after, id: localId() },
       ]
-      return [...prev.slice(0, idx), ...replacement, ...prev.slice(idx + 1)]
+      return ensureTrailingTextBlock([...prev.slice(0, idx), ...replacement, ...prev.slice(idx + 1)])
     })
   }
 
   const handlePaste = (e, blockId, offset) => {
     const items = Array.from(e.clipboardData?.items || [])
     const imageItem = items.find((i) => i.kind === 'file' && i.type.startsWith('image/'))
-    if (!imageItem) return
+    const fileItem = imageItem || items.find((i) => i.kind === 'file')
+    if (!fileItem) return
     e.preventDefault()
-    const file = imageItem.getAsFile()
+    const file = fileItem.getAsFile()
     if (file) insertFilesAtTextOffset(blockId, offset, [file])
   }
 
@@ -727,8 +850,8 @@ function PostForm({ initialPost, onCancel, onSave }) {
   const submit = async (e) => {
     e.preventDefault()
     if (!title.trim()) { setError('제목을 입력해주세요.'); return }
-    const hasContent = blocks.some((b) => (b.type === 'text' && b.content.trim()) || b.type === 'image' || b.type === 'video')
-    if (!hasContent) { setError('내용을 입력하거나 사진/영상을 추가해주세요.'); return }
+    const hasContent = blocks.some((b) => (b.type === 'text' && b.content.trim()) || b.type === 'image' || b.type === 'video' || b.type === 'file')
+    if (!hasContent) { setError('내용을 입력하거나 사진/영상/첨부파일을 추가해주세요.'); return }
 
     setSaving(true)
     setError('')
@@ -751,15 +874,22 @@ function PostForm({ initialPost, onCancel, onSave }) {
           setSavingStep(`업로드 중: ${block.name}`)
           updateMediaStatus(block.id, 'uploading', { error: null })
           if (block.type === 'image') {
-            const ids = await uploadPostImages(postId, [block.file])
+            setSavingStep(`이미지 최적화 중: ${block.name}`)
+            const uploadFile = await optimizeImageFile(block.file)
+            const ids = await uploadPostImages(postId, [uploadFile])
             if (!Array.isArray(ids) || !ids[0]) throw new Error(`${block.name} 이미지 업로드 응답이 올바르지 않습니다.`)
             updateMediaStatus(block.id, 'saved', { mediaId: ids[0] })
-            uploadedBlocks.push({ ...block, status: 'saved', mediaId: ids[0] })
-          } else {
+            uploadedBlocks.push({ ...block, status: 'saved', mediaId: ids[0], name: uploadFile.name })
+          } else if (block.type === 'video') {
             const videoId = await uploadPostVideo(postId, block.file)
             if (!videoId) throw new Error(`${block.name} 영상 업로드 응답이 올바르지 않습니다.`)
             updateMediaStatus(block.id, 'saved', { mediaId: videoId })
             uploadedBlocks.push({ ...block, status: 'saved', mediaId: videoId })
+          } else if (block.type === 'file') {
+            const fileId = await uploadPostFile(postId, block.file)
+            if (!fileId) throw new Error(`${block.name} 첨부파일 업로드 응답이 올바르지 않습니다.`)
+            updateMediaStatus(block.id, 'saved', { fileId })
+            uploadedBlocks.push({ ...block, status: 'saved', fileId })
           }
         } else {
           uploadedBlocks.push(block)
@@ -771,6 +901,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
           if (b.type === 'text') return { type: 'text', content: b.content }
           if (b.type === 'image' && b.mediaId) return { type: 'image', mediaId: b.mediaId, name: b.name, width: b.width || 'large', align: b.align || 'center' }
           if (b.type === 'video' && b.mediaId) return { type: 'video', mediaId: b.mediaId, name: b.name, width: b.width || 'large', align: b.align || 'center' }
+          if (b.type === 'file' && b.fileId) return { type: 'file', fileId: b.fileId, name: b.name }
           return null
         }).filter(Boolean)
       )
@@ -827,7 +958,13 @@ function PostForm({ initialPost, onCancel, onSave }) {
             <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
               onChange={(e) => { insertFilesAtActiveText(Array.from(e.target.files)); e.target.value = '' }} />
           </label>
-          <span className="text-xs text-[var(--theme-body-muted)]">본문 칸에 드래그하거나 Ctrl+V로 바로 삽입</span>
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+            <Paperclip size={14} />
+            압축파일
+            <input type="file" multiple accept=".zip,application/zip,application/x-zip-compressed" className="hidden"
+              onChange={(e) => { insertFilesAtActiveText(Array.from(e.target.files)); e.target.value = '' }} />
+          </label>
+          <span className="text-xs text-[var(--theme-body-muted)]">본문 칸에 드래그하거나 Ctrl+V로 바로 삽입 · 큰 이미지는 저장할 때 자동 최적화</span>
         </div>
 
         <div
@@ -881,6 +1018,28 @@ function PostForm({ initialPost, onCancel, onSave }) {
                   />
                 </div>
               </div>
+            ) : block.type === 'file' ? (
+              <FileAttachmentBlock
+                key={block.id}
+                block={block}
+                onDelete={() => removeBlock(block.id)}
+                onDragStart={(e) => {
+                  e.stopPropagation()
+                  e.dataTransfer.effectAllowed = 'move'
+                  e.dataTransfer.setData('text/plain', block.id)
+                  setDraggingBlockId(block.id)
+                }}
+                onDragEnd={() => {
+                  setDraggingBlockId(null)
+                  setDragOverBlockId(null)
+                }}
+                onBlockDragOver={(e) => handleBlockDragOver(e, block.id)}
+                onBlockDrop={(e) => handleBlockDrop(e, block.id)}
+                onBlockDragLeave={() => {
+                  if (dragOverBlockId === block.id) setDragOverBlockId(null)
+                }}
+                isDropTarget={dragOverBlockId === block.id && draggingBlockId !== block.id}
+              />
             ) : (
               <ResizableMedia
                 key={block.id}

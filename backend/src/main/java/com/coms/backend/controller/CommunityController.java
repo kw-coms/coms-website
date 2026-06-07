@@ -5,6 +5,7 @@ import com.coms.backend.dto.CommunityCommentResponse;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
 import com.coms.backend.dto.CommunityVoteRequest;
+import com.coms.backend.domain.CommunityPostFile;
 import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.service.CommunityService;
 import jakarta.validation.Valid;
@@ -195,6 +196,26 @@ public class CommunityController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping(path = "/{id}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Long> uploadFile(Authentication authentication,
+                                           @PathVariable Long id,
+                                           @RequestParam("file") MultipartFile file) {
+        Long fileId = communityService.addFile(authentication.getName(), id, file);
+        return ResponseEntity.status(HttpStatus.CREATED).body(fileId);
+    }
+
+    @GetMapping("/{id}/files/{fileId}/download")
+    public ResponseEntity<Resource> downloadFile(@PathVariable Long id, @PathVariable Long fileId) {
+        CommunityPostFile meta = communityService.loadFileMeta(id, fileId);
+        Resource resource = communityService.loadFile(id, fileId);
+        String filename = filenameOrFallback(meta.getOriginalName(), meta.getMimeType(), "attachment");
+        return ResponseEntity.ok()
+                .contentType(mediaType(meta.getMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(filename, StandardCharsets.UTF_8).build().toString())
+                .body(resource);
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(Authentication authentication, @PathVariable Long id) {
         communityService.delete(authentication.getName(), id);
@@ -248,6 +269,7 @@ public class CommunityController {
             case "video/mp4" -> ".mp4";
             case "video/webm" -> ".webm";
             case "video/quicktime" -> ".mov";
+            case "application/zip", "application/x-zip-compressed" -> ".zip";
             default -> "";
         };
     }
