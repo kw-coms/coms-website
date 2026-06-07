@@ -345,13 +345,20 @@ function RosterTab() {
         )}
         {!loadingRoster && !rosterError && roster.length > 0 && (
           <div className="mt-4 max-h-96 overflow-auto rounded-lg border border-black/10">
-            <table className="min-w-full divide-y divide-black/10 text-left text-sm">
+            <table className="w-max min-w-full table-fixed divide-y divide-black/10 text-left text-sm">
+              <colgroup>
+                <col style={{ width: '136px' }} />
+                <col style={{ width: '88px' }} />
+                <col style={{ width: '64px' }} />
+                <col style={{ width: '124px' }} />
+                <col style={{ width: '88px' }} />
+              </colgroup>
               <thead className="sticky top-0 bg-white text-xs font-semibold text-[var(--theme-body-muted)]">
                 <tr>
-                  <th className="px-3 py-3">학번</th>
-                  <th className="px-3 py-3">이름</th>
-                  <th className="px-3 py-3">기수</th>
-                  <th className="px-3 py-3">전화번호</th>
+                  <th className="px-3 py-3 whitespace-nowrap">학번</th>
+                  <th className="px-3 py-3 whitespace-nowrap">이름</th>
+                  <th className="px-3 py-3 whitespace-nowrap">기수</th>
+                  <th className="px-3 py-3 whitespace-nowrap">전화번호</th>
                   <th className="px-3 py-3"></th>
                 </tr>
               </thead>
