@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify.jsx'
 import {
@@ -275,6 +275,70 @@ function MediaStatus({ block }) {
   return <p className="mt-1 text-xs text-emerald-600">저장됨</p>
 }
 
+function PlainTextEditor({ value, onChange, onPaste, placeholder, minRows = 3, maxLength }) {
+  const editorRef = useRef(null)
+  const minHeight = `${Math.max(minRows, 2) * 1.75 + 1}rem`
+
+  useEffect(() => {
+    const editor = editorRef.current
+    if (editor && editor.textContent !== value) {
+      editor.textContent = value
+    }
+  }, [value])
+
+  const syncContent = (element) => {
+    let next = element.textContent || ''
+    if (maxLength && next.length > maxLength) {
+      next = next.slice(0, maxLength)
+      element.textContent = next
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      range.collapse(false)
+      const selection = window.getSelection()
+      selection.removeAllRanges()
+      selection.addRange(range)
+    }
+    onChange(next)
+  }
+
+  const handlePlainPaste = (e) => {
+    onPaste?.(e)
+    if (e.defaultPrevented) return
+    const text = e.clipboardData?.getData('text/plain')
+    if (!text) return
+    e.preventDefault()
+    document.execCommand('insertText', false, text)
+    syncContent(e.currentTarget)
+  }
+
+  return (
+    <div className="relative">
+      {!value && (
+        <span className="pointer-events-none absolute left-2 top-2 text-sm leading-7 text-[var(--theme-body-muted)]/70">
+          {placeholder}
+        </span>
+      )}
+      <div
+        ref={editorRef}
+        role="textbox"
+        aria-multiline="true"
+        tabIndex={0}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={(e) => syncContent(e.currentTarget)}
+        onPaste={handlePlainPaste}
+        onBlur={(e) => {
+          if ((e.currentTarget.textContent || '') !== value) {
+            e.currentTarget.textContent = value
+          }
+        }}
+        className="min-h-[80px] w-full whitespace-pre-wrap break-words rounded border border-transparent bg-white px-2 py-2 text-sm leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+        style={{ minHeight }}
+      />
+    </div>
+  )
+}
+
 function PostForm({ initialPost, onCancel, onSave }) {
   const isEditing = Boolean(initialPost)
   const [title, setTitle] = useState(initialPost?.title || '')
@@ -478,15 +542,14 @@ function PostForm({ initialPost, onCancel, onSave }) {
           {blocks.map((block, idx) => (
             <div key={block.id}>
               {block.type === 'text' ? (
-                <div className="relative">
-                  <textarea
+                <div className="relative rounded border border-black/5 bg-white">
+                  <PlainTextEditor
                     value={block.content}
-                    onChange={(e) => updateText(block.id, e.target.value)}
+                    onChange={(content) => updateText(block.id, content)}
                     onPaste={(e) => handlePaste(e, idx)}
+                    placeholder={idx === 0 ? '내용을 입력하세요. 이미지나 동영상을 이 영역 안에 바로 넣을 수 있습니다.' : '내용을 이어서 입력하세요.'}
+                    minRows={idx === 0 ? 10 : 3}
                     maxLength={MAX_CONTENT_LENGTH}
-                    placeholder={idx === 0 ? '내용을 입력하세요. 이미지는 붙여넣거나 위 버튼으로 본문에 바로 넣을 수 있습니다.' : '내용을 이어서 입력하세요.'}
-                    rows={idx === 0 ? 10 : 3}
-                    className="min-h-[80px] w-full resize-y rounded border border-transparent bg-white px-2 py-2 text-sm leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
                   />
                   {blocks.length > 1 && (
                     <div className="absolute right-2 top-2 flex gap-1">
