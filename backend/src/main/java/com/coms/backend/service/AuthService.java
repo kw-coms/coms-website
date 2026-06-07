@@ -74,25 +74,20 @@ public class AuthService implements UserDetailsService {
     }
 
     public AuthResponse signup(SignupRequest request) {
-        bannedStudentService.ensureNotBanned(request.studentId().trim());
-        if (memberRepository.existsByStudentId(request.studentId())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 가입된 학번입니다.");
-        }
         if (memberRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다.");
         }
         SignupType signupType = resolveSignupType(request);
         validateSignupType(request, signupType);
         validateCurrentProfile(request, signupType);
-        eligibleMemberService.validateAndClaimSignup(
-                request.studentId(),
-                request.name(),
-                request.graduateVerificationType(),
-                request.graduateVerificationValue()
-        );
+        String studentId = claimSignupStudentId(request, signupType);
+        bannedStudentService.ensureNotBanned(studentId);
+        if (memberRepository.existsByStudentId(studentId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 가입된 계정입니다.");
+        }
 
         Member member = new Member();
-        member.setStudentId(request.studentId().trim());
+        member.setStudentId(studentId);
         member.setName(request.name().trim());
         member.setEmail(request.email().trim());
         member.setEmailVerified(false);
@@ -115,7 +110,7 @@ public class AuthService implements UserDetailsService {
     public AuthResponse login(LoginRequest request, String clientIp) {
         checkLoginLockout(request.identifier(), clientIp);
 
-        Member member = memberRepository.findByStudentId(request.identifier())
+        Member member = findMemberByIdentifier(request.identifier())
                 .orElseGet(() -> {
                     loginFailureRepository.save(new LoginFailure(request.identifier(), clientIp));
                     throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
@@ -154,6 +149,37 @@ public class AuthService implements UserDetailsService {
         }
     }
 
+    private String claimSignupStudentId(SignupRequest request, SignupType signupType) {
+        if (signupType == SignupType.GRADUATE && normalizeNullable(request.studentId()) == null) {
+            return eligibleMemberService.validateAndClaimGraduateSignup(
+                    request.name(),
+                    request.graduateVerificationType(),
+                    request.graduateVerificationValue()
+            );
+        }
+
+        String studentId = normalizeNullable(request.studentId());
+        if (studentId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번을 입력해주세요.");
+        }
+        eligibleMemberService.validateAndClaimSignup(
+                studentId,
+                request.name(),
+                request.graduateVerificationType(),
+                request.graduateVerificationValue()
+        );
+        return studentId;
+    }
+
+    private java.util.Optional<Member> findMemberByIdentifier(String identifier) {
+        String normalized = normalizeNullable(identifier);
+        if (normalized == null) {
+            return java.util.Optional.empty();
+        }
+        return memberRepository.findByStudentId(normalized)
+                .or(() -> memberRepository.findByEmailIgnoreCase(normalized));
+    }
+
     public MemberResponse getMe(String studentId) {
         bannedStudentService.ensureNotBanned(studentId);
         Member member = memberRepository.findByStudentId(studentId)
@@ -185,14 +211,12 @@ public class AuthService implements UserDetailsService {
     }
 
     public void requestPasswordReset(String studentId, String email) {
-        String normalizedStudentId = normalizeNullable(studentId);
         String normalizedEmail = normalizeNullable(email);
-        if (normalizedStudentId == null || normalizedEmail == null) {
+        if (normalizedEmail == null) {
             return;
         }
 
-        memberRepository.findByStudentId(normalizedStudentId)
-                .filter(member -> emailMatches(member, normalizedEmail))
+        findPasswordResetMember(studentId, normalizedEmail)
                 .filter(member -> !bannedStudentService.isBanned(member.getStudentId()))
                 .ifPresent(member -> {
                     if (isPasswordResetResendOnCooldown(member)) {
@@ -207,14 +231,12 @@ public class AuthService implements UserDetailsService {
     }
 
     public void confirmPasswordReset(String studentId, String email, String code, String newPassword) {
-        String normalizedStudentId = normalizeNullable(studentId);
         String normalizedEmail = normalizeNullable(email);
-        if (normalizedStudentId == null || normalizedEmail == null) {
+        if (normalizedEmail == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "인증 정보가 올바르지 않습니다.");
         }
 
-        Member member = memberRepository.findByStudentId(normalizedStudentId)
-                .filter(candidate -> emailMatches(candidate, normalizedEmail))
+        Member member = findPasswordResetMember(studentId, normalizedEmail)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "인증 정보가 올바르지 않습니다."));
         bannedStudentService.ensureNotBanned(member.getStudentId());
 
@@ -263,9 +285,9 @@ public class AuthService implements UserDetailsService {
     }
 
     public boolean requestSignupEmailVerification(String studentId) {
-        bannedStudentService.ensureNotBanned(studentId);
-        Member member = memberRepository.findByStudentId(studentId)
+        Member member = findMemberByIdentifier(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
+        bannedStudentService.ensureNotBanned(member.getStudentId());
         if (member.isEmailVerified()) {
             return true;
         }
@@ -279,7 +301,6 @@ public class AuthService implements UserDetailsService {
     }
 
     public boolean confirmSignupEmailVerification(String studentId, String code) {
-        bannedStudentService.ensureNotBanned(studentId);
         return confirmEmailVerification(studentId, code);
     }
 
@@ -301,9 +322,9 @@ public class AuthService implements UserDetailsService {
     }
 
     public boolean confirmEmailVerification(String studentId, String code) {
-        bannedStudentService.ensureNotBanned(studentId);
-        Member member = memberRepository.findByStudentId(studentId)
+        Member member = findMemberByIdentifier(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        bannedStudentService.ensureNotBanned(member.getStudentId());
 
         if (member.isEmailVerified()) {
             return true;
@@ -369,6 +390,15 @@ public class AuthService implements UserDetailsService {
 
     private boolean emailMatches(Member member, String email) {
         return member.getEmail() != null && member.getEmail().equalsIgnoreCase(email);
+    }
+
+    private java.util.Optional<Member> findPasswordResetMember(String studentId, String email) {
+        String normalizedStudentId = normalizeNullable(studentId);
+        if (normalizedStudentId != null) {
+            return memberRepository.findByStudentId(normalizedStudentId)
+                    .filter(member -> emailMatches(member, email));
+        }
+        return memberRepository.findByEmailIgnoreCase(email);
     }
 
     private String newSixDigitCode() {

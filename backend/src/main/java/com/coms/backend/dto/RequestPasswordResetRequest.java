@@ -4,6 +4,6 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
 public record RequestPasswordResetRequest(
-        @NotBlank String studentId,
+        String studentId,
         @NotBlank @Email String email
 ) {}

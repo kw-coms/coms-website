@@ -169,7 +169,7 @@ class AuthServiceTest {
     void requestPasswordResetStoresHashedCodeAndSendsEmail() {
         Member member = saveMember("2026123472", true);
 
-        authService.requestPasswordReset("2026123472", member.getEmail());
+        authService.requestPasswordReset(null, member.getEmail());
 
         Member saved = memberRepository.findByStudentId("2026123472").orElseThrow();
         assertThat(saved.getPasswordResetCodeHash()).isNotBlank();
@@ -191,7 +191,7 @@ class AuthServiceTest {
         member.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(10));
         memberRepository.save(member);
 
-        authService.confirmPasswordReset("2026123474", member.getEmail(), "123456", "NewPassword1!");
+        authService.confirmPasswordReset(null, member.getEmail(), "123456", "NewPassword1!");
 
         Member saved = memberRepository.findByStudentId("2026123474").orElseThrow();
         assertThat(passwordEncoder.matches("NewPassword1!", saved.getPassword())).isTrue();
@@ -218,6 +218,16 @@ class AuthServiceTest {
 
         assertThat(response.token()).isNotBlank();
         assertThat(response.studentId()).isEqualTo("2026123461");
+    }
+
+    @Test
+    void loginSucceedsWithEmailIdentifier() {
+        Member member = saveMember("2026123475", true);
+
+        var response = authService.login(new com.coms.backend.dto.LoginRequest(member.getEmail(), "Password1!", false), "127.0.0.1");
+
+        assertThat(response.token()).isNotBlank();
+        assertThat(response.studentId()).isEqualTo("2026123475");
     }
 
     @Test
@@ -301,7 +311,7 @@ class AuthServiceTest {
                 .when(emailVerificationSender).sendVerificationCode(anyString(), anyString());
 
         assertThatThrownBy(() -> authService.signup(new SignupRequest(
-                "2019123462",
+                null,
                 "홍길동",
                 "GENERATION",
                 "53",
@@ -316,7 +326,6 @@ class AuthServiceTest {
 
         EligibleMember rolledBack = eligibleMemberRepository.findByVerificationKey("홍길동|2019").orElseThrow();
         assertThat(rolledBack.getStudentId()).isNull();
-        assertThat(memberRepository.existsByStudentId("2019123462")).isFalse();
     }
 
     @Test
@@ -369,7 +378,7 @@ class AuthServiceTest {
         eligibleMemberService.addGraduateSingle("홍길동", "19", null);
 
         var response = authService.signup(new SignupRequest(
-                "2019123470",
+                null,
                 "홍길동",
                 "YEAR",
                 "19",
@@ -382,11 +391,11 @@ class AuthServiceTest {
                 "GRADUATE"
         ));
 
-        assertThat(response.studentId()).isEqualTo("2019123470");
-        Member saved = memberRepository.findByStudentId("2019123470").orElseThrow();
+        assertThat(response.studentId()).startsWith("G2019-");
+        Member saved = memberRepository.findByStudentId(response.studentId()).orElseThrow();
         assertThat(saved.getAspiration()).isNull();
         assertThat(saved.getInterests()).isNull();
-        EligibleMember claimed = eligibleMemberRepository.findByStudentId("2019123470").orElseThrow();
+        EligibleMember claimed = eligibleMemberRepository.findByStudentId(response.studentId()).orElseThrow();
         assertThat(claimed.getVerificationKey()).isEqualTo("홍길동|2019");
     }
 
@@ -395,7 +404,7 @@ class AuthServiceTest {
         eligibleMemberService.addGraduateSingle("김철수", null, "53기");
 
         var response = authService.signup(new SignupRequest(
-                "2019123471",
+                null,
                 "김철수",
                 "GENERATION",
                 "53",
@@ -408,9 +417,9 @@ class AuthServiceTest {
                 "GRADUATE"
         ));
 
-        assertThat(response.studentId()).isEqualTo("2019123471");
-        assertThat(memberRepository.findByStudentId("2019123471")).isPresent();
-        EligibleMember claimed = eligibleMemberRepository.findByStudentId("2019123471").orElseThrow();
+        assertThat(response.studentId()).startsWith("G2019-");
+        assertThat(memberRepository.findByStudentId(response.studentId())).isPresent();
+        EligibleMember claimed = eligibleMemberRepository.findByStudentId(response.studentId()).orElseThrow();
         assertThat(claimed.getGeneration()).isEqualTo("53");
     }
 
