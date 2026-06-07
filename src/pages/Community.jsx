@@ -305,9 +305,10 @@ function MediaAlignControls({ value, onChange }) {
 
 
 function figureInlineStyle(wPct, align) {
-  if (align === 'left') return `float:left;width:${wPct}%;margin-right:1rem;margin-bottom:0.25rem`
-  if (align === 'right') return `float:right;width:${wPct}%;margin-left:1rem;margin-bottom:0.25rem`
-  return `display:block;width:${wPct}%;margin-left:auto;margin-right:auto;clear:both`
+  const base = 'user-select:none;-webkit-user-select:none;cursor:default'
+  if (align === 'left') return `float:left;width:${wPct}%;margin-right:1rem;margin-bottom:0.25rem;${base}`
+  if (align === 'right') return `float:right;width:${wPct}%;margin-left:1rem;margin-bottom:0.25rem;${base}`
+  return `display:block;width:${wPct}%;margin-left:auto;margin-right:auto;clear:both;${base}`
 }
 
 function domToBlocks(editorEl, figMeta) {
@@ -433,7 +434,10 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
   const safeSrc = (url) => (url && /^(https?:|blob:|\/)/i.test(url) ? url : '')
 
   const attachFigureClick = (fig) => {
-    fig.addEventListener('click', (e) => {
+    fig.draggable = false
+    fig.addEventListener('dragstart', (e) => e.preventDefault())
+    fig.addEventListener('pointerdown', (e) => {
+      e.preventDefault()
       e.stopPropagation()
       setSelectedFigId(fig.dataset.blockId)
     })
@@ -455,13 +459,13 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
         figMeta.current.set(id, { type: block.type, status: block.status || 'saved', mediaId: block.mediaId, file: block.file, preview: block.preview, name: block.name, url: block.url, width: wPct, align, legacy: block.legacy })
         const src = safeSrc(block.preview || (block.url ? apiUrl(block.url) : ''))
         const inner = block.type === 'image'
-          ? `<img src="${escH(src)}" alt="" style="display:block;width:100%;height:auto">`
-          : `<video src="${escH(src)}" controls style="display:block;width:100%;height:auto"></video>`
+          ? `<img src="${escH(src)}" alt="" draggable="false" style="display:block;width:100%;height:auto;pointer-events:none">`
+          : `<video src="${escH(src)}" controls draggable="false" style="display:block;width:100%;height:auto"></video>`
         html += `<figure contenteditable="false" data-block-id="${id}" data-type="${block.type}" data-align="${align}" style="${figureInlineStyle(wPct, align)}">${inner}</figure>`
       } else if (block.type === 'file') {
         const id = block.id || localId()
         figMeta.current.set(id, { type: 'file', status: block.status || 'saved', fileId: block.fileId, file: block.file, name: block.name, url: block.url })
-        html += `<figure contenteditable="false" data-block-id="${id}" data-type="file" style="display:inline-block;clear:both"><span style="display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.1);border-radius:4px;background:rgba(0,0,0,0.03);padding:6px 10px;font-size:13px;font-weight:600">📎 ${escH(block.name || '파일')}</span></figure>`
+        html += `<figure contenteditable="false" draggable="false" data-block-id="${id}" data-type="file" style="display:inline-block;clear:both;user-select:none;-webkit-user-select:none;cursor:default"><span style="display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.1);border-radius:4px;background:rgba(0,0,0,0.03);padding:6px 10px;font-size:13px;font-weight:600;pointer-events:none">📎 ${escH(block.name || '파일')}</span></figure>`
       }
     }
     el.innerHTML = html || ''
@@ -527,7 +531,8 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
       figure.setAttribute('style', figureInlineStyle(75, 'center'))
       const img = document.createElement('img')
       img.src = preview
-      img.setAttribute('style', 'display:block;width:100%;height:auto')
+      img.setAttribute('style', 'display:block;width:100%;height:auto;pointer-events:none')
+      img.draggable = false
       figure.appendChild(img)
     } else if (type === 'video') {
       figure.setAttribute('style', figureInlineStyle(75, 'center'))
@@ -537,7 +542,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
       vid.setAttribute('style', 'display:block;width:100%;height:auto')
       figure.appendChild(vid)
     } else {
-      figure.setAttribute('style', 'display:inline-block;clear:both')
+      figure.setAttribute('style', 'display:inline-block;clear:both;user-select:none;-webkit-user-select:none;cursor:default')
       const span = document.createElement('span')
       span.setAttribute('style', 'display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.1);border-radius:4px;background:rgba(0,0,0,0.03);padding:6px 10px;font-size:13px;font-weight:600')
       span.textContent = `📎 ${file.name}`
@@ -612,6 +617,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
             document.execCommand('insertLineBreak')
           }
         }}
+        onDragStart={(e) => { if (e.target.closest?.('figure')) e.preventDefault() }}
         onDragOver={(e) => { if (Array.from(e.dataTransfer?.items || []).some(i => i.kind === 'file')) e.preventDefault() }}
         onDrop={(e) => {
           const files = Array.from(e.dataTransfer?.files || [])
