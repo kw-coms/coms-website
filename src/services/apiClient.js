@@ -16,6 +16,20 @@ async function tryRefreshToken() {
   return res.ok
 }
 
+function errorMessageForStatus(status, data) {
+  const serverMessage = data?.message || data?.detail || data?.error
+  if (serverMessage && serverMessage !== 'Forbidden' && serverMessage !== 'Unauthorized') {
+    return serverMessage
+  }
+  if (status === 401) {
+    return '로그인이 만료되었습니다. 다시 로그인해주세요.'
+  }
+  if (status === 403) {
+    return '접근 권한이 없거나 로그인 상태가 만료되었습니다. 다시 로그인해주세요.'
+  }
+  return serverMessage || '요청 처리 중 오류가 발생했습니다.'
+}
+
 export async function request(path, options = {}) {
   const isFormData = options.body instanceof FormData
   const headers = isFormData
@@ -26,13 +40,13 @@ export async function request(path, options = {}) {
 
   let response = await fetchOnce()
   const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
-  if (response.status === 401 && canRefresh) {
+  if ((response.status === 401 || response.status === 403) && canRefresh) {
     if (await tryRefreshToken()) response = await fetchOnce()
   }
 
   const data = await response.json().catch(() => null)
   if (!response.ok) {
-    throw new Error(data?.message || data?.detail || data?.error || '요청 처리 중 오류가 발생했습니다.')
+    throw new Error(errorMessageForStatus(response.status, data))
   }
   return data
 }
@@ -46,12 +60,12 @@ export async function requestNoContent(path, options = {}) {
 
   let response = await fetchOnce()
   const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
-  if (response.status === 401 && canRefresh) {
+  if ((response.status === 401 || response.status === 403) && canRefresh) {
     if (await tryRefreshToken()) response = await fetchOnce()
   }
 
   if (!response.ok) {
     const data = await response.json().catch(() => null)
-    throw new Error(data?.message || data?.detail || data?.error || '요청 처리 중 오류가 발생했습니다.')
+    throw new Error(errorMessageForStatus(response.status, data))
   }
 }
