@@ -186,6 +186,32 @@ public class EligibleMemberService {
         eligibleMemberRepository.save(match);
     }
 
+    public String validateAndClaimGraduateSignup(String name, String verificationType, String verificationValue) {
+        String normalizedName = normalize(name);
+        if (!NAME_PATTERN.matcher(normalizedName).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름은 한글 3자리여야 합니다.");
+        }
+
+        int admissionYear = admissionYearFromGraduateVerification(verificationType, verificationValue);
+        if (!isGraduate(admissionYear)) {
+            throw invalidRoster();
+        }
+
+        List<EligibleMember> matches = eligibleMemberRepository.findAllByNameAndAdmissionYear(normalizedName, admissionYear);
+        if (matches.size() != 1) {
+            throw invalidRoster();
+        }
+
+        EligibleMember match = matches.getFirst();
+        String accountId = normalize(match.getStudentId());
+        if (accountId.isBlank()) {
+            accountId = generateGraduateAccountId(match);
+            match.setStudentId(accountId);
+            eligibleMemberRepository.save(match);
+        }
+        return accountId;
+    }
+
     public synchronized EligibleMemberImportResponse importRoster(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부 파일을 선택해주세요.");
@@ -451,6 +477,28 @@ public class EligibleMemberService {
             return;
         }
         throw invalidRoster();
+    }
+
+    private int admissionYearFromGraduateVerification(String type, String value) {
+        String normalizedType = normalize(type).toUpperCase(Locale.ROOT);
+        String normalizedValue = normalizeGeneration(value);
+        if ("YEAR".equals(normalizedType)) {
+            if (!TWO_DIGIT_YEAR_PATTERN.matcher(normalizedValue).matches()) {
+                throw invalidRoster();
+            }
+            return resolveAdmissionYear(Integer.parseInt(normalizedValue));
+        }
+        if ("GENERATION".equals(normalizedType)) {
+            if (!GENERATION_PATTERN.matcher(normalizedValue).matches()) {
+                throw invalidRoster();
+            }
+            return Integer.parseInt(normalizedValue) + FIRST_GENERATION_YEAR;
+        }
+        throw invalidRoster();
+    }
+
+    private String generateGraduateAccountId(EligibleMember member) {
+        return "G" + member.getAdmissionYear() + "-" + member.getId();
     }
 
     private String normalizeGeneration(String value) {
