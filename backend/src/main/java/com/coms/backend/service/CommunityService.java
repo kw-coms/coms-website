@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.CommunityComment;
 import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.domain.CommunityPostImage;
+import com.coms.backend.domain.CommunityPostFile;
 import com.coms.backend.domain.CommunityPostVideo;
 import com.coms.backend.domain.CommunityPostVote;
 import com.coms.backend.domain.Member;
@@ -12,6 +13,7 @@ import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
 import com.coms.backend.repository.CommunityCommentRepository;
 import com.coms.backend.repository.CommunityPostImageRepository;
+import com.coms.backend.repository.CommunityPostFileRepository;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVideoRepository;
 import com.coms.backend.repository.CommunityPostVoteRepository;
@@ -41,11 +43,18 @@ public class CommunityService {
     private static final int MAX_COMMENT_LENGTH = 1000;
     private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
     private static final long MAX_VIDEO_BYTES = 100L * 1024 * 1024;
+    private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
     private static final long CONCEPT_POST_SCORE_THRESHOLD = 5;
     private static final int MAX_EXTRA_IMAGES_PER_POST = 5;
     private static final int MAX_VIDEOS_PER_POST = 3;
+    private static final int MAX_FILES_PER_POST = 5;
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
     private static final Set<String> ALLOWED_VIDEO_TYPES = Set.of("video/mp4", "video/webm", "video/quicktime");
+    private static final Set<String> ALLOWED_FILE_TYPES = Set.of(
+            "application/zip",
+            "application/x-zip-compressed",
+            "application/octet-stream"
+    );
 
     private final CommunityPostRepository communityPostRepository;
     private final CommunityPostVoteRepository voteRepository;
@@ -54,6 +63,7 @@ public class CommunityService {
     private final CommunityCommentRepository commentRepository;
     private final NotificationService notificationService;
     private final CommunityPostImageRepository imageRepository;
+    private final CommunityPostFileRepository fileRepository;
     private final CommunityPostVideoRepository videoRepository;
 
     public CommunityService(CommunityPostRepository communityPostRepository,
@@ -63,6 +73,7 @@ public class CommunityService {
                             CommunityCommentRepository commentRepository,
                             NotificationService notificationService,
                             CommunityPostImageRepository imageRepository,
+                            CommunityPostFileRepository fileRepository,
                             CommunityPostVideoRepository videoRepository) {
         this.communityPostRepository = communityPostRepository;
         this.voteRepository = voteRepository;
@@ -71,6 +82,7 @@ public class CommunityService {
         this.storageService = storageService;
         this.notificationService = notificationService;
         this.imageRepository = imageRepository;
+        this.fileRepository = fileRepository;
         this.videoRepository = videoRepository;
     }
 
@@ -265,6 +277,13 @@ public class CommunityService {
                         "/api/community/posts/" + post.getId() + "/videos/" + vid.getId(),
                         vid.getOriginalName()))
                 .toList();
+        List<CommunityPostResponse.MediaInfo> fileInfos = fileRepository.findByPostIdOrderByPositionAsc(post.getId())
+                .stream()
+                .map(file -> new CommunityPostResponse.MediaInfo(
+                        file.getId(),
+                        "/api/community/posts/" + post.getId() + "/files/" + file.getId() + "/download",
+                        file.getOriginalName()))
+                .toList();
         return new CommunityPostResponse(
                 post.getId(),
                 post.getTitle(),
@@ -279,6 +298,7 @@ public class CommunityService {
                 imageUrls,
                 imageInfos,
                 videoInfos,
+                fileInfos,
                 post.getViewCount(),
                 votes.upvotes(),
                 votes.downvotes(),
@@ -381,6 +401,36 @@ public class CommunityService {
         }
     }
 
+    public Long addFile(String studentId, Long postId, MultipartFile file) {
+        Member member = findMember(studentId);
+        CommunityPost post = communityPostRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostOwnerOrAdmin(post, member);
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부파일을 선택해주세요.");
+        }
+        String originalName = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
+        String contentType = file.getContentType() == null ? "" : file.getContentType();
+        if (!isAllowedArchiveFile(originalName, contentType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ZIP 압축파일만 업로드할 수 있습니다.");
+        }
+        if (file.getSize() > MAX_FILE_BYTES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부파일은 50MB 이하만 업로드할 수 있습니다.");
+        }
+        long existing = fileRepository.findByPostIdOrderByPositionAsc(postId).size();
+        if (existing >= MAX_FILES_PER_POST) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부파일은 최대 5개까지 업로드할 수 있습니다.");
+        }
+        try {
+            String stored = storageService.store(file);
+            CommunityPostFile saved = fileRepository.save(
+                    new CommunityPostFile(postId, stored, originalName, normalizeArchiveMime(contentType), (int) existing));
+            return saved.getId();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "첨부파일 저장에 실패했습니다.");
+        }
+    }
+
     public void deleteVideo(String studentId, Long postId, Long videoId) {
         Member member = findMember(studentId);
         CommunityPost post = communityPostRepository.findById(postId)
@@ -402,6 +452,17 @@ public class CommunityService {
     public Resource loadVideo(Long postId, Long videoId) {
         CommunityPostVideo vid = loadVideoMeta(postId, videoId);
         return storageService.load(vid.getStoredName());
+    }
+
+    public CommunityPostFile loadFileMeta(Long postId, Long fileId) {
+        return fileRepository.findById(fileId)
+                .filter(file -> file.getPostId().equals(postId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    public Resource loadFile(Long postId, Long fileId) {
+        CommunityPostFile file = loadFileMeta(postId, fileId);
+        return storageService.load(file.getStoredName());
     }
 
     public Resource loadExtraImage(Long postId, Long imageId) {
@@ -473,6 +534,20 @@ public class CommunityService {
         List<CommunityPostVideo> videos = videoRepository.findByPostIdOrderByPositionAsc(postId);
         videos.forEach(video -> storageService.delete(video.getStoredName()));
         videoRepository.deleteByPostId(postId);
+        List<CommunityPostFile> files = fileRepository.findByPostIdOrderByPositionAsc(postId);
+        files.forEach(file -> storageService.delete(file.getStoredName()));
+        fileRepository.deleteByPostId(postId);
+    }
+
+    private boolean isAllowedArchiveFile(String originalName, String contentType) {
+        String lowerName = originalName.toLowerCase(Locale.ROOT);
+        return lowerName.endsWith(".zip") && (contentType == null || contentType.isBlank() || ALLOWED_FILE_TYPES.contains(contentType));
+    }
+
+    private String normalizeArchiveMime(String contentType) {
+        return contentType == null || contentType.isBlank() || "application/octet-stream".equals(contentType)
+                ? "application/zip"
+                : contentType;
     }
 
     private record SanitizedPost(String title, String content, CommunityPost.Category category) {}
