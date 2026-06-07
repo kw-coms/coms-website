@@ -81,7 +81,7 @@ public class AuthService implements UserDetailsService {
         }
         SignupType signupType = resolveSignupType(request);
         validateSignupType(request, signupType);
-        validateGraduateProfile(request, signupType);
+        validateCurrentProfile(request, signupType);
         eligibleMemberService.validateAndClaimSignup(
                 request.studentId(),
                 request.name(),
@@ -342,15 +342,15 @@ public class AuthService implements UserDetailsService {
         return admissionYear <= Year.now(clock).getValue() - GRADUATE_AFTER_YEARS;
     }
 
-    private void validateGraduateProfile(SignupRequest request, SignupType signupType) {
-        if (signupType != SignupType.GRADUATE) {
+    private void validateCurrentProfile(SignupRequest request, SignupType signupType) {
+        if (signupType != SignupType.CURRENT) {
             return;
         }
         if (normalizeNullable(request.interests()) == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "졸업생은 관심 분야를 입력해주세요.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "재학생은 관심 분야를 입력해주세요.");
         }
         if (normalizeNullable(request.aspiration()) == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "졸업생은 포부를 입력해주세요.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "재학생은 포부를 입력해주세요.");
         }
     }
 

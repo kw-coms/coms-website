@@ -244,9 +244,9 @@ class AuthServiceTest {
                 "Password1!",
                 "컴퓨터공학과",
                 "01012345678",
-                null,
-                null,
-                null
+                "동아리에서 프로젝트를 만들고 싶습니다.",
+                "웹",
+                "CURRENT"
         )))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
@@ -272,8 +272,8 @@ class AuthServiceTest {
                 "Password1!",
                 null,
                 null,
-                "졸업생으로 다시 함께하고 싶습니다.",
-                "웹",
+                null,
+                null,
                 "GRADUATE"
         ))).isInstanceOf(ResponseStatusException.class);
 
@@ -283,25 +283,48 @@ class AuthServiceTest {
     }
 
     @Test
-    void graduateSignupRequiresInterestsAndAspiration() {
-        eligibleMemberService.addGraduateSingle("홍길동", "19", null);
+    void currentSignupRequiresInterestsAndAspiration() {
+        eligibleMemberService.addSingle("2026123463", "홍길동");
 
         assertThatThrownBy(() -> authService.signup(new SignupRequest(
-                "2019123463",
+                "2026123463",
                 "홍길동",
-                "YEAR",
-                "19",
-                "graduate-missing-profile@example.com",
+                null,
+                null,
+                "current-missing-profile@example.com",
                 "Password1!",
                 null,
                 null,
                 null,
                 null,
-                "GRADUATE"
+                "CURRENT"
         ))).isInstanceOf(ResponseStatusException.class);
 
-        assertThat(eligibleMemberRepository.findByStudentId("2019123463")).isEmpty();
-        assertThat(memberRepository.existsByStudentId("2019123463")).isFalse();
+        assertThat(memberRepository.existsByStudentId("2026123463")).isFalse();
+    }
+
+    @Test
+    void currentSignupPersistsInterestsAndAspiration() {
+        eligibleMemberService.addSingle("2026123467", "홍길동");
+
+        var response = authService.signup(new SignupRequest(
+                "2026123467",
+                "홍길동",
+                null,
+                null,
+                "current-profile@example.com",
+                "Password1!",
+                "컴퓨터공학과",
+                "01012345678",
+                "신입 부원으로 열심히 활동하겠습니다.",
+                "보안,웹",
+                "CURRENT"
+        ));
+
+        assertThat(response.studentId()).isEqualTo("2026123467");
+        Member saved = memberRepository.findByStudentId("2026123467").orElseThrow();
+        assertThat(saved.getAspiration()).isEqualTo("신입 부원으로 열심히 활동하겠습니다.");
+        assertThat(saved.getInterests()).isEqualTo("보안,웹");
     }
 
     @Test
@@ -317,15 +340,15 @@ class AuthServiceTest {
                 "Password1!",
                 null,
                 null,
-                "프로젝트로 후배들과 함께하고 싶습니다.",
-                "웹,기타:AI",
+                null,
+                null,
                 "GRADUATE"
         ));
 
         assertThat(response.studentId()).isEqualTo("2019123470");
         Member saved = memberRepository.findByStudentId("2019123470").orElseThrow();
-        assertThat(saved.getAspiration()).isEqualTo("프로젝트로 후배들과 함께하고 싶습니다.");
-        assertThat(saved.getInterests()).isEqualTo("웹,기타:AI");
+        assertThat(saved.getAspiration()).isNull();
+        assertThat(saved.getInterests()).isNull();
         EligibleMember claimed = eligibleMemberRepository.findByStudentId("2019123470").orElseThrow();
         assertThat(claimed.getVerificationKey()).isEqualTo("홍길동|2019");
     }
@@ -343,8 +366,8 @@ class AuthServiceTest {
                 "Password1!",
                 null,
                 null,
-                "졸업생 네트워크 활동에 참여하겠습니다.",
-                "보안",
+                null,
+                null,
                 "GRADUATE"
         ));
 
