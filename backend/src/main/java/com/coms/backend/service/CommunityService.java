@@ -13,6 +13,8 @@ import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.coms.backend.repository.CommunityCommentRepository;
 import com.coms.backend.repository.CommunityPostImageRepository;
 import com.coms.backend.repository.CommunityPostFileRepository;
@@ -35,12 +37,18 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.Locale;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
 @Transactional
 public class CommunityService {
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final Pattern HTML_TAG = Pattern.compile("<(/?)([A-Za-z][A-Za-z0-9]*)([^>]*)>");
+    private static final Pattern STYLE_DECLARATION = Pattern.compile("(?i)(color|background-color)\\s*:\\s*([^;\"']+)");
+    private static final Pattern FONT_COLOR = Pattern.compile("(?i)\\bcolor\\s*=\\s*([\"']?)(#[0-9a-fA-F]{3,8}|rgba?\\([0-9.,%\\s]+\\))\\1");
+    private static final Pattern SAFE_COLOR = Pattern.compile("(?i)^(#[0-9a-f]{3,8}|rgba?\\([0-9.,%\\s]+\\))$");
     private static final int MAX_TITLE_LENGTH = 120;
     private static final int MAX_CONTENT_LENGTH = 50000;
     private static final int MAX_COMMENT_LENGTH = 1000;
@@ -219,7 +227,7 @@ public class CommunityService {
 
     private SanitizedPost validateRequest(CommunityPostRequest request, String existingTitle) {
         String title = normalizeBounded(request.title(), "제목", MAX_TITLE_LENGTH);
-        String content = normalizeBounded(request.content(), "내용", MAX_CONTENT_LENGTH);
+        String content = sanitizeCommunityContent(normalizeBounded(request.content(), "내용", MAX_CONTENT_LENGTH));
         if (existingTitle != null && !title.equals(existingTitle)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "제목은 수정할 수 없습니다.");
         }
@@ -249,6 +257,89 @@ public class CommunityService {
                 || lower.matches(".*\\son[a-z]+\\s*=.*")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 내용이 포함되어 있습니다.");
         }
+    }
+
+    private String sanitizeCommunityContent(String content) {
+        try {
+            JsonNode root = JSON.readTree(content);
+            if (!root.isArray()) {
+                rejectUnsafeText(content);
+                return content;
+            }
+            ArrayNode sanitized = JSON.createArrayNode();
+            for (JsonNode block : root) {
+                if (!block.isObject()) continue;
+                ObjectNode copy = ((ObjectNode) block).deepCopy();
+                if ("text".equals(copy.path("type").asText())) {
+                    copy.put("content", sanitizeRichText(copy.path("content").asText("")));
+                }
+                sanitized.add(copy);
+            }
+            return JSON.writeValueAsString(sanitized);
+        } catch (Exception ignored) {
+            rejectUnsafeText(content);
+            return content;
+        }
+    }
+
+    private String sanitizeRichText(String html) {
+        Matcher matcher = HTML_TAG.matcher(html == null ? "" : html);
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        while (matcher.find()) {
+            out.append(escapeHtml(html.substring(last, matcher.start())));
+            String closing = matcher.group(1);
+            String tag = matcher.group(2).toLowerCase(Locale.ROOT);
+            String attrs = matcher.group(3) == null ? "" : matcher.group(3);
+            out.append(sanitizeTag(closing, tag, attrs));
+            last = matcher.end();
+        }
+        out.append(escapeHtml((html == null ? "" : html).substring(last)));
+        return out.toString()
+                .replaceAll("(?i)(<br>\\s*)+$", "")
+                .trim();
+    }
+
+    private String sanitizeTag(String closing, String tag, String attrs) {
+        if ("br".equals(tag)) return "<br>";
+        if (Set.of("b", "strong", "i", "em", "u").contains(tag)) {
+            return closing.isBlank() ? "<" + tag + ">" : "</" + tag + ">";
+        }
+        if ("span".equals(tag) || "font".equals(tag)) {
+            if (!closing.isBlank()) return "</span>";
+            String style = sanitizeInlineColorStyle(attrs);
+            return style.isBlank() ? "<span>" : "<span style=\"" + style + "\">";
+        }
+        return "";
+    }
+
+    private String sanitizeInlineColorStyle(String attrs) {
+        StringBuilder style = new StringBuilder();
+        Matcher styleMatcher = STYLE_DECLARATION.matcher(attrs);
+        while (styleMatcher.find()) {
+            appendSafeStyle(style, styleMatcher.group(1).toLowerCase(Locale.ROOT), styleMatcher.group(2).trim());
+        }
+        Matcher fontMatcher = FONT_COLOR.matcher(attrs);
+        if (fontMatcher.find()) {
+            appendSafeStyle(style, "color", fontMatcher.group(2).trim());
+        }
+        return style.toString();
+    }
+
+    private void appendSafeStyle(StringBuilder style, String key, String value) {
+        String cleanValue = value.replaceAll("\\s+", " ");
+        if (!SAFE_COLOR.matcher(cleanValue).matches()) return;
+        if (style.indexOf(key + ":") >= 0) return;
+        if (!style.isEmpty()) style.append(';');
+        style.append(key).append(':').append(cleanValue);
+    }
+
+    private String escapeHtml(String value) {
+        return value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
     }
 
     private boolean isInitialFinalization(CommunityPost post, String nextContent) {

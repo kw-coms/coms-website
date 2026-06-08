@@ -311,7 +311,7 @@ function renderPostBlocks(post) {
           const src = block.url ? apiUrl(block.url) : null
           if (!src) return null
           return (
-            <div key={i} className="group relative my-2" style={mediaContainerStyle(block.width, block.align)}>
+            <div key={i} className="community-post-media group relative my-2" style={mediaContainerStyle(block.width, block.align)}>
               <img src={src} alt={block.name || '이미지'} draggable={false} className="community-inline-media-image" />
               <a
                 href={imageDownloadUrl(block.url)}
@@ -329,7 +329,7 @@ function renderPostBlocks(post) {
           if (!src) return null
           const downloadUrl = videoDownloadUrl(block.url)
           return (
-            <div key={i} className="group relative my-2" style={mediaContainerStyle(block.width, block.align)}>
+            <div key={i} className="community-post-media group relative my-2" style={mediaContainerStyle(block.width, block.align)}>
               <video controls preload="metadata" src={src} className="block h-auto w-full rounded" />
               <a
                 href={downloadUrl}
@@ -533,7 +533,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
   }, [selectedFigId])
 
   const escH = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-  const safeSrc = (url) => (url && /^(https?:|blob:|\/)/i.test(url) ? url : '')
+  const safeSrc = (url) => (url && /^(blob:|\/)/i.test(url) ? url : '')
   const dragFigureId = useRef(null)
 
   const trailingTypingNode = () => document.createTextNode('\u200B')
@@ -668,11 +668,11 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
         const inner = block.type === 'image'
           ? `<img src="${escH(src)}" alt="" draggable="false" class="community-inline-media-image" style="pointer-events:none">`
           : `<video src="${escH(src)}" controls preload="metadata" draggable="false" style="display:block;width:100%;height:auto"></video>`
-        html += `<figure contenteditable="false" data-block-id="${id}" data-type="${block.type}" data-align="${align}" style="${figureInlineStyle(wPct, align)}">${inner}</figure>\u200B`
+        html += `<figure class="community-editor-figure" contenteditable="false" data-block-id="${id}" data-type="${block.type}" data-align="${align}" style="${figureInlineStyle(wPct, align)}">${inner}</figure>\u200B`
       } else if (block.type === 'file') {
         const id = block.id || localId()
         figMeta.current.set(id, { type: 'file', status: block.status || 'saved', fileId: block.fileId, file: block.file, name: block.name, url: block.url })
-        html += `<figure contenteditable="false" draggable="true" data-block-id="${id}" data-type="file" style="display:inline-block;vertical-align:top;margin:0.15rem 0.2rem;user-select:none;-webkit-user-select:none;-webkit-user-drag:element;cursor:grab"><span style="display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.1);border-radius:4px;background:rgba(0,0,0,0.03);padding:6px 10px;font-size:13px;font-weight:600;pointer-events:none">📎 ${escH(block.name || '파일')}</span></figure>\u200B`
+        html += `<figure class="community-editor-figure" contenteditable="false" draggable="true" data-block-id="${id}" data-type="file" style="display:inline-block;vertical-align:top;margin:0.15rem 0.2rem;user-select:none;-webkit-user-select:none;-webkit-user-drag:element;cursor:grab"><span style="display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.1);border-radius:4px;background:rgba(0,0,0,0.03);padding:6px 10px;font-size:13px;font-weight:600;pointer-events:none">📎 ${escH(block.name || '파일')}</span></figure>\u200B`
       }
     }
     el.innerHTML = html || ''
@@ -741,6 +741,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
     const preview = type !== 'file' ? URL.createObjectURL(file) : null
     figMeta.current.set(id, { type, status: 'pending', file, preview, name: file.name, width: 75, align: type === 'file' ? 'center' : 'left' })
     const figure = document.createElement('figure')
+    figure.className = 'community-editor-figure'
     figure.contentEditable = 'false'
     figure.draggable = true
     figure.dataset.blockId = id
@@ -1053,7 +1054,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
       />
 
       <div className="overflow-hidden rounded border border-black/15 bg-white">
-        <div className="flex flex-wrap items-center gap-2 border-b border-black/10 bg-black/[0.03] px-3 py-2">
+        <div className="community-editor-toolbar flex flex-wrap items-center gap-2 border-b border-black/10 bg-black/[0.03] px-3 py-2">
           <span className="mr-1 text-xs font-black uppercase tracking-[0.2em] text-[var(--theme-body-muted)]">Editor</span>
           <div className="inline-flex overflow-hidden rounded border border-black/15 bg-white">
             <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('bold')}
