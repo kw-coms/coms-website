@@ -1547,9 +1547,9 @@ export default function Community({ onBack }) {
               {isEdited(post) && <span className="text-white/42">수정</span>}
               {post.authorAdmin && <span className="rounded bg-red-600 px-1 py-0.5 text-[10px] text-white">주딱</span>}
             </div>
-            <h3 className="mt-2 truncate text-base font-black leading-6 text-white" title={post.title}>
-              {post.title}
-              <span className="text-cyan-200">{commentCountSuffix(post)}</span>
+            <h3 className="mt-2 flex min-w-0 items-center gap-1 text-base font-black leading-6 text-white" title={post.title}>
+              <span className="min-w-0 truncate">{post.title}</span>
+              {commentCountSuffix(post) && <span className="shrink-0 text-cyan-200">{commentCountSuffix(post)}</span>}
             </h3>
           </div>
           {user?.role === 'ADMIN' && (
@@ -1830,10 +1830,10 @@ export default function Community({ onBack }) {
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{post.id}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-cyan-100">{categoryLabel(post.category || 'GENERAL')}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
-                        <span className="block max-w-[520px] truncate text-left font-semibold text-white">
-                          {concept && <span className="mr-1 rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
-                          {post.title}
-                          <span className="text-cyan-200">{commentCountSuffix(post)}</span>
+                        <span className="flex max-w-[520px] min-w-0 items-center gap-1 text-left font-semibold text-white">
+                          {concept && <span className="shrink-0 rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
+                          <span className="min-w-0 truncate">{post.title}</span>
+                          {commentCountSuffix(post) && <span className="shrink-0 text-cyan-200">{commentCountSuffix(post)}</span>}
                         </span>
                         {postHasImages(post) && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
                         {(post.videoInfos?.length > 0) && <span className="ml-1 text-xs text-cyan-200">[영상]</span>}
