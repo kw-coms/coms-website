@@ -1145,6 +1145,7 @@ export default function Community({ onBack }) {
   const [commentInput, setCommentInput] = useState('')
   const [replyTo, setReplyTo] = useState(null)
   const [replyInput, setReplyInput] = useState('')
+  const [replyMentionEnabled, setReplyMentionEnabled] = useState(true)
   const [editingCommentId, setEditingCommentId] = useState(null)
   const [editCommentInput, setEditCommentInput] = useState('')
   const [commentSaving, setCommentSaving] = useState(false)
@@ -1214,6 +1215,29 @@ export default function Community({ onBack }) {
     )))
   }
 
+  const commentCountSuffix = (post) => {
+    const count = Number(post?.commentCount || 0)
+    return count > 0 ? ` [${count.toLocaleString('ko-KR')}]` : ''
+  }
+
+  const replyMentionFor = (comment) => {
+    const name = comment?.authorName?.trim()
+    return name ? `@${name}` : ''
+  }
+
+  const buildReplyContent = (parentId) => {
+    const body = replyInput.trim()
+    if (!body) return ''
+    const parent = comments.find((comment) => comment.id === parentId)
+    const mention = replyMentionEnabled ? replyMentionFor(parent) : ''
+    const content = mention ? `${mention} ${body}` : body
+    if (content.length > MAX_COMMENT_LENGTH) {
+      alert(`태그를 포함한 답글은 ${MAX_COMMENT_LENGTH}자 이하로 입력해주세요.`)
+      return ''
+    }
+    return content
+  }
+
   useEffect(() => {
     if (!urlId) {
       /* eslint-disable react-hooks/set-state-in-effect */
@@ -1223,6 +1247,7 @@ export default function Community({ onBack }) {
       setCommentInput('')
       setReplyTo(null)
       setReplyInput('')
+      setReplyMentionEnabled(true)
       setEditingCommentId(null)
       setEditCommentInput('')
       /* eslint-enable react-hooks/set-state-in-effect */
@@ -1235,6 +1260,7 @@ export default function Community({ onBack }) {
     setCommentInput('')
     setReplyTo(null)
     setReplyInput('')
+    setReplyMentionEnabled(true)
     setEditingCommentId(null)
     setEditCommentInput('')
     let mounted = true
@@ -1281,11 +1307,14 @@ export default function Community({ onBack }) {
     if (!replyInput.trim() || !currentPost) return
     setCommentSaving(true)
     try {
-      const comment = await createComment(currentPost.id, replyInput.trim(), parentId)
+      const content = buildReplyContent(parentId)
+      if (!content) return
+      const comment = await createComment(currentPost.id, content, parentId)
       setComments((prev) => [...prev, comment])
       bumpCurrentPostCommentCount(1)
       setReplyInput('')
       setReplyTo(null)
+      setReplyMentionEnabled(true)
     } catch (err) {
       alert(err.message || '답글 등록 실패')
     } finally {
@@ -1356,6 +1385,7 @@ export default function Community({ onBack }) {
     setCommentInput('')
     setReplyTo(null)
     setReplyInput('')
+    setReplyMentionEnabled(true)
     setEditingCommentId(null)
     setEditCommentInput('')
     if (urlId) navigate('/community')
@@ -1517,7 +1547,10 @@ export default function Community({ onBack }) {
               {isEdited(post) && <span className="text-white/42">수정</span>}
               {post.authorAdmin && <span className="rounded bg-red-600 px-1 py-0.5 text-[10px] text-white">주딱</span>}
             </div>
-            <h3 className="mt-2 break-words text-base font-black leading-6 text-white">{post.title}</h3>
+            <h3 className="mt-2 truncate text-base font-black leading-6 text-white" title={post.title}>
+              {post.title}
+              <span className="text-cyan-200">{commentCountSuffix(post)}</span>
+            </h3>
           </div>
           {user?.role === 'ADMIN' && (
             <button
@@ -1533,15 +1566,15 @@ export default function Community({ onBack }) {
           <span className="min-w-0 truncate text-white/62">{post.authorDisplayName || post.authorName}</span>
           <span className="text-right">{shortDate(post.createdAt)}</span>
           <span>조회 {post.viewCount}</span>
-          <span className="text-right">댓글 {Number(post.commentCount || 0)}</span>
-          <span>개추 {postScore(post)}</span>
+          <span className="text-right">개추 {postScore(post)}</span>
         </div>
       </div>
     )
   }
 
   const renderComment = (comment, level = 0) => {
-    const indent = Math.min(level, 6) * 16
+    const depth = Math.min(level, 6)
+    const indent = depth === 0 ? 0 : `clamp(8px, ${depth * 3}vw, ${depth * 16}px)`
     const isEditing = editingCommentId === comment.id
     const isReplying = replyTo === comment.id
     return (
@@ -1605,6 +1638,7 @@ export default function Community({ onBack }) {
                   onClick={() => {
                     setReplyTo(isReplying ? null : comment.id)
                     setReplyInput('')
+                    setReplyMentionEnabled(true)
                     setEditingCommentId(null)
                     setEditCommentInput('')
                   }}
@@ -1634,6 +1668,19 @@ export default function Community({ onBack }) {
             )}
             {isReplying && (
               <div className="mt-2 space-y-2">
+                {replyMentionEnabled && replyMentionFor(comment) && (
+                  <div className="inline-flex max-w-full items-center gap-1 rounded-full border border-[#3b4890]/20 bg-[#eef3ff] px-2.5 py-1 text-xs font-bold text-[#3b4890]">
+                    <span className="truncate">{replyMentionFor(comment)}</span>
+                    <button
+                      type="button"
+                      onClick={() => setReplyMentionEnabled(false)}
+                      className="rounded-full px-1 text-[#3b4890]/70 hover:bg-[#3b4890]/10 hover:text-[#3b4890]"
+                      aria-label="답글 태그 제거"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
                 <textarea
                   value={replyInput}
                   onChange={(e) => setReplyInput(e.target.value)}
@@ -1644,7 +1691,7 @@ export default function Community({ onBack }) {
                     }
                   }}
                   placeholder="댓글을 입력하세요"
-                  maxLength={MAX_COMMENT_LENGTH}
+                  maxLength={Math.max(0, MAX_COMMENT_LENGTH - (replyMentionEnabled ? replyMentionFor(comment).length + 1 : 0))}
                   rows={3}
                   className="w-full rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-white sm:text-sm"
                   disabled={commentSaving}
@@ -1758,16 +1805,15 @@ export default function Community({ onBack }) {
                     <th className="w-36 px-4 py-3 font-semibold">글쓴이</th>
                     <th className="w-28 px-4 py-3 font-semibold">작성일</th>
                     <th className="w-20 px-4 py-3 font-semibold">조회</th>
-                    <th className="w-20 px-4 py-3 font-semibold">댓글</th>
                     <th className="w-20 px-4 py-3 font-semibold">개추</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
                   {loading && (
-                    <tr><td colSpan="8" className="px-4 py-16 text-center text-white/65">불러오는 중...</td></tr>
+                    <tr><td colSpan="7" className="px-4 py-16 text-center text-white/65">불러오는 중...</td></tr>
                   )}
                   {!loading && filteredPosts.length === 0 && (
-                    <tr><td colSpan="8" className="px-4 py-16 text-center text-white/65">등록된 글이 없습니다.</td></tr>
+                    <tr><td colSpan="7" className="px-4 py-16 text-center text-white/65">등록된 글이 없습니다.</td></tr>
                   )}
                   {visiblePosts.map((post) => {
                     const open = () => openPost(post)
@@ -1787,6 +1833,7 @@ export default function Community({ onBack }) {
                         <span className="block max-w-[520px] truncate text-left font-semibold text-white">
                           {concept && <span className="mr-1 rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
                           {post.title}
+                          <span className="text-cyan-200">{commentCountSuffix(post)}</span>
                         </span>
                         {postHasImages(post) && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
                         {(post.videoInfos?.length > 0) && <span className="ml-1 text-xs text-cyan-200">[영상]</span>}
@@ -1807,7 +1854,6 @@ export default function Community({ onBack }) {
                       </td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{shortDate(post.createdAt)}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{post.viewCount}</td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{Number(post.commentCount || 0)}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{postScore(post)}</td>
                     </tr>
                     )
