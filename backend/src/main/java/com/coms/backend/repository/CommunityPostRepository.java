@@ -8,5 +8,6 @@ import java.util.List;
 
 public interface CommunityPostRepository extends JpaRepository<CommunityPost, Long> {
     List<CommunityPost> findAllByOrderByCreatedAtDesc();
+    List<CommunityPost> findByAuthorStudentId(String authorStudentId);
     long countByAuthorStudentIdAndCreatedAtAfter(String authorStudentId, LocalDateTime createdAt);
 }

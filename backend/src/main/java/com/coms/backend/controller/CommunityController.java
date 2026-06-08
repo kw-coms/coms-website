@@ -4,7 +4,9 @@ import com.coms.backend.dto.CommunityCommentRequest;
 import com.coms.backend.dto.CommunityCommentResponse;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
+import com.coms.backend.dto.CommunityPollVoteRequest;
 import com.coms.backend.dto.CommunityVoteRequest;
+import com.coms.backend.dto.YouTubeSearchResponse;
 import com.coms.backend.domain.CommunityPostFile;
 import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.service.CommunityService;
@@ -89,8 +91,21 @@ public class CommunityController {
         return ResponseEntity.ok(communityService.vote(authentication.getName(), id, request.value()));
     }
 
+    @PostMapping("/{id}/poll-votes")
+    public ResponseEntity<CommunityPostResponse> votePoll(Authentication authentication,
+                                                          @PathVariable Long id,
+                                                          @Valid @RequestBody CommunityPollVoteRequest request) {
+        return ResponseEntity.ok(communityService.votePoll(authentication.getName(), id, request));
+    }
+
+    @GetMapping("/tools/youtube/search")
+    public ResponseEntity<YouTubeSearchResponse> searchYouTube(@RequestParam String q) {
+        return ResponseEntity.ok(communityService.searchYouTube(q));
+    }
+
     @GetMapping("/{id}/image")
-    public ResponseEntity<Resource> image(@PathVariable Long id) {
+    public ResponseEntity<Resource> image(Authentication authentication, @PathVariable Long id) {
+        communityService.requireReadablePost(authentication.getName(), id);
         CommunityPost post = communityService.imagePost(id);
         Resource resource = communityService.loadImage(id);
         ContentDisposition disposition = ContentDisposition.inline()
@@ -104,7 +119,8 @@ public class CommunityController {
     }
 
     @GetMapping("/{id}/image/download")
-    public ResponseEntity<Resource> downloadImage(@PathVariable Long id) {
+    public ResponseEntity<Resource> downloadImage(Authentication authentication, @PathVariable Long id) {
+        communityService.requireReadablePost(authentication.getName(), id);
         CommunityPost post = communityService.imagePost(id);
         Resource resource = communityService.loadImage(id);
         String filename = filenameOrFallback(post.getImageOriginalName(), post.getImageMimeType(), "community-image");
@@ -124,7 +140,8 @@ public class CommunityController {
     }
 
     @GetMapping("/{id}/images/{imageId}")
-    public ResponseEntity<Resource> getImage(@PathVariable Long id, @PathVariable Long imageId) {
+    public ResponseEntity<Resource> getImage(Authentication authentication, @PathVariable Long id, @PathVariable Long imageId) {
+        communityService.requireReadablePost(authentication.getName(), id);
         com.coms.backend.domain.CommunityPostImage meta = communityService.loadExtraImageMeta(id, imageId);
         Resource resource = communityService.loadExtraImage(id, imageId);
         String mimeType = meta.getMimeType();
@@ -137,7 +154,8 @@ public class CommunityController {
     }
 
     @GetMapping("/{id}/images/{imageId}/download")
-    public ResponseEntity<Resource> downloadExtraImage(@PathVariable Long id, @PathVariable Long imageId) {
+    public ResponseEntity<Resource> downloadExtraImage(Authentication authentication, @PathVariable Long id, @PathVariable Long imageId) {
+        communityService.requireReadablePost(authentication.getName(), id);
         com.coms.backend.domain.CommunityPostImage meta = communityService.loadExtraImageMeta(id, imageId);
         Resource resource = communityService.loadExtraImage(id, imageId);
         String filename = filenameOrFallback(meta.getOriginalName(), meta.getMimeType(), "image");
@@ -165,7 +183,8 @@ public class CommunityController {
     }
 
     @GetMapping("/{id}/videos/{videoId}")
-    public ResponseEntity<Resource> streamVideo(@PathVariable Long id, @PathVariable Long videoId) {
+    public ResponseEntity<Resource> streamVideo(Authentication authentication, @PathVariable Long id, @PathVariable Long videoId) {
+        communityService.requireReadablePost(authentication.getName(), id);
         com.coms.backend.domain.CommunityPostVideo meta = communityService.loadVideoMeta(id, videoId);
         Resource resource = communityService.loadVideo(id, videoId);
         String filename = meta.getOriginalName() == null ? "video" : meta.getOriginalName();
@@ -177,7 +196,8 @@ public class CommunityController {
     }
 
     @GetMapping("/{id}/videos/{videoId}/download")
-    public ResponseEntity<Resource> downloadVideo(@PathVariable Long id, @PathVariable Long videoId) {
+    public ResponseEntity<Resource> downloadVideo(Authentication authentication, @PathVariable Long id, @PathVariable Long videoId) {
+        communityService.requireReadablePost(authentication.getName(), id);
         com.coms.backend.domain.CommunityPostVideo meta = communityService.loadVideoMeta(id, videoId);
         Resource resource = communityService.loadVideo(id, videoId);
         String filename = filenameOrFallback(meta.getOriginalName(), meta.getMimeType(), "video");
@@ -205,7 +225,8 @@ public class CommunityController {
     }
 
     @GetMapping("/{id}/files/{fileId}/download")
-    public ResponseEntity<Resource> downloadFile(@PathVariable Long id, @PathVariable Long fileId) {
+    public ResponseEntity<Resource> downloadFile(Authentication authentication, @PathVariable Long id, @PathVariable Long fileId) {
+        communityService.requireReadablePost(authentication.getName(), id);
         CommunityPostFile meta = communityService.loadFileMeta(id, fileId);
         Resource resource = communityService.loadFile(id, fileId);
         String filename = filenameOrFallback(meta.getOriginalName(), meta.getMimeType(), "attachment");
