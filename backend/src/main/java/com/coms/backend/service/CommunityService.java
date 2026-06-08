@@ -259,11 +259,12 @@ public class CommunityService {
         if (optionIndex < 0 || optionIndex >= poll.optionCount()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "투표 선택지가 올바르지 않습니다.");
         }
+        if (poll.isClosed()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "종료된 투표입니다.");
+        }
         Optional<CommunityPollVote> existing = pollVoteRepository.findByPostIdAndPollIdAndStudentId(post.getId(), poll.pollId(), member.getStudentId());
         if (existing.isPresent()) {
-            CommunityPollVote vote = existing.get();
-            vote.setOptionIndex(optionIndex);
-            pollVoteRepository.save(vote);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 투표했습니다. 투표는 변경하거나 취소할 수 없습니다.");
         } else {
             CommunityPollVote vote = new CommunityPollVote();
             vote.setPostId(post.getId());
@@ -275,6 +276,20 @@ public class CommunityService {
         auditLogService.record(member.getStudentId(), "COMMUNITY_POLL_VOTE", "COMMUNITY_POST", String.valueOf(post.getId()), "pollId=" + poll.pollId(), null);
         return toResponse(post, member, memberRepository.findByStudentId(post.getAuthorStudentId()).orElse(null),
                 voteStats(List.of(post)), commentCounts(List.of(post)), pollResults(List.of(post), member.getStudentId()), true);
+    }
+
+    public CommunityPostResponse closePoll(String studentId, Long id, String pollId) {
+        Member member = findMember(studentId);
+        CommunityPost post = communityPostRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostVisible(member, post);
+        requirePostOwnerOrAdmin(post, member);
+        String closedContent = closePollInContent(post.getContent(), pollId);
+        post.setContent(closedContent);
+        CommunityPost saved = communityPostRepository.save(post);
+        auditLogService.record(member.getStudentId(), "COMMUNITY_POLL_CLOSE", "COMMUNITY_POST", String.valueOf(post.getId()), "pollId=" + pollId, null);
+        return toResponse(saved, member, memberRepository.findByStudentId(saved.getAuthorStudentId()).orElse(null),
+                voteStats(List.of(saved)), commentCounts(List.of(saved)), pollResults(List.of(saved), member.getStudentId()), true);
     }
 
     @Transactional(readOnly = true)
@@ -488,14 +503,43 @@ public class CommunityService {
         }
         ArrayNode options = JSON.createArrayNode();
         for (JsonNode option : copy.path("options")) {
-            String value = normalizeOptional(option.asText(""), 80);
-            if (!value.isBlank()) options.add(value);
+            ObjectNode optionCopy = JSON.createObjectNode();
+            String label = option.isObject()
+                    ? normalizeOptional(option.path("label").asText(""), 80)
+                    : normalizeOptional(option.asText(""), 80);
+            if (label.isBlank()) continue;
+            optionCopy.put("label", label);
+            if (option.isObject()) {
+                String imageUrl = normalizeOptional(option.path("imageUrl").asText(""), 500);
+                if (!imageUrl.isBlank()) {
+                    if (!HTTPS_URL.matcher(imageUrl).matches()) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "투표 보기 이미지는 HTTPS URL만 사용할 수 있습니다.");
+                    }
+                    optionCopy.put("imageUrl", imageUrl);
+                }
+            }
+            options.add(optionCopy);
             if (options.size() >= 10) break;
         }
         if (options.size() < 2) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "투표 선택지는 2개 이상 필요합니다.");
         }
         copy.set("options", options);
+        normalizePollDate(copy, "closesAt");
+        normalizePollDate(copy, "closedAt");
+    }
+
+    private void normalizePollDate(ObjectNode copy, String fieldName) {
+        String value = copy.path(fieldName).asText("");
+        if (value.isBlank()) {
+            copy.remove(fieldName);
+            return;
+        }
+        try {
+            copy.put(fieldName, LocalDateTime.parse(value).toString());
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "투표 종료 시간이 올바르지 않습니다.");
+        }
     }
 
     private String normalizeOptional(String value, int maxLength) {
@@ -975,7 +1019,7 @@ public class CommunityService {
                 myOption = index;
             }
         }
-        return new CommunityPostResponse.PollResult(definition.pollId(), counts, myOption);
+        return new CommunityPostResponse.PollResult(definition.pollId(), counts, myOption, definition.closesAt(), definition.closedAt(), definition.isClosed());
     }
 
     private List<PollDefinition> pollDefinitions(String content) {
@@ -988,12 +1032,50 @@ public class CommunityService {
                 String pollId = block.path("pollId").asText("");
                 int optionCount = block.path("options").isArray() ? block.path("options").size() : 0;
                 if (!pollId.isBlank() && optionCount > 0) {
-                    polls.add(new PollDefinition(pollId, optionCount));
+                    polls.add(new PollDefinition(pollId, optionCount, parseDate(block.path("closesAt").asText("")), parseDate(block.path("closedAt").asText(""))));
                 }
             }
             return polls;
         } catch (Exception ignored) {
             return List.of();
+        }
+    }
+
+    private String closePollInContent(String content, String pollId) {
+        try {
+            JsonNode root = JSON.readTree(content);
+            if (!root.isArray()) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "투표를 찾을 수 없습니다.");
+            }
+            boolean found = false;
+            ArrayNode next = JSON.createArrayNode();
+            for (JsonNode block : root) {
+                if (block.isObject() && "poll".equals(block.path("type").asText()) && pollId.equals(block.path("pollId").asText())) {
+                    ObjectNode copy = ((ObjectNode) block).deepCopy();
+                    copy.put("closedAt", LocalDateTime.now().toString());
+                    next.add(copy);
+                    found = true;
+                } else {
+                    next.add(block);
+                }
+            }
+            if (!found) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "투표를 찾을 수 없습니다.");
+            }
+            return sanitizeCommunityContent(JSON.writeValueAsString(next));
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "투표를 종료할 수 없습니다.");
+        }
+    }
+
+    private LocalDateTime parseDate(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return LocalDateTime.parse(value);
+        } catch (Exception ignored) {
+            return null;
         }
     }
 
@@ -1109,7 +1191,11 @@ public class CommunityService {
         communityPostRepository.delete(post);
     }
 
-    private record PollDefinition(String pollId, int optionCount) {}
+    private record PollDefinition(String pollId, int optionCount, LocalDateTime closesAt, LocalDateTime closedAt) {
+        boolean isClosed() {
+            return closedAt != null || (closesAt != null && !LocalDateTime.now().isBefore(closesAt));
+        }
+    }
 
     private record VoteSummary(long upvotes, long downvotes, Map<String, Integer> byStudent) {
         static final VoteSummary EMPTY = new VoteSummary(0, 0, Map.of());

@@ -509,7 +509,56 @@ class CommunityServiceTest {
             assertThat(result.pollId()).isEqualTo("poll-test1");
             assertThat(result.optionCounts()).containsExactly(0L, 1L);
             assertThat(result.myOption()).isEqualTo(1);
+            assertThat(result.closed()).isFalse();
         });
+    }
+
+    @Test
+    void pollVotesCannotBeChangedAfterVoting() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member voter = member("2026123456", "회원", Member.Role.USER);
+        memberRepository.save(author);
+        memberRepository.save(voter);
+        String content = "[{\"type\":\"poll\",\"pollId\":\"poll-test2\",\"question\":\"선택\",\"options\":[{\"label\":\"A\"},{\"label\":\"B\",\"imageUrl\":\"https://example.com/b.png\"}]}]";
+        var post = communityService.create(author.getStudentId(), new CommunityPostRequest("투표", content, "GENERAL", false), null);
+
+        communityService.votePoll(voter.getStudentId(), post.id(), new CommunityPollVoteRequest("poll-test2", 0));
+
+        assertThatThrownBy(() -> communityService.votePoll(voter.getStudentId(), post.id(), new CommunityPollVoteRequest("poll-test2", 1)))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getReason()).contains("이미 투표"));
+    }
+
+    @Test
+    void authorCanClosePollAndClosedPollRejectsVotes() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member voter = member("2026123456", "회원", Member.Role.USER);
+        memberRepository.save(author);
+        memberRepository.save(voter);
+        String content = "[{\"type\":\"poll\",\"pollId\":\"poll-close\",\"question\":\"선택\",\"options\":[\"A\",\"B\"]}]";
+        var post = communityService.create(author.getStudentId(), new CommunityPostRequest("투표", content, "GENERAL", false), null);
+
+        var closed = communityService.closePoll(author.getStudentId(), post.id(), "poll-close");
+
+        assertThat(closed.pollResults()).singleElement().satisfies(result -> assertThat(result.closed()).isTrue());
+        assertThatThrownBy(() -> communityService.votePoll(voter.getStudentId(), post.id(), new CommunityPollVoteRequest("poll-close", 1)))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getReason()).contains("종료"));
+    }
+
+    @Test
+    void expiredPollRejectsVotes() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member voter = member("2026123456", "회원", Member.Role.USER);
+        memberRepository.save(author);
+        memberRepository.save(voter);
+        String closesAt = java.time.LocalDateTime.now().minusMinutes(1).toString();
+        String content = "[{\"type\":\"poll\",\"pollId\":\"poll-expired\",\"question\":\"선택\",\"closesAt\":\"" + closesAt + "\",\"options\":[\"A\",\"B\"]}]";
+        var post = communityService.create(author.getStudentId(), new CommunityPostRequest("투표", content, "GENERAL", false), null);
+
+        assertThatThrownBy(() -> communityService.votePoll(voter.getStudentId(), post.id(), new CommunityPollVoteRequest("poll-expired", 1)))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getReason()).contains("종료"));
     }
 
     @Test

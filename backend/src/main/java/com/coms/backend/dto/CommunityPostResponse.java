@@ -31,5 +31,5 @@ public record CommunityPostResponse(
         boolean editable
 ) {
     public record MediaInfo(Long id, String url, String originalName) {}
-    public record PollResult(String pollId, List<Long> optionCounts, Integer myOption) {}
+    public record PollResult(String pollId, List<Long> optionCounts, Integer myOption, LocalDateTime closesAt, LocalDateTime closedAt, boolean closed) {}
 }
