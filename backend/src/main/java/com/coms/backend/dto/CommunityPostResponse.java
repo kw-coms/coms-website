@@ -23,6 +23,7 @@ public record CommunityPostResponse(
         long downvotes,
         long commentCount,
         int myVote,
+        List<PollResult> pollResults,
         boolean conceptPost,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
@@ -30,4 +31,5 @@ public record CommunityPostResponse(
         boolean editable
 ) {
     public record MediaInfo(Long id, String url, String originalName) {}
+    public record PollResult(String pollId, List<Long> optionCounts, Integer myOption) {}
 }
