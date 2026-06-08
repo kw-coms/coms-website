@@ -65,7 +65,7 @@ class CommunityServiceTest {
         assertThat(CommunityService.generationFromStudentId("2026123456")).isEqualTo("60기");
         assertThat(CommunityService.generationFromStudentId("2025123456")).isEqualTo("59기");
         assertThat(CommunityService.generationFromStudentId("2024123456")).isEqualTo("58기");
-        assertThat(CommunityService.displayName("2026123456", "관리자")).isEqualTo("60기관리자");
+        assertThat(CommunityService.displayName("2026123456", "관리자")).isEqualTo("60기 관리자");
     }
 
     @Test
@@ -87,9 +87,9 @@ class CommunityServiceTest {
 
         assertThat(posts)
                 .extracting("authorDisplayName")
-                .contains("60기관리자", "59기회원");
+                .contains("60기 관리자", "59기 회원");
         assertThat(posts)
-                .filteredOn(postResponse -> postResponse.authorDisplayName().equals("60기관리자"))
+                .filteredOn(postResponse -> postResponse.authorDisplayName().equals("60기 관리자"))
                 .singleElement()
                 .satisfies(postResponse -> assertThat(postResponse.authorAdmin()).isTrue());
     }
