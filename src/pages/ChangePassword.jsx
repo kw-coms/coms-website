@@ -45,7 +45,7 @@ function parseInterests(value) {
   return { selected, other: custom.join(' / ') }
 }
 
-function InterestsSelector({ selected, onChange, otherText, onOtherChange, inputClass }) {
+function InterestsSelector({ selected, onChange, otherText, onOtherChange, inputClass, frameClass }) {
   const toggle = (option) => {
     const next = selected.includes(option)
       ? selected.filter((item) => item !== option)
@@ -71,13 +71,18 @@ function InterestsSelector({ selected, onChange, otherText, onOtherChange, input
         ))}
       </div>
       {hasOther && (
-        <input
-          value={otherText}
-          onChange={(event) => onOtherChange(event.target.value)}
-          placeholder="기타 관심 분야를 입력하세요"
-          maxLength={100}
-          className={inputClass}
-        />
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-[var(--theme-body-muted)]/80">기타 관심 분야</p>
+          <div className={frameClass}>
+            <input
+              value={otherText}
+              onChange={(event) => onOtherChange(event.target.value)}
+              placeholder="기타 관심 분야를 입력하세요"
+              maxLength={100}
+              className={inputClass}
+            />
+          </div>
+        </div>
       )}
     </div>
   )
@@ -115,14 +120,23 @@ export default function ChangePassword({ onBack }) {
     aspiration: profileDraft.aspiration ?? user?.aspiration ?? '',
     selectedFontId: profileDraft.selectedFontId ?? user?.selectedFontId ?? '',
   }
+  const passwordChecks = [
+    { label: '8자 이상', ok: newPassword.length >= 8 },
+    { label: '영문 포함', ok: /[A-Za-z]/.test(newPassword) },
+    { label: '숫자 포함', ok: /\d/.test(newPassword) },
+    { label: '특수문자 포함', ok: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(newPassword) },
+    { label: '공백 없음', ok: newPassword.length > 0 && !/\s/.test(newPassword) },
+  ]
 
   const panelClass = 'shape-cut bg-[var(--theme-surface-96)] p-5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] sm:p-8'
   const frameClass = 'shape-cut-sm bg-black/12 p-px'
   const inputClass = 'w-full shape-cut-sm bg-white/72 px-4 py-2.5 text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/70 transition focus:bg-white/82 focus:ring-2 focus:ring-[var(--theme-accent)]/55'
   const textareaClass = `${inputClass} min-h-28 resize-y leading-6`
-  const btnClass = 'shape-cut-sm bg-white/66 px-4 py-2.5 font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/82 disabled:cursor-wait disabled:opacity-60'
+  const btnClass = 'shape-cut-sm border border-black/10 bg-white/78 px-4 py-2.5 font-semibold text-[var(--theme-body-dark)] shadow-[0_8px_20px_rgba(0,0,0,0.08)] transition hover:bg-white/92 disabled:cursor-wait disabled:opacity-60'
   const primaryBtnClass = 'shape-cut-sm bg-[var(--theme-text)] px-4 py-2.5 font-semibold text-[var(--theme-bg)] shadow-[0_10px_28px_rgba(0,0,0,0.18)] transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60'
-  const sectionClass = 'border-t border-[var(--theme-border-soft)] pt-5'
+  const cardClass = 'shape-cut-sm border border-black/10 bg-white/48 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.08)] sm:p-5'
+  const fieldCardClass = 'shape-cut-sm border border-black/8 bg-white/36 p-3'
+  const helperTextClass = 'text-xs leading-5 text-[var(--theme-body-muted)]/80'
 
   const resetMessages = () => {
     setError('')
@@ -247,15 +261,20 @@ export default function ChangePassword({ onBack }) {
 
           {error && <div className="mb-4 text-sm text-red-500">{error}</div>}
 
-          <form onSubmit={handleProfileSubmit} className="space-y-4">
+          <form onSubmit={handleProfileSubmit} className={`${cardClass} space-y-4`}>
+            <div>
+              <h3 className="text-base font-bold">회원 정보</h3>
+              <p className={helperTextClass}>연락처, 관심 분야, 사이트 표시 설정을 따로 관리합니다.</p>
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
+              <div className={fieldCardClass}>
                 <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">이름</label>
                 <div className={frameClass}>
                   <input value={user?.name || ''} className={inputClass} disabled />
                 </div>
               </div>
-              <div>
+              <div className={fieldCardClass}>
                 <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">학번</label>
                 <div className={frameClass}>
                   <input value={user?.studentId || ''} className={inputClass} disabled />
@@ -263,7 +282,7 @@ export default function ChangePassword({ onBack }) {
               </div>
             </div>
 
-            <div>
+            <div className={fieldCardClass}>
               <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">전화번호</label>
               <div className={frameClass}>
                 <input
@@ -277,7 +296,7 @@ export default function ChangePassword({ onBack }) {
               </div>
             </div>
 
-            <div>
+            <div className={fieldCardClass}>
               <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">
                 관심 분야 <span className="font-normal text-[var(--theme-body-muted)]">(복수 선택 가능)</span>
               </label>
@@ -287,10 +306,11 @@ export default function ChangePassword({ onBack }) {
                 otherText={otherInterest}
                 onOtherChange={setOtherInterestDraft}
                 inputClass={inputClass}
+                frameClass={frameClass}
               />
             </div>
 
-            <div>
+            <div className={fieldCardClass}>
               <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">사이트 폰트</label>
               <div className={frameClass}>
                 <select
@@ -306,7 +326,7 @@ export default function ChangePassword({ onBack }) {
               </div>
             </div>
 
-            <div>
+            <div className={fieldCardClass}>
               <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">포부</label>
               <div className={frameClass}>
                 <textarea
@@ -326,11 +346,12 @@ export default function ChangePassword({ onBack }) {
             </button>
           </form>
 
-          <div className={sectionClass}>
+          <div className={`${cardClass} mt-4`}>
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="font-semibold">이메일 인증</h3>
                 <p className="text-sm text-[var(--theme-body-muted)]/85">{user?.email || '-'}</p>
+                <p className={helperTextClass}>인증이 필요한 기능을 쓰기 전에 이메일 상태를 확인합니다.</p>
               </div>
               <span className={`shape-cut-sm px-3 py-1 text-xs font-semibold ${user?.emailVerified ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                 {user?.emailVerified ? '인증 완료' : '미인증'}
@@ -361,9 +382,12 @@ export default function ChangePassword({ onBack }) {
             {emailMessage && <div className="mt-3 text-sm text-emerald-600">{emailMessage}</div>}
           </div>
 
-          <form onSubmit={handlePasswordSubmit} className={`${sectionClass} space-y-4`}>
-            <h3 className="font-semibold">비밀번호 변경</h3>
+          <form onSubmit={handlePasswordSubmit} className={`${cardClass} mt-4 space-y-4`}>
             <div>
+              <h3 className="font-semibold">비밀번호 변경</h3>
+              <p className={helperTextClass}>현재 비밀번호와 새 비밀번호 입력 영역을 분리했습니다.</p>
+            </div>
+            <div className={fieldCardClass}>
               <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">현재 비밀번호</label>
               <div className={frameClass}>
                 <input
@@ -378,7 +402,7 @@ export default function ChangePassword({ onBack }) {
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
+              <div className={fieldCardClass}>
                 <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">새 비밀번호</label>
                 <div className={frameClass}>
                   <input
@@ -391,7 +415,7 @@ export default function ChangePassword({ onBack }) {
                   />
                 </div>
               </div>
-              <div>
+              <div className={fieldCardClass}>
                 <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">새 비밀번호 확인</label>
                 <div className={frameClass}>
                   <input
@@ -406,13 +430,29 @@ export default function ChangePassword({ onBack }) {
               </div>
             </div>
 
+            <div className="shape-cut-sm border border-black/8 bg-black/5 p-3">
+              <p className="mb-2 text-xs font-bold text-[var(--theme-body-muted)]/85">비밀번호 조건</p>
+              <div className="flex flex-wrap gap-2">
+                {passwordChecks.map((check) => (
+                  <span
+                    key={check.label}
+                    className={`shape-cut-sm px-2.5 py-1 text-xs font-semibold ${
+                      check.ok ? 'bg-emerald-100 text-emerald-800' : 'bg-white/64 text-[var(--theme-body-muted)]'
+                    }`}
+                  >
+                    {check.ok ? '✓ ' : ''}{check.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+
             {passwordMessage && <div className="text-sm text-emerald-600">{passwordMessage}</div>}
 
             <button type="submit" className={btnClass} disabled={loadingAction === 'password'}>
               {loadingAction === 'password' ? '변경 중...' : '비밀번호 변경'}
             </button>
 
-            <p className="text-xs leading-5 text-[var(--theme-body-muted)]/80">
+            <p className={helperTextClass}>
               비밀번호는 8자 이상, 영문·숫자·특수문자를 모두 포함해야 하며 공백은 사용할 수 없습니다.
             </p>
           </form>
