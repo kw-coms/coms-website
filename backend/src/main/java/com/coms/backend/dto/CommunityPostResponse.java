@@ -21,6 +21,7 @@ public record CommunityPostResponse(
         long viewCount,
         long upvotes,
         long downvotes,
+        long commentCount,
         int myVote,
         boolean conceptPost,
         LocalDateTime createdAt,

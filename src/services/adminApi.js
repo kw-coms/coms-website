@@ -4,6 +4,10 @@ export async function listMembers() {
   return request('/api/admin/members')
 }
 
+export async function listAuditLogs() {
+  return request('/api/admin/audit-logs')
+}
+
 export async function updateMemberRole(id, role) {
   return request(`/api/admin/members/${id}/role`, {
     method: 'PATCH',

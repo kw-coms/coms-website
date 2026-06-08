@@ -236,6 +236,14 @@ public class CommunityController {
                 .body(communityService.addComment(id, authentication.getName(), request));
     }
 
+    @PatchMapping("/{id}/comments/{commentId}")
+    public ResponseEntity<CommunityCommentResponse> updateComment(Authentication authentication,
+                                                                  @PathVariable Long id,
+                                                                  @PathVariable Long commentId,
+                                                                  @Valid @RequestBody CommunityCommentRequest request) {
+        return ResponseEntity.ok(communityService.updateComment(id, commentId, authentication.getName(), request));
+    }
+
     @DeleteMapping("/{id}/comments/{commentId}")
     public ResponseEntity<Void> deleteComment(Authentication authentication,
                                               @PathVariable Long id,

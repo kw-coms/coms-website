@@ -21,11 +21,14 @@ public class NoticeService {
     private final NoticeRepository repo;
     private final MemberRepository memberRepository;
     private final NotificationService notificationService;
+    private final AuditLogService auditLogService;
 
-    public NoticeService(NoticeRepository repo, MemberRepository memberRepository, NotificationService notificationService) {
+    public NoticeService(NoticeRepository repo, MemberRepository memberRepository, NotificationService notificationService,
+                         AuditLogService auditLogService) {
         this.repo = repo;
         this.memberRepository = memberRepository;
         this.notificationService = notificationService;
+        this.auditLogService = auditLogService;
     }
 
     @Transactional(readOnly = true)
@@ -43,17 +46,21 @@ public class NoticeService {
         applyRequest(notice, request, authorName(authorStudentId));
         Notice saved = repo.save(notice);
         notificationService.notifyNoticeCreated(saved);
+        auditLogService.record(authorStudentId, "NOTICE_CREATE", "NOTICE", String.valueOf(saved.getId()), "title=" + saved.getTitle(), null);
         return toResponse(saved);
     }
 
     public NoticeResponse update(String authorStudentId, Long id, NoticeRequest request) {
         Notice notice = getEntity(id);
         applyRequest(notice, request, authorName(authorStudentId));
+        auditLogService.record(authorStudentId, "NOTICE_UPDATE", "NOTICE", String.valueOf(notice.getId()), "title=" + notice.getTitle(), null);
         return toResponse(notice);
     }
 
-    public void delete(Long id) {
-        repo.delete(getEntity(id));
+    public void delete(String authorStudentId, Long id) {
+        Notice notice = getEntity(id);
+        repo.delete(notice);
+        auditLogService.record(authorStudentId, "NOTICE_DELETE", "NOTICE", String.valueOf(id), "title=" + notice.getTitle(), null);
     }
 
     private Notice getEntity(Long id) {

@@ -31,6 +31,12 @@ public class CommunityComment {
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(nullable = false)
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
+    @Column(nullable = false)
+    private boolean edited = false;
+
     public CommunityComment() {}
 
     public CommunityComment(Long postId, String studentId, String authorName, String content, Long parentCommentId, int depth) {
@@ -50,4 +56,12 @@ public class CommunityComment {
     public Long getParentCommentId() { return parentCommentId; }
     public int getDepth() { return depth; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public boolean isEdited() { return edited; }
+
+    public void markEdited(String content) {
+        this.content = content;
+        this.updatedAt = LocalDateTime.now();
+        this.edited = true;
+    }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword } from '../services/adminApi.js'
+import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs } from '../services/adminApi.js'
 import { listFiles, createPost, deleteFile } from '../services/archiveApi.js'
 import { listAdminFonts, setFontActive, uploadFont } from '../services/fontApi.js'
 import { useAuth } from '../contexts/useAuth.js'
@@ -61,6 +61,7 @@ export default function Admin({ onBack }) {
                 { id: 'files', label: '파일 관리' },
                 { id: 'fonts', label: '폰트 관리' },
                 { id: 'ban', label: '차단 관리' },
+                { id: 'logs', label: '로그' },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -83,6 +84,7 @@ export default function Admin({ onBack }) {
           {activeTab === 'files' && <FilesTab />}
           {activeTab === 'fonts' && <FontsTab />}
           {activeTab === 'ban' && <BanTab />}
+          {activeTab === 'logs' && <AuditLogTab />}
         </section>
       </div>
     </div>
@@ -886,6 +888,90 @@ function BanTab() {
                       차단 해제
                     </button>
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AuditLogTab() {
+  const [logs, setLogs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const load = async () => {
+    setError('')
+    try {
+      const data = await listAuditLogs()
+      setLogs(Array.isArray(data) ? data : [])
+    } catch (err) {
+      setError(err.message || '로그를 불러오지 못했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true
+    listAuditLogs()
+      .then((data) => { if (mounted) setLogs(Array.isArray(data) ? data : []) })
+      .catch((err) => { if (mounted) setError(err.message || '로그를 불러오지 못했습니다.') })
+      .finally(() => { if (mounted) setLoading(false) })
+    return () => { mounted = false }
+  }, [])
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-[var(--theme-body-dark)]">서버 감사 로그</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">로그인, 관리자 로그인, 커뮤니티 글/댓글/추천/비추천, 공지사항, 관리자 주요 작업을 최근 300건까지 봅니다.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setLoading(true); load() }}
+          className="shape-cut-sm border border-black/10 bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
+        >
+          새로고침
+        </button>
+      </div>
+
+      {loading && <p className="text-sm text-[var(--theme-body-muted)]">로그를 불러오는 중...</p>}
+      {error && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
+      {!loading && !error && logs.length === 0 && (
+        <p className="text-sm text-[var(--theme-body-muted)]">저장된 로그가 없습니다.</p>
+      )}
+      {!loading && !error && logs.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border border-black/10">
+          <table className="w-max min-w-full text-left text-sm">
+            <thead className="bg-white text-xs font-semibold text-[var(--theme-body-muted)]">
+              <tr>
+                <th className="px-3 py-3">시간</th>
+                <th className="px-3 py-3">사용자</th>
+                <th className="px-3 py-3">행위</th>
+                <th className="px-3 py-3">대상</th>
+                <th className="px-3 py-3">IP</th>
+                <th className="px-3 py-3">상세</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-black/10 bg-white/50">
+              {logs.map((log) => (
+                <tr key={log.id}>
+                  <td className="whitespace-nowrap px-3 py-3 text-xs text-[var(--theme-body-muted)]">{formatDateTime(log.createdAt)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-xs">
+                    <span className="font-semibold text-[var(--theme-body-dark)]">{log.actorName || '-'}</span>
+                    {log.actorStudentId && <span className="ml-1 font-mono text-[var(--theme-body-muted)]">({log.actorStudentId})</span>}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 font-mono text-xs font-semibold text-[#3b4890]">{log.action}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-xs text-[var(--theme-body-muted)]">
+                    {log.targetType}{log.targetId ? ` #${log.targetId}` : ''}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 font-mono text-xs text-[var(--theme-body-muted)]">{log.ipAddress || '-'}</td>
+                  <td className="max-w-[360px] whitespace-pre-wrap break-words px-3 py-3 text-xs text-[var(--theme-body-muted)]">{log.detail || '-'}</td>
                 </tr>
               ))}
             </tbody>
