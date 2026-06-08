@@ -463,7 +463,7 @@ public class CommunityService {
     static String displayName(String studentId, String name) {
         String trimmedName = name == null ? "" : name.trim();
         String generation = generationFromStudentId(studentId);
-        return generation.isBlank() ? trimmedName : generation + trimmedName;
+        return generation.isBlank() ? trimmedName : generation + " " + trimmedName;
     }
 
     static String generationFromStudentId(String studentId) {
