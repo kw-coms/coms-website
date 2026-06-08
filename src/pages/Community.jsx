@@ -10,9 +10,11 @@ import {
   ChevronRight,
   Download,
   ImagePlus,
+  Link,
   MessageSquare,
   Paperclip,
   Pencil,
+  Plus,
   Search,
   Send,
   ThumbsDown,
@@ -35,6 +37,8 @@ import {
   uploadPostFile,
   uploadPostVideo,
   voteCommunityPost,
+  voteCommunityPoll,
+  searchYoutubeVideos,
 } from '../services/communityApi.js'
 import { apiUrl } from '../services/apiClient.js'
 import { useAuth } from '../contexts/useAuth.js'
@@ -152,6 +156,86 @@ function mediaWidthPercent(width) {
   return LEGACY_MEDIA_WIDTHS[width] || LEGACY_MEDIA_WIDTHS.large
 }
 
+function isGraduateStudentId(studentId) {
+  if (!/^\d{10}$/.test(String(studentId || ''))) return true
+  const admissionYear = Number(String(studentId).slice(0, 4))
+  return admissionYear <= new Date().getFullYear() - 7
+}
+
+function canAccessAnonymousBoard(user) {
+  return user?.role === 'ADMIN' || !isGraduateStudentId(user?.studentId)
+}
+
+function youtubeVideoIdFromUrl(value) {
+  try {
+    const url = new URL(String(value || '').trim())
+    if (url.hostname === 'youtu.be') return url.pathname.slice(1)
+    if (url.hostname.endsWith('youtube.com')) {
+      if (url.pathname.startsWith('/watch')) return url.searchParams.get('v')
+      if (url.pathname.startsWith('/shorts/')) return url.pathname.split('/')[2]
+      if (url.pathname.startsWith('/embed/')) return url.pathname.split('/')[2]
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+function youtubeEmbedUrl(videoId) {
+  return `https://www.youtube.com/embed/${videoId}`
+}
+
+function externalBlockFromUrl(value, meta = {}) {
+  const raw = String(value || '').trim()
+  let url
+  try {
+    url = new URL(raw)
+  } catch {
+    throw new Error('올바른 URL을 입력해주세요.')
+  }
+  if (url.protocol !== 'https:') throw new Error('외부 콘텐츠는 https URL만 사용할 수 있습니다.')
+  const videoId = youtubeVideoIdFromUrl(raw)
+  if (videoId) {
+    return {
+      type: 'externalEmbed',
+      provider: 'youtube',
+      kind: 'youtube',
+      url: `https://www.youtube.com/watch?v=${videoId}`,
+      embedUrl: youtubeEmbedUrl(videoId),
+      title: meta.title || 'YouTube 영상',
+      thumbnailUrl: meta.thumbnailUrl || '',
+      width: 75,
+      align: 'left',
+      id: localId(),
+    }
+  }
+  const path = url.pathname.toLowerCase()
+  if (/\.(png|jpe?g|gif|webp|avif)$/.test(path)) {
+    return { type: 'externalEmbed', provider: 'external', kind: 'image', url: raw, title: meta.title || '외부 이미지', width: 75, align: 'left', id: localId() }
+  }
+  if (/\.(mp4|webm|mov)$/.test(path)) {
+    return { type: 'externalEmbed', provider: 'external', kind: 'video', url: raw, title: meta.title || '외부 영상', width: 75, align: 'left', id: localId() }
+  }
+  throw new Error('YouTube, 이미지 파일 URL, 영상 파일 URL만 삽입할 수 있습니다.')
+}
+
+function safeExternalSrc(url) {
+  return /^https:\/\//i.test(String(url || '')) ? url : ''
+}
+
+function newPollBlock(question, optionText) {
+  const options = String(optionText || '').split(/\n+/).map((item) => item.trim()).filter(Boolean).slice(0, 10)
+  if (!question.trim()) throw new Error('투표 질문을 입력해주세요.')
+  if (options.length < 2) throw new Error('투표 선택지는 줄바꿈으로 2개 이상 입력해주세요.')
+  return {
+    type: 'poll',
+    pollId: `poll-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    question: question.trim(),
+    options,
+    id: localId(),
+  }
+}
+
 
 function hasInlineImageBlock(blocks, imageUrl) {
   return Boolean(imageUrl) && blocks.some((block) => block.type === 'image' && block.url === imageUrl)
@@ -184,6 +268,12 @@ function parsePostBlocks(post) {
           const info = (post.fileInfos || []).find((f) => f.id === block.fileId)
           return { type: 'file', status: 'saved', fileId: block.fileId, name: block.name || info?.originalName, url: info?.url, id: localId() }
         }
+        if (block.type === 'externalEmbed') {
+          return { ...block, width: block.width || 75, align: block.align || 'left', id: localId() }
+        }
+        if (block.type === 'poll') {
+          return { type: 'poll', pollId: block.pollId, question: block.question || '', options: Array.isArray(block.options) ? block.options : [], id: localId() }
+        }
         return { type: 'text', content: block.content || '', id: localId() }
       }))
     }
@@ -196,15 +286,23 @@ const CATEGORY_OPTIONS = [
   { value: 'GENERAL', label: '일반' },
   { value: 'QUESTION', label: '질문' },
   { value: 'INFO', label: '정보' },
-]
-const BOARD_FILTER_OPTIONS = [
-  { value: 'ALL', label: '전체글' },
-  { value: 'CONCEPT', label: '개념글' },
-  ...CATEGORY_OPTIONS,
+  { value: 'ANONYMOUS', label: '익명' },
 ]
 
 function categoryLabel(value) {
   return CATEGORY_OPTIONS.find((item) => item.value === value)?.label || '일반'
+}
+
+function categoryOptionsForUser(user) {
+  return canAccessAnonymousBoard(user) ? CATEGORY_OPTIONS : CATEGORY_OPTIONS.filter((item) => item.value !== 'ANONYMOUS')
+}
+
+function boardFilterOptionsForUser(user) {
+  return [
+    { value: 'ALL', label: '전체글' },
+    { value: 'CONCEPT', label: '개념글' },
+    ...categoryOptionsForUser(user),
+  ]
 }
 
 function postScore(post) {
@@ -253,8 +351,9 @@ function shortDate(iso) {
   return date.toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })
 }
 
-function renderPostBlocks(post) {
+function renderPostBlocks(post, options = {}) {
   const blocks = parsePostBlocks(post)
+  const { onPollVote, pollVoting } = options
   const imageDownloadUrl = (url) => {
     if (!url) return null
     if (url.endsWith('/image')) return apiUrl(`${url}/download`)
@@ -340,6 +439,78 @@ function renderPostBlocks(post) {
                 <Download size={12} />
                 다운로드
               </a>
+            </div>
+          )
+        }
+        if (block.type === 'externalEmbed') {
+          const widthStyle = mediaContainerStyle(block.width, block.align)
+          if (block.kind === 'youtube') {
+            const src = safeExternalSrc(block.embedUrl)
+            if (!src) return null
+            return (
+              <div key={i} className="community-post-media my-2 overflow-hidden rounded border border-black/10 bg-black/[0.03]" style={widthStyle}>
+                <div className="aspect-video w-full bg-black">
+                  <iframe
+                    src={src}
+                    title={block.title || 'YouTube 영상'}
+                    className="h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                  />
+                </div>
+                {block.title && <div className="px-3 py-2 text-xs font-bold text-[var(--theme-body-dark)]">{block.title}</div>}
+              </div>
+            )
+          }
+          if (block.kind === 'image') {
+            const src = safeExternalSrc(block.url)
+            if (!src) return null
+            return (
+              <div key={i} className="community-post-media my-2" style={widthStyle}>
+                <img src={src} alt={block.title || '외부 이미지'} draggable={false} className="community-inline-media-image rounded" />
+              </div>
+            )
+          }
+          if (block.kind === 'video') {
+            const src = safeExternalSrc(block.url)
+            if (!src) return null
+            return (
+              <div key={i} className="community-post-media my-2" style={widthStyle}>
+                <video controls preload="metadata" src={src} className="block h-auto w-full rounded" />
+              </div>
+            )
+          }
+        }
+        if (block.type === 'poll') {
+          const result = (post.pollResults || []).find((item) => item.pollId === block.pollId)
+          const counts = result?.optionCounts || []
+          const total = counts.reduce((sum, count) => sum + Number(count || 0), 0)
+          return (
+            <div key={i} className="my-4 clear-both rounded-lg border border-[#3b4890]/15 bg-[#f7f9ff] p-4">
+              <p className="mb-3 text-sm font-black text-[#23306d]">{block.question}</p>
+              <div className="space-y-2">
+                {(block.options || []).map((option, index) => {
+                  const count = Number(counts[index] || 0)
+                  const pct = total > 0 ? Math.round((count / total) * 100) : 0
+                  const selected = result?.myOption === index
+                  return (
+                    <button
+                      key={`${block.pollId}-${option}-${index}`}
+                      type="button"
+                      onClick={() => onPollVote?.(block.pollId, index)}
+                      disabled={!onPollVote || pollVoting === block.pollId}
+                      className={`relative w-full overflow-hidden rounded border px-3 py-2 text-left text-sm font-semibold transition ${selected ? 'border-[#3b4890] bg-white text-[#23306d]' : 'border-black/10 bg-white text-[var(--theme-body-dark)] hover:border-[#3b4890]/30'}`}
+                    >
+                      <span className="absolute inset-y-0 left-0 bg-[#dce6ff]" style={{ width: `${pct}%` }} />
+                      <span className="relative flex items-center justify-between gap-3">
+                        <span>{option}</span>
+                        <span className="shrink-0 text-xs text-[var(--theme-body-muted)]">{count.toLocaleString('ko-KR')}표 · {pct}%</span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           )
         }
@@ -674,6 +845,23 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
         const id = block.id || localId()
         figMeta.current.set(id, { type: 'file', status: block.status || 'saved', fileId: block.fileId, file: block.file, name: block.name, url: block.url })
         html += `<figure class="community-editor-figure" contenteditable="false" draggable="true" data-block-id="${id}" data-type="file" style="display:inline-block;vertical-align:top;margin:0.15rem 0.2rem;user-select:none;-webkit-user-select:none;-webkit-user-drag:element;cursor:grab"><span style="display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(0,0,0,0.1);border-radius:4px;background:rgba(0,0,0,0.03);padding:6px 10px;font-size:13px;font-weight:600;pointer-events:none">📎 ${escH(block.name || '파일')}</span></figure>\u200B`
+      } else if (block.type === 'externalEmbed') {
+        const id = block.id || localId()
+        const wPct = mediaWidthPercent(block.width)
+        const align = block.align || 'left'
+        figMeta.current.set(id, { ...block, width: wPct, align })
+        const title = escH(block.title || (block.kind === 'youtube' ? 'YouTube 영상' : '외부 콘텐츠'))
+        const src = safeExternalSrc(block.kind === 'youtube' ? block.embedUrl : block.url)
+        const inner = block.kind === 'youtube'
+          ? `<div style="aspect-ratio:16/9;width:100%;background:#000;pointer-events:none"><iframe src="${escH(src)}" title="${title}" style="width:100%;height:100%;border:0;pointer-events:none"></iframe></div><figcaption style="padding:6px 8px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.03);pointer-events:none">${title}</figcaption>`
+          : block.kind === 'image'
+            ? `<img src="${escH(src)}" alt="${title}" draggable="false" class="community-inline-media-image" style="pointer-events:none">`
+            : `<video src="${escH(src)}" controls preload="metadata" draggable="false" style="display:block;width:100%;height:auto;pointer-events:none"></video>`
+        html += `<figure class="community-editor-figure" contenteditable="false" data-block-id="${id}" data-type="externalEmbed" data-align="${align}" style="${figureInlineStyle(wPct, align)}">${inner}</figure>\u200B`
+      } else if (block.type === 'poll') {
+        const id = block.id || localId()
+        figMeta.current.set(id, { type: 'poll', pollId: block.pollId, question: block.question, options: block.options || [] })
+        html += `<figure class="community-editor-figure" contenteditable="false" draggable="true" data-block-id="${id}" data-type="poll" style="display:block;max-width:100%;margin:0.5rem 0;user-select:none;-webkit-user-select:none;-webkit-user-drag:element;cursor:grab"><div style="border:1px solid rgba(59,72,144,0.18);border-radius:8px;background:#f7f9ff;padding:12px;pointer-events:none"><strong>${escH(block.question || '투표')}</strong><div style="margin-top:8px;font-size:12px;color:#5b6478">${escH((block.options || []).join(' · '))}</div></div></figure>\u200B`
       }
     }
     el.innerHTML = html || ''
@@ -775,10 +963,83 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
     insertAtCursor(figure)
   }
 
+  const insertExternalEmbed = (block) => {
+    const id = block.id || localId()
+    const wPct = mediaWidthPercent(block.width || 75)
+    const align = block.align || 'left'
+    figMeta.current.set(id, { ...block, id, width: wPct, align })
+    const figure = document.createElement('figure')
+    figure.className = 'community-editor-figure'
+    figure.contentEditable = 'false'
+    figure.draggable = true
+    figure.dataset.blockId = id
+    figure.dataset.type = 'externalEmbed'
+    figure.dataset.align = align
+    figure.setAttribute('style', figureInlineStyle(wPct, align))
+    const src = safeExternalSrc(block.kind === 'youtube' ? block.embedUrl : block.url)
+    if (block.kind === 'youtube') {
+      const box = document.createElement('div')
+      box.setAttribute('style', 'aspect-ratio:16/9;width:100%;background:#000;pointer-events:none')
+      const iframe = document.createElement('iframe')
+      iframe.src = src
+      iframe.title = block.title || 'YouTube 영상'
+      iframe.setAttribute('style', 'width:100%;height:100%;border:0;pointer-events:none')
+      box.appendChild(iframe)
+      figure.appendChild(box)
+      const caption = document.createElement('figcaption')
+      caption.setAttribute('style', 'padding:6px 8px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.03);pointer-events:none')
+      caption.textContent = block.title || 'YouTube 영상'
+      figure.appendChild(caption)
+    } else if (block.kind === 'image') {
+      const img = document.createElement('img')
+      img.src = src
+      img.alt = block.title || '외부 이미지'
+      img.className = 'community-inline-media-image'
+      img.draggable = false
+      img.setAttribute('style', 'pointer-events:none')
+      figure.appendChild(img)
+    } else {
+      const video = document.createElement('video')
+      video.src = src
+      video.controls = true
+      video.preload = 'metadata'
+      video.setAttribute('style', 'display:block;width:100%;height:auto;pointer-events:none')
+      figure.appendChild(video)
+    }
+    attachFigureClick(figure)
+    insertAtCursor(figure)
+  }
+
+  const insertPoll = (block) => {
+    const id = block.id || localId()
+    figMeta.current.set(id, { ...block, id })
+    const figure = document.createElement('figure')
+    figure.className = 'community-editor-figure'
+    figure.contentEditable = 'false'
+    figure.draggable = true
+    figure.dataset.blockId = id
+    figure.dataset.type = 'poll'
+    figure.setAttribute('style', 'display:block;max-width:100%;margin:0.5rem 0;user-select:none;-webkit-user-select:none;-webkit-user-drag:element;cursor:grab')
+    const box = document.createElement('div')
+    box.setAttribute('style', 'border:1px solid rgba(59,72,144,0.18);border-radius:8px;background:#f7f9ff;padding:12px;pointer-events:none')
+    const strong = document.createElement('strong')
+    strong.textContent = block.question
+    const options = document.createElement('div')
+    options.setAttribute('style', 'margin-top:8px;font-size:12px;color:#5b6478')
+    options.textContent = (block.options || []).join(' · ')
+    box.appendChild(strong)
+    box.appendChild(options)
+    figure.appendChild(box)
+    attachFigureClick(figure)
+    insertAtCursor(figure)
+  }
+
   useEffect(() => {
     if (!apiRef) return
     apiRef.current = {
       insertFiles: (files) => { saveSelection(); files.forEach(insertFile) },
+      insertExternalEmbed: (block) => { saveSelection(); insertExternalEmbed(block) },
+      insertPoll: (block) => { saveSelection(); insertPoll(block) },
       formatBlock,
       saveSelection,
       getBlocks: () => divRef.current ? domToBlocks(divRef.current, figMeta.current) : [],
@@ -952,10 +1213,16 @@ async function optimizeImageFile(file) {
   return new File([blob], nextName, { type: outputType, lastModified: Date.now() })
 }
 
-function PostForm({ initialPost, onCancel, onSave }) {
+function PostForm({ initialPost, onCancel, onSave, user }) {
   const isEditing = Boolean(initialPost)
   const [title, setTitle] = useState(initialPost?.title || '')
   const [category, setCategory] = useState(initialPost?.category || 'GENERAL')
+  const [externalUrl, setExternalUrl] = useState('')
+  const [youtubeQuery, setYoutubeQuery] = useState('')
+  const [youtubeResults, setYoutubeResults] = useState([])
+  const [youtubeSearching, setYoutubeSearching] = useState(false)
+  const [pollQuestion, setPollQuestion] = useState('')
+  const [pollOptions, setPollOptions] = useState('')
   const [saving, setSaving] = useState(false)
   const [savingStep, setSavingStep] = useState('')
   const [error, setError] = useState('')
@@ -965,12 +1232,60 @@ function PostForm({ initialPost, onCancel, onSave }) {
   const applyFormat = (command, value = null) => {
     editorApiRef.current?.formatBlock(command, value)
   }
+  const categoryOptions = useMemo(() => categoryOptionsForUser(user), [user])
+  const effectiveCategory = categoryOptions.some((item) => item.value === category) ? category : 'GENERAL'
+
+  const insertExternalUrl = () => {
+    try {
+      const block = externalBlockFromUrl(externalUrl)
+      editorApiRef.current?.insertExternalEmbed(block)
+      setExternalUrl('')
+      setError('')
+    } catch (err) {
+      setError(err.message || '외부 콘텐츠를 삽입할 수 없습니다.')
+    }
+  }
+
+  const handleYoutubeSearch = async () => {
+    if (youtubeQuery.trim().length < 2) { setError('유튜브 검색어를 2자 이상 입력해주세요.'); return }
+    setYoutubeSearching(true)
+    setError('')
+    try {
+      const data = await searchYoutubeVideos(youtubeQuery.trim())
+      setYoutubeResults(data.items || [])
+    } catch (err) {
+      setError((err.message || '유튜브 검색 실패') + ' URL 붙여넣기 임베드는 계속 사용할 수 있습니다.')
+    } finally {
+      setYoutubeSearching(false)
+    }
+  }
+
+  const insertYoutubeResult = (item) => {
+    editorApiRef.current?.insertExternalEmbed(externalBlockFromUrl(`https://www.youtube.com/watch?v=${item.videoId}`, {
+      title: item.title,
+      thumbnailUrl: item.thumbnailUrl,
+    }))
+    setYoutubeResults([])
+    setYoutubeQuery('')
+  }
+
+  const insertPollBlock = () => {
+    try {
+      const block = newPollBlock(pollQuestion, pollOptions)
+      editorApiRef.current?.insertPoll(block)
+      setPollQuestion('')
+      setPollOptions('')
+      setError('')
+    } catch (err) {
+      setError(err.message || '투표를 추가할 수 없습니다.')
+    }
+  }
 
   const submit = async (e) => {
     e.preventDefault()
     if (!title.trim()) { setError('제목을 입력해주세요.'); return }
     const blocks = editorApiRef.current?.getBlocks() || []
-    const hasContent = blocks.some(b => (b.type === 'text' && textContentForSearch(b.content).trim()) || b.type === 'image' || b.type === 'video' || b.type === 'file')
+    const hasContent = blocks.some(b => (b.type === 'text' && textContentForSearch(b.content).trim()) || b.type === 'image' || b.type === 'video' || b.type === 'file' || b.type === 'externalEmbed' || b.type === 'poll')
     if (!hasContent) { setError('내용을 입력하거나 사진/영상/첨부파일을 추가해주세요.'); return }
 
     setSaving(true)
@@ -982,7 +1297,7 @@ function PostForm({ initialPost, onCancel, onSave }) {
       } else {
         setSavingStep('글 등록 중...')
         const placeholder = textContentForSearch(blocks.find(b => b.type === 'text' && textContentForSearch(b.content).trim())?.content || '').trim() || '...'
-        const created = await createCommunityPost({ title: title.trim(), content: placeholder, category })
+        const created = await createCommunityPost({ title: title.trim(), content: placeholder, category: effectiveCategory })
         postId = created.id
       }
 
@@ -1021,13 +1336,15 @@ function PostForm({ initialPost, onCancel, onSave }) {
           if (b.type === 'image' && b.mediaId) return { type: 'image', mediaId: b.mediaId, name: b.name, width: b.width || 75, align: b.align || 'center' }
           if (b.type === 'video' && b.mediaId) return { type: 'video', mediaId: b.mediaId, name: b.name, width: b.width || 75, align: b.align || 'center' }
           if (b.type === 'file' && b.fileId) return { type: 'file', fileId: b.fileId, name: b.name }
+          if (b.type === 'externalEmbed') return { type: 'externalEmbed', provider: b.provider, kind: b.kind, url: b.url, embedUrl: b.embedUrl, title: b.title, thumbnailUrl: b.thumbnailUrl, width: b.width || 75, align: b.align || 'left' }
+          if (b.type === 'poll') return { type: 'poll', pollId: b.pollId, question: b.question, options: b.options || [] }
           return null
         }).filter(Boolean)
       )
 
       const removeLegacyImage = Boolean(initialPost?.imageUrl && !uploadedBlocks.some(b => b.legacy))
       setSavingStep('저장 중...')
-      const saved = await updateCommunityPost(postId, { title: title.trim(), content: contentJson, category, removeImage: removeLegacyImage })
+      const saved = await updateCommunityPost(postId, { title: title.trim(), content: contentJson, category: effectiveCategory, removeImage: removeLegacyImage })
       onSave(saved)
     } catch (err) {
       setError(err.message || '저장 중 오류가 발생했습니다.')
@@ -1040,10 +1357,10 @@ function PostForm({ initialPost, onCancel, onSave }) {
   return (
     <form onSubmit={submit} className="space-y-3 rounded-lg border border-white/10 bg-white/80 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.12)] sm:p-5">
       <div className="flex flex-wrap gap-2">
-        <select value={category} onChange={(e) => setCategory(e.target.value)}
+        <select value={effectiveCategory} onChange={(e) => setCategory(e.target.value)}
           className="rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
         >
-          {CATEGORY_OPTIONS.map((item) => (
+          {categoryOptions.map((item) => (
             <option key={item.value} value={item.value}>{item.label}</option>
           ))}
         </select>
@@ -1091,6 +1408,66 @@ function PostForm({ initialPost, onCancel, onSave }) {
               onChange={(e) => { editorApiRef.current?.insertFiles(Array.from(e.target.files)); e.target.value = '' }} />
           </label>
           <span className="text-xs text-[var(--theme-body-muted)]">본문 칸에 드래그하거나 Ctrl+V로 바로 삽입 · 큰 이미지는 저장할 때 자동 최적화</span>
+        </div>
+        <div className="space-y-3 border-b border-black/10 bg-white px-3 py-3">
+          <div className="flex flex-col gap-2 lg:flex-row">
+            <input
+              type="url"
+              value={externalUrl}
+              onChange={(e) => setExternalUrl(e.target.value)}
+              onFocus={() => editorApiRef.current?.saveSelection()}
+              placeholder="외부 이미지/영상/YouTube URL"
+              className="min-h-10 flex-1 rounded border border-black/15 px-3 text-sm outline-none focus:border-[#3b4890]"
+            />
+            <button type="button" onClick={insertExternalUrl} className="inline-flex min-h-10 items-center justify-center gap-1 rounded border border-black/15 bg-white px-3 text-sm font-bold text-[var(--theme-body-mid)] hover:bg-black/5">
+              <Link size={14} /> URL 삽입
+            </button>
+          </div>
+          <div className="flex flex-col gap-2 lg:flex-row">
+            <input
+              type="text"
+              value={youtubeQuery}
+              onChange={(e) => setYoutubeQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleYoutubeSearch() } }}
+              placeholder="YouTube 영상 검색"
+              className="min-h-10 flex-1 rounded border border-black/15 px-3 text-sm outline-none focus:border-[#3b4890]"
+            />
+            <button type="button" onClick={handleYoutubeSearch} disabled={youtubeSearching} className="inline-flex min-h-10 items-center justify-center gap-1 rounded border border-black/15 bg-white px-3 text-sm font-bold text-[var(--theme-body-mid)] hover:bg-black/5 disabled:opacity-50">
+              <Search size={14} /> {youtubeSearching ? '검색 중...' : '영상 검색'}
+            </button>
+          </div>
+          {youtubeResults.length > 0 && (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {youtubeResults.map((item) => (
+                <button key={item.videoId} type="button" onClick={() => insertYoutubeResult(item)} className="flex gap-2 rounded border border-black/10 bg-black/[0.03] p-2 text-left hover:bg-black/[0.06]">
+                  {item.thumbnailUrl && <img src={item.thumbnailUrl} alt="" className="h-16 w-24 rounded object-cover" />}
+                  <span className="min-w-0">
+                    <span className="line-clamp-2 text-sm font-bold text-[var(--theme-body-dark)]">{item.title}</span>
+                    <span className="mt-1 block truncate text-xs text-[var(--theme-body-muted)]">{item.channelTitle}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="grid gap-2 lg:grid-cols-[1fr_1fr_auto]">
+            <input
+              type="text"
+              value={pollQuestion}
+              onChange={(e) => setPollQuestion(e.target.value)}
+              placeholder="투표 질문"
+              className="min-h-10 rounded border border-black/15 px-3 text-sm outline-none focus:border-[#3b4890]"
+            />
+            <textarea
+              value={pollOptions}
+              onChange={(e) => setPollOptions(e.target.value)}
+              placeholder={'선택지 줄바꿈 입력\n예: 찬성\n반대'}
+              rows={2}
+              className="rounded border border-black/15 px-3 py-2 text-sm outline-none focus:border-[#3b4890]"
+            />
+            <button type="button" onClick={insertPollBlock} className="inline-flex min-h-10 items-center justify-center gap-1 rounded border border-black/15 bg-white px-3 text-sm font-bold text-[var(--theme-body-mid)] hover:bg-black/5">
+              <Plus size={14} /> 투표 추가
+            </button>
+          </div>
         </div>
         <RichEditor initialBlocks={initialBlocks} apiRef={editorApiRef} onError={(msg) => setError(msg)} />
       </div>
@@ -1149,6 +1526,10 @@ export default function Community({ onBack }) {
   const [editingCommentId, setEditingCommentId] = useState(null)
   const [editCommentInput, setEditCommentInput] = useState('')
   const [commentSaving, setCommentSaving] = useState(false)
+  const [pollVoting, setPollVoting] = useState('')
+  const boardFilterOptions = useMemo(() => boardFilterOptionsForUser(user), [user])
+  const canSeeAnonymous = canAccessAnonymousBoard(user)
+  const effectiveActiveCategory = boardFilterOptions.some((item) => item.value === activeCategory) ? activeCategory : 'ALL'
 
   useEffect(() => {
     let mounted = true
@@ -1163,20 +1544,20 @@ export default function Community({ onBack }) {
     () => posts.map((post) => ({
       ...post,
       _searchKey: `${post.title} ${post.authorDisplayName || post.authorName || ''}`.toLowerCase(),
-    })),
-    [posts]
+    })).filter((post) => canSeeAnonymous || post.category !== 'ANONYMOUS'),
+    [posts, canSeeAnonymous]
   )
 
   const filteredPosts = useMemo(() => {
-    const byCategory = activeCategory === 'ALL'
+    const byCategory = effectiveActiveCategory === 'ALL'
       ? indexedPosts
-      : activeCategory === 'CONCEPT'
+      : effectiveActiveCategory === 'CONCEPT'
         ? indexedPosts.filter(isConceptPost)
-        : indexedPosts.filter((post) => (post.category || 'GENERAL') === activeCategory)
+        : indexedPosts.filter((post) => (post.category || 'GENERAL') === effectiveActiveCategory)
     if (!searchQuery.trim()) return byCategory
     const q = searchQuery.toLowerCase()
     return byCategory.filter((post) => post._searchKey.includes(q))
-  }, [activeCategory, indexedPosts, searchQuery])
+  }, [effectiveActiveCategory, indexedPosts, searchQuery])
   const totalPages = Math.max(1, Math.ceil(filteredPosts.length / PAGE_SIZE))
   const pageStartIndex = (page - 1) * PAGE_SIZE
   const visiblePosts = useMemo(
@@ -1430,6 +1811,19 @@ export default function Community({ onBack }) {
       mergePost(updated)
     } catch (err) {
       alert(err.message || '투표 처리 중 오류가 발생했습니다.')
+    }
+  }
+
+  const handlePollVote = async (pollId, optionIndex) => {
+    if (!currentPost) return
+    setPollVoting(pollId)
+    try {
+      const updated = await voteCommunityPoll(currentPost.id, pollId, optionIndex)
+      mergePost(updated)
+    } catch (err) {
+      alert(err.message || '투표 처리 중 오류가 발생했습니다.')
+    } finally {
+      setPollVoting('')
     }
   }
 
@@ -1754,7 +2148,7 @@ export default function Community({ onBack }) {
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="-mx-1 overflow-x-auto pb-1">
                     <div className="flex min-w-max gap-2 px-1 text-sm font-bold lg:min-w-0 lg:flex-wrap">
-                      {BOARD_FILTER_OPTIONS.map((item) => (
+                      {boardFilterOptions.map((item) => (
                         <button
                           key={item.value}
                           type="button"
@@ -1763,7 +2157,7 @@ export default function Community({ onBack }) {
                             setPage(1)
                           }}
                           className={`shape-cut-sm min-h-10 px-4 py-2 transition sm:min-h-9 ${
-                            activeCategory === item.value
+                            effectiveActiveCategory === item.value
                               ? 'bg-white text-[var(--theme-body-dark)] shadow-[0_0_18px_rgba(255,255,255,0.12)]'
                               : 'border border-white/10 bg-white/8 text-white/68 hover:bg-white/14 hover:text-white'
                           }`}
@@ -1884,7 +2278,7 @@ export default function Community({ onBack }) {
               </button>
             </BoardHeader>
             <div className="p-4 sm:p-7">
-              <PostForm onCancel={backToList} onSave={handleSave} />
+              <PostForm user={user} onCancel={backToList} onSave={handleSave} />
             </div>
           </>
         )}
@@ -1898,7 +2292,7 @@ export default function Community({ onBack }) {
               </button>
             </BoardHeader>
             <div className="p-4 sm:p-7">
-              <PostForm initialPost={currentPost} onCancel={() => setMode('detail')} onSave={handleSave} />
+              <PostForm user={user} initialPost={currentPost} onCancel={() => setMode('detail')} onSave={handleSave} />
             </div>
           </>
         )}
@@ -1932,7 +2326,7 @@ export default function Community({ onBack }) {
                   </div>
                 </div>
                 <div className="min-h-[220px] sm:min-h-[280px]">
-                  {renderPostBlocks(currentPost)}
+                  {renderPostBlocks(currentPost, { onPollVote: handlePollVote, pollVoting })}
                 </div>
                 <div className="grid grid-cols-2 gap-2 border-y border-black/10 bg-[#fafafa] px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-3 sm:py-5">
                   <button type="button" onClick={() => handleVote(1)} className={`inline-flex min-h-12 items-center justify-center gap-2 border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === 1 ? 'border-[#3b4890] bg-[#3b4890] text-white' : 'border-black/15 bg-white text-[#3b4890]'}`}>

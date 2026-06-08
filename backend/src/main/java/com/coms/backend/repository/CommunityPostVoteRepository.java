@@ -12,4 +12,5 @@ public interface CommunityPostVoteRepository extends JpaRepository<CommunityPost
     List<CommunityPostVote> findByPostIdIn(Collection<Long> postIds);
     Optional<CommunityPostVote> findByPostAndStudentId(CommunityPost post, String studentId);
     void deleteByPost(CommunityPost post);
+    void deleteByStudentId(String studentId);
 }

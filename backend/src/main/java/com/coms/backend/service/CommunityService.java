@@ -6,22 +6,27 @@ import com.coms.backend.domain.CommunityPostImage;
 import com.coms.backend.domain.CommunityPostFile;
 import com.coms.backend.domain.CommunityPostVideo;
 import com.coms.backend.domain.CommunityPostVote;
+import com.coms.backend.domain.CommunityPollVote;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.CommunityCommentRequest;
 import com.coms.backend.dto.CommunityCommentResponse;
+import com.coms.backend.dto.CommunityPollVoteRequest;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
+import com.coms.backend.dto.YouTubeSearchResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.coms.backend.repository.CommunityCommentRepository;
+import com.coms.backend.repository.CommunityPollVoteRepository;
 import com.coms.backend.repository.CommunityPostImageRepository;
 import com.coms.backend.repository.CommunityPostFileRepository;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVideoRepository;
 import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.MemberRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -30,7 +35,16 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Year;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -61,6 +75,10 @@ public class CommunityService {
     private static final int MAX_VIDEOS_PER_POST = 3;
     private static final int MAX_FILES_PER_POST = 5;
     private static final int MAX_POSTS_PER_MINUTE = 5;
+    private static final int GRADUATE_AFTER_YEARS = 7;
+    private static final Pattern TEN_DIGIT_STUDENT_ID = Pattern.compile("\\d{10}");
+    private static final Pattern HTTPS_URL = Pattern.compile("^https://[^\\s<>\"']+$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern YOUTUBE_EMBED_URL = Pattern.compile("^https://www\\.youtube(-nocookie)?\\.com/embed/[A-Za-z0-9_-]{6,20}([?&][^\\s<>\"']*)?$", Pattern.CASE_INSENSITIVE);
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
     private static final Set<String> ALLOWED_VIDEO_TYPES = Set.of("video/mp4", "video/webm", "video/quicktime");
     private static final Set<String> ALLOWED_FILE_TYPES = Set.of(
@@ -79,6 +97,9 @@ public class CommunityService {
     private final CommunityPostFileRepository fileRepository;
     private final CommunityPostVideoRepository videoRepository;
     private final AuditLogService auditLogService;
+    private final CommunityPollVoteRepository pollVoteRepository;
+    private final HttpClient httpClient;
+    private final String youtubeApiKey;
 
     public CommunityService(CommunityPostRepository communityPostRepository,
                             CommunityPostVoteRepository voteRepository,
@@ -89,7 +110,9 @@ public class CommunityService {
                             CommunityPostImageRepository imageRepository,
                             CommunityPostFileRepository fileRepository,
                             CommunityPostVideoRepository videoRepository,
-                            AuditLogService auditLogService) {
+                            AuditLogService auditLogService,
+                            CommunityPollVoteRepository pollVoteRepository,
+                            @Value("${youtube.api-key:}") String youtubeApiKey) {
         this.communityPostRepository = communityPostRepository;
         this.voteRepository = voteRepository;
         this.memberRepository = memberRepository;
@@ -100,12 +123,17 @@ public class CommunityService {
         this.fileRepository = fileRepository;
         this.videoRepository = videoRepository;
         this.auditLogService = auditLogService;
+        this.pollVoteRepository = pollVoteRepository;
+        this.httpClient = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(3)).build();
+        this.youtubeApiKey = youtubeApiKey == null ? "" : youtubeApiKey.trim();
     }
 
     @Transactional(readOnly = true)
     public List<CommunityPostResponse> list(String studentId) {
         Member member = findMember(studentId);
-        List<CommunityPost> posts = communityPostRepository.findAllByOrderByCreatedAtDesc();
+        List<CommunityPost> posts = communityPostRepository.findAllByOrderByCreatedAtDesc().stream()
+                .filter(post -> canViewPost(member, post))
+                .toList();
         Map<String, Member> authors = memberRepository.findByStudentIdIn(posts.stream()
                         .map(CommunityPost::getAuthorStudentId)
                         .filter(Objects::nonNull)
@@ -114,8 +142,9 @@ public class CommunityService {
                 .collect(Collectors.toMap(Member::getStudentId, Function.identity()));
         Map<Long, VoteSummary> stats = voteStats(posts);
         Map<Long, Long> commentCounts = commentCounts(posts);
+        Map<Long, List<CommunityPostResponse.PollResult>> pollResults = pollResults(posts, member.getStudentId());
         return posts.stream()
-                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, false))
+                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, false))
                 .toList();
     }
 
@@ -123,16 +152,18 @@ public class CommunityService {
         Member member = findMember(studentId);
         CommunityPost post = communityPostRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostVisible(member, post);
         post.incrementViewCount();
         CommunityPost saved = communityPostRepository.save(post);
         return toResponse(saved, member, memberRepository.findByStudentId(saved.getAuthorStudentId()).orElse(null),
-                voteStats(List.of(saved)), commentCounts(List.of(saved)), true);
+                voteStats(List.of(saved)), commentCounts(List.of(saved)), pollResults(List.of(saved), member.getStudentId()), true);
     }
 
     public CommunityPostResponse create(String studentId, CommunityPostRequest request, MultipartFile image) {
         Member member = findMember(studentId);
         enforcePostRateLimit(member.getStudentId());
         SanitizedPost sanitized = validateRequest(request, null);
+        requireCategoryAllowed(member, sanitized.category());
         CommunityPost post = new CommunityPost();
         post.setTitle(sanitized.title());
         post.setContent(sanitized.content());
@@ -142,17 +173,19 @@ public class CommunityService {
         attachImage(post, image);
         CommunityPost saved = communityPostRepository.save(post);
         auditLogService.record(member.getStudentId(), "COMMUNITY_POST_CREATE", "COMMUNITY_POST", String.valueOf(saved.getId()), safeTitle(saved.getTitle()), null);
-        return toResponse(saved, member, member, voteStats(List.of(saved)), commentCounts(List.of(saved)), true);
+        return toResponse(saved, member, member, voteStats(List.of(saved)), commentCounts(List.of(saved)), pollResults(List.of(saved), member.getStudentId()), true);
     }
 
     public CommunityPostResponse update(String studentId, Long id, CommunityPostRequest request, MultipartFile image) {
         Member member = findMember(studentId);
         CommunityPost post = communityPostRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostVisible(member, post);
         if (!post.getAuthorStudentId().equals(member.getStudentId()) && member.getRole() != Member.Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         SanitizedPost sanitized = validateRequest(request, post.getTitle());
+        requireCategoryAllowed(member, sanitized.category());
         boolean isInitialFinalization = isInitialFinalization(post, sanitized.content());
         post.setContent(sanitized.content());
         post.setCategory(sanitized.category());
@@ -167,21 +200,18 @@ public class CommunityService {
         auditLogService.record(member.getStudentId(), "COMMUNITY_POST_UPDATE", "COMMUNITY_POST", String.valueOf(saved.getId()), safeTitle(saved.getTitle()), null);
         return toResponse(saved, member,
                 memberRepository.findByStudentId(saved.getAuthorStudentId()).orElse(null),
-                voteStats(List.of(saved)), commentCounts(List.of(saved)), true);
+                voteStats(List.of(saved)), commentCounts(List.of(saved)), pollResults(List.of(saved), member.getStudentId()), true);
     }
 
     public void delete(String studentId, Long id) {
         Member member = findMember(studentId);
         CommunityPost post = communityPostRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostVisible(member, post);
         if (!post.getAuthorStudentId().equals(member.getStudentId()) && member.getRole() != Member.Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        clearImage(post);
-        clearExtraImages(post.getId());
-        voteRepository.deleteByPost(post);
-        commentRepository.deleteByPostId(post.getId());
-        communityPostRepository.delete(post);
+        deletePostData(post);
         auditLogService.record(member.getStudentId(), "COMMUNITY_POST_DELETE", "COMMUNITY_POST", String.valueOf(id), safeTitle(post.getTitle()), null);
     }
 
@@ -192,6 +222,7 @@ public class CommunityService {
         Member member = findMember(studentId);
         CommunityPost post = communityPostRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostVisible(member, post);
         Optional<CommunityPostVote> existing = voteRepository.findByPostAndStudentId(post, member.getStudentId());
         if (value == 0) {
             existing.ifPresent(voteRepository::delete);
@@ -212,7 +243,88 @@ public class CommunityService {
         }
         auditLogService.record(member.getStudentId(), "COMMUNITY_POST_VOTE", "COMMUNITY_POST", String.valueOf(post.getId()), "value=" + value, null);
         return toResponse(post, member, memberRepository.findByStudentId(post.getAuthorStudentId()).orElse(null),
-                voteStats(List.of(post)), commentCounts(List.of(post)), true);
+                voteStats(List.of(post)), commentCounts(List.of(post)), pollResults(List.of(post), member.getStudentId()), true);
+    }
+
+    public CommunityPostResponse votePoll(String studentId, Long id, CommunityPollVoteRequest request) {
+        Member member = findMember(studentId);
+        CommunityPost post = communityPostRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostVisible(member, post);
+        PollDefinition poll = pollDefinitions(post.getContent()).stream()
+                .filter(item -> item.pollId().equals(request.pollId()))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "투표를 찾을 수 없습니다."));
+        int optionIndex = request.optionIndex();
+        if (optionIndex < 0 || optionIndex >= poll.optionCount()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "투표 선택지가 올바르지 않습니다.");
+        }
+        Optional<CommunityPollVote> existing = pollVoteRepository.findByPostIdAndPollIdAndStudentId(post.getId(), poll.pollId(), member.getStudentId());
+        if (existing.isPresent()) {
+            CommunityPollVote vote = existing.get();
+            vote.setOptionIndex(optionIndex);
+            pollVoteRepository.save(vote);
+        } else {
+            CommunityPollVote vote = new CommunityPollVote();
+            vote.setPostId(post.getId());
+            vote.setPollId(poll.pollId());
+            vote.setStudentId(member.getStudentId());
+            vote.setOptionIndex(optionIndex);
+            pollVoteRepository.save(vote);
+        }
+        auditLogService.record(member.getStudentId(), "COMMUNITY_POLL_VOTE", "COMMUNITY_POST", String.valueOf(post.getId()), "pollId=" + poll.pollId(), null);
+        return toResponse(post, member, memberRepository.findByStudentId(post.getAuthorStudentId()).orElse(null),
+                voteStats(List.of(post)), commentCounts(List.of(post)), pollResults(List.of(post), member.getStudentId()), true);
+    }
+
+    @Transactional(readOnly = true)
+    public YouTubeSearchResponse searchYouTube(String query) {
+        String trimmed = query == null ? "" : query.trim();
+        if (trimmed.length() < 2) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "검색어를 2자 이상 입력해주세요.");
+        }
+        if (youtubeApiKey.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "YouTube API 키가 설정되지 않았습니다.");
+        }
+        try {
+            String encoded = URLEncoder.encode(trimmed, StandardCharsets.UTF_8);
+            URI uri = URI.create("https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=8&q=" + encoded + "&key=" + URLEncoder.encode(youtubeApiKey, StandardCharsets.UTF_8));
+            HttpRequest request = HttpRequest.newBuilder(uri).timeout(java.time.Duration.ofSeconds(5)).GET().build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() >= 400) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "YouTube 검색 응답이 올바르지 않습니다.");
+            }
+            JsonNode root = JSON.readTree(response.body());
+            List<YouTubeSearchResponse.Item> items = new ArrayList<>();
+            for (JsonNode item : root.path("items")) {
+                String videoId = item.path("id").path("videoId").asText("");
+                if (videoId.isBlank()) continue;
+                JsonNode snippet = item.path("snippet");
+                String thumbnail = snippet.path("thumbnails").path("medium").path("url").asText(
+                        snippet.path("thumbnails").path("default").path("url").asText(""));
+                items.add(new YouTubeSearchResponse.Item(
+                        videoId,
+                        snippet.path("title").asText("YouTube video"),
+                        thumbnail,
+                        snippet.path("channelTitle").asText("")
+                ));
+            }
+            return new YouTubeSearchResponse(items);
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "YouTube 검색에 실패했습니다.");
+        }
+    }
+
+    public void deleteCommunityDataForMember(String studentId) {
+        if (studentId == null || studentId.isBlank()) return;
+        List<CommunityPost> posts = communityPostRepository.findByAuthorStudentId(studentId);
+        posts.forEach(this::deletePostData);
+        pollVoteRepository.deleteByStudentId(studentId);
+        voteRepository.deleteByStudentId(studentId);
+        Set<Long> deletedCommentIds = new java.util.HashSet<>();
+        commentRepository.findByStudentId(studentId).forEach(comment -> deleteCommentTree(comment, deletedCommentIds));
     }
 
     @Transactional(readOnly = true)
@@ -231,9 +343,46 @@ public class CommunityService {
         return storageService.load(post.getImageStoredName());
     }
 
+    @Transactional(readOnly = true)
+    public void requireReadablePost(String studentId, Long postId) {
+        Member member = findMember(studentId);
+        CommunityPost post = communityPostRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostVisible(member, post);
+    }
+
     private Member findMember(String studentId) {
         return memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    private boolean canViewPost(Member member, CommunityPost post) {
+        return !isAnonymousPost(post) || member.getRole() == Member.Role.ADMIN || !isGraduate(member);
+    }
+
+    private void requirePostVisible(Member member, CommunityPost post) {
+        if (!canViewPost(member, post)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    private void requireCategoryAllowed(Member member, CommunityPost.Category category) {
+        if (category == CommunityPost.Category.ANONYMOUS && member.getRole() != Member.Role.ADMIN && isGraduate(member)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid community category.");
+        }
+    }
+
+    private boolean isAnonymousPost(CommunityPost post) {
+        return post.getCategory() == CommunityPost.Category.ANONYMOUS;
+    }
+
+    private boolean isGraduate(Member member) {
+        String studentId = member.getStudentId();
+        if (studentId == null || !TEN_DIGIT_STUDENT_ID.matcher(studentId).matches()) {
+            return true;
+        }
+        int admissionYear = Integer.parseInt(studentId.substring(0, 4));
+        return admissionYear <= Year.now().getValue() - GRADUATE_AFTER_YEARS;
     }
 
     private SanitizedPost validateRequest(CommunityPostRequest request, String existingTitle) {
@@ -290,8 +439,13 @@ public class CommunityService {
             for (JsonNode block : root) {
                 if (!block.isObject()) continue;
                 ObjectNode copy = ((ObjectNode) block).deepCopy();
-                if ("text".equals(copy.path("type").asText())) {
+                String type = copy.path("type").asText();
+                if ("text".equals(type)) {
                     copy.put("content", sanitizeRichText(copy.path("content").asText("")));
+                } else if ("externalEmbed".equals(type)) {
+                    sanitizeExternalEmbed(copy);
+                } else if ("poll".equals(type)) {
+                    sanitizePollBlock(copy);
                 }
                 sanitized.add(copy);
             }
@@ -300,6 +454,61 @@ public class CommunityService {
             rejectUnsafeText(content);
             return content;
         }
+    }
+
+    private void sanitizeExternalEmbed(ObjectNode copy) {
+        String kind = copy.path("kind").asText("");
+        String provider = copy.path("provider").asText("");
+        String url = copy.path("url").asText("");
+        String embedUrl = copy.path("embedUrl").asText("");
+        if (!Set.of("youtube", "image", "video").contains(kind) || !Set.of("youtube", "external").contains(provider)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "지원하지 않는 외부 콘텐츠입니다.");
+        }
+        if (!url.isBlank() && !HTTPS_URL.matcher(url).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "외부 콘텐츠는 HTTPS URL만 사용할 수 있습니다.");
+        }
+        if ("youtube".equals(kind)) {
+            if (!YOUTUBE_EMBED_URL.matcher(embedUrl).matches()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "YouTube 임베드 주소가 올바르지 않습니다.");
+            }
+        } else if (!HTTPS_URL.matcher(url).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "외부 콘텐츠 주소가 올바르지 않습니다.");
+        }
+        copy.put("title", normalizeOptional(copy.path("title").asText(""), 160));
+        copy.put("thumbnailUrl", normalizeOptional(copy.path("thumbnailUrl").asText(""), 500));
+        copy.put("width", Math.max(25, Math.min(100, copy.path("width").asInt(75))));
+        copy.put("align", normalizeAlign(copy.path("align").asText("left")));
+    }
+
+    private void sanitizePollBlock(ObjectNode copy) {
+        String pollId = normalizeOptional(copy.path("pollId").asText(""), 80);
+        String question = normalizeOptional(copy.path("question").asText(""), 160);
+        if (pollId.isBlank() || question.isBlank() || !pollId.matches("[A-Za-z0-9_-]{6,80}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "투표 정보가 올바르지 않습니다.");
+        }
+        ArrayNode options = JSON.createArrayNode();
+        for (JsonNode option : copy.path("options")) {
+            String value = normalizeOptional(option.asText(""), 80);
+            if (!value.isBlank()) options.add(value);
+            if (options.size() >= 10) break;
+        }
+        if (options.size() < 2) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "투표 선택지는 2개 이상 필요합니다.");
+        }
+        copy.set("options", options);
+    }
+
+    private String normalizeOptional(String value, int maxLength) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.length() > maxLength) {
+            normalized = normalized.substring(0, maxLength);
+        }
+        rejectUnsafeText(normalized);
+        return normalized;
+    }
+
+    private String normalizeAlign(String align) {
+        return Set.of("left", "center", "right").contains(align) ? align : "left";
     }
 
     private String sanitizeRichText(String html) {
@@ -401,11 +610,15 @@ public class CommunityService {
                                              Member author,
                                              Map<Long, VoteSummary> voteStats,
                                              Map<Long, Long> commentCounts,
+                                             Map<Long, List<CommunityPostResponse.PollResult>> pollResults,
                                              boolean includeContent) {
         boolean editable = post.getAuthorStudentId().equals(currentMember.getStudentId())
                 || currentMember.getRole() == Member.Role.ADMIN;
-        boolean authorAdmin = author != null && author.getRole() == Member.Role.ADMIN;
-        String authorName = author != null ? author.getName() : post.getAuthorName();
+        boolean maskAnonymous = isAnonymousPost(post) && currentMember.getRole() != Member.Role.ADMIN;
+        boolean authorAdmin = !maskAnonymous && author != null && author.getRole() == Member.Role.ADMIN;
+        String authorName = maskAnonymous ? "익명" : (author != null ? author.getName() : post.getAuthorName());
+        String authorStudentId = maskAnonymous ? null : post.getAuthorStudentId();
+        String authorDisplayName = maskAnonymous ? "익명" : displayName(post.getAuthorStudentId(), authorName);
         VoteSummary votes = voteStats.getOrDefault(post.getId(), VoteSummary.EMPTY);
         long commentCount = commentCounts.getOrDefault(post.getId(), 0L);
         List<CommunityPostImage> extraImages = imageRepository.findByPostIdOrderByPositionAsc(post.getId());
@@ -436,9 +649,9 @@ public class CommunityService {
                 post.getId(),
                 post.getTitle(),
                 includeContent ? post.getContent() : preview(post.getContent()),
-                post.getAuthorStudentId(),
+                authorStudentId,
                 authorName,
-                displayName(post.getAuthorStudentId(), authorName),
+                authorDisplayName,
                 authorAdmin,
                 post.getCategory().name(),
                 post.getImageStoredName() == null ? null : "/api/community/posts/" + post.getId() + "/image",
@@ -452,6 +665,7 @@ public class CommunityService {
                 votes.downvotes(),
                 commentCount,
                 votes.myVote(currentMember.getStudentId()),
+                pollResults.getOrDefault(post.getId(), List.of()),
                 votes.netScore() >= CONCEPT_POST_SCORE_THRESHOLD,
                 post.getCreatedAt(),
                 post.getUpdatedAt(),
@@ -651,6 +865,7 @@ public class CommunityService {
     }
 
     private void requirePostOwnerOrAdmin(CommunityPost post, Member member) {
+        requirePostVisible(member, post);
         if (!post.getAuthorStudentId().equals(member.getStudentId()) && member.getRole() != Member.Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
@@ -733,18 +948,68 @@ public class CommunityService {
                 ));
     }
 
+    private Map<Long, List<CommunityPostResponse.PollResult>> pollResults(List<CommunityPost> posts, String currentStudentId) {
+        List<Long> postIds = posts.stream().map(CommunityPost::getId).filter(Objects::nonNull).toList();
+        if (postIds.isEmpty()) return Map.of();
+        Map<Long, List<PollDefinition>> definitions = posts.stream()
+                .collect(Collectors.toMap(CommunityPost::getId, post -> pollDefinitions(post.getContent())));
+        Map<Long, List<CommunityPollVote>> votesByPost = pollVoteRepository.findByPostIdIn(postIds).stream()
+                .collect(Collectors.groupingBy(CommunityPollVote::getPostId));
+        return definitions.entrySet().stream()
+                .filter(entry -> !entry.getValue().isEmpty())
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().stream()
+                        .map(definition -> pollResult(definition, votesByPost.getOrDefault(entry.getKey(), List.of()), currentStudentId))
+                        .toList()));
+    }
+
+    private CommunityPostResponse.PollResult pollResult(PollDefinition definition, List<CommunityPollVote> votes, String currentStudentId) {
+        List<Long> counts = new ArrayList<>(Collections.nCopies(definition.optionCount(), 0L));
+        Integer myOption = null;
+        for (CommunityPollVote vote : votes) {
+            if (!definition.pollId().equals(vote.getPollId())) continue;
+            int index = vote.getOptionIndex();
+            if (index >= 0 && index < counts.size()) {
+                counts.set(index, counts.get(index) + 1);
+            }
+            if (vote.getStudentId().equals(currentStudentId)) {
+                myOption = index;
+            }
+        }
+        return new CommunityPostResponse.PollResult(definition.pollId(), counts, myOption);
+    }
+
+    private List<PollDefinition> pollDefinitions(String content) {
+        try {
+            JsonNode root = JSON.readTree(content);
+            if (!root.isArray()) return List.of();
+            List<PollDefinition> polls = new ArrayList<>();
+            for (JsonNode block : root) {
+                if (!"poll".equals(block.path("type").asText())) continue;
+                String pollId = block.path("pollId").asText("");
+                int optionCount = block.path("options").isArray() ? block.path("options").size() : 0;
+                if (!pollId.isBlank() && optionCount > 0) {
+                    polls.add(new PollDefinition(pollId, optionCount));
+                }
+            }
+            return polls;
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
     @Transactional(readOnly = true)
     public List<CommunityCommentResponse> listComments(Long postId, String studentId) {
-        if (!communityPostRepository.existsById(postId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        CommunityPost post = communityPostRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostVisible(member, post);
         boolean isAdmin = member.getRole() == Member.Role.ADMIN;
+        boolean maskAnonymous = isAnonymousPost(post) && !isAdmin;
         return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
                 .map(c -> new CommunityCommentResponse(
                         c.getId(), c.getPostId(), c.getParentCommentId(), c.getDepth(),
-                        displayName(c.getStudentId(), c.getAuthorName()), c.getContent(), c.getCreatedAt(), c.getUpdatedAt(), c.isEdited(),
+                        maskAnonymous ? "익명" : displayName(c.getStudentId(), c.getAuthorName()), c.getContent(), c.getCreatedAt(), c.getUpdatedAt(), c.isEdited(),
                         isAdmin || c.getStudentId().equals(studentId)))
                 .toList();
     }
@@ -754,6 +1019,7 @@ public class CommunityService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        requirePostVisible(member, post);
         String content = normalizeBounded(request.content(), "댓글", MAX_COMMENT_LENGTH);
         rejectUnsafeText(content);
         CommunityComment parent = null;
@@ -775,7 +1041,7 @@ public class CommunityService {
         }
         auditLogService.record(member.getStudentId(), "COMMUNITY_COMMENT_CREATE", "COMMUNITY_COMMENT", String.valueOf(saved.getId()),
                 "postId=" + postId + (saved.getParentCommentId() == null ? "" : ", parentCommentId=" + saved.getParentCommentId()), null);
-        return new CommunityCommentResponse(saved.getId(), saved.getPostId(), saved.getParentCommentId(), saved.getDepth(), displayName(saved.getStudentId(), saved.getAuthorName()),
+        return new CommunityCommentResponse(saved.getId(), saved.getPostId(), saved.getParentCommentId(), saved.getDepth(), commentAuthorName(post, member, saved),
                 saved.getContent(), saved.getCreatedAt(), saved.getUpdatedAt(), saved.isEdited(), true);
     }
 
@@ -785,6 +1051,9 @@ public class CommunityService {
         if (!comment.getPostId().equals(postId)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        CommunityPost post = communityPostRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostVisible(member, post);
         if (!comment.getStudentId().equals(studentId) && member.getRole() != Member.Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
@@ -795,7 +1064,7 @@ public class CommunityService {
         auditLogService.record(member.getStudentId(), "COMMUNITY_COMMENT_UPDATE", "COMMUNITY_COMMENT", String.valueOf(saved.getId()),
                 "postId=" + postId, null);
         return new CommunityCommentResponse(saved.getId(), saved.getPostId(), saved.getParentCommentId(), saved.getDepth(),
-                displayName(saved.getStudentId(), saved.getAuthorName()), saved.getContent(), saved.getCreatedAt(), saved.getUpdatedAt(), saved.isEdited(), true);
+                commentAuthorName(post, member, saved), saved.getContent(), saved.getCreatedAt(), saved.getUpdatedAt(), saved.isEdited(), true);
     }
 
     public void deleteComment(Long postId, Long commentId, String studentId) {
@@ -804,6 +1073,9 @@ public class CommunityService {
         if (!comment.getPostId().equals(postId)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        CommunityPost post = communityPostRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostVisible(member, post);
         if (!comment.getStudentId().equals(studentId) && member.getRole() != Member.Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
@@ -813,9 +1085,31 @@ public class CommunityService {
     }
 
     private void deleteCommentTree(CommunityComment comment) {
-        commentRepository.findByParentCommentId(comment.getId()).forEach(this::deleteCommentTree);
+        deleteCommentTree(comment, new java.util.HashSet<>());
+    }
+
+    private void deleteCommentTree(CommunityComment comment, Set<Long> deletedCommentIds) {
+        if (!deletedCommentIds.add(comment.getId())) return;
+        commentRepository.findByParentCommentId(comment.getId()).forEach(child -> deleteCommentTree(child, deletedCommentIds));
         commentRepository.delete(comment);
     }
+
+    private String commentAuthorName(CommunityPost post, Member currentMember, CommunityComment comment) {
+        return isAnonymousPost(post) && currentMember.getRole() != Member.Role.ADMIN
+                ? "익명"
+                : displayName(comment.getStudentId(), comment.getAuthorName());
+    }
+
+    private void deletePostData(CommunityPost post) {
+        clearImage(post);
+        clearExtraImages(post.getId());
+        pollVoteRepository.deleteByPostId(post.getId());
+        voteRepository.deleteByPost(post);
+        commentRepository.deleteByPostId(post.getId());
+        communityPostRepository.delete(post);
+    }
+
+    private record PollDefinition(String pollId, int optionCount) {}
 
     private record VoteSummary(long upvotes, long downvotes, Map<String, Integer> byStudent) {
         static final VoteSummary EMPTY = new VoteSummary(0, 0, Map.of());

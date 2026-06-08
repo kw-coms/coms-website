@@ -21,10 +21,12 @@ public class AdminService {
 
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
+    private final CommunityService communityService;
 
-    public AdminService(MemberRepository memberRepository, PasswordEncoder passwordEncoder) {
+    public AdminService(MemberRepository memberRepository, PasswordEncoder passwordEncoder, CommunityService communityService) {
         this.memberRepository = memberRepository;
         this.passwordEncoder = passwordEncoder;
+        this.communityService = communityService;
     }
 
     @Transactional(readOnly = true)
@@ -44,10 +46,10 @@ public class AdminService {
     }
 
     public void deleteMember(Long id) {
-        if (!memberRepository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        }
-        memberRepository.deleteById(id);
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        communityService.deleteCommunityDataForMember(member.getStudentId());
+        memberRepository.delete(member);
     }
 
     public void resetPassword(Long id, String newPassword) {
