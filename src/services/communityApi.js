@@ -61,6 +61,12 @@ export async function voteCommunityPoll(id, pollId, optionIndex) {
   })
 }
 
+export async function closeCommunityPoll(id, pollId) {
+  return request(`/api/community/posts/${id}/polls/${encodeURIComponent(pollId)}/close`, {
+    method: 'POST',
+  })
+}
+
 export async function searchYoutubeVideos(query) {
   const q = encodeURIComponent(query)
   return request(`/api/community/posts/tools/youtube/search?q=${q}`)

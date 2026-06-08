@@ -26,6 +26,7 @@ import {
 import {
   createCommunityPost,
   createComment,
+  closeCommunityPoll,
   deleteComment,
   deleteCommunityPost,
   getCommunityPost,
@@ -223,20 +224,52 @@ function safeExternalSrc(url) {
   return /^https:\/\//i.test(String(url || '')) ? url : ''
 }
 
-function newPollBlock(question, optionText) {
+function newPollBlock(question, optionText, closesAt = '') {
   const options = (Array.isArray(optionText) ? optionText : String(optionText || '').split(/\n+/))
-    .map((item) => String(item || '').trim())
-    .filter(Boolean)
+    .map((item) => (typeof item === 'object'
+      ? { label: String(item.label || '').trim(), imageUrl: String(item.imageUrl || '').trim() }
+      : { label: String(item || '').trim(), imageUrl: '' }))
+    .filter((item) => item.label)
     .slice(0, 10)
   if (!question.trim()) throw new Error('투표 질문을 입력해주세요.')
   if (options.length < 2) throw new Error('투표 보기는 2개 이상 입력해주세요.')
+  for (const option of options) {
+    if (option.imageUrl) {
+      try {
+        const url = new URL(option.imageUrl)
+        if (url.protocol !== 'https:') throw new Error()
+      } catch {
+        throw new Error('투표 보기 이미지는 https URL만 사용할 수 있습니다.')
+      }
+    }
+  }
   return {
     type: 'poll',
     pollId: `poll-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     question: question.trim(),
     options,
+    closesAt: closesAt || undefined,
     id: localId(),
   }
+}
+
+function pollOptionLabel(option) {
+  return typeof option === 'object' ? option.label : String(option || '')
+}
+
+function pollOptionImageUrl(option) {
+  return typeof option === 'object' ? option.imageUrl : ''
+}
+
+function formatPollDate(value) {
+  if (!value) return ''
+  return new Date(value).toLocaleString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
+function datetimeLocalValue(minutesFromNow = 60) {
+  const date = new Date(Date.now() + minutesFromNow * 60 * 1000)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 
@@ -356,7 +389,7 @@ function shortDate(iso) {
 
 function renderPostBlocks(post, options = {}) {
   const blocks = parsePostBlocks(post)
-  const { onPollVote, pollVoting } = options
+  const { onPollVote, onPollClose, pollVoting, pollClosing } = options
   const imageDownloadUrl = (url) => {
     if (!url) return null
     if (url.endsWith('/image')) return apiUrl(`${url}/download`)
@@ -489,26 +522,49 @@ function renderPostBlocks(post, options = {}) {
           const result = (post.pollResults || []).find((item) => item.pollId === block.pollId)
           const counts = result?.optionCounts || []
           const total = counts.reduce((sum, count) => sum + Number(count || 0), 0)
+          const closed = Boolean(result?.closed)
+          const voted = result?.myOption !== null && result?.myOption !== undefined
+          const canClose = Boolean(onPollClose && !closed)
+          const status = closed
+            ? '종료됨'
+            : result?.closesAt
+              ? `${formatPollDate(result.closesAt)} 종료`
+              : '진행 중'
           return (
             <div key={i} className="my-4 clear-both overflow-hidden rounded-xl border border-[#3b4890]/15 bg-white shadow-[0_14px_36px_rgba(35,48,109,0.12)]">
               <div className="border-b border-[#3b4890]/10 bg-gradient-to-r from-[#3b4890] to-[#5061b5] px-4 py-3 text-white">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="rounded-full bg-white/16 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em]">Poll</span>
-                  <span className="text-xs font-bold text-white/78">총 {total.toLocaleString('ko-KR')}표</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-white/78">{status}</span>
+                    <span className="text-xs font-bold text-white/78">총 {total.toLocaleString('ko-KR')}표</span>
+                    {canClose && (
+                      <button
+                        type="button"
+                        onClick={() => onPollClose(block.pollId)}
+                        disabled={pollClosing === block.pollId}
+                        className="rounded-full bg-white/16 px-2.5 py-1 text-[11px] font-black text-white transition hover:bg-white/24 disabled:opacity-45"
+                      >
+                        {pollClosing === block.pollId ? '종료 중' : '투표 종료'}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <p className="mt-2 text-base font-black leading-6">{block.question}</p>
               </div>
               <div className="space-y-2 p-4">
                 {(block.options || []).map((option, index) => {
+                  const label = pollOptionLabel(option)
+                  const imageUrl = pollOptionImageUrl(option)
                   const count = Number(counts[index] || 0)
                   const pct = total > 0 ? Math.round((count / total) * 100) : 0
                   const selected = result?.myOption === index
                   return (
                     <button
-                      key={`${block.pollId}-${option}-${index}`}
+                      key={`${block.pollId}-${label}-${index}`}
                       type="button"
                       onClick={() => onPollVote?.(block.pollId, index)}
-                      disabled={!onPollVote || pollVoting === block.pollId}
+                      disabled={!onPollVote || pollVoting === block.pollId || closed || voted}
                       className={`relative w-full overflow-hidden rounded-lg border px-3 py-3 text-left text-sm font-semibold transition ${selected ? 'border-[#3b4890] bg-[#f7f9ff] text-[#23306d] ring-2 ring-[#3b4890]/10' : 'border-black/10 bg-white text-[var(--theme-body-dark)] hover:border-[#3b4890]/30 hover:bg-[#f8faff]'}`}
                     >
                       <span className="absolute inset-y-0 left-0 bg-[#dce6ff]" style={{ width: `${pct}%` }} />
@@ -517,7 +573,12 @@ function renderPostBlocks(post, options = {}) {
                           <span className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px] ${selected ? 'border-[#3b4890] bg-[#3b4890] text-white' : 'border-black/15 bg-white text-[var(--theme-body-muted)]'}`}>
                             {index + 1}
                           </span>
-                          <span className="min-w-0 break-words">{option}</span>
+                          {imageUrl && (
+                            <span className="flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded bg-white/75">
+                              <img src={imageUrl} alt="" className="max-h-14 max-w-20 object-contain" loading="lazy" />
+                            </span>
+                          )}
+                          <span className="min-w-0 break-words">{label}</span>
                         </span>
                         <span className="shrink-0 text-xs font-black text-[#3b4890]">{count.toLocaleString('ko-KR')}표 · {pct}%</span>
                       </span>
@@ -525,6 +586,11 @@ function renderPostBlocks(post, options = {}) {
                   )
                 })}
               </div>
+              {(closed || voted) && (
+                <div className="border-t border-black/5 bg-black/[0.02] px-4 py-2 text-xs font-bold text-[var(--theme-body-muted)]">
+                  {closed ? '종료된 투표라 결과만 볼 수 있습니다.' : '이미 투표했습니다. 투표는 변경하거나 취소할 수 없습니다.'}
+                </div>
+              )}
             </div>
           )
         }
@@ -875,7 +941,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
       } else if (block.type === 'poll') {
         const id = block.id || localId()
         figMeta.current.set(id, { type: 'poll', pollId: block.pollId, question: block.question, options: block.options || [] })
-        html += `<figure class="community-editor-figure" contenteditable="false" draggable="true" data-block-id="${id}" data-type="poll" style="display:block;max-width:100%;margin:0.5rem 0;user-select:none;-webkit-user-select:none;-webkit-user-drag:element;cursor:grab"><div style="border:1px solid rgba(59,72,144,0.18);border-radius:8px;background:#f7f9ff;padding:12px;pointer-events:none"><strong>${escH(block.question || '투표')}</strong><div style="margin-top:8px;font-size:12px;color:#5b6478">${escH((block.options || []).join(' · '))}</div></div></figure>\u200B`
+        html += `<figure class="community-editor-figure" contenteditable="false" draggable="true" data-block-id="${id}" data-type="poll" style="display:block;max-width:100%;margin:0.5rem 0;user-select:none;-webkit-user-select:none;-webkit-user-drag:element;cursor:grab"><div style="border:1px solid rgba(59,72,144,0.18);border-radius:8px;background:#f7f9ff;padding:12px;pointer-events:none"><strong>${escH(block.question || '투표')}</strong><div style="margin-top:8px;font-size:12px;color:#5b6478">${escH((block.options || []).map(pollOptionLabel).join(' · '))}</div></div></figure>\u200B`
       }
     }
     el.innerHTML = html || ''
@@ -1040,7 +1106,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
     strong.textContent = block.question
     const options = document.createElement('div')
     options.setAttribute('style', 'margin-top:8px;font-size:12px;color:#5b6478')
-    options.textContent = (block.options || []).join(' · ')
+    options.textContent = (block.options || []).map(pollOptionLabel).join(' · ')
     box.appendChild(strong)
     box.appendChild(options)
     figure.appendChild(box)
@@ -1236,7 +1302,9 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
   const [youtubeResults, setYoutubeResults] = useState([])
   const [youtubeSearching, setYoutubeSearching] = useState(false)
   const [pollQuestion, setPollQuestion] = useState('')
-  const [pollOptionInputs, setPollOptionInputs] = useState(['', ''])
+  const [pollOptionInputs, setPollOptionInputs] = useState([{ label: '', imageUrl: '' }, { label: '', imageUrl: '' }])
+  const [pollClosesAt, setPollClosesAt] = useState(datetimeLocalValue(60))
+  const [activeInsertTool, setActiveInsertTool] = useState('')
   const [saving, setSaving] = useState(false)
   const [savingStep, setSavingStep] = useState('')
   const [error, setError] = useState('')
@@ -1254,6 +1322,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
       const block = externalBlockFromUrl(externalUrl)
       editorApiRef.current?.insertExternalEmbed(block)
       setExternalUrl('')
+      setActiveInsertTool('')
       setError('')
     } catch (err) {
       setError(err.message || '외부 콘텐츠를 삽입할 수 없습니다.')
@@ -1281,26 +1350,29 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
     }))
     setYoutubeResults([])
     setYoutubeQuery('')
+    setActiveInsertTool('')
   }
 
   const insertPollBlock = () => {
     try {
-      const block = newPollBlock(pollQuestion, pollOptionInputs)
+      const block = newPollBlock(pollQuestion, pollOptionInputs, pollClosesAt)
       editorApiRef.current?.insertPoll(block)
       setPollQuestion('')
-      setPollOptionInputs(['', ''])
+      setPollOptionInputs([{ label: '', imageUrl: '' }, { label: '', imageUrl: '' }])
+      setPollClosesAt(datetimeLocalValue(60))
+      setActiveInsertTool('')
       setError('')
     } catch (err) {
       setError(err.message || '투표를 추가할 수 없습니다.')
     }
   }
 
-  const updatePollOption = (index, value) => {
-    setPollOptionInputs((prev) => prev.map((item, itemIndex) => (itemIndex === index ? value : item)))
+  const updatePollOption = (index, field, value) => {
+    setPollOptionInputs((prev) => prev.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)))
   }
 
   const addPollOption = () => {
-    setPollOptionInputs((prev) => (prev.length >= 10 ? prev : [...prev, '']))
+    setPollOptionInputs((prev) => (prev.length >= 10 ? prev : [...prev, { label: '', imageUrl: '' }]))
   }
 
   const removePollOption = (index) => {
@@ -1363,7 +1435,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
           if (b.type === 'video' && b.mediaId) return { type: 'video', mediaId: b.mediaId, name: b.name, width: b.width || 75, align: b.align || 'center' }
           if (b.type === 'file' && b.fileId) return { type: 'file', fileId: b.fileId, name: b.name }
           if (b.type === 'externalEmbed') return { type: 'externalEmbed', provider: b.provider, kind: b.kind, url: b.url, embedUrl: b.embedUrl, title: b.title, thumbnailUrl: b.thumbnailUrl, width: b.width || 75, align: b.align || 'left' }
-          if (b.type === 'poll') return { type: 'poll', pollId: b.pollId, question: b.question, options: b.options || [] }
+          if (b.type === 'poll') return { type: 'poll', pollId: b.pollId, question: b.question, options: b.options || [], closesAt: b.closesAt, closedAt: b.closedAt }
           return null
         }).filter(Boolean)
       )
@@ -1433,9 +1505,23 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
             <input type="file" multiple accept=".zip,application/zip,application/x-zip-compressed" className="hidden"
               onChange={(e) => { editorApiRef.current?.insertFiles(Array.from(e.target.files)); e.target.value = '' }} />
           </label>
-          <span className="text-xs text-[var(--theme-body-muted)]">본문 칸에 드래그하거나 Ctrl+V로 바로 삽입 · 큰 이미지는 저장할 때 자동 최적화</span>
+          <button type="button" onClick={() => setActiveInsertTool((tool) => tool === 'url' ? '' : 'url')}
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'url' ? 'border-[#3b4890] bg-[#eef3ff] text-[#3b4890]' : 'border-black/15 bg-white text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
+            <Link size={14} />URL 삽입
+          </button>
+          <button type="button" onClick={() => setActiveInsertTool((tool) => tool === 'youtube' ? '' : 'youtube')}
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'youtube' ? 'border-[#3b4890] bg-[#eef3ff] text-[#3b4890]' : 'border-black/15 bg-white text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
+            <Search size={14} />영상 검색
+          </button>
+          <button type="button" onClick={() => setActiveInsertTool((tool) => tool === 'poll' ? '' : 'poll')}
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'poll' ? 'border-[#3b4890] bg-[#eef3ff] text-[#3b4890]' : 'border-black/15 bg-white text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
+            <Plus size={14} />투표
+          </button>
+          <span className="text-xs text-[var(--theme-body-muted)]">본문 칸에 드래그하거나 Ctrl+V로 바로 삽입 · 필요한 도구만 열어서 사용</span>
         </div>
+        {activeInsertTool && (
         <div className="space-y-3 border-b border-black/10 bg-white px-3 py-3">
+          {activeInsertTool === 'url' && (
           <div className="flex flex-col gap-2 lg:flex-row">
             <input
               type="url"
@@ -1449,6 +1535,9 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
               <Link size={14} /> URL 삽입
             </button>
           </div>
+          )}
+          {activeInsertTool === 'youtube' && (
+          <>
           <div className="flex flex-col gap-2 lg:flex-row">
             <input
               type="text"
@@ -1475,11 +1564,14 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
               ))}
             </div>
           )}
+          </>
+          )}
+          {activeInsertTool === 'poll' && (
           <div className="rounded-xl border border-[#3b4890]/15 bg-[#f7f9ff] p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-sm font-black text-[#23306d]">투표 만들기</p>
-                <p className="text-xs font-semibold text-[var(--theme-body-muted)]">권한/종료시간 없이 모든 게시판 회원이 바로 투표합니다.</p>
+                <p className="text-xs font-semibold text-[var(--theme-body-muted)]">투표는 한 번 하면 변경/취소할 수 없고, 종료 후에는 결과만 보입니다.</p>
               </div>
               <button type="button" onClick={insertPollBlock} className="inline-flex min-h-10 items-center justify-center gap-1 rounded bg-[#3b4890] px-3 text-sm font-bold text-white shadow-sm hover:bg-[#2f3a7a]">
                 <Plus size={14} /> 본문에 추가
@@ -1492,15 +1584,31 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
               placeholder="투표 제목 입력"
               className="mb-2 min-h-11 w-full rounded-lg border border-[#3b4890]/15 bg-white px-3 text-sm font-semibold outline-none focus:border-[#3b4890]"
             />
+            <label className="mb-3 block text-xs font-black text-[#23306d]">
+              종료 시간
+              <input
+                type="datetime-local"
+                value={pollClosesAt}
+                onChange={(e) => setPollClosesAt(e.target.value)}
+                className="mt-1 min-h-10 w-full rounded-lg border border-[#3b4890]/15 bg-white px-3 text-sm font-semibold text-[var(--theme-body-dark)] outline-none focus:border-[#3b4890]"
+              />
+            </label>
             <div className="space-y-2">
               {pollOptionInputs.map((option, index) => (
-                <div key={index} className="flex items-center gap-2">
+                <div key={index} className="grid gap-2 rounded-lg border border-black/10 bg-white/70 p-2 sm:grid-cols-[auto_1fr_1fr_auto] sm:items-center">
                   <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#3b4890] text-xs font-black text-white">{index + 1}</span>
                   <input
                     type="text"
-                    value={option}
-                    onChange={(e) => updatePollOption(index, e.target.value)}
+                    value={option.label}
+                    onChange={(e) => updatePollOption(index, 'label', e.target.value)}
                     placeholder={`보기 ${index + 1}`}
+                    className="min-h-10 flex-1 rounded-lg border border-black/10 bg-white px-3 text-sm outline-none focus:border-[#3b4890]"
+                  />
+                  <input
+                    type="url"
+                    value={option.imageUrl}
+                    onChange={(e) => updatePollOption(index, 'imageUrl', e.target.value)}
+                    placeholder="보기 이미지 URL(선택)"
                     className="min-h-10 flex-1 rounded-lg border border-black/10 bg-white px-3 text-sm outline-none focus:border-[#3b4890]"
                   />
                   <button
@@ -1523,7 +1631,9 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
               <Plus size={16} /> 보기 추가
             </button>
           </div>
+          )}
         </div>
+        )}
         <RichEditor initialBlocks={initialBlocks} apiRef={editorApiRef} onError={(msg) => setError(msg)} />
       </div>
 
@@ -1582,6 +1692,7 @@ export default function Community({ onBack }) {
   const [editCommentInput, setEditCommentInput] = useState('')
   const [commentSaving, setCommentSaving] = useState(false)
   const [pollVoting, setPollVoting] = useState('')
+  const [pollClosing, setPollClosing] = useState('')
   const boardFilterOptions = useMemo(() => boardFilterOptionsForUser(user), [user])
   const canSeeAnonymous = canAccessAnonymousBoard(user)
   const effectiveActiveCategory = boardFilterOptions.some((item) => item.value === activeCategory) ? activeCategory : 'ALL'
@@ -1879,6 +1990,19 @@ export default function Community({ onBack }) {
       alert(err.message || '투표 처리 중 오류가 발생했습니다.')
     } finally {
       setPollVoting('')
+    }
+  }
+
+  const handlePollClose = async (pollId) => {
+    if (!currentPost || !window.confirm('투표를 종료하시겠습니까? 종료 후에는 다시 투표할 수 없습니다.')) return
+    setPollClosing(pollId)
+    try {
+      const updated = await closeCommunityPoll(currentPost.id, pollId)
+      mergePost(updated)
+    } catch (err) {
+      alert(err.message || '투표 종료 중 오류가 발생했습니다.')
+    } finally {
+      setPollClosing('')
     }
   }
 
@@ -2381,7 +2505,12 @@ export default function Community({ onBack }) {
                   </div>
                 </div>
                 <div className="min-h-[220px] sm:min-h-[280px]">
-                  {renderPostBlocks(currentPost, { onPollVote: handlePollVote, pollVoting })}
+                  {renderPostBlocks(currentPost, {
+                    onPollVote: handlePollVote,
+                    onPollClose: currentPost?.editable ? handlePollClose : null,
+                    pollVoting,
+                    pollClosing,
+                  })}
                 </div>
                 <div className="grid grid-cols-2 gap-2 border-y border-black/10 bg-[#fafafa] px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-3 sm:py-5">
                   <button type="button" onClick={() => handleVote(1)} className={`inline-flex min-h-12 items-center justify-center gap-2 border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === 1 ? 'border-[#3b4890] bg-[#3b4890] text-white' : 'border-black/15 bg-white text-[#3b4890]'}`}>

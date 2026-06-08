@@ -98,6 +98,13 @@ public class CommunityController {
         return ResponseEntity.ok(communityService.votePoll(authentication.getName(), id, request));
     }
 
+    @PostMapping("/{id}/polls/{pollId}/close")
+    public ResponseEntity<CommunityPostResponse> closePoll(Authentication authentication,
+                                                           @PathVariable Long id,
+                                                           @PathVariable String pollId) {
+        return ResponseEntity.ok(communityService.closePoll(authentication.getName(), id, pollId));
+    }
+
     @GetMapping("/tools/youtube/search")
     public ResponseEntity<YouTubeSearchResponse> searchYouTube(@RequestParam String q) {
         return ResponseEntity.ok(communityService.searchYouTube(q));
