@@ -224,9 +224,12 @@ function safeExternalSrc(url) {
 }
 
 function newPollBlock(question, optionText) {
-  const options = String(optionText || '').split(/\n+/).map((item) => item.trim()).filter(Boolean).slice(0, 10)
+  const options = (Array.isArray(optionText) ? optionText : String(optionText || '').split(/\n+/))
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+    .slice(0, 10)
   if (!question.trim()) throw new Error('투표 질문을 입력해주세요.')
-  if (options.length < 2) throw new Error('투표 선택지는 줄바꿈으로 2개 이상 입력해주세요.')
+  if (options.length < 2) throw new Error('투표 보기는 2개 이상 입력해주세요.')
   return {
     type: 'poll',
     pollId: `poll-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
@@ -487,9 +490,15 @@ function renderPostBlocks(post, options = {}) {
           const counts = result?.optionCounts || []
           const total = counts.reduce((sum, count) => sum + Number(count || 0), 0)
           return (
-            <div key={i} className="my-4 clear-both rounded-lg border border-[#3b4890]/15 bg-[#f7f9ff] p-4">
-              <p className="mb-3 text-sm font-black text-[#23306d]">{block.question}</p>
-              <div className="space-y-2">
+            <div key={i} className="my-4 clear-both overflow-hidden rounded-xl border border-[#3b4890]/15 bg-white shadow-[0_14px_36px_rgba(35,48,109,0.12)]">
+              <div className="border-b border-[#3b4890]/10 bg-gradient-to-r from-[#3b4890] to-[#5061b5] px-4 py-3 text-white">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="rounded-full bg-white/16 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em]">Poll</span>
+                  <span className="text-xs font-bold text-white/78">총 {total.toLocaleString('ko-KR')}표</span>
+                </div>
+                <p className="mt-2 text-base font-black leading-6">{block.question}</p>
+              </div>
+              <div className="space-y-2 p-4">
                 {(block.options || []).map((option, index) => {
                   const count = Number(counts[index] || 0)
                   const pct = total > 0 ? Math.round((count / total) * 100) : 0
@@ -500,12 +509,17 @@ function renderPostBlocks(post, options = {}) {
                       type="button"
                       onClick={() => onPollVote?.(block.pollId, index)}
                       disabled={!onPollVote || pollVoting === block.pollId}
-                      className={`relative w-full overflow-hidden rounded border px-3 py-2 text-left text-sm font-semibold transition ${selected ? 'border-[#3b4890] bg-white text-[#23306d]' : 'border-black/10 bg-white text-[var(--theme-body-dark)] hover:border-[#3b4890]/30'}`}
+                      className={`relative w-full overflow-hidden rounded-lg border px-3 py-3 text-left text-sm font-semibold transition ${selected ? 'border-[#3b4890] bg-[#f7f9ff] text-[#23306d] ring-2 ring-[#3b4890]/10' : 'border-black/10 bg-white text-[var(--theme-body-dark)] hover:border-[#3b4890]/30 hover:bg-[#f8faff]'}`}
                     >
                       <span className="absolute inset-y-0 left-0 bg-[#dce6ff]" style={{ width: `${pct}%` }} />
                       <span className="relative flex items-center justify-between gap-3">
-                        <span>{option}</span>
-                        <span className="shrink-0 text-xs text-[var(--theme-body-muted)]">{count.toLocaleString('ko-KR')}표 · {pct}%</span>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px] ${selected ? 'border-[#3b4890] bg-[#3b4890] text-white' : 'border-black/15 bg-white text-[var(--theme-body-muted)]'}`}>
+                            {index + 1}
+                          </span>
+                          <span className="min-w-0 break-words">{option}</span>
+                        </span>
+                        <span className="shrink-0 text-xs font-black text-[#3b4890]">{count.toLocaleString('ko-KR')}표 · {pct}%</span>
                       </span>
                     </button>
                   )
@@ -1222,7 +1236,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
   const [youtubeResults, setYoutubeResults] = useState([])
   const [youtubeSearching, setYoutubeSearching] = useState(false)
   const [pollQuestion, setPollQuestion] = useState('')
-  const [pollOptions, setPollOptions] = useState('')
+  const [pollOptionInputs, setPollOptionInputs] = useState(['', ''])
   const [saving, setSaving] = useState(false)
   const [savingStep, setSavingStep] = useState('')
   const [error, setError] = useState('')
@@ -1271,14 +1285,26 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
 
   const insertPollBlock = () => {
     try {
-      const block = newPollBlock(pollQuestion, pollOptions)
+      const block = newPollBlock(pollQuestion, pollOptionInputs)
       editorApiRef.current?.insertPoll(block)
       setPollQuestion('')
-      setPollOptions('')
+      setPollOptionInputs(['', ''])
       setError('')
     } catch (err) {
       setError(err.message || '투표를 추가할 수 없습니다.')
     }
+  }
+
+  const updatePollOption = (index, value) => {
+    setPollOptionInputs((prev) => prev.map((item, itemIndex) => (itemIndex === index ? value : item)))
+  }
+
+  const addPollOption = () => {
+    setPollOptionInputs((prev) => (prev.length >= 10 ? prev : [...prev, '']))
+  }
+
+  const removePollOption = (index) => {
+    setPollOptionInputs((prev) => (prev.length <= 2 ? prev : prev.filter((_, itemIndex) => itemIndex !== index)))
   }
 
   const submit = async (e) => {
@@ -1449,23 +1475,52 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
               ))}
             </div>
           )}
-          <div className="grid gap-2 lg:grid-cols-[1fr_1fr_auto]">
+          <div className="rounded-xl border border-[#3b4890]/15 bg-[#f7f9ff] p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-black text-[#23306d]">투표 만들기</p>
+                <p className="text-xs font-semibold text-[var(--theme-body-muted)]">권한/종료시간 없이 모든 게시판 회원이 바로 투표합니다.</p>
+              </div>
+              <button type="button" onClick={insertPollBlock} className="inline-flex min-h-10 items-center justify-center gap-1 rounded bg-[#3b4890] px-3 text-sm font-bold text-white shadow-sm hover:bg-[#2f3a7a]">
+                <Plus size={14} /> 본문에 추가
+              </button>
+            </div>
             <input
               type="text"
               value={pollQuestion}
               onChange={(e) => setPollQuestion(e.target.value)}
-              placeholder="투표 질문"
-              className="min-h-10 rounded border border-black/15 px-3 text-sm outline-none focus:border-[#3b4890]"
+              placeholder="투표 제목 입력"
+              className="mb-2 min-h-11 w-full rounded-lg border border-[#3b4890]/15 bg-white px-3 text-sm font-semibold outline-none focus:border-[#3b4890]"
             />
-            <textarea
-              value={pollOptions}
-              onChange={(e) => setPollOptions(e.target.value)}
-              placeholder={'선택지 줄바꿈 입력\n예: 찬성\n반대'}
-              rows={2}
-              className="rounded border border-black/15 px-3 py-2 text-sm outline-none focus:border-[#3b4890]"
-            />
-            <button type="button" onClick={insertPollBlock} className="inline-flex min-h-10 items-center justify-center gap-1 rounded border border-black/15 bg-white px-3 text-sm font-bold text-[var(--theme-body-mid)] hover:bg-black/5">
-              <Plus size={14} /> 투표 추가
+            <div className="space-y-2">
+              {pollOptionInputs.map((option, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#3b4890] text-xs font-black text-white">{index + 1}</span>
+                  <input
+                    type="text"
+                    value={option}
+                    onChange={(e) => updatePollOption(index, e.target.value)}
+                    placeholder={`보기 ${index + 1}`}
+                    className="min-h-10 flex-1 rounded-lg border border-black/10 bg-white px-3 text-sm outline-none focus:border-[#3b4890]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removePollOption(index)}
+                    disabled={pollOptionInputs.length <= 2}
+                    className="min-h-10 rounded border border-black/10 bg-white px-3 text-xs font-bold text-red-500 transition hover:bg-red-50 disabled:opacity-30"
+                  >
+                    삭제
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addPollOption}
+              disabled={pollOptionInputs.length >= 10}
+              className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[#3b4890]/45 bg-white/70 text-sm font-bold text-[#3b4890] transition hover:bg-white disabled:opacity-40"
+            >
+              <Plus size={16} /> 보기 추가
             </button>
           </div>
         </div>
