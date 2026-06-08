@@ -1537,7 +1537,7 @@ export default function Community({ onBack }) {
         className={`shape-cut-sm cursor-pointer border border-white/10 bg-black/18 p-4 text-left text-white/75 transition hover:bg-white/8 focus:bg-white/10 focus:outline-none ${concept ? 'border-[var(--theme-accent)]/30 bg-[var(--theme-accent)]/8' : ''}`}
       >
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-black">
               <span className="text-white/38">#{post.id}</span>
               <span className="shape-cut-sm border border-cyan-200/15 bg-cyan-200/10 px-2 py-1 text-cyan-100">{categoryLabel(post.category || 'GENERAL')}</span>
@@ -1548,7 +1548,7 @@ export default function Community({ onBack }) {
               {post.authorAdmin && <span className="rounded bg-red-600 px-1 py-0.5 text-[10px] text-white">주딱</span>}
             </div>
             <h3 className="mt-2 flex min-w-0 items-center gap-1 text-base font-black leading-6 text-white" title={post.title}>
-              <span className="min-w-0 truncate">{post.title}</span>
+              <span className="min-w-0 flex-1 truncate">{post.title}</span>
               {commentCountSuffix(post) && <span className="shrink-0 text-cyan-200">{commentCountSuffix(post)}</span>}
             </h3>
           </div>
@@ -1830,9 +1830,9 @@ export default function Community({ onBack }) {
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{post.id}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-cyan-100">{categoryLabel(post.category || 'GENERAL')}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
-                        <span className="flex max-w-[520px] min-w-0 items-center gap-1 text-left font-semibold text-white">
+                        <span className="flex max-w-full min-w-0 items-center gap-1 text-left font-semibold text-white lg:max-w-[520px]">
                           {concept && <span className="shrink-0 rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
-                          <span className="min-w-0 truncate">{post.title}</span>
+                          <span className="min-w-0 flex-1 truncate">{post.title}</span>
                           {commentCountSuffix(post) && <span className="shrink-0 text-cyan-200">{commentCountSuffix(post)}</span>}
                         </span>
                         {postHasImages(post) && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
