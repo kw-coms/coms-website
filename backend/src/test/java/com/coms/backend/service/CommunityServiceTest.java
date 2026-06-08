@@ -313,8 +313,12 @@ class CommunityServiceTest {
         var reply = communityService.addComment(post.id(), user.getStudentId(), new CommunityCommentRequest("답글", root.id()));
         var deepReply = communityService.addComment(post.id(), user.getStudentId(), new CommunityCommentRequest("대대댓글", reply.id()));
 
+        assertThat(root.authorName()).isEqualTo("59기 회원");
         assertThat(deepReply.depth()).isEqualTo(2);
         assertThat(deepReply.parentCommentId()).isEqualTo(reply.id());
+        assertThat(communityService.listComments(post.id(), user.getStudentId()))
+                .extracting("authorName")
+                .containsOnly("59기 회원");
         assertThat(communityService.get(user.getStudentId(), post.id()).commentCount()).isEqualTo(3);
         assertThat(communityService.list(user.getStudentId()))
                 .filteredOn(item -> item.id().equals(post.id()))
