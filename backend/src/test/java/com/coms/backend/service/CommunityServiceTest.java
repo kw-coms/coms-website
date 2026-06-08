@@ -3,8 +3,10 @@ package com.coms.backend.service;
 import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.CommunityCommentRequest;
+import com.coms.backend.dto.CommunityPollVoteRequest;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
+import com.coms.backend.repository.CommunityPollVoteRepository;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.CommunityCommentRepository;
@@ -42,6 +44,9 @@ class CommunityServiceTest {
     private CommunityPostVoteRepository voteRepository;
 
     @Autowired
+    private CommunityPollVoteRepository pollVoteRepository;
+
+    @Autowired
     private CommunityCommentRepository commentRepository;
 
     @Autowired
@@ -55,6 +60,7 @@ class CommunityServiceTest {
         fileRepository.deleteAll();
         imageRepository.deleteAll();
         commentRepository.deleteAll();
+        pollVoteRepository.deleteAll();
         voteRepository.deleteAll();
         communityPostRepository.deleteAll();
         memberRepository.deleteAll();
@@ -434,6 +440,95 @@ class CommunityServiceTest {
         assertThat(created.category()).isEqualTo("QUESTION");
         assertThat(communityPostRepository.findById(created.id()).orElseThrow().getCategory())
                 .isEqualTo(CommunityPost.Category.QUESTION);
+    }
+
+    @Test
+    void anonymousPostsAreHiddenFromGraduatesAndMaskedForMembers() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member viewer = member("2026123456", "회원", Member.Role.USER);
+        Member graduate = member("2018123456", "졸업생", Member.Role.USER);
+        Member admin = member("2026129999", "관리자", Member.Role.ADMIN);
+        memberRepository.save(author);
+        memberRepository.save(viewer);
+        memberRepository.save(graduate);
+        memberRepository.save(admin);
+
+        var created = communityService.create(
+                author.getStudentId(),
+                new CommunityPostRequest("익명글", "내용", "ANONYMOUS", false),
+                null
+        );
+
+        var visibleToMember = communityService.get(viewer.getStudentId(), created.id());
+        var visibleToAdmin = communityService.get(admin.getStudentId(), created.id());
+
+        assertThat(communityService.list(graduate.getStudentId())).isEmpty();
+        assertThatThrownBy(() -> communityService.get(graduate.getStudentId(), created.id()))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        assertThat(visibleToMember.authorName()).isEqualTo("익명");
+        assertThat(visibleToMember.authorStudentId()).isNull();
+        assertThat(visibleToAdmin.authorDisplayName()).contains("작성자");
+    }
+
+    @Test
+    void anonymousCommentsAreMaskedForMembersButVisibleToAdmins() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member commenter = member("2026123456", "댓글러", Member.Role.USER);
+        Member admin = member("2026129999", "관리자", Member.Role.ADMIN);
+        memberRepository.save(author);
+        memberRepository.save(commenter);
+        memberRepository.save(admin);
+        var post = communityService.create(author.getStudentId(), new CommunityPostRequest("익명글", "내용", "ANONYMOUS", false), null);
+
+        communityService.addComment(post.id(), commenter.getStudentId(), new CommunityCommentRequest("댓글", null));
+
+        assertThat(communityService.listComments(post.id(), author.getStudentId()))
+                .singleElement()
+                .extracting("authorName")
+                .isEqualTo("익명");
+        assertThat(communityService.listComments(post.id(), admin.getStudentId()))
+                .singleElement()
+                .extracting("authorName")
+                .asString()
+                .contains("댓글러");
+    }
+
+    @Test
+    void pollVotesAreStoredPerPollAndReturnedWithCounts() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member voter = member("2026123456", "회원", Member.Role.USER);
+        memberRepository.save(author);
+        memberRepository.save(voter);
+        String content = "[{\"type\":\"poll\",\"pollId\":\"poll-test1\",\"question\":\"선택\",\"options\":[\"A\",\"B\"]}]";
+        var post = communityService.create(author.getStudentId(), new CommunityPostRequest("투표", content, "GENERAL", false), null);
+
+        var updated = communityService.votePoll(voter.getStudentId(), post.id(), new CommunityPollVoteRequest("poll-test1", 1));
+
+        assertThat(updated.pollResults()).singleElement().satisfies(result -> {
+            assertThat(result.pollId()).isEqualTo("poll-test1");
+            assertThat(result.optionCounts()).containsExactly(0L, 1L);
+            assertThat(result.myOption()).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void deleteCommunityDataForMemberRemovesPostsCommentsAndVotes() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member other = member("2026123456", "회원", Member.Role.USER);
+        memberRepository.save(author);
+        memberRepository.save(other);
+        var authored = communityService.create(author.getStudentId(), new CommunityPostRequest("삭제될 글", "내용", "GENERAL", false), null);
+        var otherPost = communityService.create(other.getStudentId(), new CommunityPostRequest("남을 글", "내용", "GENERAL", false), null);
+        communityService.vote(other.getStudentId(), authored.id(), 1);
+        communityService.addComment(otherPost.id(), author.getStudentId(), new CommunityCommentRequest("작성자 댓글", null));
+
+        communityService.deleteCommunityDataForMember(author.getStudentId());
+
+        assertThat(communityPostRepository.findById(authored.id())).isEmpty();
+        assertThat(commentRepository.findByStudentId(author.getStudentId())).isEmpty();
+        assertThat(voteRepository.findByPostIdIn(java.util.List.of(authored.id()))).isEmpty();
+        assertThat(communityPostRepository.findById(otherPost.id())).isPresent();
     }
 
     @Test

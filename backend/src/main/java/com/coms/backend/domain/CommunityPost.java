@@ -50,7 +50,7 @@ public class CommunityPost {
     }
 
     public enum Category {
-        GENERAL, QUESTION, INFO
+        GENERAL, QUESTION, INFO, ANONYMOUS
     }
 
     public Long getId() { return id; }

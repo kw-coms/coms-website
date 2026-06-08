@@ -54,6 +54,18 @@ export async function voteCommunityPost(id, value) {
   })
 }
 
+export async function voteCommunityPoll(id, pollId, optionIndex) {
+  return request(`/api/community/posts/${id}/poll-votes`, {
+    method: 'POST',
+    body: JSON.stringify({ pollId, optionIndex }),
+  })
+}
+
+export async function searchYoutubeVideos(query) {
+  const q = encodeURIComponent(query)
+  return request(`/api/community/posts/tools/youtube/search?q=${q}`)
+}
+
 export async function deleteCommunityPost(id) {
   return requestNoContent(`/api/community/posts/${id}`, {
     method: 'DELETE',
