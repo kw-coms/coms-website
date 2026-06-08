@@ -525,6 +525,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
   const [selectedFigId, setSelectedFigId] = useState(null)
   const [selectedMeta, setSelectedMeta] = useState(null)
   const [dropIndicator, setDropIndicator] = useState(null)
+  const [draggingFigId, setDraggingFigId] = useState(null)
   const initialized = useRef(false)
 
   useEffect(() => {
@@ -632,6 +633,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
       e.stopPropagation()
       const id = fig.dataset.blockId
       dragFigureId.current = id
+      setDraggingFigId(id)
       e.dataTransfer.effectAllowed = 'move'
       e.dataTransfer.setData('application/x-coms-editor-figure', id)
       e.dataTransfer.setData('text/plain', '\u200B')
@@ -639,6 +641,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
     })
     fig.addEventListener('dragend', () => {
       dragFigureId.current = null
+      setDraggingFigId(null)
       setDropIndicator(null)
     })
     fig.addEventListener('pointerdown', (e) => {
@@ -817,6 +820,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
     if (meta?.preview) URL.revokeObjectURL(meta.preview)
     figMeta.current.delete(selectedFigId)
     figEl?.remove()
+    setDraggingFigId(null)
     setSelectedFigId(null)
   }
 
@@ -856,9 +860,11 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
             const range = updateDropIndicator(e.clientX, e.clientY)
             insertAtRange(fig, range)
             attachFigureClick(fig)
-            setSelectedFigId(movingFigId)
             dragFigureId.current = null
+            setDraggingFigId(null)
             setDropIndicator(null)
+            setSelectedFigId(null)
+            requestAnimationFrame(() => setSelectedFigId(movingFigId))
             return
           }
           const files = Array.from(e.dataTransfer?.files || [])
@@ -891,7 +897,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
           style={{ left: dropIndicator.left, top: dropIndicator.top, height: dropIndicator.height }}
         />
       )}
-      {selectedFigId && (
+      {selectedFigId && selectedFigId !== draggingFigId && (
         <FigureToolbar
           editorRef={divRef}
           figId={selectedFigId}
