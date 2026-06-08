@@ -27,6 +27,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       MAIL_ENABLED: ${MAIL_ENABLED:-false}
+      MAIL_HEALTH_ENABLED: ${MAIL_HEALTH_ENABLED:-false}
       MAIL_LOG_VERIFICATION_CODES: ${MAIL_LOG_VERIFICATION_CODES:-false}
       MAIL_FROM: ${MAIL_FROM:-no-reply@coms.kw.ac.kr}
       RECRUIT_MAIL_TO: ${RECRUIT_MAIL_TO:-kwcoms69@gmail.com}
