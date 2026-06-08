@@ -52,8 +52,8 @@ public class NoticeController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        noticeService.delete(id);
+    public ResponseEntity<Void> delete(Authentication authentication, @PathVariable Long id) {
+        noticeService.delete(authentication.getName(), id);
         return ResponseEntity.noContent().build();
     }
 }

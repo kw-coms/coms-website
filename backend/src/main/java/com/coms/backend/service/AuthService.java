@@ -51,6 +51,7 @@ public class AuthService implements UserDetailsService {
     private final EmailVerificationSender emailVerificationSender;
     private final FontService fontService;
     private final BannedStudentService bannedStudentService;
+    private final AuditLogService auditLogService;
     private final Clock clock;
 
     public AuthService(MemberRepository memberRepository,
@@ -61,6 +62,7 @@ public class AuthService implements UserDetailsService {
                        EmailVerificationSender emailVerificationSender,
                        FontService fontService,
                        BannedStudentService bannedStudentService,
+                       AuditLogService auditLogService,
                        Clock clock) {
         this.memberRepository = memberRepository;
         this.loginFailureRepository = loginFailureRepository;
@@ -70,6 +72,7 @@ public class AuthService implements UserDetailsService {
         this.emailVerificationSender = emailVerificationSender;
         this.fontService = fontService;
         this.bannedStudentService = bannedStudentService;
+        this.auditLogService = auditLogService;
         this.clock = clock;
     }
 
@@ -113,6 +116,7 @@ public class AuthService implements UserDetailsService {
         Member member = findMemberByIdentifier(request.identifier())
                 .orElseGet(() -> {
                     loginFailureRepository.save(new LoginFailure(request.identifier(), clientIp));
+                    auditLogService.record(null, "LOGIN_FAILURE", "AUTH", null, "identifier=" + maskIdentifier(request.identifier()), clientIp);
                     throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
                 });
 
@@ -120,6 +124,7 @@ public class AuthService implements UserDetailsService {
 
         if (!passwordEncoder.matches(request.password(), member.getPassword())) {
             loginFailureRepository.save(new LoginFailure(request.identifier(), clientIp));
+            auditLogService.record(member.getStudentId(), "LOGIN_FAILURE", "AUTH", null, "bad_credentials", clientIp);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
 
@@ -134,6 +139,8 @@ public class AuthService implements UserDetailsService {
         } catch (Exception ignored) {
             // audit write failure must not block login
         }
+        auditLogService.record(member.getStudentId(), member.getRole() == Member.Role.ADMIN ? "ADMIN_LOGIN_SUCCESS" : "LOGIN_SUCCESS",
+                "AUTH", null, null, clientIp);
 
         String token = jwtTokenProvider.generateToken(member.getStudentId());
         String refreshToken = jwtTokenProvider.generateRefreshToken(member.getStudentId(), request.rememberMe());
@@ -178,6 +185,17 @@ public class AuthService implements UserDetailsService {
         }
         return memberRepository.findByStudentId(normalized)
                 .or(() -> memberRepository.findByEmailIgnoreCase(normalized));
+    }
+
+    private String maskIdentifier(String identifier) {
+        String normalized = normalizeNullable(identifier);
+        if (normalized == null) {
+            return "blank";
+        }
+        if (normalized.length() <= 3) {
+            return "***";
+        }
+        return normalized.substring(0, 3) + "***";
     }
 
     public MemberResponse getMe(String studentId) {

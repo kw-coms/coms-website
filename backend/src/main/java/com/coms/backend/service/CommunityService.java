@@ -30,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -59,6 +60,7 @@ public class CommunityService {
     private static final int MAX_EXTRA_IMAGES_PER_POST = 5;
     private static final int MAX_VIDEOS_PER_POST = 3;
     private static final int MAX_FILES_PER_POST = 5;
+    private static final int MAX_POSTS_PER_MINUTE = 5;
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
     private static final Set<String> ALLOWED_VIDEO_TYPES = Set.of("video/mp4", "video/webm", "video/quicktime");
     private static final Set<String> ALLOWED_FILE_TYPES = Set.of(
@@ -76,6 +78,7 @@ public class CommunityService {
     private final CommunityPostImageRepository imageRepository;
     private final CommunityPostFileRepository fileRepository;
     private final CommunityPostVideoRepository videoRepository;
+    private final AuditLogService auditLogService;
 
     public CommunityService(CommunityPostRepository communityPostRepository,
                             CommunityPostVoteRepository voteRepository,
@@ -85,7 +88,8 @@ public class CommunityService {
                             NotificationService notificationService,
                             CommunityPostImageRepository imageRepository,
                             CommunityPostFileRepository fileRepository,
-                            CommunityPostVideoRepository videoRepository) {
+                            CommunityPostVideoRepository videoRepository,
+                            AuditLogService auditLogService) {
         this.communityPostRepository = communityPostRepository;
         this.voteRepository = voteRepository;
         this.memberRepository = memberRepository;
@@ -95,6 +99,7 @@ public class CommunityService {
         this.imageRepository = imageRepository;
         this.fileRepository = fileRepository;
         this.videoRepository = videoRepository;
+        this.auditLogService = auditLogService;
     }
 
     @Transactional(readOnly = true)
@@ -108,8 +113,9 @@ public class CommunityService {
                 .stream()
                 .collect(Collectors.toMap(Member::getStudentId, Function.identity()));
         Map<Long, VoteSummary> stats = voteStats(posts);
+        Map<Long, Long> commentCounts = commentCounts(posts);
         return posts.stream()
-                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, false))
+                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, false))
                 .toList();
     }
 
@@ -120,11 +126,12 @@ public class CommunityService {
         post.incrementViewCount();
         CommunityPost saved = communityPostRepository.save(post);
         return toResponse(saved, member, memberRepository.findByStudentId(saved.getAuthorStudentId()).orElse(null),
-                voteStats(List.of(saved)), true);
+                voteStats(List.of(saved)), commentCounts(List.of(saved)), true);
     }
 
     public CommunityPostResponse create(String studentId, CommunityPostRequest request, MultipartFile image) {
         Member member = findMember(studentId);
+        enforcePostRateLimit(member.getStudentId());
         SanitizedPost sanitized = validateRequest(request, null);
         CommunityPost post = new CommunityPost();
         post.setTitle(sanitized.title());
@@ -134,7 +141,8 @@ public class CommunityService {
         post.setAuthorName(member.getName());
         attachImage(post, image);
         CommunityPost saved = communityPostRepository.save(post);
-        return toResponse(saved, member, member, voteStats(List.of(saved)), true);
+        auditLogService.record(member.getStudentId(), "COMMUNITY_POST_CREATE", "COMMUNITY_POST", String.valueOf(saved.getId()), safeTitle(saved.getTitle()), null);
+        return toResponse(saved, member, member, voteStats(List.of(saved)), commentCounts(List.of(saved)), true);
     }
 
     public CommunityPostResponse update(String studentId, Long id, CommunityPostRequest request, MultipartFile image) {
@@ -156,9 +164,10 @@ public class CommunityService {
             post.markEdited();
         }
         CommunityPost saved = communityPostRepository.save(post);
+        auditLogService.record(member.getStudentId(), "COMMUNITY_POST_UPDATE", "COMMUNITY_POST", String.valueOf(saved.getId()), safeTitle(saved.getTitle()), null);
         return toResponse(saved, member,
                 memberRepository.findByStudentId(saved.getAuthorStudentId()).orElse(null),
-                voteStats(List.of(saved)), true);
+                voteStats(List.of(saved)), commentCounts(List.of(saved)), true);
     }
 
     public void delete(String studentId, Long id) {
@@ -173,6 +182,7 @@ public class CommunityService {
         voteRepository.deleteByPost(post);
         commentRepository.deleteByPostId(post.getId());
         communityPostRepository.delete(post);
+        auditLogService.record(member.getStudentId(), "COMMUNITY_POST_DELETE", "COMMUNITY_POST", String.valueOf(id), safeTitle(post.getTitle()), null);
     }
 
     public CommunityPostResponse vote(String studentId, Long id, int value) {
@@ -200,8 +210,9 @@ public class CommunityService {
             vote.setValue(value);
             voteRepository.save(vote);
         }
+        auditLogService.record(member.getStudentId(), "COMMUNITY_POST_VOTE", "COMMUNITY_POST", String.valueOf(post.getId()), "value=" + value, null);
         return toResponse(post, member, memberRepository.findByStudentId(post.getAuthorStudentId()).orElse(null),
-                voteStats(List.of(post)), true);
+                voteStats(List.of(post)), commentCounts(List.of(post)), true);
     }
 
     @Transactional(readOnly = true)
@@ -256,6 +267,15 @@ public class CommunityService {
                 || lower.contains("<iframe") || lower.contains("javascript:")
                 || lower.matches(".*\\son[a-z]+\\s*=.*")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 내용이 포함되어 있습니다.");
+        }
+    }
+
+    private void enforcePostRateLimit(String studentId) {
+        LocalDateTime windowStart = LocalDateTime.now().minusMinutes(1);
+        long recentPostCount = communityPostRepository.countByAuthorStudentIdAndCreatedAtAfter(studentId, windowStart);
+        if (recentPostCount >= MAX_POSTS_PER_MINUTE) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "게시글은 1분에 최대 " + MAX_POSTS_PER_MINUTE + "개까지 작성할 수 있습니다.");
         }
     }
 
@@ -380,12 +400,14 @@ public class CommunityService {
                                              Member currentMember,
                                              Member author,
                                              Map<Long, VoteSummary> voteStats,
+                                             Map<Long, Long> commentCounts,
                                              boolean includeContent) {
         boolean editable = post.getAuthorStudentId().equals(currentMember.getStudentId())
                 || currentMember.getRole() == Member.Role.ADMIN;
         boolean authorAdmin = author != null && author.getRole() == Member.Role.ADMIN;
         String authorName = author != null ? author.getName() : post.getAuthorName();
         VoteSummary votes = voteStats.getOrDefault(post.getId(), VoteSummary.EMPTY);
+        long commentCount = commentCounts.getOrDefault(post.getId(), 0L);
         List<CommunityPostImage> extraImages = imageRepository.findByPostIdOrderByPositionAsc(post.getId());
         List<String> imageUrls = extraImages.stream()
                 .map(img -> "/api/community/posts/" + post.getId() + "/images/" + img.getId())
@@ -428,6 +450,7 @@ public class CommunityService {
                 post.getViewCount(),
                 votes.upvotes(),
                 votes.downvotes(),
+                commentCount,
                 votes.myVote(currentMember.getStudentId()),
                 votes.netScore() >= CONCEPT_POST_SCORE_THRESHOLD,
                 post.getCreatedAt(),
@@ -685,6 +708,19 @@ public class CommunityService {
         return content.substring(0, 160);
     }
 
+    private String safeTitle(String title) {
+        return title == null || title.isBlank() ? null : "title=" + preview(title);
+    }
+
+    private Map<Long, Long> commentCounts(List<CommunityPost> posts) {
+        List<Long> postIds = posts.stream().map(CommunityPost::getId).filter(Objects::nonNull).toList();
+        if (postIds.isEmpty()) {
+            return Map.of();
+        }
+        return commentRepository.countByPostIds(postIds).stream()
+                .collect(Collectors.toMap(CommunityCommentRepository.CommentCount::getPostId, CommunityCommentRepository.CommentCount::getCount));
+    }
+
     private Map<Long, VoteSummary> voteStats(List<CommunityPost> posts) {
         List<Long> postIds = posts.stream().map(CommunityPost::getId).filter(Objects::nonNull).toList();
         if (postIds.isEmpty()) {
@@ -708,7 +744,7 @@ public class CommunityService {
         return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
                 .map(c -> new CommunityCommentResponse(
                         c.getId(), c.getPostId(), c.getParentCommentId(), c.getDepth(),
-                        c.getAuthorName(), c.getContent(), c.getCreatedAt(),
+                        c.getAuthorName(), c.getContent(), c.getCreatedAt(), c.getUpdatedAt(), c.isEdited(),
                         isAdmin || c.getStudentId().equals(studentId)))
                 .toList();
     }
@@ -728,9 +764,6 @@ public class CommunityService {
             if (!parent.getPostId().equals(postId)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reply parent does not belong to this post.");
             }
-            if (parent.getDepth() >= 1) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Replies are limited to one nested level.");
-            }
             depth = parent.getDepth() + 1;
         }
         CommunityComment saved = commentRepository.save(
@@ -740,8 +773,29 @@ public class CommunityService {
         } else {
             notificationService.notifyCommentReply(post, parent, saved);
         }
+        auditLogService.record(member.getStudentId(), "COMMUNITY_COMMENT_CREATE", "COMMUNITY_COMMENT", String.valueOf(saved.getId()),
+                "postId=" + postId + (saved.getParentCommentId() == null ? "" : ", parentCommentId=" + saved.getParentCommentId()), null);
         return new CommunityCommentResponse(saved.getId(), saved.getPostId(), saved.getParentCommentId(), saved.getDepth(), saved.getAuthorName(),
-                saved.getContent(), saved.getCreatedAt(), true);
+                saved.getContent(), saved.getCreatedAt(), saved.getUpdatedAt(), saved.isEdited(), true);
+    }
+
+    public CommunityCommentResponse updateComment(Long postId, Long commentId, String studentId, CommunityCommentRequest request) {
+        CommunityComment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!comment.getPostId().equals(postId)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        Member member = memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        if (!comment.getStudentId().equals(studentId) && member.getRole() != Member.Role.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        String content = normalizeBounded(request.content(), "댓글", MAX_COMMENT_LENGTH);
+        rejectUnsafeText(content);
+        comment.markEdited(content);
+        CommunityComment saved = commentRepository.save(comment);
+        auditLogService.record(member.getStudentId(), "COMMUNITY_COMMENT_UPDATE", "COMMUNITY_COMMENT", String.valueOf(saved.getId()),
+                "postId=" + postId, null);
+        return new CommunityCommentResponse(saved.getId(), saved.getPostId(), saved.getParentCommentId(), saved.getDepth(),
+                saved.getAuthorName(), saved.getContent(), saved.getCreatedAt(), saved.getUpdatedAt(), saved.isEdited(), true);
     }
 
     public void deleteComment(Long postId, Long commentId, String studentId) {
@@ -753,6 +807,13 @@ public class CommunityService {
         if (!comment.getStudentId().equals(studentId) && member.getRole() != Member.Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
+        deleteCommentTree(comment);
+        auditLogService.record(member.getStudentId(), "COMMUNITY_COMMENT_DELETE", "COMMUNITY_COMMENT", String.valueOf(commentId),
+                "postId=" + postId, null);
+    }
+
+    private void deleteCommentTree(CommunityComment comment) {
+        commentRepository.findByParentCommentId(comment.getId()).forEach(this::deleteCommentTree);
         commentRepository.delete(comment);
     }
 

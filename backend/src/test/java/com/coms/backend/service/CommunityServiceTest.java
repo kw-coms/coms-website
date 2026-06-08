@@ -2,6 +2,7 @@ package com.coms.backend.service;
 
 import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.domain.Member;
+import com.coms.backend.dto.CommunityCommentRequest;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
 import com.coms.backend.repository.CommunityPostRepository;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -282,6 +284,57 @@ class CommunityServiceTest {
                 new com.coms.backend.dto.CommunityCommentRequest("javascript:alert(1)", null)
         )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                 assertThat(ex.getReason()).contains("보안"));
+    }
+
+    @Test
+    void rateLimitsCommunityPostCreationPerUserPerMinute() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+
+        for (int i = 0; i < 5; i++) {
+            communityService.create(user.getStudentId(), new CommunityPostRequest("제목" + i, "내용", "GENERAL", false), null);
+        }
+
+        assertThatThrownBy(() -> communityService.create(
+                user.getStudentId(),
+                new CommunityPostRequest("제목5", "내용", "GENERAL", false),
+                null
+        )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+    }
+
+    @Test
+    void supportsDeepCommentRepliesAndCommentCounts() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var post = communityService.create(user.getStudentId(), new CommunityPostRequest("댓글", "내용", "GENERAL", false), null);
+
+        var root = communityService.addComment(post.id(), user.getStudentId(), new CommunityCommentRequest("첫 댓글", null));
+        var reply = communityService.addComment(post.id(), user.getStudentId(), new CommunityCommentRequest("답글", root.id()));
+        var deepReply = communityService.addComment(post.id(), user.getStudentId(), new CommunityCommentRequest("대대댓글", reply.id()));
+
+        assertThat(deepReply.depth()).isEqualTo(2);
+        assertThat(deepReply.parentCommentId()).isEqualTo(reply.id());
+        assertThat(communityService.get(user.getStudentId(), post.id()).commentCount()).isEqualTo(3);
+        assertThat(communityService.list(user.getStudentId()))
+                .filteredOn(item -> item.id().equals(post.id()))
+                .singleElement()
+                .satisfies(item -> assertThat(item.commentCount()).isEqualTo(3));
+    }
+
+    @Test
+    void updatesCommentContentAndMarksEdited() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var post = communityService.create(user.getStudentId(), new CommunityPostRequest("댓글", "내용", "GENERAL", false), null);
+        var comment = communityService.addComment(post.id(), user.getStudentId(), new CommunityCommentRequest("원문", null));
+
+        var updated = communityService.updateComment(post.id(), comment.id(), user.getStudentId(),
+                new CommunityCommentRequest("수정된 댓글\n두번째 줄", null));
+
+        assertThat(updated.content()).isEqualTo("수정된 댓글\n두번째 줄");
+        assertThat(updated.edited()).isTrue();
+        assertThat(updated.updatedAt()).isNotNull();
     }
 
     @Test

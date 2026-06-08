@@ -29,6 +29,7 @@ import {
   getCommunityPost,
   listComments,
   listCommunityPosts,
+  updateComment,
   updateCommunityPost,
   uploadPostImages,
   uploadPostFile,
@@ -1144,6 +1145,8 @@ export default function Community({ onBack }) {
   const [commentInput, setCommentInput] = useState('')
   const [replyTo, setReplyTo] = useState(null)
   const [replyInput, setReplyInput] = useState('')
+  const [editingCommentId, setEditingCommentId] = useState(null)
+  const [editCommentInput, setEditCommentInput] = useState('')
   const [commentSaving, setCommentSaving] = useState(false)
 
   useEffect(() => {
@@ -1199,6 +1202,18 @@ export default function Community({ onBack }) {
     setCurrentPost(post)
   }
 
+  const bumpCurrentPostCommentCount = (delta) => {
+    if (!currentPost || delta === 0) return
+    const postId = currentPost.id
+    setCurrentPost((prev) => {
+      if (!prev) return prev
+      return { ...prev, commentCount: Math.max(0, Number(prev.commentCount || 0) + delta) }
+    })
+    setPosts((prev) => prev.map((post) => (
+      post.id === postId ? { ...post, commentCount: Math.max(0, Number(post.commentCount || 0) + delta) } : post
+    )))
+  }
+
   useEffect(() => {
     if (!urlId) {
       /* eslint-disable react-hooks/set-state-in-effect */
@@ -1208,6 +1223,8 @@ export default function Community({ onBack }) {
       setCommentInput('')
       setReplyTo(null)
       setReplyInput('')
+      setEditingCommentId(null)
+      setEditCommentInput('')
       /* eslint-enable react-hooks/set-state-in-effect */
       return
     }
@@ -1218,6 +1235,8 @@ export default function Community({ onBack }) {
     setCommentInput('')
     setReplyTo(null)
     setReplyInput('')
+    setEditingCommentId(null)
+    setEditCommentInput('')
     let mounted = true
     Promise.all([
       getCommunityPost(numId),
@@ -1249,6 +1268,7 @@ export default function Community({ onBack }) {
     try {
       const comment = await createComment(currentPost.id, commentInput.trim())
       setComments((prev) => [...prev, comment])
+      bumpCurrentPostCommentCount(1)
       setCommentInput('')
     } catch (err) {
       alert(err.message || '댓글 등록 실패')
@@ -1263,6 +1283,7 @@ export default function Community({ onBack }) {
     try {
       const comment = await createComment(currentPost.id, replyInput.trim(), parentId)
       setComments((prev) => [...prev, comment])
+      bumpCurrentPostCommentCount(1)
       setReplyInput('')
       setReplyTo(null)
     } catch (err) {
@@ -1276,9 +1297,55 @@ export default function Community({ onBack }) {
     if (!currentPost || !window.confirm('댓글을 삭제하시겠습니까?')) return
     try {
       await deleteComment(currentPost.id, commentId)
-      setComments((prev) => prev.filter((c) => c.id !== commentId))
+      const toDelete = new Set([commentId])
+      let changed = true
+      while (changed) {
+        changed = false
+        comments.forEach((comment) => {
+          if (comment.parentCommentId && toDelete.has(comment.parentCommentId) && !toDelete.has(comment.id)) {
+            toDelete.add(comment.id)
+            changed = true
+          }
+        })
+      }
+      setComments((prev) => {
+        let changed = true
+        while (changed) {
+          changed = false
+          prev.forEach((comment) => {
+            if (comment.parentCommentId && toDelete.has(comment.parentCommentId) && !toDelete.has(comment.id)) {
+              toDelete.add(comment.id)
+              changed = true
+            }
+          })
+        }
+        return prev.filter((comment) => !toDelete.has(comment.id))
+      })
+      bumpCurrentPostCommentCount(-toDelete.size)
     } catch (err) {
       alert(err.message || '댓글 삭제 실패')
+    }
+  }
+
+  const startEditComment = (comment) => {
+    setEditingCommentId(comment.id)
+    setEditCommentInput(comment.content || '')
+    setReplyTo(null)
+    setReplyInput('')
+  }
+
+  const handleUpdateComment = async (commentId) => {
+    if (!currentPost || !editCommentInput.trim()) return
+    setCommentSaving(true)
+    try {
+      const updated = await updateComment(currentPost.id, commentId, editCommentInput.trim())
+      setComments((prev) => prev.map((comment) => (comment.id === commentId ? updated : comment)))
+      setEditingCommentId(null)
+      setEditCommentInput('')
+    } catch (err) {
+      alert(err.message || '댓글 수정 실패')
+    } finally {
+      setCommentSaving(false)
     }
   }
 
@@ -1289,6 +1356,8 @@ export default function Community({ onBack }) {
     setCommentInput('')
     setReplyTo(null)
     setReplyInput('')
+    setEditingCommentId(null)
+    setEditCommentInput('')
     if (urlId) navigate('/community')
   }
 
@@ -1325,17 +1394,19 @@ export default function Community({ onBack }) {
   }
 
   const currentPostConcept = currentPost ? isConceptPost(currentPost) : false
-  const threadedComments = useMemo(() => {
-    const roots = comments.filter((comment) => !comment.parentCommentId)
-    const replies = comments.reduce((acc, comment) => {
-      if (comment.parentCommentId) {
-        const list = acc.get(comment.parentCommentId) || []
-        list.push(comment)
-        acc.set(comment.parentCommentId, list)
+  const commentTree = useMemo(() => {
+    const nodes = new Map(comments.map((comment) => [comment.id, { ...comment, children: [] }]))
+    const roots = []
+    comments.forEach((comment) => {
+      const node = nodes.get(comment.id)
+      const parent = comment.parentCommentId ? nodes.get(comment.parentCommentId) : null
+      if (parent) {
+        parent.children.push(node)
+      } else {
+        roots.push(node)
       }
-      return acc
-    }, new Map())
-    return roots.flatMap((root) => [root, ...(replies.get(root.id) || [])])
+    })
+    return roots
   }, [comments])
 
   const goToPage = (nextPage) => {
@@ -1462,8 +1533,144 @@ export default function Community({ onBack }) {
           <span className="min-w-0 truncate text-white/62">{post.authorDisplayName || post.authorName}</span>
           <span className="text-right">{shortDate(post.createdAt)}</span>
           <span>조회 {post.viewCount}</span>
-          <span className="text-right">개추 {postScore(post)}</span>
+          <span className="text-right">댓글 {Number(post.commentCount || 0)}</span>
+          <span>개추 {postScore(post)}</span>
         </div>
+      </div>
+    )
+  }
+
+  const renderComment = (comment, level = 0) => {
+    const indent = Math.min(level, 6) * 16
+    const isEditing = editingCommentId === comment.id
+    const isReplying = replyTo === comment.id
+    return (
+      <div key={comment.id} className="divide-y divide-black/8">
+        <div
+          id={`comment-${comment.id}`}
+          className={`scroll-mt-28 flex items-start gap-3 px-4 py-3 ${level > 0 ? 'border-l-2 border-[#3b4890]/20 bg-black/[0.02]' : ''}`}
+          style={{ marginLeft: indent }}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-xs font-bold text-[var(--theme-body-dark)]">{comment.authorName}</span>
+              <span className="text-[11px] text-[var(--theme-body-muted)]">{new Date(comment.createdAt).toLocaleString('ko-KR')}</span>
+              {comment.edited && (
+                <span className="text-[11px] font-bold text-[var(--theme-body-muted)]">
+                  수정 {comment.updatedAt ? new Date(comment.updatedAt).toLocaleString('ko-KR') : ''}
+                </span>
+              )}
+            </div>
+            {isEditing ? (
+              <div className="space-y-2">
+                <textarea
+                  value={editCommentInput}
+                  onChange={(e) => setEditCommentInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                      e.preventDefault()
+                      handleUpdateComment(comment.id)
+                    }
+                  }}
+                  maxLength={MAX_COMMENT_LENGTH}
+                  rows={3}
+                  className="w-full rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-white sm:text-sm"
+                  disabled={commentSaving}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleUpdateComment(comment.id)}
+                    disabled={commentSaving || !editCommentInput.trim()}
+                    className="rounded bg-[#3b4890] px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                  >
+                    저장
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setEditingCommentId(null); setEditCommentInput('') }}
+                    className="rounded border border-black/15 bg-white px-3 py-2 text-xs font-bold text-[var(--theme-body-muted)]"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-size-container auto-text-comment whitespace-pre-wrap break-words text-[var(--theme-body-dark)]">{linkify(comment.content)}</p>
+            )}
+            {!isEditing && (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReplyTo(isReplying ? null : comment.id)
+                    setReplyInput('')
+                    setEditingCommentId(null)
+                    setEditCommentInput('')
+                  }}
+                  className="text-xs font-bold text-[#3b4890] hover:underline"
+                >
+                  댓글 달기
+                </button>
+                {comment.deletable && (
+                  <button
+                    type="button"
+                    onClick={() => startEditComment(comment)}
+                    className="text-xs font-bold text-[#3b4890] hover:underline"
+                  >
+                    수정
+                  </button>
+                )}
+                {comment.deletable && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteComment(comment.id)}
+                    className="text-xs font-bold text-red-500 hover:underline"
+                  >
+                    삭제
+                  </button>
+                )}
+              </div>
+            )}
+            {isReplying && (
+              <div className="mt-2 space-y-2">
+                <textarea
+                  value={replyInput}
+                  onChange={(e) => setReplyInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                      e.preventDefault()
+                      handleAddReply(comment.id)
+                    }
+                  }}
+                  placeholder="댓글을 입력하세요"
+                  maxLength={MAX_COMMENT_LENGTH}
+                  rows={3}
+                  className="w-full rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-white sm:text-sm"
+                  disabled={commentSaving}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleAddReply(comment.id)}
+                    disabled={commentSaving || !replyInput.trim()}
+                    className="rounded bg-[#3b4890] px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                  >
+                    등록
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setReplyTo(null); setReplyInput('') }}
+                    className="rounded border border-black/15 bg-white px-3 py-2 text-xs font-bold text-[var(--theme-body-muted)]"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        {comment.children?.map((child) => renderComment(child, level + 1))}
       </div>
     )
   }
@@ -1551,15 +1758,16 @@ export default function Community({ onBack }) {
                     <th className="w-36 px-4 py-3 font-semibold">글쓴이</th>
                     <th className="w-28 px-4 py-3 font-semibold">작성일</th>
                     <th className="w-20 px-4 py-3 font-semibold">조회</th>
+                    <th className="w-20 px-4 py-3 font-semibold">댓글</th>
                     <th className="w-20 px-4 py-3 font-semibold">개추</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10">
                   {loading && (
-                    <tr><td colSpan="7" className="px-4 py-16 text-center text-white/65">불러오는 중...</td></tr>
+                    <tr><td colSpan="8" className="px-4 py-16 text-center text-white/65">불러오는 중...</td></tr>
                   )}
                   {!loading && filteredPosts.length === 0 && (
-                    <tr><td colSpan="7" className="px-4 py-16 text-center text-white/65">등록된 글이 없습니다.</td></tr>
+                    <tr><td colSpan="8" className="px-4 py-16 text-center text-white/65">등록된 글이 없습니다.</td></tr>
                   )}
                   {visiblePosts.map((post) => {
                     const open = () => openPost(post)
@@ -1599,6 +1807,7 @@ export default function Community({ onBack }) {
                       </td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{shortDate(post.createdAt)}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{post.viewCount}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{Number(post.commentCount || 0)}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{postScore(post)}</td>
                     </tr>
                     )
@@ -1707,86 +1916,37 @@ export default function Community({ onBack }) {
                   </div>
                   {comments.length > 0 && (
                     <div className="divide-y divide-black/8">
-                      {threadedComments.map((c) => (
-                        <div
-                          key={c.id}
-                          id={`comment-${c.id}`}
-                          className={`scroll-mt-28 flex items-start gap-3 px-4 py-3 ${c.depth > 0 ? 'ml-3 border-l-2 border-[#3b4890]/20 bg-black/[0.02] sm:ml-10' : ''}`}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                              <span className="text-xs font-bold text-[var(--theme-body-dark)]">{c.authorName}</span>
-                              <span className="text-[11px] text-[var(--theme-body-muted)]">{new Date(c.createdAt).toLocaleString('ko-KR')}</span>
-                            </div>
-                            <p className="text-size-container auto-text-comment text-[var(--theme-body-dark)] whitespace-pre-wrap break-words">{linkify(c.content)}</p>
-                            {c.depth === 0 && (
-                              <div className="mt-2">
-                                <button
-                                  type="button"
-                                  onClick={() => { setReplyTo(replyTo === c.id ? null : c.id); setReplyInput('') }}
-                                  className="text-xs font-bold text-[#3b4890] hover:underline"
-                                >
-                                  답글 달기
-                                </button>
-                                {replyTo === c.id && (
-                                  <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-                                    <input
-                                      type="text"
-                                      value={replyInput}
-                                      onChange={(e) => setReplyInput(e.target.value)}
-                                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddReply(c.id) } }}
-                                      placeholder="답글을 입력하세요"
-                                      maxLength={MAX_COMMENT_LENGTH}
-                                      className="min-h-11 flex-1 rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-white sm:min-h-0 sm:text-sm"
-                                      disabled={commentSaving}
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => handleAddReply(c.id)}
-                                      disabled={commentSaving || !replyInput.trim()}
-                                      className="min-h-11 rounded bg-[#3b4890] px-3 py-2 text-xs font-bold text-white disabled:opacity-40 sm:min-h-0"
-                                    >
-                                      등록
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          {c.deletable && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteComment(c.id)}
-                              className="shrink-0 text-[var(--theme-body-muted)] hover:text-red-500 transition"
-                              aria-label="댓글 삭제"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                      {commentTree.map((comment) => renderComment(comment))}
                     </div>
                   )}
-                  <div className="flex flex-col gap-2 border-t border-black/8 bg-white px-4 py-3 sm:flex-row sm:items-center">
-                    <input
-                      type="text"
+                  <div className="flex flex-col gap-2 border-t border-black/8 bg-white px-4 py-3">
+                    <textarea
                       value={commentInput}
                       onChange={(e) => setCommentInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComment() } }}
+                      onKeyDown={(e) => {
+                        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                          e.preventDefault()
+                          handleAddComment()
+                        }
+                      }}
                       placeholder="댓글을 입력하세요"
                       maxLength={MAX_COMMENT_LENGTH}
-                      className="min-h-11 flex-1 rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-white sm:min-h-0 sm:text-sm"
+                      rows={3}
+                      className="min-h-24 rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-white sm:text-sm"
                       disabled={commentSaving}
                     />
-                    <button
-                      type="button"
-                      onClick={handleAddComment}
-                      disabled={commentSaving || !commentInput.trim()}
-                      className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded bg-[#3b4890] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#2d3a7a] disabled:opacity-40 sm:min-h-0"
-                    >
-                      <Send size={13} />
-                      등록
-                    </button>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-xs font-semibold text-[var(--theme-body-muted)]">Enter는 줄바꿈, Ctrl/⌘+Enter 또는 버튼으로 등록</p>
+                      <button
+                        type="button"
+                        onClick={handleAddComment}
+                        disabled={commentSaving || !commentInput.trim()}
+                        className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded bg-[#3b4890] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#2d3a7a] disabled:opacity-40"
+                      >
+                        <Send size={13} />
+                        등록
+                      </button>
+                    </div>
                   </div>
                 </div>
               </article>
