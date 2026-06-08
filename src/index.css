@@ -252,6 +252,41 @@ body {
 	user-select: none;
 }
 
+.community-editor-toolbar {
+	scrollbar-width: thin;
+}
+
+.community-editor-figure {
+	max-width: 100%;
+}
+
+@media (max-width: 640px) {
+	.community-editor-toolbar {
+		flex-wrap: nowrap !important;
+		overflow-x: auto;
+		overscroll-behavior-x: contain;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	.community-editor-toolbar > * {
+		flex: 0 0 auto;
+	}
+
+	.community-editor-figure[data-type='image'],
+	.community-editor-figure[data-type='video'],
+	.community-post-media {
+		display: block !important;
+		float: none !important;
+		width: 100% !important;
+		margin: 0.75rem 0 !important;
+		vertical-align: top !important;
+	}
+
+	.community-editor-figure[data-type='file'] {
+		max-width: 100% !important;
+	}
+}
+
 .auto-text-comment {
 	font-size: clamp(0.84rem, 0.8rem + 0.18cqw, 0.98rem);
 	line-height: 1.65;
