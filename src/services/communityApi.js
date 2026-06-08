@@ -110,6 +110,13 @@ export async function createComment(postId, content, parentCommentId = null) {
   })
 }
 
+export async function updateComment(postId, commentId, content) {
+  return request(`/api/community/posts/${postId}/comments/${commentId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ content, parentCommentId: null }),
+  })
+}
+
 export async function deleteComment(postId, commentId) {
   return requestNoContent(`/api/community/posts/${postId}/comments/${commentId}`, {
     method: 'DELETE',

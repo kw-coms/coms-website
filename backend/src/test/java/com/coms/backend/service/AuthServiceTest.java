@@ -273,7 +273,8 @@ class AuthServiceTest {
         FontService fontService = mock(FontService.class);
         when(fontService.isSelectable(null)).thenReturn(true);
         BannedStudentService banned = mock(BannedStudentService.class);
-        AuthService service = new AuthService(repo, loginFailures, eligible, passwordEncoder, jwt, sender, fontService, banned, Clock.systemDefaultZone());
+        AuditLogService auditLogService = mock(AuditLogService.class);
+        AuthService service = new AuthService(repo, loginFailures, eligible, passwordEncoder, jwt, sender, fontService, banned, auditLogService, Clock.systemDefaultZone());
 
         when(repo.existsByStudentId("2026123462")).thenReturn(false);
         when(repo.existsByEmail("new@example.com")).thenReturn(false);
