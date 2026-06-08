@@ -70,6 +70,14 @@ const MEDIA_ALIGN_OPTIONS = [
   { value: 'center', label: '가운데' },
   { value: 'right', label: '오른쪽' },
 ]
+const POLL_DURATION_OPTIONS = [
+  { value: 60, label: '1시간' },
+  { value: 360, label: '6시간' },
+  { value: 1440, label: '1일' },
+  { value: 4320, label: '3일' },
+  { value: 10080, label: '7일' },
+  { value: 0, label: '종료 없음' },
+]
 const FORMATTED_TEXT_RE = /<\/?(strong|b|em|i|u|span|font|br|div|p)\b/i
 
 let _localIdCounter = 0
@@ -1303,7 +1311,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
   const [youtubeSearching, setYoutubeSearching] = useState(false)
   const [pollQuestion, setPollQuestion] = useState('')
   const [pollOptionInputs, setPollOptionInputs] = useState([{ label: '', imageUrl: '' }, { label: '', imageUrl: '' }])
-  const [pollClosesAt, setPollClosesAt] = useState(datetimeLocalValue(60))
+  const [pollDurationMinutes, setPollDurationMinutes] = useState(60)
   const [activeInsertTool, setActiveInsertTool] = useState('')
   const [saving, setSaving] = useState(false)
   const [savingStep, setSavingStep] = useState('')
@@ -1355,11 +1363,12 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
 
   const insertPollBlock = () => {
     try {
-      const block = newPollBlock(pollQuestion, pollOptionInputs, pollClosesAt)
+      const closesAt = pollDurationMinutes > 0 ? datetimeLocalValue(pollDurationMinutes) : ''
+      const block = newPollBlock(pollQuestion, pollOptionInputs, closesAt)
       editorApiRef.current?.insertPoll(block)
       setPollQuestion('')
       setPollOptionInputs([{ label: '', imageUrl: '' }, { label: '', imageUrl: '' }])
-      setPollClosesAt(datetimeLocalValue(60))
+      setPollDurationMinutes(60)
       setActiveInsertTool('')
       setError('')
     } catch (err) {
@@ -1584,15 +1593,31 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
               placeholder="투표 제목 입력"
               className="mb-2 min-h-11 w-full rounded-lg border border-[#3b4890]/15 bg-white px-3 text-sm font-semibold outline-none focus:border-[#3b4890]"
             />
-            <label className="mb-3 block text-xs font-black text-[#23306d]">
-              종료 시간
-              <input
-                type="datetime-local"
-                value={pollClosesAt}
-                onChange={(e) => setPollClosesAt(e.target.value)}
-                className="mt-1 min-h-10 w-full rounded-lg border border-[#3b4890]/15 bg-white px-3 text-sm font-semibold text-[var(--theme-body-dark)] outline-none focus:border-[#3b4890]"
-              />
-            </label>
+            <div className="mb-3">
+              <div className="mb-2 text-xs font-black text-[#23306d]">종료 시간</div>
+              <div className="flex flex-wrap gap-2">
+                {POLL_DURATION_OPTIONS.map((option) => {
+                  const selected = pollDurationMinutes === option.value
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setPollDurationMinutes(option.value)}
+                      className={`min-h-10 rounded-full border px-3 text-xs font-black transition sm:text-sm ${selected
+                        ? 'border-[#3b4890] bg-[#3b4890] text-white shadow-sm'
+                        : 'border-[#3b4890]/15 bg-white text-[#23306d] hover:border-[#3b4890]/40 hover:bg-[#f4f6ff]'
+                      }`}
+                      aria-pressed={selected}
+                    >
+                      {option.label}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="mt-2 text-xs font-semibold text-[#4b587c]">
+                {pollDurationMinutes > 0 ? '선택한 시간 뒤 자동으로 투표가 종료됩니다.' : '작성자나 관리자가 직접 종료할 때까지 투표가 열립니다.'}
+              </p>
+            </div>
             <div className="space-y-2">
               {pollOptionInputs.map((option, index) => (
                 <div key={index} className="grid gap-2 rounded-lg border border-black/10 bg-white/70 p-2 sm:grid-cols-[auto_1fr_1fr_auto] sm:items-center">
