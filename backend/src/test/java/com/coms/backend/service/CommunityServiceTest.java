@@ -215,6 +215,33 @@ class CommunityServiceTest {
     }
 
     @Test
+    void sanitizesForgedFormattedTextBlocksOnCreateAndUpdate() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        String forgedContent = "[{\"type\":\"text\",\"content\":\"<b>굵게</b><img src=x onerror=alert(1)><span style=\\\"color:#123456;background-image:url(javascript:alert(1))\\\">색</span><script>alert(1)</script>\"}]";
+
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("원제목", forgedContent, "GENERAL", false), null);
+
+        assertThat(created.content()).contains("<b>굵게</b>");
+        assertThat(created.content()).contains("color:#123456");
+        assertThat(created.content()).doesNotContain("<img");
+        assertThat(created.content()).doesNotContain("onerror");
+        assertThat(created.content()).doesNotContain("javascript:");
+        assertThat(created.content()).doesNotContain("<script");
+
+        var updated = communityService.update(
+                user.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("원제목", "[{\"type\":\"text\",\"content\":\"<u>밑줄</u><svg/onload=alert(1)>\"}]", "GENERAL", false),
+                null
+        );
+
+        assertThat(updated.content()).contains("<u>밑줄</u>");
+        assertThat(updated.content()).doesNotContain("<svg");
+        assertThat(updated.content()).doesNotContain("onload");
+    }
+
+    @Test
     void immediateDifferentContentUpdateStillMarksEdited() {
         Member user = member("2025123456", "회원", Member.Role.USER);
         memberRepository.save(user);
