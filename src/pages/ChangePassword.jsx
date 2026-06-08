@@ -10,6 +10,78 @@ import { useAuth } from '../contexts/useAuth.js'
 import { getLogoAsset } from '../utils/logoAssets.js'
 
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?])(?!.*\s).{8,}$/
+const OTHER_INTEREST = '기타'
+const INTEREST_OPTIONS = ['보안', '웹', '앱']
+
+function choiceButtonClass(active) {
+  return `shape-cut-sm min-h-11 px-4 py-2 text-sm font-semibold transition ${
+    active
+      ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]'
+      : 'border border-black/10 bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/80'
+  }`
+}
+
+function parseInterests(value) {
+  const selected = []
+  const custom = []
+
+  String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .forEach((item) => {
+      if (INTEREST_OPTIONS.includes(item)) {
+        if (!selected.includes(item)) selected.push(item)
+        return
+      }
+
+      const otherValue = item.startsWith(`${OTHER_INTEREST}:`)
+        ? item.slice(`${OTHER_INTEREST}:`.length).trim()
+        : item
+      if (otherValue) custom.push(otherValue)
+    })
+
+  if (custom.length > 0) selected.push(OTHER_INTEREST)
+  return { selected, other: custom.join(' / ') }
+}
+
+function InterestsSelector({ selected, onChange, otherText, onOtherChange, inputClass }) {
+  const toggle = (option) => {
+    const next = selected.includes(option)
+      ? selected.filter((item) => item !== option)
+      : [...selected, option]
+    onChange(next)
+  }
+
+  const hasOther = selected.includes(OTHER_INTEREST)
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-4 sm:flex sm:flex-wrap">
+        {[...INTEREST_OPTIONS, OTHER_INTEREST].map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => toggle(option)}
+            aria-pressed={selected.includes(option)}
+            className={choiceButtonClass(selected.includes(option))}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+      {hasOther && (
+        <input
+          value={otherText}
+          onChange={(event) => onOtherChange(event.target.value)}
+          placeholder="기타 관심 분야를 입력하세요"
+          maxLength={100}
+          className={inputClass}
+        />
+      )}
+    </div>
+  )
+}
 
 export default function ChangePassword({ onBack }) {
   const { user, refreshUser, setUser } = useAuth()
@@ -21,6 +93,8 @@ export default function ChangePassword({ onBack }) {
   const [profileMessage, setProfileMessage] = useState('')
   const [emailMessage, setEmailMessage] = useState('')
   const [passwordMessage, setPasswordMessage] = useState('')
+  const [interestDraft, setInterestDraft] = useState(null)
+  const [otherInterestDraft, setOtherInterestDraft] = useState(null)
   const [error, setError] = useState('')
   const [loadingAction, setLoadingAction] = useState('')
   const [fonts, setFonts] = useState([])
@@ -33,10 +107,12 @@ export default function ChangePassword({ onBack }) {
     return () => { mounted = false }
   }, [])
 
+  const parsedInterests = parseInterests(user?.interests)
+  const selectedInterests = interestDraft ?? parsedInterests.selected
+  const otherInterest = otherInterestDraft ?? parsedInterests.other
   const profileForm = {
     phone: profileDraft.phone ?? user?.phone ?? '',
     aspiration: profileDraft.aspiration ?? user?.aspiration ?? '',
-    interests: profileDraft.interests ?? user?.interests ?? '',
     selectedFontId: profileDraft.selectedFontId ?? user?.selectedFontId ?? '',
   }
 
@@ -45,6 +121,7 @@ export default function ChangePassword({ onBack }) {
   const inputClass = 'w-full shape-cut-sm bg-white/72 px-4 py-2.5 text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/70 transition focus:bg-white/82 focus:ring-2 focus:ring-[var(--theme-accent)]/55'
   const textareaClass = `${inputClass} min-h-28 resize-y leading-6`
   const btnClass = 'shape-cut-sm bg-white/66 px-4 py-2.5 font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/82 disabled:cursor-wait disabled:opacity-60'
+  const primaryBtnClass = 'shape-cut-sm bg-[var(--theme-text)] px-4 py-2.5 font-semibold text-[var(--theme-bg)] shadow-[0_10px_28px_rgba(0,0,0,0.18)] transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60'
   const sectionClass = 'border-t border-[var(--theme-border-soft)] pt-5'
 
   const resetMessages = () => {
@@ -59,15 +136,21 @@ export default function ChangePassword({ onBack }) {
     resetMessages()
     setLoadingAction('profile')
 
+    const interestList = selectedInterests
+      .map((interest) => (interest === OTHER_INTEREST ? `${OTHER_INTEREST}: ${otherInterest.trim()}` : interest))
+      .filter((interest) => interest.trim() && interest !== `${OTHER_INTEREST}:`)
+
     try {
       const updated = await updateProfile({
         phone: profileForm.phone.trim() || null,
         aspiration: profileForm.aspiration.trim() || null,
-        interests: profileForm.interests.trim() || null,
+        interests: interestList.length > 0 ? interestList.join(', ') : null,
         selectedFontId: profileForm.selectedFontId ? Number(profileForm.selectedFontId) : null,
       })
       setUser(updated)
       setProfileDraft({})
+      setInterestDraft(null)
+      setOtherInterestDraft(null)
       setProfileMessage('회원 정보가 저장되었습니다.')
     } catch (err) {
       setError(err.message || '회원 정보 저장 중 오류가 발생했습니다.')
@@ -195,16 +278,16 @@ export default function ChangePassword({ onBack }) {
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">관심 분야</label>
-              <div className={frameClass}>
-                <input
-                  value={profileForm.interests}
-                  onChange={(e) => setProfileDraft((prev) => ({ ...prev, interests: e.target.value }))}
-                  placeholder="웹, AI, 알고리즘"
-                  maxLength={500}
-                  className={inputClass}
-                />
-              </div>
+              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">
+                관심 분야 <span className="font-normal text-[var(--theme-body-muted)]">(복수 선택 가능)</span>
+              </label>
+              <InterestsSelector
+                selected={selectedInterests}
+                onChange={setInterestDraft}
+                otherText={otherInterest}
+                onOtherChange={setOtherInterestDraft}
+                inputClass={inputClass}
+              />
             </div>
 
             <div>
@@ -238,7 +321,7 @@ export default function ChangePassword({ onBack }) {
 
             {profileMessage && <div className="text-sm text-emerald-600">{profileMessage}</div>}
 
-            <button type="submit" className={btnClass} disabled={loadingAction === 'profile'}>
+            <button type="submit" className={primaryBtnClass} disabled={loadingAction === 'profile'}>
               {loadingAction === 'profile' ? '저장 중...' : '회원 정보 저장'}
             </button>
           </form>
