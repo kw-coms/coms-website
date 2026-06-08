@@ -10,5 +10,7 @@ public record CommunityCommentResponse(
         String authorName,
         String content,
         LocalDateTime createdAt,
+        LocalDateTime updatedAt,
+        boolean edited,
         boolean deletable
 ) {}
