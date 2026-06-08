@@ -744,7 +744,7 @@ public class CommunityService {
         return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
                 .map(c -> new CommunityCommentResponse(
                         c.getId(), c.getPostId(), c.getParentCommentId(), c.getDepth(),
-                        c.getAuthorName(), c.getContent(), c.getCreatedAt(), c.getUpdatedAt(), c.isEdited(),
+                        displayName(c.getStudentId(), c.getAuthorName()), c.getContent(), c.getCreatedAt(), c.getUpdatedAt(), c.isEdited(),
                         isAdmin || c.getStudentId().equals(studentId)))
                 .toList();
     }
@@ -775,7 +775,7 @@ public class CommunityService {
         }
         auditLogService.record(member.getStudentId(), "COMMUNITY_COMMENT_CREATE", "COMMUNITY_COMMENT", String.valueOf(saved.getId()),
                 "postId=" + postId + (saved.getParentCommentId() == null ? "" : ", parentCommentId=" + saved.getParentCommentId()), null);
-        return new CommunityCommentResponse(saved.getId(), saved.getPostId(), saved.getParentCommentId(), saved.getDepth(), saved.getAuthorName(),
+        return new CommunityCommentResponse(saved.getId(), saved.getPostId(), saved.getParentCommentId(), saved.getDepth(), displayName(saved.getStudentId(), saved.getAuthorName()),
                 saved.getContent(), saved.getCreatedAt(), saved.getUpdatedAt(), saved.isEdited(), true);
     }
 
@@ -795,7 +795,7 @@ public class CommunityService {
         auditLogService.record(member.getStudentId(), "COMMUNITY_COMMENT_UPDATE", "COMMUNITY_COMMENT", String.valueOf(saved.getId()),
                 "postId=" + postId, null);
         return new CommunityCommentResponse(saved.getId(), saved.getPostId(), saved.getParentCommentId(), saved.getDepth(),
-                saved.getAuthorName(), saved.getContent(), saved.getCreatedAt(), saved.getUpdatedAt(), saved.isEdited(), true);
+                displayName(saved.getStudentId(), saved.getAuthorName()), saved.getContent(), saved.getCreatedAt(), saved.getUpdatedAt(), saved.isEdited(), true);
     }
 
     public void deleteComment(Long postId, Long commentId, String studentId) {
