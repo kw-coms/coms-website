@@ -1225,7 +1225,7 @@ export default function Community({ onBack }) {
     return (
       <span className="inline-flex max-w-full min-w-0 items-baseline" title={post.title}>
         <span className="min-w-0 truncate">{post.title}</span>
-        {suffix && <span className="shrink-0 text-cyan-200">{suffix}</span>}
+        {suffix && <span className="shrink-0 text-[0.82em] text-cyan-200">{suffix}</span>}
       </span>
     )
   }
