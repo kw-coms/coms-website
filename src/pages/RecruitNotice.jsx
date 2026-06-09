@@ -30,23 +30,23 @@ export default function RecruitNotice({ onBack, onApply }) {
       <button
         type="button"
         onClick={onBack}
-        className="shape-cut-sm inline-flex items-center gap-2 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15"
+        className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-white"
       >
         <ArrowLeft size={15} />
         이전 화면으로
       </button>
 
-      <section className="shape-cut overflow-hidden border border-white/12 bg-[var(--theme-surface-96)] text-[var(--theme-body-dark)] shadow-[0_30px_90px_rgba(0,0,0,0.32)]">
-        <div className="flex items-start justify-between gap-4 border-b border-black/10 bg-emerald-950 px-6 py-7 text-white sm:px-8">
+      <section className="overflow-hidden rounded-lg border border-black/10 bg-white text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
+        <div className="flex items-start justify-between gap-4 border-b border-black/10 bg-linear-to-br from-[#e8f3ff] via-white to-[#f5f5f7] px-6 py-7 sm:px-8">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Recruit Notice</p>
-            <h1 className="mt-4 text-3xl font-semibold leading-tight sm:text-5xl">COM&apos;s 신입 부원 모집 공지</h1>
-            <p className="mt-4 max-w-3xl text-sm font-semibold text-emerald-100/80">광운대학교 중앙 컴퓨터 학술동아리</p>
+            <p className="text-sm font-semibold text-[#0066cc]">Recruit Notice</p>
+            <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-normal sm:text-5xl">COM&apos;s 신입 부원 모집 공지</h1>
+            <p className="mt-4 max-w-3xl text-sm font-semibold text-[#6e6e73]">광운대학교 중앙 컴퓨터 학술동아리</p>
           </div>
           <button
             type="button"
             onClick={onBack}
-            className="shape-cut-sm shrink-0 border border-white/12 bg-white/10 p-2 text-white transition hover:bg-white/18"
+            className="shrink-0 rounded-full border border-black/10 bg-white/80 p-2 text-[#1d1d1f] transition hover:bg-white"
             aria-label="이전 화면으로"
           >
             <X size={20} />
@@ -56,7 +56,7 @@ export default function RecruitNotice({ onBack, onApply }) {
         <div className="grid gap-0 lg:grid-cols-[1fr_320px]">
           <article className="space-y-8 p-6 sm:p-8">
             <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 text-sm font-bold text-emerald-700">
+              <div className="inline-flex items-center gap-2 text-sm font-bold text-[#0066cc]">
                 <PenLine size={16} />
                 모집 안내
               </div>
@@ -73,8 +73,8 @@ export default function RecruitNotice({ onBack, onApply }) {
 
             <div className="grid gap-3 md:grid-cols-3">
               {recruitDetails.map(({ title, icon: Icon, body }) => (
-                <div key={title} className="shape-cut-sm border border-black/10 bg-white/70 p-4">
-                  <div className="mb-3 flex size-10 items-center justify-center bg-emerald-100 text-emerald-700">
+                <div key={title} className="rounded-lg border border-black/10 bg-[#f5f5f7] p-4">
+                  <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-[#e8f3ff] text-[#0066cc]">
                     <Icon size={19} />
                   </div>
                   <h2 className="text-base font-black">{title}</h2>
@@ -83,12 +83,12 @@ export default function RecruitNotice({ onBack, onApply }) {
               ))}
             </div>
 
-            <div className="shape-cut-sm border border-emerald-200/60 bg-emerald-50/80 p-5">
-              <h2 className="text-lg font-black text-emerald-900">지원 절차</h2>
+            <div className="rounded-lg border border-[#0071e3]/20 bg-[#e8f3ff] p-5">
+              <h2 className="text-lg font-black text-[#1d1d1f]">지원 절차</h2>
               <div className="mt-4 space-y-3">
                 {processSteps.map((step) => (
-                  <div key={step} className="flex gap-3 text-sm leading-6 text-emerald-950/80">
-                    <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-700" />
+                  <div key={step} className="flex gap-3 text-sm leading-6 text-[#6e6e73]">
+                    <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-[#0066cc]" />
                     <span>{step}</span>
                   </div>
                 ))}
@@ -96,22 +96,22 @@ export default function RecruitNotice({ onBack, onApply }) {
             </div>
           </article>
 
-          <aside className="flex flex-col justify-between gap-8 bg-emerald-950 p-6 text-white sm:p-8">
+          <aside className="flex flex-col justify-between gap-8 bg-[#f5f5f7] p-6 text-[#1d1d1f] sm:p-8">
             <div className="space-y-6">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.28em] text-emerald-200">Welcome</p>
-                <p className="mt-4 text-sm leading-7 text-white/78">
+                <p className="text-sm font-semibold text-[#0066cc]">Welcome</p>
+                <p className="mt-4 text-sm leading-7 text-[#6e6e73]">
                   COM&apos;s는 혼자서는 막막했던 공부를 함께 이어가는 공간입니다. 기초부터 차근차근 시작해도 좋고,
                   이미 만든 것이 있다면 더 큰 프로젝트로 확장해도 좋습니다.
                 </p>
               </div>
 
-              <div className="shape-cut-sm border border-white/10 bg-white/8 p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-emerald-100">
+              <div className="rounded-lg border border-black/10 bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[#1d1d1f]">
                   <Mail size={16} />
                   문의
                 </div>
-                <a href="mailto:kwcoms69@gmail.com" className="mt-2 block break-all text-sm text-white/75 hover:text-white">
+                <a href="mailto:kwcoms69@gmail.com" className="mt-2 block break-all text-sm text-[#0066cc] hover:text-[#0077ed]">
                   kwcoms69@gmail.com
                 </a>
               </div>
@@ -120,7 +120,7 @@ export default function RecruitNotice({ onBack, onApply }) {
             <button
               type="button"
               onClick={onApply}
-              className="shape-cut-sm inline-flex w-full items-center justify-center gap-2 bg-white/85 px-4 py-3 text-base font-semibold text-[var(--theme-body-dark)] transition hover:bg-white"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 py-3 text-base font-semibold text-white transition hover:bg-[#0077ed]"
             >
               <PenLine size={17} />
               지원서 작성하기

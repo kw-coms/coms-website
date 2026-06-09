@@ -5,20 +5,15 @@ import {
   Binary,
   Bell,
   CircuitBoard,
-  Github,
-  Instagram,
   LogOut,
-  Mail,
   Menu,
   Megaphone,
   Rocket,
   Sparkles,
   X,
-  Youtube,
 } from 'lucide-react'
 import { listNotices } from './services/noticeApi.js'
 import { getNotificationSummary, listNotifications, markAllNotificationsRead, markNotificationRead } from './services/notificationApi.js'
-import SplitLogoCard from './components/common/SplitLogoCard.jsx'
 const Archive = lazy(() => import('./pages/Archive.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
 const Signup = lazy(() => import('./pages/Signup.jsx'))
@@ -29,14 +24,13 @@ const ChangePassword = lazy(() => import('./pages/ChangePassword.jsx'))
 const RecruitApply = lazy(() => import('./pages/RecruitApply.jsx'))
 const RecruitNotice = lazy(() => import('./pages/RecruitNotice.jsx'))
 import { getLogoAsset } from './utils/logoAssets.js'
-import FixedBrackets from './components/common/FixedBrackets.jsx'
 import { useAuth } from './contexts/useAuth.js'
 
 const tabs = [
   { id: 'about', label: 'About', hint: '정체성', icon: Binary, accent: 'text-cyan-200' },
   { id: 'activities', label: 'Activities', hint: '세미나·스터디', icon: Sparkles, accent: 'text-rose-200' },
   { id: 'projects', label: 'Projects', hint: '실전 제작', icon: CircuitBoard, accent: 'text-violet-200' },
-  { id: 'recruit', label: 'Recruit', hint: '지원 안내', icon: Rocket, accent: 'text-emerald-200' },
+  { id: 'recruit', label: 'Recruit', hint: '지원 안내', icon: Rocket, accent: 'text-sky-500' },
 ]
 
 const activities = [
@@ -90,36 +84,111 @@ const projectDetails = [
   },
 ]
 
-const sectionMeta = {
+const heroHighlights = [
+  { label: 'Weekly', value: 'Seminar', detail: '기초와 심화가 이어지는 학습 루틴' },
+  { label: 'Team', value: 'Project', detail: '아이디어를 실제 서비스로 제작' },
+  { label: 'Campus', value: 'Network', detail: '선후배가 함께 나누는 개발 경험' },
+]
+
+const experiencePills = ['Beginner friendly', 'React · Vite', 'Arduino', 'Study archive', 'Community']
+
+const showcaseItems = [
+  {
+    eyebrow: 'Learn',
+    title: '학습 흐름을 한눈에.',
+    body: '정기 세미나, 수준별 스터디, 자료실이 하나의 흐름으로 이어집니다.',
+    target: 'activities',
+  },
+  {
+    eyebrow: 'Build',
+    title: '만들면서 성장.',
+    body: '웹사이트와 교육 프로젝트를 통해 실제로 쓰이는 결과물을 완성합니다.',
+    target: 'projects',
+  },
+  {
+    eyebrow: 'Join',
+    title: '처음이어도 괜찮게.',
+    body: '개발 경험이 적어도 함께 따라올 수 있는 활동 구조를 만듭니다.',
+    target: 'recruit',
+  },
+]
+
+const sectionMetrics = {
+  about: [
+    { value: 'Central', label: '광운대 중앙 동아리' },
+    { value: 'Build', label: '팀 제작 중심 활동' },
+    { value: 'Share', label: '선후배 경험 공유' },
+  ],
+  activities: [
+    { value: '01', label: '기초 세미나' },
+    { value: '02', label: '수준별 스터디' },
+    { value: '03', label: '팀 프로젝트' },
+  ],
+  projects: [
+    { value: 'Web', label: '공식 웹사이트' },
+    { value: 'IoT', label: '아두이노 교육' },
+    { value: 'App', label: '자유 제작' },
+  ],
+  recruit: [
+    { value: 'Step 1', label: '지원서 작성' },
+    { value: 'Step 2', label: '내부 확인' },
+    { value: 'Step 3', label: '정기 활동' },
+  ],
+}
+
+const visualDetails = {
   about: {
-    accent: 'text-cyan-100',
-    glow: 'rgba(103, 232, 249, 0.22)',
-    bracket: '#67e8f9',
-    background: 'linear-gradient(135deg, rgba(6,182,212,0.96), rgba(14,165,233,0.92), rgba(34,211,238,0.84))',
+    title: 'Club OS',
+    subtitle: 'Study · Build · Share',
+    rows: ['학습 로드맵', '프로젝트 트랙', '커뮤니티 로그'],
+    accent: '#0ea5e9',
   },
   activities: {
-    accent: 'text-rose-100',
-    glow: 'rgba(251, 113, 133, 0.22)',
-    bracket: '#fda4af',
-    background: 'linear-gradient(135deg, rgba(236,72,153,0.96), rgba(244,114,182,0.92), rgba(251,113,133,0.84))',
+    title: 'Learning Stack',
+    subtitle: 'Seminar · Study · Review',
+    rows: ['기초 세미나', '분야별 스터디', '코드 리뷰'],
+    accent: '#f43f5e',
   },
   projects: {
-    accent: 'text-violet-100',
-    glow: 'rgba(196, 181, 253, 0.22)',
-    bracket: '#c4b5fd',
-    background: 'linear-gradient(135deg, rgba(124,58,237,0.96), rgba(168,85,247,0.92), rgba(139,92,246,0.84))',
+    title: 'Project Lab',
+    subtitle: 'Prototype · Launch · Iterate',
+    rows: ['서비스 기획', '프론트엔드 구현', '배포와 개선'],
+    accent: '#8b5cf6',
   },
   recruit: {
-    accent: 'text-emerald-100',
-    glow: 'rgba(74, 222, 128, 0.22)',
-    bracket: '#6ee7b7',
-    background: 'linear-gradient(135deg, rgba(16,185,129,0.96), rgba(34,197,94,0.92), rgba(52,211,153,0.84))',
+    title: 'Join Flow',
+    subtitle: 'Apply · Meet · Start',
+    rows: ['지원서 제출', '개별 안내', '오리엔테이션'],
+    accent: '#0071e3',
   },
 }
 
-const floatingBarBaseClass = 'shape-cut border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)]'
-const solidActionBtnClass = 'shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] transition hover:scale-[1.02]'
-const ghostActionBtnClass = 'shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/20'
+const sectionMeta = {
+  about: {
+    eyebrow: 'The club',
+    background: '#ffffff',
+    visual: 'linear-gradient(135deg, #e8f8ff, #f5f5f7 55%, #ffffff)',
+  },
+  activities: {
+    eyebrow: 'Learn together',
+    background: '#f5f5f7',
+    visual: 'linear-gradient(135deg, #fff1f4, #eef5ff)',
+  },
+  projects: {
+    eyebrow: 'Build for real',
+    background: '#ffffff',
+    visual: 'linear-gradient(135deg, #edf2ff, #f7f0ff)',
+  },
+  recruit: {
+    eyebrow: 'Join COMs',
+    background: '#f5f5f7',
+    visual: 'linear-gradient(135deg, #e8f3ff, #f5f5f7 60%, #ffffff)',
+  },
+}
+
+const floatingBarBaseClass = 'border-b border-black/10 bg-white/82 shadow-[0_1px_0_rgba(255,255,255,0.55)] backdrop-blur-xl supports-[backdrop-filter]:bg-white/72'
+const solidActionBtnClass = 'inline-flex min-h-10 items-center justify-center rounded-full bg-[#0071e3] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-wait disabled:opacity-60'
+const ghostActionBtnClass = 'inline-flex min-h-10 items-center justify-center rounded-full border border-[#0071e3]/40 bg-white/70 px-5 py-2.5 text-sm font-semibold text-[#0066cc] transition hover:bg-white disabled:cursor-wait disabled:opacity-60'
 
 // ─── Auth guards ───────────────────────────────────────────────────────────
 
@@ -138,7 +207,7 @@ function RequireAuth({ children }) {
   const location = useLocation()
   if (loading) return (
     <PageShell>
-      <div className="shape-cut border border-white/10 bg-white/5 p-8 text-center text-white/70 backdrop-blur-md">
+      <div className="rounded-lg border border-black/10 bg-white/82 p-8 text-center text-[#6e6e73] shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
         로그인 상태를 확인하는 중...
       </div>
     </PageShell>
@@ -152,7 +221,7 @@ function RequireAdmin({ children }) {
   const location = useLocation()
   if (loading) return (
     <PageShell>
-      <div className="shape-cut border border-white/10 bg-white/5 p-8 text-center text-white/70 backdrop-blur-md">
+      <div className="rounded-lg border border-black/10 bg-white/82 p-8 text-center text-[#6e6e73] shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
         로그인 상태를 확인하는 중...
       </div>
     </PageShell>
@@ -186,7 +255,7 @@ function SignupPage() {
   const navigate = useNavigate()
   return (
     <PageShell wide full>
-      <button type="button" onClick={() => navigate('/login')} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15">
+      <button type="button" onClick={() => navigate('/login')} className="mb-6 rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-white">
         로그인으로 돌아가기
       </button>
       <Signup onBack={() => navigate('/login')} />
@@ -406,8 +475,8 @@ function NotificationButton({ alignLeft = false, padded = false }) {
 
 function PageFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--theme-bg)]">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-white/80" />
+    <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7]">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-black/10 border-t-[#0071e3]" />
     </div>
   )
 }
@@ -442,30 +511,14 @@ function HomeView() {
   const navigate = useNavigate()
   const location = useLocation()
   const [activeSection, setActiveSection] = useState(null)
-  const [bracketPositions, setBracketPositions] = useState({ leftX: null, rightX: null })
   const aboutRef = useRef(null)
   const activitiesRef = useRef(null)
   const projectsRef = useRef(null)
   const recruitRef = useRef(null)
-  const [bottomHidden, setBottomHidden] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [latestNotice, setLatestNotice] = useState(null)
   const [activitiesExpanded, setActivitiesExpanded] = useState(false)
   const [projectsExpanded, setProjectsExpanded] = useState(false)
-
-  const updateBracketPositions = (sectionId) => {
-    const map = { about: aboutRef, activities: activitiesRef, projects: projectsRef, recruit: recruitRef }
-    const ref = map[sectionId] || aboutRef
-    const sectionEl = ref.current
-    if (!sectionEl) return
-    const panelEl = sectionEl.querySelector?.('[data-panel]') || sectionEl
-    const rect = panelEl.getBoundingClientRect()
-    const gap = 20
-    setBracketPositions({
-      leftX: Math.max(12, Math.round(rect.left - gap)),
-      rightX: Math.round(rect.right + gap),
-    })
-  }
 
   useEffect(() => {
     let rafId = null
@@ -473,8 +526,6 @@ function HomeView() {
       if (rafId !== null) return
       rafId = requestAnimationFrame(() => {
         rafId = null
-        const y = window.scrollY || window.pageYOffset
-        setBottomHidden(y > 120)
         const sections = [
           { id: 'about', ref: aboutRef },
           { id: 'activities', ref: activitiesRef },
@@ -482,7 +533,6 @@ function HomeView() {
           { id: 'recruit', ref: recruitRef },
         ]
         let found = false
-        let foundSectionId = null
         const centerY = window.innerHeight / 2
         for (const s of sections) {
           const sectionEl = s.ref.current
@@ -492,13 +542,11 @@ function HomeView() {
           const isCentered = rect.top <= centerY && rect.bottom >= centerY
           if (isCentered) {
             setActiveSection(s.id)
-            foundSectionId = s.id
             found = true
             break
           }
         }
-        updateBracketPositions(foundSectionId || 'about')
-        if (!found && y < 140) setActiveSection(null)
+        if (!found && (window.scrollY || window.pageYOffset) < 140) setActiveSection(null)
       })
     }
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -529,10 +577,9 @@ function HomeView() {
     const ref = map[id]
     if (ref && ref.current) {
       const rect = ref.current.getBoundingClientRect()
-      const targetY = Math.max(0, window.scrollY + rect.top - (window.innerHeight / 2) + (rect.height / 2))
+      const targetY = Math.max(0, window.scrollY + rect.top - 54)
       window.scrollTo({ top: targetY, behavior: 'smooth' })
       setActiveSection(id)
-      updateBracketPositions(id)
     }
   }
 
@@ -550,23 +597,25 @@ function HomeView() {
   const goRecruitPage = () => navigate('/recruit')
   const locationPath = () => `${location.pathname}${location.search}${location.hash}`
 
-  const bracketColor = activeSection ? sectionMeta[activeSection]?.bracket : sectionMeta.about.bracket
-
   const renderSectionContent = (id) => {
     if (id === 'about') {
       return (
-        <div className="space-y-6">
-          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-cyan-200">About Signal</p>
-          <h3 className="text-2xl font-semibold sm:text-3xl">COM&apos;s는 어떤 동아리인가요?</h3>
-          <p className="max-w-3xl leading-8 text-white/85">
+        <div className="mx-auto max-w-3xl space-y-4 text-center">
+          <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.about.eyebrow}</p>
+          <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-5xl">함께 배우고, 바로 만듭니다.</h2>
+          <p className="mx-auto max-w-2xl text-lg leading-8 text-[#6e6e73] sm:text-xl">
             COM&apos;s는 컴퓨터와 소프트웨어에 관심 있는 광운대학교 학생들이 모여 함께 공부하고 프로젝트를
             진행하는 중앙 컴퓨터 학술동아리입니다.
           </p>
-          <p className="max-w-3xl leading-8 text-white/75">
-            프로그래밍 기초부터 웹 개발, 알고리즘, 아두이노, 프로젝트 협업까지 다양한 활동을 통해 실력을 키우고
-            서로의 성장을 돕습니다.
-          </p>
-          <div className="flex flex-wrap gap-3">
+          <div className="mx-auto grid max-w-2xl gap-3 pt-4 sm:grid-cols-3">
+            {sectionMetrics.about.map((item) => (
+              <div key={item.value} className="rounded-lg bg-[#f5f5f7] px-4 py-4 text-center">
+                <p className="text-lg font-semibold text-[#1d1d1f]">{item.value}</p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-[#6e6e73]">{item.label}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap justify-center gap-3 pt-2">
             <button type="button" onClick={() => openPanel('recruit')} className={solidActionBtnClass}>지원 화면으로 이동</button>
           </div>
         </div>
@@ -574,25 +623,33 @@ function HomeView() {
     }
     if (id === 'activities') {
       return (
-        <div className="space-y-6">
-          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-rose-200">Activities Signal</p>
-          <h3 className="text-2xl font-semibold sm:text-3xl">주요 활동</h3>
-          <div className="space-y-4">
-            {activities.map((item) => (
-              <div key={item} className="border-b border-white/10 pb-4 text-white/80 last:border-b-0 last:pb-0">{item}</div>
+        <div className="mx-auto w-full max-w-5xl">
+          <div className="mx-auto max-w-3xl space-y-4 text-center">
+            <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.activities.eyebrow}</p>
+            <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-5xl">처음부터 심화까지.</h2>
+            <p className="text-lg leading-8 text-[#6e6e73] sm:text-xl">기초 세미나, 수준별 스터디, 팀 프로젝트가 학기 흐름 안에서 자연스럽게 이어집니다.</p>
+          </div>
+          <div className="mt-10 grid gap-3 sm:grid-cols-2">
+            {activityDetails.map((item, index) => (
+              <article key={item.title} className="group rounded-lg bg-white px-6 py-6 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)]">
+                <div className="mb-5 inline-flex size-9 items-center justify-center rounded-full bg-[#f5f5f7] text-xs font-bold text-[#0066cc]">
+                  {String(index + 1).padStart(2, '0')}
+                </div>
+                <h3 className="text-xl font-semibold text-[#1d1d1f]">{item.title}</h3>
+                <p className="mt-3 leading-7 text-[#6e6e73]">{item.description}</p>
+              </article>
             ))}
           </div>
           {activitiesExpanded && (
-            <div className="space-y-4 border-t border-white/14 pt-5">
-              {activityDetails.map((item) => (
-                <div key={item.title} className="space-y-1.5 border-b border-white/10 pb-4 last:border-b-0 last:pb-0">
-                  <h4 className="text-base font-semibold text-white">{item.title}</h4>
-                  <p className="leading-7 text-white/78">{item.description}</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {activities.map((item) => (
+                <div key={item} className="rounded-lg bg-[#1d1d1f] px-5 py-4 text-sm font-semibold leading-6 text-white">
+                  {item}
                 </div>
               ))}
             </div>
           )}
-          <div className="flex flex-wrap gap-3">
+          <div className="mt-8 flex justify-center">
             <button type="button" onClick={() => setActivitiesExpanded((open) => !open)} className={solidActionBtnClass}>
               {activitiesExpanded ? '활동 요약 보기' : '주요 활동 더 알아보기'}
             </button>
@@ -602,25 +659,30 @@ function HomeView() {
     }
     if (id === 'projects') {
       return (
-        <div className="space-y-6">
-          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-violet-200">Projects Signal</p>
-          <h3 className="text-2xl font-semibold sm:text-3xl">프로젝트</h3>
-          <div className="space-y-4">
-            {projects.map((item) => (
-              <div key={item} className="border-b border-white/10 pb-4 text-white/80 last:border-b-0 last:pb-0">{item}</div>
+        <div className="mx-auto w-full max-w-5xl">
+          <div className="mx-auto max-w-3xl space-y-4 text-center">
+            <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.projects.eyebrow}</p>
+            <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-5xl">아이디어를 서비스로.</h2>
+            <p className="text-lg leading-8 text-[#6e6e73] sm:text-xl">스터디에서 익힌 것을 공식 웹사이트, 교육 프로젝트, 자유 제작으로 이어갑니다.</p>
+          </div>
+          <div className="mt-10 grid gap-3 lg:grid-cols-3">
+            {projectDetails.slice(0, 3).map((item) => (
+              <article key={item.title} className="rounded-lg bg-[#f5f5f7] px-6 py-7 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)]">
+                <h3 className="text-xl font-semibold text-[#1d1d1f]">{item.title}</h3>
+                <p className="mt-3 leading-7 text-[#6e6e73]">{item.description}</p>
+              </article>
             ))}
           </div>
           {projectsExpanded && (
-            <div className="space-y-4 border-t border-white/14 pt-5">
-              {projectDetails.map((item) => (
-                <div key={item.title} className="space-y-1.5 border-b border-white/10 pb-4 last:border-b-0 last:pb-0">
-                  <h4 className="text-base font-semibold text-white">{item.title}</h4>
-                  <p className="leading-7 text-white/78">{item.description}</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {projects.map((item) => (
+                <div key={item} className="rounded-lg bg-white px-5 py-4 text-sm font-semibold leading-6 text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                  {item}
                 </div>
               ))}
             </div>
           )}
-          <div className="flex flex-wrap gap-3">
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
             <button type="button" onClick={() => setProjectsExpanded((open) => !open)} className={solidActionBtnClass}>
               {projectsExpanded ? '프로젝트 요약 보기' : '프로젝트 더 알아보기'}
             </button>
@@ -630,19 +692,22 @@ function HomeView() {
       )
     }
     return (
-      <div className="space-y-6">
-        <p className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Recruit Signal</p>
-        <h3 className="text-2xl font-semibold sm:text-3xl">COM&apos;s 지원하기</h3>
-        <p className="max-w-3xl leading-8 text-white/80">
+      <div className="mx-auto max-w-3xl space-y-4 text-center">
+        <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.recruit.eyebrow}</p>
+        <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-5xl">다음 멤버를 기다립니다.</h2>
+        <p className="mx-auto max-w-2xl text-lg leading-8 text-[#6e6e73] sm:text-xl">
           광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장할 부원을 모집합니다. 개발을
           처음 시작하는 학생도 부담 없이 지원할 수 있습니다.
         </p>
-        <div className="space-y-3 text-sm leading-7 text-white/80">
-          <div>1. 지원 폼 작성</div>
-          <div>2. 내부 확인 후 개별 연락</div>
-          <div>3. 오리엔테이션 및 정기 활동 참여</div>
+        <div className="mx-auto grid max-w-2xl gap-3 pt-4 text-sm font-semibold text-[#1d1d1f] sm:grid-cols-3">
+          {sectionMetrics.recruit.map((item) => (
+            <div key={item.value} className="rounded-lg bg-white px-4 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+              <p className="text-xs text-[#0066cc]">{item.value}</p>
+              <p className="mt-1">{item.label}</p>
+            </div>
+          ))}
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap justify-center gap-3 pt-3">
           <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
             지원서 작성하기
           </button>
@@ -660,11 +725,38 @@ function HomeView() {
 
   const renderSectionPanel = (id) => {
     const meta = sectionMeta[id]
+    const visual = visualDetails[id]
     return (
-      <div className="relative mx-auto flex w-full max-w-5xl items-center justify-center overflow-visible px-4 sm:px-14 lg:px-28">
-        <div data-panel="true" className="relative z-10 w-full overflow-hidden rounded-2xl border border-white/12 shadow-lg" style={{ background: meta.background, boxShadow: `0 24px 80px ${meta.glow}` }}>
-          <div className="px-12 py-8 sm:px-18 sm:py-12 lg:px-20">
+      <div data-panel="true" className="w-full overflow-hidden" style={{ background: meta.background }}>
+        <div className="mx-auto grid min-h-[52svh] max-w-7xl items-center gap-10 px-5 py-12 sm:min-h-[62svh] sm:px-8 sm:py-16 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)] lg:px-10">
+          <div className="flex items-center">
             {renderSectionContent(id)}
+          </div>
+          <div className="flex items-center justify-center">
+            <div className="home-device relative aspect-square w-full max-w-md overflow-hidden rounded-lg ring-1 ring-black/5" style={{ background: meta.visual }}>
+              <div className="absolute inset-0 bg-linear-to-b from-white/30 via-transparent to-black/5" />
+              <div className="absolute inset-x-6 top-6 rounded-lg bg-white/78 px-5 py-4 shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+                <div className="mb-4 flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full bg-[#ff5f57]" />
+                  <span className="size-2.5 rounded-full bg-[#ffbd2e]" />
+                  <span className="size-2.5 rounded-full bg-[#0071e3]" />
+                </div>
+                <p className="text-2xl font-semibold text-[#1d1d1f]">{visual.title}</p>
+                <p className="mt-1 text-sm font-semibold text-[#6e6e73]">{visual.subtitle}</p>
+              </div>
+              <div className="absolute left-1/2 top-1/2 flex size-32 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2rem] bg-white/72 shadow-[0_24px_70px_rgba(0,0,0,0.12)] backdrop-blur-md sm:size-40">
+                <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="home-logo-float w-[68%] object-contain" />
+              </div>
+              <div className="absolute bottom-6 left-6 right-6 space-y-2">
+                {visual.rows.map((row, index) => (
+                  <div key={row} className="flex items-center gap-3 rounded-lg bg-white/76 px-4 py-3 text-sm font-semibold text-[#1d1d1f] shadow-[0_8px_24px_rgba(0,0,0,0.06)] backdrop-blur-xl">
+                    <span className="size-2.5 rounded-full" style={{ backgroundColor: visual.accent }} />
+                    <span>{row}</span>
+                    <span className="ml-auto text-xs text-[#86868b]">{String(index + 1).padStart(2, '0')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -672,39 +764,40 @@ function HomeView() {
   }
 
   return (
-    <div className="relative min-h-screen bg-[var(--theme-bg)] text-[var(--theme-text)] selection:bg-[color-mix(in_srgb,var(--theme-accent)_35%,transparent)] selection:text-[var(--theme-text)]">
-      <BackgroundLayers />
-      <FixedBrackets color={bracketColor} leftX={bracketPositions.leftX} rightX={bracketPositions.rightX} />
+    <div className="relative min-h-screen bg-[#f5f5f7] text-[#1d1d1f] selection:bg-[#0071e3]/20 selection:text-[#1d1d1f]">
 
-      <header className="fixed inset-x-0 top-0 z-60 px-4 pt-4 sm:px-6 lg:px-8">
-        <div className={`${floatingBarBaseClass} relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-5`}>
+      <header className="fixed inset-x-0 top-0 z-60">
+        <div className={`${floatingBarBaseClass} relative mx-auto flex h-12 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8`}>
           <button type="button" onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="flex min-w-0 items-center gap-3 text-left">
-            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="logo-emboss h-11 w-11 shrink-0 object-contain sm:h-12 sm:w-12" />
+            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="h-7 w-7 shrink-0 object-contain" />
             <div className="min-w-0">
-              <p className="hidden text-[10px] font-semibold uppercase tracking-[0.45em] text-[var(--theme-body-muted)] min-[400px]:block">KWANGWOON UNIVERSITY</p>
-              <h1 className="mt-1 whitespace-nowrap text-sm font-semibold text-[var(--theme-title)] sm:text-base">KW COM&apos;s</h1>
+              <h1 className="whitespace-nowrap text-sm font-semibold text-[#1d1d1f]">KW COM&apos;s</h1>
             </div>
           </button>
 
           <nav className="pointer-events-auto absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-6 md:flex">
-            {tabs.map((tab) => (
-              <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]">
-                {tab.label}
-              </button>
-            ))}
-            <button type="button" onClick={goNotices} className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]">Notices</button>
-            <button type="button" onClick={goArchive} disabled={authLoading} className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)] disabled:cursor-wait disabled:opacity-60">Resources</button>
-            <button type="button" onClick={goCommunity} disabled={authLoading} className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)] disabled:cursor-wait disabled:opacity-60">Community</button>
+            {tabs.map((tab) => {
+              const active = activeSection === tab.id
+              return (
+                <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className={`relative px-1 text-xs font-semibold transition ${active ? 'text-[#1d1d1f]' : 'text-[#1d1d1f]/72 hover:text-[#1d1d1f]'}`}>
+                  {tab.label}
+                  <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[#0071e3] transition ${active ? 'opacity-100' : 'opacity-0'}`} />
+                </button>
+              )
+            })}
+            <button type="button" onClick={goNotices} className="px-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:text-[#1d1d1f]">Notices</button>
+            <button type="button" onClick={goArchive} disabled={authLoading} className="px-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:text-[#1d1d1f] disabled:cursor-wait disabled:opacity-60">Resources</button>
+            <button type="button" onClick={goCommunity} disabled={authLoading} className="px-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:text-[#1d1d1f] disabled:cursor-wait disabled:opacity-60">Community</button>
           </nav>
 
           {user ? (
             <div className="ml-auto hidden items-center gap-2 md:flex">
               <NotificationButton />
-              <button type="button" onClick={goChangePassword} className="shape-cut-sm border border-black/10 bg-white/50 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/70" title="계정 설정">{user.name}</button>
+              <button type="button" onClick={goChangePassword} className="rounded-full px-3 py-1.5 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]" title="계정 설정">{user.name}</button>
               {user.role === 'ADMIN' && (
-                <button type="button" onClick={goAdmin} className="shape-cut-sm border border-amber-300/45 bg-amber-100/70 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100">관리자</button>
+                <button type="button" onClick={goAdmin} className="rounded-full px-3 py-1.5 text-xs font-semibold text-[#b45309] transition hover:bg-amber-100/70">관리자</button>
               )}
-              <button type="button" onClick={handleLogout} className="shape-cut-sm inline-flex items-center gap-2 border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78">
+              <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]">
                 <LogOut size={15} />
                 Logout
               </button>
@@ -714,7 +807,7 @@ function HomeView() {
               type="button"
               onClick={() => navigate('/login')}
               disabled={authLoading}
-              className="shape-cut-sm ml-auto inline-flex shrink-0 whitespace-nowrap border border-black/10 bg-white/60 px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78 disabled:cursor-wait disabled:opacity-70 sm:px-4"
+              className="ml-auto hidden shrink-0 whitespace-nowrap rounded-full bg-[#0071e3] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-wait disabled:opacity-70 md:inline-flex"
             >
               로그인
             </button>
@@ -723,7 +816,7 @@ function HomeView() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen((o) => !o)}
-            className={`shape-cut-sm ${user ? 'ml-auto' : 'ml-0'} flex shrink-0 items-center justify-center border border-black/10 bg-white/60 p-2 text-[var(--theme-body-dark)] transition hover:bg-white/78 md:hidden`}
+            className="fixed right-4 top-1.5 z-[70] flex shrink-0 items-center justify-center rounded-full p-2 text-[#1d1d1f] transition hover:bg-black/5 md:hidden"
             aria-label="메뉴"
             aria-expanded={mobileMenuOpen}
             aria-controls="mobile-menu"
@@ -737,7 +830,7 @@ function HomeView() {
           <div
             id="mobile-menu"
             role="menu"
-            className="mx-auto mt-2 max-w-7xl border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] md:hidden"
+            className="mx-auto border-b border-black/10 bg-white/95 shadow-[0_12px_28px_rgba(0,0,0,0.08)] backdrop-blur-xl md:hidden"
           >
             <div className="flex flex-col divide-y divide-black/8">
               {tabs.map((tab) => (
@@ -762,6 +855,11 @@ function HomeView() {
                 <span>Community</span>
                 <span className="ml-auto text-xs text-[var(--theme-body-muted)]">커뮤니티</span>
               </button>
+              {!user && (
+                <button type="button" onClick={() => { navigate('/login'); setMobileMenuOpen(false) }} disabled={authLoading} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[#0066cc] transition hover:bg-white/60 disabled:opacity-50">
+                  <span>로그인</span>
+                </button>
+              )}
               {user && (
                 <div className="border-t border-black/10">
                   <div className="flex flex-col divide-y divide-black/8">
@@ -791,83 +889,107 @@ function HomeView() {
         )}
       </header>
 
-      <aside className="fixed right-3 top-[80%] z-40 hidden -translate-y-1/2 md:block">
-        <div className="flex flex-col gap-2">
-          <SocialLink href="https://www.instagram.com/kw_coms" label="Instagram" icon={Instagram} />
-          <SocialLink href="https://github.com/kw-coms" label="GitHub" icon={Github} />
-          <SocialLink href="https://www.youtube.com/@kw_coms" label="YouTube" icon={Youtube} />
-          <SocialLink href="mailto:kwcoms69@gmail.com" label="Mail" icon={Mail} />
-        </div>
-      </aside>
-
-      <main className="relative mx-auto flex min-h-[100svh] max-w-7xl items-center px-4 py-16 sm:px-6 sm:py-18 lg:px-8">
-        <section className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center text-center">
-          <div className="relative w-full transition-all duration-300 opacity-100">
-            <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center justify-center py-4 sm:py-6">
-              <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-                <SplitLogoCard />
+      <main className="relative overflow-hidden pt-12">
+        <section className="relative flex min-h-[calc(76svh-3rem)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-12 text-center sm:min-h-[calc(86svh-3rem)] sm:py-14">
+          <div className="home-hero-surface absolute inset-0" />
+          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-b from-transparent to-white/85" />
+          <div className="relative z-10 mx-auto max-w-7xl">
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/76 px-4 py-2 text-xs font-semibold text-[#6e6e73] shadow-[0_6px_22px_rgba(0,0,0,0.06)] backdrop-blur-xl">
+              <span className="size-2 rounded-full bg-[#0071e3]" />
+              2026 Semester Ready
+            </div>
+            <div className="relative mx-auto mt-8 flex h-36 w-36 items-center justify-center sm:h-44 sm:w-44">
+              <div className="absolute inset-0 rounded-[2rem] bg-white/88 shadow-[0_24px_70px_rgba(0,0,0,0.1)] ring-1 ring-black/5" />
+              <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="home-logo-float relative z-10 h-24 w-24 object-contain sm:h-32 sm:w-32" />
+              <div className="absolute -left-28 top-8 hidden rounded-lg bg-white/82 px-4 py-3 text-left shadow-[0_16px_40px_rgba(0,0,0,0.09)] backdrop-blur-xl sm:block">
+                <p className="text-xs font-semibold text-[#86868b]">Track</p>
+                <p className="mt-1 text-sm font-semibold text-[#1d1d1f]">Study to Project</p>
               </div>
-              <div className="mt-5 space-y-3">
-                <p className="mx-auto whitespace-nowrap px-2 leading-8 text-white/72 text-[clamp(0.68rem,1.55vw,1.125rem)]">
-                  광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장하는 개발 커뮤니티입니다.
-                </p>
-                <div className="flex flex-wrap justify-center gap-3 pt-3">
-                  <button type="button" onClick={goArchive} disabled={authLoading} className={ghostActionBtnClass}>Resources</button>
-                  <button type="button" onClick={goCommunity} disabled={authLoading} className={ghostActionBtnClass}>Community</button>
+              <div className="absolute -right-28 bottom-8 hidden rounded-lg bg-[#1d1d1f] px-4 py-3 text-left text-white shadow-[0_16px_40px_rgba(0,0,0,0.18)] sm:block">
+                <p className="text-xs font-semibold text-white/58">Mode</p>
+                <p className="mt-1 text-sm font-semibold">Build together</p>
+              </div>
+            </div>
+            <p className="mt-7 text-sm font-semibold text-[#6e6e73]">Kwangwoon University Computer Club</p>
+            <h2 className="mt-2 text-6xl font-semibold leading-[0.9] tracking-normal text-[#1d1d1f] sm:text-8xl lg:text-[8.5rem]">
+              KW COM&apos;s
+            </h2>
+            <p className="mx-auto mt-6 max-w-[19rem] text-lg font-medium leading-8 text-[#6e6e73] sm:max-w-3xl sm:text-2xl">
+              배우고, 만들고, 성장하는 광운대학교 컴퓨터 학술동아리.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <button type="button" onClick={() => openPanel('about')} className={solidActionBtnClass}>더 알아보기</button>
+              <button type="button" onClick={goRecruitPage} className={ghostActionBtnClass}>지원하기</button>
+            </div>
+            {latestNotice && (
+              <button type="button" onClick={goNotices} className="mx-auto mt-7 flex max-w-md items-center gap-2 rounded-full bg-white px-4 py-2 text-left shadow-[0_2px_12px_rgba(0,0,0,0.08)] transition hover:shadow-[0_5px_18px_rgba(0,0,0,0.12)]">
+                <Megaphone size={14} className="shrink-0 text-[#0071e3]" />
+                <span className="truncate text-xs font-semibold text-[#1d1d1f]">{latestNotice.title}</span>
+                <span className="ml-auto shrink-0 text-[10px] font-bold uppercase text-[#0066cc]">공지</span>
+              </button>
+            )}
+            <div className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-2">
+              {experiencePills.map((pill) => (
+                <span key={pill} className="rounded-full bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#6e6e73] shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                  {pill}
+                </span>
+              ))}
+            </div>
+            <div className="mx-auto mt-10 hidden max-w-5xl gap-3 sm:grid sm:grid-cols-3">
+              {heroHighlights.map((item) => (
+                <div key={item.value} className="rounded-lg bg-white px-5 py-5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)]">
+                  <p className="text-xs font-semibold text-[#86868b]">{item.label}</p>
+                  <p className="mt-2 text-xl font-semibold text-[#1d1d1f]">{item.value}</p>
+                  <p className="mt-1 text-sm leading-6 text-[#6e6e73]">{item.detail}</p>
                 </div>
-                {latestNotice && (
-                  <button type="button" onClick={goNotices} className="mx-auto mt-4 flex max-w-sm items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/8 px-4 py-2 text-left transition hover:bg-cyan-300/14">
-                    <Megaphone size={13} className="shrink-0 text-cyan-300" />
-                    <span className="truncate text-xs font-semibold text-cyan-100">{latestNotice.title}</span>
-                    <span className="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wider text-cyan-300/60">공지</span>
-                  </button>
-                )}
-              </div>
+              ))}
             </div>
           </div>
         </section>
-      </main>
 
-      <nav
-        aria-hidden={bottomHidden}
-        className={`${floatingBarBaseClass} fixed inset-x-4 bottom-4 z-50 mx-auto max-w-5xl`}
-        style={{
-          transform: bottomHidden ? 'translateY(48px)' : 'translateY(0)',
-          opacity: bottomHidden ? 0 : 1,
-          pointerEvents: bottomHidden ? 'none' : 'auto',
-          visibility: bottomHidden ? 'hidden' : 'visible',
-          transition: 'transform .35s, opacity .35s, visibility .35s',
-        }}
-      >
-        <div className="grid grid-cols-2 divide-x divide-y divide-black/10 md:grid-cols-4 md:divide-y-0">
-          {tabs.map((tab) => {
-            const active = activeSection === tab.id
-            return (
-              <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className={`flex min-h-24 flex-col items-start justify-center p-4 text-left transition md:min-h-28 ${active ? 'bg-white/88 text-[var(--theme-body-dark)]' : 'bg-white/76 text-[var(--theme-body-mid)] hover:bg-white/84'}`}>
-                <div>
-                  <p className={`text-xs font-semibold uppercase tracking-[0.28em] ${active ? 'text-[var(--theme-body-soft)]/75' : 'text-[var(--theme-body-muted)]/75'}`}>{tab.hint}</p>
-                  <h3 className="mt-2 text-lg font-semibold text-[var(--theme-title)]">{tab.label}</h3>
-                </div>
+        <section className="bg-white px-5 py-3 sm:py-5">
+          <div className="mx-auto grid max-w-7xl gap-3 lg:grid-cols-3">
+            {showcaseItems.map((item, index) => (
+              <button
+                key={item.title}
+                type="button"
+                onClick={() => openPanel(item.target)}
+                className={`group min-h-[13.5rem] rounded-lg px-7 py-7 text-left transition hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(0,0,0,0.1)] ${index === 0 ? 'bg-[#1d1d1f] text-white' : index === 1 ? 'bg-[#f5f5f7] text-[#1d1d1f]' : 'bg-linear-to-br from-[#e8f8ff] to-[#ffffff] text-[#1d1d1f]'}`}
+              >
+                <p className={`text-sm font-semibold ${index === 0 ? 'text-white/58' : 'text-[#0066cc]'}`}>{item.eyebrow}</p>
+                <h3 className="mt-3 text-3xl font-semibold leading-tight tracking-normal">{item.title}</h3>
+                <p className={`mt-4 max-w-sm leading-7 ${index === 0 ? 'text-white/70' : 'text-[#6e6e73]'}`}>{item.body}</p>
+                <span className={`mt-8 inline-flex rounded-full px-4 py-2 text-sm font-semibold ${index === 0 ? 'bg-white text-[#1d1d1f]' : 'bg-[#0071e3] text-white'}`}>더 보기</span>
               </button>
-            )
-          })}
-        </div>
-      </nav>
+            ))}
+          </div>
+        </section>
 
-      <div className="mt-8">
-        <section ref={aboutRef} id="about" className="relative py-24">
-          <div className="mx-auto max-w-5xl px-4">{renderSectionPanel('about')}</div>
+        <section ref={aboutRef} id="about" className="relative">
+          {renderSectionPanel('about')}
         </section>
-        <section ref={activitiesRef} id="activities" className="relative py-24">
-          <div className="mx-auto max-w-5xl px-4">{renderSectionPanel('activities')}</div>
+        <section ref={activitiesRef} id="activities" className="relative">
+          {renderSectionPanel('activities')}
         </section>
-        <section ref={projectsRef} id="projects" className="relative py-24">
-          <div className="mx-auto max-w-5xl px-4">{renderSectionPanel('projects')}</div>
+        <section ref={projectsRef} id="projects" className="relative">
+          {renderSectionPanel('projects')}
         </section>
-        <section ref={recruitRef} id="recruit" className="relative py-24">
-          <div className="mx-auto max-w-5xl px-4">{renderSectionPanel('recruit')}</div>
+        <section ref={recruitRef} id="recruit" className="relative">
+          {renderSectionPanel('recruit')}
         </section>
-      </div>
+
+        <footer className="border-t border-black/10 bg-[#f5f5f7] px-5 py-10 text-sm text-[#6e6e73]">
+          <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <p>Copyright © KW COM&apos;s. All rights reserved.</p>
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              <a href="https://www.instagram.com/kw_coms" target="_blank" rel="noreferrer" className="hover:text-[#1d1d1f]">Instagram</a>
+              <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className="hover:text-[#1d1d1f]">GitHub</a>
+              <a href="https://www.youtube.com/@kw_coms" target="_blank" rel="noreferrer" className="hover:text-[#1d1d1f]">YouTube</a>
+              <a href="mailto:kwcoms69@gmail.com" className="hover:text-[#1d1d1f]">Mail</a>
+            </div>
+          </div>
+        </footer>
+      </main>
     </div>
   )
 }
@@ -876,44 +998,15 @@ function HomeView() {
 
 function PageShell({ children, wide = false, full = false }) {
   return (
-    <div className="relative min-h-screen bg-[var(--theme-bg)] text-[var(--theme-text)]">
-      <BackgroundLayers />
+    <div className="apple-route relative min-h-screen bg-[#f5f5f7] text-[#1d1d1f] selection:bg-[#0071e3]/20 selection:text-[#1d1d1f]">
+      <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white via-[#f5f5f7] to-white" />
       <div className="fixed right-4 top-4 z-50">
         <NotificationButton />
       </div>
-      <main className={`relative mx-auto flex min-h-screen px-4 sm:px-6 ${full ? 'items-start pt-24 pb-16' : 'items-center justify-center py-28'} ${wide ? 'max-w-6xl' : 'max-w-4xl'}`}>
-        <div className={`w-full ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
+      <main className={`relative mx-auto flex min-h-screen px-4 sm:px-6 ${full ? 'items-start pt-20 pb-16' : 'items-center justify-center py-24'} ${wide ? 'max-w-7xl' : 'max-w-4xl'}`}>
+        <div className={`page-transition w-full ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
       </main>
     </div>
-  )
-}
-
-function BackgroundLayers() {
-  return (
-    <div className="pointer-events-none absolute inset-0">
-      <div className="tech-grid absolute inset-0 opacity-100" />
-      <div className="absolute left-[14%] top-[16%] h-72 w-72 rounded-full bg-cyan-300/35 blur-[100px] animate-blob" style={{ animationDelay: '0s', willChange: 'transform' }} />
-      <div className="absolute right-[10%] top-[28%] h-80 w-80 rounded-full bg-rose-300/25 blur-[100px] animate-blob" style={{ animationDelay: '2.8s', willChange: 'transform' }} />
-      <div className="absolute bottom-[10%] left-[42%] h-96 w-96 rounded-full bg-[var(--theme-glow-violet)]/25 blur-[120px] animate-blob" style={{ animationDelay: '5.4s', willChange: 'transform' }} />
-      <div className="absolute left-0 top-[24%] h-px w-full bg-linear-to-r from-transparent via-white/15 to-transparent" />
-      <div className="absolute left-[8%] top-0 h-full w-px bg-linear-to-b from-transparent via-cyan-200/15 to-transparent" />
-      <div className="absolute left-0 top-[68%] h-px w-full bg-linear-to-r from-transparent via-white/10 to-transparent" />
-    </div>
-  )
-}
-
-function SocialLink({ href, label, icon: Icon }) {
-  return (
-    <a
-      href={href}
-      target={href.startsWith('mailto:') ? undefined : '_blank'}
-      rel={href.startsWith('mailto:') ? undefined : 'noreferrer'}
-      className="shape-cut-sm flex items-center gap-2 border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-3 py-2 text-sm text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] transition hover:bg-white"
-      aria-label={label}
-    >
-      <Icon size={16} />
-      <span className="hidden xl:inline">{label}</span>
-    </a>
   )
 }
 

@@ -1464,10 +1464,10 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-lg border border-white/10 bg-white/80 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.12)] sm:p-5">
+    <form onSubmit={submit} className="space-y-3 rounded-lg border border-black/10 bg-white p-4 shadow-[0_18px_45px_rgba(0,0,0,0.08)] sm:p-5">
       <div className="flex flex-wrap gap-2">
         <select value={effectiveCategory} onChange={(e) => setCategory(e.target.value)}
-          className="rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+          className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24"
         >
           {categoryOptions.map((item) => (
             <option key={item.value} value={item.value}>{item.label}</option>
@@ -1477,7 +1477,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
 
       <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={MAX_TITLE_LENGTH}
         placeholder="제목"
-        className="w-full rounded border border-black/15 bg-white px-4 py-3 text-base text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)] sm:text-sm"
+        className="w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:text-sm"
       />
 
       {effectiveCategory === 'ANONYMOUS' && (
@@ -1486,7 +1486,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
           onChange={(e) => setAnonymousName(e.target.value)}
           maxLength={MAX_ANONYMOUS_NAME_LENGTH}
           placeholder="ㅇㅇ"
-          className="w-full rounded border border-black/15 bg-white px-4 py-3 text-base text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)] sm:text-sm"
+          className="w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:text-sm"
         />
       )}
 
@@ -1678,12 +1678,12 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <button type="submit" disabled={saving || !title.trim()}
-          className="min-h-11 rounded bg-[var(--theme-text)] px-5 py-2.5 text-sm font-semibold text-[var(--theme-bg)] disabled:opacity-50 sm:min-h-0"
+          className="min-h-11 rounded-full bg-[#0071e3] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0077ed] disabled:opacity-50 sm:min-h-0"
         >
           {saving ? (savingStep || '저장 중...') : isEditing ? '수정 완료' : '글 등록'}
         </button>
         <button type="button" onClick={onCancel}
-          className="inline-flex min-h-11 items-center justify-center gap-1 rounded border border-black/15 bg-white px-4 py-2.5 text-sm font-semibold text-[var(--theme-body-mid)] sm:min-h-0"
+          className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-[#1d1d1f] sm:min-h-0"
         >
           <X size={14} />취소
         </button>
@@ -1694,12 +1694,12 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
 
 function BoardHeader({ title = "COM's 게시판", children }) {
   return (
-    <div className="border-b border-white/10 bg-black/20 px-4 py-5 sm:px-7">
+    <div className="border-b border-black/10 bg-linear-to-br from-white via-[#f5f5f7] to-[#e8f8ff] px-4 py-5 sm:px-7">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.28em] text-cyan-200">Community</p>
-          <h1 className="mt-2 break-words text-2xl font-black text-white sm:text-4xl">{title}</h1>
-          <p className="mt-2 text-sm leading-6 text-white/60">말머리별로 글을 보고, 게시글은 별도 화면처럼 열립니다.</p>
+          <p className="text-xs font-bold text-[#0066cc]">Community</p>
+          <h1 className="mt-2 break-words text-2xl font-semibold tracking-normal text-[#1d1d1f] sm:text-4xl">{title}</h1>
+          <p className="mt-2 text-sm leading-6 text-[#6e6e73]">말머리별로 글을 보고, 게시글은 별도 화면처럼 열립니다.</p>
         </div>
         {children && <div className="flex w-full shrink-0 sm:w-auto sm:justify-end">{children}</div>}
       </div>
@@ -2073,15 +2073,15 @@ export default function Community({ onBack }) {
 
   const renderPagination = (placement = 'top') => {
     const disabledClass = 'opacity-35'
-    const iconButtonClass = 'shape-cut-sm flex size-10 items-center justify-center border border-white/10 bg-white/8 text-white/68 transition enabled:hover:bg-white/14 disabled:pointer-events-none sm:size-9'
+    const iconButtonClass = 'flex size-10 items-center justify-center rounded-full border border-black/10 bg-white text-[#6e6e73] transition enabled:hover:bg-[#f5f5f7] disabled:pointer-events-none sm:size-9'
 
     return (
       <div className={`flex flex-col gap-3 ${placement === 'bottom' ? 'items-center' : 'lg:flex-row lg:items-center lg:justify-between'}`}>
-        <div className="text-center text-xs font-semibold text-white/48 lg:text-left">
+        <div className="text-center text-xs font-semibold text-[#86868b] lg:text-left">
           {filteredPosts.length > 0
             ? `${showingFrom.toLocaleString('ko-KR')}-${showingTo.toLocaleString('ko-KR')} / ${filteredPosts.length.toLocaleString('ko-KR')}`
             : '0 / 0'}
-          <span className="mx-2 text-white/20">|</span>
+          <span className="mx-2 text-black/20">|</span>
           {page.toLocaleString('ko-KR')} / {totalPages.toLocaleString('ko-KR')} 페이지
         </div>
         <div className="max-w-full overflow-x-auto pb-1">
@@ -2108,16 +2108,16 @@ export default function Community({ onBack }) {
             </button>
             {paginationItems.map((item) => (
               typeof item === 'string' ? (
-                <span key={item} className="flex size-10 items-center justify-center text-sm font-black text-white/32 sm:size-9">...</span>
+                <span key={item} className="flex size-10 items-center justify-center text-sm font-black text-[#86868b] sm:size-9">...</span>
               ) : (
                 <button
                   key={item}
                   type="button"
                   onClick={() => goToPage(item)}
-                  className={`shape-cut-sm flex size-10 items-center justify-center border text-sm font-black transition sm:size-9 ${
+                  className={`flex size-10 items-center justify-center rounded-full border text-sm font-black transition sm:size-9 ${
                     page === item
-                      ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)] text-[var(--theme-bg)] shadow-[0_0_22px_rgba(255,211,105,0.25)]'
-                      : 'border-white/10 bg-white/8 text-white/70 hover:bg-white/14 hover:text-white'
+                      ? 'border-[#0071e3] bg-[#0071e3] text-white shadow-[0_8px_22px_rgba(0,113,227,0.22)]'
+                      : 'border-black/10 bg-white text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]'
                   }`}
                   aria-current={page === item ? 'page' : undefined}
                 >
@@ -2162,20 +2162,20 @@ export default function Community({ onBack }) {
         role="button"
         onClick={open}
         onKeyDown={(event) => openRowWithKeyboard(event, open)}
-        className={`shape-cut-sm cursor-pointer border border-white/10 bg-black/18 p-4 text-left text-white/75 transition hover:bg-white/8 focus:bg-white/10 focus:outline-none ${concept ? 'border-[var(--theme-accent)]/30 bg-[var(--theme-accent)]/8' : ''}`}
+        className={`cursor-pointer rounded-lg border border-black/10 bg-white p-4 text-left text-[#6e6e73] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] focus:bg-[#f5f5f7] focus:outline-none ${concept ? 'border-[#f0c36d] bg-[#fff8e8]' : ''}`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-black">
-              <span className="text-white/38">#{post.id}</span>
-              <span className="shape-cut-sm border border-cyan-200/15 bg-cyan-200/10 px-2 py-1 text-cyan-100">{categoryLabel(post.category || 'GENERAL')}</span>
+              <span className="text-[#86868b]">#{post.id}</span>
+              <span className="rounded-full bg-[#e8f8ff] px-2 py-1 text-[#0066cc]">{categoryLabel(post.category || 'GENERAL')}</span>
               {concept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] text-[#3a2b00]">개념글</span>}
-              {postHasImages(post) && <span className="text-cyan-200">[사진]</span>}
-              {(post.videoInfos?.length > 0) && <span className="text-cyan-200">[영상]</span>}
-              {isEdited(post) && <span className="text-white/42">수정</span>}
+              {postHasImages(post) && <span className="text-[#0066cc]">[사진]</span>}
+              {(post.videoInfos?.length > 0) && <span className="text-[#0066cc]">[영상]</span>}
+              {isEdited(post) && <span className="text-[#86868b]">수정</span>}
               {post.authorAdmin && <span className="rounded bg-red-600 px-1 py-0.5 text-[10px] text-white">주딱</span>}
             </div>
-            <h3 className="mt-2 min-w-0 text-base font-black leading-6 text-white">
+            <h3 className="mt-2 min-w-0 text-base font-black leading-6 text-[#1d1d1f]">
               {renderPostTitleWithCount(post)}
             </h3>
           </div>
@@ -2183,14 +2183,14 @@ export default function Community({ onBack }) {
             <button
               type="button"
               onClick={(event) => handleAdminDeleteFromList(event, post)}
-              className="shape-cut-sm shrink-0 border border-red-300/30 px-2.5 py-1.5 text-[11px] font-black text-red-200 transition hover:bg-red-500/20"
+              className="shrink-0 rounded-full border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-black text-red-700 transition hover:bg-red-100"
             >
               삭제
             </button>
           )}
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-white/48">
-          <span className="min-w-0 truncate text-white/62">{post.authorDisplayName || post.authorName}</span>
+        <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-[#86868b]">
+          <span className="min-w-0 truncate text-[#6e6e73]">{post.authorDisplayName || post.authorName}</span>
           <span className="text-right">{shortDate(post.createdAt)}</span>
           <span>조회 {post.viewCount}</span>
           <span className="text-right">개추 {postScore(post)}</span>
@@ -2364,21 +2364,21 @@ export default function Community({ onBack }) {
     <div className="space-y-4">
       {mode === 'list' && (
         <div className="flex justify-center sm:justify-start">
-          <button type="button" onClick={onBack} className="shape-cut-sm w-full border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white sm:w-auto">
+          <button type="button" onClick={onBack} className="w-full rounded-full border border-black/10 bg-white/80 px-4 py-2.5 text-sm font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-white sm:w-auto">
             메인으로 돌아가기
           </button>
         </div>
       )}
 
-      <section className="overflow-hidden shape-cut border border-white/10 bg-white/5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md">
+      <section className="overflow-hidden rounded-lg border border-black/10 bg-white text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
         {mode === 'list' && (
           <>
             <BoardHeader>
-              <button type="button" onClick={() => setMode('write')} className="shape-cut-sm w-full bg-white/85 px-5 py-3 text-sm font-bold text-[var(--theme-body-dark)] transition hover:bg-white sm:w-auto sm:py-2.5">
+              <button type="button" onClick={() => setMode('write')} className="w-full rounded-full bg-[#0071e3] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#0077ed] sm:w-auto sm:py-2.5">
                 글쓰기
               </button>
             </BoardHeader>
-            <div className="border-b border-white/10 bg-black/18 px-4 py-4 sm:px-7">
+            <div className="border-b border-black/10 bg-[#f5f5f7] px-4 py-4 sm:px-7">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="-mx-1 overflow-x-auto pb-1">
@@ -2391,10 +2391,10 @@ export default function Community({ onBack }) {
                             setActiveCategory(item.value)
                             setPage(1)
                           }}
-                          className={`shape-cut-sm min-h-10 px-4 py-2 transition sm:min-h-9 ${
+                          className={`min-h-10 rounded-full px-4 py-2 transition sm:min-h-9 ${
                             effectiveActiveCategory === item.value
-                              ? 'bg-white text-[var(--theme-body-dark)] shadow-[0_0_18px_rgba(255,255,255,0.12)]'
-                              : 'border border-white/10 bg-white/8 text-white/68 hover:bg-white/14 hover:text-white'
+                              ? 'bg-[#0071e3] text-white'
+                              : 'border border-black/10 bg-white text-[#6e6e73] hover:text-[#1d1d1f]'
                           }`}
                         >
                           {item.label}
@@ -2404,38 +2404,38 @@ export default function Community({ onBack }) {
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <div className="relative flex items-center">
-                      <Search size={15} className="pointer-events-none absolute left-3 text-white/45" />
+                      <Search size={15} className="pointer-events-none absolute left-3 text-[#86868b]" />
                       <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => { setSearchQuery(e.target.value); setPage(1) }}
                         placeholder="제목, 작성자 검색"
-                        className="shape-cut-sm h-11 w-full border border-white/10 bg-black/24 py-2 pl-9 pr-3 text-base text-white placeholder-white/35 outline-none transition focus:border-[var(--theme-accent)] sm:h-10 sm:w-64 sm:text-sm"
+                        className="h-11 w-full rounded-full border border-black/10 bg-white py-2 pl-9 pr-3 text-base text-[#1d1d1f] placeholder:text-[#86868b] outline-none transition focus:ring-2 focus:ring-[#0071e3]/24 sm:h-10 sm:w-64 sm:text-sm"
                       />
                     </div>
-                    <span className="shape-cut-sm border border-white/10 bg-white/8 px-3 py-2 text-center text-xs font-bold text-white/55">
+                    <span className="rounded-full border border-black/10 bg-white px-3 py-2 text-center text-xs font-bold text-[#86868b]">
                       {filteredPosts.length.toLocaleString('ko-KR')}개
                     </span>
                   </div>
                 </div>
-                <div className="border-t border-white/10 pt-4">
+                <div className="border-t border-black/10 pt-4">
                   {renderPagination('top')}
                 </div>
               </div>
             </div>
-            {error && <p className="mx-5 mt-5 shape-cut-sm border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm font-semibold text-red-100 sm:mx-7">{error}</p>}
+            {error && <p className="mx-5 mt-5 rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 sm:mx-7">{error}</p>}
             <div className="m-4 space-y-3 md:hidden">
               {loading && (
-                <div className="shape-cut-sm border border-white/10 bg-black/18 px-4 py-12 text-center text-sm font-semibold text-white/65">불러오는 중...</div>
+                <div className="rounded-lg border border-black/10 bg-white px-4 py-12 text-center text-sm font-semibold text-[#6e6e73]">불러오는 중...</div>
               )}
               {!loading && filteredPosts.length === 0 && (
-                <div className="shape-cut-sm border border-white/10 bg-black/18 px-4 py-12 text-center text-sm font-semibold text-white/65">등록된 글이 없습니다.</div>
+                <div className="rounded-lg border border-black/10 bg-white px-4 py-12 text-center text-sm font-semibold text-[#6e6e73]">등록된 글이 없습니다.</div>
               )}
               {visiblePosts.map(renderPostCard)}
             </div>
-            <div className="m-5 hidden overflow-x-auto shape-cut-sm border border-white/10 bg-black/18 md:block sm:m-7">
+            <div className="m-5 hidden overflow-x-auto rounded-lg border border-black/10 bg-white md:block sm:m-7">
               <table className="w-full min-w-[860px] border-collapse text-sm">
-                <thead className="border-b border-white/10 bg-white/8 text-xs uppercase tracking-[0.16em] text-white/48">
+                <thead className="border-b border-black/10 bg-[#f5f5f7] text-xs uppercase tracking-[0.16em] text-[#86868b]">
                   <tr>
                     <th className="w-20 px-4 py-3 font-semibold">번호</th>
                     <th className="w-24 px-4 py-3 font-semibold">말머리</th>
@@ -2446,12 +2446,12 @@ export default function Community({ onBack }) {
                     <th className="w-20 px-4 py-3 font-semibold">개추</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/10">
+                <tbody className="divide-y divide-black/10">
                   {loading && (
-                    <tr><td colSpan="7" className="px-4 py-16 text-center text-white/65">불러오는 중...</td></tr>
+                    <tr><td colSpan="7" className="px-4 py-16 text-center text-[#6e6e73]">불러오는 중...</td></tr>
                   )}
                   {!loading && filteredPosts.length === 0 && (
-                    <tr><td colSpan="7" className="px-4 py-16 text-center text-white/65">등록된 글이 없습니다.</td></tr>
+                    <tr><td colSpan="7" className="px-4 py-16 text-center text-[#6e6e73]">등록된 글이 없습니다.</td></tr>
                   )}
                   {visiblePosts.map((post) => {
                     const open = () => openPost(post)
@@ -2463,18 +2463,18 @@ export default function Community({ onBack }) {
                       role="button"
                       onClick={open}
                       onKeyDown={(event) => openRowWithKeyboard(event, open)}
-                      className={`cursor-pointer text-white/75 transition hover:bg-white/5 focus:bg-white/10 focus:outline-none ${concept ? 'bg-yellow-200/5' : ''}`}
+                      className={`cursor-pointer text-[#6e6e73] transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none ${concept ? 'bg-yellow-50' : ''}`}
                     >
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{post.id}</td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-cyan-100">{categoryLabel(post.category || 'GENERAL')}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-[#86868b]">{post.id}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-[#0066cc]">{categoryLabel(post.category || 'GENERAL')}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
-                        <span className="flex max-w-full min-w-0 items-center gap-1 text-left font-semibold text-white lg:max-w-[520px]">
+                        <span className="flex max-w-full min-w-0 items-center gap-1 text-left font-semibold text-[#1d1d1f] lg:max-w-[520px]">
                           {concept && <span className="shrink-0 rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
                           {renderPostTitleWithCount(post)}
                         </span>
-                        {postHasImages(post) && <span className="ml-1 text-xs text-cyan-200">[사진]</span>}
-                        {(post.videoInfos?.length > 0) && <span className="ml-1 text-xs text-cyan-200">[영상]</span>}
-                        {isEdited(post) && <span className="ml-1 text-[10px] font-bold text-white/45">수정</span>}
+                        {postHasImages(post) && <span className="ml-1 text-xs text-[#0066cc]">[사진]</span>}
+                        {(post.videoInfos?.length > 0) && <span className="ml-1 text-xs text-[#0066cc]">[영상]</span>}
+                        {isEdited(post) && <span className="ml-1 text-[10px] font-bold text-[#86868b]">수정</span>}
                         {post.authorAdmin && <span className="ml-1 rounded bg-red-600 px-1 py-0.5 text-[10px] font-black text-white">주딱</span>}
                       </td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-semibold">
@@ -2483,13 +2483,13 @@ export default function Community({ onBack }) {
                           <button
                             type="button"
                             onClick={(event) => handleAdminDeleteFromList(event, post)}
-                            className="ml-2 rounded border border-red-300/30 px-2 py-1 text-[10px] font-black text-red-200 hover:bg-red-500/20"
+                            className="ml-2 rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-black text-red-700 hover:bg-red-100"
                           >
                             삭제
                           </button>
                         )}
                       </td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-white/45">{shortDate(post.createdAt)}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-[#86868b]">{shortDate(post.createdAt)}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{post.viewCount}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{postScore(post)}</td>
                     </tr>
@@ -2498,7 +2498,7 @@ export default function Community({ onBack }) {
                 </tbody>
               </table>
             </div>
-            <div className="border-t border-white/10 bg-black/18 px-5 py-4 sm:px-7">
+            <div className="border-t border-black/10 bg-[#f5f5f7] px-5 py-4 sm:px-7">
               {renderPagination('bottom')}
             </div>
           </>
@@ -2507,7 +2507,7 @@ export default function Community({ onBack }) {
         {mode === 'write' && (
           <>
             <BoardHeader title="글쓰기">
-              <button type="button" onClick={backToList} className="shape-cut-sm inline-flex w-full items-center justify-center gap-1 border border-white/10 bg-white/10 px-4 py-3 text-sm font-bold text-white sm:w-auto sm:py-2">
+              <button type="button" onClick={backToList} className="inline-flex w-full items-center justify-center gap-1 rounded-full border border-black/10 bg-white/80 px-4 py-3 text-sm font-bold text-[#1d1d1f] sm:w-auto sm:py-2">
                 <ArrowLeft size={14} />
                 목록
               </button>
@@ -2521,7 +2521,7 @@ export default function Community({ onBack }) {
         {mode === 'edit' && currentPost && (
           <>
             <BoardHeader title="글 수정">
-              <button type="button" onClick={() => setMode('detail')} className="shape-cut-sm inline-flex w-full items-center justify-center gap-1 border border-white/10 bg-white/10 px-4 py-3 text-sm font-bold text-white sm:w-auto sm:py-2">
+              <button type="button" onClick={() => setMode('detail')} className="inline-flex w-full items-center justify-center gap-1 rounded-full border border-black/10 bg-white/80 px-4 py-3 text-sm font-bold text-[#1d1d1f] sm:w-auto sm:py-2">
                 <ArrowLeft size={14} />
                 본문
               </button>
@@ -2535,7 +2535,7 @@ export default function Community({ onBack }) {
         {mode === 'detail' && (
           <>
             <BoardHeader title={detailLoading ? '글 여는 중...' : currentPost?.title || '게시글'}>
-              <button type="button" onClick={backToList} className="shape-cut-sm inline-flex w-full items-center justify-center gap-1 border border-white/10 bg-white/10 px-4 py-3 text-sm font-bold text-white sm:w-auto sm:py-2">
+              <button type="button" onClick={backToList} className="inline-flex w-full items-center justify-center gap-1 rounded-full border border-black/10 bg-white/80 px-4 py-3 text-sm font-bold text-[#1d1d1f] sm:w-auto sm:py-2">
                 <ArrowLeft size={14} />
                 목록
               </button>
@@ -2569,26 +2569,26 @@ export default function Community({ onBack }) {
                   })}
                 </div>
                 <div className="grid grid-cols-2 gap-2 border-y border-black/10 bg-[#fafafa] px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-3 sm:py-5">
-                  <button type="button" onClick={() => handleVote(1)} className={`inline-flex min-h-12 items-center justify-center gap-2 border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === 1 ? 'border-[#3b4890] bg-[#3b4890] text-white' : 'border-black/15 bg-white text-[#3b4890]'}`}>
+                  <button type="button" onClick={() => handleVote(1)} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === 1 ? 'border-[#0071e3] bg-[#0071e3] text-white' : 'border-black/10 bg-white text-[#0066cc]'}`}>
                     <ThumbsUp size={16} />
                     개추 {currentPost.upvotes}
                   </button>
-                  <button type="button" onClick={() => handleVote(-1)} className={`inline-flex min-h-12 items-center justify-center gap-2 border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === -1 ? 'border-red-600 bg-red-600 text-white' : 'border-black/15 bg-white text-red-600'}`}>
+                  <button type="button" onClick={() => handleVote(-1)} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === -1 ? 'border-red-600 bg-red-600 text-white' : 'border-black/10 bg-white text-red-600'}`}>
                     <ThumbsDown size={16} />
                     비추 {currentPost.downvotes}
                   </button>
                 </div>
                 <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:flex-wrap sm:justify-between">
-                  <button type="button" onClick={backToList} className="min-h-11 border border-black/15 bg-white px-4 py-2 text-sm font-bold sm:min-h-0">
+                  <button type="button" onClick={backToList} className="min-h-11 rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-bold sm:min-h-0">
                     목록
                   </button>
                   {currentPost.editable && (
                     <div className="grid grid-cols-2 gap-2 sm:flex">
-                      <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-11 items-center justify-center gap-1 border border-black/15 bg-white px-4 py-2 text-sm font-bold sm:min-h-0">
+                      <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-bold sm:min-h-0">
                         <Pencil size={14} />
                         수정
                       </button>
-                      <button type="button" onClick={() => handleDelete(currentPost)} className="inline-flex min-h-11 items-center justify-center gap-1 border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600 sm:min-h-0">
+                      <button type="button" onClick={() => handleDelete(currentPost)} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600 sm:min-h-0">
                         <Trash2 size={14} />
                         삭제
                       </button>

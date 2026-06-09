@@ -78,7 +78,7 @@
 
 :root {
 	color-scheme: dark;
-	font-family: 'Freesentation', 'Pretendard', 'LexendThin', 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', sans-serif;
 	--theme-bg: #222831;
 	--theme-text: #eeeeee;
 	--theme-accent: #ffd369;
@@ -111,7 +111,7 @@ body {
 	background: var(--theme-bg);
 	color: var(--theme-text);
 	font-family: var(--user-font-family, inherit);
-	font-weight: 100;
+	font-weight: 400;
 }
 
 #root {
@@ -204,9 +204,75 @@ label,
 }
 
 .tech-grid {
-	background-image: linear-gradient(rgba(238, 238, 238, 0.03) 1px, transparent 1px),
-		linear-gradient(90deg, rgba(238, 238, 238, 0.03) 1px, transparent 1px);
-	background-size: 4rem 4rem;
+	background-image: linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+	background-size: 5rem 5rem;
+}
+
+.home-hero-surface {
+	background-image:
+		linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(245, 245, 247, 0.22) 42%, rgba(255, 255, 255, 0.74)),
+		linear-gradient(90deg, transparent 0, rgba(255, 255, 255, 0.68) 50%, transparent 100%);
+}
+
+.home-device {
+	box-shadow:
+		0 34px 85px rgba(0, 0, 0, 0.12),
+		inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+@keyframes home-logo-float {
+	0%,
+	100% {
+		transform: translate3d(0, 0, 0);
+	}
+
+	50% {
+		transform: translate3d(0, -8px, 0);
+	}
+}
+
+.home-logo-float {
+	animation: home-logo-float 7s ease-in-out infinite;
+}
+
+.apple-route .shape-cut,
+.apple-route .shape-cut-sm,
+.apple-route .shape-cut-top {
+	clip-path: none;
+	border-radius: 0.5rem;
+}
+
+.apple-route input,
+.apple-route textarea,
+.apple-route select {
+	letter-spacing: 0;
+}
+
+@keyframes page-transition-in {
+	from {
+		opacity: 0;
+		transform: translate3d(0, 12px, 0);
+	}
+
+	to {
+		opacity: 1;
+		transform: translate3d(0, 0, 0);
+	}
+}
+
+.page-transition {
+	animation: page-transition-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.home-logo-float {
+		animation: none;
+	}
+
+	.page-transition {
+		animation: none;
+	}
 }
 
 .logo-emboss {
