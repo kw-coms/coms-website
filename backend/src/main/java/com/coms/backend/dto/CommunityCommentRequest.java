@@ -5,5 +5,10 @@ import jakarta.validation.constraints.Size;
 
 public record CommunityCommentRequest(
         @NotBlank @Size(max = 1000) String content,
-        Long parentCommentId
-) {}
+        Long parentCommentId,
+        @Size(max = 20) String anonymousName
+) {
+    public CommunityCommentRequest(String content, Long parentCommentId) {
+        this(content, parentCommentId, null);
+    }
+}

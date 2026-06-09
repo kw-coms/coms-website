@@ -48,6 +48,7 @@ const PAGE_SIZE = 30
 const CONCEPT_POST_SCORE_THRESHOLD = 5
 const MAX_TITLE_LENGTH = 120
 const MAX_COMMENT_LENGTH = 1000
+const MAX_ANONYMOUS_NAME_LENGTH = 20
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024
 const MAX_FILE_BYTES = 50 * 1024 * 1024
@@ -1239,7 +1240,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
           const text = e.clipboardData?.getData('text/plain') || ''
           document.execCommand('insertText', false, text)
         }}
-        className="min-h-[420px] w-full whitespace-pre-wrap break-words bg-white px-4 py-5 text-sm leading-7 text-[var(--theme-body-dark)] outline-none sm:px-5"
+        className="min-h-[420px] w-full overflow-x-auto whitespace-pre bg-white px-4 py-5 text-sm leading-7 text-[var(--theme-body-dark)] outline-none sm:px-5"
         placeholder="내용을 입력하세요. 이미지, 동영상을 드래그하거나 툴바에서 삽입할 수 있습니다."
       />
       {dropIndicator && (
@@ -1305,6 +1306,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
   const isEditing = Boolean(initialPost)
   const [title, setTitle] = useState(initialPost?.title || '')
   const [category, setCategory] = useState(initialPost?.category || 'GENERAL')
+  const [anonymousName, setAnonymousName] = useState(initialPost?.anonymousName || '')
   const [externalUrl, setExternalUrl] = useState('')
   const [youtubeQuery, setYoutubeQuery] = useState('')
   const [youtubeResults, setYoutubeResults] = useState([])
@@ -1404,7 +1406,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
       } else {
         setSavingStep('글 등록 중...')
         const placeholder = textContentForSearch(blocks.find(b => b.type === 'text' && textContentForSearch(b.content).trim())?.content || '').trim() || '...'
-        const created = await createCommunityPost({ title: title.trim(), content: placeholder, category: effectiveCategory })
+        const created = await createCommunityPost({ title: title.trim(), content: placeholder, category: effectiveCategory, anonymousName: anonymousName.trim() })
         postId = created.id
       }
 
@@ -1451,7 +1453,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
 
       const removeLegacyImage = Boolean(initialPost?.imageUrl && !uploadedBlocks.some(b => b.legacy))
       setSavingStep('저장 중...')
-      const saved = await updateCommunityPost(postId, { title: title.trim(), content: contentJson, category: effectiveCategory, removeImage: removeLegacyImage })
+      const saved = await updateCommunityPost(postId, { title: title.trim(), content: contentJson, category: effectiveCategory, removeImage: removeLegacyImage, anonymousName: anonymousName.trim() })
       onSave(saved)
     } catch (err) {
       setError(err.message || '저장 중 오류가 발생했습니다.')
@@ -1474,9 +1476,19 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
       </div>
 
       <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={MAX_TITLE_LENGTH}
-        placeholder="제목" readOnly={isEditing}
-        className={`w-full rounded border border-black/15 px-4 py-3 text-base text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)] sm:text-sm ${isEditing ? 'bg-black/5 text-[var(--theme-body-muted)]' : 'bg-white'}`}
+        placeholder="제목"
+        className="w-full rounded border border-black/15 bg-white px-4 py-3 text-base text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)] sm:text-sm"
       />
+
+      {effectiveCategory === 'ANONYMOUS' && (
+        <input
+          value={anonymousName}
+          onChange={(e) => setAnonymousName(e.target.value)}
+          maxLength={MAX_ANONYMOUS_NAME_LENGTH}
+          placeholder="ㅇㅇ"
+          className="w-full rounded border border-black/15 bg-white px-4 py-3 text-base text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)] sm:text-sm"
+        />
+      )}
 
       <div className="overflow-hidden rounded border border-black/15 bg-white">
         <div className="community-editor-toolbar flex flex-wrap items-center gap-2 border-b border-black/10 bg-black/[0.03] px-3 py-2">
@@ -1710,8 +1722,10 @@ export default function Community({ onBack }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [comments, setComments] = useState([])
   const [commentInput, setCommentInput] = useState('')
+  const [commentAnonymousName, setCommentAnonymousName] = useState('')
   const [replyTo, setReplyTo] = useState(null)
   const [replyInput, setReplyInput] = useState('')
+  const [replyAnonymousName, setReplyAnonymousName] = useState('')
   const [replyMentionEnabled, setReplyMentionEnabled] = useState(true)
   const [editingCommentId, setEditingCommentId] = useState(null)
   const [editCommentInput, setEditCommentInput] = useState('')
@@ -1721,6 +1735,7 @@ export default function Community({ onBack }) {
   const boardFilterOptions = useMemo(() => boardFilterOptionsForUser(user), [user])
   const canSeeAnonymous = canAccessAnonymousBoard(user)
   const effectiveActiveCategory = boardFilterOptions.some((item) => item.value === activeCategory) ? activeCategory : 'ALL'
+  const isAnonymousDetail = currentPost?.category === 'ANONYMOUS'
 
   useEffect(() => {
     let mounted = true
@@ -1827,8 +1842,10 @@ export default function Community({ onBack }) {
       setCurrentPost(null)
       setComments([])
       setCommentInput('')
+      setCommentAnonymousName('')
       setReplyTo(null)
       setReplyInput('')
+      setReplyAnonymousName('')
       setReplyMentionEnabled(true)
       setEditingCommentId(null)
       setEditCommentInput('')
@@ -1840,8 +1857,10 @@ export default function Community({ onBack }) {
     setDetailLoading(true)
     setComments([])
     setCommentInput('')
+    setCommentAnonymousName('')
     setReplyTo(null)
     setReplyInput('')
+    setReplyAnonymousName('')
     setReplyMentionEnabled(true)
     setEditingCommentId(null)
     setEditCommentInput('')
@@ -1874,7 +1893,7 @@ export default function Community({ onBack }) {
     if (!commentInput.trim() || !currentPost) return
     setCommentSaving(true)
     try {
-      const comment = await createComment(currentPost.id, commentInput.trim())
+      const comment = await createComment(currentPost.id, commentInput.trim(), null, isAnonymousDetail ? commentAnonymousName.trim() : '')
       setComments((prev) => [...prev, comment])
       bumpCurrentPostCommentCount(1)
       setCommentInput('')
@@ -1891,10 +1910,11 @@ export default function Community({ onBack }) {
     try {
       const content = buildReplyContent(parentId)
       if (!content) return
-      const comment = await createComment(currentPost.id, content, parentId)
+      const comment = await createComment(currentPost.id, content, parentId, isAnonymousDetail ? replyAnonymousName.trim() : '')
       setComments((prev) => [...prev, comment])
       bumpCurrentPostCommentCount(1)
       setReplyInput('')
+      setReplyAnonymousName('')
       setReplyTo(null)
       setReplyMentionEnabled(true)
     } catch (err) {
@@ -2245,6 +2265,7 @@ export default function Community({ onBack }) {
                   onClick={() => {
                     setReplyTo(isReplying ? null : comment.id)
                     setReplyInput('')
+                    setReplyAnonymousName('')
                     setReplyMentionEnabled(true)
                     setEditingCommentId(null)
                     setEditCommentInput('')
@@ -2288,6 +2309,16 @@ export default function Community({ onBack }) {
                     </button>
                   </div>
                 )}
+                {isAnonymousDetail && (
+                  <input
+                    value={replyAnonymousName}
+                    onChange={(e) => setReplyAnonymousName(e.target.value)}
+                    maxLength={MAX_ANONYMOUS_NAME_LENGTH}
+                    placeholder="ㅇㅇ"
+                    className="w-full rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-white sm:text-sm"
+                    disabled={commentSaving}
+                  />
+                )}
                 <textarea
                   value={replyInput}
                   onChange={(e) => setReplyInput(e.target.value)}
@@ -2314,7 +2345,7 @@ export default function Community({ onBack }) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setReplyTo(null); setReplyInput('') }}
+                    onClick={() => { setReplyTo(null); setReplyInput(''); setReplyAnonymousName('') }}
                     className="rounded border border-black/15 bg-white px-3 py-2 text-xs font-bold text-[var(--theme-body-muted)]"
                   >
                     취소
@@ -2577,6 +2608,16 @@ export default function Community({ onBack }) {
                     </div>
                   )}
                   <div className="flex flex-col gap-2 border-t border-black/8 bg-white px-4 py-3">
+                    {isAnonymousDetail && (
+                      <input
+                        value={commentAnonymousName}
+                        onChange={(e) => setCommentAnonymousName(e.target.value)}
+                        maxLength={MAX_ANONYMOUS_NAME_LENGTH}
+                        placeholder="ㅇㅇ"
+                        className="rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-white sm:text-sm"
+                        disabled={commentSaving}
+                      />
+                    )}
                     <textarea
                       value={commentInput}
                       onChange={(e) => setCommentInput(e.target.value)}
