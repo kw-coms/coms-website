@@ -78,7 +78,7 @@
 
 :root {
 	color-scheme: dark;
-	font-family: 'Freesentation', 'Pretendard', 'LexendThin', 'Segoe UI', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', sans-serif;
 	--theme-bg: #222831;
 	--theme-text: #eeeeee;
 	--theme-accent: #ffd369;
@@ -111,7 +111,7 @@ body {
 	background: var(--theme-bg);
 	color: var(--theme-text);
 	font-family: var(--user-font-family, inherit);
-	font-weight: 100;
+	font-weight: 400;
 }
 
 #root {
@@ -204,9 +204,9 @@ label,
 }
 
 .tech-grid {
-	background-image: linear-gradient(rgba(238, 238, 238, 0.03) 1px, transparent 1px),
-		linear-gradient(90deg, rgba(238, 238, 238, 0.03) 1px, transparent 1px);
-	background-size: 4rem 4rem;
+	background-image: linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+	background-size: 5rem 5rem;
 }
 
 .logo-emboss {

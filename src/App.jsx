@@ -5,20 +5,15 @@ import {
   Binary,
   Bell,
   CircuitBoard,
-  Github,
-  Instagram,
   LogOut,
-  Mail,
   Menu,
   Megaphone,
   Rocket,
   Sparkles,
   X,
-  Youtube,
 } from 'lucide-react'
 import { listNotices } from './services/noticeApi.js'
 import { getNotificationSummary, listNotifications, markAllNotificationsRead, markNotificationRead } from './services/notificationApi.js'
-import SplitLogoCard from './components/common/SplitLogoCard.jsx'
 const Archive = lazy(() => import('./pages/Archive.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
 const Signup = lazy(() => import('./pages/Signup.jsx'))
@@ -29,7 +24,6 @@ const ChangePassword = lazy(() => import('./pages/ChangePassword.jsx'))
 const RecruitApply = lazy(() => import('./pages/RecruitApply.jsx'))
 const RecruitNotice = lazy(() => import('./pages/RecruitNotice.jsx'))
 import { getLogoAsset } from './utils/logoAssets.js'
-import FixedBrackets from './components/common/FixedBrackets.jsx'
 import { useAuth } from './contexts/useAuth.js'
 
 const tabs = [
@@ -92,34 +86,30 @@ const projectDetails = [
 
 const sectionMeta = {
   about: {
-    accent: 'text-cyan-100',
-    glow: 'rgba(103, 232, 249, 0.22)',
-    bracket: '#67e8f9',
-    background: 'linear-gradient(135deg, rgba(6,182,212,0.96), rgba(14,165,233,0.92), rgba(34,211,238,0.84))',
+    eyebrow: 'The club',
+    background: '#ffffff',
+    visual: 'linear-gradient(135deg, #e8f8ff, #f5f5f7 55%, #ffffff)',
   },
   activities: {
-    accent: 'text-rose-100',
-    glow: 'rgba(251, 113, 133, 0.22)',
-    bracket: '#fda4af',
-    background: 'linear-gradient(135deg, rgba(236,72,153,0.96), rgba(244,114,182,0.92), rgba(251,113,133,0.84))',
+    eyebrow: 'Learn together',
+    background: '#f5f5f7',
+    visual: 'linear-gradient(135deg, #fff1f4, #eef5ff)',
   },
   projects: {
-    accent: 'text-violet-100',
-    glow: 'rgba(196, 181, 253, 0.22)',
-    bracket: '#c4b5fd',
-    background: 'linear-gradient(135deg, rgba(124,58,237,0.96), rgba(168,85,247,0.92), rgba(139,92,246,0.84))',
+    eyebrow: 'Build for real',
+    background: '#ffffff',
+    visual: 'linear-gradient(135deg, #edf2ff, #f7f0ff)',
   },
   recruit: {
-    accent: 'text-emerald-100',
-    glow: 'rgba(74, 222, 128, 0.22)',
-    bracket: '#6ee7b7',
-    background: 'linear-gradient(135deg, rgba(16,185,129,0.96), rgba(34,197,94,0.92), rgba(52,211,153,0.84))',
+    eyebrow: 'Join COMs',
+    background: '#f5f5f7',
+    visual: 'linear-gradient(135deg, #ecfff5, #f5f5f7 60%, #ffffff)',
   },
 }
 
-const floatingBarBaseClass = 'shape-cut border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)]'
-const solidActionBtnClass = 'shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] transition hover:scale-[1.02]'
-const ghostActionBtnClass = 'shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/20'
+const floatingBarBaseClass = 'border-b border-black/10 bg-white/82 shadow-[0_1px_0_rgba(255,255,255,0.55)] backdrop-blur-xl supports-[backdrop-filter]:bg-white/72'
+const solidActionBtnClass = 'inline-flex min-h-10 items-center justify-center rounded-full bg-[#0071e3] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-wait disabled:opacity-60'
+const ghostActionBtnClass = 'inline-flex min-h-10 items-center justify-center rounded-full border border-[#0071e3]/40 bg-white/70 px-5 py-2.5 text-sm font-semibold text-[#0066cc] transition hover:bg-white disabled:cursor-wait disabled:opacity-60'
 
 // ─── Auth guards ───────────────────────────────────────────────────────────
 
@@ -441,31 +431,15 @@ function HomeView() {
   const { user, loading: authLoading, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [activeSection, setActiveSection] = useState(null)
-  const [bracketPositions, setBracketPositions] = useState({ leftX: null, rightX: null })
+  const [, setActiveSection] = useState(null)
   const aboutRef = useRef(null)
   const activitiesRef = useRef(null)
   const projectsRef = useRef(null)
   const recruitRef = useRef(null)
-  const [bottomHidden, setBottomHidden] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [latestNotice, setLatestNotice] = useState(null)
   const [activitiesExpanded, setActivitiesExpanded] = useState(false)
   const [projectsExpanded, setProjectsExpanded] = useState(false)
-
-  const updateBracketPositions = (sectionId) => {
-    const map = { about: aboutRef, activities: activitiesRef, projects: projectsRef, recruit: recruitRef }
-    const ref = map[sectionId] || aboutRef
-    const sectionEl = ref.current
-    if (!sectionEl) return
-    const panelEl = sectionEl.querySelector?.('[data-panel]') || sectionEl
-    const rect = panelEl.getBoundingClientRect()
-    const gap = 20
-    setBracketPositions({
-      leftX: Math.max(12, Math.round(rect.left - gap)),
-      rightX: Math.round(rect.right + gap),
-    })
-  }
 
   useEffect(() => {
     let rafId = null
@@ -473,8 +447,6 @@ function HomeView() {
       if (rafId !== null) return
       rafId = requestAnimationFrame(() => {
         rafId = null
-        const y = window.scrollY || window.pageYOffset
-        setBottomHidden(y > 120)
         const sections = [
           { id: 'about', ref: aboutRef },
           { id: 'activities', ref: activitiesRef },
@@ -482,7 +454,6 @@ function HomeView() {
           { id: 'recruit', ref: recruitRef },
         ]
         let found = false
-        let foundSectionId = null
         const centerY = window.innerHeight / 2
         for (const s of sections) {
           const sectionEl = s.ref.current
@@ -492,13 +463,11 @@ function HomeView() {
           const isCentered = rect.top <= centerY && rect.bottom >= centerY
           if (isCentered) {
             setActiveSection(s.id)
-            foundSectionId = s.id
             found = true
             break
           }
         }
-        updateBracketPositions(foundSectionId || 'about')
-        if (!found && y < 140) setActiveSection(null)
+        if (!found && (window.scrollY || window.pageYOffset) < 140) setActiveSection(null)
       })
     }
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -529,10 +498,9 @@ function HomeView() {
     const ref = map[id]
     if (ref && ref.current) {
       const rect = ref.current.getBoundingClientRect()
-      const targetY = Math.max(0, window.scrollY + rect.top - (window.innerHeight / 2) + (rect.height / 2))
+      const targetY = Math.max(0, window.scrollY + rect.top - 54)
       window.scrollTo({ top: targetY, behavior: 'smooth' })
       setActiveSection(id)
-      updateBracketPositions(id)
     }
   }
 
@@ -550,23 +518,17 @@ function HomeView() {
   const goRecruitPage = () => navigate('/recruit')
   const locationPath = () => `${location.pathname}${location.search}${location.hash}`
 
-  const bracketColor = activeSection ? sectionMeta[activeSection]?.bracket : sectionMeta.about.bracket
-
   const renderSectionContent = (id) => {
     if (id === 'about') {
       return (
-        <div className="space-y-6">
-          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-cyan-200">About Signal</p>
-          <h3 className="text-2xl font-semibold sm:text-3xl">COM&apos;s는 어떤 동아리인가요?</h3>
-          <p className="max-w-3xl leading-8 text-white/85">
+        <div className="mx-auto max-w-3xl space-y-4 text-center">
+          <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.about.eyebrow}</p>
+          <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-6xl">함께 배우고, 바로 만듭니다.</h2>
+          <p className="mx-auto max-w-2xl text-lg leading-8 text-[#6e6e73] sm:text-xl">
             COM&apos;s는 컴퓨터와 소프트웨어에 관심 있는 광운대학교 학생들이 모여 함께 공부하고 프로젝트를
             진행하는 중앙 컴퓨터 학술동아리입니다.
           </p>
-          <p className="max-w-3xl leading-8 text-white/75">
-            프로그래밍 기초부터 웹 개발, 알고리즘, 아두이노, 프로젝트 협업까지 다양한 활동을 통해 실력을 키우고
-            서로의 성장을 돕습니다.
-          </p>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap justify-center gap-3 pt-2">
             <button type="button" onClick={() => openPanel('recruit')} className={solidActionBtnClass}>지원 화면으로 이동</button>
           </div>
         </div>
@@ -574,25 +536,30 @@ function HomeView() {
     }
     if (id === 'activities') {
       return (
-        <div className="space-y-6">
-          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-rose-200">Activities Signal</p>
-          <h3 className="text-2xl font-semibold sm:text-3xl">주요 활동</h3>
-          <div className="space-y-4">
-            {activities.map((item) => (
-              <div key={item} className="border-b border-white/10 pb-4 text-white/80 last:border-b-0 last:pb-0">{item}</div>
+        <div className="mx-auto w-full max-w-5xl">
+          <div className="mx-auto max-w-3xl space-y-4 text-center">
+            <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.activities.eyebrow}</p>
+            <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-6xl">처음부터 심화까지.</h2>
+            <p className="text-lg leading-8 text-[#6e6e73] sm:text-xl">기초 세미나, 수준별 스터디, 팀 프로젝트가 학기 흐름 안에서 자연스럽게 이어집니다.</p>
+          </div>
+          <div className="mt-10 grid gap-3 sm:grid-cols-2">
+            {activityDetails.map((item) => (
+              <article key={item.title} className="rounded-lg bg-white px-6 py-6 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                <h3 className="text-xl font-semibold text-[#1d1d1f]">{item.title}</h3>
+                <p className="mt-3 leading-7 text-[#6e6e73]">{item.description}</p>
+              </article>
             ))}
           </div>
           {activitiesExpanded && (
-            <div className="space-y-4 border-t border-white/14 pt-5">
-              {activityDetails.map((item) => (
-                <div key={item.title} className="space-y-1.5 border-b border-white/10 pb-4 last:border-b-0 last:pb-0">
-                  <h4 className="text-base font-semibold text-white">{item.title}</h4>
-                  <p className="leading-7 text-white/78">{item.description}</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {activities.map((item) => (
+                <div key={item} className="rounded-lg bg-[#1d1d1f] px-5 py-4 text-sm font-semibold leading-6 text-white">
+                  {item}
                 </div>
               ))}
             </div>
           )}
-          <div className="flex flex-wrap gap-3">
+          <div className="mt-8 flex justify-center">
             <button type="button" onClick={() => setActivitiesExpanded((open) => !open)} className={solidActionBtnClass}>
               {activitiesExpanded ? '활동 요약 보기' : '주요 활동 더 알아보기'}
             </button>
@@ -602,25 +569,30 @@ function HomeView() {
     }
     if (id === 'projects') {
       return (
-        <div className="space-y-6">
-          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-violet-200">Projects Signal</p>
-          <h3 className="text-2xl font-semibold sm:text-3xl">프로젝트</h3>
-          <div className="space-y-4">
-            {projects.map((item) => (
-              <div key={item} className="border-b border-white/10 pb-4 text-white/80 last:border-b-0 last:pb-0">{item}</div>
+        <div className="mx-auto w-full max-w-5xl">
+          <div className="mx-auto max-w-3xl space-y-4 text-center">
+            <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.projects.eyebrow}</p>
+            <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-6xl">아이디어를 서비스로.</h2>
+            <p className="text-lg leading-8 text-[#6e6e73] sm:text-xl">스터디에서 익힌 것을 공식 웹사이트, 교육 프로젝트, 자유 제작으로 이어갑니다.</p>
+          </div>
+          <div className="mt-10 grid gap-3 lg:grid-cols-3">
+            {projectDetails.slice(0, 3).map((item) => (
+              <article key={item.title} className="rounded-lg bg-[#f5f5f7] px-6 py-7 text-center">
+                <h3 className="text-xl font-semibold text-[#1d1d1f]">{item.title}</h3>
+                <p className="mt-3 leading-7 text-[#6e6e73]">{item.description}</p>
+              </article>
             ))}
           </div>
           {projectsExpanded && (
-            <div className="space-y-4 border-t border-white/14 pt-5">
-              {projectDetails.map((item) => (
-                <div key={item.title} className="space-y-1.5 border-b border-white/10 pb-4 last:border-b-0 last:pb-0">
-                  <h4 className="text-base font-semibold text-white">{item.title}</h4>
-                  <p className="leading-7 text-white/78">{item.description}</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {projects.map((item) => (
+                <div key={item} className="rounded-lg bg-white px-5 py-4 text-sm font-semibold leading-6 text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                  {item}
                 </div>
               ))}
             </div>
           )}
-          <div className="flex flex-wrap gap-3">
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
             <button type="button" onClick={() => setProjectsExpanded((open) => !open)} className={solidActionBtnClass}>
               {projectsExpanded ? '프로젝트 요약 보기' : '프로젝트 더 알아보기'}
             </button>
@@ -630,19 +602,19 @@ function HomeView() {
       )
     }
     return (
-      <div className="space-y-6">
-        <p className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Recruit Signal</p>
-        <h3 className="text-2xl font-semibold sm:text-3xl">COM&apos;s 지원하기</h3>
-        <p className="max-w-3xl leading-8 text-white/80">
+      <div className="mx-auto max-w-3xl space-y-4 text-center">
+        <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.recruit.eyebrow}</p>
+        <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-6xl">다음 멤버를 기다립니다.</h2>
+        <p className="mx-auto max-w-2xl text-lg leading-8 text-[#6e6e73] sm:text-xl">
           광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장할 부원을 모집합니다. 개발을
           처음 시작하는 학생도 부담 없이 지원할 수 있습니다.
         </p>
-        <div className="space-y-3 text-sm leading-7 text-white/80">
-          <div>1. 지원 폼 작성</div>
-          <div>2. 내부 확인 후 개별 연락</div>
-          <div>3. 오리엔테이션 및 정기 활동 참여</div>
+        <div className="mx-auto grid max-w-2xl gap-3 pt-4 text-sm font-semibold text-[#1d1d1f] sm:grid-cols-3">
+          <div className="rounded-lg bg-white px-4 py-4">지원 폼 작성</div>
+          <div className="rounded-lg bg-white px-4 py-4">내부 확인</div>
+          <div className="rounded-lg bg-white px-4 py-4">정기 활동 참여</div>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap justify-center gap-3 pt-3">
           <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
             지원서 작성하기
           </button>
@@ -661,10 +633,21 @@ function HomeView() {
   const renderSectionPanel = (id) => {
     const meta = sectionMeta[id]
     return (
-      <div className="relative mx-auto flex w-full max-w-5xl items-center justify-center overflow-visible px-4 sm:px-14 lg:px-28">
-        <div data-panel="true" className="relative z-10 w-full overflow-hidden rounded-2xl border border-white/12 shadow-lg" style={{ background: meta.background, boxShadow: `0 24px 80px ${meta.glow}` }}>
-          <div className="px-12 py-8 sm:px-18 sm:py-12 lg:px-20">
+      <div data-panel="true" className="w-full overflow-hidden" style={{ background: meta.background }}>
+        <div className="mx-auto grid min-h-[52svh] max-w-7xl items-center gap-10 px-5 py-12 sm:min-h-[62svh] sm:px-8 sm:py-16 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)] lg:px-10">
+          <div className="flex items-center">
             {renderSectionContent(id)}
+          </div>
+          <div className="flex items-center justify-center">
+            <div className="relative aspect-square w-full max-w-md overflow-hidden rounded-lg" style={{ background: meta.visual }}>
+              <div className="absolute inset-x-8 top-8 rounded-lg bg-white/80 px-5 py-4 text-center text-sm font-semibold text-[#1d1d1f] shadow-[0_12px_35px_rgba(0,0,0,0.08)]">KW COM&apos;s</div>
+              <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="absolute left-1/2 top-1/2 w-[58%] -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-[0_24px_50px_rgba(0,0,0,0.12)]" />
+              <div className="absolute bottom-8 left-8 right-8 grid grid-cols-3 gap-2">
+                {tabs.slice(0, 3).map((tab) => (
+                  <div key={tab.id} className="rounded-lg bg-white/70 px-3 py-3 text-center text-xs font-semibold text-[#1d1d1f] shadow-[0_8px_24px_rgba(0,0,0,0.06)]">{tab.label}</div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -672,39 +655,36 @@ function HomeView() {
   }
 
   return (
-    <div className="relative min-h-screen bg-[var(--theme-bg)] text-[var(--theme-text)] selection:bg-[color-mix(in_srgb,var(--theme-accent)_35%,transparent)] selection:text-[var(--theme-text)]">
-      <BackgroundLayers />
-      <FixedBrackets color={bracketColor} leftX={bracketPositions.leftX} rightX={bracketPositions.rightX} />
+    <div className="relative min-h-screen bg-[#f5f5f7] text-[#1d1d1f] selection:bg-[#0071e3]/20 selection:text-[#1d1d1f]">
 
-      <header className="fixed inset-x-0 top-0 z-60 px-4 pt-4 sm:px-6 lg:px-8">
-        <div className={`${floatingBarBaseClass} relative mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-5`}>
+      <header className="fixed inset-x-0 top-0 z-60">
+        <div className={`${floatingBarBaseClass} relative mx-auto flex h-12 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8`}>
           <button type="button" onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="flex min-w-0 items-center gap-3 text-left">
-            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="logo-emboss h-11 w-11 shrink-0 object-contain sm:h-12 sm:w-12" />
+            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="h-7 w-7 shrink-0 object-contain" />
             <div className="min-w-0">
-              <p className="hidden text-[10px] font-semibold uppercase tracking-[0.45em] text-[var(--theme-body-muted)] min-[400px]:block">KWANGWOON UNIVERSITY</p>
-              <h1 className="mt-1 whitespace-nowrap text-sm font-semibold text-[var(--theme-title)] sm:text-base">KW COM&apos;s</h1>
+              <h1 className="whitespace-nowrap text-sm font-semibold text-[#1d1d1f]">KW COM&apos;s</h1>
             </div>
           </button>
 
           <nav className="pointer-events-auto absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-6 md:flex">
             {tabs.map((tab) => (
-              <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]">
+              <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className="px-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:text-[#1d1d1f]">
                 {tab.label}
               </button>
             ))}
-            <button type="button" onClick={goNotices} className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)]">Notices</button>
-            <button type="button" onClick={goArchive} disabled={authLoading} className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)] disabled:cursor-wait disabled:opacity-60">Resources</button>
-            <button type="button" onClick={goCommunity} disabled={authLoading} className="px-1 text-sm font-semibold text-[var(--theme-body-dark)]/85 transition hover:text-[var(--theme-body-dark)] disabled:cursor-wait disabled:opacity-60">Community</button>
+            <button type="button" onClick={goNotices} className="px-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:text-[#1d1d1f]">Notices</button>
+            <button type="button" onClick={goArchive} disabled={authLoading} className="px-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:text-[#1d1d1f] disabled:cursor-wait disabled:opacity-60">Resources</button>
+            <button type="button" onClick={goCommunity} disabled={authLoading} className="px-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:text-[#1d1d1f] disabled:cursor-wait disabled:opacity-60">Community</button>
           </nav>
 
           {user ? (
             <div className="ml-auto hidden items-center gap-2 md:flex">
               <NotificationButton />
-              <button type="button" onClick={goChangePassword} className="shape-cut-sm border border-black/10 bg-white/50 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/70" title="계정 설정">{user.name}</button>
+              <button type="button" onClick={goChangePassword} className="rounded-full px-3 py-1.5 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]" title="계정 설정">{user.name}</button>
               {user.role === 'ADMIN' && (
-                <button type="button" onClick={goAdmin} className="shape-cut-sm border border-amber-300/45 bg-amber-100/70 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100">관리자</button>
+                <button type="button" onClick={goAdmin} className="rounded-full px-3 py-1.5 text-xs font-semibold text-[#b45309] transition hover:bg-amber-100/70">관리자</button>
               )}
-              <button type="button" onClick={handleLogout} className="shape-cut-sm inline-flex items-center gap-2 border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78">
+              <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]">
                 <LogOut size={15} />
                 Logout
               </button>
@@ -714,7 +694,7 @@ function HomeView() {
               type="button"
               onClick={() => navigate('/login')}
               disabled={authLoading}
-              className="shape-cut-sm ml-auto inline-flex shrink-0 whitespace-nowrap border border-black/10 bg-white/60 px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78 disabled:cursor-wait disabled:opacity-70 sm:px-4"
+              className="ml-auto hidden shrink-0 whitespace-nowrap rounded-full bg-[#0071e3] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-wait disabled:opacity-70 md:inline-flex"
             >
               로그인
             </button>
@@ -723,7 +703,7 @@ function HomeView() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen((o) => !o)}
-            className={`shape-cut-sm ${user ? 'ml-auto' : 'ml-0'} flex shrink-0 items-center justify-center border border-black/10 bg-white/60 p-2 text-[var(--theme-body-dark)] transition hover:bg-white/78 md:hidden`}
+            className="fixed right-4 top-1.5 z-[70] flex shrink-0 items-center justify-center rounded-full p-2 text-[#1d1d1f] transition hover:bg-black/5 md:hidden"
             aria-label="메뉴"
             aria-expanded={mobileMenuOpen}
             aria-controls="mobile-menu"
@@ -737,7 +717,7 @@ function HomeView() {
           <div
             id="mobile-menu"
             role="menu"
-            className="mx-auto mt-2 max-w-7xl border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] md:hidden"
+            className="mx-auto border-b border-black/10 bg-white/95 shadow-[0_12px_28px_rgba(0,0,0,0.08)] backdrop-blur-xl md:hidden"
           >
             <div className="flex flex-col divide-y divide-black/8">
               {tabs.map((tab) => (
@@ -762,6 +742,11 @@ function HomeView() {
                 <span>Community</span>
                 <span className="ml-auto text-xs text-[var(--theme-body-muted)]">커뮤니티</span>
               </button>
+              {!user && (
+                <button type="button" onClick={() => { navigate('/login'); setMobileMenuOpen(false) }} disabled={authLoading} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[#0066cc] transition hover:bg-white/60 disabled:opacity-50">
+                  <span>로그인</span>
+                </button>
+              )}
               {user && (
                 <div className="border-t border-black/10">
                   <div className="flex flex-col divide-y divide-black/8">
@@ -791,83 +776,69 @@ function HomeView() {
         )}
       </header>
 
-      <aside className="fixed right-3 top-[80%] z-40 hidden -translate-y-1/2 md:block">
-        <div className="flex flex-col gap-2">
-          <SocialLink href="https://www.instagram.com/kw_coms" label="Instagram" icon={Instagram} />
-          <SocialLink href="https://github.com/kw-coms" label="GitHub" icon={Github} />
-          <SocialLink href="https://www.youtube.com/@kw_coms" label="YouTube" icon={Youtube} />
-          <SocialLink href="mailto:kwcoms69@gmail.com" label="Mail" icon={Mail} />
-        </div>
-      </aside>
-
-      <main className="relative mx-auto flex min-h-[100svh] max-w-7xl items-center px-4 py-16 sm:px-6 sm:py-18 lg:px-8">
-        <section className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center text-center">
-          <div className="relative w-full transition-all duration-300 opacity-100">
-            <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center justify-center py-4 sm:py-6">
-              <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-                <SplitLogoCard />
-              </div>
-              <div className="mt-5 space-y-3">
-                <p className="mx-auto whitespace-nowrap px-2 leading-8 text-white/72 text-[clamp(0.68rem,1.55vw,1.125rem)]">
-                  광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장하는 개발 커뮤니티입니다.
-                </p>
-                <div className="flex flex-wrap justify-center gap-3 pt-3">
-                  <button type="button" onClick={goArchive} disabled={authLoading} className={ghostActionBtnClass}>Resources</button>
-                  <button type="button" onClick={goCommunity} disabled={authLoading} className={ghostActionBtnClass}>Community</button>
+      <main className="relative overflow-hidden pt-12">
+        <section className="relative flex min-h-[calc(70svh-3rem)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-12 text-center sm:min-h-[calc(84svh-3rem)] sm:py-14">
+          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-b from-transparent to-white/70" />
+          <div className="relative z-10 mx-auto max-w-6xl">
+            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="mx-auto h-24 w-24 object-contain sm:h-32 sm:w-32" />
+            <p className="mt-6 text-sm font-semibold text-[#6e6e73]">Kwangwoon University Computer Club</p>
+            <h2 className="mt-2 text-[clamp(3.4rem,11vw,8.5rem)] font-semibold leading-[0.9] tracking-normal text-[#1d1d1f]">
+              KW COM&apos;s
+            </h2>
+            <p className="mx-auto mt-6 max-w-[19rem] text-lg font-medium leading-8 text-[#6e6e73] sm:max-w-3xl sm:text-2xl">
+              배우고, 만들고, 성장하는 광운대학교 컴퓨터 학술동아리.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <button type="button" onClick={() => openPanel('about')} className={solidActionBtnClass}>더 알아보기</button>
+              <button type="button" onClick={goRecruitPage} className={ghostActionBtnClass}>지원하기</button>
+            </div>
+            {latestNotice && (
+              <button type="button" onClick={goNotices} className="mx-auto mt-7 flex max-w-md items-center gap-2 rounded-full bg-white px-4 py-2 text-left shadow-[0_2px_12px_rgba(0,0,0,0.08)] transition hover:shadow-[0_5px_18px_rgba(0,0,0,0.12)]">
+                <Megaphone size={14} className="shrink-0 text-[#0071e3]" />
+                <span className="truncate text-xs font-semibold text-[#1d1d1f]">{latestNotice.title}</span>
+                <span className="ml-auto shrink-0 text-[10px] font-bold uppercase text-[#0066cc]">공지</span>
+              </button>
+            )}
+            <div className="mx-auto mt-10 hidden max-w-4xl gap-3 sm:grid sm:grid-cols-3">
+              {[
+                ['Seminar', '매주 이어지는 기초와 심화'],
+                ['Study', '관심 분야별 함께 학습'],
+                ['Project', '실제로 쓰이는 결과물 제작'],
+              ].map(([title, body]) => (
+                <div key={title} className="rounded-lg bg-white px-5 py-5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                  <p className="text-lg font-semibold text-[#1d1d1f]">{title}</p>
+                  <p className="mt-1 text-sm leading-6 text-[#6e6e73]">{body}</p>
                 </div>
-                {latestNotice && (
-                  <button type="button" onClick={goNotices} className="mx-auto mt-4 flex max-w-sm items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/8 px-4 py-2 text-left transition hover:bg-cyan-300/14">
-                    <Megaphone size={13} className="shrink-0 text-cyan-300" />
-                    <span className="truncate text-xs font-semibold text-cyan-100">{latestNotice.title}</span>
-                    <span className="ml-auto shrink-0 text-[10px] font-bold uppercase tracking-wider text-cyan-300/60">공지</span>
-                  </button>
-                )}
-              </div>
+              ))}
             </div>
           </div>
         </section>
+
+        <section ref={aboutRef} id="about" className="relative">
+          {renderSectionPanel('about')}
+        </section>
+        <section ref={activitiesRef} id="activities" className="relative">
+          {renderSectionPanel('activities')}
+        </section>
+        <section ref={projectsRef} id="projects" className="relative">
+          {renderSectionPanel('projects')}
+        </section>
+        <section ref={recruitRef} id="recruit" className="relative">
+          {renderSectionPanel('recruit')}
+        </section>
+
+        <footer className="border-t border-black/10 bg-[#f5f5f7] px-5 py-10 text-sm text-[#6e6e73]">
+          <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <p>Copyright © KW COM&apos;s. All rights reserved.</p>
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              <a href="https://www.instagram.com/kw_coms" target="_blank" rel="noreferrer" className="hover:text-[#1d1d1f]">Instagram</a>
+              <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className="hover:text-[#1d1d1f]">GitHub</a>
+              <a href="https://www.youtube.com/@kw_coms" target="_blank" rel="noreferrer" className="hover:text-[#1d1d1f]">YouTube</a>
+              <a href="mailto:kwcoms69@gmail.com" className="hover:text-[#1d1d1f]">Mail</a>
+            </div>
+          </div>
+        </footer>
       </main>
-
-      <nav
-        aria-hidden={bottomHidden}
-        className={`${floatingBarBaseClass} fixed inset-x-4 bottom-4 z-50 mx-auto max-w-5xl`}
-        style={{
-          transform: bottomHidden ? 'translateY(48px)' : 'translateY(0)',
-          opacity: bottomHidden ? 0 : 1,
-          pointerEvents: bottomHidden ? 'none' : 'auto',
-          visibility: bottomHidden ? 'hidden' : 'visible',
-          transition: 'transform .35s, opacity .35s, visibility .35s',
-        }}
-      >
-        <div className="grid grid-cols-2 divide-x divide-y divide-black/10 md:grid-cols-4 md:divide-y-0">
-          {tabs.map((tab) => {
-            const active = activeSection === tab.id
-            return (
-              <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className={`flex min-h-24 flex-col items-start justify-center p-4 text-left transition md:min-h-28 ${active ? 'bg-white/88 text-[var(--theme-body-dark)]' : 'bg-white/76 text-[var(--theme-body-mid)] hover:bg-white/84'}`}>
-                <div>
-                  <p className={`text-xs font-semibold uppercase tracking-[0.28em] ${active ? 'text-[var(--theme-body-soft)]/75' : 'text-[var(--theme-body-muted)]/75'}`}>{tab.hint}</p>
-                  <h3 className="mt-2 text-lg font-semibold text-[var(--theme-title)]">{tab.label}</h3>
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      </nav>
-
-      <div className="mt-8">
-        <section ref={aboutRef} id="about" className="relative py-24">
-          <div className="mx-auto max-w-5xl px-4">{renderSectionPanel('about')}</div>
-        </section>
-        <section ref={activitiesRef} id="activities" className="relative py-24">
-          <div className="mx-auto max-w-5xl px-4">{renderSectionPanel('activities')}</div>
-        </section>
-        <section ref={projectsRef} id="projects" className="relative py-24">
-          <div className="mx-auto max-w-5xl px-4">{renderSectionPanel('projects')}</div>
-        </section>
-        <section ref={recruitRef} id="recruit" className="relative py-24">
-          <div className="mx-auto max-w-5xl px-4">{renderSectionPanel('recruit')}</div>
-        </section>
-      </div>
     </div>
   )
 }
@@ -891,29 +862,11 @@ function PageShell({ children, wide = false, full = false }) {
 function BackgroundLayers() {
   return (
     <div className="pointer-events-none absolute inset-0">
-      <div className="tech-grid absolute inset-0 opacity-100" />
-      <div className="absolute left-[14%] top-[16%] h-72 w-72 rounded-full bg-cyan-300/35 blur-[100px] animate-blob" style={{ animationDelay: '0s', willChange: 'transform' }} />
-      <div className="absolute right-[10%] top-[28%] h-80 w-80 rounded-full bg-rose-300/25 blur-[100px] animate-blob" style={{ animationDelay: '2.8s', willChange: 'transform' }} />
-      <div className="absolute bottom-[10%] left-[42%] h-96 w-96 rounded-full bg-[var(--theme-glow-violet)]/25 blur-[120px] animate-blob" style={{ animationDelay: '5.4s', willChange: 'transform' }} />
-      <div className="absolute left-0 top-[24%] h-px w-full bg-linear-to-r from-transparent via-white/15 to-transparent" />
-      <div className="absolute left-[8%] top-0 h-full w-px bg-linear-to-b from-transparent via-cyan-200/15 to-transparent" />
-      <div className="absolute left-0 top-[68%] h-px w-full bg-linear-to-r from-transparent via-white/10 to-transparent" />
+      <div className="absolute inset-0 bg-linear-to-b from-[#222831] via-[#20252d] to-[#171b21]" />
+      <div className="tech-grid absolute inset-0 opacity-45" />
+      <div className="absolute left-0 top-[24%] h-px w-full bg-linear-to-r from-transparent via-white/12 to-transparent" />
+      <div className="absolute left-0 top-[68%] h-px w-full bg-linear-to-r from-transparent via-white/8 to-transparent" />
     </div>
-  )
-}
-
-function SocialLink({ href, label, icon: Icon }) {
-  return (
-    <a
-      href={href}
-      target={href.startsWith('mailto:') ? undefined : '_blank'}
-      rel={href.startsWith('mailto:') ? undefined : 'noreferrer'}
-      className="shape-cut-sm flex items-center gap-2 border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-3 py-2 text-sm text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] transition hover:bg-white"
-      aria-label={label}
-    >
-      <Icon size={16} />
-      <span className="hidden xl:inline">{label}</span>
-    </a>
   )
 }
 
