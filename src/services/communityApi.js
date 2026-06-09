@@ -14,6 +14,7 @@ export async function createCommunityPost(body, image) {
     form.append('title', body.title)
     form.append('content', body.content)
     form.append('category', body.category || 'GENERAL')
+    form.append('anonymousName', body.anonymousName || '')
     form.append('image', image)
     return request('/api/community/posts', {
       method: 'POST',
@@ -34,6 +35,7 @@ export async function updateCommunityPost(id, body, image) {
     form.append('content', body.content)
     form.append('category', body.category || 'GENERAL')
     form.append('removeImage', body.removeImage ? 'true' : 'false')
+    form.append('anonymousName', body.anonymousName || '')
     form.append('image', image)
     return request(`/api/community/posts/${id}`, {
       method: 'PATCH',
@@ -121,10 +123,10 @@ export async function listComments(postId) {
   return request(`/api/community/posts/${postId}/comments`)
 }
 
-export async function createComment(postId, content, parentCommentId = null) {
+export async function createComment(postId, content, parentCommentId = null, anonymousName = '') {
   return request(`/api/community/posts/${postId}/comments`, {
     method: 'POST',
-    body: JSON.stringify({ content, parentCommentId }),
+    body: JSON.stringify({ content, parentCommentId, anonymousName }),
   })
 }
 
