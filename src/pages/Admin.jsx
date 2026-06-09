@@ -321,7 +321,7 @@ function RosterTab() {
             {adding ? '추가 중...' : '추가'}
           </button>
         </form>
-        {addResult && <p className="mt-2 text-xs font-semibold text-emerald-700">{addResult}</p>}
+        {addResult && <p className="mt-2 text-xs font-semibold text-[#0066cc]">{addResult}</p>}
         {addError && <p className="mt-2 text-xs font-semibold text-red-600">{addError}</p>}
       </div>
 
@@ -387,7 +387,7 @@ function RosterTab() {
                             <input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} maxLength={11} placeholder="01012345678" className={`${inputCls} w-36`} />
                           </div>
                           <div className="flex items-end gap-2 self-end pb-px">
-                            <button type="button" onClick={() => handleEditSave(member.id)} disabled={editSaving} className="shape-cut-sm bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">저장</button>
+                            <button type="button" onClick={() => handleEditSave(member.id)} disabled={editSaving} className="shape-cut-sm bg-[#0071e3] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0077ed] disabled:opacity-50">저장</button>
                             <button type="button" onClick={() => setEditingId(null)} className="text-xs font-semibold text-[var(--theme-body-muted)] hover:underline">취소</button>
                           </div>
                         </div>
@@ -438,7 +438,7 @@ function RosterTab() {
         </button>
 
         {result && (
-          <p className="mt-3 shape-cut-sm bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-700">
+          <p className="mt-3 shape-cut-sm bg-[#e8f3ff] px-4 py-3 text-sm font-semibold text-[#0066cc]">
             {result.message} 가져온 행: {result.imported}, 건너뜀: {result.skipped}
           </p>
         )}
@@ -776,7 +776,7 @@ function FontsTab() {
               <button
                 type="button"
                 onClick={() => toggle(font)}
-                className={`shape-cut-sm px-3 py-1.5 text-xs font-bold ${font.active ? 'bg-emerald-100 text-emerald-700' : 'bg-black/10 text-[var(--theme-body-muted)]'}`}
+                className={`shape-cut-sm px-3 py-1.5 text-xs font-bold ${font.active ? 'bg-[#e8f3ff] text-[#0066cc]' : 'bg-black/10 text-[var(--theme-body-muted)]'}`}
               >
                 {font.active ? '활성' : '비활성'}
               </button>

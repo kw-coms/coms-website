@@ -17,8 +17,8 @@ const initialForm = {
 }
 
 const inputClass =
-  'w-full shape-cut-sm border border-black/10 bg-white/70 px-4 py-3 text-[15px] text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/60 transition focus:bg-white focus:ring-2 focus:ring-emerald-300/60'
-const labelClass = 'mb-2 block text-sm font-semibold text-[var(--theme-body-dark)]'
+  'w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-[15px] text-[#1d1d1f] outline-none placeholder:text-[#86868b] transition focus:ring-2 focus:ring-[#0071e3]/24'
+const labelClass = 'mb-2 block text-sm font-semibold text-[#1d1d1f]'
 
 export default function RecruitApply({ onBack }) {
   const [form, setForm] = useState(initialForm)
@@ -106,29 +106,29 @@ export default function RecruitApply({ onBack }) {
       <button
         type="button"
         onClick={onBack}
-        className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15"
+        className="rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-white"
       >
         메인으로 돌아가기
       </button>
 
-      <section className="shape-cut overflow-hidden border border-white/10 bg-white/5 text-[var(--theme-text)] shadow-[0_22px_70px_rgba(255,255,255,0.12)] backdrop-blur-md">
-        <div className="border-b border-white/10 bg-emerald-300/8 px-6 py-6 sm:px-8">
-          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-emerald-200">Recruit</p>
-          <h1 className="mt-4 text-3xl font-semibold leading-tight sm:text-5xl">COM&apos;s 지원하기</h1>
-          <p className="mt-4 max-w-3xl leading-7 text-white/72">
+      <section className="overflow-hidden rounded-lg border border-black/10 bg-white text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
+        <div className="border-b border-black/10 bg-linear-to-br from-[#e8f3ff] via-white to-[#f5f5f7] px-6 py-7 sm:px-8">
+          <p className="text-sm font-semibold text-[#0066cc]">Recruit</p>
+          <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-normal sm:text-5xl">COM&apos;s 지원하기</h1>
+          <p className="mt-4 max-w-3xl leading-7 text-[#6e6e73]">
             로그인 없이 지원서를 작성할 수 있습니다. 작성한 내용은 웹페이지에서 바로 COM&apos;s 공식 메일로 제출됩니다.
           </p>
         </div>
 
         <div className="grid gap-0 lg:grid-cols-[1fr_320px]">
-          <form onSubmit={handleSubmit} className="grid gap-5 bg-[var(--theme-surface-96)] p-6 text-[var(--theme-body-dark)] sm:p-8">
+          <form onSubmit={handleSubmit} className="grid gap-5 bg-white p-6 text-[#1d1d1f] sm:p-8">
             <div className="flex items-center gap-3">
-              <div className="shape-cut-sm flex size-11 items-center justify-center bg-emerald-100 text-emerald-700">
+              <div className="flex size-11 items-center justify-center rounded-lg bg-[#e8f3ff] text-[#0066cc]">
                 <UserRound size={20} />
               </div>
               <div>
                 <h2 className="text-xl font-bold">지원서 양식</h2>
-                <p className="text-sm text-[var(--theme-body-muted)]">기본 정보와 지원 동기를 작성해주세요.</p>
+                <p className="text-sm text-[#6e6e73]">기본 정보와 지원 동기를 작성해주세요.</p>
               </div>
             </div>
 
@@ -191,8 +191,8 @@ export default function RecruitApply({ onBack }) {
                     onClick={() => toggleInterest(option)}
                     className={`shape-cut-sm px-4 py-2 text-sm font-semibold transition ${
                       interests.includes(option)
-                        ? 'bg-[var(--theme-body-dark)] text-white'
-                        : 'border border-black/10 bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/90'
+                        ? 'bg-[#0071e3] text-white'
+                        : 'border border-black/10 bg-[#f5f5f7] text-[#1d1d1f] hover:bg-white'
                     }`}
                   >
                     {option}
@@ -228,11 +228,11 @@ export default function RecruitApply({ onBack }) {
             </div>
 
             {error && (
-              <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>
+              <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>
             )}
 
             {submitted && (
-              <p className="shape-cut-sm flex items-center gap-2 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-700">
+              <p className="flex items-center gap-2 rounded-lg bg-[#e8f3ff] px-4 py-3 text-sm font-semibold text-[#0066cc]">
                 <CheckCircle2 size={16} />
                 지원서가 제출되었습니다. 확인 후 개별 연락드리겠습니다.
               </p>
@@ -241,36 +241,36 @@ export default function RecruitApply({ onBack }) {
             <button
               type="submit"
               disabled={loading}
-              className="shape-cut-sm inline-flex w-full items-center justify-center gap-2 bg-[var(--theme-body-dark)] px-4 py-3 text-base font-semibold text-white transition hover:bg-[var(--theme-body-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 py-3 text-base font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Send size={17} />
               {loading ? '제출 중...' : '지원서 제출하기'}
             </button>
           </form>
 
-          <aside className="flex flex-col justify-between gap-8 bg-emerald-950/22 p-6 sm:p-8">
+          <aside className="flex flex-col justify-between gap-8 bg-[#f5f5f7] p-6 sm:p-8">
             <div className="space-y-6">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.28em] text-emerald-200">Process</p>
-                <div className="mt-4 space-y-3 text-sm leading-6 text-white/78">
+                <p className="text-sm font-semibold text-[#0066cc]">Process</p>
+                <div className="mt-4 space-y-3 text-sm leading-6 text-[#6e6e73]">
                   <p>1. 지원서 작성</p>
                   <p>2. 웹페이지에서 바로 제출</p>
                   <p>3. 내부 검토 후 개별 연락</p>
                 </div>
               </div>
 
-              <div className="shape-cut-sm border border-white/10 bg-white/8 p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-emerald-100">
+              <div className="rounded-lg border border-black/10 bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[#1d1d1f]">
                   <Mail size={16} />
                   문의
                 </div>
-                <a href="mailto:kwcoms69@gmail.com" className="mt-2 block break-all text-sm text-white/75 hover:text-white">
+                <a href="mailto:kwcoms69@gmail.com" className="mt-2 block break-all text-sm text-[#0066cc] hover:text-[#0077ed]">
                   kwcoms69@gmail.com
                 </a>
               </div>
             </div>
 
-            <p className="text-xs leading-5 text-white/52">
+            <p className="text-xs leading-5 text-[#86868b]">
               제출 전 연락처와 이메일을 다시 확인해주세요. 제출 내용에 대한 연락은 작성한 연락처로 진행됩니다.
             </p>
           </aside>

@@ -19,17 +19,17 @@ const GENERATION_PATTERN = /^\d{1,3}$/
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/
 
 const inputClass =
-  'w-full min-h-12 min-w-0 shape-cut-sm border border-black/10 bg-white/70 px-4 py-3 text-base text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/60 transition focus:bg-white focus:ring-2 focus:ring-[var(--theme-accent)]/50'
+  'w-full min-h-12 min-w-0 rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f] outline-none placeholder:text-[#86868b] transition focus:ring-2 focus:ring-[#0071e3]/24'
 const textareaClass =
-  'w-full min-w-0 shape-cut-sm resize-none border border-black/10 bg-white/70 px-4 py-3 text-base text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/60 transition focus:bg-white focus:ring-2 focus:ring-[var(--theme-accent)]/50'
-const labelClass = 'mb-2 block text-sm font-semibold text-[var(--theme-body-dark)]'
+  'w-full min-w-0 rounded-lg resize-none border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f] outline-none placeholder:text-[#86868b] transition focus:ring-2 focus:ring-[#0071e3]/24'
+const labelClass = 'mb-2 block text-sm font-semibold text-[#1d1d1f]'
 const fieldGridClass = 'grid min-w-0 gap-3 sm:gap-4 md:grid-cols-2'
 
 function choiceButtonClass(active) {
-  return `shape-cut-sm min-h-11 px-4 py-2 text-sm font-semibold transition ${
+  return `min-h-11 rounded-lg px-4 py-2 text-sm font-semibold transition ${
     active
-      ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]'
-      : 'border border-black/10 bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/80'
+      ? 'bg-[#0071e3] text-white'
+      : 'border border-black/10 bg-[#f5f5f7] text-[#1d1d1f] hover:bg-white'
   }`
 }
 
@@ -72,10 +72,10 @@ function SignupTypeSelector({ value, onChange }) {
           type="button"
           onClick={() => onChange(type.id)}
           aria-pressed={value === type.id}
-          className={`shape-cut-sm min-h-12 px-4 py-3 text-sm font-semibold transition ${
+          className={`min-h-12 rounded-lg px-4 py-3 text-sm font-semibold transition ${
             value === type.id
-              ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]'
-              : 'border border-black/10 bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/80'
+              ? 'bg-[#0071e3] text-white'
+              : 'border border-black/10 bg-[#f5f5f7] text-[#1d1d1f] hover:bg-white'
           }`}
         >
           {type.label}
@@ -259,12 +259,12 @@ export default function Signup({ onBack }) {
         : "COM's 명부 확인 후 관심 분야와 포부를 함께 등록합니다."
 
   return (
-    <main className="w-full px-0 pb-6 pt-0 text-[var(--theme-text)] sm:pb-8">
-      <section className="shape-cut mx-auto grid w-full max-w-[1120px] gap-5 bg-[var(--theme-surface-96)] p-4 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-3xl sm:p-7 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-9 lg:p-8">
+    <main className="w-full px-0 pb-6 pt-0 text-[#1d1d1f] sm:pb-8">
+      <section className="mx-auto grid w-full max-w-[1120px] gap-5 rounded-lg border border-black/10 bg-white p-4 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:p-7 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-9 lg:p-8">
         <div className="min-w-0 lg:sticky lg:top-8 lg:self-start">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.28em] text-[var(--theme-body-muted)]/80">Signup</p>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{stepTitle}</h1>
-          <p className="mt-3 text-sm leading-6 text-[var(--theme-body-muted)] sm:text-base sm:leading-7">{stepDesc}</p>
+          <p className="mb-2 text-xs font-semibold text-[#0066cc]">Signup</p>
+          <h1 className="text-2xl font-semibold tracking-normal sm:text-3xl">{stepTitle}</h1>
+          <p className="mt-3 text-sm leading-6 text-[#6e6e73] sm:text-base sm:leading-7">{stepDesc}</p>
         </div>
 
         <div className="min-w-0">
@@ -296,7 +296,7 @@ export default function Signup({ onBack }) {
               </div>
 
               {isGraduateSignup && (
-                <div className="shape-cut-sm grid min-w-0 gap-3 border border-cyan-300/20 bg-cyan-300/8 p-4 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
+                <div className="grid min-w-0 gap-3 rounded-lg border border-black/10 bg-[#f5f5f7] p-4 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
                   <div>
                     <label className={labelClass} htmlFor="graduateVerificationType">졸업생 인증 방식</label>
                     <select
@@ -378,14 +378,12 @@ export default function Signup({ onBack }) {
                 </div>
               )}
 
-              {error && (
-                <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>
-              )}
+              {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
 
               <button
                 type="submit"
                 disabled={loading}
-                className="shape-cut-sm mt-1 min-h-12 w-full bg-white/70 px-4 py-3 text-base font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-1 min-h-12 w-full rounded-lg bg-[#0071e3] px-4 py-3 text-base font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? '가입 처리 중...' : isGraduateSignup ? '졸업생 회원가입' : '회원가입'}
               </button>
@@ -402,14 +400,14 @@ export default function Signup({ onBack }) {
 
           {step === 'done' && (
             <div className="space-y-5 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 text-3xl">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#e8f3ff] text-3xl text-[#0066cc]">
                 ✓
               </div>
-              <p className="text-base font-semibold text-emerald-700">이메일 인증이 완료되었습니다!</p>
+              <p className="text-base font-semibold text-[#0066cc]">이메일 인증이 완료되었습니다!</p>
               <button
                 type="button"
                 onClick={onBack}
-                className="shape-cut-sm inline-block w-full bg-white/70 px-4 py-3 text-base font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/90"
+                className="inline-block w-full rounded-lg bg-[#0071e3] px-4 py-3 text-base font-semibold text-white transition hover:bg-[#0077ed]"
               >
                 로그인하러 가기
               </button>
