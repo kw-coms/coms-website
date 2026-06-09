@@ -149,27 +149,19 @@ class CommunityServiceTest {
     }
 
     @Test
-    void updateRejectsTitleTamperingAndMarksRealContentEdits() {
+    void updatesTitleAndMarksRealContentEdits() {
         Member user = member("2025123456", "회원", Member.Role.USER);
         memberRepository.save(user);
         var created = communityService.create(user.getStudentId(), new CommunityPostRequest("원제목", "내용", "GENERAL", false), null);
 
-        assertThatThrownBy(() -> communityService.update(
-                user.getStudentId(),
-                created.id(),
-                new CommunityPostRequest("바뀐제목", "내용 수정", "GENERAL", false),
-                null
-        )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
-                assertThat(ex.getReason()).contains("제목"));
-
         var updated = communityService.update(
                 user.getStudentId(),
                 created.id(),
-                new CommunityPostRequest("원제목", "내용 수정", "INFO", false),
+                new CommunityPostRequest("바뀐제목", "내용 수정", "INFO", false),
                 null
         );
 
-        assertThat(updated.title()).isEqualTo("원제목");
+        assertThat(updated.title()).isEqualTo("바뀐제목");
         assertThat(updated.content()).isEqualTo("내용 수정");
         assertThat(updated.edited()).isTrue();
     }
@@ -455,8 +447,9 @@ class CommunityServiceTest {
 
         var created = communityService.create(
                 author.getStudentId(),
-                new CommunityPostRequest("익명글", "내용", "ANONYMOUS", false),
-                null
+                new CommunityPostRequest("익명글", "내용", "ANONYMOUS", false, "반고닉"),
+                null,
+                "118.235.10.20"
         );
 
         var visibleToMember = communityService.get(viewer.getStudentId(), created.id());
@@ -466,7 +459,9 @@ class CommunityServiceTest {
         assertThatThrownBy(() -> communityService.get(graduate.getStudentId(), created.id()))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
-        assertThat(visibleToMember.authorName()).isEqualTo("익명");
+        assertThat(visibleToMember.authorName()).isEqualTo("반고닉(118.235)");
+        assertThat(visibleToMember.authorDisplayName()).isEqualTo("반고닉(118.235)");
+        assertThat(visibleToMember.anonymousName()).isEqualTo("반고닉");
         assertThat(visibleToMember.authorStudentId()).isNull();
         assertThat(visibleToAdmin.authorDisplayName()).contains("작성자");
     }
@@ -481,12 +476,12 @@ class CommunityServiceTest {
         memberRepository.save(admin);
         var post = communityService.create(author.getStudentId(), new CommunityPostRequest("익명글", "내용", "ANONYMOUS", false), null);
 
-        communityService.addComment(post.id(), commenter.getStudentId(), new CommunityCommentRequest("댓글", null));
+        communityService.addComment(post.id(), commenter.getStudentId(), new CommunityCommentRequest("댓글", null, "ㅇㅇ"), "118.235.1.2");
 
         assertThat(communityService.listComments(post.id(), author.getStudentId()))
                 .singleElement()
                 .extracting("authorName")
-                .isEqualTo("익명");
+                .isEqualTo("ㅇㅇ(118.235)");
         assertThat(communityService.listComments(post.id(), admin.getStudentId()))
                 .singleElement()
                 .extracting("authorName")

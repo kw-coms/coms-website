@@ -10,6 +10,7 @@ import com.coms.backend.dto.YouTubeSearchResponse;
 import com.coms.backend.domain.CommunityPostFile;
 import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.service.CommunityService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
@@ -25,10 +26,13 @@ import org.springframework.web.multipart.MultipartFile;
 import java.nio.charset.StandardCharsets;
 
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/community/posts")
 public class CommunityController {
+    private static final Set<String> TRUSTED_PROXIES = Set.of("127.0.0.1", "::1", "0:0:0:0:0:0:0:1");
+
     private final CommunityService communityService;
 
     public CommunityController(CommunityService communityService) {
@@ -47,8 +51,10 @@ public class CommunityController {
 
     @PostMapping
     public ResponseEntity<CommunityPostResponse> create(Authentication authentication,
-                                                       @Valid @RequestBody CommunityPostRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(communityService.create(authentication.getName(), request, null));
+                                                       @Valid @RequestBody CommunityPostRequest request,
+                                                       HttpServletRequest servletRequest) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(communityService.create(authentication.getName(), request, null, resolveClientIp(servletRequest)));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -56,16 +62,24 @@ public class CommunityController {
                                                                  @RequestParam String title,
                                                                  @RequestParam String content,
                                                                  @RequestParam(defaultValue = "GENERAL") String category,
+                                                                 @RequestParam(value = "anonymousName", required = false) String anonymousName,
+                                                                 HttpServletRequest servletRequest,
                                                                  @RequestParam(value = "image", required = false) MultipartFile image) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(communityService.create(authentication.getName(), new CommunityPostRequest(title, content, category, false), image));
+                .body(communityService.create(
+                        authentication.getName(),
+                        new CommunityPostRequest(title, content, category, false, anonymousName),
+                        image,
+                        resolveClientIp(servletRequest)
+                ));
     }
 
     @PatchMapping("/{id}")
     public ResponseEntity<CommunityPostResponse> update(Authentication authentication,
                                                         @PathVariable Long id,
-                                                        @Valid @RequestBody CommunityPostRequest request) {
-        return ResponseEntity.ok(communityService.update(authentication.getName(), id, request, null));
+                                                        @Valid @RequestBody CommunityPostRequest request,
+                                                        HttpServletRequest servletRequest) {
+        return ResponseEntity.ok(communityService.update(authentication.getName(), id, request, null, resolveClientIp(servletRequest)));
     }
 
     @PatchMapping(path = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -75,12 +89,15 @@ public class CommunityController {
                                                                  @RequestParam String content,
                                                                  @RequestParam(defaultValue = "GENERAL") String category,
                                                                  @RequestParam(defaultValue = "false") boolean removeImage,
+                                                                 @RequestParam(value = "anonymousName", required = false) String anonymousName,
+                                                                 HttpServletRequest servletRequest,
                                                                  @RequestParam(value = "image", required = false) MultipartFile image) {
         return ResponseEntity.ok(communityService.update(
                 authentication.getName(),
                 id,
-                new CommunityPostRequest(title, content, category, removeImage),
-                image
+                new CommunityPostRequest(title, content, category, removeImage, anonymousName),
+                image,
+                resolveClientIp(servletRequest)
         ));
     }
 
@@ -259,9 +276,10 @@ public class CommunityController {
     @PostMapping("/{id}/comments")
     public ResponseEntity<CommunityCommentResponse> addComment(Authentication authentication,
                                                                @PathVariable Long id,
-                                                               @Valid @RequestBody CommunityCommentRequest request) {
+                                                               @Valid @RequestBody CommunityCommentRequest request,
+                                                               HttpServletRequest servletRequest) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(communityService.addComment(id, authentication.getName(), request));
+                .body(communityService.addComment(id, authentication.getName(), request, resolveClientIp(servletRequest)));
     }
 
     @PatchMapping("/{id}/comments/{commentId}")
@@ -308,5 +326,31 @@ public class CommunityController {
             case "application/zip", "application/x-zip-compressed" -> ".zip";
             default -> "";
         };
+    }
+
+    private static String resolveClientIp(HttpServletRequest request) {
+        String remoteAddr = request.getRemoteAddr();
+        if (TRUSTED_PROXIES.contains(remoteAddr)) {
+            String forwarded = request.getHeader("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isBlank()) {
+                String candidate = forwarded.split(",")[0].trim();
+                if (isValidIp(candidate)) return candidate;
+            }
+            String realIp = request.getHeader("X-Real-IP");
+            if (realIp != null && !realIp.isBlank() && isValidIp(realIp.trim())) {
+                return realIp.trim();
+            }
+        }
+        return remoteAddr;
+    }
+
+    private static boolean isValidIp(String ip) {
+        if (ip == null || ip.length() > 45) return false;
+        try {
+            java.net.InetAddress.getByName(ip);
+            return !ip.contains(" ");
+        } catch (java.net.UnknownHostException e) {
+            return false;
+        }
     }
 }
