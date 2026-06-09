@@ -58,13 +58,13 @@ function WriteForm({ onCancel, onSave }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4 rounded-lg border border-white/10 bg-white/80 p-5 shadow-[0_18px_50px_rgba(0,0,0,0.12)]">
+    <form onSubmit={submit} className="space-y-4 rounded-lg border border-black/10 bg-white p-5 shadow-[0_18px_45px_rgba(0,0,0,0.08)]">
       <input
         value={form.title}
         onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
         maxLength={200}
         placeholder="제목"
-        className="w-full rounded border border-black/15 bg-white px-4 py-3 text-sm text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+        className="w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-sm text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24"
       />
       <textarea
         value={form.description}
@@ -72,10 +72,10 @@ function WriteForm({ onCancel, onSave }) {
         rows={8}
         maxLength={2000}
         placeholder="설명 (선택)"
-        className="w-full resize-y rounded border border-black/15 bg-white px-4 py-3 text-sm leading-7 text-[var(--theme-body-dark)] outline-none focus:border-[var(--theme-accent)]"
+        className="w-full resize-y rounded-lg border border-black/10 bg-white px-4 py-3 text-sm leading-7 text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24"
       />
       <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--theme-body-muted)]">
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded border border-black/15 bg-white px-3 py-2 font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-[#f5f5f7] px-3 py-2 font-semibold text-[#1d1d1f] hover:bg-white">
           <FileUp size={15} />
           파일 선택
           <input
@@ -92,14 +92,14 @@ function WriteForm({ onCancel, onSave }) {
         <button
           type="submit"
           disabled={saving}
-          className="rounded bg-[var(--theme-text)] px-5 py-2.5 text-sm font-semibold text-[var(--theme-bg)] disabled:opacity-50"
+          className="rounded-full bg-[#0071e3] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
         >
           {saving ? '업로드 중...' : '등록'}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="inline-flex items-center gap-1 rounded border border-black/15 bg-white px-4 py-2.5 text-sm font-semibold text-[var(--theme-body-mid)]"
+          className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-[#1d1d1f]"
         >
           <X size={14} />
           취소
@@ -189,25 +189,25 @@ export default function Archive({ onBack }) {
           <button
             type="button"
             onClick={onBack}
-            className="shape-cut-sm border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15"
+            className="rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-white"
           >
             메인으로 돌아가기
           </button>
-          <div className="text-sm text-white/55">
+          <div className="text-sm text-[#6e6e73]">
             {user?.name ? `${user.name}님` : "COM's 자료실"}
           </div>
         </div>
       )}
 
-      <section className="overflow-hidden border border-white/10 bg-white/5 shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md">
-        <div className="border-b border-white/10 bg-black/20 px-5 py-4 sm:px-7">
+      <section className="overflow-hidden rounded-lg border border-black/10 bg-white shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
+        <div className="border-b border-black/10 bg-linear-to-br from-white via-[#f5f5f7] to-[#e8f8ff] px-5 py-5 sm:px-7">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.35em] text-cyan-200">Archive</p>
-              <h1 className="mt-4 text-3xl font-semibold sm:text-4xl">
+              <p className="text-sm font-semibold text-[#0066cc]">Archive</p>
+              <h1 className="mt-3 text-3xl font-semibold tracking-normal sm:text-4xl">
                 {mode === 'write' ? '자료 등록' : mode === 'detail' ? '자료 상세' : '자료실'}
               </h1>
-              <p className="mt-3 max-w-2xl leading-7 text-white/68">
+              <p className="mt-3 max-w-2xl leading-7 text-[#6e6e73]">
                 {mode === 'list' ? '자료를 올리거나 목록에서 선택해 다운로드합니다.' : ''}
               </p>
             </div>
@@ -215,7 +215,7 @@ export default function Archive({ onBack }) {
               <button
                 type="button"
                 onClick={() => setMode('write')}
-                className="shape-cut-sm bg-white/85 px-5 py-2.5 text-sm font-bold text-[var(--theme-body-dark)] transition hover:bg-white"
+                className="rounded-full bg-[#0071e3] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#0077ed]"
               >
                 자료 올리기
               </button>
@@ -223,7 +223,7 @@ export default function Archive({ onBack }) {
               <button
                 type="button"
                 onClick={backToList}
-                className="shape-cut-sm inline-flex items-center justify-center gap-2 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-semibold text-[#1d1d1f] transition hover:bg-white"
               >
                 <ArrowLeft size={15} />
                 목록
@@ -240,33 +240,33 @@ export default function Archive({ onBack }) {
 
         {mode === 'list' && (
           <>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-black/18 px-5 py-3 sm:px-7">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/10 bg-[#f5f5f7] px-5 py-3 sm:px-7">
               <div className="relative flex items-center">
-                <Search size={14} className="absolute left-3 text-white/45 pointer-events-none" />
+                <Search size={14} className="absolute left-3 text-[#86868b] pointer-events-none" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="제목, 설명, 작성자 검색"
-                  className="shape-cut-sm border border-white/10 bg-black/20 py-2 pl-8 pr-3 text-sm text-white placeholder-white/35 outline-none focus:border-white/25 w-56"
+                  className="w-56 rounded-full border border-black/10 bg-white py-2 pl-8 pr-3 text-sm text-[#1d1d1f] placeholder:text-[#86868b] outline-none focus:ring-2 focus:ring-[#0071e3]/24"
                 />
               </div>
-              <div className="text-xs font-semibold text-white/45">{filteredFiles.length}개</div>
+              <div className="text-xs font-semibold text-[#86868b]">{filteredFiles.length}개</div>
             </div>
 
             {notice && (
-              <div className="mx-5 mt-5 shape-cut-sm border border-emerald-300/20 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100 sm:mx-7">
+              <div className="mx-5 mt-5 rounded-lg border border-[#0071e3]/20 bg-[#e8f3ff] px-4 py-3 text-sm font-semibold text-[#0066cc] sm:mx-7">
                 {notice}
               </div>
             )}
 
             {error && (
-              <div className="mx-5 mt-5 flex flex-col gap-3 shape-cut-sm border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm text-red-100 sm:mx-7 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mx-5 mt-5 flex flex-col gap-3 rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-7 sm:flex-row sm:items-center sm:justify-between">
                 <span>{error}</span>
                 <button
                   type="button"
                   onClick={() => loadFiles()}
-                  className="inline-flex items-center justify-center gap-2 shape-cut-sm border border-white/10 bg-white/10 px-3 py-2 font-semibold text-white transition hover:bg-white/15"
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-3 py-2 font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
                 >
                   <RefreshCw size={15} />
                   다시 시도
@@ -274,17 +274,17 @@ export default function Archive({ onBack }) {
               </div>
             )}
 
-            <div className="m-5 overflow-hidden shape-cut-sm border border-white/10 bg-black/18 sm:m-7">
+            <div className="m-5 overflow-hidden rounded-lg border border-black/10 bg-white sm:m-7">
               {loading ? (
-                <div className="px-5 py-16 text-center text-white/65">자료를 불러오는 중...</div>
+                <div className="px-5 py-16 text-center text-[#6e6e73]">자료를 불러오는 중...</div>
               ) : filteredFiles.length === 0 ? (
-                <div className="px-5 py-16 text-center text-white/65">
+                <div className="px-5 py-16 text-center text-[#6e6e73]">
                   {searchQuery ? '검색 결과가 없습니다.' : '등록된 자료가 없습니다.'}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[680px] text-left text-sm">
-                    <thead className="border-b border-white/10 bg-white/8 text-xs uppercase tracking-[0.24em] text-white/45">
+                    <thead className="border-b border-black/10 bg-[#f5f5f7] text-xs uppercase tracking-[0.16em] text-[#86868b]">
                       <tr>
                         <th className="w-16 px-4 py-3 font-semibold">번호</th>
                         <th className="px-4 py-3 font-semibold">제목</th>
@@ -294,7 +294,7 @@ export default function Archive({ onBack }) {
                         <th className="w-28 px-4 py-3 text-right font-semibold">동작</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/10">
+                    <tbody className="divide-y divide-black/10">
                       {filteredFiles.map((file) => {
                         const open = () => openFile(file)
                         return (
@@ -304,15 +304,15 @@ export default function Archive({ onBack }) {
                             role="button"
                             onClick={open}
                             onKeyDown={(event) => openRowWithKeyboard(event, open)}
-                            className="cursor-pointer text-white/75 transition hover:bg-white/5 focus:bg-white/10 focus:outline-none"
+                            className="cursor-pointer text-[#6e6e73] transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none"
                           >
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-white/45">{file.id}</td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-[#86868b]">{file.id}</td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
-                              <span className="block max-w-[340px] truncate font-semibold text-white" title={file.title || file.originalName}>
+                              <span className="block max-w-[340px] truncate font-semibold text-[#1d1d1f]" title={file.title || file.originalName}>
                                 {file.title || file.originalName}
                               </span>
                               {file.description && (
-                                <span className="mt-0.5 block max-w-[340px] truncate text-xs text-white/45">
+                                <span className="mt-0.5 block max-w-[340px] truncate text-xs text-[#86868b]">
                                   {file.description}
                                 </span>
                               )}
@@ -325,7 +325,7 @@ export default function Archive({ onBack }) {
                                 <a
                                   href={downloadUrl(file.id)}
                                   onClick={(event) => event.stopPropagation()}
-                                  className="shape-cut-sm inline-flex items-center justify-center gap-2 border border-white/10 bg-white/10 px-3 py-2 font-semibold text-white transition hover:bg-white/15"
+                                  className="inline-flex items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-3 py-2 font-semibold text-[#0066cc] transition hover:bg-[#f5f5f7]"
                                 >
                                   <Download size={15} />
                                   다운로드
@@ -344,33 +344,33 @@ export default function Archive({ onBack }) {
         )}
 
         {mode === 'detail' && detailFile && (
-          <div className="m-5 border border-white/10 bg-black/18 p-5 text-white/80 sm:m-7">
-            <div className="border-b border-white/10 pb-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/45">Archive</p>
-              <h2 className="mt-3 break-words text-2xl font-bold text-white">{detailFile.title || detailFile.originalName}</h2>
-              <p className="mt-2 text-xs text-white/45">
+          <div className="m-5 rounded-lg border border-black/10 bg-[#f5f5f7] p-5 text-[#6e6e73] sm:m-7">
+            <div className="border-b border-black/10 pb-4">
+              <p className="text-xs font-semibold text-[#0066cc]">Archive</p>
+              <h2 className="mt-3 break-words text-2xl font-bold text-[#1d1d1f]">{detailFile.title || detailFile.originalName}</h2>
+              <p className="mt-2 text-xs text-[#86868b]">
                 {detailFile.uploaderName || detailFile.uploadedBy || '-'} · {formatDate(detailFile.uploadedAt)}
               </p>
             </div>
             {detailFile.description && (
-              <div className="border-b border-white/10 py-5">
-                <p className="whitespace-pre-wrap text-sm leading-7 text-white/75">{detailFile.description}</p>
+              <div className="border-b border-black/10 py-5">
+                <p className="whitespace-pre-wrap text-sm leading-7 text-[#6e6e73]">{detailFile.description}</p>
               </div>
             )}
-            <dl className="grid gap-4 border-b border-white/10 py-5 text-sm sm:grid-cols-2">
+            <dl className="grid gap-4 border-b border-black/10 py-5 text-sm sm:grid-cols-2">
               <div>
-                <dt className="text-white/45">파일명</dt>
-                <dd className="mt-1 break-all font-semibold text-white">{detailFile.originalName}</dd>
+                <dt className="text-[#86868b]">파일명</dt>
+                <dd className="mt-1 break-all font-semibold text-[#1d1d1f]">{detailFile.originalName}</dd>
               </div>
               <div>
-                <dt className="text-white/45">크기</dt>
-                <dd className="mt-1 font-semibold text-white">{formatSize(detailFile.fileSize)}</dd>
+                <dt className="text-[#86868b]">크기</dt>
+                <dd className="mt-1 font-semibold text-[#1d1d1f]">{formatSize(detailFile.fileSize)}</dd>
               </div>
             </dl>
             <div className="mt-5 flex flex-wrap gap-2">
               <a
                 href={downloadUrl(detailFile.id)}
-                className="shape-cut-sm inline-flex items-center justify-center gap-2 bg-white/85 px-4 py-2 font-semibold text-[var(--theme-body-dark)] transition hover:bg-white"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0071e3] px-4 py-2 font-semibold text-white transition hover:bg-[#0077ed]"
               >
                 <Download size={15} />
                 다운로드
@@ -379,7 +379,7 @@ export default function Archive({ onBack }) {
                 <button
                   type="button"
                   onClick={() => handleDelete(detailFile.id)}
-                  className="shape-cut-sm inline-flex items-center justify-center gap-2 border border-red-300/20 bg-red-400/10 px-4 py-2 font-semibold text-red-100 transition hover:bg-red-400/20"
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 font-semibold text-red-700 transition hover:bg-red-100"
                 >
                   <Trash2 size={15} />
                   삭제
