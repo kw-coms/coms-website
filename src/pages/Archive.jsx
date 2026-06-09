@@ -255,7 +255,7 @@ export default function Archive({ onBack }) {
             </div>
 
             {notice && (
-              <div className="mx-5 mt-5 rounded-lg border border-emerald-300/30 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 sm:mx-7">
+              <div className="mx-5 mt-5 rounded-lg border border-[#0071e3]/20 bg-[#e8f3ff] px-4 py-3 text-sm font-semibold text-[#0066cc] sm:mx-7">
                 {notice}
               </div>
             )}
