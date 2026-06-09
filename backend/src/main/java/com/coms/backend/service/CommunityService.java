@@ -79,6 +79,10 @@ public class CommunityService {
     private static final Pattern TEN_DIGIT_STUDENT_ID = Pattern.compile("\\d{10}");
     private static final Pattern HTTPS_URL = Pattern.compile("^https://[^\\s<>\"']+$", Pattern.CASE_INSENSITIVE);
     private static final Pattern YOUTUBE_EMBED_URL = Pattern.compile("^https://www\\.youtube(-nocookie)?\\.com/embed/[A-Za-z0-9_-]{6,20}([?&][^\\s<>\"']*)?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern IPV4_PREFIX = Pattern.compile("^(\\d{1,3})\\.(\\d{1,3})\\..*");
+    private static final Pattern IPV6_PREFIX = Pattern.compile("^([0-9a-fA-F]{1,4}):([0-9a-fA-F]{1,4}):.*");
+    private static final String DEFAULT_ANONYMOUS_NAME = "ㅇㅇ";
+    private static final int MAX_ANONYMOUS_NAME_LENGTH = 20;
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
     private static final Set<String> ALLOWED_VIDEO_TYPES = Set.of("video/mp4", "video/webm", "video/quicktime");
     private static final Set<String> ALLOWED_FILE_TYPES = Set.of(
@@ -160,6 +164,10 @@ public class CommunityService {
     }
 
     public CommunityPostResponse create(String studentId, CommunityPostRequest request, MultipartFile image) {
+        return create(studentId, request, image, null);
+    }
+
+    public CommunityPostResponse create(String studentId, CommunityPostRequest request, MultipartFile image, String clientIp) {
         Member member = findMember(studentId);
         enforcePostRateLimit(member.getStudentId());
         SanitizedPost sanitized = validateRequest(request, null);
@@ -170,6 +178,7 @@ public class CommunityService {
         post.setCategory(sanitized.category());
         post.setAuthorStudentId(member.getStudentId());
         post.setAuthorName(member.getName());
+        applyAnonymousPostFields(post, sanitized.category(), request.anonymousName(), clientIp);
         attachImage(post, image);
         CommunityPost saved = communityPostRepository.save(post);
         auditLogService.record(member.getStudentId(), "COMMUNITY_POST_CREATE", "COMMUNITY_POST", String.valueOf(saved.getId()), safeTitle(saved.getTitle()), null);
@@ -177,6 +186,10 @@ public class CommunityService {
     }
 
     public CommunityPostResponse update(String studentId, Long id, CommunityPostRequest request, MultipartFile image) {
+        return update(studentId, id, request, image, null);
+    }
+
+    public CommunityPostResponse update(String studentId, Long id, CommunityPostRequest request, MultipartFile image, String clientIp) {
         Member member = findMember(studentId);
         CommunityPost post = communityPostRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -186,14 +199,17 @@ public class CommunityService {
         }
         SanitizedPost sanitized = validateRequest(request, post.getTitle());
         requireCategoryAllowed(member, sanitized.category());
+        boolean titleChanged = !sanitized.title().equals(post.getTitle());
         boolean isInitialFinalization = isInitialFinalization(post, sanitized.content());
+        post.setTitle(sanitized.title());
         post.setContent(sanitized.content());
         post.setCategory(sanitized.category());
+        applyAnonymousPostFields(post, sanitized.category(), request.anonymousName(), clientIp);
         if (Boolean.TRUE.equals(request.removeImage())) {
             clearImage(post);
         }
         attachImage(post, image);
-        if (!isInitialFinalization) {
+        if (titleChanged || !isInitialFinalization) {
             post.markEdited();
         }
         CommunityPost saved = communityPostRepository.save(post);
@@ -403,9 +419,6 @@ public class CommunityService {
     private SanitizedPost validateRequest(CommunityPostRequest request, String existingTitle) {
         String title = normalizeBounded(request.title(), "제목", MAX_TITLE_LENGTH);
         String content = sanitizeCommunityContent(normalizeBounded(request.content(), "내용", MAX_CONTENT_LENGTH));
-        if (existingTitle != null && !title.equals(existingTitle)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "제목은 수정할 수 없습니다.");
-        }
         rejectUnsafeText(title);
         rejectUnsafeText(content);
         return new SanitizedPost(title, content, parseCategory(request.category()));
@@ -423,6 +436,53 @@ public class CommunityService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "허용되지 않는 제어 문자가 포함되어 있습니다.");
         }
         return normalized;
+    }
+
+    private void applyAnonymousPostFields(CommunityPost post, CommunityPost.Category category, String anonymousName, String clientIp) {
+        if (category != CommunityPost.Category.ANONYMOUS) {
+            post.setAnonymousName(null);
+            post.setIpAddress(null);
+            return;
+        }
+        post.setAnonymousName(normalizeAnonymousName(anonymousName));
+        if ((post.getIpAddress() == null || post.getIpAddress().isBlank()) && clientIp != null && !clientIp.isBlank()) {
+            post.setIpAddress(clientIp.trim());
+        }
+    }
+
+    private void applyAnonymousCommentFields(CommunityPost post, CommunityComment comment, String anonymousName, String clientIp) {
+        if (!isAnonymousPost(post)) {
+            comment.setAnonymousName(null);
+            comment.setIpAddress(null);
+            return;
+        }
+        comment.setAnonymousName(normalizeAnonymousName(anonymousName));
+        comment.setIpAddress(clientIp == null || clientIp.isBlank() ? null : clientIp.trim());
+    }
+
+    private String normalizeAnonymousName(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isEmpty()) return DEFAULT_ANONYMOUS_NAME;
+        if (normalized.length() > MAX_ANONYMOUS_NAME_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "익명 이름은 " + MAX_ANONYMOUS_NAME_LENGTH + "자 이하로 입력해주세요.");
+        }
+        rejectUnsafeText(normalized);
+        return normalized;
+    }
+
+    private String anonymousDisplayName(String anonymousName, String ipAddress) {
+        String name = normalizeAnonymousName(anonymousName);
+        String prefix = ipPrefix(ipAddress);
+        return prefix == null ? name : name + "(" + prefix + ")";
+    }
+
+    private String ipPrefix(String ipAddress) {
+        if (ipAddress == null || ipAddress.isBlank()) return null;
+        Matcher ipv4 = IPV4_PREFIX.matcher(ipAddress.trim());
+        if (ipv4.matches()) return ipv4.group(1) + "." + ipv4.group(2);
+        Matcher ipv6 = IPV6_PREFIX.matcher(ipAddress.trim());
+        if (ipv6.matches()) return ipv6.group(1) + ":" + ipv6.group(2);
+        return null;
     }
 
     private void rejectUnsafeText(String value) {
@@ -660,9 +720,10 @@ public class CommunityService {
                 || currentMember.getRole() == Member.Role.ADMIN;
         boolean maskAnonymous = isAnonymousPost(post) && currentMember.getRole() != Member.Role.ADMIN;
         boolean authorAdmin = !maskAnonymous && author != null && author.getRole() == Member.Role.ADMIN;
-        String authorName = maskAnonymous ? "익명" : (author != null ? author.getName() : post.getAuthorName());
+        String anonymousDisplay = anonymousDisplayName(post.getAnonymousName(), post.getIpAddress());
+        String authorName = maskAnonymous ? anonymousDisplay : (author != null ? author.getName() : post.getAuthorName());
         String authorStudentId = maskAnonymous ? null : post.getAuthorStudentId();
-        String authorDisplayName = maskAnonymous ? "익명" : displayName(post.getAuthorStudentId(), authorName);
+        String authorDisplayName = maskAnonymous ? anonymousDisplay : displayName(post.getAuthorStudentId(), authorName);
         VoteSummary votes = voteStats.getOrDefault(post.getId(), VoteSummary.EMPTY);
         long commentCount = commentCounts.getOrDefault(post.getId(), 0L);
         List<CommunityPostImage> extraImages = imageRepository.findByPostIdOrderByPositionAsc(post.getId());
@@ -696,6 +757,7 @@ public class CommunityService {
                 authorStudentId,
                 authorName,
                 authorDisplayName,
+                isAnonymousPost(post) ? post.getAnonymousName() : null,
                 authorAdmin,
                 post.getCategory().name(),
                 post.getImageStoredName() == null ? null : "/api/community/posts/" + post.getId() + "/image",
@@ -1091,12 +1153,16 @@ public class CommunityService {
         return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
                 .map(c -> new CommunityCommentResponse(
                         c.getId(), c.getPostId(), c.getParentCommentId(), c.getDepth(),
-                        maskAnonymous ? "익명" : displayName(c.getStudentId(), c.getAuthorName()), c.getContent(), c.getCreatedAt(), c.getUpdatedAt(), c.isEdited(),
+                        maskAnonymous ? anonymousDisplayName(c.getAnonymousName(), c.getIpAddress()) : displayName(c.getStudentId(), c.getAuthorName()), c.getContent(), c.getCreatedAt(), c.getUpdatedAt(), c.isEdited(),
                         isAdmin || c.getStudentId().equals(studentId)))
                 .toList();
     }
 
     public CommunityCommentResponse addComment(Long postId, String studentId, CommunityCommentRequest request) {
+        return addComment(postId, studentId, request, null);
+    }
+
+    public CommunityCommentResponse addComment(Long postId, String studentId, CommunityCommentRequest request, String clientIp) {
         CommunityPost post = communityPostRepository.findById(postId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         Member member = memberRepository.findByStudentId(studentId)
@@ -1114,8 +1180,9 @@ public class CommunityService {
             }
             depth = parent.getDepth() + 1;
         }
-        CommunityComment saved = commentRepository.save(
-                new CommunityComment(postId, studentId, member.getName(), content, request.parentCommentId(), depth));
+        CommunityComment comment = new CommunityComment(postId, studentId, member.getName(), content, request.parentCommentId(), depth);
+        applyAnonymousCommentFields(post, comment, request.anonymousName(), clientIp);
+        CommunityComment saved = commentRepository.save(comment);
         if (parent == null) {
             notificationService.notifyPostComment(post, saved);
         } else {
@@ -1178,7 +1245,7 @@ public class CommunityService {
 
     private String commentAuthorName(CommunityPost post, Member currentMember, CommunityComment comment) {
         return isAnonymousPost(post) && currentMember.getRole() != Member.Role.ADMIN
-                ? "익명"
+                ? anonymousDisplayName(comment.getAnonymousName(), comment.getIpAddress())
                 : displayName(comment.getStudentId(), comment.getAuthorName());
     }
 
