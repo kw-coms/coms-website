@@ -20,6 +20,12 @@ public class CommunityComment {
     @Column(nullable = false, length = 100)
     private String authorName;
 
+    @Column(name = "anonymous_name", length = 20)
+    private String anonymousName;
+
+    @Column(name = "ip_address", length = 80)
+    private String ipAddress;
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
@@ -52,6 +58,10 @@ public class CommunityComment {
     public Long getPostId() { return postId; }
     public String getStudentId() { return studentId; }
     public String getAuthorName() { return authorName; }
+    public String getAnonymousName() { return anonymousName; }
+    public void setAnonymousName(String anonymousName) { this.anonymousName = anonymousName; }
+    public String getIpAddress() { return ipAddress; }
+    public void setIpAddress(String ipAddress) { this.ipAddress = ipAddress; }
     public String getContent() { return content; }
     public Long getParentCommentId() { return parentCommentId; }
     public int getDepth() { return depth; }
