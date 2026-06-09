@@ -30,7 +30,7 @@ const tabs = [
   { id: 'about', label: 'About', hint: '정체성', icon: Binary, accent: 'text-cyan-200' },
   { id: 'activities', label: 'Activities', hint: '세미나·스터디', icon: Sparkles, accent: 'text-rose-200' },
   { id: 'projects', label: 'Projects', hint: '실전 제작', icon: CircuitBoard, accent: 'text-violet-200' },
-  { id: 'recruit', label: 'Recruit', hint: '지원 안내', icon: Rocket, accent: 'text-emerald-200' },
+  { id: 'recruit', label: 'Recruit', hint: '지원 안내', icon: Rocket, accent: 'text-sky-500' },
 ]
 
 const activities = [
@@ -159,7 +159,7 @@ const visualDetails = {
     title: 'Join Flow',
     subtitle: 'Apply · Meet · Start',
     rows: ['지원서 제출', '개별 안내', '오리엔테이션'],
-    accent: '#10b981',
+    accent: '#0071e3',
   },
 }
 
@@ -182,7 +182,7 @@ const sectionMeta = {
   recruit: {
     eyebrow: 'Join COMs',
     background: '#f5f5f7',
-    visual: 'linear-gradient(135deg, #ecfff5, #f5f5f7 60%, #ffffff)',
+    visual: 'linear-gradient(135deg, #e8f3ff, #f5f5f7 60%, #ffffff)',
   },
 }
 
@@ -739,7 +739,7 @@ function HomeView() {
                 <div className="mb-4 flex items-center gap-1.5">
                   <span className="size-2.5 rounded-full bg-[#ff5f57]" />
                   <span className="size-2.5 rounded-full bg-[#ffbd2e]" />
-                  <span className="size-2.5 rounded-full bg-[#28c840]" />
+                  <span className="size-2.5 rounded-full bg-[#0071e3]" />
                 </div>
                 <p className="text-2xl font-semibold text-[#1d1d1f]">{visual.title}</p>
                 <p className="mt-1 text-sm font-semibold text-[#6e6e73]">{visual.subtitle}</p>
@@ -895,7 +895,7 @@ function HomeView() {
           <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-b from-transparent to-white/85" />
           <div className="relative z-10 mx-auto max-w-7xl">
             <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/76 px-4 py-2 text-xs font-semibold text-[#6e6e73] shadow-[0_6px_22px_rgba(0,0,0,0.06)] backdrop-blur-xl">
-              <span className="size-2 rounded-full bg-[#28c840]" />
+              <span className="size-2 rounded-full bg-[#0071e3]" />
               2026 Semester Ready
             </div>
             <div className="relative mx-auto mt-8 flex h-36 w-36 items-center justify-center sm:h-44 sm:w-44">

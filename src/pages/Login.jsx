@@ -305,7 +305,7 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
                 </div>
               )}
 
-              {resetMessage && <div className="text-sm text-emerald-700">{resetMessage}</div>}
+              {resetMessage && <div className="text-sm text-[#0066cc]">{resetMessage}</div>}
               {resetError && <div className="text-sm text-red-500">{resetError}</div>}
 
               <ActionButton icon={resetRequested ? KeyRound : Mail} loading={resetLoading}>
@@ -355,7 +355,7 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
                 자동 로그인
               </label>
 
-              {notice && <div className="text-sm text-emerald-700">{notice}</div>}
+              {notice && <div className="text-sm text-[#0066cc]">{notice}</div>}
               {error && <div className="text-sm text-red-500">{error}</div>}
 
               <ActionButton icon={LogIn} loading={loading}>

@@ -339,7 +339,7 @@ export default function ChangePassword({ onBack }) {
               </div>
             </div>
 
-            {profileMessage && <div className="text-sm text-emerald-600">{profileMessage}</div>}
+            {profileMessage && <div className="text-sm text-[#0066cc]">{profileMessage}</div>}
 
             <button type="submit" className={primaryBtnClass} disabled={loadingAction === 'profile'}>
               {loadingAction === 'profile' ? '저장 중...' : '회원 정보 저장'}
@@ -353,7 +353,7 @@ export default function ChangePassword({ onBack }) {
                 <p className="text-sm text-[var(--theme-body-muted)]/85">{user?.email || '-'}</p>
                 <p className={helperTextClass}>인증이 필요한 기능을 쓰기 전에 이메일 상태를 확인합니다.</p>
               </div>
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${user?.emailVerified ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${user?.emailVerified ? 'bg-[#e8f3ff] text-[#0066cc]' : 'bg-amber-100 text-amber-800'}`}>
                 {user?.emailVerified ? '인증 완료' : '미인증'}
               </span>
             </div>
@@ -379,7 +379,7 @@ export default function ChangePassword({ onBack }) {
               </form>
             )}
 
-            {emailMessage && <div className="mt-3 text-sm text-emerald-600">{emailMessage}</div>}
+            {emailMessage && <div className="mt-3 text-sm text-[#0066cc]">{emailMessage}</div>}
           </div>
 
           <form onSubmit={handlePasswordSubmit} className={`${cardClass} mt-4 space-y-4`}>
@@ -437,7 +437,7 @@ export default function ChangePassword({ onBack }) {
                   <span
                     key={check.label}
                     className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      check.ok ? 'bg-emerald-100 text-emerald-800' : 'bg-white/64 text-[var(--theme-body-muted)]'
+                      check.ok ? 'bg-[#e8f3ff] text-[#0066cc]' : 'bg-white/64 text-[var(--theme-body-muted)]'
                     }`}
                   >
                     {check.ok ? '✓ ' : ''}{check.label}
@@ -446,7 +446,7 @@ export default function ChangePassword({ onBack }) {
               </div>
             </div>
 
-            {passwordMessage && <div className="text-sm text-emerald-600">{passwordMessage}</div>}
+            {passwordMessage && <div className="text-sm text-[#0066cc]">{passwordMessage}</div>}
 
             <button type="submit" className={btnClass} disabled={loadingAction === 'password'}>
               {loadingAction === 'password' ? '변경 중...' : '비밀번호 변경'}

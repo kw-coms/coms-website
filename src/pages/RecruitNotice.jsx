@@ -37,7 +37,7 @@ export default function RecruitNotice({ onBack, onApply }) {
       </button>
 
       <section className="overflow-hidden rounded-lg border border-black/10 bg-white text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
-        <div className="flex items-start justify-between gap-4 border-b border-black/10 bg-linear-to-br from-[#ecfff5] via-white to-[#f5f5f7] px-6 py-7 sm:px-8">
+        <div className="flex items-start justify-between gap-4 border-b border-black/10 bg-linear-to-br from-[#e8f3ff] via-white to-[#f5f5f7] px-6 py-7 sm:px-8">
           <div>
             <p className="text-sm font-semibold text-[#0066cc]">Recruit Notice</p>
             <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-normal sm:text-5xl">COM&apos;s 신입 부원 모집 공지</h1>
@@ -56,7 +56,7 @@ export default function RecruitNotice({ onBack, onApply }) {
         <div className="grid gap-0 lg:grid-cols-[1fr_320px]">
           <article className="space-y-8 p-6 sm:p-8">
             <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 text-sm font-bold text-emerald-700">
+              <div className="inline-flex items-center gap-2 text-sm font-bold text-[#0066cc]">
                 <PenLine size={16} />
                 모집 안내
               </div>
@@ -74,7 +74,7 @@ export default function RecruitNotice({ onBack, onApply }) {
             <div className="grid gap-3 md:grid-cols-3">
               {recruitDetails.map(({ title, icon: Icon, body }) => (
                 <div key={title} className="rounded-lg border border-black/10 bg-[#f5f5f7] p-4">
-                  <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                  <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-[#e8f3ff] text-[#0066cc]">
                     <Icon size={19} />
                   </div>
                   <h2 className="text-base font-black">{title}</h2>
@@ -83,12 +83,12 @@ export default function RecruitNotice({ onBack, onApply }) {
               ))}
             </div>
 
-            <div className="rounded-lg border border-emerald-200/60 bg-emerald-50/80 p-5">
-              <h2 className="text-lg font-black text-emerald-900">지원 절차</h2>
+            <div className="rounded-lg border border-[#0071e3]/20 bg-[#e8f3ff] p-5">
+              <h2 className="text-lg font-black text-[#1d1d1f]">지원 절차</h2>
               <div className="mt-4 space-y-3">
                 {processSteps.map((step) => (
-                  <div key={step} className="flex gap-3 text-sm leading-6 text-emerald-950/80">
-                    <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-700" />
+                  <div key={step} className="flex gap-3 text-sm leading-6 text-[#6e6e73]">
+                    <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-[#0066cc]" />
                     <span>{step}</span>
                   </div>
                 ))}

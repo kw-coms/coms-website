@@ -65,7 +65,7 @@ export function EmailVerifyStep({ studentId, email, onDone }) {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-lg border border-emerald-500/20 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+      <div className="rounded-lg border border-[#0071e3]/20 bg-[#e8f3ff] px-4 py-3 text-sm text-[#0066cc]">
         <p className="font-semibold">이메일로 인증코드를 발송했습니다.</p>
         <p className="mt-1 text-xs opacity-80">
           {email ? `${email} 받은편지함을 확인해주세요.` : '가입하신 이메일 받은편지함을 확인해주세요.'}{' '}

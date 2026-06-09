@@ -400,10 +400,10 @@ export default function Signup({ onBack }) {
 
           {step === 'done' && (
             <div className="space-y-5 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 text-3xl">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#e8f3ff] text-3xl text-[#0066cc]">
                 ✓
               </div>
-              <p className="text-base font-semibold text-emerald-700">이메일 인증이 완료되었습니다!</p>
+              <p className="text-base font-semibold text-[#0066cc]">이메일 인증이 완료되었습니다!</p>
               <button
                 type="button"
                 onClick={onBack}

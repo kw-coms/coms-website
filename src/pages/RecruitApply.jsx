@@ -112,7 +112,7 @@ export default function RecruitApply({ onBack }) {
       </button>
 
       <section className="overflow-hidden rounded-lg border border-black/10 bg-white text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
-        <div className="border-b border-black/10 bg-linear-to-br from-[#ecfff5] via-white to-[#f5f5f7] px-6 py-7 sm:px-8">
+        <div className="border-b border-black/10 bg-linear-to-br from-[#e8f3ff] via-white to-[#f5f5f7] px-6 py-7 sm:px-8">
           <p className="text-sm font-semibold text-[#0066cc]">Recruit</p>
           <h1 className="mt-3 text-3xl font-semibold leading-tight tracking-normal sm:text-5xl">COM&apos;s 지원하기</h1>
           <p className="mt-4 max-w-3xl leading-7 text-[#6e6e73]">
@@ -123,7 +123,7 @@ export default function RecruitApply({ onBack }) {
         <div className="grid gap-0 lg:grid-cols-[1fr_320px]">
           <form onSubmit={handleSubmit} className="grid gap-5 bg-white p-6 text-[#1d1d1f] sm:p-8">
             <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-lg bg-[#ecfff5] text-emerald-700">
+              <div className="flex size-11 items-center justify-center rounded-lg bg-[#e8f3ff] text-[#0066cc]">
                 <UserRound size={20} />
               </div>
               <div>
@@ -232,7 +232,7 @@ export default function RecruitApply({ onBack }) {
             )}
 
             {submitted && (
-              <p className="flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+              <p className="flex items-center gap-2 rounded-lg bg-[#e8f3ff] px-4 py-3 text-sm font-semibold text-[#0066cc]">
                 <CheckCircle2 size={16} />
                 지원서가 제출되었습니다. 확인 후 개별 연락드리겠습니다.
               </p>
