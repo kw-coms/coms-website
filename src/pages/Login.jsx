@@ -13,14 +13,14 @@ import { EmailVerifyStep } from '../components/EmailVerifyStep.jsx'
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?])(?!.*\s).{8,}$/
 
 const panelClass =
-  'shape-cut bg-[var(--theme-surface-96)] p-5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] sm:p-8'
-const frameClass = 'shape-cut-sm bg-black/12 p-px'
+  'rounded-lg border border-black/10 bg-white/86 p-5 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:p-8'
+const frameClass = 'rounded-lg bg-black/10 p-px'
 const inputClass =
-  'w-full shape-cut-sm bg-white/72 px-4 py-2.5 text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/70 transition focus:bg-white/82 focus:ring-2 focus:ring-[var(--theme-accent)]/55'
+  'w-full rounded-lg bg-white px-4 py-3 text-[#1d1d1f] outline-none placeholder:text-[#86868b] transition focus:ring-2 focus:ring-[#0071e3]/24'
 const btnClass =
-  'flex w-full items-center justify-center gap-2 shape-cut-sm bg-white/66 px-4 py-2.5 font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/82 disabled:cursor-not-allowed disabled:opacity-60'
+  'flex w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 py-3 font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-not-allowed disabled:opacity-60'
 const linkButtonClass =
-  'w-full rounded-full border border-black/10 bg-white/60 px-4 py-2 text-center font-semibold transition hover:bg-white/80 sm:w-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-left sm:underline'
+  'w-full rounded-full border border-black/10 bg-white/70 px-4 py-2 text-center font-semibold text-[#0066cc] transition hover:bg-white sm:w-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-left'
 
 const emptyResetForm = {
   email: '',
@@ -239,14 +239,14 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
         <button
           type="button"
           onClick={goBack}
-          className="shape-cut-sm inline-flex items-center gap-2 border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] shadow-[0_18px_40px_rgba(255,255,255,0.2)] transition hover:bg-white"
+          className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-white"
         >
           <ArrowLeft size={15} aria-hidden="true" />
           {isVerifyStep || isResetStep ? '로그인으로 돌아가기' : '메인으로 돌아가기'}
         </button>
       </div>
 
-      <div className="shape-cut bg-[var(--theme-surface-70)] p-px shadow-[0_22px_70px_var(--theme-shadow-glass)]">
+      <div className="rounded-lg bg-white/70 p-px shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
         <section className={panelClass}>
           <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left">
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="h-10 w-10 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
