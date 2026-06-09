@@ -61,11 +61,11 @@ export function EmailVerifyStep({ studentId, email, onDone }) {
   }
 
   const inputClass =
-    'w-full shape-cut-sm border border-black/10 bg-white/70 px-4 py-3 text-[15px] text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/60 transition focus:bg-white focus:ring-2 focus:ring-[var(--theme-accent)]/50'
+    'w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-[15px] text-[#1d1d1f] outline-none placeholder:text-[#86868b] transition focus:ring-2 focus:ring-[#0071e3]/24'
 
   return (
     <div className="space-y-5">
-      <div className="shape-cut-sm border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700">
+      <div className="rounded-lg border border-emerald-500/20 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
         <p className="font-semibold">이메일로 인증코드를 발송했습니다.</p>
         <p className="mt-1 text-xs opacity-80">
           {email ? `${email} 받은편지함을 확인해주세요.` : '가입하신 이메일 받은편지함을 확인해주세요.'}{' '}
@@ -88,13 +88,13 @@ export function EmailVerifyStep({ studentId, email, onDone }) {
         </div>
 
         {error && (
-          <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>
+          <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>
         )}
 
         <button
           type="submit"
           disabled={verifying || code.length !== 6}
-          className="shape-cut-sm w-full bg-white/70 px-4 py-3 text-base font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-lg bg-[#0071e3] px-4 py-3 text-base font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {verifying ? '인증 중...' : '인증 완료'}
         </button>
@@ -106,7 +106,7 @@ export function EmailVerifyStep({ studentId, email, onDone }) {
           type="button"
           onClick={handleResend}
           disabled={cooldown > 0 || resending}
-          className="font-semibold text-[var(--theme-body-dark)] underline disabled:cursor-not-allowed disabled:opacity-50"
+          className="font-semibold text-[#0066cc] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {resending ? '전송 중...' : cooldown > 0 ? `재전송 (${cooldown}s)` : '코드 재전송'}
         </button>

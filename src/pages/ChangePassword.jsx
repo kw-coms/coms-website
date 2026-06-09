@@ -14,10 +14,10 @@ const OTHER_INTEREST = '기타'
 const INTEREST_OPTIONS = ['보안', '웹', '앱']
 
 function choiceButtonClass(active) {
-  return `shape-cut-sm min-h-11 px-4 py-2 text-sm font-semibold transition ${
+  return `min-h-11 rounded-lg px-4 py-2 text-sm font-semibold transition ${
     active
-      ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]'
-      : 'border border-black/10 bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/80'
+      ? 'bg-[#0071e3] text-white'
+      : 'border border-black/10 bg-[#f5f5f7] text-[#1d1d1f] hover:bg-white'
   }`
 }
 
@@ -128,15 +128,15 @@ export default function ChangePassword({ onBack }) {
     { label: '공백 없음', ok: newPassword.length > 0 && !/\s/.test(newPassword) },
   ]
 
-  const panelClass = 'shape-cut bg-[var(--theme-surface-96)] p-5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] sm:p-8'
-  const frameClass = 'shape-cut-sm bg-black/12 p-px'
-  const inputClass = 'w-full shape-cut-sm bg-white/72 px-4 py-2.5 text-[var(--theme-body-dark)] outline-none placeholder:text-[var(--theme-body-muted)]/70 transition focus:bg-white/82 focus:ring-2 focus:ring-[var(--theme-accent)]/55'
+  const panelClass = 'rounded-lg border border-black/10 bg-white/88 p-5 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:p-8'
+  const frameClass = 'rounded-lg bg-black/10 p-px'
+  const inputClass = 'w-full rounded-lg bg-white px-4 py-3 text-[#1d1d1f] outline-none placeholder:text-[#86868b] transition focus:ring-2 focus:ring-[#0071e3]/24'
   const textareaClass = `${inputClass} min-h-28 resize-y leading-6`
-  const btnClass = 'shape-cut-sm border border-black/10 bg-white/78 px-4 py-2.5 font-semibold text-[var(--theme-body-dark)] shadow-[0_8px_20px_rgba(0,0,0,0.08)] transition hover:bg-white/92 disabled:cursor-wait disabled:opacity-60'
-  const primaryBtnClass = 'shape-cut-sm bg-[var(--theme-text)] px-4 py-2.5 font-semibold text-[var(--theme-bg)] shadow-[0_10px_28px_rgba(0,0,0,0.18)] transition hover:opacity-90 disabled:cursor-wait disabled:opacity-60'
-  const cardClass = 'shape-cut-sm border border-black/10 bg-white/48 p-4 shadow-[0_14px_34px_rgba(0,0,0,0.08)] sm:p-5'
-  const fieldCardClass = 'shape-cut-sm border border-black/8 bg-white/36 p-3'
-  const helperTextClass = 'text-xs leading-5 text-[var(--theme-body-muted)]/80'
+  const btnClass = 'rounded-lg border border-black/10 bg-white px-4 py-2.5 font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-[#f5f5f7] disabled:cursor-wait disabled:opacity-60'
+  const primaryBtnClass = 'rounded-lg bg-[#0071e3] px-4 py-2.5 font-semibold text-white shadow-[0_10px_28px_rgba(0,113,227,0.22)] transition hover:bg-[#0077ed] disabled:cursor-wait disabled:opacity-60'
+  const cardClass = 'rounded-lg border border-black/10 bg-[#f5f5f7] p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:p-5'
+  const fieldCardClass = 'rounded-lg border border-black/8 bg-white/70 p-3'
+  const helperTextClass = 'text-xs leading-5 text-[#86868b]'
 
   const resetMessages = () => {
     setError('')
@@ -243,13 +243,13 @@ export default function ChangePassword({ onBack }) {
         <button
           type="button"
           onClick={onBack}
-          className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] shadow-[0_18px_40px_rgba(255,255,255,0.2)] transition hover:bg-white"
+          className="rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-white"
         >
           돌아가기
         </button>
       </div>
 
-      <div className="shape-cut bg-[var(--theme-surface-70)] p-px shadow-[0_22px_70px_var(--theme-shadow-glass)]">
+      <div className="rounded-lg bg-white/70 p-px shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
         <section className={panelClass}>
           <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left">
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="h-10 w-10 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
@@ -353,7 +353,7 @@ export default function ChangePassword({ onBack }) {
                 <p className="text-sm text-[var(--theme-body-muted)]/85">{user?.email || '-'}</p>
                 <p className={helperTextClass}>인증이 필요한 기능을 쓰기 전에 이메일 상태를 확인합니다.</p>
               </div>
-              <span className={`shape-cut-sm px-3 py-1 text-xs font-semibold ${user?.emailVerified ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${user?.emailVerified ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                 {user?.emailVerified ? '인증 완료' : '미인증'}
               </span>
             </div>
@@ -430,13 +430,13 @@ export default function ChangePassword({ onBack }) {
               </div>
             </div>
 
-            <div className="shape-cut-sm border border-black/8 bg-black/5 p-3">
+            <div className="rounded-lg border border-black/8 bg-white/70 p-3">
               <p className="mb-2 text-xs font-bold text-[var(--theme-body-muted)]/85">비밀번호 조건</p>
               <div className="flex flex-wrap gap-2">
                 {passwordChecks.map((check) => (
                   <span
                     key={check.label}
-                    className={`shape-cut-sm px-2.5 py-1 text-xs font-semibold ${
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                       check.ok ? 'bg-emerald-100 text-emerald-800' : 'bg-white/64 text-[var(--theme-body-muted)]'
                     }`}
                   >

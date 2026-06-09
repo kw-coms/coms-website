@@ -84,6 +84,85 @@ const projectDetails = [
   },
 ]
 
+const heroHighlights = [
+  { label: 'Weekly', value: 'Seminar', detail: '기초와 심화가 이어지는 학습 루틴' },
+  { label: 'Team', value: 'Project', detail: '아이디어를 실제 서비스로 제작' },
+  { label: 'Campus', value: 'Network', detail: '선후배가 함께 나누는 개발 경험' },
+]
+
+const experiencePills = ['Beginner friendly', 'React · Vite', 'Arduino', 'Study archive', 'Community']
+
+const showcaseItems = [
+  {
+    eyebrow: 'Learn',
+    title: '학습 흐름을 한눈에.',
+    body: '정기 세미나, 수준별 스터디, 자료실이 하나의 흐름으로 이어집니다.',
+    target: 'activities',
+  },
+  {
+    eyebrow: 'Build',
+    title: '만들면서 성장.',
+    body: '웹사이트와 교육 프로젝트를 통해 실제로 쓰이는 결과물을 완성합니다.',
+    target: 'projects',
+  },
+  {
+    eyebrow: 'Join',
+    title: '처음이어도 괜찮게.',
+    body: '개발 경험이 적어도 함께 따라올 수 있는 활동 구조를 만듭니다.',
+    target: 'recruit',
+  },
+]
+
+const sectionMetrics = {
+  about: [
+    { value: 'Central', label: '광운대 중앙 동아리' },
+    { value: 'Build', label: '팀 제작 중심 활동' },
+    { value: 'Share', label: '선후배 경험 공유' },
+  ],
+  activities: [
+    { value: '01', label: '기초 세미나' },
+    { value: '02', label: '수준별 스터디' },
+    { value: '03', label: '팀 프로젝트' },
+  ],
+  projects: [
+    { value: 'Web', label: '공식 웹사이트' },
+    { value: 'IoT', label: '아두이노 교육' },
+    { value: 'App', label: '자유 제작' },
+  ],
+  recruit: [
+    { value: 'Step 1', label: '지원서 작성' },
+    { value: 'Step 2', label: '내부 확인' },
+    { value: 'Step 3', label: '정기 활동' },
+  ],
+}
+
+const visualDetails = {
+  about: {
+    title: 'Club OS',
+    subtitle: 'Study · Build · Share',
+    rows: ['학습 로드맵', '프로젝트 트랙', '커뮤니티 로그'],
+    accent: '#0ea5e9',
+  },
+  activities: {
+    title: 'Learning Stack',
+    subtitle: 'Seminar · Study · Review',
+    rows: ['기초 세미나', '분야별 스터디', '코드 리뷰'],
+    accent: '#f43f5e',
+  },
+  projects: {
+    title: 'Project Lab',
+    subtitle: 'Prototype · Launch · Iterate',
+    rows: ['서비스 기획', '프론트엔드 구현', '배포와 개선'],
+    accent: '#8b5cf6',
+  },
+  recruit: {
+    title: 'Join Flow',
+    subtitle: 'Apply · Meet · Start',
+    rows: ['지원서 제출', '개별 안내', '오리엔테이션'],
+    accent: '#10b981',
+  },
+}
+
 const sectionMeta = {
   about: {
     eyebrow: 'The club',
@@ -128,7 +207,7 @@ function RequireAuth({ children }) {
   const location = useLocation()
   if (loading) return (
     <PageShell>
-      <div className="shape-cut border border-white/10 bg-white/5 p-8 text-center text-white/70 backdrop-blur-md">
+      <div className="rounded-lg border border-black/10 bg-white/82 p-8 text-center text-[#6e6e73] shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
         로그인 상태를 확인하는 중...
       </div>
     </PageShell>
@@ -142,7 +221,7 @@ function RequireAdmin({ children }) {
   const location = useLocation()
   if (loading) return (
     <PageShell>
-      <div className="shape-cut border border-white/10 bg-white/5 p-8 text-center text-white/70 backdrop-blur-md">
+      <div className="rounded-lg border border-black/10 bg-white/82 p-8 text-center text-[#6e6e73] shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
         로그인 상태를 확인하는 중...
       </div>
     </PageShell>
@@ -176,7 +255,7 @@ function SignupPage() {
   const navigate = useNavigate()
   return (
     <PageShell wide full>
-      <button type="button" onClick={() => navigate('/login')} className="shape-cut-sm mb-6 border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold text-[var(--theme-text)] transition hover:bg-white/15">
+      <button type="button" onClick={() => navigate('/login')} className="mb-6 rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-white">
         로그인으로 돌아가기
       </button>
       <Signup onBack={() => navigate('/login')} />
@@ -396,8 +475,8 @@ function NotificationButton({ alignLeft = false, padded = false }) {
 
 function PageFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--theme-bg)]">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-white/80" />
+    <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7]">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-black/10 border-t-[#0071e3]" />
     </div>
   )
 }
@@ -431,7 +510,7 @@ function HomeView() {
   const { user, loading: authLoading, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [, setActiveSection] = useState(null)
+  const [activeSection, setActiveSection] = useState(null)
   const aboutRef = useRef(null)
   const activitiesRef = useRef(null)
   const projectsRef = useRef(null)
@@ -523,11 +602,19 @@ function HomeView() {
       return (
         <div className="mx-auto max-w-3xl space-y-4 text-center">
           <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.about.eyebrow}</p>
-          <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-6xl">함께 배우고, 바로 만듭니다.</h2>
+          <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-5xl">함께 배우고, 바로 만듭니다.</h2>
           <p className="mx-auto max-w-2xl text-lg leading-8 text-[#6e6e73] sm:text-xl">
             COM&apos;s는 컴퓨터와 소프트웨어에 관심 있는 광운대학교 학생들이 모여 함께 공부하고 프로젝트를
             진행하는 중앙 컴퓨터 학술동아리입니다.
           </p>
+          <div className="mx-auto grid max-w-2xl gap-3 pt-4 sm:grid-cols-3">
+            {sectionMetrics.about.map((item) => (
+              <div key={item.value} className="rounded-lg bg-[#f5f5f7] px-4 py-4 text-center">
+                <p className="text-lg font-semibold text-[#1d1d1f]">{item.value}</p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-[#6e6e73]">{item.label}</p>
+              </div>
+            ))}
+          </div>
           <div className="flex flex-wrap justify-center gap-3 pt-2">
             <button type="button" onClick={() => openPanel('recruit')} className={solidActionBtnClass}>지원 화면으로 이동</button>
           </div>
@@ -539,12 +626,15 @@ function HomeView() {
         <div className="mx-auto w-full max-w-5xl">
           <div className="mx-auto max-w-3xl space-y-4 text-center">
             <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.activities.eyebrow}</p>
-            <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-6xl">처음부터 심화까지.</h2>
+            <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-5xl">처음부터 심화까지.</h2>
             <p className="text-lg leading-8 text-[#6e6e73] sm:text-xl">기초 세미나, 수준별 스터디, 팀 프로젝트가 학기 흐름 안에서 자연스럽게 이어집니다.</p>
           </div>
           <div className="mt-10 grid gap-3 sm:grid-cols-2">
-            {activityDetails.map((item) => (
-              <article key={item.title} className="rounded-lg bg-white px-6 py-6 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+            {activityDetails.map((item, index) => (
+              <article key={item.title} className="group rounded-lg bg-white px-6 py-6 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)]">
+                <div className="mb-5 inline-flex size-9 items-center justify-center rounded-full bg-[#f5f5f7] text-xs font-bold text-[#0066cc]">
+                  {String(index + 1).padStart(2, '0')}
+                </div>
                 <h3 className="text-xl font-semibold text-[#1d1d1f]">{item.title}</h3>
                 <p className="mt-3 leading-7 text-[#6e6e73]">{item.description}</p>
               </article>
@@ -572,12 +662,12 @@ function HomeView() {
         <div className="mx-auto w-full max-w-5xl">
           <div className="mx-auto max-w-3xl space-y-4 text-center">
             <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.projects.eyebrow}</p>
-            <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-6xl">아이디어를 서비스로.</h2>
+            <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-5xl">아이디어를 서비스로.</h2>
             <p className="text-lg leading-8 text-[#6e6e73] sm:text-xl">스터디에서 익힌 것을 공식 웹사이트, 교육 프로젝트, 자유 제작으로 이어갑니다.</p>
           </div>
           <div className="mt-10 grid gap-3 lg:grid-cols-3">
             {projectDetails.slice(0, 3).map((item) => (
-              <article key={item.title} className="rounded-lg bg-[#f5f5f7] px-6 py-7 text-center">
+              <article key={item.title} className="rounded-lg bg-[#f5f5f7] px-6 py-7 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)]">
                 <h3 className="text-xl font-semibold text-[#1d1d1f]">{item.title}</h3>
                 <p className="mt-3 leading-7 text-[#6e6e73]">{item.description}</p>
               </article>
@@ -604,15 +694,18 @@ function HomeView() {
     return (
       <div className="mx-auto max-w-3xl space-y-4 text-center">
         <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.recruit.eyebrow}</p>
-        <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-6xl">다음 멤버를 기다립니다.</h2>
+        <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-5xl">다음 멤버를 기다립니다.</h2>
         <p className="mx-auto max-w-2xl text-lg leading-8 text-[#6e6e73] sm:text-xl">
           광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장할 부원을 모집합니다. 개발을
           처음 시작하는 학생도 부담 없이 지원할 수 있습니다.
         </p>
         <div className="mx-auto grid max-w-2xl gap-3 pt-4 text-sm font-semibold text-[#1d1d1f] sm:grid-cols-3">
-          <div className="rounded-lg bg-white px-4 py-4">지원 폼 작성</div>
-          <div className="rounded-lg bg-white px-4 py-4">내부 확인</div>
-          <div className="rounded-lg bg-white px-4 py-4">정기 활동 참여</div>
+          {sectionMetrics.recruit.map((item) => (
+            <div key={item.value} className="rounded-lg bg-white px-4 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+              <p className="text-xs text-[#0066cc]">{item.value}</p>
+              <p className="mt-1">{item.label}</p>
+            </div>
+          ))}
         </div>
         <div className="flex flex-wrap justify-center gap-3 pt-3">
           <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
@@ -632,6 +725,7 @@ function HomeView() {
 
   const renderSectionPanel = (id) => {
     const meta = sectionMeta[id]
+    const visual = visualDetails[id]
     return (
       <div data-panel="true" className="w-full overflow-hidden" style={{ background: meta.background }}>
         <div className="mx-auto grid min-h-[52svh] max-w-7xl items-center gap-10 px-5 py-12 sm:min-h-[62svh] sm:px-8 sm:py-16 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)] lg:px-10">
@@ -639,12 +733,27 @@ function HomeView() {
             {renderSectionContent(id)}
           </div>
           <div className="flex items-center justify-center">
-            <div className="relative aspect-square w-full max-w-md overflow-hidden rounded-lg" style={{ background: meta.visual }}>
-              <div className="absolute inset-x-8 top-8 rounded-lg bg-white/80 px-5 py-4 text-center text-sm font-semibold text-[#1d1d1f] shadow-[0_12px_35px_rgba(0,0,0,0.08)]">KW COM&apos;s</div>
-              <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="absolute left-1/2 top-1/2 w-[58%] -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-[0_24px_50px_rgba(0,0,0,0.12)]" />
-              <div className="absolute bottom-8 left-8 right-8 grid grid-cols-3 gap-2">
-                {tabs.slice(0, 3).map((tab) => (
-                  <div key={tab.id} className="rounded-lg bg-white/70 px-3 py-3 text-center text-xs font-semibold text-[#1d1d1f] shadow-[0_8px_24px_rgba(0,0,0,0.06)]">{tab.label}</div>
+            <div className="home-device relative aspect-square w-full max-w-md overflow-hidden rounded-lg ring-1 ring-black/5" style={{ background: meta.visual }}>
+              <div className="absolute inset-0 bg-linear-to-b from-white/30 via-transparent to-black/5" />
+              <div className="absolute inset-x-6 top-6 rounded-lg bg-white/78 px-5 py-4 shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+                <div className="mb-4 flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full bg-[#ff5f57]" />
+                  <span className="size-2.5 rounded-full bg-[#ffbd2e]" />
+                  <span className="size-2.5 rounded-full bg-[#28c840]" />
+                </div>
+                <p className="text-2xl font-semibold text-[#1d1d1f]">{visual.title}</p>
+                <p className="mt-1 text-sm font-semibold text-[#6e6e73]">{visual.subtitle}</p>
+              </div>
+              <div className="absolute left-1/2 top-1/2 flex size-32 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2rem] bg-white/72 shadow-[0_24px_70px_rgba(0,0,0,0.12)] backdrop-blur-md sm:size-40">
+                <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="home-logo-float w-[68%] object-contain" />
+              </div>
+              <div className="absolute bottom-6 left-6 right-6 space-y-2">
+                {visual.rows.map((row, index) => (
+                  <div key={row} className="flex items-center gap-3 rounded-lg bg-white/76 px-4 py-3 text-sm font-semibold text-[#1d1d1f] shadow-[0_8px_24px_rgba(0,0,0,0.06)] backdrop-blur-xl">
+                    <span className="size-2.5 rounded-full" style={{ backgroundColor: visual.accent }} />
+                    <span>{row}</span>
+                    <span className="ml-auto text-xs text-[#86868b]">{String(index + 1).padStart(2, '0')}</span>
+                  </div>
                 ))}
               </div>
             </div>
@@ -667,11 +776,15 @@ function HomeView() {
           </button>
 
           <nav className="pointer-events-auto absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-6 md:flex">
-            {tabs.map((tab) => (
-              <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className="px-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:text-[#1d1d1f]">
-                {tab.label}
-              </button>
-            ))}
+            {tabs.map((tab) => {
+              const active = activeSection === tab.id
+              return (
+                <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className={`relative px-1 text-xs font-semibold transition ${active ? 'text-[#1d1d1f]' : 'text-[#1d1d1f]/72 hover:text-[#1d1d1f]'}`}>
+                  {tab.label}
+                  <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[#0071e3] transition ${active ? 'opacity-100' : 'opacity-0'}`} />
+                </button>
+              )
+            })}
             <button type="button" onClick={goNotices} className="px-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:text-[#1d1d1f]">Notices</button>
             <button type="button" onClick={goArchive} disabled={authLoading} className="px-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:text-[#1d1d1f] disabled:cursor-wait disabled:opacity-60">Resources</button>
             <button type="button" onClick={goCommunity} disabled={authLoading} className="px-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:text-[#1d1d1f] disabled:cursor-wait disabled:opacity-60">Community</button>
@@ -777,12 +890,28 @@ function HomeView() {
       </header>
 
       <main className="relative overflow-hidden pt-12">
-        <section className="relative flex min-h-[calc(70svh-3rem)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-12 text-center sm:min-h-[calc(84svh-3rem)] sm:py-14">
-          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-b from-transparent to-white/70" />
-          <div className="relative z-10 mx-auto max-w-6xl">
-            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="mx-auto h-24 w-24 object-contain sm:h-32 sm:w-32" />
-            <p className="mt-6 text-sm font-semibold text-[#6e6e73]">Kwangwoon University Computer Club</p>
-            <h2 className="mt-2 text-[clamp(3.4rem,11vw,8.5rem)] font-semibold leading-[0.9] tracking-normal text-[#1d1d1f]">
+        <section className="relative flex min-h-[calc(76svh-3rem)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-12 text-center sm:min-h-[calc(86svh-3rem)] sm:py-14">
+          <div className="home-hero-surface absolute inset-0" />
+          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-b from-transparent to-white/85" />
+          <div className="relative z-10 mx-auto max-w-7xl">
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/76 px-4 py-2 text-xs font-semibold text-[#6e6e73] shadow-[0_6px_22px_rgba(0,0,0,0.06)] backdrop-blur-xl">
+              <span className="size-2 rounded-full bg-[#28c840]" />
+              2026 Semester Ready
+            </div>
+            <div className="relative mx-auto mt-8 flex h-36 w-36 items-center justify-center sm:h-44 sm:w-44">
+              <div className="absolute inset-0 rounded-[2rem] bg-white/88 shadow-[0_24px_70px_rgba(0,0,0,0.1)] ring-1 ring-black/5" />
+              <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="home-logo-float relative z-10 h-24 w-24 object-contain sm:h-32 sm:w-32" />
+              <div className="absolute -left-28 top-8 hidden rounded-lg bg-white/82 px-4 py-3 text-left shadow-[0_16px_40px_rgba(0,0,0,0.09)] backdrop-blur-xl sm:block">
+                <p className="text-xs font-semibold text-[#86868b]">Track</p>
+                <p className="mt-1 text-sm font-semibold text-[#1d1d1f]">Study to Project</p>
+              </div>
+              <div className="absolute -right-28 bottom-8 hidden rounded-lg bg-[#1d1d1f] px-4 py-3 text-left text-white shadow-[0_16px_40px_rgba(0,0,0,0.18)] sm:block">
+                <p className="text-xs font-semibold text-white/58">Mode</p>
+                <p className="mt-1 text-sm font-semibold">Build together</p>
+              </div>
+            </div>
+            <p className="mt-7 text-sm font-semibold text-[#6e6e73]">Kwangwoon University Computer Club</p>
+            <h2 className="mt-2 text-6xl font-semibold leading-[0.9] tracking-normal text-[#1d1d1f] sm:text-8xl lg:text-[8.5rem]">
               KW COM&apos;s
             </h2>
             <p className="mx-auto mt-6 max-w-[19rem] text-lg font-medium leading-8 text-[#6e6e73] sm:max-w-3xl sm:text-2xl">
@@ -799,18 +928,40 @@ function HomeView() {
                 <span className="ml-auto shrink-0 text-[10px] font-bold uppercase text-[#0066cc]">공지</span>
               </button>
             )}
-            <div className="mx-auto mt-10 hidden max-w-4xl gap-3 sm:grid sm:grid-cols-3">
-              {[
-                ['Seminar', '매주 이어지는 기초와 심화'],
-                ['Study', '관심 분야별 함께 학습'],
-                ['Project', '실제로 쓰이는 결과물 제작'],
-              ].map(([title, body]) => (
-                <div key={title} className="rounded-lg bg-white px-5 py-5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-                  <p className="text-lg font-semibold text-[#1d1d1f]">{title}</p>
-                  <p className="mt-1 text-sm leading-6 text-[#6e6e73]">{body}</p>
+            <div className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-2">
+              {experiencePills.map((pill) => (
+                <span key={pill} className="rounded-full bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#6e6e73] shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                  {pill}
+                </span>
+              ))}
+            </div>
+            <div className="mx-auto mt-10 hidden max-w-5xl gap-3 sm:grid sm:grid-cols-3">
+              {heroHighlights.map((item) => (
+                <div key={item.value} className="rounded-lg bg-white px-5 py-5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)]">
+                  <p className="text-xs font-semibold text-[#86868b]">{item.label}</p>
+                  <p className="mt-2 text-xl font-semibold text-[#1d1d1f]">{item.value}</p>
+                  <p className="mt-1 text-sm leading-6 text-[#6e6e73]">{item.detail}</p>
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section className="bg-white px-5 py-3 sm:py-5">
+          <div className="mx-auto grid max-w-7xl gap-3 lg:grid-cols-3">
+            {showcaseItems.map((item, index) => (
+              <button
+                key={item.title}
+                type="button"
+                onClick={() => openPanel(item.target)}
+                className={`group min-h-[13.5rem] rounded-lg px-7 py-7 text-left transition hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(0,0,0,0.1)] ${index === 0 ? 'bg-[#1d1d1f] text-white' : index === 1 ? 'bg-[#f5f5f7] text-[#1d1d1f]' : 'bg-linear-to-br from-[#e8f8ff] to-[#ffffff] text-[#1d1d1f]'}`}
+              >
+                <p className={`text-sm font-semibold ${index === 0 ? 'text-white/58' : 'text-[#0066cc]'}`}>{item.eyebrow}</p>
+                <h3 className="mt-3 text-3xl font-semibold leading-tight tracking-normal">{item.title}</h3>
+                <p className={`mt-4 max-w-sm leading-7 ${index === 0 ? 'text-white/70' : 'text-[#6e6e73]'}`}>{item.body}</p>
+                <span className={`mt-8 inline-flex rounded-full px-4 py-2 text-sm font-semibold ${index === 0 ? 'bg-white text-[#1d1d1f]' : 'bg-[#0071e3] text-white'}`}>더 보기</span>
+              </button>
+            ))}
           </div>
         </section>
 
@@ -847,25 +998,14 @@ function HomeView() {
 
 function PageShell({ children, wide = false, full = false }) {
   return (
-    <div className="relative min-h-screen bg-[var(--theme-bg)] text-[var(--theme-text)]">
-      <BackgroundLayers />
+    <div className="apple-route relative min-h-screen bg-[#f5f5f7] text-[#1d1d1f] selection:bg-[#0071e3]/20 selection:text-[#1d1d1f]">
+      <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white via-[#f5f5f7] to-white" />
       <div className="fixed right-4 top-4 z-50">
         <NotificationButton />
       </div>
-      <main className={`relative mx-auto flex min-h-screen px-4 sm:px-6 ${full ? 'items-start pt-24 pb-16' : 'items-center justify-center py-28'} ${wide ? 'max-w-6xl' : 'max-w-4xl'}`}>
-        <div className={`w-full ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
+      <main className={`relative mx-auto flex min-h-screen px-4 sm:px-6 ${full ? 'items-start pt-20 pb-16' : 'items-center justify-center py-24'} ${wide ? 'max-w-7xl' : 'max-w-4xl'}`}>
+        <div className={`page-transition w-full ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
       </main>
-    </div>
-  )
-}
-
-function BackgroundLayers() {
-  return (
-    <div className="pointer-events-none absolute inset-0">
-      <div className="absolute inset-0 bg-linear-to-b from-[#222831] via-[#20252d] to-[#171b21]" />
-      <div className="tech-grid absolute inset-0 opacity-45" />
-      <div className="absolute left-0 top-[24%] h-px w-full bg-linear-to-r from-transparent via-white/12 to-transparent" />
-      <div className="absolute left-0 top-[68%] h-px w-full bg-linear-to-r from-transparent via-white/8 to-transparent" />
     </div>
   )
 }
