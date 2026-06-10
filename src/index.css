@@ -77,16 +77,30 @@
 }
 
 :root {
-	color-scheme: dark;
+	color-scheme: light;
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', sans-serif;
-	--theme-bg: #222831;
-	--theme-text: #eeeeee;
-	--theme-accent: #ffd369;
-	--theme-title: #1a1f27;
-	--theme-body-dark: #1f2329;
-	--theme-body-mid: #2a3038;
-	--theme-body-soft: #313844;
-	--theme-body-muted: #3a4350;
+	--app-bg: #f5f5f7;
+	--app-surface: #ffffff;
+	--app-surface-soft: #f5f5f7;
+	--app-surface-elevated: #ffffff;
+	--app-text: #1d1d1f;
+	--app-muted: #6e6e73;
+	--app-subtle: #86868b;
+	--app-hairline: rgba(0, 0, 0, 0.1);
+	--app-hairline-strong: rgba(0, 0, 0, 0.16);
+	--app-accent: #0071e3;
+	--app-accent-hover: #0077ed;
+	--app-accent-soft: #e8f3ff;
+	--app-accent-text: #0066cc;
+	--app-accent-border: color-mix(in srgb, var(--app-accent) 42%, transparent);
+	--theme-bg: var(--app-bg);
+	--theme-text: var(--app-text);
+	--theme-accent: var(--app-accent);
+	--theme-title: var(--app-text);
+	--theme-body-dark: var(--app-text);
+	--theme-body-mid: #3c3c43;
+	--theme-body-soft: var(--app-surface-soft);
+	--theme-body-muted: var(--app-muted);
 	--theme-white: #ffffff;
 	--theme-glow-violet: #b26dff;
 	--theme-surface-96: rgba(255, 255, 255, 0.96);
@@ -96,8 +110,34 @@
 	--theme-shadow-glass: rgba(255, 255, 255, 0.24);
 }
 
+:root[data-theme-mode='dark'] {
+	color-scheme: dark;
+	--app-bg: #0f1115;
+	--app-surface: #1c1d22;
+	--app-surface-soft: #17191f;
+	--app-surface-elevated: #24262c;
+	--app-text: #f5f5f7;
+	--app-muted: #a1a1a6;
+	--app-subtle: #7d7d84;
+	--app-hairline: rgba(255, 255, 255, 0.12);
+	--app-hairline-strong: rgba(255, 255, 255, 0.18);
+	--theme-bg: var(--app-bg);
+	--theme-text: var(--app-text);
+	--theme-title: var(--app-text);
+	--theme-body-dark: var(--app-text);
+	--theme-body-mid: #d1d1d6;
+	--theme-body-soft: var(--app-surface-elevated);
+	--theme-body-muted: var(--app-muted);
+	--theme-white: var(--app-surface);
+	--theme-surface-96: rgba(28, 29, 34, 0.96);
+	--theme-surface-94: rgba(28, 29, 34, 0.94);
+	--theme-surface-70: rgba(28, 29, 34, 0.7);
+	--theme-border-soft: rgba(255, 255, 255, 0.12);
+	--theme-shadow-glass: rgba(0, 0, 0, 0.28);
+}
+
 html {
-	background: var(--theme-bg);
+	background: var(--app-bg);
 	scroll-behavior: smooth;
 	scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 	scrollbar-width: thin;
@@ -108,8 +148,8 @@ body {
 	min-height: 100vh;
 	overflow: hidden;
 	overflow-x: hidden;
-	background: var(--theme-bg);
-	color: var(--theme-text);
+	background: var(--app-bg);
+	color: var(--app-text);
 	font-family: var(--user-font-family, inherit);
 	font-weight: 400;
 }
@@ -119,8 +159,8 @@ body {
 }
 
 ::selection {
-	background: color-mix(in srgb, var(--theme-accent) 35%, transparent);
-	color: var(--theme-text);
+	background: var(--app-accent-soft);
+	color: var(--app-text);
 }
 
 ::-webkit-scrollbar {
@@ -154,7 +194,7 @@ a,
 label,
 [role="button"] {
 	touch-action: manipulation;
-	-webkit-tap-highlight-color: rgba(255, 211, 105, 0.18);
+	-webkit-tap-highlight-color: color-mix(in srgb, var(--app-accent) 18%, transparent);
 }
 
 @media (hover: none), (pointer: coarse) {
@@ -211,14 +251,256 @@ label,
 
 .home-hero-surface {
 	background-image:
-		linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(245, 245, 247, 0.22) 42%, rgba(255, 255, 255, 0.74)),
-		linear-gradient(90deg, transparent 0, rgba(255, 255, 255, 0.68) 50%, transparent 100%);
+		linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 88%, transparent), color-mix(in srgb, var(--app-accent-soft) 30%, transparent) 42%, color-mix(in srgb, var(--app-surface) 80%, transparent)),
+		linear-gradient(90deg, transparent 0, color-mix(in srgb, var(--app-surface) 70%, transparent) 50%, transparent 100%);
 }
 
 .home-device {
+	background: linear-gradient(135deg, var(--app-accent-soft), var(--app-surface-soft) 58%, var(--app-surface)) !important;
 	box-shadow:
 		0 34px 85px rgba(0, 0, 0, 0.12),
 		inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+:root[data-theme-mode='dark'] .home-hero-surface {
+	background-image:
+		linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 42%, transparent), color-mix(in srgb, var(--app-accent-soft) 45%, transparent) 48%, color-mix(in srgb, var(--app-bg) 92%, transparent)),
+		linear-gradient(90deg, transparent 0, color-mix(in srgb, var(--app-accent-soft) 34%, transparent) 50%, transparent 100%);
+}
+
+:root[data-theme-mode='dark'] .home-device {
+	box-shadow:
+		0 34px 85px rgba(0, 0, 0, 0.36),
+		inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme-mode='dark'] .theme-home img[alt*="KW COM"],
+:root[data-theme-mode='dark'] .apple-route img[alt*="KW COM"] {
+	filter: invert(1) brightness(1.08) drop-shadow(0 10px 24px rgba(0, 0, 0, 0.22));
+}
+
+.theme-home,
+.apple-route {
+	background: var(--app-bg) !important;
+	color: var(--app-text) !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home [data-panel] {
+	background: var(--app-bg) !important;
+}
+
+.theme-home .bg-\[\#0071e3\],
+.apple-route .bg-\[\#0071e3\],
+.theme-home .bg-\[\#3b4890\],
+.apple-route .bg-\[\#3b4890\] {
+	background-color: var(--app-accent) !important;
+}
+
+.theme-home .hover\:bg-\[\#0077ed\]:hover,
+.apple-route .hover\:bg-\[\#0077ed\]:hover,
+.theme-home .hover\:bg-\[\#2d3a7a\]:hover,
+.apple-route .hover\:bg-\[\#2d3a7a\]:hover {
+	background-color: var(--app-accent-hover) !important;
+}
+
+.theme-home .bg-\[\#e8f3ff\],
+.apple-route .bg-\[\#e8f3ff\],
+.theme-home .bg-\[\#e8f8ff\],
+.apple-route .bg-\[\#e8f8ff\],
+.theme-home .bg-cyan-50,
+.apple-route .bg-cyan-50 {
+	background-color: var(--app-accent-soft) !important;
+}
+
+.theme-home .text-\[\#0066cc\],
+.apple-route .text-\[\#0066cc\],
+.theme-home .text-\[\#0071e3\],
+.apple-route .text-\[\#0071e3\],
+.theme-home .text-\[\#3b4890\],
+.apple-route .text-\[\#3b4890\] {
+	color: var(--app-accent-text) !important;
+}
+
+.theme-home .border-\[\#0071e3\],
+.apple-route .border-\[\#0071e3\],
+.theme-home .border-\[\#0071e3\]\/20,
+.apple-route .border-\[\#0071e3\]\/20,
+.theme-home .border-\[\#0071e3\]\/40,
+.apple-route .border-\[\#0071e3\]\/40,
+.theme-home .focus\:border-\[\#3b4890\]:focus,
+.apple-route .focus\:border-\[\#3b4890\]:focus {
+	border-color: var(--app-accent-border) !important;
+}
+
+.theme-home .text-\[\#1d1d1f\],
+.apple-route .text-\[\#1d1d1f\],
+.theme-home .text-\[\#1d1d1f\]\/72,
+.apple-route .text-\[\#1d1d1f\]\/72,
+.theme-home .text-\[\#1d1d1f\]\/78,
+.apple-route .text-\[\#1d1d1f\]\/78,
+.theme-home .hover\:text-\[\#1d1d1f\]:hover,
+.apple-route .hover\:text-\[\#1d1d1f\]:hover {
+	color: var(--app-text) !important;
+}
+
+.theme-home .text-\[\#6e6e73\],
+.apple-route .text-\[\#6e6e73\],
+.theme-home .text-\[\#86868b\],
+.apple-route .text-\[\#86868b\],
+.theme-home .placeholder\:text-\[\#86868b\]::placeholder,
+.apple-route .placeholder\:text-\[\#86868b\]::placeholder {
+	color: var(--app-muted) !important;
+}
+
+.theme-home .bg-white,
+.apple-route .bg-white,
+.theme-popover .bg-white,
+.appearance-panel .bg-white {
+	background-color: var(--app-surface) !important;
+}
+
+.theme-home .bg-\[\#f5f5f7\],
+.apple-route .bg-\[\#f5f5f7\],
+.theme-home .bg-\[\#fafafa\],
+.apple-route .bg-\[\#fafafa\],
+.theme-home .bg-\[\#f5f5f5\],
+.apple-route .bg-\[\#f5f5f5\],
+.appearance-panel .bg-\[\#f5f5f7\] {
+	background-color: var(--app-surface-soft) !important;
+}
+
+.theme-home .bg-white\/95,
+.apple-route .bg-white\/95 {
+	background-color: color-mix(in srgb, var(--app-surface) 95%, transparent) !important;
+}
+
+.theme-home .bg-white\/88,
+.apple-route .bg-white\/88,
+.appearance-panel.bg-white\/88 {
+	background-color: color-mix(in srgb, var(--app-surface) 88%, transparent) !important;
+}
+
+.theme-home .bg-white\/86,
+.apple-route .bg-white\/86,
+.theme-home .bg-white\/82,
+.apple-route .bg-white\/82,
+.theme-home .bg-white\/80,
+.apple-route .bg-white\/80,
+.theme-home .bg-white\/78,
+.apple-route .bg-white\/78,
+.theme-home .bg-white\/76,
+.apple-route .bg-white\/76,
+.theme-home .bg-white\/72,
+.apple-route .bg-white\/72,
+.theme-home .bg-white\/70,
+.apple-route .bg-white\/70,
+.theme-home .bg-white\/64,
+.apple-route .bg-white\/64,
+.theme-home .bg-white\/60,
+.apple-route .bg-white\/60 {
+	background-color: color-mix(in srgb, var(--app-surface) 82%, transparent) !important;
+}
+
+.theme-home .hover\:bg-white:hover,
+.apple-route .hover\:bg-white:hover,
+.theme-home .hover\:bg-white\/60:hover,
+.apple-route .hover\:bg-white\/60:hover,
+.theme-home .hover\:bg-white\/78:hover,
+.apple-route .hover\:bg-white\/78:hover,
+.theme-home .focus\:bg-white:focus,
+.apple-route .focus\:bg-white:focus {
+	background-color: var(--app-surface-elevated) !important;
+}
+
+.theme-home .hover\:bg-\[\#f5f5f7\]:hover,
+.apple-route .hover\:bg-\[\#f5f5f7\]:hover,
+.theme-home .focus\:bg-\[\#f5f5f7\]:focus,
+.apple-route .focus\:bg-\[\#f5f5f7\]:focus {
+	background-color: var(--app-surface-soft) !important;
+}
+
+.theme-home .border-black\/5,
+.apple-route .border-black\/5,
+.theme-home .border-black\/8,
+.apple-route .border-black\/8,
+.theme-home .border-black\/10,
+.apple-route .border-black\/10,
+.theme-home .border-black\/15,
+.apple-route .border-black\/15 {
+	border-color: var(--app-hairline) !important;
+}
+
+.theme-home .divide-black\/8 > :not([hidden]) ~ :not([hidden]),
+.apple-route .divide-black\/8 > :not([hidden]) ~ :not([hidden]),
+.theme-home .divide-black\/10 > :not([hidden]) ~ :not([hidden]),
+.apple-route .divide-black\/10 > :not([hidden]) ~ :not([hidden]) {
+	border-color: var(--app-hairline) !important;
+}
+
+.theme-home input,
+.theme-home textarea,
+.theme-home select,
+.apple-route input,
+.apple-route textarea,
+.apple-route select {
+	background-color: var(--app-surface) !important;
+	color: var(--app-text) !important;
+	border-color: var(--app-hairline) !important;
+}
+
+.theme-home input:focus,
+.theme-home textarea:focus,
+.theme-home select:focus,
+.apple-route input:focus,
+.apple-route textarea:focus,
+.apple-route select:focus {
+	border-color: var(--app-accent-border) !important;
+	--tw-ring-color: color-mix(in srgb, var(--app-accent) 24%, transparent) !important;
+}
+
+.theme-home .bg-linear-to-br,
+.apple-route .bg-linear-to-br {
+	background-image: linear-gradient(135deg, var(--app-surface), var(--app-surface-soft) 58%, var(--app-accent-soft)) !important;
+}
+
+.theme-home .bg-linear-to-b,
+.apple-route .bg-linear-to-b {
+	background-image: linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 85%, transparent), transparent 48%, color-mix(in srgb, var(--app-bg) 88%, transparent)) !important;
+}
+
+.appearance-trigger {
+	background-color: color-mix(in srgb, var(--app-surface) 88%, transparent) !important;
+	color: var(--app-text) !important;
+	border-color: var(--app-hairline) !important;
+}
+
+.appearance-panel,
+.theme-popover {
+	background-color: color-mix(in srgb, var(--app-surface) 92%, transparent) !important;
+	color: var(--app-text) !important;
+	border-color: var(--app-hairline) !important;
+}
+
+.appearance-panel .text-\[\#1d1d1f\],
+.theme-popover .text-\[var\(--theme-body-dark\)\] {
+	color: var(--app-text) !important;
+}
+
+.appearance-panel .text-\[\#6e6e73\],
+.appearance-panel .text-\[\#86868b\],
+.theme-popover .text-\[var\(--theme-body-muted\)\] {
+	color: var(--app-muted) !important;
+}
+
+.appearance-panel .border-black\/10,
+.theme-popover .border-black\/10,
+.theme-popover .border-black\/8 {
+	border-color: var(--app-hairline) !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home .shadow-\[0_24px_70px_rgba\(0\,0\,0\,0\.1\)\],
+:root[data-theme-mode='dark'] .apple-route .shadow-\[0_24px_70px_rgba\(0\,0\,0\,0\.1\)\] {
+	box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38) !important;
 }
 
 @keyframes home-logo-float {
