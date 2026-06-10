@@ -4,12 +4,16 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import {
   Binary,
   Bell,
+  Check,
   CircuitBoard,
   LogOut,
   Menu,
   Megaphone,
+  Moon,
+  Palette,
   Rocket,
   Sparkles,
+  Sun,
   X,
 } from 'lucide-react'
 import { listNotices } from './services/noticeApi.js'
@@ -141,25 +145,25 @@ const visualDetails = {
     title: 'Club OS',
     subtitle: 'Study · Build · Share',
     rows: ['학습 로드맵', '프로젝트 트랙', '커뮤니티 로그'],
-    accent: '#0ea5e9',
+    accent: 'var(--app-accent)',
   },
   activities: {
     title: 'Learning Stack',
     subtitle: 'Seminar · Study · Review',
     rows: ['기초 세미나', '분야별 스터디', '코드 리뷰'],
-    accent: '#f43f5e',
+    accent: 'var(--app-accent)',
   },
   projects: {
     title: 'Project Lab',
     subtitle: 'Prototype · Launch · Iterate',
     rows: ['서비스 기획', '프론트엔드 구현', '배포와 개선'],
-    accent: '#8b5cf6',
+    accent: 'var(--app-accent)',
   },
   recruit: {
     title: 'Join Flow',
     subtitle: 'Apply · Meet · Start',
     rows: ['지원서 제출', '개별 안내', '오리엔테이션'],
-    accent: '#0071e3',
+    accent: 'var(--app-accent)',
   },
 }
 
@@ -187,8 +191,66 @@ const sectionMeta = {
 }
 
 const floatingBarBaseClass = 'border-b border-black/10 bg-white/82 shadow-[0_1px_0_rgba(255,255,255,0.55)] backdrop-blur-xl supports-[backdrop-filter]:bg-white/72'
-const solidActionBtnClass = 'inline-flex min-h-10 items-center justify-center rounded-full bg-[#0071e3] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-wait disabled:opacity-60'
-const ghostActionBtnClass = 'inline-flex min-h-10 items-center justify-center rounded-full border border-[#0071e3]/40 bg-white/70 px-5 py-2.5 text-sm font-semibold text-[#0066cc] transition hover:bg-white disabled:cursor-wait disabled:opacity-60'
+const solidActionBtnClass = 'inline-flex min-h-10 items-center justify-center rounded-full bg-[var(--app-accent)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--app-accent-hover)] disabled:cursor-wait disabled:opacity-60'
+const ghostActionBtnClass = 'inline-flex min-h-10 items-center justify-center rounded-full border border-[color:var(--app-accent-border)] bg-white/70 px-5 py-2.5 text-sm font-semibold text-[var(--app-accent-text)] transition hover:bg-white disabled:cursor-wait disabled:opacity-60'
+
+const DEFAULT_ACCENT = '#0071e3'
+const THEME_MODE_KEY = 'kwcoms-theme-mode'
+const ACCENT_COLOR_KEY = 'kwcoms-accent-color'
+const accentSwatches = [
+  { name: 'Apple Blue', value: '#0071e3' },
+  { name: 'Graphite', value: '#3c3c43' },
+  { name: 'Rose', value: '#d70015' },
+  { name: 'Amber', value: '#ff9f0a' },
+  { name: 'Violet', value: '#8e5cf7' },
+]
+
+function normalizeHex(value) {
+  if (typeof value !== 'string') return DEFAULT_ACCENT
+  const trimmed = value.trim()
+  const shorthand = /^#?([0-9a-f]{3})$/i.exec(trimmed)
+  if (shorthand) {
+    return `#${shorthand[1].split('').map((char) => char + char).join('').toLowerCase()}`
+  }
+  const full = /^#?([0-9a-f]{6})$/i.exec(trimmed)
+  return full ? `#${full[1].toLowerCase()}` : DEFAULT_ACCENT
+}
+
+function hexToRgb(hex) {
+  const value = normalizeHex(hex).slice(1)
+  return {
+    r: parseInt(value.slice(0, 2), 16),
+    g: parseInt(value.slice(2, 4), 16),
+    b: parseInt(value.slice(4, 6), 16),
+  }
+}
+
+function rgbToHex({ r, g, b }) {
+  return `#${[r, g, b].map((value) => Math.round(value).toString(16).padStart(2, '0')).join('')}`
+}
+
+function mixHex(base, overlay, overlayRatio) {
+  const baseRgb = hexToRgb(base)
+  const overlayRgb = hexToRgb(overlay)
+  const ratio = Math.min(Math.max(overlayRatio, 0), 1)
+  return rgbToHex({
+    r: baseRgb.r * (1 - ratio) + overlayRgb.r * ratio,
+    g: baseRgb.g * (1 - ratio) + overlayRgb.g * ratio,
+    b: baseRgb.b * (1 - ratio) + overlayRgb.b * ratio,
+  })
+}
+
+function getStoredThemeMode() {
+  if (typeof window === 'undefined') return 'light'
+  const stored = window.localStorage.getItem(THEME_MODE_KEY)
+  if (stored === 'light' || stored === 'dark') return stored
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+function getStoredAccentColor() {
+  if (typeof window === 'undefined') return DEFAULT_ACCENT
+  return normalizeHex(window.localStorage.getItem(ACCENT_COLOR_KEY) || DEFAULT_ACCENT)
+}
 
 // ─── Auth guards ───────────────────────────────────────────────────────────
 
@@ -442,7 +504,7 @@ function NotificationButton({ alignLeft = false, padded = false }) {
       {effectiveOpen && createPortal(
         <div
           ref={dropdownRef}
-          className="fixed z-[9999] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-black/10 bg-white text-[var(--theme-body-dark)] shadow-2xl"
+          className="theme-popover fixed z-[9999] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-black/10 bg-white text-[var(--theme-body-dark)] shadow-2xl"
           style={dropdownStyle}
         >
           <div className="flex items-center justify-between border-b border-black/10 px-4 py-3">
@@ -471,20 +533,140 @@ function NotificationButton({ alignLeft = false, padded = false }) {
   )
 }
 
+function AppearanceControl({ accentColor, setAccentColor, themeMode, setThemeMode }) {
+  const [open, setOpen] = useState(false)
+  const panelRef = useRef(null)
+  const accent = normalizeHex(accentColor)
+  const isDark = themeMode === 'dark'
+
+  useEffect(() => {
+    if (!open) return undefined
+    const handlePointerDown = (event) => {
+      if (panelRef.current?.contains(event.target)) return
+      setOpen(false)
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [open])
+
+  return (
+    <div ref={panelRef} className="appearance-control fixed bottom-4 right-4 z-[90] flex flex-col items-end gap-3 sm:bottom-5 sm:right-5">
+      {open && (
+        <div className="appearance-panel w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-black/10 bg-white/88 p-3 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.16)] backdrop-blur-2xl">
+          <div className="flex items-center justify-between gap-3 px-1 pb-2">
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#86868b]">Appearance</p>
+              <h2 className="text-sm font-semibold">테마 설정</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
+              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#f5f5f7] px-3 text-xs font-bold text-[#1d1d1f] transition hover:bg-white"
+              aria-label={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
+            >
+              {isDark ? <Sun size={15} /> : <Moon size={15} />}
+              {isDark ? 'Light' : 'Dark'}
+            </button>
+          </div>
+
+          <div className="rounded-xl bg-[#f5f5f7] p-3">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold text-[#6e6e73]">컬러</span>
+              <span className="rounded-full bg-white px-2.5 py-1 font-mono text-[11px] font-bold text-[#6e6e73]">{accent.toUpperCase()}</span>
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {accentSwatches.map((swatch) => {
+                const active = accent === swatch.value
+                return (
+                  <button
+                    key={swatch.value}
+                    type="button"
+                    onClick={() => setAccentColor(swatch.value)}
+                    className="relative flex aspect-square items-center justify-center rounded-full border border-black/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]"
+                    style={{ backgroundColor: swatch.value }}
+                    aria-label={`${swatch.name} 색상 선택`}
+                    title={swatch.name}
+                  >
+                    {active && <Check size={17} className="text-white drop-shadow" />}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="mt-3 flex items-center gap-2">
+              <label className="inline-flex min-h-10 flex-1 cursor-pointer items-center justify-between gap-3 rounded-full border border-black/10 bg-white px-3 text-xs font-bold text-[#1d1d1f]">
+                직접 선택
+                <input
+                  type="color"
+                  value={accent}
+                  onChange={(event) => setAccentColor(event.target.value)}
+                  className="h-7 w-9 cursor-pointer rounded-full border-0 bg-transparent p-0"
+                  aria-label="커스텀 색상 선택"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => setAccentColor(DEFAULT_ACCENT)}
+                className="min-h-10 rounded-full border border-black/10 bg-white px-3 text-xs font-bold text-[#6e6e73] transition hover:text-[#1d1d1f]"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="appearance-trigger inline-flex size-12 items-center justify-center rounded-full border border-black/10 bg-white/82 text-[#1d1d1f] shadow-[0_16px_38px_rgba(0,0,0,0.14)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white"
+        aria-label="테마 설정 열기"
+        aria-expanded={open}
+      >
+        <Palette size={20} />
+      </button>
+    </div>
+  )
+}
+
 // ─── Root router ────────────────────────────────────────────────────────────
 
 function PageFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f5f5f7]">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-black/10 border-t-[#0071e3]" />
+    <div className="flex min-h-screen items-center justify-center bg-[var(--app-bg)]">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-black/10 border-t-[var(--app-accent)]" />
     </div>
   )
 }
 
 function App() {
+  const [themeMode, setThemeMode] = useState(getStoredThemeMode)
+  const [accentColor, setAccentColor] = useState(getStoredAccentColor)
+
+  useEffect(() => {
+    const root = document.documentElement
+    const mode = themeMode === 'dark' ? 'dark' : 'light'
+    const accent = normalizeHex(accentColor)
+
+    root.dataset.themeMode = mode
+    root.style.setProperty('--app-accent', accent)
+    root.style.setProperty('--app-accent-hover', mixHex(accent, mode === 'dark' ? '#ffffff' : '#000000', mode === 'dark' ? 0.14 : 0.08))
+    root.style.setProperty('--app-accent-soft', mixHex(accent, mode === 'dark' ? '#17191f' : '#ffffff', mode === 'dark' ? 0.8 : 0.88))
+    root.style.setProperty('--app-accent-text', mode === 'dark' ? mixHex(accent, '#ffffff', 0.28) : mixHex(accent, '#000000', 0.08))
+    root.style.setProperty('--app-accent-border', `color-mix(in srgb, ${accent} 42%, transparent)`)
+
+    window.localStorage.setItem(THEME_MODE_KEY, mode)
+    window.localStorage.setItem(ACCENT_COLOR_KEY, accent)
+  }, [accentColor, themeMode])
+
   return (
     <Suspense fallback={<PageFallback />}>
       <ScrollToTop />
+      <AppearanceControl
+        accentColor={accentColor}
+        setAccentColor={setAccentColor}
+        themeMode={themeMode}
+        setThemeMode={setThemeMode}
+      />
       <Routes>
         <Route path="/" element={<HomeView />} />
         <Route path="/notices" element={<NoticesPage />} />
@@ -764,7 +946,7 @@ function HomeView() {
   }
 
   return (
-    <div className="relative min-h-screen bg-[#f5f5f7] text-[#1d1d1f] selection:bg-[#0071e3]/20 selection:text-[#1d1d1f]">
+    <div className="theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
 
       <header className="fixed inset-x-0 top-0 z-60">
         <div className={`${floatingBarBaseClass} relative mx-auto flex h-12 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8`}>
@@ -781,7 +963,7 @@ function HomeView() {
               return (
                 <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className={`relative px-1 text-xs font-semibold transition ${active ? 'text-[#1d1d1f]' : 'text-[#1d1d1f]/72 hover:text-[#1d1d1f]'}`}>
                   {tab.label}
-                  <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[#0071e3] transition ${active ? 'opacity-100' : 'opacity-0'}`} />
+                  <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${active ? 'opacity-100' : 'opacity-0'}`} />
                 </button>
               )
             })}
@@ -807,7 +989,7 @@ function HomeView() {
               type="button"
               onClick={() => navigate('/login')}
               disabled={authLoading}
-              className="ml-auto hidden shrink-0 whitespace-nowrap rounded-full bg-[#0071e3] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-wait disabled:opacity-70 md:inline-flex"
+              className="ml-auto hidden shrink-0 whitespace-nowrap rounded-full bg-[var(--app-accent)] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--app-accent-hover)] disabled:cursor-wait disabled:opacity-70 md:inline-flex"
             >
               로그인
             </button>
@@ -895,7 +1077,7 @@ function HomeView() {
           <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-b from-transparent to-white/85" />
           <div className="relative z-10 mx-auto max-w-7xl">
             <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/76 px-4 py-2 text-xs font-semibold text-[#6e6e73] shadow-[0_6px_22px_rgba(0,0,0,0.06)] backdrop-blur-xl">
-              <span className="size-2 rounded-full bg-[#0071e3]" />
+              <span className="size-2 rounded-full bg-[var(--app-accent)]" />
               2026 Semester Ready
             </div>
             <div className="relative mx-auto mt-8 flex h-36 w-36 items-center justify-center sm:h-44 sm:w-44">
@@ -923,7 +1105,7 @@ function HomeView() {
             </div>
             {latestNotice && (
               <button type="button" onClick={goNotices} className="mx-auto mt-7 flex max-w-md items-center gap-2 rounded-full bg-white px-4 py-2 text-left shadow-[0_2px_12px_rgba(0,0,0,0.08)] transition hover:shadow-[0_5px_18px_rgba(0,0,0,0.12)]">
-                <Megaphone size={14} className="shrink-0 text-[#0071e3]" />
+                <Megaphone size={14} className="shrink-0 text-[var(--app-accent-text)]" />
                 <span className="truncate text-xs font-semibold text-[#1d1d1f]">{latestNotice.title}</span>
                 <span className="ml-auto shrink-0 text-[10px] font-bold uppercase text-[#0066cc]">공지</span>
               </button>
@@ -998,7 +1180,7 @@ function HomeView() {
 
 function PageShell({ children, wide = false, full = false }) {
   return (
-    <div className="apple-route relative min-h-screen bg-[#f5f5f7] text-[#1d1d1f] selection:bg-[#0071e3]/20 selection:text-[#1d1d1f]">
+    <div className="apple-route relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
       <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white via-[#f5f5f7] to-white" />
       <div className="fixed right-4 top-4 z-50">
         <NotificationButton />
