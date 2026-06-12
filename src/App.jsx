@@ -10,7 +10,6 @@ import {
   Menu,
   Megaphone,
   Moon,
-  Palette,
   Rocket,
   Sparkles,
   Sun,
@@ -561,102 +560,69 @@ function NotificationButton({ alignLeft = false, padded = false }) {
 }
 
 function AppearanceControl({ accentColor, setAccentColor, themeMode, setThemeMode }) {
-  const [open, setOpen] = useState(false)
-  const panelRef = useRef(null)
   const accent = normalizeHex(accentColor)
   const isDark = themeMode === 'dark'
 
-  useEffect(() => {
-    if (!open) return undefined
-    const handlePointerDown = (event) => {
-      if (panelRef.current?.contains(event.target)) return
-      setOpen(false)
-    }
-    document.addEventListener('pointerdown', handlePointerDown)
-    return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [open])
-
   return (
-    <div ref={panelRef} className="appearance-control fixed bottom-4 right-4 z-[90] flex flex-col items-end gap-3 sm:bottom-5 sm:right-5">
-      {open && (
-        <div className="appearance-panel w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-black/10 bg-white/88 p-3 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.16)] backdrop-blur-2xl">
-          <div className="flex items-center justify-between gap-3 px-1 pb-2">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#86868b]">Appearance</p>
-              <h2 className="text-sm font-semibold">테마 설정</h2>
-            </div>
+    <section className="appearance-control border-t border-black/10 bg-[var(--app-surface-soft)] px-5 py-8 text-[var(--app-text)]">
+      <div className="mx-auto flex max-w-7xl flex-col gap-5 rounded-lg border border-black/10 bg-white/88 p-4 shadow-[0_12px_28px_rgba(0,0,0,0.08)] backdrop-blur-2xl sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--app-muted)]">Appearance</p>
+          <h2 className="mt-1 text-lg font-semibold text-[var(--app-text)]">화면 설정</h2>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:items-end">
+          <button
+            type="button"
+            onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[var(--app-text)] px-5 text-sm font-semibold text-[var(--app-bg)] transition hover:opacity-90"
+            aria-label={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
+          >
+            {isDark ? <Sun size={16} /> : <Moon size={16} />}
+            {isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
+          </button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">색상</span>
+            {accentSwatches.map((swatch) => {
+              const active = accent === swatch.value
+              return (
+                <button
+                  key={swatch.value}
+                  type="button"
+                  onClick={() => setAccentColor(swatch.value)}
+                  className={`relative flex size-8 items-center justify-center rounded-full border transition ${active ? 'border-[var(--app-text)]' : 'border-black/10 hover:scale-105'}`}
+                  style={{ backgroundColor: swatch.value }}
+                  aria-label={`${swatch.name} 색상 선택`}
+                  title={swatch.name}
+                >
+                  {active && <Check size={15} className="text-white drop-shadow" />}
+                </button>
+              )
+            })}
+            <label className="inline-flex min-h-8 cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)]">
+              직접 선택
+              <input
+                type="color"
+                value={accent}
+                onChange={(event) => setAccentColor(event.target.value)}
+                className="h-5 w-6 cursor-pointer rounded-full border-0 bg-transparent p-0"
+                aria-label="커스텀 색상 선택"
+              />
+            </label>
             <button
               type="button"
-              onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
-              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#f5f5f7] px-3 text-xs font-bold text-[#1d1d1f] transition hover:bg-white"
-              aria-label={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
+              onClick={() => setAccentColor(DEFAULT_ACCENT)}
+              className="min-h-8 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
             >
-              {isDark ? <Sun size={15} /> : <Moon size={15} />}
-              {isDark ? 'Light' : 'Dark'}
+              Reset
             </button>
           </div>
-
-          <div className="rounded-xl bg-[#f5f5f7] p-3">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold text-[#6e6e73]">컬러</span>
-              <span className="rounded-full bg-white px-2.5 py-1 font-mono text-[11px] font-bold text-[#6e6e73]">{accent.toUpperCase()}</span>
-            </div>
-            <div className="grid grid-cols-5 gap-2">
-              {accentSwatches.map((swatch) => {
-                const active = accent === swatch.value
-                return (
-                  <button
-                    key={swatch.value}
-                    type="button"
-                    onClick={() => setAccentColor(swatch.value)}
-                    className="relative flex aspect-square items-center justify-center rounded-full border border-black/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]"
-                    style={{ backgroundColor: swatch.value }}
-                    aria-label={`${swatch.name} 색상 선택`}
-                    title={swatch.name}
-                  >
-                    {active && <Check size={17} className="text-white drop-shadow" />}
-                  </button>
-                )
-              })}
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <label className="inline-flex min-h-10 flex-1 cursor-pointer items-center justify-between gap-3 rounded-full border border-black/10 bg-white px-3 text-xs font-bold text-[#1d1d1f]">
-                직접 선택
-                <input
-                  type="color"
-                  value={accent}
-                  onChange={(event) => setAccentColor(event.target.value)}
-                  className="h-7 w-9 cursor-pointer rounded-full border-0 bg-transparent p-0"
-                  aria-label="커스텀 색상 선택"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => setAccentColor(DEFAULT_ACCENT)}
-                className="min-h-10 rounded-full border border-black/10 bg-white px-3 text-xs font-bold text-[#6e6e73] transition hover:text-[#1d1d1f]"
-              >
-                Reset
-              </button>
-            </div>
-          </div>
         </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="appearance-trigger inline-flex size-12 items-center justify-center rounded-full border border-black/10 bg-white/82 text-[#1d1d1f] shadow-[0_16px_38px_rgba(0,0,0,0.14)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white"
-        aria-label="테마 설정 열기"
-        aria-expanded={open}
-      >
-        <Palette size={20} />
-      </button>
-    </div>
+      </div>
+    </section>
   )
 }
-
-// ─── Root router ────────────────────────────────────────────────────────────
-
 function PageFallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--app-bg)]">
@@ -688,12 +654,6 @@ function App() {
   return (
     <Suspense fallback={<PageFallback />}>
       <ScrollToTop />
-      <AppearanceControl
-        accentColor={accentColor}
-        setAccentColor={setAccentColor}
-        themeMode={themeMode}
-        setThemeMode={setThemeMode}
-      />
       <Routes>
         <Route path="/" element={<HomeView />} />
         <Route path="/notices" element={<NoticesPage />} />
@@ -709,6 +669,12 @@ function App() {
         <Route path="/recruit-notice" element={<RecruitNoticePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <AppearanceControl
+        accentColor={accentColor}
+        setAccentColor={setAccentColor}
+        themeMode={themeMode}
+        setThemeMode={setThemeMode}
+      />
     </Suspense>
   )
 }
