@@ -4,7 +4,6 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import {
   Binary,
   Bell,
-  Check,
   CircuitBoard,
   LogOut,
   Menu,
@@ -597,56 +596,62 @@ function AppearanceControl({ accentColor, setAccentColor, themeMode, setThemeMod
   const isDark = themeMode === 'dark'
 
   return (
-    <section className="appearance-control border-t border-black/10 bg-[var(--app-surface-soft)] px-5 py-8 text-[var(--app-text)]">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 rounded-lg border border-black/10 bg-white/88 p-4 shadow-[0_12px_28px_rgba(0,0,0,0.08)] backdrop-blur-2xl sm:flex-row sm:items-center sm:justify-between">
-        <div>
+    <section className="appearance-control border-t border-black/10 bg-[var(--app-surface-soft)] px-4 py-6 text-[var(--app-text)] sm:px-6">
+      <div className="appearance-panel mx-auto grid w-full max-w-5xl gap-5 rounded-lg border border-black/10 bg-white/88 px-5 py-5 shadow-[0_12px_28px_rgba(0,0,0,0.07)] backdrop-blur-2xl lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="min-w-0">
           <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--app-muted)]">Appearance</p>
           <h2 className="mt-1 text-lg font-semibold text-[var(--app-text)]">화면 설정</h2>
         </div>
 
-        <div className="flex flex-col gap-3 sm:items-end">
+        <div className="flex min-w-0 flex-col gap-3 lg:items-end">
           <button
             type="button"
             onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[var(--app-text)] px-5 text-sm font-semibold text-[var(--app-bg)] transition hover:opacity-90"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--app-text)] px-4 text-sm font-semibold text-[var(--app-bg)] shadow-[0_8px_22px_rgba(0,0,0,0.12)] transition hover:opacity-90 sm:w-auto"
             aria-label={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
           >
-            {isDark ? <Sun size={16} /> : <Moon size={16} />}
+            <span className="grid size-7 place-items-center rounded-full bg-white/12">
+              {isDark ? <Sun size={15} /> : <Moon size={15} />}
+            </span>
             {isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
           </button>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">색상</span>
-            {accentSwatches.map((swatch) => {
-              const active = accent === swatch.value
-              return (
-                <button
-                  key={swatch.value}
-                  type="button"
-                  onClick={() => setAccentColor(swatch.value)}
-                  className={`relative flex size-8 items-center justify-center rounded-full border transition ${active ? 'border-[var(--app-text)]' : 'border-black/10 hover:scale-105'}`}
-                  style={{ backgroundColor: swatch.value }}
-                  aria-label={`${swatch.name} 색상 선택`}
-                  title={swatch.name}
-                >
-                  {active && <Check size={15} className="text-white drop-shadow" />}
-                </button>
-              )
-            })}
-            <label className="inline-flex min-h-8 cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)]">
+            <div className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-[var(--app-surface)] p-1">
+              {accentSwatches.map((swatch) => {
+                const active = accent === swatch.value
+                return (
+                  <button
+                    key={swatch.value}
+                    type="button"
+                    onClick={() => setAccentColor(swatch.value)}
+                    className={`relative grid size-8 place-items-center rounded-full transition hover:scale-105 ${active ? 'ring-2 ring-[var(--app-text)] ring-offset-2 ring-offset-[var(--app-surface)]' : ''}`}
+                    style={{ backgroundColor: swatch.value }}
+                    aria-label={`${swatch.name} 색상 선택`}
+                    title={swatch.name}
+                  >
+                    {active && <span className="size-2.5 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.28)]" />}
+                  </button>
+                )
+              })}
+            </div>
+            <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)]">
               직접 선택
-              <input
-                type="color"
-                value={accent}
-                onChange={(event) => setAccentColor(event.target.value)}
-                className="h-5 w-6 cursor-pointer rounded-full border-0 bg-transparent p-0"
-                aria-label="커스텀 색상 선택"
-              />
+              <span className="relative grid size-6 overflow-hidden rounded-full border border-black/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]" style={{ backgroundColor: accent }}>
+                <input
+                  type="color"
+                  value={accent}
+                  onChange={(event) => setAccentColor(event.target.value)}
+                  className="absolute -inset-2 h-10 w-10 cursor-pointer opacity-0"
+                  aria-label="커스텀 색상 선택"
+                />
+              </span>
             </label>
             <button
               type="button"
               onClick={() => setAccentColor(DEFAULT_ACCENT)}
-              className="min-h-8 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+              className="min-h-10 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface-elevated)] hover:text-[var(--app-text)]"
             >
               Reset
             </button>
