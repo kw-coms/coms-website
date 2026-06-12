@@ -215,16 +215,16 @@ function externalBlockFromUrl(value, meta = {}) {
       title: meta.title || 'YouTube 영상',
       thumbnailUrl: meta.thumbnailUrl || '',
       width: 75,
-      align: 'left',
+      align: 'center',
       id: localId(),
     }
   }
   const path = url.pathname.toLowerCase()
   if (/\.(png|jpe?g|gif|webp|avif)$/.test(path)) {
-    return { type: 'externalEmbed', provider: 'external', kind: 'image', url: raw, title: meta.title || '외부 이미지', width: 75, align: 'left', id: localId() }
+    return { type: 'externalEmbed', provider: 'external', kind: 'image', url: raw, title: meta.title || '외부 이미지', width: 75, align: 'center', id: localId() }
   }
   if (/\.(mp4|webm|mov)$/.test(path)) {
-    return { type: 'externalEmbed', provider: 'external', kind: 'video', url: raw, title: meta.title || '외부 영상', width: 75, align: 'left', id: localId() }
+    return { type: 'externalEmbed', provider: 'external', kind: 'video', url: raw, title: meta.title || '외부 영상', width: 75, align: 'center', id: localId() }
   }
   throw new Error('YouTube, 이미지 파일 URL, 영상 파일 URL만 삽입할 수 있습니다.')
 }
@@ -314,7 +314,7 @@ function parsePostBlocks(post) {
           return { type: 'file', status: 'saved', fileId: block.fileId, name: block.name || info?.originalName, url: info?.url, id: localId() }
         }
         if (block.type === 'externalEmbed') {
-          return { ...block, width: block.width || 75, align: block.align || 'left', id: localId() }
+          return { ...block, width: block.width || 75, align: block.align || 'center', id: localId() }
         }
         if (block.type === 'poll') {
           return { type: 'poll', pollId: block.pollId, question: block.question || '', options: Array.isArray(block.options) ? block.options : [], id: localId() }
@@ -430,7 +430,7 @@ function renderPostBlocks(post, options = {}) {
     if (align === 'right') {
       return { ...base, display: 'block', float: 'right', margin: '0.25rem 0 0.75rem 1rem' }
     }
-    return { ...base, display: 'inline-block', margin: '0.15rem 0.2rem', verticalAlign: 'top' }
+    return { ...base, display: 'block', clear: 'both', margin: '0.75rem auto' }
   }
   return (
     <div className="px-4 py-5 sm:px-5">
@@ -439,17 +439,17 @@ function renderPostBlocks(post, options = {}) {
           if (!block.content.trim()) return null
           if (hasFormattedText(block.content)) {
             return (
-              <span
+              <div
                 key={i}
-                className="text-size-container whitespace-pre-wrap break-words auto-text-post"
+                className="community-post-text text-size-container whitespace-pre-wrap break-words auto-text-post"
                 dangerouslySetInnerHTML={{ __html: sanitizeEditorHtml(block.content) }}
               />
             )
           }
           return (
-            <span key={i} className="text-size-container whitespace-pre-wrap break-words auto-text-post">
+            <div key={i} className="community-post-text text-size-container whitespace-pre-wrap break-words auto-text-post">
               {linkify(block.content)}
-            </span>
+            </div>
           )
         }
         if (block.type === 'image') {
@@ -665,7 +665,7 @@ function figureInlineStyle(wPct, align) {
   const base = 'max-width:100%;user-select:none;-webkit-user-select:none;-webkit-user-drag:element;cursor:grab'
   if (align === 'left') return `${base};display:block;float:left;width:${wPct}%;margin:0.25rem 1rem 0.75rem 0;`
   if (align === 'right') return `${base};display:block;float:right;width:${wPct}%;margin:0.25rem 0 0.75rem 1rem;`
-  return `${base};display:inline-block;vertical-align:top;width:${wPct}%;margin:0.15rem 0.2rem;`
+  return `${base};display:block;clear:both;width:${wPct}%;margin:0.75rem auto;`
 }
 
 function domToBlocks(editorEl, figMeta) {
@@ -923,7 +923,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
       } else if (block.type === 'image' || block.type === 'video') {
         const id = block.id || localId()
         const wPct = mediaWidthPercent(block.width)
-        const align = block.align || 'left'
+        const align = block.align || 'center'
         figMeta.current.set(id, { type: block.type, status: block.status || 'saved', mediaId: block.mediaId, file: block.file, preview: block.preview, name: block.name, url: block.url, width: wPct, align, legacy: block.legacy })
         const src = safeSrc(block.preview || (block.url ? apiUrl(block.url) : ''))
         const inner = block.type === 'image'
@@ -937,7 +937,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
       } else if (block.type === 'externalEmbed') {
         const id = block.id || localId()
         const wPct = mediaWidthPercent(block.width)
-        const align = block.align || 'left'
+        const align = block.align || 'center'
         figMeta.current.set(id, { ...block, width: wPct, align })
         const title = escH(block.title || (block.kind === 'youtube' ? 'YouTube 영상' : '외부 콘텐츠'))
         const src = safeExternalSrc(block.kind === 'youtube' ? block.embedUrl : block.url)
@@ -1017,16 +1017,16 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
     const type = isImage ? 'image' : isVideo ? 'video' : 'file'
     const id = localId()
     const preview = type !== 'file' ? URL.createObjectURL(file) : null
-    figMeta.current.set(id, { type, status: 'pending', file, preview, name: file.name, width: 75, align: type === 'file' ? 'center' : 'left' })
+    figMeta.current.set(id, { type, status: 'pending', file, preview, name: file.name, width: 75, align: 'center' })
     const figure = document.createElement('figure')
     figure.className = 'community-editor-figure'
     figure.contentEditable = 'false'
     figure.draggable = true
     figure.dataset.blockId = id
     figure.dataset.type = type
-    figure.dataset.align = type === 'file' ? 'center' : 'left'
+    figure.dataset.align = 'center'
     if (type === 'image') {
-      figure.setAttribute('style', figureInlineStyle(75, 'left'))
+      figure.setAttribute('style', figureInlineStyle(75, 'center'))
       const img = document.createElement('img')
       img.src = preview
       img.className = 'community-inline-media-image'
@@ -1034,7 +1034,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
       img.draggable = false
       figure.appendChild(img)
     } else if (type === 'video') {
-      figure.setAttribute('style', figureInlineStyle(75, 'left'))
+      figure.setAttribute('style', figureInlineStyle(75, 'center'))
       const vid = document.createElement('video')
       vid.src = preview
       vid.controls = true
@@ -1055,7 +1055,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
   const insertExternalEmbed = (block) => {
     const id = block.id || localId()
     const wPct = mediaWidthPercent(block.width || 75)
-    const align = block.align || 'left'
+    const align = block.align || 'center'
     figMeta.current.set(id, { ...block, id, width: wPct, align })
     const figure = document.createElement('figure')
     figure.className = 'community-editor-figure'
@@ -1445,7 +1445,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
           if (b.type === 'image' && b.mediaId) return { type: 'image', mediaId: b.mediaId, name: b.name, width: b.width || 75, align: b.align || 'center' }
           if (b.type === 'video' && b.mediaId) return { type: 'video', mediaId: b.mediaId, name: b.name, width: b.width || 75, align: b.align || 'center' }
           if (b.type === 'file' && b.fileId) return { type: 'file', fileId: b.fileId, name: b.name }
-          if (b.type === 'externalEmbed') return { type: 'externalEmbed', provider: b.provider, kind: b.kind, url: b.url, embedUrl: b.embedUrl, title: b.title, thumbnailUrl: b.thumbnailUrl, width: b.width || 75, align: b.align || 'left' }
+          if (b.type === 'externalEmbed') return { type: 'externalEmbed', provider: b.provider, kind: b.kind, url: b.url, embedUrl: b.embedUrl, title: b.title, thumbnailUrl: b.thumbnailUrl, width: b.width || 75, align: b.align || 'center' }
           if (b.type === 'poll') return { type: 'poll', pollId: b.pollId, question: b.question, options: b.options || [], closesAt: b.closesAt, closedAt: b.closedAt }
           return null
         }).filter(Boolean)
