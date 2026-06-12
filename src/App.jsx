@@ -1392,25 +1392,25 @@ function HomeView() {
             {tabs.map((tab) => {
               const active = activeSection === tab.id
               return (
-                <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className={`relative px-1 text-xs font-semibold transition ${active ? 'text-[#1d1d1f]' : 'text-[#1d1d1f]/72 hover:text-[#1d1d1f]'}`}>
+                <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className={`relative px-1 text-xs font-semibold transition ${active ? 'text-[var(--app-text)]' : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'}`}>
                   {tab.label}
                   <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${active ? 'opacity-100' : 'opacity-0'}`} />
                 </button>
               )
             })}
-            <button type="button" onClick={goNotices} className="px-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:text-[#1d1d1f]">Notices</button>
-            <button type="button" onClick={goArchive} disabled={authLoading} className="px-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:text-[#1d1d1f] disabled:cursor-wait disabled:opacity-60">Resources</button>
-            <button type="button" onClick={goCommunity} disabled={authLoading} className="px-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:text-[#1d1d1f] disabled:cursor-wait disabled:opacity-60">Community</button>
+            <button type="button" onClick={goNotices} className="px-1 text-xs font-semibold text-[var(--app-muted)] transition hover:text-[var(--app-text)]">Notices</button>
+            <button type="button" onClick={goArchive} disabled={authLoading} className="px-1 text-xs font-semibold text-[var(--app-muted)] transition hover:text-[var(--app-text)] disabled:cursor-wait disabled:opacity-60">Resources</button>
+            <button type="button" onClick={goCommunity} disabled={authLoading} className="px-1 text-xs font-semibold text-[var(--app-muted)] transition hover:text-[var(--app-text)] disabled:cursor-wait disabled:opacity-60">Community</button>
           </nav>
 
           {user ? (
             <div className="ml-auto hidden items-center gap-1 md:flex">
               <NotificationButton />
-              <button type="button" onClick={goChangePassword} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]" title="계정 설정">{user.name}</button>
+              <button type="button" onClick={goChangePassword} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)]" title="계정 설정">{user.name}</button>
               {user.role === 'ADMIN' && (
                 <button type="button" onClick={goAdmin} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[#b45309] transition hover:bg-amber-100/70">관리자</button>
               )}
-              <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]">
+              <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)]">
                 <LogOut size={14} />
                 Logout
               </button>
@@ -1503,34 +1503,26 @@ function HomeView() {
       </header>
 
       <main className="relative overflow-hidden pt-[44px]">
-        <section className="apple-home-hero relative flex min-h-[calc(86svh-44px)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-12 text-center sm:min-h-[calc(92svh-44px)] sm:py-14">
+        <section className="apple-home-hero relative flex min-h-[calc(78svh-44px)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-10 text-center sm:min-h-[calc(84svh-44px)] sm:py-12">
           <div className="home-hero-surface absolute inset-0" />
-          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-b from-transparent to-white/85" />
-          <div className="relative z-10 mx-auto max-w-7xl">
-            <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/76 px-4 py-2 text-xs font-semibold text-[#6e6e73] shadow-[0_6px_22px_rgba(0,0,0,0.06)] backdrop-blur-xl">
+          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-linear-to-b from-transparent to-white/82" />
+          <div className="relative z-10 mx-auto w-full max-w-5xl">
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/64 px-3 py-1.5 text-xs font-semibold text-[#6e6e73] shadow-[0_4px_16px_rgba(0,0,0,0.05)] backdrop-blur-xl">
               <span className="size-2 rounded-full bg-[var(--app-accent)]" />
               2026 Semester Ready
             </div>
-            <div className="relative mx-auto mt-8 flex h-36 w-36 items-center justify-center sm:h-44 sm:w-44">
-              <div className="absolute inset-0 rounded-[2rem] bg-white/88 shadow-[0_24px_70px_rgba(0,0,0,0.1)] ring-1 ring-black/5" />
-              <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="home-logo-float relative z-10 h-24 w-24 object-contain sm:h-32 sm:w-32" />
-              <div className="absolute -left-28 top-8 hidden rounded-lg bg-white/82 px-4 py-3 text-left shadow-[0_16px_40px_rgba(0,0,0,0.09)] backdrop-blur-xl sm:block">
-                <p className="text-xs font-semibold text-[#86868b]">Track</p>
-                <p className="mt-1 text-sm font-semibold text-[#1d1d1f]">Study to Project</p>
-              </div>
-              <div className="absolute -right-28 bottom-8 hidden rounded-lg bg-[#1d1d1f] px-4 py-3 text-left text-white shadow-[0_16px_40px_rgba(0,0,0,0.18)] sm:block">
-                <p className="text-xs font-semibold text-white/58">Mode</p>
-                <p className="mt-1 text-sm font-semibold">Build together</p>
-              </div>
+            <div className="relative mx-auto mt-6 flex h-28 w-28 items-center justify-center sm:mt-7 sm:h-36 sm:w-36">
+              <div className="absolute inset-0 rounded-[1.75rem] bg-white/82 shadow-[0_18px_54px_rgba(0,0,0,0.09)] ring-1 ring-black/5" />
+              <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="home-logo-float relative z-10 h-20 w-20 object-contain sm:h-24 sm:w-24" />
             </div>
-            <p className="mt-7 text-sm font-semibold text-[#6e6e73]">Kwangwoon University Computer Club</p>
-            <h2 className="apple-display mt-2 text-6xl sm:text-8xl lg:text-[8.5rem]">
+            <p className="mt-6 text-sm font-semibold text-[#6e6e73]">Kwangwoon University Computer Club</p>
+            <h2 className="apple-display mt-2 whitespace-nowrap text-[3.2rem] sm:text-8xl lg:text-[8.5rem]">
               KW COM&apos;s
             </h2>
-            <p className="apple-copy mx-auto mt-6 max-w-[19rem] text-lg sm:max-w-3xl sm:text-2xl">
+            <p className="apple-copy mx-auto mt-5 max-w-[20rem] text-lg sm:max-w-3xl sm:text-2xl">
               배우고, 만들고, 성장하는 광운대학교 컴퓨터 학술동아리.
             </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <div className="mt-7 flex flex-wrap justify-center gap-3">
               <button type="button" onClick={() => openPanel('about')} className={solidActionBtnClass}>더 알아보기</button>
               <button type="button" onClick={goRecruitPage} className={ghostActionBtnClass}>지원하기</button>
             </div>
@@ -1541,33 +1533,33 @@ function HomeView() {
                 <span className="ml-auto shrink-0 text-[10px] font-bold uppercase text-[#0066cc]">공지</span>
               </button>
             )}
-            <div className="mx-auto mt-8 flex max-w-[21rem] flex-wrap justify-center gap-2 sm:max-w-3xl">
+            <div className="mx-auto mt-6 flex max-w-[21rem] flex-wrap justify-center gap-2 sm:max-w-3xl">
               {experiencePills.map((pill) => (
                 <span key={pill} className="rounded-full bg-white/70 px-2.5 py-1.5 text-[11px] font-semibold text-[#6e6e73] shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:px-3 sm:text-xs">
                   {pill}
                 </span>
               ))}
             </div>
-            <div className="mx-auto mt-10 hidden max-w-5xl gap-3 sm:grid sm:grid-cols-3">
+            <div className="apple-hero-metrics mx-auto mt-8 hidden max-w-3xl grid-cols-3 sm:grid">
               {heroHighlights.map((item) => (
-                <div key={item.value} className="rounded-lg bg-white px-5 py-5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)]">
-                  <p className="text-xs font-semibold text-[#86868b]">{item.label}</p>
-                  <p className="mt-2 text-xl font-semibold text-[#1d1d1f]">{item.value}</p>
-                  <p className="mt-1 text-sm leading-6 text-[#6e6e73]">{item.detail}</p>
+                <div key={item.value} className="px-5 text-center">
+                  <p className="text-[11px] font-semibold text-[#86868b]">{item.label}</p>
+                  <p className="mt-1 text-base font-semibold text-[#1d1d1f]">{item.value}</p>
+                  <p className="mt-1 text-xs leading-5 text-[#6e6e73]">{item.detail}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="bg-white px-5 py-3 sm:py-5">
+        <section className="apple-showcase-strip bg-white px-5 py-4 sm:py-6">
           <div className="mx-auto grid max-w-7xl gap-3 lg:grid-cols-3">
             {showcaseItems.map((item, index) => (
               <button
                 key={item.title}
                 type="button"
                 onClick={() => openPanel(item.target)}
-                className={`apple-product-panel apple-showcase-card group min-h-[13.5rem] px-7 py-7 text-left transition hover:-translate-y-0.5 ${index === 0 ? 'bg-[#1d1d1f] text-white' : index === 1 ? 'bg-[#f5f5f7] text-[#1d1d1f]' : 'bg-linear-to-br from-[#e8f8ff] to-[#ffffff] text-[#1d1d1f]'}`}
+                className={`apple-product-panel apple-showcase-card group min-h-[12rem] px-6 py-6 text-left transition hover:-translate-y-0.5 ${index === 0 ? 'apple-showcase-card-dark text-white' : index === 1 ? 'apple-showcase-card-plain text-[#1d1d1f]' : 'apple-showcase-card-soft text-[#1d1d1f]'}`}
               >
                 <p className={`text-sm font-semibold ${index === 0 ? 'text-white/58' : 'text-[#0066cc]'}`}>{item.eyebrow}</p>
                 <h3 className="mt-3 text-3xl font-semibold leading-tight tracking-normal">{item.title}</h3>
