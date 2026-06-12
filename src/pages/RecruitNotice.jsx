@@ -26,22 +26,22 @@ const processSteps = [
 
 export default function RecruitNotice({ onBack, onApply }) {
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full min-w-0 space-y-4">
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-white"
+        className="apple-action-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"
       >
         <ArrowLeft size={15} />
         이전 화면으로
       </button>
 
-      <section className="overflow-hidden rounded-lg border border-black/10 bg-white text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
-        <div className="flex items-start justify-between gap-4 border-b border-black/10 bg-linear-to-br from-[#e8f3ff] via-white to-[#f5f5f7] px-6 py-7 sm:px-8">
+      <section className="apple-board-shell">
+        <div className="apple-board-hero flex items-start justify-between gap-4 px-6 py-8 sm:px-8 sm:py-10">
           <div>
-            <p className="text-sm font-semibold text-[#0066cc]">Recruit Notice</p>
-            <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-normal sm:text-5xl">COM&apos;s 신입 부원 모집 공지</h1>
-            <p className="mt-4 max-w-3xl text-sm font-semibold text-[#6e6e73]">광운대학교 중앙 컴퓨터 학술동아리</p>
+            <p className="apple-eyebrow">Recruit Notice</p>
+            <h1 className="apple-display mt-4 text-4xl sm:text-6xl">COM&apos;s 신입 부원 모집 공지</h1>
+            <p className="apple-copy mt-5 max-w-3xl text-base sm:text-lg">광운대학교 중앙 컴퓨터 학술동아리에서 함께 배울 새 멤버를 기다립니다.</p>
           </div>
           <button
             type="button"
@@ -73,7 +73,7 @@ export default function RecruitNotice({ onBack, onApply }) {
 
             <div className="grid gap-3 md:grid-cols-3">
               {recruitDetails.map(({ title, icon: Icon, body }) => (
-                <div key={title} className="rounded-lg border border-black/10 bg-[#f5f5f7] p-4">
+                <div key={title} className="apple-soft-panel bg-[#f5f5f7] p-4">
                   <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-[#e8f3ff] text-[#0066cc]">
                     <Icon size={19} />
                   </div>
@@ -120,7 +120,7 @@ export default function RecruitNotice({ onBack, onApply }) {
             <button
               type="button"
               onClick={onApply}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 py-3 text-base font-semibold text-white transition hover:bg-[#0077ed]"
+              className="apple-action-primary inline-flex w-full items-center justify-center gap-2 px-4 py-3 text-base"
             >
               <PenLine size={17} />
               지원서 작성하기
