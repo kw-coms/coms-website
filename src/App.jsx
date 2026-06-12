@@ -326,10 +326,10 @@ const footerLinkGroups = [
   {
     title: "COM's",
     links: [
-      { label: 'About', href: '/#about' },
-      { label: 'Activities', href: '/#activities' },
-      { label: 'Projects', href: '/#projects' },
-      { label: 'Recruit', href: '/#recruit' },
+      { label: 'About', href: '/about' },
+      { label: 'Activities', href: '/activities' },
+      { label: 'Projects', href: '/projects' },
+      { label: 'Recruit', href: '/recruit' },
     ],
   },
   {
@@ -351,6 +351,27 @@ const footerLinkGroups = [
     ],
   },
 ]
+
+const navExtraItems = [
+  { id: 'notices', label: 'Notices', path: '/notices' },
+  { id: 'resources', label: 'Resources', path: '/resources', auth: true },
+  { id: 'community', label: 'Community', path: '/community', auth: true },
+]
+
+function getTabRoute(id) {
+  return id === 'recruit' ? '/recruit' : `/${id}`
+}
+
+function getActiveNavKey(pathname) {
+  if (pathname === '/about') return 'about'
+  if (pathname === '/activities') return 'activities'
+  if (pathname === '/projects') return 'projects'
+  if (pathname.startsWith('/recruit')) return 'recruit'
+  if (pathname.startsWith('/notices')) return 'notices'
+  if (pathname.startsWith('/resources')) return 'resources'
+  if (pathname.startsWith('/community')) return 'community'
+  return null
+}
 
 function normalizeHex(value) {
   if (typeof value !== 'string') return DEFAULT_ACCENT
@@ -528,7 +549,7 @@ function SettingsPage() {
 function RecruitPage() {
   const navigate = useNavigate()
   return (
-    <PageShell wide transition={false}>
+    <PageShell wide full transition={false}>
       <RecruitApply onBack={() => navigate('/')} />
     </PageShell>
   )
@@ -547,6 +568,181 @@ function RecruitNoticePage() {
     <PageShell wide full transition={false}>
       <RecruitNotice onBack={() => navigate(from, { replace: true })} onApply={goApply} />
     </PageShell>
+  )
+}
+
+function GlobalNavigation() {
+  const { user, loading: authLoading, logout } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const activeKey = getActiveNavKey(location.pathname)
+
+  const goPageTop = (to, options) => {
+    scrollToTopInstant()
+    navigate(to, options)
+  }
+
+  const closeAndGo = (to, options) => {
+    setMobileMenuOpen(false)
+    goPageTop(to, options)
+  }
+
+  const goProtected = (to) => {
+    if (authLoading) return
+    closeAndGo(to)
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    setMobileMenuOpen(false)
+    goPageTop('/')
+  }
+
+  const navClass = (key) => (
+    `relative px-1 text-xs font-semibold transition ${
+      activeKey === key
+        ? 'text-[var(--app-text)]'
+        : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'
+    }`
+  )
+
+  return (
+    <header className="apple-global-nav fixed inset-x-0 top-0 z-[80]">
+      <div className={`${floatingBarBaseClass} relative mx-auto flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-8`}>
+        <button
+          type="button"
+          onClick={() => goPageTop('/')}
+          className="flex min-w-0 items-center gap-3 text-left"
+        >
+          <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="h-6 w-6 shrink-0 object-contain" />
+          <span className="whitespace-nowrap text-sm font-semibold text-[var(--app-text)]">KW COM&apos;s</span>
+        </button>
+
+        <nav className="pointer-events-auto absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-6 md:flex">
+          {tabs.map((tab) => {
+            const route = getTabRoute(tab.id)
+            return (
+              <button key={tab.id} type="button" onClick={() => goPageTop(route)} className={navClass(tab.id)}>
+                {tab.label}
+                <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === tab.id ? 'opacity-100' : 'opacity-0'}`} />
+              </button>
+            )
+          })}
+          {navExtraItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => (item.auth ? goProtected(item.path) : goPageTop(item.path))}
+              disabled={item.auth && authLoading}
+              className={`${navClass(item.id)} disabled:cursor-wait disabled:opacity-60`}
+            >
+              {item.label}
+              <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === item.id ? 'opacity-100' : 'opacity-0'}`} />
+            </button>
+          ))}
+        </nav>
+
+        {user ? (
+          <div className="ml-auto hidden items-center gap-1 md:flex">
+            <NotificationButton />
+            <button type="button" onClick={() => goPageTop('/settings')} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)]" title="계정 설정">{user.name}</button>
+            {user.role === 'ADMIN' && (
+              <button type="button" onClick={() => goPageTop('/admin')} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[#b45309] transition hover:bg-amber-100/70">관리자</button>
+            )}
+            <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)]">
+              <LogOut size={14} />
+              Logout
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => goPageTop('/login')}
+            disabled={authLoading}
+            className="ml-auto hidden shrink-0 whitespace-nowrap rounded-full bg-[var(--app-accent)] px-4 py-1 text-xs font-semibold text-white transition hover:bg-[var(--app-accent-hover)] disabled:cursor-wait disabled:opacity-70 md:inline-flex"
+          >
+            로그인
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen((open) => !open)}
+          className="apple-global-nav-menu fixed right-4 top-1.5 z-[90] flex size-8 shrink-0 items-center justify-center rounded-full transition hover:bg-black/5 md:hidden"
+          aria-label="메뉴"
+          aria-expanded={mobileMenuOpen}
+          aria-controls="mobile-menu"
+          aria-haspopup="menu"
+        >
+          {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
+      </div>
+
+      {mobileMenuOpen && (
+        <div
+          id="mobile-menu"
+          role="menu"
+          className="mx-auto border-b border-black/10 bg-[var(--app-surface)]/95 shadow-[0_12px_28px_rgba(0,0,0,0.08)] backdrop-blur-xl md:hidden"
+        >
+          <div className="flex flex-col divide-y divide-black/8">
+            {tabs.map((tab) => {
+              const route = getTabRoute(tab.id)
+              return (
+                <button key={tab.id} type="button" onClick={() => closeAndGo(route)} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--app-text)] transition hover:bg-white/60">
+                  <tab.icon size={15} className={tab.accent} />
+                  <span>{tab.label}</span>
+                  <span className="ml-auto text-xs text-[var(--app-muted)]">{tab.hint}</span>
+                </button>
+              )
+            })}
+            <button type="button" onClick={() => closeAndGo('/notices')} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--app-text)] transition hover:bg-white/60">
+              <Megaphone size={15} className="text-cyan-500" />
+              <span>Notices</span>
+              <span className="ml-auto text-xs text-[var(--app-muted)]">공지사항</span>
+            </button>
+            <button type="button" onClick={() => goProtected('/resources')} disabled={authLoading} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--app-text)] transition hover:bg-white/60 disabled:opacity-50">
+              <CircuitBoard size={15} className="text-violet-400" />
+              <span>Resources</span>
+              <span className="ml-auto text-xs text-[var(--app-muted)]">자료실</span>
+            </button>
+            <button type="button" onClick={() => goProtected('/community')} disabled={authLoading} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--app-text)] transition hover:bg-white/60 disabled:opacity-50">
+              <Sparkles size={15} className="text-rose-400" />
+              <span>Community</span>
+              <span className="ml-auto text-xs text-[var(--app-muted)]">커뮤니티</span>
+            </button>
+            {!user && (
+              <button type="button" onClick={() => closeAndGo('/login')} disabled={authLoading} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[#0066cc] transition hover:bg-white/60 disabled:opacity-50">
+                <span>로그인</span>
+              </button>
+            )}
+            {user && (
+              <div className="border-t border-black/10">
+                <div className="flex flex-col divide-y divide-black/8">
+                  <button type="button" onClick={() => closeAndGo('/settings')} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--app-text)] transition hover:bg-white/60">
+                    <span className="flex size-5 items-center justify-center rounded-full bg-black/10 text-[10px] font-black">{user.name?.[0] ?? '?'}</span>
+                    <span>{user.name}</span>
+                    <span className="ml-auto text-xs text-[var(--app-muted)]">계정 설정</span>
+                  </button>
+                  {user.role === 'ADMIN' && (
+                    <button type="button" onClick={() => closeAndGo('/admin')} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-50/60">
+                      <span>관리자 패널</span>
+                    </button>
+                  )}
+                  <div className="py-3.5">
+                    <NotificationButton alignLeft padded />
+                  </div>
+                  <button type="button" onClick={handleLogout} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--app-text)] transition hover:bg-white/60">
+                    <LogOut size={15} />
+                    <span>로그아웃</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </header>
   )
 }
 
@@ -832,6 +1028,7 @@ function App() {
   return (
     <Suspense fallback={<PageFallback />}>
       <ScrollToTop />
+      <GlobalNavigation />
       <Routes>
         <Route path="/" element={<HomeView />} />
         <Route path="/about" element={<AboutPage />} />
@@ -863,135 +1060,25 @@ function App() {
 // ─── Home page ──────────────────────────────────────────────────────────────
 
 function AboutPage() {
-  const navigate = useNavigate()
-
-  const goHomeSection = (id) => {
-    navigate(`/#${id}`)
-    window.setTimeout(() => {
-      const target = document.getElementById(id)
-      if (target) {
-        const rect = target.getBoundingClientRect()
-        window.scrollTo({ top: Math.max(0, window.scrollY + rect.top - 54), behavior: 'smooth' })
-      }
-    }, 80)
-  }
-
   return (
-    <div className="theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
-      <header className="fixed inset-x-0 top-0 z-60">
-        <div className={`${floatingBarBaseClass} mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8`}>
-          <button type="button" onClick={() => navigate('/')} className="flex min-w-0 items-center gap-3 text-left">
-            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="h-6 w-6 shrink-0 object-contain" />
-            <span className="whitespace-nowrap text-sm font-semibold text-[#1d1d1f]">KW COM&apos;s</span>
-          </button>
-          <button type="button" onClick={() => navigate('/')} className="rounded-full px-4 py-1.5 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]">
-            Home
-          </button>
-        </div>
-      </header>
-
-      <main className="relative overflow-hidden pt-[44px]">
-        <section className="apple-detail-hero relative grid min-h-[calc(92svh-44px)] items-center gap-12 overflow-hidden bg-[#f5f5f7] px-5 py-16 lg:grid-cols-[1fr_0.92fr] lg:px-12">
-          <div className="home-hero-surface absolute inset-0" />
-          <div className="relative z-10 mx-auto max-w-3xl text-center lg:text-left">
-            <p className="apple-eyebrow">About COM&apos;s</p>
-            <h1 className="apple-display mt-4 text-6xl sm:text-7xl lg:text-[7.5rem]">
-              함께 배우고, 바로 만듭니다.
-            </h1>
-            <p className="apple-copy mt-6 text-xl sm:text-2xl">
-              COM&apos;s는 광운대학교 학생들이 컴퓨터와 소프트웨어를 함께 공부하고, 실제 프로젝트로 연결하는 중앙 컴퓨터 학술동아리입니다.
-            </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
-              <button type="button" onClick={() => navigate('/')} className={solidActionBtnClass}>홈으로 돌아가기</button>
-              <button type="button" onClick={() => goHomeSection('activities')} className={ghostActionBtnClass}>활동 보기</button>
-            </div>
-          </div>
-
-          <div className="relative z-10 mx-auto w-full max-w-xl">
-            <div className="apple-detail-visual rounded-lg bg-white/82 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-2xl">
-              <div className="mb-8 flex items-center gap-2">
-                <span className="size-3 rounded-full bg-[#ff5f57]" />
-                <span className="size-3 rounded-full bg-[#ffbd2e]" />
-                <span className="size-3 rounded-full bg-[#0071e3]" />
-              </div>
-              <div className="mx-auto flex aspect-square max-w-[18rem] items-center justify-center rounded-[2.2rem] bg-[#f5f5f7] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="w-[58%] object-contain" />
-              </div>
-              <div className="mt-8 grid gap-3">
-                {aboutDetailFlow.map(([number, title]) => (
-                  <div key={number} className="flex items-center gap-3 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-[#1d1d1f] shadow-[0_8px_24px_rgba(0,0,0,0.05)]">
-                    <span className="size-2.5 rounded-full bg-[var(--app-accent)]" />
-                    <span>{title}</span>
-                    <span className="ml-auto text-xs text-[#86868b]">{number}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-white px-5 py-16 sm:py-20">
-          <div className="mx-auto max-w-7xl">
-            <div className="mx-auto max-w-3xl text-center">
-              <p className="apple-eyebrow">What we do</p>
-              <h2 className="apple-display mt-4 text-5xl sm:text-6xl">배움이 결과물로 이어지도록.</h2>
-            </div>
-            <div className="mt-12 grid gap-4 lg:grid-cols-3">
-              {aboutDetailCards.map(({ title, eyebrow, body, icon: Icon }) => (
-                <article key={title} className="apple-product-panel apple-detail-card min-h-[19rem] px-7 py-7">
-                  <div className="mb-8 inline-flex size-11 items-center justify-center rounded-full bg-[#f5f5f7] text-[#0066cc]">
-                    <Icon size={20} />
-                  </div>
-                  <p className="apple-eyebrow">{eyebrow}</p>
-                  <h3 className="mt-3 text-3xl font-semibold text-[#1d1d1f]">{title}</h3>
-                  <p className="mt-4 text-[15px] font-medium leading-7 text-[#6e6e73]">{body}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-[#f5f5f7] px-5 py-16 sm:py-20">
-          <div className="mx-auto max-w-6xl">
-            <p className="apple-eyebrow text-center">Club flow</p>
-            <h2 className="apple-display mx-auto mt-4 max-w-4xl text-center text-5xl sm:text-6xl">
-              한 학기의 경험이 다음 학기의 기준이 됩니다.
-            </h2>
-            <div className="mt-12 grid gap-3">
-              {aboutDetailFlow.map(([number, title, body]) => (
-                <article key={number} className="apple-flow-row grid gap-4 rounded-lg bg-white px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:grid-cols-[5rem_1fr] sm:items-center">
-                  <span className="text-3xl font-semibold text-[#0066cc]">{number}</span>
-                  <div>
-                    <h3 className="text-2xl font-semibold text-[#1d1d1f]">{title}</h3>
-                    <p className="mt-2 text-[15px] font-medium leading-7 text-[#6e6e73]">{body}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-white px-5 py-16 sm:py-20">
-          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.82fr_1fr] lg:items-center">
-            <div>
-              <p className="apple-eyebrow">Culture</p>
-              <h2 className="apple-display mt-4 text-5xl sm:text-6xl">COM&apos;s가 오래 가져가는 태도.</h2>
-              <p className="apple-copy mt-5 text-xl">
-                잘하는 사람만 모이는 곳보다, 함께 성장하는 방식을 계속 만드는 곳을 지향합니다.
-              </p>
-            </div>
-            <div className="grid gap-3">
-              {aboutDetailPrinciples.map((item, index) => (
-                <div key={item} className="apple-output-row flex items-center gap-4 rounded-lg bg-[#f5f5f7] px-5 py-5">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-semibold text-[#0066cc]">{index + 1}</span>
-                  <p className="text-lg font-semibold leading-7 text-[#1d1d1f]">{item}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      </main>
-    </div>
+    <DetailStoryPage
+      eyebrow="About COM's"
+      title="함께 배우고, 바로 만듭니다."
+      body="COM's는 광운대학교 학생들이 컴퓨터와 소프트웨어를 함께 공부하고, 실제 프로젝트로 연결하는 중앙 컴퓨터 학술동아리입니다."
+      visualTitle="Club OS"
+      visualSubtitle="Study · Build · Share"
+      visualRows={['학습 로드맵', '프로젝트 트랙', '커뮤니티 로그']}
+      cards={aboutDetailCards}
+      flow={aboutDetailFlow}
+      outputsEyebrow="Culture"
+      outputsTitle="COM's가 오래 가져가는 태도."
+      outputsBody="잘하는 사람만 모이는 곳보다, 함께 성장하는 방식을 계속 만드는 곳을 지향합니다."
+      outputs={aboutDetailPrinciples}
+      primaryLabel="활동 보기"
+      primaryTo="/activities"
+      secondaryLabel="지원하기"
+      secondaryTo="/recruit"
+    />
   )
 }
 
@@ -1004,26 +1091,19 @@ function DetailStoryPage({
   visualRows,
   cards,
   flow,
+  outputsEyebrow = 'Archive',
   outputsTitle,
+  outputsBody = '학기마다 쌓인 활동은 다음 부원이 참고할 수 있는 자료와 경험으로 남습니다.',
   outputs,
-  backTarget = '/',
+  primaryLabel = '홈으로 돌아가기',
+  primaryTo = '/',
+  secondaryLabel = '지원 안내 보기',
+  secondaryTo = '/recruit-notice',
 }) {
   const navigate = useNavigate()
 
   return (
     <div className="theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
-      <header className="fixed inset-x-0 top-0 z-60">
-        <div className={`${floatingBarBaseClass} mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8`}>
-          <button type="button" onClick={() => navigate('/')} className="flex min-w-0 items-center gap-3 text-left">
-            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="h-6 w-6 shrink-0 object-contain" />
-            <span className="whitespace-nowrap text-sm font-semibold text-[#1d1d1f]">KW COM&apos;s</span>
-          </button>
-          <button type="button" onClick={() => navigate(backTarget)} className="rounded-full px-4 py-1.5 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]">
-            Home
-          </button>
-        </div>
-      </header>
-
       <main className="relative overflow-hidden pt-[44px]">
         <section className="apple-detail-hero relative grid min-h-[calc(88svh-44px)] items-center gap-12 overflow-hidden bg-[#f5f5f7] px-5 py-16 lg:grid-cols-[1fr_0.88fr] lg:px-12">
           <div className="home-hero-surface absolute inset-0" />
@@ -1032,8 +1112,8 @@ function DetailStoryPage({
             <h1 className="apple-display mt-4 text-6xl sm:text-7xl lg:text-[7rem]">{title}</h1>
             <p className="apple-copy mt-6 text-xl sm:text-2xl">{body}</p>
             <div className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
-              <button type="button" onClick={() => navigate('/')} className={solidActionBtnClass}>홈으로 돌아가기</button>
-              <button type="button" onClick={() => navigate('/#recruit')} className={ghostActionBtnClass}>지원 안내 보기</button>
+              <button type="button" onClick={() => navigate(primaryTo)} className={solidActionBtnClass}>{primaryLabel}</button>
+              <button type="button" onClick={() => navigate(secondaryTo)} className={ghostActionBtnClass}>{secondaryLabel}</button>
             </div>
           </div>
 
@@ -1103,9 +1183,9 @@ function DetailStoryPage({
         <section className="bg-white px-5 py-16 sm:py-20">
           <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.82fr_1fr] lg:items-center">
             <div>
-              <p className="apple-eyebrow">Archive</p>
+              <p className="apple-eyebrow">{outputsEyebrow}</p>
               <h2 className="apple-display mt-4 text-5xl sm:text-6xl">{outputsTitle}</h2>
-              <p className="apple-copy mt-5 text-xl">학기마다 쌓인 활동은 다음 부원이 참고할 수 있는 자료와 경험으로 남습니다.</p>
+              <p className="apple-copy mt-5 text-xl">{outputsBody}</p>
             </div>
             <div className="grid gap-3">
               {outputs.map((item, index) => (
@@ -1157,55 +1237,13 @@ function ProjectsDetailPage() {
 }
 
 function HomeView() {
-  const { user, loading: authLoading, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [activeSection, setActiveSection] = useState(null)
   const aboutRef = useRef(null)
   const activitiesRef = useRef(null)
   const projectsRef = useRef(null)
   const recruitRef = useRef(null)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [latestNotice, setLatestNotice] = useState(null)
-
-  useEffect(() => {
-    let rafId = null
-    const onScroll = () => {
-      if (rafId !== null) return
-      rafId = requestAnimationFrame(() => {
-        rafId = null
-        const sections = [
-          { id: 'about', ref: aboutRef },
-          { id: 'activities', ref: activitiesRef },
-          { id: 'projects', ref: projectsRef },
-          { id: 'recruit', ref: recruitRef },
-        ]
-        let found = false
-        const centerY = window.innerHeight / 2
-        for (const s of sections) {
-          const sectionEl = s.ref.current
-          if (!sectionEl) continue
-          const panelEl = sectionEl.querySelector?.('[data-panel]') || sectionEl
-          const rect = panelEl.getBoundingClientRect()
-          const isCentered = rect.top <= centerY && rect.bottom >= centerY
-          if (isCentered) {
-            setActiveSection(s.id)
-            found = true
-            break
-          }
-        }
-        if (!found && (window.scrollY || window.pageYOffset) < 140) setActiveSection(null)
-      })
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', onScroll, { passive: true })
-    onScroll()
-    return () => {
-      window.removeEventListener('scroll', onScroll)
-      window.removeEventListener('resize', onScroll)
-      if (rafId !== null) cancelAnimationFrame(rafId)
-    }
-  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -1227,21 +1265,10 @@ function HomeView() {
       const rect = ref.current.getBoundingClientRect()
       const targetY = Math.max(0, window.scrollY + rect.top - 54)
       window.scrollTo({ top: targetY, behavior: 'smooth' })
-      setActiveSection(id)
     }
   }
 
-  const handleLogout = async () => {
-    await logout()
-    navigate('/')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const goArchive = () => { if (!authLoading) navigate('/resources') }
-  const goCommunity = () => { if (!authLoading) navigate('/community') }
   const goNotices = () => navigate('/notices')
-  const goAdmin = () => navigate('/admin')
-  const goChangePassword = () => navigate('/settings')
   const goPageTop = (to, options) => {
     scrollToTopInstant()
     navigate(to, options)
@@ -1379,133 +1406,6 @@ function HomeView() {
   return (
     <div className="theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
 
-      <header className="fixed inset-x-0 top-0 z-60">
-        <div className={`${floatingBarBaseClass} relative mx-auto flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-8`}>
-          <button type="button" onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="flex min-w-0 items-center gap-3 text-left">
-            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="h-6 w-6 shrink-0 object-contain" />
-            <div className="min-w-0">
-              <h1 className="whitespace-nowrap text-sm font-semibold text-[#1d1d1f]">KW COM&apos;s</h1>
-            </div>
-          </button>
-
-          <nav className="pointer-events-auto absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-6 md:flex">
-            {tabs.map((tab) => {
-              const active = activeSection === tab.id
-              const route = tab.id === 'recruit' ? '/recruit' : `/${tab.id}`
-              return (
-                <button key={tab.id} type="button" onClick={() => goPageTop(route)} className={`relative px-1 text-xs font-semibold transition ${active ? 'text-[var(--app-text)]' : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'}`}>
-                  {tab.label}
-                  <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${active ? 'opacity-100' : 'opacity-0'}`} />
-                </button>
-              )
-            })}
-            <button type="button" onClick={goNotices} className="px-1 text-xs font-semibold text-[var(--app-muted)] transition hover:text-[var(--app-text)]">Notices</button>
-            <button type="button" onClick={goArchive} disabled={authLoading} className="px-1 text-xs font-semibold text-[var(--app-muted)] transition hover:text-[var(--app-text)] disabled:cursor-wait disabled:opacity-60">Resources</button>
-            <button type="button" onClick={goCommunity} disabled={authLoading} className="px-1 text-xs font-semibold text-[var(--app-muted)] transition hover:text-[var(--app-text)] disabled:cursor-wait disabled:opacity-60">Community</button>
-          </nav>
-
-          {user ? (
-            <div className="ml-auto hidden items-center gap-1 md:flex">
-              <NotificationButton />
-              <button type="button" onClick={goChangePassword} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)]" title="계정 설정">{user.name}</button>
-              {user.role === 'ADMIN' && (
-                <button type="button" onClick={goAdmin} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[#b45309] transition hover:bg-amber-100/70">관리자</button>
-              )}
-              <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)]">
-                <LogOut size={14} />
-                Logout
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => navigate('/login')}
-              disabled={authLoading}
-              className="ml-auto hidden shrink-0 whitespace-nowrap rounded-full bg-[var(--app-accent)] px-4 py-1 text-xs font-semibold text-white transition hover:bg-[var(--app-accent-hover)] disabled:cursor-wait disabled:opacity-70 md:inline-flex"
-            >
-              로그인
-            </button>
-          )}
-
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen((o) => !o)}
-            className="fixed right-4 top-1.5 z-[70] flex shrink-0 items-center justify-center rounded-full p-2 text-[#1d1d1f] transition hover:bg-black/5 md:hidden"
-            aria-label="메뉴"
-            aria-expanded={mobileMenuOpen}
-            aria-controls="mobile-menu"
-            aria-haspopup="menu"
-          >
-            {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
-        </div>
-
-        {mobileMenuOpen && (
-          <div
-            id="mobile-menu"
-            role="menu"
-            className="mx-auto border-b border-black/10 bg-white/95 shadow-[0_12px_28px_rgba(0,0,0,0.08)] backdrop-blur-xl md:hidden"
-          >
-            <div className="flex flex-col divide-y divide-black/8">
-              {tabs.map((tab) => {
-                const route = tab.id === 'recruit' ? '/recruit' : `/${tab.id}`
-                return (
-                  <button key={tab.id} type="button" onClick={() => { goPageTop(route); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
-                    <tab.icon size={15} className={tab.accent} />
-                    <span>{tab.label}</span>
-                    <span className="ml-auto text-xs text-[var(--theme-body-muted)]">{tab.hint}</span>
-                  </button>
-                )
-              })}
-              <button type="button" onClick={() => { goNotices(); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
-                <Megaphone size={15} className="text-cyan-500" />
-                <span>Notices</span>
-                <span className="ml-auto text-xs text-[var(--theme-body-muted)]">공지사항</span>
-              </button>
-              <button type="button" onClick={() => { goArchive(); setMobileMenuOpen(false) }} disabled={authLoading} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60 disabled:opacity-50">
-                <CircuitBoard size={15} className="text-violet-400" />
-                <span>Resources</span>
-                <span className="ml-auto text-xs text-[var(--theme-body-muted)]">자료실</span>
-              </button>
-              <button type="button" onClick={() => { goCommunity(); setMobileMenuOpen(false) }} disabled={authLoading} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60 disabled:opacity-50">
-                <Sparkles size={15} className="text-rose-400" />
-                <span>Community</span>
-                <span className="ml-auto text-xs text-[var(--theme-body-muted)]">커뮤니티</span>
-              </button>
-              {!user && (
-                <button type="button" onClick={() => { navigate('/login'); setMobileMenuOpen(false) }} disabled={authLoading} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[#0066cc] transition hover:bg-white/60 disabled:opacity-50">
-                  <span>로그인</span>
-                </button>
-              )}
-              {user && (
-                <div className="border-t border-black/10">
-                  <div className="flex flex-col divide-y divide-black/8">
-                    <button type="button" onClick={() => { goChangePassword(); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
-                      <span className="size-5 flex items-center justify-center rounded-full bg-black/10 text-[10px] font-black">{user.name?.[0] ?? '?'}</span>
-                      <span>{user.name}</span>
-                      <span className="ml-auto text-xs text-[var(--theme-body-muted)]">계정 설정</span>
-                    </button>
-                    {user.role === 'ADMIN' && (
-                      <button type="button" onClick={() => { goAdmin(); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-50/60">
-                        <span className="text-sm">⚙</span>
-                        <span>관리자 패널</span>
-                      </button>
-                    )}
-                    <div className="py-3.5">
-                      <NotificationButton alignLeft padded />
-                    </div>
-                    <button type="button" onClick={() => { handleLogout(); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
-                      <LogOut size={15} />
-                      <span>로그아웃</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </header>
-
       <main className="relative overflow-hidden pt-[44px]">
         <section className="apple-home-hero relative flex min-h-[calc(78svh-44px)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-10 text-center sm:min-h-[calc(84svh-44px)] sm:py-12">
           <div className="home-hero-surface absolute inset-0" />
@@ -1597,9 +1497,6 @@ function PageShell({ children, wide = false, full = false, transition = true }) 
   return (
     <div className="apple-route relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
       <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white via-[#f5f5f7] to-white" />
-      <div className="fixed right-4 top-4 z-50">
-        <NotificationButton />
-      </div>
       <main className={`relative mx-auto flex min-h-screen min-w-0 px-4 sm:px-6 ${full ? 'items-start pt-20 pb-16' : 'items-center justify-center py-24'} ${wide ? 'max-w-7xl' : 'max-w-4xl'}`}>
         <div className={`${transition ? 'page-transition' : ''} w-full min-w-0 ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
       </main>
