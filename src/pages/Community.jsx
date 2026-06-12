@@ -1464,7 +1464,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-lg border border-black/10 bg-white p-4 shadow-[0_18px_45px_rgba(0,0,0,0.08)] sm:p-5">
+    <form onSubmit={submit} className="apple-soft-panel space-y-3 p-4 sm:p-5">
       <div className="flex flex-wrap gap-2">
         <select value={effectiveCategory} onChange={(e) => setCategory(e.target.value)}
           className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24"
@@ -1678,12 +1678,12 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <button type="submit" disabled={saving || !title.trim()}
-          className="min-h-11 rounded-full bg-[#0071e3] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0077ed] disabled:opacity-50 sm:min-h-0"
+          className="apple-action-primary min-h-11 px-5 py-2.5 text-sm disabled:opacity-50 sm:min-h-0"
         >
           {saving ? (savingStep || '저장 중...') : isEditing ? '수정 완료' : '글 등록'}
         </button>
         <button type="button" onClick={onCancel}
-          className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-[#1d1d1f] sm:min-h-0"
+          className="apple-action-secondary inline-flex min-h-11 items-center justify-center gap-1 px-4 py-2.5 text-sm sm:min-h-0"
         >
           <X size={14} />취소
         </button>
@@ -1694,12 +1694,12 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
 
 function BoardHeader({ title = "COM's 게시판", children }) {
   return (
-    <div className="border-b border-black/10 bg-linear-to-br from-white via-[#f5f5f7] to-[#e8f8ff] px-4 py-5 sm:px-7">
+    <div className="apple-board-hero px-4 py-7 sm:px-8 sm:py-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="text-xs font-bold text-[#0066cc]">Community</p>
-          <h1 className="mt-2 break-words text-2xl font-semibold tracking-normal text-[#1d1d1f] sm:text-4xl">{title}</h1>
-          <p className="mt-2 text-sm leading-6 text-[#6e6e73]">말머리별로 글을 보고, 게시글은 별도 화면처럼 열립니다.</p>
+          <p className="apple-eyebrow">Community</p>
+          <h1 className="apple-display mt-3 break-words text-4xl sm:text-6xl">{title}</h1>
+          <p className="apple-copy mt-4 max-w-2xl text-base sm:text-lg">스터디 기록, 질문, 프로젝트 공유를 말머리별로 빠르게 확인합니다.</p>
         </div>
         {children && <div className="flex w-full shrink-0 sm:w-auto sm:justify-end">{children}</div>}
       </div>
@@ -2162,7 +2162,7 @@ export default function Community({ onBack }) {
         role="button"
         onClick={open}
         onKeyDown={(event) => openRowWithKeyboard(event, open)}
-        className={`cursor-pointer rounded-lg border border-black/10 bg-white p-4 text-left text-[#6e6e73] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] focus:bg-[#f5f5f7] focus:outline-none ${concept ? 'border-[#f0c36d] bg-[#fff8e8]' : ''}`}
+        className={`apple-soft-panel cursor-pointer p-4 text-left text-[#6e6e73] transition hover:-translate-y-0.5 focus:bg-[#f5f5f7] focus:outline-none ${concept ? 'border-[#f0c36d] bg-[#fff8e8]' : ''}`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -2361,24 +2361,24 @@ export default function Community({ onBack }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       {mode === 'list' && (
         <div className="flex justify-center sm:justify-start">
-          <button type="button" onClick={onBack} className="w-full rounded-full border border-black/10 bg-white/80 px-4 py-2.5 text-sm font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-white sm:w-auto">
+          <button type="button" onClick={onBack} className="apple-action-secondary w-full px-4 py-2.5 text-sm sm:w-auto">
             메인으로 돌아가기
           </button>
         </div>
       )}
 
-      <section className="overflow-hidden rounded-lg border border-black/10 bg-white text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
+      <section className="apple-board-shell">
         {mode === 'list' && (
           <>
             <BoardHeader>
-              <button type="button" onClick={() => setMode('write')} className="w-full rounded-full bg-[#0071e3] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#0077ed] sm:w-auto sm:py-2.5">
+              <button type="button" onClick={() => setMode('write')} className="apple-action-primary w-full px-5 py-3 text-sm sm:w-auto sm:py-2.5">
                 글쓰기
               </button>
             </BoardHeader>
-            <div className="border-b border-black/10 bg-[#f5f5f7] px-4 py-4 sm:px-7">
+            <div className="apple-control-strip px-4 py-4 sm:px-8">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="-mx-1 overflow-x-auto pb-1">
@@ -2391,10 +2391,10 @@ export default function Community({ onBack }) {
                             setActiveCategory(item.value)
                             setPage(1)
                           }}
-                          className={`min-h-10 rounded-full px-4 py-2 transition sm:min-h-9 ${
+                          className={`apple-chip min-h-10 px-4 py-2 sm:min-h-9 ${
                             effectiveActiveCategory === item.value
-                              ? 'bg-[#0071e3] text-white'
-                              : 'border border-black/10 bg-white text-[#6e6e73] hover:text-[#1d1d1f]'
+                              ? 'apple-chip-active'
+                              : ''
                           }`}
                         >
                           {item.label}
@@ -2433,9 +2433,9 @@ export default function Community({ onBack }) {
               )}
               {visiblePosts.map(renderPostCard)}
             </div>
-            <div className="m-5 hidden overflow-x-auto rounded-lg border border-black/10 bg-white md:block sm:m-7">
-              <table className="w-full min-w-[860px] border-collapse text-sm">
-                <thead className="border-b border-black/10 bg-[#f5f5f7] text-xs uppercase tracking-[0.16em] text-[#86868b]">
+            <div className="m-5 hidden overflow-x-auto rounded-lg border border-black/10 bg-white md:block sm:m-8">
+              <table className="apple-table w-full min-w-[860px] border-collapse text-sm">
+                <thead className="border-b border-black/10">
                   <tr>
                     <th className="w-20 px-4 py-3 font-semibold">번호</th>
                     <th className="w-24 px-4 py-3 font-semibold">말머리</th>
@@ -2498,7 +2498,7 @@ export default function Community({ onBack }) {
                 </tbody>
               </table>
             </div>
-            <div className="border-t border-black/10 bg-[#f5f5f7] px-5 py-4 sm:px-7">
+            <div className="apple-control-strip border-t px-5 py-4 sm:px-8">
               {renderPagination('bottom')}
             </div>
           </>
@@ -2507,7 +2507,7 @@ export default function Community({ onBack }) {
         {mode === 'write' && (
           <>
             <BoardHeader title="글쓰기">
-              <button type="button" onClick={backToList} className="inline-flex w-full items-center justify-center gap-1 rounded-full border border-black/10 bg-white/80 px-4 py-3 text-sm font-bold text-[#1d1d1f] sm:w-auto sm:py-2">
+              <button type="button" onClick={backToList} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
                 <ArrowLeft size={14} />
                 목록
               </button>
@@ -2521,7 +2521,7 @@ export default function Community({ onBack }) {
         {mode === 'edit' && currentPost && (
           <>
             <BoardHeader title="글 수정">
-              <button type="button" onClick={() => setMode('detail')} className="inline-flex w-full items-center justify-center gap-1 rounded-full border border-black/10 bg-white/80 px-4 py-3 text-sm font-bold text-[#1d1d1f] sm:w-auto sm:py-2">
+              <button type="button" onClick={() => setMode('detail')} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
                 <ArrowLeft size={14} />
                 본문
               </button>
@@ -2535,7 +2535,7 @@ export default function Community({ onBack }) {
         {mode === 'detail' && (
           <>
             <BoardHeader title={detailLoading ? '글 여는 중...' : currentPost?.title || '게시글'}>
-              <button type="button" onClick={backToList} className="inline-flex w-full items-center justify-center gap-1 rounded-full border border-black/10 bg-white/80 px-4 py-3 text-sm font-bold text-[#1d1d1f] sm:w-auto sm:py-2">
+              <button type="button" onClick={backToList} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
                 <ArrowLeft size={14} />
                 목록
               </button>
