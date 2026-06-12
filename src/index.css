@@ -873,6 +873,28 @@ body {
 	scrollbar-width: thin;
 }
 
+.community-compose-form {
+	background: transparent;
+}
+
+.community-compose-meta,
+.community-compose-actions,
+.community-compose-error {
+	border-radius: 8px;
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	padding: 0.75rem;
+}
+
+.community-compose-title,
+.community-compose-editor {
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.community-compose-editor [contenteditable='true'] {
+	min-height: clamp(24rem, 52vh, 42rem);
+}
+
 .community-editor-figure {
 	max-width: 100%;
 }
