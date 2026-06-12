@@ -1464,10 +1464,10 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
   }
 
   return (
-    <form onSubmit={submit} className="apple-soft-panel space-y-3 p-4 sm:p-5">
-      <div className="flex flex-wrap gap-2">
+    <form onSubmit={submit} className="community-compose-form grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+      <div className="community-compose-meta order-2 flex flex-wrap gap-2 lg:col-start-2 lg:row-start-1">
         <select value={effectiveCategory} onChange={(e) => setCategory(e.target.value)}
-          className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24"
+          className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24"
         >
           {categoryOptions.map((item) => (
             <option key={item.value} value={item.value}>{item.label}</option>
@@ -1477,7 +1477,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
 
       <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={MAX_TITLE_LENGTH}
         placeholder="제목"
-        className="w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:text-sm"
+        className="community-compose-title order-1 w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:text-sm lg:col-start-1 lg:row-start-1"
       />
 
       {effectiveCategory === 'ANONYMOUS' && (
@@ -1486,11 +1486,11 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
           onChange={(e) => setAnonymousName(e.target.value)}
           maxLength={MAX_ANONYMOUS_NAME_LENGTH}
           placeholder="ㅇㅇ"
-          className="w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:text-sm"
+          className="community-compose-anonymous order-3 w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:text-sm lg:col-start-2 lg:row-start-2"
         />
       )}
 
-      <div className="overflow-hidden rounded border border-black/15 bg-white">
+      <div className="community-compose-editor order-4 overflow-hidden rounded border border-black/15 bg-white lg:col-start-1 lg:row-start-2 lg:row-span-5">
         <div className="community-editor-toolbar flex flex-wrap items-center gap-2 border-b border-black/10 bg-black/[0.03] px-3 py-2">
           <span className="mr-1 text-xs font-black uppercase tracking-[0.2em] text-[var(--theme-body-muted)]">Editor</span>
           <div className="inline-flex overflow-hidden rounded border border-black/15 bg-white">
@@ -1674,9 +1674,9 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
         <RichEditor initialBlocks={initialBlocks} apiRef={editorApiRef} onError={(msg) => setError(msg)} />
       </div>
 
-      {error && <p className="text-sm font-semibold text-red-500">{error}</p>}
+      {error && <p className="community-compose-error order-5 text-sm font-semibold text-red-500 lg:col-start-2">{error}</p>}
 
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="community-compose-actions order-6 flex flex-col gap-2 sm:flex-row lg:col-start-2 lg:flex-col">
         <button type="submit" disabled={saving || !title.trim()}
           className="apple-action-primary min-h-11 px-5 py-2.5 text-sm disabled:opacity-50 sm:min-h-0"
         >
@@ -1721,6 +1721,21 @@ function BoardDetailBar({ post, loading, children }) {
               <span>{shortDate(post.createdAt)}</span>
             </>
           )}
+        </div>
+        {children && <div className="flex w-full shrink-0 sm:w-auto sm:justify-end">{children}</div>}
+      </div>
+    </div>
+  )
+}
+
+function BoardComposeBar({ title, children }) {
+  return (
+    <div className="apple-board-minibar px-4 py-3 sm:px-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+          <span className="text-[var(--app-accent-text)]">Community</span>
+          <span className="size-1 rounded-full bg-[var(--app-subtle)]" />
+          <span>{title}</span>
         </div>
         {children && <div className="flex w-full shrink-0 sm:w-auto sm:justify-end">{children}</div>}
       </div>
@@ -2527,13 +2542,13 @@ export default function Community({ onBack }) {
 
         {mode === 'write' && (
           <>
-            <BoardHeader title="글쓰기">
+            <BoardComposeBar title="글쓰기">
               <button type="button" onClick={backToList} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
                 <ArrowLeft size={14} />
                 목록
               </button>
-            </BoardHeader>
-            <div className="p-4 sm:p-7">
+            </BoardComposeBar>
+            <div className="p-0 sm:p-5">
               <PostForm user={user} onCancel={backToList} onSave={handleSave} />
             </div>
           </>
@@ -2541,13 +2556,13 @@ export default function Community({ onBack }) {
 
         {mode === 'edit' && currentPost && (
           <>
-            <BoardHeader title="글 수정">
+            <BoardComposeBar title="글 수정">
               <button type="button" onClick={() => setMode('detail')} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
                 <ArrowLeft size={14} />
                 본문
               </button>
-            </BoardHeader>
-            <div className="p-4 sm:p-7">
+            </BoardComposeBar>
+            <div className="p-0 sm:p-5">
               <PostForm user={user} initialPost={currentPost} onCancel={() => setMode('detail')} onSave={handleSave} />
             </div>
           </>
