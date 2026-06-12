@@ -35,13 +35,6 @@ const tabs = [
   { id: 'recruit', label: 'Recruit', hint: '지원 안내', icon: Rocket, accent: 'text-sky-500' },
 ]
 
-const activities = [
-  '정기 세미나: 프로그래밍, 웹 개발, 알고리즘, 컴퓨터 기초 주제 진행',
-  '스터디: 신입 부원부터 기존 부원까지 참여 가능한 수준별 운영',
-  '프로젝트: 웹사이트, 앱, 아두이노, 소프트웨어 개발 팀 제작',
-  '교류 활동: 선후배 간 경험 공유와 진로·학습 정보 교환',
-]
-
 const activityDetails = [
   {
     title: '정기 세미나',
@@ -59,12 +52,6 @@ const activityDetails = [
     title: '선후배 교류',
     description: '수강 과목, 공모전, 진로, 개발 학습 방법에 대한 경험을 공유하며 서로의 성장을 돕는 커뮤니티를 만듭니다.',
   },
-]
-
-const projects = [
-  'COM\'s Official Website - React · Vite · Tailwind CSS 기반 공식 웹사이트',
-  'Arduino Basic Class - 초급자를 위한 아두이노 기초 교육 프로젝트',
-  'Web Development Study - HTML · CSS · JavaScript · React 학습 스터디',
 ]
 
 const projectDetails = [
@@ -252,6 +239,78 @@ const aboutDetailPrinciples = [
   '동아리 밖에서도 이어지는 개발 경험과 포트폴리오',
 ]
 
+const activitiesDetailCards = [
+  {
+    title: '정기 세미나',
+    eyebrow: 'Weekly seminar',
+    body: '프로그래밍 기초, 웹 개발, 알고리즘, 컴퓨터 구조처럼 학기 중 꾸준히 다룰 주제를 정해 함께 학습합니다.',
+    icon: Binary,
+  },
+  {
+    title: '분야별 스터디',
+    eyebrow: 'Focused study',
+    body: '처음 시작하는 부원부터 기존 부원까지 각자 관심 분야에 맞춰 프론트엔드, 백엔드, 임베디드, 알고리즘 등을 나눠 공부합니다.',
+    icon: Sparkles,
+  },
+  {
+    title: '코드 리뷰',
+    eyebrow: 'Review loop',
+    body: '스터디와 프로젝트에서 작성한 코드를 공유하고, 더 읽기 좋은 구조와 협업 방식을 함께 익힙니다.',
+    icon: CircuitBoard,
+  },
+]
+
+const activitiesDetailFlow = [
+  ['01', '기초를 맞춥니다', '새로운 주제를 시작하기 전 필요한 개념을 함께 정리하고, 따라올 수 있는 기준을 맞춥니다.'],
+  ['02', '작게 실습합니다', '배운 내용을 작은 과제와 예제로 바로 적용하면서 손으로 익히는 시간을 만듭니다.'],
+  ['03', '서로 설명합니다', '모르는 지점을 질문하고, 이해한 내용을 다시 설명하며 학습을 오래 남깁니다.'],
+  ['04', '프로젝트로 연결합니다', '활동에서 배운 내용이 실제 제작과 포트폴리오로 이어지도록 프로젝트 주제를 찾습니다.'],
+]
+
+const activitiesDetailTopics = [
+  'HTML, CSS, JavaScript, React 기반 웹 개발',
+  'C, Python, Java 등 프로그래밍 기초와 문제 해결',
+  'Arduino와 센서를 활용한 임베디드 실습',
+  'Git, GitHub, 협업 도구를 활용한 팀 개발',
+  '공모전, 해커톤, 개인 프로젝트 준비',
+]
+
+const projectsDetailCards = [
+  {
+    title: 'Official Website',
+    eyebrow: 'Service project',
+    body: '동아리 소개, 공지사항, 자료실, 커뮤니티를 담는 공식 웹사이트를 실제 서비스 형태로 개발하고 개선합니다.',
+    icon: CircuitBoard,
+  },
+  {
+    title: 'Arduino Class',
+    eyebrow: 'Hardware lab',
+    body: '초급자를 위한 아두이노 기초 교육을 통해 센서 입력, 회로 연결, 간단한 제어 로직을 단계별로 익힙니다.',
+    icon: Binary,
+  },
+  {
+    title: 'Web Study Build',
+    eyebrow: 'Frontend track',
+    body: 'HTML, CSS, JavaScript, React를 기반으로 화면 설계와 컴포넌트 구현을 연습하고 작은 기능을 직접 완성합니다.',
+    icon: Sparkles,
+  },
+]
+
+const projectsDetailFlow = [
+  ['01', '문제를 정합니다', '동아리 안팎에서 필요한 기능이나 만들고 싶은 아이디어를 모아 프로젝트 주제로 정리합니다.'],
+  ['02', '역할을 나눕니다', '기획, 디자인, 프론트엔드, 백엔드, 하드웨어 등 필요한 역할을 나누고 협업 방식을 정합니다.'],
+  ['03', '작게 출시합니다', '완벽한 완성보다 사용 가능한 첫 버전을 빠르게 만들고 실제 피드백을 받습니다.'],
+  ['04', '계속 개선합니다', '코드 리뷰와 회고를 통해 다음 프로젝트에서 더 좋은 구조와 경험을 가져갑니다.'],
+]
+
+const projectsDetailOutputs = [
+  'COM\'s 공식 웹사이트와 운영 도구',
+  '아두이노 기초 교육용 실습 예제',
+  '웹 개발 스터디 결과물과 개인 포트폴리오',
+  '공모전, 해커톤, 자유 주제 제작물',
+  '동아리 자료실과 커뮤니티 개선 기능',
+]
+
 const DEFAULT_ACCENT = '#0071e3'
 const THEME_MODE_KEY = 'kwcoms-theme-mode'
 const ACCENT_COLOR_KEY = 'kwcoms-accent-color'
@@ -261,6 +320,36 @@ const accentSwatches = [
   { name: 'Rose', value: '#d70015' },
   { name: 'Amber', value: '#ff9f0a' },
   { name: 'Violet', value: '#8e5cf7' },
+]
+
+const footerLinkGroups = [
+  {
+    title: "COM's",
+    links: [
+      { label: 'About', href: '/#about' },
+      { label: 'Activities', href: '/#activities' },
+      { label: 'Projects', href: '/#projects' },
+      { label: 'Recruit', href: '/#recruit' },
+    ],
+  },
+  {
+    title: 'Explore',
+    links: [
+      { label: 'Notices', href: '/notices' },
+      { label: 'Community', href: '/community' },
+      { label: 'Archive', href: '/resources' },
+      { label: 'Admin', href: '/admin' },
+    ],
+  },
+  {
+    title: 'Connect',
+    links: [
+      { label: 'Instagram', href: 'https://www.instagram.com/kw_coms', external: true },
+      { label: 'GitHub', href: 'https://github.com/kw-coms', external: true },
+      { label: 'YouTube', href: 'https://www.youtube.com/@kw_coms', external: true },
+      { label: 'Mail', href: 'mailto:kwcoms69@gmail.com' },
+    ],
+  },
 ]
 
 function normalizeHex(value) {
@@ -430,7 +519,7 @@ function SettingsPage() {
 function RecruitPage() {
   const navigate = useNavigate()
   return (
-    <PageShell wide>
+    <PageShell wide transition={false}>
       <RecruitApply onBack={() => navigate('/')} />
     </PageShell>
   )
@@ -442,7 +531,7 @@ function RecruitNoticePage() {
   const from = location.state?.from || '/'
 
   return (
-    <PageShell wide full>
+    <PageShell wide full transition={false}>
       <RecruitNotice onBack={() => navigate(from, { replace: true })} onApply={() => navigate('/recruit')} />
     </PageShell>
   )
@@ -596,65 +685,103 @@ function AppearanceControl({ accentColor, setAccentColor, themeMode, setThemeMod
   const isDark = themeMode === 'dark'
 
   return (
-    <section className="appearance-control border-t border-black/10 bg-[var(--app-surface-soft)] px-4 py-6 text-[var(--app-text)] sm:px-6">
-      <div className="appearance-panel mx-auto grid w-full max-w-5xl gap-5 rounded-lg border border-black/10 bg-white/88 px-5 py-5 shadow-[0_12px_28px_rgba(0,0,0,0.07)] backdrop-blur-2xl lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--app-muted)]">Appearance</p>
-          <h2 className="mt-1 text-lg font-semibold text-[var(--app-text)]">화면 설정</h2>
+    <section className="appearance-control apple-footer-surface border-t border-black/10 bg-[var(--app-surface-soft)] px-5 py-8 text-[var(--app-muted)]">
+      <div className="mx-auto w-full max-w-5xl">
+        <div className="apple-footer-note border-b border-black/10 pb-5 text-xs leading-5">
+          <p>KW COM&apos;s는 광운대학교 학생들이 함께 공부하고 프로젝트를 만드는 중앙 컴퓨터 학술동아리입니다.</p>
+          <p className="mt-2">활동 안내와 모집 일정은 공지사항을 통해 순차적으로 공개됩니다.</p>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-3 lg:items-end">
-          <button
-            type="button"
-            onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--app-text)] px-4 text-sm font-semibold text-[var(--app-bg)] shadow-[0_8px_22px_rgba(0,0,0,0.12)] transition hover:opacity-90 sm:w-auto"
-            aria-label={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
-          >
-            <span className="grid size-7 place-items-center rounded-full bg-white/12">
-              {isDark ? <Sun size={15} /> : <Moon size={15} />}
-            </span>
-            {isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
-          </button>
+        <div className="appearance-panel grid gap-4 border-b border-black/10 py-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-subtle)]">Appearance</p>
+            <h2 className="mt-1 text-sm font-semibold text-[var(--app-text)]">화면 설정</h2>
+          </div>
 
-          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">색상</span>
-            <div className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-[var(--app-surface)] p-1">
-              {accentSwatches.map((swatch) => {
-                const active = accent === swatch.value
-                return (
-                  <button
-                    key={swatch.value}
-                    type="button"
-                    onClick={() => setAccentColor(swatch.value)}
-                    className={`relative grid size-8 place-items-center rounded-full transition hover:scale-105 ${active ? 'ring-2 ring-[var(--app-text)] ring-offset-2 ring-offset-[var(--app-surface)]' : ''}`}
-                    style={{ backgroundColor: swatch.value }}
-                    aria-label={`${swatch.name} 색상 선택`}
-                    title={swatch.name}
-                  >
-                    {active && <span className="size-2.5 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.28)]" />}
-                  </button>
-                )
-              })}
-            </div>
-            <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)]">
-              직접 선택
-              <span className="relative grid size-6 overflow-hidden rounded-full border border-black/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]" style={{ backgroundColor: accent }}>
-                <input
-                  type="color"
-                  value={accent}
-                  onChange={(event) => setAccentColor(event.target.value)}
-                  className="absolute -inset-2 h-10 w-10 cursor-pointer opacity-0"
-                  aria-label="커스텀 색상 선택"
-                />
-              </span>
-            </label>
+          <div className="appearance-actions flex min-w-0 flex-col gap-3 lg:items-end">
             <button
               type="button"
-              onClick={() => setAccentColor(DEFAULT_ACCENT)}
-              className="min-h-10 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface-elevated)] hover:text-[var(--app-text)]"
+              onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
+              className="appearance-mode-toggle inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)] sm:w-auto"
+              aria-label={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
             >
-              Reset
+              <span className="grid size-6 place-items-center rounded-full bg-[var(--app-surface-soft)] text-[var(--app-text)]">
+                {isDark ? <Sun size={14} /> : <Moon size={14} />}
+              </span>
+              {isDark ? '라이트 모드' : '다크 모드'}
             </button>
+
+            <div className="appearance-color-row flex flex-wrap items-center gap-2 lg:justify-end">
+              <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">색상</span>
+              <div className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-[var(--app-surface)] p-1">
+                {accentSwatches.map((swatch) => {
+                  const active = accent === swatch.value
+                  return (
+                    <button
+                      key={swatch.value}
+                      type="button"
+                      onClick={() => setAccentColor(swatch.value)}
+                      className={`relative grid size-7 place-items-center rounded-full transition hover:scale-105 ${active ? 'ring-2 ring-[var(--app-text)] ring-offset-2 ring-offset-[var(--app-surface)]' : ''}`}
+                      style={{ backgroundColor: swatch.value }}
+                      aria-label={`${swatch.name} 색상 선택`}
+                      title={swatch.name}
+                    >
+                      {active && <span className="size-2 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.28)]" />}
+                    </button>
+                  )
+                })}
+              </div>
+              <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)]">
+                직접 선택
+                <span className="relative grid size-5 overflow-hidden rounded-full border border-black/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]" style={{ backgroundColor: accent }}>
+                  <input
+                    type="color"
+                    value={accent}
+                    onChange={(event) => setAccentColor(event.target.value)}
+                    className="absolute -inset-2 h-10 w-10 cursor-pointer opacity-0"
+                    aria-label="커스텀 색상 선택"
+                  />
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setAccentColor(DEFAULT_ACCENT)}
+                className="min-h-9 rounded-full border border-black/10 bg-transparent px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface)] hover:text-[var(--app-text)]"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="apple-footer-directory grid gap-x-10 gap-y-6 border-b border-black/10 py-5 text-xs sm:grid-cols-3">
+          {footerLinkGroups.map((group) => (
+            <div key={group.title}>
+              <h3 className="font-semibold text-[var(--app-text)]">{group.title}</h3>
+              <ul className="mt-2 space-y-2">
+                {group.links.map((link) => (
+                  <li key={link.label}>
+                    <a
+                      href={link.href}
+                      target={link.external ? '_blank' : undefined}
+                      rel={link.external ? 'noreferrer' : undefined}
+                      className="text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                    >
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div className="apple-footer-bottom flex flex-col gap-3 pt-4 text-xs sm:flex-row sm:items-center sm:justify-between">
+          <p>Copyright © {new Date().getFullYear()} KW COM&apos;s. All rights reserved.</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            <a href="/notices" className="hover:text-[var(--app-text)]">Notices</a>
+            <a href="/community" className="hover:text-[var(--app-text)]">Community</a>
+            <a href="mailto:kwcoms69@gmail.com" className="hover:text-[var(--app-text)]">Contact</a>
           </div>
         </div>
       </div>
@@ -695,6 +822,8 @@ function App() {
       <Routes>
         <Route path="/" element={<HomeView />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/activities" element={<ActivitiesDetailPage />} />
+        <Route path="/projects" element={<ProjectsDetailPage />} />
         <Route path="/notices" element={<NoticesPage />} />
         <Route path="/notices/:id" element={<NoticesPage />} />
         <Route path="/resources" element={<RequireAuth><ArchivePage /></RequireAuth>} />
@@ -749,7 +878,7 @@ function AboutPage() {
       </header>
 
       <main className="relative overflow-hidden pt-[44px]">
-        <section className="relative grid min-h-[calc(92svh-44px)] items-center gap-12 overflow-hidden bg-[#f5f5f7] px-5 py-16 lg:grid-cols-[1fr_0.92fr] lg:px-12">
+        <section className="apple-detail-hero relative grid min-h-[calc(92svh-44px)] items-center gap-12 overflow-hidden bg-[#f5f5f7] px-5 py-16 lg:grid-cols-[1fr_0.92fr] lg:px-12">
           <div className="home-hero-surface absolute inset-0" />
           <div className="relative z-10 mx-auto max-w-3xl text-center lg:text-left">
             <p className="apple-eyebrow">About COM&apos;s</p>
@@ -766,7 +895,7 @@ function AboutPage() {
           </div>
 
           <div className="relative z-10 mx-auto w-full max-w-xl">
-            <div className="rounded-lg bg-white/82 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-2xl">
+            <div className="apple-detail-visual rounded-lg bg-white/82 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-2xl">
               <div className="mb-8 flex items-center gap-2">
                 <span className="size-3 rounded-full bg-[#ff5f57]" />
                 <span className="size-3 rounded-full bg-[#ffbd2e]" />
@@ -796,7 +925,7 @@ function AboutPage() {
             </div>
             <div className="mt-12 grid gap-4 lg:grid-cols-3">
               {aboutDetailCards.map(({ title, eyebrow, body, icon: Icon }) => (
-                <article key={title} className="apple-product-panel min-h-[19rem] px-7 py-7">
+                <article key={title} className="apple-product-panel apple-detail-card min-h-[19rem] px-7 py-7">
                   <div className="mb-8 inline-flex size-11 items-center justify-center rounded-full bg-[#f5f5f7] text-[#0066cc]">
                     <Icon size={20} />
                   </div>
@@ -817,7 +946,7 @@ function AboutPage() {
             </h2>
             <div className="mt-12 grid gap-3">
               {aboutDetailFlow.map(([number, title, body]) => (
-                <article key={number} className="grid gap-4 rounded-lg bg-white px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:grid-cols-[5rem_1fr] sm:items-center">
+                <article key={number} className="apple-flow-row grid gap-4 rounded-lg bg-white px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:grid-cols-[5rem_1fr] sm:items-center">
                   <span className="text-3xl font-semibold text-[#0066cc]">{number}</span>
                   <div>
                     <h3 className="text-2xl font-semibold text-[#1d1d1f]">{title}</h3>
@@ -840,7 +969,7 @@ function AboutPage() {
             </div>
             <div className="grid gap-3">
               {aboutDetailPrinciples.map((item, index) => (
-                <div key={item} className="flex items-center gap-4 rounded-lg bg-[#f5f5f7] px-5 py-5">
+                <div key={item} className="apple-output-row flex items-center gap-4 rounded-lg bg-[#f5f5f7] px-5 py-5">
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-semibold text-[#0066cc]">{index + 1}</span>
                   <p className="text-lg font-semibold leading-7 text-[#1d1d1f]">{item}</p>
                 </div>
@@ -850,6 +979,167 @@ function AboutPage() {
         </section>
       </main>
     </div>
+  )
+}
+
+function DetailStoryPage({
+  eyebrow,
+  title,
+  body,
+  visualTitle,
+  visualSubtitle,
+  visualRows,
+  cards,
+  flow,
+  outputsTitle,
+  outputs,
+  backTarget = '/',
+}) {
+  const navigate = useNavigate()
+
+  return (
+    <div className="theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
+      <header className="fixed inset-x-0 top-0 z-60">
+        <div className={`${floatingBarBaseClass} mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8`}>
+          <button type="button" onClick={() => navigate('/')} className="flex min-w-0 items-center gap-3 text-left">
+            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="h-6 w-6 shrink-0 object-contain" />
+            <span className="whitespace-nowrap text-sm font-semibold text-[#1d1d1f]">KW COM&apos;s</span>
+          </button>
+          <button type="button" onClick={() => navigate(backTarget)} className="rounded-full px-4 py-1.5 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]">
+            Home
+          </button>
+        </div>
+      </header>
+
+      <main className="relative overflow-hidden pt-[44px]">
+        <section className="apple-detail-hero relative grid min-h-[calc(88svh-44px)] items-center gap-12 overflow-hidden bg-[#f5f5f7] px-5 py-16 lg:grid-cols-[1fr_0.88fr] lg:px-12">
+          <div className="home-hero-surface absolute inset-0" />
+          <div className="relative z-10 mx-auto max-w-3xl text-center lg:text-left">
+            <p className="apple-eyebrow">{eyebrow}</p>
+            <h1 className="apple-display mt-4 text-6xl sm:text-7xl lg:text-[7rem]">{title}</h1>
+            <p className="apple-copy mt-6 text-xl sm:text-2xl">{body}</p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
+              <button type="button" onClick={() => navigate('/')} className={solidActionBtnClass}>홈으로 돌아가기</button>
+              <button type="button" onClick={() => navigate('/#recruit')} className={ghostActionBtnClass}>지원 안내 보기</button>
+            </div>
+          </div>
+
+          <div className="relative z-10 mx-auto w-full max-w-xl">
+            <div className="apple-detail-visual rounded-lg bg-white/82 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-2xl">
+              <div className="mb-7 flex items-center gap-2">
+                <span className="size-3 rounded-full bg-[#ff5f57]" />
+                <span className="size-3 rounded-full bg-[#ffbd2e]" />
+                <span className="size-3 rounded-full bg-[#0071e3]" />
+              </div>
+              <div className="rounded-lg bg-[#f5f5f7] px-6 py-7">
+                <p className="text-3xl font-semibold text-[#1d1d1f]">{visualTitle}</p>
+                <p className="mt-2 text-base font-semibold text-[#6e6e73]">{visualSubtitle}</p>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {visualRows.map((row, index) => (
+                  <div key={row} className="flex items-center gap-3 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-[#1d1d1f] shadow-[0_8px_24px_rgba(0,0,0,0.05)]">
+                    <span className="size-2.5 rounded-full bg-[var(--app-accent)]" />
+                    <span>{row}</span>
+                    <span className="ml-auto text-xs text-[#86868b]">{String(index + 1).padStart(2, '0')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white px-5 py-16 sm:py-20">
+          <div className="mx-auto max-w-7xl">
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="apple-eyebrow">Inside</p>
+              <h2 className="apple-display mt-4 text-5xl sm:text-6xl">무엇을 하고, 어떻게 이어가는지.</h2>
+            </div>
+            <div className="mt-12 grid gap-4 lg:grid-cols-3">
+              {cards.map(({ title: cardTitle, eyebrow: cardEyebrow, body: cardBody, icon: Icon }) => (
+                <article key={cardTitle} className="apple-product-panel apple-detail-card min-h-[19rem] px-7 py-7">
+                  <div className="mb-8 inline-flex size-11 items-center justify-center rounded-full bg-[#f5f5f7] text-[#0066cc]">
+                    <Icon size={20} />
+                  </div>
+                  <p className="apple-eyebrow">{cardEyebrow}</p>
+                  <h3 className="mt-3 text-3xl font-semibold text-[#1d1d1f]">{cardTitle}</h3>
+                  <p className="mt-4 text-[15px] font-medium leading-7 text-[#6e6e73]">{cardBody}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-[#f5f5f7] px-5 py-16 sm:py-20">
+          <div className="mx-auto max-w-6xl">
+            <p className="apple-eyebrow text-center">Flow</p>
+            <h2 className="apple-display mx-auto mt-4 max-w-4xl text-center text-5xl sm:text-6xl">작게 시작해서 오래 남기는 방식.</h2>
+            <div className="mt-12 grid gap-3">
+              {flow.map(([number, flowTitle, flowBody]) => (
+                <article key={number} className="apple-flow-row grid gap-4 rounded-lg bg-white px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:grid-cols-[5rem_1fr] sm:items-center">
+                  <span className="text-3xl font-semibold text-[#0066cc]">{number}</span>
+                  <div>
+                    <h3 className="text-2xl font-semibold text-[#1d1d1f]">{flowTitle}</h3>
+                    <p className="mt-2 text-[15px] font-medium leading-7 text-[#6e6e73]">{flowBody}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white px-5 py-16 sm:py-20">
+          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.82fr_1fr] lg:items-center">
+            <div>
+              <p className="apple-eyebrow">Archive</p>
+              <h2 className="apple-display mt-4 text-5xl sm:text-6xl">{outputsTitle}</h2>
+              <p className="apple-copy mt-5 text-xl">학기마다 쌓인 활동은 다음 부원이 참고할 수 있는 자료와 경험으로 남습니다.</p>
+            </div>
+            <div className="grid gap-3">
+              {outputs.map((item, index) => (
+                <div key={item} className="apple-output-row flex items-center gap-4 rounded-lg bg-[#f5f5f7] px-5 py-5">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-semibold text-[#0066cc]">{index + 1}</span>
+                  <p className="text-lg font-semibold leading-7 text-[#1d1d1f]">{item}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  )
+}
+
+function ActivitiesDetailPage() {
+  return (
+    <DetailStoryPage
+      eyebrow="Activities"
+      title="배움이 매주 쌓이고, 서로에게 남습니다."
+      body="COM's의 활동은 정기 세미나, 분야별 스터디, 코드 리뷰, 작은 제작 과제가 이어지는 흐름입니다. 처음 시작하는 사람도 따라올 수 있고, 이미 경험이 있는 사람도 더 깊게 확장할 수 있습니다."
+      visualTitle="Learning Stack"
+      visualSubtitle="Seminar · Study · Review"
+      visualRows={['정기 세미나', '분야별 스터디', '코드 리뷰']}
+      cards={activitiesDetailCards}
+      flow={activitiesDetailFlow}
+      outputsTitle="활동이 남기는 기록."
+      outputs={activitiesDetailTopics}
+    />
+  )
+}
+
+function ProjectsDetailPage() {
+  return (
+    <DetailStoryPage
+      eyebrow="Projects"
+      title="아이디어를 실제 서비스와 제작물로."
+      body="COM's의 프로젝트는 동아리 안에서 쓰이는 서비스, 교육용 실습, 웹 개발 결과물처럼 실제로 동작하는 결과물을 만드는 데 집중합니다. 기획부터 구현, 배포와 개선까지 팀으로 경험합니다."
+      visualTitle="Project Lab"
+      visualSubtitle="Prototype · Launch · Iterate"
+      visualRows={['서비스 기획', '팀 구현', '배포와 개선']}
+      cards={projectsDetailCards}
+      flow={projectsDetailFlow}
+      outputsTitle="프로젝트가 남기는 결과물."
+      outputs={projectsDetailOutputs}
+    />
   )
 }
 
@@ -864,8 +1154,6 @@ function HomeView() {
   const recruitRef = useRef(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [latestNotice, setLatestNotice] = useState(null)
-  const [activitiesExpanded, setActivitiesExpanded] = useState(false)
-  const [projectsExpanded, setProjectsExpanded] = useState(false)
 
   useEffect(() => {
     let rafId = null
@@ -949,21 +1237,21 @@ function HomeView() {
     if (story) {
       const metrics = sectionMetrics[id]
       const detailItems = id === 'activities'
-        ? (activitiesExpanded ? activityDetails : activityDetails.slice(0, 2))
+        ? activityDetails.slice(0, 2)
         : id === 'projects'
-          ? (projectsExpanded ? projectDetails : projectDetails.slice(0, 3))
+          ? projectDetails.slice(0, 3)
           : []
 
       const primaryAction = () => {
         if (id === 'about') navigate('/about')
-        if (id === 'activities') setActivitiesExpanded((open) => !open)
-        if (id === 'projects') setProjectsExpanded((open) => !open)
+        if (id === 'activities') navigate('/activities')
+        if (id === 'projects') navigate('/projects')
         if (id === 'recruit') goRecruitPage()
       }
 
       const secondaryAction = () => {
         if (id === 'about') openPanel('activities')
-        if (id === 'activities') openPanel('projects')
+        if (id === 'activities') navigate('/projects')
         if (id === 'recruit') navigate('/recruit-notice', { state: { from: `${locationPath()}#recruit` } })
       }
 
@@ -975,7 +1263,7 @@ function HomeView() {
             <p className="apple-copy mx-auto mt-6 max-w-3xl text-xl sm:text-2xl">{story.body}</p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <button type="button" onClick={primaryAction} className={solidActionBtnClass}>
-                {id === 'activities' && activitiesExpanded ? '활동 요약 보기' : id === 'projects' && projectsExpanded ? '프로젝트 요약 보기' : story.primary}
+                {story.primary}
               </button>
               {id === 'projects' ? (
                 <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className={ghostActionBtnClass}>{story.secondary}</a>
@@ -1025,25 +1313,6 @@ function HomeView() {
             </div>
           )}
 
-          {id === 'activities' && activitiesExpanded && (
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {activities.map((item) => (
-                <div key={item} className="rounded-lg bg-[#1d1d1f] px-5 py-4 text-sm font-semibold leading-6 text-white">
-                  {item}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {id === 'projects' && projectsExpanded && (
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {projects.map((item) => (
-                <div key={item} className="apple-soft-panel px-5 py-4 text-sm font-semibold leading-6 text-[#1d1d1f]">
-                  {item}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )
     }
@@ -1055,12 +1324,12 @@ function HomeView() {
     const visual = visualDetails[id]
     return (
       <div data-panel="true" className={`w-full overflow-hidden ${id === 'about' || id === 'projects' ? 'apple-section-band' : 'apple-section-band-muted'}`} style={{ background: meta.background }}>
-        <div className="mx-auto grid min-h-[calc(100svh-44px)] max-w-7xl items-center gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,1.05fr)_minmax(20rem,0.75fr)] lg:px-10">
+        <div className="apple-section-grid mx-auto grid min-h-[calc(100svh-44px)] max-w-7xl items-center gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,1.05fr)_minmax(20rem,0.75fr)] lg:px-10">
           <div className="flex items-center">
             {renderSectionContent(id)}
           </div>
           <div className="flex items-center justify-center">
-            <div className="home-device relative aspect-square w-full max-w-md overflow-hidden rounded-lg ring-1 ring-black/5" style={{ background: meta.visual }}>
+            <div className="home-device apple-device-card relative aspect-square w-full max-w-md overflow-hidden rounded-lg ring-1 ring-black/5" style={{ background: meta.visual }}>
               <div className="absolute inset-0 bg-linear-to-b from-white/30 via-transparent to-black/5" />
               <div className="absolute inset-x-6 top-6 rounded-lg bg-white/78 px-5 py-4 shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
                 <div className="mb-4 flex items-center gap-1.5">
@@ -1217,7 +1486,7 @@ function HomeView() {
       </header>
 
       <main className="relative overflow-hidden pt-[44px]">
-        <section className="relative flex min-h-[calc(86svh-44px)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-12 text-center sm:min-h-[calc(92svh-44px)] sm:py-14">
+        <section className="apple-home-hero relative flex min-h-[calc(86svh-44px)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-12 text-center sm:min-h-[calc(92svh-44px)] sm:py-14">
           <div className="home-hero-surface absolute inset-0" />
           <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-b from-transparent to-white/85" />
           <div className="relative z-10 mx-auto max-w-7xl">
@@ -1281,7 +1550,7 @@ function HomeView() {
                 key={item.title}
                 type="button"
                 onClick={() => openPanel(item.target)}
-                className={`apple-product-panel group min-h-[13.5rem] px-7 py-7 text-left transition hover:-translate-y-0.5 ${index === 0 ? 'bg-[#1d1d1f] text-white' : index === 1 ? 'bg-[#f5f5f7] text-[#1d1d1f]' : 'bg-linear-to-br from-[#e8f8ff] to-[#ffffff] text-[#1d1d1f]'}`}
+                className={`apple-product-panel apple-showcase-card group min-h-[13.5rem] px-7 py-7 text-left transition hover:-translate-y-0.5 ${index === 0 ? 'bg-[#1d1d1f] text-white' : index === 1 ? 'bg-[#f5f5f7] text-[#1d1d1f]' : 'bg-linear-to-br from-[#e8f8ff] to-[#ffffff] text-[#1d1d1f]'}`}
               >
                 <p className={`text-sm font-semibold ${index === 0 ? 'text-white/58' : 'text-[#0066cc]'}`}>{item.eyebrow}</p>
                 <h3 className="mt-3 text-3xl font-semibold leading-tight tracking-normal">{item.title}</h3>
@@ -1304,18 +1573,6 @@ function HomeView() {
         <section ref={recruitRef} id="recruit" className="relative">
           {renderSectionPanel('recruit')}
         </section>
-
-        <footer className="border-t border-black/10 bg-[#f5f5f7] px-5 py-10 text-sm text-[#6e6e73]">
-          <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <p>Copyright © KW COM&apos;s. All rights reserved.</p>
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
-              <a href="https://www.instagram.com/kw_coms" target="_blank" rel="noreferrer" className="hover:text-[#1d1d1f]">Instagram</a>
-              <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className="hover:text-[#1d1d1f]">GitHub</a>
-              <a href="https://www.youtube.com/@kw_coms" target="_blank" rel="noreferrer" className="hover:text-[#1d1d1f]">YouTube</a>
-              <a href="mailto:kwcoms69@gmail.com" className="hover:text-[#1d1d1f]">Mail</a>
-            </div>
-          </div>
-        </footer>
       </main>
     </div>
   )
@@ -1323,7 +1580,7 @@ function HomeView() {
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
-function PageShell({ children, wide = false, full = false }) {
+function PageShell({ children, wide = false, full = false, transition = true }) {
   return (
     <div className="apple-route relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
       <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white via-[#f5f5f7] to-white" />
@@ -1331,7 +1588,7 @@ function PageShell({ children, wide = false, full = false }) {
         <NotificationButton />
       </div>
       <main className={`relative mx-auto flex min-h-screen min-w-0 px-4 sm:px-6 ${full ? 'items-start pt-20 pb-16' : 'items-center justify-center py-24'} ${wide ? 'max-w-7xl' : 'max-w-4xl'}`}>
-        <div className={`page-transition w-full min-w-0 ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
+        <div className={`${transition ? 'page-transition' : ''} w-full min-w-0 ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
       </main>
     </div>
   )
