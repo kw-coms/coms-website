@@ -214,6 +214,11 @@ select {
 	border-bottom: 1px solid var(--app-hairline);
 }
 
+.apple-board-minibar {
+	background: color-mix(in srgb, var(--app-surface) 96%, var(--app-surface-soft));
+	border-bottom: 1px solid var(--app-hairline);
+}
+
 .apple-control-strip {
 	background: var(--app-surface-soft);
 	border-bottom: 1px solid var(--app-hairline);

@@ -1707,6 +1707,27 @@ function BoardHeader({ title = "COM's 게시판", children }) {
   )
 }
 
+function BoardDetailBar({ post, loading, children }) {
+  return (
+    <div className="apple-board-minibar px-4 py-3 sm:px-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+          <span className="text-[var(--app-accent-text)]">Community</span>
+          <span className="size-1 rounded-full bg-[var(--app-subtle)]" />
+          <span>{loading ? '글 여는 중...' : post ? categoryLabel(post.category || 'GENERAL') : '게시글'}</span>
+          {post?.createdAt && (
+            <>
+              <span className="size-1 rounded-full bg-[var(--app-subtle)]" />
+              <span>{shortDate(post.createdAt)}</span>
+            </>
+          )}
+        </div>
+        {children && <div className="flex w-full shrink-0 sm:w-auto sm:justify-end">{children}</div>}
+      </div>
+    </div>
+  )
+}
+
 export default function Community({ onBack }) {
   const { user } = useAuth()
   const { id: urlId } = useParams()
@@ -2534,17 +2555,17 @@ export default function Community({ onBack }) {
 
         {mode === 'detail' && (
           <>
-            <BoardHeader title={detailLoading ? '글 여는 중...' : currentPost?.title || '게시글'}>
+            <BoardDetailBar post={currentPost} loading={detailLoading}>
               <button type="button" onClick={backToList} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
                 <ArrowLeft size={14} />
                 목록
               </button>
-            </BoardHeader>
+            </BoardDetailBar>
             {detailLoading || !currentPost ? (
               <p className="px-4 py-16 text-center text-sm text-[var(--theme-body-muted)]">글을 여는 중...</p>
             ) : (
-              <article className="m-0 overflow-hidden bg-white shadow-[0_18px_50px_rgba(0,0,0,0.14)] sm:m-7 sm:rounded-lg">
-                <div className="border-b border-black/10 px-4 py-5 sm:px-5">
+              <article className="m-0 overflow-hidden bg-white sm:m-5 sm:rounded-lg sm:border sm:border-black/10">
+                <div className="border-b border-black/10 px-4 py-4 sm:px-5">
                   <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[#3b4890]">
                     <span>{categoryLabel(currentPost.category || 'GENERAL')}</span>
                     {currentPostConcept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
