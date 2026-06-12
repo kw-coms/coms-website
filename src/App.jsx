@@ -399,13 +399,22 @@ function getStoredAccentColor() {
   return normalizeHex(window.localStorage.getItem(ACCENT_COLOR_KEY) || DEFAULT_ACCENT)
 }
 
+function scrollToTopInstant() {
+  if (typeof window === 'undefined') return
+  const root = document.documentElement
+  const previousBehavior = root.style.scrollBehavior
+  root.style.scrollBehavior = 'auto'
+  window.scrollTo(0, 0)
+  root.style.scrollBehavior = previousBehavior
+}
+
 // ─── Auth guards ───────────────────────────────────────────────────────────
 
 function ScrollToTop() {
   const { pathname } = useLocation()
 
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    scrollToTopInstant()
   }, [pathname])
 
   return null
@@ -529,10 +538,14 @@ function RecruitNoticePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const from = location.state?.from || '/'
+  const goApply = () => {
+    scrollToTopInstant()
+    navigate('/recruit')
+  }
 
   return (
     <PageShell wide full transition={false}>
-      <RecruitNotice onBack={() => navigate(from, { replace: true })} onApply={() => navigate('/recruit')} />
+      <RecruitNotice onBack={() => navigate(from, { replace: true })} onApply={goApply} />
     </PageShell>
   )
 }
@@ -1229,7 +1242,11 @@ function HomeView() {
   const goNotices = () => navigate('/notices')
   const goAdmin = () => navigate('/admin')
   const goChangePassword = () => navigate('/settings')
-  const goRecruitPage = () => navigate('/recruit')
+  const goPageTop = (to, options) => {
+    scrollToTopInstant()
+    navigate(to, options)
+  }
+  const goRecruitPage = () => goPageTop('/recruit')
   const locationPath = () => `${location.pathname}${location.search}${location.hash}`
 
   const renderSectionContent = (id) => {
@@ -1243,16 +1260,16 @@ function HomeView() {
           : []
 
       const primaryAction = () => {
-        if (id === 'about') navigate('/about')
-        if (id === 'activities') navigate('/activities')
-        if (id === 'projects') navigate('/projects')
+        if (id === 'about') goPageTop('/about')
+        if (id === 'activities') goPageTop('/activities')
+        if (id === 'projects') goPageTop('/projects')
         if (id === 'recruit') goRecruitPage()
       }
 
       const secondaryAction = () => {
         if (id === 'about') openPanel('activities')
-        if (id === 'activities') navigate('/projects')
-        if (id === 'recruit') navigate('/recruit-notice', { state: { from: `${locationPath()}#recruit` } })
+        if (id === 'activities') goPageTop('/projects')
+        if (id === 'recruit') goPageTop('/recruit-notice', { state: { from: `${locationPath()}#recruit` } })
       }
 
       return (
