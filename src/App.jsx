@@ -810,7 +810,7 @@ function AboutPage() {
       </header>
 
       <main className="relative overflow-hidden pt-[44px]">
-        <section className="relative grid min-h-[calc(92svh-44px)] items-center gap-12 overflow-hidden bg-[#f5f5f7] px-5 py-16 lg:grid-cols-[1fr_0.92fr] lg:px-12">
+        <section className="apple-detail-hero relative grid min-h-[calc(92svh-44px)] items-center gap-12 overflow-hidden bg-[#f5f5f7] px-5 py-16 lg:grid-cols-[1fr_0.92fr] lg:px-12">
           <div className="home-hero-surface absolute inset-0" />
           <div className="relative z-10 mx-auto max-w-3xl text-center lg:text-left">
             <p className="apple-eyebrow">About COM&apos;s</p>
@@ -827,7 +827,7 @@ function AboutPage() {
           </div>
 
           <div className="relative z-10 mx-auto w-full max-w-xl">
-            <div className="rounded-lg bg-white/82 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-2xl">
+            <div className="apple-detail-visual rounded-lg bg-white/82 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-2xl">
               <div className="mb-8 flex items-center gap-2">
                 <span className="size-3 rounded-full bg-[#ff5f57]" />
                 <span className="size-3 rounded-full bg-[#ffbd2e]" />
@@ -857,7 +857,7 @@ function AboutPage() {
             </div>
             <div className="mt-12 grid gap-4 lg:grid-cols-3">
               {aboutDetailCards.map(({ title, eyebrow, body, icon: Icon }) => (
-                <article key={title} className="apple-product-panel min-h-[19rem] px-7 py-7">
+                <article key={title} className="apple-product-panel apple-detail-card min-h-[19rem] px-7 py-7">
                   <div className="mb-8 inline-flex size-11 items-center justify-center rounded-full bg-[#f5f5f7] text-[#0066cc]">
                     <Icon size={20} />
                   </div>
@@ -878,7 +878,7 @@ function AboutPage() {
             </h2>
             <div className="mt-12 grid gap-3">
               {aboutDetailFlow.map(([number, title, body]) => (
-                <article key={number} className="grid gap-4 rounded-lg bg-white px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:grid-cols-[5rem_1fr] sm:items-center">
+                <article key={number} className="apple-flow-row grid gap-4 rounded-lg bg-white px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:grid-cols-[5rem_1fr] sm:items-center">
                   <span className="text-3xl font-semibold text-[#0066cc]">{number}</span>
                   <div>
                     <h3 className="text-2xl font-semibold text-[#1d1d1f]">{title}</h3>
@@ -901,7 +901,7 @@ function AboutPage() {
             </div>
             <div className="grid gap-3">
               {aboutDetailPrinciples.map((item, index) => (
-                <div key={item} className="flex items-center gap-4 rounded-lg bg-[#f5f5f7] px-5 py-5">
+                <div key={item} className="apple-output-row flex items-center gap-4 rounded-lg bg-[#f5f5f7] px-5 py-5">
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-semibold text-[#0066cc]">{index + 1}</span>
                   <p className="text-lg font-semibold leading-7 text-[#1d1d1f]">{item}</p>
                 </div>
@@ -944,7 +944,7 @@ function DetailStoryPage({
       </header>
 
       <main className="relative overflow-hidden pt-[44px]">
-        <section className="relative grid min-h-[calc(88svh-44px)] items-center gap-12 overflow-hidden bg-[#f5f5f7] px-5 py-16 lg:grid-cols-[1fr_0.88fr] lg:px-12">
+        <section className="apple-detail-hero relative grid min-h-[calc(88svh-44px)] items-center gap-12 overflow-hidden bg-[#f5f5f7] px-5 py-16 lg:grid-cols-[1fr_0.88fr] lg:px-12">
           <div className="home-hero-surface absolute inset-0" />
           <div className="relative z-10 mx-auto max-w-3xl text-center lg:text-left">
             <p className="apple-eyebrow">{eyebrow}</p>
@@ -957,7 +957,7 @@ function DetailStoryPage({
           </div>
 
           <div className="relative z-10 mx-auto w-full max-w-xl">
-            <div className="rounded-lg bg-white/82 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-2xl">
+            <div className="apple-detail-visual rounded-lg bg-white/82 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-2xl">
               <div className="mb-7 flex items-center gap-2">
                 <span className="size-3 rounded-full bg-[#ff5f57]" />
                 <span className="size-3 rounded-full bg-[#ffbd2e]" />
@@ -988,7 +988,7 @@ function DetailStoryPage({
             </div>
             <div className="mt-12 grid gap-4 lg:grid-cols-3">
               {cards.map(({ title: cardTitle, eyebrow: cardEyebrow, body: cardBody, icon: Icon }) => (
-                <article key={cardTitle} className="apple-product-panel min-h-[19rem] px-7 py-7">
+                <article key={cardTitle} className="apple-product-panel apple-detail-card min-h-[19rem] px-7 py-7">
                   <div className="mb-8 inline-flex size-11 items-center justify-center rounded-full bg-[#f5f5f7] text-[#0066cc]">
                     <Icon size={20} />
                   </div>
@@ -1007,7 +1007,7 @@ function DetailStoryPage({
             <h2 className="apple-display mx-auto mt-4 max-w-4xl text-center text-5xl sm:text-6xl">작게 시작해서 오래 남기는 방식.</h2>
             <div className="mt-12 grid gap-3">
               {flow.map(([number, flowTitle, flowBody]) => (
-                <article key={number} className="grid gap-4 rounded-lg bg-white px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:grid-cols-[5rem_1fr] sm:items-center">
+                <article key={number} className="apple-flow-row grid gap-4 rounded-lg bg-white px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:grid-cols-[5rem_1fr] sm:items-center">
                   <span className="text-3xl font-semibold text-[#0066cc]">{number}</span>
                   <div>
                     <h3 className="text-2xl font-semibold text-[#1d1d1f]">{flowTitle}</h3>
@@ -1028,7 +1028,7 @@ function DetailStoryPage({
             </div>
             <div className="grid gap-3">
               {outputs.map((item, index) => (
-                <div key={item} className="flex items-center gap-4 rounded-lg bg-[#f5f5f7] px-5 py-5">
+                <div key={item} className="apple-output-row flex items-center gap-4 rounded-lg bg-[#f5f5f7] px-5 py-5">
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-semibold text-[#0066cc]">{index + 1}</span>
                   <p className="text-lg font-semibold leading-7 text-[#1d1d1f]">{item}</p>
                 </div>
@@ -1256,12 +1256,12 @@ function HomeView() {
     const visual = visualDetails[id]
     return (
       <div data-panel="true" className={`w-full overflow-hidden ${id === 'about' || id === 'projects' ? 'apple-section-band' : 'apple-section-band-muted'}`} style={{ background: meta.background }}>
-        <div className="mx-auto grid min-h-[calc(100svh-44px)] max-w-7xl items-center gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,1.05fr)_minmax(20rem,0.75fr)] lg:px-10">
+        <div className="apple-section-grid mx-auto grid min-h-[calc(100svh-44px)] max-w-7xl items-center gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,1.05fr)_minmax(20rem,0.75fr)] lg:px-10">
           <div className="flex items-center">
             {renderSectionContent(id)}
           </div>
           <div className="flex items-center justify-center">
-            <div className="home-device relative aspect-square w-full max-w-md overflow-hidden rounded-lg ring-1 ring-black/5" style={{ background: meta.visual }}>
+            <div className="home-device apple-device-card relative aspect-square w-full max-w-md overflow-hidden rounded-lg ring-1 ring-black/5" style={{ background: meta.visual }}>
               <div className="absolute inset-0 bg-linear-to-b from-white/30 via-transparent to-black/5" />
               <div className="absolute inset-x-6 top-6 rounded-lg bg-white/78 px-5 py-4 shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
                 <div className="mb-4 flex items-center gap-1.5">
@@ -1418,7 +1418,7 @@ function HomeView() {
       </header>
 
       <main className="relative overflow-hidden pt-[44px]">
-        <section className="relative flex min-h-[calc(86svh-44px)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-12 text-center sm:min-h-[calc(92svh-44px)] sm:py-14">
+        <section className="apple-home-hero relative flex min-h-[calc(86svh-44px)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-12 text-center sm:min-h-[calc(92svh-44px)] sm:py-14">
           <div className="home-hero-surface absolute inset-0" />
           <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-b from-transparent to-white/85" />
           <div className="relative z-10 mx-auto max-w-7xl">
@@ -1482,7 +1482,7 @@ function HomeView() {
                 key={item.title}
                 type="button"
                 onClick={() => openPanel(item.target)}
-                className={`apple-product-panel group min-h-[13.5rem] px-7 py-7 text-left transition hover:-translate-y-0.5 ${index === 0 ? 'bg-[#1d1d1f] text-white' : index === 1 ? 'bg-[#f5f5f7] text-[#1d1d1f]' : 'bg-linear-to-br from-[#e8f8ff] to-[#ffffff] text-[#1d1d1f]'}`}
+                className={`apple-product-panel apple-showcase-card group min-h-[13.5rem] px-7 py-7 text-left transition hover:-translate-y-0.5 ${index === 0 ? 'bg-[#1d1d1f] text-white' : index === 1 ? 'bg-[#f5f5f7] text-[#1d1d1f]' : 'bg-linear-to-br from-[#e8f8ff] to-[#ffffff] text-[#1d1d1f]'}`}
               >
                 <p className={`text-sm font-semibold ${index === 0 ? 'text-white/58' : 'text-[#0066cc]'}`}>{item.eyebrow}</p>
                 <h3 className="mt-3 text-3xl font-semibold leading-tight tracking-normal">{item.title}</h3>
