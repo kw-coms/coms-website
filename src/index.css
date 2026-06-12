@@ -890,6 +890,12 @@ body {
 	line-height: 1.85;
 }
 
+.community-post-text {
+	display: block;
+	clear: both;
+	margin: 0.75rem 0;
+}
+
 .inline-image,
 .inline-icon {
 	display: inline-block;

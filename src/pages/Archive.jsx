@@ -193,9 +193,6 @@ export default function Archive({ onBack }) {
           >
             메인으로 돌아가기
           </button>
-          <div className="text-sm text-[#6e6e73]">
-            {user?.name ? `${user.name}님` : "COM's 자료실"}
-          </div>
         </div>
       )}
 
