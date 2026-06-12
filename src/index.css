@@ -552,12 +552,6 @@ select {
 	background-image: linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 85%, transparent), transparent 48%, color-mix(in srgb, var(--app-bg) 88%, transparent)) !important;
 }
 
-.appearance-trigger {
-	background-color: color-mix(in srgb, var(--app-surface) 88%, transparent) !important;
-	color: var(--app-text) !important;
-	border-color: var(--app-hairline) !important;
-}
-
 .appearance-panel,
 .theme-popover {
 	background-color: color-mix(in srgb, var(--app-surface) 92%, transparent) !important;
