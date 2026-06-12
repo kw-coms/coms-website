@@ -322,6 +322,36 @@ const accentSwatches = [
   { name: 'Violet', value: '#8e5cf7' },
 ]
 
+const footerLinkGroups = [
+  {
+    title: "COM's",
+    links: [
+      { label: 'About', href: '/#about' },
+      { label: 'Activities', href: '/#activities' },
+      { label: 'Projects', href: '/#projects' },
+      { label: 'Recruit', href: '/#recruit' },
+    ],
+  },
+  {
+    title: 'Explore',
+    links: [
+      { label: 'Notices', href: '/notices' },
+      { label: 'Community', href: '/community' },
+      { label: 'Archive', href: '/resources' },
+      { label: 'Admin', href: '/admin' },
+    ],
+  },
+  {
+    title: 'Connect',
+    links: [
+      { label: 'Instagram', href: 'https://www.instagram.com/kw_coms', external: true },
+      { label: 'GitHub', href: 'https://github.com/kw-coms', external: true },
+      { label: 'YouTube', href: 'https://www.youtube.com/@kw_coms', external: true },
+      { label: 'Mail', href: 'mailto:kwcoms69@gmail.com' },
+    ],
+  },
+]
+
 function normalizeHex(value) {
   if (typeof value !== 'string') return DEFAULT_ACCENT
   const trimmed = value.trim()
@@ -655,65 +685,103 @@ function AppearanceControl({ accentColor, setAccentColor, themeMode, setThemeMod
   const isDark = themeMode === 'dark'
 
   return (
-    <section className="appearance-control border-t border-black/10 bg-[var(--app-surface-soft)] px-4 py-6 text-[var(--app-text)] sm:px-6">
-      <div className="appearance-panel mx-auto grid w-full max-w-5xl gap-5 rounded-lg border border-black/10 bg-white/88 px-5 py-5 shadow-[0_12px_28px_rgba(0,0,0,0.07)] backdrop-blur-2xl lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--app-muted)]">Appearance</p>
-          <h2 className="mt-1 text-lg font-semibold text-[var(--app-text)]">화면 설정</h2>
+    <section className="appearance-control apple-footer-surface border-t border-black/10 bg-[var(--app-surface-soft)] px-5 py-8 text-[var(--app-muted)]">
+      <div className="mx-auto w-full max-w-5xl">
+        <div className="apple-footer-note border-b border-black/10 pb-5 text-xs leading-5">
+          <p>KW COM&apos;s는 광운대학교 학생들이 함께 공부하고 프로젝트를 만드는 중앙 컴퓨터 학술동아리입니다.</p>
+          <p className="mt-2">활동 안내와 모집 일정은 공지사항을 통해 순차적으로 공개됩니다.</p>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-3 lg:items-end">
-          <button
-            type="button"
-            onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--app-text)] px-4 text-sm font-semibold text-[var(--app-bg)] shadow-[0_8px_22px_rgba(0,0,0,0.12)] transition hover:opacity-90 sm:w-auto"
-            aria-label={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
-          >
-            <span className="grid size-7 place-items-center rounded-full bg-white/12">
-              {isDark ? <Sun size={15} /> : <Moon size={15} />}
-            </span>
-            {isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
-          </button>
+        <div className="appearance-panel grid gap-4 border-b border-black/10 py-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-subtle)]">Appearance</p>
+            <h2 className="mt-1 text-sm font-semibold text-[var(--app-text)]">화면 설정</h2>
+          </div>
 
-          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-            <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">색상</span>
-            <div className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-[var(--app-surface)] p-1">
-              {accentSwatches.map((swatch) => {
-                const active = accent === swatch.value
-                return (
-                  <button
-                    key={swatch.value}
-                    type="button"
-                    onClick={() => setAccentColor(swatch.value)}
-                    className={`relative grid size-8 place-items-center rounded-full transition hover:scale-105 ${active ? 'ring-2 ring-[var(--app-text)] ring-offset-2 ring-offset-[var(--app-surface)]' : ''}`}
-                    style={{ backgroundColor: swatch.value }}
-                    aria-label={`${swatch.name} 색상 선택`}
-                    title={swatch.name}
-                  >
-                    {active && <span className="size-2.5 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.28)]" />}
-                  </button>
-                )
-              })}
-            </div>
-            <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)]">
-              직접 선택
-              <span className="relative grid size-6 overflow-hidden rounded-full border border-black/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]" style={{ backgroundColor: accent }}>
-                <input
-                  type="color"
-                  value={accent}
-                  onChange={(event) => setAccentColor(event.target.value)}
-                  className="absolute -inset-2 h-10 w-10 cursor-pointer opacity-0"
-                  aria-label="커스텀 색상 선택"
-                />
-              </span>
-            </label>
+          <div className="appearance-actions flex min-w-0 flex-col gap-3 lg:items-end">
             <button
               type="button"
-              onClick={() => setAccentColor(DEFAULT_ACCENT)}
-              className="min-h-10 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface-elevated)] hover:text-[var(--app-text)]"
+              onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
+              className="appearance-mode-toggle inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)] sm:w-auto"
+              aria-label={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
             >
-              Reset
+              <span className="grid size-6 place-items-center rounded-full bg-[var(--app-surface-soft)] text-[var(--app-text)]">
+                {isDark ? <Sun size={14} /> : <Moon size={14} />}
+              </span>
+              {isDark ? '라이트 모드' : '다크 모드'}
             </button>
+
+            <div className="appearance-color-row flex flex-wrap items-center gap-2 lg:justify-end">
+              <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">색상</span>
+              <div className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-[var(--app-surface)] p-1">
+                {accentSwatches.map((swatch) => {
+                  const active = accent === swatch.value
+                  return (
+                    <button
+                      key={swatch.value}
+                      type="button"
+                      onClick={() => setAccentColor(swatch.value)}
+                      className={`relative grid size-7 place-items-center rounded-full transition hover:scale-105 ${active ? 'ring-2 ring-[var(--app-text)] ring-offset-2 ring-offset-[var(--app-surface)]' : ''}`}
+                      style={{ backgroundColor: swatch.value }}
+                      aria-label={`${swatch.name} 색상 선택`}
+                      title={swatch.name}
+                    >
+                      {active && <span className="size-2 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.28)]" />}
+                    </button>
+                  )
+                })}
+              </div>
+              <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)]">
+                직접 선택
+                <span className="relative grid size-5 overflow-hidden rounded-full border border-black/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]" style={{ backgroundColor: accent }}>
+                  <input
+                    type="color"
+                    value={accent}
+                    onChange={(event) => setAccentColor(event.target.value)}
+                    className="absolute -inset-2 h-10 w-10 cursor-pointer opacity-0"
+                    aria-label="커스텀 색상 선택"
+                  />
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={() => setAccentColor(DEFAULT_ACCENT)}
+                className="min-h-9 rounded-full border border-black/10 bg-transparent px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface)] hover:text-[var(--app-text)]"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="apple-footer-directory grid gap-x-10 gap-y-6 border-b border-black/10 py-5 text-xs sm:grid-cols-3">
+          {footerLinkGroups.map((group) => (
+            <div key={group.title}>
+              <h3 className="font-semibold text-[var(--app-text)]">{group.title}</h3>
+              <ul className="mt-2 space-y-2">
+                {group.links.map((link) => (
+                  <li key={link.label}>
+                    <a
+                      href={link.href}
+                      target={link.external ? '_blank' : undefined}
+                      rel={link.external ? 'noreferrer' : undefined}
+                      className="text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                    >
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div className="apple-footer-bottom flex flex-col gap-3 pt-4 text-xs sm:flex-row sm:items-center sm:justify-between">
+          <p>Copyright © {new Date().getFullYear()} KW COM&apos;s. All rights reserved.</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            <a href="/notices" className="hover:text-[var(--app-text)]">Notices</a>
+            <a href="/community" className="hover:text-[var(--app-text)]">Community</a>
+            <a href="mailto:kwcoms69@gmail.com" className="hover:text-[var(--app-text)]">Contact</a>
           </div>
         </div>
       </div>
@@ -1505,18 +1573,6 @@ function HomeView() {
         <section ref={recruitRef} id="recruit" className="relative">
           {renderSectionPanel('recruit')}
         </section>
-
-        <footer className="border-t border-black/10 bg-[#f5f5f7] px-5 py-10 text-sm text-[#6e6e73]">
-          <div className="mx-auto flex max-w-7xl flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <p>Copyright © KW COM&apos;s. All rights reserved.</p>
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
-              <a href="https://www.instagram.com/kw_coms" target="_blank" rel="noreferrer" className="hover:text-[#1d1d1f]">Instagram</a>
-              <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className="hover:text-[#1d1d1f]">GitHub</a>
-              <a href="https://www.youtube.com/@kw_coms" target="_blank" rel="noreferrer" className="hover:text-[#1d1d1f]">YouTube</a>
-              <a href="mailto:kwcoms69@gmail.com" className="hover:text-[#1d1d1f]">Mail</a>
-            </div>
-          </div>
-        </footer>
       </main>
     </div>
   )

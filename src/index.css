@@ -554,11 +554,46 @@ select {
 	background-image: linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 85%, transparent), transparent 48%, color-mix(in srgb, var(--app-bg) 88%, transparent)) !important;
 }
 
-.appearance-panel,
 .theme-popover {
 	background-color: color-mix(in srgb, var(--app-surface) 92%, transparent) !important;
 	color: var(--app-text) !important;
 	border-color: var(--app-hairline) !important;
+}
+
+.apple-footer-surface {
+	background-color: var(--app-surface-soft) !important;
+	color: var(--app-muted);
+}
+
+.apple-footer-surface .appearance-panel {
+	background: transparent !important;
+	color: var(--app-text) !important;
+	border-color: var(--app-hairline) !important;
+	box-shadow: none !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+.apple-footer-note,
+.apple-footer-directory,
+.apple-footer-bottom {
+	border-color: var(--app-hairline) !important;
+}
+
+.apple-footer-surface a {
+	text-decoration: none;
+}
+
+.appearance-mode-toggle,
+.appearance-color-row > label,
+.appearance-color-row > button {
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48);
+}
+
+:root[data-theme-mode='dark'] .appearance-mode-toggle,
+:root[data-theme-mode='dark'] .appearance-color-row > label,
+:root[data-theme-mode='dark'] .appearance-color-row > button {
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .appearance-panel .text-\[\#1d1d1f\],
