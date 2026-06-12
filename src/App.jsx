@@ -35,13 +35,6 @@ const tabs = [
   { id: 'recruit', label: 'Recruit', hint: '지원 안내', icon: Rocket, accent: 'text-sky-500' },
 ]
 
-const activities = [
-  '정기 세미나: 프로그래밍, 웹 개발, 알고리즘, 컴퓨터 기초 주제 진행',
-  '스터디: 신입 부원부터 기존 부원까지 참여 가능한 수준별 운영',
-  '프로젝트: 웹사이트, 앱, 아두이노, 소프트웨어 개발 팀 제작',
-  '교류 활동: 선후배 간 경험 공유와 진로·학습 정보 교환',
-]
-
 const activityDetails = [
   {
     title: '정기 세미나',
@@ -59,12 +52,6 @@ const activityDetails = [
     title: '선후배 교류',
     description: '수강 과목, 공모전, 진로, 개발 학습 방법에 대한 경험을 공유하며 서로의 성장을 돕는 커뮤니티를 만듭니다.',
   },
-]
-
-const projects = [
-  'COM\'s Official Website - React · Vite · Tailwind CSS 기반 공식 웹사이트',
-  'Arduino Basic Class - 초급자를 위한 아두이노 기초 교육 프로젝트',
-  'Web Development Study - HTML · CSS · JavaScript · React 학습 스터디',
 ]
 
 const projectDetails = [
@@ -252,6 +239,78 @@ const aboutDetailPrinciples = [
   '동아리 밖에서도 이어지는 개발 경험과 포트폴리오',
 ]
 
+const activitiesDetailCards = [
+  {
+    title: '정기 세미나',
+    eyebrow: 'Weekly seminar',
+    body: '프로그래밍 기초, 웹 개발, 알고리즘, 컴퓨터 구조처럼 학기 중 꾸준히 다룰 주제를 정해 함께 학습합니다.',
+    icon: Binary,
+  },
+  {
+    title: '분야별 스터디',
+    eyebrow: 'Focused study',
+    body: '처음 시작하는 부원부터 기존 부원까지 각자 관심 분야에 맞춰 프론트엔드, 백엔드, 임베디드, 알고리즘 등을 나눠 공부합니다.',
+    icon: Sparkles,
+  },
+  {
+    title: '코드 리뷰',
+    eyebrow: 'Review loop',
+    body: '스터디와 프로젝트에서 작성한 코드를 공유하고, 더 읽기 좋은 구조와 협업 방식을 함께 익힙니다.',
+    icon: CircuitBoard,
+  },
+]
+
+const activitiesDetailFlow = [
+  ['01', '기초를 맞춥니다', '새로운 주제를 시작하기 전 필요한 개념을 함께 정리하고, 따라올 수 있는 기준을 맞춥니다.'],
+  ['02', '작게 실습합니다', '배운 내용을 작은 과제와 예제로 바로 적용하면서 손으로 익히는 시간을 만듭니다.'],
+  ['03', '서로 설명합니다', '모르는 지점을 질문하고, 이해한 내용을 다시 설명하며 학습을 오래 남깁니다.'],
+  ['04', '프로젝트로 연결합니다', '활동에서 배운 내용이 실제 제작과 포트폴리오로 이어지도록 프로젝트 주제를 찾습니다.'],
+]
+
+const activitiesDetailTopics = [
+  'HTML, CSS, JavaScript, React 기반 웹 개발',
+  'C, Python, Java 등 프로그래밍 기초와 문제 해결',
+  'Arduino와 센서를 활용한 임베디드 실습',
+  'Git, GitHub, 협업 도구를 활용한 팀 개발',
+  '공모전, 해커톤, 개인 프로젝트 준비',
+]
+
+const projectsDetailCards = [
+  {
+    title: 'Official Website',
+    eyebrow: 'Service project',
+    body: '동아리 소개, 공지사항, 자료실, 커뮤니티를 담는 공식 웹사이트를 실제 서비스 형태로 개발하고 개선합니다.',
+    icon: CircuitBoard,
+  },
+  {
+    title: 'Arduino Class',
+    eyebrow: 'Hardware lab',
+    body: '초급자를 위한 아두이노 기초 교육을 통해 센서 입력, 회로 연결, 간단한 제어 로직을 단계별로 익힙니다.',
+    icon: Binary,
+  },
+  {
+    title: 'Web Study Build',
+    eyebrow: 'Frontend track',
+    body: 'HTML, CSS, JavaScript, React를 기반으로 화면 설계와 컴포넌트 구현을 연습하고 작은 기능을 직접 완성합니다.',
+    icon: Sparkles,
+  },
+]
+
+const projectsDetailFlow = [
+  ['01', '문제를 정합니다', '동아리 안팎에서 필요한 기능이나 만들고 싶은 아이디어를 모아 프로젝트 주제로 정리합니다.'],
+  ['02', '역할을 나눕니다', '기획, 디자인, 프론트엔드, 백엔드, 하드웨어 등 필요한 역할을 나누고 협업 방식을 정합니다.'],
+  ['03', '작게 출시합니다', '완벽한 완성보다 사용 가능한 첫 버전을 빠르게 만들고 실제 피드백을 받습니다.'],
+  ['04', '계속 개선합니다', '코드 리뷰와 회고를 통해 다음 프로젝트에서 더 좋은 구조와 경험을 가져갑니다.'],
+]
+
+const projectsDetailOutputs = [
+  'COM\'s 공식 웹사이트와 운영 도구',
+  '아두이노 기초 교육용 실습 예제',
+  '웹 개발 스터디 결과물과 개인 포트폴리오',
+  '공모전, 해커톤, 자유 주제 제작물',
+  '동아리 자료실과 커뮤니티 개선 기능',
+]
+
 const DEFAULT_ACCENT = '#0071e3'
 const THEME_MODE_KEY = 'kwcoms-theme-mode'
 const ACCENT_COLOR_KEY = 'kwcoms-accent-color'
@@ -430,7 +489,7 @@ function SettingsPage() {
 function RecruitPage() {
   const navigate = useNavigate()
   return (
-    <PageShell wide>
+    <PageShell wide transition={false}>
       <RecruitApply onBack={() => navigate('/')} />
     </PageShell>
   )
@@ -442,7 +501,7 @@ function RecruitNoticePage() {
   const from = location.state?.from || '/'
 
   return (
-    <PageShell wide full>
+    <PageShell wide full transition={false}>
       <RecruitNotice onBack={() => navigate(from, { replace: true })} onApply={() => navigate('/recruit')} />
     </PageShell>
   )
@@ -695,6 +754,8 @@ function App() {
       <Routes>
         <Route path="/" element={<HomeView />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/activities" element={<ActivitiesDetailPage />} />
+        <Route path="/projects" element={<ProjectsDetailPage />} />
         <Route path="/notices" element={<NoticesPage />} />
         <Route path="/notices/:id" element={<NoticesPage />} />
         <Route path="/resources" element={<RequireAuth><ArchivePage /></RequireAuth>} />
@@ -853,6 +914,167 @@ function AboutPage() {
   )
 }
 
+function DetailStoryPage({
+  eyebrow,
+  title,
+  body,
+  visualTitle,
+  visualSubtitle,
+  visualRows,
+  cards,
+  flow,
+  outputsTitle,
+  outputs,
+  backTarget = '/',
+}) {
+  const navigate = useNavigate()
+
+  return (
+    <div className="theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
+      <header className="fixed inset-x-0 top-0 z-60">
+        <div className={`${floatingBarBaseClass} mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8`}>
+          <button type="button" onClick={() => navigate('/')} className="flex min-w-0 items-center gap-3 text-left">
+            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="h-6 w-6 shrink-0 object-contain" />
+            <span className="whitespace-nowrap text-sm font-semibold text-[#1d1d1f]">KW COM&apos;s</span>
+          </button>
+          <button type="button" onClick={() => navigate(backTarget)} className="rounded-full px-4 py-1.5 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]">
+            Home
+          </button>
+        </div>
+      </header>
+
+      <main className="relative overflow-hidden pt-[44px]">
+        <section className="relative grid min-h-[calc(88svh-44px)] items-center gap-12 overflow-hidden bg-[#f5f5f7] px-5 py-16 lg:grid-cols-[1fr_0.88fr] lg:px-12">
+          <div className="home-hero-surface absolute inset-0" />
+          <div className="relative z-10 mx-auto max-w-3xl text-center lg:text-left">
+            <p className="apple-eyebrow">{eyebrow}</p>
+            <h1 className="apple-display mt-4 text-6xl sm:text-7xl lg:text-[7rem]">{title}</h1>
+            <p className="apple-copy mt-6 text-xl sm:text-2xl">{body}</p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
+              <button type="button" onClick={() => navigate('/')} className={solidActionBtnClass}>홈으로 돌아가기</button>
+              <button type="button" onClick={() => navigate('/#recruit')} className={ghostActionBtnClass}>지원 안내 보기</button>
+            </div>
+          </div>
+
+          <div className="relative z-10 mx-auto w-full max-w-xl">
+            <div className="rounded-lg bg-white/82 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-2xl">
+              <div className="mb-7 flex items-center gap-2">
+                <span className="size-3 rounded-full bg-[#ff5f57]" />
+                <span className="size-3 rounded-full bg-[#ffbd2e]" />
+                <span className="size-3 rounded-full bg-[#0071e3]" />
+              </div>
+              <div className="rounded-lg bg-[#f5f5f7] px-6 py-7">
+                <p className="text-3xl font-semibold text-[#1d1d1f]">{visualTitle}</p>
+                <p className="mt-2 text-base font-semibold text-[#6e6e73]">{visualSubtitle}</p>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {visualRows.map((row, index) => (
+                  <div key={row} className="flex items-center gap-3 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-[#1d1d1f] shadow-[0_8px_24px_rgba(0,0,0,0.05)]">
+                    <span className="size-2.5 rounded-full bg-[var(--app-accent)]" />
+                    <span>{row}</span>
+                    <span className="ml-auto text-xs text-[#86868b]">{String(index + 1).padStart(2, '0')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white px-5 py-16 sm:py-20">
+          <div className="mx-auto max-w-7xl">
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="apple-eyebrow">Inside</p>
+              <h2 className="apple-display mt-4 text-5xl sm:text-6xl">무엇을 하고, 어떻게 이어가는지.</h2>
+            </div>
+            <div className="mt-12 grid gap-4 lg:grid-cols-3">
+              {cards.map(({ title: cardTitle, eyebrow: cardEyebrow, body: cardBody, icon: Icon }) => (
+                <article key={cardTitle} className="apple-product-panel min-h-[19rem] px-7 py-7">
+                  <div className="mb-8 inline-flex size-11 items-center justify-center rounded-full bg-[#f5f5f7] text-[#0066cc]">
+                    <Icon size={20} />
+                  </div>
+                  <p className="apple-eyebrow">{cardEyebrow}</p>
+                  <h3 className="mt-3 text-3xl font-semibold text-[#1d1d1f]">{cardTitle}</h3>
+                  <p className="mt-4 text-[15px] font-medium leading-7 text-[#6e6e73]">{cardBody}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-[#f5f5f7] px-5 py-16 sm:py-20">
+          <div className="mx-auto max-w-6xl">
+            <p className="apple-eyebrow text-center">Flow</p>
+            <h2 className="apple-display mx-auto mt-4 max-w-4xl text-center text-5xl sm:text-6xl">작게 시작해서 오래 남기는 방식.</h2>
+            <div className="mt-12 grid gap-3">
+              {flow.map(([number, flowTitle, flowBody]) => (
+                <article key={number} className="grid gap-4 rounded-lg bg-white px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:grid-cols-[5rem_1fr] sm:items-center">
+                  <span className="text-3xl font-semibold text-[#0066cc]">{number}</span>
+                  <div>
+                    <h3 className="text-2xl font-semibold text-[#1d1d1f]">{flowTitle}</h3>
+                    <p className="mt-2 text-[15px] font-medium leading-7 text-[#6e6e73]">{flowBody}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white px-5 py-16 sm:py-20">
+          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.82fr_1fr] lg:items-center">
+            <div>
+              <p className="apple-eyebrow">Archive</p>
+              <h2 className="apple-display mt-4 text-5xl sm:text-6xl">{outputsTitle}</h2>
+              <p className="apple-copy mt-5 text-xl">학기마다 쌓인 활동은 다음 부원이 참고할 수 있는 자료와 경험으로 남습니다.</p>
+            </div>
+            <div className="grid gap-3">
+              {outputs.map((item, index) => (
+                <div key={item} className="flex items-center gap-4 rounded-lg bg-[#f5f5f7] px-5 py-5">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-semibold text-[#0066cc]">{index + 1}</span>
+                  <p className="text-lg font-semibold leading-7 text-[#1d1d1f]">{item}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  )
+}
+
+function ActivitiesDetailPage() {
+  return (
+    <DetailStoryPage
+      eyebrow="Activities"
+      title="배움이 매주 쌓이고, 서로에게 남습니다."
+      body="COM's의 활동은 정기 세미나, 분야별 스터디, 코드 리뷰, 작은 제작 과제가 이어지는 흐름입니다. 처음 시작하는 사람도 따라올 수 있고, 이미 경험이 있는 사람도 더 깊게 확장할 수 있습니다."
+      visualTitle="Learning Stack"
+      visualSubtitle="Seminar · Study · Review"
+      visualRows={['정기 세미나', '분야별 스터디', '코드 리뷰']}
+      cards={activitiesDetailCards}
+      flow={activitiesDetailFlow}
+      outputsTitle="활동이 남기는 기록."
+      outputs={activitiesDetailTopics}
+    />
+  )
+}
+
+function ProjectsDetailPage() {
+  return (
+    <DetailStoryPage
+      eyebrow="Projects"
+      title="아이디어를 실제 서비스와 제작물로."
+      body="COM's의 프로젝트는 동아리 안에서 쓰이는 서비스, 교육용 실습, 웹 개발 결과물처럼 실제로 동작하는 결과물을 만드는 데 집중합니다. 기획부터 구현, 배포와 개선까지 팀으로 경험합니다."
+      visualTitle="Project Lab"
+      visualSubtitle="Prototype · Launch · Iterate"
+      visualRows={['서비스 기획', '팀 구현', '배포와 개선']}
+      cards={projectsDetailCards}
+      flow={projectsDetailFlow}
+      outputsTitle="프로젝트가 남기는 결과물."
+      outputs={projectsDetailOutputs}
+    />
+  )
+}
+
 function HomeView() {
   const { user, loading: authLoading, logout } = useAuth()
   const navigate = useNavigate()
@@ -864,8 +1086,6 @@ function HomeView() {
   const recruitRef = useRef(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [latestNotice, setLatestNotice] = useState(null)
-  const [activitiesExpanded, setActivitiesExpanded] = useState(false)
-  const [projectsExpanded, setProjectsExpanded] = useState(false)
 
   useEffect(() => {
     let rafId = null
@@ -949,21 +1169,21 @@ function HomeView() {
     if (story) {
       const metrics = sectionMetrics[id]
       const detailItems = id === 'activities'
-        ? (activitiesExpanded ? activityDetails : activityDetails.slice(0, 2))
+        ? activityDetails.slice(0, 2)
         : id === 'projects'
-          ? (projectsExpanded ? projectDetails : projectDetails.slice(0, 3))
+          ? projectDetails.slice(0, 3)
           : []
 
       const primaryAction = () => {
         if (id === 'about') navigate('/about')
-        if (id === 'activities') setActivitiesExpanded((open) => !open)
-        if (id === 'projects') setProjectsExpanded((open) => !open)
+        if (id === 'activities') navigate('/activities')
+        if (id === 'projects') navigate('/projects')
         if (id === 'recruit') goRecruitPage()
       }
 
       const secondaryAction = () => {
         if (id === 'about') openPanel('activities')
-        if (id === 'activities') openPanel('projects')
+        if (id === 'activities') navigate('/projects')
         if (id === 'recruit') navigate('/recruit-notice', { state: { from: `${locationPath()}#recruit` } })
       }
 
@@ -975,7 +1195,7 @@ function HomeView() {
             <p className="apple-copy mx-auto mt-6 max-w-3xl text-xl sm:text-2xl">{story.body}</p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <button type="button" onClick={primaryAction} className={solidActionBtnClass}>
-                {id === 'activities' && activitiesExpanded ? '활동 요약 보기' : id === 'projects' && projectsExpanded ? '프로젝트 요약 보기' : story.primary}
+                {story.primary}
               </button>
               {id === 'projects' ? (
                 <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className={ghostActionBtnClass}>{story.secondary}</a>
@@ -1025,25 +1245,6 @@ function HomeView() {
             </div>
           )}
 
-          {id === 'activities' && activitiesExpanded && (
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {activities.map((item) => (
-                <div key={item} className="rounded-lg bg-[#1d1d1f] px-5 py-4 text-sm font-semibold leading-6 text-white">
-                  {item}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {id === 'projects' && projectsExpanded && (
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {projects.map((item) => (
-                <div key={item} className="apple-soft-panel px-5 py-4 text-sm font-semibold leading-6 text-[#1d1d1f]">
-                  {item}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )
     }
@@ -1323,7 +1524,7 @@ function HomeView() {
 
 // ─── Shared helpers ─────────────────────────────────────────────────────────
 
-function PageShell({ children, wide = false, full = false }) {
+function PageShell({ children, wide = false, full = false, transition = true }) {
   return (
     <div className="apple-route relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
       <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white via-[#f5f5f7] to-white" />
@@ -1331,7 +1532,7 @@ function PageShell({ children, wide = false, full = false }) {
         <NotificationButton />
       </div>
       <main className={`relative mx-auto flex min-h-screen min-w-0 px-4 sm:px-6 ${full ? 'items-start pt-20 pb-16' : 'items-center justify-center py-24'} ${wide ? 'max-w-7xl' : 'max-w-4xl'}`}>
-        <div className={`page-transition w-full min-w-0 ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
+        <div className={`${transition ? 'page-transition' : ''} w-full min-w-0 ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
       </main>
     </div>
   )
