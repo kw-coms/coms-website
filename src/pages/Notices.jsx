@@ -186,7 +186,7 @@ export default function Notices() {
   const headerTitle = visibleMode === 'write' ? '공지 작성' : visibleMode === 'edit' ? '공지 수정' : '공지사항'
 
   return (
-    <div className="min-w-0 space-y-4">
+    <div className="mx-auto w-full max-w-5xl min-w-0 space-y-4">
       {!urlId && visibleMode === 'list' && (
         <div className="flex justify-center sm:justify-start">
           <button type="button" onClick={() => navigate('/')} className="apple-action-secondary px-4 py-2 text-sm">
@@ -196,17 +196,17 @@ export default function Notices() {
       )}
 
       <section className="apple-board-shell">
-        <div className="apple-board-hero px-5 py-7 sm:px-8 sm:py-10">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
+        <div className="apple-board-hero px-5 py-6 sm:px-7 sm:py-7">
+          <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+            <div className="min-w-0">
               <p className="apple-eyebrow">Notices</p>
-              <h1 className="apple-display mt-3 text-4xl sm:text-6xl">{headerTitle}</h1>
-              <p className="apple-copy mt-4 max-w-2xl text-base sm:text-lg">공지와 취업공고를 한 화면에서 빠르게 확인하고 검색합니다.</p>
+              <h1 className="apple-display mt-2 text-4xl sm:text-5xl">{headerTitle}</h1>
+              <p className="apple-copy mt-3 max-w-xl text-base sm:text-lg">공지와 취업공고를 한 화면에서 빠르게 확인하고 검색합니다.</p>
             </div>
             {(!urlId && visibleMode === 'list') ? (
-              isAdmin && <button type="button" onClick={() => setMode('write')} className="apple-action-primary px-5 py-2.5 text-sm">공지 작성</button>
+              isAdmin && <button type="button" onClick={() => setMode('write')} className="apple-action-primary justify-self-start px-5 py-2.5 text-sm md:justify-self-end">공지 작성</button>
             ) : (
-              <button type="button" onClick={backToList} className="apple-action-secondary inline-flex items-center gap-1 px-4 py-2 text-sm">
+              <button type="button" onClick={backToList} className="apple-action-secondary inline-flex items-center gap-1 justify-self-start px-4 py-2 text-sm md:justify-self-end">
                 <ArrowLeft size={14} />
                 목록
               </button>
@@ -217,7 +217,7 @@ export default function Notices() {
         {!urlId && visibleMode === 'list' && (
           <>
             {(featuredNotice || featuredJob) && (
-              <div className="apple-control-strip grid gap-3 px-5 py-4 sm:px-8 lg:grid-cols-2">
+              <div className="apple-control-strip grid gap-3 px-4 py-3 sm:px-6 lg:grid-cols-2">
                 {[
                   ['최신 공지', featuredNotice, Megaphone],
                   ['최신 취업공고', featuredJob, BriefcaseBusiness],
@@ -227,14 +227,14 @@ export default function Notices() {
                       key={label}
                       type="button"
                       onClick={() => openNotice(notice)}
-                      className="apple-soft-panel group flex min-h-24 items-center gap-4 px-4 py-3 text-left transition hover:-translate-y-0.5"
+                      className="apple-soft-panel group flex min-h-20 items-center gap-3 px-4 py-3 text-left transition hover:-translate-y-0.5"
                     >
-                      <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[#e8f8ff] text-[#0066cc]">
-                        <Icon size={20} />
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#e8f8ff] text-[#0066cc]">
+                        <Icon size={18} />
                       </span>
                       <span className="min-w-0">
                         <span className="block text-xs font-black text-[#0066cc]">{label}</span>
-                        <span className="mt-2 block truncate text-base font-black text-[#1d1d1f]">{notice.title}</span>
+                        <span className="mt-1.5 block truncate text-[15px] font-black text-[#1d1d1f]">{notice.title}</span>
                         <span className="mt-1 block text-xs font-semibold text-[#86868b]">{formatDate(notice.createdAt)} · {notice.author}</span>
                       </span>
                     </button>
@@ -242,7 +242,7 @@ export default function Notices() {
                 ))}
               </div>
             )}
-            <div className="apple-control-strip flex flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-8">
+            <div className="apple-control-strip flex flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6">
               <div className="flex flex-wrap gap-2 text-sm font-bold">
                 {[
                   ['ALL', '전체'],
@@ -272,7 +272,7 @@ export default function Notices() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="제목, 작성자 검색"
-                    className="w-full rounded-full border border-black/10 bg-white py-2 pl-8 pr-3 text-sm text-[#1d1d1f] placeholder:text-[#86868b] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:w-56"
+                    className="w-full rounded-full border border-black/10 bg-white py-2 pl-8 pr-3 text-sm text-[#1d1d1f] placeholder:text-[#86868b] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:w-64"
                   />
                 </div>
                 <span className="shrink-0 text-xs font-semibold text-[#86868b]">{filteredNotices.length}개</span>
@@ -286,7 +286,7 @@ export default function Notices() {
             {!loading && !error && filteredNotices.length > 0 && (
               <>
                 {/* 모바일 카드 목록 */}
-                <div className="mx-5 mb-5 hidden flex-col divide-y divide-black/10 overflow-hidden rounded-lg border border-black/10 bg-white max-md:flex sm:mx-7">
+                <div className="mx-4 mb-4 hidden flex-col divide-y divide-black/10 overflow-hidden rounded-lg border border-black/10 bg-white max-md:flex sm:mx-6">
                   {filteredNotices.map((notice) => {
                     const open = () => openNotice(notice)
                     const isJob = (notice.category || 'GENERAL') === 'JOB'
@@ -311,14 +311,14 @@ export default function Notices() {
                 </div>
 
                 {/* 데스크탑 테이블 */}
-                <div className="m-5 hidden overflow-hidden rounded-lg border border-black/10 bg-white sm:m-8 md:block">
+                <div className="m-4 hidden overflow-hidden rounded-lg border border-black/10 bg-white sm:m-6 md:block">
                   <table className="apple-table w-full min-w-[760px] border-collapse text-sm">
                     <thead className="border-b border-black/10">
                       <tr>
-                        <th className="w-20 px-4 py-3">번호</th>
-                        <th className="w-28 px-4 py-3">분류</th>
+                        <th className="w-16 px-4 py-3">번호</th>
+                        <th className="w-24 px-4 py-3">분류</th>
                         <th className="px-4 py-3 text-left">제목</th>
-                        <th className="w-32 px-4 py-3">작성자</th>
+                        <th className="w-28 px-4 py-3">작성자</th>
                         <th className="w-28 px-4 py-3">작성일</th>
                       </tr>
                     </thead>
@@ -334,15 +334,15 @@ export default function Notices() {
                             onKeyDown={(event) => openRowWithKeyboard(event, open)}
                             className="cursor-pointer text-[#6e6e73] transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none"
                           >
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-[#86868b]">{notice.id}</td>
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-[#0066cc]">{(notice.category || 'GENERAL') === 'JOB' ? '취업' : '공지'}</td>
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
-                              <span className="block max-w-[520px] truncate text-left font-semibold text-[#1d1d1f]">
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs text-[#86868b]">{notice.id}</td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs font-bold text-[#0066cc]">{(notice.category || 'GENERAL') === 'JOB' ? '취업' : '공지'}</td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5">
+                              <span className="block max-w-[440px] truncate text-left font-semibold text-[#1d1d1f]">
                                 {notice.title}
                               </span>
                             </td>
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{notice.author}</td>
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-[#86868b]">{formatDate(notice.createdAt)}</td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs">{notice.author}</td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs text-[#86868b]">{formatDate(notice.createdAt)}</td>
                           </tr>
                         )
                       })}
@@ -355,7 +355,7 @@ export default function Notices() {
         )}
 
         {visibleMode === 'write' && (
-          <div className="p-5 sm:p-7">
+          <div className="p-4 sm:p-6">
             <NoticeForm
               defaultCategory={activeCategory === 'JOB' ? 'JOB' : 'GENERAL'}
               onCancel={backToList}
@@ -365,7 +365,7 @@ export default function Notices() {
         )}
 
         {visibleMode === 'edit' && selectedNotice && (
-          <div className="p-5 sm:p-7">
+          <div className="p-4 sm:p-6">
             <NoticeForm
               initialNotice={selectedNotice}
               onCancel={() => {
@@ -378,7 +378,7 @@ export default function Notices() {
         )}
 
         {isDetail && (
-          <article className="m-3 overflow-hidden rounded-lg bg-white shadow-[0_18px_50px_rgba(0,0,0,0.10)] sm:m-8">
+          <article className="m-3 overflow-hidden rounded-lg bg-white shadow-[0_18px_50px_rgba(0,0,0,0.10)] sm:m-6">
             <div className="border-b border-black/10 px-4 py-5 sm:px-5">
               <div className="mb-2 text-xs font-bold text-[#0066cc]">{(selectedNotice.category || 'GENERAL') === 'JOB' ? '취업공고' : '공지'}</div>
               <h2 className="break-words text-xl font-black leading-tight sm:text-3xl md:text-4xl">
