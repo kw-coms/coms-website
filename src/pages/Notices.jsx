@@ -48,7 +48,7 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }) {
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-black/10 bg-white p-4 shadow-[0_18px_45px_rgba(0,0,0,0.08)] sm:space-y-4 sm:p-5">
+    <div className="apple-soft-panel space-y-3 p-4 sm:space-y-4 sm:p-5">
       <input
         value={formData.title}
         onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
@@ -71,10 +71,10 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }) {
           <option value="GENERAL">공지</option>
           <option value="JOB">취업공고</option>
         </select>
-        <button type="button" onClick={save} disabled={saving} className="min-h-12 flex-1 rounded-full bg-[#0071e3] px-5 text-sm font-bold text-white disabled:opacity-50 sm:min-h-0 sm:flex-none sm:py-2.5">
+        <button type="button" onClick={save} disabled={saving} className="apple-action-primary min-h-12 flex-1 px-5 text-sm disabled:opacity-50 sm:min-h-0 sm:flex-none sm:py-2.5">
           {saving ? '저장 중...' : '저장'}
         </button>
-        <button type="button" onClick={onCancel} className="min-h-12 flex-1 rounded-full border border-black/10 bg-white px-4 text-sm font-bold text-[#1d1d1f] sm:min-h-0 sm:flex-none sm:py-2.5">
+        <button type="button" onClick={onCancel} className="apple-action-secondary min-h-12 flex-1 px-4 text-sm sm:min-h-0 sm:flex-none sm:py-2.5">
           취소
         </button>
       </div>
@@ -186,27 +186,27 @@ export default function Notices() {
   const headerTitle = visibleMode === 'write' ? '공지 작성' : visibleMode === 'edit' ? '공지 수정' : '공지사항'
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       {!urlId && visibleMode === 'list' && (
         <div className="flex justify-center sm:justify-start">
-          <button type="button" onClick={() => navigate('/')} className="rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-white">
+          <button type="button" onClick={() => navigate('/')} className="apple-action-secondary px-4 py-2 text-sm">
             메인으로 돌아가기
           </button>
         </div>
       )}
 
-      <section className="overflow-hidden rounded-lg border border-black/10 bg-white text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
-        <div className="border-b border-black/10 bg-linear-to-br from-white via-[#f5f5f7] to-[#e8f8ff] px-5 py-5 sm:px-7">
+      <section className="apple-board-shell">
+        <div className="apple-board-hero px-5 py-7 sm:px-8 sm:py-10">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-bold text-[#0066cc]">Notice</p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-normal text-[#1d1d1f] sm:text-4xl">{headerTitle}</h1>
-              <p className="mt-2 text-sm leading-6 text-[#6e6e73]">공지와 취업공고를 분리해서 확인합니다.</p>
+              <p className="apple-eyebrow">Notices</p>
+              <h1 className="apple-display mt-3 text-4xl sm:text-6xl">{headerTitle}</h1>
+              <p className="apple-copy mt-4 max-w-2xl text-base sm:text-lg">공지와 취업공고를 한 화면에서 빠르게 확인하고 검색합니다.</p>
             </div>
             {(!urlId && visibleMode === 'list') ? (
-              isAdmin && <button type="button" onClick={() => setMode('write')} className="rounded-full bg-[#0071e3] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#0077ed]">공지 작성</button>
+              isAdmin && <button type="button" onClick={() => setMode('write')} className="apple-action-primary px-5 py-2.5 text-sm">공지 작성</button>
             ) : (
-              <button type="button" onClick={backToList} className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-bold text-[#1d1d1f]">
+              <button type="button" onClick={backToList} className="apple-action-secondary inline-flex items-center gap-1 px-4 py-2 text-sm">
                 <ArrowLeft size={14} />
                 목록
               </button>
@@ -217,7 +217,7 @@ export default function Notices() {
         {!urlId && visibleMode === 'list' && (
           <>
             {(featuredNotice || featuredJob) && (
-              <div className="grid gap-3 border-b border-black/10 bg-[#f5f5f7] px-5 py-4 sm:px-7 lg:grid-cols-2">
+              <div className="apple-control-strip grid gap-3 px-5 py-4 sm:px-8 lg:grid-cols-2">
                 {[
                   ['최신 공지', featuredNotice, Megaphone],
                   ['최신 취업공고', featuredJob, BriefcaseBusiness],
@@ -227,7 +227,7 @@ export default function Notices() {
                       key={label}
                       type="button"
                       onClick={() => openNotice(notice)}
-                      className="group flex min-h-24 items-center gap-4 rounded-lg border border-black/10 bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]"
+                      className="apple-soft-panel group flex min-h-24 items-center gap-4 px-4 py-3 text-left transition hover:-translate-y-0.5"
                     >
                       <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[#e8f8ff] text-[#0066cc]">
                         <Icon size={20} />
@@ -242,7 +242,7 @@ export default function Notices() {
                 ))}
               </div>
             )}
-            <div className="flex flex-col gap-3 border-b border-black/10 bg-[#f5f5f7] px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-7">
+            <div className="apple-control-strip flex flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-8">
               <div className="flex flex-wrap gap-2 text-sm font-bold">
                 {[
                   ['ALL', '전체'],
@@ -253,10 +253,10 @@ export default function Notices() {
                     key={value}
                     type="button"
                     onClick={() => setActiveCategory(value)}
-                    className={`inline-flex items-center gap-2 rounded-full px-4 py-2 transition ${
+                    className={`apple-chip inline-flex items-center gap-2 px-4 py-2 ${
                       activeCategory === value
-                        ? 'bg-[#0071e3] text-white'
-                        : 'border border-black/10 bg-white text-[#6e6e73] hover:text-[#1d1d1f]'
+                        ? 'apple-chip-active'
+                        : ''
                     }`}
                   >
                     {value === 'JOB' ? <BriefcaseBusiness size={14} /> : <Megaphone size={14} />}
@@ -272,7 +272,7 @@ export default function Notices() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="제목, 작성자 검색"
-                    className="w-full rounded-full border border-black/10 bg-white py-2 pl-8 pr-3 text-sm text-[#1d1d1f] placeholder:text-[#86868b] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:w-48"
+                    className="w-full rounded-full border border-black/10 bg-white py-2 pl-8 pr-3 text-sm text-[#1d1d1f] placeholder:text-[#86868b] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:w-56"
                   />
                 </div>
                 <span className="shrink-0 text-xs font-semibold text-[#86868b]">{filteredNotices.length}개</span>
@@ -311,9 +311,9 @@ export default function Notices() {
                 </div>
 
                 {/* 데스크탑 테이블 */}
-                <div className="m-5 hidden overflow-hidden rounded-lg border border-black/10 bg-white sm:m-7 md:block">
-                  <table className="w-full min-w-[760px] border-collapse text-sm">
-                    <thead className="border-b border-black/10 bg-[#f5f5f7] text-xs uppercase tracking-[0.16em] text-[#86868b]">
+                <div className="m-5 hidden overflow-hidden rounded-lg border border-black/10 bg-white sm:m-8 md:block">
+                  <table className="apple-table w-full min-w-[760px] border-collapse text-sm">
+                    <thead className="border-b border-black/10">
                       <tr>
                         <th className="w-20 px-4 py-3">번호</th>
                         <th className="w-28 px-4 py-3">분류</th>
@@ -378,7 +378,7 @@ export default function Notices() {
         )}
 
         {isDetail && (
-          <article className="m-3 overflow-hidden rounded-lg bg-white shadow-[0_18px_50px_rgba(0,0,0,0.14)] sm:m-7">
+          <article className="m-3 overflow-hidden rounded-lg bg-white shadow-[0_18px_50px_rgba(0,0,0,0.10)] sm:m-8">
             <div className="border-b border-black/10 px-4 py-5 sm:px-5">
               <div className="mb-2 text-xs font-bold text-[#0066cc]">{(selectedNotice.category || 'GENERAL') === 'JOB' ? '취업공고' : '공지'}</div>
               <h2 className="break-words text-xl font-black leading-tight sm:text-3xl md:text-4xl">
@@ -390,7 +390,7 @@ export default function Notices() {
             </div>
             <div className="text-size-container min-h-[200px] whitespace-pre-wrap break-words px-4 py-5 auto-text-notice sm:min-h-[360px] sm:px-5 sm:py-7">{linkify(selectedNotice.content)}</div>
             <div className="flex flex-col gap-2 border-t border-black/10 px-4 py-4 sm:flex-row sm:flex-wrap sm:justify-between sm:px-5">
-              <button type="button" onClick={backToList} className="min-h-11 rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-bold text-[#1d1d1f] sm:min-h-0">
+              <button type="button" onClick={backToList} className="apple-action-secondary min-h-11 px-4 py-2 text-sm sm:min-h-0">
                 목록
               </button>
               {isAdmin && (

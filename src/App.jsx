@@ -10,7 +10,6 @@ import {
   Menu,
   Megaphone,
   Moon,
-  Palette,
   Rocket,
   Sparkles,
   Sun,
@@ -169,30 +168,57 @@ const visualDetails = {
 
 const sectionMeta = {
   about: {
-    eyebrow: 'The club',
+    eyebrow: 'About COM\'s',
     background: '#ffffff',
     visual: 'linear-gradient(135deg, #e8f8ff, #f5f5f7 55%, #ffffff)',
   },
   activities: {
-    eyebrow: 'Learn together',
+    eyebrow: 'Activities',
     background: '#f5f5f7',
     visual: 'linear-gradient(135deg, #fff1f4, #eef5ff)',
   },
   projects: {
-    eyebrow: 'Build for real',
+    eyebrow: 'Projects',
     background: '#ffffff',
     visual: 'linear-gradient(135deg, #edf2ff, #f7f0ff)',
   },
   recruit: {
-    eyebrow: 'Join COMs',
+    eyebrow: 'Recruit',
     background: '#f5f5f7',
     visual: 'linear-gradient(135deg, #e8f3ff, #f5f5f7 60%, #ffffff)',
   },
 }
 
-const floatingBarBaseClass = 'border-b border-black/10 bg-white/82 shadow-[0_1px_0_rgba(255,255,255,0.55)] backdrop-blur-xl supports-[backdrop-filter]:bg-white/72'
-const solidActionBtnClass = 'inline-flex min-h-10 items-center justify-center rounded-full bg-[var(--app-accent)] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--app-accent-hover)] disabled:cursor-wait disabled:opacity-60'
-const ghostActionBtnClass = 'inline-flex min-h-10 items-center justify-center rounded-full border border-[color:var(--app-accent-border)] bg-white/70 px-5 py-2.5 text-sm font-semibold text-[var(--app-accent-text)] transition hover:bg-white disabled:cursor-wait disabled:opacity-60'
+const sectionStories = {
+  about: {
+    title: '광운대에서 컴퓨터를 가장 자연스럽게 시작하는 곳.',
+    body: 'COM\'s는 세미나, 스터디, 프로젝트, 커뮤니티가 하나의 흐름으로 이어지는 중앙 컴퓨터 학술동아리입니다. 처음 배우는 사람도, 이미 만들고 있는 사람도 각자의 속도로 합류할 수 있습니다.',
+    primary: '지원 흐름 보기',
+    secondary: '활동 보기',
+  },
+  activities: {
+    title: '기초부터 실전까지, 매주 이어지는 학습 루틴.',
+    body: '정기 세미나와 수준별 스터디로 기초를 쌓고, 코드 리뷰와 작은 제작 과제로 배운 내용을 바로 손에 익힙니다.',
+    primary: '활동 더 보기',
+    secondary: '프로젝트 보기',
+  },
+  projects: {
+    title: '아이디어를 실제 서비스와 제작물로.',
+    body: '공식 웹사이트, 아두이노 교육, 웹 개발 스터디처럼 동아리 안에서 쓰이고 남는 결과물을 함께 설계하고 배포합니다.',
+    primary: '프로젝트 더 보기',
+    secondary: 'GitHub 열기',
+  },
+  recruit: {
+    title: '함께 배울 다음 멤버를 기다립니다.',
+    body: '전공이나 개발 경험보다 중요한 것은 꾸준히 배우고 만들어 보려는 마음입니다. 지원서는 로그인 없이 제출할 수 있고, 운영진 확인 후 개별 안내가 진행됩니다.',
+    primary: '지원서 작성하기',
+    secondary: '모집 공지 보기',
+  },
+}
+
+const floatingBarBaseClass = 'apple-topbar border-b border-black/10'
+const solidActionBtnClass = 'apple-action-primary inline-flex min-h-10 items-center justify-center px-5 py-2.5 text-sm disabled:cursor-wait disabled:opacity-60'
+const ghostActionBtnClass = 'apple-action-secondary inline-flex min-h-10 items-center justify-center px-5 py-2.5 text-sm disabled:cursor-wait disabled:opacity-60'
 
 const DEFAULT_ACCENT = '#0071e3'
 const THEME_MODE_KEY = 'kwcoms-theme-mode'
@@ -491,7 +517,7 @@ function NotificationButton({ alignLeft = false, padded = false }) {
         ref={btnRef}
         type="button"
         onClick={toggle}
-        className="shape-cut-sm relative inline-flex items-center gap-2 border border-black/10 bg-white/60 px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/78"
+        className="relative inline-flex size-8 items-center justify-center rounded-full text-[var(--theme-body-dark)] transition hover:bg-black/5"
         aria-label="notifications"
       >
         <Bell size={15} />
@@ -534,102 +560,69 @@ function NotificationButton({ alignLeft = false, padded = false }) {
 }
 
 function AppearanceControl({ accentColor, setAccentColor, themeMode, setThemeMode }) {
-  const [open, setOpen] = useState(false)
-  const panelRef = useRef(null)
   const accent = normalizeHex(accentColor)
   const isDark = themeMode === 'dark'
 
-  useEffect(() => {
-    if (!open) return undefined
-    const handlePointerDown = (event) => {
-      if (panelRef.current?.contains(event.target)) return
-      setOpen(false)
-    }
-    document.addEventListener('pointerdown', handlePointerDown)
-    return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [open])
-
   return (
-    <div ref={panelRef} className="appearance-control fixed bottom-4 right-4 z-[90] flex flex-col items-end gap-3 sm:bottom-5 sm:right-5">
-      {open && (
-        <div className="appearance-panel w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-black/10 bg-white/88 p-3 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.16)] backdrop-blur-2xl">
-          <div className="flex items-center justify-between gap-3 px-1 pb-2">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[#86868b]">Appearance</p>
-              <h2 className="text-sm font-semibold">테마 설정</h2>
-            </div>
+    <section className="appearance-control border-t border-black/10 bg-[var(--app-surface-soft)] px-5 py-8 text-[var(--app-text)]">
+      <div className="mx-auto flex max-w-7xl flex-col gap-5 rounded-lg border border-black/10 bg-white/88 p-4 shadow-[0_12px_28px_rgba(0,0,0,0.08)] backdrop-blur-2xl sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--app-muted)]">Appearance</p>
+          <h2 className="mt-1 text-lg font-semibold text-[var(--app-text)]">화면 설정</h2>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:items-end">
+          <button
+            type="button"
+            onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[var(--app-text)] px-5 text-sm font-semibold text-[var(--app-bg)] transition hover:opacity-90"
+            aria-label={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
+          >
+            {isDark ? <Sun size={16} /> : <Moon size={16} />}
+            {isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
+          </button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">색상</span>
+            {accentSwatches.map((swatch) => {
+              const active = accent === swatch.value
+              return (
+                <button
+                  key={swatch.value}
+                  type="button"
+                  onClick={() => setAccentColor(swatch.value)}
+                  className={`relative flex size-8 items-center justify-center rounded-full border transition ${active ? 'border-[var(--app-text)]' : 'border-black/10 hover:scale-105'}`}
+                  style={{ backgroundColor: swatch.value }}
+                  aria-label={`${swatch.name} 색상 선택`}
+                  title={swatch.name}
+                >
+                  {active && <Check size={15} className="text-white drop-shadow" />}
+                </button>
+              )
+            })}
+            <label className="inline-flex min-h-8 cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)]">
+              직접 선택
+              <input
+                type="color"
+                value={accent}
+                onChange={(event) => setAccentColor(event.target.value)}
+                className="h-5 w-6 cursor-pointer rounded-full border-0 bg-transparent p-0"
+                aria-label="커스텀 색상 선택"
+              />
+            </label>
             <button
               type="button"
-              onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
-              className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[#f5f5f7] px-3 text-xs font-bold text-[#1d1d1f] transition hover:bg-white"
-              aria-label={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
+              onClick={() => setAccentColor(DEFAULT_ACCENT)}
+              className="min-h-8 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
             >
-              {isDark ? <Sun size={15} /> : <Moon size={15} />}
-              {isDark ? 'Light' : 'Dark'}
+              Reset
             </button>
           </div>
-
-          <div className="rounded-xl bg-[#f5f5f7] p-3">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold text-[#6e6e73]">컬러</span>
-              <span className="rounded-full bg-white px-2.5 py-1 font-mono text-[11px] font-bold text-[#6e6e73]">{accent.toUpperCase()}</span>
-            </div>
-            <div className="grid grid-cols-5 gap-2">
-              {accentSwatches.map((swatch) => {
-                const active = accent === swatch.value
-                return (
-                  <button
-                    key={swatch.value}
-                    type="button"
-                    onClick={() => setAccentColor(swatch.value)}
-                    className="relative flex aspect-square items-center justify-center rounded-full border border-black/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]"
-                    style={{ backgroundColor: swatch.value }}
-                    aria-label={`${swatch.name} 색상 선택`}
-                    title={swatch.name}
-                  >
-                    {active && <Check size={17} className="text-white drop-shadow" />}
-                  </button>
-                )
-              })}
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <label className="inline-flex min-h-10 flex-1 cursor-pointer items-center justify-between gap-3 rounded-full border border-black/10 bg-white px-3 text-xs font-bold text-[#1d1d1f]">
-                직접 선택
-                <input
-                  type="color"
-                  value={accent}
-                  onChange={(event) => setAccentColor(event.target.value)}
-                  className="h-7 w-9 cursor-pointer rounded-full border-0 bg-transparent p-0"
-                  aria-label="커스텀 색상 선택"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => setAccentColor(DEFAULT_ACCENT)}
-                className="min-h-10 rounded-full border border-black/10 bg-white px-3 text-xs font-bold text-[#6e6e73] transition hover:text-[#1d1d1f]"
-              >
-                Reset
-              </button>
-            </div>
-          </div>
         </div>
-      )}
-
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="appearance-trigger inline-flex size-12 items-center justify-center rounded-full border border-black/10 bg-white/82 text-[#1d1d1f] shadow-[0_16px_38px_rgba(0,0,0,0.14)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white"
-        aria-label="테마 설정 열기"
-        aria-expanded={open}
-      >
-        <Palette size={20} />
-      </button>
-    </div>
+      </div>
+    </section>
   )
 }
-
-// ─── Root router ────────────────────────────────────────────────────────────
-
 function PageFallback() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--app-bg)]">
@@ -661,12 +654,6 @@ function App() {
   return (
     <Suspense fallback={<PageFallback />}>
       <ScrollToTop />
-      <AppearanceControl
-        accentColor={accentColor}
-        setAccentColor={setAccentColor}
-        themeMode={themeMode}
-        setThemeMode={setThemeMode}
-      />
       <Routes>
         <Route path="/" element={<HomeView />} />
         <Route path="/notices" element={<NoticesPage />} />
@@ -682,6 +669,12 @@ function App() {
         <Route path="/recruit-notice" element={<RecruitNoticePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <AppearanceControl
+        accentColor={accentColor}
+        setAccentColor={setAccentColor}
+        themeMode={themeMode}
+        setThemeMode={setThemeMode}
+      />
     </Suspense>
   )
 }
@@ -780,49 +773,87 @@ function HomeView() {
   const locationPath = () => `${location.pathname}${location.search}${location.hash}`
 
   const renderSectionContent = (id) => {
-    if (id === 'about') {
+    const story = sectionStories[id]
+    if (story) {
+      const metrics = sectionMetrics[id]
+      const detailItems = id === 'activities'
+        ? (activitiesExpanded ? activityDetails : activityDetails.slice(0, 2))
+        : id === 'projects'
+          ? (projectsExpanded ? projectDetails : projectDetails.slice(0, 3))
+          : []
+
+      const primaryAction = () => {
+        if (id === 'about') openPanel('recruit')
+        if (id === 'activities') setActivitiesExpanded((open) => !open)
+        if (id === 'projects') setProjectsExpanded((open) => !open)
+        if (id === 'recruit') goRecruitPage()
+      }
+
+      const secondaryAction = () => {
+        if (id === 'about') openPanel('activities')
+        if (id === 'activities') openPanel('projects')
+        if (id === 'recruit') navigate('/recruit-notice', { state: { from: `${locationPath()}#recruit` } })
+      }
+
       return (
-        <div className="mx-auto max-w-3xl space-y-4 text-center">
-          <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.about.eyebrow}</p>
-          <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-5xl">함께 배우고, 바로 만듭니다.</h2>
-          <p className="mx-auto max-w-2xl text-lg leading-8 text-[#6e6e73] sm:text-xl">
-            COM&apos;s는 컴퓨터와 소프트웨어에 관심 있는 광운대학교 학생들이 모여 함께 공부하고 프로젝트를
-            진행하는 중앙 컴퓨터 학술동아리입니다.
-          </p>
-          <div className="mx-auto grid max-w-2xl gap-3 pt-4 sm:grid-cols-3">
-            {sectionMetrics.about.map((item) => (
-              <div key={item.value} className="rounded-lg bg-[#f5f5f7] px-4 py-4 text-center">
+        <div className="mx-auto w-full max-w-5xl">
+          <div className="mx-auto max-w-4xl text-center">
+            <p className="apple-eyebrow">{sectionMeta[id].eyebrow}</p>
+            <h2 className="apple-display mt-4 text-5xl sm:text-6xl lg:text-7xl">{story.title}</h2>
+            <p className="apple-copy mx-auto mt-6 max-w-3xl text-xl sm:text-2xl">{story.body}</p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <button type="button" onClick={primaryAction} className={solidActionBtnClass}>
+                {id === 'activities' && activitiesExpanded ? '활동 요약 보기' : id === 'projects' && projectsExpanded ? '프로젝트 요약 보기' : story.primary}
+              </button>
+              {id === 'projects' ? (
+                <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className={ghostActionBtnClass}>{story.secondary}</a>
+              ) : (
+                <button type="button" onClick={secondaryAction} className={ghostActionBtnClass}>{story.secondary}</button>
+              )}
+            </div>
+          </div>
+
+          <div className="mx-auto mt-10 grid max-w-3xl gap-3 sm:grid-cols-3">
+            {metrics.map((item) => (
+              <div key={item.value} className="apple-soft-panel px-4 py-5 text-center">
                 <p className="text-lg font-semibold text-[#1d1d1f]">{item.value}</p>
                 <p className="mt-1 text-xs font-semibold leading-5 text-[#6e6e73]">{item.label}</p>
               </div>
             ))}
           </div>
-          <div className="flex flex-wrap justify-center gap-3 pt-2">
-            <button type="button" onClick={() => openPanel('recruit')} className={solidActionBtnClass}>지원 화면으로 이동</button>
-          </div>
-        </div>
-      )
-    }
-    if (id === 'activities') {
-      return (
-        <div className="mx-auto w-full max-w-5xl">
-          <div className="mx-auto max-w-3xl space-y-4 text-center">
-            <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.activities.eyebrow}</p>
-            <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-5xl">처음부터 심화까지.</h2>
-            <p className="text-lg leading-8 text-[#6e6e73] sm:text-xl">기초 세미나, 수준별 스터디, 팀 프로젝트가 학기 흐름 안에서 자연스럽게 이어집니다.</p>
-          </div>
-          <div className="mt-10 grid gap-3 sm:grid-cols-2">
-            {activityDetails.map((item, index) => (
-              <article key={item.title} className="group rounded-lg bg-white px-6 py-6 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)]">
-                <div className="mb-5 inline-flex size-9 items-center justify-center rounded-full bg-[#f5f5f7] text-xs font-bold text-[#0066cc]">
-                  {String(index + 1).padStart(2, '0')}
-                </div>
-                <h3 className="text-xl font-semibold text-[#1d1d1f]">{item.title}</h3>
-                <p className="mt-3 leading-7 text-[#6e6e73]">{item.description}</p>
-              </article>
-            ))}
-          </div>
-          {activitiesExpanded && (
+
+          {id === 'about' && (
+            <div className="mt-10 grid gap-3 lg:grid-cols-3">
+              {showcaseItems.map((item) => (
+                <button
+                  key={item.title}
+                  type="button"
+                  onClick={() => openPanel(item.target)}
+                  className="apple-product-panel group min-h-48 px-6 py-6 text-left transition hover:-translate-y-0.5"
+                >
+                  <p className="apple-eyebrow">{item.eyebrow}</p>
+                  <h3 className="mt-3 text-2xl font-semibold leading-tight text-[#1d1d1f]">{item.title}</h3>
+                  <p className="mt-3 text-sm font-medium leading-6 text-[#6e6e73]">{item.body}</p>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {detailItems.length > 0 && (
+            <div className={`mt-10 grid gap-3 ${id === 'projects' ? 'lg:grid-cols-3' : 'sm:grid-cols-2'}`}>
+              {detailItems.map((item, index) => (
+                <article key={item.title} className="apple-product-panel px-6 py-6 text-left transition hover:-translate-y-0.5">
+                  <div className="mb-5 inline-flex size-9 items-center justify-center rounded-full bg-[#f5f5f7] text-xs font-bold text-[#0066cc]">
+                    {String(index + 1).padStart(2, '0')}
+                  </div>
+                  <h3 className="text-xl font-semibold text-[#1d1d1f]">{item.title}</h3>
+                  <p className="mt-3 text-sm font-medium leading-7 text-[#6e6e73]">{item.description}</p>
+                </article>
+              ))}
+            </div>
+          )}
+
+          {id === 'activities' && activitiesExpanded && (
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {activities.map((item) => (
                 <div key={item} className="rounded-lg bg-[#1d1d1f] px-5 py-4 text-sm font-semibold leading-6 text-white">
@@ -831,86 +862,28 @@ function HomeView() {
               ))}
             </div>
           )}
-          <div className="mt-8 flex justify-center">
-            <button type="button" onClick={() => setActivitiesExpanded((open) => !open)} className={solidActionBtnClass}>
-              {activitiesExpanded ? '활동 요약 보기' : '주요 활동 더 알아보기'}
-            </button>
-          </div>
-        </div>
-      )
-    }
-    if (id === 'projects') {
-      return (
-        <div className="mx-auto w-full max-w-5xl">
-          <div className="mx-auto max-w-3xl space-y-4 text-center">
-            <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.projects.eyebrow}</p>
-            <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-5xl">아이디어를 서비스로.</h2>
-            <p className="text-lg leading-8 text-[#6e6e73] sm:text-xl">스터디에서 익힌 것을 공식 웹사이트, 교육 프로젝트, 자유 제작으로 이어갑니다.</p>
-          </div>
-          <div className="mt-10 grid gap-3 lg:grid-cols-3">
-            {projectDetails.slice(0, 3).map((item) => (
-              <article key={item.title} className="rounded-lg bg-[#f5f5f7] px-6 py-7 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)]">
-                <h3 className="text-xl font-semibold text-[#1d1d1f]">{item.title}</h3>
-                <p className="mt-3 leading-7 text-[#6e6e73]">{item.description}</p>
-              </article>
-            ))}
-          </div>
-          {projectsExpanded && (
+
+          {id === 'projects' && projectsExpanded && (
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {projects.map((item) => (
-                <div key={item} className="rounded-lg bg-white px-5 py-4 text-sm font-semibold leading-6 text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                <div key={item} className="apple-soft-panel px-5 py-4 text-sm font-semibold leading-6 text-[#1d1d1f]">
                   {item}
                 </div>
               ))}
             </div>
           )}
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <button type="button" onClick={() => setProjectsExpanded((open) => !open)} className={solidActionBtnClass}>
-              {projectsExpanded ? '프로젝트 요약 보기' : '프로젝트 더 알아보기'}
-            </button>
-            <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className={ghostActionBtnClass}>GitHub 확인</a>
-          </div>
         </div>
       )
     }
-    return (
-      <div className="mx-auto max-w-3xl space-y-4 text-center">
-        <p className="text-sm font-semibold text-[#0066cc]">{sectionMeta.recruit.eyebrow}</p>
-        <h2 className="text-4xl font-semibold tracking-normal text-[#1d1d1f] sm:text-5xl">다음 멤버를 기다립니다.</h2>
-        <p className="mx-auto max-w-2xl text-lg leading-8 text-[#6e6e73] sm:text-xl">
-          광운대학교 중앙 컴퓨터 학술동아리 COM&apos;s는 함께 배우고, 만들고, 성장할 부원을 모집합니다. 개발을
-          처음 시작하는 학생도 부담 없이 지원할 수 있습니다.
-        </p>
-        <div className="mx-auto grid max-w-2xl gap-3 pt-4 text-sm font-semibold text-[#1d1d1f] sm:grid-cols-3">
-          {sectionMetrics.recruit.map((item) => (
-            <div key={item.value} className="rounded-lg bg-white px-4 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-              <p className="text-xs text-[#0066cc]">{item.value}</p>
-              <p className="mt-1">{item.label}</p>
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-wrap justify-center gap-3 pt-3">
-          <button type="button" onClick={goRecruitPage} className={solidActionBtnClass}>
-            지원서 작성하기
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/recruit-notice', { state: { from: `${locationPath()}#recruit` } })}
-            className={ghostActionBtnClass}
-          >
-            모집 공지 보기
-          </button>
-        </div>
-      </div>
-    )
+    return null
   }
 
   const renderSectionPanel = (id) => {
     const meta = sectionMeta[id]
     const visual = visualDetails[id]
     return (
-      <div data-panel="true" className="w-full overflow-hidden" style={{ background: meta.background }}>
-        <div className="mx-auto grid min-h-[52svh] max-w-7xl items-center gap-10 px-5 py-12 sm:min-h-[62svh] sm:px-8 sm:py-16 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.8fr)] lg:px-10">
+      <div data-panel="true" className={`w-full overflow-hidden ${id === 'about' || id === 'projects' ? 'apple-section-band' : 'apple-section-band-muted'}`} style={{ background: meta.background }}>
+        <div className="mx-auto grid min-h-[calc(100svh-44px)] max-w-7xl items-center gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,1.05fr)_minmax(20rem,0.75fr)] lg:px-10">
           <div className="flex items-center">
             {renderSectionContent(id)}
           </div>
@@ -949,9 +922,9 @@ function HomeView() {
     <div className="theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
 
       <header className="fixed inset-x-0 top-0 z-60">
-        <div className={`${floatingBarBaseClass} relative mx-auto flex h-12 items-center justify-between gap-4 px-4 sm:px-6 lg:px-8`}>
+        <div className={`${floatingBarBaseClass} relative mx-auto flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-8`}>
           <button type="button" onClick={() => { navigate('/'); window.scrollTo({ top: 0, behavior: 'smooth' }) }} className="flex min-w-0 items-center gap-3 text-left">
-            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="h-7 w-7 shrink-0 object-contain" />
+            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="h-6 w-6 shrink-0 object-contain" />
             <div className="min-w-0">
               <h1 className="whitespace-nowrap text-sm font-semibold text-[#1d1d1f]">KW COM&apos;s</h1>
             </div>
@@ -973,14 +946,14 @@ function HomeView() {
           </nav>
 
           {user ? (
-            <div className="ml-auto hidden items-center gap-2 md:flex">
+            <div className="ml-auto hidden items-center gap-1 md:flex">
               <NotificationButton />
-              <button type="button" onClick={goChangePassword} className="rounded-full px-3 py-1.5 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]" title="계정 설정">{user.name}</button>
+              <button type="button" onClick={goChangePassword} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]" title="계정 설정">{user.name}</button>
               {user.role === 'ADMIN' && (
-                <button type="button" onClick={goAdmin} className="rounded-full px-3 py-1.5 text-xs font-semibold text-[#b45309] transition hover:bg-amber-100/70">관리자</button>
+                <button type="button" onClick={goAdmin} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[#b45309] transition hover:bg-amber-100/70">관리자</button>
               )}
-              <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]">
-                <LogOut size={15} />
+              <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]">
+                <LogOut size={14} />
                 Logout
               </button>
             </div>
@@ -989,7 +962,7 @@ function HomeView() {
               type="button"
               onClick={() => navigate('/login')}
               disabled={authLoading}
-              className="ml-auto hidden shrink-0 whitespace-nowrap rounded-full bg-[var(--app-accent)] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--app-accent-hover)] disabled:cursor-wait disabled:opacity-70 md:inline-flex"
+              className="ml-auto hidden shrink-0 whitespace-nowrap rounded-full bg-[var(--app-accent)] px-4 py-1 text-xs font-semibold text-white transition hover:bg-[var(--app-accent-hover)] disabled:cursor-wait disabled:opacity-70 md:inline-flex"
             >
               로그인
             </button>
@@ -1071,8 +1044,8 @@ function HomeView() {
         )}
       </header>
 
-      <main className="relative overflow-hidden pt-12">
-        <section className="relative flex min-h-[calc(76svh-3rem)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-12 text-center sm:min-h-[calc(86svh-3rem)] sm:py-14">
+      <main className="relative overflow-hidden pt-[44px]">
+        <section className="relative flex min-h-[calc(86svh-44px)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-12 text-center sm:min-h-[calc(92svh-44px)] sm:py-14">
           <div className="home-hero-surface absolute inset-0" />
           <div className="absolute inset-x-0 bottom-0 h-1/2 bg-linear-to-b from-transparent to-white/85" />
           <div className="relative z-10 mx-auto max-w-7xl">
@@ -1093,10 +1066,10 @@ function HomeView() {
               </div>
             </div>
             <p className="mt-7 text-sm font-semibold text-[#6e6e73]">Kwangwoon University Computer Club</p>
-            <h2 className="mt-2 text-6xl font-semibold leading-[0.9] tracking-normal text-[#1d1d1f] sm:text-8xl lg:text-[8.5rem]">
+            <h2 className="apple-display mt-2 text-6xl sm:text-8xl lg:text-[8.5rem]">
               KW COM&apos;s
             </h2>
-            <p className="mx-auto mt-6 max-w-[19rem] text-lg font-medium leading-8 text-[#6e6e73] sm:max-w-3xl sm:text-2xl">
+            <p className="apple-copy mx-auto mt-6 max-w-[19rem] text-lg sm:max-w-3xl sm:text-2xl">
               배우고, 만들고, 성장하는 광운대학교 컴퓨터 학술동아리.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -1110,9 +1083,9 @@ function HomeView() {
                 <span className="ml-auto shrink-0 text-[10px] font-bold uppercase text-[#0066cc]">공지</span>
               </button>
             )}
-            <div className="mx-auto mt-8 flex max-w-3xl flex-wrap justify-center gap-2">
+            <div className="mx-auto mt-8 flex max-w-[21rem] flex-wrap justify-center gap-2 sm:max-w-3xl">
               {experiencePills.map((pill) => (
-                <span key={pill} className="rounded-full bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#6e6e73] shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                <span key={pill} className="rounded-full bg-white/70 px-2.5 py-1.5 text-[11px] font-semibold text-[#6e6e73] shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:px-3 sm:text-xs">
                   {pill}
                 </span>
               ))}
@@ -1136,7 +1109,7 @@ function HomeView() {
                 key={item.title}
                 type="button"
                 onClick={() => openPanel(item.target)}
-                className={`group min-h-[13.5rem] rounded-lg px-7 py-7 text-left transition hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(0,0,0,0.1)] ${index === 0 ? 'bg-[#1d1d1f] text-white' : index === 1 ? 'bg-[#f5f5f7] text-[#1d1d1f]' : 'bg-linear-to-br from-[#e8f8ff] to-[#ffffff] text-[#1d1d1f]'}`}
+                className={`apple-product-panel group min-h-[13.5rem] px-7 py-7 text-left transition hover:-translate-y-0.5 ${index === 0 ? 'bg-[#1d1d1f] text-white' : index === 1 ? 'bg-[#f5f5f7] text-[#1d1d1f]' : 'bg-linear-to-br from-[#e8f8ff] to-[#ffffff] text-[#1d1d1f]'}`}
               >
                 <p className={`text-sm font-semibold ${index === 0 ? 'text-white/58' : 'text-[#0066cc]'}`}>{item.eyebrow}</p>
                 <h3 className="mt-3 text-3xl font-semibold leading-tight tracking-normal">{item.title}</h3>
@@ -1185,8 +1158,8 @@ function PageShell({ children, wide = false, full = false }) {
       <div className="fixed right-4 top-4 z-50">
         <NotificationButton />
       </div>
-      <main className={`relative mx-auto flex min-h-screen px-4 sm:px-6 ${full ? 'items-start pt-20 pb-16' : 'items-center justify-center py-24'} ${wide ? 'max-w-7xl' : 'max-w-4xl'}`}>
-        <div className={`page-transition w-full ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
+      <main className={`relative mx-auto flex min-h-screen min-w-0 px-4 sm:px-6 ${full ? 'items-start pt-20 pb-16' : 'items-center justify-center py-24'} ${wide ? 'max-w-7xl' : 'max-w-4xl'}`}>
+        <div className={`page-transition w-full min-w-0 ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
       </main>
     </div>
   )
