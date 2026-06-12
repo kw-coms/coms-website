@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import {
+  ArrowLeft,
   Binary,
   Bell,
   CircuitBoard,
@@ -577,6 +578,8 @@ function GlobalNavigation() {
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const activeKey = getActiveNavKey(location.pathname)
+  const mobileTabs = tabs.slice(0, 3)
+  const showMobileTabs = mobileTabs.some((tab) => tab.id === activeKey)
 
   const goPageTop = (to, options) => {
     scrollToTopInstant()
@@ -741,6 +744,25 @@ function GlobalNavigation() {
             )}
           </div>
         </div>
+      )}
+
+      {showMobileTabs && (
+        <nav className="apple-mobile-tabs md:hidden" aria-label="상세 화면 이동">
+          {mobileTabs.map((tab) => {
+            const active = activeKey === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => closeAndGo(getTabRoute(tab.id))}
+                className={`apple-mobile-tab ${active ? 'apple-mobile-tab-active' : ''}`}
+              >
+                {tab.label}
+                <span aria-hidden="true" />
+              </button>
+            )
+          })}
+        </nav>
       )}
     </header>
   )
@@ -1074,10 +1096,6 @@ function AboutPage() {
       outputsTitle="COM's가 오래 가져가는 태도."
       outputsBody="잘하는 사람만 모이는 곳보다, 함께 성장하는 방식을 계속 만드는 곳을 지향합니다."
       outputs={aboutDetailPrinciples}
-      primaryLabel="활동 보기"
-      primaryTo="/activities"
-      secondaryLabel="지원하기"
-      secondaryTo="/recruit"
     />
   )
 }
@@ -1095,26 +1113,22 @@ function DetailStoryPage({
   outputsTitle,
   outputsBody = '학기마다 쌓인 활동은 다음 부원이 참고할 수 있는 자료와 경험으로 남습니다.',
   outputs,
-  primaryLabel = '홈으로 돌아가기',
-  primaryTo = '/',
-  secondaryLabel = '지원 안내 보기',
-  secondaryTo = '/recruit-notice',
 }) {
   const navigate = useNavigate()
 
   return (
-    <div className="theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
-      <main className="relative overflow-hidden pt-[44px]">
+    <div className="apple-detail-page theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
+      <main className="apple-detail-main relative overflow-hidden">
         <section className="apple-detail-hero relative grid min-h-[calc(88svh-44px)] items-center gap-12 overflow-hidden bg-[#f5f5f7] px-5 py-16 lg:grid-cols-[1fr_0.88fr] lg:px-12">
           <div className="home-hero-surface absolute inset-0" />
           <div className="relative z-10 mx-auto max-w-3xl text-center lg:text-left">
+            <button type="button" onClick={() => navigate('/')} className="apple-detail-home-button mx-auto mb-8 lg:mx-0">
+              <ArrowLeft size={15} />
+              메인으로 돌아가기
+            </button>
             <p className="apple-eyebrow">{eyebrow}</p>
             <h1 className="apple-display mt-4 text-6xl sm:text-7xl lg:text-[7rem]">{title}</h1>
             <p className="apple-copy mt-6 text-xl sm:text-2xl">{body}</p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
-              <button type="button" onClick={() => navigate(primaryTo)} className={solidActionBtnClass}>{primaryLabel}</button>
-              <button type="button" onClick={() => navigate(secondaryTo)} className={ghostActionBtnClass}>{secondaryLabel}</button>
-            </div>
           </div>
 
           <div className="relative z-10 mx-auto w-full max-w-xl">
