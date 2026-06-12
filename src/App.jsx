@@ -193,7 +193,7 @@ const sectionStories = {
   about: {
     title: '광운대에서 컴퓨터를 가장 자연스럽게 시작하는 곳.',
     body: 'COM\'s는 세미나, 스터디, 프로젝트, 커뮤니티가 하나의 흐름으로 이어지는 중앙 컴퓨터 학술동아리입니다. 처음 배우는 사람도, 이미 만들고 있는 사람도 각자의 속도로 합류할 수 있습니다.',
-    primary: '지원 흐름 보기',
+    primary: 'About 더 알아보기',
     secondary: '활동 보기',
   },
   activities: {
@@ -219,6 +219,39 @@ const sectionStories = {
 const floatingBarBaseClass = 'apple-topbar border-b border-black/10'
 const solidActionBtnClass = 'apple-action-primary inline-flex min-h-10 items-center justify-center px-5 py-2.5 text-sm disabled:cursor-wait disabled:opacity-60'
 const ghostActionBtnClass = 'apple-action-secondary inline-flex min-h-10 items-center justify-center px-5 py-2.5 text-sm disabled:cursor-wait disabled:opacity-60'
+
+const aboutDetailCards = [
+  {
+    title: 'Study',
+    eyebrow: '기초에서 확장까지',
+    body: '처음 배우는 사람도 따라올 수 있도록 정기 세미나와 스터디를 운영하고, 각자의 속도에 맞춰 실습과 리뷰를 이어갑니다.',
+    icon: Binary,
+  },
+  {
+    title: 'Build',
+    eyebrow: '아이디어를 실제 결과물로',
+    body: '웹, 임베디드, 자동화, 동아리 서비스처럼 손에 잡히는 프로젝트를 기획하고 직접 구현합니다.',
+    icon: CircuitBoard,
+  },
+  {
+    title: 'Share',
+    eyebrow: '경험이 다음 사람에게',
+    body: '선후배가 배운 것과 시행착오를 공유하면서 커뮤니티 안에 오래 남는 학습 기록을 만듭니다.',
+    icon: Sparkles,
+  },
+]
+
+const aboutDetailFlow = [
+  ['01', 'Learn together', '세미나와 스터디로 개발의 기본기를 함께 쌓습니다.'],
+  ['02', 'Make it real', '작은 실습을 프로젝트로 확장하며 결과물을 완성합니다.'],
+  ['03', 'Grow the community', '후기, 코드 리뷰, 자료 공유로 다음 활동의 기준을 높입니다.'],
+]
+
+const aboutDetailPrinciples = [
+  '처음 시작하는 사람도 편하게 질문할 수 있는 분위기',
+  '작게 만들고 빠르게 공유하며 개선하는 제작 문화',
+  '동아리 밖에서도 이어지는 개발 경험과 포트폴리오',
+]
 
 const DEFAULT_ACCENT = '#0071e3'
 const THEME_MODE_KEY = 'kwcoms-theme-mode'
@@ -656,6 +689,7 @@ function App() {
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<HomeView />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/notices" element={<NoticesPage />} />
         <Route path="/notices/:id" element={<NoticesPage />} />
         <Route path="/resources" element={<RequireAuth><ArchivePage /></RequireAuth>} />
@@ -680,6 +714,139 @@ function App() {
 }
 
 // ─── Home page ──────────────────────────────────────────────────────────────
+
+function AboutPage() {
+  const navigate = useNavigate()
+
+  const goHomeSection = (id) => {
+    navigate(`/#${id}`)
+    window.setTimeout(() => {
+      const target = document.getElementById(id)
+      if (target) {
+        const rect = target.getBoundingClientRect()
+        window.scrollTo({ top: Math.max(0, window.scrollY + rect.top - 54), behavior: 'smooth' })
+      }
+    }, 80)
+  }
+
+  return (
+    <div className="theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
+      <header className="fixed inset-x-0 top-0 z-60">
+        <div className={`${floatingBarBaseClass} mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8`}>
+          <button type="button" onClick={() => navigate('/')} className="flex min-w-0 items-center gap-3 text-left">
+            <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="h-6 w-6 shrink-0 object-contain" />
+            <span className="whitespace-nowrap text-sm font-semibold text-[#1d1d1f]">KW COM&apos;s</span>
+          </button>
+          <button type="button" onClick={() => navigate('/')} className="rounded-full px-4 py-1.5 text-xs font-semibold text-[#1d1d1f]/78 transition hover:bg-black/5 hover:text-[#1d1d1f]">
+            Home
+          </button>
+        </div>
+      </header>
+
+      <main className="relative overflow-hidden pt-[44px]">
+        <section className="relative grid min-h-[calc(92svh-44px)] items-center gap-12 overflow-hidden bg-[#f5f5f7] px-5 py-16 lg:grid-cols-[1fr_0.92fr] lg:px-12">
+          <div className="home-hero-surface absolute inset-0" />
+          <div className="relative z-10 mx-auto max-w-3xl text-center lg:text-left">
+            <p className="apple-eyebrow">About COM&apos;s</p>
+            <h1 className="apple-display mt-4 text-6xl sm:text-7xl lg:text-[7.5rem]">
+              함께 배우고, 바로 만듭니다.
+            </h1>
+            <p className="apple-copy mt-6 text-xl sm:text-2xl">
+              COM&apos;s는 광운대학교 학생들이 컴퓨터와 소프트웨어를 함께 공부하고, 실제 프로젝트로 연결하는 중앙 컴퓨터 학술동아리입니다.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3 lg:justify-start">
+              <button type="button" onClick={() => navigate('/')} className={solidActionBtnClass}>홈으로 돌아가기</button>
+              <button type="button" onClick={() => goHomeSection('activities')} className={ghostActionBtnClass}>활동 보기</button>
+            </div>
+          </div>
+
+          <div className="relative z-10 mx-auto w-full max-w-xl">
+            <div className="rounded-lg bg-white/82 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-2xl">
+              <div className="mb-8 flex items-center gap-2">
+                <span className="size-3 rounded-full bg-[#ff5f57]" />
+                <span className="size-3 rounded-full bg-[#ffbd2e]" />
+                <span className="size-3 rounded-full bg-[#0071e3]" />
+              </div>
+              <div className="mx-auto flex aspect-square max-w-[18rem] items-center justify-center rounded-[2.2rem] bg-[#f5f5f7] shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="w-[58%] object-contain" />
+              </div>
+              <div className="mt-8 grid gap-3">
+                {aboutDetailFlow.map(([number, title]) => (
+                  <div key={number} className="flex items-center gap-3 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-[#1d1d1f] shadow-[0_8px_24px_rgba(0,0,0,0.05)]">
+                    <span className="size-2.5 rounded-full bg-[var(--app-accent)]" />
+                    <span>{title}</span>
+                    <span className="ml-auto text-xs text-[#86868b]">{number}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white px-5 py-16 sm:py-20">
+          <div className="mx-auto max-w-7xl">
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="apple-eyebrow">What we do</p>
+              <h2 className="apple-display mt-4 text-5xl sm:text-6xl">배움이 결과물로 이어지도록.</h2>
+            </div>
+            <div className="mt-12 grid gap-4 lg:grid-cols-3">
+              {aboutDetailCards.map(({ title, eyebrow, body, icon: Icon }) => (
+                <article key={title} className="apple-product-panel min-h-[19rem] px-7 py-7">
+                  <div className="mb-8 inline-flex size-11 items-center justify-center rounded-full bg-[#f5f5f7] text-[#0066cc]">
+                    <Icon size={20} />
+                  </div>
+                  <p className="apple-eyebrow">{eyebrow}</p>
+                  <h3 className="mt-3 text-3xl font-semibold text-[#1d1d1f]">{title}</h3>
+                  <p className="mt-4 text-[15px] font-medium leading-7 text-[#6e6e73]">{body}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-[#f5f5f7] px-5 py-16 sm:py-20">
+          <div className="mx-auto max-w-6xl">
+            <p className="apple-eyebrow text-center">Club flow</p>
+            <h2 className="apple-display mx-auto mt-4 max-w-4xl text-center text-5xl sm:text-6xl">
+              한 학기의 경험이 다음 학기의 기준이 됩니다.
+            </h2>
+            <div className="mt-12 grid gap-3">
+              {aboutDetailFlow.map(([number, title, body]) => (
+                <article key={number} className="grid gap-4 rounded-lg bg-white px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:grid-cols-[5rem_1fr] sm:items-center">
+                  <span className="text-3xl font-semibold text-[#0066cc]">{number}</span>
+                  <div>
+                    <h3 className="text-2xl font-semibold text-[#1d1d1f]">{title}</h3>
+                    <p className="mt-2 text-[15px] font-medium leading-7 text-[#6e6e73]">{body}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white px-5 py-16 sm:py-20">
+          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.82fr_1fr] lg:items-center">
+            <div>
+              <p className="apple-eyebrow">Culture</p>
+              <h2 className="apple-display mt-4 text-5xl sm:text-6xl">COM&apos;s가 오래 가져가는 태도.</h2>
+              <p className="apple-copy mt-5 text-xl">
+                잘하는 사람만 모이는 곳보다, 함께 성장하는 방식을 계속 만드는 곳을 지향합니다.
+              </p>
+            </div>
+            <div className="grid gap-3">
+              {aboutDetailPrinciples.map((item, index) => (
+                <div key={item} className="flex items-center gap-4 rounded-lg bg-[#f5f5f7] px-5 py-5">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-semibold text-[#0066cc]">{index + 1}</span>
+                  <p className="text-lg font-semibold leading-7 text-[#1d1d1f]">{item}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  )
+}
 
 function HomeView() {
   const { user, loading: authLoading, logout } = useAuth()
@@ -783,7 +950,7 @@ function HomeView() {
           : []
 
       const primaryAction = () => {
-        if (id === 'about') openPanel('recruit')
+        if (id === 'about') navigate('/about')
         if (id === 'activities') setActivitiesExpanded((open) => !open)
         if (id === 'projects') setProjectsExpanded((open) => !open)
         if (id === 'recruit') goRecruitPage()
