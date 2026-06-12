@@ -1391,8 +1391,9 @@ function HomeView() {
           <nav className="pointer-events-auto absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-6 md:flex">
             {tabs.map((tab) => {
               const active = activeSection === tab.id
+              const route = tab.id === 'recruit' ? '/recruit' : `/${tab.id}`
               return (
-                <button key={tab.id} type="button" onClick={() => openPanel(tab.id)} className={`relative px-1 text-xs font-semibold transition ${active ? 'text-[var(--app-text)]' : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'}`}>
+                <button key={tab.id} type="button" onClick={() => goPageTop(route)} className={`relative px-1 text-xs font-semibold transition ${active ? 'text-[var(--app-text)]' : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'}`}>
                   {tab.label}
                   <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${active ? 'opacity-100' : 'opacity-0'}`} />
                 </button>
@@ -1446,13 +1447,16 @@ function HomeView() {
             className="mx-auto border-b border-black/10 bg-white/95 shadow-[0_12px_28px_rgba(0,0,0,0.08)] backdrop-blur-xl md:hidden"
           >
             <div className="flex flex-col divide-y divide-black/8">
-              {tabs.map((tab) => (
-                <button key={tab.id} type="button" onClick={() => { openPanel(tab.id); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
-                  <tab.icon size={15} className={tab.accent} />
-                  <span>{tab.label}</span>
-                  <span className="ml-auto text-xs text-[var(--theme-body-muted)]">{tab.hint}</span>
-                </button>
-              ))}
+              {tabs.map((tab) => {
+                const route = tab.id === 'recruit' ? '/recruit' : `/${tab.id}`
+                return (
+                  <button key={tab.id} type="button" onClick={() => { goPageTop(route); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
+                    <tab.icon size={15} className={tab.accent} />
+                    <span>{tab.label}</span>
+                    <span className="ml-auto text-xs text-[var(--theme-body-muted)]">{tab.hint}</span>
+                  </button>
+                )
+              })}
               <button type="button" onClick={() => { goNotices(); setMobileMenuOpen(false) }} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60">
                 <Megaphone size={15} className="text-cyan-500" />
                 <span>Notices</span>
