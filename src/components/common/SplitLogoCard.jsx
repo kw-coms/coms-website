@@ -24,7 +24,7 @@ export default function SplitLogoCard() {
           style={{
             WebkitTextStroke: '1px rgba(255, 255, 255, 0.28)',
             filter: 'drop-shadow(0 0 16px rgba(255, 255, 255, 0.14))',
-            fontFamily: 'Orbitron, Segoe UI, sans-serif',
+            fontFamily: 'var(--apple-font-family)',
             fontSize: 'clamp(3.2rem, 5vw, 4.8rem)',
             lineHeight: '1.05',
             letterSpacing: '-0.03em',
