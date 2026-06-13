@@ -111,4 +111,48 @@ class NotificationServiceExternalInviteTest {
         )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                 assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
     }
+
+    @Test
+    void rejectsJavascriptAcceptUrl() {
+        Member member = memberRepository.findByStudentId("2026000001").orElseGet(() -> {
+            Member fresh = new Member();
+            fresh.setStudentId("2026000001");
+            fresh.setName("Test Member");
+            fresh.setEmail("test-scheme-" + System.nanoTime() + "@example.com");
+            fresh.setPassword("hashed-password");
+            return memberRepository.save(fresh);
+        });
+
+        assertThatThrownBy(() -> notificationService.notifyExternalInvite(
+                member.getStudentId(),
+                "Food Club",
+                "xss attempt",
+                "javascript:alert(1)",
+                false
+        )).isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
+            assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(ex.getReason()).contains("acceptUrl");
+        });
+    }
+
+    @Test
+    void rejectsRelativeAcceptUrl() {
+        Member member = memberRepository.findByStudentId("2026000001").orElseGet(() -> {
+            Member fresh = new Member();
+            fresh.setStudentId("2026000001");
+            fresh.setName("Test Member");
+            fresh.setEmail("test-relative-" + System.nanoTime() + "@example.com");
+            fresh.setPassword("hashed-password");
+            return memberRepository.save(fresh);
+        });
+
+        assertThatThrownBy(() -> notificationService.notifyExternalInvite(
+                member.getStudentId(),
+                "Food Club",
+                "no-scheme",
+                "/foodclub/accept",
+                false
+        )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
 }
