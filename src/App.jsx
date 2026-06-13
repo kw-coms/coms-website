@@ -616,10 +616,11 @@ function GlobalNavigation() {
         <button
           type="button"
           onClick={() => goPageTop('/')}
-          className="flex min-w-0 items-center gap-3 text-left"
+          className="apple-global-nav-brand flex min-w-0 items-center gap-3 text-left"
+          aria-label="홈으로 이동"
         >
           <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="h-6 w-6 shrink-0 object-contain" />
-          <span className="whitespace-nowrap text-sm font-semibold text-[var(--app-text)]">KW COM&apos;s</span>
+          <span className="whitespace-nowrap text-sm font-bold text-[var(--app-text)]">KW COM&apos;s</span>
         </button>
 
         <nav className="pointer-events-auto absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-6 md:flex">
@@ -672,13 +673,13 @@ function GlobalNavigation() {
         <button
           type="button"
           onClick={() => setMobileMenuOpen((open) => !open)}
-          className="apple-global-nav-menu fixed right-4 top-1.5 z-[90] flex size-8 shrink-0 items-center justify-center rounded-full transition hover:bg-black/5 md:hidden"
-          aria-label="메뉴"
+          className="apple-global-nav-menu md:hidden"
+          aria-label={mobileMenuOpen ? '메뉴 닫기' : '메뉴 열기'}
           aria-expanded={mobileMenuOpen}
           aria-controls="mobile-menu"
           aria-haspopup="menu"
         >
-          {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+          {mobileMenuOpen ? <X size={21} strokeWidth={2.1} /> : <Menu size={22} strokeWidth={2.25} />}
         </button>
       </div>
 
@@ -686,56 +687,56 @@ function GlobalNavigation() {
         <div
           id="mobile-menu"
           role="menu"
-          className="mx-auto border-b border-black/10 bg-[var(--app-surface)]/95 shadow-[0_12px_28px_rgba(0,0,0,0.08)] backdrop-blur-xl md:hidden"
+          className="apple-mobile-menu-panel mx-auto md:hidden"
         >
-          <div className="flex flex-col divide-y divide-black/8">
+          <div className="flex flex-col divide-y divide-[var(--app-hairline)]">
             {tabs.map((tab) => {
               const route = getTabRoute(tab.id)
               return (
-                <button key={tab.id} type="button" onClick={() => closeAndGo(route)} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--app-text)] transition hover:bg-white/60">
+                <button key={tab.id} type="button" onClick={() => closeAndGo(route)} className="apple-mobile-menu-item">
                   <tab.icon size={15} className={tab.accent} />
                   <span>{tab.label}</span>
                   <span className="ml-auto text-xs text-[var(--app-muted)]">{tab.hint}</span>
                 </button>
               )
             })}
-            <button type="button" onClick={() => closeAndGo('/notices')} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--app-text)] transition hover:bg-white/60">
+            <button type="button" onClick={() => closeAndGo('/notices')} className="apple-mobile-menu-item">
               <Megaphone size={15} className="text-cyan-500" />
               <span>Notices</span>
               <span className="ml-auto text-xs text-[var(--app-muted)]">공지사항</span>
             </button>
-            <button type="button" onClick={() => goProtected('/resources')} disabled={authLoading} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--app-text)] transition hover:bg-white/60 disabled:opacity-50">
+            <button type="button" onClick={() => goProtected('/resources')} disabled={authLoading} className="apple-mobile-menu-item disabled:opacity-50">
               <CircuitBoard size={15} className="text-violet-400" />
               <span>Resources</span>
               <span className="ml-auto text-xs text-[var(--app-muted)]">자료실</span>
             </button>
-            <button type="button" onClick={() => goProtected('/community')} disabled={authLoading} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--app-text)] transition hover:bg-white/60 disabled:opacity-50">
+            <button type="button" onClick={() => goProtected('/community')} disabled={authLoading} className="apple-mobile-menu-item disabled:opacity-50">
               <Sparkles size={15} className="text-rose-400" />
               <span>Community</span>
               <span className="ml-auto text-xs text-[var(--app-muted)]">커뮤니티</span>
             </button>
             {!user && (
-              <button type="button" onClick={() => closeAndGo('/login')} disabled={authLoading} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[#0066cc] transition hover:bg-white/60 disabled:opacity-50">
+              <button type="button" onClick={() => closeAndGo('/login')} disabled={authLoading} className="apple-mobile-menu-item apple-mobile-menu-item-accent disabled:opacity-50">
                 <span>로그인</span>
               </button>
             )}
             {user && (
-              <div className="border-t border-black/10">
-                <div className="flex flex-col divide-y divide-black/8">
-                  <button type="button" onClick={() => closeAndGo('/settings')} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--app-text)] transition hover:bg-white/60">
+              <div className="border-t border-[var(--app-hairline)]">
+                <div className="flex flex-col divide-y divide-[var(--app-hairline)]">
+                  <button type="button" onClick={() => closeAndGo('/settings')} className="apple-mobile-menu-item">
                     <span className="flex size-5 items-center justify-center rounded-full bg-black/10 text-[10px] font-black">{user.name?.[0] ?? '?'}</span>
                     <span>{user.name}</span>
                     <span className="ml-auto text-xs text-[var(--app-muted)]">계정 설정</span>
                   </button>
                   {user.role === 'ADMIN' && (
-                    <button type="button" onClick={() => closeAndGo('/admin')} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-50/60">
+                    <button type="button" onClick={() => closeAndGo('/admin')} className="apple-mobile-menu-item apple-mobile-menu-item-warning">
                       <span>관리자 패널</span>
                     </button>
                   )}
                   <div className="py-3.5">
                     <NotificationButton alignLeft padded />
                   </div>
-                  <button type="button" onClick={handleLogout} className="flex items-center gap-3 px-5 py-3.5 text-sm font-semibold text-[var(--app-text)] transition hover:bg-white/60">
+                  <button type="button" onClick={handleLogout} className="apple-mobile-menu-item">
                     <LogOut size={15} />
                     <span>로그아웃</span>
                   </button>
@@ -1277,7 +1278,8 @@ function HomeView() {
     const ref = map[id]
     if (ref && ref.current) {
       const rect = ref.current.getBoundingClientRect()
-      const targetY = Math.max(0, window.scrollY + rect.top - 54)
+      const navHeight = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--apple-nav-height')) || 44
+      const targetY = Math.max(0, window.scrollY + rect.top - navHeight - 10)
       window.scrollTo({ top: targetY, behavior: 'smooth' })
     }
   }
@@ -1420,7 +1422,7 @@ function HomeView() {
   return (
     <div className="theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
 
-      <main className="relative overflow-hidden pt-[44px]">
+      <main className="apple-home-main relative overflow-hidden">
         <section className="apple-home-hero relative flex min-h-[calc(78svh-44px)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-10 text-center sm:min-h-[calc(84svh-44px)] sm:py-12">
           <div className="home-hero-surface absolute inset-0" />
           <div className="absolute inset-x-0 bottom-0 h-1/3 bg-linear-to-b from-transparent to-white/82" />
