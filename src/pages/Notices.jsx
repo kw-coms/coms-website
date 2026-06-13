@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify.jsx'
-import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Search, Trash2 } from 'lucide-react'
+import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Search, Sparkles, Trash2 } from 'lucide-react'
 import { listNotices, createNotice, updateNotice, deleteNotice } from '../services/noticeApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 
@@ -21,6 +21,45 @@ function clickableCell(open) {
   return {
     onClick: open,
   }
+}
+
+const NOTICE_CATEGORY_META = {
+  GENERAL: {
+    label: '공지',
+    shortLabel: '공지',
+    featuredLabel: '최신 공지',
+    icon: Megaphone,
+    badgeClass: 'bg-[#e8f8ff] text-[#0066cc]',
+  },
+  PROMOTION: {
+    label: '홍보',
+    shortLabel: '홍보',
+    featuredLabel: '최신 홍보',
+    icon: Sparkles,
+    badgeClass: 'bg-[#eafaf2] text-[#248a3d]',
+  },
+  JOB: {
+    label: '취업공고',
+    shortLabel: '취업',
+    featuredLabel: '최신 취업공고',
+    icon: BriefcaseBusiness,
+    badgeClass: 'bg-amber-100 text-amber-700',
+  },
+}
+
+const NOTICE_CATEGORY_OPTIONS = ['GENERAL', 'PROMOTION', 'JOB']
+
+const NOTICE_FILTERS = [
+  { value: 'ALL', label: '전체', icon: Megaphone },
+  ...NOTICE_CATEGORY_OPTIONS.map((value) => ({
+    value,
+    label: NOTICE_CATEGORY_META[value].label,
+    icon: NOTICE_CATEGORY_META[value].icon,
+  })),
+]
+
+function noticeCategoryMeta(value) {
+  return NOTICE_CATEGORY_META[value] || NOTICE_CATEGORY_META.GENERAL
 }
 
 function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }) {
@@ -68,8 +107,9 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }) {
           onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value }))}
           className="flex-1 rounded-lg border border-black/10 bg-white px-3 py-3 text-sm font-semibold sm:flex-none sm:py-2"
         >
-          <option value="GENERAL">공지</option>
-          <option value="JOB">취업공고</option>
+          {NOTICE_CATEGORY_OPTIONS.map((value) => (
+            <option key={value} value={value}>{noticeCategoryMeta(value).label}</option>
+          ))}
         </select>
         <button type="button" onClick={save} disabled={saving} className="apple-action-primary min-h-12 flex-1 px-5 text-sm disabled:opacity-50 sm:min-h-0 sm:flex-none sm:py-2.5">
           {saving ? '저장 중...' : '저장'}
@@ -123,15 +163,17 @@ export default function Notices() {
     return byCategory.filter((notice) =>
       (notice.title || '').toLowerCase().includes(q) ||
       (notice.content || '').toLowerCase().includes(q) ||
-      (notice.author || '').toLowerCase().includes(q)
+      (notice.author || '').toLowerCase().includes(q) ||
+      noticeCategoryMeta(notice.category || 'GENERAL').label.toLowerCase().includes(q)
     )
   }, [activeCategory, notices, searchQuery])
-  const featuredNotice = useMemo(
-    () => notices.find((notice) => (notice.category || 'GENERAL') === 'GENERAL'),
-    [notices],
-  )
-  const featuredJob = useMemo(
-    () => notices.find((notice) => (notice.category || 'GENERAL') === 'JOB'),
+  const featuredNotices = useMemo(
+    () => NOTICE_CATEGORY_OPTIONS
+      .map((category) => ({
+        category,
+        notice: notices.find((notice) => (notice.category || 'GENERAL') === category),
+      }))
+      .filter((item) => item.notice),
     [notices],
   )
 
@@ -201,7 +243,7 @@ export default function Notices() {
             <div className="min-w-0">
               <p className="apple-eyebrow">Notices</p>
               <h1 className="apple-display mt-2 text-4xl sm:text-5xl">{headerTitle}</h1>
-              <p className="apple-copy mt-3 max-w-xl text-base sm:text-lg">공지와 취업공고를 한 화면에서 빠르게 확인하고 검색합니다.</p>
+              <p className="apple-copy mt-3 max-w-xl text-base sm:text-lg">공지, 홍보, 취업공고를 한 화면에서 빠르게 확인하고 검색합니다.</p>
             </div>
             {(!urlId && visibleMode === 'list') ? (
               isAdmin && <button type="button" onClick={() => setMode('write')} className="apple-action-primary justify-self-start px-5 py-2.5 text-sm md:justify-self-end">공지 작성</button>
@@ -216,39 +258,34 @@ export default function Notices() {
 
         {!urlId && visibleMode === 'list' && (
           <>
-            {(featuredNotice || featuredJob) && (
-              <div className="apple-control-strip grid gap-3 px-4 py-3 sm:px-6 lg:grid-cols-2">
-                {[
-                  ['최신 공지', featuredNotice, Megaphone],
-                  ['최신 취업공고', featuredJob, BriefcaseBusiness],
-                ].map(([label, notice, Icon]) => (
-                  notice && (
+            {featuredNotices.length > 0 && (
+              <div className="apple-control-strip grid gap-3 px-4 py-3 sm:px-6 lg:grid-cols-3">
+                {featuredNotices.map(({ category, notice }) => {
+                  const meta = noticeCategoryMeta(category)
+                  const Icon = meta.icon
+                  return (
                     <button
-                      key={label}
+                      key={category}
                       type="button"
                       onClick={() => openNotice(notice)}
                       className="apple-soft-panel group flex min-h-20 items-center gap-3 px-4 py-3 text-left transition hover:-translate-y-0.5"
                     >
-                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#e8f8ff] text-[#0066cc]">
+                      <span className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${meta.badgeClass}`}>
                         <Icon size={18} />
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-xs font-black text-[#0066cc]">{label}</span>
+                        <span className="block text-xs font-black text-[#0066cc]">{meta.featuredLabel}</span>
                         <span className="mt-1.5 block truncate text-[15px] font-black text-[#1d1d1f]">{notice.title}</span>
                         <span className="mt-1 block text-xs font-semibold text-[#86868b]">{formatDate(notice.createdAt)} · {notice.author}</span>
                       </span>
                     </button>
                   )
-                ))}
+                })}
               </div>
             )}
             <div className="apple-control-strip flex flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6">
               <div className="flex flex-wrap gap-2 text-sm font-bold">
-                {[
-                  ['ALL', '전체'],
-                  ['GENERAL', '공지'],
-                  ['JOB', '취업공고'],
-                ].map(([value, label]) => (
+                {NOTICE_FILTERS.map(({ value, label, icon: Icon }) => (
                   <button
                     key={value}
                     type="button"
@@ -259,7 +296,7 @@ export default function Notices() {
                         : ''
                     }`}
                   >
-                    {value === 'JOB' ? <BriefcaseBusiness size={14} /> : <Megaphone size={14} />}
+                    <Icon size={14} />
                     {label}
                   </button>
                 ))}
@@ -289,7 +326,7 @@ export default function Notices() {
                 <div className="mx-4 mb-4 hidden flex-col divide-y divide-black/10 overflow-hidden rounded-lg border border-black/10 bg-white max-md:flex sm:mx-6">
                   {filteredNotices.map((notice) => {
                     const open = () => openNotice(notice)
-                    const isJob = (notice.category || 'GENERAL') === 'JOB'
+                    const meta = noticeCategoryMeta(notice.category || 'GENERAL')
                     return (
                       <button
                         key={notice.id}
@@ -298,8 +335,8 @@ export default function Notices() {
                         className="flex flex-col gap-1.5 px-4 py-4 text-left transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none"
                       >
                         <div className="flex items-center gap-2">
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${isJob ? 'bg-amber-100 text-amber-700' : 'bg-[#e8f8ff] text-[#0066cc]'}`}>
-                            {isJob ? '취업공고' : '공지'}
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${meta.badgeClass}`}>
+                            {meta.label}
                           </span>
                           <span className="ml-auto text-[11px] text-[#86868b]">{formatDate(notice.createdAt)}</span>
                         </div>
@@ -316,7 +353,7 @@ export default function Notices() {
                     <thead className="border-b border-black/10">
                       <tr>
                         <th className="w-16 px-4 py-3">번호</th>
-                        <th className="w-24 px-4 py-3">분류</th>
+                        <th className="w-28 px-4 py-3">분류</th>
                         <th className="px-4 py-3 text-left">제목</th>
                         <th className="w-28 px-4 py-3">작성자</th>
                         <th className="w-28 px-4 py-3">작성일</th>
@@ -325,6 +362,7 @@ export default function Notices() {
                     <tbody className="divide-y divide-black/10">
                       {filteredNotices.map((notice) => {
                         const open = () => openNotice(notice)
+                        const meta = noticeCategoryMeta(notice.category || 'GENERAL')
                         return (
                           <tr
                             key={notice.id}
@@ -335,7 +373,9 @@ export default function Notices() {
                             className="cursor-pointer text-[#6e6e73] transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none"
                           >
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs text-[#86868b]">{notice.id}</td>
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs font-bold text-[#0066cc]">{(notice.category || 'GENERAL') === 'JOB' ? '취업' : '공지'}</td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs font-bold">
+                              <span className={`inline-flex rounded-full px-2.5 py-1 ${meta.badgeClass}`}>{meta.shortLabel}</span>
+                            </td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5">
                               <span className="block max-w-[440px] truncate text-left font-semibold text-[#1d1d1f]">
                                 {notice.title}
@@ -357,7 +397,7 @@ export default function Notices() {
         {visibleMode === 'write' && (
           <div className="p-4 sm:p-6">
             <NoticeForm
-              defaultCategory={activeCategory === 'JOB' ? 'JOB' : 'GENERAL'}
+              defaultCategory={activeCategory === 'ALL' ? 'GENERAL' : activeCategory}
               onCancel={backToList}
               onSave={(notice) => { mergeNotice(notice); load({ showLoading: false }) }}
             />
@@ -380,7 +420,9 @@ export default function Notices() {
         {isDetail && (
           <article className="m-3 overflow-hidden rounded-lg bg-white shadow-[0_18px_50px_rgba(0,0,0,0.10)] sm:m-6">
             <div className="border-b border-black/10 px-4 py-5 sm:px-5">
-              <div className="mb-2 text-xs font-bold text-[#0066cc]">{(selectedNotice.category || 'GENERAL') === 'JOB' ? '취업공고' : '공지'}</div>
+              <div className={`mb-2 inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${noticeCategoryMeta(selectedNotice.category || 'GENERAL').badgeClass}`}>
+                {noticeCategoryMeta(selectedNotice.category || 'GENERAL').label}
+              </div>
               <h2 className="break-words text-xl font-black leading-tight sm:text-3xl md:text-4xl">
                 {selectedNotice.title}
               </h2>
