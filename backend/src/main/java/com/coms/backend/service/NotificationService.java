@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Optional;
 
@@ -71,6 +73,7 @@ public class NotificationService {
         if (recipientStudentId == null || recipientStudentId.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "recipientStudentId is required");
         }
+        String safeAcceptUrl = sanitizeAcceptUrl(acceptUrl);
         boolean recipientKnown = memberRepository.existsByStudentId(recipientStudentId)
                 || eligibleMemberRepository.findByStudentId(recipientStudentId).isPresent();
         if (!recipientKnown) {
@@ -87,7 +90,7 @@ public class NotificationService {
                 message
         );
         notification.setActorLabel(actorLabel);
-        notification.setAcceptUrl(acceptUrl);
+        notification.setAcceptUrl(safeAcceptUrl);
         Notification saved = notificationRepository.save(notification);
 
         if (sendEmail) {
@@ -97,8 +100,8 @@ public class NotificationService {
                 try {
                     String subject = actorLabel == null ? "초대가 도착했습니다" : "[" + actorLabel + "] 초대가 도착했습니다";
                     StringBuilder body = new StringBuilder(message);
-                    if (acceptUrl != null && !acceptUrl.isBlank()) {
-                        body.append("\n\n수락 링크: ").append(acceptUrl);
+                    if (safeAcceptUrl != null) {
+                        body.append("\n\n수락 링크: ").append(safeAcceptUrl);
                     }
                     mailSender.sendExternalInvite(email.get(), subject, body.toString());
                 } catch (RuntimeException e) {
@@ -109,6 +112,24 @@ public class NotificationService {
             }
         }
         return saved;
+    }
+
+    private String sanitizeAcceptUrl(String acceptUrl) {
+        if (acceptUrl == null || acceptUrl.isBlank()) {
+            return null;
+        }
+        try {
+            URI parsed = new URI(acceptUrl);
+            String scheme = parsed.getScheme();
+            if (scheme == null
+                    || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))
+                    || parsed.getHost() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "acceptUrl must be an http(s) URL");
+            }
+            return acceptUrl;
+        } catch (URISyntaxException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "acceptUrl is not a valid URL");
+        }
     }
 
     public void notifyNoticeCreated(Notice notice) {
