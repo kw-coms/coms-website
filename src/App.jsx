@@ -919,7 +919,8 @@ function NotificationButton({ alignLeft = false, padded = false }) {
       // Navigation should still work if the read marker fails.
     }
     setOpen(false)
-    if (item.acceptUrl) {
+    const safeAcceptUrl = typeof item.acceptUrl === 'string' && /^https?:\/\//i.test(item.acceptUrl)
+    if (safeAcceptUrl) {
       window.open(item.acceptUrl, '_blank', 'noopener,noreferrer')
     } else if (item.noticeId) {
       navigate(`/notices/${item.noticeId}`)
