@@ -6,24 +6,37 @@ import com.coms.backend.domain.Notification;
 import com.coms.backend.domain.Notice;
 import com.coms.backend.dto.NotificationResponse;
 import com.coms.backend.dto.NotificationSummaryResponse;
+import com.coms.backend.repository.EligibleMemberRepository;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.NotificationRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @Transactional
 public class NotificationService {
+    private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
+
     private final NotificationRepository notificationRepository;
     private final MemberRepository memberRepository;
+    private final EligibleMemberRepository eligibleMemberRepository;
+    private final EmailVerificationSender mailSender;
 
-    public NotificationService(NotificationRepository notificationRepository, MemberRepository memberRepository) {
+    public NotificationService(NotificationRepository notificationRepository,
+                               MemberRepository memberRepository,
+                               EligibleMemberRepository eligibleMemberRepository,
+                               EmailVerificationSender mailSender) {
         this.notificationRepository = notificationRepository;
         this.memberRepository = memberRepository;
+        this.eligibleMemberRepository = eligibleMemberRepository;
+        this.mailSender = mailSender;
     }
 
     public void notifyPostComment(CommunityPost post, CommunityComment comment) {
@@ -48,6 +61,54 @@ public class NotificationService {
                 null,
                 reply.getAuthorName() + " replied to your comment."
         );
+    }
+
+    public Notification notifyExternalInvite(String recipientStudentId,
+                                              String actorLabel,
+                                              String message,
+                                              String acceptUrl,
+                                              boolean sendEmail) {
+        if (recipientStudentId == null || recipientStudentId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "recipientStudentId is required");
+        }
+        boolean recipientKnown = memberRepository.existsByStudentId(recipientStudentId)
+                || eligibleMemberRepository.findByStudentId(recipientStudentId).isPresent();
+        if (!recipientKnown) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown studentId");
+        }
+
+        Notification notification = build(
+                recipientStudentId,
+                null,
+                Notification.Type.EXTERNAL_INVITE,
+                null,
+                null,
+                null,
+                message
+        );
+        notification.setActorLabel(actorLabel);
+        notification.setAcceptUrl(acceptUrl);
+        Notification saved = notificationRepository.save(notification);
+
+        if (sendEmail) {
+            Optional<String> email = memberRepository.findByStudentId(recipientStudentId)
+                    .map(member -> member.getEmail());
+            if (email.isPresent()) {
+                try {
+                    String subject = actorLabel == null ? "초대가 도착했습니다" : "[" + actorLabel + "] 초대가 도착했습니다";
+                    StringBuilder body = new StringBuilder(message);
+                    if (acceptUrl != null && !acceptUrl.isBlank()) {
+                        body.append("\n\n수락 링크: ").append(acceptUrl);
+                    }
+                    mailSender.sendExternalInvite(email.get(), subject, body.toString());
+                } catch (RuntimeException e) {
+                    log.warn("External invite email failed for {}", recipientStudentId, e);
+                }
+            } else {
+                log.info("Skipping email for {} — no registered member account", recipientStudentId);
+            }
+        }
+        return saved;
     }
 
     public void notifyNoticeCreated(Notice notice) {
@@ -132,6 +193,8 @@ public class NotificationService {
                 notification.getPostId(),
                 notification.getCommentId(),
                 notification.getNoticeId(),
+                notification.getAcceptUrl(),
+                notification.getActorLabel(),
                 notification.getMessage(),
                 notification.getReadAt() != null,
                 notification.getCreatedAt()

@@ -1,5 +1,6 @@
 package com.coms.backend.config;
 
+import com.coms.backend.security.IntegrationHmacFilter;
 import com.coms.backend.security.JwtAuthenticationFilter;
 import com.coms.backend.security.JwtTokenProvider;
 import com.coms.backend.security.OriginValidationFilter;
@@ -48,7 +49,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            UserDetailsService userDetailsService,
-                                           OriginValidationFilter originValidationFilter) throws Exception {
+                                           OriginValidationFilter originValidationFilter,
+                                           IntegrationHmacFilter integrationHmacFilter) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
@@ -57,6 +59,7 @@ public class SecurityConfig {
                 auth.requestMatchers("/error", "/api/auth/signup", "/api/auth/login", "/api/auth/logout", "/api/auth/refresh", "/hello", "/api/server/time",
                         "/api/auth/email-verification/request-signup", "/api/auth/email-verification/confirm-signup",
                         "/api/auth/password-reset/request", "/api/auth/password-reset/confirm").permitAll();
+                auth.requestMatchers("/api/integrations/**").hasRole("INTEGRATION");
                 auth.requestMatchers(HttpMethod.POST, "/api/recruit/apply").permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/api/maintenance/bootstrap").permitAll();
                 auth.requestMatchers("/api/maintenance/**").hasRole("ADMIN");
@@ -103,6 +106,7 @@ public class SecurityConfig {
                 ))
             )
             .addFilterBefore(originValidationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(integrationHmacFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(
                 new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService),
                 UsernamePasswordAuthenticationFilter.class
