@@ -919,7 +919,9 @@ function NotificationButton({ alignLeft = false, padded = false }) {
       // Navigation should still work if the read marker fails.
     }
     setOpen(false)
-    if (item.noticeId) {
+    if (item.acceptUrl) {
+      window.open(item.acceptUrl, '_blank', 'noopener,noreferrer')
+    } else if (item.noticeId) {
       navigate(`/notices/${item.noticeId}`)
     } else if (item.postId) {
       navigate(`/community/${item.postId}${item.commentId ? `#comment-${item.commentId}` : ''}`)
@@ -1004,7 +1006,13 @@ function NotificationButton({ alignLeft = false, padded = false }) {
                 <span className="flex items-start gap-2">
                   <span className="notification-dot mt-1.5" aria-hidden="true" />
                   <span className="min-w-0 flex-1">
+                    {item.actorLabel && (
+                      <span className="mb-1 inline-block rounded bg-black/5 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--theme-body-muted)]">{item.actorLabel}</span>
+                    )}
                     <span className={`block ${item.read ? 'font-medium' : 'font-bold'}`}>{item.message}</span>
+                    {item.acceptUrl && (
+                      <span className="mt-1 block text-[11px] font-bold text-[#3b4890]">눌러서 수락하러 가기 →</span>
+                    )}
                     <span className="mt-1 block text-[11px] text-[var(--theme-body-muted)]">{new Date(item.createdAt).toLocaleString('ko-KR')}</span>
                   </span>
                 </span>
