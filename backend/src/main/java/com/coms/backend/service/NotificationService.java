@@ -2,8 +2,10 @@ package com.coms.backend.service;
 
 import com.coms.backend.domain.CommunityComment;
 import com.coms.backend.domain.CommunityPost;
+import com.coms.backend.domain.Member;
 import com.coms.backend.domain.Notification;
 import com.coms.backend.domain.Notice;
+import com.coms.backend.dto.MemberExternalInviteRequest;
 import com.coms.backend.dto.NotificationResponse;
 import com.coms.backend.dto.NotificationSummaryResponse;
 import com.coms.backend.repository.EligibleMemberRepository;
@@ -18,6 +20,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 
@@ -130,6 +134,43 @@ public class NotificationService {
         } catch (URISyntaxException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "acceptUrl is not a valid URL");
         }
+    }
+
+    public record ExternalInviteBatchResult(int accepted, List<String> unknown, int rejected) {}
+
+    public ExternalInviteBatchResult notifyExternalInviteFromMember(String senderStudentId, MemberExternalInviteRequest request) {
+        if (senderStudentId == null || senderStudentId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sender required");
+        }
+        Member sender = memberRepository.findByStudentId(senderStudentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sender is not a registered member"));
+        String label = (request.getActorLabel() == null || request.getActorLabel().isBlank())
+                ? sender.getName()
+                : request.getActorLabel();
+
+        List<String> unknown = new ArrayList<>();
+        int accepted = 0;
+        int rejected = 0;
+        for (String rawRecipient : new LinkedHashSet<>(request.getRecipientStudentIds())) {
+            String recipient = rawRecipient == null ? "" : rawRecipient.trim();
+            if (recipient.isEmpty() || recipient.equals(senderStudentId)) {
+                rejected += 1;
+                continue;
+            }
+            boolean known = memberRepository.existsByStudentId(recipient)
+                    || eligibleMemberRepository.findByStudentId(recipient).isPresent();
+            if (!known) {
+                unknown.add(recipient);
+                continue;
+            }
+            try {
+                notifyExternalInvite(recipient, label, request.getMessage(), request.getAcceptUrl(), false);
+                accepted += 1;
+            } catch (ResponseStatusException ex) {
+                rejected += 1;
+            }
+        }
+        return new ExternalInviteBatchResult(accepted, unknown, rejected);
     }
 
     public void notifyNoticeCreated(Notice notice) {
