@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify.jsx'
-import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Search, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Search, Sparkles, Trash2, UsersRound } from 'lucide-react'
 import { listNotices, createNotice, updateNotice, deleteNotice } from '../services/noticeApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 
@@ -38,6 +38,13 @@ const NOTICE_CATEGORY_META = {
     icon: Sparkles,
     badgeClass: 'bg-[#eafaf2] text-[#248a3d]',
   },
+  SMALL_GROUP: {
+    label: '소모임',
+    shortLabel: '소모임',
+    featuredLabel: '최신 소모임',
+    icon: UsersRound,
+    badgeClass: 'bg-[#f2efff] text-[#6e56cf]',
+  },
   JOB: {
     label: '취업공고',
     shortLabel: '취업',
@@ -47,7 +54,7 @@ const NOTICE_CATEGORY_META = {
   },
 }
 
-const NOTICE_CATEGORY_OPTIONS = ['GENERAL', 'PROMOTION', 'JOB']
+const NOTICE_CATEGORY_OPTIONS = ['GENERAL', 'PROMOTION', 'SMALL_GROUP', 'JOB']
 
 const NOTICE_FILTERS = [
   { value: 'ALL', label: '전체', icon: Megaphone },
@@ -243,7 +250,7 @@ export default function Notices() {
             <div className="min-w-0">
               <p className="apple-eyebrow">Notices</p>
               <h1 className="apple-display mt-2 text-4xl sm:text-5xl">{headerTitle}</h1>
-              <p className="apple-copy mt-3 max-w-xl text-base sm:text-lg">공지, 홍보, 취업공고를 한 화면에서 빠르게 확인하고 검색합니다.</p>
+              <p className="apple-copy mt-3 max-w-xl text-base sm:text-lg">공지, 홍보, 소모임, 취업공고를 한 화면에서 빠르게 확인하고 검색합니다.</p>
             </div>
             {(!urlId && visibleMode === 'list') ? (
               isAdmin && <button type="button" onClick={() => setMode('write')} className="apple-action-primary justify-self-start px-5 py-2.5 text-sm md:justify-self-end">공지 작성</button>
@@ -259,7 +266,7 @@ export default function Notices() {
         {!urlId && visibleMode === 'list' && (
           <>
             {featuredNotices.length > 0 && (
-              <div className="apple-control-strip grid gap-3 px-4 py-3 sm:px-6 lg:grid-cols-3">
+              <div className="apple-control-strip grid gap-3 px-4 py-3 sm:px-6 md:grid-cols-2 xl:grid-cols-4">
                 {featuredNotices.map(({ category, notice }) => {
                   const meta = noticeCategoryMeta(category)
                   const Icon = meta.icon
