@@ -323,12 +323,28 @@ function sanitizeFontFamily(name) {
   return String(name || '').replace(/["\\]/g, '').trim()
 }
 
+function safeFontUrl(raw) {
+  const value = String(raw || '').trim()
+  if (!value) return null
+  if (/["()\s\\<>]/.test(value)) return null
+  if (typeof window === 'undefined') return null
+  try {
+    const parsed = new URL(value, window.location.origin)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null
+    if (parsed.origin !== window.location.origin) return null
+    return encodeURI(parsed.pathname + parsed.search)
+  } catch {
+    return null
+  }
+}
+
 function buildFontFaceCss(fonts) {
   return fonts
     .map((font) => {
       const family = sanitizeFontFamily(font.name)
-      if (!family) return ''
-      return `@font-face{font-family:"${family}";src:url("${font.fileUrl}") format("woff2"),url("${font.fileUrl}");font-display:swap;}`
+      const url = safeFontUrl(font.fileUrl)
+      if (!family || !url) return ''
+      return `@font-face{font-family:"${family}";src:url("${url}") format("woff2"),url("${url}");font-display:swap;}`
     })
     .filter(Boolean)
     .join('\n')
