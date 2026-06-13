@@ -49,6 +49,23 @@ public class EmailVerificationSender {
         );
     }
 
+    public void sendExternalInvite(String to, String subject, String text) {
+        if (!mailEnabled) {
+            log.info("External invite mail skipped for {} (mail disabled)", to);
+            return;
+        }
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(from);
+            message.setTo(to);
+            message.setSubject(subject);
+            message.setText(text);
+            mailSender.send(message);
+        } catch (RuntimeException e) {
+            log.warn("Failed to send external invite mail to {}", to, e);
+        }
+    }
+
     private void sendCode(String to, String code, String subject, String text, String logLabel) {
         if (!mailEnabled) {
             if (logVerificationCodes) {
