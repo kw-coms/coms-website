@@ -48,7 +48,7 @@ public class Notice {
     }
 
     public enum Category {
-        GENERAL, JOB
+        GENERAL, PROMOTION, JOB
     }
 
     public Long getId() { return id; }
