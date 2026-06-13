@@ -49,6 +49,13 @@ class NoticeServiceTest {
     }
 
     @Test
+    void createsPromotionNoticeCategory() {
+        var notice = noticeService.create("2026123000", new NoticeRequest("홍보", "행사 홍보", null, false, "PROMOTION"));
+
+        assertThat(notice.category()).isEqualTo("PROMOTION");
+    }
+
+    @Test
     void updateIgnoresClientSuppliedAuthor() {
         var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", "가짜", false, null));
 
