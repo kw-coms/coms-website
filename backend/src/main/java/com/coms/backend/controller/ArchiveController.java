@@ -40,9 +40,10 @@ public class ArchiveController {
     public ResponseEntity<ArchiveFileResponse> upload(
             @RequestParam("title") String title,
             @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "category", defaultValue = "GENERAL") String category,
             @RequestParam("file") MultipartFile file,
             Authentication authentication) throws IOException {
-        return ResponseEntity.ok(archiveService.upload(title, description, file, authentication.getName()));
+        return ResponseEntity.ok(archiveService.upload(title, description, category, file, authentication.getName()));
     }
 
     @GetMapping
