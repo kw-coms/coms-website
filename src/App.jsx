@@ -320,7 +320,11 @@ const FONT_SELECTION_KEY = 'kwcoms-font-id'
 const DEFAULT_FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Apple SD Gothic Neo', 'Segoe UI', 'Malgun Gothic', sans-serif"
 
 function sanitizeFontFamily(name) {
-  return String(name || '').replace(/["\\]/g, '').trim()
+  return String(name || '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/["\\\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, '')
+    .trim()
+    .slice(0, 64)
 }
 
 function safeFontUrl(raw) {
