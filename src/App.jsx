@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { listNotices } from './services/noticeApi.js'
 import { getNotificationSummary, listNotifications, markAllNotificationsRead, markNotificationRead } from './services/notificationApi.js'
+import { listFonts } from './services/fontApi.js'
 const Archive = lazy(() => import('./pages/Archive.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
 const Signup = lazy(() => import('./pages/Signup.jsx'))
@@ -315,6 +316,32 @@ const projectsDetailOutputs = [
 const DEFAULT_ACCENT = '#0071e3'
 const THEME_MODE_KEY = 'kwcoms-theme-mode'
 const ACCENT_COLOR_KEY = 'kwcoms-accent-color'
+const FONT_SELECTION_KEY = 'kwcoms-font-id'
+const DEFAULT_FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Apple SD Gothic Neo', 'Segoe UI', 'Malgun Gothic', sans-serif"
+
+function sanitizeFontFamily(name) {
+  return String(name || '').replace(/["\\]/g, '').trim()
+}
+
+function buildFontFaceCss(fonts) {
+  return fonts
+    .map((font) => {
+      const family = sanitizeFontFamily(font.name)
+      if (!family) return ''
+      return `@font-face{font-family:"${family}";src:url("${font.fileUrl}") format("woff2"),url("${font.fileUrl}");font-display:swap;}`
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
+function getStoredFontId() {
+  if (typeof window === 'undefined') return null
+  const raw = window.localStorage.getItem(FONT_SELECTION_KEY)
+  if (!raw) return null
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 const accentSwatches = [
   { name: 'Apple Blue', value: '#0071e3' },
   { name: 'Graphite', value: '#3c3c43' },
@@ -912,9 +939,19 @@ function NotificationButton({ alignLeft = false, padded = false }) {
   )
 }
 
-function AppearanceControl({ accentColor, setAccentColor, themeMode, setThemeMode }) {
+function AppearanceControl({
+  accentColor,
+  setAccentColor,
+  themeMode,
+  setThemeMode,
+  activeFonts = [],
+  selectedFontId = null,
+  onFontChange,
+  fontSelectionLocked = false,
+}) {
   const accent = normalizeHex(accentColor)
   const isDark = themeMode === 'dark'
+  const fontSelectValue = selectedFontId ? String(selectedFontId) : ''
 
   return (
     <section className="appearance-control apple-footer-surface border-t border-black/10 bg-[var(--app-surface-soft)] px-5 py-8 text-[var(--app-muted)]">
@@ -942,6 +979,29 @@ function AppearanceControl({ accentColor, setAccentColor, themeMode, setThemeMod
               </span>
               {isDark ? '라이트 모드' : '다크 모드'}
             </button>
+
+            {activeFonts.length > 0 && (
+              <div className="appearance-font-row flex flex-wrap items-center gap-2 lg:justify-end">
+                <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">폰트</span>
+                {fontSelectionLocked ? (
+                  <span className="rounded-full border border-black/10 bg-[var(--app-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)]">
+                    계정 설정에서 변경
+                  </span>
+                ) : (
+                  <select
+                    value={fontSelectValue}
+                    onChange={(event) => onFontChange?.(event.target.value)}
+                    className="min-h-9 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] outline-none transition focus:ring-2 focus:ring-[var(--app-accent)]/30"
+                    aria-label="사이트 폰트 선택"
+                  >
+                    <option value="">기본 폰트</option>
+                    {activeFonts.map((font) => (
+                      <option key={font.id} value={font.id}>{font.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
 
             <div className="appearance-color-row flex flex-wrap items-center gap-2 lg:justify-end">
               <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">색상</span>
@@ -1029,8 +1089,11 @@ function PageFallback() {
 }
 
 function App() {
+  const { user } = useAuth()
   const [themeMode, setThemeMode] = useState(getStoredThemeMode)
   const [accentColor, setAccentColor] = useState(getStoredAccentColor)
+  const [activeFonts, setActiveFonts] = useState([])
+  const [guestFontId, setGuestFontId] = useState(getStoredFontId)
 
   useEffect(() => {
     const root = document.documentElement
@@ -1047,6 +1110,51 @@ function App() {
     window.localStorage.setItem(THEME_MODE_KEY, mode)
     window.localStorage.setItem(ACCENT_COLOR_KEY, accent)
   }, [accentColor, themeMode])
+
+  useEffect(() => {
+    let mounted = true
+    listFonts()
+      .then((data) => { if (mounted) setActiveFonts(Array.isArray(data) ? data : []) })
+      .catch(() => { if (mounted) setActiveFonts([]) })
+    return () => { mounted = false }
+  }, [])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined
+    const styleId = 'site-font-faces'
+    let styleEl = document.getElementById(styleId)
+    if (!styleEl) {
+      styleEl = document.createElement('style')
+      styleEl.id = styleId
+      document.head.appendChild(styleEl)
+    }
+    styleEl.textContent = buildFontFaceCss(activeFonts)
+    return undefined
+  }, [activeFonts])
+
+  const effectiveFontId = user?.selectedFontId ?? guestFontId
+  const selectedFont = activeFonts.find((font) => font.id === Number(effectiveFontId))
+
+  useEffect(() => {
+    const root = document.documentElement
+    if (selectedFont) {
+      const family = sanitizeFontFamily(selectedFont.name)
+      root.style.setProperty('--apple-font-family', `"${family}", ${DEFAULT_FONT_FAMILY}`)
+    } else {
+      root.style.removeProperty('--apple-font-family')
+    }
+  }, [selectedFont])
+
+  const handleGuestFontChange = (value) => {
+    const id = value ? Number(value) : null
+    if (id && Number.isFinite(id)) {
+      setGuestFontId(id)
+      window.localStorage.setItem(FONT_SELECTION_KEY, String(id))
+    } else {
+      setGuestFontId(null)
+      window.localStorage.removeItem(FONT_SELECTION_KEY)
+    }
+  }
 
   return (
     <Suspense fallback={<PageFallback />}>
@@ -1075,6 +1183,10 @@ function App() {
         setAccentColor={setAccentColor}
         themeMode={themeMode}
         setThemeMode={setThemeMode}
+        activeFonts={activeFonts}
+        selectedFontId={user ? null : guestFontId}
+        onFontChange={handleGuestFontChange}
+        fontSelectionLocked={Boolean(user)}
       />
     </Suspense>
   )
