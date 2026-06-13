@@ -11,6 +11,7 @@ public record ArchiveFileResponse(
         Long fileSize,
         String uploadedBy,
         String uploaderName,
+        String category,
         LocalDateTime uploadedAt
 ) {
 }

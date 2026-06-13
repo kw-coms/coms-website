@@ -57,6 +57,21 @@ class ArchiveServiceTest {
         assertThat(response.originalName()).isEqualTo("guide.pdf");
         assertThat(response.fileSize()).isEqualTo(pdf.getSize());
         assertThat(response.uploaderName()).isEqualTo("홍길동");
+        assertThat(response.category()).isEqualTo("GENERAL");
+    }
+
+    @Test
+    void acceptsAcademicJournalCategory() throws Exception {
+        MockMultipartFile pdf = new MockMultipartFile(
+                "file",
+                "journal.pdf",
+                "application/pdf",
+                "%PDF-1.4".getBytes()
+        );
+
+        var response = archiveService.upload("학술회지 1호", null, "ACADEMIC_JOURNAL", pdf, "2026123456");
+
+        assertThat(response.category()).isEqualTo("ACADEMIC_JOURNAL");
     }
 
     @Test
@@ -70,6 +85,20 @@ class ArchiveServiceTest {
 
         assertThatThrownBy(() -> archiveService.upload("위험 파일", null, html, "2026123456"))
                 .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void rejectsInvalidCategory() {
+        MockMultipartFile pdf = new MockMultipartFile(
+                "file",
+                "guide.pdf",
+                "application/pdf",
+                "%PDF-1.4".getBytes()
+        );
+
+        assertThatThrownBy(() -> archiveService.upload("강의 자료", null, "UNKNOWN", pdf, "2026123456"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getReason()).contains("Invalid archive category"));
     }
 
     @Test
