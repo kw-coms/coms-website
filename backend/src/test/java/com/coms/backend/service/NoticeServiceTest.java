@@ -56,6 +56,13 @@ class NoticeServiceTest {
     }
 
     @Test
+    void createsSmallGroupNoticeCategory() {
+        var notice = noticeService.create("2026123000", new NoticeRequest("소모임", "소모임 안내", null, false, "SMALL_GROUP"));
+
+        assertThat(notice.category()).isEqualTo("SMALL_GROUP");
+    }
+
+    @Test
     void updateIgnoresClientSuppliedAuthor() {
         var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", "가짜", false, null));
 
