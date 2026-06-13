@@ -742,13 +742,22 @@ select {
 
 .theme-home .hover\:bg-white:hover,
 .apple-route .hover\:bg-white:hover,
+.theme-home .hover\:bg-white\/20:hover,
+.apple-route .hover\:bg-white\/20:hover,
+.theme-home .hover\:bg-white\/24:hover,
+.apple-route .hover\:bg-white\/24:hover,
 .theme-home .hover\:bg-white\/60:hover,
 .apple-route .hover\:bg-white\/60:hover,
 .theme-home .hover\:bg-white\/78:hover,
 .apple-route .hover\:bg-white\/78:hover,
+.theme-home .hover\:bg-white\/80:hover,
+.apple-route .hover\:bg-white\/80:hover,
 .theme-home .focus\:bg-white:focus,
-.apple-route .focus\:bg-white:focus {
+.apple-route .focus\:bg-white:focus,
+.theme-home .focus\:bg-white\/80:focus,
+.apple-route .focus\:bg-white\/80:focus {
 	background-color: var(--app-surface-elevated) !important;
+	color: var(--app-text) !important;
 }
 
 .theme-home .hover\:bg-\[\#f5f5f7\]:hover,
