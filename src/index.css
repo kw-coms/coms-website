@@ -835,6 +835,41 @@ select {
 	background-color: color-mix(in srgb, #ff9f0a 18%, var(--app-surface)) !important;
 }
 
+:root[data-theme-mode='dark'] .theme-home .bg-\[\#ffe2a2\],
+:root[data-theme-mode='dark'] .apple-route .bg-\[\#ffe2a2\],
+:root[data-theme-mode='dark'] .theme-home .bg-yellow-50,
+:root[data-theme-mode='dark'] .apple-route .bg-yellow-50 {
+	background-color: color-mix(in srgb, #f59e0b 28%, var(--app-surface)) !important;
+}
+
+.concept-post-card,
+.concept-post-row {
+	color: #4a2f00 !important;
+}
+
+.concept-post-card h3,
+.concept-post-card .text-\[\#1d1d1f\],
+.concept-post-row .text-\[\#1d1d1f\] {
+	color: #2a1900 !important;
+}
+
+:root[data-theme-mode='dark'] .concept-post-card,
+:root[data-theme-mode='dark'] .concept-post-row {
+	color: #ffd793 !important;
+}
+
+:root[data-theme-mode='dark'] .concept-post-card h3,
+:root[data-theme-mode='dark'] .concept-post-card .text-\[\#1d1d1f\],
+:root[data-theme-mode='dark'] .concept-post-row .text-\[\#1d1d1f\] {
+	color: var(--app-text) !important;
+}
+
+.theme-popover .bg-cyan-50,
+.theme-popover .bg-\[\#e8f3ff\],
+.theme-popover .bg-\[\#e8f8ff\] {
+	background-color: var(--app-accent-soft) !important;
+}
+
 .theme-home .bg-\[\#f0c36d\],
 .apple-route .bg-\[\#f0c36d\] {
 	background-color: #d8a14d !important;
