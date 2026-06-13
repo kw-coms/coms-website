@@ -33,12 +33,17 @@ public class OriginValidationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        if (isSafeMethod(request.getMethod()) || hasTrustedOriginEvidence(request)) {
+        if (isIntegrationPath(request) || isSafeMethod(request.getMethod()) || hasTrustedOriginEvidence(request)) {
             filterChain.doFilter(request, response);
             return;
         }
 
         response.sendError(HttpServletResponse.SC_FORBIDDEN, "Untrusted request origin.");
+    }
+
+    private static boolean isIntegrationPath(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path != null && path.startsWith("/api/integrations/");
     }
 
     private boolean hasTrustedOriginEvidence(HttpServletRequest request) {
