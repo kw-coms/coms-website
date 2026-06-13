@@ -4,10 +4,11 @@ export async function listFiles() {
   return request('/api/files')
 }
 
-export async function createPost({ title, description, file }) {
+export async function createPost({ title, description, category, file }) {
   const formData = new FormData()
   formData.append('title', title)
   if (description) formData.append('description', description)
+  formData.append('category', category || 'GENERAL')
   formData.append('file', file)
   const response = await fetch(apiUrl('/api/files'), {
     method: 'POST',

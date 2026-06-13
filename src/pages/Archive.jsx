@@ -34,8 +34,46 @@ function clickableCell(open) {
   return { onClick: open }
 }
 
+const ARCHIVE_CATEGORIES = [
+  { value: 'ALL', label: '전체' },
+  { value: 'GENERAL', label: '일반 자료' },
+  { value: 'ACADEMIC_JOURNAL', label: '학술회지' },
+]
+
+const WRITABLE_ARCHIVE_CATEGORIES = ARCHIVE_CATEGORIES.filter((item) => item.value !== 'ALL')
+
+function categoryLabel(value) {
+  return ARCHIVE_CATEGORIES.find((item) => item.value === value)?.label || '일반 자료'
+}
+
+function CategorySegment({ value, onChange, items, counts }) {
+  return (
+    <div className="inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.62)]">
+      {items.map((item) => {
+        const selected = value === item.value
+        return (
+          <button
+            key={item.value}
+            type="button"
+            aria-pressed={selected}
+            onClick={() => onChange(item.value)}
+            className={`inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-full px-3.5 text-xs font-bold transition ${selected ? 'bg-[var(--app-surface)] text-[var(--app-text)] shadow-[0_1px_2px_rgba(0,0,0,0.08)]' : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'}`}
+          >
+            <span>{item.label}</span>
+            {counts && (
+              <span className={selected ? 'text-[var(--app-accent-text)]' : 'text-[var(--app-subtle)]'}>
+                {counts[item.value] || 0}
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function WriteForm({ onCancel, onSave }) {
-  const [form, setForm] = useState({ title: '', description: '' })
+  const [form, setForm] = useState({ title: '', description: '', category: 'GENERAL' })
   const [file, setFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -48,7 +86,7 @@ function WriteForm({ onCancel, onSave }) {
     setSaving(true)
     setError('')
     try {
-      const saved = await createPost({ title: form.title.trim(), description: form.description.trim(), file })
+      const saved = await createPost({ title: form.title.trim(), description: form.description.trim(), category: form.category, file })
       onSave(saved)
     } catch (err) {
       setError(err.message || '업로드 중 오류가 발생했습니다.')
@@ -58,24 +96,42 @@ function WriteForm({ onCancel, onSave }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4 rounded-lg border border-black/10 bg-white p-5 shadow-[0_18px_45px_rgba(0,0,0,0.08)]">
-      <input
-        value={form.title}
-        onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-        maxLength={200}
-        placeholder="제목"
-        className="w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-sm text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24"
-      />
-      <textarea
-        value={form.description}
-        onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-        rows={8}
-        maxLength={2000}
-        placeholder="설명 (선택)"
-        className="w-full resize-y rounded-lg border border-black/10 bg-white px-4 py-3 text-sm leading-7 text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24"
-      />
-      <div className="flex flex-wrap items-center gap-3 text-sm text-[var(--theme-body-muted)]">
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-[#f5f5f7] px-3 py-2 font-semibold text-[#1d1d1f] hover:bg-white">
+    <form onSubmit={submit} className="apple-soft-panel space-y-5 p-5 sm:p-6">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem]">
+        <label className="block">
+          <span className="mb-2 block text-xs font-bold text-[var(--app-subtle)]">제목</span>
+          <input
+            value={form.title}
+            onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+            maxLength={200}
+            placeholder="자료 제목"
+            className="h-12 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 text-sm text-[var(--app-text)] outline-none transition focus:ring-2 focus:ring-[#0071e3]/24"
+          />
+        </label>
+        <div>
+          <span className="mb-2 block text-xs font-bold text-[var(--app-subtle)]">카테고리</span>
+          <CategorySegment
+            value={form.category}
+            onChange={(category) => setForm((p) => ({ ...p, category }))}
+            items={WRITABLE_ARCHIVE_CATEGORIES}
+          />
+        </div>
+      </div>
+
+      <label className="block">
+        <span className="mb-2 block text-xs font-bold text-[var(--app-subtle)]">설명</span>
+        <textarea
+          value={form.description}
+          onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+          rows={7}
+          maxLength={2000}
+          placeholder="선택 입력"
+          className="w-full resize-y rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-sm leading-7 text-[var(--app-text)] outline-none transition focus:ring-2 focus:ring-[#0071e3]/24"
+        />
+      </label>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-3 text-sm text-[var(--app-muted)]">
+        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3.5 font-bold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)]">
           <FileUp size={15} />
           파일 선택
           <input
@@ -85,21 +141,23 @@ function WriteForm({ onCancel, onSave }) {
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
         </label>
-        <span className="min-w-0 truncate">{file ? file.name : '선택된 파일 없음'}</span>
+        <span className="min-w-0 flex-1 truncate font-medium">{file ? file.name : '선택된 파일 없음'}</span>
       </div>
+
       {error && <p className="text-sm font-semibold text-red-500">{error}</p>}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <button
           type="submit"
           disabled={saving}
-          className="rounded-full bg-[#0071e3] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+          className="apple-action-primary inline-flex min-h-10 items-center justify-center gap-2 px-5 text-sm disabled:opacity-50"
         >
+          <FileUp size={15} />
           {saving ? '업로드 중...' : '등록'}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-[#1d1d1f]"
+          className="apple-action-secondary inline-flex min-h-10 items-center justify-center gap-1.5 px-4 text-sm"
         >
           <X size={14} />
           취소
@@ -118,6 +176,7 @@ export default function Archive({ onBack }) {
   const [detailFile, setDetailFile] = useState(null)
   const [mode, setMode] = useState('list')
   const [searchQuery, setSearchQuery] = useState('')
+  const [activeCategory, setActiveCategory] = useState('ALL')
 
   const isAdmin = user?.role === 'ADMIN'
 
@@ -140,14 +199,31 @@ export default function Archive({ onBack }) {
   }, [])
 
   const filteredFiles = useMemo(() => {
-    if (!searchQuery.trim()) return files
+    const byCategory = activeCategory === 'ALL'
+      ? files
+      : files.filter((f) => (f.category || 'GENERAL') === activeCategory)
+    if (!searchQuery.trim()) return byCategory
     const q = searchQuery.toLowerCase()
-    return files.filter((f) =>
+    return byCategory.filter((f) =>
       (f.title || f.originalName || '').toLowerCase().includes(q) ||
       (f.description || '').toLowerCase().includes(q) ||
-      (f.uploaderName || f.uploadedBy || '').toLowerCase().includes(q)
+      (f.uploaderName || f.uploadedBy || '').toLowerCase().includes(q) ||
+      categoryLabel(f.category || 'GENERAL').toLowerCase().includes(q)
     )
-  }, [files, searchQuery])
+  }, [activeCategory, files, searchQuery])
+
+  const categoryCounts = useMemo(() => {
+    const counts = {
+      ALL: files.length,
+      GENERAL: 0,
+      ACADEMIC_JOURNAL: 0,
+    }
+    files.forEach((file) => {
+      const category = file.category || 'GENERAL'
+      counts[category] = (counts[category] || 0) + 1
+    })
+    return counts
+  }, [files])
 
   const handleDelete = async (id) => {
     if (!window.confirm('자료를 삭제하시겠습니까?')) return
@@ -183,28 +259,29 @@ export default function Archive({ onBack }) {
   }
 
   return (
-    <div className="w-full space-y-5">
+    <div className="w-full space-y-4 text-[var(--app-text)]">
       {mode === 'list' && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
             onClick={onBack}
-            className="rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-white"
+            className="apple-detail-home-button"
           >
+            <ArrowLeft size={14} />
             메인으로 돌아가기
           </button>
         </div>
       )}
 
-      <section className="overflow-hidden rounded-lg border border-black/10 bg-white shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
-        <div className="border-b border-black/10 bg-linear-to-br from-white via-[#f5f5f7] to-[#e8f8ff] px-5 py-5 sm:px-7">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-[#0066cc]">Archive</p>
-              <h1 className="mt-3 text-3xl font-semibold tracking-normal sm:text-4xl">
+      <section className="apple-board-shell">
+        <div className="apple-board-hero px-5 py-6 sm:px-8 sm:py-8">
+          <div className="flex flex-wrap items-end justify-between gap-5">
+            <div className="min-w-0">
+              <p className="apple-eyebrow">Archive</p>
+              <h1 className="mt-2 text-3xl font-bold leading-tight tracking-normal sm:text-4xl">
                 {mode === 'write' ? '자료 등록' : mode === 'detail' ? '자료 상세' : '자료실'}
               </h1>
-              <p className="mt-3 max-w-2xl leading-7 text-[#6e6e73]">
+              <p className="apple-copy mt-3 max-w-2xl">
                 {mode === 'list' ? '자료를 올리거나 목록에서 선택해 다운로드합니다.' : ''}
               </p>
             </div>
@@ -212,15 +289,16 @@ export default function Archive({ onBack }) {
               <button
                 type="button"
                 onClick={() => setMode('write')}
-                className="rounded-full bg-[#0071e3] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#0077ed]"
+                className="apple-action-primary inline-flex min-h-10 items-center justify-center gap-2 px-5 text-sm"
               >
+                <FileUp size={15} />
                 자료 올리기
               </button>
             ) : (
               <button
                 type="button"
                 onClick={backToList}
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-semibold text-[#1d1d1f] transition hover:bg-white"
+                className="apple-action-secondary inline-flex min-h-10 items-center justify-center gap-2 px-4 text-sm"
               >
                 <ArrowLeft size={15} />
                 목록
@@ -230,40 +308,48 @@ export default function Archive({ onBack }) {
         </div>
 
         {mode === 'write' && (
-          <div className="p-5 sm:p-7">
+          <div className="bg-[var(--app-surface-soft)] p-5 sm:p-7">
             <WriteForm onCancel={backToList} onSave={handleSave} />
           </div>
         )}
 
         {mode === 'list' && (
           <>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/10 bg-[#f5f5f7] px-5 py-3 sm:px-7">
-              <div className="relative flex items-center">
-                <Search size={14} className="absolute left-3 text-[#86868b] pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="제목, 설명, 작성자 검색"
-                  className="w-56 rounded-full border border-black/10 bg-white py-2 pl-8 pr-3 text-sm text-[#1d1d1f] placeholder:text-[#86868b] outline-none focus:ring-2 focus:ring-[#0071e3]/24"
-                />
+            <div className="apple-control-strip flex flex-col gap-3 px-5 py-4 sm:px-7 lg:flex-row lg:items-center lg:justify-between">
+              <CategorySegment
+                value={activeCategory}
+                onChange={setActiveCategory}
+                items={ARCHIVE_CATEGORIES}
+                counts={categoryCounts}
+              />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="relative flex items-center">
+                  <Search size={14} className="pointer-events-none absolute left-3 text-[var(--app-subtle)]" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="제목, 설명, 작성자 검색"
+                    className="h-10 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-8 pr-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none transition focus:ring-2 focus:ring-[#0071e3]/24 sm:w-64"
+                  />
+                </div>
+                <div className="text-xs font-bold text-[var(--app-subtle)]">{filteredFiles.length}개</div>
               </div>
-              <div className="text-xs font-semibold text-[#86868b]">{filteredFiles.length}개</div>
             </div>
 
             {notice && (
-              <div className="mx-5 mt-5 rounded-lg border border-[#0071e3]/20 bg-[#e8f3ff] px-4 py-3 text-sm font-semibold text-[#0066cc] sm:mx-7">
+              <div className="mx-5 mt-5 rounded-lg border border-[#0071e3]/20 bg-[#e8f3ff] px-4 py-3 text-sm font-bold text-[#0066cc] sm:mx-7">
                 {notice}
               </div>
             )}
 
             {error && (
-              <div className="mx-5 mt-5 flex flex-col gap-3 rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-7 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mx-5 mt-5 flex flex-col gap-3 rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 sm:mx-7 sm:flex-row sm:items-center sm:justify-between">
                 <span>{error}</span>
                 <button
                   type="button"
                   onClick={() => loadFiles()}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-3 py-2 font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]"
+                  className="apple-action-secondary inline-flex min-h-10 items-center justify-center gap-2 px-3 text-sm"
                 >
                   <RefreshCw size={15} />
                   다시 시도
@@ -271,27 +357,28 @@ export default function Archive({ onBack }) {
               </div>
             )}
 
-            <div className="m-5 overflow-hidden rounded-lg border border-black/10 bg-white sm:m-7">
+            <div className="m-5 overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:m-7">
               {loading ? (
-                <div className="px-5 py-16 text-center text-[#6e6e73]">자료를 불러오는 중...</div>
+                <div className="px-5 py-16 text-center text-sm font-medium text-[var(--app-muted)]">자료를 불러오는 중...</div>
               ) : filteredFiles.length === 0 ? (
-                <div className="px-5 py-16 text-center text-[#6e6e73]">
+                <div className="px-5 py-16 text-center text-sm font-medium text-[var(--app-muted)]">
                   {searchQuery ? '검색 결과가 없습니다.' : '등록된 자료가 없습니다.'}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[680px] text-left text-sm">
-                    <thead className="border-b border-black/10 bg-[#f5f5f7] text-xs uppercase tracking-[0.16em] text-[#86868b]">
+                  <table className="apple-table w-full min-w-[760px] text-left text-sm">
+                    <thead className="border-b border-[var(--app-hairline)]">
                       <tr>
-                        <th className="w-16 px-4 py-3 font-semibold">번호</th>
-                        <th className="px-4 py-3 font-semibold">제목</th>
-                        <th className="w-28 px-4 py-3 font-semibold">크기</th>
-                        <th className="w-28 px-4 py-3 font-semibold">작성자</th>
-                        <th className="w-36 px-4 py-3 font-semibold">날짜</th>
-                        <th className="w-28 px-4 py-3 text-right font-semibold">동작</th>
+                        <th className="w-16 px-4 py-3">번호</th>
+                        <th className="w-28 px-4 py-3">카테고리</th>
+                        <th className="px-4 py-3">제목</th>
+                        <th className="w-28 px-4 py-3">크기</th>
+                        <th className="w-28 px-4 py-3">작성자</th>
+                        <th className="w-36 px-4 py-3">날짜</th>
+                        <th className="w-28 px-4 py-3 text-right">동작</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-black/10">
+                    <tbody className="divide-y divide-[var(--app-hairline)]">
                       {filteredFiles.map((file) => {
                         const open = () => openFile(file)
                         return (
@@ -301,15 +388,20 @@ export default function Archive({ onBack }) {
                             role="button"
                             onClick={open}
                             onKeyDown={(event) => openRowWithKeyboard(event, open)}
-                            className="cursor-pointer text-[#6e6e73] transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none"
+                            className="cursor-pointer text-[var(--app-muted)] focus:outline-none"
                           >
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-[#86868b]">{file.id}</td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-[var(--app-subtle)]">{file.id}</td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
-                              <span className="block max-w-[340px] truncate font-semibold text-[#1d1d1f]" title={file.title || file.originalName}>
+                              <span className="inline-flex rounded-full bg-[var(--app-accent-soft)] px-2.5 py-1 text-xs font-bold text-[var(--app-accent-text)]">
+                                {categoryLabel(file.category || 'GENERAL')}
+                              </span>
+                            </td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
+                              <span className="block max-w-[340px] truncate font-bold text-[var(--app-text)]" title={file.title || file.originalName}>
                                 {file.title || file.originalName}
                               </span>
                               {file.description && (
-                                <span className="mt-0.5 block max-w-[340px] truncate text-xs text-[#86868b]">
+                                <span className="mt-0.5 block max-w-[340px] truncate text-xs text-[var(--app-subtle)]">
                                   {file.description}
                                 </span>
                               )}
@@ -322,7 +414,7 @@ export default function Archive({ onBack }) {
                                 <a
                                   href={downloadUrl(file.id)}
                                   onClick={(event) => event.stopPropagation()}
-                                  className="inline-flex items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-3 py-2 font-semibold text-[#0066cc] transition hover:bg-[#f5f5f7]"
+                                  className="inline-flex min-h-9 items-center justify-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 font-bold text-[var(--app-accent-text)] transition hover:bg-[var(--app-surface-elevated)]"
                                 >
                                   <Download size={15} />
                                   다운로드
@@ -341,33 +433,34 @@ export default function Archive({ onBack }) {
         )}
 
         {mode === 'detail' && detailFile && (
-          <div className="m-5 rounded-lg border border-black/10 bg-[#f5f5f7] p-5 text-[#6e6e73] sm:m-7">
-            <div className="border-b border-black/10 pb-4">
-              <p className="text-xs font-semibold text-[#0066cc]">Archive</p>
-              <h2 className="mt-3 break-words text-2xl font-bold text-[#1d1d1f]">{detailFile.title || detailFile.originalName}</h2>
-              <p className="mt-2 text-xs text-[#86868b]">
-                {detailFile.uploaderName || detailFile.uploadedBy || '-'} · {formatDate(detailFile.uploadedAt)}
-              </p>
+          <div className="m-5 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] p-5 text-[var(--app-muted)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:m-7 sm:p-7">
+            <div className="border-b border-[var(--app-hairline)] pb-5">
+              <p className="apple-eyebrow">Archive</p>
+              <h2 className="mt-3 break-words text-2xl font-bold text-[var(--app-text)]">{detailFile.title || detailFile.originalName}</h2>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[var(--app-subtle)]">
+                <span className="rounded-full bg-[var(--app-accent-soft)] px-2.5 py-1 font-bold text-[var(--app-accent-text)]">{categoryLabel(detailFile.category || 'GENERAL')}</span>
+                <span>{detailFile.uploaderName || detailFile.uploadedBy || '-'} · {formatDate(detailFile.uploadedAt)}</span>
+              </div>
             </div>
             {detailFile.description && (
-              <div className="border-b border-black/10 py-5">
-                <p className="whitespace-pre-wrap text-sm leading-7 text-[#6e6e73]">{detailFile.description}</p>
+              <div className="border-b border-[var(--app-hairline)] py-5">
+                <p className="whitespace-pre-wrap text-sm leading-7 text-[var(--app-muted)]">{detailFile.description}</p>
               </div>
             )}
-            <dl className="grid gap-4 border-b border-black/10 py-5 text-sm sm:grid-cols-2">
+            <dl className="grid gap-4 border-b border-[var(--app-hairline)] py-5 text-sm sm:grid-cols-2">
               <div>
-                <dt className="text-[#86868b]">파일명</dt>
-                <dd className="mt-1 break-all font-semibold text-[#1d1d1f]">{detailFile.originalName}</dd>
+                <dt className="font-bold text-[var(--app-subtle)]">파일명</dt>
+                <dd className="mt-1 break-all font-bold text-[var(--app-text)]">{detailFile.originalName}</dd>
               </div>
               <div>
-                <dt className="text-[#86868b]">크기</dt>
-                <dd className="mt-1 font-semibold text-[#1d1d1f]">{formatSize(detailFile.fileSize)}</dd>
+                <dt className="font-bold text-[var(--app-subtle)]">크기</dt>
+                <dd className="mt-1 font-bold text-[var(--app-text)]">{formatSize(detailFile.fileSize)}</dd>
               </div>
             </dl>
             <div className="mt-5 flex flex-wrap gap-2">
               <a
                 href={downloadUrl(detailFile.id)}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0071e3] px-4 py-2 font-semibold text-white transition hover:bg-[#0077ed]"
+                className="apple-action-primary inline-flex min-h-10 items-center justify-center gap-2 px-4 text-sm"
               >
                 <Download size={15} />
                 다운로드
@@ -376,7 +469,7 @@ export default function Archive({ onBack }) {
                 <button
                   type="button"
                   onClick={() => handleDelete(detailFile.id)}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 font-semibold text-red-700 transition hover:bg-red-100"
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-700 transition hover:bg-red-100"
                 >
                   <Trash2 size={15} />
                   삭제
