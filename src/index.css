@@ -870,6 +870,77 @@ select {
 	background-color: var(--app-accent-soft) !important;
 }
 
+.notification-row {
+	position: relative;
+	transition: background-color 160ms ease;
+}
+
+.notification-row .notification-dot {
+	display: inline-block;
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 9999px;
+	flex-shrink: 0;
+}
+
+.notification-row-unread {
+	background-color: color-mix(in srgb, var(--app-accent) 9%, var(--app-surface)) !important;
+	color: var(--app-text);
+	box-shadow: inset 3px 0 0 var(--app-accent);
+}
+
+.notification-row-unread .notification-dot {
+	background-color: var(--app-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 22%, transparent);
+}
+
+.notification-row-unread:hover {
+	background-color: color-mix(in srgb, var(--app-accent) 16%, var(--app-surface)) !important;
+}
+
+.notification-row-read {
+	background-color: var(--app-surface) !important;
+	color: var(--app-muted);
+}
+
+.notification-row-read .notification-dot {
+	background-color: color-mix(in srgb, var(--app-muted) 35%, transparent);
+}
+
+.notification-row-read:hover {
+	background-color: var(--app-surface-soft) !important;
+}
+
+.concept-post-card,
+.concept-post-row {
+	position: relative;
+	color: var(--app-text) !important;
+	background-color: color-mix(in srgb, #ffb340 14%, var(--app-surface)) !important;
+	background-image: linear-gradient(
+		90deg,
+		color-mix(in srgb, #ffb340 20%, var(--app-surface)) 0,
+		color-mix(in srgb, #ffb340 8%, var(--app-surface)) 100%
+	) !important;
+	box-shadow: inset 3px 0 0 #ff9f0a;
+}
+
+.concept-post-card h3,
+.concept-post-card .text-\[\#1d1d1f\],
+.concept-post-row .text-\[\#1d1d1f\] {
+	color: var(--app-text) !important;
+}
+
+:root[data-theme-mode='dark'] .concept-post-card,
+:root[data-theme-mode='dark'] .concept-post-row {
+	background-color: color-mix(in srgb, #ff9f0a 18%, var(--app-surface)) !important;
+	background-image: linear-gradient(
+		90deg,
+		color-mix(in srgb, #ff9f0a 26%, var(--app-surface)) 0,
+		color-mix(in srgb, #ff9f0a 10%, var(--app-surface)) 100%
+	) !important;
+	box-shadow: inset 3px 0 0 #ffb340;
+}
+
 .theme-home .bg-\[\#f0c36d\],
 .apple-route .bg-\[\#f0c36d\] {
 	background-color: #d8a14d !important;

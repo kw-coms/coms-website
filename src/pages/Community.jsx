@@ -2198,7 +2198,7 @@ export default function Community({ onBack }) {
         role="button"
         onClick={open}
         onKeyDown={(event) => openRowWithKeyboard(event, open)}
-        className={`apple-soft-panel cursor-pointer p-4 text-left text-[#6e6e73] transition hover:-translate-y-0.5 focus:bg-[#f5f5f7] focus:outline-none ${concept ? 'concept-post-card border-[#d99a36] bg-[#ffe2a2]' : ''}`}
+        className={`apple-soft-panel cursor-pointer p-4 text-left text-[#6e6e73] transition hover:-translate-y-0.5 focus:bg-[#f5f5f7] focus:outline-none ${concept ? 'concept-post-card' : ''}`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -2499,7 +2499,7 @@ export default function Community({ onBack }) {
                       role="button"
                       onClick={open}
                       onKeyDown={(event) => openRowWithKeyboard(event, open)}
-                      className={`cursor-pointer text-[#6e6e73] transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none ${concept ? 'concept-post-row bg-[#ffe2a2]' : ''}`}
+                      className={`cursor-pointer text-[#6e6e73] transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none ${concept ? 'concept-post-row' : ''}`}
                     >
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-[#86868b]">{post.id}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-[#0066cc]">{categoryLabel(post.category || 'GENERAL')}</td>

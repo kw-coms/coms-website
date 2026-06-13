@@ -358,8 +358,62 @@ function getStoredFontId() {
   if (typeof window === 'undefined') return null
   const raw = window.localStorage.getItem(FONT_SELECTION_KEY)
   if (!raw) return null
+  if (raw.startsWith('b:')) return raw
   const n = Number(raw)
   return Number.isFinite(n) && n > 0 ? n : null
+}
+
+const BUILT_IN_FONTS = [
+  {
+    id: 'b:pretendard',
+    name: 'Pretendard',
+    family: 'Pretendard Variable',
+    stylesheet: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css',
+  },
+  {
+    id: 'b:noto-sans-kr',
+    name: 'Noto Sans KR',
+    family: 'Noto Sans KR',
+    stylesheet: 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap',
+  },
+  {
+    id: 'b:ibm-plex-sans-kr',
+    name: 'IBM Plex Sans KR',
+    family: 'IBM Plex Sans KR',
+    stylesheet: 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap',
+  },
+  {
+    id: 'b:nanum-gothic',
+    name: 'Nanum Gothic',
+    family: 'Nanum Gothic',
+    stylesheet: 'https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap',
+  },
+  {
+    id: 'b:gowun-dodum',
+    name: 'Gowun Dodum',
+    family: 'Gowun Dodum',
+    stylesheet: 'https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap',
+  },
+  {
+    id: 'b:nanum-myeongjo',
+    name: 'Nanum Myeongjo',
+    family: 'Nanum Myeongjo',
+    stylesheet: 'https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&display=swap',
+  },
+]
+
+function injectBuiltinFontStylesheets() {
+  if (typeof document === 'undefined') return
+  BUILT_IN_FONTS.forEach((font) => {
+    const linkId = `builtin-font-${font.id}`
+    if (document.getElementById(linkId)) return
+    const link = document.createElement('link')
+    link.id = linkId
+    link.rel = 'stylesheet'
+    link.href = font.stylesheet
+    link.crossOrigin = 'anonymous'
+    document.head.appendChild(link)
+  })
 }
 
 const accentSwatches = [
@@ -945,10 +999,15 @@ function NotificationButton({ alignLeft = false, padded = false }) {
                 key={item.id}
                 type="button"
                 onClick={() => openNotification(item)}
-                className={`block w-full border-b border-black/8 px-4 py-3 text-left text-sm last:border-b-0 hover:bg-black/5 ${item.read ? 'bg-white' : 'bg-cyan-50'}`}
+                className={`notification-row block w-full border-b border-black/8 px-4 py-3 text-left text-sm last:border-b-0 ${item.read ? 'notification-row-read' : 'notification-row-unread'}`}
               >
-                <span className="block font-semibold">{item.message}</span>
-                <span className="mt-1 block text-[11px] text-[var(--theme-body-muted)]">{new Date(item.createdAt).toLocaleString('ko-KR')}</span>
+                <span className="flex items-start gap-2">
+                  <span className="notification-dot mt-1.5" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className={`block ${item.read ? 'font-medium' : 'font-bold'}`}>{item.message}</span>
+                    <span className="mt-1 block text-[11px] text-[var(--theme-body-muted)]">{new Date(item.createdAt).toLocaleString('ko-KR')}</span>
+                  </span>
+                </span>
               </button>
             ))}
           </div>
@@ -1152,13 +1211,18 @@ function App() {
     return undefined
   }, [activeFonts])
 
-  const effectiveFontId = user?.selectedFontId ?? guestFontId
-  const selectedFont = activeFonts.find((font) => font.id === Number(effectiveFontId))
+  useEffect(() => {
+    injectBuiltinFontStylesheets()
+  }, [])
+
+  const combinedFonts = [...BUILT_IN_FONTS, ...activeFonts]
+  const effectiveFontId = guestFontId ?? (user?.selectedFontId ?? null)
+  const selectedFont = combinedFonts.find((font) => String(font.id) === String(effectiveFontId))
 
   useEffect(() => {
     const root = document.documentElement
     if (selectedFont) {
-      const family = sanitizeFontFamily(selectedFont.name)
+      const family = sanitizeFontFamily(selectedFont.family || selectedFont.name)
       root.style.setProperty('--apple-font-family', `"${family}", ${DEFAULT_FONT_FAMILY}`)
     } else {
       root.style.removeProperty('--apple-font-family')
@@ -1166,8 +1230,18 @@ function App() {
   }, [selectedFont])
 
   const handleGuestFontChange = (value) => {
-    const id = value ? Number(value) : null
-    if (id && Number.isFinite(id)) {
+    if (!value) {
+      setGuestFontId(null)
+      window.localStorage.removeItem(FONT_SELECTION_KEY)
+      return
+    }
+    if (String(value).startsWith('b:')) {
+      setGuestFontId(value)
+      window.localStorage.setItem(FONT_SELECTION_KEY, value)
+      return
+    }
+    const id = Number(value)
+    if (Number.isFinite(id) && id > 0) {
       setGuestFontId(id)
       window.localStorage.setItem(FONT_SELECTION_KEY, String(id))
     } else {
@@ -1203,10 +1277,10 @@ function App() {
         setAccentColor={setAccentColor}
         themeMode={themeMode}
         setThemeMode={setThemeMode}
-        activeFonts={activeFonts}
-        selectedFontId={user ? null : guestFontId}
+        activeFonts={combinedFonts}
+        selectedFontId={effectiveFontId}
         onFontChange={handleGuestFontChange}
-        fontSelectionLocked={Boolean(user)}
+        fontSelectionLocked={false}
       />
     </Suspense>
   )
