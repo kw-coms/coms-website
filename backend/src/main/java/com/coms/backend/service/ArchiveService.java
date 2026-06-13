@@ -49,6 +49,11 @@ public class ArchiveService {
     }
 
     public ArchiveFileResponse upload(String title, String description, MultipartFile file, String uploaderStudentId) throws IOException {
+        return upload(title, description, null, file, uploaderStudentId);
+    }
+
+    public ArchiveFileResponse upload(String title, String description, String category, MultipartFile file, String uploaderStudentId) throws IOException {
+        ArchiveFile.Category parsedCategory = parseCategory(category);
         validateUpload(file);
         String stored = storage.store(file);
         try {
@@ -57,6 +62,7 @@ public class ArchiveService {
             ArchiveFile entity = new ArchiveFile();
             entity.setTitle(title != null && !title.isBlank() ? title.trim() : cleanOriginalFilename(file));
             entity.setDescription(description != null && !description.isBlank() ? description.trim() : null);
+            entity.setCategory(parsedCategory);
             entity.setOriginalName(cleanOriginalFilename(file));
             entity.setStoredName(stored);
             entity.setMimeType(file.getContentType() == null ? "application/octet-stream" : file.getContentType());
@@ -97,8 +103,20 @@ public class ArchiveService {
                 file.getFileSize(),
                 file.getUploadedBy(),
                 file.getUploaderName(),
+                file.getCategory().name(),
                 file.getUploadedAt()
         );
+    }
+
+    private ArchiveFile.Category parseCategory(String value) {
+        if (value == null || value.isBlank()) {
+            return ArchiveFile.Category.GENERAL;
+        }
+        try {
+            return ArchiveFile.Category.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid archive category.");
+        }
     }
 
     private String cleanOriginalFilename(MultipartFile file) {
