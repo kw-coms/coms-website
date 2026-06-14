@@ -1,7 +1,7 @@
-import { request } from './apiClient.js'
+import { request, requestOptional } from './apiClient.js'
 
 export async function listFonts() {
-  return request('/api/fonts')
+  return requestOptional('/api/fonts', {}, [])
 }
 
 export async function listAdminFonts() {
