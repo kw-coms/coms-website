@@ -19,6 +19,7 @@ export async function mockAdminApis(page) {
   await page.route('**/api/auth/refresh', (route) => route.fulfill({ status: 204 }))
   await page.route('**/api/fonts', (route) => route.fulfill({ status: 200, json: [] }))
   await page.route('**/api/admin/members', (route) => route.fulfill({ status: 200, json: [] }))
+  await page.route('**/api/admin/recruit-applications', (route) => route.fulfill({ status: 200, json: [] }))
   await page.route('**/api/notifications', (route) => route.fulfill({ status: 200, json: [] }))
   await page.route('**/api/notifications/summary', (route) => route.fulfill({ status: 200, json: { unreadCount: 0 } }))
 }

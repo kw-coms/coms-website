@@ -12,6 +12,17 @@ export async function clearAdminCache() {
   return request('/api/admin/cache/clear', { method: 'POST' })
 }
 
+export async function listRecruitApplications() {
+  return request('/api/admin/recruit-applications')
+}
+
+export async function updateRecruitApplicationStatus(id, payload) {
+  return request(`/api/admin/recruit-applications/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
 export async function updateMemberRole(id, role) {
   return request(`/api/admin/members/${id}/role`, {
     method: 'PATCH',
