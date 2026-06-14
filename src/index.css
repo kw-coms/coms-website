@@ -282,12 +282,19 @@ select {
 }
 
 .apple-detail-title {
-	max-width: min(100%, 12.2em);
-	font-size: clamp(4rem, 5vw, 6rem);
+	--apple-detail-title-base: clamp(4rem, 5vw, 6rem);
+	--apple-title-fit: 1;
+	max-width: min(100%, 48rem);
+	font-size: calc(var(--apple-detail-title-base) * var(--apple-title-fit));
 	line-height: 1.03;
 	text-wrap: balance;
 	word-break: keep-all;
 	overflow-wrap: normal;
+}
+
+.apple-detail-title-phrase {
+	display: inline-block;
+	white-space: nowrap;
 }
 
 .apple-copy {
@@ -1252,7 +1259,7 @@ select {
 	.apple-detail-hero .apple-display {
 		width: 100%;
 		max-width: 360px !important;
-		font-size: clamp(2.25rem, 8.6vw, 2.78rem) !important;
+		font-size: calc(clamp(2.25rem, 8.6vw, 2.78rem) * var(--apple-title-fit, 1)) !important;
 		line-height: 1.14;
 		overflow-wrap: normal;
 		white-space: normal !important;
