@@ -281,6 +281,15 @@ select {
 	line-height: 0.98;
 }
 
+.apple-detail-title {
+	max-width: min(100%, 12.2em);
+	font-size: clamp(4rem, 5vw, 6rem);
+	line-height: 1.03;
+	text-wrap: balance;
+	word-break: keep-all;
+	overflow-wrap: normal;
+}
+
 .apple-copy {
 	color: var(--app-muted);
 	font-weight: 500;
@@ -1243,9 +1252,9 @@ select {
 	.apple-detail-hero .apple-display {
 		width: 100%;
 		max-width: 360px !important;
-		font-size: clamp(1.68rem, 7.1vw, 2.08rem) !important;
+		font-size: clamp(2.25rem, 8.6vw, 2.78rem) !important;
 		line-height: 1.14;
-		overflow-wrap: anywhere;
+		overflow-wrap: normal;
 		white-space: normal !important;
 		word-break: keep-all;
 		text-wrap: balance;
