@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockOptionalApis } from './visualSupport.js'
+import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
 
 const routeExpectations = [
   ['/', /KW COM's/],
@@ -76,4 +76,36 @@ test('appearance panel explains guest font persistence scope', async ({ page }) 
 
   await expect(page.locator('[aria-label="폰트 설정"]')).toBeVisible()
   await expect(page.getByText('게스트 임시 적용')).toBeVisible()
+})
+
+test('signup follows the recruit application form structure', async ({ page }) => {
+  await page.goto('/signup')
+
+  await expect(page.getByRole('heading', { name: "COM's 회원가입" })).toBeVisible()
+  await expect(page.getByText('지원하기와 같은 흐름으로 가입 정보를 작성합니다.')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '가입 정보 양식' })).toBeVisible()
+  await expect(page.getByText('Process')).toBeVisible()
+  await expect(page.getByText('1. 가입 정보 작성')).toBeVisible()
+  await expect(page.getByText('2. 명부 확인 및 계정 생성')).toBeVisible()
+  await expect(page.getByText('3. 이메일 인증 후 로그인')).toBeVisible()
+
+  for (const interest of ['웹', '앱', '보안', '알고리즘', '아두이노', '디자인', '기타']) {
+    await expect(page.getByRole('button', { name: interest })).toBeVisible()
+  }
+})
+
+test('admin exposes a pre-deploy screen check panel', async ({ page }) => {
+  await mockAdminApis(page)
+
+  await page.goto('/admin')
+  await page.getByRole('button', { name: '화면 점검' }).click()
+
+  await expect(page.getByRole('heading', { name: '배포 전 화면 점검' })).toBeVisible()
+  await expect(page.getByText('Smoke 대상 경로')).toBeVisible()
+  const routePanel = page.getByTestId('screen-check-routes')
+  for (const path of ['/', '/activities', '/projects', '/notices', '/login', '/signup', '/recruit']) {
+    await expect(routePanel.locator(`a[href="${path}"]`)).toBeVisible()
+  }
+  await expect(page.getByText('/api/auth/me')).toBeVisible()
+  await expect(page.getByText('/api/fonts')).toBeVisible()
 })
