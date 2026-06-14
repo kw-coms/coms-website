@@ -6,9 +6,11 @@ import com.coms.backend.dto.NotificationSummaryResponse;
 import com.coms.backend.service.NotificationService;
 import com.coms.backend.service.NotificationService.ExternalInviteBatchResult;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -45,7 +47,11 @@ public class NotificationController {
 
     @PostMapping("/external-invite")
     public ResponseEntity<Map<String, Object>> sendExternalInvite(Authentication authentication,
+                                                                  @RequestHeader(value = "X-Requested-With", required = false) String requestedWith,
                                                                   @Valid @RequestBody MemberExternalInviteRequest request) {
+        if (requestedWith == null || !"XMLHttpRequest".equalsIgnoreCase(requestedWith)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "X-Requested-With required");
+        }
         ExternalInviteBatchResult result = notificationService.notifyExternalInviteFromMember(authentication.getName(), request);
         return ResponseEntity.ok(Map.of(
                 "accepted", result.accepted(),
