@@ -4,6 +4,7 @@ import com.coms.backend.dto.AddEligibleMemberRequest;
 import com.coms.backend.dto.AuditLogResponse;
 import com.coms.backend.dto.BanStudentRequest;
 import com.coms.backend.dto.BannedStudentResponse;
+import com.coms.backend.dto.CacheClearResponse;
 import com.coms.backend.dto.ResetPasswordRequest;
 import com.coms.backend.dto.EligibleMemberImportResponse;
 import com.coms.backend.dto.EligibleMemberResponse;
@@ -14,6 +15,7 @@ import com.coms.backend.dto.UpdateEligibleMemberRequest;
 import com.coms.backend.service.AdminService;
 import com.coms.backend.service.AuditLogService;
 import com.coms.backend.service.BannedStudentService;
+import com.coms.backend.service.CacheMaintenanceService;
 import com.coms.backend.service.EligibleMemberService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -33,13 +35,16 @@ public class AdminController {
     private final EligibleMemberService eligibleMemberService;
     private final BannedStudentService bannedStudentService;
     private final AuditLogService auditLogService;
+    private final CacheMaintenanceService cacheMaintenanceService;
 
     public AdminController(AdminService adminService, EligibleMemberService eligibleMemberService,
-                           BannedStudentService bannedStudentService, AuditLogService auditLogService) {
+                           BannedStudentService bannedStudentService, AuditLogService auditLogService,
+                           CacheMaintenanceService cacheMaintenanceService) {
         this.adminService = adminService;
         this.eligibleMemberService = eligibleMemberService;
         this.bannedStudentService = bannedStudentService;
         this.auditLogService = auditLogService;
+        this.cacheMaintenanceService = cacheMaintenanceService;
     }
 
     @GetMapping("/members")
@@ -142,7 +147,15 @@ public class AdminController {
     }
 
     @GetMapping("/audit-logs")
-    public ResponseEntity<List<AuditLogResponse>> auditLogs() {
-        return ResponseEntity.ok(auditLogService.recent());
+    public ResponseEntity<List<AuditLogResponse>> auditLogs(@RequestParam(defaultValue = "1000") int limit) {
+        return ResponseEntity.ok(auditLogService.recent(limit));
+    }
+
+    @PostMapping("/cache/clear")
+    public ResponseEntity<CacheClearResponse> clearCache(Authentication authentication) {
+        CacheClearResponse response = cacheMaintenanceService.clearAll();
+        auditLogService.record(authentication.getName(), "ADMIN_CACHE_CLEAR", "CACHE", null,
+                "clearedCount=" + response.clearedCount() + ", clearedCaches=" + String.join(",", response.clearedCaches()), null);
+        return ResponseEntity.ok(response);
     }
 }
