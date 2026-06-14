@@ -28,4 +28,13 @@ class SecurityConfigSourceTest {
         assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/files\").authenticated()");
         assertThat(source).contains("auth.requestMatchers(HttpMethod.DELETE, \"/api/files/**\").hasRole(\"ADMIN\")");
     }
+
+    @Test
+    void communitySharePreviewRoutesArePublicButCommunityApiStaysPrivate() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/coms/backend/config/SecurityConfig.java"));
+
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.GET, \"/api/community/posts/*/share\", \"/api/community/posts/*/share-data\", \"/api/community/posts/*/share-image\").permitAll()");
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.HEAD, \"/api/community/posts/*/share\", \"/api/community/posts/*/share-data\", \"/api/community/posts/*/share-image\").permitAll()");
+        assertThat(source).contains("auth.requestMatchers(\"/api/community/**\").authenticated()");
+    }
 }

@@ -375,6 +375,39 @@ public class CommunityService {
     }
 
     @Transactional(readOnly = true)
+    public CommunityPostSharePreview sharePreview(Long id) {
+        CommunityPost post = communityPostRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        return new CommunityPostSharePreview(
+                post.getId(),
+                post.getTitle(),
+                shareDescription(post.getContent()),
+                hasShareImage(post)
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public CommunityPostShareImage loadShareImage(Long id) {
+        CommunityPost post = communityPostRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (post.getImageStoredName() != null) {
+            return new CommunityPostShareImage(
+                    storageService.load(post.getImageStoredName()),
+                    post.getImageOriginalName(),
+                    post.getImageMimeType()
+            );
+        }
+        CommunityPostImage image = imageRepository.findByPostIdOrderByPositionAsc(id).stream()
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        return new CommunityPostShareImage(
+                storageService.load(image.getStoredName()),
+                image.getOriginalName(),
+                image.getMimeType()
+        );
+    }
+
+    @Transactional(readOnly = true)
     public void requireReadablePost(String studentId, Long postId) {
         Member member = findMember(studentId);
         CommunityPost post = communityPostRepository.findById(postId)
@@ -405,6 +438,11 @@ public class CommunityService {
 
     private boolean isAnonymousPost(CommunityPost post) {
         return post.getCategory() == CommunityPost.Category.ANONYMOUS;
+    }
+
+    private boolean hasShareImage(CommunityPost post) {
+        return post.getImageStoredName() != null
+                || !imageRepository.findByPostIdOrderByPositionAsc(post.getId()).isEmpty();
     }
 
     private boolean isGraduate(Member member) {
@@ -1029,6 +1067,41 @@ public class CommunityService {
         return content.substring(0, 160);
     }
 
+    private String shareDescription(String content) {
+        String plainText = plainTextContent(content).replaceAll("\\s+", " ").trim();
+        return preview(plainText);
+    }
+
+    private String plainTextContent(String content) {
+        if (content == null || content.isBlank()) {
+            return "";
+        }
+        try {
+            JsonNode root = JSON.readTree(content);
+            if (!root.isArray()) {
+                return stripHtml(content);
+            }
+            StringBuilder out = new StringBuilder();
+            for (JsonNode block : root) {
+                if (!block.isObject()) continue;
+                String type = block.path("type").asText();
+                String text = switch (type) {
+                    case "text" -> stripHtml(block.path("content").asText(""));
+                    case "poll" -> block.path("question").asText("");
+                    case "externalEmbed" -> block.path("title").asText("");
+                    default -> "";
+                };
+                if (!text.isBlank()) {
+                    if (!out.isEmpty()) out.append(' ');
+                    out.append(text.trim());
+                }
+            }
+            return out.isEmpty() ? stripHtml(content) : out.toString();
+        } catch (Exception ignored) {
+            return stripHtml(content);
+        }
+    }
+
     private String safeTitle(String title) {
         return title == null || title.isBlank() ? null : "title=" + preview(title);
     }
@@ -1283,4 +1356,8 @@ public class CommunityService {
             return upvotes - downvotes;
         }
     }
+
+    public record CommunityPostSharePreview(Long id, String title, String description, boolean hasImage) {}
+
+    public record CommunityPostShareImage(Resource resource, String originalName, String mimeType) {}
 }

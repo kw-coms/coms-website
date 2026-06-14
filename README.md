@@ -148,6 +148,7 @@ docker compose --env-file .env up -d --build
 | 공지사항 관리 | `POST`, `PUT`, `DELETE /api/notices/**` | 관리자 |
 | 자료실 | `/api/files/**` | 회원 |
 | 커뮤니티 | `/api/community/posts/**` | 회원 |
+| 커뮤니티 링크 미리보기 | `GET /api/community/posts/{id}/share`, `GET /api/community/posts/{id}/share-data`, `GET /api/community/posts/{id}/share-image` | 공개 |
 | 알림 | `/api/notifications/**` | 회원 |
 | 폰트 조회 | `GET /api/fonts/**` | 공개 |
 | 관리자 | `/api/admin/**` | 관리자 |
@@ -158,6 +159,7 @@ docker compose --env-file .env up -d --build
 | 변수 | 설명 |
 | --- | --- |
 | `VITE_API_BASE_URL` | 프론트엔드 API base URL |
+| `PUBLIC_BASE_URL` | 공유 미리보기용 공개 사이트 URL |
 | `SPRING_PROFILES_ACTIVE` | Spring profile |
 | `JWT_SECRET` | JWT 서명 secret |
 | `DB_HOST`, `DB_PORT`, `DB_NAME` | DB 접속 정보 |

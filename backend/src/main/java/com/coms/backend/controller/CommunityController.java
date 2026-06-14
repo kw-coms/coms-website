@@ -12,7 +12,9 @@ import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.service.CommunityService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -22,11 +24,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.util.HtmlUtils;
 
 import java.nio.charset.StandardCharsets;
 
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/community/posts")
@@ -34,9 +38,12 @@ public class CommunityController {
     private static final Set<String> TRUSTED_PROXIES = Set.of("127.0.0.1", "::1", "0:0:0:0:0:0:0:1");
 
     private final CommunityService communityService;
+    private final String publicBaseUrl;
 
-    public CommunityController(CommunityService communityService) {
+    public CommunityController(CommunityService communityService,
+                               @Value("${app.public-base-url:}") String publicBaseUrl) {
         this.communityService = communityService;
+        this.publicBaseUrl = publicBaseUrl == null ? "" : publicBaseUrl.trim();
     }
 
     @GetMapping
@@ -47,6 +54,50 @@ public class CommunityController {
     @GetMapping("/{id}")
     public ResponseEntity<CommunityPostResponse> get(Authentication authentication, @PathVariable Long id) {
         return ResponseEntity.ok(communityService.get(authentication.getName(), id));
+    }
+
+    @GetMapping(value = "/{id}/share", produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> sharePreview(@PathVariable Long id, HttpServletRequest request) {
+        CommunityService.CommunityPostSharePreview preview = communityService.sharePreview(id);
+        String postUrl = absoluteUrl(request, "/community/" + id);
+        String imageUrl = preview.hasImage()
+                ? absoluteUrl(request, "/api/community/posts/" + id + "/share-image")
+                : null;
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/html;charset=UTF-8"))
+                .cacheControl(CacheControl.noStore())
+                .body(sharePreviewHtml(preview, postUrl, imageUrl));
+    }
+
+    @GetMapping("/{id}/share-data")
+    public ResponseEntity<CommunityShareData> shareData(@PathVariable Long id, HttpServletRequest request) {
+        CommunityService.CommunityPostSharePreview preview = communityService.sharePreview(id);
+        String postUrl = absoluteUrl(request, "/community/" + id);
+        String imageUrl = preview.hasImage()
+                ? absoluteUrl(request, "/api/community/posts/" + id + "/share-image")
+                : null;
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(new CommunityShareData(
+                        preview.id(),
+                        preview.title(),
+                        shareDescription(preview),
+                        postUrl,
+                        imageUrl,
+                        preview.hasImage()
+                ));
+    }
+
+    @GetMapping("/{id}/share-image")
+    public ResponseEntity<Resource> shareImage(@PathVariable Long id) {
+        CommunityService.CommunityPostShareImage image = communityService.loadShareImage(id);
+        String filename = filenameOrFallback(image.originalName(), image.mimeType(), "community-preview");
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic())
+                .contentType(mediaType(image.mimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(filename, StandardCharsets.UTF_8).build().toString())
+                .body(image.resource());
     }
 
     @PostMapping
@@ -299,12 +350,108 @@ public class CommunityController {
     }
 
     private MediaType mediaType(String mimeType) {
+        if (mimeType == null || mimeType.isBlank()) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
         try {
             return MediaType.parseMediaType(mimeType);
         } catch (InvalidMediaTypeException e) {
             return MediaType.APPLICATION_OCTET_STREAM;
         }
     }
+
+    private String sharePreviewHtml(CommunityService.CommunityPostSharePreview preview,
+                                    String postUrl,
+                                    String imageUrl) {
+        String title = html(preview.title());
+        String description = html(shareDescription(preview));
+        String escapedPostUrl = html(postUrl);
+        StringBuilder html = new StringBuilder();
+        html.append("<!doctype html><html lang=\"ko\"><head>");
+        html.append("<meta charset=\"utf-8\">");
+        html.append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+        html.append("<meta name=\"robots\" content=\"noindex,nofollow\">");
+        html.append("<title>").append(title).append("</title>");
+        html.append("<link rel=\"canonical\" href=\"").append(escapedPostUrl).append("\">");
+        html.append("<meta property=\"og:type\" content=\"article\">");
+        html.append("<meta property=\"og:site_name\" content=\"COM's\">");
+        html.append("<meta property=\"og:title\" content=\"").append(title).append("\">");
+        html.append("<meta property=\"og:description\" content=\"").append(description).append("\">");
+        html.append("<meta property=\"og:url\" content=\"").append(escapedPostUrl).append("\">");
+        html.append("<meta name=\"twitter:title\" content=\"").append(title).append("\">");
+        html.append("<meta name=\"twitter:description\" content=\"").append(description).append("\">");
+        if (imageUrl != null) {
+            String escapedImageUrl = html(imageUrl);
+            html.append("<meta property=\"og:image\" content=\"").append(escapedImageUrl).append("\">");
+            html.append("<meta property=\"og:image:secure_url\" content=\"").append(escapedImageUrl).append("\">");
+            html.append("<meta name=\"twitter:card\" content=\"summary_large_image\">");
+            html.append("<meta name=\"twitter:image\" content=\"").append(escapedImageUrl).append("\">");
+        } else {
+            html.append("<meta name=\"twitter:card\" content=\"summary\">");
+        }
+        html.append("</head><body>");
+        html.append("<a href=\"").append(escapedPostUrl).append("\">").append(title).append("</a>");
+        html.append("</body></html>");
+        return html.toString();
+    }
+
+    private String shareDescription(CommunityService.CommunityPostSharePreview preview) {
+        return preview.description().isBlank()
+                ? "COM's 커뮤니티 게시글입니다."
+                : preview.description();
+    }
+
+    private String absoluteUrl(HttpServletRequest request, String path) {
+        String baseUrl = publicBaseUrl.isBlank() ? requestBaseUrl(request) : publicBaseUrl;
+        return trimTrailingSlash(baseUrl) + path;
+    }
+
+    private String requestBaseUrl(HttpServletRequest request) {
+        String forwardedProto = firstForwardedValue(request.getHeader("X-Forwarded-Proto"));
+        String forwardedHost = firstForwardedValue(request.getHeader("X-Forwarded-Host"));
+        String proto = forwardedProto == null || forwardedProto.isBlank()
+                ? (request.isSecure() ? "https" : request.getScheme())
+                : forwardedProto;
+        String host = forwardedHost == null || forwardedHost.isBlank() ? request.getHeader("Host") : forwardedHost;
+        if (host == null || host.isBlank()) {
+            host = request.getServerName();
+            int port = request.getServerPort();
+            if (port > 0 && !isDefaultPort(proto, port)) {
+                host += ":" + port;
+            }
+        }
+        return proto + "://" + host;
+    }
+
+    private String firstForwardedValue(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.split(",")[0].trim();
+    }
+
+    private boolean isDefaultPort(String scheme, int port) {
+        return ("http".equalsIgnoreCase(scheme) && port == 80)
+                || ("https".equalsIgnoreCase(scheme) && port == 443);
+    }
+
+    private String trimTrailingSlash(String value) {
+        if (value.endsWith("/")) {
+            return value.substring(0, value.length() - 1);
+        }
+        return value;
+    }
+
+    private String html(String value) {
+        return HtmlUtils.htmlEscape(value == null ? "" : value, StandardCharsets.UTF_8.name());
+    }
+
+    private record CommunityShareData(Long id,
+                                      String title,
+                                      String description,
+                                      String url,
+                                      String imageUrl,
+                                      boolean hasImage) {}
 
     private String filenameOrFallback(String originalName, String mimeType, String fallbackBase) {
         if (originalName != null && !originalName.isBlank()) {
