@@ -69,6 +69,8 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.PUT, "/api/notices/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/notices/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.GET, "/api/fonts", "/api/fonts/**").permitAll();
+                auth.requestMatchers(HttpMethod.GET, "/api/community/posts/*/share", "/api/community/posts/*/share-data", "/api/community/posts/*/share-image").permitAll();
+                auth.requestMatchers(HttpMethod.HEAD, "/api/community/posts/*/share", "/api/community/posts/*/share-data", "/api/community/posts/*/share-image").permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/api/files").authenticated();
                 auth.requestMatchers(HttpMethod.DELETE, "/api/files/**").hasRole("ADMIN");
                 auth.requestMatchers("/api/files", "/api/files/**").authenticated();
