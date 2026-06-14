@@ -23,7 +23,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         "jwt.secret=test-secret-key-with-at-least-32-chars",
         "spring.datasource.url=jdbc:h2:mem:notification-member-invite-test;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
         "mail.enabled=false",
-        "integration.hmac-secret=unit-test-secret-1234567890-abcdef"
+        "integration.hmac-secret=unit-test-secret-1234567890-abcdef",
+        "notification.external-invite.allowed-hosts=example.test"
 })
 class NotificationServiceMemberInviteTest {
 
@@ -97,7 +98,83 @@ class NotificationServiceMemberInviteTest {
         assertThat(saved).hasSize(1);
         assertThat(saved.get(0).getType()).isEqualTo(Notification.Type.EXTERNAL_INVITE);
         assertThat(saved.get(0).getActorLabel()).isEqualTo("팀메이트");
+        assertThat(saved.get(0).getActorStudentId()).isEqualTo(sender.getStudentId());
         assertThat(saved.get(0).getAcceptUrl()).contains("invite=abc");
+    }
+
+    @Test
+    void truncatesActorLabelToOneHundredCharacters() {
+        String longLabel = "ㄱ".repeat(150);
+        MemberExternalInviteRequest req = request(
+                List.of(recipient.getStudentId()),
+                longLabel,
+                "팀플",
+                null
+        );
+
+        notificationService.notifyExternalInviteFromMember(sender.getStudentId(), req);
+
+        Notification saved = notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(recipient.getStudentId()).get(0);
+        assertThat(saved.getActorLabel()).hasSize(100);
+    }
+
+    @Test
+    void rejectsAcceptUrlOutsideAllowlist() {
+        MemberExternalInviteRequest req = request(
+                List.of(recipient.getStudentId()),
+                "팀메이트",
+                "팀플",
+                "https://evil.example/phish"
+        );
+
+        assertThatThrownBy(() -> notificationService.notifyExternalInviteFromMember(sender.getStudentId(), req))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
+                    assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(ex.getReason()).contains("host");
+                });
+        assertThat(notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(recipient.getStudentId())).isEmpty();
+    }
+
+    @Test
+    void rejectsNonHttpAcceptUrlScheme() {
+        MemberExternalInviteRequest req = request(
+                List.of(recipient.getStudentId()),
+                "팀메이트",
+                "팀플",
+                "javascript:alert(1)"
+        );
+
+        assertThatThrownBy(() -> notificationService.notifyExternalInviteFromMember(sender.getStudentId(), req))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void dedupesRecipientsAfterTrimmingWhitespace() {
+        MemberExternalInviteRequest req = request(
+                List.of(recipient.getStudentId(), " " + recipient.getStudentId() + " ", recipient.getStudentId() + "\n"),
+                "팀메이트",
+                "팀플",
+                null
+        );
+
+        NotificationService.ExternalInviteBatchResult result = notificationService.notifyExternalInviteFromMember(sender.getStudentId(), req);
+
+        assertThat(result.accepted()).isEqualTo(1);
+        assertThat(notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(recipient.getStudentId())).hasSize(1);
+    }
+
+    @Test
+    void enforcesPerMinuteRateLimit() {
+        for (int i = 0; i < 10; i++) {
+            notificationService.notifyExternalInviteFromMember(sender.getStudentId(),
+                    request(List.of(recipient.getStudentId()), "팀메이트", "팀플 " + i, null));
+        }
+
+        assertThatThrownBy(() -> notificationService.notifyExternalInviteFromMember(sender.getStudentId(),
+                request(List.of(recipient.getStudentId()), "팀메이트", "한 건 더", null)))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
     }
 
     @Test
