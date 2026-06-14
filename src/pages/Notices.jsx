@@ -266,7 +266,7 @@ export default function Notices() {
         {!urlId && visibleMode === 'list' && (
           <>
             {featuredNotices.length > 0 && (
-              <div className="apple-control-strip grid gap-3 px-4 py-3 sm:px-6 md:grid-cols-2 xl:grid-cols-4">
+              <div className="apple-control-strip grid gap-3 px-4 py-4 sm:px-6 md:grid-cols-2 xl:grid-cols-4">
                 {featuredNotices.map(({ category, notice }) => {
                   const meta = noticeCategoryMeta(category)
                   const Icon = meta.icon
@@ -275,15 +275,15 @@ export default function Notices() {
                       key={category}
                       type="button"
                       onClick={() => openNotice(notice)}
-                      className="apple-soft-panel group flex min-h-20 items-center gap-3 px-4 py-3 text-left transition hover:-translate-y-0.5"
+                      className="apple-soft-panel group grid min-h-[5.75rem] grid-cols-[2.75rem_minmax(0,1fr)] items-center gap-3 px-3.5 py-3 text-left transition hover:-translate-y-0.5 sm:min-h-24 sm:grid-cols-[3rem_minmax(0,1fr)] sm:px-4"
                     >
-                      <span className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${meta.badgeClass}`}>
+                      <span className={`flex size-11 shrink-0 items-center justify-center rounded-full sm:size-12 ${meta.badgeClass}`}>
                         <Icon size={18} />
                       </span>
                       <span className="min-w-0">
                         <span className="block text-xs font-black text-[#0066cc]">{meta.featuredLabel}</span>
-                        <span className="mt-1.5 block truncate text-[15px] font-black text-[#1d1d1f]">{notice.title}</span>
-                        <span className="mt-1 block text-xs font-semibold text-[#86868b]">{formatDate(notice.createdAt)} · {notice.author}</span>
+                        <span className="mt-1 block line-clamp-2 text-sm font-black leading-5 text-[#1d1d1f] sm:text-[15px]">{notice.title}</span>
+                        <span className="mt-1 block truncate text-xs font-semibold text-[#86868b]">{formatDate(notice.createdAt)} · {notice.author}</span>
                       </span>
                     </button>
                   )
@@ -291,13 +291,13 @@ export default function Notices() {
               </div>
             )}
             <div className="apple-control-strip flex flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6">
-              <div className="flex flex-wrap gap-2 text-sm font-bold">
+              <div className="grid grid-cols-2 gap-2 text-sm font-bold sm:flex sm:flex-wrap">
                 {NOTICE_FILTERS.map(({ value, label, icon: Icon }) => (
                   <button
                     key={value}
                     type="button"
                     onClick={() => setActiveCategory(value)}
-                    className={`apple-chip inline-flex items-center gap-2 px-4 py-2 ${
+                    className={`apple-chip inline-flex min-w-0 items-center justify-center gap-2 px-3 py-2 sm:px-4 ${
                       activeCategory === value
                         ? 'apple-chip-active'
                         : ''
@@ -308,8 +308,8 @@ export default function Notices() {
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-3">
-                <div className="relative flex flex-1 items-center sm:flex-none">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="relative flex min-w-0 flex-1 items-center sm:flex-none">
                   <Search size={14} className="pointer-events-none absolute left-3 text-[#86868b]" />
                   <input
                     type="text"
@@ -330,7 +330,7 @@ export default function Notices() {
             {!loading && !error && filteredNotices.length > 0 && (
               <>
                 {/* 모바일 카드 목록 */}
-                <div className="mx-4 mb-4 hidden flex-col divide-y divide-black/10 overflow-hidden rounded-lg border border-black/10 bg-white max-md:flex sm:mx-6">
+                <div className="mx-4 mb-4 hidden grid-cols-1 gap-3 max-md:grid sm:mx-6">
                   {filteredNotices.map((notice) => {
                     const open = () => openNotice(notice)
                     const meta = noticeCategoryMeta(notice.category || 'GENERAL')
@@ -339,16 +339,16 @@ export default function Notices() {
                         key={notice.id}
                         type="button"
                         onClick={open}
-                        className="flex flex-col gap-1.5 px-4 py-4 text-left transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none"
+                        className="apple-soft-panel flex min-h-[7rem] flex-col gap-2 px-4 py-3.5 text-left transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none"
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${meta.badgeClass}`}>
                             {meta.label}
                           </span>
                           <span className="ml-auto text-[11px] text-[#86868b]">{formatDate(notice.createdAt)}</span>
                         </div>
-                        <span className="line-clamp-2 text-sm font-semibold leading-6 text-[#1d1d1f]">{notice.title}</span>
-                        <span className="text-xs text-[#86868b]">{notice.author}</span>
+                        <span className="line-clamp-2 text-[15px] font-bold leading-6 text-[#1d1d1f]">{notice.title}</span>
+                        <span className="mt-auto truncate text-xs font-semibold text-[#86868b]">{notice.author}</span>
                       </button>
                     )
                   })}

@@ -48,7 +48,7 @@ function categoryLabel(value) {
 
 function CategorySegment({ value, onChange, items, counts }) {
   return (
-    <div className="inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.62)]">
+    <div className="flex w-full max-w-full items-center gap-1 overflow-x-auto rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.62)] sm:inline-flex sm:w-auto">
       {items.map((item) => {
         const selected = value === item.value
         return (
@@ -57,9 +57,9 @@ function CategorySegment({ value, onChange, items, counts }) {
             type="button"
             aria-pressed={selected}
             onClick={() => onChange(item.value)}
-            className={`inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-full px-3.5 text-xs font-bold transition ${selected ? 'bg-[var(--app-surface)] text-[var(--app-text)] shadow-[0_1px_2px_rgba(0,0,0,0.08)]' : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'}`}
+            className={`inline-flex min-h-9 min-w-0 flex-1 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-bold transition sm:min-h-8 sm:flex-none sm:px-3.5 ${selected ? 'bg-[var(--app-surface)] text-[var(--app-text)] shadow-[0_1px_2px_rgba(0,0,0,0.08)]' : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'}`}
           >
-            <span>{item.label}</span>
+            <span className="whitespace-nowrap">{item.label}</span>
             {counts && (
               <span className={selected ? 'text-[var(--app-accent-text)]' : 'text-[var(--app-subtle)]'}>
                 {counts[item.value] || 0}
@@ -265,7 +265,7 @@ export default function Archive({ onBack }) {
           <button
             type="button"
             onClick={onBack}
-            className="apple-detail-home-button"
+            className="apple-detail-home-button w-full sm:w-auto"
           >
             <ArrowLeft size={14} />
             메인으로 돌아가기
@@ -315,15 +315,15 @@ export default function Archive({ onBack }) {
 
         {mode === 'list' && (
           <>
-            <div className="apple-control-strip flex flex-col gap-3 px-5 py-4 sm:px-7 lg:flex-row lg:items-center lg:justify-between">
+            <div className="apple-control-strip flex flex-col gap-3 px-4 py-4 sm:px-7 lg:flex-row lg:items-center lg:justify-between">
               <CategorySegment
                 value={activeCategory}
                 onChange={setActiveCategory}
                 items={ARCHIVE_CATEGORIES}
                 counts={categoryCounts}
               />
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="relative flex items-center">
+              <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="relative flex min-w-0 items-center">
                   <Search size={14} className="pointer-events-none absolute left-3 text-[var(--app-subtle)]" />
                   <input
                     type="text"
@@ -357,15 +357,57 @@ export default function Archive({ onBack }) {
               </div>
             )}
 
-            <div className="m-5 overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:m-7">
+            <div className="m-4 overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:m-7">
               {loading ? (
-                <div className="px-5 py-16 text-center text-sm font-medium text-[var(--app-muted)]">자료를 불러오는 중...</div>
+                <div className="flex min-h-[12rem] items-center justify-center px-5 py-12 text-center text-sm font-medium text-[var(--app-muted)] sm:min-h-[14rem]">자료를 불러오는 중...</div>
               ) : filteredFiles.length === 0 ? (
-                <div className="px-5 py-16 text-center text-sm font-medium text-[var(--app-muted)]">
+                <div className="flex min-h-[12rem] items-center justify-center px-5 py-12 text-center text-sm font-medium text-[var(--app-muted)] sm:min-h-[14rem]">
                   {searchQuery ? '검색 결과가 없습니다.' : '등록된 자료가 없습니다.'}
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <>
+                <div className="grid gap-3 p-4 md:hidden">
+                  {filteredFiles.map((file) => {
+                    const open = () => openFile(file)
+                    return (
+                      <article key={file.id} className="apple-soft-panel p-4">
+                        <button
+                          type="button"
+                          onClick={open}
+                          className="block w-full text-left focus:outline-none"
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="rounded-full bg-[var(--app-accent-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--app-accent-text)]">
+                              {categoryLabel(file.category || 'GENERAL')}
+                            </span>
+                            <span className="ml-auto shrink-0 text-[11px] font-bold text-[var(--app-subtle)]">{formatSize(file.fileSize)}</span>
+                          </span>
+                          <span className="mt-3 block line-clamp-2 text-[15px] font-bold leading-6 text-[var(--app-text)]" title={file.title || file.originalName}>
+                            {file.title || file.originalName}
+                          </span>
+                          {file.description && (
+                            <span className="mt-1 block line-clamp-2 text-xs leading-5 text-[var(--app-muted)]">
+                              {file.description}
+                            </span>
+                          )}
+                          <span className="mt-3 block truncate text-xs font-semibold text-[var(--app-subtle)]">
+                            {file.uploaderName || file.uploadedBy || '-'} · {formatDate(file.uploadedAt)}
+                          </span>
+                        </button>
+                        <div className="mt-4 flex justify-end border-t border-[var(--app-hairline)] pt-3">
+                          <a
+                            href={downloadUrl(file.id)}
+                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3.5 text-sm font-bold text-[var(--app-accent-text)] transition hover:bg-[var(--app-surface-elevated)]"
+                          >
+                            <Download size={15} />
+                            다운로드
+                          </a>
+                        </div>
+                      </article>
+                    )
+                  })}
+                </div>
+                <div className="hidden overflow-x-auto md:block">
                   <table className="apple-table w-full min-w-[760px] text-left text-sm">
                     <thead className="border-b border-[var(--app-hairline)]">
                       <tr>
@@ -427,6 +469,7 @@ export default function Archive({ onBack }) {
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
             </div>
           </>
