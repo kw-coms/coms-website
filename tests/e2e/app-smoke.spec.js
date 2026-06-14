@@ -109,3 +109,54 @@ test('admin exposes a pre-deploy screen check panel', async ({ page }) => {
   await expect(page.getByText('/api/auth/me')).toBeVisible()
   await expect(page.getByText('/api/fonts')).toBeVisible()
 })
+
+test('admin logs tab can expand log window and clear caches', async ({ page }) => {
+  await mockAdminApis(page)
+  const requestedLimits = []
+  let cacheClearCalled = false
+
+  await page.route('**/api/admin/audit-logs**', (route) => {
+    const url = new URL(route.request().url())
+    requestedLimits.push(url.searchParams.get('limit'))
+    return route.fulfill({
+      status: 200,
+      json: [
+        {
+          id: 1,
+          actorStudentId: '2020123456',
+          actorName: '관리자',
+          action: 'ADMIN_CACHE_CLEAR',
+          targetType: 'CACHE',
+          targetId: null,
+          detail: 'clearedCount=1',
+          ipAddress: null,
+          createdAt: '2026-06-15T03:30:00',
+        },
+      ],
+    })
+  })
+  await page.route('**/api/admin/cache/clear', (route) => {
+    cacheClearCalled = true
+    expect(route.request().method()).toBe('POST')
+    return route.fulfill({
+      status: 200,
+      json: {
+        clearedCaches: ['fonts'],
+        clearedCount: 1,
+        clearedAt: '2026-06-15T03:31:00',
+      },
+    })
+  })
+
+  await page.goto('/admin')
+  await page.getByRole('button', { name: '로그' }).click()
+  await expect.poll(() => requestedLimits.at(-1)).toBe('1000')
+
+  await page.getByLabel('로그 표시 개수').selectOption('2000')
+  await expect.poll(() => requestedLimits.at(-1)).toBe('2000')
+
+  await page.getByRole('button', { name: '캐시 초기화' }).click()
+
+  await expect.poll(() => cacheClearCalled).toBe(true)
+  await expect(page.getByText('캐시 1개를 초기화했습니다.')).toBeVisible()
+})

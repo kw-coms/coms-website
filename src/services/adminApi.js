@@ -4,8 +4,12 @@ export async function listMembers() {
   return request('/api/admin/members')
 }
 
-export async function listAuditLogs() {
-  return request('/api/admin/audit-logs')
+export async function listAuditLogs(limit = 1000) {
+  return request(`/api/admin/audit-logs?limit=${encodeURIComponent(limit)}`)
+}
+
+export async function clearAdminCache() {
+  return request('/api/admin/cache/clear', { method: 'POST' })
 }
 
 export async function updateMemberRole(id, role) {
