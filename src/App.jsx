@@ -1343,7 +1343,7 @@ function DetailStoryPage({
               메인으로 돌아가기
             </button>
             <p className="apple-eyebrow">{eyebrow}</p>
-            <h1 className="apple-display mt-4 text-6xl sm:text-7xl lg:text-[7rem]">{title}</h1>
+            <h1 className="apple-display apple-detail-title mt-4">{title}</h1>
             <p className="apple-copy mt-6 text-xl sm:text-2xl">{body}</p>
           </div>
 
@@ -1436,7 +1436,12 @@ function ActivitiesDetailPage() {
   return (
     <DetailStoryPage
       eyebrow="Activities"
-      title="배움이 매주 쌓이고, 서로에게 남습니다."
+      title={(
+        <>
+          <span className="inline-block">배움이 매주 쌓이고,</span>{' '}
+          <span className="inline-block">서로에게 남습니다.</span>
+        </>
+      )}
       body="COM's의 활동은 정기 세미나, 분야별 스터디, 코드 리뷰, 작은 제작 과제가 이어지는 흐름입니다. 처음 시작하는 사람도 따라올 수 있고, 이미 경험이 있는 사람도 더 깊게 확장할 수 있습니다."
       visualTitle="Learning Stack"
       visualSubtitle="Seminar · Study · Review"
