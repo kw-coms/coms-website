@@ -1,6 +1,10 @@
 package com.coms.backend.service;
 
+import com.coms.backend.domain.RecruitApplication;
+import com.coms.backend.dto.RecruitApplicationAdminResponse;
 import com.coms.backend.dto.RecruitApplicationRequest;
+import com.coms.backend.dto.RecruitApplicationStatusUpdateRequest;
+import com.coms.backend.repository.RecruitApplicationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
@@ -26,21 +31,25 @@ public class RecruitApplicationService {
     private static final Duration RATE_LIMIT_WINDOW = Duration.ofMinutes(10);
 
     private final JavaMailSender mailSender;
+    private final RecruitApplicationRepository recruitApplicationRepository;
     private final boolean mailEnabled;
     private final String from;
     private final String to;
     private final Map<String, Deque<LocalDateTime>> submissionAttemptsByClient = new ConcurrentHashMap<>();
 
     public RecruitApplicationService(JavaMailSender mailSender,
+                                     RecruitApplicationRepository recruitApplicationRepository,
                                      @Value("${mail.enabled:false}") boolean mailEnabled,
                                      @Value("${mail.from:no-reply@coms.kw.ac.kr}") String from,
                                      @Value("${recruit.mail.to:kwcoms69@gmail.com}") String to) {
         this.mailSender = mailSender;
+        this.recruitApplicationRepository = recruitApplicationRepository;
         this.mailEnabled = mailEnabled;
         this.from = from;
         this.to = to;
     }
 
+    @Transactional
     public void sendApplication(RecruitApplicationRequest request, String clientIp) {
         enforceRateLimit(clientIp);
         if (!mailEnabled) {
@@ -56,10 +65,51 @@ public class RecruitApplicationService {
             message.setText(buildBody(request));
             mailSender.send(message);
             mailSender.send(buildApplicantConfirmationMessage(request));
+            recruitApplicationRepository.save(toEntity(request, clientIp));
         } catch (RuntimeException e) {
             log.warn("Failed to send recruit application for studentId={}", request.studentId(), e);
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "지원서 메일 발송에 실패했습니다.");
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<RecruitApplicationAdminResponse> listApplications() {
+        return recruitApplicationRepository.findAllByOrderBySubmittedAtDescIdDesc().stream()
+                .map(RecruitApplicationAdminResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public RecruitApplicationAdminResponse updateStatus(Long id, RecruitApplicationStatusUpdateRequest request) {
+        RecruitApplication application = recruitApplicationRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "지원서를 찾을 수 없습니다."));
+        application.setStatus(parseStatus(request.status()));
+        application.setAdminNote(trimToNull(request.adminNote()));
+        return RecruitApplicationAdminResponse.from(application);
+    }
+
+    private static RecruitApplication.Status parseStatus(String rawStatus) {
+        try {
+            return RecruitApplication.Status.valueOf(trim(rawStatus).toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "지원서 상태 값이 올바르지 않습니다.");
+        }
+    }
+
+    private static RecruitApplication toEntity(RecruitApplicationRequest request, String clientIp) {
+        RecruitApplication application = new RecruitApplication();
+        application.setName(trim(request.name()));
+        application.setStudentId(trim(request.studentId()));
+        application.setDepartment(trim(request.department()));
+        application.setGrade(trimToNull(request.grade()));
+        application.setPhone(trim(request.phone()));
+        application.setEmail(trim(request.email()));
+        application.setInterests(interestsText(request.interests()));
+        application.setMotive(trim(request.motive()));
+        application.setExperience(trimToNull(request.experience()));
+        application.setExpectation(trim(request.expectation()));
+        application.setClientIp(trimToNull(clientIp));
+        return application;
     }
 
     private void enforceRateLimit(String clientIp) {
@@ -141,6 +191,11 @@ public class RecruitApplicationService {
     private static String optional(String value, String fallback) {
         String trimmed = trim(value);
         return trimmed.isBlank() ? fallback : trimmed;
+    }
+
+    private static String trimToNull(String value) {
+        String trimmed = trim(value);
+        return trimmed.isBlank() ? null : trimmed;
     }
 
     private static String trim(String value) {

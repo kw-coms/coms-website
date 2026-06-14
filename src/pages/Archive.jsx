@@ -281,8 +281,11 @@ export default function Archive({ onBack }) {
               <h1 className="mt-2 text-3xl font-bold leading-tight tracking-normal sm:text-4xl">
                 {mode === 'write' ? '자료 등록' : mode === 'detail' ? '자료 상세' : '자료실'}
               </h1>
+              {mode === 'list' && (
+                <p className="mt-2 text-sm font-bold text-[var(--app-accent-text)]">다시 찾는 자료실</p>
+              )}
               <p className="apple-copy mt-3 max-w-2xl">
-                {mode === 'list' ? '자료를 올리거나 목록에서 선택해 다운로드합니다.' : ''}
+                {mode === 'list' ? '세미나, 프로젝트, 학술회지 자료를 카테고리와 검색으로 빠르게 다시 찾습니다.' : ''}
               </p>
             </div>
             {mode === 'list' ? (
@@ -329,7 +332,7 @@ export default function Archive({ onBack }) {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="제목, 설명, 작성자 검색"
+                    placeholder="세미나, 프로젝트, 작성자 검색"
                     className="h-10 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-8 pr-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none transition focus:ring-2 focus:ring-[#0071e3]/24 sm:w-64"
                   />
                 </div>
