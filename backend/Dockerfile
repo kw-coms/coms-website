@@ -11,7 +11,7 @@ RUN ./gradlew --version --no-daemon
 
 COPY src ./src
 
-RUN ./gradlew clean bootJar -x test --no-daemon
+RUN ./gradlew clean test --tests com.coms.backend.MigrationVersionTest bootJar --no-daemon
 
 
 FROM eclipse-temurin:21-jre-alpine
