@@ -1198,6 +1198,16 @@ select {
 		padding-top: calc(var(--apple-nav-height) + var(--apple-mobile-tabs-height) + env(safe-area-inset-top));
 	}
 
+	.apple-page-shell-main {
+		padding-left: 1rem !important;
+		padding-right: 1rem !important;
+	}
+
+	.apple-page-shell-main-full {
+		padding-top: calc(var(--apple-nav-height) + env(safe-area-inset-top) + 1.25rem) !important;
+		padding-bottom: 5rem !important;
+	}
+
 	.apple-detail-home-button {
 		margin-bottom: 1rem;
 	}
@@ -1303,6 +1313,27 @@ select {
 
 	.apple-board-shell {
 		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08) !important;
+	}
+
+	.apple-board-hero {
+		padding: 1.5rem 1.25rem !important;
+	}
+
+	.apple-board-hero .apple-display {
+		font-size: clamp(2.4rem, 11vw, 3.1rem) !important;
+		line-height: 1.04;
+	}
+
+	.apple-control-strip {
+		scrollbar-width: none;
+	}
+
+	.apple-control-strip::-webkit-scrollbar {
+		display: none;
+	}
+
+	.appearance-color-row > div > button {
+		aspect-ratio: 1 / 1;
 	}
 }
 
