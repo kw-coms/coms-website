@@ -390,20 +390,22 @@ public class CommunityService {
     public CommunityPostShareImage loadShareImage(Long id) {
         CommunityPost post = communityPostRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (post.getImageStoredName() != null) {
+        Optional<CommunityPostImage> contentImage = firstShareImage(post);
+        if (contentImage.isPresent()) {
+            CommunityPostImage image = contentImage.get();
             return new CommunityPostShareImage(
-                    storageService.load(post.getImageStoredName()),
-                    post.getImageOriginalName(),
-                    post.getImageMimeType()
+                    storageService.load(image.getStoredName()),
+                    image.getOriginalName(),
+                    image.getMimeType()
             );
         }
-        CommunityPostImage image = imageRepository.findByPostIdOrderByPositionAsc(id).stream()
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (post.getImageStoredName() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         return new CommunityPostShareImage(
-                storageService.load(image.getStoredName()),
-                image.getOriginalName(),
-                image.getMimeType()
+                storageService.load(post.getImageStoredName()),
+                post.getImageOriginalName(),
+                post.getImageMimeType()
         );
     }
 
@@ -441,8 +443,39 @@ public class CommunityService {
     }
 
     private boolean hasShareImage(CommunityPost post) {
-        return post.getImageStoredName() != null
-                || !imageRepository.findByPostIdOrderByPositionAsc(post.getId()).isEmpty();
+        return firstShareImage(post).isPresent()
+                || post.getImageStoredName() != null;
+    }
+
+    private Optional<CommunityPostImage> firstShareImage(CommunityPost post) {
+        List<CommunityPostImage> images = imageRepository.findByPostIdOrderByPositionAsc(post.getId());
+        return firstContentImage(post.getContent(), images).or(images.stream()::findFirst);
+    }
+
+    private Optional<CommunityPostImage> firstContentImage(String content, List<CommunityPostImage> images) {
+        if (content == null || content.isBlank() || images.isEmpty()) {
+            return Optional.empty();
+        }
+        Map<Long, CommunityPostImage> imagesById = images.stream()
+                .collect(Collectors.toMap(CommunityPostImage::getId, Function.identity()));
+        try {
+            JsonNode root = JSON.readTree(content);
+            if (!root.isArray()) {
+                return Optional.empty();
+            }
+            for (JsonNode block : root) {
+                if (!"image".equals(block.path("type").asText())) {
+                    continue;
+                }
+                Long mediaId = block.path("mediaId").canConvertToLong() ? block.path("mediaId").asLong() : null;
+                if (mediaId != null && imagesById.containsKey(mediaId)) {
+                    return Optional.of(imagesById.get(mediaId));
+                }
+            }
+        } catch (Exception ignored) {
+            return Optional.empty();
+        }
+        return Optional.empty();
     }
 
     private boolean isGraduate(Member member) {
