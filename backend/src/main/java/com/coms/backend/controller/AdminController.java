@@ -10,6 +10,8 @@ import com.coms.backend.dto.EligibleMemberImportResponse;
 import com.coms.backend.dto.EligibleMemberResponse;
 import com.coms.backend.dto.LoginAuditResponse;
 import com.coms.backend.dto.MemberResponse;
+import com.coms.backend.dto.RecruitApplicationAdminResponse;
+import com.coms.backend.dto.RecruitApplicationStatusUpdateRequest;
 import com.coms.backend.dto.RoleUpdateRequest;
 import com.coms.backend.dto.UpdateEligibleMemberRequest;
 import com.coms.backend.service.AdminService;
@@ -17,6 +19,7 @@ import com.coms.backend.service.AuditLogService;
 import com.coms.backend.service.BannedStudentService;
 import com.coms.backend.service.CacheMaintenanceService;
 import com.coms.backend.service.EligibleMemberService;
+import com.coms.backend.service.RecruitApplicationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -36,15 +39,18 @@ public class AdminController {
     private final BannedStudentService bannedStudentService;
     private final AuditLogService auditLogService;
     private final CacheMaintenanceService cacheMaintenanceService;
+    private final RecruitApplicationService recruitApplicationService;
 
     public AdminController(AdminService adminService, EligibleMemberService eligibleMemberService,
                            BannedStudentService bannedStudentService, AuditLogService auditLogService,
-                           CacheMaintenanceService cacheMaintenanceService) {
+                           CacheMaintenanceService cacheMaintenanceService,
+                           RecruitApplicationService recruitApplicationService) {
         this.adminService = adminService;
         this.eligibleMemberService = eligibleMemberService;
         this.bannedStudentService = bannedStudentService;
         this.auditLogService = auditLogService;
         this.cacheMaintenanceService = cacheMaintenanceService;
+        this.recruitApplicationService = recruitApplicationService;
     }
 
     @GetMapping("/members")
@@ -144,6 +150,22 @@ public class AdminController {
     @GetMapping("/login-audit")
     public ResponseEntity<List<LoginAuditResponse>> loginAudit() {
         return ResponseEntity.ok(adminService.listLoginAudit());
+    }
+
+    @GetMapping("/recruit-applications")
+    public ResponseEntity<List<RecruitApplicationAdminResponse>> recruitApplications() {
+        return ResponseEntity.ok(recruitApplicationService.listApplications());
+    }
+
+    @PatchMapping("/recruit-applications/{id}/status")
+    public ResponseEntity<RecruitApplicationAdminResponse> updateRecruitApplicationStatus(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody RecruitApplicationStatusUpdateRequest request) {
+        RecruitApplicationAdminResponse response = recruitApplicationService.updateStatus(id, request);
+        auditLogService.record(authentication.getName(), "ADMIN_RECRUIT_APPLICATION_STATUS_UPDATE", "RECRUIT_APPLICATION",
+                String.valueOf(id), "status=" + response.status(), null);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/audit-logs")
