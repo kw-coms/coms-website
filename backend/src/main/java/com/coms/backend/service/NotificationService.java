@@ -13,6 +13,7 @@ import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.NotificationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,29 +21,47 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @Transactional
 public class NotificationService {
     private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
+    private static final int ACTOR_LABEL_MAX = 100;
+    private static final int MAX_EXTERNAL_INVITES_PER_MINUTE = 10;
+    private static final int MAX_EXTERNAL_INVITES_PER_DAY = 200;
 
     private final NotificationRepository notificationRepository;
     private final MemberRepository memberRepository;
     private final EligibleMemberRepository eligibleMemberRepository;
     private final EmailVerificationSender mailSender;
+    private final Set<String> acceptUrlAllowedHosts;
 
     public NotificationService(NotificationRepository notificationRepository,
                                MemberRepository memberRepository,
                                EligibleMemberRepository eligibleMemberRepository,
-                               EmailVerificationSender mailSender) {
+                               EmailVerificationSender mailSender,
+                               @Value("${notification.external-invite.allowed-hosts:coms.kw.ac.kr}") String allowedHosts) {
         this.notificationRepository = notificationRepository;
         this.memberRepository = memberRepository;
         this.eligibleMemberRepository = eligibleMemberRepository;
         this.mailSender = mailSender;
+        this.acceptUrlAllowedHosts = parseAllowedHosts(allowedHosts);
+    }
+
+    private static Set<String> parseAllowedHosts(String raw) {
+        if (raw == null || raw.isBlank()) return Set.of();
+        Set<String> hosts = new java.util.HashSet<>();
+        for (String entry : raw.split(",")) {
+            String trimmed = entry.trim().toLowerCase();
+            if (!trimmed.isEmpty()) hosts.add(trimmed);
+        }
+        return Set.copyOf(hosts);
     }
 
     public void notifyPostComment(CommunityPost post, CommunityComment comment) {
@@ -119,20 +138,45 @@ public class NotificationService {
     }
 
     private String sanitizeAcceptUrl(String acceptUrl) {
+        return sanitizeAcceptUrl(acceptUrl, false);
+    }
+
+    private String sanitizeAcceptUrl(String acceptUrl, boolean enforceHostAllowlist) {
         if (acceptUrl == null || acceptUrl.isBlank()) {
             return null;
         }
         try {
             URI parsed = new URI(acceptUrl);
             String scheme = parsed.getScheme();
+            String host = parsed.getHost();
             if (scheme == null
                     || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))
-                    || parsed.getHost() == null) {
+                    || host == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "acceptUrl must be an http(s) URL");
+            }
+            if (enforceHostAllowlist && !acceptUrlAllowedHosts.isEmpty()
+                    && !acceptUrlAllowedHosts.contains(host.toLowerCase())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "acceptUrl host not allowed");
             }
             return acceptUrl;
         } catch (URISyntaxException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "acceptUrl is not a valid URL");
+        }
+    }
+
+    private void enforceExternalInviteRateLimit(String senderStudentId) {
+        LocalDateTime now = LocalDateTime.now();
+        long perMinute = notificationRepository.countByActorStudentIdAndTypeAndCreatedAtAfter(
+                senderStudentId, Notification.Type.EXTERNAL_INVITE, now.minusMinutes(1));
+        if (perMinute >= MAX_EXTERNAL_INVITES_PER_MINUTE) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "초대 알림은 1분에 최대 " + MAX_EXTERNAL_INVITES_PER_MINUTE + "건까지 보낼 수 있습니다.");
+        }
+        long perDay = notificationRepository.countByActorStudentIdAndTypeAndCreatedAtAfter(
+                senderStudentId, Notification.Type.EXTERNAL_INVITE, now.minusDays(1));
+        if (perDay >= MAX_EXTERNAL_INVITES_PER_DAY) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "초대 알림은 하루 최대 " + MAX_EXTERNAL_INVITES_PER_DAY + "건까지 보낼 수 있습니다.");
         }
     }
 
@@ -144,19 +188,31 @@ public class NotificationService {
         }
         Member sender = memberRepository.findByStudentId(senderStudentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sender is not a registered member"));
-        String label = (request.getActorLabel() == null || request.getActorLabel().isBlank())
+
+        enforceExternalInviteRateLimit(senderStudentId);
+
+        String rawLabel = (request.getActorLabel() == null || request.getActorLabel().isBlank())
                 ? sender.getName()
                 : request.getActorLabel();
+        String label = rawLabel == null ? null
+                : rawLabel.length() > ACTOR_LABEL_MAX ? rawLabel.substring(0, ACTOR_LABEL_MAX) : rawLabel;
 
-        List<String> unknown = new ArrayList<>();
-        int accepted = 0;
+        String safeAcceptUrl = sanitizeAcceptUrl(request.getAcceptUrl(), true);
+
+        LinkedHashSet<String> normalizedRecipients = new LinkedHashSet<>();
         int rejected = 0;
-        for (String rawRecipient : new LinkedHashSet<>(request.getRecipientStudentIds())) {
-            String recipient = rawRecipient == null ? "" : rawRecipient.trim();
-            if (recipient.isEmpty() || recipient.equals(senderStudentId)) {
+        for (String raw : request.getRecipientStudentIds()) {
+            String trimmed = raw == null ? "" : raw.trim();
+            if (trimmed.isEmpty() || trimmed.equals(senderStudentId)) {
                 rejected += 1;
                 continue;
             }
+            normalizedRecipients.add(trimmed);
+        }
+
+        List<String> unknown = new ArrayList<>();
+        int accepted = 0;
+        for (String recipient : normalizedRecipients) {
             boolean known = memberRepository.existsByStudentId(recipient)
                     || eligibleMemberRepository.findByStudentId(recipient).isPresent();
             if (!known) {
@@ -164,7 +220,8 @@ public class NotificationService {
                 continue;
             }
             try {
-                notifyExternalInvite(recipient, label, request.getMessage(), request.getAcceptUrl(), false);
+                Notification saved = notifyExternalInvite(recipient, label, request.getMessage(), safeAcceptUrl, false);
+                saved.setActorStudentId(senderStudentId);
                 accepted += 1;
             } catch (ResponseStatusException ex) {
                 rejected += 1;
@@ -257,6 +314,7 @@ public class NotificationService {
                 notification.getNoticeId(),
                 notification.getAcceptUrl(),
                 notification.getActorLabel(),
+                notification.getActorStudentId(),
                 notification.getMessage(),
                 notification.getReadAt() != null,
                 notification.getCreatedAt()
