@@ -1315,6 +1315,20 @@ select {
 		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08) !important;
 	}
 
+	.notice-mobile-card {
+		display: grid;
+		min-height: 7rem;
+		grid-template-rows: auto minmax(3rem, auto) auto;
+		row-gap: 0.35rem;
+		padding: 0.875rem 1rem 0.8rem;
+	}
+
+	.notice-mobile-title-frame {
+		display: flex;
+		min-height: 3rem;
+		align-items: center;
+	}
+
 	.apple-board-hero {
 		padding: 1.5rem 1.25rem !important;
 	}
