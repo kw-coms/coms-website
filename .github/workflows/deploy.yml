@@ -78,10 +78,27 @@ jobs:
               git reset --hard FETCH_HEAD
             fi
 
+            # Keep only persistent secrets/data; remove every other untracked or ignored build artifact.
+            git clean -fdx -e .env -e backend-data/ -e backend/uploads/ -e uploads/
+
             if [ ! -f .env ]; then
               echo "Missing $DEPLOY_PATH/.env on the server. Create it from .env.example before deploying." >&2
               exit 1
             fi
+
+            if $COMPOSE --env-file .env -f docker-compose.yml exec -T db true >/dev/null 2>&1; then
+              V38_SCRIPT="$($COMPOSE --env-file .env -f docker-compose.yml exec -T db sh -c \
+                'if [ "$(psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT to_regclass('\''public.flyway_schema_history'\'')")" = "flyway_schema_history" ]; then
+                   psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT script FROM flyway_schema_history WHERE version = '\''38'\'' AND success = true ORDER BY installed_rank DESC LIMIT 1"
+                 fi')"
+              if [ -n "$V38_SCRIPT" ] && [ "$V38_SCRIPT" != "V38__mobile_push_tokens.sql" ]; then
+                echo "Refusing deploy: Flyway V38 is recorded as $V38_SCRIPT, expected V38__mobile_push_tokens.sql." >&2
+                echo "Back up the database and repair its Flyway history before deploying this release." >&2
+                exit 1
+              fi
+            fi
+
+            (cd backend && ./gradlew clean test --no-daemon)
 
             $COMPOSE --env-file .env -f docker-compose.yml up -d --build --remove-orphans
             docker image prune -f
