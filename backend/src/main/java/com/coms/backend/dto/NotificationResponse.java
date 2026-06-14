@@ -10,6 +10,7 @@ public record NotificationResponse(
         Long noticeId,
         String acceptUrl,
         String actorLabel,
+        String actorStudentId,
         String message,
         boolean read,
         LocalDateTime createdAt
