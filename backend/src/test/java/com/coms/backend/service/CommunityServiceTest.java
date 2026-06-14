@@ -370,6 +370,33 @@ class CommunityServiceTest {
     }
 
     @Test
+    void shareImageUsesFirstImageBlockInVisiblePostOrder() throws Exception {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("이미지", "내용", "GENERAL", false), null);
+        MockMultipartFile lowerImage = new MockMultipartFile("images", "lower.png", "image/png", "lower".getBytes());
+        MockMultipartFile topImage = new MockMultipartFile("images", "top.png", "image/png", "top".getBytes());
+        java.util.List<Long> imageIds = communityService.addImages(user.getStudentId(), created.id(), java.util.List.of(lowerImage, topImage));
+
+        String content = """
+                [{"type":"image","mediaId":%d,"name":"top.png","width":75,"align":"center"},
+                 {"type":"text","content":"본문"},
+                 {"type":"image","mediaId":%d,"name":"lower.png","width":75,"align":"center"}]
+                """.formatted(imageIds.get(1), imageIds.get(0));
+        communityService.update(
+                user.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("이미지", content, "GENERAL", false),
+                null
+        );
+
+        var shareImage = communityService.loadShareImage(created.id());
+
+        assertThat(shareImage.resource().getInputStream().readAllBytes()).isEqualTo("top".getBytes());
+        assertThat(shareImage.originalName()).isEqualTo("top.png");
+    }
+
+    @Test
     void acceptsZipAttachmentsAndExposesDownloadUrl() {
         Member user = member("2025123456", "회원", Member.Role.USER);
         memberRepository.save(user);
