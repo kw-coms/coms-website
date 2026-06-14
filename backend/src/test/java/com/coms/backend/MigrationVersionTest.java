@@ -36,6 +36,16 @@ class MigrationVersionTest {
     }
 
     @Test
+    void productionMigrationHistoryKeepsMobileAt38AndRecruitmentAt39() {
+        Path migrations = Path.of("src/main/resources/db/migration");
+
+        assertTrue(Files.exists(migrations.resolve("V38__mobile_push_tokens.sql")),
+                "Production Flyway history assigns V38 to mobile push tokens");
+        assertTrue(Files.exists(migrations.resolve("V39__recruit_application_workflow.sql")),
+                "Recruitment workflow must follow the production V38 migration");
+    }
+
+    @Test
     void migrationsResolveInFlyway() {
         Flyway flyway = Flyway.configure()
                 .dataSource("jdbc:h2:mem:flyway-migration-test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1", "sa", "")

@@ -1,0 +1,13 @@
+.git
+.github
+.omx
+backend
+backend-data
+uploads
+node_modules
+dist
+test-results
+playwright-report
+blob-report
+*.log
+.DS_Store
