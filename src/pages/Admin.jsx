@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { RefreshCw, RotateCcw } from 'lucide-react'
-import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache } from '../services/adminApi.js'
+import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache, listRecruitApplications, updateRecruitApplicationStatus } from '../services/adminApi.js'
 import { listFiles, createPost, deleteFile } from '../services/archiveApi.js'
 import { listAdminFonts, setFontActive, uploadFont } from '../services/fontApi.js'
 import { useAuth } from '../contexts/useAuth.js'
@@ -36,9 +36,48 @@ const SCREEN_CHECK_APIS = [
 
 const AUDIT_LOG_LIMITS = [300, 1000, 2000]
 
+const RECRUIT_STATUS_OPTIONS = [
+  { value: 'RECEIVED', label: '접수됨' },
+  { value: 'REVIEWING', label: '검토중' },
+  { value: 'ACCEPTED', label: '합격' },
+  { value: 'HOLD', label: '보류' },
+  { value: 'REJECTED', label: '불합격' },
+]
+
+const RECRUIT_PENDING_STATUSES = new Set(['RECEIVED', 'REVIEWING', 'HOLD'])
+
 export default function Admin({ onBack }) {
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState('members')
+  const [activeTab, setActiveTab] = useState('overview')
+  const [recruitApplications, setRecruitApplications] = useState([])
+  const [recruitLoading, setRecruitLoading] = useState(true)
+  const [recruitError, setRecruitError] = useState('')
+
+  const loadRecruitApplications = async () => {
+    setRecruitError('')
+    try {
+      const data = await listRecruitApplications()
+      setRecruitApplications(Array.isArray(data) ? data : [])
+    } catch (err) {
+      setRecruitError(err.message || '모집 지원서를 불러오지 못했습니다.')
+    } finally {
+      setRecruitLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true
+    listRecruitApplications()
+      .then((data) => {
+        if (mounted) {
+          setRecruitError('')
+          setRecruitApplications(Array.isArray(data) ? data : [])
+        }
+      })
+      .catch((err) => { if (mounted) setRecruitError(err.message || '모집 지원서를 불러오지 못했습니다.') })
+      .finally(() => { if (mounted) setRecruitLoading(false) })
+    return () => { mounted = false }
+  }, [])
 
   if (user?.role !== 'ADMIN') {
     return (
@@ -75,7 +114,9 @@ export default function Admin({ onBack }) {
           <div className="-mx-1 mb-6 overflow-x-auto pb-1">
             <div className="flex min-w-max gap-2 px-1">
               {[
+                { id: 'overview', label: '운영 요약' },
                 { id: 'members', label: '회원 관리' },
+                { id: 'recruit', label: '모집 관리' },
                 { id: 'roster', label: '명부 인증' },
                 { id: 'files', label: '파일 관리' },
                 { id: 'fonts', label: '폰트 관리' },
@@ -99,7 +140,26 @@ export default function Admin({ onBack }) {
             </div>
           </div>
 
+          {activeTab === 'overview' && (
+            <OverviewTab
+              recruitApplications={recruitApplications}
+              recruitLoading={recruitLoading}
+              recruitError={recruitError}
+              onOpenRecruit={() => setActiveTab('recruit')}
+            />
+          )}
           {activeTab === 'members' && <MembersTab currentUser={user} />}
+          {activeTab === 'recruit' && (
+            <RecruitApplicationsTab
+              applications={recruitApplications}
+              loading={recruitLoading}
+              error={recruitError}
+              onReload={loadRecruitApplications}
+              onUpdated={(updated) => {
+                setRecruitApplications((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+              }}
+            />
+          )}
           {activeTab === 'roster' && <RosterTab />}
           {activeTab === 'files' && <FilesTab />}
           {activeTab === 'fonts' && <FontsTab />}
@@ -118,6 +178,231 @@ function parseInterests(raw) {
     if (item.startsWith('기타:')) return `기타 (${item.slice(3)})`
     return item
   })
+}
+
+function recruitStatusLabel(status) {
+  return RECRUIT_STATUS_OPTIONS.find((option) => option.value === status)?.label || status || '알 수 없음'
+}
+
+function recruitPendingCount(applications) {
+  return applications.filter((application) => RECRUIT_PENDING_STATUSES.has(application.status)).length
+}
+
+function OverviewTab({ recruitApplications, recruitLoading, recruitError, onOpenRecruit }) {
+  const pendingCount = recruitPendingCount(recruitApplications)
+  const latestApplication = recruitApplications[0]
+  const cards = [
+    {
+      label: '처리 대기 지원',
+      value: recruitLoading ? '확인 중' : `${pendingCount.toLocaleString('ko-KR')}건`,
+      detail: recruitError || '접수·검토·보류 상태의 지원서',
+    },
+    {
+      label: '최근 지원자',
+      value: latestApplication ? latestApplication.name : '없음',
+      detail: latestApplication ? `${latestApplication.department} · ${recruitStatusLabel(latestApplication.status)}` : '새 지원서가 들어오면 여기에 표시됩니다.',
+    },
+    {
+      label: '운영 체크',
+      value: 'Admin OS',
+      detail: '모집, 명부, 자료실, 로그를 한 흐름에서 점검합니다.',
+    },
+  ]
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-[var(--theme-body-dark)]">운영 요약</h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
+            운영진이 매주 확인해야 할 모집, 회원, 자료, 로그 흐름을 한 화면에서 시작합니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onOpenRecruit}
+          className="shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] transition hover:opacity-90"
+        >
+          모집 관리 열기
+        </button>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        {cards.map((card) => (
+          <div key={card.label} className="rounded-lg border border-black/10 bg-black/5 p-4">
+            <p className="text-xs font-semibold text-[var(--theme-body-muted)]">{card.label}</p>
+            <p className="mt-2 text-2xl font-bold text-[var(--theme-body-dark)]">{card.value}</p>
+            <p className="mt-2 text-xs leading-5 text-[var(--theme-body-muted)]">{card.detail}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-lg border border-black/10 bg-white/60 p-4">
+        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">다음 운영 액션</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {[
+            ['모집', '지원 상태와 운영 메모를 정리합니다.'],
+            ['커뮤니티', '공지와 활동 글 흐름을 확인합니다.'],
+            ['자료실', '최근 세미나·프로젝트 자료를 올립니다.'],
+          ].map(([title, body]) => (
+            <div key={title} className="shape-cut-sm border border-black/10 bg-black/5 px-3 py-3">
+              <p className="text-sm font-bold text-[var(--theme-body-dark)]">{title}</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">{body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RecruitApplicationsTab({ applications, loading, error, onReload, onUpdated }) {
+  const [drafts, setDrafts] = useState({})
+  const [savingId, setSavingId] = useState(null)
+  const [message, setMessage] = useState('')
+  const [saveError, setSaveError] = useState('')
+
+  const updateDraft = (id, patch) => {
+    setDrafts((prev) => ({
+      ...prev,
+      [id]: { ...(prev[id] || {}), ...patch },
+    }))
+  }
+
+  const saveApplication = async (application) => {
+    const draft = drafts[application.id] || {}
+    setSavingId(application.id)
+    setMessage('')
+    setSaveError('')
+    try {
+      const updated = await updateRecruitApplicationStatus(application.id, {
+        status: draft.status || application.status,
+        adminNote: draft.adminNote || '',
+      })
+      onUpdated(updated)
+      setDrafts((prev) => ({
+        ...prev,
+        [updated.id]: {
+          status: updated.status,
+          adminNote: updated.adminNote || '',
+        },
+      }))
+      setMessage(`${updated.name} 지원서를 저장했습니다.`)
+    } catch (err) {
+      setSaveError(err.message || '지원서 상태를 저장하지 못했습니다.')
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-[var(--theme-body-dark)]">모집 지원 관리</h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
+            지원서 접수 이후 검토 상태와 운영 메모를 남겨 학기 모집 흐름을 끊기지 않게 관리합니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onReload}
+          className="shape-cut-sm border border-black/10 bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
+        >
+          새로고침
+        </button>
+      </div>
+
+      {message && <p className="shape-cut-sm bg-[#e8f3ff] px-4 py-3 text-sm font-semibold text-[#0066cc]">{message}</p>}
+      {saveError && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{saveError}</p>}
+      {loading && <p className="text-sm text-[var(--theme-body-muted)]">지원서를 불러오는 중...</p>}
+      {error && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
+      {!loading && !error && applications.length === 0 && (
+        <p className="text-sm text-[var(--theme-body-muted)]">아직 접수된 지원서가 없습니다.</p>
+      )}
+
+      {!loading && !error && applications.length > 0 && (
+        <div className="space-y-3">
+          {applications.map((application) => {
+            const draft = drafts[application.id] || {
+              status: application.status || 'RECEIVED',
+              adminNote: application.adminNote || '',
+            }
+            return (
+              <article key={application.id} className="rounded-lg border border-black/10 bg-black/5 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-lg font-bold text-[var(--theme-body-dark)]">{application.name}</h3>
+                      <span className="rounded bg-[#e8f3ff] px-2 py-1 text-xs font-bold text-[#0066cc]">{recruitStatusLabel(application.status)}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-[var(--theme-body-muted)]">
+                      {application.studentId} · {application.department} · {application.grade || '학년 미입력'} · {formatDateTime(application.submittedAt)}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--theme-body-muted)]">{application.phone} · {application.email}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+                      <span>상태</span>
+                      <select
+                        aria-label={`${application.name} 지원 상태`}
+                        value={draft.status}
+                        onChange={(event) => updateDraft(application.id, { status: event.target.value })}
+                        className="shape-cut-sm border border-black/10 bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none"
+                      >
+                        {RECRUIT_STATUS_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => saveApplication(application)}
+                      disabled={savingId === application.id}
+                      aria-label={`${application.name} 저장`}
+                      className="mt-5 shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-xs font-semibold text-[var(--theme-bg)] transition hover:opacity-90 disabled:opacity-50"
+                    >
+                      {savingId === application.id ? '저장 중...' : '저장'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold text-[var(--theme-body-muted)]">관심 분야</p>
+                      <p className="mt-1 text-sm text-[var(--theme-body-dark)]">{application.interests || '미선택'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-[var(--theme-body-muted)]">지원 동기</p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--theme-body-dark)]">{application.motive}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold text-[var(--theme-body-muted)]">기대하는 활동</p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--theme-body-dark)]">{application.expectation}</p>
+                    </div>
+                    <label className="block text-xs font-semibold text-[var(--theme-body-muted)]">
+                      <span>운영 메모</span>
+                      <textarea
+                        aria-label={`${application.name} 운영 메모`}
+                        value={draft.adminNote}
+                        onChange={(event) => updateDraft(application.id, { adminNote: event.target.value })}
+                        maxLength={1000}
+                        className="mt-1 min-h-24 w-full rounded-lg border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+                        placeholder="면담 일정, 연락 결과, 합격 안내 여부 등을 남깁니다."
+                      />
+                    </label>
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function ScreenCheckTab() {
