@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CheckCircle2, Mail, Send, UserRound } from 'lucide-react'
 import { signupUser } from '../services/authApi.js'
 import { EmailVerifyStep } from '../components/EmailVerifyStep.jsx'
 
@@ -6,7 +7,7 @@ const CURRENT_SIGNUP = 'current'
 const GRADUATE_SIGNUP = 'graduate'
 const OTHER_INTEREST = '기타'
 
-const INTEREST_OPTIONS = ['보안', '웹', '앱']
+const INTEREST_OPTIONS = ['웹', '앱', '보안', '알고리즘', '아두이노', '디자인']
 const SIGNUP_TYPES = [
   { id: CURRENT_SIGNUP, label: '재학생' },
   { id: GRADUATE_SIGNUP, label: '졸업생' },
@@ -249,7 +250,6 @@ export default function Signup({ onBack }) {
     }
   }
 
-  const stepTitle = step === 'verify' ? '이메일 인증' : step === 'done' ? '가입 완료' : isGraduateSignup ? '졸업생 회원가입' : '회원가입'
   const stepDesc = step === 'verify'
     ? '가입하신 이메일로 발송된 인증코드를 입력해주세요.'
     : step === 'done'
@@ -259,17 +259,38 @@ export default function Signup({ onBack }) {
         : "COM's 명부 확인 후 관심 분야와 포부를 함께 등록합니다."
 
   return (
-    <main className="w-full px-0 pb-6 pt-0 text-[#1d1d1f] sm:pb-8">
-      <section className="mx-auto grid w-full max-w-[1120px] gap-5 rounded-lg border border-black/10 bg-white p-4 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:p-7 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-9 lg:p-8">
-        <div className="min-w-0 lg:sticky lg:top-8 lg:self-start">
-          <p className="mb-2 text-xs font-semibold text-[#0066cc]">Signup</p>
-          <h1 className="text-2xl font-semibold tracking-normal sm:text-3xl">{stepTitle}</h1>
-          <p className="mt-3 text-sm leading-6 text-[#6e6e73] sm:text-base sm:leading-7">{stepDesc}</p>
+    <div className="w-full min-w-0 space-y-4 text-[#1d1d1f]">
+      <button
+        type="button"
+        onClick={onBack}
+        className="apple-action-secondary px-4 py-2 text-sm"
+      >
+        로그인으로 돌아가기
+      </button>
+
+      <section className="apple-board-shell">
+        <div className="apple-board-hero px-6 py-8 sm:px-8 sm:py-10">
+          <p className="apple-eyebrow">Signup</p>
+          <h1 className="apple-display mt-3 text-4xl sm:text-6xl">COM&apos;s 회원가입</h1>
+          <p className="apple-copy mt-5 max-w-3xl text-base sm:text-lg">
+            지원하기와 같은 흐름으로 가입 정보를 작성합니다. 재학생은 명부 확인과 관심 분야를 함께 등록하고, 졸업생은 명부 인증 정보로 계정을 만듭니다.
+          </p>
         </div>
 
-        <div className="min-w-0">
+        <div className="grid gap-0 lg:grid-cols-[1fr_320px]">
+          <div className="min-w-0 bg-white p-6 sm:p-8">
           {step === 'form' && (
             <form onSubmit={handleSubmit} className="grid min-w-0 gap-4 sm:gap-5">
+              <div className="flex items-center gap-3">
+                <div className="flex size-11 items-center justify-center rounded-lg bg-[#e8f3ff] text-[#0066cc]">
+                  <UserRound size={20} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">가입 정보 양식</h2>
+                  <p className="text-sm text-[#6e6e73]">{stepDesc}</p>
+                </div>
+              </div>
+
               <SignupTypeSelector value={signupType} onChange={handleSignupTypeChange} />
 
               <div className={isCurrentSignup ? fieldGridClass : 'grid min-w-0 gap-3 sm:gap-4'}>
@@ -383,8 +404,9 @@ export default function Signup({ onBack }) {
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-1 min-h-12 w-full rounded-lg bg-[#0071e3] px-4 py-3 text-base font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-not-allowed disabled:opacity-60"
+                className="apple-action-primary mt-1 inline-flex min-h-12 w-full items-center justify-center gap-2 px-4 py-3 text-base disabled:cursor-not-allowed disabled:opacity-60"
               >
+                <Send size={17} />
                 {loading ? '가입 처리 중...' : isGraduateSignup ? '졸업생 회원가입' : '회원가입'}
               </button>
             </form>
@@ -401,20 +423,48 @@ export default function Signup({ onBack }) {
           {step === 'done' && (
             <div className="space-y-5 text-center">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#e8f3ff] text-3xl text-[#0066cc]">
-                ✓
+                <CheckCircle2 size={30} />
               </div>
               <p className="text-base font-semibold text-[#0066cc]">이메일 인증이 완료되었습니다!</p>
               <button
                 type="button"
                 onClick={onBack}
-                className="inline-block w-full rounded-lg bg-[#0071e3] px-4 py-3 text-base font-semibold text-white transition hover:bg-[#0077ed]"
+                className="apple-action-primary inline-flex w-full items-center justify-center px-4 py-3 text-base"
               >
                 로그인하러 가기
               </button>
             </div>
           )}
+          </div>
+
+          <aside className="flex flex-col justify-between gap-8 bg-[#f5f5f7] p-6 sm:p-8">
+            <div className="space-y-6">
+              <div>
+                <p className="text-sm font-semibold text-[#0066cc]">Process</p>
+                <div className="mt-4 space-y-3 text-sm leading-6 text-[#6e6e73]">
+                  <p>1. 가입 정보 작성</p>
+                  <p>2. 명부 확인 및 계정 생성</p>
+                  <p>3. 이메일 인증 후 로그인</p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-black/10 bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[#1d1d1f]">
+                  <Mail size={16} />
+                  가입 안내
+                </div>
+                <p className="mt-2 text-sm leading-6 text-[#6e6e73]">
+                  재학생은 명부의 학번과 이름이 일치해야 합니다. 졸업생은 입학연도 끝 두 자리 또는 기수로 인증합니다.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs leading-5 text-[#86868b]">
+              가입 후 이메일 인증을 완료해야 로그인할 수 있습니다. 지원서와 달리 회원가입은 계정 생성과 인증 절차가 함께 진행됩니다.
+            </p>
+          </aside>
         </div>
       </section>
-    </main>
+    </div>
   )
 }
