@@ -207,6 +207,7 @@ const sectionStories = {
 const floatingBarBaseClass = 'apple-topbar border-b border-black/10'
 const solidActionBtnClass = 'apple-action-primary inline-flex min-h-10 items-center justify-center px-5 py-2.5 text-sm disabled:cursor-wait disabled:opacity-60'
 const ghostActionBtnClass = 'apple-action-secondary inline-flex min-h-10 items-center justify-center px-5 py-2.5 text-sm disabled:cursor-wait disabled:opacity-60'
+const DETAIL_TITLE_MIN_FIT = 0.74
 
 const aboutDetailCards = [
   {
@@ -1069,8 +1070,11 @@ function AppearanceControl({
             </button>
 
             {activeFonts.length > 0 && (
-              <div className="appearance-font-row flex flex-wrap items-center gap-2 lg:justify-end">
+              <div className="appearance-font-row flex flex-wrap items-center gap-2 lg:justify-end" aria-label="폰트 설정">
                 <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">폰트</span>
+                <span className="rounded-full border border-black/10 bg-[var(--app-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-muted)]">
+                  {fontSelectionLocked ? '계정 저장 설정' : '게스트 임시 적용'}
+                </span>
                 {fontSelectionLocked ? (
                   <span className="rounded-full border border-black/10 bg-[var(--app-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)]">
                     계정 설정에서 변경
@@ -1331,6 +1335,60 @@ function DetailStoryPage({
   outputs,
 }) {
   const navigate = useNavigate()
+  const titleRef = useRef(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return undefined
+
+    const titleEl = titleRef.current
+    if (!titleEl) return undefined
+
+    let active = true
+    let frameId = 0
+
+    const fitTitle = () => {
+      if (!active) return
+      window.cancelAnimationFrame(frameId)
+      frameId = window.requestAnimationFrame(() => {
+        if (!active) return
+
+        const phrases = Array.from(titleEl.querySelectorAll('.apple-detail-title-phrase'))
+        if (phrases.length === 0) return
+
+        const availableWidth = titleEl.clientWidth
+        const currentFit = Number.parseFloat(getComputedStyle(titleEl).getPropertyValue('--apple-title-fit')) || 1
+        const widestPhrase = phrases.reduce((max, phrase) => Math.max(max, phrase.scrollWidth / currentFit), 0)
+        if (!availableWidth || !widestPhrase) return
+
+        const nextFit = Math.min(1, Math.max(DETAIL_TITLE_MIN_FIT, (availableWidth - 2) / widestPhrase))
+        if (Math.abs(nextFit - currentFit) > 0.004) {
+          titleEl.style.setProperty('--apple-title-fit', nextFit.toFixed(3))
+        }
+      })
+    }
+
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fitTitle)
+    resizeObserver?.observe(titleEl)
+
+    const mutationObserver = typeof MutationObserver === 'undefined' ? null : new MutationObserver(fitTitle)
+    mutationObserver?.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] })
+
+    const fontSet = document.fonts
+    fontSet?.addEventListener?.('loadingdone', fitTitle)
+    fontSet?.ready?.then(fitTitle).catch(() => {})
+    window.addEventListener('resize', fitTitle)
+
+    fitTitle()
+
+    return () => {
+      active = false
+      window.cancelAnimationFrame(frameId)
+      resizeObserver?.disconnect()
+      mutationObserver?.disconnect()
+      fontSet?.removeEventListener?.('loadingdone', fitTitle)
+      window.removeEventListener('resize', fitTitle)
+    }
+  }, [title])
 
   return (
     <div className="apple-detail-page theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
@@ -1343,7 +1401,7 @@ function DetailStoryPage({
               메인으로 돌아가기
             </button>
             <p className="apple-eyebrow">{eyebrow}</p>
-            <h1 className="apple-display apple-detail-title mt-4">{title}</h1>
+            <h1 ref={titleRef} className="apple-display apple-detail-title mt-4">{title}</h1>
             <p className="apple-copy mt-6 text-xl sm:text-2xl">{body}</p>
           </div>
 
@@ -1438,8 +1496,8 @@ function ActivitiesDetailPage() {
       eyebrow="Activities"
       title={(
         <>
-          <span className="inline-block">배움이 매주 쌓이고,</span>{' '}
-          <span className="inline-block">서로에게 남습니다.</span>
+          <span className="apple-detail-title-phrase">배움이 매주 쌓이고,</span>{' '}
+          <span className="apple-detail-title-phrase">서로에게 남습니다.</span>
         </>
       )}
       body="COM's의 활동은 정기 세미나, 분야별 스터디, 코드 리뷰, 작은 제작 과제가 이어지는 흐름입니다. 처음 시작하는 사람도 따라올 수 있고, 이미 경험이 있는 사람도 더 깊게 확장할 수 있습니다."

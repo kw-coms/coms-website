@@ -1,4 +1,4 @@
-import { request } from './apiClient.js'
+import { request, requestOptional } from './apiClient.js'
 
 export async function signupUser(payload) {
   return request('/api/auth/signup', {
@@ -19,7 +19,7 @@ export async function logoutUser() {
 }
 
 export async function getCurrentUser() {
-  return request('/api/auth/me')
+  return requestOptional('/api/auth/me', {}, null)
 }
 
 export async function changePassword(currentPassword, newPassword) {
