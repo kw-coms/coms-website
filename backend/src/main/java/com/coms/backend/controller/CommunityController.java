@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 @RequestMapping("/api/community/posts")
 public class CommunityController {
     private static final Set<String> TRUSTED_PROXIES = Set.of("127.0.0.1", "::1", "0:0:0:0:0:0:0:1");
+    private static final String SHARE_DESCRIPTION = "여기를 눌러 내용을 확인하세요.\ncoms.kw.ac.kr";
 
     private final CommunityService communityService;
     private final String publicBaseUrl;
@@ -81,7 +82,7 @@ public class CommunityController {
                 .body(new CommunityShareData(
                         preview.id(),
                         preview.title(),
-                        shareDescription(preview),
+                        SHARE_DESCRIPTION,
                         postUrl,
                         imageUrl,
                         preview.hasImage()
@@ -364,7 +365,7 @@ public class CommunityController {
                                     String postUrl,
                                     String imageUrl) {
         String title = html(preview.title());
-        String description = html(shareDescription(preview));
+        String description = html(SHARE_DESCRIPTION);
         String escapedPostUrl = html(postUrl);
         StringBuilder html = new StringBuilder();
         html.append("<!doctype html><html lang=\"ko\"><head>");
@@ -393,12 +394,6 @@ public class CommunityController {
         html.append("<a href=\"").append(escapedPostUrl).append("\">").append(title).append("</a>");
         html.append("</body></html>");
         return html.toString();
-    }
-
-    private String shareDescription(CommunityService.CommunityPostSharePreview preview) {
-        return preview.description().isBlank()
-                ? "COM's 커뮤니티 게시글입니다."
-                : preview.description();
     }
 
     private String absoluteUrl(HttpServletRequest request, String path) {
