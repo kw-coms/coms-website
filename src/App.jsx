@@ -1093,7 +1093,7 @@ function AppearanceControl({
 
             <div className="appearance-color-row flex flex-wrap items-center gap-2 lg:justify-end">
               <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">색상</span>
-              <div className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-[var(--app-surface)] p-1">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-[var(--app-surface)] p-1.5">
                 {accentSwatches.map((swatch) => {
                   const active = accent === swatch.value
                   return (
@@ -1101,12 +1101,12 @@ function AppearanceControl({
                       key={swatch.value}
                       type="button"
                       onClick={() => setAccentColor(swatch.value)}
-                      className={`relative grid size-7 place-items-center rounded-full transition hover:scale-105 ${active ? 'ring-2 ring-[var(--app-text)] ring-offset-2 ring-offset-[var(--app-surface)]' : ''}`}
+                      className={`relative grid size-11 min-h-11 min-w-11 place-items-center rounded-full transition hover:scale-105 sm:size-8 sm:min-h-8 sm:min-w-8 ${active ? 'ring-2 ring-[var(--app-text)] ring-offset-2 ring-offset-[var(--app-surface)]' : ''}`}
                       style={{ backgroundColor: swatch.value }}
                       aria-label={`${swatch.name} 색상 선택`}
                       title={swatch.name}
                     >
-                      {active && <span className="size-2 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.28)]" />}
+                      {active && <span className="size-2.5 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.28)] sm:size-2" />}
                     </button>
                   )
                 })}
@@ -1728,7 +1728,7 @@ function PageShell({ children, wide = false, full = false, transition = true }) 
   return (
     <div className="apple-route relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
       <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white via-[#f5f5f7] to-white" />
-      <main className={`relative mx-auto flex min-h-screen min-w-0 px-4 sm:px-6 ${full ? 'items-start pt-20 pb-16' : 'items-center justify-center py-24'} ${wide ? 'max-w-7xl' : 'max-w-4xl'}`}>
+      <main className={`apple-page-shell-main ${full ? 'apple-page-shell-main-full' : ''} relative mx-auto flex min-h-screen min-w-0 px-4 sm:px-6 ${full ? 'items-start pt-20 pb-16' : 'items-center justify-center py-24'} ${wide ? 'max-w-7xl' : 'max-w-4xl'}`}>
         <div className={`${transition ? 'page-transition' : ''} w-full min-w-0 ${wide ? 'max-w-6xl' : 'max-w-xl'}`}>{children}</div>
       </main>
     </div>
