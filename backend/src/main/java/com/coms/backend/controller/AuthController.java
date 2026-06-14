@@ -35,16 +35,33 @@ public class AuthController {
 
     private static final Duration REMEMBERED_REFRESH_COOKIE_AGE = Duration.ofDays(30);
 
+    private static final java.util.Set<String> VALID_SAME_SITE = java.util.Set.of("Lax", "Strict", "None");
+
     private final AuthService authService;
     private final JwtTokenProvider jwtTokenProvider;
     private final boolean cookieSecure;
+    private final String cookieSameSite;
 
     public AuthController(AuthService authService,
                           JwtTokenProvider jwtTokenProvider,
-                          @Value("${cookie.secure:false}") boolean cookieSecure) {
+                          @Value("${cookie.secure:false}") boolean cookieSecure,
+                          @Value("${cookie.same-site:Lax}") String cookieSameSite) {
         this.authService = authService;
         this.jwtTokenProvider = jwtTokenProvider;
         this.cookieSecure = cookieSecure;
+        String requested = cookieSameSite == null ? "Lax" : cookieSameSite.trim();
+        // SameSite=None requires Secure=true per RFC; if the deployer mis-paired the flags, log and fall back to Lax.
+        if ("None".equalsIgnoreCase(requested) && !cookieSecure) {
+            org.slf4j.LoggerFactory.getLogger(AuthController.class)
+                    .warn("cookie.same-site=None requires cookie.secure=true; falling back to Lax");
+            this.cookieSameSite = "Lax";
+        } else if (!VALID_SAME_SITE.contains(requested)) {
+            org.slf4j.LoggerFactory.getLogger(AuthController.class)
+                    .warn("cookie.same-site={} is not one of Lax/Strict/None; falling back to Lax", requested);
+            this.cookieSameSite = "Lax";
+        } else {
+            this.cookieSameSite = requested.substring(0, 1).toUpperCase() + requested.substring(1).toLowerCase();
+        }
     }
 
     @PostMapping("/signup")
@@ -88,10 +105,10 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletResponse response) {
         response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("token", "")
-                .httpOnly(true).secure(cookieSecure).sameSite("Lax")
+                .httpOnly(true).secure(cookieSecure).sameSite(cookieSameSite)
                 .maxAge(Duration.ZERO).path("/").build().toString());
         response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("refreshToken", "")
-                .httpOnly(true).secure(cookieSecure).sameSite("Lax")
+                .httpOnly(true).secure(cookieSecure).sameSite(cookieSameSite)
                 .maxAge(Duration.ZERO).path("/api/auth/refresh").build().toString());
         return ResponseEntity.noContent().build();
     }
@@ -132,13 +149,13 @@ public class AuthController {
 
     private ResponseCookie accessCookie(String token) {
         return ResponseCookie.from("token", token)
-                .httpOnly(true).secure(cookieSecure).sameSite("Lax")
+                .httpOnly(true).secure(cookieSecure).sameSite(cookieSameSite)
                 .path("/").build();
     }
 
     private ResponseCookie refreshCookie(String token, boolean rememberMe) {
         ResponseCookie.ResponseCookieBuilder cookie = ResponseCookie.from("refreshToken", token)
-                .httpOnly(true).secure(cookieSecure).sameSite("Lax")
+                .httpOnly(true).secure(cookieSecure).sameSite(cookieSameSite)
                 .path("/api/auth/refresh");
         if (rememberMe) {
             cookie.maxAge(REMEMBERED_REFRESH_COOKIE_AGE);
