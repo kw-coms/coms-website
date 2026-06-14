@@ -330,7 +330,7 @@ export default function Notices() {
             {!loading && !error && filteredNotices.length > 0 && (
               <>
                 {/* 모바일 카드 목록 */}
-                <div className="mx-4 mb-4 hidden grid-cols-1 gap-3 max-md:grid sm:mx-6">
+                <div className="mx-4 mb-4 hidden grid-cols-1 gap-2.5 max-md:grid sm:mx-6">
                   {filteredNotices.map((notice) => {
                     const open = () => openNotice(notice)
                     const meta = noticeCategoryMeta(notice.category || 'GENERAL')
@@ -339,7 +339,7 @@ export default function Notices() {
                         key={notice.id}
                         type="button"
                         onClick={open}
-                        className="apple-soft-panel flex min-h-[7rem] flex-col gap-2 px-4 py-3.5 text-left transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none"
+                        className="notice-mobile-card apple-soft-panel text-left transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none"
                       >
                         <div className="flex min-w-0 items-center gap-2">
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${meta.badgeClass}`}>
@@ -347,7 +347,9 @@ export default function Notices() {
                           </span>
                           <span className="ml-auto text-[11px] text-[#86868b]">{formatDate(notice.createdAt)}</span>
                         </div>
-                        <span className="line-clamp-2 text-[15px] font-bold leading-6 text-[#1d1d1f]">{notice.title}</span>
+                        <span className="notice-mobile-title-frame">
+                          <span className="line-clamp-2 text-[15px] font-bold leading-6 text-[#1d1d1f]">{notice.title}</span>
+                        </span>
                         <span className="mt-auto truncate text-xs font-semibold text-[#86868b]">{notice.author}</span>
                       </button>
                     )
