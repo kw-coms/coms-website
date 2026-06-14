@@ -104,6 +104,27 @@ const showcaseItems = [
   },
 ]
 
+const activityHubItems = [
+  {
+    title: '공지사항',
+    body: '모집, 세미나, 운영 안내를 빠르게 확인합니다.',
+    route: '/notices',
+    cta: '공지 보기',
+  },
+  {
+    title: '커뮤니티',
+    body: '질문, 프로젝트 모집, 활동 후기를 부원들과 나눕니다.',
+    route: '/community',
+    cta: '커뮤니티 열기',
+  },
+  {
+    title: '자료실',
+    body: '세미나 자료와 프로젝트 기록을 다시 찾아봅니다.',
+    route: '/resources',
+    cta: '자료 찾기',
+  },
+]
+
 const sectionMetrics = {
   about: [
     { value: 'Central', label: '광운대 중앙 동아리' },
@@ -1762,6 +1783,38 @@ function HomeView() {
                 <span className={`mt-8 inline-flex rounded-full px-4 py-2 text-sm font-semibold ${index === 0 ? 'bg-white text-[#1d1d1f]' : 'bg-[#0071e3] text-white'}`}>더 보기</span>
               </button>
             ))}
+          </div>
+        </section>
+
+        <section className="bg-[#f5f5f7] px-5 py-12 sm:py-16">
+          <div className="mx-auto max-w-7xl">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="apple-eyebrow">Member loop</p>
+                <h2 className="apple-display mt-3 text-4xl sm:text-5xl">활동 허브</h2>
+                <p className="apple-copy mt-3 max-w-2xl text-lg">
+                  공지, 커뮤니티, 자료실을 한 번에 이어서 부원이 다시 들어올 이유를 분명하게 만듭니다.
+                </p>
+              </div>
+              <button type="button" onClick={() => goPageTop('/notices')} className={ghostActionBtnClass}>최근 공지 보기</button>
+            </div>
+            <div className="mt-8 grid gap-3 lg:grid-cols-3">
+              {activityHubItems.map((item, index) => (
+                <button
+                  key={item.title}
+                  type="button"
+                  onClick={() => goPageTop(item.route)}
+                  className="apple-product-panel min-h-44 px-6 py-6 text-left transition hover:-translate-y-0.5"
+                >
+                  <span className="inline-flex size-8 items-center justify-center rounded-full bg-[#e8f3ff] text-sm font-bold text-[#0066cc]">
+                    {index + 1}
+                  </span>
+                  <h3 className="mt-5 text-2xl font-semibold text-[#1d1d1f]">{item.title}</h3>
+                  <p className="mt-3 text-sm font-medium leading-6 text-[#6e6e73]">{item.body}</p>
+                  <span className="mt-5 inline-flex text-sm font-bold text-[#0066cc]">{item.cta}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </section>
 
