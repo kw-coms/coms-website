@@ -4,6 +4,7 @@ import com.coms.backend.domain.AuditLog;
 import com.coms.backend.dto.AuditLogResponse;
 import com.coms.backend.repository.AuditLogRepository;
 import com.coms.backend.repository.MemberRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +14,8 @@ import java.util.List;
 @Service
 public class AuditLogService {
     private static final int MAX_DETAIL_LENGTH = 1000;
+    private static final int DEFAULT_RECENT_LIMIT = 1000;
+    private static final int MAX_RECENT_LIMIT = 2000;
 
     private final AuditLogRepository auditLogRepository;
     private final MemberRepository memberRepository;
@@ -46,7 +49,12 @@ public class AuditLogService {
 
     @Transactional(readOnly = true)
     public List<AuditLogResponse> recent() {
-        return auditLogRepository.findTop300ByOrderByCreatedAtDesc().stream()
+        return recent(DEFAULT_RECENT_LIMIT);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AuditLogResponse> recent(int limit) {
+        return auditLogRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, boundedLimit(limit))).stream()
                 .map(log -> new AuditLogResponse(
                         log.getId(),
                         log.getActorStudentId(),
@@ -59,6 +67,13 @@ public class AuditLogService {
                         log.getCreatedAt()
                 ))
                 .toList();
+    }
+
+    private int boundedLimit(int limit) {
+        if (limit < 1) {
+            return 1;
+        }
+        return Math.min(limit, MAX_RECENT_LIMIT);
     }
 
     private String resolveActorName(String actorStudentId) {
