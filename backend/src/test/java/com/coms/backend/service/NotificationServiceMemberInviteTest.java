@@ -103,6 +103,24 @@ class NotificationServiceMemberInviteTest {
     }
 
     @Test
+    void acceptsLongTeamMateInviteUrls() {
+        String invitePayload = "a".repeat(900);
+        String longAcceptUrl = "https://example.test/team-randomizer/#invite=" + invitePayload;
+        MemberExternalInviteRequest req = request(
+                List.of(recipient.getStudentId()),
+                "팀메이트",
+                "팀플 같이해요",
+                longAcceptUrl
+        );
+
+        NotificationService.ExternalInviteBatchResult result = notificationService.notifyExternalInviteFromMember(sender.getStudentId(), req);
+
+        assertThat(result.accepted()).isEqualTo(1);
+        Notification saved = notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(recipient.getStudentId()).get(0);
+        assertThat(saved.getAcceptUrl()).isEqualTo(longAcceptUrl);
+    }
+
+    @Test
     void truncatesActorLabelToOneHundredCharacters() {
         String longLabel = "ㄱ".repeat(150);
         MemberExternalInviteRequest req = request(

@@ -18,7 +18,7 @@ public class MemberExternalInviteRequest {
     @Size(max = 300)
     private String message;
 
-    @Size(max = 500)
+    @Size(max = 2000)
     private String acceptUrl;
 
     public List<String> getRecipientStudentIds() { return recipientStudentIds; }

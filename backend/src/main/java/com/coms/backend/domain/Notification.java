@@ -24,7 +24,7 @@ public class Notification {
     private Long commentId;
     private Long noticeId;
 
-    @Column(length = 500)
+    @Column(length = 2000)
     private String acceptUrl;
 
     @Column(length = 100)
