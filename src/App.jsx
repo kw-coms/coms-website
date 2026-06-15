@@ -1006,6 +1006,7 @@ function AppearanceControl({
   selectedFontId = null,
   onFontChange,
   fontSelectionLocked = false,
+  onOpenAccountSettings,
 }) {
   const accent = normalizeHex(accentColor)
   const isDark = themeMode === 'dark'
@@ -1045,9 +1046,13 @@ function AppearanceControl({
                   {fontSelectionLocked ? '계정 저장 설정' : '게스트 임시 적용'}
                 </span>
                 {fontSelectionLocked ? (
-                  <span className="rounded-full border border-black/10 bg-[var(--app-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)]">
+                  <button
+                    type="button"
+                    onClick={onOpenAccountSettings}
+                    className="rounded-full border border-black/10 bg-[var(--app-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface-elevated)] hover:text-[var(--app-text)] focus:outline-none focus:ring-2 focus:ring-[var(--app-accent)]/30"
+                  >
                     계정 설정에서 변경
-                  </span>
+                  </button>
                 ) : (
                   <select
                     value={fontSelectValue}
@@ -1151,6 +1156,7 @@ function PageFallback() {
 
 function App() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [themeMode, setThemeMode] = useState(getStoredThemeMode)
   const [accentColor, setAccentColor] = useState(getStoredAccentColor)
   const [activeFonts, setActiveFonts] = useState([])
@@ -1231,6 +1237,11 @@ function App() {
     }
   }
 
+  const openAccountSettings = () => {
+    navigate('/settings')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   return (
     <Suspense fallback={<PageFallback />}>
       <ScrollToTop />
@@ -1262,6 +1273,7 @@ function App() {
         selectedFontId={effectiveFontId}
         onFontChange={handleGuestFontChange}
         fontSelectionLocked={Boolean(user)}
+        onOpenAccountSettings={openAccountSettings}
       />
     </Suspense>
   )
