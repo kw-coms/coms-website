@@ -57,6 +57,9 @@ public class Member {
 
     private Long selectedFontId;
 
+    @Column(length = 50)
+    private String selectedBuiltinFontKey;
+
     public enum Role {
         USER, ADMIN
     }
@@ -97,4 +100,6 @@ public class Member {
     public void setLastLoginIp(String lastLoginIp) { this.lastLoginIp = lastLoginIp; }
     public Long getSelectedFontId() { return selectedFontId; }
     public void setSelectedFontId(Long selectedFontId) { this.selectedFontId = selectedFontId; }
+    public String getSelectedBuiltinFontKey() { return selectedBuiltinFontKey; }
+    public void setSelectedBuiltinFontKey(String selectedBuiltinFontKey) { this.selectedBuiltinFontKey = selectedBuiltinFontKey; }
 }

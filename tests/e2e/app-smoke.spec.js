@@ -90,6 +90,56 @@ test('appearance panel directs signed-in users to account-saved font settings', 
   await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--apple-font-family'))).toBe('')
 })
 
+test('signed-in account built-in font applies across the site', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.unroute('**/api/auth/me')
+  await page.route('**/api/auth/me', (route) => route.fulfill({
+    status: 200,
+    json: {
+      id: 1,
+      name: '관리자',
+      studentId: '2020123456',
+      role: 'ADMIN',
+      emailVerified: true,
+      selectedBuiltinFontKey: 'b:pretendard',
+    },
+  }))
+
+  await page.goto('/')
+
+  await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--apple-font-family')))
+    .toContain('Pretendard Variable')
+})
+
+test('member settings saves and previews a built-in font preference', async ({ page }) => {
+  await mockAdminApis(page)
+  let savedProfile = null
+  await page.route('**/api/auth/profile', async (route) => {
+    savedProfile = route.request().postDataJSON()
+    await route.fulfill({
+      status: 200,
+      json: {
+        id: 1,
+        name: '관리자',
+        studentId: '2020123456',
+        role: 'ADMIN',
+        emailVerified: true,
+        ...savedProfile,
+      },
+    })
+  })
+
+  await page.goto('/settings')
+  await page.getByLabel('사이트 폰트').selectOption('b:pretendard')
+
+  await expect(page.getByTestId('account-font-preview')).toHaveCSS('font-family', /Pretendard Variable/)
+  await page.getByRole('button', { name: '회원 정보 저장' }).click()
+  await expect.poll(() => savedProfile).toMatchObject({
+    selectedFontId: null,
+    selectedBuiltinFontKey: 'b:pretendard',
+  })
+})
+
 test('signup follows the recruit application form structure', async ({ page }) => {
   await page.goto('/signup')
 
@@ -124,6 +174,11 @@ test('admin exposes a pre-deploy screen check panel', async ({ page }) => {
 
 test('admin font management explains availability and uses action labels', async ({ page }) => {
   await mockAdminApis(page)
+  await page.route('**/api/fonts/*/file', (route) => route.fulfill({
+    status: 200,
+    contentType: 'font/woff2',
+    body: '',
+  }))
   await page.route('**/api/admin/fonts', (route) => route.fulfill({
     status: 200,
     json: [
@@ -138,6 +193,8 @@ test('admin font management explains availability and uses action labels', async
   await expect(page.getByText('활성 폰트만 사이트 폰트 선택 목록에 표시됩니다.')).toBeVisible()
   await expect(page.getByRole('button', { name: '활성 폰트 비활성화' })).toBeVisible()
   await expect(page.getByRole('button', { name: '비활성 폰트 활성화' })).toBeVisible()
+  await expect(page.getByTestId('admin-font-preview-1')).toHaveCSS('font-family', /활성 폰트/)
+  await expect(page.getByTestId('admin-font-preview-2')).toHaveCSS('font-family', /비활성 폰트/)
 })
 
 test('admin logs tab can expand log window and clear caches', async ({ page }) => {

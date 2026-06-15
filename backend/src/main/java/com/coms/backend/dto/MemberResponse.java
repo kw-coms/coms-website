@@ -11,6 +11,7 @@ public record MemberResponse(
         String role,
         String aspiration,
         String interests,
-        Long selectedFontId
+        Long selectedFontId,
+        String selectedBuiltinFontKey
 ) {
 }

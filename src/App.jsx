@@ -18,6 +18,7 @@ import {
 import { listNotices } from './services/noticeApi.js'
 import { getNotificationSummary, listNotifications, markAllNotificationsRead, markNotificationRead } from './services/notificationApi.js'
 import { listFonts } from './services/fontApi.js'
+import { BUILT_IN_FONTS, buildFontFaceCss, fontFamilyValue, injectBuiltinFontStylesheets } from './services/fontPreferences.js'
 const Archive = lazy(() => import('./pages/Archive.jsx'))
 const Login = lazy(() => import('./pages/Login.jsx'))
 const Signup = lazy(() => import('./pages/Signup.jsx'))
@@ -339,42 +340,6 @@ const DEFAULT_ACCENT = '#0071e3'
 const THEME_MODE_KEY = 'kwcoms-theme-mode'
 const ACCENT_COLOR_KEY = 'kwcoms-accent-color'
 const FONT_SELECTION_KEY = 'kwcoms-font-id'
-const DEFAULT_FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Apple SD Gothic Neo', 'Segoe UI', 'Malgun Gothic', sans-serif"
-
-function sanitizeFontFamily(name) {
-  return String(name || '')
-    // eslint-disable-next-line no-control-regex
-    .replace(/["\\\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, '')
-    .trim()
-    .slice(0, 64)
-}
-
-function safeFontUrl(raw) {
-  const value = String(raw || '').trim()
-  if (!value) return null
-  if (/["()\s\\<>]/.test(value)) return null
-  if (typeof window === 'undefined') return null
-  try {
-    const parsed = new URL(value, window.location.origin)
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null
-    if (parsed.origin !== window.location.origin) return null
-    return encodeURI(parsed.pathname + parsed.search)
-  } catch {
-    return null
-  }
-}
-
-function buildFontFaceCss(fonts) {
-  return fonts
-    .map((font) => {
-      const family = sanitizeFontFamily(font.name)
-      const url = safeFontUrl(font.fileUrl)
-      if (!family || !url) return ''
-      return `@font-face{font-family:"${family}";src:url("${url}") format("woff2"),url("${url}");font-display:swap;}`
-    })
-    .filter(Boolean)
-    .join('\n')
-}
 
 function getStoredFontId() {
   if (typeof window === 'undefined') return null
@@ -383,59 +348,6 @@ function getStoredFontId() {
   if (raw.startsWith('b:')) return raw
   const n = Number(raw)
   return Number.isFinite(n) && n > 0 ? n : null
-}
-
-const BUILT_IN_FONTS = [
-  {
-    id: 'b:pretendard',
-    name: 'Pretendard',
-    family: 'Pretendard Variable',
-    stylesheet: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css',
-  },
-  {
-    id: 'b:noto-sans-kr',
-    name: 'Noto Sans KR',
-    family: 'Noto Sans KR',
-    stylesheet: 'https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap',
-  },
-  {
-    id: 'b:ibm-plex-sans-kr',
-    name: 'IBM Plex Sans KR',
-    family: 'IBM Plex Sans KR',
-    stylesheet: 'https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap',
-  },
-  {
-    id: 'b:nanum-gothic',
-    name: 'Nanum Gothic',
-    family: 'Nanum Gothic',
-    stylesheet: 'https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap',
-  },
-  {
-    id: 'b:gowun-dodum',
-    name: 'Gowun Dodum',
-    family: 'Gowun Dodum',
-    stylesheet: 'https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap',
-  },
-  {
-    id: 'b:nanum-myeongjo',
-    name: 'Nanum Myeongjo',
-    family: 'Nanum Myeongjo',
-    stylesheet: 'https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&display=swap',
-  },
-]
-
-function injectBuiltinFontStylesheets() {
-  if (typeof document === 'undefined') return
-  BUILT_IN_FONTS.forEach((font) => {
-    const linkId = `builtin-font-${font.id}`
-    if (document.getElementById(linkId)) return
-    const link = document.createElement('link')
-    link.id = linkId
-    link.rel = 'stylesheet'
-    link.href = font.stylesheet
-    link.crossOrigin = 'anonymous'
-    document.head.appendChild(link)
-  })
 }
 
 const accentSwatches = [
@@ -1247,14 +1159,13 @@ function App() {
   }, [])
 
   const combinedFonts = [...BUILT_IN_FONTS, ...activeFonts]
-  const effectiveFontId = user ? user.selectedFontId : guestFontId
+  const effectiveFontId = user ? (user.selectedBuiltinFontKey ?? user.selectedFontId) : guestFontId
   const selectedFont = combinedFonts.find((font) => String(font.id) === String(effectiveFontId))
 
   useEffect(() => {
     const root = document.documentElement
     if (selectedFont) {
-      const family = sanitizeFontFamily(selectedFont.family || selectedFont.name)
-      root.style.setProperty('--apple-font-family', `"${family}", ${DEFAULT_FONT_FAMILY}`)
+      root.style.setProperty('--apple-font-family', fontFamilyValue(selectedFont))
     } else {
       root.style.removeProperty('--apple-font-family')
     }
