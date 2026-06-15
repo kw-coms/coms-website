@@ -82,7 +82,7 @@ class AuthServiceTest {
 
         var response = authService.updateProfile(
                 "2026123456",
-                new UpdateProfileRequest(" 01012345678 ", " 프로젝트를 만들고 싶습니다. ", " 웹, AI ", null)
+                new UpdateProfileRequest(" 01012345678 ", " 프로젝트를 만들고 싶습니다. ", " 웹, AI ", null, null)
         );
 
         assertThat(response.phone()).isEqualTo("01012345678");
@@ -93,6 +93,49 @@ class AuthServiceTest {
         assertThat(saved.getPhone()).isEqualTo("01012345678");
         assertThat(saved.getAspiration()).isEqualTo("프로젝트를 만들고 싶습니다.");
         assertThat(saved.getInterests()).isEqualTo("웹, AI");
+    }
+
+    @Test
+    void updateProfilePersistsBuiltInFontPreference() {
+        saveMember("2026123464", false);
+
+        var response = authService.updateProfile(
+                "2026123464",
+                new UpdateProfileRequest(null, null, null, null, "b:pretendard")
+        );
+
+        assertThat(response.selectedFontId()).isNull();
+        assertThat(response.selectedBuiltinFontKey()).isEqualTo("b:pretendard");
+
+        Member saved = memberRepository.findByStudentId("2026123464").orElseThrow();
+        assertThat(saved.getSelectedFontId()).isNull();
+        assertThat(saved.getSelectedBuiltinFontKey()).isEqualTo("b:pretendard");
+    }
+
+    @Test
+    void updateProfileRejectsUnknownBuiltInFontPreference() {
+        saveMember("2026123465", false);
+
+        assertThatThrownBy(() -> authService.updateProfile(
+                "2026123465",
+                new UpdateProfileRequest(null, null, null, null, "b:unknown")
+        )).isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
+            assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(ex.getReason()).contains("Built-in font");
+        });
+    }
+
+    @Test
+    void updateProfileRejectsMultipleFontPreferences() {
+        saveMember("2026123466", false);
+
+        assertThatThrownBy(() -> authService.updateProfile(
+                "2026123466",
+                new UpdateProfileRequest(null, null, null, 1L, "b:pretendard")
+        )).isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
+            assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(ex.getReason()).contains("one font preference");
+        });
     }
 
     @Test

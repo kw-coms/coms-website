@@ -3,6 +3,7 @@ import { RefreshCw, RotateCcw } from 'lucide-react'
 import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache, listRecruitApplications, updateRecruitApplicationStatus } from '../services/adminApi.js'
 import { listFiles, createPost, deleteFile } from '../services/archiveApi.js'
 import { listAdminFonts, setFontActive, uploadFont } from '../services/fontApi.js'
+import { buildFontFaceCss, fontFamilyValue } from '../services/fontPreferences.js'
 import { useAuth } from '../contexts/useAuth.js'
 
 const BAN_DURATIONS = [
@@ -1056,6 +1057,17 @@ function FontsTab() {
     return () => { mounted = false }
   }, [])
 
+  useEffect(() => {
+    const styleId = 'admin-font-faces'
+    let styleEl = document.getElementById(styleId)
+    if (!styleEl) {
+      styleEl = document.createElement('style')
+      styleEl.id = styleId
+      document.head.appendChild(styleEl)
+    }
+    styleEl.textContent = buildFontFaceCss(fonts)
+  }, [fonts])
+
   const submit = async (event) => {
     event.preventDefault()
     if (!name.trim() || !file) return
@@ -1128,6 +1140,13 @@ function FontsTab() {
               <div>
                 <p className="font-semibold text-[var(--theme-body-dark)]">{font.name}</p>
                 <p className="text-xs text-[var(--theme-body-muted)]">{new Date(font.createdAt).toLocaleString('ko-KR')}</p>
+                <p
+                  data-testid={`admin-font-preview-${font.id}`}
+                  className="mt-2 text-base text-[var(--theme-body-dark)]"
+                  style={{ fontFamily: fontFamilyValue(font) }}
+                >
+                  한글 English 123 · 폰트 미리보기
+                </p>
               </div>
               <button
                 type="button"
