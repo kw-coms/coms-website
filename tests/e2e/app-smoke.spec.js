@@ -78,6 +78,18 @@ test('appearance panel explains guest font persistence scope', async ({ page }) 
   await expect(page.getByText('게스트 임시 적용')).toBeVisible()
 })
 
+test('appearance panel directs signed-in users to account-saved font settings', async ({ page }) => {
+  await page.addInitScript(() => window.localStorage.setItem('kwcoms-font-id', 'b:noto-sans-kr'))
+  await mockAdminApis(page)
+  await page.goto('/')
+
+  const fontSettings = page.locator('[aria-label="폰트 설정"]')
+  await expect(fontSettings).toContainText('계정 저장 설정')
+  await expect(fontSettings).toContainText('계정 설정에서 변경')
+  await expect(fontSettings.getByRole('combobox', { name: '사이트 폰트 선택' })).toHaveCount(0)
+  await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--apple-font-family'))).toBe('')
+})
+
 test('signup follows the recruit application form structure', async ({ page }) => {
   await page.goto('/signup')
 
@@ -108,6 +120,24 @@ test('admin exposes a pre-deploy screen check panel', async ({ page }) => {
   }
   await expect(page.getByText('/api/auth/me')).toBeVisible()
   await expect(page.getByText('/api/fonts')).toBeVisible()
+})
+
+test('admin font management explains availability and uses action labels', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/admin/fonts', (route) => route.fulfill({
+    status: 200,
+    json: [
+      { id: 1, name: '활성 폰트', fileUrl: '/api/fonts/1/file', active: true, createdAt: '2026-06-15T03:30:00' },
+      { id: 2, name: '비활성 폰트', fileUrl: '/api/fonts/2/file', active: false, createdAt: '2026-06-15T03:31:00' },
+    ],
+  }))
+
+  await page.goto('/admin')
+  await page.getByRole('button', { name: '폰트 관리' }).click()
+
+  await expect(page.getByText('활성 폰트만 사이트 폰트 선택 목록에 표시됩니다.')).toBeVisible()
+  await expect(page.getByRole('button', { name: '활성 폰트 비활성화' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '비활성 폰트 활성화' })).toBeVisible()
 })
 
 test('admin logs tab can expand log window and clear caches', async ({ page }) => {

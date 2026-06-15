@@ -1247,7 +1247,7 @@ function App() {
   }, [])
 
   const combinedFonts = [...BUILT_IN_FONTS, ...activeFonts]
-  const effectiveFontId = guestFontId ?? (user?.selectedFontId ?? null)
+  const effectiveFontId = user ? user.selectedFontId : guestFontId
   const selectedFont = combinedFonts.find((font) => String(font.id) === String(effectiveFontId))
 
   useEffect(() => {
@@ -1311,7 +1311,7 @@ function App() {
         activeFonts={combinedFonts}
         selectedFontId={effectiveFontId}
         onFontChange={handleGuestFontChange}
-        fontSelectionLocked={false}
+        fontSelectionLocked={Boolean(user)}
       />
     </Suspense>
   )

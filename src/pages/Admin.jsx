@@ -1113,6 +1113,10 @@ function FontsTab() {
         {error && <p className="mt-2 text-sm font-semibold text-red-600">{error}</p>}
       </form>
 
+      <p className="rounded-lg border border-black/10 bg-black/5 px-4 py-3 text-xs leading-5 text-[var(--theme-body-muted)]">
+        활성 폰트만 사이트 폰트 선택 목록에 표시됩니다. 비활성화해도 폰트 파일과 기존 회원의 저장값은 삭제되지 않습니다.
+      </p>
+
       {loading ? (
         <p className="text-sm text-[var(--theme-body-muted)]">폰트를 불러오는 중...</p>
       ) : fonts.length === 0 ? (
@@ -1128,9 +1132,10 @@ function FontsTab() {
               <button
                 type="button"
                 onClick={() => toggle(font)}
+                aria-label={`${font.name} ${font.active ? '비활성화' : '활성화'}`}
                 className={`shape-cut-sm px-3 py-1.5 text-xs font-bold ${font.active ? 'bg-[#e8f3ff] text-[#0066cc]' : 'bg-black/10 text-[var(--theme-body-muted)]'}`}
               >
-                {font.active ? '활성' : '비활성'}
+                {font.active ? '비활성화' : '활성화'}
               </button>
             </div>
           ))}
