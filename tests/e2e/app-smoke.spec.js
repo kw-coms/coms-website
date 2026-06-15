@@ -78,6 +78,22 @@ test('appearance panel explains guest font persistence scope', async ({ page }) 
   await expect(page.getByText('게스트 임시 적용')).toBeVisible()
 })
 
+test('home surfaces companion service links as launchable destinations', async ({ page }) => {
+  await page.goto('/')
+
+  await expect(page.getByRole('heading', { name: "COM's Apps" })).toBeVisible()
+
+  for (const [name, href] of [
+    ['Food Club', 'https://coms.kw.ac.kr/foodclub/'],
+    ['TeamMate', 'https://coms.kw.ac.kr/team-randomizer/'],
+    ['Game Club', 'https://coms.kw.ac.kr/gameclub/'],
+    ['KW Mate', 'http://kwmate.com/'],
+    ['Daily Coding', 'https://dailycoding-final.com/'],
+  ]) {
+    await expect(page.getByRole('link', { name: new RegExp(`${name}.*열기`) })).toHaveAttribute('href', href)
+  }
+})
+
 test('appearance panel directs signed-in users to account-saved font settings', async ({ page }) => {
   await page.addInitScript(() => window.localStorage.setItem('kwcoms-font-id', 'b:noto-sans-kr'))
   await mockAdminApis(page)
@@ -170,6 +186,47 @@ test('admin exposes a pre-deploy screen check panel', async ({ page }) => {
   }
   await expect(page.getByText('/api/auth/me')).toBeVisible()
   await expect(page.getByText('/api/fonts')).toBeVisible()
+})
+
+test('admin password reset accepts simple temporary passwords without complexity copy', async ({ page }) => {
+  await mockAdminApis(page)
+  let promptMessage
+  let resetPayload = null
+
+  await page.route('**/api/admin/members', (route) => route.fulfill({
+    status: 200,
+    json: [
+      {
+        id: 2,
+        name: '홍길동',
+        studentId: '2024123456',
+        email: 'hong@example.com',
+        emailVerified: true,
+        role: 'USER',
+      },
+    ],
+  }))
+  await page.route('**/api/admin/members/2/password', async (route) => {
+    resetPayload = route.request().postDataJSON()
+    await route.fulfill({ status: 204 })
+  })
+  await page.addInitScript(() => {
+    window.__adminPromptMessages = []
+    window.prompt = (message) => {
+      window.__adminPromptMessages.push(message)
+      return 'temp1'
+    }
+    window.alert = () => {}
+  })
+
+  await page.goto('/admin')
+  await page.getByRole('button', { name: '회원 관리' }).click()
+  await page.getByRole('button', { name: '비번 초기화' }).click()
+  promptMessage = await page.evaluate(() => window.__adminPromptMessages[0] || '')
+
+  expect(promptMessage).not.toContain('특수문자')
+  expect(promptMessage).not.toContain('8자')
+  await expect.poll(() => resetPayload).toEqual({ password: 'temp1' })
 })
 
 test('admin font management explains availability and uses action labels', async ({ page }) => {
