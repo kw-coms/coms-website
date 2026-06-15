@@ -213,7 +213,8 @@ public class AuthService implements UserDetailsService {
                 member.getRole().name(),
                 member.getAspiration(),
                 member.getInterests(),
-                member.getSelectedFontId()
+                member.getSelectedFontId(),
+                member.getSelectedBuiltinFontKey()
         );
     }
 
@@ -282,10 +283,17 @@ public class AuthService implements UserDetailsService {
         member.setPhone(normalizeNullable(request.phone()));
         member.setAspiration(normalizeNullable(request.aspiration()));
         member.setInterests(normalizeNullable(request.interests()));
+        if (request.selectedFontId() != null && request.selectedBuiltinFontKey() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose only one font preference.");
+        }
         if (!fontService.isSelectable(request.selectedFontId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selected font is not available.");
         }
+        if (!fontService.isSelectableBuiltIn(request.selectedBuiltinFontKey())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Built-in font is not available.");
+        }
         member.setSelectedFontId(request.selectedFontId());
+        member.setSelectedBuiltinFontKey(request.selectedBuiltinFontKey());
         memberRepository.save(member);
         return new MemberResponse(
                 member.getId(),
@@ -298,7 +306,8 @@ public class AuthService implements UserDetailsService {
                 member.getRole().name(),
                 member.getAspiration(),
                 member.getInterests(),
-                member.getSelectedFontId()
+                member.getSelectedFontId(),
+                member.getSelectedBuiltinFontKey()
         );
     }
 

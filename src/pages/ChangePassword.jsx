@@ -6,6 +6,7 @@ import {
   updateProfile,
 } from '../services/authApi.js'
 import { listFonts } from '../services/fontApi.js'
+import { BUILT_IN_FONTS, fontFamilyValue } from '../services/fontPreferences.js'
 import { useAuth } from '../contexts/useAuth.js'
 import { getLogoAsset } from '../utils/logoAssets.js'
 
@@ -118,8 +119,10 @@ export default function ChangePassword({ onBack }) {
   const profileForm = {
     phone: profileDraft.phone ?? user?.phone ?? '',
     aspiration: profileDraft.aspiration ?? user?.aspiration ?? '',
-    selectedFontId: profileDraft.selectedFontId ?? user?.selectedFontId ?? '',
+    selectedFontValue: profileDraft.selectedFontValue ?? user?.selectedBuiltinFontKey ?? user?.selectedFontId ?? '',
   }
+  const selectableFonts = [...BUILT_IN_FONTS, ...fonts]
+  const selectedFont = selectableFonts.find((font) => String(font.id) === String(profileForm.selectedFontValue))
   const passwordChecks = [
     { label: '8자 이상', ok: newPassword.length >= 8 },
     { label: '영문 포함', ok: /[A-Za-z]/.test(newPassword) },
@@ -159,7 +162,12 @@ export default function ChangePassword({ onBack }) {
         phone: profileForm.phone.trim() || null,
         aspiration: profileForm.aspiration.trim() || null,
         interests: interestList.length > 0 ? interestList.join(', ') : null,
-        selectedFontId: profileForm.selectedFontId ? Number(profileForm.selectedFontId) : null,
+        selectedFontId: profileForm.selectedFontValue && !String(profileForm.selectedFontValue).startsWith('b:')
+          ? Number(profileForm.selectedFontValue)
+          : null,
+        selectedBuiltinFontKey: String(profileForm.selectedFontValue).startsWith('b:')
+          ? profileForm.selectedFontValue
+          : null,
       })
       setUser(updated)
       setProfileDraft({})
@@ -311,19 +319,27 @@ export default function ChangePassword({ onBack }) {
             </div>
 
             <div className={fieldCardClass}>
-              <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">사이트 폰트</label>
+              <label htmlFor="account-font-select" className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">사이트 폰트</label>
               <div className={frameClass}>
                 <select
-                  value={profileForm.selectedFontId}
-                  onChange={(e) => setProfileDraft((prev) => ({ ...prev, selectedFontId: e.target.value }))}
+                  id="account-font-select"
+                  value={profileForm.selectedFontValue}
+                  onChange={(e) => setProfileDraft((prev) => ({ ...prev, selectedFontValue: e.target.value }))}
                   className={inputClass}
                 >
                   <option value="">기본 고딕체</option>
-                  {fonts.map((font) => (
+                  {selectableFonts.map((font) => (
                     <option key={font.id} value={font.id}>{font.name}</option>
                   ))}
                 </select>
               </div>
+              <p
+                data-testid="account-font-preview"
+                className="mt-3 rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f]"
+                style={{ fontFamily: fontFamilyValue(selectedFont) }}
+              >
+                한글 English 123 · 선택한 폰트 미리보기
+              </p>
             </div>
 
             <div className={fieldCardClass}>
