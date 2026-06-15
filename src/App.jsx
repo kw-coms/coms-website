@@ -6,7 +6,9 @@ import {
   ArrowUpRight,
   Binary,
   Bell,
+  ChevronDown,
   CircuitBoard,
+  Grid3x3,
   LogOut,
   Menu,
   Megaphone,
@@ -648,9 +650,28 @@ function GlobalNavigation() {
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [appsOpen, setAppsOpen] = useState(false)
+  const appsWrapperRef = useRef(null)
   const activeKey = getActiveNavKey(location.pathname)
   const mobileTabs = tabs.slice(0, 3)
   const showMobileTabs = mobileTabs.some((tab) => tab.id === activeKey)
+
+  useEffect(() => {
+    if (!appsOpen) return undefined
+    const onDocClick = (event) => {
+      if (!appsWrapperRef.current) return
+      if (!appsWrapperRef.current.contains(event.target)) setAppsOpen(false)
+    }
+    const onKey = (event) => {
+      if (event.key === 'Escape') setAppsOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [appsOpen])
 
   const goPageTop = (to, options) => {
     scrollToTopInstant()
@@ -716,6 +737,51 @@ function GlobalNavigation() {
               <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === item.id ? 'opacity-100' : 'opacity-0'}`} />
             </button>
           ))}
+          <div ref={appsWrapperRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setAppsOpen((open) => !open)}
+              className={`${navClass('apps')} inline-flex items-center gap-1`}
+              aria-haspopup="menu"
+              aria-expanded={appsOpen}
+            >
+              Apps
+              <ChevronDown size={12} className={`transition ${appsOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+            </button>
+            {appsOpen && (
+              <div
+                role="menu"
+                className="absolute left-1/2 top-full z-[90] mt-4 w-72 -translate-x-1/2 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_18px_45px_rgba(0,0,0,0.12)]"
+              >
+                <div className="border-b border-black/5 px-4 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#86868b]">Service launcher</p>
+                  <p className="text-sm font-semibold text-[#1d1d1f]">COM&apos;s Apps</p>
+                </div>
+                <ul className="flex flex-col py-1">
+                  {companionServices.map((service) => (
+                    <li key={service.title}>
+                      <a
+                        href={service.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={() => setAppsOpen(false)}
+                        className="flex items-start gap-3 px-4 py-2.5 transition hover:bg-[#f5f5f7]"
+                      >
+                        <span className="mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#e8f3ff] text-[#0066cc]">
+                          <Grid3x3 size={14} aria-hidden="true" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-semibold text-[#1d1d1f]">{service.title}</span>
+                          <span className="block truncate text-xs font-medium text-[#86868b]">{service.domain}</span>
+                        </span>
+                        <ArrowUpRight size={14} className="mt-1.5 text-[#86868b]" aria-hidden="true" />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </nav>
 
         {user ? (
@@ -786,6 +852,26 @@ function GlobalNavigation() {
               <span>Community</span>
               <span className="ml-auto text-xs text-[var(--app-muted)]">커뮤니티</span>
             </button>
+            <div className="px-5 pb-2 pt-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--app-subtle)]">Apps</p>
+            </div>
+            {companionServices.map((service) => (
+              <a
+                key={service.title}
+                href={service.href}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setMobileMenuOpen(false)}
+                className="apple-mobile-menu-item"
+              >
+                <Grid3x3 size={15} className="text-sky-500" />
+                <span>{service.title}</span>
+                <span className="ml-auto inline-flex items-center gap-1 text-xs text-[var(--app-muted)]">
+                  {service.domain}
+                  <ArrowUpRight size={12} aria-hidden="true" />
+                </span>
+              </a>
+            ))}
             {!user && (
               <button type="button" onClick={() => closeAndGo('/login')} disabled={authLoading} className="apple-mobile-menu-item apple-mobile-menu-item-accent disabled:opacity-50">
                 <span>로그인</span>
