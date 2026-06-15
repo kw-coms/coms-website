@@ -30,6 +30,14 @@ public class FontService {
             "application/x-font-otf",
             "application/octet-stream"
     );
+    private static final Set<String> BUILT_IN_FONT_KEYS = Set.of(
+            "b:pretendard",
+            "b:noto-sans-kr",
+            "b:ibm-plex-sans-kr",
+            "b:nanum-gothic",
+            "b:gowun-dodum",
+            "b:nanum-myeongjo"
+    );
 
     private final SiteFontRepository siteFontRepository;
     private final StorageService storageService;
@@ -55,6 +63,10 @@ public class FontService {
             return true;
         }
         return siteFontRepository.findById(id).map(SiteFont::isActive).orElse(false);
+    }
+
+    public boolean isSelectableBuiltIn(String key) {
+        return key == null || BUILT_IN_FONT_KEYS.contains(key);
     }
 
     public SiteFontResponse upload(String name, MultipartFile file) {

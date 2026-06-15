@@ -87,7 +87,8 @@ public class AdminService {
                 member.getRole().name(),
                 member.getAspiration(),
                 member.getInterests(),
-                member.getSelectedFontId()
+                member.getSelectedFontId(),
+                member.getSelectedBuiltinFontKey()
         );
     }
 }
