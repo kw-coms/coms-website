@@ -52,6 +52,13 @@ public class AdminService {
         memberRepository.delete(member);
     }
 
+    public void deleteByStudentId(String studentId) {
+        Member member = memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        communityService.deleteCommunityDataForMember(member.getStudentId());
+        memberRepository.delete(member);
+    }
+
     public void resetPassword(Long id, String newPassword) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));

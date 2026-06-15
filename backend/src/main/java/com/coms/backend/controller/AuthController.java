@@ -39,15 +39,18 @@ public class AuthController {
 
     private final AuthService authService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final com.coms.backend.service.AdminService adminService;
     private final boolean cookieSecure;
     private final String cookieSameSite;
 
     public AuthController(AuthService authService,
                           JwtTokenProvider jwtTokenProvider,
+                          com.coms.backend.service.AdminService adminService,
                           @Value("${cookie.secure:false}") boolean cookieSecure,
                           @Value("${cookie.same-site:Lax}") String cookieSameSite) {
         this.authService = authService;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.adminService = adminService;
         this.cookieSecure = cookieSecure;
         String requested = cookieSameSite == null ? "Lax" : cookieSameSite.trim();
         // SameSite=None requires Secure=true per RFC; if the deployer mis-paired the flags, log and fall back to Lax.
@@ -116,6 +119,19 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<MemberResponse> me(Authentication authentication) {
         return ResponseEntity.ok(authService.getMe(authentication.getName()));
+    }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> withdraw(Authentication authentication, HttpServletResponse response) {
+        adminService.deleteByStudentId(authentication.getName());
+        // Best-effort: clear the auth cookies so the freshly deleted account can't continue using its tokens.
+        response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("token", "")
+                .httpOnly(true).secure(cookieSecure).sameSite(cookieSameSite)
+                .maxAge(Duration.ZERO).path("/").build().toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("refreshToken", "")
+                .httpOnly(true).secure(cookieSecure).sameSite(cookieSameSite)
+                .maxAge(Duration.ZERO).path("/api/auth/refresh").build().toString());
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/password")
