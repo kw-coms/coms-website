@@ -101,7 +101,8 @@ test('appearance panel directs signed-in users to account-saved font settings', 
 
   const fontSettings = page.locator('[aria-label="폰트 설정"]')
   await expect(fontSettings).toContainText('계정 저장 설정')
-  await expect(fontSettings).toContainText('계정 설정에서 변경')
+  await fontSettings.getByRole('button', { name: '계정 설정에서 변경' }).click()
+  await expect(page).toHaveURL(/\/settings$/)
   await expect(fontSettings.getByRole('combobox', { name: '사이트 폰트 선택' })).toHaveCount(0)
   await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--apple-font-family'))).toBe('')
 })
