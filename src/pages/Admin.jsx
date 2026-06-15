@@ -841,7 +841,7 @@ function MembersTab({ currentUser }) {
   }
 
   const handlePasswordReset = async (member) => {
-    const newPassword = window.prompt(`${member.name} (${member.studentId}) 회원의 새 비밀번호를 입력하세요.\n(8자 이상, 영문·숫자·특수문자 포함, 공백 불가)`)
+    const newPassword = window.prompt(`${member.name} (${member.studentId}) 회원의 새 임시 비밀번호를 입력하세요.\n(관리자 초기화는 공백만 입력할 수 없습니다.)`)
     if (!newPassword) return
     try {
       await resetMemberPassword(member.id, newPassword)
