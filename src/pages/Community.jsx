@@ -115,8 +115,11 @@ function cleanEditorNode(node) {
     const style = []
     const color = node.style?.color || node.getAttribute('color')
     const backgroundColor = node.style?.backgroundColor
+    const rawFontFamily = node.style?.fontFamily || node.getAttribute('face')
+    const fontFamily = typeof rawFontFamily === 'string' && /^[\w\s\-,'"]+$/.test(rawFontFamily) ? rawFontFamily : ''
     if (color && !/url|expression|javascript/i.test(color)) style.push(`color:${color}`)
     if (backgroundColor && !/url|expression|javascript/i.test(backgroundColor)) style.push(`background-color:${backgroundColor}`)
+    if (fontFamily) style.push(`font-family:${fontFamily}`)
     if (style.length) el.setAttribute('style', style.join(';'))
     appendCleanChildren(node, el)
     return el
@@ -965,6 +968,19 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
     }
   }
 
+  useEffect(() => {
+    const onSelChange = () => {
+      const sel = document.getSelection()
+      if (!sel || sel.rangeCount === 0) return
+      const range = sel.getRangeAt(0)
+      if (divRef.current?.contains(range.commonAncestorContainer)) {
+        savedRange.current = range.cloneRange()
+      }
+    }
+    document.addEventListener('selectionchange', onSelChange)
+    return () => document.removeEventListener('selectionchange', onSelChange)
+  }, [])
+
   const restoreSelection = () => {
     const sel = window.getSelection()
     const range = savedRange.current
@@ -1494,22 +1510,67 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
         <div className="community-editor-toolbar flex flex-wrap items-center gap-2 border-b border-black/10 bg-black/[0.03] px-3 py-2">
           <span className="mr-1 text-xs font-black uppercase tracking-[0.2em] text-[var(--theme-body-muted)]">Editor</span>
           <div className="inline-flex overflow-hidden rounded border border-black/15 bg-white">
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('bold')}
+            <button type="button"
+              onPointerDown={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchStart={(e) => e.preventDefault()}
+              onClick={() => applyFormat('bold')}
               className="min-h-9 px-3 text-sm font-black text-[var(--theme-body-dark)] hover:bg-black/5">B</button>
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('italic')}
+            <button type="button"
+              onPointerDown={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchStart={(e) => e.preventDefault()}
+              onClick={() => applyFormat('italic')}
               className="min-h-9 px-3 text-sm italic text-[var(--theme-body-dark)] hover:bg-black/5">I</button>
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => applyFormat('underline')}
+            <button type="button"
+              onPointerDown={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchStart={(e) => e.preventDefault()}
+              onClick={() => applyFormat('underline')}
               className="min-h-9 px-3 text-sm underline text-[var(--theme-body-dark)] hover:bg-black/5">U</button>
           </div>
+          <label className="inline-flex min-h-9 items-center gap-1.5 rounded border border-black/15 bg-white px-2 text-xs font-semibold text-[var(--theme-body-mid)] hover:bg-black/5"
+            onPointerDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => e.preventDefault()}>
+            글꼴
+            <select
+              defaultValue=""
+              className="bg-transparent text-xs outline-none"
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                const value = e.target.value
+                if (!value) return
+                applyFormat('fontName', value)
+                e.target.value = ''
+              }}
+            >
+              <option value="" disabled>선택</option>
+              <option value='Pretendard, -apple-system, BlinkMacSystemFont, sans-serif'>Pretendard</option>
+              <option value="'Noto Sans KR', sans-serif">Noto Sans KR</option>
+              <option value="'IBM Plex Sans KR', sans-serif">IBM Plex Sans KR</option>
+              <option value="'Nanum Gothic', sans-serif">Nanum Gothic</option>
+              <option value="'Gowun Dodum', sans-serif">Gowun Dodum</option>
+              <option value="'Nanum Myeongjo', serif">Nanum Myeongjo</option>
+              <option value="ui-monospace, SFMono-Regular, Menlo, monospace">Monospace</option>
+            </select>
+          </label>
           <label className="inline-flex min-h-9 items-center gap-1.5 rounded border border-black/15 bg-white px-2 text-xs font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
             글자색
             <input type="color" defaultValue="#111827" className="h-6 w-7 cursor-pointer border-0 bg-transparent p-0"
-              onMouseDown={(e) => e.preventDefault()} onChange={(e) => applyFormat('foreColor', e.target.value)} />
+              onPointerDown={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchStart={(e) => e.preventDefault()}
+              onChange={(e) => applyFormat('foreColor', e.target.value)} />
           </label>
           <label className="inline-flex min-h-9 items-center gap-1.5 rounded border border-black/15 bg-white px-2 text-xs font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
             배경
             <input type="color" defaultValue="#fff3a3" className="h-6 w-7 cursor-pointer border-0 bg-transparent p-0"
-              onMouseDown={(e) => e.preventDefault()} onChange={(e) => applyFormat('hiliteColor', e.target.value)} />
+              onPointerDown={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchStart={(e) => e.preventDefault()}
+              onChange={(e) => applyFormat('hiliteColor', e.target.value)} />
           </label>
           <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
             <ImagePlus size={14} />이미지
