@@ -587,7 +587,10 @@ select {
 }
 
 .apple-mobile-menu-panel {
-	overflow: hidden;
+	max-height: calc(100dvh - var(--apple-nav-height, 44px) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	-webkit-overflow-scrolling: touch;
 	border-bottom: 1px solid var(--app-hairline);
 	background: color-mix(in srgb, var(--app-surface) 94%, transparent);
 	box-shadow: 0 18px 40px rgba(0, 0, 0, 0.1);
