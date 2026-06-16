@@ -651,6 +651,7 @@ function GlobalNavigation() {
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [appsOpen, setAppsOpen] = useState(false)
+  const [mobileAppsOpen, setMobileAppsOpen] = useState(false)
   const appsWrapperRef = useRef(null)
   const activeKey = getActiveNavKey(location.pathname)
   const mobileTabs = tabs.slice(0, 3)
@@ -680,6 +681,7 @@ function GlobalNavigation() {
 
   const closeAndGo = (to, options) => {
     setMobileMenuOpen(false)
+    setMobileAppsOpen(false)
     goPageTop(to, options)
   }
 
@@ -852,26 +854,58 @@ function GlobalNavigation() {
               <span>Community</span>
               <span className="ml-auto text-xs text-[var(--app-muted)]">커뮤니티</span>
             </button>
-            <div className="px-5 pb-2 pt-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--app-subtle)]">Apps</p>
-            </div>
-            {companionServices.map((service) => (
-              <a
-                key={service.title}
-                href={service.href}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => setMobileMenuOpen(false)}
-                className="apple-mobile-menu-item"
-              >
-                <Grid3x3 size={15} className="text-sky-500" />
-                <span>{service.title}</span>
-                <span className="ml-auto inline-flex items-center gap-1 text-xs text-[var(--app-muted)]">
-                  {service.domain}
-                  <ArrowUpRight size={12} aria-hidden="true" />
-                </span>
-              </a>
-            ))}
+            <button
+              type="button"
+              onClick={() => setMobileAppsOpen((open) => !open)}
+              aria-expanded={mobileAppsOpen}
+              aria-controls="mobile-apps-panel"
+              className="apple-mobile-menu-item"
+            >
+              <Grid3x3 size={15} className="text-sky-500" />
+              <span>Apps</span>
+              <span className="ml-auto inline-flex items-center gap-1 text-xs text-[var(--app-muted)]">
+                {companionServices.length}개 서비스
+                <ChevronDown
+                  size={14}
+                  className={`transition ${mobileAppsOpen ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                />
+              </span>
+            </button>
+            {mobileAppsOpen && (
+              <div id="mobile-apps-panel" className="flex flex-col divide-y divide-[var(--app-hairline)] bg-black/[0.015]">
+                {companionServices.map((service) => (
+                  <a
+                    key={service.title}
+                    href={service.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => {
+                      setMobileMenuOpen(false)
+                      setMobileAppsOpen(false)
+                    }}
+                    className="flex items-start gap-3 px-6 py-3 transition hover:bg-black/[0.03]"
+                  >
+                    <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#e8f3ff] text-[#0066cc]">
+                      <Grid3x3 size={13} aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-1.5 text-sm font-semibold text-[var(--app-text)]">
+                        {service.title}
+                        <ArrowUpRight size={12} className="text-[var(--app-muted)]" aria-hidden="true" />
+                      </span>
+                      <span className="mt-0.5 block text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--app-subtle)]">
+                        {service.eyebrow}
+                      </span>
+                      <span className="mt-1 block text-xs leading-relaxed text-[var(--app-muted)]">
+                        {service.body}
+                      </span>
+                      <span className="mt-1 block truncate text-[11px] text-[var(--app-subtle)]">{service.domain}</span>
+                    </span>
+                  </a>
+                ))}
+              </div>
+            )}
             {!user && (
               <button type="button" onClick={() => closeAndGo('/login')} disabled={authLoading} className="apple-mobile-menu-item apple-mobile-menu-item-accent disabled:opacity-50">
                 <span>로그인</span>
