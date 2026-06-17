@@ -3,6 +3,9 @@ package com.coms.backend.controller;
 import com.coms.backend.dto.CommunityCommentRequest;
 import com.coms.backend.dto.CommunityCommentResponse;
 import com.coms.backend.dto.CommunityDeleteRequest;
+import com.coms.backend.dto.DeletedCommunityPostAppealRequest;
+import com.coms.backend.dto.DeletedCommunityPostAppealResponse;
+import com.coms.backend.dto.DeletedCommunityPostResponse;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
 import com.coms.backend.dto.CommunityPollVoteRequest;
@@ -10,6 +13,9 @@ import com.coms.backend.dto.CommunityVoteRequest;
 import com.coms.backend.dto.YouTubeSearchResponse;
 import com.coms.backend.domain.CommunityPostFile;
 import com.coms.backend.domain.CommunityPost;
+import com.coms.backend.domain.DeletedCommunityPostImage;
+import com.coms.backend.domain.DeletedCommunityPostMedia;
+import com.coms.backend.service.CommunityDeletionArchiveService;
 import com.coms.backend.service.CommunityService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -40,17 +46,59 @@ public class CommunityController {
     private static final String SHARE_DESCRIPTION = "여기를 눌러 내용을 확인하세요.\ncoms.kw.ac.kr";
 
     private final CommunityService communityService;
+    private final CommunityDeletionArchiveService communityDeletionArchiveService;
     private final String publicBaseUrl;
 
     public CommunityController(CommunityService communityService,
+                               CommunityDeletionArchiveService communityDeletionArchiveService,
                                @Value("${app.public-base-url:}") String publicBaseUrl) {
         this.communityService = communityService;
+        this.communityDeletionArchiveService = communityDeletionArchiveService;
         this.publicBaseUrl = publicBaseUrl == null ? "" : publicBaseUrl.trim();
     }
 
     @GetMapping
     public ResponseEntity<List<CommunityPostResponse>> list(Authentication authentication) {
         return ResponseEntity.ok(communityService.list(authentication.getName()));
+    }
+
+    @GetMapping("/deleted/me")
+    public ResponseEntity<List<DeletedCommunityPostResponse>> myDeletedPosts(Authentication authentication) {
+        return ResponseEntity.ok(communityDeletionArchiveService.mine(authentication.getName()));
+    }
+
+    @GetMapping("/deleted/{id}/images/{imageId}")
+    public ResponseEntity<Resource> deletedImage(Authentication authentication, @PathVariable Long id, @PathVariable Long imageId) {
+        DeletedCommunityPostImage meta = communityDeletionArchiveService.loadOwnImageMeta(id, imageId, authentication.getName());
+        Resource resource = communityDeletionArchiveService.loadOwnImage(id, imageId, authentication.getName());
+        String filename = meta.getOriginalName() == null || meta.getOriginalName().isBlank() ? "deleted-community-image" : meta.getOriginalName();
+        return ResponseEntity.ok()
+                .contentType(mediaType(meta.getMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(filename, StandardCharsets.UTF_8).build().toString())
+                .body(resource);
+    }
+
+    @GetMapping("/deleted/{id}/media/{mediaId}")
+    public ResponseEntity<Resource> deletedMedia(Authentication authentication, @PathVariable Long id, @PathVariable Long mediaId) {
+        DeletedCommunityPostMedia meta = communityDeletionArchiveService.loadOwnMediaMeta(id, mediaId, authentication.getName());
+        Resource resource = communityDeletionArchiveService.loadOwnMedia(id, mediaId, authentication.getName());
+        String filename = meta.getOriginalName() == null || meta.getOriginalName().isBlank() ? "deleted-community-media" : meta.getOriginalName();
+        ContentDisposition disposition = DeletedCommunityPostMedia.KIND_FILE.equals(meta.getKind())
+                ? ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build()
+                : ContentDisposition.inline().filename(filename, StandardCharsets.UTF_8).build();
+        return ResponseEntity.ok()
+                .contentType(mediaType(meta.getMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .body(resource);
+    }
+
+    @PostMapping("/deleted/{id}/appeals")
+    public ResponseEntity<DeletedCommunityPostAppealResponse> appealDeletedPost(Authentication authentication,
+                                                                                @PathVariable Long id,
+                                                                                @Valid @RequestBody DeletedCommunityPostAppealRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(communityDeletionArchiveService.requestRestore(id, authentication.getName(), request));
     }
 
     @GetMapping("/{id}")

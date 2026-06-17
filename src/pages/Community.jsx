@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify.jsx'
 import {
   ArrowLeft,
@@ -15,8 +15,10 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  RotateCcw,
   Search,
   Send,
+  ShieldAlert,
   ThumbsDown,
   ThumbsUp,
   Trash2,
@@ -27,9 +29,11 @@ import {
   createCommunityPost,
   createComment,
   closeCommunityPoll,
+  appealDeletedCommunityPost,
   deleteComment,
   deleteCommunityPost,
   getCommunityPost,
+  listMyDeletedCommunityPosts,
   listComments,
   listCommunityPosts,
   updateComment,
@@ -161,6 +165,31 @@ function textContentForSearch(value) {
   const template = document.createElement('template')
   template.innerHTML = sanitizeEditorHtml(value)
   return template.content.textContent || ''
+}
+
+function deletedRecordText(value) {
+  const raw = String(value || '')
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return textContentForSearch(raw)
+    return parsed.map((block) => {
+      if (!block || typeof block !== 'object') return ''
+      if (block.type === 'text') return textContentForSearch(block.content || '')
+      if (block.type === 'poll') return `투표: ${block.question || ''}`
+      if (block.type === 'externalEmbed') return block.title || block.url || ''
+      if (block.type === 'file') return block.name || '첨부파일'
+      if (block.type === 'image') return block.name || '이미지'
+      if (block.type === 'video') return block.name || '영상'
+      return ''
+    }).filter(Boolean).join(' · ')
+  } catch {
+    return textContentForSearch(raw)
+  }
+}
+
+function deletionIdentity(name, studentId) {
+  const safeName = name || '알 수 없음'
+  return studentId ? `${safeName}(${studentId})` : safeName
 }
 
 function mediaWidthPercent(width) {
@@ -1796,7 +1825,7 @@ function BoardComposeBar({ title, children }) {
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-[var(--theme-body-muted)]">
           <span className="text-[var(--app-accent-text)]">Community</span>
           <span className="size-1 rounded-full bg-[var(--app-subtle)]" />
-          <span>{title}</span>
+          <h1 className="text-xs font-semibold text-[var(--theme-body-muted)]">{title}</h1>
         </div>
         {children && <div className="flex w-full shrink-0 sm:w-auto sm:justify-end">{children}</div>}
       </div>
@@ -1808,12 +1837,16 @@ export default function Community({ onBack }) {
   const { user } = useAuth()
   const { id: urlId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const [posts, setPosts] = useState([])
+  const [deletedPosts, setDeletedPosts] = useState([])
   const [currentPost, setCurrentPost] = useState(null)
   const [mode, setMode] = useState('list')
   const [loading, setLoading] = useState(true)
+  const [deletedLoading, setDeletedLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState('')
+  const [deletedError, setDeletedError] = useState('')
   const [page, setPage] = useState(1)
   const [activeCategory, setActiveCategory] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
@@ -1829,10 +1862,14 @@ export default function Community({ onBack }) {
   const [commentSaving, setCommentSaving] = useState(false)
   const [pollVoting, setPollVoting] = useState('')
   const [pollClosing, setPollClosing] = useState('')
+  const [appealOpenId, setAppealOpenId] = useState(null)
+  const [appealDrafts, setAppealDrafts] = useState({})
+  const [appealingId, setAppealingId] = useState(null)
   const boardFilterOptions = useMemo(() => boardFilterOptionsForUser(user), [user])
   const canSeeAnonymous = canAccessAnonymousBoard(user)
   const effectiveActiveCategory = boardFilterOptions.some((item) => item.value === activeCategory) ? activeCategory : 'ALL'
   const isAnonymousDetail = currentPost?.category === 'ANONYMOUS'
+  const deletedViewRequested = useMemo(() => new URLSearchParams(location.search).get('view') === 'deleted', [location.search])
 
   useEffect(() => {
     let mounted = true
@@ -1933,9 +1970,25 @@ export default function Community({ onBack }) {
   }
 
   useEffect(() => {
+    if (mode !== 'deleted') return undefined
+    let mounted = true
+    Promise.resolve()
+      .then(() => {
+        if (!mounted) return []
+        setDeletedLoading(true)
+        setDeletedError('')
+        return listMyDeletedCommunityPosts()
+      })
+      .then((data) => { if (mounted) setDeletedPosts(Array.isArray(data) ? data : []) })
+      .catch((err) => { if (mounted) setDeletedError(err.message || '삭제 기록을 불러오지 못했습니다.') })
+      .finally(() => { if (mounted) setDeletedLoading(false) })
+    return () => { mounted = false }
+  }, [mode])
+
+  useEffect(() => {
     if (!urlId) {
       /* eslint-disable react-hooks/set-state-in-effect */
-      setMode('list')
+      setMode(deletedViewRequested ? 'deleted' : 'list')
       setCurrentPost(null)
       setComments([])
       setCommentInput('')
@@ -1980,7 +2033,7 @@ export default function Community({ onBack }) {
       .finally(() => { if (mounted) setDetailLoading(false) })
     return () => { mounted = false }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlId])
+  }, [urlId, deletedViewRequested])
 
   const openPost = (post) => {
     navigate('/community/' + post.id)
@@ -2088,6 +2141,7 @@ export default function Community({ onBack }) {
     setEditingCommentId(null)
     setEditCommentInput('')
     if (urlId) navigate('/community')
+    else if (deletedViewRequested) navigate('/community', { replace: true })
   }
 
   const handleSave = (saved) => {
@@ -2118,6 +2172,41 @@ export default function Community({ onBack }) {
   const handleAdminDeleteFromList = async (event, post) => {
     event.stopPropagation()
     await handleDelete(post)
+  }
+
+  const openDeletedRecords = () => {
+    setMode('deleted')
+    navigate('/community?view=deleted')
+  }
+
+  const submitAppeal = async (record) => {
+    const message = (appealDrafts[record.id] || '').trim()
+    if (!message) {
+      alert('복원 요청 사유를 입력해주세요.')
+      return
+    }
+    setAppealingId(record.id)
+    try {
+      const appeal = await appealDeletedCommunityPost(record.id, message)
+      setDeletedPosts((prev) => prev.map((item) => (
+        item.id === record.id
+          ? {
+              ...item,
+              latestAppealStatus: appeal.status,
+              latestAppealMessage: appeal.message,
+              latestAppealCreatedAt: appeal.createdAt,
+              latestAppealRequesterStudentId: appeal.requesterStudentId,
+              latestAppealRequesterName: appeal.requesterName,
+            }
+          : item
+      )))
+      setAppealOpenId(null)
+      setAppealDrafts((prev) => ({ ...prev, [record.id]: '' }))
+    } catch (err) {
+      alert(err.message || '복원 요청을 보내지 못했습니다.')
+    } finally {
+      setAppealingId(null)
+    }
   }
 
   const handleVote = async (value) => {
@@ -2479,9 +2568,15 @@ export default function Community({ onBack }) {
         {mode === 'list' && (
           <>
             <BoardHeader>
-              <button type="button" onClick={() => setMode('write')} className="apple-action-primary w-full px-5 py-3 text-sm sm:w-auto sm:py-2.5">
-                글쓰기
-              </button>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <button type="button" onClick={openDeletedRecords} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-5 py-3 text-sm sm:w-auto sm:py-2.5">
+                  <ShieldAlert size={14} />
+                  내 삭제 기록
+                </button>
+                <button type="button" onClick={() => setMode('write')} className="apple-action-primary w-full px-5 py-3 text-sm sm:w-auto sm:py-2.5">
+                  글쓰기
+                </button>
+              </div>
             </BoardHeader>
             <div className="apple-control-strip px-4 py-4 sm:px-8">
               <div className="flex flex-col gap-4">
@@ -2605,6 +2700,98 @@ export default function Community({ onBack }) {
             </div>
             <div className="apple-control-strip border-t px-5 py-4 sm:px-8">
               {renderPagination('bottom')}
+            </div>
+          </>
+        )}
+
+        {mode === 'deleted' && (
+          <>
+            <BoardComposeBar title="내 삭제 기록">
+              <button type="button" onClick={backToList} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
+                <ArrowLeft size={14} />
+                목록
+              </button>
+            </BoardComposeBar>
+            <div className="space-y-3 p-4 sm:p-6">
+              <div className="rounded-lg border border-[#3b4890]/15 bg-[#f7f9ff] px-4 py-3 text-sm text-[#3b4890]">
+                관리자가 삭제한 글과 직접 삭제한 글의 원문, 사유, 처리자를 여기서 확인할 수 있습니다.
+              </div>
+              {deletedError && <p className="rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{deletedError}</p>}
+              {deletedLoading && <div className="rounded-lg border border-black/10 bg-white px-4 py-12 text-center text-sm font-semibold text-[#6e6e73]">삭제 기록을 불러오는 중...</div>}
+              {!deletedLoading && deletedPosts.length === 0 && (
+                <div className="rounded-lg border border-black/10 bg-white px-4 py-12 text-center text-sm font-semibold text-[#6e6e73]">삭제된 내 글이 없습니다.</div>
+              )}
+              {!deletedLoading && deletedPosts.map((record) => {
+                const restored = Boolean(record.restoredPostId)
+                const appealed = Boolean(record.latestAppealStatus)
+                return (
+                  <article key={record.id} className="overflow-hidden rounded-lg border border-black/10 bg-white">
+                    <div className="border-b border-black/10 px-4 py-4">
+                      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[#3b4890]">
+                        <span>{categoryLabel(record.category || 'GENERAL')}</span>
+                        <span className={restored ? 'rounded bg-emerald-100 px-2 py-1 text-emerald-700' : 'rounded bg-red-50 px-2 py-1 text-red-700'}>
+                          {restored ? '복원됨' : '삭제됨'}
+                        </span>
+                        {appealed && <span className="rounded bg-[#fff4cc] px-2 py-1 text-[#8a6400]">복원 요청 접수됨</span>}
+                      </div>
+                      <h2 className="break-words text-lg font-black text-[#1d1d1f]">{record.title}</h2>
+                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--theme-body-muted)]">
+                        <span>삭제 {record.deletedAt ? new Date(record.deletedAt).toLocaleString('ko-KR') : '-'}</span>
+                        <span>처리자 {deletionIdentity(record.deletedByName, record.deletedByStudentId)}</span>
+                        {record.restoredAt && <span>복원 {new Date(record.restoredAt).toLocaleString('ko-KR')}</span>}
+                      </div>
+                    </div>
+                    <div className="space-y-3 px-4 py-4 text-sm text-[#424245]">
+                      <div>
+                        <strong className="mb-1 block text-xs text-[#3b4890]">삭제 사유</strong>
+                        <p className="whitespace-pre-wrap break-words">{record.deletionReason || '사유 없음'}</p>
+                      </div>
+                      <div>
+                        <strong className="mb-1 block text-xs text-[#3b4890]">원문</strong>
+                        <p className="whitespace-pre-wrap break-words">{deletedRecordText(record.content) || '원문 미리보기가 없습니다.'}</p>
+                      </div>
+                      {record.commentCount > 0 && (
+                        <div>
+                          <strong className="mb-1 block text-xs text-[#3b4890]">함께 보관된 댓글 {record.commentCount}</strong>
+                          <p className="whitespace-pre-wrap break-words text-xs text-[var(--theme-body-muted)]">
+                            {(record.commentInfos || []).slice(0, 3).map((comment) => `${comment.authorName || '회원'}: ${comment.content}`).join('\n')}
+                          </p>
+                        </div>
+                      )}
+                      {restored ? (
+                        <a href={`/community/${record.restoredPostId}`} className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700">
+                          <RotateCcw size={14} />
+                          복원된 글 열기
+                        </a>
+                      ) : appealed ? (
+                        <p className="rounded-lg border border-[#f0c36d]/40 bg-[#fff9e8] px-3 py-2 text-xs font-bold text-[#8a6400]">복원 요청 접수됨: {record.latestAppealMessage}</p>
+                      ) : appealOpenId === record.id ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={appealDrafts[record.id] || ''}
+                            onChange={(event) => setAppealDrafts((prev) => ({ ...prev, [record.id]: event.target.value }))}
+                            maxLength={500}
+                            rows={3}
+                            placeholder="복원이 필요한 이유를 적어주세요."
+                            className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:text-sm"
+                          />
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <button type="button" onClick={() => submitAppeal(record)} disabled={appealingId === record.id} className="apple-action-primary px-4 py-2 text-sm">
+                              {appealingId === record.id ? '보내는 중...' : '요청 보내기'}
+                            </button>
+                            <button type="button" onClick={() => setAppealOpenId(null)} className="apple-action-secondary px-4 py-2 text-sm">취소</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button type="button" onClick={() => setAppealOpenId(record.id)} className="apple-action-secondary inline-flex items-center gap-1 px-4 py-2 text-sm">
+                          <RotateCcw size={14} />
+                          복원 요청
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                )
+              })}
             </div>
           </>
         )}

@@ -39,7 +39,7 @@ public class Notification {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public enum Type {
-        COMMENT_ON_POST, REPLY_ON_COMMENT, NOTICE_CREATED, EXTERNAL_INVITE, COMMUNITY_POST_RESTORED
+        COMMENT_ON_POST, REPLY_ON_COMMENT, NOTICE_CREATED, EXTERNAL_INVITE, COMMUNITY_POST_RESTORED, COMMUNITY_POST_DELETED
     }
 
     public Long getId() { return id; }

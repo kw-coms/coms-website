@@ -2,6 +2,7 @@ package com.coms.backend.service;
 
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.CommunityCommentRequest;
+import com.coms.backend.dto.DeletedCommunityPostAppealRequest;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.DeletedCommunityPostResponse;
 import com.coms.backend.repository.AuditLogRepository;
@@ -13,6 +14,7 @@ import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVideoRepository;
 import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.DeletedCommunityPostCommentRepository;
+import com.coms.backend.repository.DeletedCommunityPostAppealRepository;
 import com.coms.backend.repository.DeletedCommunityPostImageRepository;
 import com.coms.backend.repository.DeletedCommunityPostMediaRepository;
 import com.coms.backend.repository.DeletedCommunityPostRepository;
@@ -83,12 +85,16 @@ class CommunityServiceAuditLogTest {
     private DeletedCommunityPostCommentRepository deletedCommunityPostCommentRepository;
 
     @Autowired
+    private DeletedCommunityPostAppealRepository deletedCommunityPostAppealRepository;
+
+    @Autowired
     private NotificationRepository notificationRepository;
 
     @BeforeEach
     @AfterEach
     void clean() {
         notificationRepository.deleteAll();
+        deletedCommunityPostAppealRepository.deleteAll();
         deletedCommunityPostCommentRepository.deleteAll();
         deletedCommunityPostMediaRepository.deleteAll();
         deletedCommunityPostImageRepository.deleteAll();
@@ -133,6 +139,74 @@ class CommunityServiceAuditLogTest {
                             "deletedByRole=ADMIN"
                     );
                 });
+    }
+
+    @Test
+    void authorCanReviewDeletedPostAndRequestRestore() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member other = member("2025222222", "다른회원", Member.Role.USER);
+        Member admin = member("2026123456", "관리자", Member.Role.ADMIN);
+        memberRepository.save(author);
+        memberRepository.save(other);
+        memberRepository.save(admin);
+        var created = communityService.create(
+                author.getStudentId(),
+                new CommunityPostRequest("억울한 삭제 기록", "삭제된 원문입니다.", "GENERAL", false),
+                null
+        );
+
+        communityService.delete(admin.getStudentId(), created.id(), "운영 기준 재검토 필요");
+
+        var snapshot = deletedCommunityPostRepository.findAll().get(0);
+        assertThat(notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(author.getStudentId()))
+                .singleElement()
+                .satisfies(notification -> {
+                    assertThat(notification.getType().name()).isEqualTo("COMMUNITY_POST_DELETED");
+                    assertThat(notification.getPostId()).isNull();
+                    assertThat(notification.getActorStudentId()).isEqualTo(admin.getStudentId());
+                    assertThat(notification.getMessage()).contains("억울한 삭제 기록", "운영 기준 재검토 필요");
+                });
+        assertThat(communityDeletionArchiveService.mine(author.getStudentId()))
+                .singleElement()
+                .satisfies(record -> {
+                    assertThat(record.id()).isEqualTo(snapshot.getId());
+                    assertThat(record.title()).isEqualTo("억울한 삭제 기록");
+                    assertThat(record.content()).contains("삭제된 원문");
+                    assertThat(record.deletedByStudentId()).isEqualTo(admin.getStudentId());
+                    assertThat(record.deletedByName()).isEqualTo(admin.getName());
+                    assertThat(record.deletionReason()).isEqualTo("운영 기준 재검토 필요");
+                    assertThat(record.latestAppealStatus()).isNull();
+                });
+        assertThat(communityDeletionArchiveService.mine(other.getStudentId())).isEmpty();
+
+        var appeal = communityDeletionArchiveService.requestRestore(
+                snapshot.getId(),
+                author.getStudentId(),
+                new DeletedCommunityPostAppealRequest("동아리 규칙 위반이 아니라고 생각합니다.")
+        );
+
+        assertThat(appeal.status()).isEqualTo("OPEN");
+        assertThat(appeal.message()).contains("규칙 위반");
+        assertThat(communityDeletionArchiveService.mine(author.getStudentId()))
+                .singleElement()
+                .satisfies(record -> {
+                    assertThat(record.latestAppealStatus()).isEqualTo("OPEN");
+                    assertThat(record.latestAppealMessage()).contains("규칙 위반");
+                    assertThat(record.latestAppealCreatedAt()).isNotNull();
+                });
+        assertThat(communityDeletionArchiveService.recent(10))
+                .singleElement()
+                .satisfies(record -> {
+                    assertThat(record.latestAppealStatus()).isEqualTo("OPEN");
+                    assertThat(record.latestAppealRequesterStudentId()).isEqualTo(author.getStudentId());
+                });
+        assertThatThrownBy(() -> communityDeletionArchiveService.requestRestore(
+                snapshot.getId(),
+                other.getStudentId(),
+                new DeletedCommunityPostAppealRequest("제가 대신 요청합니다.")
+        ))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
     }
 
     @Test
@@ -297,6 +371,7 @@ class CommunityServiceAuditLogTest {
                 .satisfies(image -> assertThat(restoredPost.getContent()).contains("\"mediaId\":" + image.getId()));
         assertThat(restoredPost.getContent()).doesNotContain("\"mediaId\":" + originalInlineId);
         assertThat(notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(author.getStudentId()))
+                .filteredOn(notification -> notification.getType().name().equals("COMMUNITY_POST_RESTORED"))
                 .singleElement()
                 .satisfies(notification -> {
                     assertThat(notification.getType().name()).isEqualTo("COMMUNITY_POST_RESTORED");
