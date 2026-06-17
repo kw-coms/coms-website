@@ -924,9 +924,7 @@ function GlobalNavigation() {
                       <span>관리자 패널</span>
                     </button>
                   )}
-                  <div className="py-3.5">
-                    <NotificationButton alignLeft padded />
-                  </div>
+                  <NotificationButton alignLeft variant="mobileMenu" />
                   <button type="button" onClick={handleLogout} className="apple-mobile-menu-item">
                     <LogOut size={15} />
                     <span>로그아웃</span>
@@ -960,7 +958,7 @@ function GlobalNavigation() {
   )
 }
 
-function NotificationButton({ alignLeft = false, padded = false }) {
+function NotificationButton({ alignLeft = false, variant = 'icon' }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -1059,21 +1057,40 @@ function NotificationButton({ alignLeft = false, padded = false }) {
   }
 
   if (!user) return null
+  const mobileMenu = variant === 'mobileMenu'
 
   return (
-    <div className={padded ? 'px-5' : ''}>
+    <div>
       <button
         ref={btnRef}
         type="button"
         onClick={toggle}
-        className="relative inline-flex size-8 items-center justify-center rounded-full text-[var(--theme-body-dark)] transition hover:bg-black/5"
+        className={mobileMenu
+          ? 'apple-mobile-menu-item apple-mobile-menu-notification'
+          : 'relative inline-flex size-8 items-center justify-center rounded-full text-[var(--theme-body-dark)] transition hover:bg-black/5'}
         aria-label="notifications"
       >
-        <Bell size={15} />
-        {unreadCount > 0 && (
-          <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
+        {mobileMenu ? (
+          <>
+            <Bell size={15} className="text-blue-500" />
+            <span>알림</span>
+            <span className="ml-auto text-xs text-[var(--app-muted)]">
+              {unreadCount > 0 ? (
+                <span className="inline-flex min-w-5 justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              ) : '새 알림 없음'}
+            </span>
+          </>
+        ) : (
+          <>
+            <Bell size={15} />
+            {unreadCount > 0 && (
+              <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </>
         )}
       </button>
       {effectiveOpen && createPortal(
