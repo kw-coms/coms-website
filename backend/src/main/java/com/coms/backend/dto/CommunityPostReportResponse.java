@@ -8,6 +8,8 @@ public record CommunityPostReportResponse(
         Long id,
         Long postId,
         String postTitle,
+        String postAuthorStudentId,
+        String postAuthorName,
         String reporterStudentId,
         String reason,
         String detail,
@@ -22,10 +24,16 @@ public record CommunityPostReportResponse(
     }
 
     public static CommunityPostReportResponse from(CommunityPostReport report, String postTitle) {
+        return from(report, report.getPostId(), postTitle);
+    }
+
+    public static CommunityPostReportResponse from(CommunityPostReport report, Long postId, String postTitle) {
         return new CommunityPostReportResponse(
                 report.getId(),
-                report.getPostId(),
-                postTitle,
+                postId,
+                postTitle == null || postTitle.isBlank() ? report.getPostTitle() : postTitle,
+                report.getPostAuthorStudentId(),
+                report.getPostAuthorName(),
                 report.getReporterStudentId(),
                 report.getReason(),
                 report.getDetail(),
