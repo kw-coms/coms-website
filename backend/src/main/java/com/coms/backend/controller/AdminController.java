@@ -5,6 +5,7 @@ import com.coms.backend.dto.AuditLogResponse;
 import com.coms.backend.dto.BanStudentRequest;
 import com.coms.backend.dto.BannedStudentResponse;
 import com.coms.backend.dto.CacheClearResponse;
+import com.coms.backend.dto.DeletedCommunityPostResponse;
 import com.coms.backend.dto.ResetPasswordRequest;
 import com.coms.backend.dto.EligibleMemberImportResponse;
 import com.coms.backend.dto.EligibleMemberResponse;
@@ -18,6 +19,7 @@ import com.coms.backend.service.AdminService;
 import com.coms.backend.service.AuditLogService;
 import com.coms.backend.service.BannedStudentService;
 import com.coms.backend.service.CacheMaintenanceService;
+import com.coms.backend.service.CommunityDeletionArchiveService;
 import com.coms.backend.service.EligibleMemberService;
 import com.coms.backend.service.RecruitApplicationService;
 import jakarta.validation.Valid;
@@ -40,17 +42,20 @@ public class AdminController {
     private final AuditLogService auditLogService;
     private final CacheMaintenanceService cacheMaintenanceService;
     private final RecruitApplicationService recruitApplicationService;
+    private final CommunityDeletionArchiveService communityDeletionArchiveService;
 
     public AdminController(AdminService adminService, EligibleMemberService eligibleMemberService,
                            BannedStudentService bannedStudentService, AuditLogService auditLogService,
                            CacheMaintenanceService cacheMaintenanceService,
-                           RecruitApplicationService recruitApplicationService) {
+                           RecruitApplicationService recruitApplicationService,
+                           CommunityDeletionArchiveService communityDeletionArchiveService) {
         this.adminService = adminService;
         this.eligibleMemberService = eligibleMemberService;
         this.bannedStudentService = bannedStudentService;
         this.auditLogService = auditLogService;
         this.cacheMaintenanceService = cacheMaintenanceService;
         this.recruitApplicationService = recruitApplicationService;
+        this.communityDeletionArchiveService = communityDeletionArchiveService;
     }
 
     @GetMapping("/members")
@@ -173,6 +178,11 @@ public class AdminController {
     @GetMapping("/audit-logs")
     public ResponseEntity<List<AuditLogResponse>> auditLogs(@RequestParam(defaultValue = "1000") int limit) {
         return ResponseEntity.ok(auditLogService.recent(limit));
+    }
+
+    @GetMapping("/community/deleted-posts")
+    public ResponseEntity<List<DeletedCommunityPostResponse>> deletedCommunityPosts(@RequestParam(defaultValue = "300") int limit) {
+        return ResponseEntity.ok(communityDeletionArchiveService.recent(limit));
     }
 
     @PostMapping("/cache/clear")

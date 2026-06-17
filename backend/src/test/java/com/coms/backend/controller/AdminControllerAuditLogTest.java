@@ -4,6 +4,7 @@ import com.coms.backend.service.AdminService;
 import com.coms.backend.service.AuditLogService;
 import com.coms.backend.service.BannedStudentService;
 import com.coms.backend.service.CacheMaintenanceService;
+import com.coms.backend.service.CommunityDeletionArchiveService;
 import com.coms.backend.service.EligibleMemberService;
 import com.coms.backend.service.RecruitApplicationService;
 import org.junit.jupiter.api.Test;
@@ -25,13 +26,15 @@ class AdminControllerAuditLogTest {
     private final AuditLogService auditLogService = mock(AuditLogService.class);
     private final CacheMaintenanceService cacheMaintenanceService = mock(CacheMaintenanceService.class);
     private final RecruitApplicationService recruitApplicationService = mock(RecruitApplicationService.class);
+    private final CommunityDeletionArchiveService communityDeletionArchiveService = mock(CommunityDeletionArchiveService.class);
     private final AdminController controller = new AdminController(
             adminService,
             eligibleMemberService,
             bannedStudentService,
             auditLogService,
             cacheMaintenanceService,
-            recruitApplicationService
+            recruitApplicationService,
+            communityDeletionArchiveService
     );
 
     @Test
