@@ -1,6 +1,7 @@
 package com.coms.backend.controller;
 
 import com.coms.backend.domain.DeletedCommunityPostImage;
+import com.coms.backend.domain.DeletedCommunityPostMedia;
 import com.coms.backend.dto.AddEligibleMemberRequest;
 import com.coms.backend.dto.AuditLogResponse;
 import com.coms.backend.dto.BanStudentRequest;
@@ -201,6 +202,20 @@ public class AdminController {
                 .contentType(mediaType(meta.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
                         .filename(filename, StandardCharsets.UTF_8).build().toString())
+                .body(resource);
+    }
+
+    @GetMapping("/community/deleted-posts/{id}/media/{mediaId}")
+    public ResponseEntity<Resource> deletedCommunityPostMedia(@PathVariable Long id, @PathVariable Long mediaId) {
+        DeletedCommunityPostMedia meta = communityDeletionArchiveService.loadMediaMeta(id, mediaId);
+        Resource resource = communityDeletionArchiveService.loadMedia(id, mediaId);
+        String filename = meta.getOriginalName() == null || meta.getOriginalName().isBlank() ? "deleted-community-media" : meta.getOriginalName();
+        ContentDisposition disposition = DeletedCommunityPostMedia.KIND_FILE.equals(meta.getKind())
+                ? ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build()
+                : ContentDisposition.inline().filename(filename, StandardCharsets.UTF_8).build();
+        return ResponseEntity.ok()
+                .contentType(mediaType(meta.getMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(resource);
     }
 
