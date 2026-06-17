@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, RefreshCw, RotateCcw } from 'lucide-react'
-import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache, listCommunityReports, resolveCommunityReport, listRecruitApplications, updateRecruitApplicationStatus } from '../services/adminApi.js'
+import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache, listCommunityReports, listDeletedCommunityPosts, resolveCommunityReport, listRecruitApplications, updateRecruitApplicationStatus } from '../services/adminApi.js'
 import { listFiles, createPost, deleteFile } from '../services/archiveApi.js'
 import { listAdminFonts, setFontActive, uploadFont } from '../services/fontApi.js'
 import { buildFontFaceCss, fontFamilyValue } from '../services/fontPreferences.js'
@@ -168,6 +168,7 @@ export default function Admin({ onBack }) {
                 { id: 'files', label: '파일 관리' },
                 { id: 'fonts', label: '폰트 관리' },
                 { id: 'community', label: '커뮤니티 관리' },
+                { id: 'deleted-posts', label: '삭제 보관함' },
                 { id: 'screen-check', label: '화면 점검' },
                 { id: 'ban', label: '차단 관리' },
                 { id: 'logs', label: '로그' },
@@ -212,6 +213,7 @@ export default function Admin({ onBack }) {
           {activeTab === 'files' && <FilesTab />}
           {activeTab === 'fonts' && <FontsTab />}
           {activeTab === 'community' && <CommunityReportsTab />}
+          {activeTab === 'deleted-posts' && <DeletedCommunityPostsTab />}
           {activeTab === 'screen-check' && <ScreenCheckTab />}
           {activeTab === 'ban' && <BanTab />}
           {activeTab === 'logs' && <AuditLogTab />}
@@ -1463,6 +1465,116 @@ function CommunityReportsTab() {
   )
 }
 
+function DeletedCommunityPostsTab() {
+  const [posts, setPosts] = useState([])
+  const [limit, setLimit] = useState(300)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const load = async (requestedLimit = limit) => {
+    setError('')
+    try {
+      const data = await listDeletedCommunityPosts(requestedLimit)
+      setPosts(Array.isArray(data) ? data : [])
+    } catch (err) {
+      setError(err.message || '삭제 보관함을 불러오지 못했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true
+    listDeletedCommunityPosts(limit)
+      .then((data) => {
+        if (mounted) {
+          setError('')
+          setPosts(Array.isArray(data) ? data : [])
+        }
+      })
+      .catch((err) => { if (mounted) setError(err.message || '삭제 보관함을 불러오지 못했습니다.') })
+      .finally(() => { if (mounted) setLoading(false) })
+    return () => { mounted = false }
+  }, [limit])
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-[var(--theme-body-dark)]">커뮤니티 삭제 보관함</h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
+            관리자가 삭제한 게시글의 원문, 작성자, 삭제자, 사유를 확인합니다.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-xs font-semibold text-[var(--theme-body-muted)]">
+            <span>표시 개수</span>
+            <select
+              aria-label="삭제 보관함 표시 개수"
+              value={limit}
+              onChange={(event) => {
+                setLoading(true)
+                setLimit(Number(event.target.value))
+              }}
+              className="shape-cut-sm border border-black/10 bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition focus:border-black/30"
+            >
+              {[100, 300, 1000].map((option) => (
+                <option key={option} value={option}>{option.toLocaleString('ko-KR')}건</option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() => { setLoading(true); load() }}
+            className="shape-cut-sm inline-flex items-center gap-1.5 border border-black/10 bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
+            disabled={loading}
+          >
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+            새로고침
+          </button>
+        </div>
+      </div>
+
+      {loading && <p className="text-sm text-[var(--theme-body-muted)]">삭제 보관함을 불러오는 중...</p>}
+      {error && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
+      {!loading && !error && posts.length === 0 && (
+        <p className="text-sm text-[var(--theme-body-muted)]">보관된 삭제 게시글이 없습니다.</p>
+      )}
+      {!loading && !error && posts.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border border-black/10">
+          <table className="w-max min-w-full text-left text-sm">
+            <thead className="bg-white text-xs font-semibold text-[var(--theme-body-muted)]">
+              <tr>
+                <th className="px-3 py-3">삭제</th>
+                <th className="px-3 py-3">게시글</th>
+                <th className="px-3 py-3">작성자</th>
+                <th className="px-3 py-3">삭제자</th>
+                <th className="px-3 py-3">사유</th>
+                <th className="px-3 py-3">원문</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-black/10 bg-white/50">
+              {posts.map((post) => (
+                <tr key={post.id}>
+                  <td className="whitespace-nowrap px-3 py-3 text-xs text-[var(--theme-body-muted)]">{formatDateTime(post.deletedAt)}</td>
+                  <td className="max-w-[260px] px-3 py-3 text-xs">
+                    <span className="block break-words font-semibold text-[#3b4890]">{post.title || '-'}</span>
+                    <span className="mt-1 block font-mono text-[10px] text-[var(--theme-body-muted)]">#{post.originalPostId}</span>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-xs text-[var(--theme-body-muted)]">{deletedPostIdentity(post.authorName, post.authorStudentId)}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-xs text-[var(--theme-body-muted)]">{deletedPostIdentity(post.deletedByName, post.deletedByStudentId)}</td>
+                  <td className="max-w-[220px] whitespace-pre-wrap break-words px-3 py-3 text-xs font-semibold text-[var(--theme-body-dark)]">{post.deletionReason || '-'}</td>
+                  <td className="max-w-[420px] whitespace-pre-wrap break-words px-3 py-3 text-xs text-[var(--theme-body-muted)]">{post.content || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AuditLogTab() {
   const [logs, setLogs] = useState([])
   const [limit, setLimit] = useState(1000)
@@ -1680,6 +1792,11 @@ function formatDateTime(value) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function deletedPostIdentity(name, studentId) {
+  const safeName = name || '-'
+  return studentId ? `${safeName}(${studentId})` : safeName
 }
 
 function auditLogSearchText(log) {
