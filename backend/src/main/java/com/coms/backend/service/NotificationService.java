@@ -88,6 +88,19 @@ public class NotificationService {
         );
     }
 
+    public void notifyPostRestored(CommunityPost post, String adminStudentId, String adminName) {
+        String actorName = adminName == null || adminName.isBlank() ? "관리자" : adminName;
+        createIfDifferent(
+                post.getAuthorStudentId(),
+                adminStudentId,
+                Notification.Type.COMMUNITY_POST_RESTORED,
+                post.getId(),
+                null,
+                null,
+                actorName + "님이 삭제 보관함에서 \"" + post.getTitle() + "\" 글을 복원했습니다."
+        );
+    }
+
     public Notification notifyExternalInvite(String recipientStudentId,
                                               String actorLabel,
                                               String message,
