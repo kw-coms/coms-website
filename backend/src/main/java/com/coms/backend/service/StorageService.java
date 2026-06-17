@@ -9,9 +9,11 @@ public interface StorageService {
     String store(MultipartFile file) throws IOException;
 
     /**
-     * Store an image with all embedded metadata (EXIF GPS, camera/device tags, etc.) stripped.
-     * Re-encodable raster formats are decoded and re-written so no metadata survives; formats that
-     * cannot be safely re-encoded fall back to a raw {@link #store} copy.
+     * Store an image, stripping embedded metadata (EXIF GPS, camera/device tags, etc.) for the
+     * formats that can be safely re-encoded — currently JPEG and PNG, which are decoded and
+     * re-written so no metadata survives. Formats with no safe re-encoder (GIF, WebP) fall back to
+     * a raw {@link #store} copy and retain their original metadata; restrict uploads to JPEG/PNG at
+     * the API layer if the stripping guarantee is required for every accepted format.
      */
     String storeImage(MultipartFile file, String contentType) throws IOException;
 
