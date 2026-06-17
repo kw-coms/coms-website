@@ -58,6 +58,7 @@ public class CommunityDeletionArchiveService {
     private final MemberRepository memberRepository;
     private final StorageService storageService;
     private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
 
     public CommunityDeletionArchiveService(DeletedCommunityPostRepository repository,
                                            DeletedCommunityPostImageRepository deletedImageRepository,
@@ -70,7 +71,8 @@ public class CommunityDeletionArchiveService {
                                            CommunityCommentRepository commentRepository,
                                            MemberRepository memberRepository,
                                            StorageService storageService,
-                                           AuditLogService auditLogService) {
+                                           AuditLogService auditLogService,
+                                           NotificationService notificationService) {
         this.repository = repository;
         this.deletedImageRepository = deletedImageRepository;
         this.deletedMediaRepository = deletedMediaRepository;
@@ -83,6 +85,7 @@ public class CommunityDeletionArchiveService {
         this.memberRepository = memberRepository;
         this.storageService = storageService;
         this.auditLogService = auditLogService;
+        this.notificationService = notificationService;
     }
 
     public DeletedCommunityPost record(CommunityPost post, Member deletedBy, String reason) {
@@ -257,6 +260,7 @@ public class CommunityDeletionArchiveService {
                         "author=" + snapshot.getAuthorName() + "(" + snapshot.getAuthorStudentId() + ")"
                 ),
                 null);
+        notificationService.notifyPostRestored(savedPost, admin.getStudentId(), admin.getName());
         return new DeletedCommunityPostRestoreResponse(savedPost.getId());
     }
 

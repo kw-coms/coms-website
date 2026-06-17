@@ -550,6 +550,28 @@ test('admin deleted community posts tab preserves deletion evidence', async ({ p
           restoredPostId: null,
           restoredAt: null,
         },
+        {
+          id: 2,
+          originalPostId: 78,
+          title: '복원된 보관 대상',
+          content: '[{"type":"text","content":"이미 복원된 게시글입니다."}]',
+          authorStudentId: '2025333333',
+          authorName: '다른작성자',
+          category: 'INFO',
+          deletedByStudentId: '2020123456',
+          deletedByName: '관리자',
+          deletedByRole: 'ADMIN',
+          deletionReason: '테스트 후 복원',
+          originalCreatedAt: '2026-06-15T02:00:00',
+          deletedAt: '2026-06-15T02:31:00',
+          imageInfos: [],
+          videoInfos: [],
+          fileInfos: [],
+          commentCount: 0,
+          commentInfos: [],
+          restoredPostId: 79,
+          restoredAt: '2026-06-15T03:45:00',
+        },
       ],
     })
   })
@@ -570,11 +592,21 @@ test('admin deleted community posts tab preserves deletion evidence', async ({ p
   await expect(page.getByText('삭제 전 댓글입니다.')).toBeVisible()
   await expect(page.getByText('삭제 전 답글입니다.')).toBeVisible()
   await expect(page.getByRole('cell', { name: '작성자(2025123456)', exact: true })).toBeVisible()
-  await expect(page.getByText('관리자(2020123456)')).toBeVisible()
+  await expect(page.getByRole('cell', { name: '관리자(2020123456)', exact: true }).first()).toBeVisible()
   await expect(page.getByText('운영 규칙 위반')).toBeVisible()
+  await page.getByPlaceholder('제목·작성자·댓글·첨부 검색').fill('삭제 전 댓글')
+  await expect(page.getByText('삭제 보관 대상')).toBeVisible()
+  await expect(page.getByText('복원된 보관 대상')).toBeHidden()
+  await page.getByPlaceholder('제목·작성자·댓글·첨부 검색').fill('')
+  await page.getByLabel('삭제 보관함 상태').selectOption('RESTORED')
+  await expect(page.getByText('복원된 보관 대상')).toBeVisible()
+  await expect(page.getByText('삭제 보관 대상')).toBeHidden()
+  await page.getByLabel('삭제 보관함 상태').selectOption('OPEN')
+  await page.getByLabel('삭제 보관함 증거 유형').selectOption('COMMENTS')
+  await expect(page.getByText('삭제 보관 대상')).toBeVisible()
   await page.getByRole('button', { name: '되돌리기' }).click()
   await expect.poll(() => restored).toBe(true)
-  await expect(page.getByText('복원됨')).toBeVisible()
+  await expect(page.getByRole('table').getByText('복원됨')).toBeVisible()
   await expect(page.getByRole('link', { name: '#88 열기' })).toHaveAttribute('href', '/community/88')
 })
 
