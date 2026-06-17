@@ -2102,6 +2102,10 @@ export default function Community({ onBack }) {
       ? window.prompt('삭제 사유를 입력하세요. 감사 로그에 기록됩니다.', '')
       : ''
     if (reason === null) return
+    if (user?.role === 'ADMIN' && post.authorStudentId !== user.studentId && !reason.trim()) {
+      alert('관리자가 다른 회원의 글을 삭제하려면 삭제 사유가 필요합니다.')
+      return
+    }
     try {
       await deleteCommunityPost(post.id, reason)
       setPosts((prev) => prev.filter((item) => item.id !== post.id))
