@@ -1,6 +1,7 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.Member;
+import com.coms.backend.dto.CommunityCommentRequest;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.repository.AuditLogRepository;
 import com.coms.backend.repository.CommunityCommentRepository;
@@ -140,6 +141,47 @@ class CommunityServiceAuditLogTest {
                 .satisfies(log -> assertThat(log.getDetail())
                         .contains("reason=스팸 category=ANONYMOUS")
                         .doesNotContain("\ncategory=ANONYMOUS"));
+    }
+
+    @Test
+    void adminCommentDeletionAuditLogKeepsCommentAndModeratorSnapshot() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member commenter = member("2025222222", "댓글러", Member.Role.USER);
+        Member admin = member("2026123456", "관리자", Member.Role.ADMIN);
+        memberRepository.save(author);
+        memberRepository.save(commenter);
+        memberRepository.save(admin);
+        var post = communityService.create(
+                author.getStudentId(),
+                new CommunityPostRequest("댓글 감사 대상", "본문", "GENERAL", false),
+                null
+        );
+        var comment = communityService.addComment(
+                post.id(),
+                commenter.getStudentId(),
+                new CommunityCommentRequest("삭제될 댓글 내용입니다.", null)
+        );
+        auditLogRepository.deleteAll();
+
+        communityService.deleteComment(post.id(), comment.id(), admin.getStudentId());
+
+        assertThat(auditLogRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, 5)))
+                .filteredOn(log -> log.getAction().equals("COMMUNITY_COMMENT_DELETE"))
+                .singleElement()
+                .satisfies(log -> {
+                    assertThat(log.getActorStudentId()).isEqualTo(admin.getStudentId());
+                    assertThat(log.getActorName()).isEqualTo(admin.getName());
+                    assertThat(log.getTargetType()).isEqualTo("COMMUNITY_COMMENT");
+                    assertThat(log.getTargetId()).isEqualTo(String.valueOf(comment.id()));
+                    assertThat(log.getDetail()).contains(
+                            "postId=" + post.id(),
+                            "title=댓글 감사 대상",
+                            "author=댓글러(2025222222)",
+                            "deletedBy=관리자(2026123456)",
+                            "deletedByRole=ADMIN",
+                            "content=삭제될 댓글 내용입니다."
+                    );
+                });
     }
 
     private Member member(String studentId, String name, Member.Role role) {

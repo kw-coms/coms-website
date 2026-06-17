@@ -45,18 +45,22 @@ public class AdminService {
         return toResponse(memberRepository.save(member));
     }
 
-    public void deleteMember(Long id) {
+    public DeletedMemberSnapshot deleteMember(Long id) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        DeletedMemberSnapshot snapshot = DeletedMemberSnapshot.from(member);
         communityService.deleteCommunityDataForMember(member.getStudentId());
         memberRepository.delete(member);
+        return snapshot;
     }
 
-    public void deleteByStudentId(String studentId) {
+    public DeletedMemberSnapshot deleteByStudentId(String studentId) {
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        DeletedMemberSnapshot snapshot = DeletedMemberSnapshot.from(member);
         communityService.deleteCommunityDataForMember(member.getStudentId());
         memberRepository.delete(member);
+        return snapshot;
     }
 
     public void resetPassword(Long id, String newPassword) {
@@ -97,5 +101,23 @@ public class AdminService {
                 member.getSelectedFontId(),
                 member.getSelectedBuiltinFontKey()
         );
+    }
+
+    public record DeletedMemberSnapshot(
+            Long id,
+            String studentId,
+            String name,
+            String role,
+            String email
+    ) {
+        private static DeletedMemberSnapshot from(Member member) {
+            return new DeletedMemberSnapshot(
+                    member.getId(),
+                    member.getStudentId(),
+                    member.getName(),
+                    member.getRole().name(),
+                    member.getEmail()
+            );
+        }
     }
 }
