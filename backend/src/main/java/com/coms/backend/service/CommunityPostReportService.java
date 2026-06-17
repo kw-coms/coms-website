@@ -1,5 +1,6 @@
 package com.coms.backend.service;
 
+import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.domain.CommunityPostReport;
 import com.coms.backend.dto.CommunityPostReportRequest;
 import com.coms.backend.dto.CommunityPostReportResponse;
@@ -12,7 +13,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -37,9 +41,8 @@ public class CommunityPostReportService {
     }
 
     public CommunityPostReportResponse report(Long postId, String reporterStudentId, CommunityPostReportRequest request) {
-        if (!postRepository.existsById(postId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "신고할 글을 찾을 수 없습니다.");
-        }
+        CommunityPost post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "신고할 글을 찾을 수 없습니다."));
         String reason = request.reason() == null ? "" : request.reason().trim().toUpperCase();
         if (!ALLOWED_REASONS.contains(reason)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "지원하지 않는 신고 사유입니다.");
@@ -55,14 +58,21 @@ public class CommunityPostReportService {
         report.setReason(reason);
         report.setDetail(request.detail());
         report.setCreatedAt(LocalDateTime.now());
-        return CommunityPostReportResponse.from(reportRepository.save(report));
+        return CommunityPostReportResponse.from(reportRepository.save(report), post.getTitle());
     }
 
     @Transactional(readOnly = true)
     public List<CommunityPostReportResponse> listOpen() {
-        return reportRepository.findByStatusOrderByCreatedAtDesc(CommunityPostReport.Status.OPEN)
+        List<CommunityPostReport> reports = reportRepository.findByStatusOrderByCreatedAtDesc(CommunityPostReport.Status.OPEN);
+        Map<Long, CommunityPost> postsById = postRepository.findAllById(reports.stream()
+                        .map(CommunityPostReport::getPostId)
+                        .collect(Collectors.toSet()))
                 .stream()
-                .map(CommunityPostReportResponse::from)
+                .collect(Collectors.toMap(CommunityPost::getId, Function.identity()));
+        return reports.stream()
+                .map(report -> CommunityPostReportResponse.from(
+                        report,
+                        postsById.containsKey(report.getPostId()) ? postsById.get(report.getPostId()).getTitle() : null))
                 .toList();
     }
 
@@ -84,6 +94,7 @@ public class CommunityPostReportService {
         report.setResolvedByStudentId(resolverStudentId);
         report.setResolutionNote(note);
         report.setResolvedAt(LocalDateTime.now());
-        return CommunityPostReportResponse.from(reportRepository.save(report));
+        String postTitle = postRepository.findById(report.getPostId()).map(CommunityPost::getTitle).orElse(null);
+        return CommunityPostReportResponse.from(reportRepository.save(report), postTitle);
     }
 }

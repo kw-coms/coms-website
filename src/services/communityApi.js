@@ -74,9 +74,11 @@ export async function searchYoutubeVideos(query) {
   return request(`/api/community/posts/tools/youtube/search?q=${q}`)
 }
 
-export async function deleteCommunityPost(id) {
+export async function deleteCommunityPost(id, reason = '') {
+  const cleanReason = reason?.trim() || ''
   return requestNoContent(`/api/community/posts/${id}`, {
     method: 'DELETE',
+    body: cleanReason ? JSON.stringify({ reason: cleanReason }) : undefined,
   })
 }
 
