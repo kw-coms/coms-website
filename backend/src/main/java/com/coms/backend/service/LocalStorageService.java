@@ -9,7 +9,12 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,6 +51,72 @@ public class LocalStorageService implements StorageService {
 
         Files.copy(file.getInputStream(), destination);
         return stored;
+    }
+
+    @Override
+    public String storeImage(MultipartFile file, String contentType) throws IOException {
+        String originalName = cleanOriginalFilename(file);
+        if (file.isEmpty() || originalName.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File is empty or missing a filename.");
+        }
+
+        byte[] sanitized = stripImageMetadata(file, contentType);
+        if (sanitized == null) {
+            // Format cannot be safely re-encoded (e.g. animated GIF, WebP) — store the raw bytes.
+            return store(file);
+        }
+
+        String stored = UUID.randomUUID() + "_" + originalName;
+        Path destination = root.resolve(stored).normalize();
+        if (!destination.startsWith(root)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid filename.");
+        }
+
+        Files.write(destination, sanitized);
+        return stored;
+    }
+
+    /**
+     * Decodes the image to a pixel buffer and re-encodes it, dropping every metadata block
+     * (EXIF GPS coordinates, camera/device identifiers, timestamps). Returns {@code null} for
+     * formats ImageIO cannot losslessly re-write so the caller can fall back to a raw copy.
+     */
+    private byte[] stripImageMetadata(MultipartFile file, String contentType) throws IOException {
+        String format = reencodeFormat(contentType);
+        if (format == null) {
+            return null;
+        }
+        BufferedImage image;
+        try (InputStream in = file.getInputStream()) {
+            image = ImageIO.read(in);
+        }
+        if (image == null) {
+            return null;
+        }
+        BufferedImage target = image;
+        if ("jpg".equals(format) && image.getColorModel().hasAlpha()) {
+            // JPEG has no alpha channel; flatten onto white to avoid a corrupt write.
+            target = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
+            java.awt.Graphics2D g = target.createGraphics();
+            g.drawImage(image, 0, 0, Color.WHITE, null);
+            g.dispose();
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        if (!ImageIO.write(target, format, out)) {
+            return null;
+        }
+        return out.toByteArray();
+    }
+
+    private String reencodeFormat(String contentType) {
+        if (contentType == null) {
+            return null;
+        }
+        return switch (contentType) {
+            case "image/jpeg" -> "jpg";
+            case "image/png" -> "png";
+            default -> null;
+        };
     }
 
     @Override
