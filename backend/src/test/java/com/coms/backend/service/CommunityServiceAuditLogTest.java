@@ -12,7 +12,9 @@ import com.coms.backend.repository.CommunityPostImageRepository;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVideoRepository;
 import com.coms.backend.repository.CommunityPostVoteRepository;
+import com.coms.backend.repository.DeletedCommunityPostCommentRepository;
 import com.coms.backend.repository.DeletedCommunityPostImageRepository;
+import com.coms.backend.repository.DeletedCommunityPostMediaRepository;
 import com.coms.backend.repository.DeletedCommunityPostRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -73,9 +75,17 @@ class CommunityServiceAuditLogTest {
     @Autowired
     private DeletedCommunityPostImageRepository deletedCommunityPostImageRepository;
 
+    @Autowired
+    private DeletedCommunityPostMediaRepository deletedCommunityPostMediaRepository;
+
+    @Autowired
+    private DeletedCommunityPostCommentRepository deletedCommunityPostCommentRepository;
+
     @BeforeEach
     @AfterEach
     void clean() {
+        deletedCommunityPostCommentRepository.deleteAll();
+        deletedCommunityPostMediaRepository.deleteAll();
         deletedCommunityPostImageRepository.deleteAll();
         deletedCommunityPostRepository.deleteAll();
         auditLogRepository.deleteAll();
@@ -299,6 +309,98 @@ class CommunityServiceAuditLogTest {
         assertThatThrownBy(() -> communityDeletionArchiveService.restore(snapshotId, admin.getStudentId()))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void adminCanRestoreDeletedPostWithCommentsVideosAndFiles() throws Exception {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member commenter = member("2025222222", "댓글러", Member.Role.USER);
+        Member admin = member("2026123456", "관리자", Member.Role.ADMIN);
+        memberRepository.save(author);
+        memberRepository.save(commenter);
+        memberRepository.save(admin);
+        var created = communityService.create(
+                author.getStudentId(),
+                new CommunityPostRequest("댓글 첨부 복원 대상", "임시 본문", "GENERAL", false),
+                null
+        );
+        Long originalVideoId = communityService.addVideo(
+                author.getStudentId(),
+                created.id(),
+                new MockMultipartFile("video", "demo.mp4", "video/mp4", "video".getBytes())
+        );
+        Long originalFileId = communityService.addFile(
+                author.getStudentId(),
+                created.id(),
+                new MockMultipartFile("file", "source.zip", "application/zip", "zip".getBytes())
+        );
+        String content = """
+                [{"type":"text","content":"영상과 첨부, 댓글까지 복원되어야 합니다."},
+                 {"type":"video","mediaId":%d,"name":"demo.mp4","width":75,"align":"center"},
+                 {"type":"file","fileId":%d,"name":"source.zip"}]
+                """.formatted(originalVideoId, originalFileId);
+        communityService.update(
+                author.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("댓글 첨부 복원 대상", content, "GENERAL", false),
+                null
+        );
+        var root = communityService.addComment(
+                created.id(),
+                commenter.getStudentId(),
+                new CommunityCommentRequest("첫 댓글", null)
+        );
+        var reply = communityService.addComment(
+                created.id(),
+                author.getStudentId(),
+                new CommunityCommentRequest("답글", root.id())
+        );
+
+        communityService.delete(admin.getStudentId(), created.id(), "첨부와 댓글 증거 확인");
+        Long snapshotId = deletedCommunityPostRepository.findAll().get(0).getId();
+
+        assertThat(deletedCommunityPostMediaRepository.findByDeletedPostIdOrderByPositionAsc(snapshotId))
+                .hasSize(2)
+                .extracting("originalName")
+                .containsExactly("demo.mp4", "source.zip");
+        assertThat(deletedCommunityPostCommentRepository.findByDeletedPostIdOrderByDepthAscCreatedAtAsc(snapshotId))
+                .hasSize(2)
+                .extracting("content")
+                .containsExactly("첫 댓글", "답글");
+        assertThat(communityDeletionArchiveService.recent(10))
+                .singleElement()
+                .satisfies(response -> {
+                    assertThat(response.videoInfos()).singleElement()
+                            .satisfies(video -> assertThat(video.originalMediaId()).isEqualTo(originalVideoId));
+                    assertThat(response.fileInfos()).singleElement()
+                            .satisfies(file -> assertThat(file.originalMediaId()).isEqualTo(originalFileId));
+                    assertThat(response.commentCount()).isEqualTo(2);
+                    assertThat(response.commentInfos())
+                            .extracting(DeletedCommunityPostResponse.CommentInfo::content)
+                            .containsExactly("첫 댓글", "답글");
+                });
+
+        Long restoredPostId = communityDeletionArchiveService.restore(snapshotId, admin.getStudentId()).restoredPostId();
+
+        var restoredVideos = videoRepository.findByPostIdOrderByPositionAsc(restoredPostId);
+        var restoredFiles = fileRepository.findByPostIdOrderByPositionAsc(restoredPostId);
+        assertThat(restoredVideos).singleElement()
+                .satisfies(video -> assertThat(video.getOriginalName()).isEqualTo("demo.mp4"));
+        assertThat(restoredFiles).singleElement()
+                .satisfies(file -> assertThat(file.getOriginalName()).isEqualTo("source.zip"));
+        var restoredPost = communityPostRepository.findById(restoredPostId).orElseThrow();
+        assertThat(restoredPost.getContent())
+                .contains("\"mediaId\":" + restoredVideos.get(0).getId())
+                .contains("\"fileId\":" + restoredFiles.get(0).getId())
+                .doesNotContain("\"mediaId\":" + originalVideoId)
+                .doesNotContain("\"fileId\":" + originalFileId);
+        var restoredComments = commentRepository.findByPostIdOrderByCreatedAtAsc(restoredPostId);
+        assertThat(restoredComments).hasSize(2);
+        assertThat(restoredComments.get(0).getContent()).isEqualTo("첫 댓글");
+        assertThat(restoredComments.get(1).getContent()).isEqualTo("답글");
+        assertThat(restoredComments.get(1).getParentCommentId()).isEqualTo(restoredComments.get(0).getId());
+        assertThat(root.id()).isNotEqualTo(restoredComments.get(0).getId());
+        assertThat(reply.id()).isNotEqualTo(restoredComments.get(1).getId());
     }
 
     @Test
