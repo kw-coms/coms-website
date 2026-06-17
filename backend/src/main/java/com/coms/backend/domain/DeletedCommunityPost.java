@@ -57,6 +57,18 @@ public class DeletedCommunityPost {
     @Column(name = "deleted_at", nullable = false)
     private LocalDateTime deletedAt = LocalDateTime.now();
 
+    @Column(name = "restored_post_id")
+    private Long restoredPostId;
+
+    @Column(name = "restored_by_student_id", length = 64)
+    private String restoredByStudentId;
+
+    @Column(name = "restored_by_name", length = 100)
+    private String restoredByName;
+
+    @Column(name = "restored_at")
+    private LocalDateTime restoredAt;
+
     public Long getId() { return id; }
     public Long getOriginalPostId() { return originalPostId; }
     public void setOriginalPostId(Long originalPostId) { this.originalPostId = originalPostId; }
@@ -86,4 +98,12 @@ public class DeletedCommunityPost {
     public void setDeletionReason(String deletionReason) { this.deletionReason = deletionReason; }
     public LocalDateTime getDeletedAt() { return deletedAt; }
     public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+    public Long getRestoredPostId() { return restoredPostId; }
+    public void setRestoredPostId(Long restoredPostId) { this.restoredPostId = restoredPostId; }
+    public String getRestoredByStudentId() { return restoredByStudentId; }
+    public void setRestoredByStudentId(String restoredByStudentId) { this.restoredByStudentId = restoredByStudentId; }
+    public String getRestoredByName() { return restoredByName; }
+    public void setRestoredByName(String restoredByName) { this.restoredByName = restoredByName; }
+    public LocalDateTime getRestoredAt() { return restoredAt; }
+    public void setRestoredAt(LocalDateTime restoredAt) { this.restoredAt = restoredAt; }
 }

@@ -1,11 +1,13 @@
 package com.coms.backend.controller;
 
+import com.coms.backend.domain.DeletedCommunityPostImage;
 import com.coms.backend.dto.AddEligibleMemberRequest;
 import com.coms.backend.dto.AuditLogResponse;
 import com.coms.backend.dto.BanStudentRequest;
 import com.coms.backend.dto.BannedStudentResponse;
 import com.coms.backend.dto.CacheClearResponse;
 import com.coms.backend.dto.DeletedCommunityPostResponse;
+import com.coms.backend.dto.DeletedCommunityPostRestoreResponse;
 import com.coms.backend.dto.ResetPasswordRequest;
 import com.coms.backend.dto.EligibleMemberImportResponse;
 import com.coms.backend.dto.EligibleMemberResponse;
@@ -23,12 +25,17 @@ import com.coms.backend.service.CommunityDeletionArchiveService;
 import com.coms.backend.service.EligibleMemberService;
 import com.coms.backend.service.RecruitApplicationService;
 import jakarta.validation.Valid;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @PreAuthorize("hasRole('ADMIN')")
@@ -185,6 +192,24 @@ public class AdminController {
         return ResponseEntity.ok(communityDeletionArchiveService.recent(limit));
     }
 
+    @GetMapping("/community/deleted-posts/{id}/images/{imageId}")
+    public ResponseEntity<Resource> deletedCommunityPostImage(@PathVariable Long id, @PathVariable Long imageId) {
+        DeletedCommunityPostImage meta = communityDeletionArchiveService.loadImageMeta(id, imageId);
+        Resource resource = communityDeletionArchiveService.loadImage(id, imageId);
+        String filename = meta.getOriginalName() == null || meta.getOriginalName().isBlank() ? "deleted-community-image" : meta.getOriginalName();
+        return ResponseEntity.ok()
+                .contentType(mediaType(meta.getMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(filename, StandardCharsets.UTF_8).build().toString())
+                .body(resource);
+    }
+
+    @PostMapping("/community/deleted-posts/{id}/restore")
+    public ResponseEntity<DeletedCommunityPostRestoreResponse> restoreDeletedCommunityPost(Authentication authentication,
+                                                                                          @PathVariable Long id) {
+        return ResponseEntity.ok(communityDeletionArchiveService.restore(id, authentication.getName()));
+    }
+
     @PostMapping("/cache/clear")
     public ResponseEntity<CacheClearResponse> clearCache(Authentication authentication) {
         CacheClearResponse response = cacheMaintenanceService.clearAll();
@@ -214,5 +239,12 @@ public class AdminController {
     private String auditValue(String value) {
         String normalized = value == null ? "" : value.trim().replaceAll("\\s+", " ");
         return normalized.isEmpty() ? "-" : normalized;
+    }
+
+    private MediaType mediaType(String mimeType) {
+        if (mimeType == null || mimeType.isBlank()) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
+        return MediaType.parseMediaType(mimeType);
     }
 }
