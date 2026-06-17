@@ -277,6 +277,17 @@ test('admin logs tab can expand log window and clear caches', async ({ page }) =
           ipAddress: null,
           createdAt: '2026-06-15T03:30:00',
         },
+        {
+          id: 2,
+          actorStudentId: '2020123456',
+          actorName: '관리자',
+          action: 'COMMUNITY_POST_DELETE',
+          targetType: 'COMMUNITY_POST',
+          targetId: '77',
+          detail: 'title=삭제 대상\nreason=삭제 사유',
+          ipAddress: null,
+          createdAt: '2026-06-15T03:29:00',
+        },
       ],
     })
   })
@@ -296,6 +307,19 @@ test('admin logs tab can expand log window and clear caches', async ({ page }) =
   await page.goto('/admin')
   await page.getByRole('button', { name: '로그' }).click()
   await expect.poll(() => requestedLimits.at(-1)).toBe('1000')
+  await expect(page.getByText('커뮤니티 글 삭제')).toBeVisible()
+
+  await page.getByLabel('로그 종류').selectOption('COMMUNITY_POST_DELETE')
+  await expect(page.getByText('커뮤니티 글 삭제')).toBeVisible()
+  await expect(page.getByText('캐시 초기화', { exact: true })).toHaveCount(1)
+
+  await page.getByPlaceholder('사용자, 행위, 상세 검색').fill('삭제 사유')
+  await expect(page.getByText('title=삭제 대상')).toBeVisible()
+  await expect(page.getByText('clearedCount=1')).toHaveCount(0)
+
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'CSV' }).click()
+  await expect.poll(async () => (await download).suggestedFilename()).toMatch(/coms-audit-logs-\d{4}-\d{2}-\d{2}\.csv/)
 
   await page.getByLabel('로그 표시 개수').selectOption('2000')
   await expect.poll(() => requestedLimits.at(-1)).toBe('2000')
@@ -304,6 +328,62 @@ test('admin logs tab can expand log window and clear caches', async ({ page }) =
 
   await expect.poll(() => cacheClearCalled).toBe(true)
   await expect(page.getByText('캐시 1개를 초기화했습니다.')).toBeVisible()
+})
+
+test('admin community reports tab resolves open reports', async ({ page }) => {
+  await mockAdminApis(page)
+  let reports = [
+    {
+      id: 9,
+      postId: 77,
+      postTitle: '신고된 게시글',
+      reporterStudentId: '2026123456',
+      reason: 'SPAM',
+      detail: '홍보 링크 반복',
+      status: 'OPEN',
+      resolvedByStudentId: null,
+      resolutionNote: null,
+      createdAt: '2026-06-15T03:29:00',
+      resolvedAt: null,
+    },
+  ]
+  let resolvePayload = null
+
+  await page.addInitScript(() => { window.confirm = () => true })
+  await page.route('**/api/admin/community/reports', (route) => route.fulfill({ status: 200, json: reports }))
+  await page.route('**/api/admin/community/reports/9', async (route) => {
+    expect(route.request().method()).toBe('PATCH')
+    resolvePayload = route.request().postDataJSON()
+    reports = []
+    return route.fulfill({
+      status: 200,
+      json: {
+        id: 9,
+        postId: 77,
+        postTitle: '신고된 게시글',
+        reporterStudentId: '2026123456',
+        reason: 'SPAM',
+        detail: '홍보 링크 반복',
+        status: 'ACCEPTED',
+        resolvedByStudentId: '2020123456',
+        resolutionNote: resolvePayload.note,
+        createdAt: '2026-06-15T03:29:00',
+        resolvedAt: '2026-06-15T03:35:00',
+      },
+    })
+  })
+
+  await page.goto('/admin')
+  await page.getByRole('button', { name: '커뮤니티 관리' }).click()
+
+  await expect(page.getByRole('heading', { name: '커뮤니티 신고 큐' })).toBeVisible()
+  await expect(page.getByText('신고된 게시글')).toBeVisible()
+  await expect(page.getByText('스팸/홍보')).toBeVisible()
+  await page.getByPlaceholder('운영 메모').fill('삭제 처리 완료')
+  await page.getByRole('button', { name: '처리 완료' }).click()
+
+  await expect.poll(() => resolvePayload).toEqual({ action: 'ACCEPT', note: '삭제 처리 완료' })
+  await expect(page.getByText('처리 대기 중인 신고가 없습니다.')).toBeVisible()
 })
 
 test('admin tracks recruit applications from overview to status update', async ({ page }) => {

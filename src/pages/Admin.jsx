@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { RefreshCw, RotateCcw } from 'lucide-react'
-import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache, listRecruitApplications, updateRecruitApplicationStatus } from '../services/adminApi.js'
+import { Download, RefreshCw, RotateCcw } from 'lucide-react'
+import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache, listCommunityReports, resolveCommunityReport, listRecruitApplications, updateRecruitApplicationStatus } from '../services/adminApi.js'
 import { listFiles, createPost, deleteFile } from '../services/archiveApi.js'
 import { listAdminFonts, setFontActive, uploadFont } from '../services/fontApi.js'
 import { buildFontFaceCss, fontFamilyValue } from '../services/fontPreferences.js'
@@ -36,6 +36,46 @@ const SCREEN_CHECK_APIS = [
 ]
 
 const AUDIT_LOG_LIMITS = [300, 1000, 2000]
+
+const AUDIT_LOG_FILTERS = [
+  { value: 'ALL', label: '전체 로그' },
+  { value: 'COMMUNITY_POST_DELETE', label: '커뮤니티 삭제' },
+  { value: 'ADMIN_MEMBER_DELETE', label: '회원 삭제' },
+  { value: 'ADMIN_STUDENT_BAN', label: '학번 차단' },
+  { value: 'ADMIN_RECRUIT_APPLICATION_STATUS_UPDATE', label: '모집 상태 변경' },
+]
+
+const AUDIT_ACTION_LABELS = {
+  COMMUNITY_POST_CREATE: '커뮤니티 글 작성',
+  COMMUNITY_POST_UPDATE: '커뮤니티 글 수정',
+  COMMUNITY_POST_DELETE: '커뮤니티 글 삭제',
+  COMMUNITY_COMMENT_CREATE: '댓글 작성',
+  COMMUNITY_COMMENT_UPDATE: '댓글 수정',
+  COMMUNITY_COMMENT_DELETE: '댓글 삭제',
+  COMMUNITY_POST_VOTE: '추천/비추천',
+  COMMUNITY_POLL_VOTE: '투표',
+  COMMUNITY_POLL_CLOSE: '투표 종료',
+  ADMIN_MEMBER_ROLE_UPDATE: '회원 권한 변경',
+  ADMIN_MEMBER_DELETE: '회원 삭제',
+  ADMIN_MEMBER_PASSWORD_RESET: '비밀번호 초기화',
+  ADMIN_ELIGIBLE_MEMBER_ADD: '명부 추가',
+  ADMIN_ELIGIBLE_MEMBER_UPDATE: '명부 수정',
+  ADMIN_ELIGIBLE_MEMBER_DELETE: '명부 삭제',
+  ADMIN_ELIGIBLE_MEMBER_IMPORT: '명부 가져오기',
+  ADMIN_STUDENT_BAN: '학번 차단',
+  ADMIN_STUDENT_UNBAN: '차단 해제',
+  ADMIN_RECRUIT_APPLICATION_STATUS_UPDATE: '모집 상태 변경',
+  ADMIN_CACHE_CLEAR: '캐시 초기화',
+}
+
+const COMMUNITY_REPORT_REASONS = {
+  SPAM: '스팸/홍보',
+  ABUSE: '비방/괴롭힘',
+  PRIVACY: '개인정보',
+  PROFANITY: '욕설/혐오',
+  MISLEADING: '허위/오해 소지',
+  OTHER: '기타',
+}
 
 const RECRUIT_STATUS_OPTIONS = [
   { value: 'RECEIVED', label: '접수됨' },
@@ -121,6 +161,7 @@ export default function Admin({ onBack }) {
                 { id: 'roster', label: '명부 인증' },
                 { id: 'files', label: '파일 관리' },
                 { id: 'fonts', label: '폰트 관리' },
+                { id: 'community', label: '커뮤니티 관리' },
                 { id: 'screen-check', label: '화면 점검' },
                 { id: 'ban', label: '차단 관리' },
                 { id: 'logs', label: '로그' },
@@ -164,6 +205,7 @@ export default function Admin({ onBack }) {
           {activeTab === 'roster' && <RosterTab />}
           {activeTab === 'files' && <FilesTab />}
           {activeTab === 'fonts' && <FontsTab />}
+          {activeTab === 'community' && <CommunityReportsTab />}
           {activeTab === 'screen-check' && <ScreenCheckTab />}
           {activeTab === 'ban' && <BanTab />}
           {activeTab === 'logs' && <AuditLogTab />}
@@ -1274,14 +1316,163 @@ function BanTab() {
   )
 }
 
+function CommunityReportsTab() {
+  const [reports, setReports] = useState([])
+  const [notes, setNotes] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [workingId, setWorkingId] = useState(null)
+
+  const load = async () => {
+    setError('')
+    try {
+      const data = await listCommunityReports()
+      setReports(Array.isArray(data) ? data : [])
+    } catch (err) {
+      setError(err.message || '신고 목록을 불러오지 못했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true
+    listCommunityReports()
+      .then((data) => {
+        if (mounted) {
+          setError('')
+          setReports(Array.isArray(data) ? data : [])
+        }
+      })
+      .catch((err) => { if (mounted) setError(err.message || '신고 목록을 불러오지 못했습니다.') })
+      .finally(() => { if (mounted) setLoading(false) })
+    return () => { mounted = false }
+  }, [])
+
+  const resolveReport = async (report, action) => {
+    const verb = action === 'ACCEPT' ? '처리 완료' : '기각'
+    if (!window.confirm(`신고 #${report.id}을 ${verb}하시겠습니까?`)) return
+    setWorkingId(report.id)
+    try {
+      await resolveCommunityReport(report.id, { action, note: notes[report.id] || '' })
+      setReports((prev) => prev.filter((item) => item.id !== report.id))
+      setNotes((prev) => {
+        const next = { ...prev }
+        delete next[report.id]
+        return next
+      })
+    } catch (err) {
+      alert(err.message || '신고 처리 중 오류가 발생했습니다.')
+    } finally {
+      setWorkingId(null)
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-[var(--theme-body-dark)]">커뮤니티 신고 큐</h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
+            접수된 게시글 신고를 확인하고 처리 결과와 운영 메모를 남깁니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => { setLoading(true); load() }}
+          className="shape-cut-sm inline-flex items-center gap-1.5 border border-black/10 bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
+          disabled={loading}
+        >
+          <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+          새로고침
+        </button>
+      </div>
+
+      {loading && <p className="text-sm text-[var(--theme-body-muted)]">신고 목록을 불러오는 중...</p>}
+      {error && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
+      {!loading && !error && reports.length === 0 && (
+        <p className="text-sm text-[var(--theme-body-muted)]">처리 대기 중인 신고가 없습니다.</p>
+      )}
+      {!loading && !error && reports.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border border-black/10">
+          <table className="w-max min-w-full text-left text-sm">
+            <thead className="bg-white text-xs font-semibold text-[var(--theme-body-muted)]">
+              <tr>
+                <th className="px-3 py-3">접수</th>
+                <th className="px-3 py-3">게시글</th>
+                <th className="px-3 py-3">신고자</th>
+                <th className="px-3 py-3">사유</th>
+                <th className="px-3 py-3">상세</th>
+                <th className="px-3 py-3">처리 메모</th>
+                <th className="px-3 py-3">처리</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-black/10 bg-white/50">
+              {reports.map((report) => (
+                <tr key={report.id}>
+                  <td className="whitespace-nowrap px-3 py-3 text-xs text-[var(--theme-body-muted)]">{formatDateTime(report.createdAt)}</td>
+                  <td className="max-w-[260px] px-3 py-3 text-xs">
+                    <span className="block break-words font-semibold text-[#3b4890]">{report.postTitle || '삭제되었거나 찾을 수 없는 글'}</span>
+                    <span className="mt-1 block font-mono text-[10px] text-[var(--theme-body-muted)]">#{report.postId}</span>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 font-mono text-xs text-[var(--theme-body-muted)]">{report.reporterStudentId}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-xs font-semibold text-[var(--theme-body-dark)]">{COMMUNITY_REPORT_REASONS[report.reason] || report.reason}</td>
+                  <td className="max-w-[320px] whitespace-pre-wrap break-words px-3 py-3 text-xs text-[var(--theme-body-muted)]">{report.detail || '-'}</td>
+                  <td className="px-3 py-3">
+                    <input
+                      value={notes[report.id] || ''}
+                      onChange={(event) => setNotes((prev) => ({ ...prev, [report.id]: event.target.value }))}
+                      placeholder="운영 메모"
+                      maxLength={500}
+                      className="w-56 rounded border border-black/15 bg-white px-2 py-1.5 text-xs outline-none focus:border-black/40"
+                    />
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => resolveReport(report, 'ACCEPT')}
+                        disabled={workingId !== null}
+                        className="shape-cut-sm bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {workingId === report.id ? '처리 중...' : '처리 완료'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => resolveReport(report, 'REJECT')}
+                        disabled={workingId !== null}
+                        className="shape-cut-sm border border-black/10 bg-white/70 px-3 py-1.5 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white disabled:opacity-50"
+                      >
+                        기각
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AuditLogTab() {
   const [logs, setLogs] = useState([])
   const [limit, setLimit] = useState(1000)
+  const [actionFilter, setActionFilter] = useState('ALL')
+  const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [clearingCache, setClearingCache] = useState(false)
   const [cacheMessage, setCacheMessage] = useState('')
   const [cacheError, setCacheError] = useState('')
+  const normalizedSearch = searchQuery.trim().toLowerCase()
+  const visibleLogs = logs.filter((log) => {
+    if (actionFilter !== 'ALL' && log.action !== actionFilter) return false
+    if (!normalizedSearch) return true
+    return auditLogSearchText(log).includes(normalizedSearch)
+  })
 
   const load = async (requestedLimit = limit) => {
     setError('')
@@ -1326,14 +1517,49 @@ function AuditLogTab() {
     }
   }
 
+  const exportVisibleLogs = () => {
+    if (visibleLogs.length === 0) return
+    const headers = ['createdAt', 'actorName', 'actorStudentId', 'action', 'targetType', 'targetId', 'ipAddress', 'detail']
+    const rows = visibleLogs.map((log) => headers.map((key) => csvCell(log[key] || '')).join(','))
+    const csv = [headers.join(','), ...rows].join('\n')
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `coms-audit-logs-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-[var(--theme-body-dark)]">서버 감사 로그</p>
-          <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">로그인, 관리자 로그인, 커뮤니티 글/댓글/추천/비추천, 공지사항, 관리자 주요 작업을 최근 {limit.toLocaleString('ko-KR')}건까지 봅니다.</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">로그인, 관리자 로그인, 커뮤니티 글/댓글/추천/비추천, 공지사항, 관리자 주요 작업을 최근 {limit.toLocaleString('ko-KR')}건까지 봅니다. 커뮤니티 삭제 로그는 삭제한 관리자와 삭제된 글 스냅샷을 함께 표시합니다.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-xs font-semibold text-[var(--theme-body-muted)]">
+            <span>종류</span>
+            <select
+              aria-label="로그 종류"
+              value={actionFilter}
+              onChange={(event) => setActionFilter(event.target.value)}
+              className="shape-cut-sm border border-black/10 bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition focus:border-black/30"
+            >
+              {AUDIT_LOG_FILTERS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="사용자, 행위, 상세 검색"
+            className="shape-cut-sm w-48 border border-black/10 bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition placeholder:text-[var(--theme-body-muted)] focus:border-black/30"
+          />
           <label className="flex items-center gap-2 text-xs font-semibold text-[var(--theme-body-muted)]">
             <span>로그 표시 개수</span>
             <select
@@ -1368,6 +1594,15 @@ function AuditLogTab() {
             <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
             {clearingCache ? '초기화 중...' : '캐시 초기화'}
           </button>
+          <button
+            type="button"
+            onClick={exportVisibleLogs}
+            className="shape-cut-sm inline-flex items-center gap-1.5 border border-black/10 bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
+            disabled={visibleLogs.length === 0}
+          >
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
+            CSV
+          </button>
         </div>
       </div>
 
@@ -1378,7 +1613,10 @@ function AuditLogTab() {
       {!loading && !error && logs.length === 0 && (
         <p className="text-sm text-[var(--theme-body-muted)]">저장된 로그가 없습니다.</p>
       )}
-      {!loading && !error && logs.length > 0 && (
+      {!loading && !error && logs.length > 0 && visibleLogs.length === 0 && (
+        <p className="text-sm text-[var(--theme-body-muted)]">선택한 종류의 로그가 없습니다.</p>
+      )}
+      {!loading && !error && visibleLogs.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-black/10">
           <table className="w-max min-w-full text-left text-sm">
             <thead className="bg-white text-xs font-semibold text-[var(--theme-body-muted)]">
@@ -1392,14 +1630,17 @@ function AuditLogTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-black/10 bg-white/50">
-              {logs.map((log) => (
+              {visibleLogs.map((log) => (
                 <tr key={log.id}>
                   <td className="whitespace-nowrap px-3 py-3 text-xs text-[var(--theme-body-muted)]">{formatDateTime(log.createdAt)}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-xs">
                     <span className="font-semibold text-[var(--theme-body-dark)]">{log.actorName || '-'}</span>
                     {log.actorStudentId && <span className="ml-1 font-mono text-[var(--theme-body-muted)]">({log.actorStudentId})</span>}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3 font-mono text-xs font-semibold text-[#3b4890]">{log.action}</td>
+                  <td className="whitespace-nowrap px-3 py-3 text-xs">
+                    <span className="font-semibold text-[#3b4890]">{AUDIT_ACTION_LABELS[log.action] || log.action}</span>
+                    <span className="mt-1 block font-mono text-[10px] text-[var(--theme-body-muted)]">{log.action}</span>
+                  </td>
                   <td className="whitespace-nowrap px-3 py-3 text-xs text-[var(--theme-body-muted)]">
                     {log.targetType}{log.targetId ? ` #${log.targetId}` : ''}
                   </td>
@@ -1433,4 +1674,25 @@ function formatDateTime(value) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function auditLogSearchText(log) {
+  return [
+    log.actorName,
+    log.actorStudentId,
+    AUDIT_ACTION_LABELS[log.action],
+    log.action,
+    log.targetType,
+    log.targetId,
+    log.ipAddress,
+    log.detail,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+}
+
+function csvCell(value) {
+  const text = String(value ?? '')
+  return `"${text.replaceAll('"', '""')}"`
 }
