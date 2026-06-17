@@ -1028,7 +1028,7 @@ public class CommunityService {
         CommunityPostVideo vid = videoRepository.findById(videoId)
                 .filter(v -> v.getPostId().equals(postId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        storageService.delete(vid.getStoredName());
+        deleteStoredFile(vid.getStoredName(), Set.of());
         videoRepository.delete(vid);
     }
 
@@ -1130,10 +1130,10 @@ public class CommunityService {
         images.forEach(image -> deleteStoredFile(image.getStoredName(), preservedStoredNames));
         imageRepository.deleteByPostId(postId);
         List<CommunityPostVideo> videos = videoRepository.findByPostIdOrderByPositionAsc(postId);
-        videos.forEach(video -> storageService.delete(video.getStoredName()));
+        videos.forEach(video -> deleteStoredFile(video.getStoredName(), preservedStoredNames));
         videoRepository.deleteByPostId(postId);
         List<CommunityPostFile> files = fileRepository.findByPostIdOrderByPositionAsc(postId);
-        files.forEach(file -> storageService.delete(file.getStoredName()));
+        files.forEach(file -> deleteStoredFile(file.getStoredName(), preservedStoredNames));
         fileRepository.deleteByPostId(postId);
     }
 
