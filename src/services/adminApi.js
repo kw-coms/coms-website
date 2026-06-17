@@ -16,6 +16,10 @@ export async function listCommunityReports() {
   return request('/api/admin/community/reports')
 }
 
+export async function listDeletedCommunityPosts(limit = 300) {
+  return request(`/api/admin/community/deleted-posts?limit=${encodeURIComponent(limit)}`)
+}
+
 export async function resolveCommunityReport(id, payload) {
   return request(`/api/admin/community/reports/${id}`, {
     method: 'PATCH',

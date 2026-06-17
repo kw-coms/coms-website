@@ -102,6 +102,7 @@ public class CommunityService {
     private final CommunityPostFileRepository fileRepository;
     private final CommunityPostVideoRepository videoRepository;
     private final AuditLogService auditLogService;
+    private final CommunityDeletionArchiveService deletionArchiveService;
     private final CommunityPollVoteRepository pollVoteRepository;
     private final HttpClient httpClient;
     private final String youtubeApiKey;
@@ -118,6 +119,7 @@ public class CommunityService {
                             CommunityPostFileRepository fileRepository,
                             CommunityPostVideoRepository videoRepository,
                             AuditLogService auditLogService,
+                            CommunityDeletionArchiveService deletionArchiveService,
                             CommunityPollVoteRepository pollVoteRepository,
                             @Value("${youtube.api-key:}") String youtubeApiKey,
                             @Value("${community.anonymous-salt:}") String anonymousSalt,
@@ -132,6 +134,7 @@ public class CommunityService {
         this.fileRepository = fileRepository;
         this.videoRepository = videoRepository;
         this.auditLogService = auditLogService;
+        this.deletionArchiveService = deletionArchiveService;
         this.pollVoteRepository = pollVoteRepository;
         this.httpClient = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(3)).build();
         this.youtubeApiKey = youtubeApiKey == null ? "" : youtubeApiKey.trim();
@@ -256,7 +259,14 @@ public class CommunityService {
         if (!post.getAuthorStudentId().equals(member.getStudentId()) && member.getRole() != Member.Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        String detail = deletionAuditDetail(post, member, normalizeDeleteReason(reason));
+        String normalizedReason = normalizeDeleteReason(reason);
+        if (member.getRole() == Member.Role.ADMIN
+                && !post.getAuthorStudentId().equals(member.getStudentId())
+                && normalizedReason == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "관리자 삭제 사유를 입력해주세요.");
+        }
+        String detail = deletionAuditDetail(post, member, normalizedReason);
+        deletionArchiveService.record(post, member, normalizedReason == null ? "직접 삭제" : normalizedReason);
         deletePostData(post);
         auditLogService.record(member.getStudentId(), "COMMUNITY_POST_DELETE", "COMMUNITY_POST", String.valueOf(id), detail, null);
     }
@@ -1186,6 +1196,10 @@ public class CommunityService {
         if (safeTitle(post.getTitle()) != null) {
             lines.add(safeTitle(post.getTitle()));
         }
+        String contentPreview = auditTextPreview(post.getContent());
+        if (contentPreview != null) {
+            lines.add("content=" + contentPreview);
+        }
         lines.add("author=" + auditIdentity(authorName, post.getAuthorStudentId()));
         lines.add("deletedBy=" + auditIdentity(deletedBy.getName(), deletedBy.getStudentId()));
         lines.add("deletedByRole=" + deletedBy.getRole().name());
@@ -1200,6 +1214,11 @@ public class CommunityService {
         String safeName = name == null || name.isBlank() ? "-" : name.trim();
         String safeStudentId = studentId == null || studentId.isBlank() ? "-" : studentId.trim();
         return safeName + "(" + safeStudentId + ")";
+    }
+
+    private String auditTextPreview(String value) {
+        String normalized = plainTextContent(value).replaceAll("\\s+", " ").trim();
+        return normalized.isEmpty() ? null : preview(normalized);
     }
 
     private String normalizeDeleteReason(String reason) {
