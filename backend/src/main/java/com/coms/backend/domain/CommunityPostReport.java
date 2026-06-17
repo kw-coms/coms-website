@@ -21,8 +21,17 @@ public class CommunityPostReport {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "post_id", nullable = false)
+    @Column(name = "post_id")
     private Long postId;
+
+    @Column(name = "post_title", length = 120)
+    private String postTitle;
+
+    @Column(name = "post_author_student_id", length = 64)
+    private String postAuthorStudentId;
+
+    @Column(name = "post_author_name", length = 100)
+    private String postAuthorName;
 
     @Column(name = "reporter_student_id", nullable = false, length = 64)
     private String reporterStudentId;
@@ -52,6 +61,12 @@ public class CommunityPostReport {
     public Long getId() { return id; }
     public Long getPostId() { return postId; }
     public void setPostId(Long postId) { this.postId = postId; }
+    public String getPostTitle() { return postTitle; }
+    public void setPostTitle(String postTitle) { this.postTitle = postTitle; }
+    public String getPostAuthorStudentId() { return postAuthorStudentId; }
+    public void setPostAuthorStudentId(String postAuthorStudentId) { this.postAuthorStudentId = postAuthorStudentId; }
+    public String getPostAuthorName() { return postAuthorName; }
+    public void setPostAuthorName(String postAuthorName) { this.postAuthorName = postAuthorName; }
     public String getReporterStudentId() { return reporterStudentId; }
     public void setReporterStudentId(String reporterStudentId) { this.reporterStudentId = reporterStudentId; }
     public String getReason() { return reason; }
