@@ -27,7 +27,14 @@ public record DeletedCommunityPostResponse(
         Long restoredPostId,
         String restoredByStudentId,
         String restoredByName,
-        LocalDateTime restoredAt
+        LocalDateTime restoredAt,
+        String latestAppealStatus,
+        String latestAppealRequesterStudentId,
+        String latestAppealRequesterName,
+        String latestAppealMessage,
+        LocalDateTime latestAppealCreatedAt,
+        String latestAppealResolutionNote,
+        LocalDateTime latestAppealResolvedAt
 ) {
     public record ImageInfo(Long id, Long originalImageId, String kind, String url, String originalName) {}
     public record MediaInfo(Long id, Long originalMediaId, String kind, String url, String originalName) {}
