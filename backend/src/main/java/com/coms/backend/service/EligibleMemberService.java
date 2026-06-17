@@ -135,11 +135,12 @@ public class EligibleMemberService {
         eligibleMemberRepository.save(member);
     }
 
-    public void deleteEligibleMember(Long id) {
-        if (!eligibleMemberRepository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "명부에서 해당 항목을 찾을 수 없습니다.");
-        }
-        eligibleMemberRepository.deleteById(id);
+    public DeletedEligibleMemberSnapshot deleteEligibleMember(Long id) {
+        EligibleMember member = eligibleMemberRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "명부에서 해당 항목을 찾을 수 없습니다."));
+        DeletedEligibleMemberSnapshot snapshot = DeletedEligibleMemberSnapshot.from(member);
+        eligibleMemberRepository.delete(member);
+        return snapshot;
     }
 
     public void validateAndClaimSignup(String studentId, String name, String verificationType, String verificationValue) {
@@ -537,5 +538,23 @@ public class EligibleMemberService {
 
     private ResponseStatusException invalidRoster() {
         return new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번 또는 졸업생 인증 정보와 이름을 확인해주세요.");
+    }
+
+    public record DeletedEligibleMemberSnapshot(
+            Long id,
+            String studentId,
+            String name,
+            String generation,
+            String phone
+    ) {
+        private static DeletedEligibleMemberSnapshot from(EligibleMember member) {
+            return new DeletedEligibleMemberSnapshot(
+                    member.getId(),
+                    member.getStudentId(),
+                    member.getName(),
+                    member.getGeneration(),
+                    member.getPhone()
+            );
+        }
     }
 }

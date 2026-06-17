@@ -70,8 +70,9 @@ public class AdminController {
 
     @DeleteMapping("/members/{id}")
     public ResponseEntity<Void> deleteMember(Authentication authentication, @PathVariable Long id) {
-        adminService.deleteMember(id);
-        auditLogService.record(authentication.getName(), "ADMIN_MEMBER_DELETE", "MEMBER", String.valueOf(id), null, null);
+        AdminService.DeletedMemberSnapshot deleted = adminService.deleteMember(id);
+        auditLogService.record(authentication.getName(), "ADMIN_MEMBER_DELETE", "MEMBER", String.valueOf(id),
+                memberDeletionDetail(deleted), null);
         return ResponseEntity.noContent().build();
     }
 
@@ -104,8 +105,9 @@ public class AdminController {
 
     @DeleteMapping("/eligible-members/{id}")
     public ResponseEntity<Void> deleteEligibleMember(Authentication authentication, @PathVariable Long id) {
-        eligibleMemberService.deleteEligibleMember(id);
-        auditLogService.record(authentication.getName(), "ADMIN_ELIGIBLE_MEMBER_DELETE", "ELIGIBLE_MEMBER", String.valueOf(id), null, null);
+        EligibleMemberService.DeletedEligibleMemberSnapshot deleted = eligibleMemberService.deleteEligibleMember(id);
+        auditLogService.record(authentication.getName(), "ADMIN_ELIGIBLE_MEMBER_DELETE", "ELIGIBLE_MEMBER", String.valueOf(id),
+                eligibleMemberDeletionDetail(deleted), null);
         return ResponseEntity.noContent().build();
     }
 
@@ -179,5 +181,28 @@ public class AdminController {
         auditLogService.record(authentication.getName(), "ADMIN_CACHE_CLEAR", "CACHE", null,
                 "clearedCount=" + response.clearedCount() + ", clearedCaches=" + String.join(",", response.clearedCaches()), null);
         return ResponseEntity.ok(response);
+    }
+
+    private String memberDeletionDetail(AdminService.DeletedMemberSnapshot member) {
+        return String.join("\n",
+                "studentId=" + auditValue(member.studentId()),
+                "name=" + auditValue(member.name()),
+                "role=" + auditValue(member.role()),
+                "email=" + auditValue(member.email())
+        );
+    }
+
+    private String eligibleMemberDeletionDetail(EligibleMemberService.DeletedEligibleMemberSnapshot member) {
+        return String.join("\n",
+                "studentId=" + auditValue(member.studentId()),
+                "name=" + auditValue(member.name()),
+                "generation=" + auditValue(member.generation()),
+                "phone=" + auditValue(member.phone())
+        );
+    }
+
+    private String auditValue(String value) {
+        String normalized = value == null ? "" : value.trim().replaceAll("\\s+", " ");
+        return normalized.isEmpty() ? "-" : normalized;
     }
 }

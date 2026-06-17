@@ -1408,9 +1408,10 @@ public class CommunityService {
         if (!comment.getStudentId().equals(studentId) && member.getRole() != Member.Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
+        String detail = commentDeletionAuditDetail(post, comment, member);
         deleteCommentTree(comment);
         auditLogService.record(member.getStudentId(), "COMMUNITY_COMMENT_DELETE", "COMMUNITY_COMMENT", String.valueOf(commentId),
-                "postId=" + postId, null);
+                detail, null);
     }
 
     private void deleteCommentTree(CommunityComment comment) {
@@ -1421,6 +1422,21 @@ public class CommunityService {
         if (!deletedCommentIds.add(comment.getId())) return;
         commentRepository.findByParentCommentId(comment.getId()).forEach(child -> deleteCommentTree(child, deletedCommentIds));
         commentRepository.delete(comment);
+    }
+
+    private String commentDeletionAuditDetail(CommunityPost post, CommunityComment comment, Member deletedBy) {
+        List<String> lines = new ArrayList<>();
+        lines.add("postId=" + post.getId());
+        if (safeTitle(post.getTitle()) != null) {
+            lines.add(safeTitle(post.getTitle()));
+        }
+        lines.add("author=" + auditIdentity(comment.getAuthorName(), comment.getStudentId()));
+        lines.add("deletedBy=" + auditIdentity(deletedBy.getName(), deletedBy.getStudentId()));
+        lines.add("deletedByRole=" + deletedBy.getRole().name());
+        if (comment.getContent() != null && !comment.getContent().isBlank()) {
+            lines.add("content=" + preview(comment.getContent().trim().replaceAll("\\s+", " ")));
+        }
+        return String.join("\n", lines);
     }
 
     private String commentAuthorName(CommunityPost post, Member currentMember, CommunityComment comment) {
