@@ -1,15 +1,25 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.CommunityPost;
+import com.coms.backend.domain.CommunityComment;
+import com.coms.backend.domain.CommunityPostFile;
 import com.coms.backend.domain.CommunityPostImage;
+import com.coms.backend.domain.CommunityPostVideo;
 import com.coms.backend.domain.DeletedCommunityPost;
+import com.coms.backend.domain.DeletedCommunityPostComment;
 import com.coms.backend.domain.DeletedCommunityPostImage;
+import com.coms.backend.domain.DeletedCommunityPostMedia;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.DeletedCommunityPostResponse;
 import com.coms.backend.dto.DeletedCommunityPostRestoreResponse;
+import com.coms.backend.repository.CommunityCommentRepository;
+import com.coms.backend.repository.CommunityPostFileRepository;
 import com.coms.backend.repository.CommunityPostImageRepository;
 import com.coms.backend.repository.CommunityPostRepository;
+import com.coms.backend.repository.CommunityPostVideoRepository;
+import com.coms.backend.repository.DeletedCommunityPostCommentRepository;
 import com.coms.backend.repository.DeletedCommunityPostImageRepository;
+import com.coms.backend.repository.DeletedCommunityPostMediaRepository;
 import com.coms.backend.repository.DeletedCommunityPostRepository;
 import com.coms.backend.repository.MemberRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -38,23 +48,38 @@ public class CommunityDeletionArchiveService {
 
     private final DeletedCommunityPostRepository repository;
     private final DeletedCommunityPostImageRepository deletedImageRepository;
+    private final DeletedCommunityPostMediaRepository deletedMediaRepository;
+    private final DeletedCommunityPostCommentRepository deletedCommentRepository;
     private final CommunityPostRepository communityPostRepository;
     private final CommunityPostImageRepository imageRepository;
+    private final CommunityPostVideoRepository videoRepository;
+    private final CommunityPostFileRepository fileRepository;
+    private final CommunityCommentRepository commentRepository;
     private final MemberRepository memberRepository;
     private final StorageService storageService;
     private final AuditLogService auditLogService;
 
     public CommunityDeletionArchiveService(DeletedCommunityPostRepository repository,
                                            DeletedCommunityPostImageRepository deletedImageRepository,
+                                           DeletedCommunityPostMediaRepository deletedMediaRepository,
+                                           DeletedCommunityPostCommentRepository deletedCommentRepository,
                                            CommunityPostRepository communityPostRepository,
                                            CommunityPostImageRepository imageRepository,
+                                           CommunityPostVideoRepository videoRepository,
+                                           CommunityPostFileRepository fileRepository,
+                                           CommunityCommentRepository commentRepository,
                                            MemberRepository memberRepository,
                                            StorageService storageService,
                                            AuditLogService auditLogService) {
         this.repository = repository;
         this.deletedImageRepository = deletedImageRepository;
+        this.deletedMediaRepository = deletedMediaRepository;
+        this.deletedCommentRepository = deletedCommentRepository;
         this.communityPostRepository = communityPostRepository;
         this.imageRepository = imageRepository;
+        this.videoRepository = videoRepository;
+        this.fileRepository = fileRepository;
+        this.commentRepository = commentRepository;
         this.memberRepository = memberRepository;
         this.storageService = storageService;
         this.auditLogService = auditLogService;
@@ -77,6 +102,8 @@ public class CommunityDeletionArchiveService {
         snapshot.setDeletionReason(reason);
         DeletedCommunityPost saved = repository.save(snapshot);
         recordImages(saved, post);
+        recordMedia(saved, post);
+        recordComments(saved, post);
         return saved;
     }
 
@@ -94,14 +121,20 @@ public class CommunityDeletionArchiveService {
 
     @Transactional(readOnly = true)
     public Set<String> archivedStoredNames(Long deletedPostId) {
-        return deletedImageRepository.findByDeletedPostIdOrderByPositionAsc(deletedPostId).stream()
+        Set<String> names = deletedImageRepository.findByDeletedPostIdOrderByPositionAsc(deletedPostId).stream()
                 .map(DeletedCommunityPostImage::getStoredName)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        deletedMediaRepository.findByDeletedPostIdOrderByPositionAsc(deletedPostId).stream()
+                .map(DeletedCommunityPostMedia::getStoredName)
+                .forEach(names::add);
+        return names;
     }
 
     @Transactional(readOnly = true)
     public boolean isArchivedStoredName(String storedName) {
-        return storedName != null && !storedName.isBlank() && deletedImageRepository.existsByStoredName(storedName);
+        return storedName != null && !storedName.isBlank()
+                && (deletedImageRepository.existsByStoredName(storedName)
+                || deletedMediaRepository.existsByStoredName(storedName));
     }
 
     @Transactional(readOnly = true)
@@ -115,6 +148,19 @@ public class CommunityDeletionArchiveService {
     public Resource loadImage(Long deletedPostId, Long imageId) {
         DeletedCommunityPostImage image = loadImageMeta(deletedPostId, imageId);
         return storageService.load(image.getStoredName());
+    }
+
+    @Transactional(readOnly = true)
+    public DeletedCommunityPostMedia loadMediaMeta(Long deletedPostId, Long mediaId) {
+        return deletedMediaRepository.findById(mediaId)
+                .filter(media -> media.getDeletedPostId().equals(deletedPostId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true)
+    public Resource loadMedia(Long deletedPostId, Long mediaId) {
+        DeletedCommunityPostMedia media = loadMediaMeta(deletedPostId, mediaId);
+        return storageService.load(media.getStoredName());
     }
 
     @Transactional
@@ -131,6 +177,8 @@ public class CommunityDeletionArchiveService {
         }
 
         List<DeletedCommunityPostImage> archivedImages = deletedImageRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId());
+        List<DeletedCommunityPostMedia> archivedMedia = deletedMediaRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId());
+        List<DeletedCommunityPostComment> archivedComments = deletedCommentRepository.findByDeletedPostIdOrderByDepthAscCreatedAtAsc(snapshot.getId());
         CommunityPost restored = new CommunityPost();
         restored.setTitle(snapshot.getTitle());
         restored.setContent(snapshot.getContent());
@@ -151,7 +199,7 @@ public class CommunityDeletionArchiveService {
                 });
         CommunityPost savedPost = communityPostRepository.save(restored);
 
-        Map<Long, Long> mediaIdMap = new HashMap<>();
+        Map<Long, Long> imageIdMap = new HashMap<>();
         for (DeletedCommunityPostImage archivedImage : archivedImages) {
             if (!DeletedCommunityPostImage.KIND_INLINE.equals(archivedImage.getKind())) {
                 continue;
@@ -164,13 +212,37 @@ public class CommunityDeletionArchiveService {
                     archivedImage.getPosition()
             ));
             if (archivedImage.getOriginalImageId() != null) {
-                mediaIdMap.put(archivedImage.getOriginalImageId(), savedImage.getId());
+                imageIdMap.put(archivedImage.getOriginalImageId(), savedImage.getId());
             }
         }
-        if (!mediaIdMap.isEmpty()) {
-            savedPost.setContent(rewriteImageMediaIds(snapshot.getContent(), mediaIdMap));
+        Map<Long, Long> videoIdMap = new HashMap<>();
+        Map<Long, Long> fileIdMap = new HashMap<>();
+        for (DeletedCommunityPostMedia archived : archivedMedia) {
+            if (DeletedCommunityPostMedia.KIND_VIDEO.equals(archived.getKind())) {
+                CommunityPostVideo savedVideo = videoRepository.save(new CommunityPostVideo(
+                        savedPost.getId(),
+                        archived.getStoredName(),
+                        archived.getOriginalName(),
+                        archived.getMimeType(),
+                        archived.getPosition()
+                ));
+                videoIdMap.put(archived.getOriginalMediaId(), savedVideo.getId());
+            } else if (DeletedCommunityPostMedia.KIND_FILE.equals(archived.getKind())) {
+                CommunityPostFile savedFile = fileRepository.save(new CommunityPostFile(
+                        savedPost.getId(),
+                        archived.getStoredName(),
+                        archived.getOriginalName(),
+                        archived.getMimeType(),
+                        archived.getPosition()
+                ));
+                fileIdMap.put(archived.getOriginalMediaId(), savedFile.getId());
+            }
+        }
+        if (!imageIdMap.isEmpty() || !videoIdMap.isEmpty() || !fileIdMap.isEmpty()) {
+            savedPost.setContent(rewriteMediaIds(snapshot.getContent(), imageIdMap, videoIdMap, fileIdMap));
             savedPost = communityPostRepository.save(savedPost);
         }
+        restoreComments(savedPost.getId(), archivedComments);
 
         snapshot.setRestoredPostId(savedPost.getId());
         snapshot.setRestoredByStudentId(admin.getStudentId());
@@ -222,6 +294,52 @@ public class CommunityDeletionArchiveService {
         }
     }
 
+    private void recordMedia(DeletedCommunityPost snapshot, CommunityPost post) {
+        List<CommunityPostVideo> videos = videoRepository.findByPostIdOrderByPositionAsc(post.getId());
+        for (CommunityPostVideo video : videos) {
+            deletedMediaRepository.save(new DeletedCommunityPostMedia(
+                    snapshot.getId(),
+                    video.getId(),
+                    DeletedCommunityPostMedia.KIND_VIDEO,
+                    video.getStoredName(),
+                    video.getOriginalName(),
+                    video.getMimeType(),
+                    video.getPosition()
+            ));
+        }
+        List<CommunityPostFile> files = fileRepository.findByPostIdOrderByPositionAsc(post.getId());
+        for (CommunityPostFile file : files) {
+            deletedMediaRepository.save(new DeletedCommunityPostMedia(
+                    snapshot.getId(),
+                    file.getId(),
+                    DeletedCommunityPostMedia.KIND_FILE,
+                    file.getStoredName(),
+                    file.getOriginalName(),
+                    file.getMimeType(),
+                    file.getPosition()
+            ));
+        }
+    }
+
+    private void recordComments(DeletedCommunityPost snapshot, CommunityPost post) {
+        for (CommunityComment comment : commentRepository.findByPostIdOrderByCreatedAtAsc(post.getId())) {
+            deletedCommentRepository.save(new DeletedCommunityPostComment(
+                    snapshot.getId(),
+                    comment.getId(),
+                    comment.getParentCommentId(),
+                    comment.getStudentId(),
+                    comment.getAuthorName(),
+                    comment.getAnonymousName(),
+                    comment.getIpAddress(),
+                    comment.getContent(),
+                    comment.getDepth(),
+                    comment.getCreatedAt(),
+                    comment.getUpdatedAt(),
+                    comment.isEdited()
+            ));
+        }
+    }
+
     private DeletedCommunityPostResponse toResponse(DeletedCommunityPost snapshot) {
         List<DeletedCommunityPostResponse.ImageInfo> imageInfos = deletedImageRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId()).stream()
                 .map(image -> new DeletedCommunityPostResponse.ImageInfo(
@@ -230,6 +348,38 @@ public class CommunityDeletionArchiveService {
                         image.getKind(),
                         "/api/admin/community/deleted-posts/" + snapshot.getId() + "/images/" + image.getId(),
                         image.getOriginalName()
+                ))
+                .toList();
+        List<DeletedCommunityPostResponse.MediaInfo> videoInfos = deletedMediaRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId()).stream()
+                .filter(media -> DeletedCommunityPostMedia.KIND_VIDEO.equals(media.getKind()))
+                .map(media -> new DeletedCommunityPostResponse.MediaInfo(
+                        media.getId(),
+                        media.getOriginalMediaId(),
+                        media.getKind(),
+                        "/api/admin/community/deleted-posts/" + snapshot.getId() + "/media/" + media.getId(),
+                        media.getOriginalName()
+                ))
+                .toList();
+        List<DeletedCommunityPostResponse.MediaInfo> fileInfos = deletedMediaRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId()).stream()
+                .filter(media -> DeletedCommunityPostMedia.KIND_FILE.equals(media.getKind()))
+                .map(media -> new DeletedCommunityPostResponse.MediaInfo(
+                        media.getId(),
+                        media.getOriginalMediaId(),
+                        media.getKind(),
+                        "/api/admin/community/deleted-posts/" + snapshot.getId() + "/media/" + media.getId(),
+                        media.getOriginalName()
+                ))
+                .toList();
+        List<DeletedCommunityPostComment> comments = deletedCommentRepository.findByDeletedPostIdOrderByDepthAscCreatedAtAsc(snapshot.getId());
+        List<DeletedCommunityPostResponse.CommentInfo> commentInfos = comments.stream()
+                .map(comment -> new DeletedCommunityPostResponse.CommentInfo(
+                        comment.getOriginalCommentId(),
+                        comment.getOriginalParentCommentId(),
+                        comment.getStudentId(),
+                        comment.getAuthorName(),
+                        comment.getContent(),
+                        comment.getCreatedAt(),
+                        comment.isEdited()
                 ))
                 .toList();
         return new DeletedCommunityPostResponse(
@@ -249,6 +399,10 @@ public class CommunityDeletionArchiveService {
                 snapshot.getDeletionReason(),
                 snapshot.getDeletedAt(),
                 imageInfos,
+                videoInfos,
+                fileInfos,
+                comments.size(),
+                commentInfos,
                 snapshot.getRestoredPostId(),
                 snapshot.getRestoredByStudentId(),
                 snapshot.getRestoredByName(),
@@ -267,7 +421,34 @@ public class CommunityDeletionArchiveService {
         }
     }
 
-    private String rewriteImageMediaIds(String content, Map<Long, Long> mediaIdMap) {
+    private void restoreComments(Long restoredPostId, List<DeletedCommunityPostComment> archivedComments) {
+        Map<Long, Long> restoredCommentIds = new HashMap<>();
+        for (DeletedCommunityPostComment archived : archivedComments) {
+            Long parentCommentId = archived.getOriginalParentCommentId() == null
+                    ? null
+                    : restoredCommentIds.get(archived.getOriginalParentCommentId());
+            CommunityComment restored = new CommunityComment(
+                    restoredPostId,
+                    archived.getStudentId(),
+                    archived.getAuthorName(),
+                    archived.getContent(),
+                    parentCommentId,
+                    archived.getDepth()
+            );
+            restored.setAnonymousName(archived.getAnonymousName());
+            restored.setIpAddress(archived.getIpAddress());
+            restored.setCreatedAt(archived.getCreatedAt());
+            restored.setUpdatedAt(archived.getUpdatedAt());
+            restored.setEdited(archived.isEdited());
+            CommunityComment saved = commentRepository.save(restored);
+            restoredCommentIds.put(archived.getOriginalCommentId(), saved.getId());
+        }
+    }
+
+    private String rewriteMediaIds(String content,
+                                   Map<Long, Long> imageIdMap,
+                                   Map<Long, Long> videoIdMap,
+                                   Map<Long, Long> fileIdMap) {
         try {
             JsonNode root = JSON.readTree(content);
             if (!root.isArray()) {
@@ -275,15 +456,23 @@ public class CommunityDeletionArchiveService {
             }
             ArrayNode next = JSON.createArrayNode();
             for (JsonNode block : root) {
-                if (block.isObject()
-                        && "image".equals(block.path("type").asText())
-                        && block.path("mediaId").canConvertToLong()) {
-                    Long nextId = mediaIdMap.get(block.path("mediaId").asLong());
-                    if (nextId != null) {
-                        ObjectNode copy = ((ObjectNode) block).deepCopy();
-                        copy.put("mediaId", nextId);
-                        next.add(copy);
-                        continue;
+                if (block.isObject()) {
+                    String type = block.path("type").asText();
+                    String idField = "file".equals(type) ? "fileId" : "mediaId";
+                    Map<Long, Long> idMap = switch (type) {
+                        case "image" -> imageIdMap;
+                        case "video" -> videoIdMap;
+                        case "file" -> fileIdMap;
+                        default -> Map.of();
+                    };
+                    if (!idMap.isEmpty() && block.path(idField).canConvertToLong()) {
+                        Long nextId = idMap.get(block.path(idField).asLong());
+                        if (nextId != null) {
+                            ObjectNode copy = ((ObjectNode) block).deepCopy();
+                            copy.put(idField, nextId);
+                            next.add(copy);
+                            continue;
+                        }
                     }
                 }
                 next.add(block);
