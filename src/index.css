@@ -601,6 +601,7 @@ select {
 .apple-mobile-menu-item {
 	display: flex;
 	min-height: 3.25rem;
+	width: 100%;
 	align-items: center;
 	gap: 0.75rem;
 	padding: 0 1.25rem;
@@ -608,7 +609,13 @@ select {
 	font-size: 0.925rem;
 	font-weight: 700;
 	letter-spacing: 0;
+	text-align: left;
 	transition: background-color 160ms ease, color 160ms ease;
+}
+
+.apple-mobile-menu-notification {
+	border: 0;
+	background: transparent;
 }
 
 .apple-mobile-menu-item:hover {
