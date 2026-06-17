@@ -486,8 +486,11 @@ class CommunityServiceTest {
         assertThatThrownBy(() -> communityService.get(graduate.getStudentId(), created.id()))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
-        assertThat(visibleToMember.authorName()).isEqualTo("반고닉(118.235)");
-        assertThat(visibleToMember.authorDisplayName()).isEqualTo("반고닉(118.235)");
+        // The IP is reduced to a salted, opaque tag — same IP stays linkable, but no real
+        // network octets leak. "118.235.10.20" -> HmacSHA256(jwt.secret, ip)[0..1] = 835e.
+        assertThat(visibleToMember.authorName()).isEqualTo("반고닉(835e)");
+        assertThat(visibleToMember.authorName()).doesNotContain("118.235");
+        assertThat(visibleToMember.authorDisplayName()).isEqualTo("반고닉(835e)");
         assertThat(visibleToMember.anonymousName()).isEqualTo("반고닉");
         assertThat(visibleToMember.authorStudentId()).isNull();
         assertThat(visibleToAdmin.authorDisplayName()).contains("작성자");
@@ -508,7 +511,7 @@ class CommunityServiceTest {
         assertThat(communityService.listComments(post.id(), author.getStudentId()))
                 .singleElement()
                 .extracting("authorName")
-                .isEqualTo("ㅇㅇ(118.235)");
+                .isEqualTo("ㅇㅇ(c8fe)");
         assertThat(communityService.listComments(post.id(), admin.getStudentId()))
                 .singleElement()
                 .extracting("authorName")

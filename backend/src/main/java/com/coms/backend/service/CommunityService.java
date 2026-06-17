@@ -40,6 +40,8 @@ import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.time.Year;
 import java.time.LocalDateTime;
@@ -79,8 +81,6 @@ public class CommunityService {
     private static final Pattern TEN_DIGIT_STUDENT_ID = Pattern.compile("\\d{10}");
     private static final Pattern HTTPS_URL = Pattern.compile("^https://[^\\s<>\"']+$", Pattern.CASE_INSENSITIVE);
     private static final Pattern YOUTUBE_EMBED_URL = Pattern.compile("^https://www\\.youtube(-nocookie)?\\.com/embed/[A-Za-z0-9_-]{6,20}([?&][^\\s<>\"']*)?$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern IPV4_PREFIX = Pattern.compile("^(\\d{1,3})\\.(\\d{1,3})\\..*");
-    private static final Pattern IPV6_PREFIX = Pattern.compile("^([0-9a-fA-F]{1,4}):([0-9a-fA-F]{1,4}):.*");
     private static final String DEFAULT_ANONYMOUS_NAME = "ㅇㅇ";
     private static final int MAX_ANONYMOUS_NAME_LENGTH = 20;
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
@@ -104,6 +104,7 @@ public class CommunityService {
     private final CommunityPollVoteRepository pollVoteRepository;
     private final HttpClient httpClient;
     private final String youtubeApiKey;
+    private final String anonymousSalt;
 
     public CommunityService(CommunityPostRepository communityPostRepository,
                             CommunityPostVoteRepository voteRepository,
@@ -116,7 +117,8 @@ public class CommunityService {
                             CommunityPostVideoRepository videoRepository,
                             AuditLogService auditLogService,
                             CommunityPollVoteRepository pollVoteRepository,
-                            @Value("${youtube.api-key:}") String youtubeApiKey) {
+                            @Value("${youtube.api-key:}") String youtubeApiKey,
+                            @Value("${community.anonymous-salt:${jwt.secret:coms-anonymous-display-salt}}") String anonymousSalt) {
         this.communityPostRepository = communityPostRepository;
         this.voteRepository = voteRepository;
         this.memberRepository = memberRepository;
@@ -130,6 +132,8 @@ public class CommunityService {
         this.pollVoteRepository = pollVoteRepository;
         this.httpClient = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(3)).build();
         this.youtubeApiKey = youtubeApiKey == null ? "" : youtubeApiKey.trim();
+        this.anonymousSalt = anonymousSalt == null || anonymousSalt.isBlank()
+                ? "coms-anonymous-display-salt" : anonymousSalt;
     }
 
     @Transactional(readOnly = true)
@@ -543,17 +547,26 @@ public class CommunityService {
 
     private String anonymousDisplayName(String anonymousName, String ipAddress) {
         String name = normalizeAnonymousName(anonymousName);
-        String prefix = ipPrefix(ipAddress);
-        return prefix == null ? name : name + "(" + prefix + ")";
+        String tag = anonymousTag(ipAddress);
+        return tag == null ? name : name + "(" + tag + ")";
     }
 
-    private String ipPrefix(String ipAddress) {
+    /**
+     * Derives a short, opaque, salted tag from the client IP. Same IP yields the same tag (so
+     * sockpuppets within a thread stay linkable) while revealing nothing about the real network —
+     * unlike a raw IP prefix, which deanonymizes posters in a small community. The full IP remains
+     * in the database for admin moderation only.
+     */
+    private String anonymousTag(String ipAddress) {
         if (ipAddress == null || ipAddress.isBlank()) return null;
-        Matcher ipv4 = IPV4_PREFIX.matcher(ipAddress.trim());
-        if (ipv4.matches()) return ipv4.group(1) + "." + ipv4.group(2);
-        Matcher ipv6 = IPV6_PREFIX.matcher(ipAddress.trim());
-        if (ipv6.matches()) return ipv6.group(1) + ":" + ipv6.group(2);
-        return null;
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(anonymousSalt.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] digest = mac.doFinal(ipAddress.trim().getBytes(StandardCharsets.UTF_8));
+            return String.format("%02x%02x", digest[0] & 0xff, digest[1] & 0xff);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void rejectUnsafeText(String value) {
@@ -890,7 +903,7 @@ public class CommunityService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지는 5MB 이하만 업로드할 수 있습니다.");
             }
             try {
-                String stored = storageService.store(image);
+                String stored = storageService.storeImage(image, contentType);
                 CommunityPostImage saved = imageRepository.save(new CommunityPostImage(postId, stored, image.getOriginalFilename(), contentType, startPos + i));
                 createdIds.add(saved.getId());
             } catch (IOException e) {
@@ -1033,7 +1046,7 @@ public class CommunityService {
         }
         clearImage(post);
         try {
-            post.setImageStoredName(storageService.store(image));
+            post.setImageStoredName(storageService.storeImage(image, contentType));
             post.setImageOriginalName(image.getOriginalFilename());
             post.setImageMimeType(contentType);
         } catch (IOException e) {
