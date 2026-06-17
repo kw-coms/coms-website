@@ -69,6 +69,7 @@ public class CommunityService {
     private static final int MAX_TITLE_LENGTH = 120;
     private static final int MAX_CONTENT_LENGTH = 50000;
     private static final int MAX_COMMENT_LENGTH = 1000;
+    private static final int MAX_DELETE_REASON_LENGTH = 300;
     private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
     private static final long MAX_VIDEO_BYTES = 100L * 1024 * 1024;
     private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
@@ -244,6 +245,10 @@ public class CommunityService {
     }
 
     public void delete(String studentId, Long id) {
+        delete(studentId, id, null);
+    }
+
+    public void delete(String studentId, Long id, String reason) {
         Member member = findMember(studentId);
         CommunityPost post = communityPostRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -251,8 +256,9 @@ public class CommunityService {
         if (!post.getAuthorStudentId().equals(member.getStudentId()) && member.getRole() != Member.Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
+        String detail = deletionAuditDetail(post, member, normalizeDeleteReason(reason));
         deletePostData(post);
-        auditLogService.record(member.getStudentId(), "COMMUNITY_POST_DELETE", "COMMUNITY_POST", String.valueOf(id), safeTitle(post.getTitle()), null);
+        auditLogService.record(member.getStudentId(), "COMMUNITY_POST_DELETE", "COMMUNITY_POST", String.valueOf(id), detail, null);
     }
 
     public CommunityPostResponse vote(String studentId, Long id, int value) {
@@ -1170,6 +1176,41 @@ public class CommunityService {
 
     private String safeTitle(String title) {
         return title == null || title.isBlank() ? null : "title=" + preview(title);
+    }
+
+    private String deletionAuditDetail(CommunityPost post, Member deletedBy, String reason) {
+        String authorName = memberRepository.findByStudentId(post.getAuthorStudentId())
+                .map(Member::getName)
+                .orElse(post.getAuthorName());
+        List<String> lines = new ArrayList<>();
+        if (safeTitle(post.getTitle()) != null) {
+            lines.add(safeTitle(post.getTitle()));
+        }
+        lines.add("author=" + auditIdentity(authorName, post.getAuthorStudentId()));
+        lines.add("deletedBy=" + auditIdentity(deletedBy.getName(), deletedBy.getStudentId()));
+        lines.add("deletedByRole=" + deletedBy.getRole().name());
+        lines.add("category=" + post.getCategory().name());
+        if (reason != null) {
+            lines.add("reason=" + reason);
+        }
+        return String.join("\n", lines);
+    }
+
+    private String auditIdentity(String name, String studentId) {
+        String safeName = name == null || name.isBlank() ? "-" : name.trim();
+        String safeStudentId = studentId == null || studentId.isBlank() ? "-" : studentId.trim();
+        return safeName + "(" + safeStudentId + ")";
+    }
+
+    private String normalizeDeleteReason(String reason) {
+        String normalized = reason == null ? "" : reason.trim().replaceAll("\\s+", " ");
+        if (normalized.isEmpty()) return null;
+        if (normalized.length() > MAX_DELETE_REASON_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "삭제 사유는 " + MAX_DELETE_REASON_LENGTH + "자 이하로 입력해주세요.");
+        }
+        rejectUnsafeText(normalized);
+        return normalized;
     }
 
     private Map<Long, Long> commentCounts(List<CommunityPost> posts) {

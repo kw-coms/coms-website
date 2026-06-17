@@ -2098,8 +2098,12 @@ export default function Community({ onBack }) {
 
   const handleDelete = async (post) => {
     if (!window.confirm('게시글을 삭제하시겠습니까?')) return
+    const reason = user?.role === 'ADMIN'
+      ? window.prompt('삭제 사유를 입력하세요. 감사 로그에 기록됩니다.', '')
+      : ''
+    if (reason === null) return
     try {
-      await deleteCommunityPost(post.id)
+      await deleteCommunityPost(post.id, reason)
       setPosts((prev) => prev.filter((item) => item.id !== post.id))
       backToList()
     } catch (err) {
