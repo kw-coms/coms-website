@@ -8,4 +8,5 @@ import java.util.List;
 
 public interface DeletedCommunityPostRepository extends JpaRepository<DeletedCommunityPost, Long> {
     List<DeletedCommunityPost> findAllByOrderByDeletedAtDesc(Pageable pageable);
+    List<DeletedCommunityPost> findByAuthorStudentIdOrderByDeletedAtDesc(String authorStudentId);
 }

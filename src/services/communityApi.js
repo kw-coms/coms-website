@@ -82,6 +82,17 @@ export async function deleteCommunityPost(id, reason = '') {
   })
 }
 
+export async function listMyDeletedCommunityPosts() {
+  return request('/api/community/posts/deleted/me')
+}
+
+export async function appealDeletedCommunityPost(id, message) {
+  return request(`/api/community/posts/deleted/${id}/appeals`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  })
+}
+
 export async function uploadPostImages(postId, files) {
   const form = new FormData()
   files.forEach((f) => form.append('images', f))

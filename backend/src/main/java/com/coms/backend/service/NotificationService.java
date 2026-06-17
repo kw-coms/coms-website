@@ -2,6 +2,7 @@ package com.coms.backend.service;
 
 import com.coms.backend.domain.CommunityComment;
 import com.coms.backend.domain.CommunityPost;
+import com.coms.backend.domain.DeletedCommunityPost;
 import com.coms.backend.domain.Member;
 import com.coms.backend.domain.Notification;
 import com.coms.backend.domain.Notice;
@@ -98,6 +99,22 @@ public class NotificationService {
                 null,
                 null,
                 actorName + "님이 삭제 보관함에서 \"" + post.getTitle() + "\" 글을 복원했습니다."
+        );
+    }
+
+    public void notifyPostDeleted(DeletedCommunityPost snapshot, String actorStudentId, String actorName) {
+        String moderatorName = actorName == null || actorName.isBlank() ? "관리자" : actorName;
+        String reason = snapshot.getDeletionReason() == null || snapshot.getDeletionReason().isBlank()
+                ? "삭제 사유가 기록되지 않았습니다."
+                : snapshot.getDeletionReason();
+        createIfDifferent(
+                snapshot.getAuthorStudentId(),
+                actorStudentId,
+                Notification.Type.COMMUNITY_POST_DELETED,
+                null,
+                null,
+                null,
+                moderatorName + "님이 \"" + snapshot.getTitle() + "\" 글을 삭제했습니다. 사유: " + reason
         );
     }
 

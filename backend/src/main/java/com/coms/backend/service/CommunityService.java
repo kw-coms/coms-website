@@ -269,6 +269,9 @@ public class CommunityService {
         var snapshot = deletionArchiveService.record(post, member, normalizedReason == null ? "직접 삭제" : normalizedReason);
         deletePostData(post, deletionArchiveService.archivedStoredNames(snapshot.getId()));
         auditLogService.record(member.getStudentId(), "COMMUNITY_POST_DELETE", "COMMUNITY_POST", String.valueOf(id), detail, null);
+        if (!snapshot.getAuthorStudentId().equals(member.getStudentId())) {
+            notificationService.notifyPostDeleted(snapshot, member.getStudentId(), member.getName());
+        }
     }
 
     public CommunityPostResponse vote(String studentId, Long id, int value) {
