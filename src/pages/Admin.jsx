@@ -1472,6 +1472,14 @@ function DeletedCommunityPostsTab() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [restoringId, setRestoringId] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [evidenceFilter, setEvidenceFilter] = useState('ALL')
+  const normalizedSearch = searchQuery.trim().toLowerCase()
+  const visiblePosts = posts
+    .filter((post) => deletedPostMatchesSearch(post, normalizedSearch))
+    .filter((post) => deletedPostMatchesStatus(post, statusFilter))
+    .filter((post) => deletedPostMatchesEvidence(post, evidenceFilter))
 
   const load = async (requestedLimit = limit) => {
     setError('')
@@ -1511,6 +1519,7 @@ function DeletedCommunityPostsTab() {
           ? { ...item, restoredPostId, restoredAt: new Date().toISOString() }
           : item
       )))
+      setStatusFilter('ALL')
     } catch (err) {
       setError(err.message || '삭제 게시글 복원에 실패했습니다.')
     } finally {
@@ -1556,12 +1565,45 @@ function DeletedCommunityPostsTab() {
         </div>
       </div>
 
+      <div className="grid gap-2 rounded-lg border border-black/10 bg-white/55 p-3 md:grid-cols-[minmax(14rem,1fr)_12rem_12rem]">
+        <input
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="제목·작성자·댓글·첨부 검색"
+          className="shape-cut-sm border border-black/10 bg-white/80 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition placeholder:text-[var(--theme-body-muted)] focus:border-black/30"
+        />
+        <select
+          aria-label="삭제 보관함 상태"
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value)}
+          className="shape-cut-sm border border-black/10 bg-white/80 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition focus:border-black/30"
+        >
+          <option value="ALL">전체 상태</option>
+          <option value="OPEN">복원 전</option>
+          <option value="RESTORED">복원됨</option>
+        </select>
+        <select
+          aria-label="삭제 보관함 증거 유형"
+          value={evidenceFilter}
+          onChange={(event) => setEvidenceFilter(event.target.value)}
+          className="shape-cut-sm border border-black/10 bg-white/80 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition focus:border-black/30"
+        >
+          <option value="ALL">전체 증거</option>
+          <option value="MEDIA">사진·영상·첨부 포함</option>
+          <option value="COMMENTS">댓글 포함</option>
+          <option value="POLL">투표 포함</option>
+        </select>
+      </div>
+
       {loading && <p className="text-sm text-[var(--theme-body-muted)]">삭제 보관함을 불러오는 중...</p>}
       {error && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
       {!loading && !error && posts.length === 0 && (
         <p className="text-sm text-[var(--theme-body-muted)]">보관된 삭제 게시글이 없습니다.</p>
       )}
-      {!loading && !error && posts.length > 0 && (
+      {!loading && !error && posts.length > 0 && visiblePosts.length === 0 && (
+        <p className="text-sm text-[var(--theme-body-muted)]">조건에 맞는 삭제 게시글이 없습니다.</p>
+      )}
+      {!loading && !error && visiblePosts.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-black/10">
           <table className="w-max min-w-full text-left text-sm">
             <thead className="bg-white text-xs font-semibold text-[var(--theme-body-muted)]">
@@ -1576,7 +1618,7 @@ function DeletedCommunityPostsTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-black/10 bg-white/50">
-              {posts.map((post) => (
+              {visiblePosts.map((post) => (
                 <tr key={post.id}>
                   <td className="whitespace-nowrap px-3 py-3 text-xs text-[var(--theme-body-muted)]">{formatDateTime(post.deletedAt)}</td>
                   <td className="max-w-[260px] px-3 py-3 text-xs">
@@ -1741,6 +1783,53 @@ function DeletedPostEvidence({ post }) {
       )}
     </div>
   )
+}
+
+function deletedPostMatchesSearch(post, normalizedSearch) {
+  if (!normalizedSearch) return true
+  return deletedPostSearchText(post).includes(normalizedSearch)
+}
+
+function deletedPostMatchesStatus(post, statusFilter) {
+  if (statusFilter === 'RESTORED') return Boolean(post.restoredPostId)
+  if (statusFilter === 'OPEN') return !post.restoredPostId
+  return true
+}
+
+function deletedPostMatchesEvidence(post, evidenceFilter) {
+  if (evidenceFilter === 'MEDIA') {
+    return (post.imageInfos || []).length > 0 || (post.videoInfos || []).length > 0 || (post.fileInfos || []).length > 0
+  }
+  if (evidenceFilter === 'COMMENTS') {
+    return Number(post.commentCount || 0) > 0 || (post.commentInfos || []).length > 0
+  }
+  if (evidenceFilter === 'POLL') {
+    return deletedPostBlocks(post).some((block) => block.type === 'poll')
+  }
+  return true
+}
+
+function deletedPostSearchText(post) {
+  const blocks = deletedPostBlocks(post)
+  return [
+    post.title,
+    post.originalPostId,
+    post.category,
+    post.authorName,
+    post.authorStudentId,
+    post.deletedByName,
+    post.deletedByStudentId,
+    post.deletionReason,
+    post.restoredPostId,
+    ...blocks.map((block) => {
+      if (block.type === 'poll') return [block.question, ...block.options.map(deletedPollOptionLabel)].join(' ')
+      return [block.content, block.name, block.title].join(' ')
+    }),
+    ...(post.imageInfos || []).map((item) => item.originalName),
+    ...(post.videoInfos || []).map((item) => item.originalName),
+    ...(post.fileInfos || []).map((item) => item.originalName),
+    ...(post.commentInfos || []).flatMap((comment) => [comment.authorName, comment.authorStudentId, comment.content]),
+  ].map((value) => String(value || '').toLowerCase()).join(' ')
 }
 
 function deletedPostBlocks(post) {

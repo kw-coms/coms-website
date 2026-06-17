@@ -17,6 +17,7 @@ import com.coms.backend.repository.DeletedCommunityPostImageRepository;
 import com.coms.backend.repository.DeletedCommunityPostMediaRepository;
 import com.coms.backend.repository.DeletedCommunityPostRepository;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.NotificationRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,9 +82,13 @@ class CommunityServiceAuditLogTest {
     @Autowired
     private DeletedCommunityPostCommentRepository deletedCommunityPostCommentRepository;
 
+    @Autowired
+    private NotificationRepository notificationRepository;
+
     @BeforeEach
     @AfterEach
     void clean() {
+        notificationRepository.deleteAll();
         deletedCommunityPostCommentRepository.deleteAll();
         deletedCommunityPostMediaRepository.deleteAll();
         deletedCommunityPostImageRepository.deleteAll();
@@ -291,6 +296,14 @@ class CommunityServiceAuditLogTest {
         assertThat(restoredImages).singleElement()
                 .satisfies(image -> assertThat(restoredPost.getContent()).contains("\"mediaId\":" + image.getId()));
         assertThat(restoredPost.getContent()).doesNotContain("\"mediaId\":" + originalInlineId);
+        assertThat(notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(author.getStudentId()))
+                .singleElement()
+                .satisfies(notification -> {
+                    assertThat(notification.getType().name()).isEqualTo("COMMUNITY_POST_RESTORED");
+                    assertThat(notification.getPostId()).isEqualTo(restoredPost.getId());
+                    assertThat(notification.getActorStudentId()).isEqualTo(admin.getStudentId());
+                    assertThat(notification.getMessage()).contains("복원");
+                });
         assertThat(communityDeletionArchiveService.recent(10))
                 .singleElement()
                 .satisfies(response -> {
