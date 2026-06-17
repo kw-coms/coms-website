@@ -12,6 +12,17 @@ export async function clearAdminCache() {
   return request('/api/admin/cache/clear', { method: 'POST' })
 }
 
+export async function listCommunityReports() {
+  return request('/api/admin/community/reports')
+}
+
+export async function resolveCommunityReport(id, payload) {
+  return request(`/api/admin/community/reports/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
 export async function listRecruitApplications() {
   return request('/api/admin/recruit-applications')
 }
