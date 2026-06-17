@@ -284,7 +284,7 @@ test('admin logs tab can expand log window and clear caches', async ({ page }) =
           action: 'COMMUNITY_POST_DELETE',
           targetType: 'COMMUNITY_POST',
           targetId: '77',
-          detail: 'title=삭제 대상\nreason=삭제 사유',
+          detail: 'title=삭제 대상\ncontent=삭제된 게시글 원문입니다.\nreason=삭제 사유',
           ipAddress: null,
           createdAt: '2026-06-15T03:29:00',
         },
@@ -376,6 +376,7 @@ test('admin logs tab can expand log window and clear caches', async ({ page }) =
 
   await page.getByPlaceholder('사용자, 행위, 상세 검색').fill('삭제 사유')
   await expect(page.getByText('title=삭제 대상')).toBeVisible()
+  await expect(page.getByText('content=삭제된 게시글 원문입니다.')).toBeVisible()
   await expect(page.getByText('clearedCount=1')).toHaveCount(0)
 
   const download = page.waitForEvent('download')
@@ -449,6 +450,40 @@ test('admin community reports tab resolves open reports', async ({ page }) => {
 
   await expect.poll(() => resolvePayload).toEqual({ action: 'ACCEPT', note: '삭제 처리 완료' })
   await expect(page.getByText('처리 대기 중인 신고가 없습니다.')).toBeVisible()
+})
+
+test('admin deleted community posts tab preserves deletion evidence', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/admin/community/deleted-posts**', (route) => route.fulfill({
+    status: 200,
+    json: [
+      {
+        id: 1,
+        originalPostId: 77,
+        title: '삭제 보관 대상',
+        content: '관리자가 삭제한 게시글 원문입니다.',
+        authorStudentId: '2025123456',
+        authorName: '작성자',
+        category: 'GENERAL',
+        deletedByStudentId: '2020123456',
+        deletedByName: '관리자',
+        deletedByRole: 'ADMIN',
+        deletionReason: '운영 규칙 위반',
+        originalCreatedAt: '2026-06-15T03:00:00',
+        deletedAt: '2026-06-15T03:31:00',
+      },
+    ],
+  }))
+
+  await page.goto('/admin')
+  await page.getByRole('button', { name: '삭제 보관함' }).click()
+
+  await expect(page.getByRole('heading', { name: '커뮤니티 삭제 보관함' })).toBeVisible()
+  await expect(page.getByText('삭제 보관 대상')).toBeVisible()
+  await expect(page.getByText('관리자가 삭제한 게시글 원문입니다.')).toBeVisible()
+  await expect(page.getByText('작성자(2025123456)')).toBeVisible()
+  await expect(page.getByText('관리자(2020123456)')).toBeVisible()
+  await expect(page.getByText('운영 규칙 위반')).toBeVisible()
 })
 
 test('admin tracks recruit applications from overview to status update', async ({ page }) => {

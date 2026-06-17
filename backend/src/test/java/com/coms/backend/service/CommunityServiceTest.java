@@ -623,7 +623,7 @@ class CommunityServiceTest {
         assertThatThrownBy(() -> communityService.delete(otherUser.getStudentId(), created.id()))
                 .isInstanceOf(ResponseStatusException.class);
 
-        communityService.delete(admin.getStudentId(), created.id());
+        communityService.delete(admin.getStudentId(), created.id(), "운영 기준 위반");
 
         assertThat(communityPostRepository.findById(created.id())).isEmpty();
     }
