@@ -84,6 +84,9 @@ public class CommunityPost {
     public void setViewCount(long viewCount) { this.viewCount = viewCount; }
     public void incrementViewCount() { this.viewCount++; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public boolean isEdited() { return edited; }
+    public void setEdited(boolean edited) { this.edited = edited; }
 }
