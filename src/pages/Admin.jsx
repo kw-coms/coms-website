@@ -40,7 +40,11 @@ const AUDIT_LOG_LIMITS = [300, 1000, 2000]
 const AUDIT_LOG_FILTERS = [
   { value: 'ALL', label: '전체 로그' },
   { value: 'COMMUNITY_POST_DELETE', label: '커뮤니티 삭제' },
+  { value: 'COMMUNITY_COMMENT_DELETE', label: '댓글 삭제' },
+  { value: 'COMMUNITY_REPORT_ACCEPT', label: '신고 처리 완료' },
+  { value: 'COMMUNITY_REPORT_REJECT', label: '신고 기각' },
   { value: 'ADMIN_MEMBER_DELETE', label: '회원 삭제' },
+  { value: 'ADMIN_ELIGIBLE_MEMBER_DELETE', label: '명부 삭제' },
   { value: 'ADMIN_STUDENT_BAN', label: '학번 차단' },
   { value: 'ADMIN_RECRUIT_APPLICATION_STATUS_UPDATE', label: '모집 상태 변경' },
 ]
@@ -55,6 +59,8 @@ const AUDIT_ACTION_LABELS = {
   COMMUNITY_POST_VOTE: '추천/비추천',
   COMMUNITY_POLL_VOTE: '투표',
   COMMUNITY_POLL_CLOSE: '투표 종료',
+  COMMUNITY_REPORT_ACCEPT: '신고 처리 완료',
+  COMMUNITY_REPORT_REJECT: '신고 기각',
   ADMIN_MEMBER_ROLE_UPDATE: '회원 권한 변경',
   ADMIN_MEMBER_DELETE: '회원 삭제',
   ADMIN_MEMBER_PASSWORD_RESET: '비밀번호 초기화',

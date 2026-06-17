@@ -288,6 +288,50 @@ test('admin logs tab can expand log window and clear caches', async ({ page }) =
           ipAddress: null,
           createdAt: '2026-06-15T03:29:00',
         },
+        {
+          id: 3,
+          actorStudentId: '2020123456',
+          actorName: '관리자',
+          action: 'COMMUNITY_REPORT_ACCEPT',
+          targetType: 'COMMUNITY_POST_REPORT',
+          targetId: '9',
+          detail: 'postId=77\ntitle=신고된 게시글\nauthor=작성자(2025123456)\nreporter=2026123456\nresolvedBy=관리자(2020123456)\nreason=SPAM\nnote=게시글 삭제 완료',
+          ipAddress: null,
+          createdAt: '2026-06-15T03:28:00',
+        },
+        {
+          id: 4,
+          actorStudentId: '2020123456',
+          actorName: '관리자',
+          action: 'ADMIN_MEMBER_DELETE',
+          targetType: 'MEMBER',
+          targetId: '7',
+          detail: 'studentId=2025222222\nname=삭제회원\nrole=USER\nemail=deleted@example.com',
+          ipAddress: null,
+          createdAt: '2026-06-15T03:27:00',
+        },
+        {
+          id: 5,
+          actorStudentId: '2020123456',
+          actorName: '관리자',
+          action: 'ADMIN_ELIGIBLE_MEMBER_DELETE',
+          targetType: 'ELIGIBLE_MEMBER',
+          targetId: '8',
+          detail: 'studentId=2025333333\nname=명부대상\ngeneration=59\nphone=01012345678',
+          ipAddress: null,
+          createdAt: '2026-06-15T03:26:00',
+        },
+        {
+          id: 6,
+          actorStudentId: '2020123456',
+          actorName: '관리자',
+          action: 'COMMUNITY_COMMENT_DELETE',
+          targetType: 'COMMUNITY_COMMENT',
+          targetId: '11',
+          detail: 'postId=77\ntitle=댓글 감사 대상\nauthor=댓글러(2025444444)\ndeletedBy=관리자(2020123456)\ndeletedByRole=ADMIN\ncontent=삭제될 댓글 내용입니다.',
+          ipAddress: null,
+          createdAt: '2026-06-15T03:25:00',
+        },
       ],
     })
   })
@@ -306,8 +350,25 @@ test('admin logs tab can expand log window and clear caches', async ({ page }) =
 
   await page.goto('/admin')
   await page.getByRole('button', { name: '로그' }).click()
+  const auditTable = page.getByRole('table')
   await expect.poll(() => requestedLimits.at(-1)).toBe('1000')
   await expect(page.getByText('커뮤니티 글 삭제')).toBeVisible()
+  await expect(auditTable.getByText('신고 처리 완료')).toBeVisible()
+
+  await page.getByLabel('로그 종류').selectOption('COMMUNITY_REPORT_ACCEPT')
+  await expect(auditTable.getByText('신고 처리 완료')).toBeVisible()
+  await page.getByPlaceholder('사용자, 행위, 상세 검색').fill('신고된 게시글')
+  await expect(page.getByText('title=신고된 게시글')).toBeVisible()
+
+  await page.getByPlaceholder('사용자, 행위, 상세 검색').fill('명부대상')
+  await page.getByLabel('로그 종류').selectOption('ADMIN_ELIGIBLE_MEMBER_DELETE')
+  await expect(page.getByText('name=명부대상')).toBeVisible()
+
+  await page.getByPlaceholder('사용자, 행위, 상세 검색').fill('삭제될 댓글')
+  await page.getByLabel('로그 종류').selectOption('COMMUNITY_COMMENT_DELETE')
+  await expect(page.getByText('content=삭제될 댓글 내용입니다.')).toBeVisible()
+
+  await page.getByPlaceholder('사용자, 행위, 상세 검색').fill('')
 
   await page.getByLabel('로그 종류').selectOption('COMMUNITY_POST_DELETE')
   await expect(page.getByText('커뮤니티 글 삭제')).toBeVisible()
@@ -337,6 +398,8 @@ test('admin community reports tab resolves open reports', async ({ page }) => {
       id: 9,
       postId: 77,
       postTitle: '신고된 게시글',
+      postAuthorStudentId: '2025123456',
+      postAuthorName: '작성자',
       reporterStudentId: '2026123456',
       reason: 'SPAM',
       detail: '홍보 링크 반복',
@@ -361,6 +424,8 @@ test('admin community reports tab resolves open reports', async ({ page }) => {
         id: 9,
         postId: 77,
         postTitle: '신고된 게시글',
+        postAuthorStudentId: '2025123456',
+        postAuthorName: '작성자',
         reporterStudentId: '2026123456',
         reason: 'SPAM',
         detail: '홍보 링크 반복',
