@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.CommunityCommentRequest;
 import com.coms.backend.dto.CommunityPostRequest;
+import com.coms.backend.dto.DeletedCommunityPostResponse;
 import com.coms.backend.repository.AuditLogRepository;
 import com.coms.backend.repository.CommunityCommentRepository;
 import com.coms.backend.repository.CommunityPollVoteRepository;
@@ -11,6 +12,7 @@ import com.coms.backend.repository.CommunityPostImageRepository;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVideoRepository;
 import com.coms.backend.repository.CommunityPostVoteRepository;
+import com.coms.backend.repository.DeletedCommunityPostImageRepository;
 import com.coms.backend.repository.DeletedCommunityPostRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -20,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,11 +30,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = {
         "jwt.secret=test-secret-key-with-at-least-32-chars",
-        "spring.datasource.url=jdbc:h2:mem:community-service-audit-log-test;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1"
+        "spring.datasource.url=jdbc:h2:mem:community-service-audit-log-test;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
+        "storage.location=./build/test-uploads/community-service-audit-log"
 })
 class CommunityServiceAuditLogTest {
     @Autowired
     private CommunityService communityService;
+
+    @Autowired
+    private CommunityDeletionArchiveService communityDeletionArchiveService;
 
     @Autowired
     private MemberRepository memberRepository;
@@ -63,9 +70,13 @@ class CommunityServiceAuditLogTest {
     @Autowired
     private DeletedCommunityPostRepository deletedCommunityPostRepository;
 
+    @Autowired
+    private DeletedCommunityPostImageRepository deletedCommunityPostImageRepository;
+
     @BeforeEach
     @AfterEach
     void clean() {
+        deletedCommunityPostImageRepository.deleteAll();
         deletedCommunityPostRepository.deleteAll();
         auditLogRepository.deleteAll();
         fileRepository.deleteAll();
@@ -180,6 +191,151 @@ class CommunityServiceAuditLogTest {
                     assertThat(snapshot.getDeletedByRole()).isEqualTo(Member.Role.ADMIN.name());
                     assertThat(snapshot.getDeletionReason()).isEqualTo("운영 규칙 위반");
                 });
+    }
+
+    @Test
+    void adminDeletionArchivesOriginalImagesAndKeepsThemReadable() throws Exception {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member admin = member("2026123456", "관리자", Member.Role.ADMIN);
+        memberRepository.save(author);
+        memberRepository.save(admin);
+        MockMultipartFile cover = new MockMultipartFile("image", "cover.png", "image/png", "cover".getBytes());
+        MockMultipartFile inline = new MockMultipartFile("images", "inline.png", "image/png", "inline".getBytes());
+        var created = communityService.create(
+                author.getStudentId(),
+                new CommunityPostRequest("사진 보관 대상", "임시 본문", "GENERAL", false),
+                cover
+        );
+        Long inlineImageId = communityService.addImages(author.getStudentId(), created.id(), java.util.List.of(inline)).get(0);
+        String content = """
+                [{"type":"text","content":"사진까지 보관해야 하는 원문입니다."},
+                 {"type":"image","mediaId":%d,"name":"inline.png","width":75,"align":"center"}]
+                """.formatted(inlineImageId);
+        communityService.update(
+                author.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("사진 보관 대상", content, "GENERAL", false),
+                null
+        );
+
+        communityService.delete(admin.getStudentId(), created.id(), "이미지 증거 확인");
+
+        var snapshot = deletedCommunityPostRepository.findAll().get(0);
+        assertThat(deletedCommunityPostImageRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId()))
+                .hasSize(2)
+                .anySatisfy(image -> {
+                    assertThat(image.getKind()).isEqualTo("COVER");
+                    assertThat(image.getOriginalName()).isEqualTo("cover.png");
+                })
+                .anySatisfy(image -> {
+                    assertThat(image.getKind()).isEqualTo("INLINE");
+                    assertThat(image.getOriginalImageId()).isEqualTo(inlineImageId);
+                    assertThat(image.getOriginalName()).isEqualTo("inline.png");
+                    assertThat(communityDeletionArchiveService.loadImage(snapshot.getId(), image.getId()).getInputStream().readAllBytes())
+                            .isEqualTo("inline".getBytes());
+                });
+
+        assertThat(communityDeletionArchiveService.recent(10))
+                .singleElement()
+                .satisfies(response -> assertThat(response.imageInfos())
+                        .extracting(DeletedCommunityPostResponse.ImageInfo::originalName)
+                        .containsExactly("cover.png", "inline.png"));
+    }
+
+    @Test
+    void adminCanRestoreDeletedPostWithImagesAndInlineMediaIds() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member admin = member("2026123456", "관리자", Member.Role.ADMIN);
+        memberRepository.save(author);
+        memberRepository.save(admin);
+        MockMultipartFile cover = new MockMultipartFile("image", "cover.png", "image/png", "cover".getBytes());
+        MockMultipartFile inline = new MockMultipartFile("images", "inline.png", "image/png", "inline".getBytes());
+        var created = communityService.create(
+                author.getStudentId(),
+                new CommunityPostRequest("복원 대상", "임시 본문", "QUESTION", false),
+                cover
+        );
+        Long originalInlineId = communityService.addImages(author.getStudentId(), created.id(), java.util.List.of(inline)).get(0);
+        String content = """
+                [{"type":"text","content":"복원해야 하는 사진 원문입니다."},
+                 {"type":"image","mediaId":%d,"name":"inline.png","width":75,"align":"center"}]
+                """.formatted(originalInlineId);
+        communityService.update(
+                author.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("복원 대상", content, "QUESTION", false),
+                null
+        );
+        communityService.delete(admin.getStudentId(), created.id(), "복원 테스트");
+        Long snapshotId = deletedCommunityPostRepository.findAll().get(0).getId();
+
+        var restored = communityDeletionArchiveService.restore(snapshotId, admin.getStudentId());
+
+        assertThat(restored.restoredPostId()).isNotNull();
+        var restoredPost = communityPostRepository.findById(restored.restoredPostId()).orElseThrow();
+        assertThat(restoredPost.getTitle()).isEqualTo("복원 대상");
+        assertThat(restoredPost.getAuthorStudentId()).isEqualTo(author.getStudentId());
+        assertThat(restoredPost.getCategory()).isEqualTo(com.coms.backend.domain.CommunityPost.Category.QUESTION);
+        assertThat(restoredPost.getImageOriginalName()).isEqualTo("cover.png");
+        var restoredImages = imageRepository.findByPostIdOrderByPositionAsc(restoredPost.getId());
+        assertThat(restoredImages).singleElement()
+                .satisfies(image -> assertThat(restoredPost.getContent()).contains("\"mediaId\":" + image.getId()));
+        assertThat(restoredPost.getContent()).doesNotContain("\"mediaId\":" + originalInlineId);
+        assertThat(communityDeletionArchiveService.recent(10))
+                .singleElement()
+                .satisfies(response -> {
+                    assertThat(response.restoredPostId()).isEqualTo(restoredPost.getId());
+                    assertThat(response.restoredByStudentId()).isEqualTo(admin.getStudentId());
+                    assertThat(response.restoredAt()).isNotNull();
+                });
+        assertThat(auditLogRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(0, 10)))
+                .filteredOn(log -> log.getAction().equals("COMMUNITY_POST_RESTORE"))
+                .singleElement()
+                .satisfies(log -> {
+                    assertThat(log.getActorStudentId()).isEqualTo(admin.getStudentId());
+                    assertThat(log.getTargetId()).isEqualTo(String.valueOf(restoredPost.getId()));
+                    assertThat(log.getDetail()).contains("deletedSnapshotId=" + snapshotId);
+                });
+        assertThatThrownBy(() -> communityDeletionArchiveService.restore(snapshotId, admin.getStudentId()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void removingRestoredImageKeepsDeletedArchiveEvidenceReadable() throws Exception {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member admin = member("2026123456", "관리자", Member.Role.ADMIN);
+        memberRepository.save(author);
+        memberRepository.save(admin);
+        var created = communityService.create(
+                author.getStudentId(),
+                new CommunityPostRequest("복원 이미지 삭제 대상", "임시 본문", "GENERAL", false),
+                null
+        );
+        Long originalImageId = communityService.addImages(
+                author.getStudentId(),
+                created.id(),
+                java.util.List.of(new MockMultipartFile("images", "inline.png", "image/png", "inline".getBytes()))
+        ).get(0);
+        communityService.update(
+                author.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("복원 이미지 삭제 대상", """
+                        [{"type":"text","content":"복원 후에도 보관함 사진은 남아야 합니다."},
+                         {"type":"image","mediaId":%d,"name":"inline.png","width":75,"align":"center"}]
+                        """.formatted(originalImageId), "GENERAL", false),
+                null
+        );
+        communityService.delete(admin.getStudentId(), created.id(), "복원 이미지 보존 테스트");
+        Long snapshotId = deletedCommunityPostRepository.findAll().get(0).getId();
+        Long archivedImageId = deletedCommunityPostImageRepository.findByDeletedPostIdOrderByPositionAsc(snapshotId).get(0).getId();
+        Long restoredPostId = communityDeletionArchiveService.restore(snapshotId, admin.getStudentId()).restoredPostId();
+        Long restoredImageId = imageRepository.findByPostIdOrderByPositionAsc(restoredPostId).get(0).getId();
+
+        communityService.deleteImage(admin.getStudentId(), restoredPostId, restoredImageId);
+
+        assertThat(communityDeletionArchiveService.loadImage(snapshotId, archivedImageId).getInputStream().readAllBytes())
+                .isEqualTo("inline".getBytes());
     }
 
     @Test

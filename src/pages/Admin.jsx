@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Download, RefreshCw, RotateCcw } from 'lucide-react'
-import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache, listCommunityReports, listDeletedCommunityPosts, resolveCommunityReport, listRecruitApplications, updateRecruitApplicationStatus } from '../services/adminApi.js'
+import { apiUrl } from '../services/apiClient.js'
+import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache, listCommunityReports, listDeletedCommunityPosts, restoreDeletedCommunityPost, resolveCommunityReport, listRecruitApplications, updateRecruitApplicationStatus } from '../services/adminApi.js'
 import { listFiles, createPost, deleteFile } from '../services/archiveApi.js'
 import { listAdminFonts, setFontActive, uploadFont } from '../services/fontApi.js'
 import { buildFontFaceCss, fontFamilyValue } from '../services/fontPreferences.js'
@@ -1470,6 +1471,7 @@ function DeletedCommunityPostsTab() {
   const [limit, setLimit] = useState(300)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [restoringId, setRestoringId] = useState(null)
 
   const load = async (requestedLimit = limit) => {
     setError('')
@@ -1497,13 +1499,32 @@ function DeletedCommunityPostsTab() {
     return () => { mounted = false }
   }, [limit])
 
+  const restorePost = async (post) => {
+    if (!window.confirm(`"${post.title || '삭제된 게시글'}"을 커뮤니티에 되돌리겠습니까?`)) return
+    setRestoringId(post.id)
+    setError('')
+    try {
+      const response = await restoreDeletedCommunityPost(post.id)
+      const restoredPostId = response?.restoredPostId
+      setPosts((current) => current.map((item) => (
+        item.id === post.id
+          ? { ...item, restoredPostId, restoredAt: new Date().toISOString() }
+          : item
+      )))
+    } catch (err) {
+      setError(err.message || '삭제 게시글 복원에 실패했습니다.')
+    } finally {
+      setRestoringId(null)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-[var(--theme-body-dark)]">커뮤니티 삭제 보관함</h2>
           <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
-            관리자가 삭제한 게시글의 원문, 작성자, 삭제자, 사유를 확인합니다.
+            관리자가 삭제한 게시글의 원문, 사진, 작성자, 삭제자, 사유를 확인하고 필요한 경우 복원합니다.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -1551,6 +1572,7 @@ function DeletedCommunityPostsTab() {
                 <th className="px-3 py-3">삭제자</th>
                 <th className="px-3 py-3">사유</th>
                 <th className="px-3 py-3">원문</th>
+                <th className="px-3 py-3">상태</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/10 bg-white/50">
@@ -1564,7 +1586,29 @@ function DeletedCommunityPostsTab() {
                   <td className="whitespace-nowrap px-3 py-3 text-xs text-[var(--theme-body-muted)]">{deletedPostIdentity(post.authorName, post.authorStudentId)}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-xs text-[var(--theme-body-muted)]">{deletedPostIdentity(post.deletedByName, post.deletedByStudentId)}</td>
                   <td className="max-w-[220px] whitespace-pre-wrap break-words px-3 py-3 text-xs font-semibold text-[var(--theme-body-dark)]">{post.deletionReason || '-'}</td>
-                  <td className="max-w-[420px] whitespace-pre-wrap break-words px-3 py-3 text-xs text-[var(--theme-body-muted)]">{post.content || '-'}</td>
+                  <td className="max-w-[520px] px-3 py-3 text-xs text-[var(--theme-body-muted)]">
+                    <DeletedPostEvidence post={post} />
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-xs">
+                    {post.restoredPostId ? (
+                      <div className="space-y-1">
+                        <span className="block font-semibold text-emerald-700">복원됨</span>
+                        <a href={`/community/${post.restoredPostId}`} className="font-mono text-[10px] font-semibold text-[#3b4890] underline">
+                          #{post.restoredPostId} 열기
+                        </a>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => restorePost(post)}
+                        disabled={restoringId !== null}
+                        className="shape-cut-sm inline-flex items-center gap-1.5 border border-[#3b4890]/20 bg-[#f4f6ff] px-3 py-1.5 text-xs font-semibold text-[#3b4890] transition hover:bg-[#e8ecff] disabled:opacity-50"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                        {restoringId === post.id ? '복원 중...' : '되돌리기'}
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1573,6 +1617,174 @@ function DeletedCommunityPostsTab() {
       )}
     </div>
   )
+}
+
+function DeletedPostEvidence({ post }) {
+  const blocks = deletedPostBlocks(post)
+  const usedImageIds = new Set(blocks.filter((block) => block.type === 'image' && block.imageInfo?.id).map((block) => block.imageInfo.id))
+  const extraImages = (post.imageInfos || []).filter((image) => !usedImageIds.has(image.id))
+  return (
+    <div className="space-y-2">
+      {blocks.length === 0 && <span className="text-[var(--theme-body-muted)]">-</span>}
+      {blocks.map((block, index) => {
+        if (block.type === 'image') {
+          if (!block.url) return null
+          return (
+            <figure
+              key={`image-${block.imageInfo?.id || index}`}
+              className="overflow-hidden rounded-md border border-black/10 bg-white"
+              style={{ width: `${deletedMediaWidth(block.width)}%`, maxWidth: '100%', marginInline: block.align === 'center' ? 'auto' : block.align === 'right' ? 'auto 0' : '0 auto' }}
+            >
+              <img src={apiUrl(block.url)} alt={block.name || '삭제 게시글 이미지'} className="block max-h-72 w-full object-contain" />
+              {block.name && <figcaption className="border-t border-black/10 px-2 py-1 text-[10px] font-semibold text-[var(--theme-body-muted)]">{block.name}</figcaption>}
+            </figure>
+          )
+        }
+        if (block.type === 'externalImage') {
+          return (
+            <figure key={`external-${index}`} className="overflow-hidden rounded-md border border-black/10 bg-white">
+              <img src={block.url} alt={block.title || '외부 이미지'} className="block max-h-72 w-full object-contain" />
+            </figure>
+          )
+        }
+        return (
+          <div key={`text-${index}`} className="whitespace-pre-wrap break-words leading-5 text-[var(--theme-body-dark)]">
+            {deletedHasFormattedText(block.content) ? (
+              <span dangerouslySetInnerHTML={{ __html: sanitizeDeletedHtml(block.content) }} />
+            ) : (
+              block.content || '-'
+            )}
+          </div>
+        )
+      })}
+      {extraImages.length > 0 && (
+        <div className="grid max-w-[360px] grid-cols-2 gap-2">
+          {extraImages.map((image) => (
+            <figure key={image.id} className="overflow-hidden rounded-md border border-black/10 bg-white">
+              <img src={apiUrl(image.url)} alt={image.originalName || '삭제 게시글 이미지'} className="block aspect-square w-full object-contain" />
+              <figcaption className="truncate border-t border-black/10 px-2 py-1 text-[10px] font-semibold text-[var(--theme-body-muted)]">
+                {image.kind === 'COVER' ? '대표 이미지' : image.originalName || '이미지'}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function deletedPostBlocks(post) {
+  const images = post.imageInfos || []
+  const fallback = String(post.content || '').trim()
+  if (!fallback) return []
+  try {
+    const parsed = JSON.parse(fallback)
+    if (!Array.isArray(parsed)) return [{ type: 'text', content: fallback }]
+    return parsed.map((block) => {
+      if (block?.type === 'image') {
+        const imageInfo = images.find((image) => image.originalImageId === block.mediaId || image.id === block.mediaId)
+        return {
+          type: 'image',
+          imageInfo,
+          url: imageInfo?.url,
+          name: block.name || imageInfo?.originalName,
+          width: block.width || 75,
+          align: block.align || 'center',
+        }
+      }
+      if (block?.type === 'externalEmbed' && block.kind === 'image' && isSafeHttpsUrl(block.url)) {
+        return { type: 'externalImage', url: block.url, title: block.title || '외부 이미지' }
+      }
+      if (block?.type === 'poll') {
+        return { type: 'text', content: block.question || '' }
+      }
+      return { type: 'text', content: block?.content || '' }
+    }).filter((block) => block.type !== 'text' || String(block.content || '').trim())
+  } catch {
+    return [{ type: 'text', content: fallback }]
+  }
+}
+
+function deletedMediaWidth(width) {
+  const numeric = Number(width)
+  if (Number.isFinite(numeric)) return Math.min(100, Math.max(35, numeric))
+  if (width === 'small') return 35
+  if (width === 'medium') return 55
+  return 75
+}
+
+function deletedHasFormattedText(value) {
+  return /<\/?(?:b|strong|i|em|u|s|mark|span|br|p|div|font)\b/i.test(String(value || ''))
+}
+
+function sanitizeDeletedHtml(value) {
+  if (typeof document === 'undefined') return escapeDeletedHtml(value)
+  const template = document.createElement('template')
+  template.innerHTML = String(value || '')
+  const container = document.createElement('div')
+  appendDeletedCleanChildren(template.content, container)
+  return container.innerHTML
+    .replace(/\u200B/g, '')
+    .replace(/(<br\s*\/?>\s*)+$/gi, '')
+}
+
+function escapeDeletedHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function appendDeletedCleanChildren(source, target) {
+  for (const child of Array.from(source.childNodes)) {
+    const clean = cleanDeletedNode(child)
+    if (clean) target.appendChild(clean)
+  }
+}
+
+function cleanDeletedNode(node) {
+  if (node.nodeType === 3) return document.createTextNode(node.textContent.replace(/\u200B/g, ''))
+  if (node.nodeType !== 1) return document.createTextNode('')
+
+  const tag = node.tagName.toLowerCase()
+  if (tag === 'br') return document.createElement('br')
+  if (['b', 'strong', 'i', 'em', 'u'].includes(tag)) {
+    const el = document.createElement(tag)
+    appendDeletedCleanChildren(node, el)
+    return el
+  }
+  if (tag === 'span' || tag === 'font') {
+    const el = document.createElement('span')
+    const style = []
+    const color = node.style?.color || node.getAttribute('color')
+    const backgroundColor = node.style?.backgroundColor
+    const rawFontFamily = node.style?.fontFamily || node.getAttribute('face')
+    const fontFamily = typeof rawFontFamily === 'string' && /^[\w\s\-,'"]+$/.test(rawFontFamily) ? rawFontFamily : ''
+    if (color && !/url|expression|javascript/i.test(color)) style.push(`color:${color}`)
+    if (backgroundColor && !/url|expression|javascript/i.test(backgroundColor)) style.push(`background-color:${backgroundColor}`)
+    if (fontFamily) style.push(`font-family:${fontFamily}`)
+    if (style.length) el.setAttribute('style', style.join(';'))
+    appendDeletedCleanChildren(node, el)
+    return el
+  }
+  if (tag === 'div' || tag === 'p') {
+    const fragment = document.createDocumentFragment()
+    appendDeletedCleanChildren(node, fragment)
+    fragment.appendChild(document.createElement('br'))
+    return fragment
+  }
+  const fragment = document.createDocumentFragment()
+  appendDeletedCleanChildren(node, fragment)
+  return fragment
+}
+
+function isSafeHttpsUrl(value) {
+  try {
+    return new URL(String(value || '')).protocol === 'https:'
+  } catch {
+    return false
+  }
 }
 
 function AuditLogTab() {

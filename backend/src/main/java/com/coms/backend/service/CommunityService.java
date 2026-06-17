@@ -266,8 +266,8 @@ public class CommunityService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "관리자 삭제 사유를 입력해주세요.");
         }
         String detail = deletionAuditDetail(post, member, normalizedReason);
-        deletionArchiveService.record(post, member, normalizedReason == null ? "직접 삭제" : normalizedReason);
-        deletePostData(post);
+        var snapshot = deletionArchiveService.record(post, member, normalizedReason == null ? "직접 삭제" : normalizedReason);
+        deletePostData(post, deletionArchiveService.archivedStoredNames(snapshot.getId()));
         auditLogService.record(member.getStudentId(), "COMMUNITY_POST_DELETE", "COMMUNITY_POST", String.valueOf(id), detail, null);
     }
 
@@ -957,7 +957,7 @@ public class CommunityService {
         CommunityPostImage img = imageRepository.findById(imageId)
                 .filter(i -> i.getPostId().equals(postId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        storageService.delete(img.getStoredName());
+        deleteStoredFile(img.getStoredName(), Set.of());
         imageRepository.delete(img);
     }
 
@@ -1109,8 +1109,12 @@ public class CommunityService {
     }
 
     private void clearImage(CommunityPost post) {
+        clearImage(post, Set.of());
+    }
+
+    private void clearImage(CommunityPost post, Set<String> preservedStoredNames) {
         if (post.getImageStoredName() != null) {
-            storageService.delete(post.getImageStoredName());
+            deleteStoredFile(post.getImageStoredName(), preservedStoredNames);
         }
         post.setImageStoredName(null);
         post.setImageOriginalName(null);
@@ -1118,8 +1122,12 @@ public class CommunityService {
     }
 
     private void clearExtraImages(Long postId) {
+        clearExtraImages(postId, Set.of());
+    }
+
+    private void clearExtraImages(Long postId, Set<String> preservedStoredNames) {
         List<CommunityPostImage> images = imageRepository.findByPostIdOrderByPositionAsc(postId);
-        images.forEach(image -> storageService.delete(image.getStoredName()));
+        images.forEach(image -> deleteStoredFile(image.getStoredName(), preservedStoredNames));
         imageRepository.deleteByPostId(postId);
         List<CommunityPostVideo> videos = videoRepository.findByPostIdOrderByPositionAsc(postId);
         videos.forEach(video -> storageService.delete(video.getStoredName()));
@@ -1465,12 +1473,23 @@ public class CommunityService {
     }
 
     private void deletePostData(CommunityPost post) {
-        clearImage(post);
-        clearExtraImages(post.getId());
+        deletePostData(post, Set.of());
+    }
+
+    private void deletePostData(CommunityPost post, Set<String> preservedStoredNames) {
+        clearImage(post, preservedStoredNames);
+        clearExtraImages(post.getId(), preservedStoredNames);
         pollVoteRepository.deleteByPostId(post.getId());
         voteRepository.deleteByPost(post);
         commentRepository.deleteByPostId(post.getId());
         communityPostRepository.delete(post);
+    }
+
+    private void deleteStoredFile(String storedName, Set<String> preservedStoredNames) {
+        if (storedName == null || preservedStoredNames.contains(storedName) || deletionArchiveService.isArchivedStoredName(storedName)) {
+            return;
+        }
+        storageService.delete(storedName);
     }
 
     private record PollDefinition(String pollId, int optionCount, LocalDateTime closesAt, LocalDateTime closedAt) {
