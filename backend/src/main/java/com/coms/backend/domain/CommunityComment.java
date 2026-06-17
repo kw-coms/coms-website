@@ -68,6 +68,9 @@ public class CommunityComment {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public boolean isEdited() { return edited; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public void setEdited(boolean edited) { this.edited = edited; }
 
     public void markEdited(String content) {
         this.content = content;

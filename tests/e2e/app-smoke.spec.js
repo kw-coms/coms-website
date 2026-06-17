@@ -465,6 +465,16 @@ test('admin deleted community posts tab preserves deletion evidence', async ({ p
     contentType: 'image/png',
     body: onePixelPng,
   }))
+  await page.route('**/api/admin/community/deleted-posts/1/media/10', (route) => route.fulfill({
+    status: 200,
+    contentType: 'video/mp4',
+    body: Buffer.from('video'),
+  }))
+  await page.route('**/api/admin/community/deleted-posts/1/media/11', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/zip',
+    body: Buffer.from('zip'),
+  }))
   await page.route('**/api/admin/community/deleted-posts/1/restore', (route) => {
     if (route.request().method() !== 'POST') return route.fallback()
     restored = true
@@ -479,7 +489,7 @@ test('admin deleted community posts tab preserves deletion evidence', async ({ p
           id: 1,
           originalPostId: 77,
           title: '삭제 보관 대상',
-          content: '[{"type":"text","content":"관리자가 삭제한 게시글 원문입니다."},{"type":"image","mediaId":3,"name":"증거사진.png","width":75,"align":"center"}]',
+          content: '[{"type":"text","content":"관리자가 삭제한 게시글 원문입니다."},{"type":"image","mediaId":3,"name":"증거사진.png","width":75,"align":"center"},{"type":"poll","pollId":"poll-1","question":"점심 메뉴?","options":[{"label":"한식"},{"label":"중식"}]},{"type":"video","mediaId":4,"name":"증거영상.mp4","width":75,"align":"center"},{"type":"file","fileId":5,"name":"source.zip"}]',
           authorStudentId: '2025123456',
           authorName: '작성자',
           category: 'GENERAL',
@@ -498,6 +508,45 @@ test('admin deleted community posts tab preserves deletion evidence', async ({ p
               originalName: '증거사진.png',
             },
           ],
+          videoInfos: [
+            {
+              id: 10,
+              originalMediaId: 4,
+              kind: 'VIDEO',
+              url: '/api/admin/community/deleted-posts/1/media/10',
+              originalName: '증거영상.mp4',
+            },
+          ],
+          fileInfos: [
+            {
+              id: 11,
+              originalMediaId: 5,
+              kind: 'FILE',
+              url: '/api/admin/community/deleted-posts/1/media/11',
+              originalName: 'source.zip',
+            },
+          ],
+          commentCount: 2,
+          commentInfos: [
+            {
+              originalCommentId: 21,
+              originalParentCommentId: null,
+              authorStudentId: '2025222222',
+              authorName: '댓글러',
+              content: '삭제 전 댓글입니다.',
+              createdAt: '2026-06-15T03:10:00',
+              edited: false,
+            },
+            {
+              originalCommentId: 22,
+              originalParentCommentId: 21,
+              authorStudentId: '2025123456',
+              authorName: '작성자',
+              content: '삭제 전 답글입니다.',
+              createdAt: '2026-06-15T03:12:00',
+              edited: true,
+            },
+          ],
           restoredPostId: null,
           restoredAt: null,
         },
@@ -512,8 +561,15 @@ test('admin deleted community posts tab preserves deletion evidence', async ({ p
   await expect(page.getByRole('heading', { name: '커뮤니티 삭제 보관함' })).toBeVisible()
   await expect(page.getByText('삭제 보관 대상')).toBeVisible()
   await expect(page.getByText('관리자가 삭제한 게시글 원문입니다.')).toBeVisible()
+  await expect(page.getByText('투표: 점심 메뉴?')).toBeVisible()
+  await expect(page.getByText('한식 · 중식')).toBeVisible()
   await expect(page.getByRole('img', { name: '증거사진.png' })).toBeVisible()
-  await expect(page.getByText('작성자(2025123456)')).toBeVisible()
+  await expect(page.getByText('증거영상.mp4')).toBeVisible()
+  await expect(page.getByRole('link', { name: /source\.zip/ })).toBeVisible()
+  await expect(page.getByText('댓글 2개 보관됨')).toBeVisible()
+  await expect(page.getByText('삭제 전 댓글입니다.')).toBeVisible()
+  await expect(page.getByText('삭제 전 답글입니다.')).toBeVisible()
+  await expect(page.getByRole('cell', { name: '작성자(2025123456)', exact: true })).toBeVisible()
   await expect(page.getByText('관리자(2020123456)')).toBeVisible()
   await expect(page.getByText('운영 규칙 위반')).toBeVisible()
   await page.getByRole('button', { name: '되돌리기' }).click()

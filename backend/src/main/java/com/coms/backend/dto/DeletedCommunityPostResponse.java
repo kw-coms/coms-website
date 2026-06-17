@@ -20,10 +20,24 @@ public record DeletedCommunityPostResponse(
         String deletionReason,
         LocalDateTime deletedAt,
         List<ImageInfo> imageInfos,
+        List<MediaInfo> videoInfos,
+        List<MediaInfo> fileInfos,
+        long commentCount,
+        List<CommentInfo> commentInfos,
         Long restoredPostId,
         String restoredByStudentId,
         String restoredByName,
         LocalDateTime restoredAt
 ) {
     public record ImageInfo(Long id, Long originalImageId, String kind, String url, String originalName) {}
+    public record MediaInfo(Long id, Long originalMediaId, String kind, String url, String originalName) {}
+    public record CommentInfo(
+            Long originalCommentId,
+            Long originalParentCommentId,
+            String authorStudentId,
+            String authorName,
+            String content,
+            LocalDateTime createdAt,
+            boolean edited
+    ) {}
 }
