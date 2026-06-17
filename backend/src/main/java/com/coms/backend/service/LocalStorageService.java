@@ -10,7 +10,10 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.awt.Color;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -20,10 +23,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Iterator;
 import java.util.UUID;
 
 @Service
 public class LocalStorageService implements StorageService {
+
+    /** Reject images whose decoded pixel count would exceed this, to bound heap use (decompression bomb). */
+    private static final long MAX_PIXELS = 50L * 1024 * 1024; // 50 megapixels
 
     private final Path root;
 
@@ -62,7 +69,9 @@ public class LocalStorageService implements StorageService {
 
         byte[] sanitized = stripImageMetadata(file, contentType);
         if (sanitized == null) {
-            // Format cannot be safely re-encoded (e.g. animated GIF, WebP) — store the raw bytes.
+            // ImageIO has no safe re-encoder for this format (GIF, WebP) so metadata cannot be
+            // stripped here; the raw bytes — including any EXIF/XMP — are stored as-is. Callers
+            // requiring the stripping guarantee must restrict uploads to JPEG/PNG at the API layer.
             return store(file);
         }
 
@@ -78,8 +87,10 @@ public class LocalStorageService implements StorageService {
 
     /**
      * Decodes the image to a pixel buffer and re-encodes it, dropping every metadata block
-     * (EXIF GPS coordinates, camera/device identifiers, timestamps). Returns {@code null} for
-     * formats ImageIO cannot losslessly re-write so the caller can fall back to a raw copy.
+     * (EXIF GPS coordinates, camera/device identifiers, timestamps). The header dimensions are
+     * checked before the full decode so an attacker cannot exhaust heap with a small file that
+     * expands to a huge pixel buffer (decompression bomb). Returns {@code null} for formats ImageIO
+     * cannot losslessly re-write so the caller can fall back to a raw copy.
      */
     private byte[] stripImageMetadata(MultipartFile file, String contentType) throws IOException {
         String format = reencodeFormat(contentType);
@@ -87,8 +98,26 @@ public class LocalStorageService implements StorageService {
             return null;
         }
         BufferedImage image;
-        try (InputStream in = file.getInputStream()) {
-            image = ImageIO.read(in);
+        try (InputStream in = file.getInputStream();
+             ImageInputStream iis = ImageIO.createImageInputStream(in)) {
+            if (iis == null) {
+                return null;
+            }
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(iis);
+            if (!readers.hasNext()) {
+                return null;
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(iis, true, true);
+                long pixels = (long) reader.getWidth(0) * reader.getHeight(0);
+                if (pixels > MAX_PIXELS) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image dimensions are too large.");
+                }
+                image = reader.read(0);
+            } finally {
+                reader.dispose();
+            }
         }
         if (image == null) {
             return null;
@@ -97,9 +126,12 @@ public class LocalStorageService implements StorageService {
         if ("jpg".equals(format) && image.getColorModel().hasAlpha()) {
             // JPEG has no alpha channel; flatten onto white to avoid a corrupt write.
             target = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
-            java.awt.Graphics2D g = target.createGraphics();
-            g.drawImage(image, 0, 0, Color.WHITE, null);
-            g.dispose();
+            Graphics2D g = target.createGraphics();
+            try {
+                g.drawImage(image, 0, 0, Color.WHITE, null);
+            } finally {
+                g.dispose();
+            }
         }
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         if (!ImageIO.write(target, format, out)) {
