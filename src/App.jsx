@@ -1012,6 +1012,8 @@ function NotificationButton({ alignLeft = false, padded = false }) {
     const safeAcceptUrl = typeof item.acceptUrl === 'string' && /^https?:\/\//i.test(item.acceptUrl)
     if (safeAcceptUrl) {
       window.open(item.acceptUrl, '_blank', 'noopener,noreferrer')
+    } else if (item.type === 'COMMUNITY_POST_DELETED') {
+      navigate('/community?view=deleted')
     } else if (item.noticeId) {
       navigate(`/notices/${item.noticeId}`)
     } else if (item.postId) {

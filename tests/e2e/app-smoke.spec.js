@@ -610,6 +610,77 @@ test('admin deleted community posts tab preserves deletion evidence', async ({ p
   await expect(page.getByRole('link', { name: '#88 열기' })).toHaveAttribute('href', '/community/88')
 })
 
+test('community exposes my deleted posts and restore appeal for members', async ({ page }) => {
+  let appealPayload = null
+  await page.route('**/api/auth/me', (route) => route.fulfill({
+    status: 200,
+    json: {
+      id: 2,
+      name: '작성자',
+      studentId: '2025123456',
+      role: 'USER',
+      emailVerified: true,
+    },
+  }))
+  await page.route('**/api/auth/refresh', (route) => route.fulfill({ status: 204 }))
+  await page.route('**/api/community/posts/deleted/me', (route) => route.fulfill({
+    status: 200,
+    json: [
+      {
+        id: 5,
+        originalPostId: 77,
+        title: '삭제된 질문',
+        content: '원문 질문 내용입니다.',
+        authorStudentId: '2025123456',
+        authorName: '작성자',
+        category: 'QUESTION',
+        deletedByStudentId: '2020123456',
+        deletedByName: '관리자',
+        deletionReason: '중복 게시글로 판단',
+        deletedAt: '2026-06-18T04:30:00',
+        commentCount: 1,
+        commentInfos: [{ authorName: '댓글러', content: '댓글 증거', createdAt: '2026-06-18T04:00:00' }],
+        imageInfos: [],
+        videoInfos: [],
+        fileInfos: [],
+        restoredPostId: null,
+        restoredAt: null,
+        latestAppealStatus: null,
+      },
+    ],
+  }))
+  await page.route('**/api/community/posts/deleted/5/appeals', async (route) => {
+    appealPayload = await route.request().postDataJSON()
+    return route.fulfill({
+      status: 201,
+      json: {
+        id: 9,
+        deletedPostId: 5,
+        requesterStudentId: '2025123456',
+        requesterName: '작성자',
+        message: appealPayload.message,
+        status: 'OPEN',
+        createdAt: '2026-06-18T04:40:00',
+      },
+    })
+  })
+  await page.route('**/api/community/posts', (route) => route.fulfill({ status: 200, json: [] }))
+
+  await page.goto('/community?view=deleted')
+
+  await expect(page.getByRole('heading', { name: '내 삭제 기록' })).toBeVisible()
+  await expect(page.getByText('삭제된 질문')).toBeVisible()
+  await expect(page.getByText('중복 게시글로 판단')).toBeVisible()
+  await expect(page.getByText('관리자(2020123456)')).toBeVisible()
+  await expect(page.getByText('원문 질문 내용입니다.')).toBeVisible()
+  await page.getByRole('button', { name: '복원 요청' }).click()
+  await page.getByPlaceholder('복원이 필요한 이유를 적어주세요.').fill('삭제 기준을 다시 확인해주세요.')
+  await page.getByRole('button', { name: '요청 보내기' }).click()
+
+  expect(appealPayload).toEqual({ message: '삭제 기준을 다시 확인해주세요.' })
+  await expect(page.getByText('복원 요청 접수됨', { exact: true })).toBeVisible()
+})
+
 test('admin tracks recruit applications from overview to status update', async ({ page }) => {
   await mockAdminApis(page)
   let savedStatus = 'RECEIVED'

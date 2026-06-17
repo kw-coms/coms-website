@@ -5,11 +5,14 @@ import com.coms.backend.domain.CommunityComment;
 import com.coms.backend.domain.CommunityPostFile;
 import com.coms.backend.domain.CommunityPostImage;
 import com.coms.backend.domain.CommunityPostVideo;
+import com.coms.backend.domain.DeletedCommunityPostAppeal;
 import com.coms.backend.domain.DeletedCommunityPost;
 import com.coms.backend.domain.DeletedCommunityPostComment;
 import com.coms.backend.domain.DeletedCommunityPostImage;
 import com.coms.backend.domain.DeletedCommunityPostMedia;
 import com.coms.backend.domain.Member;
+import com.coms.backend.dto.DeletedCommunityPostAppealRequest;
+import com.coms.backend.dto.DeletedCommunityPostAppealResponse;
 import com.coms.backend.dto.DeletedCommunityPostResponse;
 import com.coms.backend.dto.DeletedCommunityPostRestoreResponse;
 import com.coms.backend.repository.CommunityCommentRepository;
@@ -18,6 +21,7 @@ import com.coms.backend.repository.CommunityPostImageRepository;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVideoRepository;
 import com.coms.backend.repository.DeletedCommunityPostCommentRepository;
+import com.coms.backend.repository.DeletedCommunityPostAppealRepository;
 import com.coms.backend.repository.DeletedCommunityPostImageRepository;
 import com.coms.backend.repository.DeletedCommunityPostMediaRepository;
 import com.coms.backend.repository.DeletedCommunityPostRepository;
@@ -35,6 +39,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +55,7 @@ public class CommunityDeletionArchiveService {
     private final DeletedCommunityPostImageRepository deletedImageRepository;
     private final DeletedCommunityPostMediaRepository deletedMediaRepository;
     private final DeletedCommunityPostCommentRepository deletedCommentRepository;
+    private final DeletedCommunityPostAppealRepository deletedAppealRepository;
     private final CommunityPostRepository communityPostRepository;
     private final CommunityPostImageRepository imageRepository;
     private final CommunityPostVideoRepository videoRepository;
@@ -64,6 +70,7 @@ public class CommunityDeletionArchiveService {
                                            DeletedCommunityPostImageRepository deletedImageRepository,
                                            DeletedCommunityPostMediaRepository deletedMediaRepository,
                                            DeletedCommunityPostCommentRepository deletedCommentRepository,
+                                           DeletedCommunityPostAppealRepository deletedAppealRepository,
                                            CommunityPostRepository communityPostRepository,
                                            CommunityPostImageRepository imageRepository,
                                            CommunityPostVideoRepository videoRepository,
@@ -77,6 +84,7 @@ public class CommunityDeletionArchiveService {
         this.deletedImageRepository = deletedImageRepository;
         this.deletedMediaRepository = deletedMediaRepository;
         this.deletedCommentRepository = deletedCommentRepository;
+        this.deletedAppealRepository = deletedAppealRepository;
         this.communityPostRepository = communityPostRepository;
         this.imageRepository = imageRepository;
         this.videoRepository = videoRepository;
@@ -117,9 +125,51 @@ public class CommunityDeletionArchiveService {
 
     @Transactional(readOnly = true)
     public List<DeletedCommunityPostResponse> recent(int limit) {
-        return repository.findAllByOrderByDeletedAtDesc(PageRequest.of(0, boundedLimit(limit))).stream()
-                .map(this::toResponse)
-                .toList();
+        return toResponses(repository.findAllByOrderByDeletedAtDesc(PageRequest.of(0, boundedLimit(limit))),
+                "/api/admin/community/deleted-posts");
+    }
+
+    @Transactional(readOnly = true)
+    public List<DeletedCommunityPostResponse> mine(String studentId) {
+        return toResponses(repository.findByAuthorStudentIdOrderByDeletedAtDesc(studentId),
+                "/api/community/posts/deleted");
+    }
+
+    @Transactional
+    public DeletedCommunityPostAppealResponse requestRestore(Long deletedPostId,
+                                                             String requesterStudentId,
+                                                             DeletedCommunityPostAppealRequest request) {
+        Member requester = memberRepository.findByStudentId(requesterStudentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        DeletedCommunityPost snapshot = repository.findById(deletedPostId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!snapshot.getAuthorStudentId().equals(requester.getStudentId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        if (snapshot.getRestoredPostId() != null || snapshot.getRestoredAt() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 복원된 게시글입니다.");
+        }
+        String message = normalizeAppealMessage(request == null ? null : request.message());
+        if (deletedAppealRepository.existsByDeletedPostIdAndRequesterStudentIdAndStatus(
+                snapshot.getId(), requester.getStudentId(), DeletedCommunityPostAppeal.Status.OPEN)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 열린 복원 요청이 있습니다.");
+        }
+        DeletedCommunityPostAppeal appeal = new DeletedCommunityPostAppeal();
+        appeal.setDeletedPostId(snapshot.getId());
+        appeal.setRequesterStudentId(requester.getStudentId());
+        appeal.setRequesterName(requester.getName());
+        appeal.setMessage(message);
+        DeletedCommunityPostAppeal saved = deletedAppealRepository.save(appeal);
+        auditLogService.record(requester.getStudentId(), "COMMUNITY_POST_RESTORE_REQUEST", "DELETED_COMMUNITY_POST",
+                String.valueOf(snapshot.getId()),
+                String.join("\n",
+                        "originalPostId=" + snapshot.getOriginalPostId(),
+                        "title=" + snapshot.getTitle(),
+                        "deletedBy=" + snapshot.getDeletedByName() + "(" + snapshot.getDeletedByStudentId() + ")",
+                        "message=" + message
+                ),
+                null);
+        return toAppealResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -148,6 +198,18 @@ public class CommunityDeletionArchiveService {
     }
 
     @Transactional(readOnly = true)
+    public DeletedCommunityPostImage loadOwnImageMeta(Long deletedPostId, Long imageId, String studentId) {
+        requireAuthor(deletedPostId, studentId);
+        return loadImageMeta(deletedPostId, imageId);
+    }
+
+    @Transactional(readOnly = true)
+    public Resource loadOwnImage(Long deletedPostId, Long imageId, String studentId) {
+        loadOwnImageMeta(deletedPostId, imageId, studentId);
+        return loadImage(deletedPostId, imageId);
+    }
+
+    @Transactional(readOnly = true)
     public Resource loadImage(Long deletedPostId, Long imageId) {
         DeletedCommunityPostImage image = loadImageMeta(deletedPostId, imageId);
         return storageService.load(image.getStoredName());
@@ -158,6 +220,18 @@ public class CommunityDeletionArchiveService {
         return deletedMediaRepository.findById(mediaId)
                 .filter(media -> media.getDeletedPostId().equals(deletedPostId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true)
+    public DeletedCommunityPostMedia loadOwnMediaMeta(Long deletedPostId, Long mediaId, String studentId) {
+        requireAuthor(deletedPostId, studentId);
+        return loadMediaMeta(deletedPostId, mediaId);
+    }
+
+    @Transactional(readOnly = true)
+    public Resource loadOwnMedia(Long deletedPostId, Long mediaId, String studentId) {
+        loadOwnMediaMeta(deletedPostId, mediaId, studentId);
+        return loadMedia(deletedPostId, mediaId);
     }
 
     @Transactional(readOnly = true)
@@ -344,13 +418,22 @@ public class CommunityDeletionArchiveService {
         }
     }
 
-    private DeletedCommunityPostResponse toResponse(DeletedCommunityPost snapshot) {
+    private List<DeletedCommunityPostResponse> toResponses(List<DeletedCommunityPost> snapshots, String mediaBasePath) {
+        Map<Long, DeletedCommunityPostAppeal> latestAppeals = latestAppeals(snapshots.stream().map(DeletedCommunityPost::getId).toList());
+        return snapshots.stream()
+                .map(snapshot -> toResponse(snapshot, mediaBasePath, latestAppeals.get(snapshot.getId())))
+                .toList();
+    }
+
+    private DeletedCommunityPostResponse toResponse(DeletedCommunityPost snapshot,
+                                                    String mediaBasePath,
+                                                    DeletedCommunityPostAppeal latestAppeal) {
         List<DeletedCommunityPostResponse.ImageInfo> imageInfos = deletedImageRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId()).stream()
                 .map(image -> new DeletedCommunityPostResponse.ImageInfo(
                         image.getId(),
                         image.getOriginalImageId(),
                         image.getKind(),
-                        "/api/admin/community/deleted-posts/" + snapshot.getId() + "/images/" + image.getId(),
+                        mediaBasePath + "/" + snapshot.getId() + "/images/" + image.getId(),
                         image.getOriginalName()
                 ))
                 .toList();
@@ -360,7 +443,7 @@ public class CommunityDeletionArchiveService {
                         media.getId(),
                         media.getOriginalMediaId(),
                         media.getKind(),
-                        "/api/admin/community/deleted-posts/" + snapshot.getId() + "/media/" + media.getId(),
+                        mediaBasePath + "/" + snapshot.getId() + "/media/" + media.getId(),
                         media.getOriginalName()
                 ))
                 .toList();
@@ -370,7 +453,7 @@ public class CommunityDeletionArchiveService {
                         media.getId(),
                         media.getOriginalMediaId(),
                         media.getKind(),
-                        "/api/admin/community/deleted-posts/" + snapshot.getId() + "/media/" + media.getId(),
+                        mediaBasePath + "/" + snapshot.getId() + "/media/" + media.getId(),
                         media.getOriginalName()
                 ))
                 .toList();
@@ -410,7 +493,59 @@ public class CommunityDeletionArchiveService {
                 snapshot.getRestoredPostId(),
                 snapshot.getRestoredByStudentId(),
                 snapshot.getRestoredByName(),
-                snapshot.getRestoredAt()
+                snapshot.getRestoredAt(),
+                latestAppeal == null ? null : latestAppeal.getStatus().name(),
+                latestAppeal == null ? null : latestAppeal.getRequesterStudentId(),
+                latestAppeal == null ? null : latestAppeal.getRequesterName(),
+                latestAppeal == null ? null : latestAppeal.getMessage(),
+                latestAppeal == null ? null : latestAppeal.getCreatedAt(),
+                latestAppeal == null ? null : latestAppeal.getResolutionNote(),
+                latestAppeal == null ? null : latestAppeal.getResolvedAt()
+        );
+    }
+
+    private Map<Long, DeletedCommunityPostAppeal> latestAppeals(Collection<Long> deletedPostIds) {
+        if (deletedPostIds == null || deletedPostIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, DeletedCommunityPostAppeal> latest = new HashMap<>();
+        for (DeletedCommunityPostAppeal appeal : deletedAppealRepository.findByDeletedPostIdInOrderByCreatedAtDesc(deletedPostIds)) {
+            latest.putIfAbsent(appeal.getDeletedPostId(), appeal);
+        }
+        return latest;
+    }
+
+    private DeletedCommunityPost requireAuthor(Long deletedPostId, String studentId) {
+        DeletedCommunityPost snapshot = repository.findById(deletedPostId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!snapshot.getAuthorStudentId().equals(studentId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        return snapshot;
+    }
+
+    private String normalizeAppealMessage(String value) {
+        String normalized = value == null ? "" : value.trim().replaceAll("\\s+", " ");
+        if (normalized.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "복원 요청 사유를 입력해주세요.");
+        }
+        if (normalized.length() > 500) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "복원 요청 사유는 500자 이하로 입력해주세요.");
+        }
+        return normalized;
+    }
+
+    private DeletedCommunityPostAppealResponse toAppealResponse(DeletedCommunityPostAppeal appeal) {
+        return new DeletedCommunityPostAppealResponse(
+                appeal.getId(),
+                appeal.getDeletedPostId(),
+                appeal.getRequesterStudentId(),
+                appeal.getRequesterName(),
+                appeal.getMessage(),
+                appeal.getStatus().name(),
+                appeal.getCreatedAt(),
+                appeal.getResolvedAt(),
+                appeal.getResolutionNote()
         );
     }
 
