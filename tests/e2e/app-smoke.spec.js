@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { Buffer } from 'node:buffer'
 import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
 
 const routeExpectations = [
@@ -454,26 +455,56 @@ test('admin community reports tab resolves open reports', async ({ page }) => {
 
 test('admin deleted community posts tab preserves deletion evidence', async ({ page }) => {
   await mockAdminApis(page)
-  await page.route('**/api/admin/community/deleted-posts**', (route) => route.fulfill({
+  const onePixelPng = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+    'base64',
+  )
+  let restored = false
+  await page.route('**/api/admin/community/deleted-posts/1/images/9', (route) => route.fulfill({
     status: 200,
-    json: [
-      {
-        id: 1,
-        originalPostId: 77,
-        title: '삭제 보관 대상',
-        content: '관리자가 삭제한 게시글 원문입니다.',
-        authorStudentId: '2025123456',
-        authorName: '작성자',
-        category: 'GENERAL',
-        deletedByStudentId: '2020123456',
-        deletedByName: '관리자',
-        deletedByRole: 'ADMIN',
-        deletionReason: '운영 규칙 위반',
-        originalCreatedAt: '2026-06-15T03:00:00',
-        deletedAt: '2026-06-15T03:31:00',
-      },
-    ],
+    contentType: 'image/png',
+    body: onePixelPng,
   }))
+  await page.route('**/api/admin/community/deleted-posts/1/restore', (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    restored = true
+    return route.fulfill({ status: 200, json: { restoredPostId: 88 } })
+  })
+  await page.route('**/api/admin/community/deleted-posts**', (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    return route.fulfill({
+      status: 200,
+      json: [
+        {
+          id: 1,
+          originalPostId: 77,
+          title: '삭제 보관 대상',
+          content: '[{"type":"text","content":"관리자가 삭제한 게시글 원문입니다."},{"type":"image","mediaId":3,"name":"증거사진.png","width":75,"align":"center"}]',
+          authorStudentId: '2025123456',
+          authorName: '작성자',
+          category: 'GENERAL',
+          deletedByStudentId: '2020123456',
+          deletedByName: '관리자',
+          deletedByRole: 'ADMIN',
+          deletionReason: '운영 규칙 위반',
+          originalCreatedAt: '2026-06-15T03:00:00',
+          deletedAt: '2026-06-15T03:31:00',
+          imageInfos: [
+            {
+              id: 9,
+              originalImageId: 3,
+              kind: 'INLINE',
+              url: '/api/admin/community/deleted-posts/1/images/9',
+              originalName: '증거사진.png',
+            },
+          ],
+          restoredPostId: null,
+          restoredAt: null,
+        },
+      ],
+    })
+  })
+  page.on('dialog', (dialog) => dialog.accept())
 
   await page.goto('/admin')
   await page.getByRole('button', { name: '삭제 보관함' }).click()
@@ -481,9 +512,14 @@ test('admin deleted community posts tab preserves deletion evidence', async ({ p
   await expect(page.getByRole('heading', { name: '커뮤니티 삭제 보관함' })).toBeVisible()
   await expect(page.getByText('삭제 보관 대상')).toBeVisible()
   await expect(page.getByText('관리자가 삭제한 게시글 원문입니다.')).toBeVisible()
+  await expect(page.getByRole('img', { name: '증거사진.png' })).toBeVisible()
   await expect(page.getByText('작성자(2025123456)')).toBeVisible()
   await expect(page.getByText('관리자(2020123456)')).toBeVisible()
   await expect(page.getByText('운영 규칙 위반')).toBeVisible()
+  await page.getByRole('button', { name: '되돌리기' }).click()
+  await expect.poll(() => restored).toBe(true)
+  await expect(page.getByText('복원됨')).toBeVisible()
+  await expect(page.getByRole('link', { name: '#88 열기' })).toHaveAttribute('href', '/community/88')
 })
 
 test('admin tracks recruit applications from overview to status update', async ({ page }) => {
