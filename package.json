@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "node tests/communityExperience.test.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "e2e": "npm run build && playwright test",
