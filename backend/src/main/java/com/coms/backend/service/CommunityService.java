@@ -104,7 +104,8 @@ public class CommunityService {
     private final CommunityPollVoteRepository pollVoteRepository;
     private final HttpClient httpClient;
     private final String youtubeApiKey;
-    private final String anonymousSalt;
+    private final byte[] anonymousTagKey;
+    private static final String IP_TAG_CONTEXT = "coms-anonymous-ip-tag-v1";
 
     public CommunityService(CommunityPostRepository communityPostRepository,
                             CommunityPostVoteRepository voteRepository,
@@ -118,7 +119,8 @@ public class CommunityService {
                             AuditLogService auditLogService,
                             CommunityPollVoteRepository pollVoteRepository,
                             @Value("${youtube.api-key:}") String youtubeApiKey,
-                            @Value("${community.anonymous-salt:${jwt.secret:coms-anonymous-display-salt}}") String anonymousSalt) {
+                            @Value("${community.anonymous-salt:}") String anonymousSalt,
+                            @Value("${jwt.secret:}") String jwtSecret) {
         this.communityPostRepository = communityPostRepository;
         this.voteRepository = voteRepository;
         this.memberRepository = memberRepository;
@@ -132,8 +134,26 @@ public class CommunityService {
         this.pollVoteRepository = pollVoteRepository;
         this.httpClient = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(3)).build();
         this.youtubeApiKey = youtubeApiKey == null ? "" : youtubeApiKey.trim();
-        this.anonymousSalt = anonymousSalt == null || anonymousSalt.isBlank()
-                ? "coms-anonymous-display-salt" : anonymousSalt;
+        this.anonymousTagKey = resolveAnonymousTagKey(anonymousSalt, jwtSecret);
+    }
+
+    /**
+     * Resolves the HMAC key used to tag anonymous posters. A dedicated {@code community.anonymous-salt}
+     * is used as-is. Otherwise a separate key is derived from {@code jwt.secret} via HMAC over a fixed
+     * context label, so the signing secret is never reused directly as the IP-tag key (key separation).
+     */
+    private static byte[] resolveAnonymousTagKey(String anonymousSalt, String jwtSecret) {
+        if (anonymousSalt != null && !anonymousSalt.isBlank()) {
+            return anonymousSalt.getBytes(StandardCharsets.UTF_8);
+        }
+        String base = jwtSecret == null || jwtSecret.isBlank() ? "coms-anonymous-display-salt" : jwtSecret;
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(base.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return mac.doFinal(IP_TAG_CONTEXT.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to derive anonymous tag key", e);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -561,7 +581,7 @@ public class CommunityService {
         if (ipAddress == null || ipAddress.isBlank()) return null;
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(anonymousSalt.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            mac.init(new SecretKeySpec(anonymousTagKey, "HmacSHA256"));
             byte[] digest = mac.doFinal(ipAddress.trim().getBytes(StandardCharsets.UTF_8));
             return String.format("%02x%02x", digest[0] & 0xff, digest[1] & 0xff);
         } catch (Exception e) {
