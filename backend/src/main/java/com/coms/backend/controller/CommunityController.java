@@ -2,6 +2,7 @@ package com.coms.backend.controller;
 
 import com.coms.backend.dto.CommunityCommentRequest;
 import com.coms.backend.dto.CommunityCommentResponse;
+import com.coms.backend.dto.CommunityDeleteRequest;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
 import com.coms.backend.dto.CommunityPollVoteRequest;
@@ -314,8 +315,12 @@ public class CommunityController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(Authentication authentication, @PathVariable Long id) {
-        communityService.delete(authentication.getName(), id);
+    public ResponseEntity<Void> delete(Authentication authentication,
+                                       @PathVariable Long id,
+                                       @RequestParam(required = false) String reason,
+                                       @RequestBody(required = false) CommunityDeleteRequest request) {
+        String effectiveReason = request != null ? request.reason() : reason;
+        communityService.delete(authentication.getName(), id, effectiveReason);
         return ResponseEntity.noContent().build();
     }
 
