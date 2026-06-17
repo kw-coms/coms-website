@@ -47,6 +47,10 @@ import {
 } from '../services/communityApi.js'
 import { apiUrl } from '../services/apiClient.js'
 import { useAuth } from '../contexts/useAuth.js'
+import {
+  buildDeletedPostTimeline,
+  filterAndSortCommunityPosts,
+} from '../utils/communityExperience.js'
 
 const PAGE_SIZE = 30
 const CONCEPT_POST_SCORE_THRESHOLD = 5
@@ -364,6 +368,13 @@ const CATEGORY_OPTIONS = [
   { value: 'QUESTION', label: '질문' },
   { value: 'INFO', label: '정보' },
   { value: 'ANONYMOUS', label: '익명' },
+]
+
+const SORT_OPTIONS = [
+  { value: 'latest', label: '최신순' },
+  { value: 'comments', label: '댓글 많은 순' },
+  { value: 'score', label: '추천순' },
+  { value: 'views', label: '조회순' },
 ]
 
 function categoryLabel(value) {
@@ -1849,6 +1860,7 @@ export default function Community({ onBack }) {
   const [deletedError, setDeletedError] = useState('')
   const [page, setPage] = useState(1)
   const [activeCategory, setActiveCategory] = useState('ALL')
+  const [sortMode, setSortMode] = useState('latest')
   const [searchQuery, setSearchQuery] = useState('')
   const [comments, setComments] = useState([])
   const [commentInput, setCommentInput] = useState('')
@@ -1880,24 +1892,15 @@ export default function Community({ onBack }) {
     return () => { mounted = false }
   }, [])
 
-  const indexedPosts = useMemo(
-    () => posts.map((post) => ({
-      ...post,
-      _searchKey: `${post.title} ${post.authorDisplayName || post.authorName || ''}`.toLowerCase(),
-    })).filter((post) => canSeeAnonymous || post.category !== 'ANONYMOUS'),
-    [posts, canSeeAnonymous]
+  const filteredPosts = useMemo(
+    () => filterAndSortCommunityPosts(posts, {
+      category: effectiveActiveCategory,
+      query: searchQuery,
+      sort: sortMode,
+      canSeeAnonymous,
+    }),
+    [canSeeAnonymous, effectiveActiveCategory, posts, searchQuery, sortMode],
   )
-
-  const filteredPosts = useMemo(() => {
-    const byCategory = effectiveActiveCategory === 'ALL'
-      ? indexedPosts
-      : effectiveActiveCategory === 'CONCEPT'
-        ? indexedPosts.filter(isConceptPost)
-        : indexedPosts.filter((post) => (post.category || 'GENERAL') === effectiveActiveCategory)
-    if (!searchQuery.trim()) return byCategory
-    const q = searchQuery.toLowerCase()
-    return byCategory.filter((post) => post._searchKey.includes(q))
-  }, [effectiveActiveCategory, indexedPosts, searchQuery])
   const totalPages = Math.max(1, Math.ceil(filteredPosts.length / PAGE_SIZE))
   const pageStartIndex = (page - 1) * PAGE_SIZE
   const visiblePosts = useMemo(
@@ -2609,13 +2612,36 @@ export default function Community({ onBack }) {
                         type="text"
                         value={searchQuery}
                         onChange={(e) => { setSearchQuery(e.target.value); setPage(1) }}
-                        placeholder="제목, 작성자 검색"
+                        placeholder="제목, 본문, 작성자 검색"
                         className="h-11 w-full rounded-full border border-black/10 bg-white py-2 pl-9 pr-3 text-base text-[#1d1d1f] placeholder:text-[#86868b] outline-none transition focus:ring-2 focus:ring-[#0071e3]/24 sm:h-10 sm:w-64 sm:text-sm"
                       />
                     </div>
                     <span className="rounded-full border border-black/10 bg-white px-3 py-2 text-center text-xs font-bold text-[#86868b]">
                       {filteredPosts.length.toLocaleString('ko-KR')}개
                     </span>
+                  </div>
+                </div>
+                <div className="-mx-1 overflow-x-auto pb-1">
+                  <div className="flex min-w-max items-center gap-2 px-1 text-xs font-black text-[#6e6e73]">
+                    <span className="shrink-0">정렬</span>
+                    {SORT_OPTIONS.map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => {
+                          setSortMode(item.value)
+                          setPage(1)
+                        }}
+                        className={`apple-chip min-h-9 px-3 py-1.5 ${sortMode === item.value ? 'apple-chip-active' : ''}`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                    {searchQuery.trim() && (
+                      <span className="rounded-full border border-[#3b4890]/15 bg-[#f7f9ff] px-3 py-2 text-[#3b4890]">
+                        본문까지 검색 중
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="border-t border-black/10 pt-4">
@@ -2724,6 +2750,7 @@ export default function Community({ onBack }) {
               {!deletedLoading && deletedPosts.map((record) => {
                 const restored = Boolean(record.restoredPostId)
                 const appealed = Boolean(record.latestAppealStatus)
+                const timeline = buildDeletedPostTimeline(record)
                 return (
                   <article key={record.id} className="overflow-hidden rounded-lg border border-black/10 bg-white">
                     <div className="border-b border-black/10 px-4 py-4">
@@ -2756,6 +2783,27 @@ export default function Community({ onBack }) {
                           <p className="whitespace-pre-wrap break-words text-xs text-[var(--theme-body-muted)]">
                             {(record.commentInfos || []).slice(0, 3).map((comment) => `${comment.authorName || '회원'}: ${comment.content}`).join('\n')}
                           </p>
+                        </div>
+                      )}
+                      {timeline.length > 0 && (
+                        <div>
+                          <strong className="mb-2 block text-xs text-[#3b4890]">처리 타임라인</strong>
+                          <ol className="space-y-2">
+                            {timeline.map((item, index) => (
+                              <li key={`${record.id}-${item.label}-${index}`} className="grid grid-cols-[auto_1fr] gap-2 text-xs">
+                                <span className="mt-1 size-2 rounded-full bg-[#3b4890]" aria-hidden="true" />
+                                <span className="min-w-0">
+                                  <span className="font-black text-[#1d1d1f]">{item.label}</span>
+                                  {item.time && <span className="ml-2 text-[var(--theme-body-muted)]">{item.time}</span>}
+                                  {item.detail && (
+                                    <span className="block break-words text-[var(--theme-body-muted)]">
+                                      {item.label === '삭제됨' ? '처리자는 상단 기록에 표시됩니다.' : item.detail}
+                                    </span>
+                                  )}
+                                </span>
+                              </li>
+                            ))}
+                          </ol>
                         </div>
                       )}
                       {restored ? (
