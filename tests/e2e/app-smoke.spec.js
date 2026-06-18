@@ -768,6 +768,8 @@ test('activity hub points members back to notices community and archive', async 
   await page.goto('/')
 
   await expect(page.getByRole('heading', { name: '활동 허브' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Activity log/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
   await expect(page.getByRole('heading', { name: '공지사항' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '커뮤니티' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '자료실' })).toBeVisible()
@@ -825,6 +827,54 @@ test('signed-in members see real activity records and schedule events', async ({
   await expect(page.getByText('관리자가 등록한 실제 활동 기록')).toBeVisible()
   await expect(page.getByText('운영진 등록 회의')).toBeVisible()
   await expect(page.getByText('로그인 하세요')).toHaveCount(0)
+})
+
+test('admin can add a schedule directly from the monthly calendar', async ({ page }) => {
+  await mockAdminApis(page)
+  let createdPayload = null
+  await page.route('**/api/club-activities', async (route) => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postData() || ''
+      const form = {
+        title: multipartField(body, 'title'),
+        kind: multipartField(body, 'kind'),
+        category: multipartField(body, 'category'),
+        eventDate: multipartField(body, 'eventDate'),
+        description: multipartField(body, 'description'),
+      }
+      createdPayload = form
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: 20,
+          kind: form.kind,
+          category: form.category,
+          title: form.title,
+          description: form.description,
+          eventDate: form.eventDate,
+          imageUrl: null,
+          imageOriginalName: null,
+          createdByName: '관리자',
+        },
+      })
+      return
+    }
+    await route.fulfill({ status: 200, json: [] })
+  })
+
+  await page.goto('/activities')
+  await page.getByLabel('일정 제목').fill('캘린더 직접 등록 회의')
+  await page.getByLabel('일정 날짜').fill('2026-06-24')
+  await page.getByLabel('일정 분류').selectOption('MEETING')
+  await page.getByRole('button', { name: '일정 추가' }).click()
+
+  await expect.poll(() => createdPayload).toMatchObject({
+    title: '캘린더 직접 등록 회의',
+    kind: 'SCHEDULE',
+    category: 'MEETING',
+    eventDate: '2026-06-24',
+  })
+  await expect(page.getByText('캘린더 직접 등록 회의')).toBeVisible()
 })
 
 test('admin can register a club activity record', async ({ page }) => {
