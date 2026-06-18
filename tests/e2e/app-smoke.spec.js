@@ -784,6 +784,9 @@ test('top navigation groups activity log and monthly calendar under Activity', a
   const activityMenu = page.getByRole('menu').filter({ hasText: 'Activity log' })
   await expect(activityMenu.getByRole('button', { name: /Activity log/ })).toBeVisible()
   await expect(activityMenu.getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
+  const activityMenuBox = await activityMenu.boundingBox()
+  const activityLogBox = await activityMenu.getByRole('button', { name: /Activity log/ }).boundingBox()
+  expect(activityLogBox.width).toBeGreaterThanOrEqual((activityMenuBox.width || 0) - 2)
   await activityMenu.getByRole('button', { name: /Activity log/ }).click()
   await expect(page).toHaveURL(/\/activity-log$/)
   await page.goto('/')
@@ -870,6 +873,17 @@ test('signed-in members see real activity records and schedule events', async ({
         imageOriginalName: null,
         createdByName: '관리자',
       },
+      {
+        id: 3,
+        kind: 'SCHEDULE',
+        category: 'PROJECT',
+        title: '다음 해 프로젝트 발표회',
+        description: '',
+        eventDate: '2027-07-15',
+        imageUrl: null,
+        imageOriginalName: null,
+        createdByName: '관리자',
+      },
     ],
   }))
 
@@ -881,6 +895,12 @@ test('signed-in members see real activity records and schedule events', async ({
 
   await page.goto('/monthly-calendar')
   await expect(page.getByText('운영진 등록 회의')).toBeVisible()
+  await expect(page.getByText('다음 해 프로젝트 발표회')).toHaveCount(0)
+  await page.getByLabel('년도 선택').fill('2027')
+  await page.getByLabel('월 선택', { exact: true }).selectOption({ label: '7월' })
+  await expect(page.getByText('2027년 7월')).toBeVisible()
+  await expect(page.getByText('다음 해 프로젝트 발표회')).toBeVisible()
+  await expect(page.getByText('운영진 등록 회의')).toHaveCount(0)
   await expect(page.getByText('로그인 하세요')).toHaveCount(0)
 })
 
