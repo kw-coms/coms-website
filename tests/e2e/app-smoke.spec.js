@@ -764,15 +764,24 @@ test('admin tracks recruit applications from overview to status update', async (
   await expect(page.locator('article').filter({ hasText: '김지원' }).locator('span').filter({ hasText: '검토중' })).toBeVisible()
 })
 
-test('activity hub points members back to notices community and archive', async ({ page }) => {
+test('top navigation exposes activity log and monthly calendar outside the home hub', async ({ page }) => {
   await page.goto('/')
 
+  const desktopNav = page.locator('header nav').first()
+  await expect(desktopNav.getByRole('button', { name: 'Activity log' })).toBeVisible()
+  await expect(desktopNav.getByRole('button', { name: 'Monthly calendar' })).toBeVisible()
+
   await expect(page.getByRole('heading', { name: '활동 허브' })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Activity log/ })).toBeVisible()
-  await expect(page.getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
+  await expect(page.locator('section').filter({ has: page.getByRole('heading', { name: '활동 허브' }) }).getByRole('button', { name: /Activity log/ })).toHaveCount(0)
+  await expect(page.locator('section').filter({ has: page.getByRole('heading', { name: '활동 허브' }) }).getByRole('button', { name: /Monthly calendar/ })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '공지사항' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '커뮤니티' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '자료실' })).toBeVisible()
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByLabel('메뉴 열기').click()
+  await expect(page.getByRole('menu').getByRole('button', { name: /Activity log/ })).toBeVisible()
+  await expect(page.getByRole('menu').getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
 })
 
 test('activity records and calendar are locked for guests without dummy content', async ({ page }) => {
