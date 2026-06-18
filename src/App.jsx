@@ -501,8 +501,7 @@ const activitySectionNavItems = [
     id: 'activity-log',
     label: 'Activity log',
     hint: '활동 기록',
-    path: '/activities',
-    hash: '#activity-log',
+    path: '/activity-log',
     icon: Sparkles,
     accent: 'text-rose-400',
   },
@@ -510,8 +509,7 @@ const activitySectionNavItems = [
     id: 'monthly-calendar',
     label: 'Monthly calendar',
     hint: '월별 일정',
-    path: '/activities',
-    hash: '#monthly-calendar',
+    path: '/monthly-calendar',
     icon: CalendarDays,
     accent: 'text-sky-500',
   },
@@ -524,6 +522,8 @@ function getTabRoute(id) {
 function getActiveNavKey(pathname) {
   if (pathname === '/about') return 'about'
   if (pathname === '/activities') return 'activities'
+  if (pathname === '/activity-log') return 'activity-log'
+  if (pathname === '/monthly-calendar') return 'monthly-calendar'
   if (pathname === '/projects') return 'projects'
   if (pathname.startsWith('/recruit')) return 'recruit'
   if (pathname.startsWith('/notices')) return 'notices'
@@ -1483,6 +1483,8 @@ function App() {
         <Route path="/" element={<HomeView />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/activities" element={<ActivitiesDetailPage />} />
+        <Route path="/activity-log" element={<ActivityLogPage />} />
+        <Route path="/monthly-calendar" element={<MonthlyCalendarPage />} />
         <Route path="/projects" element={<ProjectsDetailPage />} />
         <Route path="/notices" element={<NoticesPage />} />
         <Route path="/notices/:id" element={<NoticesPage />} />
@@ -1538,6 +1540,15 @@ function ActivityLogSection({ compact = false }) {
   const navigate = useNavigate()
   const [records, setRecords] = useState(null)
   const [error, setError] = useState('')
+  const [activityForm, setActivityForm] = useState({
+    title: '',
+    eventDate: '',
+    category: 'SEMINAR',
+    description: '',
+  })
+  const [activityImage, setActivityImage] = useState(null)
+  const [savingActivity, setSavingActivity] = useState(false)
+  const [activityNotice, setActivityNotice] = useState('')
 
   useEffect(() => {
     if (authLoading || !user) {
@@ -1562,6 +1573,35 @@ function ActivityLogSection({ compact = false }) {
   const activityItems = (user ? records || [] : []).filter((item) => item.kind === 'ACTIVITY')
   const visibleItems = compact ? activityItems.slice(0, 3) : activityItems
   const isLocked = !authLoading && !user
+  const isAdmin = user?.role === 'ADMIN'
+
+  const submitActivity = async (event) => {
+    event.preventDefault()
+    if (!activityForm.title.trim() || !activityForm.eventDate) return
+    const form = event.currentTarget
+    setSavingActivity(true)
+    setActivityNotice('')
+    setError('')
+    try {
+      const created = await createClubActivity({
+        kind: 'ACTIVITY',
+        category: activityForm.category,
+        title: activityForm.title.trim(),
+        description: activityForm.description.trim(),
+        eventDate: activityForm.eventDate,
+        image: activityImage,
+      })
+      setRecords((prev) => [created, ...(Array.isArray(prev) ? prev : [])])
+      setActivityNotice('활동 기록을 추가했습니다.')
+      setActivityForm((prev) => ({ ...prev, title: '', eventDate: '', description: '' }))
+      setActivityImage(null)
+      form.reset()
+    } catch (err) {
+      setError(err.message || '활동 기록을 추가하지 못했습니다.')
+    } finally {
+      setSavingActivity(false)
+    }
+  }
 
   return (
     <section id="activity-log" className={`activity-proof-section ${compact ? 'activity-proof-section-compact' : ''} scroll-mt-24 bg-white px-5 py-12 sm:py-16`}>
@@ -1581,6 +1621,66 @@ function ActivityLogSection({ compact = false }) {
             </p>
           </div>
         </div>
+
+        {isAdmin && !isLocked && (
+          <form onSubmit={submitActivity} className="activity-admin-composer mt-8" aria-label="활동 기록 추가">
+            <div>
+              <p className="activity-admin-composer-title">관리자 활동 기록 작성</p>
+              <p className="activity-admin-composer-copy">세미나, 스터디, 프로젝트 발표, MT/행사, 성과 기록을 활동 로그에 바로 추가합니다.</p>
+            </div>
+            <label>
+              <span>활동 제목</span>
+              <input
+                value={activityForm.title}
+                onChange={(event) => setActivityForm((prev) => ({ ...prev, title: event.target.value }))}
+                maxLength={120}
+              />
+            </label>
+            <label>
+              <span>활동 날짜</span>
+              <input
+                type="date"
+                value={activityForm.eventDate}
+                onChange={(event) => setActivityForm((prev) => ({ ...prev, eventDate: event.target.value }))}
+              />
+            </label>
+            <label>
+              <span>활동 분류</span>
+              <select
+                value={activityForm.category}
+                onChange={(event) => setActivityForm((prev) => ({ ...prev, category: event.target.value }))}
+              >
+                {clubActivityCategories.map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>활동 사진</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => setActivityImage(event.target.files?.[0] || null)}
+              />
+            </label>
+            <label className="activity-admin-composer-wide">
+              <span>활동 내용</span>
+              <textarea
+                value={activityForm.description}
+                onChange={(event) => setActivityForm((prev) => ({ ...prev, description: event.target.value }))}
+                maxLength={500}
+                rows={3}
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={savingActivity || !activityForm.title.trim() || !activityForm.eventDate}
+            >
+              {savingActivity ? '추가 중...' : '활동 기록 추가'}
+            </button>
+            {activityNotice && <p className="activity-admin-composer-notice">{activityNotice}</p>}
+          </form>
+        )}
 
         {authLoading || loading ? (
           <div className="activity-empty-state mt-8">
@@ -1870,8 +1970,6 @@ function DetailStoryPage({
   outputsTitle,
   outputsBody = '학기마다 쌓인 활동은 다음 부원이 참고할 수 있는 자료와 경험으로 남습니다.',
   outputs,
-  showActivityLog = false,
-  showCalendar = false,
 }) {
   const navigate = useNavigate()
   const titleRef = useRef(null)
@@ -2007,9 +2105,6 @@ function DetailStoryPage({
           </div>
         </section>
 
-        {showActivityLog && <ActivityLogSection />}
-        {showCalendar && <ClubCalendarSection />}
-
         <section className="bg-white px-5 py-16 sm:py-20">
           <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.82fr_1fr] lg:items-center">
             <div>
@@ -2050,10 +2145,16 @@ function ActivitiesDetailPage() {
       flow={activitiesDetailFlow}
       outputsTitle="활동이 남기는 기록."
       outputs={activitiesDetailTopics}
-      showActivityLog
-      showCalendar
     />
   )
+}
+
+function ActivityLogPage() {
+  return <ActivityLogSection />
+}
+
+function MonthlyCalendarPage() {
+  return <ClubCalendarSection />
 }
 
 function ProjectsDetailPage() {
@@ -2343,9 +2444,6 @@ function HomeView() {
             </div>
           </div>
         </section>
-
-        <ActivityLogSection compact />
-        <ClubCalendarSection compact />
 
         <section className="bg-white px-5 py-12 sm:py-16">
           <div className="mx-auto max-w-7xl">
