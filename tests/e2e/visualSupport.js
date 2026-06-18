@@ -23,4 +23,5 @@ export async function mockAdminApis(page) {
   await page.route('**/api/admin/community/deleted-posts**', (route) => route.fulfill({ status: 200, json: [] }))
   await page.route('**/api/notifications', (route) => route.fulfill({ status: 200, json: [] }))
   await page.route('**/api/notifications/summary', (route) => route.fulfill({ status: 200, json: { unreadCount: 0 } }))
+  await page.route('**/api/club-activities', (route) => route.fulfill({ status: 200, json: [] }))
 }

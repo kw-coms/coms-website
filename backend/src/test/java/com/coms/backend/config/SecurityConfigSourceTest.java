@@ -30,6 +30,15 @@ class SecurityConfigSourceTest {
     }
 
     @Test
+    void clubActivityRecordsAreMemberReadableAndAdminWritable() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/coms/backend/config/SecurityConfig.java"));
+
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.GET, \"/api/club-activities\", \"/api/club-activities/**\").authenticated()");
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/club-activities\").hasRole(\"ADMIN\")");
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.DELETE, \"/api/club-activities/**\").hasRole(\"ADMIN\")");
+    }
+
+    @Test
     void communitySharePreviewRoutesArePublicButCommunityApiStaysPrivate() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/coms/backend/config/SecurityConfig.java"));
 
