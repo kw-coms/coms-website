@@ -68,6 +68,9 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.POST, "/api/notices").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.PUT, "/api/notices/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/notices/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/club-activities", "/api/club-activities/**").authenticated();
+                auth.requestMatchers(HttpMethod.POST, "/api/club-activities").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.DELETE, "/api/club-activities/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.GET, "/api/fonts", "/api/fonts/**").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/api/community/posts/*/share", "/api/community/posts/*/share-data", "/api/community/posts/*/share-image").permitAll();
                 auth.requestMatchers(HttpMethod.HEAD, "/api/community/posts/*/share", "/api/community/posts/*/share-data", "/api/community/posts/*/share-image").permitAll();
