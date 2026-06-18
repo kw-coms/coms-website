@@ -6,6 +6,7 @@ import {
   ArrowUpRight,
   Binary,
   Bell,
+  CalendarDays,
   ChevronDown,
   CircuitBoard,
   Grid3x3,
@@ -19,6 +20,7 @@ import {
   X,
 } from 'lucide-react'
 import { listNotices } from './services/noticeApi.js'
+import { listClubActivities } from './services/clubActivityApi.js'
 import { getNotificationSummary, listNotifications, markAllNotificationsRead, markNotificationRead } from './services/notificationApi.js'
 import { listFonts } from './services/fontApi.js'
 import { BUILT_IN_FONTS, buildFontFaceCss, fontFamilyValue, injectBuiltinFontStylesheets } from './services/fontPreferences.js'
@@ -340,6 +342,53 @@ const activitiesDetailTopics = [
   'Git, GitHub, 협업 도구를 활용한 팀 개발',
   '공모전, 해커톤, 개인 프로젝트 준비',
 ]
+
+const calendarWeekdays = ['월', '화', '수', '목', '금', '토', '일']
+
+function buildCalendarMonth(referenceDate = new Date()) {
+  const year = referenceDate.getFullYear()
+  const month = referenceDate.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const leadingBlanks = (firstDay.getDay() + 6) % 7
+  const trailingBlanks = (7 - ((leadingBlanks + daysInMonth) % 7)) % 7
+  return {
+    title: `${year}년 ${month + 1}월`,
+    year,
+    month,
+    days: Array.from({ length: daysInMonth }, (_, index) => index + 1),
+    leadingBlanks,
+    trailingBlanks,
+  }
+}
+
+function parseLocalDate(value) {
+  if (typeof value !== 'string') return null
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return null
+  return new Date(year, month - 1, day)
+}
+
+function formatActivityDate(value) {
+  const date = parseLocalDate(value)
+  if (!date) return value || ''
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
+}
+
+function categoryLabel(value) {
+  const labels = {
+    GENERAL: '일반',
+    SEMINAR: '세미나',
+    STUDY: '스터디',
+    PROJECT: '프로젝트',
+    MEETING: '회의',
+    RECRUIT: '모집',
+    EVENT: '행사',
+    MT: 'MT',
+    ACHIEVEMENT: '성과',
+  }
+  return labels[value] || value || '일반'
+}
 
 const projectsDetailCards = [
   {
@@ -1439,6 +1488,246 @@ function AboutPage() {
   )
 }
 
+function ActivityLogSection({ compact = false }) {
+  const { user, loading: authLoading } = useAuth()
+  const navigate = useNavigate()
+  const [records, setRecords] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (authLoading || !user) {
+      return undefined
+    }
+    let mounted = true
+    listClubActivities()
+      .then((data) => {
+        if (!mounted) return
+        setError('')
+        setRecords(Array.isArray(data) ? data : [])
+      })
+      .catch((err) => {
+        if (!mounted) return
+        setError(err.message || '활동 기록을 불러오지 못했습니다.')
+        setRecords([])
+      })
+    return () => { mounted = false }
+  }, [authLoading, user])
+
+  const loading = Boolean(user && records === null && !error)
+  const activityItems = (user ? records || [] : []).filter((item) => item.kind === 'ACTIVITY')
+  const visibleItems = compact ? activityItems.slice(0, 3) : activityItems
+  const isLocked = !authLoading && !user
+
+  return (
+    <section className={`activity-proof-section ${compact ? 'activity-proof-section-compact' : ''} bg-white px-5 py-12 sm:py-16`}>
+      <div className="mx-auto max-w-7xl">
+        <div className="grid gap-8 lg:grid-cols-[0.62fr_1fr] lg:items-end">
+          <div>
+            <p className="apple-eyebrow">Activity log</p>
+            <h2 className="apple-display mt-3 text-4xl sm:text-5xl">실제로 이어지는 활동 기록</h2>
+            <p className="apple-copy mt-4 max-w-2xl text-lg">
+              신입생이 가장 먼저 궁금해하는 것은 지금도 활동이 이어지는지입니다. 검증된 활동 사진과 기록이 등록되면 날짜, 활동명, 후기 흐름으로 보여줍니다.
+            </p>
+          </div>
+          <div className="activity-proof-note apple-soft-panel px-5 py-5">
+            <p className="text-sm font-semibold text-[#1d1d1f]">기록 방식</p>
+            <p className="mt-2 text-sm font-medium leading-6 text-[#6e6e73]">
+              세미나, 스터디, 프로젝트 발표, MT/행사, 수상/성과처럼 실제 확인된 항목만 활동 로그에 노출합니다.
+            </p>
+          </div>
+        </div>
+
+        {authLoading || loading ? (
+          <div className="activity-empty-state mt-8">
+            <Sparkles size={22} aria-hidden="true" />
+            <div>
+              <h3>활동 기록을 불러오는 중...</h3>
+              <p>회원 상태와 등록된 활동 기록을 확인하고 있습니다.</p>
+            </div>
+          </div>
+        ) : isLocked ? (
+          <div className="activity-empty-state activity-locked-state mt-8">
+            <Sparkles size={22} aria-hidden="true" />
+            <div>
+              <h3>로그인 하세요</h3>
+              <p>회원 로그인 후 활동 기록과 일정을 확인할 수 있습니다.</p>
+              <button type="button" onClick={() => navigate('/login')} className="apple-action-primary mt-3 inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">
+                로그인
+              </button>
+            </div>
+          </div>
+        ) : error ? (
+          <div className="activity-empty-state mt-8">
+            <Sparkles size={22} aria-hidden="true" />
+            <div>
+              <h3>활동 기록을 불러오지 못했습니다.</h3>
+              <p>{error}</p>
+            </div>
+          </div>
+        ) : visibleItems.length > 0 ? (
+          <div className="activity-log-grid mt-8">
+            {visibleItems.map((item) => (
+              <article key={item.id} className="activity-log-card activity-log-card-blue">
+                <div className={`activity-log-photo ${item.imageUrl ? 'activity-log-photo-has-image' : ''}`}>
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt="" className="activity-log-image" loading="lazy" />
+                  ) : (
+                    <>
+                      <div className="activity-log-photo-bar" aria-hidden="true">
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                      <div className="activity-log-photo-mark" aria-hidden="true">
+                        <Sparkles size={24} />
+                      </div>
+                    </>
+                  )}
+                  <div className="activity-log-photo-caption">
+                    <span>{categoryLabel(item.category)}</span>
+                    <strong>{formatActivityDate(item.eventDate)}</strong>
+                  </div>
+                </div>
+                <div className="activity-log-body">
+                  <p className="activity-log-term">{item.createdByName || 'COM\'s'}</p>
+                  <h3>{item.title}</h3>
+                  {item.description && <p>{item.description}</p>}
+                  <div className="activity-log-tags" aria-label={`${item.title} 태그`}>
+                    <span>{categoryLabel(item.category)}</span>
+                    {item.imageOriginalName && <span>사진 기록</span>}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="activity-empty-state mt-8">
+            <Sparkles size={22} aria-hidden="true" />
+            <div>
+              <h3>등록된 활동 기록이 없습니다.</h3>
+              <p>확인된 활동 사진, 후기, 성과 기록이 추가되면 이 영역에 바로 표시됩니다.</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function ClubCalendarSection({ compact = false }) {
+  const { user, loading: authLoading } = useAuth()
+  const navigate = useNavigate()
+  const [records, setRecords] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (authLoading || !user) {
+      return undefined
+    }
+    let mounted = true
+    listClubActivities()
+      .then((data) => {
+        if (!mounted) return
+        setError('')
+        setRecords(Array.isArray(data) ? data : [])
+      })
+      .catch((err) => {
+        if (!mounted) return
+        setError(err.message || '일정을 불러오지 못했습니다.')
+        setRecords([])
+      })
+    return () => { mounted = false }
+  }, [authLoading, user])
+
+  const loading = Boolean(user && records === null && !error)
+  const scheduleItems = (user ? records || [] : []).filter((item) => item.kind === 'SCHEDULE')
+  const calendarMonth = buildCalendarMonth(parseLocalDate(scheduleItems[0]?.eventDate) || new Date())
+  const eventsByDay = scheduleItems.reduce((acc, event) => {
+    const eventDate = parseLocalDate(event.eventDate)
+    if (!eventDate) return acc
+    if (eventDate.getFullYear() !== calendarMonth.year || eventDate.getMonth() !== calendarMonth.month) return acc
+    const day = eventDate.getDate()
+    acc[day] = [...(acc[day] || []), event]
+    return acc
+  }, {})
+  const isLocked = !authLoading && !user
+
+  return (
+    <section className={`club-calendar-section ${compact ? 'club-calendar-section-compact' : ''} bg-[#f5f5f7] px-5 py-12 sm:py-16`}>
+      <div className="mx-auto max-w-7xl">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="apple-eyebrow">Monthly calendar</p>
+            <h2 className="apple-display mt-3 text-4xl sm:text-5xl">동아리 일정 캘린더</h2>
+            <p className="apple-copy mt-4 max-w-2xl text-lg">
+              공지사항 목록만으로 놓치기 쉬운 정기 회의, 세미나, 스터디, 발표, 모집 마감, MT/행사를 월별 흐름으로 확인합니다.
+            </p>
+          </div>
+          <div className="club-calendar-title">
+            <CalendarDays size={18} aria-hidden="true" />
+            <span>{calendarMonth.title}</span>
+          </div>
+        </div>
+
+        <div className="club-calendar-shell mt-8">
+          <div className="club-calendar-weekdays" aria-hidden="true">
+            {calendarWeekdays.map((weekday) => (
+              <span key={weekday}>{weekday}</span>
+            ))}
+          </div>
+          <div className="club-calendar-grid">
+            {Array.from({ length: calendarMonth.leadingBlanks }, (_, index) => (
+              <div key={`leading-${index}`} className="club-calendar-day club-calendar-day-empty" aria-hidden="true" />
+            ))}
+            {calendarMonth.days.map((day) => {
+              const dayEvents = eventsByDay[day] || []
+              return (
+                <div key={day} className={`club-calendar-day ${dayEvents.length ? 'club-calendar-day-active' : ''}`}>
+                  <span className="club-calendar-day-number">{day}</span>
+                  <div className="club-calendar-events">
+                    {dayEvents.map((event) => (
+                      <span key={`${day}-${event.title}`} className={`club-calendar-event club-calendar-event-${(event.category || 'event').toLowerCase()}`}>
+                        {event.title}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+            {Array.from({ length: calendarMonth.trailingBlanks }, (_, index) => (
+              <div key={`trailing-${index}`} className="club-calendar-day club-calendar-day-empty" aria-hidden="true" />
+            ))}
+          </div>
+          {(authLoading || loading) && (
+            <div className="calendar-empty-state">
+              동아리 일정을 불러오는 중입니다.
+            </div>
+          )}
+          {isLocked && (
+            <div className="calendar-empty-state">
+              <strong>회원 전용 일정</strong>
+              <span>회원 로그인 후 월별 동아리 일정을 확인할 수 있습니다.</span>
+              <button type="button" onClick={() => navigate('/login')} className="apple-action-primary ml-2 inline-flex min-h-9 items-center justify-center px-3 py-1.5 text-xs">
+                로그인
+              </button>
+            </div>
+          )}
+          {!isLocked && !loading && error && (
+            <div className="calendar-empty-state">
+              {error}
+            </div>
+          )}
+          {!isLocked && !loading && !error && scheduleItems.length === 0 && (
+            <div className="calendar-empty-state">
+              등록된 일정이 없습니다. 실제 정기 회의, 세미나, 스터디, 프로젝트 발표, 모집 마감, MT/행사 일정이 추가되면 캘린더에 표시됩니다.
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function DetailStoryPage({
   eyebrow,
   title,
@@ -1452,6 +1741,8 @@ function DetailStoryPage({
   outputsTitle,
   outputsBody = '학기마다 쌓인 활동은 다음 부원이 참고할 수 있는 자료와 경험으로 남습니다.',
   outputs,
+  showActivityLog = false,
+  showCalendar = false,
 }) {
   const navigate = useNavigate()
   const titleRef = useRef(null)
@@ -1587,6 +1878,9 @@ function DetailStoryPage({
           </div>
         </section>
 
+        {showActivityLog && <ActivityLogSection />}
+        {showCalendar && <ClubCalendarSection />}
+
         <section className="bg-white px-5 py-16 sm:py-20">
           <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.82fr_1fr] lg:items-center">
             <div>
@@ -1627,6 +1921,8 @@ function ActivitiesDetailPage() {
       flow={activitiesDetailFlow}
       outputsTitle="활동이 남기는 기록."
       outputs={activitiesDetailTopics}
+      showActivityLog
+      showCalendar
     />
   )
 }
@@ -1918,6 +2214,9 @@ function HomeView() {
             </div>
           </div>
         </section>
+
+        <ActivityLogSection compact />
+        <ClubCalendarSection compact />
 
         <section className="bg-white px-5 py-12 sm:py-16">
           <div className="mx-auto max-w-7xl">
