@@ -112,18 +112,6 @@ const showcaseItems = [
 
 const activityHubItems = [
   {
-    title: 'Activity log',
-    body: '관리자가 등록한 실제 활동 기록과 사진을 회원에게 보여줍니다.',
-    route: '/activities',
-    cta: '활동 기록 보기',
-  },
-  {
-    title: 'Monthly calendar',
-    body: '정기 회의, 세미나, 발표, 모집 마감을 월별 일정으로 확인합니다.',
-    route: '/activities',
-    cta: '일정 보기',
-  },
-  {
     title: '공지사항',
     body: '모집, 세미나, 운영 안내를 빠르게 확인합니다.',
     route: '/notices',
@@ -508,6 +496,27 @@ const navExtraItems = [
   { id: 'community', label: 'Community', path: '/community', auth: true },
 ]
 
+const activitySectionNavItems = [
+  {
+    id: 'activity-log',
+    label: 'Activity log',
+    hint: '활동 기록',
+    path: '/activities',
+    hash: '#activity-log',
+    icon: Sparkles,
+    accent: 'text-rose-400',
+  },
+  {
+    id: 'monthly-calendar',
+    label: 'Monthly calendar',
+    hint: '월별 일정',
+    path: '/activities',
+    hash: '#monthly-calendar',
+    icon: CalendarDays,
+    accent: 'text-sky-500',
+  },
+]
+
 function getTabRoute(id) {
   return id === 'recruit' ? '/recruit' : `/${id}`
 }
@@ -729,6 +738,12 @@ function GlobalNavigation() {
   const activeKey = getActiveNavKey(location.pathname)
   const mobileTabs = tabs.slice(0, 3)
   const showMobileTabs = mobileTabs.some((tab) => tab.id === activeKey)
+  const primaryNavItems = [
+    ...tabs.slice(0, 2).map((tab) => ({ ...tab, path: getTabRoute(tab.id) })),
+    ...activitySectionNavItems,
+    ...tabs.slice(2).map((tab) => ({ ...tab, path: getTabRoute(tab.id) })),
+  ]
+  const desktopNavItems = [...primaryNavItems, ...navExtraItems]
 
   useEffect(() => {
     if (!appsOpen) return undefined
@@ -747,6 +762,15 @@ function GlobalNavigation() {
     }
   }, [appsOpen])
 
+  useEffect(() => {
+    if (!location.hash) return undefined
+    const sectionId = decodeURIComponent(location.hash.slice(1))
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ block: 'start' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [location.hash, location.pathname])
+
   const goPageTop = (to, options) => {
     scrollToTopInstant()
     navigate(to, options)
@@ -761,6 +785,15 @@ function GlobalNavigation() {
   const goProtected = (to) => {
     if (authLoading) return
     closeAndGo(to)
+  }
+
+  const goNavItem = (item) => {
+    const target = `${item.path}${item.hash || ''}`
+    if (item.auth) {
+      goProtected(target)
+      return
+    }
+    goPageTop(target)
   }
 
   const handleLogout = async () => {
@@ -790,21 +823,12 @@ function GlobalNavigation() {
           <span className="whitespace-nowrap text-sm font-bold text-[var(--app-text)]">KW COM&apos;s</span>
         </button>
 
-        <nav className="pointer-events-auto absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-6 md:flex">
-          {tabs.map((tab) => {
-            const route = getTabRoute(tab.id)
-            return (
-              <button key={tab.id} type="button" onClick={() => goPageTop(route)} className={navClass(tab.id)}>
-                {tab.label}
-                <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === tab.id ? 'opacity-100' : 'opacity-0'}`} />
-              </button>
-            )
-          })}
-          {navExtraItems.map((item) => (
+        <nav className="pointer-events-auto absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-3 lg:gap-5 md:flex">
+          {desktopNavItems.map((item) => (
             <button
               key={item.id}
               type="button"
-              onClick={() => (item.auth ? goProtected(item.path) : goPageTop(item.path))}
+              onClick={() => goNavItem(item)}
               disabled={item.auth && authLoading}
               className={`${navClass(item.id)} disabled:cursor-wait disabled:opacity-60`}
             >
@@ -902,16 +926,13 @@ function GlobalNavigation() {
           className="apple-mobile-menu-panel mx-auto md:hidden"
         >
           <div className="flex flex-col divide-y divide-[var(--app-hairline)]">
-            {tabs.map((tab) => {
-              const route = getTabRoute(tab.id)
-              return (
-                <button key={tab.id} type="button" onClick={() => closeAndGo(route)} className="apple-mobile-menu-item">
-                  <tab.icon size={15} className={tab.accent} />
-                  <span>{tab.label}</span>
-                  <span className="ml-auto text-xs text-[var(--app-muted)]">{tab.hint}</span>
-                </button>
-              )
-            })}
+            {primaryNavItems.map((item) => (
+              <button key={item.id} type="button" onClick={() => closeAndGo(`${item.path}${item.hash || ''}`)} className="apple-mobile-menu-item">
+                <item.icon size={15} className={item.accent} />
+                <span>{item.label}</span>
+                <span className="ml-auto text-xs text-[var(--app-muted)]">{item.hint}</span>
+              </button>
+            ))}
             <button type="button" onClick={() => closeAndGo('/notices')} className="apple-mobile-menu-item">
               <Megaphone size={15} className="text-cyan-500" />
               <span>Notices</span>
@@ -1543,7 +1564,7 @@ function ActivityLogSection({ compact = false }) {
   const isLocked = !authLoading && !user
 
   return (
-    <section className={`activity-proof-section ${compact ? 'activity-proof-section-compact' : ''} bg-white px-5 py-12 sm:py-16`}>
+    <section id="activity-log" className={`activity-proof-section ${compact ? 'activity-proof-section-compact' : ''} scroll-mt-24 bg-white px-5 py-12 sm:py-16`}>
       <div className="mx-auto max-w-7xl">
         <div className="grid gap-8 lg:grid-cols-[0.62fr_1fr] lg:items-end">
           <div>
@@ -1710,7 +1731,7 @@ function ClubCalendarSection({ compact = false }) {
   }
 
   return (
-    <section className={`club-calendar-section ${compact ? 'club-calendar-section-compact' : ''} bg-[#f5f5f7] px-5 py-12 sm:py-16`}>
+    <section id="monthly-calendar" className={`club-calendar-section ${compact ? 'club-calendar-section-compact' : ''} scroll-mt-24 bg-[#f5f5f7] px-5 py-12 sm:py-16`}>
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -2303,7 +2324,7 @@ function HomeView() {
               </div>
               <button type="button" onClick={() => goPageTop('/notices')} className={ghostActionBtnClass}>최근 공지 보기</button>
             </div>
-            <div className="mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <div className="mt-8 grid gap-3 md:grid-cols-3">
               {activityHubItems.map((item, index) => (
                 <button
                   key={item.title}
