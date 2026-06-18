@@ -769,6 +769,54 @@ select {
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
+.club-calendar-controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.65rem;
+}
+
+.club-calendar-controls label {
+	display: inline-flex;
+	min-height: 2.45rem;
+	align-items: center;
+	gap: 0.5rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 9999px;
+	background: var(--app-surface);
+	padding: 0.25rem 0.35rem 0.25rem 0.9rem;
+	color: var(--app-muted);
+	font-size: 0.78rem;
+	font-weight: 850;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.club-calendar-controls input,
+.club-calendar-controls select {
+	height: 1.95rem;
+	border: 0;
+	border-radius: 9999px;
+	background: var(--app-surface-soft);
+	padding: 0 0.7rem;
+	color: var(--app-text);
+	font-size: 0.9rem;
+	font-weight: 850;
+	outline: none;
+}
+
+.club-calendar-controls input {
+	width: 5.6rem;
+}
+
+.club-calendar-controls select {
+	min-width: 5.2rem;
+	cursor: pointer;
+}
+
+.club-calendar-controls input:focus,
+.club-calendar-controls select:focus {
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
 .calendar-admin-composer {
 	display: grid;
 	grid-template-columns: minmax(14rem, 1.25fr) minmax(10rem, 1fr) minmax(9rem, 0.72fr) minmax(8rem, 0.72fr) auto;

@@ -344,6 +344,10 @@ const activitiesDetailTopics = [
 ]
 
 const calendarWeekdays = ['월', '화', '수', '목', '금', '토', '일']
+const calendarMonthOptions = Array.from({ length: 12 }, (_, index) => ({
+  value: index,
+  label: `${index + 1}월`,
+}))
 
 function buildCalendarMonth(referenceDate = new Date()) {
   const year = referenceDate.getFullYear()
@@ -868,7 +872,7 @@ function GlobalNavigation() {
                       <button
                         type="button"
                         onClick={() => goNavItem(item)}
-                        className="flex items-start gap-3 px-4 py-2.5 transition hover:bg-[#f5f5f7]"
+                        className="flex w-full items-start gap-3 px-4 py-2.5 transition hover:bg-[#f5f5f7]"
                       >
                         <span className="mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#e8f3ff] text-[#0066cc]">
                           <item.icon size={14} aria-hidden="true" />
@@ -1777,8 +1781,11 @@ function ActivityLogSection({ compact = false }) {
 function ClubCalendarSection({ compact = false }) {
   const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
+  const initialCalendarDate = new Date()
   const [records, setRecords] = useState(null)
   const [error, setError] = useState('')
+  const [selectedYear, setSelectedYear] = useState(initialCalendarDate.getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(initialCalendarDate.getMonth())
   const [scheduleForm, setScheduleForm] = useState({
     title: '',
     eventDate: '',
@@ -1809,7 +1816,7 @@ function ClubCalendarSection({ compact = false }) {
 
   const loading = Boolean(user && records === null && !error)
   const scheduleItems = (user ? records || [] : []).filter((item) => item.kind === 'SCHEDULE')
-  const calendarMonth = buildCalendarMonth(parseLocalDate(scheduleItems[0]?.eventDate) || new Date())
+  const calendarMonth = buildCalendarMonth(new Date(selectedYear, selectedMonth, 1))
   const eventsByDay = scheduleItems.reduce((acc, event) => {
     const eventDate = parseLocalDate(event.eventDate)
     if (!eventDate) return acc
@@ -1820,6 +1827,12 @@ function ClubCalendarSection({ compact = false }) {
   }, {})
   const isLocked = !authLoading && !user
   const isAdmin = user?.role === 'ADMIN'
+
+  const updateSelectedYear = (value) => {
+    const nextYear = Number(value)
+    if (!Number.isFinite(nextYear)) return
+    setSelectedYear(Math.min(2100, Math.max(2000, nextYear)))
+  }
 
   const submitSchedule = async (event) => {
     event.preventDefault()
@@ -1836,6 +1849,11 @@ function ClubCalendarSection({ compact = false }) {
         eventDate: scheduleForm.eventDate,
       })
       setRecords((prev) => [created, ...(Array.isArray(prev) ? prev : [])])
+      const createdDate = parseLocalDate(created.eventDate)
+      if (createdDate) {
+        setSelectedYear(createdDate.getFullYear())
+        setSelectedMonth(createdDate.getMonth())
+      }
       setScheduleNotice('일정을 추가했습니다.')
       setScheduleForm((prev) => ({ ...prev, title: '', description: '', eventDate: '' }))
     } catch (err) {
@@ -1860,6 +1878,32 @@ function ClubCalendarSection({ compact = false }) {
             <CalendarDays size={18} aria-hidden="true" />
             <span>{calendarMonth.title}</span>
           </div>
+        </div>
+        <div className="club-calendar-controls mt-5" aria-label="달력 년도와 월 선택">
+          <label>
+            <span>년도</span>
+            <input
+              type="number"
+              min="2000"
+              max="2100"
+              step="1"
+              value={selectedYear}
+              onChange={(event) => updateSelectedYear(event.target.value)}
+              aria-label="년도 선택"
+            />
+          </label>
+          <label>
+            <span>월</span>
+            <select
+              value={selectedMonth}
+              onChange={(event) => setSelectedMonth(Number(event.target.value))}
+              aria-label="월 선택"
+            >
+              {calendarMonthOptions.map((month) => (
+                <option key={month.value} value={month.value}>{month.label}</option>
+              ))}
+            </select>
+          </label>
         </div>
 
         {isAdmin && !isLocked && (
