@@ -20,7 +20,7 @@ import {
   X,
 } from 'lucide-react'
 import { listNotices } from './services/noticeApi.js'
-import { listClubActivities } from './services/clubActivityApi.js'
+import { createClubActivity, listClubActivities } from './services/clubActivityApi.js'
 import { getNotificationSummary, listNotifications, markAllNotificationsRead, markNotificationRead } from './services/notificationApi.js'
 import { listFonts } from './services/fontApi.js'
 import { BUILT_IN_FONTS, buildFontFaceCss, fontFamilyValue, injectBuiltinFontStylesheets } from './services/fontPreferences.js'
@@ -111,6 +111,18 @@ const showcaseItems = [
 ]
 
 const activityHubItems = [
+  {
+    title: 'Activity log',
+    body: '관리자가 등록한 실제 활동 기록과 사진을 회원에게 보여줍니다.',
+    route: '/activities',
+    cta: '활동 기록 보기',
+  },
+  {
+    title: 'Monthly calendar',
+    body: '정기 회의, 세미나, 발표, 모집 마감을 월별 일정으로 확인합니다.',
+    route: '/activities',
+    cta: '일정 보기',
+  },
   {
     title: '공지사항',
     body: '모집, 세미나, 운영 안내를 빠르게 확인합니다.',
@@ -389,6 +401,18 @@ function categoryLabel(value) {
   }
   return labels[value] || value || '일반'
 }
+
+const clubActivityCategories = [
+  ['GENERAL', '일반'],
+  ['SEMINAR', '세미나'],
+  ['STUDY', '스터디'],
+  ['PROJECT', '프로젝트'],
+  ['MEETING', '회의'],
+  ['RECRUIT', '모집'],
+  ['EVENT', '행사'],
+  ['MT', 'MT'],
+  ['ACHIEVEMENT', '성과'],
+]
 
 const projectsDetailCards = [
   {
@@ -1619,6 +1643,14 @@ function ClubCalendarSection({ compact = false }) {
   const navigate = useNavigate()
   const [records, setRecords] = useState(null)
   const [error, setError] = useState('')
+  const [scheduleForm, setScheduleForm] = useState({
+    title: '',
+    eventDate: '',
+    category: 'MEETING',
+    description: '',
+  })
+  const [savingSchedule, setSavingSchedule] = useState(false)
+  const [scheduleNotice, setScheduleNotice] = useState('')
 
   useEffect(() => {
     if (authLoading || !user) {
@@ -1651,6 +1683,31 @@ function ClubCalendarSection({ compact = false }) {
     return acc
   }, {})
   const isLocked = !authLoading && !user
+  const isAdmin = user?.role === 'ADMIN'
+
+  const submitSchedule = async (event) => {
+    event.preventDefault()
+    if (!scheduleForm.title.trim() || !scheduleForm.eventDate) return
+    setSavingSchedule(true)
+    setScheduleNotice('')
+    setError('')
+    try {
+      const created = await createClubActivity({
+        kind: 'SCHEDULE',
+        category: scheduleForm.category,
+        title: scheduleForm.title.trim(),
+        description: scheduleForm.description.trim(),
+        eventDate: scheduleForm.eventDate,
+      })
+      setRecords((prev) => [created, ...(Array.isArray(prev) ? prev : [])])
+      setScheduleNotice('일정을 추가했습니다.')
+      setScheduleForm((prev) => ({ ...prev, title: '', description: '', eventDate: '' }))
+    } catch (err) {
+      setError(err.message || '일정을 추가하지 못했습니다.')
+    } finally {
+      setSavingSchedule(false)
+    }
+  }
 
   return (
     <section className={`club-calendar-section ${compact ? 'club-calendar-section-compact' : ''} bg-[#f5f5f7] px-5 py-12 sm:py-16`}>
@@ -1668,6 +1725,57 @@ function ClubCalendarSection({ compact = false }) {
             <span>{calendarMonth.title}</span>
           </div>
         </div>
+
+        {isAdmin && !isLocked && (
+          <form onSubmit={submitSchedule} className="calendar-admin-composer mt-8" aria-label="캘린더 일정 추가">
+            <div>
+              <p className="calendar-admin-composer-title">관리자 일정 추가</p>
+              <p className="calendar-admin-composer-copy">캘린더에 바로 표시할 정기 회의, 세미나, 발표, 모집 마감 일정을 등록합니다.</p>
+            </div>
+            <label>
+              <span>일정 제목</span>
+              <input
+                value={scheduleForm.title}
+                onChange={(event) => setScheduleForm((prev) => ({ ...prev, title: event.target.value }))}
+                maxLength={120}
+              />
+            </label>
+            <label>
+              <span>일정 날짜</span>
+              <input
+                type="date"
+                value={scheduleForm.eventDate}
+                onChange={(event) => setScheduleForm((prev) => ({ ...prev, eventDate: event.target.value }))}
+              />
+            </label>
+            <label>
+              <span>일정 분류</span>
+              <select
+                value={scheduleForm.category}
+                onChange={(event) => setScheduleForm((prev) => ({ ...prev, category: event.target.value }))}
+              >
+                {clubActivityCategories.map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="calendar-admin-composer-wide">
+              <span>일정 설명</span>
+              <input
+                value={scheduleForm.description}
+                onChange={(event) => setScheduleForm((prev) => ({ ...prev, description: event.target.value }))}
+                maxLength={500}
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={savingSchedule || !scheduleForm.title.trim() || !scheduleForm.eventDate}
+            >
+              {savingSchedule ? '추가 중...' : '일정 추가'}
+            </button>
+            {scheduleNotice && <p className="calendar-admin-composer-notice">{scheduleNotice}</p>}
+          </form>
+        )}
 
         <div className="club-calendar-shell mt-8">
           <div className="club-calendar-weekdays" aria-hidden="true">
@@ -2195,7 +2303,7 @@ function HomeView() {
               </div>
               <button type="button" onClick={() => goPageTop('/notices')} className={ghostActionBtnClass}>최근 공지 보기</button>
             </div>
-            <div className="mt-8 grid gap-3 lg:grid-cols-3">
+            <div className="mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               {activityHubItems.map((item, index) => (
                 <button
                   key={item.title}
