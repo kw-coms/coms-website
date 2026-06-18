@@ -8,6 +8,7 @@ const routeExpectations = [
   ['/activity-log', /실제로 이어지는 활동 기록/],
   ['/monthly-calendar', /동아리 일정 캘린더/],
   ['/projects', /아이디어를 실제 서비스와 제작물로\./],
+  ['/apps', /COM's Apps/],
   ['/notices', /공지사항|등록된 공지/],
   ['/login', /로그인|아이디/],
 ]
@@ -86,9 +87,13 @@ test('appearance panel explains guest font persistence scope', async ({ page }) 
   await expect(page.getByText('게스트 임시 적용')).toBeVisible()
 })
 
-test('home surfaces companion service links as launchable destinations', async ({ page }) => {
+test('apps page surfaces companion service links away from the home dashboard', async ({ page }) => {
   await page.goto('/')
 
+  await expect(page.getByRole('heading', { name: "COM's Apps" })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '동아리 일정 캘린더' })).toBeVisible()
+
+  await page.goto('/apps')
   await expect(page.getByRole('heading', { name: "COM's Apps" })).toBeVisible()
 
   for (const [name, href] of [
@@ -766,30 +771,46 @@ test('admin tracks recruit applications from overview to status update', async (
   await expect(page.locator('article').filter({ hasText: '김지원' }).locator('span').filter({ hasText: '검토중' })).toBeVisible()
 })
 
-test('top navigation exposes activity log and monthly calendar outside the home hub', async ({ page }) => {
+test('top navigation groups activity log and monthly calendar under Activity', async ({ page }) => {
   await page.goto('/')
 
   const desktopNav = page.locator('header nav').first()
-  await expect(desktopNav.getByRole('button', { name: 'Activity log' })).toBeVisible()
-  await expect(desktopNav.getByRole('button', { name: 'Monthly calendar' })).toBeVisible()
-  await desktopNav.getByRole('button', { name: 'Activity log' }).click()
+  await expect(desktopNav.getByRole('button', { name: 'Notices' })).toBeVisible()
+  await expect(desktopNav.getByRole('button', { name: 'Activity' })).toBeVisible()
+  await expect(desktopNav.getByRole('button', { name: 'Activity log' })).toHaveCount(0)
+  await expect(desktopNav.getByRole('button', { name: 'Monthly calendar' })).toHaveCount(0)
+
+  await desktopNav.getByRole('button', { name: 'Activity' }).click()
+  const activityMenu = page.getByRole('menu').filter({ hasText: 'Activity log' })
+  await expect(activityMenu.getByRole('button', { name: /Activity log/ })).toBeVisible()
+  await expect(activityMenu.getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
+  await activityMenu.getByRole('button', { name: /Activity log/ }).click()
   await expect(page).toHaveURL(/\/activity-log$/)
   await page.goto('/')
-  await desktopNav.getByRole('button', { name: 'Monthly calendar' }).click()
+
+  await desktopNav.getByRole('button', { name: 'Activity' }).click()
+  await page.getByRole('menu').filter({ hasText: 'Monthly calendar' }).getByRole('button', { name: /Monthly calendar/ }).click()
   await expect(page).toHaveURL(/\/monthly-calendar$/)
+  await page.goto('/')
+  await desktopNav.getByRole('button', { name: 'Apps' }).click()
+  await expect(page).toHaveURL(/\/apps$/)
   await page.goto('/')
 
   await expect(page.getByRole('heading', { name: '활동 허브' })).toBeVisible()
   await expect(page.locator('section').filter({ has: page.getByRole('heading', { name: '활동 허브' }) }).getByRole('button', { name: /Activity log/ })).toHaveCount(0)
   await expect(page.locator('section').filter({ has: page.getByRole('heading', { name: '활동 허브' }) }).getByRole('button', { name: /Monthly calendar/ })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '실제로 이어지는 활동 기록' })).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: '동아리 일정 캘린더' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '동아리 일정 캘린더' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '공지사항' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '커뮤니티' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '자료실' })).toBeVisible()
 
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByLabel('메뉴 열기').click()
+  await expect(page.getByRole('menu').getByRole('button', { name: /^Notices/ })).toBeVisible()
+  await expect(page.getByRole('menu').getByRole('button', { name: /^Activity/ })).toBeVisible()
+  await expect(page.getByRole('menu').getByRole('button', { name: /Activity log/ })).toHaveCount(0)
+  await page.getByRole('menu').getByRole('button', { name: /^Activity/ }).click()
   await expect(page.getByRole('menu').getByRole('button', { name: /Activity log/ })).toBeVisible()
   await expect(page.getByRole('menu').getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
 })
