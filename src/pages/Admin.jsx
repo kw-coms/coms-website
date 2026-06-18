@@ -3,6 +3,7 @@ import { Download, RefreshCw, RotateCcw } from 'lucide-react'
 import { apiUrl } from '../services/apiClient.js'
 import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache, listCommunityReports, listDeletedCommunityPosts, restoreDeletedCommunityPost, resolveCommunityReport, listRecruitApplications, updateRecruitApplicationStatus } from '../services/adminApi.js'
 import { listFiles, createPost, deleteFile } from '../services/archiveApi.js'
+import { createClubActivity, deleteClubActivity, listClubActivities } from '../services/clubActivityApi.js'
 import { listAdminFonts, setFontActive, uploadFont } from '../services/fontApi.js'
 import { buildFontFaceCss, fontFamilyValue } from '../services/fontPreferences.js'
 import { useAuth } from '../contexts/useAuth.js'
@@ -166,6 +167,7 @@ export default function Admin({ onBack }) {
                 { id: 'members', label: '회원 관리' },
                 { id: 'recruit', label: '모집 관리' },
                 { id: 'roster', label: '명부 인증' },
+                { id: 'activities', label: '활동 관리' },
                 { id: 'files', label: '파일 관리' },
                 { id: 'fonts', label: '폰트 관리' },
                 { id: 'community', label: '커뮤니티 관리' },
@@ -211,6 +213,7 @@ export default function Admin({ onBack }) {
             />
           )}
           {activeTab === 'roster' && <RosterTab />}
+          {activeTab === 'activities' && <ActivitiesAdminTab />}
           {activeTab === 'files' && <FilesTab />}
           {activeTab === 'fonts' && <FontsTab />}
           {activeTab === 'community' && <CommunityReportsTab />}
@@ -994,6 +997,207 @@ function MembersTab({ currentUser }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+function ActivitiesAdminTab() {
+  const imageInputRef = useRef(null)
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [form, setForm] = useState({
+    kind: 'ACTIVITY',
+    category: 'SEMINAR',
+    title: '',
+    description: '',
+    eventDate: '',
+    image: null,
+  })
+
+  const loadActivities = () => {
+    setError('')
+    listClubActivities()
+      .then((data) => setItems(Array.isArray(data) ? data : []))
+      .catch((err) => setError(err.message || '활동 기록을 불러오지 못했습니다.'))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    let mounted = true
+    listClubActivities()
+      .then((data) => { if (mounted) setItems(Array.isArray(data) ? data : []) })
+      .catch((err) => { if (mounted) setError(err.message || '활동 기록을 불러오지 못했습니다.') })
+      .finally(() => { if (mounted) setLoading(false) })
+    return () => { mounted = false }
+  }, [])
+
+  const submit = async (event) => {
+    event.preventDefault()
+    if (!form.title.trim() || !form.eventDate) return
+    setSaving(true)
+    setError('')
+    setNotice('')
+    try {
+      const created = await createClubActivity({
+        kind: form.kind,
+        category: form.category,
+        title: form.title.trim(),
+        description: form.description.trim(),
+        eventDate: form.eventDate,
+        image: form.image,
+      })
+      setItems((prev) => [created, ...prev])
+      setNotice('활동 기록을 등록했습니다.')
+      setForm((prev) => ({ ...prev, title: '', description: '', image: null }))
+      event.currentTarget.reset()
+      setForm((prev) => ({ ...prev, kind: 'ACTIVITY', category: 'SEMINAR', eventDate: '' }))
+    } catch (err) {
+      setError(err.message || '활동 기록 등록 중 오류가 발생했습니다.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (item) => {
+    if (!window.confirm(`${item.title} 기록을 삭제하시겠습니까?`)) return
+    try {
+      await deleteClubActivity(item.id)
+      setItems((prev) => prev.filter((entry) => entry.id !== item.id))
+    } catch (err) {
+      alert(err.message || '활동 기록을 삭제하지 못했습니다.')
+    }
+  }
+
+  const inputClass = 'shape-cut-sm border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
+
+  return (
+    <div className="space-y-6">
+      <form onSubmit={submit} className="rounded-lg border border-black/10 bg-black/5 p-4">
+        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">활동 기록 등록</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">회원에게만 보이는 실제 활동 기록과 일정을 등록합니다. 더미 예시는 등록하지 않습니다.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+            활동 제목
+            <input
+              value={form.title}
+              onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
+              maxLength={120}
+              className={inputClass}
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+            활동 날짜
+            <input
+              type="date"
+              value={form.eventDate}
+              onChange={(event) => setForm((prev) => ({ ...prev, eventDate: event.target.value }))}
+              className={inputClass}
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+            활동 종류
+            <select
+              value={form.kind}
+              onChange={(event) => {
+                if (event.target.value === 'SCHEDULE' && imageInputRef.current) {
+                  imageInputRef.current.value = ''
+                }
+                setForm((prev) => ({ ...prev, kind: event.target.value, image: event.target.value === 'SCHEDULE' ? null : prev.image }))
+              }}
+              className={inputClass}
+            >
+              <option value="ACTIVITY">활동 기록</option>
+              <option value="SCHEDULE">일정</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+            활동 분류
+            <select
+              value={form.category}
+              onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
+              className={inputClass}
+            >
+              <option value="GENERAL">일반</option>
+              <option value="SEMINAR">세미나</option>
+              <option value="STUDY">스터디</option>
+              <option value="PROJECT">프로젝트</option>
+              <option value="MEETING">회의</option>
+              <option value="RECRUIT">모집</option>
+              <option value="EVENT">행사</option>
+              <option value="MT">MT</option>
+              <option value="ACHIEVEMENT">성과</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)] md:col-span-2">
+            활동 설명
+            <textarea
+              value={form.description}
+              onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
+              rows={3}
+              className={inputClass}
+            />
+          </label>
+          {form.kind === 'ACTIVITY' && (
+            <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)] md:col-span-2">
+              활동 사진
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                onChange={(event) => setForm((prev) => ({ ...prev, image: event.target.files?.[0] || null }))}
+                className="text-sm text-[var(--theme-body-dark)]"
+              />
+            </label>
+          )}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            type="submit"
+            disabled={saving || !form.title.trim() || !form.eventDate}
+            className="shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] disabled:opacity-50"
+          >
+            {saving ? '등록 중...' : '활동 등록'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setLoading(true); loadActivities() }}
+            className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
+          >
+            새로고침
+          </button>
+        </div>
+        {notice && <p className="mt-2 text-xs font-semibold text-[#0066cc]">{notice}</p>}
+        {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
+      </form>
+
+      {loading ? (
+        <p className="text-sm text-[var(--theme-body-muted)]">활동 기록을 불러오는 중...</p>
+      ) : items.length === 0 ? (
+        <p className="text-sm text-[var(--theme-body-muted)]">등록된 활동 기록이 없습니다.</p>
+      ) : (
+        <div className="space-y-2">
+          {items.map((item) => (
+            <article key={item.id} className="shape-cut-sm flex flex-wrap items-center justify-between gap-3 border border-black/10 bg-black/5 px-4 py-3">
+              <div>
+                <p className="font-semibold text-[var(--theme-body-dark)]">{item.title}</p>
+                <p className="text-xs text-[var(--theme-body-muted)]">
+                  {item.kind === 'SCHEDULE' ? '일정' : '활동'} · {item.category} · {item.eventDate}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDelete(item)}
+                className="text-xs font-semibold text-red-500 transition hover:underline"
+              >
+                삭제
+              </button>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -19,6 +19,11 @@ const fontFamilies = [
   'Nanum Myeongjo',
 ]
 
+function multipartField(body, name) {
+  const match = new RegExp(`name="${name}"\\r\\n\\r\\n([^\\r]+)`).exec(body || '')
+  return match?.[1] || ''
+}
+
 async function assertActivitiesTitleFits(page) {
   await expect
     .poll(async () => {
@@ -766,6 +771,114 @@ test('activity hub points members back to notices community and archive', async 
   await expect(page.getByRole('heading', { name: '공지사항' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '커뮤니티' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '자료실' })).toBeVisible()
+})
+
+test('activity records and calendar are locked for guests without dummy content', async ({ page }) => {
+  await page.goto('/activities')
+
+  await expect(page.getByRole('heading', { name: '실제로 이어지는 활동 기록' })).toBeVisible()
+  await expect(page.getByText('로그인 하세요')).toBeVisible()
+  await expect(page.getByText('회원 로그인 후 활동 기록과 일정을 확인할 수 있습니다.')).toBeVisible()
+  await expect(page.getByText('등록된 활동 기록이 없습니다.')).toHaveCount(0)
+  await expect(page.getByText('알고리즘 스터디 진행')).toHaveCount(0)
+  await expect(page.getByText('웹 프로젝트 발표회')).toHaveCount(0)
+})
+
+test('signed-in members see real activity records and schedule events', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/club-activities/1/image', (route) => route.fulfill({
+    status: 200,
+    contentType: 'image/png',
+    body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=', 'base64'),
+  }))
+  await page.route('**/api/club-activities', (route) => route.fulfill({
+    status: 200,
+    json: [
+      {
+        id: 1,
+        kind: 'ACTIVITY',
+        category: 'SEMINAR',
+        title: '운영진 등록 세미나',
+        description: '관리자가 등록한 실제 활동 기록',
+        eventDate: '2026-06-18',
+        imageUrl: '/api/club-activities/1/image',
+        imageOriginalName: 'seminar.jpg',
+        createdByName: '관리자',
+      },
+      {
+        id: 2,
+        kind: 'SCHEDULE',
+        category: 'MEETING',
+        title: '운영진 등록 회의',
+        description: '',
+        eventDate: '2026-06-20',
+        imageUrl: null,
+        imageOriginalName: null,
+        createdByName: '관리자',
+      },
+    ],
+  }))
+
+  await page.goto('/activities')
+
+  await expect(page.getByRole('heading', { name: '운영진 등록 세미나' })).toBeVisible()
+  await expect(page.getByText('관리자가 등록한 실제 활동 기록')).toBeVisible()
+  await expect(page.getByText('운영진 등록 회의')).toBeVisible()
+  await expect(page.getByText('로그인 하세요')).toHaveCount(0)
+})
+
+test('admin can register a club activity record', async ({ page }) => {
+  await mockAdminApis(page)
+  let createdPayload = null
+  await page.route('**/api/club-activities', async (route) => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postData() || ''
+      const form = {
+        title: multipartField(body, 'title'),
+        kind: multipartField(body, 'kind'),
+        category: multipartField(body, 'category'),
+        eventDate: multipartField(body, 'eventDate'),
+        description: multipartField(body, 'description'),
+      }
+      createdPayload = {
+        title: form.title,
+        kind: form.kind,
+        category: form.category,
+        eventDate: form.eventDate,
+      }
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: 10,
+          kind: form.kind,
+          category: form.category,
+          title: form.title,
+          description: form.description,
+          eventDate: form.eventDate,
+          imageUrl: null,
+          imageOriginalName: null,
+          createdByName: '관리자',
+        },
+      })
+      return
+    }
+    await route.fulfill({ status: 200, json: [] })
+  })
+
+  await page.goto('/admin')
+  await page.getByRole('button', { name: '활동 관리' }).click()
+  await page.getByLabel('활동 제목').fill('운영진 등록 활동')
+  await page.getByLabel('활동 날짜').fill('2026-06-18')
+  await page.getByLabel('활동 종류').selectOption('ACTIVITY')
+  await page.getByLabel('활동 분류').selectOption('SEMINAR')
+  await page.getByRole('button', { name: '활동 등록' }).click()
+
+  await expect.poll(() => createdPayload).toMatchObject({
+    title: '운영진 등록 활동',
+    kind: 'ACTIVITY',
+    category: 'SEMINAR',
+    eventDate: '2026-06-18',
+  })
 })
 
 test('archive highlights repeat-visit search and category controls', async ({ page }) => {

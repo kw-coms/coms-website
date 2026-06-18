@@ -522,6 +522,391 @@ select {
 	background: linear-gradient(135deg, var(--app-accent-soft), var(--app-surface) 64%) !important;
 }
 
+.activity-proof-section,
+.club-calendar-section {
+	color: var(--app-text);
+}
+
+.activity-proof-section-compact {
+	padding-top: 3.5rem;
+}
+
+.activity-proof-note {
+	background: color-mix(in srgb, var(--app-surface) 88%, transparent) !important;
+}
+
+.activity-log-grid {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+.activity-log-card {
+	display: grid;
+	min-height: 31rem;
+	overflow: hidden;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface);
+	box-shadow: 0 18px 48px rgba(0, 0, 0, 0.08);
+}
+
+.activity-log-photo {
+	position: relative;
+	min-height: 13.5rem;
+	overflow: hidden;
+	background:
+		linear-gradient(145deg, color-mix(in srgb, var(--activity-log-accent) 70%, #ffffff), color-mix(in srgb, var(--activity-log-accent) 15%, var(--app-surface)) 62%),
+		linear-gradient(90deg, rgba(255, 255, 255, 0.32), transparent);
+}
+
+.activity-log-photo::before,
+.activity-log-photo::after {
+	content: '';
+	position: absolute;
+	border: 1px solid rgba(255, 255, 255, 0.42);
+	background: rgba(255, 255, 255, 0.18);
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+}
+
+.activity-log-photo::before {
+	left: 1rem;
+	top: 4.4rem;
+	width: 44%;
+	height: 38%;
+	border-radius: 1rem;
+	transform: rotate(-5deg);
+}
+
+.activity-log-photo::after {
+	right: 1rem;
+	top: 2.2rem;
+	width: 38%;
+	height: 46%;
+	border-radius: 1.4rem;
+	transform: rotate(6deg);
+}
+
+.activity-log-photo-has-image::before,
+.activity-log-photo-has-image::after {
+	display: none;
+}
+
+.activity-log-image {
+	display: block;
+	width: 100%;
+	height: 100%;
+	min-height: 13.5rem;
+	object-fit: cover;
+}
+
+.activity-log-photo-bar {
+	position: absolute;
+	left: 1rem;
+	top: 1rem;
+	z-index: 1;
+	display: flex;
+	gap: 0.35rem;
+}
+
+.activity-log-photo-bar span {
+	display: block;
+	width: 0.55rem;
+	height: 0.55rem;
+	border-radius: 9999px;
+	background: rgba(255, 255, 255, 0.75);
+}
+
+.activity-log-photo-mark {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	z-index: 2;
+	display: flex;
+	width: 4.75rem;
+	height: 4.75rem;
+	transform: translate(-50%, -50%);
+	align-items: center;
+	justify-content: center;
+	border-radius: 1.5rem;
+	background: rgba(255, 255, 255, 0.82);
+	color: color-mix(in srgb, var(--activity-log-accent) 72%, #1d1d1f);
+	box-shadow: 0 18px 46px rgba(0, 0, 0, 0.16);
+}
+
+.activity-log-photo-caption {
+	position: absolute;
+	inset-inline: 1rem;
+	bottom: 1rem;
+	z-index: 3;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	border-radius: 9999px;
+	background: rgba(255, 255, 255, 0.82);
+	padding: 0.6rem 0.75rem;
+	color: #1d1d1f;
+	font-size: 0.75rem;
+	font-weight: 800;
+	box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+}
+
+.activity-log-photo-caption span {
+	color: color-mix(in srgb, var(--activity-log-accent) 74%, #1d1d1f);
+}
+
+.activity-log-body {
+	display: flex;
+	flex-direction: column;
+	padding: 1.35rem;
+}
+
+.activity-log-term {
+	margin: 0;
+	color: var(--app-accent-text);
+	font-size: 0.78rem;
+	font-weight: 800;
+}
+
+.activity-log-body h3 {
+	margin: 0.55rem 0 0;
+	color: var(--app-text);
+	font-size: 1.45rem;
+	font-weight: 750;
+	line-height: 1.2;
+}
+
+.activity-log-body p:not(.activity-log-term) {
+	margin: 0.8rem 0 0;
+	color: var(--app-muted);
+	font-size: 0.925rem;
+	font-weight: 600;
+	line-height: 1.75;
+}
+
+.activity-log-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin-top: auto;
+	padding-top: 1.2rem;
+}
+
+.activity-log-tags span {
+	border: 1px solid var(--app-hairline);
+	border-radius: 9999px;
+	background: var(--app-surface-soft);
+	padding: 0.35rem 0.55rem;
+	color: var(--app-muted);
+	font-size: 0.72rem;
+	font-weight: 800;
+}
+
+.activity-empty-state {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	border: 1px dashed var(--app-hairline-strong);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--app-surface) 78%, transparent);
+	padding: 1.25rem;
+	color: var(--app-muted);
+}
+
+.activity-empty-state svg {
+	flex-shrink: 0;
+	color: var(--app-accent-text);
+}
+
+.activity-empty-state h3 {
+	margin: 0;
+	color: var(--app-text);
+	font-size: 1rem;
+	font-weight: 800;
+}
+
+.activity-empty-state p {
+	margin: 0.35rem 0 0;
+	font-size: 0.9rem;
+	font-weight: 600;
+	line-height: 1.6;
+}
+
+.activity-log-card-blue {
+	--activity-log-accent: #0071e3;
+}
+
+.activity-log-card-violet {
+	--activity-log-accent: #8e5cf7;
+}
+
+.activity-log-card-cyan {
+	--activity-log-accent: #00a7c7;
+}
+
+.activity-log-card-amber {
+	--activity-log-accent: #ff9f0a;
+}
+
+.club-calendar-section-compact {
+	padding-top: 3.5rem;
+}
+
+.club-calendar-title {
+	display: inline-flex;
+	min-height: 2.4rem;
+	align-items: center;
+	gap: 0.45rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 9999px;
+	background: var(--app-surface);
+	padding: 0 0.95rem;
+	color: var(--app-text);
+	font-size: 0.9rem;
+	font-weight: 800;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.club-calendar-shell {
+	overflow: hidden;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface);
+	box-shadow: 0 24px 70px rgba(0, 0, 0, 0.1);
+}
+
+.club-calendar-weekdays,
+.club-calendar-grid {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.club-calendar-weekdays {
+	border-bottom: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 86%, var(--app-surface-soft));
+}
+
+.club-calendar-weekdays span {
+	padding: 0.9rem 0.5rem;
+	color: var(--app-subtle);
+	font-size: 0.78rem;
+	font-weight: 800;
+	text-align: center;
+}
+
+.club-calendar-day {
+	position: relative;
+	min-height: 8.4rem;
+	border-right: 1px solid var(--app-hairline);
+	border-bottom: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	padding: 0.75rem;
+}
+
+.club-calendar-day:nth-child(7n) {
+	border-right: 0;
+}
+
+.club-calendar-day:nth-last-child(-n + 7) {
+	border-bottom: 0;
+}
+
+.club-calendar-day-active {
+	background:
+		linear-gradient(180deg, color-mix(in srgb, var(--app-accent-soft) 46%, transparent), transparent 58%),
+		var(--app-surface);
+}
+
+.club-calendar-day-empty {
+	background: var(--app-surface-soft);
+}
+
+.club-calendar-day-number {
+	display: inline-flex;
+	width: 1.75rem;
+	height: 1.75rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: 9999px;
+	color: var(--app-text);
+	font-size: 0.86rem;
+	font-weight: 800;
+}
+
+.club-calendar-day-active .club-calendar-day-number {
+	background: var(--app-accent);
+	color: #fff;
+}
+
+.club-calendar-events {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	margin-top: 0.75rem;
+}
+
+.club-calendar-event {
+	display: block;
+	overflow: hidden;
+	border-radius: 0.45rem;
+	padding: 0.35rem 0.45rem;
+	color: #1d1d1f;
+	font-size: 0.75rem;
+	font-weight: 800;
+	line-height: 1.25;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.club-calendar-event-seminar {
+	background: color-mix(in srgb, #00a7c7 18%, #ffffff);
+}
+
+.club-calendar-event-study {
+	background: color-mix(in srgb, #34c759 18%, #ffffff);
+}
+
+.club-calendar-event-meeting {
+	background: color-mix(in srgb, #8e5cf7 18%, #ffffff);
+}
+
+.club-calendar-event-project {
+	background: color-mix(in srgb, #0071e3 18%, #ffffff);
+}
+
+.club-calendar-event-recruit {
+	background: color-mix(in srgb, #ff9f0a 24%, #ffffff);
+}
+
+.club-calendar-event-event {
+	background: color-mix(in srgb, #d70015 15%, #ffffff);
+}
+
+.club-calendar-event-general,
+.club-calendar-event-mt,
+.club-calendar-event-achievement {
+	background: color-mix(in srgb, var(--app-accent) 16%, #ffffff);
+}
+
+.calendar-empty-state {
+	border-top: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 88%, var(--app-surface-soft));
+	padding: 1rem;
+	color: var(--app-muted);
+	font-size: 0.9rem;
+	font-weight: 700;
+	line-height: 1.6;
+	text-align: center;
+}
+
+.calendar-empty-state strong,
+.calendar-empty-state span {
+	display: inline-block;
+	margin-inline: 0.2rem;
+}
+
 .apple-showcase-card-plain h3,
 .apple-showcase-card-soft h3 {
 	color: var(--app-text) !important;
@@ -1211,6 +1596,12 @@ select {
 	}
 }
 
+@media (max-width: 1180px) {
+	.activity-log-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
 @media (max-width: 767px) {
 	:root {
 		--apple-nav-height: 58px;
@@ -1335,6 +1726,54 @@ select {
 
 	.apple-showcase-card h3 {
 		font-size: 1.5rem !important;
+	}
+
+	.activity-log-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.activity-log-card {
+		min-height: auto;
+	}
+
+	.activity-log-photo {
+		min-height: 11rem;
+	}
+
+	.activity-empty-state {
+		align-items: flex-start;
+		padding: 1rem;
+	}
+
+	.club-calendar-title {
+		width: 100%;
+		justify-content: center;
+	}
+
+	.club-calendar-weekdays span {
+		padding: 0.65rem 0.25rem;
+		font-size: 0.72rem;
+	}
+
+	.club-calendar-day {
+		min-height: 4.65rem;
+		padding: 0.38rem;
+	}
+
+	.club-calendar-day-number {
+		width: 1.45rem;
+		height: 1.45rem;
+		font-size: 0.75rem;
+	}
+
+	.club-calendar-events {
+		gap: 0.25rem;
+		margin-top: 0.35rem;
+	}
+
+	.club-calendar-event {
+		padding: 0.25rem 0.32rem;
+		font-size: 0.64rem;
 	}
 
 	.apple-board-shell {
