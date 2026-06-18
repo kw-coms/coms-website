@@ -862,10 +862,6 @@ function GlobalNavigation() {
                 role="menu"
                 className="absolute left-1/2 top-full z-[90] mt-4 w-64 -translate-x-1/2 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_18px_45px_rgba(0,0,0,0.12)]"
               >
-                <div className="border-b border-black/5 px-4 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#86868b]">Activity</p>
-                  <p className="text-sm font-semibold text-[#1d1d1f]">기록과 일정</p>
-                </div>
                 <ul className="flex flex-col py-1">
                   {activitySectionNavItems.map((item) => (
                     <li key={item.id}>
