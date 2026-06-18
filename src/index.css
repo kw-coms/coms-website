@@ -769,6 +769,91 @@ select {
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
+.calendar-admin-composer {
+	display: grid;
+	grid-template-columns: minmax(14rem, 1.25fr) minmax(10rem, 1fr) minmax(9rem, 0.72fr) minmax(8rem, 0.72fr) auto;
+	align-items: end;
+	gap: 0.75rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface);
+	padding: 1rem;
+	box-shadow: 0 16px 48px rgba(0, 0, 0, 0.08);
+}
+
+.calendar-admin-composer-title {
+	margin: 0;
+	color: var(--app-text);
+	font-size: 0.95rem;
+	font-weight: 850;
+}
+
+.calendar-admin-composer-copy {
+	margin: 0.35rem 0 0;
+	color: var(--app-muted);
+	font-size: 0.78rem;
+	font-weight: 650;
+	line-height: 1.5;
+}
+
+.calendar-admin-composer label {
+	display: grid;
+	gap: 0.35rem;
+	color: var(--app-muted);
+	font-size: 0.74rem;
+	font-weight: 850;
+}
+
+.calendar-admin-composer input,
+.calendar-admin-composer select {
+	width: 100%;
+	min-height: 2.45rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.45rem;
+	background: var(--app-surface-soft);
+	padding: 0 0.75rem;
+	color: var(--app-text);
+	font-size: 0.9rem;
+	font-weight: 750;
+	outline: none;
+}
+
+.calendar-admin-composer input:focus,
+.calendar-admin-composer select:focus {
+	border-color: color-mix(in srgb, var(--app-accent) 64%, var(--app-hairline));
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+.calendar-admin-composer button {
+	min-height: 2.45rem;
+	border: 0;
+	border-radius: 9999px;
+	background: var(--app-text);
+	padding: 0 1rem;
+	color: var(--app-bg);
+	font-size: 0.86rem;
+	font-weight: 850;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.calendar-admin-composer button:disabled {
+	cursor: not-allowed;
+	opacity: 0.5;
+}
+
+.calendar-admin-composer-wide {
+	grid-column: 2 / span 2;
+}
+
+.calendar-admin-composer-notice {
+	grid-column: 1 / -1;
+	margin: 0;
+	color: var(--app-accent-text);
+	font-size: 0.8rem;
+	font-weight: 800;
+}
+
 .club-calendar-shell {
 	overflow: hidden;
 	border: 1px solid var(--app-hairline);
@@ -1748,6 +1833,14 @@ select {
 	.club-calendar-title {
 		width: 100%;
 		justify-content: center;
+	}
+
+	.calendar-admin-composer {
+		grid-template-columns: 1fr;
+	}
+
+	.calendar-admin-composer-wide {
+		grid-column: auto;
 	}
 
 	.club-calendar-weekdays span {
