@@ -525,6 +525,7 @@ function getActiveNavKey(pathname) {
   if (pathname === '/activity-log') return 'activity-log'
   if (pathname === '/monthly-calendar') return 'monthly-calendar'
   if (pathname === '/projects') return 'projects'
+  if (pathname === '/apps') return 'apps'
   if (pathname.startsWith('/recruit')) return 'recruit'
   if (pathname.startsWith('/notices')) return 'notices'
   if (pathname.startsWith('/resources')) return 'resources'
@@ -732,27 +733,26 @@ function GlobalNavigation() {
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [appsOpen, setAppsOpen] = useState(false)
-  const [mobileAppsOpen, setMobileAppsOpen] = useState(false)
-  const appsWrapperRef = useRef(null)
+  const [activityOpen, setActivityOpen] = useState(false)
+  const [mobileActivityOpen, setMobileActivityOpen] = useState(false)
+  const activityWrapperRef = useRef(null)
   const activeKey = getActiveNavKey(location.pathname)
   const mobileTabs = tabs.slice(0, 3)
   const showMobileTabs = mobileTabs.some((tab) => tab.id === activeKey)
-  const primaryNavItems = [
-    ...tabs.slice(0, 2).map((tab) => ({ ...tab, path: getTabRoute(tab.id) })),
-    ...activitySectionNavItems,
-    ...tabs.slice(2).map((tab) => ({ ...tab, path: getTabRoute(tab.id) })),
-  ]
-  const desktopNavItems = [...primaryNavItems, ...navExtraItems]
+  const primaryNavItems = tabs.map((tab) => ({ ...tab, path: getTabRoute(tab.id) }))
+  const noticesNavItem = navExtraItems.find((item) => item.id === 'notices')
+  const memberNavItems = navExtraItems.filter((item) => item.id !== 'notices')
+  const activityNavActive = activitySectionNavItems.some((item) => item.id === activeKey)
 
   useEffect(() => {
-    if (!appsOpen) return undefined
+    if (!activityOpen) return undefined
     const onDocClick = (event) => {
-      if (!appsWrapperRef.current) return
-      if (!appsWrapperRef.current.contains(event.target)) setAppsOpen(false)
+      if (activityWrapperRef.current && !activityWrapperRef.current.contains(event.target)) setActivityOpen(false)
     }
     const onKey = (event) => {
-      if (event.key === 'Escape') setAppsOpen(false)
+      if (event.key === 'Escape') {
+        setActivityOpen(false)
+      }
     }
     document.addEventListener('mousedown', onDocClick)
     document.addEventListener('keydown', onKey)
@@ -760,7 +760,7 @@ function GlobalNavigation() {
       document.removeEventListener('mousedown', onDocClick)
       document.removeEventListener('keydown', onKey)
     }
-  }, [appsOpen])
+  }, [activityOpen])
 
   useEffect(() => {
     if (!location.hash) return undefined
@@ -778,7 +778,7 @@ function GlobalNavigation() {
 
   const closeAndGo = (to, options) => {
     setMobileMenuOpen(false)
-    setMobileAppsOpen(false)
+    setMobileActivityOpen(false)
     goPageTop(to, options)
   }
 
@@ -789,6 +789,7 @@ function GlobalNavigation() {
 
   const goNavItem = (item) => {
     const target = `${item.path}${item.hash || ''}`
+    setActivityOpen(false)
     if (item.auth) {
       goProtected(target)
       return
@@ -802,9 +803,9 @@ function GlobalNavigation() {
     goPageTop('/')
   }
 
-  const navClass = (key) => (
+  const navClass = (key, active = activeKey === key) => (
     `relative px-1 text-xs font-semibold transition ${
-      activeKey === key
+      active
         ? 'text-[var(--app-text)]'
         : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'
     }`
@@ -824,7 +825,70 @@ function GlobalNavigation() {
         </button>
 
         <nav className="pointer-events-auto absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-3 lg:gap-5 md:flex">
-          {desktopNavItems.map((item) => (
+          {primaryNavItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => goNavItem(item)}
+              className={`${navClass(item.id)} disabled:cursor-wait disabled:opacity-60`}
+            >
+              {item.label}
+              <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === item.id ? 'opacity-100' : 'opacity-0'}`} />
+            </button>
+          ))}
+          {noticesNavItem && (
+            <button
+              type="button"
+              onClick={() => goNavItem(noticesNavItem)}
+              className={navClass(noticesNavItem.id)}
+            >
+              {noticesNavItem.label}
+              <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === noticesNavItem.id ? 'opacity-100' : 'opacity-0'}`} />
+            </button>
+          )}
+          <div ref={activityWrapperRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setActivityOpen((open) => !open)}
+              className={`${navClass('activity', activityNavActive)} inline-flex items-center gap-1`}
+              aria-haspopup="menu"
+              aria-expanded={activityOpen}
+            >
+              Activity
+              <ChevronDown size={12} className={`transition ${activityOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+            </button>
+            {activityOpen && (
+              <div
+                role="menu"
+                className="absolute left-1/2 top-full z-[90] mt-4 w-64 -translate-x-1/2 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_18px_45px_rgba(0,0,0,0.12)]"
+              >
+                <div className="border-b border-black/5 px-4 py-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#86868b]">Activity</p>
+                  <p className="text-sm font-semibold text-[#1d1d1f]">기록과 일정</p>
+                </div>
+                <ul className="flex flex-col py-1">
+                  {activitySectionNavItems.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => goNavItem(item)}
+                        className="flex items-start gap-3 px-4 py-2.5 transition hover:bg-[#f5f5f7]"
+                      >
+                        <span className="mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#e8f3ff] text-[#0066cc]">
+                          <item.icon size={14} aria-hidden="true" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-left text-sm font-semibold text-[#1d1d1f]">{item.label}</span>
+                          <span className="block text-left text-xs font-medium text-[#86868b]">{item.hint}</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          {memberNavItems.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -836,51 +900,10 @@ function GlobalNavigation() {
               <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === item.id ? 'opacity-100' : 'opacity-0'}`} />
             </button>
           ))}
-          <div ref={appsWrapperRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setAppsOpen((open) => !open)}
-              className={`${navClass('apps')} inline-flex items-center gap-1`}
-              aria-haspopup="menu"
-              aria-expanded={appsOpen}
-            >
-              Apps
-              <ChevronDown size={12} className={`transition ${appsOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
-            </button>
-            {appsOpen && (
-              <div
-                role="menu"
-                className="absolute left-1/2 top-full z-[90] mt-4 w-72 -translate-x-1/2 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_18px_45px_rgba(0,0,0,0.12)]"
-              >
-                <div className="border-b border-black/5 px-4 py-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#86868b]">Service launcher</p>
-                  <p className="text-sm font-semibold text-[#1d1d1f]">COM&apos;s Apps</p>
-                </div>
-                <ul className="flex flex-col py-1">
-                  {companionServices.map((service) => (
-                    <li key={service.title}>
-                      <a
-                        href={service.href}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={() => setAppsOpen(false)}
-                        className="flex items-start gap-3 px-4 py-2.5 transition hover:bg-[#f5f5f7]"
-                      >
-                        <span className="mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#e8f3ff] text-[#0066cc]">
-                          <Grid3x3 size={14} aria-hidden="true" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-semibold text-[#1d1d1f]">{service.title}</span>
-                          <span className="block truncate text-xs font-medium text-[#86868b]">{service.domain}</span>
-                        </span>
-                        <ArrowUpRight size={14} className="mt-1.5 text-[#86868b]" aria-hidden="true" />
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+          <button type="button" onClick={() => goPageTop('/apps')} className={navClass('apps', activeKey === 'apps')}>
+            Apps
+            <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === 'apps' ? 'opacity-100' : 'opacity-0'}`} />
+          </button>
         </nav>
 
         {user ? (
@@ -938,6 +961,44 @@ function GlobalNavigation() {
               <span>Notices</span>
               <span className="ml-auto text-xs text-[var(--app-muted)]">공지사항</span>
             </button>
+            <button
+              type="button"
+              onClick={() => setMobileActivityOpen((open) => !open)}
+              aria-expanded={mobileActivityOpen}
+              aria-controls="mobile-activity-panel"
+              className="apple-mobile-menu-item"
+            >
+              <CalendarDays size={15} className="text-sky-500" />
+              <span>Activity</span>
+              <span className="ml-auto inline-flex items-center gap-1 text-xs text-[var(--app-muted)]">
+                기록·일정
+                <ChevronDown
+                  size={14}
+                  className={`transition ${mobileActivityOpen ? 'rotate-180' : ''}`}
+                  aria-hidden="true"
+                />
+              </span>
+            </button>
+            {mobileActivityOpen && (
+              <div id="mobile-activity-panel" className="flex flex-col divide-y divide-[var(--app-hairline)] bg-black/[0.015]">
+                {activitySectionNavItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => closeAndGo(item.path)}
+                    className="flex items-start gap-3 px-6 py-3 text-left transition hover:bg-black/[0.03]"
+                  >
+                    <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#e8f3ff] text-[#0066cc]">
+                      <item.icon size={13} aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-[var(--app-text)]">{item.label}</span>
+                      <span className="mt-0.5 block text-xs leading-relaxed text-[var(--app-muted)]">{item.hint}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
             <button type="button" onClick={() => goProtected('/resources')} disabled={authLoading} className="apple-mobile-menu-item disabled:opacity-50">
               <CircuitBoard size={15} className="text-violet-400" />
               <span>Resources</span>
@@ -950,56 +1011,13 @@ function GlobalNavigation() {
             </button>
             <button
               type="button"
-              onClick={() => setMobileAppsOpen((open) => !open)}
-              aria-expanded={mobileAppsOpen}
-              aria-controls="mobile-apps-panel"
+              onClick={() => closeAndGo('/apps')}
               className="apple-mobile-menu-item"
             >
               <Grid3x3 size={15} className="text-sky-500" />
               <span>Apps</span>
-              <span className="ml-auto inline-flex items-center gap-1 text-xs text-[var(--app-muted)]">
-                {companionServices.length}개 서비스
-                <ChevronDown
-                  size={14}
-                  className={`transition ${mobileAppsOpen ? 'rotate-180' : ''}`}
-                  aria-hidden="true"
-                />
-              </span>
+              <span className="ml-auto text-xs text-[var(--app-muted)]">서비스</span>
             </button>
-            {mobileAppsOpen && (
-              <div id="mobile-apps-panel" className="flex flex-col divide-y divide-[var(--app-hairline)] bg-black/[0.015]">
-                {companionServices.map((service) => (
-                  <a
-                    key={service.title}
-                    href={service.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => {
-                      setMobileMenuOpen(false)
-                      setMobileAppsOpen(false)
-                    }}
-                    className="flex items-start gap-3 px-6 py-3 transition hover:bg-black/[0.03]"
-                  >
-                    <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#e8f3ff] text-[#0066cc]">
-                      <Grid3x3 size={13} aria-hidden="true" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5 text-sm font-semibold text-[var(--app-text)]">
-                        {service.title}
-                        <ArrowUpRight size={12} className="text-[var(--app-muted)]" aria-hidden="true" />
-                      </span>
-                      <span className="mt-0.5 block text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--app-subtle)]">
-                        {service.eyebrow}
-                      </span>
-                      <span className="mt-1 block text-xs leading-relaxed text-[var(--app-muted)]">
-                        {service.body}
-                      </span>
-                      <span className="mt-1 block truncate text-[11px] text-[var(--app-subtle)]">{service.domain}</span>
-                    </span>
-                  </a>
-                ))}
-              </div>
-            )}
             {!user && (
               <button type="button" onClick={() => closeAndGo('/login')} disabled={authLoading} className="apple-mobile-menu-item apple-mobile-menu-item-accent disabled:opacity-50">
                 <span>로그인</span>
@@ -1486,6 +1504,7 @@ function App() {
         <Route path="/activity-log" element={<ActivityLogPage />} />
         <Route path="/monthly-calendar" element={<MonthlyCalendarPage />} />
         <Route path="/projects" element={<ProjectsDetailPage />} />
+        <Route path="/apps" element={<AppsPage />} />
         <Route path="/notices" element={<NoticesPage />} />
         <Route path="/notices/:id" element={<NoticesPage />} />
         <Route path="/resources" element={<RequireAuth><ArchivePage /></RequireAuth>} />
@@ -2157,6 +2176,63 @@ function MonthlyCalendarPage() {
   return <ClubCalendarSection />
 }
 
+function AppsPage() {
+  return (
+    <div className="apple-detail-page theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
+      <main className="relative overflow-hidden pt-12">
+        <CompanionServicesSection />
+      </main>
+    </div>
+  )
+}
+
+function CompanionServicesSection() {
+  return (
+    <section className="bg-white px-5 py-12 sm:py-16">
+      <div className="mx-auto max-w-7xl">
+        <div className="grid gap-8 lg:grid-cols-[0.72fr_1fr] lg:items-end">
+          <div>
+            <p className="apple-eyebrow">Service launcher</p>
+            <h2 className="apple-display mt-3 text-4xl sm:text-5xl">COM&apos;s Apps</h2>
+            <p className="apple-copy mt-4 max-w-xl text-lg">
+              공식 웹사이트에서 동아리 주변 서비스로 바로 이동할 수 있게 묶었습니다. 활동, 팀 편성, 게임, 캠퍼스 유틸, 코딩 루틴을 한 흐름으로 이어갑니다.
+            </p>
+          </div>
+          <div className="apple-soft-panel bg-[#f5f5f7] px-5 py-5">
+            <p className="text-sm font-semibold text-[#1d1d1f]">개선 방향</p>
+            <p className="mt-2 text-sm font-medium leading-6 text-[#6e6e73]">
+              다음 단계로는 통합 로그인 상태 표시, 서비스별 운영 상태, 최근 활동 요약을 붙이면 COM&apos;s 전체 생태계가 더 선명해집니다.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {companionServices.map((service) => (
+            <a
+              key={service.title}
+              href={service.href}
+              target="_blank"
+              rel="noreferrer"
+              className="apple-product-panel group flex min-h-64 flex-col px-6 py-6 text-left no-underline transition hover:-translate-y-0.5"
+            >
+              <p className="text-sm font-semibold text-[#0066cc]">{service.eyebrow}</p>
+              <h3 className="mt-3 text-2xl font-semibold leading-tight text-[#1d1d1f]">{service.title}</h3>
+              <p className="mt-3 flex-1 text-sm font-medium leading-6 text-[#6e6e73]">{service.body}</p>
+              <span className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-[#0066cc]">
+                열기
+                <ArrowUpRight size={15} aria-hidden="true" />
+              </span>
+              <span className="mt-3 truncate rounded-full bg-[#f5f5f7] px-3 py-1.5 text-xs font-semibold text-[#86868b]">
+                {service.domain}
+              </span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function ProjectsDetailPage() {
   return (
     <DetailStoryPage
@@ -2445,48 +2521,7 @@ function HomeView() {
           </div>
         </section>
 
-        <section className="bg-white px-5 py-12 sm:py-16">
-          <div className="mx-auto max-w-7xl">
-            <div className="grid gap-8 lg:grid-cols-[0.72fr_1fr] lg:items-end">
-              <div>
-                <p className="apple-eyebrow">Service launcher</p>
-                <h2 className="apple-display mt-3 text-4xl sm:text-5xl">COM&apos;s Apps</h2>
-                <p className="apple-copy mt-4 max-w-xl text-lg">
-                  공식 웹사이트에서 동아리 주변 서비스로 바로 이동할 수 있게 묶었습니다. 활동, 팀 편성, 게임, 캠퍼스 유틸, 코딩 루틴을 한 흐름으로 이어갑니다.
-                </p>
-              </div>
-              <div className="apple-soft-panel bg-[#f5f5f7] px-5 py-5">
-                <p className="text-sm font-semibold text-[#1d1d1f]">개선 방향</p>
-                <p className="mt-2 text-sm font-medium leading-6 text-[#6e6e73]">
-                  다음 단계로는 통합 로그인 상태 표시, 서비스별 운영 상태, 최근 활동 요약을 붙이면 COM&apos;s 전체 생태계가 더 선명해집니다.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-              {companionServices.map((service) => (
-                <a
-                  key={service.title}
-                  href={service.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="apple-product-panel group flex min-h-64 flex-col px-6 py-6 text-left no-underline transition hover:-translate-y-0.5"
-                >
-                  <p className="text-sm font-semibold text-[#0066cc]">{service.eyebrow}</p>
-                  <h3 className="mt-3 text-2xl font-semibold leading-tight text-[#1d1d1f]">{service.title}</h3>
-                  <p className="mt-3 flex-1 text-sm font-medium leading-6 text-[#6e6e73]">{service.body}</p>
-                  <span className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-[#0066cc]">
-                    열기
-                    <ArrowUpRight size={15} aria-hidden="true" />
-                  </span>
-                  <span className="mt-3 truncate rounded-full bg-[#f5f5f7] px-3 py-1.5 text-xs font-semibold text-[#86868b]">
-                    {service.domain}
-                  </span>
-                </a>
-              ))}
-            </div>
-          </div>
-        </section>
+        <ClubCalendarSection compact />
 
         <section ref={aboutRef} id="about" className="relative">
           {renderSectionPanel('about')}
