@@ -41,7 +41,7 @@ jobs:
           ssh-keyscan -p "$DEPLOY_PORT" "$DEPLOY_HOST" >> ~/.ssh/known_hosts
 
           ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
-            "DEPLOY_PATH=${DEPLOY_PATH@Q} DEPLOY_REPO=${DEPLOY_REPO@Q} DEPLOY_REF=${DEPLOY_REF@Q} PUBLIC_BASE_URL=${PUBLIC_BASE_URL@Q} bash -s" << 'REMOTE'
+            "DEPLOY_PATH=${DEPLOY_PATH@Q} DEPLOY_REPO=${DEPLOY_REPO@Q} DEPLOY_REF=${DEPLOY_REF@Q} PUBLIC_BASE_URL=${PUBLIC_BASE_URL@Q} bash -c 'tmp=\$(mktemp /tmp/coms-deploy.XXXXXX); cat > \"\$tmp\"; bash \"\$tmp\"; status=\$?; rm -f \"\$tmp\"; exit \"\$status\"'" << 'REMOTE'
             set -euo pipefail
 
             DEPLOY_PATH="${DEPLOY_PATH/#\~/$HOME}"
