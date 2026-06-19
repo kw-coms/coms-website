@@ -308,6 +308,99 @@
         },
         "type": "object"
       },
+      "ClubProjectCategoryRequest": {
+        "properties": {
+          "key": {
+            "maxLength": 40,
+            "minLength": 0,
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 60,
+            "minLength": 0,
+            "type": "string"
+          },
+          "position": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ClubProjectCategoryResponse": {
+        "properties": {
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "position": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "projectCount": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "ClubProjectResponse": {
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "categoryName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "displayUrl": {
+            "type": "string"
+          },
+          "eyebrow": {
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileInfo"
+            },
+            "type": "array"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "linkUrl": {
+            "type": "string"
+          },
+          "madeBy": {
+            "type": "string"
+          },
+          "position": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CommentInfo": {
         "properties": {
           "anonymousName": {
@@ -949,6 +1042,25 @@
             "maximum": 1,
             "minimum": 0,
             "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "FileInfo": {
+        "properties": {
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "originalName": {
+            "type": "string"
+          },
+          "size": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -2028,7 +2140,7 @@
     },
     "/api/admin/club-activity-categories": {
       "post": {
-        "operationId": "create_4",
+        "operationId": "create_6",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2058,7 +2170,7 @@
     },
     "/api/admin/club-activity-categories/{id}": {
       "delete": {
-        "operationId": "delete_3",
+        "operationId": "delete_5",
         "parameters": [
           {
             "in": "path",
@@ -2080,7 +2192,7 @@
         ]
       },
       "patch": {
-        "operationId": "update_3",
+        "operationId": "update_5",
         "parameters": [
           {
             "in": "path",
@@ -2116,6 +2228,99 @@
         },
         "tags": [
           "club-activity-category-controller"
+        ]
+      }
+    },
+    "/api/admin/club-project-categories": {
+      "post": {
+        "operationId": "create_5",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClubProjectCategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClubProjectCategoryResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "club-project-category-controller"
+        ]
+      }
+    },
+    "/api/admin/club-project-categories/{id}": {
+      "delete": {
+        "operationId": "delete_4",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "club-project-category-controller"
+        ]
+      },
+      "patch": {
+        "operationId": "update_4",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClubProjectCategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClubProjectCategoryResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "club-project-category-controller"
         ]
       }
     },
@@ -3164,7 +3369,7 @@
     },
     "/api/club-activities": {
       "get": {
-        "operationId": "list_3",
+        "operationId": "list_4",
         "responses": {
           "200": {
             "content": {
@@ -3185,7 +3390,7 @@
         ]
       },
       "post": {
-        "operationId": "create_3",
+        "operationId": "create_4",
         "parameters": [
           {
             "in": "query",
@@ -3264,7 +3469,7 @@
     },
     "/api/club-activities/categories": {
       "get": {
-        "operationId": "list_5",
+        "operationId": "list_7",
         "responses": {
           "200": {
             "content": {
@@ -3287,7 +3492,7 @@
     },
     "/api/club-activities/{id}": {
       "delete": {
-        "operationId": "delete_2",
+        "operationId": "delete_3",
         "parameters": [
           {
             "in": "path",
@@ -3338,7 +3543,7 @@
         ]
       },
       "patch": {
-        "operationId": "update_2",
+        "operationId": "update_3",
         "parameters": [
           {
             "in": "path",
@@ -3410,7 +3615,7 @@
     },
     "/api/club-activities/{id}/files": {
       "post": {
-        "operationId": "uploadFile_1",
+        "operationId": "uploadFile_2",
         "parameters": [
           {
             "in": "path",
@@ -3460,7 +3665,7 @@
     },
     "/api/club-activities/{id}/files/{fileId}": {
       "delete": {
-        "operationId": "deleteFile",
+        "operationId": "deleteFile_1",
         "parameters": [
           {
             "in": "path",
@@ -3493,7 +3698,7 @@
     },
     "/api/club-activities/{id}/files/{fileId}/download": {
       "get": {
-        "operationId": "downloadFile_1",
+        "operationId": "downloadFile_2",
         "parameters": [
           {
             "in": "path",
@@ -3730,6 +3935,379 @@
         },
         "tags": [
           "club-activity-controller"
+        ]
+      }
+    },
+    "/api/club-projects": {
+      "get": {
+        "operationId": "list_3",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClubProjectResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "club-project-controller"
+        ]
+      },
+      "post": {
+        "operationId": "create_3",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "category",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "title",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "description",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "eyebrow",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "madeBy",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "linkUrl",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "displayUrl",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "position",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClubProjectResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "club-project-controller"
+        ]
+      }
+    },
+    "/api/club-projects/categories": {
+      "get": {
+        "operationId": "list_6",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClubProjectCategoryResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "club-project-category-controller"
+        ]
+      }
+    },
+    "/api/club-projects/{id}": {
+      "delete": {
+        "operationId": "delete_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "club-project-controller"
+        ]
+      },
+      "patch": {
+        "operationId": "update_2",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "title",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "description",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "eyebrow",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "madeBy",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "linkUrl",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "displayUrl",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "position",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClubProjectResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "club-project-controller"
+        ]
+      }
+    },
+    "/api/club-projects/{id}/files": {
+      "post": {
+        "operationId": "uploadFile_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "format": "binary",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "int64",
+                  "type": "integer"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "club-project-controller"
+        ]
+      }
+    },
+    "/api/club-projects/{id}/files/{fileId}": {
+      "delete": {
+        "operationId": "deleteFile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "club-project-controller"
+        ]
+      }
+    },
+    "/api/club-projects/{id}/files/{fileId}/download": {
+      "get": {
+        "operationId": "downloadFile_1",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fileId",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "club-project-controller"
         ]
       }
     },
@@ -5153,7 +5731,7 @@
     },
     "/api/files/{id}": {
       "delete": {
-        "operationId": "delete_4",
+        "operationId": "delete_6",
         "parameters": [
           {
             "in": "path",
@@ -5946,7 +6524,7 @@
     },
     "/api/notifications": {
       "get": {
-        "operationId": "list_4",
+        "operationId": "list_5",
         "responses": {
           "200": {
             "content": {
