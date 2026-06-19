@@ -15,10 +15,11 @@ import {
   Moon,
   Sparkles,
   Sun,
+  ThumbsUp,
   X,
 } from 'lucide-react'
 import { listNotices } from './services/noticeApi.js'
-import { createClubActivity, listClubActivities } from './services/clubActivityApi.js'
+import { createClubActivity, listClubActivities, getClubActivity, voteClubActivity } from './services/clubActivityApi.js'
 import { getNotificationSummary, listNotifications, markAllNotificationsRead, markNotificationRead } from './services/notificationApi.js'
 import { listFonts } from './services/fontApi.js'
 import { BUILT_IN_FONTS, buildFontFaceCss, fontFamilyValue, injectBuiltinFontStylesheets } from './services/fontPreferences.js'
@@ -1183,12 +1184,20 @@ function useClubActivities(loadErrorMessage) {
     queryClient.setQueryData(CLUB_ACTIVITIES_QUERY_KEY, (prev) => [created, ...(Array.isArray(prev) ? prev : [])])
   }
 
-  return { user, authLoading, records, loading, loadError, prependActivity }
+  const mergeActivity = (updated) => {
+    queryClient.setQueryData(CLUB_ACTIVITIES_QUERY_KEY, (prev) =>
+      (Array.isArray(prev) ? prev : []).map((item) => (item.id === updated.id ? { ...item, ...updated } : item)),
+    )
+  }
+
+  return { user, authLoading, records, loading, loadError, prependActivity, mergeActivity }
 }
 
 function ActivityLogSection({ compact = false }) {
   const navigate = useNavigate()
-  const { user, authLoading, records, loading, loadError, prependActivity } = useClubActivities('활동 기록을 불러오지 못했습니다.')
+  const { user, authLoading, records, loading, loadError, prependActivity, mergeActivity } = useClubActivities('활동 기록을 불러오지 못했습니다.')
+  const [votingId, setVotingId] = useState(null)
+  const [viewedIds] = useState(() => new Set())
   const [submitError, setSubmitError] = useState('')
   const error = submitError || loadError
   const [activityForm, setActivityForm] = useState({
@@ -1231,6 +1240,31 @@ function ActivityLogSection({ compact = false }) {
       setSubmitError(err.message || '활동 기록을 추가하지 못했습니다.')
     } finally {
       setSavingActivity(false)
+    }
+  }
+
+  // Register a view once per activity per mount when the card is opened.
+  const registerActivityView = async (item) => {
+    if (!user || viewedIds.has(item.id)) return
+    viewedIds.add(item.id)
+    try {
+      const detail = await getClubActivity(item.id)
+      mergeActivity(detail)
+    } catch {
+      viewedIds.delete(item.id)
+    }
+  }
+
+  const handleActivityVote = async (item) => {
+    if (!user || votingId) return
+    setVotingId(item.id)
+    try {
+      const updated = await voteClubActivity(item.id, item.myVote === 1 ? 0 : 1)
+      mergeActivity(updated)
+    } catch (err) {
+      setSubmitError(err.message || '추천 중 오류가 발생했습니다.')
+    } finally {
+      setVotingId(null)
     }
   }
 
@@ -1343,7 +1377,12 @@ function ActivityLogSection({ compact = false }) {
         ) : visibleItems.length > 0 ? (
           <div className="activity-log-grid mt-8">
             {visibleItems.map((item) => (
-              <article key={item.id} className="activity-log-card activity-log-card-blue">
+              <article
+                key={item.id}
+                className="activity-log-card activity-log-card-blue"
+                onMouseEnter={() => registerActivityView(item)}
+                onFocus={() => registerActivityView(item)}
+              >
                 <div className={`activity-log-photo ${item.imageUrl ? 'activity-log-photo-has-image' : ''}`}>
                   {item.imageUrl ? (
                     <img src={item.imageUrl} alt="" className="activity-log-image" loading="lazy" />
@@ -1371,6 +1410,18 @@ function ActivityLogSection({ compact = false }) {
                   <div className="activity-log-tags" aria-label={`${item.title} 태그`}>
                     <span>{categoryLabel(item.category)}</span>
                     {item.imageOriginalName && <span>사진 기록</span>}
+                  </div>
+                  <div className="mt-3 flex items-center gap-3 text-xs font-semibold text-[#6e6e73]">
+                    <span>조회 {item.viewCount ?? 0}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleActivityVote(item)}
+                      disabled={votingId === item.id}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black transition disabled:opacity-50 ${item.myVote === 1 ? 'border-[#0071e3] bg-[#0071e3] text-white' : 'border-black/10 bg-white text-[#0066cc]'}`}
+                    >
+                      <ThumbsUp size={14} />
+                      개추 {item.upvotes ?? 0}
+                    </button>
                   </div>
                 </div>
               </article>

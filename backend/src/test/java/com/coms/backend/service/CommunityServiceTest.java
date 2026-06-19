@@ -167,6 +167,92 @@ class CommunityServiceTest {
     }
 
     @Test
+    void adminEditingAnotherMembersPostKeepsOriginalAuthor() {
+        Member author = member("2025123456", "원작성자", Member.Role.USER);
+        Member admin = member("2026129999", "관리자", Member.Role.ADMIN);
+        memberRepository.save(author);
+        memberRepository.save(admin);
+        var created = communityService.create(
+                author.getStudentId(),
+                new CommunityPostRequest("원제목", "내용", "GENERAL", false),
+                null
+        );
+
+        var updated = communityService.update(
+                admin.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("관리자가 고친 제목", "관리자가 고친 내용", "GENERAL", false),
+                null
+        );
+
+        assertThat(updated.authorStudentId()).isEqualTo(author.getStudentId());
+        assertThat(updated.authorName()).isEqualTo("원작성자");
+        assertThat(updated.authorDisplayName()).isEqualTo("59기 원작성자");
+        assertThat(updated.authorAdmin()).isFalse();
+        CommunityPost persisted = communityPostRepository.findById(created.id()).orElseThrow();
+        assertThat(persisted.getAuthorStudentId()).isEqualTo(author.getStudentId());
+        assertThat(persisted.getAuthorName()).isEqualTo("원작성자");
+    }
+
+    @Test
+    void editingAnonymousPostKeepsOriginalAnonymousIdentity() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member viewer = member("2026123456", "회원", Member.Role.USER);
+        Member admin = member("2026129999", "관리자", Member.Role.ADMIN);
+        memberRepository.save(author);
+        memberRepository.save(viewer);
+        memberRepository.save(admin);
+        var created = communityService.create(
+                author.getStudentId(),
+                new CommunityPostRequest("익명글", "내용", "ANONYMOUS", false, "반고닉"),
+                null,
+                "118.235.10.20"
+        );
+        String originalAnonDisplay = communityService.get(viewer.getStudentId(), created.id()).authorName();
+        assertThat(originalAnonDisplay).isEqualTo("반고닉(1e83)");
+
+        // Admin edits from a different network and sends no anonymousName — identity must not change.
+        communityService.update(
+                admin.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("익명글", "관리자 수정", "ANONYMOUS", false, ""),
+                null,
+                "203.0.113.99"
+        );
+
+        var afterEdit = communityService.get(viewer.getStudentId(), created.id());
+        assertThat(afterEdit.authorName()).isEqualTo(originalAnonDisplay);
+        assertThat(afterEdit.anonymousName()).isEqualTo("반고닉");
+        assertThat(afterEdit.authorStudentId()).isNull();
+        CommunityPost persisted = communityPostRepository.findById(created.id()).orElseThrow();
+        assertThat(persisted.getAuthorStudentId()).isEqualTo(author.getStudentId());
+        assertThat(persisted.getAnonymousName()).isEqualTo("반고닉");
+        assertThat(persisted.getIpAddress()).isEqualTo("118.235.10.20");
+    }
+
+    @Test
+    void adminEditingAnotherMembersCommentKeepsOriginalAuthor() {
+        Member author = member("2025123456", "댓글작성자", Member.Role.USER);
+        Member admin = member("2026129999", "관리자", Member.Role.ADMIN);
+        memberRepository.save(author);
+        memberRepository.save(admin);
+        var post = communityService.create(author.getStudentId(), new CommunityPostRequest("글", "내용", "GENERAL", false), null);
+        var comment = communityService.addComment(post.id(), author.getStudentId(), new CommunityCommentRequest("원문 댓글", null));
+
+        var updated = communityService.updateComment(post.id(), comment.id(), admin.getStudentId(),
+                new CommunityCommentRequest("관리자가 고친 댓글", null));
+
+        assertThat(updated.content()).isEqualTo("관리자가 고친 댓글");
+        assertThat(updated.authorName()).isEqualTo("59기 댓글작성자");
+        assertThat(commentRepository.findById(comment.id()).orElseThrow().getStudentId()).isEqualTo(author.getStudentId());
+        assertThat(commentRepository.findById(comment.id()).orElseThrow().getAuthorName()).isEqualTo("댓글작성자");
+        assertThat(communityService.listComments(post.id(), author.getStudentId()))
+                .singleElement()
+                .extracting("authorName")
+                .isEqualTo("59기 댓글작성자");
+    }
+
+    @Test
     void initialPlaceholderFinalizationDoesNotMarkEdited() {
         Member user = member("2025123456", "회원", Member.Role.USER);
         memberRepository.save(user);

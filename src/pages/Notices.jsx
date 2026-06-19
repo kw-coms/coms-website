@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify.jsx'
-import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Search, Sparkles, Trash2, UsersRound } from 'lucide-react'
-import { listNotices, createNotice, updateNotice, deleteNotice } from '../services/noticeApi.js'
+import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Search, Sparkles, ThumbsUp, Trash2, UsersRound } from 'lucide-react'
+import { listNotices, getNotice, createNotice, updateNotice, deleteNotice, voteNotice } from '../services/noticeApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 
 function formatDate(iso) {
@@ -189,12 +189,18 @@ export default function Notices() {
     const numId = Number(urlId)
     if (isNaN(numId)) { navigate('/notices', { replace: true }); return }
     if (loading) return
-    const found = notices.find((n) => n.id === numId)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (found) setSelectedNotice(found)
-    else navigate('/notices', { replace: true })
+    let mounted = true
+    // Fetch the full notice so the view count is registered and engagement (조회/개추) is current.
+    getNotice(numId)
+      .then((detail) => {
+        if (!mounted) return
+        setSelectedNotice(detail)
+        setNotices((prev) => prev.map((item) => (item.id === detail.id ? { ...item, ...detail } : item)))
+      })
+      .catch(() => { if (mounted) navigate('/notices', { replace: true }) })
+    return () => { mounted = false }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlId, loading, notices.length])
+  }, [urlId, loading])
 
   const openNotice = (notice) => {
     setMode('list')
@@ -227,6 +233,21 @@ export default function Notices() {
       backToList()
     } catch (err) {
       alert(err.message || '삭제 중 오류가 발생했습니다.')
+    }
+  }
+
+  const [voting, setVoting] = useState(false)
+  const handleNoticeVote = async () => {
+    if (!selectedNotice || voting) return
+    setVoting(true)
+    try {
+      const updated = await voteNotice(selectedNotice.id, selectedNotice.myVote === 1 ? 0 : 1)
+      setSelectedNotice(updated)
+      setNotices((prev) => prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
+    } catch (err) {
+      alert(err.message || '추천 중 오류가 발생했습니다.')
+    } finally {
+      setVoting(false)
     }
   }
 
@@ -438,8 +459,23 @@ export default function Notices() {
               <p className="mt-3 text-xs text-[#86868b]">
                 작성자 {selectedNotice.author} · {new Date(selectedNotice.createdAt).toLocaleString('ko-KR')}
               </p>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#86868b]">
+                <span>조회 {selectedNotice.viewCount ?? 0}</span>
+                <span>개추 {selectedNotice.upvotes ?? 0}</span>
+              </div>
             </div>
             <div className="text-size-container min-h-[200px] whitespace-pre-wrap break-words px-4 py-5 auto-text-notice sm:min-h-[360px] sm:px-5 sm:py-7">{linkify(selectedNotice.content)}</div>
+            <div className="flex items-center justify-center border-t border-black/10 bg-[#fafafa] px-4 py-4 sm:px-5">
+              <button
+                type="button"
+                onClick={handleNoticeVote}
+                disabled={voting}
+                className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-5 py-3 text-sm font-black disabled:opacity-50 ${selectedNotice.myVote === 1 ? 'border-[#0071e3] bg-[#0071e3] text-white' : 'border-black/10 bg-white text-[#0066cc]'}`}
+              >
+                <ThumbsUp size={16} />
+                개추 {selectedNotice.upvotes ?? 0}
+              </button>
+            </div>
             <div className="flex flex-col gap-2 border-t border-black/10 px-4 py-4 sm:flex-row sm:flex-wrap sm:justify-between sm:px-5">
               <button type="button" onClick={backToList} className="apple-action-secondary min-h-11 px-4 py-2 text-sm sm:min-h-0">
                 목록

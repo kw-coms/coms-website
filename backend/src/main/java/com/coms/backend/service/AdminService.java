@@ -4,7 +4,9 @@ import com.coms.backend.domain.Member;
 import com.coms.backend.dto.LoginAuditResponse;
 import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.RoleUpdateRequest;
+import com.coms.backend.repository.ClubActivityVoteRepository;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.NoticeVoteRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,11 +24,16 @@ public class AdminService {
     private final MemberRepository memberRepository;
     private final PasswordEncoder passwordEncoder;
     private final CommunityService communityService;
+    private final NoticeVoteRepository noticeVoteRepository;
+    private final ClubActivityVoteRepository clubActivityVoteRepository;
 
-    public AdminService(MemberRepository memberRepository, PasswordEncoder passwordEncoder, CommunityService communityService) {
+    public AdminService(MemberRepository memberRepository, PasswordEncoder passwordEncoder, CommunityService communityService,
+                        NoticeVoteRepository noticeVoteRepository, ClubActivityVoteRepository clubActivityVoteRepository) {
         this.memberRepository = memberRepository;
         this.passwordEncoder = passwordEncoder;
         this.communityService = communityService;
+        this.noticeVoteRepository = noticeVoteRepository;
+        this.clubActivityVoteRepository = clubActivityVoteRepository;
     }
 
     @Transactional(readOnly = true)
@@ -50,6 +57,7 @@ public class AdminService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         DeletedMemberSnapshot snapshot = DeletedMemberSnapshot.from(member);
         communityService.deleteCommunityDataForMember(member.getStudentId());
+        deleteEngagementVotesForMember(member.getStudentId());
         memberRepository.delete(member);
         return snapshot;
     }
@@ -59,8 +67,14 @@ public class AdminService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         DeletedMemberSnapshot snapshot = DeletedMemberSnapshot.from(member);
         communityService.deleteCommunityDataForMember(member.getStudentId());
+        deleteEngagementVotesForMember(member.getStudentId());
         memberRepository.delete(member);
         return snapshot;
+    }
+
+    private void deleteEngagementVotesForMember(String studentId) {
+        noticeVoteRepository.deleteByStudentId(studentId);
+        clubActivityVoteRepository.deleteByStudentId(studentId);
     }
 
     public void resetPassword(Long id, String newPassword) {
