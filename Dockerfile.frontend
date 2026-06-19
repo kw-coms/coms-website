@@ -7,6 +7,13 @@ RUN npm ci
 
 COPY . .
 
+# Sentry DSN must be baked at build time (Vite inlines import.meta.env.VITE_* into the
+# static bundle; runtime container env cannot inject it). Blank = Sentry stays disabled.
+ARG VITE_SENTRY_DSN=
+ARG VITE_SENTRY_ENV=production
+ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
+ENV VITE_SENTRY_ENV=$VITE_SENTRY_ENV
+
 RUN npm run build
 
 
