@@ -46,6 +46,18 @@ dependencies {
 	// OpenAPI / Swagger UI — springdoc 2.x targets Boot 3; Boot 4 compatibility unconfirmed
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
 
+	// Firebase Admin SDK — used by PushNotificationSender to send FCM push.
+	// Fully gated behind push.enabled + a valid credentials file; a no-op otherwise.
+	implementation 'com.google.firebase:firebase-admin:9.4.1'
+
+	// Sentry error reporting — env-gated. Blank SENTRY_DSN = clean no-op (Sentry default).
+	// NOTE: the sentry-spring-boot-starter-jakarta auto-configuration targets Spring Boot 3
+	// and references org.springframework.boot.web.client.RestClientCustomizer, which was
+	// removed in Boot 4 — pulling in the starter breaks every ApplicationContext load.
+	// We therefore use the plain Spring (non-Boot) integration + explicit @EnableSentry,
+	// which is Boot-version-agnostic and still a clean no-op when the DSN is blank.
+	implementation 'io.sentry:sentry-spring-jakarta:7.18.0'
+
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
 	testImplementation 'org.springframework.security:spring-security-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
