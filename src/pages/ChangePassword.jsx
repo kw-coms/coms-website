@@ -7,6 +7,7 @@ import {
 } from '../services/authApi.js'
 import { listFonts } from '../services/fontApi.js'
 import { BUILT_IN_FONTS, fontFamilyValue } from '../services/fontPreferences.js'
+import { listProfileMiniAppDocuments } from '../services/miniAppsApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 import { getLogoAsset } from '../utils/logoAssets.js'
 
@@ -104,6 +105,7 @@ export default function ChangePassword({ onBack }) {
   const [error, setError] = useState('')
   const [loadingAction, setLoadingAction] = useState('')
   const [fonts, setFonts] = useState([])
+  const [miniAppDocuments, setMiniAppDocuments] = useState({ worldcup: [], tier: [] })
 
   useEffect(() => {
     let mounted = true
@@ -112,6 +114,27 @@ export default function ChangePassword({ onBack }) {
       .catch(() => { if (mounted) setFonts([]) })
     return () => { mounted = false }
   }, [])
+
+  useEffect(() => {
+    if (!user?.studentId) {
+      return undefined
+    }
+
+    let mounted = true
+    Promise.allSettled([
+      listProfileMiniAppDocuments('worldcup'),
+      listProfileMiniAppDocuments('tier'),
+    ])
+      .then(([worldcup, tier]) => {
+        if (!mounted) return
+        setMiniAppDocuments({
+          worldcup: worldcup.status === 'fulfilled' && Array.isArray(worldcup.value) ? worldcup.value : [],
+          tier: tier.status === 'fulfilled' && Array.isArray(tier.value) ? tier.value : [],
+        })
+      })
+
+    return () => { mounted = false }
+  }, [user?.studentId])
 
   const parsedInterests = parseInterests(user?.interests)
   const selectedInterests = interestDraft ?? parsedInterests.selected
@@ -140,6 +163,22 @@ export default function ChangePassword({ onBack }) {
   const cardClass = 'rounded-lg border border-black/10 bg-[#f5f5f7] p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:p-5'
   const fieldCardClass = 'rounded-lg border border-black/8 bg-white/70 p-3'
   const helperTextClass = 'text-xs leading-5 text-[#86868b]'
+  const miniAppProfiles = [
+    {
+      key: 'worldcup',
+      label: 'COMS 월드컵',
+      description: '내가 만든 월드컵과 플레이 결과',
+      href: 'https://coms.kw.ac.kr/worldcup/',
+      documents: miniAppDocuments.worldcup,
+    },
+    {
+      key: 'tier',
+      label: 'COMS 티어표',
+      description: '내가 만든 티어표와 저장한 결과',
+      href: 'https://coms.kw.ac.kr/tier/',
+      documents: miniAppDocuments.tier,
+    },
+  ]
 
   const resetMessages = () => {
     setError('')
@@ -361,6 +400,50 @@ export default function ChangePassword({ onBack }) {
               {loadingAction === 'profile' ? '저장 중...' : '회원 정보 저장'}
             </button>
           </form>
+
+          <div className={`${cardClass} mt-4`}>
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="text-base font-bold">미니앱 저장함</h3>
+                <p className={helperTextClass}>월드컵과 티어표에서 저장한 템플릿·결과를 COMS 계정 기준으로 모아봅니다.</p>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {miniAppProfiles.map((profile) => {
+                const sharedCount = profile.documents.filter((document) => document.shared).length
+                return (
+                  <a
+                    key={profile.key}
+                    href={profile.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg border border-black/10 bg-white/72 p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:-translate-y-0.5 hover:bg-white"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-bold text-[#0066cc]">{profile.label}</p>
+                        <p className="mt-1 text-xs font-semibold leading-5 text-[#86868b]">{profile.description}</p>
+                      </div>
+                      <span className="rounded-full bg-[#e8f3ff] px-2.5 py-1 text-xs font-bold text-[#0066cc]">
+                        {profile.documents.length}개
+                      </span>
+                    </div>
+                    <p className="mt-3 text-xs font-semibold text-[#6e6e73]">공유 중 {sharedCount}개</p>
+                    <div className="mt-3 space-y-1">
+                      {profile.documents.slice(0, 2).map((document) => (
+                        <p key={`${document.contentType}-${document.contentId}`} className="truncate text-sm font-semibold text-[#1d1d1f]">
+                          {document.contentType === 'result' ? '결과' : '템플릿'} · {document.title}
+                        </p>
+                      ))}
+                      {profile.documents.length === 0 && (
+                        <p className="text-sm font-semibold text-[#86868b]">아직 저장한 항목이 없습니다.</p>
+                      )}
+                    </div>
+                  </a>
+                )
+              })}
+            </div>
+          </div>
 
           <div className={`${cardClass} mt-4`}>
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
