@@ -24,9 +24,10 @@ public class ClubActivity {
     @Column(nullable = false, length = 20)
     private Kind kind = Kind.ACTIVITY;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private Category category = Category.GENERAL;
+    // Category is a string key validated against the DB-backed
+    // club_activity_categories table (admin-managed CRUD), not a hardcoded enum.
+    @Column(nullable = false, length = 40)
+    private String category = "GENERAL";
 
     @Column(nullable = false, length = 120)
     private String title;
@@ -68,15 +69,11 @@ public class ClubActivity {
         ACTIVITY, SCHEDULE
     }
 
-    public enum Category {
-        GENERAL, SEMINAR, STUDY, PROJECT, MEETING, RECRUIT, EVENT, MT, ACHIEVEMENT
-    }
-
     public Long getId() { return id; }
     public Kind getKind() { return kind; }
     public void setKind(Kind kind) { this.kind = kind; }
-    public Category getCategory() { return category; }
-    public void setCategory(Category category) { this.category = category; }
+    public String getCategory() { return category; }
+    public void setCategory(String category) { this.category = category; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getDescription() { return description; }
