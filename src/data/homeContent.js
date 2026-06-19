@@ -151,6 +151,20 @@ export const companionServices = [
     href: 'https://dailycoding-final.com/',
     domain: 'dailycoding-final.com',
   },
+  {
+    title: 'BugSnap',
+    eyebrow: 'Bug report',
+    body: '오류 화면 스크린샷을 올리면 OCR로 텍스트를 추출해 GitHub Issue용 버그 리포트 초안을 만들어주는 도구입니다.',
+    href: 'https://coms.kw.ac.kr/BugSnap/',
+    domain: 'coms.kw.ac.kr/BugSnap',
+  },
+  {
+    title: 'LogDoctor',
+    eyebrow: 'Log triage',
+    body: '서버 에러 로그를 붙여넣으면 원인 후보와 확인·해결 절차를 정리해주는 개발자용 로그 분석 도구입니다.',
+    href: 'https://coms.kw.ac.kr/LogDoctor/',
+    domain: 'coms.kw.ac.kr/LogDoctor',
+  },
 ]
 
 export const sectionMetrics = {
