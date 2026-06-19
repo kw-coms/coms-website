@@ -1,0 +1,111 @@
+name: OpenAPI Drift Check
+
+on:
+  pull_request:
+
+jobs:
+  openapi-drift:
+    name: Verify committed openapi.json is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The Gradle toolchain pins Java 21 (Spring Boot 4 / Gradle 9.x); 17 will not compile.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Boot backend (H2 in-memory) and capture /v3/api-docs
+        working-directory: backend
+        env:
+          JWT_SECRET: coms-dev-only-secret-key-do-not-use-in-production!!
+        run: |
+          set -euo pipefail
+
+          # Boot the app on H2 in-memory so no external Postgres is needed.
+          ./gradlew bootRun \
+            --args='--spring.profiles.active=dev --spring.datasource.url=jdbc:h2:mem:comsdb;MODE=PostgreSQL --spring.jpa.hibernate.ddl-auto=create-drop' \
+            > "$RUNNER_TEMP/bootRun.log" 2>&1 &
+          BOOT_PID=$!
+          echo "BOOT_PID=$BOOT_PID" >> "$GITHUB_ENV"
+
+          # Health-check loop with timeout (~120s).
+          ready=0
+          for attempt in $(seq 1 60); do
+            if ! kill -0 "$BOOT_PID" 2>/dev/null; then
+              echo "Backend process exited before becoming ready." >&2
+              cat "$RUNNER_TEMP/bootRun.log" >&2 || true
+              exit 1
+            fi
+            if curl -fsS http://127.0.0.1:8080/v3/api-docs -o "$RUNNER_TEMP/openapi.live.json"; then
+              ready=1
+              echo "Backend is up after ${attempt} attempt(s)."
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            echo "Timed out waiting for /v3/api-docs." >&2
+            cat "$RUNNER_TEMP/bootRun.log" >&2 || true
+            exit 1
+          fi
+
+      - name: Normalize and compare against committed openapi.json
+        run: |
+          set -euo pipefail
+
+          # Normalize both documents (sorted keys, stable formatting) so that
+          # incidental ordering / whitespace differences never cause false drift.
+          python3 - "$RUNNER_TEMP/openapi.live.json" "backend/openapi.json" <<'PY'
+          import json, sys
+
+          live_path, committed_path = sys.argv[1], sys.argv[2]
+
+          def load(path):
+              with open(path, "r", encoding="utf-8") as f:
+                  return json.load(f)
+
+          def normalize(doc):
+              # Drop the "servers" block — springdoc derives it from the request Host
+              # header (localhost vs 127.0.0.1 vs the deployed host), which is an
+              # environment artifact, not real API drift.
+              doc.pop("servers", None)
+              return json.dumps(doc, sort_keys=True, indent=2, ensure_ascii=False)
+
+          live = normalize(load(live_path))
+          committed = normalize(load(committed_path))
+
+          with open("/tmp/openapi.live.norm.json", "w", encoding="utf-8") as f:
+              f.write(live)
+          with open("/tmp/openapi.committed.norm.json", "w", encoding="utf-8") as f:
+              f.write(committed)
+
+          if live != committed:
+              print("::error::OpenAPI drift detected — backend/openapi.json is out of date.")
+              print("Regenerate it from a running backend, e.g.:")
+              print("  curl -s http://127.0.0.1:8080/v3/api-docs -o backend/openapi.json")
+              print("then commit the updated file.")
+              sys.exit(1)
+
+          print("OpenAPI spec is up to date.")
+          PY
+
+      - name: Show normalized diff on failure
+        if: failure()
+        run: |
+          diff -u /tmp/openapi.committed.norm.json /tmp/openapi.live.norm.json || true
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -n "${BOOT_PID:-}" ]; then
+            kill "$BOOT_PID" 2>/dev/null || true
+            wait "$BOOT_PID" 2>/dev/null || true
+          fi

@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -41,18 +42,36 @@ public class NotificationService {
     private final MemberRepository memberRepository;
     private final EligibleMemberRepository eligibleMemberRepository;
     private final EmailVerificationSender mailSender;
+    private final PushNotificationSender pushNotificationSender;
     private final Set<String> acceptUrlAllowedHosts;
 
     public NotificationService(NotificationRepository notificationRepository,
                                MemberRepository memberRepository,
                                EligibleMemberRepository eligibleMemberRepository,
                                EmailVerificationSender mailSender,
+                               PushNotificationSender pushNotificationSender,
                                @Value("${notification.external-invite.allowed-hosts:coms.kw.ac.kr}") String allowedHosts) {
         this.notificationRepository = notificationRepository;
         this.memberRepository = memberRepository;
         this.eligibleMemberRepository = eligibleMemberRepository;
         this.mailSender = mailSender;
+        this.pushNotificationSender = pushNotificationSender;
         this.acceptUrlAllowedHosts = parseAllowedHosts(allowedHosts);
+    }
+
+    /**
+     * Best-effort FCM push. Wraps the sender (which itself never throws) in an extra guard so a
+     * push failure can never break the in-app notification transaction.
+     */
+    private void sendPush(String recipientStudentId, String title, String body, Map<String, String> data) {
+        if (recipientStudentId == null || recipientStudentId.isBlank()) {
+            return;
+        }
+        try {
+            pushNotificationSender.sendToMember(recipientStudentId, title, body, data);
+        } catch (RuntimeException e) {
+            log.warn("Push dispatch to {} failed (ignored)", recipientStudentId, e);
+        }
     }
 
     private static Set<String> parseAllowedHosts(String raw) {
@@ -66,6 +85,7 @@ public class NotificationService {
     }
 
     public void notifyPostComment(CommunityPost post, CommunityComment comment) {
+        String message = comment.getAuthorName() + " commented on your post.";
         createIfDifferent(
                 post.getAuthorStudentId(),
                 comment.getStudentId(),
@@ -73,11 +93,16 @@ public class NotificationService {
                 post.getId(),
                 comment.getId(),
                 null,
-                comment.getAuthorName() + " commented on your post."
+                message
         );
+        if (post.getAuthorStudentId() != null && !post.getAuthorStudentId().equals(comment.getStudentId())) {
+            sendPush(post.getAuthorStudentId(), "새 댓글", message,
+                    Map.of("type", "COMMENT_ON_POST", "postId", String.valueOf(post.getId())));
+        }
     }
 
     public void notifyCommentReply(CommunityPost post, CommunityComment parent, CommunityComment reply) {
+        String message = reply.getAuthorName() + " replied to your comment.";
         createIfDifferent(
                 parent.getStudentId(),
                 reply.getStudentId(),
@@ -85,8 +110,12 @@ public class NotificationService {
                 post.getId(),
                 reply.getId(),
                 null,
-                reply.getAuthorName() + " replied to your comment."
+                message
         );
+        if (parent.getStudentId() != null && !parent.getStudentId().equals(reply.getStudentId())) {
+            sendPush(parent.getStudentId(), "새 답글", message,
+                    Map.of("type", "REPLY_ON_COMMENT", "postId", String.valueOf(post.getId())));
+        }
     }
 
     public void notifyPostRestored(CommunityPost post, String adminStudentId, String adminName) {
@@ -268,7 +297,8 @@ public class NotificationService {
         String message = studentId.isBlank()
                 ? "새 지원서가 도착했습니다: " + applicantName
                 : "새 지원서가 도착했습니다: " + applicantName + " (" + studentId + ")";
-        List<Notification> notifications = memberRepository.findByRole(Member.Role.ADMIN).stream()
+        List<Member> admins = memberRepository.findByRole(Member.Role.ADMIN);
+        List<Notification> notifications = admins.stream()
                 .map(admin -> build(
                         admin.getStudentId(),
                         null,
@@ -281,11 +311,17 @@ public class NotificationService {
                 .toList();
         if (!notifications.isEmpty()) {
             notificationRepository.saveAll(notifications);
+            for (Member admin : admins) {
+                sendPush(admin.getStudentId(), "새 지원서", message,
+                        Map.of("type", "RECRUIT_APPLICATION"));
+            }
         }
     }
 
     public void notifyNoticeCreated(Notice notice) {
-        List<Notification> notifications = memberRepository.findAll().stream()
+        String message = "New notice: " + notice.getTitle();
+        List<Member> members = memberRepository.findAll();
+        List<Notification> notifications = members.stream()
                 .map(member -> build(
                         member.getStudentId(),
                         null,
@@ -293,10 +329,14 @@ public class NotificationService {
                         null,
                         null,
                         notice.getId(),
-                        "New notice: " + notice.getTitle()
+                        message
                 ))
                 .toList();
         notificationRepository.saveAll(notifications);
+        Map<String, String> data = Map.of("type", "NOTICE_CREATED", "noticeId", String.valueOf(notice.getId()));
+        for (Member member : members) {
+            sendPush(member.getStudentId(), "새 공지", message, data);
+        }
     }
 
     @Transactional(readOnly = true)
