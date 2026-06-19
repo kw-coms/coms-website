@@ -20,6 +20,10 @@ export async function listDeletedCommunityPosts(limit = 300) {
   return request(`/api/admin/community/deleted-posts?limit=${encodeURIComponent(limit)}`)
 }
 
+export async function getDeletedCommunityPost(id) {
+  return request(`/api/admin/community/deleted-posts/${id}`)
+}
+
 export async function restoreDeletedCommunityPost(id) {
   return request(`/api/admin/community/deleted-posts/${id}/restore`, { method: 'POST' })
 }

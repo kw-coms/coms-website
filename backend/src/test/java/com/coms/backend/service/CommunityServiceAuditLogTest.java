@@ -492,6 +492,70 @@ class CommunityServiceAuditLogTest {
     }
 
     @Test
+    void deletedPostDetailExposesArchivedCommentsAndImages() throws Exception {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member commenter = member("2025222222", "댓글러", Member.Role.USER);
+        Member admin = member("2026123456", "관리자", Member.Role.ADMIN);
+        memberRepository.save(author);
+        memberRepository.save(commenter);
+        memberRepository.save(admin);
+        MockMultipartFile cover = new MockMultipartFile("image", "cover.png", "image/png", "cover".getBytes());
+        MockMultipartFile inline = new MockMultipartFile("images", "inline.png", "image/png", "inline".getBytes());
+        var created = communityService.create(
+                author.getStudentId(),
+                new CommunityPostRequest("상세 보기 대상", "임시 본문", "GENERAL", false),
+                cover
+        );
+        Long inlineImageId = communityService.addImages(author.getStudentId(), created.id(), java.util.List.of(inline)).get(0);
+        String content = """
+                [{"type":"text","content":"상세 보기에서 보여야 하는 원문입니다."},
+                 {"type":"image","mediaId":%d,"name":"inline.png","width":75,"align":"center"}]
+                """.formatted(inlineImageId);
+        communityService.update(
+                author.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("상세 보기 대상", content, "GENERAL", false),
+                null
+        );
+        var root = communityService.addComment(
+                created.id(),
+                commenter.getStudentId(),
+                new CommunityCommentRequest("최상위 댓글", null)
+        );
+        communityService.addComment(
+                created.id(),
+                author.getStudentId(),
+                new CommunityCommentRequest("대댓글", root.id())
+        );
+
+        communityService.delete(admin.getStudentId(), created.id(), "상세 보기 증거 확인");
+        Long snapshotId = deletedCommunityPostRepository.findAll().get(0).getId();
+
+        DeletedCommunityPostResponse detail = communityDeletionArchiveService.detail(snapshotId);
+
+        assertThat(detail.id()).isEqualTo(snapshotId);
+        assertThat(detail.title()).isEqualTo("상세 보기 대상");
+        assertThat(detail.authorStudentId()).isEqualTo(author.getStudentId());
+        assertThat(detail.imageInfos())
+                .extracting(DeletedCommunityPostResponse.ImageInfo::originalName)
+                .containsExactly("cover.png", "inline.png");
+        assertThat(detail.imageInfos())
+                .allSatisfy(image -> assertThat(image.url())
+                        .startsWith("/api/admin/community/deleted-posts/" + snapshotId + "/images/"));
+        assertThat(detail.commentCount()).isEqualTo(2);
+        assertThat(detail.commentInfos())
+                .hasSize(2)
+                .satisfies(comments -> {
+                    assertThat(comments.get(0).content()).isEqualTo("최상위 댓글");
+                    assertThat(comments.get(0).depth()).isEqualTo(0);
+                    assertThat(comments.get(0).originalParentCommentId()).isNull();
+                    assertThat(comments.get(1).content()).isEqualTo("대댓글");
+                    assertThat(comments.get(1).depth()).isEqualTo(1);
+                    assertThat(comments.get(1).originalParentCommentId()).isEqualTo(comments.get(0).originalCommentId());
+                });
+    }
+
+    @Test
     void removingRestoredImageKeepsDeletedArchiveEvidenceReadable() throws Exception {
         Member author = member("2025123456", "작성자", Member.Role.USER);
         Member admin = member("2026123456", "관리자", Member.Role.ADMIN);

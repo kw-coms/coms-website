@@ -310,6 +310,9 @@
       },
       "CommentInfo": {
         "properties": {
+          "anonymousName": {
+            "type": "string"
+          },
           "authorName": {
             "type": "string"
           },
@@ -322,6 +325,10 @@
           "createdAt": {
             "format": "date-time",
             "type": "string"
+          },
+          "depth": {
+            "format": "int32",
+            "type": "integer"
           },
           "edited": {
             "type": "boolean"
@@ -2136,6 +2143,37 @@
                     "$ref": "#/components/schemas/DeletedCommunityPostResponse"
                   },
                   "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "admin-controller"
+        ]
+      }
+    },
+    "/api/admin/community/deleted-posts/{id}": {
+      "get": {
+        "operationId": "deletedCommunityPost",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedCommunityPostResponse"
                 }
               }
             },
