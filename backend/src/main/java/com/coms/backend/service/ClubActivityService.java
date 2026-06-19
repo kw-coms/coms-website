@@ -1,12 +1,17 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.ClubActivity;
+import com.coms.backend.domain.ClubActivityFile;
+import com.coms.backend.domain.ClubActivityImage;
 import com.coms.backend.domain.ClubActivityVote;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.ClubActivityResponse;
+import com.coms.backend.repository.ClubActivityFileRepository;
+import com.coms.backend.repository.ClubActivityImageRepository;
 import com.coms.backend.repository.ClubActivityRepository;
 import com.coms.backend.repository.ClubActivityVoteRepository;
 import com.coms.backend.repository.MemberRepository;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -30,6 +36,9 @@ import java.util.stream.Collectors;
 public class ClubActivityService {
 
     private static final long MAX_IMAGE_BYTES = 20L * 1024 * 1024;
+    private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
+    private static final int MAX_IMAGES_PER_ACTIVITY = 12;
+    private static final int MAX_FILES_PER_ACTIVITY = 10;
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
             "image/jpeg",
             "image/png",
@@ -41,15 +50,24 @@ public class ClubActivityService {
     private final MemberRepository memberRepository;
     private final StorageService storageService;
     private final ClubActivityVoteRepository voteRepository;
+    private final ClubActivityImageRepository imageRepository;
+    private final ClubActivityFileRepository fileRepository;
+    private final ClubActivityCategoryService categoryService;
 
     public ClubActivityService(ClubActivityRepository repository,
                                MemberRepository memberRepository,
                                StorageService storageService,
-                               ClubActivityVoteRepository voteRepository) {
+                               ClubActivityVoteRepository voteRepository,
+                               ClubActivityImageRepository imageRepository,
+                               ClubActivityFileRepository fileRepository,
+                               ClubActivityCategoryService categoryService) {
         this.repository = repository;
         this.memberRepository = memberRepository;
         this.storageService = storageService;
         this.voteRepository = voteRepository;
+        this.imageRepository = imageRepository;
+        this.fileRepository = fileRepository;
+        this.categoryService = categoryService;
     }
 
     @Transactional(readOnly = true)
@@ -61,8 +79,11 @@ public class ClubActivityService {
     public List<ClubActivityResponse> list(String studentId) {
         List<ClubActivity> activities = repository.findAllByOrderByEventDateDescCreatedAtDesc();
         Map<Long, VoteSummary> stats = voteStats(activities);
+        Map<String, String> categoryNames = categoryService.keyToNameMap();
+        Map<Long, List<ClubActivityImage>> images = imagesByActivity(activities);
+        Map<Long, List<ClubActivityFile>> files = filesByActivity(activities);
         return activities.stream()
-                .map(activity -> toResponse(activity, stats, studentId))
+                .map(activity -> toResponse(activity, stats, categoryNames, images, files, studentId))
                 .toList();
     }
 
@@ -70,7 +91,7 @@ public class ClubActivityService {
         ClubActivity activity = get(id);
         activity.incrementViewCount();
         ClubActivity saved = repository.save(activity);
-        return toResponse(saved, voteStats(List.of(saved)), studentId);
+        return toResponse(saved, studentId);
     }
 
     public ClubActivityResponse vote(String studentId, Long id, int value) {
@@ -90,7 +111,7 @@ public class ClubActivityService {
             vote.setValue(1);
             voteRepository.save(vote);
         }
-        return toResponse(activity, voteStats(List.of(activity)), studentId);
+        return toResponse(activity, studentId);
     }
 
     public ClubActivityResponse create(String kind,
@@ -101,7 +122,7 @@ public class ClubActivityService {
                                        MultipartFile image,
                                        String creatorStudentId) throws IOException {
         ClubActivity.Kind parsedKind = parseKind(kind);
-        ClubActivity.Category parsedCategory = parseCategory(category);
+        String categoryKey = resolveCategory(category);
         if (title == null || title.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Activity title is required.");
         }
@@ -114,7 +135,7 @@ public class ClubActivityService {
 
         ClubActivity activity = new ClubActivity();
         activity.setKind(parsedKind);
-        activity.setCategory(parsedCategory);
+        activity.setCategory(categoryKey);
         activity.setTitle(title.trim());
         activity.setDescription(description != null && !description.isBlank() ? description.trim() : null);
         activity.setEventDate(eventDate);
@@ -140,11 +161,150 @@ public class ClubActivityService {
 
         try {
             ClubActivity saved = repository.save(activity);
-            return toResponse(saved, voteStats(List.of(saved)), creatorStudentId);
+            // Mirror the legacy single image into the new image table so all images
+            // flow through the same multi-image rendering path.
+            if (storedImage != null) {
+                imageRepository.save(new ClubActivityImage(saved.getId(), storedImage,
+                        activity.getImageOriginalName(), activity.getImageMimeType(), 0));
+            }
+            return toResponse(saved, creatorStudentId);
         } catch (RuntimeException e) {
             if (storedImage != null) storageService.delete(storedImage);
             throw e;
         }
+    }
+
+    public ClubActivityResponse update(Long id,
+                                       String kind,
+                                       String category,
+                                       String title,
+                                       String description,
+                                       LocalDate eventDate,
+                                       String editorStudentId) {
+        ClubActivity activity = get(id);
+        if (kind != null && !kind.isBlank()) {
+            activity.setKind(parseKind(kind));
+        }
+        if (category != null && !category.isBlank()) {
+            activity.setCategory(resolveCategory(category));
+        }
+        if (title != null) {
+            if (title.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Activity title is required.");
+            }
+            activity.setTitle(title.trim());
+        }
+        if (description != null) {
+            activity.setDescription(description.isBlank() ? null : description.trim());
+        }
+        if (eventDate != null) {
+            activity.setEventDate(eventDate);
+        }
+        activity.setUpdatedAt(LocalDateTime.now());
+        ClubActivity saved = repository.save(activity);
+        return toResponse(saved, editorStudentId);
+    }
+
+    public List<Long> addImages(Long id, List<MultipartFile> images) {
+        if (images == null || images.isEmpty()) return List.of();
+        ClubActivity activity = get(id);
+        List<ClubActivityImage> existing = imageRepository.findByClubActivityIdOrderByPositionAsc(id);
+        long uploadCount = images.stream().filter(image -> image != null && !image.isEmpty()).count();
+        if (existing.size() + uploadCount > MAX_IMAGES_PER_ACTIVITY) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "활동 사진은 최대 " + MAX_IMAGES_PER_ACTIVITY + "개까지 업로드할 수 있습니다.");
+        }
+        int startPos = existing.size();
+        List<Long> createdIds = new ArrayList<>();
+        int offset = 0;
+        for (MultipartFile image : images) {
+            if (image == null || image.isEmpty()) continue;
+            validateImage(image);
+            try {
+                String stored = storageService.storeImage(image, image.getContentType());
+                ClubActivityImage saved = imageRepository.save(new ClubActivityImage(
+                        activity.getId(), stored, cleanOriginalFilename(image), image.getContentType(), startPos + offset));
+                createdIds.add(saved.getId());
+                offset++;
+            } catch (IOException e) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 저장에 실패했습니다.");
+            }
+        }
+        return createdIds;
+    }
+
+    public void deleteImage(Long id, Long imageId) {
+        ClubActivityImage image = imageRepository.findById(imageId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!image.getClubActivityId().equals(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        storageService.delete(image.getStoredName());
+        imageRepository.delete(image);
+    }
+
+    public Long addFile(Long id, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부할 파일을 선택하세요.");
+        }
+        ClubActivity activity = get(id);
+        if (file.getSize() > MAX_FILE_BYTES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부 파일은 50MB 이하만 업로드할 수 있습니다.");
+        }
+        List<ClubActivityFile> existing = fileRepository.findByClubActivityIdOrderByPositionAsc(id);
+        if (existing.size() >= MAX_FILES_PER_ACTIVITY) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "첨부 파일은 최대 " + MAX_FILES_PER_ACTIVITY + "개까지 업로드할 수 있습니다.");
+        }
+        try {
+            String stored = storageService.store(file);
+            String contentType = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
+            ClubActivityFile saved = fileRepository.save(new ClubActivityFile(
+                    activity.getId(), stored, cleanOriginalFilename(file), contentType, existing.size()));
+            return saved.getId();
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장에 실패했습니다.");
+        }
+    }
+
+    public void deleteFile(Long id, Long fileId) {
+        ClubActivityFile file = fileRepository.findById(fileId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!file.getClubActivityId().equals(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        storageService.delete(file.getStoredName());
+        fileRepository.delete(file);
+    }
+
+    @Transactional(readOnly = true)
+    public ClubActivityImage loadImageMeta(Long id, Long imageId) {
+        ClubActivityImage image = imageRepository.findById(imageId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!image.getClubActivityId().equals(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return image;
+    }
+
+    @Transactional(readOnly = true)
+    public Resource loadImageResource(Long id, Long imageId) {
+        return storageService.load(loadImageMeta(id, imageId).getStoredName());
+    }
+
+    @Transactional(readOnly = true)
+    public ClubActivityFile loadFileMeta(Long id, Long fileId) {
+        ClubActivityFile file = fileRepository.findById(fileId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!file.getClubActivityId().equals(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return file;
+    }
+
+    @Transactional(readOnly = true)
+    public Resource loadFileResource(Long id, Long fileId) {
+        return storageService.load(loadFileMeta(id, fileId).getStoredName());
     }
 
     @Transactional(readOnly = true)
@@ -155,6 +315,14 @@ public class ClubActivityService {
 
     public void delete(Long id) {
         ClubActivity activity = get(id);
+        for (ClubActivityImage image : imageRepository.findByClubActivityIdOrderByPositionAsc(id)) {
+            storageService.delete(image.getStoredName());
+        }
+        for (ClubActivityFile file : fileRepository.findByClubActivityIdOrderByPositionAsc(id)) {
+            storageService.delete(file.getStoredName());
+        }
+        imageRepository.deleteByClubActivityId(id);
+        fileRepository.deleteByClubActivityId(id);
         if (activity.getImageStoredName() != null) {
             storageService.delete(activity.getImageStoredName());
         }
@@ -172,15 +340,10 @@ public class ClubActivityService {
         }
     }
 
-    private ClubActivity.Category parseCategory(String value) {
-        if (value == null || value.isBlank()) {
-            return ClubActivity.Category.GENERAL;
-        }
-        try {
-            return ClubActivity.Category.valueOf(value.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid activity category.");
-        }
+    private String resolveCategory(String value) {
+        String key = value == null || value.isBlank() ? "GENERAL" : value.trim();
+        categoryService.requireValidKey(key);
+        return key;
     }
 
     private void validateImage(MultipartFile image) {
@@ -211,17 +374,79 @@ public class ClubActivityService {
                 ));
     }
 
-    private ClubActivityResponse toResponse(ClubActivity activity, Map<Long, VoteSummary> voteStats, String studentId) {
+    private Map<Long, List<ClubActivityImage>> imagesByActivity(List<ClubActivity> activities) {
+        List<Long> ids = activities.stream().map(ClubActivity::getId).filter(Objects::nonNull).toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return imageRepository.findByClubActivityIdInOrderByPositionAsc(ids).stream()
+                .collect(Collectors.groupingBy(ClubActivityImage::getClubActivityId));
+    }
+
+    private Map<Long, List<ClubActivityFile>> filesByActivity(List<ClubActivity> activities) {
+        List<Long> ids = activities.stream().map(ClubActivity::getId).filter(Objects::nonNull).toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return fileRepository.findByClubActivityIdInOrderByPositionAsc(ids).stream()
+                .collect(Collectors.groupingBy(ClubActivityFile::getClubActivityId));
+    }
+
+    private ClubActivityResponse toResponse(ClubActivity activity, String studentId) {
+        return toResponse(activity, voteStats(List.of(activity)), categoryService.keyToNameMap(),
+                imagesByActivity(List.of(activity)), filesByActivity(List.of(activity)), studentId);
+    }
+
+    private ClubActivityResponse toResponse(ClubActivity activity,
+                                            Map<Long, VoteSummary> voteStats,
+                                            Map<String, String> categoryNames,
+                                            Map<Long, List<ClubActivityImage>> imagesByActivity,
+                                            Map<Long, List<ClubActivityFile>> filesByActivity,
+                                            String studentId) {
         VoteSummary votes = voteStats.getOrDefault(activity.getId(), VoteSummary.EMPTY);
+        List<ClubActivityImage> images = imagesByActivity.getOrDefault(activity.getId(), List.of());
+        List<ClubActivityFile> files = filesByActivity.getOrDefault(activity.getId(), List.of());
+
+        List<ClubActivityResponse.MediaInfo> imageInfos = images.stream()
+                .map(img -> new ClubActivityResponse.MediaInfo(
+                        img.getId(),
+                        "/api/club-activities/" + activity.getId() + "/images/" + img.getId(),
+                        img.getOriginalName()))
+                .toList();
+        List<ClubActivityResponse.MediaInfo> fileInfos = files.stream()
+                .map(file -> new ClubActivityResponse.MediaInfo(
+                        file.getId(),
+                        "/api/club-activities/" + activity.getId() + "/files/" + file.getId() + "/download",
+                        file.getOriginalName()))
+                .toList();
+
+        // Backward-compatible primary image url: prefer the first multi-image,
+        // otherwise the legacy single-image endpoint.
+        String primaryImageUrl;
+        String primaryImageName;
+        if (!imageInfos.isEmpty()) {
+            primaryImageUrl = imageInfos.get(0).url();
+            primaryImageName = imageInfos.get(0).originalName();
+        } else if (activity.getImageStoredName() != null) {
+            primaryImageUrl = "/api/club-activities/" + activity.getId() + "/image";
+            primaryImageName = activity.getImageOriginalName();
+        } else {
+            primaryImageUrl = null;
+            primaryImageName = null;
+        }
+
         return new ClubActivityResponse(
                 activity.getId(),
                 activity.getKind().name(),
-                activity.getCategory().name(),
+                activity.getCategory(),
+                categoryNames.getOrDefault(activity.getCategory(), activity.getCategory()),
                 activity.getTitle(),
                 activity.getDescription(),
                 activity.getEventDate(),
-                activity.getImageStoredName() == null ? null : "/api/club-activities/" + activity.getId() + "/image",
-                activity.getImageOriginalName(),
+                primaryImageUrl,
+                primaryImageName,
+                imageInfos,
+                fileInfos,
                 activity.getCreatedByName(),
                 activity.getViewCount(),
                 votes.upvotes(),
