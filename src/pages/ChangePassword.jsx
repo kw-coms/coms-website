@@ -10,8 +10,7 @@ import { BUILT_IN_FONTS, fontFamilyValue } from '../services/fontPreferences.js'
 import { listProfileMiniAppDocuments } from '../services/miniAppsApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 import { getLogoAsset } from '../utils/logoAssets.js'
-
-const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?])(?!.*\s).{8,}$/
+import { PASSWORD_PATTERN, PASSWORD_MESSAGE } from '../utils/passwordPolicy.js'
 const OTHER_INTEREST = '기타'
 const INTEREST_OPTIONS = ['보안', '웹', '앱']
 
@@ -262,7 +261,7 @@ export default function ChangePassword({ onBack }) {
     resetMessages()
 
     if (!PASSWORD_PATTERN.test(newPassword)) {
-      setError('비밀번호는 8자 이상, 영문·숫자·특수문자를 모두 포함하고 공백이 없어야 합니다.')
+      setError(PASSWORD_MESSAGE)
       return
     }
     if (newPassword !== confirmPassword) {

@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,9 +28,12 @@ class RecruitApplicationServiceTest {
     @Test
     void sendApplicationSendsMailToRecruitRecipient() {
         JavaMailSender mailSender = mock(JavaMailSender.class);
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.save(any(RecruitApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
         RecruitApplicationService service = new RecruitApplicationService(
                 mailSender,
-                mock(RecruitApplicationRepository.class),
+                repository,
+                mock(NotificationService.class),
                 true,
                 "no-reply@coms.kw.ac.kr",
                 "recruit@coms.kw.ac.kr"
@@ -61,25 +65,37 @@ class RecruitApplicationServiceTest {
     }
 
     @Test
-    void sendApplicationFailsWhenMailIsDisabled() {
+    void sendApplicationPersistsAndNotifiesAdminsEvenWhenMailDisabled() {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.save(any(RecruitApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        NotificationService notificationService = mock(NotificationService.class);
         RecruitApplicationService service = new RecruitApplicationService(
-                mock(JavaMailSender.class),
-                mock(RecruitApplicationRepository.class),
+                mailSender,
+                repository,
+                notificationService,
                 false,
                 "no-reply@coms.kw.ac.kr",
                 "recruit@coms.kw.ac.kr"
         );
 
-        assertThatThrownBy(() -> service.sendApplication(sampleRequest(), "127.0.0.1"))
-                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
-                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
+        // Mail disabled must NOT lose the application: it is still saved and admins are
+        // alerted in-app. No email is attempted, and no exception is thrown.
+        service.sendApplication(sampleRequest(), "127.0.0.1");
+
+        verify(repository).save(any(RecruitApplication.class));
+        verify(notificationService).notifyRecruitApplication(any(RecruitApplication.class));
+        verify(mailSender, never()).send(any(SimpleMailMessage.class));
     }
 
     @Test
     void sendApplicationRateLimitsRepeatedSubmissionsFromSameClient() {
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.save(any(RecruitApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
         RecruitApplicationService service = new RecruitApplicationService(
                 mock(JavaMailSender.class),
-                mock(RecruitApplicationRepository.class),
+                repository,
+                mock(NotificationService.class),
                 true,
                 "no-reply@coms.kw.ac.kr",
                 "recruit@coms.kw.ac.kr"
@@ -99,9 +115,11 @@ class RecruitApplicationServiceTest {
         JavaMailSender mailSender = mock(JavaMailSender.class);
         RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
         when(repository.save(any(RecruitApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        NotificationService notificationService = mock(NotificationService.class);
         RecruitApplicationService service = new RecruitApplicationService(
                 mailSender,
                 repository,
+                notificationService,
                 true,
                 "no-reply@coms.kw.ac.kr",
                 "recruit@coms.kw.ac.kr"
@@ -117,6 +135,9 @@ class RecruitApplicationServiceTest {
         assertThat(saved.getStatus()).isEqualTo(RecruitApplication.Status.RECEIVED);
         assertThat(saved.getClientIp()).isEqualTo("203.0.113.9");
         assertThat(saved.getInterests()).isEqualTo("웹, 기타: AI");
+
+        // Admins are alerted in-app for every received application.
+        verify(notificationService).notifyRecruitApplication(any(RecruitApplication.class));
     }
 
     @Test
@@ -128,6 +149,7 @@ class RecruitApplicationServiceTest {
         RecruitApplicationService service = new RecruitApplicationService(
                 mock(JavaMailSender.class),
                 repository,
+                mock(NotificationService.class),
                 true,
                 "no-reply@coms.kw.ac.kr",
                 "recruit@coms.kw.ac.kr"
@@ -151,6 +173,7 @@ class RecruitApplicationServiceTest {
         RecruitApplicationService service = new RecruitApplicationService(
                 mock(JavaMailSender.class),
                 repository,
+                mock(NotificationService.class),
                 true,
                 "no-reply@coms.kw.ac.kr",
                 "recruit@coms.kw.ac.kr"
