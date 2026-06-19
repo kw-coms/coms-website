@@ -9,8 +9,7 @@ import {
 import { useAuth } from '../contexts/useAuth.js'
 import { getLogoAsset } from '../utils/logoAssets.js'
 import { EmailVerifyStep } from '../components/EmailVerifyStep.jsx'
-
-const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?])(?!.*\s).{8,}$/
+import { PASSWORD_PATTERN, PASSWORD_MESSAGE } from '../utils/passwordPolicy.js'
 
 const panelClass =
   'rounded-lg border border-black/10 bg-white/86 p-5 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:p-8'
@@ -191,7 +190,7 @@ export default function Login({ onCancel, onSuccess, goSignup }) {
       return
     }
     if (!PASSWORD_PATTERN.test(newPassword)) {
-      setResetError('비밀번호는 8자 이상, 영문·숫자·특수문자를 모두 포함하고 공백이 없어야 합니다.')
+      setResetError(PASSWORD_MESSAGE)
       return
     }
     if (newPassword !== resetForm.newPasswordConfirm) {

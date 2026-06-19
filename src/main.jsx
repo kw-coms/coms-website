@@ -1,9 +1,16 @@
 import { Component, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 import App from './App.jsx'
 import { AuthProvider } from './contexts/AuthContext.jsx'
+import { queryClient } from './services/queryClient.js'
+import { captureError, initObservability } from './services/observability.js'
+
+const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0'
+
+initObservability({ release: `coms-website@${APP_VERSION}` })
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -13,6 +20,10 @@ class ErrorBoundary extends Component {
 
   static getDerivedStateFromError() {
     return { hasError: true }
+  }
+
+  componentDidCatch(error, info) {
+    captureError(error, { componentStack: info?.componentStack })
   }
 
   render() {
@@ -37,11 +48,13 @@ class ErrorBoundary extends Component {
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
-      <BrowserRouter>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </BrowserRouter>
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </BrowserRouter>
+      </QueryClientProvider>
     </ErrorBoundary>
   </StrictMode>,
 )

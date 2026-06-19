@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Download, RefreshCw, RotateCcw } from 'lucide-react'
 import { apiUrl } from '../services/apiClient.js'
 import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache, listCommunityReports, listDeletedCommunityPosts, restoreDeletedCommunityPost, resolveCommunityReport, listRecruitApplications, updateRecruitApplicationStatus } from '../services/adminApi.js'
@@ -95,9 +96,18 @@ const RECRUIT_STATUS_OPTIONS = [
 
 const RECRUIT_PENDING_STATUSES = new Set(['RECEIVED', 'REVIEWING', 'HOLD'])
 
+const ADMIN_TAB_IDS = new Set([
+  'overview', 'members', 'recruit', 'roster', 'activities', 'files',
+  'fonts', 'community', 'deleted-posts', 'screen-check', 'ban', 'logs',
+])
+
 export default function Admin({ onBack }) {
   const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState('overview')
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState(() => {
+    const requested = searchParams.get('tab')
+    return requested && ADMIN_TAB_IDS.has(requested) ? requested : 'overview'
+  })
   const [recruitApplications, setRecruitApplications] = useState([])
   const [recruitLoading, setRecruitLoading] = useState(true)
   const [recruitError, setRecruitError] = useState('')

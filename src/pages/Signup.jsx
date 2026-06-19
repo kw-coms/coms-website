@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { CheckCircle2, Mail, Send, UserRound } from 'lucide-react'
 import { signupUser } from '../services/authApi.js'
 import { EmailVerifyStep } from '../components/EmailVerifyStep.jsx'
+import { PASSWORD_PATTERN } from '../utils/passwordPolicy.js'
 
 const CURRENT_SIGNUP = 'current'
 const GRADUATE_SIGNUP = 'graduate'
@@ -17,7 +18,6 @@ const STUDENT_ID_PATTERN = /^\d{10}$/
 const NAME_PATTERN = /^[가-힣]{3}$/
 const TWO_DIGIT_PATTERN = /^\d{2}$/
 const GENERATION_PATTERN = /^\d{1,3}$/
-const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,}$/
 
 const inputClass =
   'w-full min-h-12 min-w-0 rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f] outline-none placeholder:text-[#86868b] transition focus:ring-2 focus:ring-[#0071e3]/24'

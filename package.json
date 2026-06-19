@@ -1,7 +1,7 @@
 {
   "name": "coms-website",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,6 +14,8 @@
     "smoke": "npm run build && playwright test --project=smoke"
   },
   "dependencies": {
+    "@sentry/react": "^10.59.0",
+    "@tanstack/react-query": "^5.101.0",
     "lucide-react": "^0.542.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

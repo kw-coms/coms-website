@@ -260,6 +260,30 @@ public class NotificationService {
         return new ExternalInviteBatchResult(accepted, unknown, rejected);
     }
 
+    public void notifyRecruitApplication(com.coms.backend.domain.RecruitApplication application) {
+        String applicantName = application.getName() == null || application.getName().isBlank()
+                ? "지원자"
+                : application.getName().trim();
+        String studentId = application.getStudentId() == null ? "" : application.getStudentId().trim();
+        String message = studentId.isBlank()
+                ? "새 지원서가 도착했습니다: " + applicantName
+                : "새 지원서가 도착했습니다: " + applicantName + " (" + studentId + ")";
+        List<Notification> notifications = memberRepository.findByRole(Member.Role.ADMIN).stream()
+                .map(admin -> build(
+                        admin.getStudentId(),
+                        null,
+                        Notification.Type.RECRUIT_APPLICATION,
+                        null,
+                        null,
+                        null,
+                        message
+                ))
+                .toList();
+        if (!notifications.isEmpty()) {
+            notificationRepository.saveAll(notifications);
+        }
+    }
+
     public void notifyNoticeCreated(Notice notice) {
         List<Notification> notifications = memberRepository.findAll().stream()
                 .map(member -> build(

@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getCurrentUser, logoutUser } from '../services/authApi.js'
+import { setUserContext } from '../services/observability.js'
 import { AuthContext } from './useAuth.js'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+
+  // Keep Sentry's user context in sync with the session (no-op when Sentry is disabled).
+  useEffect(() => {
+    setUserContext(user)
+  }, [user])
 
   useEffect(() => {
     let mounted = true
