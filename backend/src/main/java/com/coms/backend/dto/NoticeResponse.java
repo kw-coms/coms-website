@@ -9,6 +9,9 @@ public record NoticeResponse(
         String author,
         boolean pinned,
         String category,
+        long viewCount,
+        long upvotes,
+        int myVote,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {

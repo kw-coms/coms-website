@@ -13,6 +13,9 @@ public record ClubActivityResponse(
         String imageUrl,
         String imageOriginalName,
         String createdByName,
+        long viewCount,
+        long upvotes,
+        int myVote,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
