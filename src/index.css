@@ -48,6 +48,11 @@
 	--app-subtle: #9a9aa1;
 	--app-hairline: rgba(255, 255, 255, 0.16);
 	--app-hairline-strong: rgba(255, 255, 255, 0.26);
+	--app-accent: #2997ff;
+	--app-accent-hover: #4aa8ff;
+	--app-accent-soft: rgba(41, 151, 255, 0.16);
+	--app-accent-text: #6cb6ff;
+	--app-accent-border: color-mix(in srgb, var(--app-accent) 42%, transparent);
 	--theme-bg: var(--app-bg);
 	--theme-text: var(--app-text);
 	--theme-title: var(--app-text);
@@ -506,20 +511,6 @@ select {
 
 .apple-showcase-strip {
 	background: var(--app-bg) !important;
-}
-
-.apple-showcase-card-dark {
-	background: #1d1d1f !important;
-	border-color: rgba(255, 255, 255, 0.12) !important;
-	box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18) !important;
-}
-
-.apple-showcase-card-plain {
-	background: var(--app-surface) !important;
-}
-
-.apple-showcase-card-soft {
-	background: linear-gradient(135deg, var(--app-accent-soft), var(--app-surface) 64%) !important;
 }
 
 .activity-proof-section,
@@ -1084,7 +1075,7 @@ select {
 	overflow: hidden;
 	border-radius: 0.45rem;
 	padding: 0.35rem 0.45rem;
-	color: #1d1d1f;
+	color: var(--app-text);
 	font-size: 0.75rem;
 	font-weight: 800;
 	line-height: 1.25;
@@ -1093,33 +1084,33 @@ select {
 }
 
 .club-calendar-event-seminar {
-	background: color-mix(in srgb, #00a7c7 18%, #ffffff);
+	background: color-mix(in srgb, #00a7c7 20%, var(--app-surface));
 }
 
 .club-calendar-event-study {
-	background: color-mix(in srgb, #34c759 18%, #ffffff);
+	background: color-mix(in srgb, #34c759 20%, var(--app-surface));
 }
 
 .club-calendar-event-meeting {
-	background: color-mix(in srgb, #8e5cf7 18%, #ffffff);
+	background: color-mix(in srgb, #8e5cf7 20%, var(--app-surface));
 }
 
 .club-calendar-event-project {
-	background: color-mix(in srgb, #0071e3 18%, #ffffff);
+	background: color-mix(in srgb, #0071e3 20%, var(--app-surface));
 }
 
 .club-calendar-event-recruit {
-	background: color-mix(in srgb, #ff9f0a 24%, #ffffff);
+	background: color-mix(in srgb, #ff9f0a 26%, var(--app-surface));
 }
 
 .club-calendar-event-event {
-	background: color-mix(in srgb, #d70015 15%, #ffffff);
+	background: color-mix(in srgb, #d70015 18%, var(--app-surface));
 }
 
 .club-calendar-event-general,
 .club-calendar-event-mt,
 .club-calendar-event-achievement {
-	background: color-mix(in srgb, var(--app-accent) 16%, #ffffff);
+	background: color-mix(in srgb, var(--app-accent) 18%, var(--app-surface));
 }
 
 .calendar-empty-state {
@@ -1137,11 +1128,6 @@ select {
 .calendar-empty-state span {
 	display: inline-block;
 	margin-inline: 0.2rem;
-}
-
-.apple-showcase-card-plain h3,
-.apple-showcase-card-soft h3 {
-	color: var(--app-text) !important;
 }
 
 .apple-home-hero > .relative.z-10 {

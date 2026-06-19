@@ -1314,7 +1314,7 @@ function ActivityLogSection({ compact = false }) {
   }
 
   return (
-    <section id="activity-log" className={`activity-proof-section ${compact ? 'activity-proof-section-compact' : ''} scroll-mt-24 bg-white px-5 py-12 sm:py-16`}>
+    <section id="activity-log" className={`activity-proof-section ${compact ? 'activity-proof-section-compact' : ''} scroll-mt-24 bg-[var(--app-surface)] px-5 py-12 sm:py-16`}>
       <div className="mx-auto max-w-7xl">
         <div className="grid gap-8 lg:grid-cols-[0.62fr_1fr] lg:items-end">
           <div>
@@ -1325,8 +1325,8 @@ function ActivityLogSection({ compact = false }) {
             </p>
           </div>
           <div className="activity-proof-note apple-soft-panel px-5 py-5">
-            <p className="text-sm font-semibold text-[#1d1d1f]">기록 방식</p>
-            <p className="mt-2 text-sm font-medium leading-6 text-[#6e6e73]">
+            <p className="text-sm font-semibold text-[var(--app-text)]">기록 방식</p>
+            <p className="mt-2 text-sm font-medium leading-6 text-[var(--app-muted)]">
               세미나, 스터디, 프로젝트 발표, MT/행사, 수상/성과처럼 실제 확인된 항목만 활동 로그에 노출합니다.
             </p>
           </div>
@@ -1394,22 +1394,22 @@ function ActivityLogSection({ compact = false }) {
 
         {!compact && !isLocked && !authLoading && !loading && !loadError && (
           <div className="activity-log-filters mt-8 flex flex-wrap items-end gap-3">
-            <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs font-semibold text-[#6e6e73]">
+            <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
               <span>검색</span>
               <input
                 type="search"
                 value={searchText}
                 onChange={(event) => setSearchText(event.target.value)}
                 placeholder="제목, 내용, 작성자로 검색"
-                className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/40"
+                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
               />
             </label>
-            <label className="flex flex-col gap-1 text-xs font-semibold text-[#6e6e73]">
+            <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
               <span>분류</span>
               <select
                 value={categoryFilter}
                 onChange={(event) => setCategoryFilter(event.target.value)}
-                className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/40"
+                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
               >
                 <option value="ALL">전체 분류</option>
                 {categories.map((category) => (
@@ -1417,29 +1417,29 @@ function ActivityLogSection({ compact = false }) {
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1 text-xs font-semibold text-[#6e6e73]">
+            <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
               <span>시작일</span>
               <input
                 type="date"
                 value={fromDate}
                 onChange={(event) => setFromDate(event.target.value)}
-                className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/40"
+                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
               />
             </label>
-            <label className="flex flex-col gap-1 text-xs font-semibold text-[#6e6e73]">
+            <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
               <span>종료일</span>
               <input
                 type="date"
                 value={toDate}
                 onChange={(event) => setToDate(event.target.value)}
-                className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/40"
+                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
               />
             </label>
             {hasActiveFilters && (
               <button
                 type="button"
                 onClick={() => { setSearchText(''); setCategoryFilter('ALL'); setFromDate(''); setToDate('') }}
-                className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-[#0066cc] transition hover:bg-black/5"
+                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--app-accent-text)] transition hover:bg-[var(--app-surface-soft)]"
               >
                 필터 초기화
               </button>
@@ -1518,7 +1518,7 @@ function ActivityLogSection({ compact = false }) {
                         <li key={file.id}>
                           <a
                             href={file.url}
-                            className="inline-flex items-center gap-1 font-semibold text-[#0066cc] underline-offset-2 hover:underline"
+                            className="inline-flex items-center gap-1 font-semibold text-[var(--app-accent-text)] underline-offset-2 hover:underline"
                           >
                             <Download size={13} aria-hidden="true" />
                             {file.originalName || '첨부파일'}
@@ -1527,13 +1527,13 @@ function ActivityLogSection({ compact = false }) {
                       ))}
                     </ul>
                   )}
-                  <div className="mt-3 flex items-center gap-3 text-xs font-semibold text-[#6e6e73]">
+                  <div className="mt-3 flex items-center gap-3 text-xs font-semibold text-[var(--app-muted)]">
                     <span>조회 {item.viewCount ?? 0}</span>
                     <button
                       type="button"
                       onClick={() => handleActivityVote(item)}
                       disabled={votingId === item.id}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black transition disabled:opacity-50 ${item.myVote === 1 ? 'border-[#0071e3] bg-[#0071e3] text-white' : 'border-black/10 bg-white text-[#0066cc]'}`}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black transition disabled:opacity-50 ${item.myVote === 1 ? 'border-[var(--app-accent)] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
                     >
                       <ThumbsUp size={14} />
                       개추 {item.upvotes ?? 0}
@@ -1635,7 +1635,7 @@ function ClubCalendarSection({ compact = false }) {
   }
 
   return (
-    <section id="monthly-calendar" className={`club-calendar-section ${compact ? 'club-calendar-section-compact' : ''} scroll-mt-24 bg-[#f5f5f7] px-5 py-12 sm:py-16`}>
+    <section id="monthly-calendar" className={`club-calendar-section ${compact ? 'club-calendar-section-compact' : ''} scroll-mt-24 bg-[var(--app-surface-soft)] px-5 py-12 sm:py-16`}>
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -2232,17 +2232,17 @@ function HomeView() {
 
         <section className="apple-showcase-strip bg-white px-5 py-4 sm:py-6">
           <div className="mx-auto grid max-w-7xl gap-3 lg:grid-cols-3">
-            {showcaseItems.map((item, index) => (
+            {showcaseItems.map((item) => (
               <button
                 key={item.title}
                 type="button"
                 onClick={() => openPanel(item.target)}
-                className={`apple-product-panel apple-showcase-card group min-h-[12rem] px-6 py-6 text-left transition hover:-translate-y-0.5 ${index === 0 ? 'apple-showcase-card-dark text-white' : index === 1 ? 'apple-showcase-card-plain text-[#1d1d1f]' : 'apple-showcase-card-soft text-[#1d1d1f]'}`}
+                className="apple-product-panel apple-showcase-card group flex min-h-[12rem] flex-col px-6 py-6 text-left text-[var(--app-text)] transition hover:-translate-y-0.5"
               >
-                <p className={`text-sm font-semibold ${index === 0 ? 'text-white/58' : 'text-[#0066cc]'}`}>{item.eyebrow}</p>
-                <h3 className="mt-3 text-3xl font-semibold leading-tight tracking-normal">{item.title}</h3>
-                <p className={`mt-4 max-w-sm leading-7 ${index === 0 ? 'text-white/70' : 'text-[#6e6e73]'}`}>{item.body}</p>
-                <span className={`mt-8 inline-flex rounded-full px-4 py-2 text-sm font-semibold ${index === 0 ? 'bg-white text-[#1d1d1f]' : 'bg-[#0071e3] text-white'}`}>더 보기</span>
+                <p className="text-sm font-semibold text-[var(--app-accent-text)]">{item.eyebrow}</p>
+                <h3 className="mt-3 text-3xl font-semibold leading-tight tracking-normal text-[var(--app-text)]">{item.title}</h3>
+                <p className="mt-4 max-w-sm leading-7 text-[var(--app-muted)]">{item.body}</p>
+                <span className="apple-action-primary mt-8 inline-flex w-fit items-center px-4 py-2 text-sm">더 보기</span>
               </button>
             ))}
           </div>
