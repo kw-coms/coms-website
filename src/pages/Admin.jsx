@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Download, RefreshCw, RotateCcw } from 'lucide-react'
+import { Download, Eye, RefreshCw, RotateCcw, X } from 'lucide-react'
 import { apiUrl } from '../services/apiClient.js'
-import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache, listCommunityReports, listDeletedCommunityPosts, restoreDeletedCommunityPost, resolveCommunityReport, listRecruitApplications, updateRecruitApplicationStatus } from '../services/adminApi.js'
+import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache, listCommunityReports, listDeletedCommunityPosts, getDeletedCommunityPost, restoreDeletedCommunityPost, resolveCommunityReport, listRecruitApplications, updateRecruitApplicationStatus } from '../services/adminApi.js'
 import { listFiles, createPost, deleteFile } from '../services/archiveApi.js'
 import {
   createClubActivity,
@@ -2158,6 +2158,7 @@ function DeletedCommunityPostsTab() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [evidenceFilter, setEvidenceFilter] = useState('ALL')
+  const [detailPost, setDetailPost] = useState(null)
   const normalizedSearch = searchQuery.trim().toLowerCase()
   const visiblePosts = posts
     .filter((post) => deletedPostMatchesSearch(post, normalizedSearch))
@@ -2197,11 +2198,17 @@ function DeletedCommunityPostsTab() {
     try {
       const response = await restoreDeletedCommunityPost(post.id)
       const restoredPostId = response?.restoredPostId
+      const restoredAt = new Date().toISOString()
       setPosts((current) => current.map((item) => (
         item.id === post.id
-          ? { ...item, restoredPostId, restoredAt: new Date().toISOString() }
+          ? { ...item, restoredPostId, restoredAt }
           : item
       )))
+      setDetailPost((current) => (
+        current && current.id === post.id
+          ? { ...current, restoredPostId, restoredAt }
+          : current
+      ))
       setStatusFilter('ALL')
     } catch (err) {
       setError(err.message || '삭제 게시글 복원에 실패했습니다.')
@@ -2297,6 +2304,7 @@ function DeletedCommunityPostsTab() {
                 <th className="px-3 py-3">삭제자</th>
                 <th className="px-3 py-3">사유</th>
                 <th className="px-3 py-3">원문</th>
+                <th className="px-3 py-3">보기</th>
                 <th className="px-3 py-3">상태</th>
               </tr>
             </thead>
@@ -2313,6 +2321,16 @@ function DeletedCommunityPostsTab() {
                   <td className="max-w-[220px] whitespace-pre-wrap break-words px-3 py-3 text-xs font-semibold text-[var(--theme-body-dark)]">{post.deletionReason || '-'}</td>
                   <td className="max-w-[520px] px-3 py-3 text-xs text-[var(--theme-body-muted)]">
                     <DeletedPostEvidence post={post} />
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setDetailPost(post)}
+                      className="shape-cut-sm inline-flex items-center gap-1.5 border border-black/10 bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#3b4890] transition hover:bg-white"
+                    >
+                      <Eye className="h-3.5 w-3.5" aria-hidden="true" />
+                      원문 보기
+                    </button>
                   </td>
                   <td className="whitespace-nowrap px-3 py-3 text-xs">
                     {post.restoredPostId ? (
@@ -2340,8 +2358,317 @@ function DeletedCommunityPostsTab() {
           </table>
         </div>
       )}
+      {detailPost && (
+        <DeletedPostDetailModal
+          post={detailPost}
+          onClose={() => setDetailPost(null)}
+          onRestore={restorePost}
+          restoring={restoringId === detailPost.id}
+          restoreDisabled={restoringId !== null}
+        />
+      )}
     </div>
   )
+}
+
+function DeletedPostDetailModal({ post, onClose, onRestore, restoring, restoreDisabled }) {
+  const [detail, setDetail] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let mounted = true
+    getDeletedCommunityPost(post.id)
+      .then((data) => { if (mounted && data) setDetail(data) })
+      .catch((err) => { if (mounted) setError(err.message || '원문을 불러오지 못했습니다.') })
+      .finally(() => { if (mounted) setLoading(false) })
+    return () => { mounted = false }
+  }, [post.id])
+
+  useEffect(() => {
+    const onKey = (event) => { if (event.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  // Detail comes from the API once loaded; restore status always tracks the live parent row.
+  const full = { ...(detail || post), restoredPostId: post.restoredPostId, restoredAt: post.restoredAt }
+  const commentTree = buildDeletedCommentTree(full.commentInfos || [])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:p-8"
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}
+    >
+      <div className="my-auto w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between gap-3 border-b border-black/10 bg-[#f7f9ff] px-5 py-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#3b4890]">삭제 보관함 · 원문 보기</p>
+            <p className="truncate text-xs text-[var(--theme-body-muted)]">#{full.originalPostId} · {deletedCategoryLabel(full.category)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="닫기"
+            className="shrink-0 rounded-full p-1.5 text-[var(--theme-body-muted)] transition hover:bg-black/5 hover:text-[var(--theme-body-dark)]"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="max-h-[calc(100vh-10rem)] overflow-y-auto">
+          <div className="border-b border-black/10 bg-amber-50/70 px-5 py-3 text-xs leading-5 text-amber-900">
+            <div className="grid gap-1 sm:grid-cols-2">
+              <span><strong>삭제자</strong> {deletedPostIdentity(full.deletedByName, full.deletedByStudentId)}{full.deletedByRole ? ` · ${full.deletedByRole}` : ''}</span>
+              <span><strong>삭제 시각</strong> {formatDateTime(full.deletedAt)}</span>
+              <span className="sm:col-span-2 whitespace-pre-wrap break-words"><strong>사유</strong> {full.deletionReason || '-'}</span>
+            </div>
+            {full.latestAppealStatus && (
+              <div className="mt-2 border-t border-amber-900/15 pt-2">
+                <span className="font-semibold">복원 요청({deletedAppealStatusLabel(full.latestAppealStatus)})</span>
+                {full.latestAppealRequesterName && <span> · {deletedPostIdentity(full.latestAppealRequesterName, full.latestAppealRequesterStudentId)}</span>}
+                {full.latestAppealCreatedAt && <span> · {formatDateTime(full.latestAppealCreatedAt)}</span>}
+                {full.latestAppealMessage && <p className="mt-1 whitespace-pre-wrap break-words text-amber-900/90">{full.latestAppealMessage}</p>}
+                {full.latestAppealResolutionNote && <p className="mt-1 whitespace-pre-wrap break-words text-amber-900/80">처리 메모: {full.latestAppealResolutionNote}</p>}
+              </div>
+            )}
+          </div>
+
+          <article className="px-5 py-5">
+            <h2 className="text-xl font-black leading-7 text-[var(--theme-body-dark)] break-words">{full.title || '제목 없음'}</h2>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--theme-body-muted)]">
+              <span className="font-semibold text-[var(--theme-body-dark)]">{deletedPostIdentity(full.authorName, full.authorStudentId)}</span>
+              <span>{formatDateTime(full.originalCreatedAt)}</span>
+              {full.originalUpdatedAt && full.originalUpdatedAt !== full.originalCreatedAt && <span>수정 {formatDateTime(full.originalUpdatedAt)}</span>}
+              <span>조회 {Number(full.viewCount || 0).toLocaleString('ko-KR')}</span>
+            </div>
+
+            {error && <p className="mt-3 shape-cut-sm bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-700">{error}</p>}
+            {loading && <p className="mt-3 text-xs text-[var(--theme-body-muted)]">원문을 불러오는 중...</p>}
+
+            <div className="mt-4 border-t border-black/10 pt-4 text-sm text-[var(--theme-body-dark)]">
+              <DeletedPostBody post={full} />
+            </div>
+
+            <section className="mt-6 border-t border-black/10 pt-4">
+              <h3 className="mb-3 text-sm font-bold text-[var(--theme-body-dark)]">댓글 {Number(full.commentCount || (full.commentInfos || []).length || 0).toLocaleString('ko-KR')}개</h3>
+              {commentTree.length === 0 ? (
+                <p className="text-xs text-[var(--theme-body-muted)]">보관된 댓글이 없습니다.</p>
+              ) : (
+                <div className="space-y-1">
+                  {commentTree.map((comment) => renderDeletedComment(comment, 0))}
+                </div>
+              )}
+            </section>
+          </article>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-black/10 bg-white px-5 py-3">
+          {full.restoredPostId ? (
+            <div className="mr-auto flex items-center gap-2 text-xs font-semibold text-emerald-700">
+              <span>복원됨</span>
+              <a href={`/community/${full.restoredPostId}`} className="font-mono underline">#{full.restoredPostId} 열기</a>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onRestore(full)}
+              disabled={restoreDisabled}
+              className="shape-cut-sm mr-auto inline-flex items-center gap-1.5 border border-[#3b4890]/20 bg-[#f4f6ff] px-3 py-2 text-xs font-semibold text-[#3b4890] transition hover:bg-[#e8ecff] disabled:opacity-50"
+            >
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              {restoring ? '복원 중...' : '커뮤니티로 되돌리기'}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="shape-cut-sm border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-black/5"
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DeletedPostBody({ post }) {
+  const blocks = deletedPostBlocks(post)
+  const usedImageIds = new Set(blocks.filter((block) => block.type === 'image' && block.imageInfo?.id).map((block) => block.imageInfo.id))
+  const usedVideoIds = new Set(blocks.filter((block) => block.type === 'video' && block.mediaInfo?.id).map((block) => block.mediaInfo.id))
+  const usedFileIds = new Set(blocks.filter((block) => block.type === 'file' && block.mediaInfo?.id).map((block) => block.mediaInfo.id))
+  const extraImages = (post.imageInfos || []).filter((image) => !usedImageIds.has(image.id))
+  const extraVideos = (post.videoInfos || []).filter((media) => !usedVideoIds.has(media.id))
+  const extraFiles = (post.fileInfos || []).filter((media) => !usedFileIds.has(media.id))
+  return (
+    <div className="space-y-3">
+      {blocks.length === 0 && <p className="text-sm text-[var(--theme-body-muted)]">본문이 없습니다.</p>}
+      {blocks.map((block, index) => {
+        if (block.type === 'image') {
+          if (!block.url) return null
+          return (
+            <figure
+              key={`image-${block.imageInfo?.id || index}`}
+              className="overflow-hidden rounded-lg border border-black/10 bg-white"
+              style={{ width: `${deletedMediaWidth(block.width)}%`, maxWidth: '100%', marginInline: block.align === 'center' ? 'auto' : block.align === 'right' ? 'auto 0' : '0 auto' }}
+            >
+              <img src={apiUrl(block.url)} alt={block.name || '삭제 게시글 이미지'} className="block w-full object-contain" />
+              {block.name && <figcaption className="border-t border-black/10 px-2 py-1 text-[11px] font-semibold text-[var(--theme-body-muted)]">{block.name}</figcaption>}
+            </figure>
+          )
+        }
+        if (block.type === 'externalImage') {
+          return (
+            <figure key={`external-${index}`} className="overflow-hidden rounded-lg border border-black/10 bg-white">
+              <img src={block.url} alt={block.title || '외부 이미지'} className="block w-full object-contain" />
+            </figure>
+          )
+        }
+        if (block.type === 'video') {
+          if (!block.url) return null
+          return (
+            <figure
+              key={`video-${block.mediaInfo?.id || index}`}
+              className="overflow-hidden rounded-lg border border-black/10 bg-white"
+              style={{ width: `${deletedMediaWidth(block.width)}%`, maxWidth: '100%', marginInline: block.align === 'center' ? 'auto' : block.align === 'right' ? 'auto 0' : '0 auto' }}
+            >
+              <video src={apiUrl(block.url)} className="block w-full bg-black" controls preload="metadata" />
+              {block.name && <figcaption className="border-t border-black/10 px-2 py-1 text-[11px] font-semibold text-[var(--theme-body-muted)]">{block.name}</figcaption>}
+            </figure>
+          )
+        }
+        if (block.type === 'file') {
+          if (!block.url) return null
+          return (
+            <a key={`file-${block.mediaInfo?.id || index}`} href={apiUrl(block.url)} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-[#3b4890] underline">
+              <Download className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">{block.name || '첨부파일'}</span>
+            </a>
+          )
+        }
+        if (block.type === 'poll') {
+          return (
+            <div key={`poll-${index}`} className="rounded-lg border border-[#3b4890]/15 bg-[#f7f9ff] px-4 py-3 text-sm text-[var(--theme-body-dark)]">
+              <strong className="block text-[#3b4890]">투표: {block.question || '투표'}</strong>
+              {block.options.length > 0 && (
+                <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-[var(--theme-body-muted)]">
+                  {block.options.map((option, i) => {
+                    const label = deletedPollOptionLabel(option)
+                    return label ? <li key={i}>{label}</li> : null
+                  })}
+                </ul>
+              )}
+            </div>
+          )
+        }
+        return (
+          <div key={`text-${index}`} className="whitespace-pre-wrap break-words leading-7 text-[var(--theme-body-dark)]">
+            {deletedHasFormattedText(block.content) ? (
+              <span dangerouslySetInnerHTML={{ __html: sanitizeDeletedHtml(block.content) }} />
+            ) : (
+              block.content || ''
+            )}
+          </div>
+        )
+      })}
+      {extraImages.length > 0 && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {extraImages.map((image) => (
+            <figure key={image.id} className="overflow-hidden rounded-lg border border-black/10 bg-white">
+              <img src={apiUrl(image.url)} alt={image.originalName || '삭제 게시글 이미지'} className="block aspect-square w-full object-contain" />
+              <figcaption className="truncate border-t border-black/10 px-2 py-1 text-[11px] font-semibold text-[var(--theme-body-muted)]">
+                {image.kind === 'COVER' ? '대표 이미지' : image.originalName || '이미지'}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      )}
+      {extraVideos.length > 0 && (
+        <div className="grid gap-2">
+          {extraVideos.map((media) => (
+            <figure key={media.id} className="overflow-hidden rounded-lg border border-black/10 bg-white">
+              <video src={apiUrl(media.url)} className="block w-full bg-black" controls preload="metadata" />
+              <figcaption className="truncate border-t border-black/10 px-2 py-1 text-[11px] font-semibold text-[var(--theme-body-muted)]">{media.originalName || '영상'}</figcaption>
+            </figure>
+          ))}
+        </div>
+      )}
+      {extraFiles.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {extraFiles.map((media) => (
+            <a key={media.id} href={apiUrl(media.url)} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-[#3b4890] underline">
+              <Download className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">{media.originalName || '첨부파일'}</span>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function buildDeletedCommentTree(comments) {
+  const nodes = new Map(comments.map((comment) => [comment.originalCommentId, { ...comment, children: [] }]))
+  const roots = []
+  comments.forEach((comment) => {
+    const node = nodes.get(comment.originalCommentId)
+    const parent = comment.originalParentCommentId ? nodes.get(comment.originalParentCommentId) : null
+    if (parent) {
+      parent.children.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+  return roots
+}
+
+function renderDeletedComment(comment, level) {
+  const depth = Math.min(level, 6)
+  const indent = depth === 0 ? 0 : `clamp(8px, ${depth * 3}vw, ${depth * 16}px)`
+  const displayName = comment.anonymousName
+    ? deletedPostIdentity(comment.anonymousName, comment.authorStudentId)
+    : deletedPostIdentity(comment.authorName, comment.authorStudentId)
+  return (
+    <div key={comment.originalCommentId}>
+      <div
+        className={`rounded-md px-3 py-2 text-sm ${level > 0 ? 'border-l-2 border-[#3b4890]/20 bg-black/[0.02]' : 'bg-black/[0.015]'}`}
+        style={{ marginLeft: indent }}
+      >
+        <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-xs font-bold text-[var(--theme-body-dark)]">{displayName}</span>
+          <span className="text-[11px] text-[var(--theme-body-muted)]">{formatDateTime(comment.createdAt)}</span>
+          {comment.edited && <span className="text-[11px] font-bold text-[var(--theme-body-muted)]">수정됨</span>}
+        </div>
+        <p className="whitespace-pre-wrap break-words text-[var(--theme-body-dark)]">{comment.content}</p>
+      </div>
+      {comment.children?.length > 0 && (
+        <div className="mt-1 space-y-1">
+          {comment.children.map((child) => renderDeletedComment(child, level + 1))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function deletedCategoryLabel(value) {
+  const map = {
+    GENERAL: '일반',
+    QUESTION: '질문',
+    ANONYMOUS: '익명',
+    CONCEPT: '컨셉',
+    INFO: '정보',
+    PROMOTION: '홍보',
+    SMALL_GROUP: '소모임',
+  }
+  return map[value] || value || '일반'
+}
+
+function deletedAppealStatusLabel(value) {
+  const map = { OPEN: '대기', APPROVED: '승인', REJECTED: '거절', RESOLVED: '처리됨' }
+  return map[value] || value
 }
 
 function DeletedPostEvidence({ post }) {
