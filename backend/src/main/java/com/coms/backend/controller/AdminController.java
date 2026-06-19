@@ -193,6 +193,11 @@ public class AdminController {
         return ResponseEntity.ok(communityDeletionArchiveService.recent(limit));
     }
 
+    @GetMapping("/community/deleted-posts/{id}")
+    public ResponseEntity<DeletedCommunityPostResponse> deletedCommunityPost(@PathVariable Long id) {
+        return ResponseEntity.ok(communityDeletionArchiveService.detail(id));
+    }
+
     @GetMapping("/community/deleted-posts/{id}/images/{imageId}")
     public ResponseEntity<Resource> deletedCommunityPostImage(@PathVariable Long id, @PathVariable Long imageId) {
         DeletedCommunityPostImage meta = communityDeletionArchiveService.loadImageMeta(id, imageId);
