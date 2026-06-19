@@ -1,5 +1,6 @@
 package com.coms.backend.controller;
 
+import com.coms.backend.dto.EngagementVoteRequest;
 import com.coms.backend.dto.NoticeRequest;
 import com.coms.backend.dto.NoticeResponse;
 import com.coms.backend.service.NoticeService;
@@ -29,13 +30,24 @@ public class NoticeController {
     }
 
     @GetMapping
-    public ResponseEntity<List<NoticeResponse>> list() {
-        return ResponseEntity.ok(noticeService.list());
+    public ResponseEntity<List<NoticeResponse>> list(Authentication authentication) {
+        return ResponseEntity.ok(noticeService.list(studentId(authentication)));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<NoticeResponse> get(@PathVariable Long id) {
-        return ResponseEntity.ok(noticeService.get(id));
+    public ResponseEntity<NoticeResponse> get(Authentication authentication, @PathVariable Long id) {
+        return ResponseEntity.ok(noticeService.getAndIncrementView(id, studentId(authentication)));
+    }
+
+    @PostMapping("/{id}/vote")
+    public ResponseEntity<NoticeResponse> vote(Authentication authentication,
+                                               @PathVariable Long id,
+                                               @Valid @RequestBody EngagementVoteRequest request) {
+        return ResponseEntity.ok(noticeService.vote(authentication.getName(), id, request.value()));
+    }
+
+    private String studentId(Authentication authentication) {
+        return authentication == null ? null : authentication.getName();
     }
 
     @PostMapping

@@ -55,6 +55,9 @@ public class ClubActivity {
     @Column
     private String createdByName;
 
+    @Column(name = "view_count", nullable = false)
+    private long viewCount = 0;
+
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -92,6 +95,9 @@ public class ClubActivity {
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
     public String getCreatedByName() { return createdByName; }
     public void setCreatedByName(String createdByName) { this.createdByName = createdByName; }
+    public long getViewCount() { return viewCount; }
+    public void setViewCount(long viewCount) { this.viewCount = viewCount; }
+    public void incrementViewCount() { this.viewCount++; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

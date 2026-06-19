@@ -81,6 +81,29 @@ class ClubActivityServiceTest {
     }
 
     @Test
+    void detailFetchIncrementsViewCountAndUpvoteTogglesMyVote() throws Exception {
+        var activity = clubActivityService.create("ACTIVITY", "SEMINAR", "세미나", null, LocalDate.of(2026, 6, 18), null, "2026123456");
+
+        var firstView = clubActivityService.getAndIncrementView(activity.id(), "2026123456");
+        var secondView = clubActivityService.getAndIncrementView(activity.id(), "2026123456");
+        assertThat(firstView.viewCount()).isEqualTo(1);
+        assertThat(secondView.viewCount()).isEqualTo(2);
+
+        var upvoted = clubActivityService.vote("2026123456", activity.id(), 1);
+        assertThat(upvoted.upvotes()).isEqualTo(1);
+        assertThat(upvoted.myVote()).isEqualTo(1);
+
+        var cleared = clubActivityService.vote("2026123456", activity.id(), 1);
+        assertThat(cleared.upvotes()).isZero();
+        assertThat(cleared.myVote()).isZero();
+
+        assertThat(clubActivityService.list("2026123456"))
+                .filteredOn(item -> item.id().equals(activity.id()))
+                .singleElement()
+                .satisfies(item -> assertThat(item.viewCount()).isEqualTo(2));
+    }
+
+    @Test
     void rejectsNonImageActivityUpload() {
         MockMultipartFile pdf = new MockMultipartFile(
                 "image",
