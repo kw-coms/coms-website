@@ -44,6 +44,12 @@ services:
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://coms.kw.ac.kr}
       SPRING_FLYWAY_ENABLED: "true"
       SPRING_JPA_HIBERNATE_DDL_AUTO: ${SPRING_JPA_HIBERNATE_DDL_AUTO:-validate}
+      # Sentry error reporting — blank DSN = disabled (safe no-op).
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENV: ${SENTRY_ENV:-production}
+      # Mobile push (FCM) — disabled until PUSH_ENABLED=true AND a creds file is mounted+set.
+      PUSH_ENABLED: ${PUSH_ENABLED:-false}
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-}
       TZ: Asia/Seoul
       JAVA_TOOL_OPTIONS: "-Duser.timezone=Asia/Seoul"
     ports:
@@ -51,6 +57,10 @@ services:
     volumes:
       - ./backend-data:/app/data
       - backend-uploads:/app/uploads
+      # To enable FCM push, mount the Firebase service-account JSON read-only and set
+      # FIREBASE_CREDENTIALS_PATH (+ PUSH_ENABLED=true) in your .env, e.g.:
+      #   FIREBASE_CREDENTIALS_PATH=/app/secrets/firebase-service-account.json
+      # - ./secrets/firebase-service-account.json:/app/secrets/firebase-service-account.json:ro
     depends_on:
       db:
         condition: service_healthy
