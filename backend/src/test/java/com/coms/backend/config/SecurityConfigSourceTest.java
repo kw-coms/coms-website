@@ -46,4 +46,13 @@ class SecurityConfigSourceTest {
         assertThat(source).contains("auth.requestMatchers(HttpMethod.HEAD, \"/api/community/posts/*/share\", \"/api/community/posts/*/share-data\", \"/api/community/posts/*/share-image\").permitAll()");
         assertThat(source).contains("auth.requestMatchers(\"/api/community/**\").authenticated()");
     }
+
+    @Test
+    void miniAppSharedDocumentsRequireComsLogin() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/coms/backend/config/SecurityConfig.java"));
+
+        assertThat(source).doesNotContain("auth.requestMatchers(HttpMethod.GET, \"/api/mini-apps/*/shared\", \"/api/mini-apps/*/shared/*\").permitAll()");
+        assertThat(source).doesNotContain("auth.requestMatchers(HttpMethod.HEAD, \"/api/mini-apps/*/shared\", \"/api/mini-apps/*/shared/*\").permitAll()");
+        assertThat(source).contains("auth.requestMatchers(\"/api/mini-apps/**\").authenticated()");
+    }
 }
