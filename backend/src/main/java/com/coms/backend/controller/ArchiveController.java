@@ -65,6 +65,20 @@ public class ArchiveController {
                 .body(resource);
     }
 
+    @GetMapping("/{id}/inline")
+    public ResponseEntity<Resource> inline(@PathVariable Long id) {
+        ArchiveFile file = archiveService.get(id);
+        Resource resource = storageService.load(file.getStoredName());
+        ContentDisposition disposition = ContentDisposition.inline()
+                .filename(file.getOriginalName(), StandardCharsets.UTF_8)
+                .build();
+
+        return ResponseEntity.ok()
+                .contentType(mediaType(file.getMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .body(resource);
+    }
+
     private MediaType mediaType(String mimeType) {
         try {
             return MediaType.parseMediaType(mimeType);

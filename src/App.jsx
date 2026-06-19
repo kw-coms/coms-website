@@ -133,6 +133,20 @@ const activityHubItems = [
 
 const companionServices = [
   {
+    title: 'COMS 월드컵',
+    eyebrow: 'Worldcup',
+    body: '둘 중 하나를 고르며 개발 언어, 야식, 밈, 세미나 주제의 최종 우승자를 뽑는 COMS 미니게임입니다.',
+    href: 'https://coms.kw.ac.kr/worldcup/',
+    domain: 'coms.kw.ac.kr/worldcup',
+  },
+  {
+    title: 'COMS 티어표',
+    eyebrow: 'Tier board',
+    body: '언어, 프레임워크, 프로젝트, 활동 주제를 S/A/B/C/D로 나누고 공유하는 COMS 티어표 도구입니다.',
+    href: 'https://coms.kw.ac.kr/tier/',
+    domain: 'coms.kw.ac.kr/tier',
+  },
+  {
     title: 'Food Club',
     eyebrow: 'Meal loop',
     body: '부원들과 밥 약속과 맛집 후보를 가볍게 모으는 식사 모임 허브입니다.',
@@ -2241,7 +2255,7 @@ function CompanionServicesSection() {
           <div className="apple-soft-panel bg-[#f5f5f7] px-5 py-5">
             <p className="text-sm font-semibold text-[#1d1d1f]">개선 방향</p>
             <p className="mt-2 text-sm font-medium leading-6 text-[#6e6e73]">
-              다음 단계로는 통합 로그인 상태 표시, 서비스별 운영 상태, 최근 활동 요약을 붙이면 COM&apos;s 전체 생태계가 더 선명해집니다.
+              월드컵과 티어표는 COMS 계정 기반 저장·공유를 사용합니다. 다음 단계로는 서비스별 운영 상태와 최근 활동 요약을 붙이면 생태계가 더 선명해집니다.
             </p>
           </div>
         </div>
