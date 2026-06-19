@@ -8,6 +8,7 @@ import {
   CalendarDays,
   ChevronDown,
   CircuitBoard,
+  Download,
   Grid3x3,
   LogOut,
   Menu,
@@ -19,7 +20,7 @@ import {
   X,
 } from 'lucide-react'
 import { listNotices } from './services/noticeApi.js'
-import { createClubActivity, listClubActivities, getClubActivity, voteClubActivity } from './services/clubActivityApi.js'
+import { createClubActivity, listClubActivities, getClubActivity, voteClubActivity, listClubActivityCategories } from './services/clubActivityApi.js'
 import { getNotificationSummary, listNotifications, markAllNotificationsRead, markNotificationRead } from './services/notificationApi.js'
 import { listFonts } from './services/fontApi.js'
 import { BUILT_IN_FONTS, buildFontFaceCss, fontFamilyValue, injectBuiltinFontStylesheets } from './services/fontPreferences.js'
@@ -68,6 +69,7 @@ import CompanionServicesSection from './components/home/CompanionServicesSection
 
 const NOTIFICATIONS_QUERY_KEY = ['app-shell', 'notifications']
 const CLUB_ACTIVITIES_QUERY_KEY = ['app-shell', 'club-activities']
+const CLUB_ACTIVITY_CATEGORIES_QUERY_KEY = ['app-shell', 'club-activity-categories']
 const FONTS_QUERY_KEY = ['app-shell', 'fonts']
 const LATEST_NOTICE_QUERY_KEY = ['app-shell', 'latest-notice']
 
@@ -106,7 +108,10 @@ function formatActivityDate(value) {
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
 }
 
-function categoryLabel(value) {
+// Categories are admin-managed (DB-backed). Prefer the server-provided display
+// name; fall back to the legacy hardcoded labels for any cached/older payloads.
+function categoryLabel(value, fallbackName) {
+  if (fallbackName) return fallbackName
   const labels = {
     GENERAL: '일반',
     SEMINAR: '세미나',
@@ -1193,9 +1198,28 @@ function useClubActivities(loadErrorMessage) {
   return { user, authLoading, records, loading, loadError, prependActivity, mergeActivity }
 }
 
+// Admin-managed club-activity categories. Falls back to the static list so the
+// dropdowns still render if the categories endpoint is unavailable.
+function useClubActivityCategories() {
+  const { user, loading: authLoading } = useAuth()
+  const query = useQuery({
+    queryKey: CLUB_ACTIVITY_CATEGORIES_QUERY_KEY,
+    queryFn: async () => {
+      const data = await listClubActivityCategories()
+      return Array.isArray(data) ? data : []
+    },
+    enabled: Boolean(user) && !authLoading,
+  })
+  const categories = query.data && query.data.length > 0
+    ? query.data
+    : clubActivityCategories.map(([key, name], position) => ({ key, name, position }))
+  return categories
+}
+
 function ActivityLogSection({ compact = false }) {
   const navigate = useNavigate()
   const { user, authLoading, records, loading, loadError, prependActivity, mergeActivity } = useClubActivities('활동 기록을 불러오지 못했습니다.')
+  const categories = useClubActivityCategories()
   const [votingId, setVotingId] = useState(null)
   const [viewedIds] = useState(() => new Set())
   const [submitError, setSubmitError] = useState('')
@@ -1203,17 +1227,38 @@ function ActivityLogSection({ compact = false }) {
   const [activityForm, setActivityForm] = useState({
     title: '',
     eventDate: '',
-    category: 'SEMINAR',
+    category: '',
     description: '',
   })
   const [activityImage, setActivityImage] = useState(null)
   const [savingActivity, setSavingActivity] = useState(false)
   const [activityNotice, setActivityNotice] = useState('')
+  // Search + filter state (mirrors notices/resources/community list patterns).
+  const [searchText, setSearchText] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('ALL')
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
 
-  const activityItems = (user ? records || [] : []).filter((item) => item.kind === 'ACTIVITY')
-  const visibleItems = compact ? activityItems.slice(0, 3) : activityItems
+  // Default the composer category to the first admin-managed category without
+  // a state-syncing effect (the dropdown is controlled by this derived value).
+  const selectedCategory = activityForm.category || categories[0]?.key || ''
+
+  const allActivityItems = (user ? records || [] : []).filter((item) => item.kind === 'ACTIVITY')
+  const normalizedSearch = searchText.trim().toLowerCase()
+  const filteredItems = allActivityItems.filter((item) => {
+    if (categoryFilter !== 'ALL' && item.category !== categoryFilter) return false
+    if (fromDate && (item.eventDate || '') < fromDate) return false
+    if (toDate && (item.eventDate || '') > toDate) return false
+    if (normalizedSearch) {
+      const haystack = `${item.title || ''} ${item.description || ''} ${item.createdByName || ''}`.toLowerCase()
+      if (!haystack.includes(normalizedSearch)) return false
+    }
+    return true
+  })
+  const visibleItems = compact ? filteredItems.slice(0, 3) : filteredItems
   const isLocked = !authLoading && !user
   const isAdmin = user?.role === 'ADMIN'
+  const hasActiveFilters = Boolean(normalizedSearch) || categoryFilter !== 'ALL' || Boolean(fromDate) || Boolean(toDate)
 
   const submitActivity = async (event) => {
     event.preventDefault()
@@ -1225,7 +1270,7 @@ function ActivityLogSection({ compact = false }) {
     try {
       const created = await createClubActivity({
         kind: 'ACTIVITY',
-        category: activityForm.category,
+        category: selectedCategory,
         title: activityForm.title.trim(),
         description: activityForm.description.trim(),
         eventDate: activityForm.eventDate,
@@ -1312,11 +1357,11 @@ function ActivityLogSection({ compact = false }) {
             <label>
               <span>활동 분류</span>
               <select
-                value={activityForm.category}
+                value={selectedCategory}
                 onChange={(event) => setActivityForm((prev) => ({ ...prev, category: event.target.value }))}
               >
-                {clubActivityCategories.map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                {categories.map((category) => (
+                  <option key={category.key} value={category.key}>{category.name}</option>
                 ))}
               </select>
             </label>
@@ -1345,6 +1390,61 @@ function ActivityLogSection({ compact = false }) {
             </button>
             {activityNotice && <p className="activity-admin-composer-notice">{activityNotice}</p>}
           </form>
+        )}
+
+        {!compact && !isLocked && !authLoading && !loading && !loadError && (
+          <div className="activity-log-filters mt-8 flex flex-wrap items-end gap-3">
+            <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs font-semibold text-[#6e6e73]">
+              <span>검색</span>
+              <input
+                type="search"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder="제목, 내용, 작성자로 검색"
+                className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/40"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold text-[#6e6e73]">
+              <span>분류</span>
+              <select
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+                className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/40"
+              >
+                <option value="ALL">전체 분류</option>
+                {categories.map((category) => (
+                  <option key={category.key} value={category.key}>{category.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold text-[#6e6e73]">
+              <span>시작일</span>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(event) => setFromDate(event.target.value)}
+                className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/40"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold text-[#6e6e73]">
+              <span>종료일</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(event) => setToDate(event.target.value)}
+                className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/40"
+              />
+            </label>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={() => { setSearchText(''); setCategoryFilter('ALL'); setFromDate(''); setToDate('') }}
+                className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-[#0066cc] transition hover:bg-black/5"
+              >
+                필터 초기화
+              </button>
+            )}
+          </div>
         )}
 
         {authLoading || loading ? (
@@ -1399,7 +1499,7 @@ function ActivityLogSection({ compact = false }) {
                     </>
                   )}
                   <div className="activity-log-photo-caption">
-                    <span>{categoryLabel(item.category)}</span>
+                    <span>{categoryLabel(item.category, item.categoryName)}</span>
                     <strong>{formatActivityDate(item.eventDate)}</strong>
                   </div>
                 </div>
@@ -1408,9 +1508,25 @@ function ActivityLogSection({ compact = false }) {
                   <h3>{item.title}</h3>
                   {item.description && <p>{item.description}</p>}
                   <div className="activity-log-tags" aria-label={`${item.title} 태그`}>
-                    <span>{categoryLabel(item.category)}</span>
-                    {item.imageOriginalName && <span>사진 기록</span>}
+                    <span>{categoryLabel(item.category, item.categoryName)}</span>
+                    {(item.imageInfos?.length ?? 0) > 0 && <span>사진 {item.imageInfos.length}장</span>}
+                    {(item.fileInfos?.length ?? 0) > 0 && <span>첨부 {item.fileInfos.length}개</span>}
                   </div>
+                  {(item.fileInfos?.length ?? 0) > 0 && (
+                    <ul className="mt-2 flex flex-col gap-1 text-xs">
+                      {item.fileInfos.map((file) => (
+                        <li key={file.id}>
+                          <a
+                            href={file.url}
+                            className="inline-flex items-center gap-1 font-semibold text-[#0066cc] underline-offset-2 hover:underline"
+                          >
+                            <Download size={13} aria-hidden="true" />
+                            {file.originalName || '첨부파일'}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <div className="mt-3 flex items-center gap-3 text-xs font-semibold text-[#6e6e73]">
                     <span>조회 {item.viewCount ?? 0}</span>
                     <button
@@ -1426,6 +1542,14 @@ function ActivityLogSection({ compact = false }) {
                 </div>
               </article>
             ))}
+          </div>
+        ) : hasActiveFilters ? (
+          <div className="activity-empty-state mt-8">
+            <Sparkles size={22} aria-hidden="true" />
+            <div>
+              <h3>검색 결과가 없습니다.</h3>
+              <p>다른 검색어나 필터 조건으로 다시 시도해보세요.</p>
+            </div>
           </div>
         ) : (
           <div className="activity-empty-state mt-8">
@@ -1444,6 +1568,7 @@ function ActivityLogSection({ compact = false }) {
 function ClubCalendarSection({ compact = false }) {
   const navigate = useNavigate()
   const { user, authLoading, records, loading, loadError, prependActivity } = useClubActivities('일정을 불러오지 못했습니다.')
+  const categories = useClubActivityCategories()
   const initialCalendarDate = new Date()
   const [submitError, setSubmitError] = useState('')
   const error = submitError || loadError
@@ -1470,6 +1595,9 @@ function ClubCalendarSection({ compact = false }) {
   }, {})
   const isLocked = !authLoading && !user
   const isAdmin = user?.role === 'ADMIN'
+  const selectedScheduleCategory = categories.some((category) => category.key === scheduleForm.category)
+    ? scheduleForm.category
+    : (categories[0]?.key || scheduleForm.category)
 
   const updateSelectedYear = (value) => {
     const nextYear = Number(value)
@@ -1486,7 +1614,7 @@ function ClubCalendarSection({ compact = false }) {
     try {
       const created = await createClubActivity({
         kind: 'SCHEDULE',
-        category: scheduleForm.category,
+        category: selectedScheduleCategory,
         title: scheduleForm.title.trim(),
         description: scheduleForm.description.trim(),
         eventDate: scheduleForm.eventDate,
@@ -1574,11 +1702,11 @@ function ClubCalendarSection({ compact = false }) {
             <label>
               <span>일정 분류</span>
               <select
-                value={scheduleForm.category}
+                value={selectedScheduleCategory}
                 onChange={(event) => setScheduleForm((prev) => ({ ...prev, category: event.target.value }))}
               >
-                {clubActivityCategories.map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                {categories.map((category) => (
+                  <option key={category.key} value={category.key}>{category.name}</option>
                 ))}
               </select>
             </label>

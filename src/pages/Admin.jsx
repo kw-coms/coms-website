@@ -4,7 +4,20 @@ import { Download, RefreshCw, RotateCcw } from 'lucide-react'
 import { apiUrl } from '../services/apiClient.js'
 import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache, listCommunityReports, listDeletedCommunityPosts, restoreDeletedCommunityPost, resolveCommunityReport, listRecruitApplications, updateRecruitApplicationStatus } from '../services/adminApi.js'
 import { listFiles, createPost, deleteFile } from '../services/archiveApi.js'
-import { createClubActivity, deleteClubActivity, listClubActivities } from '../services/clubActivityApi.js'
+import {
+  createClubActivity,
+  deleteClubActivity,
+  listClubActivities,
+  updateClubActivity,
+  uploadClubActivityImages,
+  deleteClubActivityImage,
+  uploadClubActivityFile,
+  deleteClubActivityFile,
+  listClubActivityCategories,
+  createClubActivityCategory,
+  updateClubActivityCategory,
+  deleteClubActivityCategory,
+} from '../services/clubActivityApi.js'
 import { listAdminFonts, setFontActive, uploadFont } from '../services/fontApi.js'
 import { buildFontFaceCss, fontFamilyValue } from '../services/fontPreferences.js'
 import { useAuth } from '../contexts/useAuth.js'
@@ -1011,20 +1024,26 @@ function MembersTab({ currentUser }) {
   )
 }
 
+const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
+
 function ActivitiesAdminTab() {
   const imageInputRef = useRef(null)
+  const filesInputRef = useRef(null)
   const [items, setItems] = useState([])
+  const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [form, setForm] = useState({
     kind: 'ACTIVITY',
-    category: 'SEMINAR',
+    category: '',
     title: '',
     description: '',
     eventDate: '',
     image: null,
+    images: [],
+    files: [],
   })
 
   const loadActivities = () => {
@@ -1035,10 +1054,26 @@ function ActivitiesAdminTab() {
       .finally(() => setLoading(false))
   }
 
+  const loadCategories = () => {
+    listClubActivityCategories()
+      .then((data) => {
+        const list = Array.isArray(data) ? data : []
+        setCategories(list)
+        setForm((prev) => (prev.category || list.length === 0 ? prev : { ...prev, category: list[0].key }))
+      })
+      .catch(() => {})
+  }
+
   useEffect(() => {
     let mounted = true
-    listClubActivities()
-      .then((data) => { if (mounted) setItems(Array.isArray(data) ? data : []) })
+    Promise.all([listClubActivities(), listClubActivityCategories()])
+      .then(([activityData, categoryData]) => {
+        if (!mounted) return
+        setItems(Array.isArray(activityData) ? activityData : [])
+        const list = Array.isArray(categoryData) ? categoryData : []
+        setCategories(list)
+        setForm((prev) => (prev.category || list.length === 0 ? prev : { ...prev, category: list[0].key }))
+      })
       .catch((err) => { if (mounted) setError(err.message || '활동 기록을 불러오지 못했습니다.') })
       .finally(() => { if (mounted) setLoading(false) })
     return () => { mounted = false }
@@ -1059,11 +1094,26 @@ function ActivitiesAdminTab() {
         eventDate: form.eventDate,
         image: form.image,
       })
-      setItems((prev) => [created, ...prev])
+      if (form.kind === 'ACTIVITY' && form.images.length > 0) {
+        await uploadClubActivityImages(created.id, form.images)
+      }
+      if (form.kind === 'ACTIVITY' && form.files.length > 0) {
+        for (const file of form.files) {
+          await uploadClubActivityFile(created.id, file)
+        }
+      }
+      // Re-fetch the list so the new media counts are reflected.
+      if (form.images.length > 0 || form.files.length > 0) {
+        const refreshed = await listClubActivities()
+        setItems(Array.isArray(refreshed) ? refreshed : [])
+      } else {
+        setItems((prev) => [created, ...prev])
+      }
       setNotice('활동 기록을 등록했습니다.')
-      setForm((prev) => ({ ...prev, title: '', description: '', image: null }))
       event.currentTarget.reset()
-      setForm((prev) => ({ ...prev, kind: 'ACTIVITY', category: 'SEMINAR', eventDate: '' }))
+      if (imageInputRef.current) imageInputRef.current.value = ''
+      if (filesInputRef.current) filesInputRef.current.value = ''
+      setForm((prev) => ({ ...prev, title: '', description: '', eventDate: '', image: null, images: [], files: [] }))
     } catch (err) {
       setError(err.message || '활동 기록 등록 중 오류가 발생했습니다.')
     } finally {
@@ -1081,13 +1131,22 @@ function ActivitiesAdminTab() {
     }
   }
 
-  const inputClass = 'shape-cut-sm border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
+  const handleUpdated = (updated) => {
+    setItems((prev) => prev.map((entry) => (entry.id === updated.id ? { ...entry, ...updated } : entry)))
+  }
+
+  const inputClass = ADMIN_INPUT_CLASS
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      <ClubActivityCategoriesAdmin
+        categories={categories}
+        onChanged={() => { loadCategories(); loadActivities() }}
+      />
+
       <form onSubmit={submit} className="rounded-lg border border-black/10 bg-black/5 p-4">
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">활동 기록 등록</p>
-        <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">회원에게만 보이는 실제 활동 기록과 일정을 등록합니다. 더미 예시는 등록하지 않습니다.</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">회원에게만 보이는 실제 활동 기록과 일정을 등록합니다. 사진 여러 장과 파일 첨부를 함께 올릴 수 있습니다.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
             활동 제목
@@ -1112,10 +1171,17 @@ function ActivitiesAdminTab() {
             <select
               value={form.kind}
               onChange={(event) => {
-                if (event.target.value === 'SCHEDULE' && imageInputRef.current) {
-                  imageInputRef.current.value = ''
+                if (event.target.value === 'SCHEDULE') {
+                  if (imageInputRef.current) imageInputRef.current.value = ''
+                  if (filesInputRef.current) filesInputRef.current.value = ''
                 }
-                setForm((prev) => ({ ...prev, kind: event.target.value, image: event.target.value === 'SCHEDULE' ? null : prev.image }))
+                setForm((prev) => ({
+                  ...prev,
+                  kind: event.target.value,
+                  image: event.target.value === 'SCHEDULE' ? null : prev.image,
+                  images: event.target.value === 'SCHEDULE' ? [] : prev.images,
+                  files: event.target.value === 'SCHEDULE' ? [] : prev.files,
+                }))
               }}
               className={inputClass}
             >
@@ -1130,37 +1196,44 @@ function ActivitiesAdminTab() {
               onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
               className={inputClass}
             >
-              <option value="GENERAL">일반</option>
-              <option value="SEMINAR">세미나</option>
-              <option value="STUDY">스터디</option>
-              <option value="PROJECT">프로젝트</option>
-              <option value="MEETING">회의</option>
-              <option value="RECRUIT">모집</option>
-              <option value="EVENT">행사</option>
-              <option value="MT">MT</option>
-              <option value="ACHIEVEMENT">성과</option>
+              {categories.map((category) => (
+                <option key={category.key} value={category.key}>{category.name}</option>
+              ))}
             </select>
           </label>
           <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)] md:col-span-2">
-            활동 설명
+            활동 내용
             <textarea
               value={form.description}
               onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-              rows={3}
+              rows={4}
               className={inputClass}
             />
           </label>
           {form.kind === 'ACTIVITY' && (
-            <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)] md:col-span-2">
-              활동 사진
-              <input
-                ref={imageInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp"
-                onChange={(event) => setForm((prev) => ({ ...prev, image: event.target.files?.[0] || null }))}
-                className="text-sm text-[var(--theme-body-dark)]"
-              />
-            </label>
+            <>
+              <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)] md:col-span-2">
+                활동 사진 (여러 장 선택 가능)
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  onChange={(event) => setForm((prev) => ({ ...prev, images: Array.from(event.target.files || []) }))}
+                  className="text-sm text-[var(--theme-body-dark)]"
+                />
+              </label>
+              <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)] md:col-span-2">
+                파일 첨부 (여러 개 선택 가능)
+                <input
+                  ref={filesInputRef}
+                  type="file"
+                  multiple
+                  onChange={(event) => setForm((prev) => ({ ...prev, files: Array.from(event.target.files || []) }))}
+                  className="text-sm text-[var(--theme-body-dark)]"
+                />
+              </label>
+            </>
           )}
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -1190,24 +1263,420 @@ function ActivitiesAdminTab() {
       ) : (
         <div className="space-y-2">
           {items.map((item) => (
-            <article key={item.id} className="shape-cut-sm flex flex-wrap items-center justify-between gap-3 border border-black/10 bg-black/5 px-4 py-3">
-              <div>
-                <p className="font-semibold text-[var(--theme-body-dark)]">{item.title}</p>
-                <p className="text-xs text-[var(--theme-body-muted)]">
-                  {item.kind === 'SCHEDULE' ? '일정' : '활동'} · {item.category} · {item.eventDate}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleDelete(item)}
-                className="text-xs font-semibold text-red-500 transition hover:underline"
-              >
-                삭제
-              </button>
-            </article>
+            <ActivityAdminRow
+              key={item.id}
+              item={item}
+              categories={categories}
+              onDelete={handleDelete}
+              onUpdated={handleUpdated}
+            />
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// Inline editor + media manager for a single activity record.
+function ActivityAdminRow({ item, categories, onDelete, onUpdated }) {
+  const [editing, setEditing] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [rowError, setRowError] = useState('')
+  const [draft, setDraft] = useState({
+    category: item.category,
+    title: item.title,
+    description: item.description || '',
+    eventDate: item.eventDate || '',
+  })
+  const imageInputRef = useRef(null)
+  const fileInputRef = useRef(null)
+
+  const startEdit = () => {
+    setDraft({
+      category: item.category,
+      title: item.title,
+      description: item.description || '',
+      eventDate: item.eventDate || '',
+    })
+    setRowError('')
+    setEditing(true)
+  }
+
+  const saveEdit = async () => {
+    if (!draft.title.trim() || !draft.eventDate) return
+    setBusy(true)
+    setRowError('')
+    try {
+      const updated = await updateClubActivity(item.id, {
+        category: draft.category,
+        title: draft.title.trim(),
+        description: draft.description,
+        eventDate: draft.eventDate,
+      })
+      onUpdated(updated)
+      setEditing(false)
+    } catch (err) {
+      setRowError(err.message || '활동 기록을 수정하지 못했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const refreshFromServer = async () => {
+    const list = await listClubActivities()
+    const refreshed = (Array.isArray(list) ? list : []).find((entry) => entry.id === item.id)
+    if (refreshed) onUpdated(refreshed)
+  }
+
+  const addImages = async (event) => {
+    const files = Array.from(event.target.files || [])
+    if (files.length === 0) return
+    setBusy(true)
+    setRowError('')
+    try {
+      await uploadClubActivityImages(item.id, files)
+      await refreshFromServer()
+    } catch (err) {
+      setRowError(err.message || '사진을 추가하지 못했습니다.')
+    } finally {
+      setBusy(false)
+      if (imageInputRef.current) imageInputRef.current.value = ''
+    }
+  }
+
+  const addFile = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setBusy(true)
+    setRowError('')
+    try {
+      await uploadClubActivityFile(item.id, file)
+      await refreshFromServer()
+    } catch (err) {
+      setRowError(err.message || '파일을 추가하지 못했습니다.')
+    } finally {
+      setBusy(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const removeImage = async (imageId) => {
+    setBusy(true)
+    setRowError('')
+    try {
+      await deleteClubActivityImage(item.id, imageId)
+      await refreshFromServer()
+    } catch (err) {
+      setRowError(err.message || '사진을 삭제하지 못했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const removeFile = async (fileId) => {
+    setBusy(true)
+    setRowError('')
+    try {
+      await deleteClubActivityFile(item.id, fileId)
+      await refreshFromServer()
+    } catch (err) {
+      setRowError(err.message || '파일을 삭제하지 못했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const categoryName = categories.find((category) => category.key === item.category)?.name || item.categoryName || item.category
+  const isActivity = item.kind !== 'SCHEDULE'
+
+  return (
+    <article className="shape-cut-sm border border-black/10 bg-black/5 px-4 py-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-[var(--theme-body-dark)]">{item.title}</p>
+          <p className="text-xs text-[var(--theme-body-muted)]">
+            {item.kind === 'SCHEDULE' ? '일정' : '활동'} · {categoryName} · {item.eventDate}
+            {(item.imageInfos?.length ?? 0) > 0 && ` · 사진 ${item.imageInfos.length}장`}
+            {(item.fileInfos?.length ?? 0) > 0 && ` · 첨부 ${item.fileInfos.length}개`}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={() => (editing ? setEditing(false) : startEdit())}
+            className="text-xs font-semibold text-[#0066cc] transition hover:underline"
+          >
+            {editing ? '닫기' : '수정'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(item)}
+            className="text-xs font-semibold text-red-500 transition hover:underline"
+          >
+            삭제
+          </button>
+        </div>
+      </div>
+
+      {editing && (
+        <div className="mt-3 grid gap-3 border-t border-black/10 pt-3 md:grid-cols-2">
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+            활동 제목
+            <input
+              value={draft.title}
+              onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
+              maxLength={120}
+              className={ADMIN_INPUT_CLASS}
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+            활동 날짜
+            <input
+              type="date"
+              value={draft.eventDate}
+              onChange={(event) => setDraft((prev) => ({ ...prev, eventDate: event.target.value }))}
+              className={ADMIN_INPUT_CLASS}
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+            활동 분류
+            <select
+              value={draft.category}
+              onChange={(event) => setDraft((prev) => ({ ...prev, category: event.target.value }))}
+              className={ADMIN_INPUT_CLASS}
+            >
+              {categories.map((category) => (
+                <option key={category.key} value={category.key}>{category.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)] md:col-span-2">
+            활동 내용
+            <textarea
+              value={draft.description}
+              onChange={(event) => setDraft((prev) => ({ ...prev, description: event.target.value }))}
+              rows={4}
+              className={ADMIN_INPUT_CLASS}
+            />
+          </label>
+
+          {isActivity && (
+            <div className="md:col-span-2">
+              <p className="text-xs font-semibold text-[var(--theme-body-muted)]">사진</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(item.imageInfos || []).map((image) => (
+                  <div key={image.id} className="relative">
+                    <img src={image.url} alt="" className="h-16 w-16 rounded object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(image.id)}
+                      disabled={busy}
+                      className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white disabled:opacity-50"
+                      aria-label="사진 삭제"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <input
+                ref={imageInputRef}
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                onChange={addImages}
+                disabled={busy}
+                className="mt-2 text-sm text-[var(--theme-body-dark)]"
+              />
+            </div>
+          )}
+
+          {isActivity && (
+            <div className="md:col-span-2">
+              <p className="text-xs font-semibold text-[var(--theme-body-muted)]">파일 첨부</p>
+              <ul className="mt-2 flex flex-col gap-1">
+                {(item.fileInfos || []).map((file) => (
+                  <li key={file.id} className="flex items-center gap-2 text-xs">
+                    <a href={file.url} className="font-semibold text-[#0066cc] hover:underline">{file.originalName || '첨부파일'}</a>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(file.id)}
+                      disabled={busy}
+                      className="font-semibold text-red-500 hover:underline disabled:opacity-50"
+                    >
+                      삭제
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <input
+                ref={fileInputRef}
+                type="file"
+                onChange={addFile}
+                disabled={busy}
+                className="mt-2 text-sm text-[var(--theme-body-dark)]"
+              />
+            </div>
+          )}
+
+          {rowError && <p className="text-xs font-semibold text-red-600 md:col-span-2">{rowError}</p>}
+
+          <div className="flex items-center gap-2 md:col-span-2">
+            <button
+              type="button"
+              onClick={saveEdit}
+              disabled={busy || !draft.title.trim() || !draft.eventDate}
+              className="shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] disabled:opacity-50"
+            >
+              {busy ? '저장 중...' : '변경 저장'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)]"
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+    </article>
+  )
+}
+
+// Admin CRUD for the DB-backed activity categories.
+function ClubActivityCategoriesAdmin({ categories, onChanged }) {
+  const [newName, setNewName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [editingId, setEditingId] = useState(null)
+  const [editName, setEditName] = useState('')
+
+  const addCategory = async (event) => {
+    event.preventDefault()
+    if (!newName.trim()) return
+    setBusy(true)
+    setError('')
+    try {
+      await createClubActivityCategory({ name: newName.trim() })
+      setNewName('')
+      onChanged()
+    } catch (err) {
+      setError(err.message || '분류를 추가하지 못했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveRename = async (category) => {
+    if (!editName.trim()) return
+    setBusy(true)
+    setError('')
+    try {
+      await updateClubActivityCategory(category.id, { name: editName.trim() })
+      setEditingId(null)
+      setEditName('')
+      onChanged()
+    } catch (err) {
+      setError(err.message || '분류를 수정하지 못했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const removeCategory = async (category) => {
+    if (!window.confirm(`'${category.name}' 분류를 삭제하시겠습니까?`)) return
+    setBusy(true)
+    setError('')
+    try {
+      await deleteClubActivityCategory(category.id)
+      onChanged()
+    } catch (err) {
+      setError(err.message || '분류를 삭제하지 못했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-black/10 bg-black/5 p-4">
+      <p className="text-sm font-semibold text-[var(--theme-body-dark)]">활동 분류 관리</p>
+      <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">활동 분류를 추가, 이름 변경, 삭제할 수 있습니다. 사용 중인 분류는 삭제할 수 없습니다.</p>
+
+      <form onSubmit={addCategory} className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          value={newName}
+          onChange={(event) => setNewName(event.target.value)}
+          maxLength={60}
+          placeholder="새 분류 이름"
+          className={ADMIN_INPUT_CLASS}
+        />
+        <button
+          type="submit"
+          disabled={busy || !newName.trim()}
+          className="shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] disabled:opacity-50"
+        >
+          분류 추가
+        </button>
+      </form>
+
+      {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
+
+      <ul className="mt-3 flex flex-col gap-2">
+        {categories.map((category) => (
+          <li key={category.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-black/10 bg-white/60 px-3 py-2">
+            {editingId === category.id ? (
+              <div className="flex flex-1 flex-wrap items-center gap-2">
+                <input
+                  value={editName}
+                  onChange={(event) => setEditName(event.target.value)}
+                  maxLength={60}
+                  className={ADMIN_INPUT_CLASS}
+                />
+                <button
+                  type="button"
+                  onClick={() => saveRename(category)}
+                  disabled={busy || !editName.trim()}
+                  className="text-xs font-semibold text-[#0066cc] hover:underline disabled:opacity-50"
+                >
+                  저장
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setEditingId(null); setEditName('') }}
+                  className="text-xs font-semibold text-[var(--theme-body-muted)] hover:underline"
+                >
+                  취소
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="text-sm text-[var(--theme-body-dark)]">
+                  <span className="font-semibold">{category.name}</span>
+                  <span className="ml-2 text-xs text-[var(--theme-body-muted)]">{category.key} · 사용 {category.activityCount ?? 0}건</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setEditingId(category.id); setEditName(category.name) }}
+                    className="text-xs font-semibold text-[#0066cc] hover:underline"
+                  >
+                    이름 변경
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeCategory(category)}
+                    disabled={busy}
+                    className="text-xs font-semibold text-red-500 hover:underline disabled:opacity-50"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
