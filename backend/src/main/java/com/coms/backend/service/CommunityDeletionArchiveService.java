@@ -130,6 +130,14 @@ public class CommunityDeletionArchiveService {
     }
 
     @Transactional(readOnly = true)
+    public DeletedCommunityPostResponse detail(Long deletedPostId) {
+        DeletedCommunityPost snapshot = repository.findById(deletedPostId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        return toResponse(snapshot, "/api/admin/community/deleted-posts",
+                latestAppeals(List.of(snapshot.getId())).get(snapshot.getId()));
+    }
+
+    @Transactional(readOnly = true)
     public List<DeletedCommunityPostResponse> mine(String studentId) {
         return toResponses(repository.findByAuthorStudentIdOrderByDeletedAtDesc(studentId),
                 "/api/community/posts/deleted");
@@ -464,6 +472,8 @@ public class CommunityDeletionArchiveService {
                         comment.getOriginalParentCommentId(),
                         comment.getStudentId(),
                         comment.getAuthorName(),
+                        comment.getAnonymousName(),
+                        comment.getDepth(),
                         comment.getContent(),
                         comment.getCreatedAt(),
                         comment.isEdited()

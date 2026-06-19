@@ -43,6 +43,8 @@ public record DeletedCommunityPostResponse(
             Long originalParentCommentId,
             String authorStudentId,
             String authorName,
+            String anonymousName,
+            int depth,
             String content,
             LocalDateTime createdAt,
             boolean edited
