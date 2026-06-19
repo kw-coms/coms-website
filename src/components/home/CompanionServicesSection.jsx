@@ -1,48 +1,161 @@
-import { ArrowUpRight } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowUpRight, Download } from 'lucide-react'
+import { apiUrl } from '../../services/apiClient.js'
+import { listClubProjects, listClubProjectCategories } from '../../services/clubProjectApi.js'
 import { companionServices } from '../../data/homeContent.js'
 
+const DEFAULT_MADE_BY = '최준혁'
+
+// Graceful fallback used when the backend is unavailable (mirrors how other
+// sections degrade). Built from the original hardcoded companionServices so the
+// section keeps rendering the same links offline.
+const FALLBACK_CATEGORIES = [
+  { key: 'WEBSITE', name: '웹사이트' },
+  { key: 'APP', name: '앱' },
+  { key: 'GAME', name: '게임' },
+]
+
+const FALLBACK_PROJECTS = companionServices.map((service, index) => ({
+  id: `fallback-${index}`,
+  category: service.title === 'Game Club' ? 'GAME' : 'WEBSITE',
+  categoryName: service.title === 'Game Club' ? '게임' : '웹사이트',
+  title: service.title,
+  description: service.body,
+  eyebrow: service.eyebrow,
+  madeBy: DEFAULT_MADE_BY,
+  linkUrl: service.href,
+  displayUrl: service.domain,
+  files: [],
+}))
+
+function groupByCategory(projects, categories) {
+  const order = categories.length > 0 ? categories : FALLBACK_CATEGORIES
+  const groups = order.map((category) => ({
+    key: category.key,
+    name: category.name,
+    projects: projects.filter((project) => project.category === category.key),
+  }))
+  // Surface any project whose category is missing from the category list under
+  // its own heading so nothing silently disappears.
+  const known = new Set(order.map((category) => category.key))
+  const leftovers = projects.filter((project) => !known.has(project.category))
+  if (leftovers.length > 0) {
+    const byKey = new Map()
+    for (const project of leftovers) {
+      if (!byKey.has(project.category)) {
+        byKey.set(project.category, { key: project.category, name: project.categoryName || project.category, projects: [] })
+      }
+      byKey.get(project.category).projects.push(project)
+    }
+    groups.push(...byKey.values())
+  }
+  return groups.filter((group) => group.projects.length > 0)
+}
+
+function ProjectCard({ project }) {
+  const hasLink = Boolean(project.linkUrl)
+  const files = Array.isArray(project.files) ? project.files : []
+  const CardTag = hasLink ? 'a' : 'div'
+  const cardProps = hasLink
+    ? { href: project.linkUrl, target: '_blank', rel: 'noreferrer' }
+    : {}
+
+  return (
+    <CardTag
+      {...cardProps}
+      className="apple-product-panel group flex min-h-64 flex-col px-6 py-6 text-left no-underline transition hover:-translate-y-0.5"
+    >
+      {project.eyebrow && <p className="text-sm font-semibold text-[#0066cc]">{project.eyebrow}</p>}
+      <h3 className="mt-3 text-2xl font-semibold leading-tight text-[#1d1d1f]">{project.title}</h3>
+      {project.description && (
+        <p className="mt-3 flex-1 text-sm font-medium leading-6 text-[#6e6e73]">{project.description}</p>
+      )}
+      <p className={`text-xs font-semibold text-[#86868b] ${project.description ? 'mt-4' : 'mt-3 flex-1'}`}>
+        만든 사람: {project.madeBy || DEFAULT_MADE_BY}
+      </p>
+
+      <div className="mt-5 flex flex-wrap items-center gap-2">
+        {hasLink && (
+          <span className="inline-flex items-center gap-2 text-sm font-bold text-[#0066cc]">
+            열기
+            <ArrowUpRight size={15} aria-hidden="true" />
+          </span>
+        )}
+        {files.map((file) => (
+          <a
+            key={file.id}
+            href={apiUrl(file.url)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-[#0066cc] px-3 py-1.5 text-xs font-bold text-white no-underline transition hover:bg-[#0052a3]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Download size={13} aria-hidden="true" />
+            다운로드
+          </a>
+        ))}
+      </div>
+
+      {project.displayUrl && (
+        <span className="mt-3 truncate rounded-full bg-[#f5f5f7] px-3 py-1.5 text-xs font-semibold text-[#86868b]">
+          {project.displayUrl}
+        </span>
+      )}
+    </CardTag>
+  )
+}
+
 function CompanionServicesSection() {
+  const [projects, setProjects] = useState(FALLBACK_PROJECTS)
+  const [categories, setCategories] = useState(FALLBACK_CATEGORIES)
+
+  useEffect(() => {
+    let mounted = true
+    Promise.all([listClubProjects(), listClubProjectCategories()])
+      .then(([projectData, categoryData]) => {
+        if (!mounted) return
+        const projectList = Array.isArray(projectData) ? projectData : []
+        const categoryList = Array.isArray(categoryData) ? categoryData : []
+        // Only replace the fallback when the API actually returns content.
+        if (projectList.length > 0) setProjects(projectList)
+        if (categoryList.length > 0) setCategories(categoryList)
+      })
+      .catch(() => {
+        // Keep the fallback when the backend is unavailable.
+      })
+    return () => { mounted = false }
+  }, [])
+
+  const groups = groupByCategory(projects, categories)
+
   return (
     <section className="bg-white px-5 py-12 sm:py-16">
       <div className="mx-auto max-w-7xl">
-        <div className="grid gap-8 lg:grid-cols-[0.72fr_1fr] lg:items-end">
-          <div>
-            <p className="apple-eyebrow">Service launcher</p>
-            <h2 className="apple-display mt-3 text-4xl sm:text-5xl">COM&apos;s Apps</h2>
-            <p className="apple-copy mt-4 max-w-xl text-lg">
-              공식 웹사이트에서 동아리 주변 서비스로 바로 이동할 수 있게 묶었습니다. 활동, 팀 편성, 게임, 캠퍼스 유틸, 코딩 루틴을 한 흐름으로 이어갑니다.
-            </p>
-          </div>
-          <div className="apple-soft-panel bg-[#f5f5f7] px-5 py-5">
-            <p className="text-sm font-semibold text-[#1d1d1f]">개선 방향</p>
-            <p className="mt-2 text-sm font-medium leading-6 text-[#6e6e73]">
-              월드컵과 티어표는 COMS 계정 기반 저장·공유를 사용합니다. 다음 단계로는 서비스별 운영 상태와 최근 활동 요약을 붙이면 생태계가 더 선명해집니다.
-            </p>
-          </div>
+        <div className="max-w-2xl">
+          <p className="apple-eyebrow">Service launcher</p>
+          <h2 className="apple-display mt-3 text-4xl sm:text-5xl">COM&apos;s Apps</h2>
+          <p className="apple-copy mt-4 text-lg">
+            동아리 부원들이 직접 만든 웹사이트·앱·게임 프로젝트를 한곳에 모았습니다. 카테고리별로 살펴보고, 링크로 바로 열거나 배포 파일을 내려받아 사용해 보세요.
+          </p>
         </div>
 
-        <div className="mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          {companionServices.map((service) => (
-            <a
-              key={service.title}
-              href={service.href}
-              target="_blank"
-              rel="noreferrer"
-              className="apple-product-panel group flex min-h-64 flex-col px-6 py-6 text-left no-underline transition hover:-translate-y-0.5"
-            >
-              <p className="text-sm font-semibold text-[#0066cc]">{service.eyebrow}</p>
-              <h3 className="mt-3 text-2xl font-semibold leading-tight text-[#1d1d1f]">{service.title}</h3>
-              <p className="mt-3 flex-1 text-sm font-medium leading-6 text-[#6e6e73]">{service.body}</p>
-              <span className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-[#0066cc]">
-                열기
-                <ArrowUpRight size={15} aria-hidden="true" />
-              </span>
-              <span className="mt-3 truncate rounded-full bg-[#f5f5f7] px-3 py-1.5 text-xs font-semibold text-[#86868b]">
-                {service.domain}
-              </span>
-            </a>
-          ))}
-        </div>
+        {groups.length === 0 ? (
+          <p className="mt-8 text-sm font-medium text-[#6e6e73]">등록된 프로젝트가 아직 없습니다.</p>
+        ) : (
+          <div className="mt-10 space-y-12">
+            {groups.map((group) => (
+              <div key={group.key}>
+                <div className="flex items-baseline gap-3">
+                  <h3 className="text-2xl font-bold text-[#1d1d1f]">{group.name}</h3>
+                  <span className="text-sm font-semibold text-[#86868b]">{group.projects.length}개</span>
+                </div>
+                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {group.projects.map((project) => (
+                    <ProjectCard key={project.id} project={project} />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )
