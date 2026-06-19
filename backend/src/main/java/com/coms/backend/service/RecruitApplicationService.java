@@ -32,6 +32,7 @@ public class RecruitApplicationService {
 
     private final JavaMailSender mailSender;
     private final RecruitApplicationRepository recruitApplicationRepository;
+    private final NotificationService notificationService;
     private final boolean mailEnabled;
     private final String from;
     private final String to;
@@ -39,11 +40,13 @@ public class RecruitApplicationService {
 
     public RecruitApplicationService(JavaMailSender mailSender,
                                      RecruitApplicationRepository recruitApplicationRepository,
+                                     NotificationService notificationService,
                                      @Value("${mail.enabled:false}") boolean mailEnabled,
                                      @Value("${mail.from:no-reply@coms.kw.ac.kr}") String from,
                                      @Value("${recruit.mail.to:kwcoms69@gmail.com}") String to) {
         this.mailSender = mailSender;
         this.recruitApplicationRepository = recruitApplicationRepository;
+        this.notificationService = notificationService;
         this.mailEnabled = mailEnabled;
         this.from = from;
         this.to = to;
@@ -52,8 +55,14 @@ public class RecruitApplicationService {
     @Transactional
     public void sendApplication(RecruitApplicationRequest request, String clientIp) {
         enforceRateLimit(clientIp);
+
+        // Persist + alert admins first so an application is never lost — even when
+        // email is disabled or the SMTP server is unreachable. Email is best-effort.
+        RecruitApplication application = recruitApplicationRepository.save(toEntity(request, clientIp));
+        notificationService.notifyRecruitApplication(application);
+
         if (!mailEnabled) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "메일 발송 설정이 아직 완료되지 않았습니다.");
+            return;
         }
 
         try {
@@ -65,10 +74,10 @@ public class RecruitApplicationService {
             message.setText(buildBody(request));
             mailSender.send(message);
             mailSender.send(buildApplicantConfirmationMessage(request));
-            recruitApplicationRepository.save(toEntity(request, clientIp));
         } catch (RuntimeException e) {
-            log.warn("Failed to send recruit application for studentId={}", request.studentId(), e);
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "지원서 메일 발송에 실패했습니다.");
+            // Application is already saved and admins are notified in-app; don't fail the
+            // submission just because the notification email could not be delivered.
+            log.warn("Recruit application saved but notification email failed for studentId={}", request.studentId(), e);
         }
     }
 
