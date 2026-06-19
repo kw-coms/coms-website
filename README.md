@@ -165,6 +165,7 @@ docker compose --env-file .env up -d --build
 | `DB_HOST`, `DB_PORT`, `DB_NAME` | DB 접속 정보 |
 | `DB_USER`, `DB_PASSWORD` | DB 계정 |
 | `COOKIE_SECURE` | HTTPS 쿠키 보안 옵션 |
+| `COOKIE_SAME_SITE` | 쿠키 SameSite 정책 (`Lax` 기본값; 모바일 앱 연동 시 `None` 필요) |
 | `CORS_ALLOWED_ORIGINS` | 허용할 origin 목록 |
 | `MAIL_ENABLED` | 메일 발송 사용 여부 |
 | `MAIL_LOG_VERIFICATION_CODES` | 인증 코드 로그 출력 여부 |
@@ -194,6 +195,7 @@ docker compose --env-file .env up -d --build
 
 - 운영에서는 `JWT_SECRET`과 `DB_PASSWORD`를 기본값으로 두지 않습니다.
 - 운영에서는 `COOKIE_SECURE=true`를 유지합니다.
+- **Capacitor 모바일 앱 연동 시**: `COOKIE_SAME_SITE=None`과 `COOKIE_SECURE=true`를 설정하고, `CORS_ALLOWED_ORIGINS`에 `https://localhost`(Android)와 `capacitor://localhost`(iOS)를 추가해야 합니다. `SameSite=None`은 반드시 HTTPS(Secure=true)와 함께 사용해야 합니다.
 - 운영에서는 `MAIL_LOG_VERIFICATION_CODES=false`를 유지합니다.
 - PostgreSQL 스키마는 Flyway migration으로 관리합니다.
 - 운영 reverse proxy는 `/api`와 `/actuator` 요청을 백엔드로 전달해야 합니다.
