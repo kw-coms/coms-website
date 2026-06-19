@@ -5,11 +5,8 @@ import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
 const routeExpectations = [
   ['/', /KW COM's/],
   ['/activities', /배움이 매주 쌓이고,\s*서로에게 남습니다\./],
-  ['/activity-log', /실제로 이어지는 활동 기록/],
-  ['/monthly-calendar', /동아리 일정 캘린더/],
   ['/projects', /아이디어를 실제 서비스와 제작물로\./],
   ['/apps', /COM's Apps/],
-  ['/notices', /공지사항|등록된 공지/],
   ['/login', /로그인|아이디/],
 ]
 
@@ -826,19 +823,15 @@ test('activities page does not embed the activity log or monthly calendar', asyn
   await expect(page.getByRole('heading', { name: '동아리 일정 캘린더' })).toHaveCount(0)
 })
 
-test('activity records and calendar are locked for guests without dummy content', async ({ page }) => {
+test('activity records and calendar redirect guests to login', async ({ page }) => {
   await page.goto('/activity-log')
-
-  await expect(page.getByRole('heading', { name: '실제로 이어지는 활동 기록' })).toBeVisible()
-  await expect(page.getByText('로그인 하세요')).toBeVisible()
-  await expect(page.getByText('회원 로그인 후 활동 기록과 일정을 확인할 수 있습니다.')).toBeVisible()
+  await expect(page).toHaveURL(/\/login$/)
   await expect(page.getByText('등록된 활동 기록이 없습니다.')).toHaveCount(0)
   await expect(page.getByText('알고리즘 스터디 진행')).toHaveCount(0)
   await expect(page.getByText('웹 프로젝트 발표회')).toHaveCount(0)
 
   await page.goto('/monthly-calendar')
-  await expect(page.getByRole('heading', { name: '동아리 일정 캘린더' })).toBeVisible()
-  await expect(page.getByText('회원 전용 일정')).toBeVisible()
+  await expect(page).toHaveURL(/\/login$/)
 })
 
 test('signed-in members see real activity records and schedule events', async ({ page }) => {

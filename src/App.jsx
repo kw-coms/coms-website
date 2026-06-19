@@ -1112,12 +1112,12 @@ function App() {
         <Route path="/" element={<HomeView />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/activities" element={<ActivitiesDetailPage />} />
-        <Route path="/activity-log" element={<ActivityLogPage />} />
-        <Route path="/monthly-calendar" element={<MonthlyCalendarPage />} />
+        <Route path="/activity-log" element={<RequireAuth><ActivityLogPage /></RequireAuth>} />
+        <Route path="/monthly-calendar" element={<RequireAuth><MonthlyCalendarPage /></RequireAuth>} />
         <Route path="/projects" element={<ProjectsDetailPage />} />
         <Route path="/apps" element={<AppsPage />} />
-        <Route path="/notices" element={<NoticesPage />} />
-        <Route path="/notices/:id" element={<NoticesPage />} />
+        <Route path="/notices" element={<RequireAuth><NoticesPage /></RequireAuth>} />
+        <Route path="/notices/:id" element={<RequireAuth><NoticesPage /></RequireAuth>} />
         <Route path="/resources" element={<RequireAuth><ArchivePage /></RequireAuth>} />
         <Route path="/community" element={<RequireAuth><CommunityPage /></RequireAuth>} />
         <Route path="/community/:id" element={<RequireAuth><CommunityPage /></RequireAuth>} />
