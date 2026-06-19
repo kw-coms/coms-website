@@ -1,9 +1,11 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.ClubActivity;
+import com.coms.backend.domain.ClubActivityVote;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.ClubActivityResponse;
 import com.coms.backend.repository.ClubActivityRepository;
+import com.coms.backend.repository.ClubActivityVoteRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -17,7 +19,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -34,20 +40,57 @@ public class ClubActivityService {
     private final ClubActivityRepository repository;
     private final MemberRepository memberRepository;
     private final StorageService storageService;
+    private final ClubActivityVoteRepository voteRepository;
 
     public ClubActivityService(ClubActivityRepository repository,
                                MemberRepository memberRepository,
-                               StorageService storageService) {
+                               StorageService storageService,
+                               ClubActivityVoteRepository voteRepository) {
         this.repository = repository;
         this.memberRepository = memberRepository;
         this.storageService = storageService;
+        this.voteRepository = voteRepository;
     }
 
     @Transactional(readOnly = true)
     public List<ClubActivityResponse> list() {
-        return repository.findAllByOrderByEventDateDescCreatedAtDesc().stream()
-                .map(this::toResponse)
+        return list(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ClubActivityResponse> list(String studentId) {
+        List<ClubActivity> activities = repository.findAllByOrderByEventDateDescCreatedAtDesc();
+        Map<Long, VoteSummary> stats = voteStats(activities);
+        return activities.stream()
+                .map(activity -> toResponse(activity, stats, studentId))
                 .toList();
+    }
+
+    public ClubActivityResponse getAndIncrementView(Long id, String studentId) {
+        ClubActivity activity = get(id);
+        activity.incrementViewCount();
+        ClubActivity saved = repository.save(activity);
+        return toResponse(saved, voteStats(List.of(saved)), studentId);
+    }
+
+    public ClubActivityResponse vote(String studentId, Long id, int value) {
+        if (value < 0 || value > 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid vote value.");
+        }
+        memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        ClubActivity activity = get(id);
+        Optional<ClubActivityVote> existing = voteRepository.findByClubActivityIdAndStudentId(activity.getId(), studentId);
+        if (value == 0 || existing.isPresent()) {
+            existing.ifPresent(voteRepository::delete);
+        } else {
+            ClubActivityVote vote = new ClubActivityVote();
+            vote.setClubActivityId(activity.getId());
+            vote.setStudentId(studentId);
+            vote.setValue(1);
+            voteRepository.save(vote);
+        }
+        return toResponse(activity, voteStats(List.of(activity)), studentId);
     }
 
     public ClubActivityResponse create(String kind,
@@ -96,7 +139,8 @@ public class ClubActivityService {
         }
 
         try {
-            return toResponse(repository.save(activity));
+            ClubActivity saved = repository.save(activity);
+            return toResponse(saved, voteStats(List.of(saved)), creatorStudentId);
         } catch (RuntimeException e) {
             if (storedImage != null) storageService.delete(storedImage);
             throw e;
@@ -155,7 +199,20 @@ public class ClubActivityService {
         return StringUtils.cleanPath(filename == null ? "" : filename);
     }
 
-    private ClubActivityResponse toResponse(ClubActivity activity) {
+    private Map<Long, VoteSummary> voteStats(List<ClubActivity> activities) {
+        List<Long> ids = activities.stream().map(ClubActivity::getId).filter(Objects::nonNull).toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return voteRepository.findByClubActivityIdIn(ids).stream()
+                .collect(Collectors.groupingBy(
+                        ClubActivityVote::getClubActivityId,
+                        Collectors.collectingAndThen(Collectors.toList(), VoteSummary::from)
+                ));
+    }
+
+    private ClubActivityResponse toResponse(ClubActivity activity, Map<Long, VoteSummary> voteStats, String studentId) {
+        VoteSummary votes = voteStats.getOrDefault(activity.getId(), VoteSummary.EMPTY);
         return new ClubActivityResponse(
                 activity.getId(),
                 activity.getKind().name(),
@@ -166,8 +223,26 @@ public class ClubActivityService {
                 activity.getImageStoredName() == null ? null : "/api/club-activities/" + activity.getId() + "/image",
                 activity.getImageOriginalName(),
                 activity.getCreatedByName(),
+                activity.getViewCount(),
+                votes.upvotes(),
+                votes.myVote(studentId),
                 activity.getCreatedAt(),
                 activity.getUpdatedAt()
         );
+    }
+
+    private record VoteSummary(long upvotes, Map<String, Integer> byStudent) {
+        static final VoteSummary EMPTY = new VoteSummary(0, Map.of());
+
+        static VoteSummary from(List<ClubActivityVote> votes) {
+            long upvotes = votes.stream().filter(vote -> vote.getValue() > 0).count();
+            Map<String, Integer> byStudent = votes.stream()
+                    .collect(Collectors.toMap(ClubActivityVote::getStudentId, ClubActivityVote::getValue, (a, b) -> b));
+            return new VoteSummary(upvotes, byStudent);
+        }
+
+        int myVote(String studentId) {
+            return studentId == null ? 0 : byStudent.getOrDefault(studentId, 0);
+        }
     }
 }

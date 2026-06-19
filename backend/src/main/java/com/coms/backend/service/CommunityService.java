@@ -229,10 +229,11 @@ public class CommunityService {
         requireCategoryAllowed(member, sanitized.category());
         boolean titleChanged = !sanitized.title().equals(post.getTitle());
         boolean isInitialFinalization = isInitialFinalization(post, sanitized.content());
+        boolean wasAnonymous = isAnonymousPost(post);
         post.setTitle(sanitized.title());
         post.setContent(sanitized.content());
         post.setCategory(sanitized.category());
-        applyAnonymousPostFields(post, sanitized.category(), request.anonymousName(), clientIp);
+        preserveAnonymousPostFields(post, wasAnonymous, sanitized.category(), request.anonymousName(), clientIp);
         if (Boolean.TRUE.equals(request.removeImage())) {
             clearImage(post);
         }
@@ -562,6 +563,26 @@ public class CommunityService {
         if ((post.getIpAddress() == null || post.getIpAddress().isBlank()) && clientIp != null && !clientIp.isBlank()) {
             post.setIpAddress(clientIp.trim());
         }
+    }
+
+    /**
+     * Preserves the anonymous identity (display name + IP tag) of an existing post across edits.
+     * The identity is frozen at creation: editing — even by an admin or a non-author — must never
+     * reassign authorship. If the post stays anonymous, the original anonymousName/ipAddress are kept
+     * verbatim; only a genuine category transition re-derives the fields.
+     */
+    private void preserveAnonymousPostFields(CommunityPost post, boolean wasAnonymous, CommunityPost.Category category,
+                                             String anonymousName, String clientIp) {
+        if (category != CommunityPost.Category.ANONYMOUS) {
+            post.setAnonymousName(null);
+            post.setIpAddress(null);
+            return;
+        }
+        if (wasAnonymous) {
+            // Already anonymous: keep the stored identity untouched regardless of who is editing.
+            return;
+        }
+        applyAnonymousPostFields(post, category, anonymousName, clientIp);
     }
 
     private void applyAnonymousCommentFields(CommunityPost post, CommunityComment comment, String anonymousName, String clientIp) {

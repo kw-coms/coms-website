@@ -2,8 +2,10 @@ package com.coms.backend.controller;
 
 import com.coms.backend.domain.ClubActivity;
 import com.coms.backend.dto.ClubActivityResponse;
+import com.coms.backend.dto.EngagementVoteRequest;
 import com.coms.backend.service.ClubActivityService;
 import com.coms.backend.service.StorageService;
+import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
 import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,8 +40,20 @@ public class ClubActivityController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ClubActivityResponse>> list() {
-        return ResponseEntity.ok(clubActivityService.list());
+    public ResponseEntity<List<ClubActivityResponse>> list(Authentication authentication) {
+        return ResponseEntity.ok(clubActivityService.list(authentication.getName()));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ClubActivityResponse> get(Authentication authentication, @PathVariable Long id) {
+        return ResponseEntity.ok(clubActivityService.getAndIncrementView(id, authentication.getName()));
+    }
+
+    @PostMapping("/{id}/vote")
+    public ResponseEntity<ClubActivityResponse> vote(Authentication authentication,
+                                                     @PathVariable Long id,
+                                                     @Valid @RequestBody EngagementVoteRequest request) {
+        return ResponseEntity.ok(clubActivityService.vote(authentication.getName(), id, request.value()));
     }
 
     @PostMapping

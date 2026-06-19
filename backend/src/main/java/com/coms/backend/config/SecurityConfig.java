@@ -66,10 +66,12 @@ public class SecurityConfig {
                 auth.requestMatchers("/api/maintenance/**").hasRole("ADMIN");
                 auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/**").permitAll();
+                auth.requestMatchers(HttpMethod.POST, "/api/notices/*/vote").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/notices").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.PUT, "/api/notices/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/notices/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.GET, "/api/club-activities", "/api/club-activities/**").authenticated();
+                auth.requestMatchers(HttpMethod.POST, "/api/club-activities/*/vote").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/club-activities").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/club-activities/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.GET, "/api/fonts", "/api/fonts/**").permitAll();

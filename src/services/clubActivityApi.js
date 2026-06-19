@@ -23,6 +23,17 @@ export async function createClubActivity({ kind, category, title, description, e
   return data
 }
 
+export async function getClubActivity(id) {
+  return request(`/api/club-activities/${id}`)
+}
+
+export async function voteClubActivity(id, value) {
+  return request(`/api/club-activities/${id}/vote`, {
+    method: 'POST',
+    body: JSON.stringify({ value }),
+  })
+}
+
 export async function deleteClubActivity(id) {
   return requestNoContent(`/api/club-activities/${id}`, {
     method: 'DELETE',

@@ -63,6 +63,48 @@ class NoticeServiceTest {
     }
 
     @Test
+    void detailFetchIncrementsViewCount() {
+        var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
+
+        var first = noticeService.getAndIncrementView(notice.id(), "2026123000");
+        var second = noticeService.getAndIncrementView(notice.id(), "2026123000");
+
+        assertThat(first.viewCount()).isEqualTo(1);
+        assertThat(second.viewCount()).isEqualTo(2);
+    }
+
+    @Test
+    void upvoteTogglesAndTracksMyVote() {
+        var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
+
+        var upvoted = noticeService.vote("2026123000", notice.id(), 1);
+        assertThat(upvoted.upvotes()).isEqualTo(1);
+        assertThat(upvoted.myVote()).isEqualTo(1);
+
+        var cleared = noticeService.vote("2026123000", notice.id(), 1);
+        assertThat(cleared.upvotes()).isZero();
+        assertThat(cleared.myVote()).isZero();
+    }
+
+    @Test
+    void listExposesEngagementCountsWithViewerVote() {
+        var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
+        noticeService.vote("2026123000", notice.id(), 1);
+
+        assertThat(noticeService.list("2026123000"))
+                .filteredOn(item -> item.id().equals(notice.id()))
+                .singleElement()
+                .satisfies(item -> {
+                    assertThat(item.upvotes()).isEqualTo(1);
+                    assertThat(item.myVote()).isEqualTo(1);
+                });
+        assertThat(noticeService.list(null))
+                .filteredOn(item -> item.id().equals(notice.id()))
+                .singleElement()
+                .satisfies(item -> assertThat(item.myVote()).isZero());
+    }
+
+    @Test
     void updateIgnoresClientSuppliedAuthor() {
         var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", "가짜", false, null));
 
