@@ -69,9 +69,13 @@ public class ClubActivityController {
             @RequestParam("title") String title,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam("eventDate") LocalDate eventDate,
+            @RequestParam(value = "endDate", required = false) LocalDate endDate,
+            @RequestParam(value = "startTime", required = false) String startTime,
+            @RequestParam(value = "endTime", required = false) String endTime,
             @RequestParam(value = "image", required = false) MultipartFile image,
             Authentication authentication) throws IOException {
-        return ResponseEntity.ok(clubActivityService.create(kind, category, title, description, eventDate, image, authentication.getName()));
+        return ResponseEntity.ok(clubActivityService.create(kind, category, title, description,
+                eventDate, endDate, startTime, endTime, image, authentication.getName()));
     }
 
     @PatchMapping("/{id}")
@@ -82,8 +86,12 @@ public class ClubActivityController {
             @RequestParam(value = "title", required = false) String title,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "eventDate", required = false) LocalDate eventDate,
+            @RequestParam(value = "endDate", required = false) LocalDate endDate,
+            @RequestParam(value = "startTime", required = false) String startTime,
+            @RequestParam(value = "endTime", required = false) String endTime,
             Authentication authentication) {
-        return ResponseEntity.ok(clubActivityService.update(id, kind, category, title, description, eventDate, authentication.getName()));
+        return ResponseEntity.ok(clubActivityService.update(id, kind, category, title, description,
+                eventDate, endDate, startTime, endTime, authentication.getName()));
     }
 
     @GetMapping("/{id}/image")
