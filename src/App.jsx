@@ -24,8 +24,10 @@ import {
 import { listNotices } from './services/noticeApi.js'
 import {
   createClubActivity,
+  deleteClubActivity,
   listClubActivities,
   getClubActivity,
+  updateClubActivity,
   voteClubActivity,
   listClubActivityCategories,
   listScheduleOccurrences,
@@ -33,6 +35,8 @@ import {
   createRecurringSchedule,
   updateRecurringSchedule,
   deleteRecurringSchedule,
+  upsertRecurringScheduleException,
+  deleteRecurringScheduleException,
 } from './services/clubActivityApi.js'
 import { getNotificationSummary, listNotifications, markAllNotificationsRead, markNotificationRead } from './services/notificationApi.js'
 import { listFonts } from './services/fontApi.js'
@@ -47,7 +51,8 @@ const ChangePassword = lazy(() => import('./pages/ChangePassword.jsx'))
 const RecruitApply = lazy(() => import('./pages/RecruitApply.jsx'))
 const RecruitNotice = lazy(() => import('./pages/RecruitNotice.jsx'))
 import { getLogoAsset } from './utils/logoAssets.js'
-import { buildCalendarDayEvents, visibleDayEvents } from './utils/monthlyCalendar.js'
+import { buildCalendarDayEvents, buildMonthEventSummary, visibleDayEvents } from './utils/monthlyCalendar.js'
+import { parseScheduleCsv } from './utils/scheduleCsv.js'
 import { useAuth } from './contexts/useAuth.js'
 import { ActivityCategory } from './contract/enums.js'
 import { enumLabels } from './contract/labels.js'
@@ -1228,7 +1233,13 @@ function useClubActivities(loadErrorMessage) {
     )
   }
 
-  return { user, authLoading, records, loading, loadError, prependActivity, mergeActivity }
+  const removeActivity = (id) => {
+    queryClient.setQueryData(CLUB_ACTIVITIES_QUERY_KEY, (prev) =>
+      (Array.isArray(prev) ? prev : []).filter((item) => item.id !== id),
+    )
+  }
+
+  return { user, authLoading, records, loading, loadError, prependActivity, mergeActivity, removeActivity }
 }
 
 // Admin-managed club-activity categories. Falls back to the static list so the
@@ -1622,13 +1633,32 @@ const EMPTY_CALENDAR_SCHEDULE_FORM = {
   endTime: '',
 }
 
-function CalendarScheduleComposer({ onDateCreated }) {
+function calendarFormFromDateSchedule(schedule) {
+  if (!schedule) {
+    return { ...EMPTY_CALENDAR_SCHEDULE_FORM, daysOfWeek: [] }
+  }
+  return {
+    mode: 'date',
+    title: schedule.title || '',
+    startDate: schedule.eventDate || schedule.startDate || '',
+    endDate: schedule.endDate || schedule.eventDate || schedule.startDate || '',
+    daysOfWeek: [],
+    startTime: schedule.startTime || '',
+    endTime: schedule.endTime || '',
+  }
+}
+
+function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSchedule, onDateEditDone }) {
   const queryClient = useQueryClient()
   const { user, loading: authLoading } = useAuth()
-  const [form, setForm] = useState(EMPTY_CALENDAR_SCHEDULE_FORM)
+  const [form, setForm] = useState(() => calendarFormFromDateSchedule(editingDateSchedule))
   const [editingRecurringId, setEditingRecurringId] = useState(null)
+  const [csvText, setCsvText] = useState('')
+  const [csvImporting, setCsvImporting] = useState(false)
+  const [csvNotice, setCsvNotice] = useState('')
+  const [csvError, setCsvError] = useState('')
   const [saving, setSaving] = useState(false)
-  const [notice, setNotice] = useState('')
+  const [notice, setNotice] = useState(editingDateSchedule ? '선택한 날짜 일정을 수정 중입니다.' : '')
   const [error, setError] = useState('')
 
   const listQuery = useQuery({
@@ -1644,6 +1674,7 @@ function CalendarScheduleComposer({ onDateCreated }) {
   const setMode = (mode) => {
     setForm((prev) => ({ ...prev, mode }))
     setEditingRecurringId(null)
+    if (editingDateSchedule) onDateEditDone?.()
     setNotice('')
     setError('')
   }
@@ -1660,6 +1691,7 @@ function CalendarScheduleComposer({ onDateCreated }) {
   const resetForm = () => {
     setForm(EMPTY_CALENDAR_SCHEDULE_FORM)
     setEditingRecurringId(null)
+    onDateEditDone?.()
     setNotice('')
     setError('')
   }
@@ -1673,6 +1705,7 @@ function CalendarScheduleComposer({ onDateCreated }) {
       endTime: prev.endTime,
     }))
     setEditingRecurringId(null)
+    onDateEditDone?.()
   }
 
   const startEdit = (schedule) => {
@@ -1720,16 +1753,25 @@ function CalendarScheduleComposer({ onDateCreated }) {
     setError('')
     try {
       if (form.mode === 'date') {
-        const created = await createClubActivity({
+        const payload = {
           kind: 'SCHEDULE',
+          category: editingDateSchedule?.category || 'GENERAL',
           title,
           eventDate: form.startDate,
           endDate,
           startTime: form.startTime,
           endTime: form.endTime,
-        })
-        onDateCreated?.(created)
-        setNotice('날짜 일정을 추가했습니다.')
+          description: editingDateSchedule?.description || '',
+        }
+        if (editingDateSchedule?.id) {
+          const updated = await updateClubActivity(editingDateSchedule.id, payload)
+          onDateUpdated?.(updated)
+          setNotice('날짜 일정을 수정했습니다.')
+        } else {
+          const created = await createClubActivity(payload)
+          onDateCreated?.(created)
+          setNotice('날짜 일정을 추가했습니다.')
+        }
       } else {
         const payload = {
           title,
@@ -1759,6 +1801,67 @@ function CalendarScheduleComposer({ onDateCreated }) {
     }
   }
 
+  const handleCsvFile = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setCsvText(await file.text())
+    setCsvNotice(`${file.name} 내용을 불러왔습니다.`)
+    setCsvError('')
+  }
+
+  const importCsv = async () => {
+    const parsed = parseScheduleCsv(csvText)
+    if (parsed.errors.length > 0) {
+      setCsvNotice('')
+      setCsvError(parsed.errors.map((entry) => `${entry.line}행: ${entry.message}`).join(' '))
+      return
+    }
+    if (parsed.rows.length === 0) {
+      setCsvNotice('')
+      setCsvError('가져올 일정이 없습니다.')
+      return
+    }
+    setCsvImporting(true)
+    setCsvNotice('')
+    setCsvError('')
+    try {
+      let importedCount = 0
+      for (const row of parsed.rows) {
+        if (row.type === 'date') {
+          const created = await createClubActivity({
+            kind: 'SCHEDULE',
+            category: 'GENERAL',
+            title: row.title,
+            eventDate: row.startDate,
+            endDate: row.endDate || row.startDate,
+            startTime: row.startTime,
+            endTime: row.endTime,
+          })
+          onDateCreated?.(created)
+        } else {
+          await createRecurringSchedule({
+            title: row.title,
+            description: null,
+            startDate: row.startDate,
+            endDate: row.endDate,
+            daysOfWeek: row.daysOfWeek,
+            startTime: row.startTime || null,
+            endTime: row.endTime || null,
+            location: null,
+            category: null,
+          })
+        }
+        importedCount += 1
+      }
+      refreshCalendar()
+      setCsvNotice(`CSV에서 일정 ${importedCount}개를 가져왔습니다.`)
+    } catch (err) {
+      setCsvError(err.message || 'CSV 일정을 가져오지 못했습니다.')
+    } finally {
+      setCsvImporting(false)
+    }
+  }
+
   const remove = async (schedule) => {
     if (typeof window !== 'undefined' && !window.confirm(`'${schedule.title}' 정기 모임을 삭제할까요?`)) return
     setError('')
@@ -1778,7 +1881,7 @@ function CalendarScheduleComposer({ onDateCreated }) {
       <form onSubmit={submit} className="calendar-admin-composer calendar-admin-composer-unified" aria-label="캘린더 일정 관리">
         <div className="calendar-admin-composer-heading">
           <p className="calendar-admin-composer-title">
-            {editingRecurringId ? '정기 모임 수정' : '관리자 일정 추가'}
+            {editingDateSchedule ? '날짜 일정 수정' : (editingRecurringId ? '정기 모임 수정' : '관리자 일정 추가')}
           </p>
           <p className="calendar-admin-composer-copy">처음에 날짜 일정인지 정기 모임인지 선택하고, 제목·기간·시간만 입력합니다.</p>
         </div>
@@ -1797,7 +1900,7 @@ function CalendarScheduleComposer({ onDateCreated }) {
             className={form.mode === 'recurring' ? 'is-active' : ''}
             onClick={() => setMode('recurring')}
             aria-pressed={form.mode === 'recurring'}
-            disabled={saving}
+            disabled={saving || Boolean(editingDateSchedule)}
           >
             정기 모임
           </button>
@@ -1864,9 +1967,9 @@ function CalendarScheduleComposer({ onDateCreated }) {
             type="submit"
             disabled={saving || !form.title.trim() || !form.startDate || (form.mode === 'recurring' && (!form.endDate || form.daysOfWeek.length === 0))}
           >
-            {saving ? '저장 중...' : (editingRecurringId ? '정기 모임 수정' : (form.mode === 'date' ? '날짜 일정 추가' : '정기 모임 등록'))}
+            {saving ? '저장 중...' : (editingDateSchedule ? '날짜 일정 수정' : (editingRecurringId ? '정기 모임 수정' : (form.mode === 'date' ? '날짜 일정 추가' : '정기 모임 등록')))}
           </button>
-          {editingRecurringId && (
+          {(editingRecurringId || editingDateSchedule) && (
             <button type="button" className="recurring-cancel-edit" onClick={resetForm} disabled={saving}>
               취소
             </button>
@@ -1875,6 +1978,30 @@ function CalendarScheduleComposer({ onDateCreated }) {
         {notice && <p className="calendar-admin-composer-notice">{notice}</p>}
         {error && <p className="calendar-admin-composer-notice" style={{ color: '#dc2626' }}>{error}</p>}
       </form>
+
+      <div className="calendar-csv-import mt-4">
+        <div>
+          <p className="calendar-admin-composer-title">학기 일정 CSV 가져오기</p>
+          <p className="calendar-admin-composer-copy">type,title,startDate,endDate,startTime,endTime,daysOfWeek 형식으로 날짜 일정과 정기 모임을 한 번에 등록합니다.</p>
+        </div>
+        <textarea
+          aria-label="학기 일정 CSV"
+          value={csvText}
+          onChange={(event) => setCsvText(event.target.value)}
+          placeholder="종류,제목,시작일,종료일,시작시간,종료시간,요일"
+        />
+        <div className="calendar-csv-import-actions">
+          <label>
+            CSV 파일 선택
+            <input type="file" accept=".csv,text/csv" onChange={handleCsvFile} />
+          </label>
+          <button type="button" onClick={importCsv} disabled={csvImporting || !csvText.trim()}>
+            {csvImporting ? '가져오는 중...' : 'CSV 일정 가져오기'}
+          </button>
+        </div>
+        {csvNotice && <p className="calendar-admin-composer-notice">{csvNotice}</p>}
+        {csvError && <p className="calendar-admin-composer-notice" style={{ color: '#dc2626' }}>{csvError}</p>}
+      </div>
 
       {schedules.length > 0 && (
         <ul className="recurring-schedule-list mt-4">
@@ -1912,12 +2039,18 @@ function CalendarScheduleComposer({ onDateCreated }) {
 
 function ClubCalendarSection({ compact = false }) {
   const navigate = useNavigate()
-  const { user, authLoading, records, loading, loadError, prependActivity } = useClubActivities('일정을 불러오지 못했습니다.')
+  const queryClient = useQueryClient()
+  const { user, authLoading, records, loading, loadError, prependActivity, mergeActivity, removeActivity } = useClubActivities('일정을 불러오지 못했습니다.')
   const initialCalendarDate = new Date()
   const error = loadError
   const [selectedYear, setSelectedYear] = useState(initialCalendarDate.getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(initialCalendarDate.getMonth())
   const [selectedDay, setSelectedDay] = useState(null)
+  const [editingDateSchedule, setEditingDateSchedule] = useState(null)
+  const [calendarNotice, setCalendarNotice] = useState('')
+  const [calendarActionError, setCalendarActionError] = useState('')
+  const [exceptionEditor, setExceptionEditor] = useState(null)
+  const [exceptionSaving, setExceptionSaving] = useState(false)
 
   const occurrences = useScheduleOccurrences(selectedYear, selectedMonth)
   const scheduleItems = (user ? records || [] : []).filter((item) => item.kind === 'SCHEDULE')
@@ -1931,12 +2064,22 @@ function ClubCalendarSection({ compact = false }) {
   const isLocked = !authLoading && !user
   const isAdmin = user?.role === 'ADMIN'
   const selectedDayEvents = selectedDay ? eventsByDay[selectedDay] || [] : []
+  const monthSummary = buildMonthEventSummary({
+    eventsByDay,
+    calendarMonth,
+    today: new Date(selectedYear, selectedMonth, 1),
+    limit: 3,
+  })
 
   const updateSelectedYear = (value) => {
     const nextYear = Number(value)
     if (!Number.isFinite(nextYear)) return
     setSelectedDay(null)
     setSelectedYear(Math.min(2100, Math.max(2000, nextYear)))
+  }
+
+  const refreshOccurrences = () => {
+    queryClient.invalidateQueries({ queryKey: SCHEDULE_OCCURRENCES_QUERY_KEY })
   }
 
   const handleDateCreated = (created) => {
@@ -1949,11 +2092,115 @@ function ClubCalendarSection({ compact = false }) {
     }
   }
 
+  const handleDateUpdated = (updated) => {
+    mergeActivity(updated)
+    setEditingDateSchedule(null)
+    const updatedDate = parseLocalDate(updated.eventDate)
+    if (updatedDate) {
+      setSelectedYear(updatedDate.getFullYear())
+      setSelectedMonth(updatedDate.getMonth())
+      setSelectedDay(updatedDate.getDate())
+    }
+  }
+
+  const startDateEdit = (event) => {
+    const activity = scheduleItems.find((item) => item.id === event.activityId)
+    if (!activity) return
+    setEditingDateSchedule(activity)
+    setCalendarNotice('')
+    setCalendarActionError('')
+  }
+
+  const deleteDateSchedule = async (event) => {
+    if (!event.activityId) return
+    if (typeof window !== 'undefined' && !window.confirm(`'${event.title}' 날짜 일정을 삭제할까요?`)) return
+    setCalendarNotice('')
+    setCalendarActionError('')
+    try {
+      await deleteClubActivity(event.activityId)
+      removeActivity(event.activityId)
+      setEditingDateSchedule(null)
+      setCalendarNotice('날짜 일정을 삭제했습니다.')
+    } catch (err) {
+      setCalendarActionError(err.message || '날짜 일정을 삭제하지 못했습니다.')
+    }
+  }
+
+  const cancelRecurringOccurrence = async (event) => {
+    setExceptionSaving(true)
+    setCalendarNotice('')
+    setCalendarActionError('')
+    try {
+      await upsertRecurringScheduleException(event.recurringScheduleId, event.date, {
+        canceled: true,
+        startTime: null,
+        endTime: null,
+      })
+      refreshOccurrences()
+      setCalendarNotice('이번 주 정기 일정을 취소 처리했습니다.')
+    } catch (err) {
+      setCalendarActionError(err.message || '정기 일정 예외를 저장하지 못했습니다.')
+    } finally {
+      setExceptionSaving(false)
+    }
+  }
+
+  const clearRecurringException = async (event) => {
+    setExceptionSaving(true)
+    setCalendarNotice('')
+    setCalendarActionError('')
+    try {
+      await deleteRecurringScheduleException(event.recurringScheduleId, event.date)
+      refreshOccurrences()
+      setExceptionEditor(null)
+      setCalendarNotice('이번 주 예외를 해제했습니다.')
+    } catch (err) {
+      setCalendarActionError(err.message || '정기 일정 예외를 해제하지 못했습니다.')
+    } finally {
+      setExceptionSaving(false)
+    }
+  }
+
+  const startExceptionEdit = (event) => {
+    setExceptionEditor({
+      eventId: event.id,
+      startTime: event.startTime || '',
+      endTime: event.endTime || '',
+    })
+    setCalendarNotice('')
+    setCalendarActionError('')
+  }
+
+  const saveExceptionEdit = async (event) => {
+    if (!exceptionEditor) return
+    if (exceptionEditor.startTime && exceptionEditor.endTime && exceptionEditor.endTime < exceptionEditor.startTime) {
+      setCalendarActionError('종료 시간은 시작 시간 이후여야 합니다.')
+      return
+    }
+    setExceptionSaving(true)
+    setCalendarNotice('')
+    setCalendarActionError('')
+    try {
+      await upsertRecurringScheduleException(event.recurringScheduleId, event.date, {
+        canceled: false,
+        startTime: exceptionEditor.startTime || null,
+        endTime: exceptionEditor.endTime || null,
+      })
+      refreshOccurrences()
+      setExceptionEditor(null)
+      setCalendarNotice('이번 주 정기 일정 시간을 변경했습니다.')
+    } catch (err) {
+      setCalendarActionError(err.message || '정기 일정 시간을 변경하지 못했습니다.')
+    } finally {
+      setExceptionSaving(false)
+    }
+  }
+
   const eventMeta = (event) => {
     const rangeLabel = event.range && event.startDate !== event.endDate
       ? `${formatActivityDate(event.startDate)} ~ ${formatActivityDate(event.endDate)}`
       : formatActivityDate(event.date)
-    return [rangeLabel, event.timeLabel, event.recurring ? '정기 모임' : '날짜 일정'].filter(Boolean).join(' · ')
+    return [rangeLabel, event.timeLabel, event.canceled ? '취소됨' : '', event.recurring ? '정기 모임' : '날짜 일정'].filter(Boolean).join(' · ')
   }
 
   return (
@@ -2003,7 +2250,30 @@ function ClubCalendarSection({ compact = false }) {
         </div>
 
         {isAdmin && !isLocked && (
-          <CalendarScheduleComposer onDateCreated={handleDateCreated} />
+          <CalendarScheduleComposer
+            key={editingDateSchedule ? `date-edit-${editingDateSchedule.id}` : 'calendar-composer'}
+            onDateCreated={handleDateCreated}
+            onDateUpdated={handleDateUpdated}
+            editingDateSchedule={editingDateSchedule}
+            onDateEditDone={() => setEditingDateSchedule(null)}
+          />
+        )}
+
+        {!isLocked && monthSummary.length > 0 && (
+          <div className="calendar-month-summary mt-6">
+            <div>
+              <p>이번 달 예정 일정 {monthSummary.length}개</p>
+              <span>{calendarMonth.title}에서 먼저 확인할 일정입니다.</span>
+            </div>
+            <ul>
+              {monthSummary.map((event) => (
+                <li key={`summary-${event.id}`}>
+                  <strong>{event.title}</strong>
+                  <span>{eventMeta(event)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <div className="club-calendar-shell mt-8">
@@ -2024,17 +2294,22 @@ function ClubCalendarSection({ compact = false }) {
                   <button type="button" className="club-calendar-day-number" onClick={() => setSelectedDay(day)} aria-label={`${day}일 일정 보기`}>{day}</button>
                   <div className="club-calendar-events">
                     {visible.map((event) => (
-                      <span
+                      <button
+                        type="button"
                         key={event.id}
-                        className={`club-calendar-event ${event.range ? `club-calendar-event-range club-calendar-event-range-${event.segment}` : ''} ${event.recurring ? 'club-calendar-event-recurring' : ''}`}
+                        className={`club-calendar-event ${event.range ? `club-calendar-event-range club-calendar-event-range-${event.segment}` : ''} ${event.recurring ? 'club-calendar-event-recurring' : ''} ${event.canceled ? 'club-calendar-event-canceled' : ''}`}
                         title={[event.title, eventMeta(event)].filter(Boolean).join(' · ')}
+                        onClick={() => setSelectedDay(day)}
                       >
                         {event.recurring && <Repeat size={11} aria-label="반복 일정" className="club-calendar-event-icon" />}
                         <span className="club-calendar-event-title">{event.showTitle ? event.title : ''}</span>
                         {event.showTitle && event.timeLabel && (
                           <span className="club-calendar-event-meta">{event.timeLabel}</span>
                         )}
-                      </span>
+                        {event.showTitle && event.canceled && (
+                          <span className="club-calendar-event-badge">취소됨</span>
+                        )}
+                      </button>
                     ))}
                     {overflowCount > 0 && (
                       <button type="button" className="club-calendar-event-overflow" onClick={() => setSelectedDay(day)}>
@@ -2062,15 +2337,60 @@ function ClubCalendarSection({ compact = false }) {
               </div>
               <ul>
                 {selectedDayEvents.map((event) => (
-                  <li key={`detail-${event.id}`}>
+                  <li key={`detail-${event.id}`} className={event.canceled ? 'calendar-day-detail-canceled' : ''}>
                     <span className="calendar-day-detail-dot" aria-hidden="true" />
                     <div>
                       <strong>{event.title}</strong>
                       <span>{eventMeta(event)}</span>
+                      {isAdmin && !event.recurring && (
+                        <div className="calendar-day-detail-actions">
+                          <button type="button" onClick={() => startDateEdit(event)}>날짜 일정 수정 시작</button>
+                          <button type="button" className="is-danger" onClick={() => deleteDateSchedule(event)}>날짜 일정 삭제</button>
+                        </div>
+                      )}
+                      {isAdmin && event.recurring && (
+                        <div className="calendar-day-detail-actions">
+                          {!event.canceled && (
+                            <button type="button" onClick={() => cancelRecurringOccurrence(event)} disabled={exceptionSaving}>이번 일정 취소</button>
+                          )}
+                          <button type="button" onClick={() => startExceptionEdit(event)} disabled={exceptionSaving}>시간 변경</button>
+                          {(event.exceptionId || event.canceled) && (
+                            <button type="button" className="is-danger" onClick={() => clearRecurringException(event)} disabled={exceptionSaving}>예외 해제</button>
+                          )}
+                        </div>
+                      )}
+                      {exceptionEditor?.eventId === event.id && (
+                        <div className="calendar-exception-editor">
+                          <label>
+                            <span>예외 시작 시간</span>
+                            <input
+                              type="time"
+                              value={exceptionEditor.startTime}
+                              onChange={(changeEvent) => setExceptionEditor((prev) => ({ ...prev, startTime: changeEvent.target.value }))}
+                            />
+                          </label>
+                          <label>
+                            <span>예외 종료 시간</span>
+                            <input
+                              type="time"
+                              value={exceptionEditor.endTime}
+                              onChange={(changeEvent) => setExceptionEditor((prev) => ({ ...prev, endTime: changeEvent.target.value }))}
+                            />
+                          </label>
+                          <button type="button" onClick={() => saveExceptionEdit(event)} disabled={exceptionSaving}>
+                            시간 변경 저장
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </li>
                 ))}
               </ul>
+              {(calendarNotice || calendarActionError) && (
+                <p className={`calendar-day-detail-message ${calendarActionError ? 'is-error' : ''}`}>
+                  {calendarActionError || calendarNotice}
+                </p>
+              )}
             </div>
           )}
           {(authLoading || loading) && (
