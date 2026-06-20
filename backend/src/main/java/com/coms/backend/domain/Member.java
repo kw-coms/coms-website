@@ -30,6 +30,9 @@ public class Member {
 
     private LocalDateTime emailVerificationExpiresAt;
 
+    @Column(name = "email_verification_attempts", nullable = false)
+    private int emailVerificationAttempts = 0;
+
     private String passwordResetCodeHash;
 
     private LocalDateTime passwordResetExpiresAt;
@@ -82,6 +85,10 @@ public class Member {
     public void setEmailVerificationCodeHash(String emailVerificationCodeHash) { this.emailVerificationCodeHash = emailVerificationCodeHash; }
     public LocalDateTime getEmailVerificationExpiresAt() { return emailVerificationExpiresAt; }
     public void setEmailVerificationExpiresAt(LocalDateTime emailVerificationExpiresAt) { this.emailVerificationExpiresAt = emailVerificationExpiresAt; }
+    public int getEmailVerificationAttempts() { return emailVerificationAttempts; }
+    public void setEmailVerificationAttempts(int emailVerificationAttempts) { this.emailVerificationAttempts = emailVerificationAttempts; }
+    public int incrementEmailVerificationAttempts() { return ++this.emailVerificationAttempts; }
+    public void resetEmailVerificationAttempts() { this.emailVerificationAttempts = 0; }
     public String getPasswordResetCodeHash() { return passwordResetCodeHash; }
     public void setPasswordResetCodeHash(String passwordResetCodeHash) { this.passwordResetCodeHash = passwordResetCodeHash; }
     public LocalDateTime getPasswordResetExpiresAt() { return passwordResetExpiresAt; }
