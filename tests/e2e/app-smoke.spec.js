@@ -1120,8 +1120,10 @@ test('calendar admin composer uses horizontal space for schedule controls', asyn
   expect(composerBox).not.toBeNull()
   expect(modeTabsBox).not.toBeNull()
   expect(modeTabsBox.width).toBeGreaterThan(composerBox.width * 0.85)
+  await expect(page.locator('.calendar-admin-mode-tabs button.is-active').filter({ hasText: '날짜 일정' }).locator('.calendar-admin-mode-badge')).toHaveText('선택 중')
 
   await page.getByRole('button', { name: '정기 모임' }).click()
+  await expect(page.locator('.calendar-admin-mode-tabs button.is-active').filter({ hasText: '정기 모임' }).locator('.calendar-admin-mode-badge')).toHaveText('선택 중')
   const weekdayPickerBox = await page.locator('.recurring-weekday-picker').boundingBox()
   expect(weekdayPickerBox).not.toBeNull()
   expect(weekdayPickerBox.width).toBeGreaterThan(composerBox.width * 0.85)
@@ -1804,12 +1806,15 @@ test('monthly calendar paints the selected date and recurring occurrence', async
   const dayButton = page.getByRole('button', { name: '13일 일정 보기' })
   await dayButton.click()
   await expect(dayButton.locator('..')).toHaveClass(/club-calendar-day-selected/)
+  await expect(dayButton.locator('..').locator('.club-calendar-day-selected-label')).toHaveText('선택한 날짜')
 
   const recurringEvent = page.locator('.club-calendar-event-recurring').filter({ hasText: '정기 회의' })
   await recurringEvent.click()
   await expect(recurringEvent).toHaveAttribute('aria-pressed', 'true')
   await expect(recurringEvent).toHaveClass(/club-calendar-event-selected/)
+  await expect(recurringEvent.locator('.club-calendar-event-selected-mark')).toHaveText('선택됨')
   await expect(page.locator('.calendar-day-detail-selected').filter({ hasText: '정기 회의' })).toBeVisible()
+  await expect(page.locator('.calendar-day-detail-selected').locator('.calendar-day-detail-selected-badge')).toHaveText('선택한 일정')
 })
 
 test('admin can set and clear one-date recurring schedule exceptions', async ({ page }) => {

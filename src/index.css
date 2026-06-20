@@ -1157,9 +1157,9 @@ select {
 	grid-column: 1 / -1;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	width: 100%;
-	min-height: 2.65rem;
+	min-height: 3.2rem;
 	align-items: center;
-	gap: 0.25rem;
+	gap: 0.35rem;
 	border: 1px solid var(--app-hairline);
 	border-radius: 0.65rem;
 	background: var(--app-surface-soft);
@@ -1167,22 +1167,67 @@ select {
 }
 
 .calendar-admin-mode-tabs button {
+	display: flex;
 	width: 100%;
-	min-height: 2.08rem;
+	min-height: 2.7rem;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.6rem;
 	border: 0;
 	border-radius: 0.48rem;
 	background: transparent;
-	padding: 0 0.75rem;
+	padding: 0.44rem 0.7rem;
 	color: var(--app-muted);
 	font-size: 0.86rem;
 	font-weight: 850;
-	white-space: nowrap;
+	text-align: left;
+	white-space: normal;
 	box-shadow: none;
 }
 
 .calendar-admin-mode-tabs button.is-active {
-	background: var(--app-text);
+	background:
+		linear-gradient(135deg, var(--app-text), color-mix(in srgb, var(--app-accent) 42%, var(--app-text)));
 	color: var(--app-bg);
+	box-shadow: 0 10px 24px color-mix(in srgb, var(--app-accent) 16%, transparent);
+}
+
+.calendar-admin-mode-tab-main {
+	display: grid;
+	min-width: 0;
+	gap: 0.05rem;
+}
+
+.calendar-admin-mode-tab-label {
+	overflow: hidden;
+	color: inherit;
+	font-size: 0.9rem;
+	font-weight: 900;
+	line-height: 1.16;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.calendar-admin-mode-tab-copy {
+	overflow: hidden;
+	color: color-mix(in srgb, currentColor 72%, transparent);
+	font-size: 0.68rem;
+	font-weight: 760;
+	line-height: 1.2;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.calendar-admin-mode-badge {
+	flex: 0 0 auto;
+	border: 1px solid color-mix(in srgb, var(--app-bg) 54%, transparent);
+	border-radius: 9999px;
+	background: color-mix(in srgb, var(--app-bg) 16%, transparent);
+	padding: 0.16rem 0.46rem;
+	color: var(--app-bg);
+	font-size: 0.64rem;
+	font-weight: 900;
+	line-height: 1.2;
 }
 
 .calendar-admin-composer label {
@@ -1628,6 +1673,21 @@ select {
 	cursor: pointer;
 }
 
+.club-calendar-day-selected-label {
+	position: absolute;
+	top: 0.75rem;
+	right: 0.65rem;
+	z-index: 1;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 45%, transparent);
+	border-radius: 9999px;
+	background: color-mix(in srgb, var(--app-accent) 16%, var(--app-surface));
+	padding: 0.14rem 0.45rem;
+	color: var(--app-accent-text);
+	font-size: 0.62rem;
+	font-weight: 900;
+	line-height: 1.2;
+}
+
 .club-calendar-events {
 	display: flex;
 	flex-direction: column;
@@ -1733,6 +1793,18 @@ select {
 
 .club-calendar-event-recurring.club-calendar-event-selected {
 	border-style: solid;
+}
+
+.club-calendar-event-selected-mark {
+	flex: 0 0 auto;
+	border: 1px solid color-mix(in srgb, var(--app-bg) 48%, transparent);
+	border-radius: 9999px;
+	background: color-mix(in srgb, var(--app-bg) 14%, transparent);
+	padding: 0.08rem 0.34rem;
+	color: var(--app-bg);
+	font-size: 0.58rem;
+	font-weight: 900;
+	line-height: 1.15;
 }
 
 .club-calendar-event-canceled {
@@ -1858,16 +1930,16 @@ select {
 }
 
 .calendar-day-detail-selected {
-	border-color: color-mix(in srgb, var(--app-accent) 64%, var(--app-hairline));
+	border-color: color-mix(in srgb, var(--calendar-event-color, var(--app-accent)) 64%, var(--app-hairline));
 	background:
-		linear-gradient(90deg, color-mix(in srgb, var(--app-accent) 13%, transparent), transparent 74%),
+		linear-gradient(90deg, color-mix(in srgb, var(--calendar-event-color, var(--app-accent)) 13%, transparent), transparent 74%),
 		var(--app-surface);
-	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 28%, transparent);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--calendar-event-color, var(--app-accent)) 28%, transparent);
 }
 
 .calendar-day-detail-selected .calendar-day-detail-dot {
-	background: color-mix(in srgb, var(--app-accent) 72%, #34c759);
-	box-shadow: 0 0 0 4px color-mix(in srgb, var(--app-accent) 14%, transparent);
+	background: color-mix(in srgb, var(--calendar-event-color, var(--app-accent)) 72%, #34c759);
+	box-shadow: 0 0 0 4px color-mix(in srgb, var(--calendar-event-color, var(--app-accent)) 14%, transparent);
 }
 
 .calendar-day-detail-dot {
@@ -1884,6 +1956,13 @@ select {
 	display: block;
 }
 
+.calendar-day-detail-title-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.45rem;
+}
+
 .calendar-day-detail li strong {
 	color: var(--app-text);
 	font-size: 0.9rem;
@@ -1895,6 +1974,19 @@ select {
 	color: var(--app-muted);
 	font-size: 0.78rem;
 	font-weight: 650;
+}
+
+.calendar-day-detail-selected-badge {
+	display: inline-flex !important;
+	margin-top: 0 !important;
+	border: 1px solid color-mix(in srgb, var(--calendar-event-color, var(--app-accent)) 42%, transparent);
+	border-radius: 9999px;
+	background: color-mix(in srgb, var(--calendar-event-color, var(--app-accent)) 13%, var(--app-surface));
+	padding: 0.12rem 0.45rem;
+	color: var(--app-accent-text) !important;
+	font-size: 0.62rem !important;
+	font-weight: 900 !important;
+	line-height: 1.2;
 }
 
 .calendar-day-detail-actions {
@@ -1988,6 +2080,14 @@ select {
 	background: var(--app-surface);
 }
 
+.recurring-schedule-item-selected {
+	border-color: color-mix(in srgb, var(--app-accent) 58%, var(--app-hairline));
+	background:
+		linear-gradient(90deg, color-mix(in srgb, var(--app-accent) 12%, transparent), transparent 82%),
+		var(--app-surface);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 22%, transparent);
+}
+
 .recurring-schedule-item-main {
 	display: flex;
 	flex-direction: column;
@@ -1998,10 +2098,22 @@ select {
 .recurring-schedule-item-title {
 	display: flex;
 	align-items: center;
+	flex-wrap: wrap;
 	gap: 0.3rem;
 	font-weight: 800;
 	font-size: 0.92rem;
 	color: var(--app-text);
+}
+
+.recurring-schedule-item-badge {
+	border: 1px solid color-mix(in srgb, var(--app-accent) 42%, transparent);
+	border-radius: 9999px;
+	background: color-mix(in srgb, var(--app-accent) 13%, var(--app-surface));
+	padding: 0.1rem 0.42rem;
+	color: var(--app-accent-text);
+	font-size: 0.62rem;
+	font-weight: 900;
+	line-height: 1.2;
 }
 
 .recurring-schedule-item-meta {
