@@ -1049,6 +1049,375 @@ test('admin can register a club activity record', async ({ page }) => {
   })
 })
 
+test('notice detail registers a view and toggles the upvote count', async ({ page }) => {
+  await mockAdminApis(page)
+  let viewRegistered = false
+  let voteValue = null
+  let upvotes = 4
+
+  await page.route('**/api/notices', (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    return route.fulfill({
+      status: 200,
+      json: [
+        {
+          id: 7,
+          category: 'GENERAL',
+          title: '조회수 검증 공지',
+          content: '공지 본문 내용입니다.',
+          author: '관리자',
+          createdAt: '2026-06-15T03:30:00',
+          viewCount: 11,
+          upvotes,
+          myVote: 0,
+        },
+      ],
+    })
+  })
+  await page.route('**/api/notices/7', (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    viewRegistered = true
+    return route.fulfill({
+      status: 200,
+      json: {
+        id: 7,
+        category: 'GENERAL',
+        title: '조회수 검증 공지',
+        content: '공지 본문 내용입니다.',
+        author: '관리자',
+        createdAt: '2026-06-15T03:30:00',
+        viewCount: 12,
+        upvotes,
+        myVote: 0,
+      },
+    })
+  })
+  await page.route('**/api/notices/7/vote', async (route) => {
+    expect(route.request().method()).toBe('POST')
+    voteValue = route.request().postDataJSON().value
+    upvotes = voteValue === 1 ? 5 : 4
+    return route.fulfill({
+      status: 200,
+      json: {
+        id: 7,
+        category: 'GENERAL',
+        title: '조회수 검증 공지',
+        content: '공지 본문 내용입니다.',
+        author: '관리자',
+        createdAt: '2026-06-15T03:30:00',
+        viewCount: 12,
+        upvotes,
+        myVote: voteValue,
+      },
+    })
+  })
+
+  await page.goto('/notices/7')
+
+  await expect.poll(() => viewRegistered).toBe(true)
+  await expect(page.getByRole('heading', { name: '조회수 검증 공지' })).toBeVisible()
+  await expect(page.getByText('조회 12')).toBeVisible()
+
+  const voteButton = page.getByRole('button', { name: /개추 4/ })
+  await voteButton.click()
+  await expect.poll(() => voteValue).toBe(1)
+  await expect(page.getByRole('button', { name: /개추 5/ })).toBeVisible()
+})
+
+test('club activity card registers a view and toggles the upvote count', async ({ page }) => {
+  await mockAdminApis(page)
+  let viewRegistered = false
+  let voteValue = null
+  let upvotes = 2
+
+  await page.unroute('**/api/club-activities')
+  await page.route('**/api/club-activities', (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    return route.fulfill({
+      status: 200,
+      json: [
+        {
+          id: 5,
+          kind: 'ACTIVITY',
+          category: 'SEMINAR',
+          title: '조회 검증 세미나',
+          description: '활동 기록 본문입니다.',
+          eventDate: '2026-06-18',
+          imageUrl: null,
+          imageOriginalName: null,
+          createdByName: '관리자',
+          viewCount: 8,
+          upvotes,
+          myVote: 0,
+        },
+      ],
+    })
+  })
+  await page.route('**/api/club-activities/5', (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    viewRegistered = true
+    return route.fulfill({
+      status: 200,
+      json: {
+        id: 5,
+        kind: 'ACTIVITY',
+        category: 'SEMINAR',
+        title: '조회 검증 세미나',
+        description: '활동 기록 본문입니다.',
+        eventDate: '2026-06-18',
+        imageUrl: null,
+        imageOriginalName: null,
+        createdByName: '관리자',
+        viewCount: 9,
+        upvotes,
+        myVote: 0,
+      },
+    })
+  })
+  await page.route('**/api/club-activities/5/vote', async (route) => {
+    expect(route.request().method()).toBe('POST')
+    voteValue = route.request().postDataJSON().value
+    upvotes = voteValue === 1 ? 3 : 2
+    return route.fulfill({
+      status: 200,
+      json: {
+        id: 5,
+        kind: 'ACTIVITY',
+        category: 'SEMINAR',
+        title: '조회 검증 세미나',
+        description: '활동 기록 본문입니다.',
+        eventDate: '2026-06-18',
+        imageUrl: null,
+        imageOriginalName: null,
+        createdByName: '관리자',
+        viewCount: 9,
+        upvotes,
+        myVote: voteValue,
+      },
+    })
+  })
+
+  await page.goto('/activity-log')
+
+  const card = page.locator('article.activity-log-card').filter({ hasText: '조회 검증 세미나' })
+  await expect(card).toBeVisible()
+  await card.hover()
+
+  await expect.poll(() => viewRegistered).toBe(true)
+  await expect(card.getByText('조회 9')).toBeVisible()
+
+  await card.getByRole('button', { name: /개추 2/ }).click()
+  await expect.poll(() => voteValue).toBe(1)
+  await expect(card.getByRole('button', { name: /개추 3/ })).toBeVisible()
+})
+
+test('admin deleted post full view modal renders title, body, image, and comments', async ({ page }) => {
+  await mockAdminApis(page)
+  const onePixelPng = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+    'base64',
+  )
+  const summaryRow = {
+    id: 1,
+    originalPostId: 77,
+    title: '원문 보기 대상',
+    content: '[{"type":"text","content":"요약 목록 본문"}]',
+    authorStudentId: '2025123456',
+    authorName: '작성자',
+    category: 'GENERAL',
+    deletedByStudentId: '2020123456',
+    deletedByName: '관리자',
+    deletedByRole: 'ADMIN',
+    deletionReason: '운영 규칙 위반',
+    originalCreatedAt: '2026-06-15T03:00:00',
+    deletedAt: '2026-06-15T03:31:00',
+    imageInfos: [],
+    videoInfos: [],
+    fileInfos: [],
+    commentCount: 2,
+    commentInfos: [],
+    restoredPostId: null,
+    restoredAt: null,
+  }
+  // Register the broad list route first; the more specific detail/image routes
+  // are registered afterwards so Playwright (last-match-wins) routes them.
+  await page.route('**/api/admin/community/deleted-posts**', (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    return route.fulfill({ status: 200, json: [summaryRow] })
+  })
+  await page.route('**/api/admin/community/deleted-posts/1', (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    return route.fulfill({
+      status: 200,
+      json: {
+        ...summaryRow,
+        content: '[{"type":"text","content":"삭제된 게시글 원문 전체입니다."},{"type":"image","mediaId":3,"name":"증거.png","width":75,"align":"center"}]',
+        imageInfos: [
+          {
+            id: 9,
+            originalImageId: 3,
+            kind: 'INLINE',
+            url: '/api/admin/community/deleted-posts/1/images/9',
+            originalName: '증거.png',
+          },
+        ],
+        commentInfos: [
+          {
+            originalCommentId: 21,
+            originalParentCommentId: null,
+            authorStudentId: '2025222222',
+            authorName: '댓글러',
+            content: '원문 댓글입니다.',
+            createdAt: '2026-06-15T03:10:00',
+            edited: false,
+          },
+          {
+            originalCommentId: 22,
+            originalParentCommentId: 21,
+            authorStudentId: '2025123456',
+            authorName: '작성자',
+            content: '원문 답글입니다.',
+            createdAt: '2026-06-15T03:12:00',
+            edited: true,
+          },
+        ],
+      },
+    })
+  })
+  await page.route('**/api/admin/community/deleted-posts/1/images/9', (route) => route.fulfill({
+    status: 200,
+    contentType: 'image/png',
+    body: onePixelPng,
+  }))
+
+  await page.goto('/admin')
+  await page.getByRole('button', { name: '삭제 보관함' }).click()
+
+  await expect(page.getByRole('heading', { name: '커뮤니티 삭제 보관함' })).toBeVisible()
+  await page.getByRole('button', { name: '원문 보기' }).click()
+
+  const modal = page.getByRole('dialog')
+  await expect(modal.getByText('삭제 보관함 · 원문 보기')).toBeVisible()
+  await expect(modal.getByRole('heading', { name: '원문 보기 대상' })).toBeVisible()
+  await expect(modal.getByText('삭제된 게시글 원문 전체입니다.')).toBeVisible()
+  await expect(modal.getByRole('img', { name: '증거.png' })).toBeVisible()
+  await expect(modal.getByText('댓글 2개')).toBeVisible()
+  await expect(modal.getByText('원문 댓글입니다.')).toBeVisible()
+  await expect(modal.getByText('원문 답글입니다.')).toBeVisible()
+
+  await modal.getByLabel('닫기').click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+})
+
+test('apps page renders DB-driven club projects grouped by category', async ({ page }) => {
+  await page.route('**/api/club-projects/categories', (route) => route.fulfill({
+    status: 200,
+    json: [
+      { id: 1, key: 'WEBSITE', name: '웹사이트', position: 0 },
+      { id: 2, key: 'APP', name: '앱', position: 1 },
+    ],
+  }))
+  await page.route('**/api/club-projects', (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    return route.fulfill({
+      status: 200,
+      json: [
+        {
+          id: 11,
+          category: 'WEBSITE',
+          categoryName: '웹사이트',
+          title: 'COM\'s 포털',
+          description: '동아리 포털 사이트',
+          eyebrow: 'Web',
+          madeBy: '김개발',
+          linkUrl: 'https://portal.example.com/',
+          displayUrl: 'portal.example.com',
+          files: [],
+        },
+        {
+          id: 12,
+          category: 'APP',
+          categoryName: '앱',
+          title: '출석 체크 앱',
+          description: '세미나 출석 관리 앱',
+          eyebrow: 'App',
+          madeBy: '이모바일',
+          linkUrl: null,
+          displayUrl: null,
+          files: [{ id: 99, url: '/api/club-projects/12/files/99', originalName: 'attend.apk' }],
+        },
+      ],
+    })
+  })
+
+  await page.goto('/apps')
+
+  await expect(page.getByRole('heading', { name: "COM's Apps" })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '웹사이트', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '앱', exact: true })).toBeVisible()
+
+  const portalCard = page.locator('a.apple-product-panel').filter({ hasText: "COM's 포털" })
+  await expect(portalCard).toHaveAttribute('href', 'https://portal.example.com/')
+  await expect(portalCard.getByText('만든 사람: 김개발')).toBeVisible()
+  await expect(portalCard.getByText('열기')).toBeVisible()
+
+  const attendCard = page.locator('.apple-product-panel').filter({ hasText: '출석 체크 앱' })
+  await expect(attendCard.getByText('만든 사람: 이모바일')).toBeVisible()
+  await expect(attendCard.getByRole('link', { name: /다운로드/ })).toBeVisible()
+})
+
+test('monthly calendar renders recurring schedule occurrences for the selected month', async ({ page }) => {
+  await mockAdminApis(page)
+  // The calendar requests occurrences for the visible month; only July 2026
+  // (year=2026&month=7) returns recurring occurrences. Other months are empty.
+  await page.unroute('**/api/club-activities/schedule**')
+  await page.route('**/api/club-activities/schedule**', (route) => {
+    const url = new URL(route.request().url())
+    if (url.searchParams.get('year') !== '2026' || url.searchParams.get('month') !== '7') {
+      return route.fulfill({ status: 200, json: [] })
+    }
+    return route.fulfill({
+      status: 200,
+      json: [
+        {
+          recurringScheduleId: 3,
+          date: '2026-07-06',
+          title: '정기 회의',
+          category: 'MEETING',
+          startTime: '18:00',
+          endTime: '19:00',
+          location: '동아리방',
+        },
+        {
+          recurringScheduleId: 3,
+          date: '2026-07-13',
+          title: '정기 회의',
+          category: 'MEETING',
+          startTime: '18:00',
+          endTime: '19:00',
+          location: '동아리방',
+        },
+      ],
+    })
+  })
+
+  await page.goto('/monthly-calendar')
+  await page.getByLabel('년도 선택').fill('2026')
+  await page.getByLabel('월 선택', { exact: true }).selectOption({ label: '7월' })
+
+  await expect(page.getByText('2026년 7월')).toBeVisible()
+  const recurringEvents = page.locator('.club-calendar-event-recurring').filter({ hasText: '정기 회의' })
+  await expect(recurringEvents).toHaveCount(2)
+  await expect(recurringEvents.first().getByText('18:00~19:00')).toBeVisible()
+  await expect(recurringEvents.first().getByText('@동아리방')).toBeVisible()
+})
+
+test('guest visiting notices is redirected to login', async ({ page }) => {
+  await page.goto('/notices')
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(page.getByText('조회수 검증 공지')).toHaveCount(0)
+})
+
 test('archive highlights repeat-visit search and category controls', async ({ page }) => {
   await mockAdminApis(page)
   await page.route('**/api/files', (route) => route.fulfill({
