@@ -89,6 +89,28 @@ class ClubActivityServiceTest {
     }
 
     @Test
+    void createsScheduleRangeWithTimes() throws Exception {
+        var response = clubActivityService.create(
+                "SCHEDULE",
+                "GENERAL",
+                "신입 부원 OT",
+                null,
+                LocalDate.of(2026, 6, 1),
+                LocalDate.of(2026, 6, 3),
+                "18:30",
+                "20:00",
+                null,
+                "2026123456"
+        );
+
+        assertThat(response.eventDate()).isEqualTo(LocalDate.of(2026, 6, 1));
+        assertThat(response.endDate()).isEqualTo(LocalDate.of(2026, 6, 3));
+        assertThat(response.startTime()).isEqualTo("18:30");
+        assertThat(response.endTime()).isEqualTo("20:00");
+        assertThat(response.description()).isNull();
+    }
+
+    @Test
     void detailFetchIncrementsViewCountAndUpvoteTogglesMyVote() throws Exception {
         var activity = clubActivityService.create("ACTIVITY", "SEMINAR", "세미나", null, LocalDate.of(2026, 6, 18), null, "2026123456");
 
