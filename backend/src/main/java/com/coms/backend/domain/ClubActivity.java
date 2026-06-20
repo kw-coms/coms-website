@@ -48,6 +48,9 @@ public class ClubActivity {
     @Column
     private LocalTime endTime;
 
+    @Column(name = "color_hex", length = 7)
+    private String colorHex;
+
     @Column
     private String imageOriginalName;
 
@@ -96,6 +99,8 @@ public class ClubActivity {
     public void setStartTime(LocalTime startTime) { this.startTime = startTime; }
     public LocalTime getEndTime() { return endTime; }
     public void setEndTime(LocalTime endTime) { this.endTime = endTime; }
+    public String getColorHex() { return colorHex; }
+    public void setColorHex(String colorHex) { this.colorHex = colorHex; }
     public String getImageOriginalName() { return imageOriginalName; }
     public void setImageOriginalName(String imageOriginalName) { this.imageOriginalName = imageOriginalName; }
     public String getImageStoredName() { return imageStoredName; }

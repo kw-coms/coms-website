@@ -17,6 +17,7 @@ public record ScheduleOccurrenceResponse(
         String location,
         String category,
         String categoryName,
+        String colorHex,
         boolean recurring,
         boolean canceled
 ) {

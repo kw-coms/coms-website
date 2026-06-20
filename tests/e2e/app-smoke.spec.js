@@ -81,7 +81,7 @@ test('appearance panel explains guest font persistence scope', async ({ page }) 
   await page.goto('/')
 
   await expect(page.locator('[aria-label="폰트 설정"]')).toBeVisible()
-  await expect(page.getByText('게스트 임시 적용')).toBeVisible()
+  await expect(page.getByText('이 브라우저에 임시 적용')).toBeVisible()
 })
 
 test('apps page surfaces companion service links away from the home dashboard', async ({ page }) => {
@@ -110,8 +110,8 @@ test('appearance panel directs signed-in users to account-saved font settings', 
   await page.goto('/')
 
   const fontSettings = page.locator('[aria-label="폰트 설정"]')
-  await expect(fontSettings).toContainText('계정 저장 설정')
-  await fontSettings.getByRole('button', { name: '계정 설정에서 변경' }).click()
+  await expect(fontSettings).toContainText('내 계정에 저장됨')
+  await fontSettings.getByRole('button', { name: '계정 설정에서 폰트 변경' }).click()
   await expect(page).toHaveURL(/\/settings$/)
   await expect(fontSettings.getByRole('combobox', { name: '사이트 폰트 선택' })).toHaveCount(0)
   await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--apple-font-family'))).toBe('')
@@ -926,6 +926,7 @@ test('admin can add a schedule directly from the monthly calendar', async ({ pag
         endDate: multipartField(body, 'endDate'),
         startTime: multipartField(body, 'startTime'),
         endTime: multipartField(body, 'endTime'),
+        colorHex: multipartField(body, 'colorHex'),
       }
       activities = activities.map((item) => item.id === id ? { ...item, ...updatedPayload } : item)
       await route.fulfill({ status: 200, json: activities.find((item) => item.id === id) })
@@ -951,6 +952,7 @@ test('admin can add a schedule directly from the monthly calendar', async ({ pag
         startTime: multipartField(body, 'startTime'),
         endTime: multipartField(body, 'endTime'),
         description: multipartField(body, 'description'),
+        colorHex: multipartField(body, 'colorHex'),
       }
       createdPayload = form
       const created = {
@@ -963,6 +965,7 @@ test('admin can add a schedule directly from the monthly calendar', async ({ pag
         endDate: form.endDate,
         startTime: form.startTime,
         endTime: form.endTime,
+        colorHex: form.colorHex,
         imageUrl: null,
         imageOriginalName: null,
         createdByName: '관리자',
@@ -986,6 +989,7 @@ test('admin can add a schedule directly from the monthly calendar', async ({ pag
   await page.getByLabel('종료일 (선택)').fill('2026-06-26')
   await page.getByLabel('시작 시간 (선택)').fill('18:00')
   await page.getByLabel('종료 시간 (선택)').fill('19:30')
+  await page.getByLabel('일정 색상').fill('#ff9f0a')
   await page.getByRole('button', { name: '날짜 일정 추가' }).click()
 
   await expect.poll(() => createdPayload).toMatchObject({
@@ -996,14 +1000,18 @@ test('admin can add a schedule directly from the monthly calendar', async ({ pag
     endDate: '2026-06-26',
     startTime: '18:00',
     endTime: '19:30',
+    colorHex: '#ff9f0a',
   })
-  await expect(page.locator('.club-calendar-event-title').filter({ hasText: '캘린더 직접 등록 회의' })).toBeVisible()
+  const createdEvent = page.locator('.club-calendar-event').filter({ hasText: '캘린더 직접 등록 회의' })
+  await expect(createdEvent).toBeVisible()
+  await expect(createdEvent).toHaveAttribute('style', /--calendar-event-color: #ff9f0a/)
 
   await page.getByRole('button', { name: '11일 일정 보기' }).click()
   await page.getByRole('button', { name: '날짜 일정 수정 시작' }).click()
   await page.getByLabel('일정 제목').fill('수정 후 회의')
   await page.getByLabel('시작 시간 (선택)').fill('18:30')
   await page.getByLabel('종료 시간 (선택)').fill('19:30')
+  await page.getByLabel('일정 색상').fill('#34c759')
   await page.getByRole('button', { name: '날짜 일정 수정', exact: true }).click()
   await expect.poll(() => updatedPayload).toMatchObject({
     title: '수정 후 회의',
@@ -1011,6 +1019,7 @@ test('admin can add a schedule directly from the monthly calendar', async ({ pag
     endDate: '2026-06-11',
     startTime: '18:30',
     endTime: '19:30',
+    colorHex: '#34c759',
   })
   await expect(page.locator('.club-calendar-event-title').filter({ hasText: '수정 후 회의' })).toBeVisible()
 
@@ -1035,6 +1044,7 @@ test('admin can bulk import semester schedules from CSV', async ({ page }) => {
         endDate: multipartField(body, 'endDate'),
         startTime: multipartField(body, 'startTime'),
         endTime: multipartField(body, 'endTime'),
+        colorHex: multipartField(body, 'colorHex'),
       }
       createdDateSchedules.push(form)
       await route.fulfill({
@@ -1065,9 +1075,9 @@ test('admin can bulk import semester schedules from CSV', async ({ page }) => {
   })
 
   await page.goto('/monthly-calendar')
-  await page.getByLabel('학기 일정 CSV').fill(`종류,제목,시작일,종료일,시작시간,종료시간,요일
-날짜,개강 총회,2026-03-04,2026-03-04,18:00,19:00,
-정기,알고리즘 스터디,2026-03-10,2026-06-20,19:00,21:00,MON|WED`)
+  await page.getByLabel('학기 일정 CSV').fill(`종류,제목,시작일,종료일,시작시간,종료시간,요일,색상
+날짜,개강 총회,2026-03-04,2026-03-04,18:00,19:00,,#ff9f0a
+정기,알고리즘 스터디,2026-03-10,2026-06-20,19:00,21:00,MON|WED,#34c759`)
   await page.getByRole('button', { name: 'CSV 일정 가져오기' }).click()
 
   await expect.poll(() => createdDateSchedules).toEqual([
@@ -1078,6 +1088,7 @@ test('admin can bulk import semester schedules from CSV', async ({ page }) => {
       endDate: '2026-03-04',
       startTime: '18:00',
       endTime: '19:00',
+      colorHex: '#ff9f0a',
     },
   ])
   await expect.poll(() => createdRecurringSchedules).toEqual([
@@ -1091,14 +1102,53 @@ test('admin can bulk import semester schedules from CSV', async ({ page }) => {
       endTime: '21:00',
       location: null,
       category: null,
+      colorHex: '#34c759',
     },
   ])
   await expect(page.getByText('CSV에서 일정 2개를 가져왔습니다.')).toBeVisible()
 })
 
+test('calendar admin composer uses horizontal space for schedule controls', async ({ page }) => {
+  await mockAdminApis(page)
+
+  await page.goto('/monthly-calendar')
+
+  const composer = page.locator('.calendar-admin-composer')
+  const composerBox = await composer.boundingBox()
+  const modeTabsBox = await page.locator('.calendar-admin-mode-tabs').boundingBox()
+  expect(composerBox).not.toBeNull()
+  expect(modeTabsBox).not.toBeNull()
+  expect(modeTabsBox.width).toBeGreaterThan(composerBox.width * 0.85)
+
+  await page.getByRole('button', { name: '정기 모임' }).click()
+  const weekdayPickerBox = await page.locator('.recurring-weekday-picker').boundingBox()
+  expect(weekdayPickerBox).not.toBeNull()
+  expect(weekdayPickerBox.width).toBeGreaterThan(composerBox.width * 0.85)
+  expect(weekdayPickerBox.height).toBeLessThan(72)
+})
+
 test('admin can write an activity log entry directly from the activity log page', async ({ page }) => {
   await mockAdminApis(page)
   let createdPayload = null
+  let uploadedImageFields = 0
+  const onePixelPng = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+    'base64',
+  )
+  let activities = []
+  await page.route('**/api/club-activities/30/images', async (route) => {
+    const body = route.request().postDataBuffer()?.toString('latin1') || ''
+    uploadedImageFields = (body.match(/name="images"/g) || []).length
+    activities = activities.map((item) => item.id === 30 ? {
+      ...item,
+      imageUrl: '/api/club-activities/30/images/101',
+      imageInfos: [
+        { id: 101, url: '/api/club-activities/30/images/101', originalName: 'first.png' },
+        { id: 102, url: '/api/club-activities/30/images/102', originalName: 'second.png' },
+      ],
+    } : item)
+    await route.fulfill({ status: 201, json: [101, 102] })
+  })
   await page.route('**/api/club-activities', async (route) => {
     if (route.request().method() === 'POST') {
       const body = route.request().postData() || ''
@@ -1110,29 +1160,34 @@ test('admin can write an activity log entry directly from the activity log page'
         description: multipartField(body, 'description'),
       }
       createdPayload = form
-      await route.fulfill({
-        status: 200,
-        json: {
-          id: 30,
-          kind: form.kind,
-          category: form.category,
-          title: form.title,
-          description: form.description,
-          eventDate: form.eventDate,
-          imageUrl: null,
-          imageOriginalName: null,
-          createdByName: '관리자',
-        },
-      })
+      const created = {
+        id: 30,
+        kind: form.kind,
+        category: form.category,
+        title: form.title,
+        description: form.description,
+        eventDate: form.eventDate,
+        imageUrl: null,
+        imageOriginalName: null,
+        imageInfos: [],
+        fileInfos: [],
+        createdByName: '관리자',
+      }
+      activities = [created, ...activities]
+      await route.fulfill({ status: 200, json: created })
       return
     }
-    await route.fulfill({ status: 200, json: [] })
+    await route.fulfill({ status: 200, json: activities })
   })
 
   await page.goto('/activity-log')
   await page.getByLabel('활동 제목').fill('활동 로그 직접 작성')
   await page.getByLabel('활동 날짜').fill('2026-06-25')
   await page.getByLabel('활동 분류').selectOption('PROJECT')
+  await page.getByLabel('활동 사진').setInputFiles([
+    { name: 'first.png', mimeType: 'image/png', buffer: onePixelPng },
+    { name: 'second.png', mimeType: 'image/png', buffer: onePixelPng },
+  ])
   await page.getByLabel('활동 내용').fill('프로젝트 발표 후기와 사진 기록')
   await page.getByRole('button', { name: '활동 기록 추가' }).click()
 
@@ -1143,7 +1198,9 @@ test('admin can write an activity log entry directly from the activity log page'
     eventDate: '2026-06-25',
     description: '프로젝트 발표 후기와 사진 기록',
   })
+  await expect.poll(() => uploadedImageFields).toBe(2)
   await expect(page.getByRole('heading', { name: '활동 로그 직접 작성' })).toBeVisible()
+  await expect(page.getByText('사진 2장')).toBeVisible()
 })
 
 test('admin can register a club activity record', async ({ page }) => {
@@ -1275,11 +1332,13 @@ test('notice detail registers a view and toggles the upvote count', async ({ pag
   await expect(page.getByRole('button', { name: /개추 5/ })).toBeVisible()
 })
 
-test('club activity card registers a view and toggles the upvote count', async ({ page }) => {
+test('club activity detail registers view, vote, edit, and delete only after opening', async ({ page }) => {
   await mockAdminApis(page)
   let viewRegistered = false
   let voteValue = null
   let upvotes = 2
+  let updatedPayload = null
+  let deletedId = null
 
   await page.unroute('**/api/club-activities')
   await page.route('**/api/club-activities', (route) => {
@@ -1296,6 +1355,11 @@ test('club activity card registers a view and toggles the upvote count', async (
           eventDate: '2026-06-18',
           imageUrl: null,
           imageOriginalName: null,
+          imageInfos: [
+            { id: 51, url: '/api/club-activities/5/images/51', originalName: 'first.png' },
+            { id: 52, url: '/api/club-activities/5/images/52', originalName: 'second.png' },
+          ],
+          fileInfos: [],
           createdByName: '관리자',
           viewCount: 8,
           upvotes,
@@ -1304,7 +1368,44 @@ test('club activity card registers a view and toggles the upvote count', async (
       ],
     })
   })
-  await page.route('**/api/club-activities/5', (route) => {
+  await page.route('**/api/club-activities/5', async (route) => {
+    if (route.request().method() === 'PATCH') {
+      const body = route.request().postData() || ''
+      updatedPayload = {
+        title: multipartField(body, 'title'),
+        category: multipartField(body, 'category'),
+        eventDate: multipartField(body, 'eventDate'),
+        description: multipartField(body, 'description'),
+      }
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: 5,
+          kind: 'ACTIVITY',
+          category: updatedPayload.category,
+          title: updatedPayload.title,
+          description: updatedPayload.description,
+          eventDate: updatedPayload.eventDate,
+          imageUrl: '/api/club-activities/5/images/51',
+          imageOriginalName: 'first.png',
+          imageInfos: [
+            { id: 51, url: '/api/club-activities/5/images/51', originalName: 'first.png' },
+            { id: 52, url: '/api/club-activities/5/images/52', originalName: 'second.png' },
+          ],
+          fileInfos: [],
+          createdByName: '관리자',
+          viewCount: 9,
+          upvotes,
+          myVote: 0,
+        },
+      })
+      return
+    }
+    if (route.request().method() === 'DELETE') {
+      deletedId = 5
+      await route.fulfill({ status: 204, body: '' })
+      return
+    }
     if (route.request().method() !== 'GET') return route.fallback()
     viewRegistered = true
     return route.fulfill({
@@ -1316,8 +1417,13 @@ test('club activity card registers a view and toggles the upvote count', async (
         title: '조회 검증 세미나',
         description: '활동 기록 본문입니다.',
         eventDate: '2026-06-18',
-        imageUrl: null,
-        imageOriginalName: null,
+        imageUrl: '/api/club-activities/5/images/51',
+        imageOriginalName: 'first.png',
+        imageInfos: [
+          { id: 51, url: '/api/club-activities/5/images/51', originalName: 'first.png' },
+          { id: 52, url: '/api/club-activities/5/images/52', originalName: 'second.png' },
+        ],
+        fileInfos: [],
         createdByName: '관리자',
         viewCount: 9,
         upvotes,
@@ -1338,8 +1444,13 @@ test('club activity card registers a view and toggles the upvote count', async (
         title: '조회 검증 세미나',
         description: '활동 기록 본문입니다.',
         eventDate: '2026-06-18',
-        imageUrl: null,
-        imageOriginalName: null,
+        imageUrl: '/api/club-activities/5/images/51',
+        imageOriginalName: 'first.png',
+        imageInfos: [
+          { id: 51, url: '/api/club-activities/5/images/51', originalName: 'first.png' },
+          { id: 52, url: '/api/club-activities/5/images/52', originalName: 'second.png' },
+        ],
+        fileInfos: [],
         createdByName: '관리자',
         viewCount: 9,
         upvotes,
@@ -1352,14 +1463,40 @@ test('club activity card registers a view and toggles the upvote count', async (
 
   const card = page.locator('article.activity-log-card').filter({ hasText: '조회 검증 세미나' })
   await expect(card).toBeVisible()
+  await expect(card.locator('img')).toHaveAttribute('src', /\/api\/club-activities\/5\/images\/51/)
+  await expect(card.getByText('조회 8')).toBeVisible()
+  await expect(card.getByText('개추 2')).toBeVisible()
+  await expect(card.getByRole('button', { name: /개추/ })).toHaveCount(0)
+
   await card.hover()
+  await expect.poll(() => viewRegistered).toBe(false)
 
+  await card.getByRole('button', { name: '내용 보기', exact: true }).click()
   await expect.poll(() => viewRegistered).toBe(true)
-  await expect(card.getByText('조회 9')).toBeVisible()
+  const dialog = page.getByRole('dialog', { name: /조회 검증 세미나/ })
+  await expect(dialog.getByText('조회 9')).toBeVisible()
+  await expect(dialog.locator('.activity-detail-gallery img')).toHaveCount(2)
 
-  await card.getByRole('button', { name: /개추 2/ }).click()
+  await dialog.getByRole('button', { name: /개추 2/ }).click()
   await expect.poll(() => voteValue).toBe(1)
-  await expect(card.getByRole('button', { name: /개추 3/ })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: /개추 3/ })).toBeVisible()
+
+  await dialog.getByRole('button', { name: '수정' }).click()
+  await dialog.getByLabel('활동 제목').fill('수정된 세미나')
+  await dialog.getByLabel('활동 내용').fill('수정된 활동 본문입니다.')
+  await dialog.getByRole('button', { name: '수정 저장' }).click()
+  await expect.poll(() => updatedPayload).toMatchObject({
+    title: '수정된 세미나',
+    category: 'SEMINAR',
+    eventDate: '2026-06-18',
+    description: '수정된 활동 본문입니다.',
+  })
+  await expect(page.getByRole('dialog', { name: /수정된 세미나/ })).toBeVisible()
+
+  page.once('dialog', (dialogPrompt) => dialogPrompt.accept())
+  await page.getByRole('dialog', { name: /수정된 세미나/ }).getByRole('button', { name: '삭제' }).click()
+  await expect.poll(() => deletedId).toBe(5)
+  await expect(page.getByRole('dialog')).toHaveCount(0)
 })
 
 test('admin deleted post full view modal renders title, body, image, and comments', async ({ page }) => {
@@ -1634,6 +1771,44 @@ test('monthly calendar renders recurring schedule occurrences for the selected m
   await expect(recurringEvents.first().getByText('18:00~19:00')).toBeVisible()
   await expect(recurringEvents.first().getByText('@동아리방')).toHaveCount(0)
   await expect(page.locator('.club-calendar-event-badge', { hasText: '취소됨' })).toBeVisible()
+})
+
+test('monthly calendar paints the selected date and recurring occurrence', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.unroute('**/api/club-activities/schedule**')
+  await page.route('**/api/club-activities/schedule**', (route) => {
+    const url = new URL(route.request().url())
+    if (url.searchParams.get('year') !== '2026' || url.searchParams.get('month') !== '7') {
+      return route.fulfill({ status: 200, json: [] })
+    }
+    return route.fulfill({
+      status: 200,
+      json: [
+        {
+          recurringScheduleId: 3,
+          date: '2026-07-13',
+          title: '정기 회의',
+          category: 'MEETING',
+          startTime: '18:00',
+          endTime: '19:00',
+        },
+      ],
+    })
+  })
+
+  await page.goto('/monthly-calendar')
+  await page.getByLabel('년도 선택').fill('2026')
+  await page.getByLabel('월 선택', { exact: true }).selectOption({ label: '7월' })
+
+  const dayButton = page.getByRole('button', { name: '13일 일정 보기' })
+  await dayButton.click()
+  await expect(dayButton.locator('..')).toHaveClass(/club-calendar-day-selected/)
+
+  const recurringEvent = page.locator('.club-calendar-event-recurring').filter({ hasText: '정기 회의' })
+  await recurringEvent.click()
+  await expect(recurringEvent).toHaveAttribute('aria-pressed', 'true')
+  await expect(recurringEvent).toHaveClass(/club-calendar-event-selected/)
+  await expect(page.locator('.calendar-day-detail-selected').filter({ hasText: '정기 회의' })).toBeVisible()
 })
 
 test('admin can set and clear one-date recurring schedule exceptions', async ({ page }) => {
