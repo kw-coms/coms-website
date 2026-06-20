@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Download, FileUp, RefreshCw, Search, Trash2, X } from 'lucide-react'
 import { createPost, deleteFile, downloadUrl, listFiles } from '../services/archiveApi.js'
 import { useAuth } from '../contexts/useAuth.js'
+import { ArchiveCategory } from '../contract/enums.js'
+import { enumLabels } from '../contract/labels.js'
 
 function formatSize(bytes) {
   if (!Number.isFinite(bytes)) return '-'
@@ -34,10 +36,17 @@ function clickableCell(open) {
   return { onClick: open }
 }
 
+// Labels keyed by the canonical ArchiveFile.Category enum (drift-guarded);
+// 'ALL' is a UI-only pseudo-category, not part of the contract.
+const ARCHIVE_CATEGORY_LABELS = enumLabels(ArchiveCategory, {
+  [ArchiveCategory.GENERAL]: '일반 자료',
+  [ArchiveCategory.ACADEMIC_JOURNAL]: '학술회지',
+})
+
 const ARCHIVE_CATEGORIES = [
   { value: 'ALL', label: '전체' },
-  { value: 'GENERAL', label: '일반 자료' },
-  { value: 'ACADEMIC_JOURNAL', label: '학술회지' },
+  { value: ArchiveCategory.GENERAL, label: ARCHIVE_CATEGORY_LABELS[ArchiveCategory.GENERAL] },
+  { value: ArchiveCategory.ACADEMIC_JOURNAL, label: ARCHIVE_CATEGORY_LABELS[ArchiveCategory.ACADEMIC_JOURNAL] },
 ]
 
 const WRITABLE_ARCHIVE_CATEGORIES = ARCHIVE_CATEGORIES.filter((item) => item.value !== 'ALL')
