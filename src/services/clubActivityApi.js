@@ -4,12 +4,15 @@ export async function listClubActivities() {
   return request('/api/club-activities')
 }
 
-export async function createClubActivity({ kind, category, title, description, eventDate, image }) {
+export async function createClubActivity({ kind, category, title, description, eventDate, endDate, startTime, endTime, image }) {
   const formData = new FormData()
   formData.append('kind', kind)
   formData.append('category', category || 'GENERAL')
   formData.append('title', title)
   formData.append('eventDate', eventDate)
+  if (endDate) formData.append('endDate', endDate)
+  if (startTime) formData.append('startTime', startTime)
+  if (endTime) formData.append('endTime', endTime)
   if (description) formData.append('description', description)
   if (image) formData.append('image', image)
 
@@ -23,13 +26,16 @@ export async function createClubActivity({ kind, category, title, description, e
   return data
 }
 
-export async function updateClubActivity(id, { kind, category, title, description, eventDate }) {
+export async function updateClubActivity(id, { kind, category, title, description, eventDate, endDate, startTime, endTime }) {
   const formData = new FormData()
   if (kind != null) formData.append('kind', kind)
   if (category != null) formData.append('category', category)
   if (title != null) formData.append('title', title)
   if (description != null) formData.append('description', description)
   if (eventDate != null) formData.append('eventDate', eventDate)
+  if (endDate != null) formData.append('endDate', endDate)
+  if (startTime != null) formData.append('startTime', startTime)
+  if (endTime != null) formData.append('endTime', endTime)
   return request(`/api/club-activities/${id}`, {
     method: 'PATCH',
     body: formData,

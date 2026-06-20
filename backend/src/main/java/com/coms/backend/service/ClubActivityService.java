@@ -22,6 +22,8 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -121,6 +123,19 @@ public class ClubActivityService {
                                        LocalDate eventDate,
                                        MultipartFile image,
                                        String creatorStudentId) throws IOException {
+        return create(kind, category, title, description, eventDate, eventDate, null, null, image, creatorStudentId);
+    }
+
+    public ClubActivityResponse create(String kind,
+                                       String category,
+                                       String title,
+                                       String description,
+                                       LocalDate eventDate,
+                                       LocalDate endDate,
+                                       String startTime,
+                                       String endTime,
+                                       MultipartFile image,
+                                       String creatorStudentId) throws IOException {
         ClubActivity.Kind parsedKind = parseKind(kind);
         String categoryKey = resolveCategory(category);
         if (title == null || title.isBlank()) {
@@ -129,6 +144,10 @@ public class ClubActivityService {
         if (eventDate == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Activity date is required.");
         }
+        LocalDate normalizedEndDate = normalizeEndDate(eventDate, endDate);
+        LocalTime parsedStartTime = parseTime(startTime);
+        LocalTime parsedEndTime = parseTime(endTime);
+        validateTimeRange(parsedStartTime, parsedEndTime);
 
         Member member = memberRepository.findByStudentId(creatorStudentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
@@ -139,6 +158,9 @@ public class ClubActivityService {
         activity.setTitle(title.trim());
         activity.setDescription(description != null && !description.isBlank() ? description.trim() : null);
         activity.setEventDate(eventDate);
+        activity.setEndDate(normalizedEndDate);
+        activity.setStartTime(parsedStartTime);
+        activity.setEndTime(parsedEndTime);
         activity.setCreatedBy(creatorStudentId);
         activity.setCreatedByName(member.getName());
         activity.setCreatedAt(LocalDateTime.now());
@@ -181,6 +203,19 @@ public class ClubActivityService {
                                        String description,
                                        LocalDate eventDate,
                                        String editorStudentId) {
+        return update(id, kind, category, title, description, eventDate, null, null, null, editorStudentId);
+    }
+
+    public ClubActivityResponse update(Long id,
+                                       String kind,
+                                       String category,
+                                       String title,
+                                       String description,
+                                       LocalDate eventDate,
+                                       LocalDate endDate,
+                                       String startTime,
+                                       String endTime,
+                                       String editorStudentId) {
         ClubActivity activity = get(id);
         if (kind != null && !kind.isBlank()) {
             activity.setKind(parseKind(kind));
@@ -199,7 +234,22 @@ public class ClubActivityService {
         }
         if (eventDate != null) {
             activity.setEventDate(eventDate);
+            if (endDate == null) {
+                activity.setEndDate(eventDate);
+            }
         }
+        if (endDate != null) {
+            activity.setEndDate(normalizeEndDate(activity.getEventDate(), endDate));
+        } else if (activity.getEndDate() == null) {
+            activity.setEndDate(activity.getEventDate());
+        }
+        if (startTime != null) {
+            activity.setStartTime(parseTime(startTime));
+        }
+        if (endTime != null) {
+            activity.setEndTime(parseTime(endTime));
+        }
+        validateTimeRange(activity.getStartTime(), activity.getEndTime());
         activity.setUpdatedAt(LocalDateTime.now());
         ClubActivity saved = repository.save(activity);
         return toResponse(saved, editorStudentId);
@@ -340,6 +390,34 @@ public class ClubActivityService {
         }
     }
 
+    private LocalDate normalizeEndDate(LocalDate eventDate, LocalDate endDate) {
+        LocalDate normalized = endDate == null ? eventDate : endDate;
+        if (normalized == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Activity end date is required.");
+        }
+        if (normalized.isBefore(eventDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "종료일은 시작일과 같거나 이후여야 합니다.");
+        }
+        return normalized;
+    }
+
+    private LocalTime parseTime(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalTime.parse(value.trim());
+        } catch (DateTimeParseException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "시간 형식이 올바르지 않습니다. (HH:mm)");
+        }
+    }
+
+    private void validateTimeRange(LocalTime startTime, LocalTime endTime) {
+        if (startTime != null && endTime != null && endTime.isBefore(startTime)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "종료 시간은 시작 시간 이후여야 합니다.");
+        }
+    }
+
     private String resolveCategory(String value) {
         String key = value == null || value.isBlank() ? "GENERAL" : value.trim();
         categoryService.requireValidKey(key);
@@ -443,6 +521,9 @@ public class ClubActivityService {
                 activity.getTitle(),
                 activity.getDescription(),
                 activity.getEventDate(),
+                activity.getEndDate(),
+                activity.getStartTime() == null ? null : activity.getStartTime().toString(),
+                activity.getEndTime() == null ? null : activity.getEndTime().toString(),
                 primaryImageUrl,
                 primaryImageName,
                 imageInfos,
