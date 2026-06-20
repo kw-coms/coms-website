@@ -1,6 +1,7 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.Member;
+import com.coms.backend.dto.RecurringScheduleExceptionRequest;
 import com.coms.backend.dto.RecurringScheduleRequest;
 import com.coms.backend.dto.ScheduleOccurrenceResponse;
 import com.coms.backend.repository.MemberRepository;
@@ -96,6 +97,47 @@ class RecurringScheduleServiceTest {
         assertThat(occ.category()).isEqualTo("STUDY");
         assertThat(occ.categoryName()).isEqualTo("스터디");
         assertThat(occ.description()).isEqualTo("알고리즘");
+    }
+
+    @Test
+    void appliesSingleOccurrenceCancellationAndTimeOverride() {
+        var created = recurringScheduleService.create(new RecurringScheduleRequest(
+                "운영 회의", null,
+                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 10),
+                List.of("MON", "WED"), "18:00", "19:00", null, null), "2026123456");
+
+        var canceled = recurringScheduleService.upsertException(created.id(), LocalDate.of(2026, 6, 3),
+                new RecurringScheduleExceptionRequest(true, null, null));
+        var moved = recurringScheduleService.upsertException(created.id(), LocalDate.of(2026, 6, 8),
+                new RecurringScheduleExceptionRequest(false, "20:00", "21:30"));
+
+        List<ScheduleOccurrenceResponse> june = recurringScheduleService.occurrencesForMonth(2026, 6);
+
+        assertThat(june).extracting(ScheduleOccurrenceResponse::date)
+                .contains(LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 3), LocalDate.of(2026, 6, 8), LocalDate.of(2026, 6, 10));
+        ScheduleOccurrenceResponse canceledOccurrence = june.stream()
+                .filter(o -> o.date().equals(LocalDate.of(2026, 6, 3)))
+                .findFirst()
+                .orElseThrow();
+        assertThat(canceledOccurrence.exceptionId()).isEqualTo(canceled.id());
+        assertThat(canceledOccurrence.canceled()).isTrue();
+        assertThat(canceledOccurrence.startTime()).isEqualTo("18:00");
+
+        ScheduleOccurrenceResponse movedOccurrence = june.stream()
+                .filter(o -> o.date().equals(LocalDate.of(2026, 6, 8)))
+                .findFirst()
+                .orElseThrow();
+        assertThat(movedOccurrence.exceptionId()).isEqualTo(moved.id());
+        assertThat(movedOccurrence.canceled()).isFalse();
+        assertThat(movedOccurrence.startTime()).isEqualTo("20:00");
+        assertThat(movedOccurrence.endTime()).isEqualTo("21:30");
+
+        recurringScheduleService.deleteException(created.id(), LocalDate.of(2026, 6, 3));
+        assertThat(recurringScheduleService.occurrencesForMonth(2026, 6).stream()
+                .filter(o -> o.date().equals(LocalDate.of(2026, 6, 3)))
+                .findFirst()
+                .orElseThrow()
+                .canceled()).isFalse();
     }
 
     @Test

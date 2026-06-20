@@ -122,6 +122,19 @@ export async function deleteRecurringSchedule(id) {
   })
 }
 
+export async function upsertRecurringScheduleException(id, date, payload) {
+  return request(`/api/admin/recurring-schedules/${id}/exceptions/${date}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteRecurringScheduleException(id, date) {
+  return requestNoContent(`/api/admin/recurring-schedules/${id}/exceptions/${date}`, {
+    method: 'DELETE',
+  })
+}
+
 // ─── Admin-managed categories (CRUD) ─────────────────────────────────────────
 
 export async function listClubActivityCategories() {
