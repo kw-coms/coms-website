@@ -34,13 +34,14 @@ class ClubProjectServiceTest {
         var projects = clubProjectService.list();
         assertThat(projects).isNotEmpty();
         assertThat(projects).allSatisfy(p -> assertThat(p.madeBy()).isEqualTo("최준혁"));
-        assertThat(projects).extracting("title").contains("COMS 월드컵", "Game Club", "BugSnap", "LogDoctor");
-        // Game Club is seeded under the 게임 category, the rest under 웹사이트.
+        assertThat(projects).extracting("title").contains("COMS 월드컵", "Game Club", "BugSnap", "LogDoctor", "PRDoctor");
+        // Game Club and the developer tools are seeded under 웹사이트 because they
+        // are hosted web services on coms.kw.ac.kr.
         assertThat(projects).filteredOn(p -> p.title().equals("Game Club"))
                 .singleElement()
                 .satisfies(p -> {
-                    assertThat(p.category()).isEqualTo("GAME");
-                    assertThat(p.categoryName()).isEqualTo("게임");
+                    assertThat(p.category()).isEqualTo("WEBSITE");
+                    assertThat(p.categoryName()).isEqualTo("웹사이트");
                 });
         assertThat(projects).filteredOn(p -> p.title().equals("COMS 월드컵"))
                 .singleElement()
@@ -48,6 +49,14 @@ class ClubProjectServiceTest {
                     assertThat(p.category()).isEqualTo("WEBSITE");
                     assertThat(p.linkUrl()).isEqualTo("https://coms.kw.ac.kr/worldcup/");
                     assertThat(p.displayUrl()).isEqualTo("coms.kw.ac.kr/worldcup");
+                });
+        assertThat(projects).filteredOn(p -> p.title().equals("PRDoctor"))
+                .singleElement()
+                .satisfies(p -> {
+                    assertThat(p.category()).isEqualTo("WEBSITE");
+                    assertThat(p.eyebrow()).isEqualTo("PR review");
+                    assertThat(p.linkUrl()).isEqualTo("https://coms.kw.ac.kr/PRDoctor/");
+                    assertThat(p.displayUrl()).isEqualTo("coms.kw.ac.kr/PRDoctor");
                 });
     }
 
