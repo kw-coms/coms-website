@@ -22,6 +22,7 @@ const eventsByDay = buildCalendarDayEvents({
       endDate: '2026-06-03',
       startTime: '18:30',
       endTime: '20:00',
+      colorHex: '#ff9f0a',
     },
   ],
   recurringOccurrences: [
@@ -31,6 +32,7 @@ const eventsByDay = buildCalendarDayEvents({
       date: '2026-06-02',
       startTime: '19:00',
       recurring: true,
+      colorHex: '#34c759',
     },
     {
       recurringScheduleId: 3,
@@ -68,6 +70,7 @@ assert.deepEqual(
     startTime: '18:30',
     endTime: '20:00',
     timeLabel: '18:30~20:00',
+    colorHex: '#ff9f0a',
     recurring: false,
     range: true,
     segment: 'start',
@@ -80,6 +83,7 @@ assert.equal(eventsByDay[2][0].showTitle, false)
 assert.equal(eventsByDay[3][0].segment, 'end')
 assert.equal(eventsByDay[4][0].exceptionId, 7)
 assert.equal(eventsByDay[4][0].canceled, true)
+assert.equal(eventsByDay[2][1].colorHex, '#34c759')
 
 const summary = buildMonthEventSummary({
   eventsByDay,
