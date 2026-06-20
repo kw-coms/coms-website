@@ -20,17 +20,17 @@ const TWO_DIGIT_PATTERN = /^\d{2}$/
 const GENERATION_PATTERN = /^\d{1,3}$/
 
 const inputClass =
-  'w-full min-h-12 min-w-0 rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f] outline-none placeholder:text-[#86868b] transition focus:ring-2 focus:ring-[#0071e3]/24'
+  'w-full min-h-12 min-w-0 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none placeholder:text-[var(--app-subtle)] transition focus:ring-2 focus:ring-[var(--app-accent)]/24'
 const textareaClass =
-  'w-full min-w-0 rounded-lg resize-none border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f] outline-none placeholder:text-[#86868b] transition focus:ring-2 focus:ring-[#0071e3]/24'
-const labelClass = 'mb-2 block text-sm font-semibold text-[#1d1d1f]'
+  'w-full min-w-0 rounded-lg resize-none border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none placeholder:text-[var(--app-subtle)] transition focus:ring-2 focus:ring-[var(--app-accent)]/24'
+const labelClass = 'mb-2 block text-sm font-semibold text-[var(--app-text)]'
 const fieldGridClass = 'grid min-w-0 gap-3 sm:gap-4 md:grid-cols-2'
 
 function choiceButtonClass(active) {
   return `min-h-11 rounded-lg px-4 py-2 text-sm font-semibold transition ${
     active
-      ? 'bg-[#0071e3] text-white'
-      : 'border border-black/10 bg-[#f5f5f7] text-[#1d1d1f] hover:bg-white'
+      ? 'bg-[var(--app-accent)] text-white'
+      : 'border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] text-[var(--app-text)] hover:bg-[var(--app-surface)]'
   }`
 }
 
@@ -75,8 +75,8 @@ function SignupTypeSelector({ value, onChange }) {
           aria-pressed={value === type.id}
           className={`min-h-12 rounded-lg px-4 py-3 text-sm font-semibold transition ${
             value === type.id
-              ? 'bg-[#0071e3] text-white'
-              : 'border border-black/10 bg-[#f5f5f7] text-[#1d1d1f] hover:bg-white'
+              ? 'bg-[var(--app-accent)] text-white'
+              : 'border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] text-[var(--app-text)] hover:bg-[var(--app-surface)]'
           }`}
         >
           {type.label}
@@ -259,7 +259,7 @@ export default function Signup({ onBack }) {
         : "COM's 명부 확인 후 관심 분야와 포부를 함께 등록합니다."
 
   return (
-    <div className="w-full min-w-0 space-y-4 text-[#1d1d1f]">
+    <div className="w-full min-w-0 space-y-4 text-[var(--app-text)]">
       <button
         type="button"
         onClick={onBack}
@@ -278,16 +278,16 @@ export default function Signup({ onBack }) {
         </div>
 
         <div className="grid gap-0 lg:grid-cols-[1fr_320px]">
-          <div className="min-w-0 bg-white p-6 sm:p-8">
+          <div className="min-w-0 bg-[var(--app-surface)] p-6 sm:p-8">
           {step === 'form' && (
             <form onSubmit={handleSubmit} className="grid min-w-0 gap-4 sm:gap-5">
               <div className="flex items-center gap-3">
-                <div className="flex size-11 items-center justify-center rounded-lg bg-[#e8f3ff] text-[#0066cc]">
+                <div className="flex size-11 items-center justify-center rounded-lg bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]">
                   <UserRound size={20} />
                 </div>
                 <div>
                   <h2 className="text-xl font-bold">가입 정보 양식</h2>
-                  <p className="text-sm text-[#6e6e73]">{stepDesc}</p>
+                  <p className="text-sm text-[var(--app-muted)]">{stepDesc}</p>
                 </div>
               </div>
 
@@ -317,7 +317,7 @@ export default function Signup({ onBack }) {
               </div>
 
               {isGraduateSignup && (
-                <div className="grid min-w-0 gap-3 rounded-lg border border-black/10 bg-[#f5f5f7] p-4 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
+                <div className="grid min-w-0 gap-3 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-4 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
                   <div>
                     <label className={labelClass} htmlFor="graduateVerificationType">졸업생 인증 방식</label>
                     <select
@@ -422,10 +422,10 @@ export default function Signup({ onBack }) {
 
           {step === 'done' && (
             <div className="space-y-5 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#e8f3ff] text-3xl text-[#0066cc]">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-3xl text-[var(--app-accent-text)]">
                 <CheckCircle2 size={30} />
               </div>
-              <p className="text-base font-semibold text-[#0066cc]">이메일 인증이 완료되었습니다!</p>
+              <p className="text-base font-semibold text-[var(--app-accent-text)]">이메일 인증이 완료되었습니다!</p>
               <button
                 type="button"
                 onClick={onBack}
@@ -437,29 +437,29 @@ export default function Signup({ onBack }) {
           )}
           </div>
 
-          <aside className="flex flex-col justify-between gap-8 bg-[#f5f5f7] p-6 sm:p-8">
+          <aside className="flex flex-col justify-between gap-8 bg-[var(--app-surface-soft)] p-6 sm:p-8">
             <div className="space-y-6">
               <div>
-                <p className="text-sm font-semibold text-[#0066cc]">Process</p>
-                <div className="mt-4 space-y-3 text-sm leading-6 text-[#6e6e73]">
+                <p className="text-sm font-semibold text-[var(--app-accent-text)]">Process</p>
+                <div className="mt-4 space-y-3 text-sm leading-6 text-[var(--app-muted)]">
                   <p>1. 가입 정보 작성</p>
                   <p>2. 명부 확인 및 계정 생성</p>
                   <p>3. 이메일 인증 후 로그인</p>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-black/10 bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-                <div className="flex items-center gap-2 text-sm font-semibold text-[#1d1d1f]">
+              <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--app-text)]">
                   <Mail size={16} />
                   가입 안내
                 </div>
-                <p className="mt-2 text-sm leading-6 text-[#6e6e73]">
+                <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
                   재학생은 명부의 학번과 이름이 일치해야 합니다. 졸업생은 입학연도 끝 두 자리 또는 기수로 인증합니다.
                 </p>
               </div>
             </div>
 
-            <p className="text-xs leading-5 text-[#86868b]">
+            <p className="text-xs leading-5 text-[var(--app-subtle)]">
               가입 후 이메일 인증을 완료해야 로그인할 수 있습니다. 지원서와 달리 회원가입은 계정 생성과 인증 절차가 함께 진행됩니다.
             </p>
           </aside>
