@@ -87,6 +87,7 @@ public class AdminService {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         member.setPassword(passwordEncoder.encode(newPassword));
+        member.incrementTokenVersion();
         memberRepository.save(member);
     }
 
