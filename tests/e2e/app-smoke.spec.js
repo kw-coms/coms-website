@@ -887,12 +887,12 @@ test('signed-in members see real activity records and schedule events', async ({
   await expect(page.getByText('운영진 등록 회의')).toHaveCount(0)
 
   await page.goto('/monthly-calendar')
-  await expect(page.getByText('운영진 등록 회의')).toBeVisible()
+  await expect(page.locator('.club-calendar-event-title').filter({ hasText: '운영진 등록 회의' })).toBeVisible()
   await expect(page.getByText('다음 해 프로젝트 발표회')).toHaveCount(0)
   await page.getByLabel('년도 선택').fill('2027')
   await page.getByLabel('월 선택', { exact: true }).selectOption({ label: '7월' })
-  await expect(page.getByText('2027년 7월')).toBeVisible()
-  await expect(page.getByText('다음 해 프로젝트 발표회')).toBeVisible()
+  await expect(page.locator('.club-calendar-title').getByText('2027년 7월')).toBeVisible()
+  await expect(page.locator('.club-calendar-event-title').filter({ hasText: '다음 해 프로젝트 발표회' })).toBeVisible()
   await expect(page.getByText('운영진 등록 회의')).toHaveCount(0)
   await expect(page.getByText('로그인 하세요')).toHaveCount(0)
 })
@@ -900,6 +900,45 @@ test('signed-in members see real activity records and schedule events', async ({
 test('admin can add a schedule directly from the monthly calendar', async ({ page }) => {
   await mockAdminApis(page)
   let createdPayload = null
+  let updatedPayload = null
+  let deletedId = null
+  let activities = [{
+    id: 41,
+    kind: 'SCHEDULE',
+    category: 'GENERAL',
+    title: '수정 전 회의',
+    eventDate: '2026-06-11',
+    endDate: '2026-06-11',
+    startTime: '17:00',
+    endTime: '18:00',
+    description: null,
+    imageUrl: null,
+    imageOriginalName: null,
+    createdByName: '관리자',
+  }]
+  await page.route(/\/api\/club-activities\/\d+$/, async (route) => {
+    const id = Number(new URL(route.request().url()).pathname.split('/').pop())
+    if (route.request().method() === 'PATCH') {
+      const body = route.request().postData() || ''
+      updatedPayload = {
+        title: multipartField(body, 'title'),
+        eventDate: multipartField(body, 'eventDate'),
+        endDate: multipartField(body, 'endDate'),
+        startTime: multipartField(body, 'startTime'),
+        endTime: multipartField(body, 'endTime'),
+      }
+      activities = activities.map((item) => item.id === id ? { ...item, ...updatedPayload } : item)
+      await route.fulfill({ status: 200, json: activities.find((item) => item.id === id) })
+      return
+    }
+    if (route.request().method() === 'DELETE') {
+      deletedId = id
+      activities = activities.filter((item) => item.id !== id)
+      await route.fulfill({ status: 204, body: '' })
+      return
+    }
+    await route.fulfill({ status: 200, json: activities.find((item) => item.id === id) })
+  })
   await page.route('**/api/club-activities', async (route) => {
     if (route.request().method() === 'POST') {
       const body = route.request().postData() || ''
@@ -914,29 +953,34 @@ test('admin can add a schedule directly from the monthly calendar', async ({ pag
         description: multipartField(body, 'description'),
       }
       createdPayload = form
+      const created = {
+        id: 20,
+        kind: form.kind,
+        category: form.category,
+        title: form.title,
+        description: form.description,
+        eventDate: form.eventDate,
+        endDate: form.endDate,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        imageUrl: null,
+        imageOriginalName: null,
+        createdByName: '관리자',
+      }
+      activities = [created, ...activities]
       await route.fulfill({
         status: 200,
-        json: {
-          id: 20,
-          kind: form.kind,
-          category: form.category,
-          title: form.title,
-          description: form.description,
-          eventDate: form.eventDate,
-          endDate: form.endDate,
-          startTime: form.startTime,
-          endTime: form.endTime,
-          imageUrl: null,
-          imageOriginalName: null,
-          createdByName: '관리자',
-        },
+        json: created,
       })
       return
     }
-    await route.fulfill({ status: 200, json: [] })
+    await route.fulfill({ status: 200, json: activities })
   })
 
   await page.goto('/monthly-calendar')
+  await expect(page.getByText('이번 달 예정 일정')).toBeVisible()
+  await expect(page.locator('.calendar-month-summary').getByText('수정 전 회의')).toBeVisible()
+
   await page.getByLabel('일정 제목').fill('캘린더 직접 등록 회의')
   await page.getByLabel('시작일').fill('2026-06-24')
   await page.getByLabel('종료일 (선택)').fill('2026-06-26')
@@ -954,6 +998,102 @@ test('admin can add a schedule directly from the monthly calendar', async ({ pag
     endTime: '19:30',
   })
   await expect(page.locator('.club-calendar-event-title').filter({ hasText: '캘린더 직접 등록 회의' })).toBeVisible()
+
+  await page.getByRole('button', { name: '11일 일정 보기' }).click()
+  await page.getByRole('button', { name: '날짜 일정 수정 시작' }).click()
+  await page.getByLabel('일정 제목').fill('수정 후 회의')
+  await page.getByLabel('시작 시간 (선택)').fill('18:30')
+  await page.getByLabel('종료 시간 (선택)').fill('19:30')
+  await page.getByRole('button', { name: '날짜 일정 수정', exact: true }).click()
+  await expect.poll(() => updatedPayload).toMatchObject({
+    title: '수정 후 회의',
+    eventDate: '2026-06-11',
+    endDate: '2026-06-11',
+    startTime: '18:30',
+    endTime: '19:30',
+  })
+  await expect(page.locator('.club-calendar-event-title').filter({ hasText: '수정 후 회의' })).toBeVisible()
+
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: '날짜 일정 삭제' }).click()
+  await expect.poll(() => deletedId).toBe(41)
+  await expect(page.getByText('수정 후 회의')).toHaveCount(0)
+})
+
+test('admin can bulk import semester schedules from CSV', async ({ page }) => {
+  await mockAdminApis(page)
+  const createdDateSchedules = []
+  const createdRecurringSchedules = []
+
+  await page.route('**/api/club-activities', async (route) => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postData() || ''
+      const form = {
+        title: multipartField(body, 'title'),
+        kind: multipartField(body, 'kind'),
+        eventDate: multipartField(body, 'eventDate'),
+        endDate: multipartField(body, 'endDate'),
+        startTime: multipartField(body, 'startTime'),
+        endTime: multipartField(body, 'endTime'),
+      }
+      createdDateSchedules.push(form)
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: 80 + createdDateSchedules.length,
+          category: 'GENERAL',
+          description: '',
+          imageUrl: null,
+          imageOriginalName: null,
+          createdByName: '관리자',
+          ...form,
+        },
+      })
+      return
+    }
+    await route.fulfill({ status: 200, json: [] })
+  })
+  await page.unroute('**/api/admin/recurring-schedules**')
+  await page.route('**/api/admin/recurring-schedules**', async (route) => {
+    if (route.request().method() === 'POST') {
+      const payload = route.request().postDataJSON()
+      createdRecurringSchedules.push(payload)
+      await route.fulfill({ status: 201, json: { id: 90 + createdRecurringSchedules.length, ...payload } })
+      return
+    }
+    await route.fulfill({ status: 200, json: [] })
+  })
+
+  await page.goto('/monthly-calendar')
+  await page.getByLabel('학기 일정 CSV').fill(`종류,제목,시작일,종료일,시작시간,종료시간,요일
+날짜,개강 총회,2026-03-04,2026-03-04,18:00,19:00,
+정기,알고리즘 스터디,2026-03-10,2026-06-20,19:00,21:00,MON|WED`)
+  await page.getByRole('button', { name: 'CSV 일정 가져오기' }).click()
+
+  await expect.poll(() => createdDateSchedules).toEqual([
+    {
+      title: '개강 총회',
+      kind: 'SCHEDULE',
+      eventDate: '2026-03-04',
+      endDate: '2026-03-04',
+      startTime: '18:00',
+      endTime: '19:00',
+    },
+  ])
+  await expect.poll(() => createdRecurringSchedules).toEqual([
+    {
+      title: '알고리즘 스터디',
+      description: null,
+      startDate: '2026-03-10',
+      endDate: '2026-06-20',
+      daysOfWeek: ['MON', 'WED'],
+      startTime: '19:00',
+      endTime: '21:00',
+      location: null,
+      category: null,
+    },
+  ])
+  await expect(page.getByText('CSV에서 일정 2개를 가져왔습니다.')).toBeVisible()
 })
 
 test('admin can write an activity log entry directly from the activity log page', async ({ page }) => {
@@ -1377,6 +1517,68 @@ test('apps page renders DB-driven club projects grouped by category', async ({ p
   await expect(attendCard.getByRole('link', { name: /다운로드/ })).toBeVisible()
 })
 
+test('admin Apps management shows public-card previews with status badges', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/club-projects/categories', (route) => route.fulfill({
+    status: 200,
+    json: [
+      { id: 1, key: 'WEBSITE', name: '웹사이트', position: 0 },
+      { id: 2, key: 'APP', name: '앱', position: 1 },
+    ],
+  }))
+  await page.route('**/api/club-projects', (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    return route.fulfill({
+      status: 200,
+      json: [
+        {
+          id: 11,
+          category: 'WEBSITE',
+          categoryName: '웹사이트',
+          title: "COM's 포털",
+          description: '부원용 서비스 허브',
+          eyebrow: 'Portal',
+          madeBy: '김개발',
+          linkUrl: 'https://coms.kw.ac.kr/portal/',
+          displayUrl: 'coms.kw.ac.kr/portal',
+          files: [],
+        },
+        {
+          id: 12,
+          category: 'APP',
+          categoryName: '앱',
+          title: '출석 체크 앱',
+          description: '세미나 출석 관리 앱',
+          eyebrow: 'App',
+          madeBy: '이모바일',
+          linkUrl: null,
+          displayUrl: null,
+          files: [{ id: 99, url: '/api/club-projects/12/files/99', originalName: 'attend.apk' }],
+        },
+      ],
+    })
+  })
+
+  await page.goto('/admin')
+  await page.getByRole('button', { name: 'Apps 관리' }).click()
+
+  const portalPreview = page.getByTestId('admin-app-preview-11')
+  await expect(portalPreview.getByText("COM's 포털")).toBeVisible()
+  await expect(portalPreview.getByText('열기 가능')).toBeVisible()
+  await expect(portalPreview.getByText('COMS 호스팅')).toBeVisible()
+
+  const appPreview = page.getByTestId('admin-app-preview-12')
+  await expect(appPreview.getByText('출석 체크 앱')).toBeVisible()
+  await expect(appPreview.getByLabel('앱 상태').getByText('다운로드')).toBeVisible()
+
+  await page.getByLabel('제목').fill('새 앱')
+  await page.getByLabel('분류').selectOption('APP')
+  await page.getByLabel('링크 URL (선택)').fill('https://example.com/new-app')
+  const draftPreview = page.getByTestId('admin-app-preview-draft')
+  await expect(draftPreview.getByText('새 앱')).toBeVisible()
+  await expect(draftPreview.getByText('외부 링크')).toBeVisible()
+})
+
 test('monthly calendar renders recurring schedule occurrences for the selected month', async ({ page }) => {
   await mockAdminApis(page)
   // The calendar requests occurrences for the visible month; only July 2026
@@ -1408,6 +1610,16 @@ test('monthly calendar renders recurring schedule occurrences for the selected m
           endTime: '19:00',
           location: '동아리방',
         },
+        {
+          recurringScheduleId: 3,
+          exceptionId: 9,
+          date: '2026-07-20',
+          title: '정기 회의',
+          category: 'MEETING',
+          startTime: '18:00',
+          endTime: '19:00',
+          canceled: true,
+        },
       ],
     })
   })
@@ -1418,9 +1630,73 @@ test('monthly calendar renders recurring schedule occurrences for the selected m
 
   await expect(page.getByText('2026년 7월')).toBeVisible()
   const recurringEvents = page.locator('.club-calendar-event-recurring').filter({ hasText: '정기 회의' })
-  await expect(recurringEvents).toHaveCount(2)
+  await expect(recurringEvents).toHaveCount(3)
   await expect(recurringEvents.first().getByText('18:00~19:00')).toBeVisible()
   await expect(recurringEvents.first().getByText('@동아리방')).toHaveCount(0)
+  await expect(page.locator('.club-calendar-event-badge', { hasText: '취소됨' })).toBeVisible()
+})
+
+test('admin can set and clear one-date recurring schedule exceptions', async ({ page }) => {
+  await mockAdminApis(page)
+  const exceptionWrites = []
+  let exceptionDelete = null
+
+  await page.unroute('**/api/club-activities/schedule**')
+  await page.route('**/api/club-activities/schedule**', (route) => route.fulfill({
+    status: 200,
+    json: [
+      {
+        recurringScheduleId: 3,
+        date: '2026-07-13',
+        title: '정기 회의',
+        category: 'MEETING',
+        startTime: '18:00',
+        endTime: '19:00',
+      },
+      {
+        recurringScheduleId: 3,
+        exceptionId: 9,
+        date: '2026-07-20',
+        title: '정기 회의',
+        category: 'MEETING',
+        startTime: '18:00',
+        endTime: '19:00',
+        canceled: true,
+      },
+    ],
+  }))
+  await page.route(/\/api\/admin\/recurring-schedules\/3\/exceptions\/2026-07-\d+$/, async (route) => {
+    const url = new URL(route.request().url())
+    if (route.request().method() === 'PUT') {
+      exceptionWrites.push({ path: url.pathname, payload: route.request().postDataJSON() })
+      await route.fulfill({ status: 200, json: { id: 77, recurringScheduleId: 3, exceptionDate: url.pathname.split('/').pop(), ...route.request().postDataJSON() } })
+      return
+    }
+    if (route.request().method() === 'DELETE') {
+      exceptionDelete = url.pathname
+      await route.fulfill({ status: 204, body: '' })
+      return
+    }
+    await route.fallback()
+  })
+
+  await page.goto('/monthly-calendar')
+  await page.getByLabel('년도 선택').fill('2026')
+  await page.getByLabel('월 선택', { exact: true }).selectOption({ label: '7월' })
+
+  await page.getByRole('button', { name: '13일 일정 보기' }).click()
+  await page.getByRole('button', { name: '시간 변경' }).click()
+  await page.getByLabel('예외 시작 시간').fill('20:00')
+  await page.getByLabel('예외 종료 시간').fill('21:30')
+  await page.getByRole('button', { name: '시간 변경 저장' }).click()
+  await expect.poll(() => exceptionWrites.at(-1)).toEqual({
+    path: '/api/admin/recurring-schedules/3/exceptions/2026-07-13',
+    payload: { canceled: false, startTime: '20:00', endTime: '21:30' },
+  })
+
+  await page.getByRole('button', { name: '20일 일정 보기' }).click()
+  await page.getByRole('button', { name: '예외 해제' }).click()
+  await expect.poll(() => exceptionDelete).toBe('/api/admin/recurring-schedules/3/exceptions/2026-07-20')
 })
 
 test('guest visiting notices is redirected to login', async ({ page }) => {
