@@ -769,6 +769,7 @@ test('admin tracks recruit applications from overview to status update', async (
 })
 
 test('top navigation groups activity log and monthly calendar under Activity', async ({ page }) => {
+  await mockAdminApis(page)
   await page.goto('/')
 
   const desktopNav = page.locator('header nav').first()
