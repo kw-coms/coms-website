@@ -136,6 +136,20 @@ public class RecruitApplicationService {
             }
             attempts.addLast(now);
         }
+
+        evictExpiredClients(cutoff);
+    }
+
+    // Purge clients whose entire window has expired so the in-memory map cannot leak memory.
+    private void evictExpiredClients(LocalDateTime cutoff) {
+        submissionAttemptsByClient.forEach((key, attempts) -> {
+            synchronized (attempts) {
+                LocalDateTime last = attempts.peekLast();
+                if (last == null || last.isBefore(cutoff)) {
+                    submissionAttemptsByClient.remove(key, attempts);
+                }
+            }
+        });
     }
 
     private static String buildBody(RecruitApplicationRequest request) {
