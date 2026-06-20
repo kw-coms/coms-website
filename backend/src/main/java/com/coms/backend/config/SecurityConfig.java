@@ -50,7 +50,8 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            UserDetailsService userDetailsService,
                                            OriginValidationFilter originValidationFilter,
-                                           IntegrationHmacFilter integrationHmacFilter) throws Exception {
+                                           IntegrationHmacFilter integrationHmacFilter,
+                                           com.coms.backend.repository.MemberRepository memberRepository) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
@@ -130,7 +131,7 @@ public class SecurityConfig {
             .addFilterBefore(originValidationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(integrationHmacFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(
-                new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService),
+                new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService, memberRepository),
                 UsernamePasswordAuthenticationFilter.class
             );
 
