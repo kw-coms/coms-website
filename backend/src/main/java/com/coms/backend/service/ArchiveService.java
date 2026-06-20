@@ -1,9 +1,11 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.ArchiveFile;
+import com.coms.backend.domain.ArchiveFileVote;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.ArchiveFileResponse;
 import com.coms.backend.repository.ArchiveFileRepository;
+import com.coms.backend.repository.ArchiveFileVoteRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,7 +17,11 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -41,11 +47,14 @@ public class ArchiveService {
     private final ArchiveFileRepository repo;
     private final StorageService storage;
     private final MemberRepository memberRepository;
+    private final ArchiveFileVoteRepository voteRepository;
 
-    public ArchiveService(ArchiveFileRepository repo, StorageService storage, MemberRepository memberRepository) {
+    public ArchiveService(ArchiveFileRepository repo, StorageService storage, MemberRepository memberRepository,
+                          ArchiveFileVoteRepository voteRepository) {
         this.repo = repo;
         this.storage = storage;
         this.memberRepository = memberRepository;
+        this.voteRepository = voteRepository;
     }
 
     public ArchiveFileResponse upload(String title, String description, MultipartFile file, String uploaderStudentId) throws IOException {
@@ -69,7 +78,8 @@ public class ArchiveService {
             entity.setFileSize(file.getSize());
             entity.setUploadedBy(uploaderStudentId);
             entity.setUploaderName(member.getName());
-            return toResponse(repo.save(entity));
+            ArchiveFile saved = repo.save(entity);
+            return toResponse(saved, voteStats(List.of(saved)), uploaderStudentId);
         } catch (RuntimeException e) {
             storage.delete(stored);
             throw e;
@@ -78,7 +88,14 @@ public class ArchiveService {
 
     @Transactional(readOnly = true)
     public List<ArchiveFileResponse> list() {
-        return repo.findAllByOrderByUploadedAtDesc().stream().map(this::toResponse).toList();
+        return list(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ArchiveFileResponse> list(String studentId) {
+        List<ArchiveFile> files = repo.findAllByOrderByUploadedAtDesc();
+        Map<Long, VoteSummary> stats = voteStats(files);
+        return files.stream().map(file -> toResponse(file, stats, studentId)).toList();
     }
 
     @Transactional(readOnly = true)
@@ -87,13 +104,59 @@ public class ArchiveService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
+    public ArchiveFileResponse getAndIncrementView(Long id, String studentId) {
+        ArchiveFile file = get(id);
+        file.incrementViewCount();
+        ArchiveFile saved = repo.save(file);
+        return toResponse(saved, voteStats(List.of(saved)), studentId);
+    }
+
+    public void incrementView(Long id) {
+        ArchiveFile file = get(id);
+        file.incrementViewCount();
+        repo.save(file);
+    }
+
+    public ArchiveFileResponse vote(String studentId, Long id, int value) {
+        if (value < 0 || value > 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid vote value.");
+        }
+        memberRepository.findByStudentId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        ArchiveFile file = get(id);
+        Optional<ArchiveFileVote> existing = voteRepository.findByArchiveFileIdAndStudentId(file.getId(), studentId);
+        if (value == 0 || existing.isPresent()) {
+            existing.ifPresent(voteRepository::delete);
+        } else {
+            ArchiveFileVote vote = new ArchiveFileVote();
+            vote.setArchiveFileId(file.getId());
+            vote.setStudentId(studentId);
+            vote.setValue(1);
+            voteRepository.save(vote);
+        }
+        return toResponse(file, voteStats(List.of(file)), studentId);
+    }
+
     public void delete(Long id) {
         ArchiveFile file = get(id);
         storage.delete(file.getStoredName());
         repo.delete(file);
     }
 
-    private ArchiveFileResponse toResponse(ArchiveFile file) {
+    private Map<Long, VoteSummary> voteStats(List<ArchiveFile> files) {
+        List<Long> ids = files.stream().map(ArchiveFile::getId).filter(Objects::nonNull).toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return voteRepository.findByArchiveFileIdIn(ids).stream()
+                .collect(Collectors.groupingBy(
+                        ArchiveFileVote::getArchiveFileId,
+                        Collectors.collectingAndThen(Collectors.toList(), VoteSummary::from)
+                ));
+    }
+
+    private ArchiveFileResponse toResponse(ArchiveFile file, Map<Long, VoteSummary> voteStats, String studentId) {
+        VoteSummary votes = voteStats.getOrDefault(file.getId(), VoteSummary.EMPTY);
         return new ArchiveFileResponse(
                 file.getId(),
                 file.getTitle() != null ? file.getTitle() : file.getOriginalName(),
@@ -104,8 +167,26 @@ public class ArchiveService {
                 file.getUploadedBy(),
                 file.getUploaderName(),
                 file.getCategory().name(),
+                file.getViewCount(),
+                votes.upvotes(),
+                votes.myVote(studentId),
                 file.getUploadedAt()
         );
+    }
+
+    private record VoteSummary(long upvotes, Map<String, Integer> byStudent) {
+        static final VoteSummary EMPTY = new VoteSummary(0, Map.of());
+
+        static VoteSummary from(List<ArchiveFileVote> votes) {
+            long upvotes = votes.stream().filter(vote -> vote.getValue() > 0).count();
+            Map<String, Integer> byStudent = votes.stream()
+                    .collect(Collectors.toMap(ArchiveFileVote::getStudentId, ArchiveFileVote::getValue, (a, b) -> b));
+            return new VoteSummary(upvotes, byStudent);
+        }
+
+        int myVote(String studentId) {
+            return studentId == null ? 0 : byStudent.getOrDefault(studentId, 0);
+        }
     }
 
     private ArchiveFile.Category parseCategory(String value) {

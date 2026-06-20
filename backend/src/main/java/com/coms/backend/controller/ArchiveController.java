@@ -2,8 +2,10 @@ package com.coms.backend.controller;
 
 import com.coms.backend.domain.ArchiveFile;
 import com.coms.backend.dto.ArchiveFileResponse;
+import com.coms.backend.dto.EngagementVoteRequest;
 import com.coms.backend.service.ArchiveService;
 import com.coms.backend.service.StorageService;
+import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -47,13 +50,21 @@ public class ArchiveController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ArchiveFileResponse>> list() {
-        return ResponseEntity.ok(archiveService.list());
+    public ResponseEntity<List<ArchiveFileResponse>> list(Authentication authentication) {
+        return ResponseEntity.ok(archiveService.list(authentication == null ? null : authentication.getName()));
+    }
+
+    @PostMapping("/{id}/vote")
+    public ResponseEntity<ArchiveFileResponse> vote(Authentication authentication,
+                                                    @PathVariable Long id,
+                                                    @Valid @RequestBody EngagementVoteRequest request) {
+        return ResponseEntity.ok(archiveService.vote(authentication.getName(), id, request.value()));
     }
 
     @GetMapping("/{id}/download")
     public ResponseEntity<Resource> download(@PathVariable Long id) {
         ArchiveFile file = archiveService.get(id);
+        archiveService.incrementView(id);
         Resource resource = storageService.load(file.getStoredName());
         ContentDisposition disposition = ContentDisposition.attachment()
                 .filename(file.getOriginalName(), StandardCharsets.UTF_8)
