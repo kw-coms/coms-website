@@ -5,6 +5,8 @@ import {
   Rocket,
   Sparkles,
 } from 'lucide-react'
+import { ActivityCategory } from '../contract/enums.js'
+import { enumLabels } from '../contract/labels.js'
 
 export const tabs = [
   { id: 'about', label: 'About', hint: '정체성', icon: Binary, accent: 'text-cyan-200' },
@@ -342,17 +344,20 @@ export const calendarMonthOptions = Array.from({ length: 12 }, (_, index) => ({
   label: `${index + 1}월`,
 }))
 
-export const clubActivityCategories = [
-  ['GENERAL', '일반'],
-  ['SEMINAR', '세미나'],
-  ['STUDY', '스터디'],
-  ['PROJECT', '프로젝트'],
-  ['MEETING', '회의'],
-  ['RECRUIT', '모집'],
-  ['EVENT', '행사'],
-  ['MT', 'MT'],
-  ['ACHIEVEMENT', '성과'],
-]
+// Keys bound to the canonical ClubActivity.Category enum (drift-guarded).
+export const clubActivityCategories = Object.entries(
+  enumLabels(ActivityCategory, {
+    [ActivityCategory.GENERAL]: '일반',
+    [ActivityCategory.SEMINAR]: '세미나',
+    [ActivityCategory.STUDY]: '스터디',
+    [ActivityCategory.PROJECT]: '프로젝트',
+    [ActivityCategory.MEETING]: '회의',
+    [ActivityCategory.RECRUIT]: '모집',
+    [ActivityCategory.EVENT]: '행사',
+    [ActivityCategory.MT]: 'MT',
+    [ActivityCategory.ACHIEVEMENT]: '성과',
+  }),
+)
 
 export const projectsDetailCards = [
   {

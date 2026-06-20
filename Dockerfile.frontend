@@ -14,6 +14,16 @@ ARG VITE_SENTRY_ENV=production
 ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 ENV VITE_SENTRY_ENV=$VITE_SENTRY_ENV
 
+# Sentry source map upload (optional). Only uploads when SENTRY_AUTH_TOKEN is
+# non-empty; otherwise the @sentry/vite-plugin is skipped and the build is a
+# normal no-upload build. ORG/PROJECT fall back to vite.config.js defaults.
+ARG SENTRY_AUTH_TOKEN=
+ARG SENTRY_ORG=
+ARG SENTRY_PROJECT=
+ENV SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN
+ENV SENTRY_ORG=$SENTRY_ORG
+ENV SENTRY_PROJECT=$SENTRY_PROJECT
+
 RUN npm run build
 
 
