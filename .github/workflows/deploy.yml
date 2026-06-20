@@ -11,6 +11,10 @@ on:
         required: false
         default: main
 
+concurrency:
+  group: deploy-${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
