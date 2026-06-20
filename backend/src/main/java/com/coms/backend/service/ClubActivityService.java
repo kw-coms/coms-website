@@ -136,6 +136,20 @@ public class ClubActivityService {
                                        String endTime,
                                        MultipartFile image,
                                        String creatorStudentId) throws IOException {
+        return create(kind, category, title, description, eventDate, endDate, startTime, endTime, null, image, creatorStudentId);
+    }
+
+    public ClubActivityResponse create(String kind,
+                                       String category,
+                                       String title,
+                                       String description,
+                                       LocalDate eventDate,
+                                       LocalDate endDate,
+                                       String startTime,
+                                       String endTime,
+                                       String colorHex,
+                                       MultipartFile image,
+                                       String creatorStudentId) throws IOException {
         ClubActivity.Kind parsedKind = parseKind(kind);
         String categoryKey = resolveCategory(category);
         if (title == null || title.isBlank()) {
@@ -148,6 +162,7 @@ public class ClubActivityService {
         LocalTime parsedStartTime = parseTime(startTime);
         LocalTime parsedEndTime = parseTime(endTime);
         validateTimeRange(parsedStartTime, parsedEndTime);
+        String normalizedColor = normalizeColorHex(colorHex);
 
         Member member = memberRepository.findByStudentId(creatorStudentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
@@ -161,6 +176,7 @@ public class ClubActivityService {
         activity.setEndDate(normalizedEndDate);
         activity.setStartTime(parsedStartTime);
         activity.setEndTime(parsedEndTime);
+        activity.setColorHex(normalizedColor);
         activity.setCreatedBy(creatorStudentId);
         activity.setCreatedByName(member.getName());
         activity.setCreatedAt(LocalDateTime.now());
@@ -216,6 +232,20 @@ public class ClubActivityService {
                                        String startTime,
                                        String endTime,
                                        String editorStudentId) {
+        return update(id, kind, category, title, description, eventDate, endDate, startTime, endTime, null, editorStudentId);
+    }
+
+    public ClubActivityResponse update(Long id,
+                                       String kind,
+                                       String category,
+                                       String title,
+                                       String description,
+                                       LocalDate eventDate,
+                                       LocalDate endDate,
+                                       String startTime,
+                                       String endTime,
+                                       String colorHex,
+                                       String editorStudentId) {
         ClubActivity activity = get(id);
         if (kind != null && !kind.isBlank()) {
             activity.setKind(parseKind(kind));
@@ -248,6 +278,9 @@ public class ClubActivityService {
         }
         if (endTime != null) {
             activity.setEndTime(parseTime(endTime));
+        }
+        if (colorHex != null) {
+            activity.setColorHex(normalizeColorHex(colorHex));
         }
         validateTimeRange(activity.getStartTime(), activity.getEndTime());
         activity.setUpdatedAt(LocalDateTime.now());
@@ -424,6 +457,17 @@ public class ClubActivityService {
         return key;
     }
 
+    private String normalizeColorHex(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        if (!normalized.matches("^#[0-9a-f]{6}$")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "색상은 #RRGGBB 형식이어야 합니다.");
+        }
+        return normalized;
+    }
+
     private void validateImage(MultipartFile image) {
         String contentType = image.getContentType();
         if (contentType == null || !ALLOWED_IMAGE_TYPES.contains(contentType)) {
@@ -524,6 +568,7 @@ public class ClubActivityService {
                 activity.getEndDate(),
                 activity.getStartTime() == null ? null : activity.getStartTime().toString(),
                 activity.getEndTime() == null ? null : activity.getEndTime().toString(),
+                activity.getColorHex(),
                 primaryImageUrl,
                 primaryImageName,
                 imageInfos,

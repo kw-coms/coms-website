@@ -205,6 +205,7 @@ public class RecurringScheduleService {
         schedule.setLocation(request.location() != null && !request.location().isBlank()
                 ? request.location().trim() : null);
         schedule.setCategory(resolveCategory(request.category()));
+        schedule.setColorHex(normalizeColorHex(request.colorHex()));
     }
 
     private String resolveCategory(String value) {
@@ -214,6 +215,17 @@ public class RecurringScheduleService {
         String key = value.trim();
         categoryService.requireValidKey(key);
         return key;
+    }
+
+    private String normalizeColorHex(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        if (!normalized.matches("^#[0-9a-f]{6}$")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "색상은 #RRGGBB 형식이어야 합니다.");
+        }
+        return normalized;
     }
 
     private LocalTime parseTime(String value) {
@@ -288,6 +300,7 @@ public class RecurringScheduleService {
                 schedule.getCategory(),
                 schedule.getCategory() == null ? null
                         : categoryNames.getOrDefault(schedule.getCategory(), schedule.getCategory()),
+                schedule.getColorHex(),
                 schedule.getCreatedByName(),
                 schedule.getCreatedAt(),
                 schedule.getUpdatedAt()
@@ -330,6 +343,7 @@ public class RecurringScheduleService {
                 schedule.getCategory(),
                 schedule.getCategory() == null ? null
                         : categoryNames.getOrDefault(schedule.getCategory(), schedule.getCategory()),
+                schedule.getColorHex(),
                 true,
                 exception != null && exception.isCanceled()
         );
