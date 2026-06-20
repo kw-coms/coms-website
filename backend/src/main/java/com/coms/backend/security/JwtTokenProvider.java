@@ -32,20 +32,21 @@ public class JwtTokenProvider {
         this.expiration = expiration;
     }
 
-    public String generateToken(String studentId) {
+    public String generateToken(String studentId, int tokenVersion) {
         return Jwts.builder()
                 .subject(studentId)
                 .issuer(ISSUER)
                 .audience().add(AUDIENCE).and()
                 .id(UUID.randomUUID().toString())
                 .claim("type", "access")
+                .claim("tv", tokenVersion)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
 
-    public String generateRefreshToken(String studentId, boolean rememberMe) {
+    public String generateRefreshToken(String studentId, boolean rememberMe, int tokenVersion) {
         long refreshExpiration = rememberMe ? REMEMBERED_REFRESH_EXPIRATION : REFRESH_EXPIRATION;
         return Jwts.builder()
                 .subject(studentId)
@@ -54,6 +55,7 @@ public class JwtTokenProvider {
                 .id(UUID.randomUUID().toString())
                 .claim("type", "refresh")
                 .claim("remember", rememberMe)
+                .claim("tv", tokenVersion)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + refreshExpiration))
                 .signWith(key, Jwts.SIG.HS256)
@@ -62,6 +64,11 @@ public class JwtTokenProvider {
 
     public String getStudentId(String token) {
         return parser().parseSignedClaims(token).getPayload().getSubject();
+    }
+
+    public int getTokenVersion(String token) {
+        Object tv = parser().parseSignedClaims(token).getPayload().get("tv");
+        return tv instanceof Number ? ((Number) tv).intValue() : 0;
     }
 
     public boolean validateToken(String token) {
