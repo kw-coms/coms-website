@@ -34,11 +34,12 @@ public class ClubProjectCategorySeeder implements ApplicationRunner {
             new String[]{"WEBSITE", "COMS 티어표", "언어, 프레임워크, 프로젝트, 활동 주제를 S/A/B/C/D로 나누고 공유하는 COMS 티어표 도구입니다.", "Tier board", "https://coms.kw.ac.kr/tier/", "coms.kw.ac.kr/tier"},
             new String[]{"WEBSITE", "Food Club", "부원들과 밥 약속과 맛집 후보를 가볍게 모으는 식사 모임 허브입니다.", "Meal loop", "https://coms.kw.ac.kr/foodclub/", "coms.kw.ac.kr/foodclub"},
             new String[]{"WEBSITE", "TeamMate", "스터디와 프로젝트 팀을 조건에 맞춰 빠르게 나누는 팀 편성 도구입니다.", "Team randomizer", "https://coms.kw.ac.kr/team-randomizer/", "coms.kw.ac.kr/team-randomizer"},
-            new String[]{"GAME", "Game Club", "동아리 안에서 함께 즐길 수 있는 작은 게임과 이벤트 공간입니다.", "Playground", "https://coms.kw.ac.kr/gameclub/", "coms.kw.ac.kr/gameclub"},
+            new String[]{"WEBSITE", "Game Club", "동아리 안에서 함께 즐길 수 있는 작은 게임과 이벤트 공간입니다.", "Playground", "https://coms.kw.ac.kr/gameclub/", "coms.kw.ac.kr/gameclub"},
             new String[]{"WEBSITE", "KW Mate", "광운대 생활에 필요한 연결과 정보를 더 쉽게 찾도록 돕는 서비스입니다.", "Campus utility", "http://kwmate.com/", "kwmate.com"},
             new String[]{"WEBSITE", "Daily Coding", "매일 코딩 문제와 기록을 이어가며 학습 루틴을 만드는 연습 공간입니다.", "Practice", "https://dailycoding-final.com/", "dailycoding-final.com"},
             new String[]{"WEBSITE", "BugSnap", "오류 화면 스크린샷을 올리면 OCR로 텍스트를 추출해 GitHub Issue용 버그 리포트 초안을 만들어주는 도구입니다.", "Bug report", "https://coms.kw.ac.kr/BugSnap/", "coms.kw.ac.kr/BugSnap"},
-            new String[]{"WEBSITE", "LogDoctor", "서버 에러 로그를 붙여넣으면 원인 후보와 확인·해결 절차를 정리해주는 개발자용 로그 분석 도구입니다.", "Log triage", "https://coms.kw.ac.kr/LogDoctor/", "coms.kw.ac.kr/LogDoctor"}
+            new String[]{"WEBSITE", "LogDoctor", "서버 에러 로그를 붙여넣으면 원인 후보와 확인·해결 절차를 정리해주는 개발자용 로그 분석 도구입니다.", "Log triage", "https://coms.kw.ac.kr/LogDoctor/", "coms.kw.ac.kr/LogDoctor"},
+            new String[]{"WEBSITE", "PRDoctor", "GitHub PR 링크를 넣으면 변경 요약, 위험도, 보안 경고, 테스트 목록, 리뷰 코멘트 초안을 정리해주는 코드 리뷰 보조 도구입니다.", "PR review", "https://coms.kw.ac.kr/PRDoctor/", "coms.kw.ac.kr/PRDoctor"}
     );
 
     private static final String DEFAULT_MADE_BY = "최준혁";

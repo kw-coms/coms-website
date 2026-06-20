@@ -167,6 +167,13 @@ export const companionServices = [
     href: 'https://coms.kw.ac.kr/LogDoctor/',
     domain: 'coms.kw.ac.kr/LogDoctor',
   },
+  {
+    title: 'PRDoctor',
+    eyebrow: 'PR review',
+    body: 'GitHub PR 링크를 넣으면 변경 요약, 위험도, 보안 경고, 테스트 목록, 리뷰 코멘트 초안을 정리해주는 코드 리뷰 보조 도구입니다.',
+    href: 'https://coms.kw.ac.kr/PRDoctor/',
+    domain: 'coms.kw.ac.kr/PRDoctor',
+  },
 ]
 
 export const sectionMetrics = {
