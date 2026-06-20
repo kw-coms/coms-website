@@ -33,5 +33,7 @@ export async function mockAdminApis(page) {
       { id: 5, key: 'MEETING', name: '회의', position: 4, activityCount: 0 },
     ],
   }))
+  await page.route('**/api/club-activities/schedule**', (route) => route.fulfill({ status: 200, json: [] }))
+  await page.route('**/api/admin/recurring-schedules**', (route) => route.fulfill({ status: 200, json: [] }))
   await page.route('**/api/club-activities', (route) => route.fulfill({ status: 200, json: [] }))
 }
