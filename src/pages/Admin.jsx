@@ -33,6 +33,7 @@ import {
 import { listAdminFonts, setFontActive, uploadFont } from '../services/fontApi.js'
 import { buildFontFaceCss, fontFamilyValue } from '../services/fontPreferences.js'
 import { useAuth } from '../contexts/useAuth.js'
+import AppProjectCard from '../components/apps/AppProjectCard.jsx'
 
 const BAN_DURATIONS = [
   { value: '6H', label: '6시간' },
@@ -1796,6 +1797,20 @@ function ClubProjectsAdminTab() {
     setItems((prev) => prev.map((entry) => (entry.id === updated.id ? { ...entry, ...updated } : entry)))
   }
 
+  const draftCategoryName = categories.find((category) => category.key === form.category)?.name || form.category
+  const draftProject = {
+    id: 'draft',
+    category: form.category,
+    categoryName: draftCategoryName,
+    title: form.title.trim(),
+    eyebrow: form.eyebrow.trim(),
+    description: form.description.trim(),
+    madeBy: form.madeBy.trim() || '최준혁',
+    linkUrl: form.linkUrl.trim(),
+    displayUrl: form.displayUrl.trim(),
+    files: form.file ? [{ id: 'draft-file', url: '#', originalName: form.file.name }] : [],
+  }
+
   return (
     <div className="space-y-8">
       <ClubProjectCategoriesAdmin
@@ -1885,6 +1900,17 @@ function ClubProjectsAdminTab() {
               className="text-sm text-[var(--theme-body-dark)]"
             />
           </label>
+        </div>
+        <div className="mt-4 rounded-lg border border-[var(--app-hairline)] bg-white/60 p-3">
+          <p className="text-xs font-bold text-[var(--theme-body-dark)]">공개 카드 미리보기</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">Apps 페이지와 같은 카드 형태로 노출 상태를 확인합니다.</p>
+          <AppProjectCard
+            project={draftProject}
+            showStatusBadges
+            interactive={false}
+            testId="admin-app-preview-draft"
+            className="mt-3"
+          />
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <button
@@ -2043,6 +2069,15 @@ function ClubProjectAdminRow({ item, categories, onDelete, onUpdated }) {
             삭제
           </button>
         </div>
+      </div>
+
+      <div className="mt-3" data-testid={`admin-app-preview-${item.id}`}>
+        <AppProjectCard
+          project={{ ...item, categoryName }}
+          showStatusBadges
+          interactive={false}
+          className="min-h-0"
+        />
       </div>
 
       {editing && (

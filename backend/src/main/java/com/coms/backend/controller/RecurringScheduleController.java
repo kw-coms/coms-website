@@ -1,5 +1,7 @@
 package com.coms.backend.controller;
 
+import com.coms.backend.dto.RecurringScheduleExceptionRequest;
+import com.coms.backend.dto.RecurringScheduleExceptionResponse;
 import com.coms.backend.dto.RecurringScheduleRequest;
 import com.coms.backend.dto.RecurringScheduleResponse;
 import com.coms.backend.dto.ScheduleOccurrenceResponse;
@@ -14,11 +16,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -66,6 +70,23 @@ public class RecurringScheduleController {
     @DeleteMapping("/admin/recurring-schedules/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         recurringScheduleService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/admin/recurring-schedules/{id}/exceptions/{date}")
+    public ResponseEntity<RecurringScheduleExceptionResponse> upsertException(
+            @PathVariable Long id,
+            @PathVariable LocalDate date,
+            @RequestBody RecurringScheduleExceptionRequest request) {
+        return ResponseEntity.ok(recurringScheduleService.upsertException(id, date, request));
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/admin/recurring-schedules/{id}/exceptions/{date}")
+    public ResponseEntity<Void> deleteException(@PathVariable Long id,
+                                                @PathVariable LocalDate date) {
+        recurringScheduleService.deleteException(id, date);
         return ResponseEntity.noContent().build();
     }
 }
