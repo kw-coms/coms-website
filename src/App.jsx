@@ -48,6 +48,8 @@ const RecruitApply = lazy(() => import('./pages/RecruitApply.jsx'))
 const RecruitNotice = lazy(() => import('./pages/RecruitNotice.jsx'))
 import { getLogoAsset } from './utils/logoAssets.js'
 import { useAuth } from './contexts/useAuth.js'
+import { ActivityCategory } from './contract/enums.js'
+import { enumLabels } from './contract/labels.js'
 import {
   tabs,
   activityDetails,
@@ -138,20 +140,22 @@ function formatActivityDate(value) {
 
 // Categories are admin-managed (DB-backed). Prefer the server-provided display
 // name; fall back to the legacy hardcoded labels for any cached/older payloads.
+// Keys bound to the canonical ClubActivity.Category enum (drift-guarded).
+const ACTIVITY_CATEGORY_LABELS = enumLabels(ActivityCategory, {
+  [ActivityCategory.GENERAL]: '일반',
+  [ActivityCategory.SEMINAR]: '세미나',
+  [ActivityCategory.STUDY]: '스터디',
+  [ActivityCategory.PROJECT]: '프로젝트',
+  [ActivityCategory.MEETING]: '회의',
+  [ActivityCategory.RECRUIT]: '모집',
+  [ActivityCategory.EVENT]: '행사',
+  [ActivityCategory.MT]: 'MT',
+  [ActivityCategory.ACHIEVEMENT]: '성과',
+})
+
 function categoryLabel(value, fallbackName) {
   if (fallbackName) return fallbackName
-  const labels = {
-    GENERAL: '일반',
-    SEMINAR: '세미나',
-    STUDY: '스터디',
-    PROJECT: '프로젝트',
-    MEETING: '회의',
-    RECRUIT: '모집',
-    EVENT: '행사',
-    MT: 'MT',
-    ACHIEVEMENT: '성과',
-  }
-  return labels[value] || value || '일반'
+  return ACTIVITY_CATEGORY_LABELS[value] || value || '일반'
 }
 
 const DEFAULT_ACCENT = '#0071e3'
