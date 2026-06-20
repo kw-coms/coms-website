@@ -47,6 +47,7 @@ const ChangePassword = lazy(() => import('./pages/ChangePassword.jsx'))
 const RecruitApply = lazy(() => import('./pages/RecruitApply.jsx'))
 const RecruitNotice = lazy(() => import('./pages/RecruitNotice.jsx'))
 import { getLogoAsset } from './utils/logoAssets.js'
+import { buildCalendarDayEvents, visibleDayEvents } from './utils/monthlyCalendar.js'
 import { useAuth } from './contexts/useAuth.js'
 import { ActivityCategory } from './contract/enums.js'
 import { enumLabels } from './contract/labels.js'
@@ -1611,23 +1612,21 @@ function ActivityLogSection({ compact = false }) {
   )
 }
 
-const EMPTY_RECURRING_FORM = {
+const EMPTY_CALENDAR_SCHEDULE_FORM = {
+  mode: 'date',
   title: '',
-  description: '',
   startDate: '',
   endDate: '',
   daysOfWeek: [],
   startTime: '',
   endTime: '',
-  location: '',
-  category: '',
 }
 
-function RecurringScheduleManager({ categories }) {
+function CalendarScheduleComposer({ onDateCreated }) {
   const queryClient = useQueryClient()
   const { user, loading: authLoading } = useAuth()
-  const [form, setForm] = useState(EMPTY_RECURRING_FORM)
-  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState(EMPTY_CALENDAR_SCHEDULE_FORM)
+  const [editingRecurringId, setEditingRecurringId] = useState(null)
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -1642,6 +1641,13 @@ function RecurringScheduleManager({ categories }) {
   })
   const schedules = listQuery.data ?? []
 
+  const setMode = (mode) => {
+    setForm((prev) => ({ ...prev, mode }))
+    setEditingRecurringId(null)
+    setNotice('')
+    setError('')
+  }
+
   const toggleDay = (value) => {
     setForm((prev) => ({
       ...prev,
@@ -1652,22 +1658,33 @@ function RecurringScheduleManager({ categories }) {
   }
 
   const resetForm = () => {
-    setForm(EMPTY_RECURRING_FORM)
-    setEditingId(null)
+    setForm(EMPTY_CALENDAR_SCHEDULE_FORM)
+    setEditingRecurringId(null)
+    setNotice('')
+    setError('')
+  }
+
+  const resetAfterSave = () => {
+    setForm((prev) => ({
+      ...EMPTY_CALENDAR_SCHEDULE_FORM,
+      mode: prev.mode,
+      daysOfWeek: prev.mode === 'recurring' ? prev.daysOfWeek : [],
+      startTime: prev.startTime,
+      endTime: prev.endTime,
+    }))
+    setEditingRecurringId(null)
   }
 
   const startEdit = (schedule) => {
-    setEditingId(schedule.id)
+    setEditingRecurringId(schedule.id)
     setForm({
+      mode: 'recurring',
       title: schedule.title || '',
-      description: schedule.description || '',
       startDate: schedule.startDate || '',
       endDate: schedule.endDate || '',
       daysOfWeek: Array.isArray(schedule.daysOfWeek) ? schedule.daysOfWeek : [],
       startTime: schedule.startTime || '',
       endTime: schedule.endTime || '',
-      location: schedule.location || '',
-      category: schedule.category || '',
     })
     setNotice('')
     setError('')
@@ -1680,84 +1697,118 @@ function RecurringScheduleManager({ categories }) {
 
   const submit = async (event) => {
     event.preventDefault()
-    if (!form.title.trim() || !form.startDate || !form.endDate || form.daysOfWeek.length === 0) {
-      setError('제목, 기간, 요일을 모두 입력하세요.')
+    const title = form.title.trim()
+    const endDate = form.endDate || form.startDate
+    if (!title || !form.startDate) {
+      setError('일정 제목과 시작일을 입력하세요.')
+      return
+    }
+    if (endDate < form.startDate) {
+      setError('종료일은 시작일과 같거나 이후여야 합니다.')
+      return
+    }
+    if (form.startTime && form.endTime && form.endTime < form.startTime) {
+      setError('종료 시간은 시작 시간 이후여야 합니다.')
+      return
+    }
+    if (form.mode === 'recurring' && form.daysOfWeek.length === 0) {
+      setError('정기 모임은 반복 요일을 하나 이상 선택하세요.')
       return
     }
     setSaving(true)
     setNotice('')
     setError('')
-    const payload = {
-      title: form.title.trim(),
-      description: form.description.trim() || null,
-      startDate: form.startDate,
-      endDate: form.endDate,
-      daysOfWeek: form.daysOfWeek,
-      startTime: form.startTime || null,
-      endTime: form.endTime || null,
-      location: form.location.trim() || null,
-      category: form.category || null,
-    }
     try {
-      if (editingId) {
-        await updateRecurringSchedule(editingId, payload)
-        setNotice('정기 일정을 수정했습니다.')
+      if (form.mode === 'date') {
+        const created = await createClubActivity({
+          kind: 'SCHEDULE',
+          title,
+          eventDate: form.startDate,
+          endDate,
+          startTime: form.startTime,
+          endTime: form.endTime,
+        })
+        onDateCreated?.(created)
+        setNotice('날짜 일정을 추가했습니다.')
       } else {
-        await createRecurringSchedule(payload)
-        setNotice('정기 일정을 추가했습니다.')
+        const payload = {
+          title,
+          description: null,
+          startDate: form.startDate,
+          endDate,
+          daysOfWeek: form.daysOfWeek,
+          startTime: form.startTime || null,
+          endTime: form.endTime || null,
+          location: null,
+          category: null,
+        }
+        if (editingRecurringId) {
+          await updateRecurringSchedule(editingRecurringId, payload)
+          setNotice('정기 모임을 수정했습니다.')
+        } else {
+          await createRecurringSchedule(payload)
+          setNotice('정기 모임을 추가했습니다.')
+        }
+        refreshCalendar()
       }
-      resetForm()
-      refreshCalendar()
+      resetAfterSave()
     } catch (err) {
-      setError(err.message || '정기 일정을 저장하지 못했습니다.')
+      setError(err.message || '일정을 저장하지 못했습니다.')
     } finally {
       setSaving(false)
     }
   }
 
   const remove = async (schedule) => {
-    if (typeof window !== 'undefined' && !window.confirm(`'${schedule.title}' 정기 일정을 삭제할까요?`)) return
+    if (typeof window !== 'undefined' && !window.confirm(`'${schedule.title}' 정기 모임을 삭제할까요?`)) return
     setError('')
     setNotice('')
     try {
       await deleteRecurringSchedule(schedule.id)
-      if (editingId === schedule.id) resetForm()
-      setNotice('정기 일정을 삭제했습니다.')
+      if (editingRecurringId === schedule.id) resetForm()
+      setNotice('정기 모임을 삭제했습니다.')
       refreshCalendar()
     } catch (err) {
-      setError(err.message || '정기 일정을 삭제하지 못했습니다.')
+      setError(err.message || '정기 모임을 삭제하지 못했습니다.')
     }
   }
 
   return (
     <div className="recurring-schedule-manager mt-6">
-      <form onSubmit={submit} className="calendar-admin-composer" aria-label="정기(반복) 일정 관리">
-        <div>
+      <form onSubmit={submit} className="calendar-admin-composer calendar-admin-composer-unified" aria-label="캘린더 일정 관리">
+        <div className="calendar-admin-composer-heading">
           <p className="calendar-admin-composer-title">
-            <Repeat size={15} aria-hidden="true" style={{ marginRight: 6, verticalAlign: '-2px' }} />
-            {editingId ? '정기 일정 수정' : '정기(반복) 일정 추가'}
+            {editingRecurringId ? '정기 모임 수정' : '관리자 일정 추가'}
           </p>
-          <p className="calendar-admin-composer-copy">기간과 요일로 반복되는 정기 모임·소모임을 등록하면 캘린더의 매주 해당 요일에 자동 표시됩니다.</p>
+          <p className="calendar-admin-composer-copy">처음에 날짜 일정인지 정기 모임인지 선택하고, 제목·기간·시간만 입력합니다.</p>
+        </div>
+        <div className="calendar-admin-mode-tabs" role="radiogroup" aria-label="일정 종류 선택">
+          <button
+            type="button"
+            className={form.mode === 'date' ? 'is-active' : ''}
+            onClick={() => setMode('date')}
+            aria-pressed={form.mode === 'date'}
+            disabled={saving}
+          >
+            날짜 일정
+          </button>
+          <button
+            type="button"
+            className={form.mode === 'recurring' ? 'is-active' : ''}
+            onClick={() => setMode('recurring')}
+            aria-pressed={form.mode === 'recurring'}
+            disabled={saving}
+          >
+            정기 모임
+          </button>
         </div>
         <label>
-          <span>반복 일정 이름</span>
+          <span>일정 제목</span>
           <input
             value={form.title}
             onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
             maxLength={120}
           />
-        </label>
-        <label>
-          <span>반복 분류 (선택)</span>
-          <select
-            value={form.category}
-            onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
-          >
-            <option value="">분류 없음</option>
-            {categories.map((category) => (
-              <option key={category.key} value={category.key}>{category.name}</option>
-            ))}
-          </select>
         </label>
         <label>
           <span>시작일</span>
@@ -1768,28 +1819,30 @@ function RecurringScheduleManager({ categories }) {
           />
         </label>
         <label>
-          <span>종료일</span>
+          <span>{form.mode === 'date' ? '종료일 (선택)' : '종료일'}</span>
           <input
             type="date"
             value={form.endDate}
             onChange={(event) => setForm((prev) => ({ ...prev, endDate: event.target.value }))}
           />
         </label>
-        <fieldset className="calendar-admin-composer-wide recurring-weekday-picker">
-          <legend>반복 요일</legend>
-          <div className="recurring-weekday-options">
-            {WEEKDAY_OPTIONS.map((weekday) => (
-              <label key={weekday.value} className={`recurring-weekday-option ${form.daysOfWeek.includes(weekday.value) ? 'is-active' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={form.daysOfWeek.includes(weekday.value)}
-                  onChange={() => toggleDay(weekday.value)}
-                />
-                <span>{weekday.label}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        {form.mode === 'recurring' && (
+          <fieldset className="calendar-admin-composer-wide recurring-weekday-picker">
+            <legend>반복 요일</legend>
+            <div className="recurring-weekday-options">
+              {WEEKDAY_OPTIONS.map((weekday) => (
+                <label key={weekday.value} className={`recurring-weekday-option ${form.daysOfWeek.includes(weekday.value) ? 'is-active' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={form.daysOfWeek.includes(weekday.value)}
+                    onChange={() => toggleDay(weekday.value)}
+                  />
+                  <span>{weekday.label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
         <label>
           <span>시작 시간 (선택)</span>
           <input
@@ -1806,33 +1859,19 @@ function RecurringScheduleManager({ categories }) {
             onChange={(event) => setForm((prev) => ({ ...prev, endTime: event.target.value }))}
           />
         </label>
-        <label className="calendar-admin-composer-wide">
-          <span>장소 (선택)</span>
-          <input
-            value={form.location}
-            onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value }))}
-            maxLength={200}
-          />
-        </label>
-        <label className="calendar-admin-composer-wide">
-          <span>반복 일정 메모 (선택)</span>
-          <input
-            value={form.description}
-            onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-            maxLength={500}
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={saving || !form.title.trim() || !form.startDate || !form.endDate || form.daysOfWeek.length === 0}
-        >
-          {saving ? '저장 중...' : (editingId ? '반복 일정 수정' : '반복 일정 등록')}
-        </button>
-        {editingId && (
-          <button type="button" className="recurring-cancel-edit" onClick={resetForm} disabled={saving}>
-            취소
+        <div className="calendar-admin-composer-actions">
+          <button
+            type="submit"
+            disabled={saving || !form.title.trim() || !form.startDate || (form.mode === 'recurring' && (!form.endDate || form.daysOfWeek.length === 0))}
+          >
+            {saving ? '저장 중...' : (editingRecurringId ? '정기 모임 수정' : (form.mode === 'date' ? '날짜 일정 추가' : '정기 모임 등록'))}
           </button>
-        )}
+          {editingRecurringId && (
+            <button type="button" className="recurring-cancel-edit" onClick={resetForm} disabled={saving}>
+              취소
+            </button>
+          )}
+        </div>
         {notice && <p className="calendar-admin-composer-notice">{notice}</p>}
         {error && <p className="calendar-admin-composer-notice" style={{ color: '#dc2626' }}>{error}</p>}
       </form>
@@ -1854,8 +1893,6 @@ function RecurringScheduleManager({ categories }) {
                     {formatActivityDate(schedule.startDate)} ~ {formatActivityDate(schedule.endDate)}
                     {dayLabels && ` · ${dayLabels}요일`}
                     {timeLabel && ` · ${timeLabel}`}
-                    {schedule.location && ` · @${schedule.location}`}
-                    {schedule.categoryName && ` · ${schedule.categoryName}`}
                   </span>
                 </div>
                 <div className="recurring-schedule-item-actions">
@@ -1876,88 +1913,47 @@ function RecurringScheduleManager({ categories }) {
 function ClubCalendarSection({ compact = false }) {
   const navigate = useNavigate()
   const { user, authLoading, records, loading, loadError, prependActivity } = useClubActivities('일정을 불러오지 못했습니다.')
-  const categories = useClubActivityCategories()
   const initialCalendarDate = new Date()
-  const [submitError, setSubmitError] = useState('')
-  const error = submitError || loadError
+  const error = loadError
   const [selectedYear, setSelectedYear] = useState(initialCalendarDate.getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(initialCalendarDate.getMonth())
-  const [scheduleForm, setScheduleForm] = useState({
-    title: '',
-    eventDate: '',
-    category: 'MEETING',
-    description: '',
-  })
-  const [savingSchedule, setSavingSchedule] = useState(false)
-  const [scheduleNotice, setScheduleNotice] = useState('')
+  const [selectedDay, setSelectedDay] = useState(null)
 
   const occurrences = useScheduleOccurrences(selectedYear, selectedMonth)
   const scheduleItems = (user ? records || [] : []).filter((item) => item.kind === 'SCHEDULE')
   const calendarMonth = buildCalendarMonth(new Date(selectedYear, selectedMonth, 1))
-  const eventsByDay = scheduleItems.reduce((acc, event) => {
-    const eventDate = parseLocalDate(event.eventDate)
-    if (!eventDate) return acc
-    if (eventDate.getFullYear() !== calendarMonth.year || eventDate.getMonth() !== calendarMonth.month) return acc
-    const day = eventDate.getDate()
-    acc[day] = [...(acc[day] || []), { ...event, recurring: false }]
-    return acc
-  }, {})
-  // Merge recurring occurrences expanded by the backend for the visible month.
-  ;(user ? occurrences : []).forEach((occ) => {
-    const occDate = parseLocalDate(occ.date)
-    if (!occDate) return
-    if (occDate.getFullYear() !== calendarMonth.year || occDate.getMonth() !== calendarMonth.month) return
-    const day = occDate.getDate()
-    const timeLabel = occ.startTime ? (occ.endTime ? `${occ.startTime}~${occ.endTime}` : occ.startTime) : ''
-    eventsByDay[day] = [...(eventsByDay[day] || []), {
-      id: `recurring-${occ.recurringScheduleId}-${occ.date}`,
-      title: occ.title,
-      category: occ.category || 'event',
-      recurring: true,
-      timeLabel,
-      location: occ.location || '',
-    }]
+  const eventsByDay = buildCalendarDayEvents({
+    calendarMonth,
+    scheduleItems,
+    recurringOccurrences: user ? occurrences : [],
   })
   const hasAnyEvent = Object.values(eventsByDay).some((list) => list.length > 0)
   const isLocked = !authLoading && !user
   const isAdmin = user?.role === 'ADMIN'
-  const selectedScheduleCategory = categories.some((category) => category.key === scheduleForm.category)
-    ? scheduleForm.category
-    : (categories[0]?.key || scheduleForm.category)
+  const selectedDayEvents = selectedDay ? eventsByDay[selectedDay] || [] : []
 
   const updateSelectedYear = (value) => {
     const nextYear = Number(value)
     if (!Number.isFinite(nextYear)) return
+    setSelectedDay(null)
     setSelectedYear(Math.min(2100, Math.max(2000, nextYear)))
   }
 
-  const submitSchedule = async (event) => {
-    event.preventDefault()
-    if (!scheduleForm.title.trim() || !scheduleForm.eventDate) return
-    setSavingSchedule(true)
-    setScheduleNotice('')
-    setSubmitError('')
-    try {
-      const created = await createClubActivity({
-        kind: 'SCHEDULE',
-        category: selectedScheduleCategory,
-        title: scheduleForm.title.trim(),
-        description: scheduleForm.description.trim(),
-        eventDate: scheduleForm.eventDate,
-      })
-      prependActivity(created)
-      const createdDate = parseLocalDate(created.eventDate)
-      if (createdDate) {
-        setSelectedYear(createdDate.getFullYear())
-        setSelectedMonth(createdDate.getMonth())
-      }
-      setScheduleNotice('일정을 추가했습니다.')
-      setScheduleForm((prev) => ({ ...prev, title: '', description: '', eventDate: '' }))
-    } catch (err) {
-      setSubmitError(err.message || '일정을 추가하지 못했습니다.')
-    } finally {
-      setSavingSchedule(false)
+  const handleDateCreated = (created) => {
+    prependActivity(created)
+    const createdDate = parseLocalDate(created.eventDate)
+    if (createdDate) {
+      setSelectedYear(createdDate.getFullYear())
+      setSelectedMonth(createdDate.getMonth())
+      setSelectedDay(createdDate.getDate())
     }
+  }
+
+  const eventMeta = (event) => {
+    const rangeLabel = event.range && event.startDate !== event.endDate
+      ? `${formatActivityDate(event.startDate)} ~ ${formatActivityDate(event.endDate)}`
+      : formatActivityDate(event.date)
+    return [rangeLabel, event.timeLabel, event.recurring ? '정기 모임' : '날짜 일정'].filter(Boolean).join(' · ')
   }
 
   return (
@@ -1993,7 +1989,10 @@ function ClubCalendarSection({ compact = false }) {
             <span>월</span>
             <select
               value={selectedMonth}
-              onChange={(event) => setSelectedMonth(Number(event.target.value))}
+              onChange={(event) => {
+                setSelectedDay(null)
+                setSelectedMonth(Number(event.target.value))
+              }}
               aria-label="월 선택"
             >
               {calendarMonthOptions.map((month) => (
@@ -2004,58 +2003,7 @@ function ClubCalendarSection({ compact = false }) {
         </div>
 
         {isAdmin && !isLocked && (
-          <form onSubmit={submitSchedule} className="calendar-admin-composer mt-8" aria-label="캘린더 일정 추가">
-            <div>
-              <p className="calendar-admin-composer-title">관리자 일정 추가</p>
-              <p className="calendar-admin-composer-copy">캘린더에 바로 표시할 정기 회의, 세미나, 발표, 모집 마감 일정을 등록합니다.</p>
-            </div>
-            <label>
-              <span>일정 제목</span>
-              <input
-                value={scheduleForm.title}
-                onChange={(event) => setScheduleForm((prev) => ({ ...prev, title: event.target.value }))}
-                maxLength={120}
-              />
-            </label>
-            <label>
-              <span>일정 날짜</span>
-              <input
-                type="date"
-                value={scheduleForm.eventDate}
-                onChange={(event) => setScheduleForm((prev) => ({ ...prev, eventDate: event.target.value }))}
-              />
-            </label>
-            <label>
-              <span>일정 분류</span>
-              <select
-                value={selectedScheduleCategory}
-                onChange={(event) => setScheduleForm((prev) => ({ ...prev, category: event.target.value }))}
-              >
-                {categories.map((category) => (
-                  <option key={category.key} value={category.key}>{category.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="calendar-admin-composer-wide">
-              <span>일정 설명</span>
-              <input
-                value={scheduleForm.description}
-                onChange={(event) => setScheduleForm((prev) => ({ ...prev, description: event.target.value }))}
-                maxLength={500}
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={savingSchedule || !scheduleForm.title.trim() || !scheduleForm.eventDate}
-            >
-              {savingSchedule ? '추가 중...' : '일정 추가'}
-            </button>
-            {scheduleNotice && <p className="calendar-admin-composer-notice">{scheduleNotice}</p>}
-          </form>
-        )}
-
-        {isAdmin && !isLocked && (
-          <RecurringScheduleManager categories={categories} />
+          <CalendarScheduleComposer onDateCreated={handleDateCreated} />
         )}
 
         <div className="club-calendar-shell mt-8">
@@ -2070,28 +2018,29 @@ function ClubCalendarSection({ compact = false }) {
             ))}
             {calendarMonth.days.map((day) => {
               const dayEvents = eventsByDay[day] || []
+              const { visible, overflowCount } = visibleDayEvents(dayEvents, 3)
               return (
-                <div key={day} className={`club-calendar-day ${dayEvents.length ? 'club-calendar-day-active' : ''}`}>
-                  <span className="club-calendar-day-number">{day}</span>
+                <div key={day} className={`club-calendar-day ${dayEvents.length ? 'club-calendar-day-active' : ''} ${selectedDay === day ? 'club-calendar-day-selected' : ''}`}>
+                  <button type="button" className="club-calendar-day-number" onClick={() => setSelectedDay(day)} aria-label={`${day}일 일정 보기`}>{day}</button>
                   <div className="club-calendar-events">
-                    {dayEvents.map((event) => (
+                    {visible.map((event) => (
                       <span
-                        key={event.id ? `${day}-${event.id}` : `${day}-${event.title}`}
-                        className={`club-calendar-event club-calendar-event-${(event.category || 'event').toLowerCase()} ${event.recurring ? 'club-calendar-event-recurring' : ''}`}
-                        title={event.recurring && (event.timeLabel || event.location)
-                          ? [event.title, event.timeLabel, event.location].filter(Boolean).join(' · ')
-                          : event.title}
+                        key={event.id}
+                        className={`club-calendar-event ${event.range ? `club-calendar-event-range club-calendar-event-range-${event.segment}` : ''} ${event.recurring ? 'club-calendar-event-recurring' : ''}`}
+                        title={[event.title, eventMeta(event)].filter(Boolean).join(' · ')}
                       >
                         {event.recurring && <Repeat size={11} aria-label="반복 일정" className="club-calendar-event-icon" />}
-                        <span className="club-calendar-event-title">{event.title}</span>
-                        {event.recurring && event.timeLabel && (
+                        <span className="club-calendar-event-title">{event.showTitle ? event.title : ''}</span>
+                        {event.showTitle && event.timeLabel && (
                           <span className="club-calendar-event-meta">{event.timeLabel}</span>
-                        )}
-                        {event.recurring && event.location && (
-                          <span className="club-calendar-event-meta">@{event.location}</span>
                         )}
                       </span>
                     ))}
+                    {overflowCount > 0 && (
+                      <button type="button" className="club-calendar-event-overflow" onClick={() => setSelectedDay(day)}>
+                        +{overflowCount}개
+                      </button>
+                    )}
                   </div>
                 </div>
               )
@@ -2100,6 +2049,30 @@ function ClubCalendarSection({ compact = false }) {
               <div key={`trailing-${index}`} className="club-calendar-day club-calendar-day-empty" aria-hidden="true" />
             ))}
           </div>
+          {selectedDay && selectedDayEvents.length > 0 && (
+            <div className="calendar-day-detail">
+              <div className="calendar-day-detail-header">
+                <div>
+                  <strong>{calendarMonth.title} {selectedDay}일</strong>
+                  <span>{selectedDayEvents.length}개 일정</span>
+                </div>
+                <button type="button" onClick={() => setSelectedDay(null)} aria-label="선택한 날짜 닫기">
+                  <X size={15} aria-hidden="true" />
+                </button>
+              </div>
+              <ul>
+                {selectedDayEvents.map((event) => (
+                  <li key={`detail-${event.id}`}>
+                    <span className="calendar-day-detail-dot" aria-hidden="true" />
+                    <div>
+                      <strong>{event.title}</strong>
+                      <span>{eventMeta(event)}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {(authLoading || loading) && (
             <div className="calendar-empty-state">
               동아리 일정을 불러오는 중입니다.
