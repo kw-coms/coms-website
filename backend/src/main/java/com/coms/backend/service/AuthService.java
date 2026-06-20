@@ -35,6 +35,7 @@ public class AuthService implements UserDetailsService {
     private static final int EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES = 1;
     private static final int PASSWORD_RESET_EXPIRES_MINUTES = 10;
     private static final int PASSWORD_RESET_RESEND_COOLDOWN_MINUTES = 1;
+    private static final int MAX_PASSWORD_RESET_ATTEMPTS = 5;
     private static final int MAX_FAILURES_PER_ID = 5;
     private static final int LOCKOUT_WINDOW_MINUTES = 15;
     private static final int GRADUATE_AFTER_YEARS = 7;
@@ -244,6 +245,7 @@ public class AuthService implements UserDetailsService {
                     String code = newSixDigitCode();
                     member.setPasswordResetCodeHash(passwordEncoder.encode(code));
                     member.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(PASSWORD_RESET_EXPIRES_MINUTES));
+                    member.resetPasswordResetAttempts();
                     memberRepository.save(member);
                     emailVerificationSender.sendPasswordResetCode(member.getEmail(), code);
                 });
@@ -268,10 +270,15 @@ public class AuthService implements UserDetailsService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호 재설정 인증코드가 만료되었습니다.");
         }
         if (!passwordEncoder.matches(code, member.getPasswordResetCodeHash())) {
+            if (member.incrementPasswordResetAttempts() >= MAX_PASSWORD_RESET_ATTEMPTS) {
+                clearPasswordResetCode(member);
+            }
+            memberRepository.save(member);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호 재설정 인증코드가 올바르지 않습니다.");
         }
 
         member.setPassword(passwordEncoder.encode(newPassword));
+        member.resetPasswordResetAttempts();
         clearPasswordResetCode(member);
         memberRepository.save(member);
     }

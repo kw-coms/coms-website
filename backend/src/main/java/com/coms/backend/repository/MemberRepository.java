@@ -13,6 +13,8 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     Optional<Member> findByEmailIgnoreCase(String email);
     List<Member> findByStudentIdIn(Collection<String> studentIds);
     List<Member> findByRole(Member.Role role);
+    long countByRole(Member.Role role);
+    boolean existsByRole(Member.Role role);
     boolean existsByStudentId(String studentId);
     boolean existsByEmail(String email);
 }
