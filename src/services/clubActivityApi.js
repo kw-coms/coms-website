@@ -85,6 +85,37 @@ export async function deleteClubActivityFile(id, fileId) {
   })
 }
 
+// ─── Recurring schedules (calendar expansion + admin CRUD) ───────────────────
+
+// Expanded recurring occurrences for a given month (1-12). Authenticated read.
+export async function listScheduleOccurrences(year, month) {
+  return request(`/api/club-activities/schedule?year=${year}&month=${month}`)
+}
+
+export async function listRecurringSchedules() {
+  return request('/api/admin/recurring-schedules')
+}
+
+export async function createRecurringSchedule(payload) {
+  return request('/api/admin/recurring-schedules', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateRecurringSchedule(id, payload) {
+  return request(`/api/admin/recurring-schedules/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteRecurringSchedule(id) {
+  return requestNoContent(`/api/admin/recurring-schedules/${id}`, {
+    method: 'DELETE',
+  })
+}
+
 // ─── Admin-managed categories (CRUD) ─────────────────────────────────────────
 
 export async function listClubActivityCategories() {

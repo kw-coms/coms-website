@@ -1723,6 +1723,111 @@
         },
         "type": "object"
       },
+      "RecurringScheduleRequest": {
+        "properties": {
+          "category": {
+            "maxLength": 40,
+            "minLength": 0,
+            "type": "string"
+          },
+          "daysOfWeek": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "description": {
+            "maxLength": 4000,
+            "minLength": 0,
+            "type": "string"
+          },
+          "endDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "endTime": {
+            "type": "string"
+          },
+          "location": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string"
+          },
+          "startDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 120,
+            "minLength": 0,
+            "type": "string"
+          }
+        },
+        "required": [
+          "endDate",
+          "startDate"
+        ],
+        "type": "object"
+      },
+      "RecurringScheduleResponse": {
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "categoryName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdByName": {
+            "type": "string"
+          },
+          "daysOfWeek": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "endDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "endTime": {
+            "type": "string"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "location": {
+            "type": "string"
+          },
+          "startDate": {
+            "format": "date",
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "RequestPasswordResetRequest": {
         "properties": {
           "email": {
@@ -1757,6 +1862,43 @@
         "properties": {
           "role": {
             "minLength": 1,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ScheduleOccurrenceResponse": {
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "categoryName": {
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "endTime": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "recurring": {
+            "type": "boolean"
+          },
+          "recurringScheduleId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "startTime": {
+            "type": "string"
+          },
+          "title": {
             "type": "string"
           }
         },
@@ -2140,7 +2282,7 @@
     },
     "/api/admin/club-activity-categories": {
       "post": {
-        "operationId": "create_6",
+        "operationId": "create_7",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2170,7 +2312,7 @@
     },
     "/api/admin/club-activity-categories/{id}": {
       "delete": {
-        "operationId": "delete_5",
+        "operationId": "delete_6",
         "parameters": [
           {
             "in": "path",
@@ -2192,7 +2334,7 @@
         ]
       },
       "patch": {
-        "operationId": "update_5",
+        "operationId": "update_6",
         "parameters": [
           {
             "in": "path",
@@ -2233,7 +2375,7 @@
     },
     "/api/admin/club-project-categories": {
       "post": {
-        "operationId": "create_5",
+        "operationId": "create_6",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2263,7 +2405,7 @@
     },
     "/api/admin/club-project-categories/{id}": {
       "delete": {
-        "operationId": "delete_4",
+        "operationId": "delete_5",
         "parameters": [
           {
             "in": "path",
@@ -2285,7 +2427,7 @@
         ]
       },
       "patch": {
-        "operationId": "update_4",
+        "operationId": "update_5",
         "parameters": [
           {
             "in": "path",
@@ -3027,6 +3169,120 @@
         ]
       }
     },
+    "/api/admin/recurring-schedules": {
+      "get": {
+        "operationId": "list_5",
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecurringScheduleResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "recurring-schedule-controller"
+        ]
+      },
+      "post": {
+        "operationId": "create_5",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecurringScheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringScheduleResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "recurring-schedule-controller"
+        ]
+      }
+    },
+    "/api/admin/recurring-schedules/{id}": {
+      "delete": {
+        "operationId": "delete_4",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "recurring-schedule-controller"
+        ]
+      },
+      "patch": {
+        "operationId": "update_4",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecurringScheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringScheduleResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "recurring-schedule-controller"
+        ]
+      }
+    },
     "/api/auth/email-verification/confirm": {
       "post": {
         "operationId": "confirmEmailVerification",
@@ -3469,7 +3725,7 @@
     },
     "/api/club-activities/categories": {
       "get": {
-        "operationId": "list_7",
+        "operationId": "list_8",
         "responses": {
           "200": {
             "content": {
@@ -3487,6 +3743,49 @@
         },
         "tags": [
           "club-activity-category-controller"
+        ]
+      }
+    },
+    "/api/club-activities/schedule": {
+      "get": {
+        "operationId": "occurrences",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "*/*": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScheduleOccurrenceResponse"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "recurring-schedule-controller"
         ]
       }
     },
@@ -4048,7 +4347,7 @@
     },
     "/api/club-projects/categories": {
       "get": {
-        "operationId": "list_6",
+        "operationId": "list_7",
         "responses": {
           "200": {
             "content": {
@@ -5731,7 +6030,7 @@
     },
     "/api/files/{id}": {
       "delete": {
-        "operationId": "delete_6",
+        "operationId": "delete_7",
         "parameters": [
           {
             "in": "path",
@@ -6524,7 +6823,7 @@
     },
     "/api/notifications": {
       "get": {
-        "operationId": "list_5",
+        "operationId": "list_6",
         "responses": {
           "200": {
             "content": {

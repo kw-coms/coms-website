@@ -1113,6 +1113,142 @@ select {
 	background: color-mix(in srgb, var(--app-accent) 18%, var(--app-surface));
 }
 
+.club-calendar-event-recurring {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+	border: 1px dashed color-mix(in srgb, var(--app-accent) 45%, transparent);
+}
+
+.club-calendar-event-icon {
+	flex: 0 0 auto;
+	opacity: 0.8;
+}
+
+.club-calendar-event-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.club-calendar-event-meta {
+	flex: 0 0 auto;
+	font-size: 0.68rem;
+	font-weight: 700;
+	opacity: 0.72;
+}
+
+/* Recurring (repeating) schedule admin manager */
+.recurring-schedule-list {
+	display: grid;
+	gap: 0.5rem;
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.recurring-schedule-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.6rem;
+	padding: 0.6rem 0.85rem;
+	background: var(--app-surface);
+}
+
+.recurring-schedule-item-main {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+	min-width: 0;
+}
+
+.recurring-schedule-item-title {
+	display: flex;
+	align-items: center;
+	gap: 0.3rem;
+	font-weight: 800;
+	font-size: 0.92rem;
+	color: var(--app-text);
+}
+
+.recurring-schedule-item-meta {
+	font-size: 0.78rem;
+	font-weight: 600;
+	color: var(--app-muted);
+}
+
+.recurring-schedule-item-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	flex: 0 0 auto;
+}
+
+.recurring-schedule-item-actions button {
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface-soft);
+	padding: 0.3rem 0.6rem;
+	font-size: 0.8rem;
+	font-weight: 700;
+	color: var(--app-text);
+	cursor: pointer;
+}
+
+.recurring-schedule-delete {
+	display: inline-flex;
+	align-items: center;
+	color: #dc2626;
+}
+
+.recurring-weekday-picker {
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.6rem;
+	padding: 0.55rem 0.75rem;
+}
+
+.recurring-weekday-picker legend {
+	font-size: 0.8rem;
+	font-weight: 700;
+	color: var(--app-muted);
+	padding: 0 0.3rem;
+}
+
+.recurring-weekday-options {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+}
+
+.recurring-weekday-option {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 999px;
+	padding: 0.25rem 0.6rem;
+	font-size: 0.85rem;
+	font-weight: 700;
+	cursor: pointer;
+	user-select: none;
+}
+
+.recurring-weekday-option.is-active {
+	background: color-mix(in srgb, var(--app-accent) 18%, var(--app-surface));
+	border-color: color-mix(in srgb, var(--app-accent) 55%, transparent);
+}
+
+.recurring-weekday-option input {
+	accent-color: var(--app-accent);
+}
+
+.recurring-cancel-edit {
+	background: var(--app-surface-soft);
+}
+
 .calendar-empty-state {
 	border-top: 1px solid var(--app-hairline);
 	background: color-mix(in srgb, var(--app-surface) 88%, var(--app-surface-soft));
