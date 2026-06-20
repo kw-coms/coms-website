@@ -6,6 +6,7 @@ const HEADER_ALIASES = {
   startTime: ['startTime', 'start_time', '시작시간', '시작 시간'],
   endTime: ['endTime', 'end_time', '종료시간', '종료 시간'],
   daysOfWeek: ['daysOfWeek', 'days_of_week', '요일', '반복요일', '반복 요일'],
+  colorHex: ['colorHex', 'color', '색상', '컬러'],
 }
 
 function parseCsvLine(line) {
@@ -53,6 +54,13 @@ function splitDays(value) {
     .filter(Boolean)
 }
 
+function normalizeColorHex(value) {
+  const trimmed = String(value || '').trim()
+  if (!trimmed) return ''
+  const normalized = trimmed.toLowerCase()
+  return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : null
+}
+
 export function parseScheduleCsv(text) {
   const lines = String(text || '')
     .split(/\r?\n/)
@@ -79,6 +87,7 @@ export function parseScheduleCsv(text) {
       startTime: String(raw.startTime || '').trim(),
       endTime: String(raw.endTime || '').trim(),
       daysOfWeek: splitDays(raw.daysOfWeek),
+      colorHex: normalizeColorHex(raw.colorHex),
     }
 
     if (!['date', 'recurring'].includes(row.type)) {
@@ -91,6 +100,10 @@ export function parseScheduleCsv(text) {
     }
     if (row.type === 'recurring' && (!row.endDate || row.daysOfWeek.length === 0)) {
       errors.push({ line: lineNumber, message: '정기 일정은 종료일과 반복 요일이 필요합니다.' })
+      return
+    }
+    if (row.colorHex === null) {
+      errors.push({ line: lineNumber, message: '색상은 #RRGGBB 형식이어야 합니다.' })
       return
     }
 

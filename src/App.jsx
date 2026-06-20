@@ -28,6 +28,7 @@ import {
   listClubActivities,
   getClubActivity,
   updateClubActivity,
+  uploadClubActivityImages,
   voteClubActivity,
   listClubActivityCategories,
   listScheduleOccurrences,
@@ -106,6 +107,8 @@ const WEEKDAY_SHORT = {
   MONDAY: '월', TUESDAY: '화', WEDNESDAY: '수', THURSDAY: '목',
   FRIDAY: '금', SATURDAY: '토', SUNDAY: '일',
 }
+const SCHEDULE_COLOR_OPTIONS = ['#0071e3', '#34c759', '#ff9f0a', '#8e5cf7', '#ff3b30', '#00a7c7']
+const DEFAULT_SCHEDULE_COLOR = SCHEDULE_COLOR_OPTIONS[0]
 const FONTS_QUERY_KEY = ['app-shell', 'fonts']
 const LATEST_NOTICE_QUERY_KEY = ['app-shell', 'latest-notice']
 
@@ -950,7 +953,7 @@ function AppearanceControl({
               <div className="appearance-font-row flex flex-wrap items-center gap-2 lg:justify-end" aria-label="폰트 설정">
                 <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">폰트</span>
                 <span className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-muted)]">
-                  {fontSelectionLocked ? '계정 저장 설정' : '게스트 임시 적용'}
+                  {fontSelectionLocked ? '내 계정에 저장됨' : '이 브라우저에 임시 적용'}
                 </span>
                 {fontSelectionLocked ? (
                   <button
@@ -958,7 +961,7 @@ function AppearanceControl({
                     onClick={onOpenAccountSettings}
                     className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface-elevated)] hover:text-[var(--app-text)] focus:outline-none focus:ring-2 focus:ring-[var(--app-accent)]/30"
                   >
-                    계정 설정에서 변경
+                    계정 설정에서 폰트 변경
                   </button>
                 ) : (
                   <select
@@ -1276,7 +1279,8 @@ function useScheduleOccurrences(year, month) {
 
 function ActivityLogSection({ compact = false }) {
   const navigate = useNavigate()
-  const { user, authLoading, records, loading, loadError, prependActivity, mergeActivity } = useClubActivities('활동 기록을 불러오지 못했습니다.')
+  const queryClient = useQueryClient()
+  const { user, authLoading, records, loading, loadError, prependActivity, mergeActivity, removeActivity } = useClubActivities('활동 기록을 불러오지 못했습니다.')
   const categories = useClubActivityCategories()
   const [votingId, setVotingId] = useState(null)
   const [viewedIds] = useState(() => new Set())
@@ -1288,9 +1292,14 @@ function ActivityLogSection({ compact = false }) {
     category: '',
     description: '',
   })
-  const [activityImage, setActivityImage] = useState(null)
+  const [activityImages, setActivityImages] = useState([])
   const [savingActivity, setSavingActivity] = useState(false)
   const [activityNotice, setActivityNotice] = useState('')
+  const [selectedActivityId, setSelectedActivityId] = useState(null)
+  const [activityEditor, setActivityEditor] = useState(null)
+  const [editImages, setEditImages] = useState([])
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [deletingActivity, setDeletingActivity] = useState(false)
   // Search + filter state (mirrors notices/resources/community list patterns).
   const [searchText, setSearchText] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('ALL')
@@ -1314,9 +1323,24 @@ function ActivityLogSection({ compact = false }) {
     return true
   })
   const visibleItems = compact ? filteredItems.slice(0, 3) : filteredItems
+  const selectedActivity = allActivityItems.find((item) => item.id === selectedActivityId) || null
   const isLocked = !authLoading && !user
   const isAdmin = user?.role === 'ADMIN'
   const hasActiveFilters = Boolean(normalizedSearch) || categoryFilter !== 'ALL' || Boolean(fromDate) || Boolean(toDate)
+  const selectedEditorCategory = activityEditor?.category || categories[0]?.key || ''
+
+  const activityImagesFor = (item) => {
+    const infos = Array.isArray(item?.imageInfos) ? item.imageInfos.filter((image) => image?.url) : []
+    if (infos.length > 0) return infos
+    if (item?.imageUrl) {
+      return [{
+        id: `${item.id}-legacy-image`,
+        url: item.imageUrl,
+        originalName: item.imageOriginalName || '활동 사진',
+      }]
+    }
+    return []
+  }
 
   const submitActivity = async (event) => {
     event.preventDefault()
@@ -1332,12 +1356,15 @@ function ActivityLogSection({ compact = false }) {
         title: activityForm.title.trim(),
         description: activityForm.description.trim(),
         eventDate: activityForm.eventDate,
-        image: activityImage,
       })
       prependActivity(created)
+      if (activityImages.length > 0) {
+        await uploadClubActivityImages(created.id, activityImages)
+        await queryClient.invalidateQueries({ queryKey: CLUB_ACTIVITIES_QUERY_KEY })
+      }
       setActivityNotice('활동 기록을 추가했습니다.')
       setActivityForm((prev) => ({ ...prev, title: '', eventDate: '', description: '' }))
-      setActivityImage(null)
+      setActivityImages([])
       form.reset()
     } catch (err) {
       setSubmitError(err.message || '활동 기록을 추가하지 못했습니다.')
@@ -1358,6 +1385,79 @@ function ActivityLogSection({ compact = false }) {
     }
   }
 
+  const openActivityDetail = (item) => {
+    setSelectedActivityId(item.id)
+    setActivityEditor(null)
+    setEditImages([])
+    setSubmitError('')
+    registerActivityView(item)
+  }
+
+  const closeActivityDetail = () => {
+    setSelectedActivityId(null)
+    setActivityEditor(null)
+    setEditImages([])
+    setSavingEdit(false)
+    setDeletingActivity(false)
+  }
+
+  const startActivityEdit = () => {
+    if (!selectedActivity) return
+    setActivityEditor({
+      title: selectedActivity.title || '',
+      eventDate: selectedActivity.eventDate || '',
+      category: selectedActivity.category || categories[0]?.key || '',
+      description: selectedActivity.description || '',
+    })
+    setEditImages([])
+    setSubmitError('')
+  }
+
+  const saveActivityEdit = async (event) => {
+    event.preventDefault()
+    if (!selectedActivity || !activityEditor?.title.trim() || !activityEditor.eventDate) return
+    setSavingEdit(true)
+    setSubmitError('')
+    try {
+      const updated = await updateClubActivity(selectedActivity.id, {
+        kind: 'ACTIVITY',
+        category: selectedEditorCategory,
+        title: activityEditor.title.trim(),
+        description: activityEditor.description.trim(),
+        eventDate: activityEditor.eventDate,
+      })
+      mergeActivity(updated)
+      if (editImages.length > 0) {
+        await uploadClubActivityImages(selectedActivity.id, editImages)
+        await queryClient.invalidateQueries({ queryKey: CLUB_ACTIVITIES_QUERY_KEY })
+      }
+      setActivityEditor(null)
+      setEditImages([])
+      setActivityNotice('활동 기록을 수정했습니다.')
+    } catch (err) {
+      setSubmitError(err.message || '활동 기록을 수정하지 못했습니다.')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  const deleteSelectedActivity = async () => {
+    if (!selectedActivity || deletingActivity) return
+    if (!window.confirm('이 활동 기록을 삭제할까요?')) return
+    setDeletingActivity(true)
+    setSubmitError('')
+    try {
+      await deleteClubActivity(selectedActivity.id)
+      removeActivity(selectedActivity.id)
+      closeActivityDetail()
+      setActivityNotice('활동 기록을 삭제했습니다.')
+    } catch (err) {
+      setSubmitError(err.message || '활동 기록을 삭제하지 못했습니다.')
+    } finally {
+      setDeletingActivity(false)
+    }
+  }
+
   const handleActivityVote = async (item) => {
     if (!user || votingId) return
     setVotingId(item.id)
@@ -1372,254 +1472,375 @@ function ActivityLogSection({ compact = false }) {
   }
 
   return (
-    <section id="activity-log" className={`activity-proof-section ${compact ? 'activity-proof-section-compact' : ''} scroll-mt-24 bg-[var(--app-surface)] px-5 py-12 sm:py-16`}>
-      <div className="mx-auto max-w-7xl">
-        <div className="grid gap-8 lg:grid-cols-[0.62fr_1fr] lg:items-end">
-          <div>
-            <p className="apple-eyebrow">Activity log</p>
-            <h2 className="apple-display mt-3 text-4xl sm:text-5xl">실제로 이어지는 활동 기록</h2>
-            <p className="apple-copy mt-4 max-w-2xl text-lg">
-              신입생이 가장 먼저 궁금해하는 것은 지금도 활동이 이어지는지입니다. 검증된 활동 사진과 기록이 등록되면 날짜, 활동명, 후기 흐름으로 보여줍니다.
-            </p>
-          </div>
-          <div className="activity-proof-note apple-soft-panel px-5 py-5">
-            <p className="text-sm font-semibold text-[var(--app-text)]">기록 방식</p>
-            <p className="mt-2 text-sm font-medium leading-6 text-[var(--app-muted)]">
-              세미나, 스터디, 프로젝트 발표, MT/행사, 수상/성과처럼 실제 확인된 항목만 활동 로그에 노출합니다.
-            </p>
-          </div>
-        </div>
-
-        {isAdmin && !isLocked && (
-          <form onSubmit={submitActivity} className="activity-admin-composer mt-8" aria-label="활동 기록 추가">
+    <>
+      <section id="activity-log" className={`activity-proof-section ${compact ? 'activity-proof-section-compact' : ''} scroll-mt-24 bg-[var(--app-surface)] px-5 py-12 sm:py-16`}>
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-8 lg:grid-cols-[0.62fr_1fr] lg:items-end">
             <div>
-              <p className="activity-admin-composer-title">관리자 활동 기록 작성</p>
-              <p className="activity-admin-composer-copy">세미나, 스터디, 프로젝트 발표, MT/행사, 성과 기록을 활동 로그에 바로 추가합니다.</p>
+              <p className="apple-eyebrow">Activity log</p>
+              <h2 className="apple-display mt-3 text-4xl sm:text-5xl">실제로 이어지는 활동 기록</h2>
+              <p className="apple-copy mt-4 max-w-2xl text-lg">
+                신입생이 가장 먼저 궁금해하는 것은 지금도 활동이 이어지는지입니다. 검증된 활동 사진과 기록이 등록되면 날짜, 활동명, 후기 흐름으로 보여줍니다.
+              </p>
             </div>
-            <label>
-              <span>활동 제목</span>
-              <input
-                value={activityForm.title}
-                onChange={(event) => setActivityForm((prev) => ({ ...prev, title: event.target.value }))}
-                maxLength={120}
-              />
-            </label>
-            <label>
-              <span>활동 날짜</span>
-              <input
-                type="date"
-                value={activityForm.eventDate}
-                onChange={(event) => setActivityForm((prev) => ({ ...prev, eventDate: event.target.value }))}
-              />
-            </label>
-            <label>
-              <span>활동 분류</span>
-              <select
-                value={selectedCategory}
-                onChange={(event) => setActivityForm((prev) => ({ ...prev, category: event.target.value }))}
-              >
-                {categories.map((category) => (
-                  <option key={category.key} value={category.key}>{category.name}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>활동 사진</span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) => setActivityImage(event.target.files?.[0] || null)}
-              />
-            </label>
-            <label className="activity-admin-composer-wide">
-              <span>활동 내용</span>
-              <textarea
-                value={activityForm.description}
-                onChange={(event) => setActivityForm((prev) => ({ ...prev, description: event.target.value }))}
-                maxLength={500}
-                rows={3}
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={savingActivity || !activityForm.title.trim() || !activityForm.eventDate}
-            >
-              {savingActivity ? '추가 중...' : '활동 기록 추가'}
-            </button>
-            {activityNotice && <p className="activity-admin-composer-notice">{activityNotice}</p>}
-          </form>
-        )}
+            <div className="activity-proof-note apple-soft-panel px-5 py-5">
+              <p className="text-sm font-semibold text-[var(--app-text)]">기록 방식</p>
+              <p className="mt-2 text-sm font-medium leading-6 text-[var(--app-muted)]">
+                세미나, 스터디, 프로젝트 발표, MT/행사, 수상/성과처럼 실제 확인된 항목만 활동 로그에 노출합니다.
+              </p>
+            </div>
+          </div>
 
-        {!compact && !isLocked && !authLoading && !loading && !loadError && (
-          <div className="activity-log-filters mt-8 flex flex-wrap items-end gap-3">
-            <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
-              <span>검색</span>
-              <input
-                type="search"
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-                placeholder="제목, 내용, 작성자로 검색"
-                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
-              <span>분류</span>
-              <select
-                value={categoryFilter}
-                onChange={(event) => setCategoryFilter(event.target.value)}
-                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
-              >
-                <option value="ALL">전체 분류</option>
-                {categories.map((category) => (
-                  <option key={category.key} value={category.key}>{category.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
-              <span>시작일</span>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(event) => setFromDate(event.target.value)}
-                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
-              <span>종료일</span>
-              <input
-                type="date"
-                value={toDate}
-                onChange={(event) => setToDate(event.target.value)}
-                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
-              />
-            </label>
-            {hasActiveFilters && (
+          {isAdmin && !isLocked && (
+            <form onSubmit={submitActivity} className="activity-admin-composer mt-8" aria-label="활동 기록 추가">
+              <div>
+                <p className="activity-admin-composer-title">관리자 활동 기록 작성</p>
+                <p className="activity-admin-composer-copy">세미나, 스터디, 프로젝트 발표, MT/행사, 성과 기록을 활동 로그에 바로 추가합니다.</p>
+              </div>
+              <label>
+                <span>활동 제목</span>
+                <input
+                  value={activityForm.title}
+                  onChange={(event) => setActivityForm((prev) => ({ ...prev, title: event.target.value }))}
+                  maxLength={120}
+                />
+              </label>
+              <label>
+                <span>활동 날짜</span>
+                <input
+                  type="date"
+                  value={activityForm.eventDate}
+                  onChange={(event) => setActivityForm((prev) => ({ ...prev, eventDate: event.target.value }))}
+                />
+              </label>
+              <label>
+                <span>활동 분류</span>
+                <select
+                  value={selectedCategory}
+                  onChange={(event) => setActivityForm((prev) => ({ ...prev, category: event.target.value }))}
+                >
+                  {categories.map((category) => (
+                    <option key={category.key} value={category.key}>{category.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>활동 사진</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(event) => setActivityImages(Array.from(event.target.files || []))}
+                />
+              </label>
+              <label className="activity-admin-composer-wide">
+                <span>활동 내용</span>
+                <textarea
+                  value={activityForm.description}
+                  onChange={(event) => setActivityForm((prev) => ({ ...prev, description: event.target.value }))}
+                  maxLength={500}
+                  rows={3}
+                />
+              </label>
               <button
-                type="button"
-                onClick={() => { setSearchText(''); setCategoryFilter('ALL'); setFromDate(''); setToDate('') }}
-                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--app-accent-text)] transition hover:bg-[var(--app-surface-soft)]"
+                type="submit"
+                disabled={savingActivity || !activityForm.title.trim() || !activityForm.eventDate}
               >
-                필터 초기화
+                {savingActivity ? '추가 중...' : '활동 기록 추가'}
               </button>
-            )}
-          </div>
-        )}
+              {activityNotice && <p className="activity-admin-composer-notice">{activityNotice}</p>}
+            </form>
+          )}
 
-        {authLoading || loading ? (
-          <div className="activity-empty-state mt-8">
-            <Sparkles size={22} aria-hidden="true" />
-            <div>
-              <h3>활동 기록을 불러오는 중...</h3>
-              <p>회원 상태와 등록된 활동 기록을 확인하고 있습니다.</p>
+          {!compact && !isLocked && !authLoading && !loading && !loadError && (
+            <div className="activity-log-filters mt-8 flex flex-wrap items-end gap-3">
+              <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
+                <span>검색</span>
+                <input
+                  type="search"
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  placeholder="제목, 내용, 작성자로 검색"
+                  className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
+                <span>분류</span>
+                <select
+                  value={categoryFilter}
+                  onChange={(event) => setCategoryFilter(event.target.value)}
+                  className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
+                >
+                  <option value="ALL">전체 분류</option>
+                  {categories.map((category) => (
+                    <option key={category.key} value={category.key}>{category.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
+                <span>시작일</span>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(event) => setFromDate(event.target.value)}
+                  className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
+                <span>종료일</span>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(event) => setToDate(event.target.value)}
+                  className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
+                />
+              </label>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchText(''); setCategoryFilter('ALL'); setFromDate(''); setToDate('') }}
+                  className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--app-accent-text)] transition hover:bg-[var(--app-surface-soft)]"
+                >
+                  필터 초기화
+                </button>
+              )}
             </div>
-          </div>
-        ) : isLocked ? (
-          <div className="activity-empty-state activity-locked-state mt-8">
-            <Sparkles size={22} aria-hidden="true" />
-            <div>
-              <h3>로그인 하세요</h3>
-              <p>회원 로그인 후 활동 기록과 일정을 확인할 수 있습니다.</p>
-              <button type="button" onClick={() => navigate('/login')} className="apple-action-primary mt-3 inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">
-                로그인
-              </button>
+          )}
+
+          {authLoading || loading ? (
+            <div className="activity-empty-state mt-8">
+              <Sparkles size={22} aria-hidden="true" />
+              <div>
+                <h3>활동 기록을 불러오는 중...</h3>
+                <p>회원 상태와 등록된 활동 기록을 확인하고 있습니다.</p>
+              </div>
             </div>
-          </div>
-        ) : error ? (
-          <div className="activity-empty-state mt-8">
-            <Sparkles size={22} aria-hidden="true" />
-            <div>
-              <h3>활동 기록을 불러오지 못했습니다.</h3>
-              <p>{error}</p>
+          ) : isLocked ? (
+            <div className="activity-empty-state activity-locked-state mt-8">
+              <Sparkles size={22} aria-hidden="true" />
+              <div>
+                <h3>로그인 하세요</h3>
+                <p>회원 로그인 후 활동 기록과 일정을 확인할 수 있습니다.</p>
+                <button type="button" onClick={() => navigate('/login')} className="apple-action-primary mt-3 inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">
+                  로그인
+                </button>
+              </div>
             </div>
-          </div>
-        ) : visibleItems.length > 0 ? (
-          <div className="activity-log-grid mt-8">
-            {visibleItems.map((item) => (
-              <article
-                key={item.id}
-                className="activity-log-card activity-log-card-blue"
-                onMouseEnter={() => registerActivityView(item)}
-                onFocus={() => registerActivityView(item)}
-              >
-                <div className={`activity-log-photo ${item.imageUrl ? 'activity-log-photo-has-image' : ''}`}>
-                  {item.imageUrl ? (
-                    <img src={item.imageUrl} alt="" className="activity-log-image" loading="lazy" />
-                  ) : (
-                    <>
-                      <div className="activity-log-photo-bar" aria-hidden="true">
-                        <span />
-                        <span />
-                        <span />
-                      </div>
-                      <div className="activity-log-photo-mark" aria-hidden="true">
-                        <Sparkles size={24} />
-                      </div>
-                    </>
-                  )}
-                  <div className="activity-log-photo-caption">
-                    <span>{categoryLabel(item.category, item.categoryName)}</span>
-                    <strong>{formatActivityDate(item.eventDate)}</strong>
-                  </div>
-                </div>
-                <div className="activity-log-body">
-                  <p className="activity-log-term">{item.createdByName || 'COM\'s'}</p>
-                  <h3>{item.title}</h3>
-                  {item.description && <p>{item.description}</p>}
-                  <div className="activity-log-tags" aria-label={`${item.title} 태그`}>
-                    <span>{categoryLabel(item.category, item.categoryName)}</span>
-                    {(item.imageInfos?.length ?? 0) > 0 && <span>사진 {item.imageInfos.length}장</span>}
-                    {(item.fileInfos?.length ?? 0) > 0 && <span>첨부 {item.fileInfos.length}개</span>}
-                  </div>
-                  {(item.fileInfos?.length ?? 0) > 0 && (
-                    <ul className="mt-2 flex flex-col gap-1 text-xs">
-                      {item.fileInfos.map((file) => (
-                        <li key={file.id}>
-                          <a
-                            href={file.url}
-                            className="inline-flex items-center gap-1 font-semibold text-[var(--app-accent-text)] underline-offset-2 hover:underline"
-                          >
-                            <Download size={13} aria-hidden="true" />
-                            {file.originalName || '첨부파일'}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <div className="mt-3 flex items-center gap-3 text-xs font-semibold text-[var(--app-muted)]">
-                    <span>조회 {item.viewCount ?? 0}</span>
+          ) : error ? (
+            <div className="activity-empty-state mt-8">
+              <Sparkles size={22} aria-hidden="true" />
+              <div>
+                <h3>활동 기록을 불러오지 못했습니다.</h3>
+                <p>{error}</p>
+              </div>
+            </div>
+          ) : visibleItems.length > 0 ? (
+            <div className="activity-log-grid mt-8">
+              {visibleItems.map((item) => {
+                const itemImages = activityImagesFor(item)
+                const previewImage = itemImages[0]?.url || ''
+                return (
+                  <article key={item.id} className="activity-log-card activity-log-card-blue">
                     <button
                       type="button"
-                      onClick={() => handleActivityVote(item)}
-                      disabled={votingId === item.id}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black transition disabled:opacity-50 ${item.myVote === 1 ? 'border-[var(--app-accent)] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
+                      className={`activity-log-photo ${previewImage ? 'activity-log-photo-has-image' : ''}`}
+                      onClick={() => openActivityDetail(item)}
+                      aria-label={`${item.title} 내용 보기`}
                     >
-                      <ThumbsUp size={14} />
-                      개추 {item.upvotes ?? 0}
+                      {previewImage ? (
+                        <img src={previewImage} alt="" className="activity-log-image" loading="lazy" />
+                      ) : (
+                        <>
+                          <div className="activity-log-photo-bar" aria-hidden="true">
+                            <span />
+                            <span />
+                            <span />
+                          </div>
+                          <div className="activity-log-photo-mark" aria-hidden="true">
+                            <Sparkles size={24} />
+                          </div>
+                        </>
+                      )}
+                      <span className="activity-log-photo-caption">
+                        <span>{categoryLabel(item.category, item.categoryName)}</span>
+                        <strong>{formatActivityDate(item.eventDate)}</strong>
+                      </span>
                     </button>
-                  </div>
+                    <div className="activity-log-body">
+                      <p className="activity-log-term">{item.createdByName || 'COM\'s'}</p>
+                      <h3>
+                        <button type="button" className="activity-log-title-button" onClick={() => openActivityDetail(item)}>
+                          {item.title}
+                        </button>
+                      </h3>
+                      {item.description && <p>{item.description}</p>}
+                      <div className="activity-log-tags" aria-label={`${item.title} 태그`}>
+                        <span>{categoryLabel(item.category, item.categoryName)}</span>
+                        {itemImages.length > 0 && <span>사진 {itemImages.length}장</span>}
+                        {(item.fileInfos?.length ?? 0) > 0 && <span>첨부 {item.fileInfos.length}개</span>}
+                      </div>
+                      <div className="activity-log-stats" aria-label={`${item.title} 반응`}>
+                        <span>조회 {item.viewCount ?? 0}</span>
+                        <span><ThumbsUp size={13} aria-hidden="true" />개추 {item.upvotes ?? 0}</span>
+                      </div>
+                      <button type="button" className="activity-log-open-button" onClick={() => openActivityDetail(item)}>
+                        내용 보기
+                      </button>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          ) : hasActiveFilters ? (
+            <div className="activity-empty-state mt-8">
+              <Sparkles size={22} aria-hidden="true" />
+              <div>
+                <h3>검색 결과가 없습니다.</h3>
+                <p>다른 검색어나 필터 조건으로 다시 시도해보세요.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="activity-empty-state mt-8">
+              <Sparkles size={22} aria-hidden="true" />
+              <div>
+                <h3>등록된 활동 기록이 없습니다.</h3>
+                <p>확인된 활동 사진, 후기, 성과 기록이 추가되면 이 영역에 바로 표시됩니다.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {selectedActivity && createPortal(
+        <div className="activity-detail-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) closeActivityDetail()
+        }}>
+          <article
+            className="activity-detail-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="activity-detail-title"
+          >
+            <header className="activity-detail-header">
+              <div>
+                <p className="activity-detail-eyebrow">
+                  {categoryLabel(selectedActivity.category, selectedActivity.categoryName)} · {formatActivityDate(selectedActivity.eventDate)}
+                </p>
+                <h3 id="activity-detail-title">{selectedActivity.title}</h3>
+                <p>{selectedActivity.createdByName || 'COM\'s'} 작성</p>
+              </div>
+              <button type="button" className="activity-detail-close" onClick={closeActivityDetail} aria-label="활동 기록 닫기">
+                <X size={18} aria-hidden="true" />
+              </button>
+            </header>
+
+            {activityEditor ? (
+              <form onSubmit={saveActivityEdit} className="activity-detail-editor" aria-label="활동 기록 수정">
+                <label>
+                  <span>활동 제목</span>
+                  <input
+                    value={activityEditor.title}
+                    onChange={(event) => setActivityEditor((prev) => ({ ...prev, title: event.target.value }))}
+                    maxLength={120}
+                  />
+                </label>
+                <label>
+                  <span>활동 날짜</span>
+                  <input
+                    type="date"
+                    value={activityEditor.eventDate}
+                    onChange={(event) => setActivityEditor((prev) => ({ ...prev, eventDate: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  <span>활동 분류</span>
+                  <select
+                    value={selectedEditorCategory}
+                    onChange={(event) => setActivityEditor((prev) => ({ ...prev, category: event.target.value }))}
+                  >
+                    {categories.map((category) => (
+                      <option key={category.key} value={category.key}>{category.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>사진 추가</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(event) => setEditImages(Array.from(event.target.files || []))}
+                  />
+                </label>
+                <label className="activity-detail-editor-wide">
+                  <span>활동 내용</span>
+                  <textarea
+                    value={activityEditor.description}
+                    onChange={(event) => setActivityEditor((prev) => ({ ...prev, description: event.target.value }))}
+                    maxLength={500}
+                    rows={5}
+                  />
+                </label>
+                <div className="activity-detail-editor-actions">
+                  <button type="button" className="activity-detail-secondary" onClick={() => setActivityEditor(null)} disabled={savingEdit}>
+                    취소
+                  </button>
+                  <button type="submit" disabled={savingEdit || !activityEditor.title.trim() || !activityEditor.eventDate}>
+                    {savingEdit ? '저장 중...' : '수정 저장'}
+                  </button>
                 </div>
-              </article>
-            ))}
-          </div>
-        ) : hasActiveFilters ? (
-          <div className="activity-empty-state mt-8">
-            <Sparkles size={22} aria-hidden="true" />
-            <div>
-              <h3>검색 결과가 없습니다.</h3>
-              <p>다른 검색어나 필터 조건으로 다시 시도해보세요.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="activity-empty-state mt-8">
-            <Sparkles size={22} aria-hidden="true" />
-            <div>
-              <h3>등록된 활동 기록이 없습니다.</h3>
-              <p>확인된 활동 사진, 후기, 성과 기록이 추가되면 이 영역에 바로 표시됩니다.</p>
-            </div>
-          </div>
-        )}
-      </div>
-    </section>
+              </form>
+            ) : (
+              <>
+                {activityImagesFor(selectedActivity).length > 0 && (
+                  <div className="activity-detail-gallery" aria-label="활동 사진">
+                    {activityImagesFor(selectedActivity).map((image, index) => (
+                      <img key={image.id || image.url || index} src={image.url} alt="" loading="lazy" />
+                    ))}
+                  </div>
+                )}
+                {selectedActivity.description && (
+                  <p className="activity-detail-description">{selectedActivity.description}</p>
+                )}
+                {(selectedActivity.fileInfos?.length ?? 0) > 0 && (
+                  <ul className="activity-detail-files">
+                    {selectedActivity.fileInfos.map((file) => (
+                      <li key={file.id}>
+                        <a href={file.url}>
+                          <Download size={14} aria-hidden="true" />
+                          {file.originalName || '첨부파일'}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="activity-detail-actions">
+                  <span>조회 {selectedActivity.viewCount ?? 0}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleActivityVote(selectedActivity)}
+                    disabled={votingId === selectedActivity.id}
+                    className={selectedActivity.myVote === 1 ? 'is-active' : ''}
+                  >
+                    <ThumbsUp size={15} aria-hidden="true" />
+                    개추 {selectedActivity.upvotes ?? 0}
+                  </button>
+                  {isAdmin && (
+                    <div className="activity-detail-admin-actions">
+                      <button type="button" onClick={startActivityEdit}>수정</button>
+                      <button type="button" onClick={deleteSelectedActivity} disabled={deletingActivity}>
+                        {deletingActivity ? '삭제 중...' : '삭제'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </article>
+        </div>,
+        document.body,
+      )}
+    </>
   )
 }
 
@@ -1631,6 +1852,7 @@ const EMPTY_CALENDAR_SCHEDULE_FORM = {
   daysOfWeek: [],
   startTime: '',
   endTime: '',
+  colorHex: DEFAULT_SCHEDULE_COLOR,
 }
 
 function calendarFormFromDateSchedule(schedule) {
@@ -1645,6 +1867,7 @@ function calendarFormFromDateSchedule(schedule) {
     daysOfWeek: [],
     startTime: schedule.startTime || '',
     endTime: schedule.endTime || '',
+    colorHex: schedule.colorHex || DEFAULT_SCHEDULE_COLOR,
   }
 }
 
@@ -1703,6 +1926,7 @@ function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSch
       daysOfWeek: prev.mode === 'recurring' ? prev.daysOfWeek : [],
       startTime: prev.startTime,
       endTime: prev.endTime,
+      colorHex: prev.colorHex || DEFAULT_SCHEDULE_COLOR,
     }))
     setEditingRecurringId(null)
     onDateEditDone?.()
@@ -1718,6 +1942,7 @@ function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSch
       daysOfWeek: Array.isArray(schedule.daysOfWeek) ? schedule.daysOfWeek : [],
       startTime: schedule.startTime || '',
       endTime: schedule.endTime || '',
+      colorHex: schedule.colorHex || DEFAULT_SCHEDULE_COLOR,
     })
     setNotice('')
     setError('')
@@ -1761,6 +1986,7 @@ function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSch
           endDate,
           startTime: form.startTime,
           endTime: form.endTime,
+          colorHex: form.colorHex,
           description: editingDateSchedule?.description || '',
         }
         if (editingDateSchedule?.id) {
@@ -1781,6 +2007,7 @@ function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSch
           daysOfWeek: form.daysOfWeek,
           startTime: form.startTime || null,
           endTime: form.endTime || null,
+          colorHex: form.colorHex,
           location: null,
           category: null,
         }
@@ -1836,6 +2063,7 @@ function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSch
             endDate: row.endDate || row.startDate,
             startTime: row.startTime,
             endTime: row.endTime,
+            colorHex: row.colorHex,
           })
           onDateCreated?.(created)
         } else {
@@ -1847,6 +2075,7 @@ function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSch
             daysOfWeek: row.daysOfWeek,
             startTime: row.startTime || null,
             endTime: row.endTime || null,
+            colorHex: row.colorHex,
             location: null,
             category: null,
           })
@@ -1930,8 +2159,8 @@ function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSch
           />
         </label>
         {form.mode === 'recurring' && (
-          <fieldset className="calendar-admin-composer-wide recurring-weekday-picker">
-            <legend>반복 요일</legend>
+          <div className="calendar-admin-composer-wide recurring-weekday-picker" role="group" aria-labelledby="recurring-weekday-label">
+            <span id="recurring-weekday-label" className="recurring-weekday-label">반복 요일</span>
             <div className="recurring-weekday-options">
               {WEEKDAY_OPTIONS.map((weekday) => (
                 <label key={weekday.value} className={`recurring-weekday-option ${form.daysOfWeek.includes(weekday.value) ? 'is-active' : ''}`}>
@@ -1944,7 +2173,7 @@ function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSch
                 </label>
               ))}
             </div>
-          </fieldset>
+          </div>
         )}
         <label>
           <span>시작 시간 (선택)</span>
@@ -1962,6 +2191,30 @@ function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSch
             onChange={(event) => setForm((prev) => ({ ...prev, endTime: event.target.value }))}
           />
         </label>
+        <div className="calendar-color-picker">
+          <span>일정 색상</span>
+          <div className="calendar-color-swatches" aria-label="빠른 색상 선택">
+            {SCHEDULE_COLOR_OPTIONS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={form.colorHex === color ? 'is-active' : ''}
+                style={{ '--calendar-swatch-color': color }}
+                onClick={() => setForm((prev) => ({ ...prev, colorHex: color }))}
+                aria-label={`${color} 색상 선택`}
+                aria-pressed={form.colorHex === color}
+                disabled={saving}
+              />
+            ))}
+          </div>
+          <input
+            aria-label="일정 색상"
+            type="color"
+            value={form.colorHex || DEFAULT_SCHEDULE_COLOR}
+            onChange={(event) => setForm((prev) => ({ ...prev, colorHex: event.target.value }))}
+            disabled={saving}
+          />
+        </div>
         <div className="calendar-admin-composer-actions">
           <button
             type="submit"
@@ -2046,6 +2299,7 @@ function ClubCalendarSection({ compact = false }) {
   const [selectedYear, setSelectedYear] = useState(initialCalendarDate.getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(initialCalendarDate.getMonth())
   const [selectedDay, setSelectedDay] = useState(null)
+  const [selectedEventId, setSelectedEventId] = useState(null)
   const [editingDateSchedule, setEditingDateSchedule] = useState(null)
   const [calendarNotice, setCalendarNotice] = useState('')
   const [calendarActionError, setCalendarActionError] = useState('')
@@ -2064,6 +2318,7 @@ function ClubCalendarSection({ compact = false }) {
   const isLocked = !authLoading && !user
   const isAdmin = user?.role === 'ADMIN'
   const selectedDayEvents = selectedDay ? eventsByDay[selectedDay] || [] : []
+  const activeSelectedEventId = selectedDayEvents.some((event) => event.id === selectedEventId) ? selectedEventId : null
   const monthSummary = buildMonthEventSummary({
     eventsByDay,
     calendarMonth,
@@ -2075,7 +2330,18 @@ function ClubCalendarSection({ compact = false }) {
     const nextYear = Number(value)
     if (!Number.isFinite(nextYear)) return
     setSelectedDay(null)
+    setSelectedEventId(null)
     setSelectedYear(Math.min(2100, Math.max(2000, nextYear)))
+  }
+
+  const selectCalendarDay = (day) => {
+    setSelectedDay(day)
+    setSelectedEventId(null)
+  }
+
+  const selectCalendarEvent = (day, event) => {
+    setSelectedDay(day)
+    setSelectedEventId(event.id)
   }
 
   const refreshOccurrences = () => {
@@ -2089,6 +2355,7 @@ function ClubCalendarSection({ compact = false }) {
       setSelectedYear(createdDate.getFullYear())
       setSelectedMonth(createdDate.getMonth())
       setSelectedDay(createdDate.getDate())
+      setSelectedEventId(null)
     }
   }
 
@@ -2100,6 +2367,7 @@ function ClubCalendarSection({ compact = false }) {
       setSelectedYear(updatedDate.getFullYear())
       setSelectedMonth(updatedDate.getMonth())
       setSelectedDay(updatedDate.getDate())
+      setSelectedEventId(null)
     }
   }
 
@@ -2120,6 +2388,7 @@ function ClubCalendarSection({ compact = false }) {
       await deleteClubActivity(event.activityId)
       removeActivity(event.activityId)
       setEditingDateSchedule(null)
+      setSelectedEventId(null)
       setCalendarNotice('날짜 일정을 삭제했습니다.')
     } catch (err) {
       setCalendarActionError(err.message || '날짜 일정을 삭제하지 못했습니다.')
@@ -2238,6 +2507,7 @@ function ClubCalendarSection({ compact = false }) {
               value={selectedMonth}
               onChange={(event) => {
                 setSelectedDay(null)
+                setSelectedEventId(null)
                 setSelectedMonth(Number(event.target.value))
               }}
               aria-label="월 선택"
@@ -2291,15 +2561,25 @@ function ClubCalendarSection({ compact = false }) {
               const { visible, overflowCount } = visibleDayEvents(dayEvents, 3)
               return (
                 <div key={day} className={`club-calendar-day ${dayEvents.length ? 'club-calendar-day-active' : ''} ${selectedDay === day ? 'club-calendar-day-selected' : ''}`}>
-                  <button type="button" className="club-calendar-day-number" onClick={() => setSelectedDay(day)} aria-label={`${day}일 일정 보기`}>{day}</button>
+                  <button
+                    type="button"
+                    className="club-calendar-day-number"
+                    onClick={() => selectCalendarDay(day)}
+                    aria-label={`${day}일 일정 보기`}
+                    aria-pressed={selectedDay === day}
+                  >
+                    {day}
+                  </button>
                   <div className="club-calendar-events">
                     {visible.map((event) => (
                       <button
                         type="button"
                         key={event.id}
-                        className={`club-calendar-event ${event.range ? `club-calendar-event-range club-calendar-event-range-${event.segment}` : ''} ${event.recurring ? 'club-calendar-event-recurring' : ''} ${event.canceled ? 'club-calendar-event-canceled' : ''}`}
+                        className={`club-calendar-event ${event.range ? `club-calendar-event-range club-calendar-event-range-${event.segment}` : ''} ${event.recurring ? 'club-calendar-event-recurring' : ''} ${event.canceled ? 'club-calendar-event-canceled' : ''} ${activeSelectedEventId === event.id ? 'club-calendar-event-selected' : ''}`}
                         title={[event.title, eventMeta(event)].filter(Boolean).join(' · ')}
-                        onClick={() => setSelectedDay(day)}
+                        onClick={() => selectCalendarEvent(day, event)}
+                        aria-pressed={activeSelectedEventId === event.id}
+                        style={event.colorHex ? { '--calendar-event-color': event.colorHex } : undefined}
                       >
                         {event.recurring && <Repeat size={11} aria-label="반복 일정" className="club-calendar-event-icon" />}
                         <span className="club-calendar-event-title">{event.showTitle ? event.title : ''}</span>
@@ -2312,7 +2592,7 @@ function ClubCalendarSection({ compact = false }) {
                       </button>
                     ))}
                     {overflowCount > 0 && (
-                      <button type="button" className="club-calendar-event-overflow" onClick={() => setSelectedDay(day)}>
+                      <button type="button" className="club-calendar-event-overflow" onClick={() => selectCalendarDay(day)}>
                         +{overflowCount}개
                       </button>
                     )}
@@ -2331,13 +2611,16 @@ function ClubCalendarSection({ compact = false }) {
                   <strong>{calendarMonth.title} {selectedDay}일</strong>
                   <span>{selectedDayEvents.length}개 일정</span>
                 </div>
-                <button type="button" onClick={() => setSelectedDay(null)} aria-label="선택한 날짜 닫기">
+                <button type="button" onClick={() => { setSelectedDay(null); setSelectedEventId(null) }} aria-label="선택한 날짜 닫기">
                   <X size={15} aria-hidden="true" />
                 </button>
               </div>
               <ul>
                 {selectedDayEvents.map((event) => (
-                  <li key={`detail-${event.id}`} className={event.canceled ? 'calendar-day-detail-canceled' : ''}>
+                  <li
+                    key={`detail-${event.id}`}
+                    className={`${event.canceled ? 'calendar-day-detail-canceled' : ''} ${activeSelectedEventId === event.id ? 'calendar-day-detail-selected' : ''}`}
+                  >
                     <span className="calendar-day-detail-dot" aria-hidden="true" />
                     <div>
                       <strong>{event.title}</strong>
