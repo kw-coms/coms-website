@@ -62,8 +62,25 @@ public class AppCatalogService {
         entry.setTitle(request.title().trim());
         entry.setEyebrow(request.eyebrow() != null && !request.eyebrow().isBlank() ? request.eyebrow().trim() : null);
         entry.setBody(request.body() != null && !request.body().isBlank() ? request.body().trim() : null);
-        entry.setHref(request.href() != null && !request.href().isBlank() ? request.href().trim() : null);
+        entry.setHref(sanitizeHref(request.href()));
         entry.setSortOrder(request.sortOrder() != null ? request.sortOrder() : 0);
+    }
+
+    private String sanitizeHref(String href) {
+        if (href == null || href.isBlank()) {
+            return null;
+        }
+        String trimmed = href.trim();
+        String scheme;
+        try {
+            scheme = java.net.URI.create(trimmed).getScheme();
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "잘못된 링크 형식입니다.");
+        }
+        if (scheme == null || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "링크는 http(s) 주소만 등록할 수 있습니다.");
+        }
+        return trimmed;
     }
 
     private AppCatalogResponse toResponse(AppCatalogEntry entry) {
