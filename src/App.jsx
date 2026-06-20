@@ -73,7 +73,7 @@ const CLUB_ACTIVITY_CATEGORIES_QUERY_KEY = ['app-shell', 'club-activity-categori
 const FONTS_QUERY_KEY = ['app-shell', 'fonts']
 const LATEST_NOTICE_QUERY_KEY = ['app-shell', 'latest-notice']
 
-const floatingBarBaseClass = 'apple-topbar border-b border-black/10'
+const floatingBarBaseClass = 'apple-topbar border-b border-[var(--app-hairline)]'
 const solidActionBtnClass = 'apple-action-primary inline-flex min-h-10 items-center justify-center px-5 py-2.5 text-sm disabled:cursor-wait disabled:opacity-60'
 const ghostActionBtnClass = 'apple-action-secondary inline-flex min-h-10 items-center justify-center px-5 py-2.5 text-sm disabled:cursor-wait disabled:opacity-60'
 const DETAIL_TITLE_MIN_FIT = 0.74
@@ -231,7 +231,7 @@ function RequireAuth({ children }) {
   const location = useLocation()
   if (loading) return (
     <PageShell>
-      <div className="rounded-lg border border-black/10 bg-white/82 p-8 text-center text-[#6e6e73] shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+      <div className="rounded-lg border border-[var(--app-hairline)] bg-white/82 p-8 text-center text-[var(--app-muted)] shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
         로그인 상태를 확인하는 중...
       </div>
     </PageShell>
@@ -245,7 +245,7 @@ function RequireAdmin({ children }) {
   const location = useLocation()
   if (loading) return (
     <PageShell>
-      <div className="rounded-lg border border-black/10 bg-white/82 p-8 text-center text-[#6e6e73] shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+      <div className="rounded-lg border border-[var(--app-hairline)] bg-white/82 p-8 text-center text-[var(--app-muted)] shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
         로그인 상태를 확인하는 중...
       </div>
     </PageShell>
@@ -485,7 +485,7 @@ function GlobalNavigation() {
             {activityOpen && (
               <div
                 role="menu"
-                className="absolute left-1/2 top-full z-[90] mt-4 w-64 -translate-x-1/2 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_18px_45px_rgba(0,0,0,0.12)]"
+                className="absolute left-1/2 top-full z-[90] mt-4 w-64 -translate-x-1/2 overflow-hidden rounded-2xl border border-[var(--app-hairline)] bg-[var(--app-surface)] shadow-[0_18px_45px_rgba(0,0,0,0.12)]"
               >
                 <ul className="flex flex-col py-1">
                   {activitySectionNavItems.map((item) => (
@@ -493,14 +493,14 @@ function GlobalNavigation() {
                       <button
                         type="button"
                         onClick={() => goNavItem(item)}
-                        className="flex w-full items-start gap-3 px-4 py-2.5 transition hover:bg-[#f5f5f7]"
+                        className="flex w-full items-start gap-3 px-4 py-2.5 transition hover:bg-[var(--app-surface-soft)]"
                       >
-                        <span className="mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#e8f3ff] text-[#0066cc]">
+                        <span className="mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]">
                           <item.icon size={14} aria-hidden="true" />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block text-left text-sm font-semibold text-[#1d1d1f]">{item.label}</span>
-                          <span className="block text-left text-xs font-medium text-[#86868b]">{item.hint}</span>
+                          <span className="block text-left text-sm font-semibold text-[var(--app-text)]">{item.label}</span>
+                          <span className="block text-left text-xs font-medium text-[var(--app-subtle)]">{item.hint}</span>
                         </span>
                       </button>
                     </li>
@@ -609,7 +609,7 @@ function GlobalNavigation() {
                     onClick={() => closeAndGo(item.path)}
                     className="flex w-full items-start gap-3 px-6 py-3 text-left transition hover:bg-black/[0.03]"
                   >
-                    <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#e8f3ff] text-[#0066cc]">
+                    <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]">
                       <item.icon size={13} aria-hidden="true" />
                     </span>
                     <span className="min-w-0 flex-1">
@@ -826,10 +826,10 @@ function NotificationButton({ alignLeft = false, variant = 'icon' }) {
       {effectiveOpen && createPortal(
         <div
           ref={dropdownRef}
-          className="theme-popover fixed z-[9999] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-black/10 bg-white text-[var(--theme-body-dark)] shadow-2xl"
+          className="theme-popover fixed z-[9999] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--theme-body-dark)] shadow-2xl"
           style={dropdownStyle}
         >
-          <div className="flex items-center justify-between border-b border-black/10 px-4 py-3">
+          <div className="flex items-center justify-between border-b border-[var(--app-hairline)] px-4 py-3">
             <span className="text-sm font-black">알림</span>
             <button type="button" onClick={readAll} className="text-xs font-bold text-[#3b4890] hover:underline">모두 읽음</button>
           </div>
@@ -882,14 +882,14 @@ function AppearanceControl({
   const fontSelectValue = selectedFontId ? String(selectedFontId) : ''
 
   return (
-    <section className="appearance-control apple-footer-surface border-t border-black/10 bg-[var(--app-surface-soft)] px-5 py-8 text-[var(--app-muted)]">
+    <section className="appearance-control apple-footer-surface border-t border-[var(--app-hairline)] bg-[var(--app-surface-soft)] px-5 py-8 text-[var(--app-muted)]">
       <div className="mx-auto w-full max-w-5xl">
-        <div className="apple-footer-note border-b border-black/10 pb-5 text-xs leading-5">
+        <div className="apple-footer-note border-b border-[var(--app-hairline)] pb-5 text-xs leading-5">
           <p>KW COM&apos;s는 광운대학교 학생들이 함께 공부하고 프로젝트를 만드는 중앙 컴퓨터 학술동아리입니다.</p>
           <p className="mt-2">활동 안내와 모집 일정은 공지사항을 통해 순차적으로 공개됩니다.</p>
         </div>
 
-        <div className="appearance-panel grid gap-4 border-b border-black/10 py-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="appearance-panel grid gap-4 border-b border-[var(--app-hairline)] py-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-subtle)]">Appearance</p>
             <h2 className="mt-1 text-sm font-semibold text-[var(--app-text)]">화면 설정</h2>
@@ -899,7 +899,7 @@ function AppearanceControl({
             <button
               type="button"
               onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
-              className="appearance-mode-toggle inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)] sm:w-auto"
+              className="appearance-mode-toggle inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)] sm:w-auto"
               aria-label={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
             >
               <span className="grid size-6 place-items-center rounded-full bg-[var(--app-surface-soft)] text-[var(--app-text)]">
@@ -911,14 +911,14 @@ function AppearanceControl({
             {activeFonts.length > 0 && (
               <div className="appearance-font-row flex flex-wrap items-center gap-2 lg:justify-end" aria-label="폰트 설정">
                 <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">폰트</span>
-                <span className="rounded-full border border-black/10 bg-[var(--app-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-muted)]">
+                <span className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-muted)]">
                   {fontSelectionLocked ? '계정 저장 설정' : '게스트 임시 적용'}
                 </span>
                 {fontSelectionLocked ? (
                   <button
                     type="button"
                     onClick={onOpenAccountSettings}
-                    className="rounded-full border border-black/10 bg-[var(--app-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface-elevated)] hover:text-[var(--app-text)] focus:outline-none focus:ring-2 focus:ring-[var(--app-accent)]/30"
+                    className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface-elevated)] hover:text-[var(--app-text)] focus:outline-none focus:ring-2 focus:ring-[var(--app-accent)]/30"
                   >
                     계정 설정에서 변경
                   </button>
@@ -926,7 +926,7 @@ function AppearanceControl({
                   <select
                     value={fontSelectValue}
                     onChange={(event) => onFontChange?.(event.target.value)}
-                    className="min-h-9 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] outline-none transition focus:ring-2 focus:ring-[var(--app-accent)]/30"
+                    className="min-h-9 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] outline-none transition focus:ring-2 focus:ring-[var(--app-accent)]/30"
                     aria-label="사이트 폰트 선택"
                   >
                     <option value="">기본 폰트</option>
@@ -940,7 +940,7 @@ function AppearanceControl({
 
             <div className="appearance-color-row flex flex-wrap items-center gap-2 lg:justify-end">
               <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">색상</span>
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-[var(--app-surface)] p-1.5">
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] p-1.5">
                 {accentSwatches.map((swatch) => {
                   const active = accent === swatch.value
                   return (
@@ -953,14 +953,14 @@ function AppearanceControl({
                       aria-label={`${swatch.name} 색상 선택`}
                       title={swatch.name}
                     >
-                      {active && <span className="size-2.5 rounded-full bg-white shadow-[0_1px_4px_rgba(0,0,0,0.28)] sm:size-2" />}
+                      {active && <span className="size-2.5 rounded-full bg-[var(--app-surface)] shadow-[0_1px_4px_rgba(0,0,0,0.28)] sm:size-2" />}
                     </button>
                   )
                 })}
               </div>
-              <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)]">
+              <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)]">
                 직접 선택
-                <span className="relative grid size-5 overflow-hidden rounded-full border border-black/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]" style={{ backgroundColor: accent }}>
+                <span className="relative grid size-5 overflow-hidden rounded-full border border-[var(--app-hairline)] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]" style={{ backgroundColor: accent }}>
                   <input
                     type="color"
                     value={accent}
@@ -973,7 +973,7 @@ function AppearanceControl({
               <button
                 type="button"
                 onClick={() => setAccentColor(DEFAULT_ACCENT)}
-                className="min-h-9 rounded-full border border-black/10 bg-transparent px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface)] hover:text-[var(--app-text)]"
+                className="min-h-9 rounded-full border border-[var(--app-hairline)] bg-transparent px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface)] hover:text-[var(--app-text)]"
               >
                 Reset
               </button>
@@ -981,7 +981,7 @@ function AppearanceControl({
           </div>
         </div>
 
-        <div className="apple-footer-directory grid gap-x-10 gap-y-6 border-b border-black/10 py-5 text-xs sm:grid-cols-3">
+        <div className="apple-footer-directory grid gap-x-10 gap-y-6 border-b border-[var(--app-hairline)] py-5 text-xs sm:grid-cols-3">
           {footerLinkGroups.map((group) => (
             <div key={group.title}>
               <h3 className="font-semibold text-[var(--app-text)]">{group.title}</h3>
@@ -1860,7 +1860,7 @@ function DetailStoryPage({
   return (
     <div className="apple-detail-page theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
       <main className="apple-detail-main relative overflow-hidden">
-        <section className="apple-detail-hero relative grid min-h-[calc(88svh-44px)] items-center gap-12 overflow-hidden bg-[#f5f5f7] px-5 py-16 lg:grid-cols-[1fr_0.88fr] lg:px-12">
+        <section className="apple-detail-hero relative grid min-h-[calc(88svh-44px)] items-center gap-12 overflow-hidden bg-[var(--app-surface-soft)] px-5 py-16 lg:grid-cols-[1fr_0.88fr] lg:px-12">
           <div className="home-hero-surface absolute inset-0" />
           <div className="relative z-10 mx-auto max-w-3xl text-center lg:text-left">
             <button type="button" onClick={() => navigate('/')} className="apple-detail-home-button mx-auto mb-8 lg:mx-0">
@@ -1877,18 +1877,18 @@ function DetailStoryPage({
               <div className="mb-7 flex items-center gap-2">
                 <span className="size-3 rounded-full bg-[#ff5f57]" />
                 <span className="size-3 rounded-full bg-[#ffbd2e]" />
-                <span className="size-3 rounded-full bg-[#0071e3]" />
+                <span className="size-3 rounded-full bg-[var(--app-accent)]" />
               </div>
-              <div className="rounded-lg bg-[#f5f5f7] px-6 py-7">
-                <p className="text-3xl font-semibold text-[#1d1d1f]">{visualTitle}</p>
-                <p className="mt-2 text-base font-semibold text-[#6e6e73]">{visualSubtitle}</p>
+              <div className="rounded-lg bg-[var(--app-surface-soft)] px-6 py-7">
+                <p className="text-3xl font-semibold text-[var(--app-text)]">{visualTitle}</p>
+                <p className="mt-2 text-base font-semibold text-[var(--app-muted)]">{visualSubtitle}</p>
               </div>
               <div className="mt-4 grid gap-3">
                 {visualRows.map((row, index) => (
-                  <div key={row} className="flex items-center gap-3 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-[#1d1d1f] shadow-[0_8px_24px_rgba(0,0,0,0.05)]">
+                  <div key={row} className="flex items-center gap-3 rounded-lg bg-[var(--app-surface)] px-4 py-3 text-sm font-semibold text-[var(--app-text)] shadow-[0_8px_24px_rgba(0,0,0,0.05)]">
                     <span className="size-2.5 rounded-full bg-[var(--app-accent)]" />
                     <span>{row}</span>
-                    <span className="ml-auto text-xs text-[#86868b]">{String(index + 1).padStart(2, '0')}</span>
+                    <span className="ml-auto text-xs text-[var(--app-subtle)]">{String(index + 1).padStart(2, '0')}</span>
                   </div>
                 ))}
               </div>
@@ -1896,7 +1896,7 @@ function DetailStoryPage({
           </div>
         </section>
 
-        <section className="bg-white px-5 py-16 sm:py-20">
+        <section className="bg-[var(--app-surface)] px-5 py-16 sm:py-20">
           <div className="mx-auto max-w-7xl">
             <div className="mx-auto max-w-3xl text-center">
               <p className="apple-eyebrow">Inside</p>
@@ -1905,29 +1905,29 @@ function DetailStoryPage({
             <div className="mt-12 grid gap-4 lg:grid-cols-3">
               {cards.map(({ title: cardTitle, eyebrow: cardEyebrow, body: cardBody, icon: Icon }) => (
                 <article key={cardTitle} className="apple-product-panel apple-detail-card min-h-[19rem] px-7 py-7">
-                  <div className="mb-8 inline-flex size-11 items-center justify-center rounded-full bg-[#f5f5f7] text-[#0066cc]">
+                  <div className="mb-8 inline-flex size-11 items-center justify-center rounded-full bg-[var(--app-surface-soft)] text-[var(--app-accent-text)]">
                     <Icon size={20} />
                   </div>
                   <p className="apple-eyebrow">{cardEyebrow}</p>
-                  <h3 className="mt-3 text-3xl font-semibold text-[#1d1d1f]">{cardTitle}</h3>
-                  <p className="mt-4 text-[15px] font-medium leading-7 text-[#6e6e73]">{cardBody}</p>
+                  <h3 className="mt-3 text-3xl font-semibold text-[var(--app-text)]">{cardTitle}</h3>
+                  <p className="mt-4 text-[15px] font-medium leading-7 text-[var(--app-muted)]">{cardBody}</p>
                 </article>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="bg-[#f5f5f7] px-5 py-16 sm:py-20">
+        <section className="bg-[var(--app-surface-soft)] px-5 py-16 sm:py-20">
           <div className="mx-auto max-w-6xl">
             <p className="apple-eyebrow text-center">Flow</p>
             <h2 className="apple-display mx-auto mt-4 max-w-4xl text-center text-5xl sm:text-6xl">작게 시작해서 오래 남기는 방식.</h2>
             <div className="mt-12 grid gap-3">
               {flow.map(([number, flowTitle, flowBody]) => (
-                <article key={number} className="apple-flow-row grid gap-4 rounded-lg bg-white px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:grid-cols-[5rem_1fr] sm:items-center">
-                  <span className="text-3xl font-semibold text-[#0066cc]">{number}</span>
+                <article key={number} className="apple-flow-row grid gap-4 rounded-lg bg-[var(--app-surface)] px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:grid-cols-[5rem_1fr] sm:items-center">
+                  <span className="text-3xl font-semibold text-[var(--app-accent-text)]">{number}</span>
                   <div>
-                    <h3 className="text-2xl font-semibold text-[#1d1d1f]">{flowTitle}</h3>
-                    <p className="mt-2 text-[15px] font-medium leading-7 text-[#6e6e73]">{flowBody}</p>
+                    <h3 className="text-2xl font-semibold text-[var(--app-text)]">{flowTitle}</h3>
+                    <p className="mt-2 text-[15px] font-medium leading-7 text-[var(--app-muted)]">{flowBody}</p>
                   </div>
                 </article>
               ))}
@@ -1935,7 +1935,7 @@ function DetailStoryPage({
           </div>
         </section>
 
-        <section className="bg-white px-5 py-16 sm:py-20">
+        <section className="bg-[var(--app-surface)] px-5 py-16 sm:py-20">
           <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.82fr_1fr] lg:items-center">
             <div>
               <p className="apple-eyebrow">{outputsEyebrow}</p>
@@ -1944,9 +1944,9 @@ function DetailStoryPage({
             </div>
             <div className="grid gap-3">
               {outputs.map((item, index) => (
-                <div key={item} className="apple-output-row flex items-center gap-4 rounded-lg bg-[#f5f5f7] px-5 py-5">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-semibold text-[#0066cc]">{index + 1}</span>
-                  <p className="text-lg font-semibold leading-7 text-[#1d1d1f]">{item}</p>
+                <div key={item} className="apple-output-row flex items-center gap-4 rounded-lg bg-[var(--app-surface-soft)] px-5 py-5">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--app-surface)] text-sm font-semibold text-[var(--app-accent-text)]">{index + 1}</span>
+                  <p className="text-lg font-semibold leading-7 text-[var(--app-text)]">{item}</p>
                 </div>
               ))}
             </div>
@@ -2094,8 +2094,8 @@ function HomeView() {
           <div className="mx-auto mt-10 grid max-w-3xl gap-3 sm:grid-cols-3">
             {metrics.map((item) => (
               <div key={item.value} className="apple-soft-panel px-4 py-5 text-center">
-                <p className="text-lg font-semibold text-[#1d1d1f]">{item.value}</p>
-                <p className="mt-1 text-xs font-semibold leading-5 text-[#6e6e73]">{item.label}</p>
+                <p className="text-lg font-semibold text-[var(--app-text)]">{item.value}</p>
+                <p className="mt-1 text-xs font-semibold leading-5 text-[var(--app-muted)]">{item.label}</p>
               </div>
             ))}
           </div>
@@ -2110,8 +2110,8 @@ function HomeView() {
                   className="apple-product-panel group min-h-48 px-6 py-6 text-left transition hover:-translate-y-0.5"
                 >
                   <p className="apple-eyebrow">{item.eyebrow}</p>
-                  <h3 className="mt-3 text-2xl font-semibold leading-tight text-[#1d1d1f]">{item.title}</h3>
-                  <p className="mt-3 text-sm font-medium leading-6 text-[#6e6e73]">{item.body}</p>
+                  <h3 className="mt-3 text-2xl font-semibold leading-tight text-[var(--app-text)]">{item.title}</h3>
+                  <p className="mt-3 text-sm font-medium leading-6 text-[var(--app-muted)]">{item.body}</p>
                 </button>
               ))}
             </div>
@@ -2121,11 +2121,11 @@ function HomeView() {
             <div className={`mt-10 grid gap-3 ${id === 'projects' ? 'lg:grid-cols-3' : 'sm:grid-cols-2'}`}>
               {detailItems.map((item, index) => (
                 <article key={item.title} className="apple-product-panel px-6 py-6 text-left transition hover:-translate-y-0.5">
-                  <div className="mb-5 inline-flex size-9 items-center justify-center rounded-full bg-[#f5f5f7] text-xs font-bold text-[#0066cc]">
+                  <div className="mb-5 inline-flex size-9 items-center justify-center rounded-full bg-[var(--app-surface-soft)] text-xs font-bold text-[var(--app-accent-text)]">
                     {String(index + 1).padStart(2, '0')}
                   </div>
-                  <h3 className="text-xl font-semibold text-[#1d1d1f]">{item.title}</h3>
-                  <p className="mt-3 text-sm font-medium leading-7 text-[#6e6e73]">{item.description}</p>
+                  <h3 className="text-xl font-semibold text-[var(--app-text)]">{item.title}</h3>
+                  <p className="mt-3 text-sm font-medium leading-7 text-[var(--app-muted)]">{item.description}</p>
                 </article>
               ))}
             </div>
@@ -2153,20 +2153,20 @@ function HomeView() {
                 <div className="mb-4 flex items-center gap-1.5">
                   <span className="size-2.5 rounded-full bg-[#ff5f57]" />
                   <span className="size-2.5 rounded-full bg-[#ffbd2e]" />
-                  <span className="size-2.5 rounded-full bg-[#0071e3]" />
+                  <span className="size-2.5 rounded-full bg-[var(--app-accent)]" />
                 </div>
-                <p className="text-2xl font-semibold text-[#1d1d1f]">{visual.title}</p>
-                <p className="mt-1 text-sm font-semibold text-[#6e6e73]">{visual.subtitle}</p>
+                <p className="text-2xl font-semibold text-[var(--app-text)]">{visual.title}</p>
+                <p className="mt-1 text-sm font-semibold text-[var(--app-muted)]">{visual.subtitle}</p>
               </div>
               <div className="absolute left-1/2 top-1/2 flex size-32 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2rem] bg-white/72 shadow-[0_24px_70px_rgba(0,0,0,0.12)] backdrop-blur-md sm:size-40">
                 <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="home-logo-float w-[68%] object-contain" />
               </div>
               <div className="absolute bottom-6 left-6 right-6 space-y-2">
                 {visual.rows.map((row, index) => (
-                  <div key={row} className="flex items-center gap-3 rounded-lg bg-white/76 px-4 py-3 text-sm font-semibold text-[#1d1d1f] shadow-[0_8px_24px_rgba(0,0,0,0.06)] backdrop-blur-xl">
+                  <div key={row} className="flex items-center gap-3 rounded-lg bg-white/76 px-4 py-3 text-sm font-semibold text-[var(--app-text)] shadow-[0_8px_24px_rgba(0,0,0,0.06)] backdrop-blur-xl">
                     <span className="size-2.5 rounded-full" style={{ backgroundColor: visual.accent }} />
                     <span>{row}</span>
-                    <span className="ml-auto text-xs text-[#86868b]">{String(index + 1).padStart(2, '0')}</span>
+                    <span className="ml-auto text-xs text-[var(--app-subtle)]">{String(index + 1).padStart(2, '0')}</span>
                   </div>
                 ))}
               </div>
@@ -2181,11 +2181,11 @@ function HomeView() {
     <div className="theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
 
       <main className="apple-home-main relative overflow-hidden">
-        <section className="apple-home-hero relative flex min-h-[calc(78svh-44px)] items-center justify-center overflow-hidden bg-[#f5f5f7] px-5 py-10 text-center sm:min-h-[calc(84svh-44px)] sm:py-12">
+        <section className="apple-home-hero relative flex min-h-[calc(78svh-44px)] items-center justify-center overflow-hidden bg-[var(--app-surface-soft)] px-5 py-10 text-center sm:min-h-[calc(84svh-44px)] sm:py-12">
           <div className="home-hero-surface absolute inset-0" />
           <div className="absolute inset-x-0 bottom-0 h-1/3 bg-linear-to-b from-transparent to-white/82" />
           <div className="relative z-10 mx-auto w-full max-w-5xl">
-            <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/64 px-3 py-1.5 text-xs font-semibold text-[#6e6e73] shadow-[0_4px_16px_rgba(0,0,0,0.05)] backdrop-blur-xl">
+            <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/64 px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)] shadow-[0_4px_16px_rgba(0,0,0,0.05)] backdrop-blur-xl">
               <span className="size-2 rounded-full bg-[var(--app-accent)]" />
               2026 Semester Ready
             </div>
@@ -2193,7 +2193,7 @@ function HomeView() {
               <div className="absolute inset-0 rounded-[1.75rem] bg-white/82 shadow-[0_18px_54px_rgba(0,0,0,0.09)] ring-1 ring-black/5" />
               <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="home-logo-float relative z-10 h-20 w-20 object-contain sm:h-24 sm:w-24" />
             </div>
-            <p className="mt-6 text-sm font-semibold text-[#6e6e73]">Kwangwoon University Computer Club</p>
+            <p className="mt-6 text-sm font-semibold text-[var(--app-muted)]">Kwangwoon University Computer Club</p>
             <h2 className="apple-display mt-2 whitespace-nowrap text-[3.2rem] sm:text-8xl lg:text-[8.5rem]">
               KW COM&apos;s
             </h2>
@@ -2205,15 +2205,15 @@ function HomeView() {
               <button type="button" onClick={goRecruitPage} className={ghostActionBtnClass}>지원하기</button>
             </div>
             {latestNotice && (
-              <button type="button" onClick={goNotices} className="mx-auto mt-7 flex max-w-md items-center gap-2 rounded-full bg-white px-4 py-2 text-left shadow-[0_2px_12px_rgba(0,0,0,0.08)] transition hover:shadow-[0_5px_18px_rgba(0,0,0,0.12)]">
+              <button type="button" onClick={goNotices} className="mx-auto mt-7 flex max-w-md items-center gap-2 rounded-full bg-[var(--app-surface)] px-4 py-2 text-left shadow-[0_2px_12px_rgba(0,0,0,0.08)] transition hover:shadow-[0_5px_18px_rgba(0,0,0,0.12)]">
                 <Megaphone size={14} className="shrink-0 text-[var(--app-accent-text)]" />
-                <span className="truncate text-xs font-semibold text-[#1d1d1f]">{latestNotice.title}</span>
-                <span className="ml-auto shrink-0 text-[10px] font-bold uppercase text-[#0066cc]">공지</span>
+                <span className="truncate text-xs font-semibold text-[var(--app-text)]">{latestNotice.title}</span>
+                <span className="ml-auto shrink-0 text-[10px] font-bold uppercase text-[var(--app-accent-text)]">공지</span>
               </button>
             )}
             <div className="mx-auto mt-6 flex max-w-[21rem] flex-wrap justify-center gap-2 sm:max-w-3xl">
               {experiencePills.map((pill) => (
-                <span key={pill} className="rounded-full bg-white/70 px-2.5 py-1.5 text-[11px] font-semibold text-[#6e6e73] shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:px-3 sm:text-xs">
+                <span key={pill} className="rounded-full bg-white/70 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-muted)] shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:px-3 sm:text-xs">
                   {pill}
                 </span>
               ))}
@@ -2221,16 +2221,16 @@ function HomeView() {
             <div className="apple-hero-metrics mx-auto mt-8 hidden max-w-3xl grid-cols-3 sm:grid">
               {heroHighlights.map((item) => (
                 <div key={item.value} className="px-5 text-center">
-                  <p className="text-[11px] font-semibold text-[#86868b]">{item.label}</p>
-                  <p className="mt-1 text-base font-semibold text-[#1d1d1f]">{item.value}</p>
-                  <p className="mt-1 text-xs leading-5 text-[#6e6e73]">{item.detail}</p>
+                  <p className="text-[11px] font-semibold text-[var(--app-subtle)]">{item.label}</p>
+                  <p className="mt-1 text-base font-semibold text-[var(--app-text)]">{item.value}</p>
+                  <p className="mt-1 text-xs leading-5 text-[var(--app-muted)]">{item.detail}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="apple-showcase-strip bg-white px-5 py-4 sm:py-6">
+        <section className="apple-showcase-strip bg-[var(--app-surface)] px-5 py-4 sm:py-6">
           <div className="mx-auto grid max-w-7xl gap-3 lg:grid-cols-3">
             {showcaseItems.map((item) => (
               <button
@@ -2248,7 +2248,7 @@ function HomeView() {
           </div>
         </section>
 
-        <section className="bg-[#f5f5f7] px-5 py-12 sm:py-16">
+        <section className="bg-[var(--app-surface-soft)] px-5 py-12 sm:py-16">
           <div className="mx-auto max-w-7xl">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
@@ -2268,12 +2268,12 @@ function HomeView() {
                   onClick={() => goPageTop(item.route)}
                   className="apple-product-panel min-h-44 px-6 py-6 text-left transition hover:-translate-y-0.5"
                 >
-                  <span className="inline-flex size-8 items-center justify-center rounded-full bg-[#e8f3ff] text-sm font-bold text-[#0066cc]">
+                  <span className="inline-flex size-8 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-sm font-bold text-[var(--app-accent-text)]">
                     {index + 1}
                   </span>
-                  <h3 className="mt-5 text-2xl font-semibold text-[#1d1d1f]">{item.title}</h3>
-                  <p className="mt-3 text-sm font-medium leading-6 text-[#6e6e73]">{item.body}</p>
-                  <span className="mt-5 inline-flex text-sm font-bold text-[#0066cc]">{item.cta}</span>
+                  <h3 className="mt-5 text-2xl font-semibold text-[var(--app-text)]">{item.title}</h3>
+                  <p className="mt-3 text-sm font-medium leading-6 text-[var(--app-muted)]">{item.body}</p>
+                  <span className="mt-5 inline-flex text-sm font-bold text-[var(--app-accent-text)]">{item.cta}</span>
                 </button>
               ))}
             </div>
