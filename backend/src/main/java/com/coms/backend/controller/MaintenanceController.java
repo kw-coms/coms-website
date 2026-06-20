@@ -72,8 +72,7 @@ public class MaintenanceController {
             @RequestHeader(value = "X-Bootstrap-Secret", required = false) String providedSecret,
             @Valid @RequestBody BootstrapRequest req) {
         verifyBootstrapSecret(providedSecret);
-        boolean adminExists = memberRepository.findAll().stream()
-                .anyMatch(m -> m.getRole() == Member.Role.ADMIN);
+        boolean adminExists = memberRepository.existsByRole(Member.Role.ADMIN);
         if (adminExists) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bootstrap already completed.");
         }

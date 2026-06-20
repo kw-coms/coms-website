@@ -80,14 +80,30 @@ public class ArchiveController {
     public ResponseEntity<Resource> inline(@PathVariable Long id) {
         ArchiveFile file = archiveService.get(id);
         Resource resource = storageService.load(file.getStoredName());
-        ContentDisposition disposition = ContentDisposition.inline()
+        MediaType mediaType = mediaType(file.getMimeType());
+        // Only render images and PDFs inline. Anything else (HTML, SVG, scripts, ...) is forced to
+        // download as an attachment so the browser never renders it, neutralizing stored XSS even if
+        // a dangerous content-type slipped past upload validation. SVG (image/svg+xml) is excluded
+        // from the inline allowlist because it can carry script.
+        boolean inlineSafe = isInlineSafe(mediaType);
+        ContentDisposition disposition = (inlineSafe
+                ? ContentDisposition.inline()
+                : ContentDisposition.attachment())
                 .filename(file.getOriginalName(), StandardCharsets.UTF_8)
                 .build();
 
         return ResponseEntity.ok()
-                .contentType(mediaType(file.getMimeType()))
+                .contentType(mediaType)
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(resource);
+    }
+
+    private boolean isInlineSafe(MediaType mediaType) {
+        if (MediaType.APPLICATION_PDF.equalsTypeAndSubtype(mediaType)) {
+            return true;
+        }
+        return "image".equalsIgnoreCase(mediaType.getType())
+                && !"svg+xml".equalsIgnoreCase(mediaType.getSubtype());
     }
 
     private MediaType mediaType(String mimeType) {
