@@ -140,12 +140,14 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-	config.setAllowedOrigins(
-		Arrays.stream(corsAllowedOrigins.split(","))
+	List<String> allowedOrigins = Arrays.stream(corsAllowedOrigins.split(","))
 			.map(String::trim)
 			.filter(origin -> !origin.isEmpty())
-			.toList()
-	);
+			.toList();
+	if (allowedOrigins.contains("*")) {
+		throw new IllegalStateException("CORS '*' is incompatible with allowCredentials=true");
+	}
+	config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "X-Bootstrap-Secret"));
         config.setAllowCredentials(true);

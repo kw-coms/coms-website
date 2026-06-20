@@ -34,6 +34,9 @@ public class Member {
 
     private LocalDateTime passwordResetExpiresAt;
 
+    @Column(name = "password_reset_attempts", nullable = false)
+    private int passwordResetAttempts = 0;
+
     private String department;
 
     private String phone;
@@ -83,6 +86,10 @@ public class Member {
     public void setPasswordResetCodeHash(String passwordResetCodeHash) { this.passwordResetCodeHash = passwordResetCodeHash; }
     public LocalDateTime getPasswordResetExpiresAt() { return passwordResetExpiresAt; }
     public void setPasswordResetExpiresAt(LocalDateTime passwordResetExpiresAt) { this.passwordResetExpiresAt = passwordResetExpiresAt; }
+    public int getPasswordResetAttempts() { return passwordResetAttempts; }
+    public void setPasswordResetAttempts(int passwordResetAttempts) { this.passwordResetAttempts = passwordResetAttempts; }
+    public int incrementPasswordResetAttempts() { return ++this.passwordResetAttempts; }
+    public void resetPasswordResetAttempts() { this.passwordResetAttempts = 0; }
     public String getDepartment() { return department; }
     public void setDepartment(String department) { this.department = department; }
     public String getPhone() { return phone; }

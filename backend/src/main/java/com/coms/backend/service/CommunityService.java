@@ -422,6 +422,9 @@ public class CommunityService {
     public CommunityPostSharePreview sharePreview(Long id) {
         CommunityPost post = communityPostRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (isAnonymousPost(post)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         return new CommunityPostSharePreview(
                 post.getId(),
                 post.getTitle(),
@@ -434,6 +437,9 @@ public class CommunityService {
     public CommunityPostShareImage loadShareImage(Long id) {
         CommunityPost post = communityPostRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (isAnonymousPost(post)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         Optional<CommunityPostImage> contentImage = firstShareImage(post);
         if (contentImage.isPresent()) {
             CommunityPostImage image = contentImage.get();
