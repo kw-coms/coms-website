@@ -82,11 +82,16 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.POST, "/api/club-projects", "/api/club-projects/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.PATCH, "/api/club-projects/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/club-projects/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/apps", "/api/apps/**").authenticated();
+                auth.requestMatchers(HttpMethod.POST, "/api/apps", "/api/apps/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.PUT, "/api/apps/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.DELETE, "/api/apps/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.GET, "/api/fonts", "/api/fonts/**").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/api/community/posts/*/share", "/api/community/posts/*/share-data", "/api/community/posts/*/share-image").permitAll();
                 auth.requestMatchers(HttpMethod.HEAD, "/api/community/posts/*/share", "/api/community/posts/*/share-data", "/api/community/posts/*/share-image").permitAll();
                 auth.requestMatchers("/api/mini-apps/**").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/files").authenticated();
+                auth.requestMatchers(HttpMethod.POST, "/api/files/*/vote").authenticated();
                 auth.requestMatchers(HttpMethod.DELETE, "/api/files/**").hasRole("ADMIN");
                 auth.requestMatchers("/api/files", "/api/files/**").authenticated();
                 auth.requestMatchers("/api/community/**").authenticated();
