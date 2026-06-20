@@ -47,6 +47,9 @@ public class ArchiveFile {
     @Column(nullable = false)
     private Category category = Category.GENERAL;
 
+    @Column(name = "view_count", nullable = false)
+    private long viewCount = 0;
+
     @Column(nullable = false)
     private LocalDateTime uploadedAt = LocalDateTime.now();
 
@@ -73,6 +76,9 @@ public class ArchiveFile {
     public void setDescription(String description) { this.description = description; }
     public Category getCategory() { return category; }
     public void setCategory(Category category) { this.category = category; }
+    public long getViewCount() { return viewCount; }
+    public void setViewCount(long viewCount) { this.viewCount = viewCount; }
+    public void incrementViewCount() { this.viewCount++; }
     public LocalDateTime getUploadedAt() { return uploadedAt; }
     public void setUploadedAt(LocalDateTime uploadedAt) { this.uploadedAt = uploadedAt; }
 }

@@ -12,6 +12,9 @@ public record ArchiveFileResponse(
         String uploadedBy,
         String uploaderName,
         String category,
+        long viewCount,
+        long upvotes,
+        int myVote,
         LocalDateTime uploadedAt
 ) {
 }
