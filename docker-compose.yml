@@ -72,6 +72,10 @@ services:
       args:
         VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
         VITE_SENTRY_ENV: ${VITE_SENTRY_ENV:-production}
+        # Sentry source map upload (optional). Empty token = no upload, normal build.
+        SENTRY_AUTH_TOKEN: ${SENTRY_AUTH_TOKEN:-}
+        SENTRY_ORG: ${SENTRY_ORG:-}
+        SENTRY_PROJECT: ${SENTRY_PROJECT:-}
     container_name: coms-frontend
     restart: unless-stopped
     ports:

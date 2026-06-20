@@ -4,6 +4,8 @@ import { linkify } from '../utils/linkify.jsx'
 import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Search, Sparkles, ThumbsUp, Trash2, UsersRound } from 'lucide-react'
 import { listNotices, getNotice, createNotice, updateNotice, deleteNotice, voteNotice } from '../services/noticeApi.js'
 import { useAuth } from '../contexts/useAuth.js'
+import { NoticeCategory } from '../contract/enums.js'
+import { enumLabels } from '../contract/labels.js'
 
 function formatDate(iso) {
   const date = new Date(iso)
@@ -23,38 +25,44 @@ function clickableCell(open) {
   }
 }
 
-const NOTICE_CATEGORY_META = {
-  GENERAL: {
+// Keys bound to the canonical Notice.Category enum (drift-guarded).
+const NOTICE_CATEGORY_META = enumLabels(NoticeCategory, {
+  [NoticeCategory.GENERAL]: {
     label: '공지',
     shortLabel: '공지',
     featuredLabel: '최신 공지',
     icon: Megaphone,
     badgeClass: 'bg-[#e8f8ff] text-[var(--app-accent-text)]',
   },
-  PROMOTION: {
+  [NoticeCategory.PROMOTION]: {
     label: '홍보',
     shortLabel: '홍보',
     featuredLabel: '최신 홍보',
     icon: Sparkles,
     badgeClass: 'bg-[#eafaf2] text-[#248a3d]',
   },
-  SMALL_GROUP: {
+  [NoticeCategory.SMALL_GROUP]: {
     label: '소모임',
     shortLabel: '소모임',
     featuredLabel: '최신 소모임',
     icon: UsersRound,
     badgeClass: 'bg-[#f2efff] text-[#6e56cf]',
   },
-  JOB: {
+  [NoticeCategory.JOB]: {
     label: '취업공고',
     shortLabel: '취업',
     featuredLabel: '최신 취업공고',
     icon: BriefcaseBusiness,
     badgeClass: 'bg-amber-100 text-amber-700',
   },
-}
+})
 
-const NOTICE_CATEGORY_OPTIONS = ['GENERAL', 'PROMOTION', 'SMALL_GROUP', 'JOB']
+const NOTICE_CATEGORY_OPTIONS = [
+  NoticeCategory.GENERAL,
+  NoticeCategory.PROMOTION,
+  NoticeCategory.SMALL_GROUP,
+  NoticeCategory.JOB,
+]
 
 const NOTICE_FILTERS = [
   { value: 'ALL', label: '전체', icon: Megaphone },
