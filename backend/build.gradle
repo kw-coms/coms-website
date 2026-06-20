@@ -2,10 +2,24 @@ plugins {
 	id 'java'
 	id 'org.springframework.boot' version '4.0.6'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id 'org.owasp.dependencycheck' version '10.0.4'
 }
 
 group = 'com.coms'
 version = '0.0.1-SNAPSHOT'
+
+// OWASP Dependency-Check — scans declared dependencies for known CVEs.
+// Run on demand / on a schedule via `./gradlew dependencyCheckAnalyze`; it is
+// intentionally NOT wired into the normal build, since the NVD database download
+// is slow and rate-limited. Set the NVD_API_KEY env var (free key from
+// https://nvd.nist.gov/developers/request-an-api-key) to avoid rate limits.
+dependencyCheck {
+	failBuildOnCVSS = 7.0
+	formats = ['HTML', 'JSON']
+	nvd {
+		apiKey = System.getenv('NVD_API_KEY')
+	}
+}
 
 java {
 	toolchain {

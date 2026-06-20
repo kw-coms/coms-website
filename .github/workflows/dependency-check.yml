@@ -1,0 +1,53 @@
+name: Dependency Check
+
+# OWASP Dependency-Check — scans backend Gradle dependencies for known CVEs.
+#
+# This workflow is intentionally NOT triggered on push/PR: the NVD database
+# download is slow and rate-limited, and a finding (or a transient rate-limit)
+# should never block day-to-day development. It runs on a weekly schedule and
+# can be kicked off manually from the Actions tab.
+#
+# NOTE: set the `NVD_API_KEY` repository secret to avoid NVD rate limits.
+# Request a free key at https://nvd.nist.gov/developers/request-an-api-key
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly, Monday 09:00 UTC.
+    - cron: "0 9 * * 1"
+
+jobs:
+  dependency-check:
+    name: OWASP Dependency-Check (backend)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The Gradle toolchain pins Java 21 (Spring Boot 4 / Gradle 9.x); 17 will not compile.
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # continue-on-error so a CVE finding or NVD rate-limit never fails the job.
+      - name: Run OWASP Dependency-Check
+        id: depcheck
+        continue-on-error: true
+        working-directory: backend
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: ./gradlew dependencyCheckAnalyze --no-daemon
+
+      - name: Upload Dependency-Check report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-report
+          path: |
+            backend/build/reports/dependency-check-report.html
+            backend/build/reports/dependency-check-report.json
+          if-no-files-found: warn
