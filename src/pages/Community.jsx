@@ -536,7 +536,7 @@ function renderPostBlocks(post, options = {}) {
             const src = safeExternalSrc(block.embedUrl)
             if (!src) return null
             return (
-              <div key={i} className="community-post-media my-2 overflow-hidden rounded border border-black/10 bg-black/[0.03]" style={widthStyle}>
+              <div key={i} className="community-post-media my-2 overflow-hidden rounded border border-[var(--app-hairline)] bg-black/[0.03]" style={widthStyle}>
                 <div className="aspect-video w-full bg-black">
                   <iframe
                     src={src}
@@ -583,7 +583,7 @@ function renderPostBlocks(post, options = {}) {
               ? `${formatPollDate(result.closesAt)} 종료`
               : '진행 중'
           return (
-            <div key={i} className="my-4 clear-both overflow-hidden rounded-xl border border-[#3b4890]/15 bg-white shadow-[0_14px_36px_rgba(35,48,109,0.12)]">
+            <div key={i} className="my-4 clear-both overflow-hidden rounded-xl border border-[#3b4890]/15 bg-[var(--app-surface)] shadow-[0_14px_36px_rgba(35,48,109,0.12)]">
               <div className="border-b border-[#3b4890]/10 bg-gradient-to-r from-[#3b4890] to-[#5061b5] px-4 py-3 text-white">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="rounded-full bg-white/16 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em]">Poll</span>
@@ -617,12 +617,12 @@ function renderPostBlocks(post, options = {}) {
                       type="button"
                       onClick={() => onPollVote?.(block.pollId, index)}
                       disabled={!onPollVote || pollVoting === block.pollId || closed || voted}
-                      className={`relative w-full overflow-hidden rounded-lg border px-3 py-3 text-left text-sm font-semibold transition ${selected ? 'border-[#3b4890] bg-[#f7f9ff] text-[#23306d] ring-2 ring-[#3b4890]/10' : 'border-black/10 bg-white text-[var(--theme-body-dark)] hover:border-[#3b4890]/30 hover:bg-[#f8faff]'}`}
+                      className={`relative w-full overflow-hidden rounded-lg border px-3 py-3 text-left text-sm font-semibold transition ${selected ? 'border-[#3b4890] bg-[#f7f9ff] text-[#23306d] ring-2 ring-[#3b4890]/10' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--theme-body-dark)] hover:border-[#3b4890]/30 hover:bg-[#f8faff]'}`}
                     >
                       <span className="absolute inset-y-0 left-0 bg-[#dce6ff]" style={{ width: `${pct}%` }} />
                       <span className="relative flex items-center justify-between gap-3">
                         <span className="flex min-w-0 items-center gap-2">
-                          <span className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px] ${selected ? 'border-[#3b4890] bg-[#3b4890] text-white' : 'border-black/15 bg-white text-[var(--theme-body-muted)]'}`}>
+                          <span className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px] ${selected ? 'border-[#3b4890] bg-[#3b4890] text-white' : 'border-black/15 bg-[var(--app-surface)] text-[var(--theme-body-muted)]'}`}>
                             {index + 1}
                           </span>
                           {imageUrl && (
@@ -651,7 +651,7 @@ function renderPostBlocks(post, options = {}) {
       })}
       <div style={{ clear: 'both' }} />
       {allAttachments.length > 0 && (
-        <div className="mt-5 border-t border-black/10 pt-4">
+        <div className="mt-5 border-t border-[var(--app-hairline)] pt-4">
           <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-[var(--theme-body-muted)]">첨부파일</p>
           <div className="flex flex-col gap-2">
             {allAttachments.map((attachment) => (
@@ -659,7 +659,7 @@ function renderPostBlocks(post, options = {}) {
                 key={attachment.key}
                 href={attachment.href}
                 download={attachment.name}
-                className="inline-flex min-h-10 items-center gap-2 rounded border border-black/10 bg-black/[0.03] px-3 py-2 text-sm font-semibold text-[#3b4890] transition hover:bg-black/[0.06] hover:underline"
+                className="inline-flex min-h-10 items-center gap-2 rounded border border-[var(--app-hairline)] bg-black/[0.03] px-3 py-2 text-sm font-semibold text-[#3b4890] transition hover:bg-black/[0.06] hover:underline"
               >
                 <Download size={14} />
                 <span className="break-all">{attachment.name}</span>
@@ -688,7 +688,7 @@ function clickableCell(open) {
 
 function MediaAlignControls({ value, onChange }) {
   return (
-    <div className="flex items-center gap-1 rounded-full border border-black/10 bg-white/85 px-2 py-1 shadow-sm">
+    <div className="flex items-center gap-1 rounded-full border border-[var(--app-hairline)] bg-white/85 px-2 py-1 shadow-sm">
       {MEDIA_ALIGN_OPTIONS.map((option) => (
         <button
           key={option.value}
@@ -798,14 +798,14 @@ function FigureToolbar({ editorRef, figId, meta, onResize, onAlign, onDelete, on
   }
 
   if (!rect) return null
-  const hCls = 'fixed z-50 block h-3 w-3 -translate-x-1/2 -translate-y-1/2 border-2 border-blue-500 bg-white'
+  const hCls = 'fixed z-50 block h-3 w-3 -translate-x-1/2 -translate-y-1/2 border-2 border-blue-500 bg-[var(--app-surface)]'
 
   return createPortal(
     <>
       <div className="pointer-events-none fixed z-40 border-2 border-blue-500"
         style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }} />
       <div ref={toolbarRef}
-        className="fixed z-50 flex items-center gap-1 whitespace-nowrap rounded border border-black/10 bg-white/95 px-2 py-1 shadow backdrop-blur-sm"
+        className="fixed z-50 flex items-center gap-1 whitespace-nowrap rounded border border-[var(--app-hairline)] bg-white/95 px-2 py-1 shadow backdrop-blur-sm"
         style={{ left: rect.left + rect.width / 2, top: Math.max(4, rect.top - 36), transform: 'translateX(-50%)' }}
       >
         <MediaAlignControls value={meta?.align || 'center'} onChange={onAlign} />
@@ -1296,7 +1296,7 @@ function RichEditor({ initialBlocks, apiRef, onError }) {
           const text = e.clipboardData?.getData('text/plain') || ''
           document.execCommand('insertText', false, text)
         }}
-        className="min-h-[420px] w-full overflow-x-auto whitespace-pre bg-white px-4 py-5 text-sm leading-7 text-[var(--theme-body-dark)] outline-none sm:px-5"
+        className="min-h-[420px] w-full overflow-x-auto whitespace-pre bg-[var(--app-surface)] px-4 py-5 text-sm leading-7 text-[var(--theme-body-dark)] outline-none sm:px-5"
         placeholder="내용을 입력하세요. 이미지, 동영상을 드래그하거나 툴바에서 삽입할 수 있습니다."
       />
       {dropIndicator && (
@@ -1523,7 +1523,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
     <form onSubmit={submit} className="community-compose-form grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
       <div className="community-compose-meta order-2 flex flex-wrap gap-2 lg:col-start-2 lg:row-start-1">
         <select value={effectiveCategory} onChange={(e) => setCategory(e.target.value)}
-          className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24"
+          className="w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24"
         >
           {categoryOptions.map((item) => (
             <option key={item.value} value={item.value}>{item.label}</option>
@@ -1533,7 +1533,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
 
       <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={MAX_TITLE_LENGTH}
         placeholder="제목"
-        className="community-compose-title order-1 w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:text-sm lg:col-start-1 lg:row-start-1"
+        className="community-compose-title order-1 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm lg:col-start-1 lg:row-start-1"
       />
 
       {effectiveCategory === 'ANONYMOUS' && (
@@ -1542,14 +1542,14 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
           onChange={(e) => setAnonymousName(e.target.value)}
           maxLength={MAX_ANONYMOUS_NAME_LENGTH}
           placeholder="ㅇㅇ"
-          className="community-compose-anonymous order-3 w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:text-sm lg:col-start-2 lg:row-start-2"
+          className="community-compose-anonymous order-3 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm lg:col-start-2 lg:row-start-2"
         />
       )}
 
-      <div className="community-compose-editor order-4 overflow-hidden rounded border border-black/15 bg-white lg:col-start-1 lg:row-start-2 lg:row-span-5">
-        <div className="community-editor-toolbar flex flex-wrap items-center gap-2 border-b border-black/10 bg-black/[0.03] px-3 py-2">
+      <div className="community-compose-editor order-4 overflow-hidden rounded border border-black/15 bg-[var(--app-surface)] lg:col-start-1 lg:row-start-2 lg:row-span-5">
+        <div className="community-editor-toolbar flex flex-wrap items-center gap-2 border-b border-[var(--app-hairline)] bg-black/[0.03] px-3 py-2">
           <span className="mr-1 text-xs font-black uppercase tracking-[0.2em] text-[var(--theme-body-muted)]">Editor</span>
-          <div className="inline-flex overflow-hidden rounded border border-black/15 bg-white">
+          <div className="inline-flex overflow-hidden rounded border border-black/15 bg-[var(--app-surface)]">
             <button type="button"
               onPointerDown={(e) => e.preventDefault()}
               onMouseDown={(e) => e.preventDefault()}
@@ -1569,7 +1569,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
               onClick={() => applyFormat('underline')}
               className="min-h-9 px-3 text-sm underline text-[var(--theme-body-dark)] hover:bg-black/5">U</button>
           </div>
-          <label className="inline-flex min-h-9 items-center gap-1.5 rounded border border-black/15 bg-white px-2 text-xs font-semibold text-[var(--theme-body-mid)] hover:bg-black/5"
+          <label className="inline-flex min-h-9 items-center gap-1.5 rounded border border-black/15 bg-[var(--app-surface)] px-2 text-xs font-semibold text-[var(--theme-body-mid)] hover:bg-black/5"
             onPointerDown={(e) => e.preventDefault()}
             onMouseDown={(e) => e.preventDefault()}
             onTouchStart={(e) => e.preventDefault()}>
@@ -1596,7 +1596,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
               <option value="ui-monospace, SFMono-Regular, Menlo, monospace">Monospace</option>
             </select>
           </label>
-          <label className="inline-flex min-h-9 items-center gap-1.5 rounded border border-black/15 bg-white px-2 text-xs font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+          <label className="inline-flex min-h-9 items-center gap-1.5 rounded border border-black/15 bg-[var(--app-surface)] px-2 text-xs font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
             글자색
             <input type="color" defaultValue="#111827" className="h-6 w-7 cursor-pointer border-0 bg-transparent p-0"
               onPointerDown={(e) => e.preventDefault()}
@@ -1604,7 +1604,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
               onTouchStart={(e) => e.preventDefault()}
               onChange={(e) => applyFormat('foreColor', e.target.value)} />
           </label>
-          <label className="inline-flex min-h-9 items-center gap-1.5 rounded border border-black/15 bg-white px-2 text-xs font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+          <label className="inline-flex min-h-9 items-center gap-1.5 rounded border border-black/15 bg-[var(--app-surface)] px-2 text-xs font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
             배경
             <input type="color" defaultValue="#fff3a3" className="h-6 w-7 cursor-pointer border-0 bg-transparent p-0"
               onPointerDown={(e) => e.preventDefault()}
@@ -1612,37 +1612,37 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
               onTouchStart={(e) => e.preventDefault()}
               onChange={(e) => applyFormat('hiliteColor', e.target.value)} />
           </label>
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
             <ImagePlus size={14} />이미지
             <input type="file" multiple accept="image/jpeg,image/png,image/gif,image/webp" className="hidden"
               onChange={(e) => { editorApiRef.current?.insertFiles(Array.from(e.target.files)); e.target.value = '' }} />
           </label>
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
             <Video size={14} />동영상
             <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden"
               onChange={(e) => { editorApiRef.current?.insertFiles(Array.from(e.target.files)); e.target.value = '' }} />
           </label>
-          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+          <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
             <Paperclip size={14} />압축파일
             <input type="file" multiple accept=".zip,application/zip,application/x-zip-compressed" className="hidden"
               onChange={(e) => { editorApiRef.current?.insertFiles(Array.from(e.target.files)); e.target.value = '' }} />
           </label>
           <button type="button" onClick={() => setActiveInsertTool((tool) => tool === 'url' ? '' : 'url')}
-            className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'url' ? 'border-[#3b4890] bg-[#eef3ff] text-[#3b4890]' : 'border-black/15 bg-white text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'url' ? 'border-[#3b4890] bg-[#eef3ff] text-[#3b4890]' : 'border-black/15 bg-[var(--app-surface)] text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
             <Link size={14} />URL 삽입
           </button>
           <button type="button" onClick={() => setActiveInsertTool((tool) => tool === 'youtube' ? '' : 'youtube')}
-            className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'youtube' ? 'border-[#3b4890] bg-[#eef3ff] text-[#3b4890]' : 'border-black/15 bg-white text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'youtube' ? 'border-[#3b4890] bg-[#eef3ff] text-[#3b4890]' : 'border-black/15 bg-[var(--app-surface)] text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
             <Search size={14} />영상 검색
           </button>
           <button type="button" onClick={() => setActiveInsertTool((tool) => tool === 'poll' ? '' : 'poll')}
-            className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'poll' ? 'border-[#3b4890] bg-[#eef3ff] text-[#3b4890]' : 'border-black/15 bg-white text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'poll' ? 'border-[#3b4890] bg-[#eef3ff] text-[#3b4890]' : 'border-black/15 bg-[var(--app-surface)] text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
             <Plus size={14} />투표
           </button>
           <span className="text-xs text-[var(--theme-body-muted)]">본문 칸에 드래그하거나 Ctrl+V로 바로 삽입 · 필요한 도구만 열어서 사용</span>
         </div>
         {activeInsertTool && (
-        <div className="space-y-3 border-b border-black/10 bg-white px-3 py-3">
+        <div className="space-y-3 border-b border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-3">
           {activeInsertTool === 'url' && (
           <div className="flex flex-col gap-2 lg:flex-row">
             <input
@@ -1653,7 +1653,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
               placeholder="외부 이미지/영상/YouTube URL"
               className="min-h-10 flex-1 rounded border border-black/15 px-3 text-sm outline-none focus:border-[#3b4890]"
             />
-            <button type="button" onClick={insertExternalUrl} className="inline-flex min-h-10 items-center justify-center gap-1 rounded border border-black/15 bg-white px-3 text-sm font-bold text-[var(--theme-body-mid)] hover:bg-black/5">
+            <button type="button" onClick={insertExternalUrl} className="inline-flex min-h-10 items-center justify-center gap-1 rounded border border-black/15 bg-[var(--app-surface)] px-3 text-sm font-bold text-[var(--theme-body-mid)] hover:bg-black/5">
               <Link size={14} /> URL 삽입
             </button>
           </div>
@@ -1669,14 +1669,14 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
               placeholder="YouTube 영상 검색"
               className="min-h-10 flex-1 rounded border border-black/15 px-3 text-sm outline-none focus:border-[#3b4890]"
             />
-            <button type="button" onClick={handleYoutubeSearch} disabled={youtubeSearching} className="inline-flex min-h-10 items-center justify-center gap-1 rounded border border-black/15 bg-white px-3 text-sm font-bold text-[var(--theme-body-mid)] hover:bg-black/5 disabled:opacity-50">
+            <button type="button" onClick={handleYoutubeSearch} disabled={youtubeSearching} className="inline-flex min-h-10 items-center justify-center gap-1 rounded border border-black/15 bg-[var(--app-surface)] px-3 text-sm font-bold text-[var(--theme-body-mid)] hover:bg-black/5 disabled:opacity-50">
               <Search size={14} /> {youtubeSearching ? '검색 중...' : '영상 검색'}
             </button>
           </div>
           {youtubeResults.length > 0 && (
             <div className="grid gap-2 sm:grid-cols-2">
               {youtubeResults.map((item) => (
-                <button key={item.videoId} type="button" onClick={() => insertYoutubeResult(item)} className="flex gap-2 rounded border border-black/10 bg-black/[0.03] p-2 text-left hover:bg-black/[0.06]">
+                <button key={item.videoId} type="button" onClick={() => insertYoutubeResult(item)} className="flex gap-2 rounded border border-[var(--app-hairline)] bg-black/[0.03] p-2 text-left hover:bg-black/[0.06]">
                   {item.thumbnailUrl && <img src={item.thumbnailUrl} alt="" className="h-16 w-24 rounded object-cover" />}
                   <span className="min-w-0">
                     <span className="line-clamp-2 text-sm font-bold text-[var(--theme-body-dark)]">{item.title}</span>
@@ -1704,7 +1704,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
               value={pollQuestion}
               onChange={(e) => setPollQuestion(e.target.value)}
               placeholder="투표 제목 입력"
-              className="mb-2 min-h-11 w-full rounded-lg border border-[#3b4890]/15 bg-white px-3 text-sm font-semibold outline-none focus:border-[#3b4890]"
+              className="mb-2 min-h-11 w-full rounded-lg border border-[#3b4890]/15 bg-[var(--app-surface)] px-3 text-sm font-semibold outline-none focus:border-[#3b4890]"
             />
             <div className="mb-3">
               <div className="mb-2 text-xs font-black text-[#23306d]">종료 시간</div>
@@ -1718,7 +1718,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
                       onClick={() => setPollDurationMinutes(option.value)}
                       className={`min-h-10 rounded-full border px-3 text-xs font-black transition sm:text-sm ${selected
                         ? 'border-[#3b4890] bg-[#3b4890] text-white shadow-sm'
-                        : 'border-[#3b4890]/15 bg-white text-[#23306d] hover:border-[#3b4890]/40 hover:bg-[#f4f6ff]'
+                        : 'border-[#3b4890]/15 bg-[var(--app-surface)] text-[#23306d] hover:border-[#3b4890]/40 hover:bg-[#f4f6ff]'
                       }`}
                       aria-pressed={selected}
                     >
@@ -1733,27 +1733,27 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
             </div>
             <div className="space-y-2">
               {pollOptionInputs.map((option, index) => (
-                <div key={index} className="grid gap-2 rounded-lg border border-black/10 bg-white/70 p-2 sm:grid-cols-[auto_1fr_1fr_auto] sm:items-center">
+                <div key={index} className="grid gap-2 rounded-lg border border-[var(--app-hairline)] bg-white/70 p-2 sm:grid-cols-[auto_1fr_1fr_auto] sm:items-center">
                   <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#3b4890] text-xs font-black text-white">{index + 1}</span>
                   <input
                     type="text"
                     value={option.label}
                     onChange={(e) => updatePollOption(index, 'label', e.target.value)}
                     placeholder={`보기 ${index + 1}`}
-                    className="min-h-10 flex-1 rounded-lg border border-black/10 bg-white px-3 text-sm outline-none focus:border-[#3b4890]"
+                    className="min-h-10 flex-1 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-sm outline-none focus:border-[#3b4890]"
                   />
                   <input
                     type="url"
                     value={option.imageUrl}
                     onChange={(e) => updatePollOption(index, 'imageUrl', e.target.value)}
                     placeholder="보기 이미지 URL(선택)"
-                    className="min-h-10 flex-1 rounded-lg border border-black/10 bg-white px-3 text-sm outline-none focus:border-[#3b4890]"
+                    className="min-h-10 flex-1 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-sm outline-none focus:border-[#3b4890]"
                   />
                   <button
                     type="button"
                     onClick={() => removePollOption(index)}
                     disabled={pollOptionInputs.length <= 2}
-                    className="min-h-10 rounded border border-black/10 bg-white px-3 text-xs font-bold text-red-500 transition hover:bg-red-50 disabled:opacity-30"
+                    className="min-h-10 rounded border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-xs font-bold text-red-500 transition hover:bg-red-50 disabled:opacity-30"
                   >
                     삭제
                   </button>
@@ -1764,7 +1764,7 @@ function PostForm({ initialPost, onCancel, onSave, user }) {
               type="button"
               onClick={addPollOption}
               disabled={pollOptionInputs.length >= 10}
-              className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[#3b4890]/45 bg-white/70 text-sm font-bold text-[#3b4890] transition hover:bg-white disabled:opacity-40"
+              className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[#3b4890]/45 bg-white/70 text-sm font-bold text-[#3b4890] transition hover:bg-[var(--app-surface)] disabled:opacity-40"
             >
               <Plus size={16} /> 보기 추가
             </button>
@@ -2270,11 +2270,11 @@ export default function Community({ onBack }) {
 
   const renderPagination = (placement = 'top') => {
     const disabledClass = 'opacity-35'
-    const iconButtonClass = 'flex size-10 items-center justify-center rounded-full border border-black/10 bg-white text-[#6e6e73] transition enabled:hover:bg-[#f5f5f7] disabled:pointer-events-none sm:size-9'
+    const iconButtonClass = 'flex size-10 items-center justify-center rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-muted)] transition enabled:hover:bg-[var(--app-surface-soft)] disabled:pointer-events-none sm:size-9'
 
     return (
       <div className={`flex flex-col gap-3 ${placement === 'bottom' ? 'items-center' : 'lg:flex-row lg:items-center lg:justify-between'}`}>
-        <div className="text-center text-xs font-semibold text-[#86868b] lg:text-left">
+        <div className="text-center text-xs font-semibold text-[var(--app-subtle)] lg:text-left">
           {filteredPosts.length > 0
             ? `${showingFrom.toLocaleString('ko-KR')}-${showingTo.toLocaleString('ko-KR')} / ${filteredPosts.length.toLocaleString('ko-KR')}`
             : '0 / 0'}
@@ -2305,7 +2305,7 @@ export default function Community({ onBack }) {
             </button>
             {paginationItems.map((item) => (
               typeof item === 'string' ? (
-                <span key={item} className="flex size-10 items-center justify-center text-sm font-black text-[#86868b] sm:size-9">...</span>
+                <span key={item} className="flex size-10 items-center justify-center text-sm font-black text-[var(--app-subtle)] sm:size-9">...</span>
               ) : (
                 <button
                   key={item}
@@ -2313,8 +2313,8 @@ export default function Community({ onBack }) {
                   onClick={() => goToPage(item)}
                   className={`flex size-10 items-center justify-center rounded-full border text-sm font-black transition sm:size-9 ${
                     page === item
-                      ? 'border-[#0071e3] bg-[#0071e3] text-white shadow-[0_8px_22px_rgba(0,113,227,0.22)]'
-                      : 'border-black/10 bg-white text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]'
+                      ? 'border-[#0071e3] bg-[var(--app-accent)] text-white shadow-[0_8px_22px_rgba(0,113,227,0.22)]'
+                      : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-muted)] hover:bg-[var(--app-surface-soft)] hover:text-[var(--app-text)]'
                   }`}
                   aria-current={page === item ? 'page' : undefined}
                 >
@@ -2359,20 +2359,20 @@ export default function Community({ onBack }) {
         role="button"
         onClick={open}
         onKeyDown={(event) => openRowWithKeyboard(event, open)}
-        className={`apple-soft-panel cursor-pointer p-4 text-left text-[#6e6e73] transition hover:-translate-y-0.5 focus:bg-[#f5f5f7] focus:outline-none ${concept ? 'concept-post-card' : ''}`}
+        className={`apple-soft-panel cursor-pointer p-4 text-left text-[var(--app-muted)] transition hover:-translate-y-0.5 focus:bg-[var(--app-surface-soft)] focus:outline-none ${concept ? 'concept-post-card' : ''}`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-black">
-              <span className="text-[#86868b]">#{post.id}</span>
-              <span className="rounded-full bg-[#e8f8ff] px-2 py-1 text-[#0066cc]">{categoryLabel(post.category || 'GENERAL')}</span>
+              <span className="text-[var(--app-subtle)]">#{post.id}</span>
+              <span className="rounded-full bg-[#e8f8ff] px-2 py-1 text-[var(--app-accent-text)]">{categoryLabel(post.category || 'GENERAL')}</span>
               {concept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] text-[#3a2b00]">개념글</span>}
-              {postHasImages(post) && <span className="text-[#0066cc]">[사진]</span>}
-              {(post.videoInfos?.length > 0) && <span className="text-[#0066cc]">[영상]</span>}
-              {isEdited(post) && <span className="text-[#86868b]">수정</span>}
+              {postHasImages(post) && <span className="text-[var(--app-accent-text)]">[사진]</span>}
+              {(post.videoInfos?.length > 0) && <span className="text-[var(--app-accent-text)]">[영상]</span>}
+              {isEdited(post) && <span className="text-[var(--app-subtle)]">수정</span>}
               {post.authorAdmin && <span className="rounded bg-red-600 px-1 py-0.5 text-[10px] text-white">주딱</span>}
             </div>
-            <h3 className="mt-2 min-w-0 text-base font-black leading-6 text-[#1d1d1f]">
+            <h3 className="mt-2 min-w-0 text-base font-black leading-6 text-[var(--app-text)]">
               {renderPostTitleWithCount(post)}
             </h3>
           </div>
@@ -2386,8 +2386,8 @@ export default function Community({ onBack }) {
             </button>
           )}
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-[#86868b]">
-          <span className="min-w-0 truncate text-[#6e6e73]">{post.authorDisplayName || post.authorName}</span>
+        <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-[var(--app-subtle)]">
+          <span className="min-w-0 truncate text-[var(--app-muted)]">{post.authorDisplayName || post.authorName}</span>
           <span className="text-right">{shortDate(post.createdAt)}</span>
           <span>조회 {post.viewCount}</span>
           <span className="text-right">개추 {postScore(post)}</span>
@@ -2431,7 +2431,7 @@ export default function Community({ onBack }) {
                   }}
                   maxLength={MAX_COMMENT_LENGTH}
                   rows={3}
-                  className="w-full rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-white sm:text-sm"
+                  className="w-full rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-[var(--app-surface)] sm:text-sm"
                   disabled={commentSaving}
                 />
                 <div className="flex flex-wrap gap-2">
@@ -2446,7 +2446,7 @@ export default function Community({ onBack }) {
                   <button
                     type="button"
                     onClick={() => { setEditingCommentId(null); setEditCommentInput('') }}
-                    className="rounded border border-black/15 bg-white px-3 py-2 text-xs font-bold text-[var(--theme-body-muted)]"
+                    className="rounded border border-black/15 bg-[var(--app-surface)] px-3 py-2 text-xs font-bold text-[var(--theme-body-muted)]"
                   >
                     취소
                   </button>
@@ -2512,7 +2512,7 @@ export default function Community({ onBack }) {
                     onChange={(e) => setReplyAnonymousName(e.target.value)}
                     maxLength={MAX_ANONYMOUS_NAME_LENGTH}
                     placeholder="ㅇㅇ"
-                    className="w-full rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-white sm:text-sm"
+                    className="w-full rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-[var(--app-surface)] sm:text-sm"
                     disabled={commentSaving}
                   />
                 )}
@@ -2528,7 +2528,7 @@ export default function Community({ onBack }) {
                   placeholder="댓글을 입력하세요"
                   maxLength={Math.max(0, MAX_COMMENT_LENGTH - (replyMentionEnabled ? replyMentionFor(comment).length + 1 : 0))}
                   rows={3}
-                  className="w-full rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-white sm:text-sm"
+                  className="w-full rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-[var(--app-surface)] sm:text-sm"
                   disabled={commentSaving}
                 />
                 <div className="flex flex-wrap gap-2">
@@ -2543,7 +2543,7 @@ export default function Community({ onBack }) {
                   <button
                     type="button"
                     onClick={() => { setReplyTo(null); setReplyInput(''); setReplyAnonymousName('') }}
-                    className="rounded border border-black/15 bg-white px-3 py-2 text-xs font-bold text-[var(--theme-body-muted)]"
+                    className="rounded border border-black/15 bg-[var(--app-surface)] px-3 py-2 text-xs font-bold text-[var(--theme-body-muted)]"
                   >
                     취소
                   </button>
@@ -2607,22 +2607,22 @@ export default function Community({ onBack }) {
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <div className="relative flex items-center">
-                      <Search size={15} className="pointer-events-none absolute left-3 text-[#86868b]" />
+                      <Search size={15} className="pointer-events-none absolute left-3 text-[var(--app-subtle)]" />
                       <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => { setSearchQuery(e.target.value); setPage(1) }}
                         placeholder="제목, 본문, 작성자 검색"
-                        className="h-11 w-full rounded-full border border-black/10 bg-white py-2 pl-9 pr-3 text-base text-[#1d1d1f] placeholder:text-[#86868b] outline-none transition focus:ring-2 focus:ring-[#0071e3]/24 sm:h-10 sm:w-64 sm:text-sm"
+                        className="h-11 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-9 pr-3 text-base text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none transition focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:h-10 sm:w-64 sm:text-sm"
                       />
                     </div>
-                    <span className="rounded-full border border-black/10 bg-white px-3 py-2 text-center text-xs font-bold text-[#86868b]">
+                    <span className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-center text-xs font-bold text-[var(--app-subtle)]">
                       {filteredPosts.length.toLocaleString('ko-KR')}개
                     </span>
                   </div>
                 </div>
                 <div className="-mx-1 overflow-x-auto pb-1">
-                  <div className="flex min-w-max items-center gap-2 px-1 text-xs font-black text-[#6e6e73]">
+                  <div className="flex min-w-max items-center gap-2 px-1 text-xs font-black text-[var(--app-muted)]">
                     <span className="shrink-0">정렬</span>
                     {SORT_OPTIONS.map((item) => (
                       <button
@@ -2644,7 +2644,7 @@ export default function Community({ onBack }) {
                     )}
                   </div>
                 </div>
-                <div className="border-t border-black/10 pt-4">
+                <div className="border-t border-[var(--app-hairline)] pt-4">
                   {renderPagination('top')}
                 </div>
               </div>
@@ -2652,16 +2652,16 @@ export default function Community({ onBack }) {
             {error && <p className="mx-5 mt-5 rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 sm:mx-7">{error}</p>}
             <div className="m-4 space-y-3 md:hidden">
               {loading && (
-                <div className="rounded-lg border border-black/10 bg-white px-4 py-12 text-center text-sm font-semibold text-[#6e6e73]">불러오는 중...</div>
+                <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-12 text-center text-sm font-semibold text-[var(--app-muted)]">불러오는 중...</div>
               )}
               {!loading && filteredPosts.length === 0 && (
-                <div className="rounded-lg border border-black/10 bg-white px-4 py-12 text-center text-sm font-semibold text-[#6e6e73]">등록된 글이 없습니다.</div>
+                <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-12 text-center text-sm font-semibold text-[var(--app-muted)]">등록된 글이 없습니다.</div>
               )}
               {visiblePosts.map(renderPostCard)}
             </div>
-            <div className="m-5 hidden overflow-x-auto rounded-lg border border-black/10 bg-white md:block sm:m-8">
+            <div className="m-5 hidden overflow-x-auto rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] md:block sm:m-8">
               <table className="apple-table w-full min-w-[860px] border-collapse text-sm">
-                <thead className="border-b border-black/10">
+                <thead className="border-b border-[var(--app-hairline)]">
                   <tr>
                     <th className="w-20 px-4 py-3 font-semibold">번호</th>
                     <th className="w-24 px-4 py-3 font-semibold">말머리</th>
@@ -2674,10 +2674,10 @@ export default function Community({ onBack }) {
                 </thead>
                 <tbody className="divide-y divide-black/10">
                   {loading && (
-                    <tr><td colSpan="7" className="px-4 py-16 text-center text-[#6e6e73]">불러오는 중...</td></tr>
+                    <tr><td colSpan="7" className="px-4 py-16 text-center text-[var(--app-muted)]">불러오는 중...</td></tr>
                   )}
                   {!loading && filteredPosts.length === 0 && (
-                    <tr><td colSpan="7" className="px-4 py-16 text-center text-[#6e6e73]">등록된 글이 없습니다.</td></tr>
+                    <tr><td colSpan="7" className="px-4 py-16 text-center text-[var(--app-muted)]">등록된 글이 없습니다.</td></tr>
                   )}
                   {visiblePosts.map((post) => {
                     const open = () => openPost(post)
@@ -2689,18 +2689,18 @@ export default function Community({ onBack }) {
                       role="button"
                       onClick={open}
                       onKeyDown={(event) => openRowWithKeyboard(event, open)}
-                      className={`cursor-pointer text-[#6e6e73] transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none ${concept ? 'concept-post-row' : ''}`}
+                      className={`cursor-pointer text-[var(--app-muted)] transition hover:bg-[var(--app-surface-soft)] focus:bg-[var(--app-surface-soft)] focus:outline-none ${concept ? 'concept-post-row' : ''}`}
                     >
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-[#86868b]">{post.id}</td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-[#0066cc]">{categoryLabel(post.category || 'GENERAL')}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-[var(--app-subtle)]">{post.id}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-[var(--app-accent-text)]">{categoryLabel(post.category || 'GENERAL')}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
-                        <span className="flex max-w-full min-w-0 items-center gap-1 text-left font-semibold text-[#1d1d1f] lg:max-w-[520px]">
+                        <span className="flex max-w-full min-w-0 items-center gap-1 text-left font-semibold text-[var(--app-text)] lg:max-w-[520px]">
                           {concept && <span className="shrink-0 rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
                           {renderPostTitleWithCount(post)}
                         </span>
-                        {postHasImages(post) && <span className="ml-1 text-xs text-[#0066cc]">[사진]</span>}
-                        {(post.videoInfos?.length > 0) && <span className="ml-1 text-xs text-[#0066cc]">[영상]</span>}
-                        {isEdited(post) && <span className="ml-1 text-[10px] font-bold text-[#86868b]">수정</span>}
+                        {postHasImages(post) && <span className="ml-1 text-xs text-[var(--app-accent-text)]">[사진]</span>}
+                        {(post.videoInfos?.length > 0) && <span className="ml-1 text-xs text-[var(--app-accent-text)]">[영상]</span>}
+                        {isEdited(post) && <span className="ml-1 text-[10px] font-bold text-[var(--app-subtle)]">수정</span>}
                         {post.authorAdmin && <span className="ml-1 rounded bg-red-600 px-1 py-0.5 text-[10px] font-black text-white">주딱</span>}
                       </td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-semibold">
@@ -2715,7 +2715,7 @@ export default function Community({ onBack }) {
                           </button>
                         )}
                       </td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-[#86868b]">{shortDate(post.createdAt)}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-[var(--app-subtle)]">{shortDate(post.createdAt)}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{post.viewCount}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{postScore(post)}</td>
                     </tr>
@@ -2743,17 +2743,17 @@ export default function Community({ onBack }) {
                 관리자가 삭제한 글과 직접 삭제한 글의 원문, 사유, 처리자를 여기서 확인할 수 있습니다.
               </div>
               {deletedError && <p className="rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{deletedError}</p>}
-              {deletedLoading && <div className="rounded-lg border border-black/10 bg-white px-4 py-12 text-center text-sm font-semibold text-[#6e6e73]">삭제 기록을 불러오는 중...</div>}
+              {deletedLoading && <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-12 text-center text-sm font-semibold text-[var(--app-muted)]">삭제 기록을 불러오는 중...</div>}
               {!deletedLoading && deletedPosts.length === 0 && (
-                <div className="rounded-lg border border-black/10 bg-white px-4 py-12 text-center text-sm font-semibold text-[#6e6e73]">삭제된 내 글이 없습니다.</div>
+                <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-12 text-center text-sm font-semibold text-[var(--app-muted)]">삭제된 내 글이 없습니다.</div>
               )}
               {!deletedLoading && deletedPosts.map((record) => {
                 const restored = Boolean(record.restoredPostId)
                 const appealed = Boolean(record.latestAppealStatus)
                 const timeline = buildDeletedPostTimeline(record)
                 return (
-                  <article key={record.id} className="overflow-hidden rounded-lg border border-black/10 bg-white">
-                    <div className="border-b border-black/10 px-4 py-4">
+                  <article key={record.id} className="overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)]">
+                    <div className="border-b border-[var(--app-hairline)] px-4 py-4">
                       <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[#3b4890]">
                         <span>{categoryLabel(record.category || 'GENERAL')}</span>
                         <span className={restored ? 'rounded bg-emerald-100 px-2 py-1 text-emerald-700' : 'rounded bg-red-50 px-2 py-1 text-red-700'}>
@@ -2761,7 +2761,7 @@ export default function Community({ onBack }) {
                         </span>
                         {appealed && <span className="rounded bg-[#fff4cc] px-2 py-1 text-[#8a6400]">복원 요청 접수됨</span>}
                       </div>
-                      <h2 className="break-words text-lg font-black text-[#1d1d1f]">{record.title}</h2>
+                      <h2 className="break-words text-lg font-black text-[var(--app-text)]">{record.title}</h2>
                       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--theme-body-muted)]">
                         <span>삭제 {record.deletedAt ? new Date(record.deletedAt).toLocaleString('ko-KR') : '-'}</span>
                         <span>처리자 {deletionIdentity(record.deletedByName, record.deletedByStudentId)}</span>
@@ -2793,7 +2793,7 @@ export default function Community({ onBack }) {
                               <li key={`${record.id}-${item.label}-${index}`} className="grid grid-cols-[auto_1fr] gap-2 text-xs">
                                 <span className="mt-1 size-2 rounded-full bg-[#3b4890]" aria-hidden="true" />
                                 <span className="min-w-0">
-                                  <span className="font-black text-[#1d1d1f]">{item.label}</span>
+                                  <span className="font-black text-[var(--app-text)]">{item.label}</span>
                                   {item.time && <span className="ml-2 text-[var(--theme-body-muted)]">{item.time}</span>}
                                   {item.detail && (
                                     <span className="block break-words text-[var(--theme-body-muted)]">
@@ -2821,7 +2821,7 @@ export default function Community({ onBack }) {
                             maxLength={500}
                             rows={3}
                             placeholder="복원이 필요한 이유를 적어주세요."
-                            className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-base outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:text-sm"
+                            className="w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-base outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm"
                           />
                           <div className="flex flex-col gap-2 sm:flex-row">
                             <button type="button" onClick={() => submitAppeal(record)} disabled={appealingId === record.id} className="apple-action-primary px-4 py-2 text-sm">
@@ -2883,8 +2883,8 @@ export default function Community({ onBack }) {
             {detailLoading || !currentPost ? (
               <p className="px-4 py-16 text-center text-sm text-[var(--theme-body-muted)]">글을 여는 중...</p>
             ) : (
-              <article className="m-0 overflow-hidden bg-white sm:m-5 sm:rounded-lg sm:border sm:border-black/10">
-                <div className="border-b border-black/10 px-4 py-4 sm:px-5">
+              <article className="m-0 overflow-hidden bg-[var(--app-surface)] sm:m-5 sm:rounded-lg sm:border sm:border-[var(--app-hairline)]">
+                <div className="border-b border-[var(--app-hairline)] px-4 py-4 sm:px-5">
                   <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[#3b4890]">
                     <span>{categoryLabel(currentPost.category || 'GENERAL')}</span>
                     {currentPostConcept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
@@ -2908,23 +2908,23 @@ export default function Community({ onBack }) {
                     pollClosing,
                   })}
                 </div>
-                <div className="grid grid-cols-2 gap-2 border-y border-black/10 bg-[#fafafa] px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-3 sm:py-5">
-                  <button type="button" onClick={() => handleVote(1)} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === 1 ? 'border-[#0071e3] bg-[#0071e3] text-white' : 'border-black/10 bg-white text-[#0066cc]'}`}>
+                <div className="grid grid-cols-2 gap-2 border-y border-[var(--app-hairline)] bg-[#fafafa] px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-3 sm:py-5">
+                  <button type="button" onClick={() => handleVote(1)} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === 1 ? 'border-[#0071e3] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}>
                     <ThumbsUp size={16} />
                     개추 {currentPost.upvotes}
                   </button>
-                  <button type="button" onClick={() => handleVote(-1)} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === -1 ? 'border-red-600 bg-red-600 text-white' : 'border-black/10 bg-white text-red-600'}`}>
+                  <button type="button" onClick={() => handleVote(-1)} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === -1 ? 'border-red-600 bg-red-600 text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-red-600'}`}>
                     <ThumbsDown size={16} />
                     비추 {currentPost.downvotes}
                   </button>
                 </div>
                 <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:flex-wrap sm:justify-between">
-                  <button type="button" onClick={backToList} className="min-h-11 rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-bold sm:min-h-0">
+                  <button type="button" onClick={backToList} className="min-h-11 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
                     목록
                   </button>
                   {currentPost.editable && (
                     <div className="grid grid-cols-2 gap-2 sm:flex">
-                      <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-bold sm:min-h-0">
+                      <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
                         <Pencil size={14} />
                         수정
                       </button>
@@ -2937,8 +2937,8 @@ export default function Community({ onBack }) {
                 </div>
 
                 {/* 댓글 섹션 */}
-                <div className="border-t border-black/10">
-                  <div className="flex items-center gap-2 bg-[#f5f5f5] px-4 py-3">
+                <div className="border-t border-[var(--app-hairline)]">
+                  <div className="flex items-center gap-2 bg-[var(--app-surface-soft)] px-4 py-3">
                     <MessageSquare size={15} className="text-[#3b4890]" />
                     <span className="text-sm font-black text-[#3b4890]">댓글 {comments.length}</span>
                   </div>
@@ -2947,14 +2947,14 @@ export default function Community({ onBack }) {
                       {commentTree.map((comment) => renderComment(comment))}
                     </div>
                   )}
-                  <div className="flex flex-col gap-2 border-t border-black/8 bg-white px-4 py-3">
+                  <div className="flex flex-col gap-2 border-t border-black/8 bg-[var(--app-surface)] px-4 py-3">
                     {isAnonymousDetail && (
                       <input
                         value={commentAnonymousName}
                         onChange={(e) => setCommentAnonymousName(e.target.value)}
                         maxLength={MAX_ANONYMOUS_NAME_LENGTH}
                         placeholder="ㅇㅇ"
-                        className="rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-white sm:text-sm"
+                        className="rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-[var(--app-surface)] sm:text-sm"
                         disabled={commentSaving}
                       />
                     )}
@@ -2970,7 +2970,7 @@ export default function Community({ onBack }) {
                       placeholder="댓글을 입력하세요"
                       maxLength={MAX_COMMENT_LENGTH}
                       rows={3}
-                      className="min-h-24 rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-white sm:text-sm"
+                      className="min-h-24 rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-[var(--app-surface)] sm:text-sm"
                       disabled={commentSaving}
                     />
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

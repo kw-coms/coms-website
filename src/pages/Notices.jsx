@@ -29,7 +29,7 @@ const NOTICE_CATEGORY_META = {
     shortLabel: '공지',
     featuredLabel: '최신 공지',
     icon: Megaphone,
-    badgeClass: 'bg-[#e8f8ff] text-[#0066cc]',
+    badgeClass: 'bg-[#e8f8ff] text-[var(--app-accent-text)]',
   },
   PROMOTION: {
     label: '홍보',
@@ -99,20 +99,20 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }) {
         value={formData.title}
         onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
         placeholder="제목"
-        className="w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:text-sm"
+        className="w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm"
       />
       <textarea
         value={formData.content}
         onChange={(e) => setFormData((p) => ({ ...p, content: e.target.value }))}
         placeholder="내용"
         rows={10}
-        className="w-full resize-y rounded-lg border border-black/10 bg-white px-4 py-3 text-base leading-7 text-[#1d1d1f] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:rows-14 sm:text-sm"
+        className="w-full resize-y rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base leading-7 text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:rows-14 sm:text-sm"
       />
       <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
         <select
           value={formData.category}
           onChange={(e) => setFormData((p) => ({ ...p, category: e.target.value }))}
-          className="flex-1 rounded-lg border border-black/10 bg-white px-3 py-3 text-sm font-semibold sm:flex-none sm:py-2"
+          className="flex-1 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-3 text-sm font-semibold sm:flex-none sm:py-2"
         >
           {NOTICE_CATEGORY_OPTIONS.map((value) => (
             <option key={value} value={value}>{noticeCategoryMeta(value).label}</option>
@@ -302,9 +302,9 @@ export default function Notices() {
                         <Icon size={18} />
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-xs font-black text-[#0066cc]">{meta.featuredLabel}</span>
-                        <span className="mt-1 block line-clamp-2 text-sm font-black leading-5 text-[#1d1d1f] sm:text-[15px]">{notice.title}</span>
-                        <span className="mt-1 block truncate text-xs font-semibold text-[#86868b]">{formatDate(notice.createdAt)} · {notice.author}</span>
+                        <span className="block text-xs font-black text-[var(--app-accent-text)]">{meta.featuredLabel}</span>
+                        <span className="mt-1 block line-clamp-2 text-sm font-black leading-5 text-[var(--app-text)] sm:text-[15px]">{notice.title}</span>
+                        <span className="mt-1 block truncate text-xs font-semibold text-[var(--app-subtle)]">{formatDate(notice.createdAt)} · {notice.author}</span>
                       </span>
                     </button>
                   )
@@ -331,22 +331,22 @@ export default function Notices() {
               </div>
               <div className="flex min-w-0 items-center gap-3">
                 <div className="relative flex min-w-0 flex-1 items-center sm:flex-none">
-                  <Search size={14} className="pointer-events-none absolute left-3 text-[#86868b]" />
+                  <Search size={14} className="pointer-events-none absolute left-3 text-[var(--app-subtle)]" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="제목, 작성자 검색"
-                    className="w-full rounded-full border border-black/10 bg-white py-2 pl-8 pr-3 text-sm text-[#1d1d1f] placeholder:text-[#86868b] outline-none focus:ring-2 focus:ring-[#0071e3]/24 sm:w-64"
+                    className="w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-8 pr-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:w-64"
                   />
                 </div>
-                <span className="shrink-0 text-xs font-semibold text-[#86868b]">{filteredNotices.length}개</span>
+                <span className="shrink-0 text-xs font-semibold text-[var(--app-subtle)]">{filteredNotices.length}개</span>
               </div>
             </div>
-            {loading && <p className="px-4 py-16 text-center text-sm text-[#6e6e73]">불러오는 중...</p>}
+            {loading && <p className="px-4 py-16 text-center text-sm text-[var(--app-muted)]">불러오는 중...</p>}
             {error && <p className="mx-5 mt-5 rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-7">{error}</p>}
             {!loading && !error && filteredNotices.length === 0 && (
-              <p className="px-4 py-16 text-center text-sm text-[#6e6e73]">등록된 글이 없습니다.</p>
+              <p className="px-4 py-16 text-center text-sm text-[var(--app-muted)]">등록된 글이 없습니다.</p>
             )}
             {!loading && !error && filteredNotices.length > 0 && (
               <>
@@ -360,27 +360,27 @@ export default function Notices() {
                         key={notice.id}
                         type="button"
                         onClick={open}
-                        className="notice-mobile-card apple-soft-panel text-left transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none"
+                        className="notice-mobile-card apple-soft-panel text-left transition hover:bg-[var(--app-surface-soft)] focus:bg-[var(--app-surface-soft)] focus:outline-none"
                       >
                         <div className="flex min-w-0 items-center gap-2">
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${meta.badgeClass}`}>
                             {meta.label}
                           </span>
-                          <span className="ml-auto text-[11px] text-[#86868b]">{formatDate(notice.createdAt)}</span>
+                          <span className="ml-auto text-[11px] text-[var(--app-subtle)]">{formatDate(notice.createdAt)}</span>
                         </div>
                         <span className="notice-mobile-title-frame">
-                          <span className="line-clamp-2 text-[15px] font-bold leading-6 text-[#1d1d1f]">{notice.title}</span>
+                          <span className="line-clamp-2 text-[15px] font-bold leading-6 text-[var(--app-text)]">{notice.title}</span>
                         </span>
-                        <span className="mt-auto truncate text-xs font-semibold text-[#86868b]">{notice.author}</span>
+                        <span className="mt-auto truncate text-xs font-semibold text-[var(--app-subtle)]">{notice.author}</span>
                       </button>
                     )
                   })}
                 </div>
 
                 {/* 데스크탑 테이블 */}
-                <div className="m-4 hidden overflow-hidden rounded-lg border border-black/10 bg-white sm:m-6 md:block">
+                <div className="m-4 hidden overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] sm:m-6 md:block">
                   <table className="apple-table w-full min-w-[760px] border-collapse text-sm">
-                    <thead className="border-b border-black/10">
+                    <thead className="border-b border-[var(--app-hairline)]">
                       <tr>
                         <th className="w-16 px-4 py-3">번호</th>
                         <th className="w-28 px-4 py-3">분류</th>
@@ -400,19 +400,19 @@ export default function Notices() {
                             role="button"
                             onClick={open}
                             onKeyDown={(event) => openRowWithKeyboard(event, open)}
-                            className="cursor-pointer text-[#6e6e73] transition hover:bg-[#f5f5f7] focus:bg-[#f5f5f7] focus:outline-none"
+                            className="cursor-pointer text-[var(--app-muted)] transition hover:bg-[var(--app-surface-soft)] focus:bg-[var(--app-surface-soft)] focus:outline-none"
                           >
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs text-[#86868b]">{notice.id}</td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs text-[var(--app-subtle)]">{notice.id}</td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs font-bold">
                               <span className={`inline-flex rounded-full px-2.5 py-1 ${meta.badgeClass}`}>{meta.shortLabel}</span>
                             </td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5">
-                              <span className="block max-w-[440px] truncate text-left font-semibold text-[#1d1d1f]">
+                              <span className="block max-w-[440px] truncate text-left font-semibold text-[var(--app-text)]">
                                 {notice.title}
                               </span>
                             </td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs">{notice.author}</td>
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs text-[#86868b]">{formatDate(notice.createdAt)}</td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs text-[var(--app-subtle)]">{formatDate(notice.createdAt)}</td>
                           </tr>
                         )
                       })}
@@ -448,41 +448,41 @@ export default function Notices() {
         )}
 
         {isDetail && (
-          <article className="m-3 overflow-hidden rounded-lg bg-white shadow-[0_18px_50px_rgba(0,0,0,0.10)] sm:m-6">
-            <div className="border-b border-black/10 px-4 py-5 sm:px-5">
+          <article className="m-3 overflow-hidden rounded-lg bg-[var(--app-surface)] shadow-[0_18px_50px_rgba(0,0,0,0.10)] sm:m-6">
+            <div className="border-b border-[var(--app-hairline)] px-4 py-5 sm:px-5">
               <div className={`mb-2 inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${noticeCategoryMeta(selectedNotice.category || 'GENERAL').badgeClass}`}>
                 {noticeCategoryMeta(selectedNotice.category || 'GENERAL').label}
               </div>
               <h2 className="break-words text-xl font-black leading-tight sm:text-3xl md:text-4xl">
                 {selectedNotice.title}
               </h2>
-              <p className="mt-3 text-xs text-[#86868b]">
+              <p className="mt-3 text-xs text-[var(--app-subtle)]">
                 작성자 {selectedNotice.author} · {new Date(selectedNotice.createdAt).toLocaleString('ko-KR')}
               </p>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#86868b]">
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--app-subtle)]">
                 <span>조회 {selectedNotice.viewCount ?? 0}</span>
                 <span>개추 {selectedNotice.upvotes ?? 0}</span>
               </div>
             </div>
             <div className="text-size-container min-h-[200px] whitespace-pre-wrap break-words px-4 py-5 auto-text-notice sm:min-h-[360px] sm:px-5 sm:py-7">{linkify(selectedNotice.content)}</div>
-            <div className="flex items-center justify-center border-t border-black/10 bg-[#fafafa] px-4 py-4 sm:px-5">
+            <div className="flex items-center justify-center border-t border-[var(--app-hairline)] bg-[#fafafa] px-4 py-4 sm:px-5">
               <button
                 type="button"
                 onClick={handleNoticeVote}
                 disabled={voting}
-                className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-5 py-3 text-sm font-black disabled:opacity-50 ${selectedNotice.myVote === 1 ? 'border-[#0071e3] bg-[#0071e3] text-white' : 'border-black/10 bg-white text-[#0066cc]'}`}
+                className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-5 py-3 text-sm font-black disabled:opacity-50 ${selectedNotice.myVote === 1 ? 'border-[#0071e3] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
               >
                 <ThumbsUp size={16} />
                 개추 {selectedNotice.upvotes ?? 0}
               </button>
             </div>
-            <div className="flex flex-col gap-2 border-t border-black/10 px-4 py-4 sm:flex-row sm:flex-wrap sm:justify-between sm:px-5">
+            <div className="flex flex-col gap-2 border-t border-[var(--app-hairline)] px-4 py-4 sm:flex-row sm:flex-wrap sm:justify-between sm:px-5">
               <button type="button" onClick={backToList} className="apple-action-secondary min-h-11 px-4 py-2 text-sm sm:min-h-0">
                 목록
               </button>
               {isAdmin && (
                 <div className="grid grid-cols-2 gap-2 sm:flex">
-                  <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-bold sm:min-h-0">
+                  <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
                     <Pencil size={14} />
                     수정
                   </button>

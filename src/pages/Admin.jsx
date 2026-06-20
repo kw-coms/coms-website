@@ -169,7 +169,7 @@ export default function Admin({ onBack }) {
         <button
           type="button"
           onClick={onBack}
-          className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white"
+          className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-[var(--app-surface)]"
         >
           메인으로 돌아가기
         </button>
@@ -184,7 +184,7 @@ export default function Admin({ onBack }) {
         <button
           type="button"
           onClick={onBack}
-          className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] shadow-[0_18px_40px_rgba(255,255,255,0.2)] transition hover:bg-white"
+          className="shape-cut-sm border border-[var(--theme-border-soft)] bg-[var(--theme-surface-96)] px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] shadow-[0_18px_40px_rgba(255,255,255,0.2)] transition hover:bg-[var(--app-surface)]"
         >
           메인으로 돌아가기
         </button>
@@ -219,7 +219,7 @@ export default function Admin({ onBack }) {
                   className={`shape-cut-sm shrink-0 px-4 py-2 text-sm font-semibold transition ${
                     activeTab === tab.id
                       ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]'
-                      : 'border border-black/10 bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/80'
+                      : 'border border-[var(--app-hairline)] bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/80'
                   }`}
                 >
                   {tab.label}
@@ -321,7 +321,7 @@ function OverviewTab({ recruitApplications, recruitLoading, recruitError, onOpen
 
       <div className="grid gap-3 md:grid-cols-3">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-lg border border-black/10 bg-black/5 p-4">
+          <div key={card.label} className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
             <p className="text-xs font-semibold text-[var(--theme-body-muted)]">{card.label}</p>
             <p className="mt-2 text-2xl font-bold text-[var(--theme-body-dark)]">{card.value}</p>
             <p className="mt-2 text-xs leading-5 text-[var(--theme-body-muted)]">{card.detail}</p>
@@ -329,7 +329,7 @@ function OverviewTab({ recruitApplications, recruitLoading, recruitError, onOpen
         ))}
       </div>
 
-      <div className="rounded-lg border border-black/10 bg-white/60 p-4">
+      <div className="rounded-lg border border-[var(--app-hairline)] bg-white/60 p-4">
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">다음 운영 액션</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           {[
@@ -337,7 +337,7 @@ function OverviewTab({ recruitApplications, recruitLoading, recruitError, onOpen
             ['커뮤니티', '공지와 활동 글 흐름을 확인합니다.'],
             ['자료실', '최근 세미나·프로젝트 자료를 올립니다.'],
           ].map(([title, body]) => (
-            <div key={title} className="shape-cut-sm border border-black/10 bg-black/5 px-3 py-3">
+            <div key={title} className="shape-cut-sm border border-[var(--app-hairline)] bg-black/5 px-3 py-3">
               <p className="text-sm font-bold text-[var(--theme-body-dark)]">{title}</p>
               <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">{body}</p>
             </div>
@@ -399,13 +399,13 @@ function RecruitApplicationsTab({ applications, loading, error, onReload, onUpda
         <button
           type="button"
           onClick={onReload}
-          className="shape-cut-sm border border-black/10 bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
+          className="shape-cut-sm border border-[var(--app-hairline)] bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
         >
           새로고침
         </button>
       </div>
 
-      {message && <p className="shape-cut-sm bg-[#e8f3ff] px-4 py-3 text-sm font-semibold text-[#0066cc]">{message}</p>}
+      {message && <p className="shape-cut-sm bg-[var(--app-accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-accent-text)]">{message}</p>}
       {saveError && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{saveError}</p>}
       {loading && <p className="text-sm text-[var(--theme-body-muted)]">지원서를 불러오는 중...</p>}
       {error && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
@@ -421,12 +421,12 @@ function RecruitApplicationsTab({ applications, loading, error, onReload, onUpda
               adminNote: application.adminNote || '',
             }
             return (
-              <article key={application.id} className="rounded-lg border border-black/10 bg-black/5 p-4">
+              <article key={application.id} className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-lg font-bold text-[var(--theme-body-dark)]">{application.name}</h3>
-                      <span className="rounded bg-[#e8f3ff] px-2 py-1 text-xs font-bold text-[#0066cc]">{recruitStatusLabel(application.status)}</span>
+                      <span className="rounded bg-[var(--app-accent-soft)] px-2 py-1 text-xs font-bold text-[var(--app-accent-text)]">{recruitStatusLabel(application.status)}</span>
                     </div>
                     <p className="mt-1 text-xs text-[var(--theme-body-muted)]">
                       {application.studentId} · {application.department} · {application.grade || '학년 미입력'} · {formatDateTime(application.submittedAt)}
@@ -440,7 +440,7 @@ function RecruitApplicationsTab({ applications, loading, error, onReload, onUpda
                         aria-label={`${application.name} 지원 상태`}
                         value={draft.status}
                         onChange={(event) => updateDraft(application.id, { status: event.target.value })}
-                        className="shape-cut-sm border border-black/10 bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none"
+                        className="shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none"
                       >
                         {RECRUIT_STATUS_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>{option.label}</option>
@@ -482,7 +482,7 @@ function RecruitApplicationsTab({ applications, loading, error, onReload, onUpda
                         value={draft.adminNote}
                         onChange={(event) => updateDraft(application.id, { adminNote: event.target.value })}
                         maxLength={1000}
-                        className="mt-1 min-h-24 w-full rounded-lg border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+                        className="mt-1 min-h-24 w-full rounded-lg border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
                         placeholder="면담 일정, 연락 결과, 합격 안내 여부 등을 남깁니다."
                       />
                     </label>
@@ -507,7 +507,7 @@ function ScreenCheckTab() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-black/10 bg-black/5 p-4">
+      <div className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">Smoke 대상 경로</p>
         <div data-testid="screen-check-routes" className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {SCREEN_CHECK_ROUTES.map((route) => (
@@ -516,7 +516,7 @@ function ScreenCheckTab() {
               href={route.path}
               target="_blank"
               rel="noreferrer"
-              className="shape-cut-sm border border-black/10 bg-white/70 px-3 py-3 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white"
+              className="shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-3 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-[var(--app-surface)]"
             >
               <span className="block text-xs text-[var(--theme-body-muted)]">{route.label}</span>
               <span className="mt-1 block font-mono">{route.path}</span>
@@ -525,11 +525,11 @@ function ScreenCheckTab() {
         </div>
       </div>
 
-      <div className="rounded-lg border border-black/10 bg-black/5 p-4">
+      <div className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">API 상태 확인 표면</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           {SCREEN_CHECK_APIS.map((api) => (
-            <div key={api.path} className="shape-cut-sm border border-black/10 bg-white/70 px-3 py-3">
+            <div key={api.path} className="shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-3">
               <span className="block text-xs font-semibold text-[var(--theme-body-muted)]">{api.label}</span>
               <span className="mt-1 block break-all font-mono text-sm text-[var(--theme-body-dark)]">{api.path}</span>
             </div>
@@ -693,11 +693,11 @@ function RosterTab() {
     })
   }
 
-  const inputCls = 'shape-cut-sm border border-black/10 bg-white/70 px-2 py-1 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
+  const inputCls = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-2 py-1 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-black/10 bg-black/5 p-4">
+      <div className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">개별 회원 추가</p>
         <p className="mt-1 text-xs text-[var(--theme-body-muted)]">명부에 직접 추가합니다. 재학생은 10자리 학번, 졸업생은 입학년도 끝 두자리 또는 기수로 추가합니다. 둘 중 하나 입력 시 나머지 자동 계산됩니다.</p>
         <div className="mt-3 flex gap-1">
@@ -709,7 +709,7 @@ function RosterTab() {
               className={`shape-cut-sm px-3 py-1 text-xs font-semibold transition ${
                 addForm.mode === m.id
                   ? 'bg-[var(--theme-text)] text-[var(--theme-bg)]'
-                  : 'border border-black/10 bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/80'
+                  : 'border border-[var(--app-hairline)] bg-white/60 text-[var(--theme-body-dark)] hover:bg-white/80'
               }`}
             >
               {m.label}
@@ -723,7 +723,7 @@ function RosterTab() {
               onChange={(e) => setAddForm((p) => ({ ...p, studentId: e.target.value }))}
               placeholder="학번 (10자리)"
               maxLength={10}
-              className="shape-cut-sm w-40 border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+              className="shape-cut-sm w-40 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
             />
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -733,7 +733,7 @@ function RosterTab() {
                 placeholder="입학년도 끝 두자리 (예: 19)"
                 maxLength={2}
                 inputMode="numeric"
-                className="shape-cut-sm w-44 border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+                className="shape-cut-sm w-44 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
               />
               <input
                 value={addForm.generation}
@@ -741,7 +741,7 @@ function RosterTab() {
                 placeholder="기수 (예: 53)"
                 maxLength={2}
                 inputMode="numeric"
-                className="shape-cut-sm w-32 border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+                className="shape-cut-sm w-32 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
               />
             </div>
           )}
@@ -750,7 +750,7 @@ function RosterTab() {
             onChange={(e) => setAddForm((p) => ({ ...p, name: e.target.value }))}
             placeholder="이름"
             maxLength={20}
-            className="shape-cut-sm w-32 border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+            className="shape-cut-sm w-32 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
           />
           <button
             type="submit"
@@ -765,11 +765,11 @@ function RosterTab() {
             {adding ? '추가 중...' : '추가'}
           </button>
         </form>
-        {addResult && <p className="mt-2 text-xs font-semibold text-[#0066cc]">{addResult}</p>}
+        {addResult && <p className="mt-2 text-xs font-semibold text-[var(--app-accent-text)]">{addResult}</p>}
         {addError && <p className="mt-2 text-xs font-semibold text-red-600">{addError}</p>}
       </div>
 
-      <div className="rounded-lg border border-black/10 bg-black/5 p-4">
+      <div className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-[var(--theme-body-dark)]">명부 확인 · 편집</p>
@@ -778,7 +778,7 @@ function RosterTab() {
           <button
             type="button"
             onClick={() => { setLoadingRoster(true); loadRoster() }}
-            className="shape-cut-sm border border-black/10 bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
+            className="shape-cut-sm border border-[var(--app-hairline)] bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
           >
             새로고침
           </button>
@@ -790,7 +790,7 @@ function RosterTab() {
           <p className="mt-4 text-sm text-[var(--theme-body-muted)]">등록된 명부가 없습니다.</p>
         )}
         {!loadingRoster && !rosterError && roster.length > 0 && (
-          <div className="mt-4 max-h-96 overflow-auto rounded-lg border border-black/10">
+          <div className="mt-4 max-h-96 overflow-auto rounded-lg border border-[var(--app-hairline)]">
             <table className="w-max min-w-full table-fixed divide-y divide-black/10 text-left text-sm">
               <colgroup>
                 <col style={{ width: '136px' }} />
@@ -799,7 +799,7 @@ function RosterTab() {
                 <col style={{ width: '124px' }} />
                 <col style={{ width: '88px' }} />
               </colgroup>
-              <thead className="sticky top-0 bg-white text-xs font-semibold text-[var(--theme-body-muted)]">
+              <thead className="sticky top-0 bg-[var(--app-surface)] text-xs font-semibold text-[var(--theme-body-muted)]">
                 <tr>
                   <th className="px-3 py-3 whitespace-nowrap">학번</th>
                   <th className="px-3 py-3 whitespace-nowrap">이름</th>
@@ -831,7 +831,7 @@ function RosterTab() {
                             <input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} maxLength={11} placeholder="01012345678" className={`${inputCls} w-36`} />
                           </div>
                           <div className="flex items-end gap-2 self-end pb-px">
-                            <button type="button" onClick={() => handleEditSave(member.id)} disabled={editSaving} className="shape-cut-sm bg-[#0071e3] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0077ed] disabled:opacity-50">저장</button>
+                            <button type="button" onClick={() => handleEditSave(member.id)} disabled={editSaving} className="shape-cut-sm bg-[var(--app-accent)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--app-accent-hover)] disabled:opacity-50">저장</button>
                             <button type="button" onClick={() => setEditingId(null)} className="text-xs font-semibold text-[var(--theme-body-muted)] hover:underline">취소</button>
                           </div>
                         </div>
@@ -858,7 +858,7 @@ function RosterTab() {
         )}
       </div>
 
-      <div className="rounded-lg border border-black/10 bg-black/5 p-4">
+      <div className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">명부 일괄 업로드</p>
         <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
           엑셀(.xlsx) 또는 구글 폼 CSV를 업로드하면 회원가입 시 학번·이름을 대조합니다.
@@ -876,13 +876,13 @@ function RosterTab() {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="mt-3 shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
+          className="mt-3 shape-cut-sm border border-[var(--app-hairline)] bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
         >
           {uploading ? '명부 가져오는 중...' : '명부 업로드 (.xlsx / .csv)'}
         </button>
 
         {result && (
-          <p className="mt-3 shape-cut-sm bg-[#e8f3ff] px-4 py-3 text-sm font-semibold text-[#0066cc]">
+          <p className="mt-3 shape-cut-sm bg-[var(--app-accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-accent-text)]">
             {result.message} 가져온 행: {result.imported}, 건너뜀: {result.skipped}
           </p>
         )}
@@ -955,7 +955,7 @@ function MembersTab({ currentUser }) {
         const hasExtra = member.aspiration || interests.length > 0
 
         return (
-          <div key={member.id} className="shape-cut-sm border border-black/10 bg-black/5">
+          <div key={member.id} className="shape-cut-sm border border-[var(--app-hairline)] bg-black/5">
             <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
@@ -1010,7 +1010,7 @@ function MembersTab({ currentUser }) {
             </div>
 
             {isExpanded && hasExtra && (
-              <div className="border-t border-black/10 px-4 py-3 space-y-2 bg-black/3">
+              <div className="border-t border-[var(--app-hairline)] px-4 py-3 space-y-2 bg-black/3">
                 {interests.length > 0 && (
                   <div>
                     <p className="text-xs font-semibold text-[var(--theme-body-muted)] uppercase tracking-wide">관심 분야</p>
@@ -1038,7 +1038,7 @@ function MembersTab({ currentUser }) {
   )
 }
 
-const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
+const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
 
 function ActivitiesAdminTab() {
   const imageInputRef = useRef(null)
@@ -1158,7 +1158,7 @@ function ActivitiesAdminTab() {
         onChanged={() => { loadCategories(); loadActivities() }}
       />
 
-      <form onSubmit={submit} className="rounded-lg border border-black/10 bg-black/5 p-4">
+      <form onSubmit={submit} className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">활동 기록 등록</p>
         <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">회원에게만 보이는 실제 활동 기록과 일정을 등록합니다. 사진 여러 장과 파일 첨부를 함께 올릴 수 있습니다.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -1261,12 +1261,12 @@ function ActivitiesAdminTab() {
           <button
             type="button"
             onClick={() => { setLoading(true); loadActivities() }}
-            className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
+            className="shape-cut-sm border border-[var(--app-hairline)] bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
           >
             새로고침
           </button>
         </div>
-        {notice && <p className="mt-2 text-xs font-semibold text-[#0066cc]">{notice}</p>}
+        {notice && <p className="mt-2 text-xs font-semibold text-[var(--app-accent-text)]">{notice}</p>}
         {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
       </form>
 
@@ -1404,7 +1404,7 @@ function ActivityAdminRow({ item, categories, onDelete, onUpdated }) {
   const isActivity = item.kind !== 'SCHEDULE'
 
   return (
-    <article className="shape-cut-sm border border-black/10 bg-black/5 px-4 py-3">
+    <article className="shape-cut-sm border border-[var(--app-hairline)] bg-black/5 px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-semibold text-[var(--theme-body-dark)]">{item.title}</p>
@@ -1418,7 +1418,7 @@ function ActivityAdminRow({ item, categories, onDelete, onUpdated }) {
           <button
             type="button"
             onClick={() => (editing ? setEditing(false) : startEdit())}
-            className="text-xs font-semibold text-[#0066cc] transition hover:underline"
+            className="text-xs font-semibold text-[var(--app-accent-text)] transition hover:underline"
           >
             {editing ? '닫기' : '수정'}
           </button>
@@ -1433,7 +1433,7 @@ function ActivityAdminRow({ item, categories, onDelete, onUpdated }) {
       </div>
 
       {editing && (
-        <div className="mt-3 grid gap-3 border-t border-black/10 pt-3 md:grid-cols-2">
+        <div className="mt-3 grid gap-3 border-t border-[var(--app-hairline)] pt-3 md:grid-cols-2">
           <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
             활동 제목
             <input
@@ -1511,7 +1511,7 @@ function ActivityAdminRow({ item, categories, onDelete, onUpdated }) {
               <ul className="mt-2 flex flex-col gap-1">
                 {(item.fileInfos || []).map((file) => (
                   <li key={file.id} className="flex items-center gap-2 text-xs">
-                    <a href={file.url} className="font-semibold text-[#0066cc] hover:underline">{file.originalName || '첨부파일'}</a>
+                    <a href={file.url} className="font-semibold text-[var(--app-accent-text)] hover:underline">{file.originalName || '첨부파일'}</a>
                     <button
                       type="button"
                       onClick={() => removeFile(file.id)}
@@ -1547,7 +1547,7 @@ function ActivityAdminRow({ item, categories, onDelete, onUpdated }) {
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)]"
+              className="shape-cut-sm border border-[var(--app-hairline)] bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)]"
             >
               취소
             </button>
@@ -1613,7 +1613,7 @@ function ClubActivityCategoriesAdmin({ categories, onChanged }) {
   }
 
   return (
-    <div className="rounded-lg border border-black/10 bg-black/5 p-4">
+    <div className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
       <p className="text-sm font-semibold text-[var(--theme-body-dark)]">활동 분류 관리</p>
       <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">활동 분류를 추가, 이름 변경, 삭제할 수 있습니다. 사용 중인 분류는 삭제할 수 없습니다.</p>
 
@@ -1638,7 +1638,7 @@ function ClubActivityCategoriesAdmin({ categories, onChanged }) {
 
       <ul className="mt-3 flex flex-col gap-2">
         {categories.map((category) => (
-          <li key={category.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-black/10 bg-white/60 px-3 py-2">
+          <li key={category.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-[var(--app-hairline)] bg-white/60 px-3 py-2">
             {editingId === category.id ? (
               <div className="flex flex-1 flex-wrap items-center gap-2">
                 <input
@@ -1651,7 +1651,7 @@ function ClubActivityCategoriesAdmin({ categories, onChanged }) {
                   type="button"
                   onClick={() => saveRename(category)}
                   disabled={busy || !editName.trim()}
-                  className="text-xs font-semibold text-[#0066cc] hover:underline disabled:opacity-50"
+                  className="text-xs font-semibold text-[var(--app-accent-text)] hover:underline disabled:opacity-50"
                 >
                   저장
                 </button>
@@ -1673,7 +1673,7 @@ function ClubActivityCategoriesAdmin({ categories, onChanged }) {
                   <button
                     type="button"
                     onClick={() => { setEditingId(category.id); setEditName(category.name) }}
-                    className="text-xs font-semibold text-[#0066cc] hover:underline"
+                    className="text-xs font-semibold text-[var(--app-accent-text)] hover:underline"
                   >
                     이름 변경
                   </button>
@@ -1803,7 +1803,7 @@ function ClubProjectsAdminTab() {
         onChanged={() => { loadCategories(); loadProjects() }}
       />
 
-      <form onSubmit={submit} className="rounded-lg border border-black/10 bg-black/5 p-4">
+      <form onSubmit={submit} className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">프로젝트 등록</p>
         <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">동아리 부원들이 만든 웹사이트·앱·게임을 등록합니다. 외부 링크와 배포 파일(apk/zip)을 함께 또는 따로 추가할 수 있습니다.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -1897,12 +1897,12 @@ function ClubProjectsAdminTab() {
           <button
             type="button"
             onClick={() => { setLoading(true); loadProjects() }}
-            className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
+            className="shape-cut-sm border border-[var(--app-hairline)] bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80"
           >
             새로고침
           </button>
         </div>
-        {notice && <p className="mt-2 text-xs font-semibold text-[#0066cc]">{notice}</p>}
+        {notice && <p className="mt-2 text-xs font-semibold text-[var(--app-accent-text)]">{notice}</p>}
         {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
       </form>
 
@@ -2017,7 +2017,7 @@ function ClubProjectAdminRow({ item, categories, onDelete, onUpdated }) {
   const categoryName = categories.find((category) => category.key === item.category)?.name || item.categoryName || item.category
 
   return (
-    <article className="shape-cut-sm border border-black/10 bg-black/5 px-4 py-3">
+    <article className="shape-cut-sm border border-[var(--app-hairline)] bg-black/5 px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-semibold text-[var(--theme-body-dark)]">{item.title}</p>
@@ -2031,7 +2031,7 @@ function ClubProjectAdminRow({ item, categories, onDelete, onUpdated }) {
           <button
             type="button"
             onClick={() => (editing ? setEditing(false) : startEdit())}
-            className="text-xs font-semibold text-[#0066cc] transition hover:underline"
+            className="text-xs font-semibold text-[var(--app-accent-text)] transition hover:underline"
           >
             {editing ? '닫기' : '수정'}
           </button>
@@ -2046,7 +2046,7 @@ function ClubProjectAdminRow({ item, categories, onDelete, onUpdated }) {
       </div>
 
       {editing && (
-        <div className="mt-3 grid gap-3 border-t border-black/10 pt-3 md:grid-cols-2">
+        <div className="mt-3 grid gap-3 border-t border-[var(--app-hairline)] pt-3 md:grid-cols-2">
           <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
             제목
             <input
@@ -2119,7 +2119,7 @@ function ClubProjectAdminRow({ item, categories, onDelete, onUpdated }) {
             <ul className="mt-2 flex flex-col gap-1">
               {(item.files || []).map((file) => (
                 <li key={file.id} className="flex items-center gap-2 text-xs">
-                  <a href={apiUrl(file.url)} className="font-semibold text-[#0066cc] hover:underline">{file.originalName || '배포파일'}</a>
+                  <a href={apiUrl(file.url)} className="font-semibold text-[var(--app-accent-text)] hover:underline">{file.originalName || '배포파일'}</a>
                   <button
                     type="button"
                     onClick={() => removeFile(file.id)}
@@ -2154,7 +2154,7 @@ function ClubProjectAdminRow({ item, categories, onDelete, onUpdated }) {
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)]"
+              className="shape-cut-sm border border-[var(--app-hairline)] bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)]"
             >
               취소
             </button>
@@ -2220,7 +2220,7 @@ function ClubProjectCategoriesAdmin({ categories, onChanged }) {
   }
 
   return (
-    <div className="rounded-lg border border-black/10 bg-black/5 p-4">
+    <div className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
       <p className="text-sm font-semibold text-[var(--theme-body-dark)]">프로젝트 분류 관리</p>
       <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">프로젝트 분류를 추가, 이름 변경, 삭제할 수 있습니다. 사용 중인 분류는 삭제할 수 없습니다.</p>
 
@@ -2245,7 +2245,7 @@ function ClubProjectCategoriesAdmin({ categories, onChanged }) {
 
       <ul className="mt-3 flex flex-col gap-2">
         {categories.map((category) => (
-          <li key={category.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-black/10 bg-white/60 px-3 py-2">
+          <li key={category.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-[var(--app-hairline)] bg-white/60 px-3 py-2">
             {editingId === category.id ? (
               <div className="flex flex-1 flex-wrap items-center gap-2">
                 <input
@@ -2258,7 +2258,7 @@ function ClubProjectCategoriesAdmin({ categories, onChanged }) {
                   type="button"
                   onClick={() => saveRename(category)}
                   disabled={busy || !editName.trim()}
-                  className="text-xs font-semibold text-[#0066cc] hover:underline disabled:opacity-50"
+                  className="text-xs font-semibold text-[var(--app-accent-text)] hover:underline disabled:opacity-50"
                 >
                   저장
                 </button>
@@ -2280,7 +2280,7 @@ function ClubProjectCategoriesAdmin({ categories, onChanged }) {
                   <button
                     type="button"
                     onClick={() => { setEditingId(category.id); setEditName(category.name) }}
-                    className="text-xs font-semibold text-[#0066cc] hover:underline"
+                    className="text-xs font-semibold text-[var(--app-accent-text)] hover:underline"
                   >
                     이름 변경
                   </button>
@@ -2357,7 +2357,7 @@ function FilesTab() {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="shape-cut-sm border border-black/10 bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
+          className="shape-cut-sm border border-[var(--app-hairline)] bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
         >
           {uploading ? '업로드 중...' : '파일 업로드'}
         </button>
@@ -2372,7 +2372,7 @@ function FilesTab() {
           {files.map((file) => (
             <div
               key={file.id}
-              className="shape-cut-sm flex items-center justify-between gap-3 border border-black/10 bg-black/5 px-4 py-3"
+              className="shape-cut-sm flex items-center justify-between gap-3 border border-[var(--app-hairline)] bg-black/5 px-4 py-3"
             >
               <div>
                 <p className="font-semibold text-[var(--theme-body-dark)]">{file.originalName}</p>
@@ -2452,7 +2452,7 @@ function FontsTab() {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={submit} className="rounded-lg border border-black/10 bg-black/5 p-4">
+      <form onSubmit={submit} className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">폰트 업로드</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
           <input
@@ -2460,7 +2460,7 @@ function FontsTab() {
             onChange={(e) => setName(e.target.value)}
             placeholder="폰트 이름"
             maxLength={100}
-            className="shape-cut-sm border border-black/10 bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none"
+            className="shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none"
           />
           <input
             type="file"
@@ -2480,7 +2480,7 @@ function FontsTab() {
         {error && <p className="mt-2 text-sm font-semibold text-red-600">{error}</p>}
       </form>
 
-      <p className="rounded-lg border border-black/10 bg-black/5 px-4 py-3 text-xs leading-5 text-[var(--theme-body-muted)]">
+      <p className="rounded-lg border border-[var(--app-hairline)] bg-black/5 px-4 py-3 text-xs leading-5 text-[var(--theme-body-muted)]">
         활성 폰트만 사이트 폰트 선택 목록에 표시됩니다. 비활성화해도 폰트 파일과 기존 회원의 저장값은 삭제되지 않습니다.
       </p>
 
@@ -2491,7 +2491,7 @@ function FontsTab() {
       ) : (
         <div className="space-y-2">
           {fonts.map((font) => (
-            <div key={font.id} className="shape-cut-sm flex flex-wrap items-center justify-between gap-3 border border-black/10 bg-black/5 px-4 py-3">
+            <div key={font.id} className="shape-cut-sm flex flex-wrap items-center justify-between gap-3 border border-[var(--app-hairline)] bg-black/5 px-4 py-3">
               <div>
                 <p className="font-semibold text-[var(--theme-body-dark)]">{font.name}</p>
                 <p className="text-xs text-[var(--theme-body-muted)]">{new Date(font.createdAt).toLocaleString('ko-KR')}</p>
@@ -2507,7 +2507,7 @@ function FontsTab() {
                 type="button"
                 onClick={() => toggle(font)}
                 aria-label={`${font.name} ${font.active ? '비활성화' : '활성화'}`}
-                className={`shape-cut-sm px-3 py-1.5 text-xs font-bold ${font.active ? 'bg-[#e8f3ff] text-[#0066cc]' : 'bg-black/10 text-[var(--theme-body-muted)]'}`}
+                className={`shape-cut-sm px-3 py-1.5 text-xs font-bold ${font.active ? 'bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]' : 'bg-black/10 text-[var(--theme-body-muted)]'}`}
               >
                 {font.active ? '비활성화' : '활성화'}
               </button>
@@ -2566,7 +2566,7 @@ function BanTab() {
     }
   }
 
-  const inputCls = 'rounded border border-black/15 bg-white px-2 py-1 text-sm outline-none focus:border-black/40'
+  const inputCls = 'rounded border border-black/15 bg-[var(--app-surface)] px-2 py-1 text-sm outline-none focus:border-black/40'
 
   return (
     <div className="space-y-6">
@@ -2601,7 +2601,7 @@ function BanTab() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-black/10 text-left text-xs font-semibold uppercase tracking-wide text-[var(--theme-body-muted)]">
+              <tr className="border-b border-[var(--app-hairline)] text-left text-xs font-semibold uppercase tracking-wide text-[var(--theme-body-muted)]">
                 <th className="px-3 py-2">학번</th>
                 <th className="px-3 py-2">차단일</th>
                 <th className="px-3 py-2">만료</th>
@@ -2693,7 +2693,7 @@ function CommunityReportsTab() {
         <button
           type="button"
           onClick={() => { setLoading(true); load() }}
-          className="shape-cut-sm inline-flex items-center gap-1.5 border border-black/10 bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
+          className="shape-cut-sm inline-flex items-center gap-1.5 border border-[var(--app-hairline)] bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
           disabled={loading}
         >
           <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
@@ -2707,9 +2707,9 @@ function CommunityReportsTab() {
         <p className="text-sm text-[var(--theme-body-muted)]">처리 대기 중인 신고가 없습니다.</p>
       )}
       {!loading && !error && reports.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-black/10">
+        <div className="overflow-x-auto rounded-lg border border-[var(--app-hairline)]">
           <table className="w-max min-w-full text-left text-sm">
-            <thead className="bg-white text-xs font-semibold text-[var(--theme-body-muted)]">
+            <thead className="bg-[var(--app-surface)] text-xs font-semibold text-[var(--theme-body-muted)]">
               <tr>
                 <th className="px-3 py-3">접수</th>
                 <th className="px-3 py-3">게시글</th>
@@ -2737,7 +2737,7 @@ function CommunityReportsTab() {
                       onChange={(event) => setNotes((prev) => ({ ...prev, [report.id]: event.target.value }))}
                       placeholder="운영 메모"
                       maxLength={500}
-                      className="w-56 rounded border border-black/15 bg-white px-2 py-1.5 text-xs outline-none focus:border-black/40"
+                      className="w-56 rounded border border-black/15 bg-[var(--app-surface)] px-2 py-1.5 text-xs outline-none focus:border-black/40"
                     />
                   </td>
                   <td className="whitespace-nowrap px-3 py-3">
@@ -2754,7 +2754,7 @@ function CommunityReportsTab() {
                         type="button"
                         onClick={() => resolveReport(report, 'REJECT')}
                         disabled={workingId !== null}
-                        className="shape-cut-sm border border-black/10 bg-white/70 px-3 py-1.5 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white disabled:opacity-50"
+                        className="shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-1.5 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-[var(--app-surface)] disabled:opacity-50"
                       >
                         기각
                       </button>
@@ -2857,7 +2857,7 @@ function DeletedCommunityPostsTab() {
                 setLoading(true)
                 setLimit(Number(event.target.value))
               }}
-              className="shape-cut-sm border border-black/10 bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition focus:border-black/30"
+              className="shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition focus:border-black/30"
             >
               {[100, 300, 1000].map((option) => (
                 <option key={option} value={option}>{option.toLocaleString('ko-KR')}건</option>
@@ -2867,7 +2867,7 @@ function DeletedCommunityPostsTab() {
           <button
             type="button"
             onClick={() => { setLoading(true); load() }}
-            className="shape-cut-sm inline-flex items-center gap-1.5 border border-black/10 bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
+            className="shape-cut-sm inline-flex items-center gap-1.5 border border-[var(--app-hairline)] bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
             disabled={loading}
           >
             <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
@@ -2876,18 +2876,18 @@ function DeletedCommunityPostsTab() {
         </div>
       </div>
 
-      <div className="grid gap-2 rounded-lg border border-black/10 bg-white/55 p-3 md:grid-cols-[minmax(14rem,1fr)_12rem_12rem]">
+      <div className="grid gap-2 rounded-lg border border-[var(--app-hairline)] bg-white/55 p-3 md:grid-cols-[minmax(14rem,1fr)_12rem_12rem]">
         <input
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
           placeholder="제목·작성자·댓글·첨부 검색"
-          className="shape-cut-sm border border-black/10 bg-white/80 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition placeholder:text-[var(--theme-body-muted)] focus:border-black/30"
+          className="shape-cut-sm border border-[var(--app-hairline)] bg-white/80 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition placeholder:text-[var(--theme-body-muted)] focus:border-black/30"
         />
         <select
           aria-label="삭제 보관함 상태"
           value={statusFilter}
           onChange={(event) => setStatusFilter(event.target.value)}
-          className="shape-cut-sm border border-black/10 bg-white/80 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition focus:border-black/30"
+          className="shape-cut-sm border border-[var(--app-hairline)] bg-white/80 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition focus:border-black/30"
         >
           <option value="ALL">전체 상태</option>
           <option value="OPEN">복원 전</option>
@@ -2897,7 +2897,7 @@ function DeletedCommunityPostsTab() {
           aria-label="삭제 보관함 증거 유형"
           value={evidenceFilter}
           onChange={(event) => setEvidenceFilter(event.target.value)}
-          className="shape-cut-sm border border-black/10 bg-white/80 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition focus:border-black/30"
+          className="shape-cut-sm border border-[var(--app-hairline)] bg-white/80 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition focus:border-black/30"
         >
           <option value="ALL">전체 증거</option>
           <option value="MEDIA">사진·영상·첨부 포함</option>
@@ -2915,9 +2915,9 @@ function DeletedCommunityPostsTab() {
         <p className="text-sm text-[var(--theme-body-muted)]">조건에 맞는 삭제 게시글이 없습니다.</p>
       )}
       {!loading && !error && visiblePosts.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-black/10">
+        <div className="overflow-x-auto rounded-lg border border-[var(--app-hairline)]">
           <table className="w-max min-w-full text-left text-sm">
-            <thead className="bg-white text-xs font-semibold text-[var(--theme-body-muted)]">
+            <thead className="bg-[var(--app-surface)] text-xs font-semibold text-[var(--theme-body-muted)]">
               <tr>
                 <th className="px-3 py-3">삭제</th>
                 <th className="px-3 py-3">게시글</th>
@@ -2947,7 +2947,7 @@ function DeletedCommunityPostsTab() {
                     <button
                       type="button"
                       onClick={() => setDetailPost(post)}
-                      className="shape-cut-sm inline-flex items-center gap-1.5 border border-black/10 bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#3b4890] transition hover:bg-white"
+                      className="shape-cut-sm inline-flex items-center gap-1.5 border border-[var(--app-hairline)] bg-white/70 px-3 py-1.5 text-xs font-semibold text-[#3b4890] transition hover:bg-[var(--app-surface)]"
                     >
                       <Eye className="h-3.5 w-3.5" aria-hidden="true" />
                       원문 보기
@@ -3023,8 +3023,8 @@ function DeletedPostDetailModal({ post, onClose, onRestore, restoring, restoreDi
       aria-modal="true"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}
     >
-      <div className="my-auto w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between gap-3 border-b border-black/10 bg-[#f7f9ff] px-5 py-3">
+      <div className="my-auto w-full max-w-3xl overflow-hidden rounded-2xl bg-[var(--app-surface)] shadow-2xl">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--app-hairline)] bg-[#f7f9ff] px-5 py-3">
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#3b4890]">삭제 보관함 · 원문 보기</p>
             <p className="truncate text-xs text-[var(--theme-body-muted)]">#{full.originalPostId} · {deletedCategoryLabel(full.category)}</p>
@@ -3040,7 +3040,7 @@ function DeletedPostDetailModal({ post, onClose, onRestore, restoring, restoreDi
         </div>
 
         <div className="max-h-[calc(100vh-10rem)] overflow-y-auto">
-          <div className="border-b border-black/10 bg-amber-50/70 px-5 py-3 text-xs leading-5 text-amber-900">
+          <div className="border-b border-[var(--app-hairline)] bg-amber-50/70 px-5 py-3 text-xs leading-5 text-amber-900">
             <div className="grid gap-1 sm:grid-cols-2">
               <span><strong>삭제자</strong> {deletedPostIdentity(full.deletedByName, full.deletedByStudentId)}{full.deletedByRole ? ` · ${full.deletedByRole}` : ''}</span>
               <span><strong>삭제 시각</strong> {formatDateTime(full.deletedAt)}</span>
@@ -3069,11 +3069,11 @@ function DeletedPostDetailModal({ post, onClose, onRestore, restoring, restoreDi
             {error && <p className="mt-3 shape-cut-sm bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-700">{error}</p>}
             {loading && <p className="mt-3 text-xs text-[var(--theme-body-muted)]">원문을 불러오는 중...</p>}
 
-            <div className="mt-4 border-t border-black/10 pt-4 text-sm text-[var(--theme-body-dark)]">
+            <div className="mt-4 border-t border-[var(--app-hairline)] pt-4 text-sm text-[var(--theme-body-dark)]">
               <DeletedPostBody post={full} />
             </div>
 
-            <section className="mt-6 border-t border-black/10 pt-4">
+            <section className="mt-6 border-t border-[var(--app-hairline)] pt-4">
               <h3 className="mb-3 text-sm font-bold text-[var(--theme-body-dark)]">댓글 {Number(full.commentCount || (full.commentInfos || []).length || 0).toLocaleString('ko-KR')}개</h3>
               {commentTree.length === 0 ? (
                 <p className="text-xs text-[var(--theme-body-muted)]">보관된 댓글이 없습니다.</p>
@@ -3086,7 +3086,7 @@ function DeletedPostDetailModal({ post, onClose, onRestore, restoring, restoreDi
           </article>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-black/10 bg-white px-5 py-3">
+        <div className="flex items-center justify-end gap-2 border-t border-[var(--app-hairline)] bg-[var(--app-surface)] px-5 py-3">
           {full.restoredPostId ? (
             <div className="mr-auto flex items-center gap-2 text-xs font-semibold text-emerald-700">
               <span>복원됨</span>
@@ -3106,7 +3106,7 @@ function DeletedPostDetailModal({ post, onClose, onRestore, restoring, restoreDi
           <button
             type="button"
             onClick={onClose}
-            className="shape-cut-sm border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-black/5"
+            className="shape-cut-sm border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-black/5"
           >
             닫기
           </button>
@@ -3133,17 +3133,17 @@ function DeletedPostBody({ post }) {
           return (
             <figure
               key={`image-${block.imageInfo?.id || index}`}
-              className="overflow-hidden rounded-lg border border-black/10 bg-white"
+              className="overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)]"
               style={{ width: `${deletedMediaWidth(block.width)}%`, maxWidth: '100%', marginInline: block.align === 'center' ? 'auto' : block.align === 'right' ? 'auto 0' : '0 auto' }}
             >
               <img src={apiUrl(block.url)} alt={block.name || '삭제 게시글 이미지'} className="block w-full object-contain" />
-              {block.name && <figcaption className="border-t border-black/10 px-2 py-1 text-[11px] font-semibold text-[var(--theme-body-muted)]">{block.name}</figcaption>}
+              {block.name && <figcaption className="border-t border-[var(--app-hairline)] px-2 py-1 text-[11px] font-semibold text-[var(--theme-body-muted)]">{block.name}</figcaption>}
             </figure>
           )
         }
         if (block.type === 'externalImage') {
           return (
-            <figure key={`external-${index}`} className="overflow-hidden rounded-lg border border-black/10 bg-white">
+            <figure key={`external-${index}`} className="overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)]">
               <img src={block.url} alt={block.title || '외부 이미지'} className="block w-full object-contain" />
             </figure>
           )
@@ -3153,18 +3153,18 @@ function DeletedPostBody({ post }) {
           return (
             <figure
               key={`video-${block.mediaInfo?.id || index}`}
-              className="overflow-hidden rounded-lg border border-black/10 bg-white"
+              className="overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)]"
               style={{ width: `${deletedMediaWidth(block.width)}%`, maxWidth: '100%', marginInline: block.align === 'center' ? 'auto' : block.align === 'right' ? 'auto 0' : '0 auto' }}
             >
               <video src={apiUrl(block.url)} className="block w-full bg-black" controls preload="metadata" />
-              {block.name && <figcaption className="border-t border-black/10 px-2 py-1 text-[11px] font-semibold text-[var(--theme-body-muted)]">{block.name}</figcaption>}
+              {block.name && <figcaption className="border-t border-[var(--app-hairline)] px-2 py-1 text-[11px] font-semibold text-[var(--theme-body-muted)]">{block.name}</figcaption>}
             </figure>
           )
         }
         if (block.type === 'file') {
           if (!block.url) return null
           return (
-            <a key={`file-${block.mediaInfo?.id || index}`} href={apiUrl(block.url)} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-[#3b4890] underline">
+            <a key={`file-${block.mediaInfo?.id || index}`} href={apiUrl(block.url)} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[#3b4890] underline">
               <Download className="h-4 w-4 shrink-0" aria-hidden="true" />
               <span className="truncate">{block.name || '첨부파일'}</span>
             </a>
@@ -3198,9 +3198,9 @@ function DeletedPostBody({ post }) {
       {extraImages.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {extraImages.map((image) => (
-            <figure key={image.id} className="overflow-hidden rounded-lg border border-black/10 bg-white">
+            <figure key={image.id} className="overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)]">
               <img src={apiUrl(image.url)} alt={image.originalName || '삭제 게시글 이미지'} className="block aspect-square w-full object-contain" />
-              <figcaption className="truncate border-t border-black/10 px-2 py-1 text-[11px] font-semibold text-[var(--theme-body-muted)]">
+              <figcaption className="truncate border-t border-[var(--app-hairline)] px-2 py-1 text-[11px] font-semibold text-[var(--theme-body-muted)]">
                 {image.kind === 'COVER' ? '대표 이미지' : image.originalName || '이미지'}
               </figcaption>
             </figure>
@@ -3210,9 +3210,9 @@ function DeletedPostBody({ post }) {
       {extraVideos.length > 0 && (
         <div className="grid gap-2">
           {extraVideos.map((media) => (
-            <figure key={media.id} className="overflow-hidden rounded-lg border border-black/10 bg-white">
+            <figure key={media.id} className="overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)]">
               <video src={apiUrl(media.url)} className="block w-full bg-black" controls preload="metadata" />
-              <figcaption className="truncate border-t border-black/10 px-2 py-1 text-[11px] font-semibold text-[var(--theme-body-muted)]">{media.originalName || '영상'}</figcaption>
+              <figcaption className="truncate border-t border-[var(--app-hairline)] px-2 py-1 text-[11px] font-semibold text-[var(--theme-body-muted)]">{media.originalName || '영상'}</figcaption>
             </figure>
           ))}
         </div>
@@ -3220,7 +3220,7 @@ function DeletedPostBody({ post }) {
       {extraFiles.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {extraFiles.map((media) => (
-            <a key={media.id} href={apiUrl(media.url)} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-[#3b4890] underline">
+            <a key={media.id} href={apiUrl(media.url)} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[#3b4890] underline">
               <Download className="h-4 w-4 shrink-0" aria-hidden="true" />
               <span className="truncate">{media.originalName || '첨부파일'}</span>
             </a>
@@ -3310,17 +3310,17 @@ function DeletedPostEvidence({ post }) {
           return (
             <figure
               key={`image-${block.imageInfo?.id || index}`}
-              className="overflow-hidden rounded-md border border-black/10 bg-white"
+              className="overflow-hidden rounded-md border border-[var(--app-hairline)] bg-[var(--app-surface)]"
               style={{ width: `${deletedMediaWidth(block.width)}%`, maxWidth: '100%', marginInline: block.align === 'center' ? 'auto' : block.align === 'right' ? 'auto 0' : '0 auto' }}
             >
               <img src={apiUrl(block.url)} alt={block.name || '삭제 게시글 이미지'} className="block max-h-72 w-full object-contain" />
-              {block.name && <figcaption className="border-t border-black/10 px-2 py-1 text-[10px] font-semibold text-[var(--theme-body-muted)]">{block.name}</figcaption>}
+              {block.name && <figcaption className="border-t border-[var(--app-hairline)] px-2 py-1 text-[10px] font-semibold text-[var(--theme-body-muted)]">{block.name}</figcaption>}
             </figure>
           )
         }
         if (block.type === 'externalImage') {
           return (
-            <figure key={`external-${index}`} className="overflow-hidden rounded-md border border-black/10 bg-white">
+            <figure key={`external-${index}`} className="overflow-hidden rounded-md border border-[var(--app-hairline)] bg-[var(--app-surface)]">
               <img src={block.url} alt={block.title || '외부 이미지'} className="block max-h-72 w-full object-contain" />
             </figure>
           )
@@ -3330,18 +3330,18 @@ function DeletedPostEvidence({ post }) {
           return (
             <figure
               key={`video-${block.mediaInfo?.id || index}`}
-              className="overflow-hidden rounded-md border border-black/10 bg-white"
+              className="overflow-hidden rounded-md border border-[var(--app-hairline)] bg-[var(--app-surface)]"
               style={{ width: `${deletedMediaWidth(block.width)}%`, maxWidth: '100%', marginInline: block.align === 'center' ? 'auto' : block.align === 'right' ? 'auto 0' : '0 auto' }}
             >
               <video src={apiUrl(block.url)} className="block max-h-72 w-full bg-black" controls preload="metadata" />
-              {block.name && <figcaption className="border-t border-black/10 px-2 py-1 text-[10px] font-semibold text-[var(--theme-body-muted)]">{block.name}</figcaption>}
+              {block.name && <figcaption className="border-t border-[var(--app-hairline)] px-2 py-1 text-[10px] font-semibold text-[var(--theme-body-muted)]">{block.name}</figcaption>}
             </figure>
           )
         }
         if (block.type === 'file') {
           if (!block.url) return null
           return (
-            <a key={`file-${block.mediaInfo?.id || index}`} href={apiUrl(block.url)} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-black/10 bg-white px-2 py-1 text-[11px] font-semibold text-[#3b4890] underline">
+            <a key={`file-${block.mediaInfo?.id || index}`} href={apiUrl(block.url)} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-[var(--app-hairline)] bg-[var(--app-surface)] px-2 py-1 text-[11px] font-semibold text-[#3b4890] underline">
               <Download className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span className="truncate">{block.name || '첨부파일'}</span>
             </a>
@@ -3368,9 +3368,9 @@ function DeletedPostEvidence({ post }) {
       {extraImages.length > 0 && (
         <div className="grid max-w-[360px] grid-cols-2 gap-2">
           {extraImages.map((image) => (
-            <figure key={image.id} className="overflow-hidden rounded-md border border-black/10 bg-white">
+            <figure key={image.id} className="overflow-hidden rounded-md border border-[var(--app-hairline)] bg-[var(--app-surface)]">
               <img src={apiUrl(image.url)} alt={image.originalName || '삭제 게시글 이미지'} className="block aspect-square w-full object-contain" />
-              <figcaption className="truncate border-t border-black/10 px-2 py-1 text-[10px] font-semibold text-[var(--theme-body-muted)]">
+              <figcaption className="truncate border-t border-[var(--app-hairline)] px-2 py-1 text-[10px] font-semibold text-[var(--theme-body-muted)]">
                 {image.kind === 'COVER' ? '대표 이미지' : image.originalName || '이미지'}
               </figcaption>
             </figure>
@@ -3380,9 +3380,9 @@ function DeletedPostEvidence({ post }) {
       {extraVideos.length > 0 && (
         <div className="grid max-w-[360px] gap-2">
           {extraVideos.map((media) => (
-            <figure key={media.id} className="overflow-hidden rounded-md border border-black/10 bg-white">
+            <figure key={media.id} className="overflow-hidden rounded-md border border-[var(--app-hairline)] bg-[var(--app-surface)]">
               <video src={apiUrl(media.url)} className="block max-h-72 w-full bg-black" controls preload="metadata" />
-              <figcaption className="truncate border-t border-black/10 px-2 py-1 text-[10px] font-semibold text-[var(--theme-body-muted)]">{media.originalName || '영상'}</figcaption>
+              <figcaption className="truncate border-t border-[var(--app-hairline)] px-2 py-1 text-[10px] font-semibold text-[var(--theme-body-muted)]">{media.originalName || '영상'}</figcaption>
             </figure>
           ))}
         </div>
@@ -3390,7 +3390,7 @@ function DeletedPostEvidence({ post }) {
       {extraFiles.length > 0 && (
         <div className="flex max-w-[360px] flex-wrap gap-2">
           {extraFiles.map((media) => (
-            <a key={media.id} href={apiUrl(media.url)} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-black/10 bg-white px-2 py-1 text-[11px] font-semibold text-[#3b4890] underline">
+            <a key={media.id} href={apiUrl(media.url)} className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-[var(--app-hairline)] bg-[var(--app-surface)] px-2 py-1 text-[11px] font-semibold text-[#3b4890] underline">
               <Download className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span className="truncate">{media.originalName || '첨부파일'}</span>
             </a>
@@ -3398,7 +3398,7 @@ function DeletedPostEvidence({ post }) {
         </div>
       )}
       {comments.length > 0 && (
-        <div className="max-w-[420px] rounded-md border border-black/10 bg-white px-3 py-2">
+        <div className="max-w-[420px] rounded-md border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2">
           <strong className="block text-[11px] text-[var(--theme-body-dark)]">댓글 {post.commentCount || comments.length}개 보관됨</strong>
           <div className="mt-2 space-y-1.5">
             {comments.slice(0, 5).map((comment) => (
@@ -3696,7 +3696,7 @@ function AuditLogTab() {
               aria-label="로그 종류"
               value={actionFilter}
               onChange={(event) => setActionFilter(event.target.value)}
-              className="shape-cut-sm border border-black/10 bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition focus:border-black/30"
+              className="shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition focus:border-black/30"
             >
               {AUDIT_LOG_FILTERS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -3707,7 +3707,7 @@ function AuditLogTab() {
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="사용자, 행위, 상세 검색"
-            className="shape-cut-sm w-48 border border-black/10 bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition placeholder:text-[var(--theme-body-muted)] focus:border-black/30"
+            className="shape-cut-sm w-48 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition placeholder:text-[var(--theme-body-muted)] focus:border-black/30"
           />
           <label className="flex items-center gap-2 text-xs font-semibold text-[var(--theme-body-muted)]">
             <span>로그 표시 개수</span>
@@ -3718,7 +3718,7 @@ function AuditLogTab() {
                 setLoading(true)
                 setLimit(Number(event.target.value))
               }}
-              className="shape-cut-sm border border-black/10 bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition focus:border-black/30"
+              className="shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition focus:border-black/30"
             >
               {AUDIT_LOG_LIMITS.map((option) => (
                 <option key={option} value={option}>{option.toLocaleString('ko-KR')}건</option>
@@ -3728,7 +3728,7 @@ function AuditLogTab() {
           <button
             type="button"
             onClick={() => { setLoading(true); load() }}
-            className="shape-cut-sm inline-flex items-center gap-1.5 border border-black/10 bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
+            className="shape-cut-sm inline-flex items-center gap-1.5 border border-[var(--app-hairline)] bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
             disabled={loading}
           >
             <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
@@ -3746,7 +3746,7 @@ function AuditLogTab() {
           <button
             type="button"
             onClick={exportVisibleLogs}
-            className="shape-cut-sm inline-flex items-center gap-1.5 border border-black/10 bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
+            className="shape-cut-sm inline-flex items-center gap-1.5 border border-[var(--app-hairline)] bg-white/60 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
             disabled={visibleLogs.length === 0}
           >
             <Download className="h-3.5 w-3.5" aria-hidden="true" />
@@ -3755,7 +3755,7 @@ function AuditLogTab() {
         </div>
       </div>
 
-      {cacheMessage && <p className="shape-cut-sm bg-[#e8f3ff] px-4 py-3 text-sm font-semibold text-[#0066cc]">{cacheMessage}</p>}
+      {cacheMessage && <p className="shape-cut-sm bg-[var(--app-accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-accent-text)]">{cacheMessage}</p>}
       {cacheError && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{cacheError}</p>}
       {loading && <p className="text-sm text-[var(--theme-body-muted)]">로그를 불러오는 중...</p>}
       {error && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
@@ -3766,9 +3766,9 @@ function AuditLogTab() {
         <p className="text-sm text-[var(--theme-body-muted)]">선택한 종류의 로그가 없습니다.</p>
       )}
       {!loading && !error && visibleLogs.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-black/10">
+        <div className="overflow-x-auto rounded-lg border border-[var(--app-hairline)]">
           <table className="w-max min-w-full text-left text-sm">
-            <thead className="bg-white text-xs font-semibold text-[var(--theme-body-muted)]">
+            <thead className="bg-[var(--app-surface)] text-xs font-semibold text-[var(--theme-body-muted)]">
               <tr>
                 <th className="px-3 py-3">시간</th>
                 <th className="px-3 py-3">사용자</th>
