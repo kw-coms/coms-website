@@ -11,6 +11,7 @@ import jakarta.persistence.Table;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "club_activities")
@@ -37,6 +38,15 @@ public class ClubActivity {
 
     @Column(nullable = false)
     private LocalDate eventDate;
+
+    @Column(nullable = false)
+    private LocalDate endDate;
+
+    @Column
+    private LocalTime startTime;
+
+    @Column
+    private LocalTime endTime;
 
     @Column
     private String imageOriginalName;
@@ -80,6 +90,12 @@ public class ClubActivity {
     public void setDescription(String description) { this.description = description; }
     public LocalDate getEventDate() { return eventDate; }
     public void setEventDate(LocalDate eventDate) { this.eventDate = eventDate; }
+    public LocalDate getEndDate() { return endDate; }
+    public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
+    public LocalTime getStartTime() { return startTime; }
+    public void setStartTime(LocalTime startTime) { this.startTime = startTime; }
+    public LocalTime getEndTime() { return endTime; }
+    public void setEndTime(LocalTime endTime) { this.endTime = endTime; }
     public String getImageOriginalName() { return imageOriginalName; }
     public void setImageOriginalName(String imageOriginalName) { this.imageOriginalName = imageOriginalName; }
     public String getImageStoredName() { return imageStoredName; }
