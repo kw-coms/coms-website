@@ -40,6 +40,9 @@ public class Member {
     @Column(name = "password_reset_attempts", nullable = false)
     private int passwordResetAttempts = 0;
 
+    @Column(name = "token_version", nullable = false)
+    private int tokenVersion = 0;
+
     private String department;
 
     private String phone;
@@ -97,6 +100,9 @@ public class Member {
     public void setPasswordResetAttempts(int passwordResetAttempts) { this.passwordResetAttempts = passwordResetAttempts; }
     public int incrementPasswordResetAttempts() { return ++this.passwordResetAttempts; }
     public void resetPasswordResetAttempts() { this.passwordResetAttempts = 0; }
+    public int getTokenVersion() { return tokenVersion; }
+    public void setTokenVersion(int tokenVersion) { this.tokenVersion = tokenVersion; }
+    public int incrementTokenVersion() { return ++this.tokenVersion; }
     public String getDepartment() { return department; }
     public void setDepartment(String department) { this.department = department; }
     public String getPhone() { return phone; }

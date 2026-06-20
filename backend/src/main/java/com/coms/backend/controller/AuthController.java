@@ -98,15 +98,38 @@ public class AuthController {
         }
         String studentId = jwtTokenProvider.getStudentId(refreshToken);
         authService.ensureAccountNotBanned(studentId);
-        String newAccessToken = jwtTokenProvider.generateToken(studentId);
+
+        // Reject revoked refresh tokens (stale token version).
+        int currentTokenVersion = authService.getCurrentTokenVersion(studentId);
+        if (jwtTokenProvider.getTokenVersion(refreshToken) != currentTokenVersion) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        // Rotate: re-issue both a new access token and a new refresh token.
+        boolean rememberMe = jwtTokenProvider.isRememberedRefreshToken(refreshToken);
+        String newAccessToken = jwtTokenProvider.generateToken(studentId, currentTokenVersion);
+        String newRefreshToken = jwtTokenProvider.generateRefreshToken(studentId, rememberMe, currentTokenVersion);
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie(newAccessToken).toString());
+        response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(newRefreshToken, rememberMe).toString());
 
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletResponse response) {
+    public ResponseEntity<Void> logout(HttpServletRequest servletRequest, HttpServletResponse response) {
+        // Revoke all of this user's sessions by bumping their token version.
+        // The access cookie ("token", path "/") is the one delivered to this endpoint.
+        String accessToken = null;
+        if (servletRequest.getCookies() != null) {
+            for (Cookie c : servletRequest.getCookies()) {
+                if ("token".equals(c.getName())) { accessToken = c.getValue(); break; }
+            }
+        }
+        if (accessToken != null && jwtTokenProvider.validateToken(accessToken) && !jwtTokenProvider.isRefreshToken(accessToken)) {
+            authService.revokeAllSessions(jwtTokenProvider.getStudentId(accessToken));
+        }
+
         response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("token", "")
                 .httpOnly(true).secure(cookieSecure).sameSite(cookieSameSite)
                 .maxAge(Duration.ZERO).path("/").build().toString());
