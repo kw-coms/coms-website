@@ -8,6 +8,8 @@ import com.coms.backend.repository.ArchiveFileRepository;
 import com.coms.backend.repository.ArchiveFileVoteRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.InvalidMediaTypeException;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -36,6 +38,7 @@ public class ArchiveService {
     );
     private static final Set<String> BLOCKED_MIME_TYPES = Set.of(
             "text/html",
+            "application/xhtml+xml",
             "image/svg+xml",
             "application/javascript",
             "text/javascript",
@@ -214,13 +217,30 @@ public class ArchiveService {
         if (file.getSize() > MAX_ARCHIVE_FILE_BYTES) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "자료실 파일은 500MB 이하만 업로드할 수 있습니다.");
         }
-        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
-        if (BLOCKED_MIME_TYPES.contains(contentType)) {
+        String baseContentType = baseContentType(file.getContentType());
+        if (BLOCKED_MIME_TYPES.contains(baseContentType)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 파일 형식입니다.");
         }
         String extension = StringUtils.getFilenameExtension(filename);
         if (extension == null || !ALLOWED_EXTENSIONS.contains(extension.toLowerCase(Locale.ROOT))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "허용되지 않는 자료실 파일 확장자입니다.");
+        }
+    }
+
+    /**
+     * Reduces a client-supplied content-type to its base {@code type/subtype}, stripping any
+     * parameters (e.g. {@code charset}). This prevents blocklist bypasses such as
+     * {@code text/html; charset=utf-8} slipping past an exact-match check.
+     */
+    private String baseContentType(String contentType) {
+        if (contentType == null || contentType.isBlank()) {
+            return MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        }
+        try {
+            MediaType mediaType = MediaType.parseMediaType(contentType);
+            return (mediaType.getType() + "/" + mediaType.getSubtype()).toLowerCase(Locale.ROOT);
+        } catch (InvalidMediaTypeException e) {
+            return MediaType.APPLICATION_OCTET_STREAM_VALUE;
         }
     }
 }
