@@ -145,8 +145,8 @@ public class AuthService implements UserDetailsService {
         auditLogService.record(member.getStudentId(), member.getRole() == Member.Role.ADMIN ? "ADMIN_LOGIN_SUCCESS" : "LOGIN_SUCCESS",
                 "AUTH", null, null, clientIp);
 
-        String token = jwtTokenProvider.generateToken(member.getStudentId());
-        String refreshToken = jwtTokenProvider.generateRefreshToken(member.getStudentId(), request.rememberMe());
+        String token = jwtTokenProvider.generateToken(member.getStudentId(), member.getTokenVersion());
+        String refreshToken = jwtTokenProvider.generateRefreshToken(member.getStudentId(), request.rememberMe(), member.getTokenVersion());
         return new AuthResponse(token, member.getStudentId(), member.getName(), "로그인 성공", refreshToken);
     }
 
@@ -229,6 +229,7 @@ public class AuthService implements UserDetailsService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "현재 비밀번호가 올바르지 않습니다.");
         }
         member.setPassword(passwordEncoder.encode(newPassword));
+        member.incrementTokenVersion();
         memberRepository.save(member);
     }
 
@@ -280,6 +281,7 @@ public class AuthService implements UserDetailsService {
         }
 
         member.setPassword(passwordEncoder.encode(newPassword));
+        member.incrementTokenVersion();
         member.resetPasswordResetAttempts();
         clearPasswordResetCode(member);
         memberRepository.save(member);
@@ -405,6 +407,22 @@ public class AuthService implements UserDetailsService {
 
     public void ensureAccountNotBanned(String studentId) {
         bannedStudentService.ensureNotBanned(studentId);
+    }
+
+    /** Revokes all existing sessions for the member by bumping the token version. */
+    public void revokeAllSessions(String studentId) {
+        memberRepository.findByStudentId(studentId).ifPresent(member -> {
+            member.incrementTokenVersion();
+            memberRepository.save(member);
+        });
+    }
+
+    /** Current token version for the member, or 0 if not found. */
+    @Transactional(readOnly = true)
+    public int getCurrentTokenVersion(String studentId) {
+        return memberRepository.findByStudentId(studentId)
+                .map(Member::getTokenVersion)
+                .orElse(0);
     }
 
     private void enforceEmailVerificationResendCooldown(Member member) {
