@@ -29,6 +29,7 @@ import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -265,6 +266,10 @@ public class AdminController {
         if (mimeType == null || mimeType.isBlank()) {
             return MediaType.APPLICATION_OCTET_STREAM;
         }
-        return MediaType.parseMediaType(mimeType);
+        try {
+            return MediaType.parseMediaType(mimeType);
+        } catch (InvalidMediaTypeException e) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
     }
 }

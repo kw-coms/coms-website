@@ -44,11 +44,17 @@ public class AdminService {
     public MemberResponse updateRole(Long id, RoleUpdateRequest request) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        Member.Role newRole;
         try {
-            member.setRole(Member.Role.valueOf(request.role().trim().toUpperCase(Locale.ROOT)));
+            newRole = Member.Role.valueOf(request.role().trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid role.");
         }
+        boolean demotingAdmin = member.getRole() == Member.Role.ADMIN && newRole != Member.Role.ADMIN;
+        if (demotingAdmin && memberRepository.countByRole(Member.Role.ADMIN) <= 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "마지막 관리자는 강등할 수 없습니다.");
+        }
+        member.setRole(newRole);
         return toResponse(memberRepository.save(member));
     }
 
