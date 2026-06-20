@@ -81,10 +81,12 @@ class RecurringScheduleServiceTest {
 
     @Test
     void carriesTimeLocationAndCategoryOntoOccurrences() {
-        recurringScheduleService.create(new RecurringScheduleRequest(
+        var created = recurringScheduleService.create(new RecurringScheduleRequest(
                 "스터디", "알고리즘",
                 LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 7),
-                List.of("MON"), "18:30", "20:00", "동아리방", "STUDY"), "2026123456");
+                List.of("MON"), "18:30", "20:00", "동아리방", "STUDY", "#8e5cf7"), "2026123456");
+
+        assertThat(created.colorHex()).isEqualTo("#8e5cf7");
 
         List<ScheduleOccurrenceResponse> june = recurringScheduleService.occurrencesForMonth(2026, 6);
 
@@ -97,6 +99,7 @@ class RecurringScheduleServiceTest {
         assertThat(occ.category()).isEqualTo("STUDY");
         assertThat(occ.categoryName()).isEqualTo("스터디");
         assertThat(occ.description()).isEqualTo("알고리즘");
+        assertThat(occ.colorHex()).isEqualTo("#8e5cf7");
     }
 
     @Test

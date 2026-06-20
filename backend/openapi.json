@@ -1746,6 +1746,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "colorHex",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -3120,6 +3128,14 @@
           },
           {
             "name": "endTime",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "colorHex",
             "in": "query",
             "required": false,
             "schema": {
@@ -6452,6 +6468,9 @@
           "endTime": {
             "type": "string"
           },
+          "colorHex": {
+            "type": "string"
+          },
           "imageUrl": {
             "type": "string"
           },
@@ -6699,6 +6718,10 @@
             "type": "string",
             "maxLength": 40,
             "minLength": 0
+          },
+          "colorHex": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
           }
         },
         "required": [
@@ -6746,6 +6769,9 @@
             "type": "string"
           },
           "categoryName": {
+            "type": "string"
+          },
+          "colorHex": {
             "type": "string"
           },
           "createdByName": {
@@ -7501,6 +7527,9 @@
             "type": "string"
           },
           "categoryName": {
+            "type": "string"
+          },
+          "colorHex": {
             "type": "string"
           },
           "recurring": {
