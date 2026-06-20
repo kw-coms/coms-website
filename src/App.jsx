@@ -2120,18 +2120,28 @@ function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSch
             className={form.mode === 'date' ? 'is-active' : ''}
             onClick={() => setMode('date')}
             aria-pressed={form.mode === 'date'}
+            aria-label="날짜 일정"
             disabled={saving}
           >
-            날짜 일정
+            <span className="calendar-admin-mode-tab-main" aria-hidden="true">
+              <span className="calendar-admin-mode-tab-label">날짜 일정</span>
+              <span className="calendar-admin-mode-tab-copy">하루 또는 기간 일정</span>
+            </span>
+            {form.mode === 'date' && <span className="calendar-admin-mode-badge" aria-hidden="true">선택 중</span>}
           </button>
           <button
             type="button"
             className={form.mode === 'recurring' ? 'is-active' : ''}
             onClick={() => setMode('recurring')}
             aria-pressed={form.mode === 'recurring'}
+            aria-label="정기 모임"
             disabled={saving || Boolean(editingDateSchedule)}
           >
-            정기 모임
+            <span className="calendar-admin-mode-tab-main" aria-hidden="true">
+              <span className="calendar-admin-mode-tab-label">정기 모임</span>
+              <span className="calendar-admin-mode-tab-copy">매주 반복되는 일정</span>
+            </span>
+            {form.mode === 'recurring' && <span className="calendar-admin-mode-badge" aria-hidden="true">선택 중</span>}
           </button>
         </div>
         <label>
@@ -2264,10 +2274,11 @@ function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSch
               ? (schedule.endTime ? `${schedule.startTime}~${schedule.endTime}` : schedule.startTime)
               : ''
             return (
-              <li key={schedule.id} className="recurring-schedule-item">
+              <li key={schedule.id} className={`recurring-schedule-item ${editingRecurringId === schedule.id ? 'recurring-schedule-item-selected' : ''}`}>
                 <div className="recurring-schedule-item-main">
                   <span className="recurring-schedule-item-title">
                     <Repeat size={13} aria-hidden="true" /> {schedule.title}
+                    {editingRecurringId === schedule.id && <span className="recurring-schedule-item-badge">수정 중</span>}
                   </span>
                   <span className="recurring-schedule-item-meta">
                     {formatActivityDate(schedule.startDate)} ~ {formatActivityDate(schedule.endDate)}
@@ -2570,6 +2581,7 @@ function ClubCalendarSection({ compact = false }) {
                   >
                     {day}
                   </button>
+                  {selectedDay === day && <span className="club-calendar-day-selected-label" aria-hidden="true">선택한 날짜</span>}
                   <div className="club-calendar-events">
                     {visible.map((event) => (
                       <button
@@ -2588,6 +2600,9 @@ function ClubCalendarSection({ compact = false }) {
                         )}
                         {event.showTitle && event.canceled && (
                           <span className="club-calendar-event-badge">취소됨</span>
+                        )}
+                        {activeSelectedEventId === event.id && (
+                          <span className="club-calendar-event-selected-mark" aria-hidden="true">선택됨</span>
                         )}
                       </button>
                     ))}
@@ -2620,10 +2635,16 @@ function ClubCalendarSection({ compact = false }) {
                   <li
                     key={`detail-${event.id}`}
                     className={`${event.canceled ? 'calendar-day-detail-canceled' : ''} ${activeSelectedEventId === event.id ? 'calendar-day-detail-selected' : ''}`}
+                    style={event.colorHex ? { '--calendar-event-color': event.colorHex } : undefined}
                   >
                     <span className="calendar-day-detail-dot" aria-hidden="true" />
                     <div>
-                      <strong>{event.title}</strong>
+                      <div className="calendar-day-detail-title-row">
+                        <strong>{event.title}</strong>
+                        {activeSelectedEventId === event.id && (
+                          <span className="calendar-day-detail-selected-badge">선택한 일정</span>
+                        )}
+                      </div>
                       <span>{eventMeta(event)}</span>
                       {isAdmin && !event.recurring && (
                         <div className="calendar-day-detail-actions">
