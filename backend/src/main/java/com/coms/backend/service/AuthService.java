@@ -36,6 +36,7 @@ public class AuthService implements UserDetailsService {
     private static final int PASSWORD_RESET_EXPIRES_MINUTES = 10;
     private static final int PASSWORD_RESET_RESEND_COOLDOWN_MINUTES = 1;
     private static final int MAX_PASSWORD_RESET_ATTEMPTS = 5;
+    private static final int MAX_EMAIL_VERIFICATION_ATTEMPTS = 5;
     private static final int MAX_FAILURES_PER_ID = 5;
     private static final int LOCKOUT_WINDOW_MINUTES = 15;
     private static final int GRADUATE_AFTER_YEARS = 7;
@@ -105,6 +106,7 @@ public class AuthService implements UserDetailsService {
         String code = newSixDigitCode();
         member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
         member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
+        member.resetEmailVerificationAttempts();
         memberRepository.save(member);
         emailVerificationSender.sendVerificationCode(member.getEmail(), code);
 
@@ -329,6 +331,7 @@ public class AuthService implements UserDetailsService {
         String code = newSixDigitCode();
         member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
         member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
+        member.resetEmailVerificationAttempts();
         memberRepository.save(member);
         emailVerificationSender.sendVerificationCode(member.getEmail(), code);
         return false;
@@ -350,6 +353,7 @@ public class AuthService implements UserDetailsService {
         String code = newSixDigitCode();
         member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
         member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
+        member.resetEmailVerificationAttempts();
         memberRepository.save(member);
         emailVerificationSender.sendVerificationCode(member.getEmail(), code);
         return false;
@@ -371,10 +375,15 @@ public class AuthService implements UserDetailsService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이메일 인증코드가 만료되었습니다.");
         }
         if (!passwordEncoder.matches(code, member.getEmailVerificationCodeHash())) {
+            if (member.incrementEmailVerificationAttempts() >= MAX_EMAIL_VERIFICATION_ATTEMPTS) {
+                clearEmailVerificationCode(member);
+            }
+            memberRepository.save(member);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이메일 인증코드가 올바르지 않습니다.");
         }
 
         member.setEmailVerified(true);
+        member.resetEmailVerificationAttempts();
         clearEmailVerificationCode(member);
         memberRepository.save(member);
         return true;
