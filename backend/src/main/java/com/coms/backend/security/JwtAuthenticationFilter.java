@@ -1,5 +1,7 @@
 package com.coms.backend.security;
 
+import com.coms.backend.domain.Member;
+import com.coms.backend.repository.MemberRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
@@ -16,10 +18,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider tokenProvider;
     private final UserDetailsService userDetailsService;
+    private final MemberRepository memberRepository;
 
-    public JwtAuthenticationFilter(JwtTokenProvider tokenProvider, UserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(JwtTokenProvider tokenProvider, UserDetailsService userDetailsService,
+                                   MemberRepository memberRepository) {
         this.tokenProvider = tokenProvider;
         this.userDetailsService = userDetailsService;
+        this.memberRepository = memberRepository;
     }
 
     @Override
@@ -31,10 +36,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (token != null && tokenProvider.validateToken(token) && !tokenProvider.isRefreshToken(token)) {
             try {
                 String studentId = tokenProvider.getStudentId(token);
-                var userDetails = userDetailsService.loadUserByUsername(studentId);
-                var auth = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                Member member = memberRepository.findByStudentId(studentId).orElse(null);
+                // Reject tokens whose version is stale: incrementing tokenVersion revokes all prior tokens.
+                if (member != null && tokenProvider.getTokenVersion(token) == member.getTokenVersion()) {
+                    var userDetails = userDetailsService.loadUserByUsername(studentId);
+                    var auth = new UsernamePasswordAuthenticationToken(
+                            userDetails, null, userDetails.getAuthorities());
+                    SecurityContextHolder.getContext().setAuthentication(auth);
+                }
             } catch (Exception e) {
                 SecurityContextHolder.clearContext();
             }
