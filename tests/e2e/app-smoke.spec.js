@@ -908,6 +908,9 @@ test('admin can add a schedule directly from the monthly calendar', async ({ pag
         kind: multipartField(body, 'kind'),
         category: multipartField(body, 'category'),
         eventDate: multipartField(body, 'eventDate'),
+        endDate: multipartField(body, 'endDate'),
+        startTime: multipartField(body, 'startTime'),
+        endTime: multipartField(body, 'endTime'),
         description: multipartField(body, 'description'),
       }
       createdPayload = form
@@ -920,6 +923,9 @@ test('admin can add a schedule directly from the monthly calendar', async ({ pag
           title: form.title,
           description: form.description,
           eventDate: form.eventDate,
+          endDate: form.endDate,
+          startTime: form.startTime,
+          endTime: form.endTime,
           imageUrl: null,
           imageOriginalName: null,
           createdByName: '관리자',
@@ -932,17 +938,22 @@ test('admin can add a schedule directly from the monthly calendar', async ({ pag
 
   await page.goto('/monthly-calendar')
   await page.getByLabel('일정 제목').fill('캘린더 직접 등록 회의')
-  await page.getByLabel('일정 날짜').fill('2026-06-24')
-  await page.getByLabel('일정 분류').selectOption('MEETING')
-  await page.getByRole('button', { name: '일정 추가' }).click()
+  await page.getByLabel('시작일').fill('2026-06-24')
+  await page.getByLabel('종료일 (선택)').fill('2026-06-26')
+  await page.getByLabel('시작 시간 (선택)').fill('18:00')
+  await page.getByLabel('종료 시간 (선택)').fill('19:30')
+  await page.getByRole('button', { name: '날짜 일정 추가' }).click()
 
   await expect.poll(() => createdPayload).toMatchObject({
     title: '캘린더 직접 등록 회의',
     kind: 'SCHEDULE',
-    category: 'MEETING',
+    category: 'GENERAL',
     eventDate: '2026-06-24',
+    endDate: '2026-06-26',
+    startTime: '18:00',
+    endTime: '19:30',
   })
-  await expect(page.getByText('캘린더 직접 등록 회의')).toBeVisible()
+  await expect(page.locator('.club-calendar-event-title').filter({ hasText: '캘린더 직접 등록 회의' })).toBeVisible()
 })
 
 test('admin can write an activity log entry directly from the activity log page', async ({ page }) => {
@@ -1409,7 +1420,7 @@ test('monthly calendar renders recurring schedule occurrences for the selected m
   const recurringEvents = page.locator('.club-calendar-event-recurring').filter({ hasText: '정기 회의' })
   await expect(recurringEvents).toHaveCount(2)
   await expect(recurringEvents.first().getByText('18:00~19:00')).toBeVisible()
-  await expect(recurringEvents.first().getByText('@동아리방')).toBeVisible()
+  await expect(recurringEvents.first().getByText('@동아리방')).toHaveCount(0)
 })
 
 test('guest visiting notices is redirected to login', async ({ page }) => {
