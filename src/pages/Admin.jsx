@@ -203,7 +203,7 @@ export default function Admin({ onBack }) {
                 { id: 'recruit', label: '모집 관리' },
                 { id: 'roster', label: '명부 인증' },
                 { id: 'activities', label: '활동 관리' },
-                { id: 'projects', label: '프로젝트 관리' },
+                { id: 'projects', label: 'Apps 관리' },
                 { id: 'files', label: '파일 관리' },
                 { id: 'fonts', label: '폰트 관리' },
                 { id: 'community', label: '커뮤니티 관리' },
@@ -1720,7 +1720,7 @@ function ClubProjectsAdminTab() {
     setError('')
     listClubProjects()
       .then((data) => setItems(Array.isArray(data) ? data : []))
-      .catch((err) => setError(err.message || '프로젝트를 불러오지 못했습니다.'))
+      .catch((err) => setError(err.message || 'Apps 항목을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }
 
@@ -1744,7 +1744,7 @@ function ClubProjectsAdminTab() {
         setCategories(list)
         setForm((prev) => (prev.category || list.length === 0 ? prev : { ...prev, category: list[0].key }))
       })
-      .catch((err) => { if (mounted) setError(err.message || '프로젝트를 불러오지 못했습니다.') })
+      .catch((err) => { if (mounted) setError(err.message || 'Apps 항목을 불러오지 못했습니다.') })
       .finally(() => { if (mounted) setLoading(false) })
     return () => { mounted = false }
   }, [])
@@ -1772,23 +1772,23 @@ function ClubProjectsAdminTab() {
       } else {
         setItems((prev) => [...prev, created])
       }
-      setNotice('프로젝트를 등록했습니다.')
+      setNotice('Apps 항목을 등록했습니다.')
       if (fileInputRef.current) fileInputRef.current.value = ''
       setForm((prev) => ({ ...prev, title: '', eyebrow: '', description: '', linkUrl: '', displayUrl: '', file: null }))
     } catch (err) {
-      setError(err.message || '프로젝트 등록 중 오류가 발생했습니다.')
+      setError(err.message || 'Apps 항목 등록 중 오류가 발생했습니다.')
     } finally {
       setSaving(false)
     }
   }
 
   const handleDelete = async (item) => {
-    if (!window.confirm(`${item.title} 프로젝트를 삭제하시겠습니까?`)) return
+    if (!window.confirm(`${item.title} Apps 항목을 삭제하시겠습니까?`)) return
     try {
       await deleteClubProject(item.id)
       setItems((prev) => prev.filter((entry) => entry.id !== item.id))
     } catch (err) {
-      alert(err.message || '프로젝트를 삭제하지 못했습니다.')
+      alert(err.message || 'Apps 항목을 삭제하지 못했습니다.')
     }
   }
 
@@ -1804,8 +1804,8 @@ function ClubProjectsAdminTab() {
       />
 
       <form onSubmit={submit} className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
-        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">프로젝트 등록</p>
-        <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">동아리 부원들이 만든 웹사이트·앱·게임을 등록합니다. 외부 링크와 배포 파일(apk/zip)을 함께 또는 따로 추가할 수 있습니다.</p>
+        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">Apps 항목 등록</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">COM&apos;s Apps에 노출할 웹사이트·앱·게임을 등록합니다. 외부 링크와 배포 파일(apk/zip)을 함께 또는 따로 추가할 수 있습니다.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
             제목
@@ -1892,7 +1892,7 @@ function ClubProjectsAdminTab() {
             disabled={saving || !form.title.trim() || !form.category}
             className="shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] disabled:opacity-50"
           >
-            {saving ? '등록 중...' : '프로젝트 등록'}
+            {saving ? '등록 중...' : 'Apps 항목 등록'}
           </button>
           <button
             type="button"
@@ -1907,9 +1907,9 @@ function ClubProjectsAdminTab() {
       </form>
 
       {loading ? (
-        <p className="text-sm text-[var(--theme-body-muted)]">프로젝트를 불러오는 중...</p>
+        <p className="text-sm text-[var(--theme-body-muted)]">Apps 항목을 불러오는 중...</p>
       ) : items.length === 0 ? (
-        <p className="text-sm text-[var(--theme-body-muted)]">등록된 프로젝트가 없습니다.</p>
+        <p className="text-sm text-[var(--theme-body-muted)]">등록된 Apps 항목이 없습니다.</p>
       ) : (
         <div className="space-y-2">
           {items.map((item) => (
@@ -1973,7 +1973,7 @@ function ClubProjectAdminRow({ item, categories, onDelete, onUpdated }) {
       onUpdated(updated)
       setEditing(false)
     } catch (err) {
-      setRowError(err.message || '프로젝트를 수정하지 못했습니다.')
+      setRowError(err.message || 'Apps 항목을 수정하지 못했습니다.')
     } finally {
       setBusy(false)
     }
@@ -2221,8 +2221,8 @@ function ClubProjectCategoriesAdmin({ categories, onChanged }) {
 
   return (
     <div className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
-      <p className="text-sm font-semibold text-[var(--theme-body-dark)]">프로젝트 분류 관리</p>
-      <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">프로젝트 분류를 추가, 이름 변경, 삭제할 수 있습니다. 사용 중인 분류는 삭제할 수 없습니다.</p>
+      <p className="text-sm font-semibold text-[var(--theme-body-dark)]">Apps 분류 관리</p>
+      <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">COM&apos;s Apps 분류를 추가, 이름 변경, 삭제할 수 있습니다. 사용 중인 분류는 삭제할 수 없습니다.</p>
 
       <form onSubmit={addCategory} className="mt-3 flex flex-wrap items-center gap-2">
         <input
