@@ -15,6 +15,7 @@ import {
   Megaphone,
   Moon,
   Repeat,
+  Search,
   Sparkles,
   Sun,
   ThumbsUp,
@@ -34,6 +35,15 @@ import {
   updateRecurringSchedule,
   deleteRecurringSchedule,
 } from './services/clubActivityApi.js'
+import {
+  createClubEvent,
+  deleteClubEvent,
+  deleteClubEventEntry,
+  getClubEvent,
+  listClubEvents,
+  uploadClubEventEntry,
+  voteClubEventEntry,
+} from './services/clubEventApi.js'
 import { getNotificationSummary, listNotifications, markAllNotificationsRead, markNotificationRead } from './services/notificationApi.js'
 import { listFonts } from './services/fontApi.js'
 import { BUILT_IN_FONTS, buildFontFaceCss, fontFamilyValue, injectBuiltinFontStylesheets } from './services/fontPreferences.js'
@@ -85,6 +95,7 @@ import CompanionServicesSection from './components/home/CompanionServicesSection
 
 const NOTIFICATIONS_QUERY_KEY = ['app-shell', 'notifications']
 const CLUB_ACTIVITIES_QUERY_KEY = ['app-shell', 'club-activities']
+const CLUB_EVENTS_QUERY_KEY = ['app-shell', 'club-events']
 const CLUB_ACTIVITY_CATEGORIES_QUERY_KEY = ['app-shell', 'club-activity-categories']
 const SCHEDULE_OCCURRENCES_QUERY_KEY = ['app-shell', 'schedule-occurrences']
 const RECURRING_SCHEDULES_QUERY_KEY = ['app-shell', 'recurring-schedules']
@@ -181,6 +192,7 @@ function getActiveNavKey(pathname) {
   if (pathname === '/about') return 'about'
   if (pathname === '/activities') return 'activities'
   if (pathname === '/activity-log') return 'activity-log'
+  if (pathname === '/activity-events') return 'activity-events'
   if (pathname === '/monthly-calendar') return 'monthly-calendar'
   if (pathname === '/projects') return 'projects'
   if (pathname === '/apps') return 'apps'
@@ -1146,6 +1158,7 @@ function App() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/activities" element={<ActivitiesDetailPage />} />
         <Route path="/activity-log" element={<RequireAuth><ActivityLogPage /></RequireAuth>} />
+        <Route path="/activity-events" element={<RequireAuth><ClubEventPage /></RequireAuth>} />
         <Route path="/monthly-calendar" element={<RequireAuth><MonthlyCalendarPage /></RequireAuth>} />
         <Route path="/projects" element={<ProjectsDetailPage />} />
         <Route path="/apps" element={<AppsPage />} />
@@ -1263,10 +1276,56 @@ function useScheduleOccurrences(year, month) {
   return query.data ?? []
 }
 
+const ACTIVITY_SORT_OPTIONS = [
+  { value: 'latest', label: '최신순' },
+  { value: 'views', label: '조회순' },
+  { value: 'upvotes', label: '추천순' },
+]
+
+function formatActivityDateTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('ko-KR', {
+    year: '2-digit',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function activityListDate(item) {
+  return item.createdAt ? formatActivityDateTime(item.createdAt) : formatActivityDate(item.eventDate)
+}
+
+function activityMediaInfos(item) {
+  if (Array.isArray(item.imageInfos) && item.imageInfos.length > 0) return item.imageInfos
+  if (item.imageUrl) return [{ id: 'legacy-image', url: item.imageUrl, originalName: item.imageOriginalName }]
+  return []
+}
+
+function activityFileInfos(item) {
+  return Array.isArray(item.fileInfos) ? item.fileInfos : []
+}
+
+function sortedActivityItems(items, sortMode) {
+  return [...items].sort((a, b) => {
+    if (sortMode === 'views') return (b.viewCount ?? 0) - (a.viewCount ?? 0)
+    if (sortMode === 'upvotes') return (b.upvotes ?? 0) - (a.upvotes ?? 0)
+    const bDate = b.eventDate || b.createdAt || ''
+    const aDate = a.eventDate || a.createdAt || ''
+    return String(bDate).localeCompare(String(aDate))
+  })
+}
+
 function ActivityLogSection({ compact = false }) {
   const navigate = useNavigate()
   const { user, authLoading, records, loading, loadError, prependActivity, mergeActivity } = useClubActivities('활동 기록을 불러오지 못했습니다.')
   const categories = useClubActivityCategories()
+  const [mode, setMode] = useState('list')
+  const [selectedActivity, setSelectedActivity] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [votingId, setVotingId] = useState(null)
   const [viewedIds] = useState(() => new Set())
   const [submitError, setSubmitError] = useState('')
@@ -1285,6 +1344,7 @@ function ActivityLogSection({ compact = false }) {
   const [categoryFilter, setCategoryFilter] = useState('ALL')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [sortMode, setSortMode] = useState('latest')
 
   // Default the composer category to the first admin-managed category without
   // a state-syncing effect (the dropdown is controlled by this derived value).
@@ -1302,10 +1362,22 @@ function ActivityLogSection({ compact = false }) {
     }
     return true
   })
-  const visibleItems = compact ? filteredItems.slice(0, 3) : filteredItems
+  const sortedItems = sortedActivityItems(filteredItems, sortMode)
+  const visibleItems = compact ? sortedItems.slice(0, 3) : sortedItems
   const isLocked = !authLoading && !user
   const isAdmin = user?.role === 'ADMIN'
   const hasActiveFilters = Boolean(normalizedSearch) || categoryFilter !== 'ALL' || Boolean(fromDate) || Boolean(toDate)
+
+  const backToList = () => {
+    setMode('list')
+    setSelectedActivity(null)
+    setSubmitError('')
+  }
+
+  const resetActivityForm = () => {
+    setActivityForm({ title: '', eventDate: '', category: '', description: '' })
+    setActivityImage(null)
+  }
 
   const submitActivity = async (event) => {
     event.preventDefault()
@@ -1325,9 +1397,10 @@ function ActivityLogSection({ compact = false }) {
       })
       prependActivity(created)
       setActivityNotice('활동 기록을 추가했습니다.')
-      setActivityForm((prev) => ({ ...prev, title: '', eventDate: '', description: '' }))
-      setActivityImage(null)
+      resetActivityForm()
       form.reset()
+      setSelectedActivity(created)
+      setMode('detail')
     } catch (err) {
       setSubmitError(err.message || '활동 기록을 추가하지 못했습니다.')
     } finally {
@@ -1339,12 +1412,29 @@ function ActivityLogSection({ compact = false }) {
   const registerActivityView = async (item) => {
     if (!user || viewedIds.has(item.id)) return
     viewedIds.add(item.id)
+    setDetailLoading(true)
     try {
       const detail = await getClubActivity(item.id)
       mergeActivity(detail)
+      setSelectedActivity(detail)
     } catch {
       viewedIds.delete(item.id)
+    } finally {
+      setDetailLoading(false)
     }
+  }
+
+  const openActivity = (item) => {
+    setMode('detail')
+    setSelectedActivity(item)
+    setSubmitError('')
+    registerActivityView(item)
+  }
+
+  const openActivityWithKeyboard = (event, item) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    openActivity(item)
   }
 
   const handleActivityVote = async (item) => {
@@ -1353,6 +1443,7 @@ function ActivityLogSection({ compact = false }) {
     try {
       const updated = await voteClubActivity(item.id, item.myVote === 1 ? 0 : 1)
       mergeActivity(updated)
+      if (selectedActivity?.id === item.id) setSelectedActivity(updated)
     } catch (err) {
       setSubmitError(err.message || '추천 중 오류가 발생했습니다.')
     } finally {
@@ -1360,253 +1451,976 @@ function ActivityLogSection({ compact = false }) {
     }
   }
 
-  return (
-    <section id="activity-log" className={`activity-proof-section ${compact ? 'activity-proof-section-compact' : ''} scroll-mt-24 bg-[var(--app-surface)] px-5 py-12 sm:py-16`}>
-      <div className="mx-auto max-w-7xl">
-        <div className="grid gap-8 lg:grid-cols-[0.62fr_1fr] lg:items-end">
-          <div>
-            <p className="apple-eyebrow">Activity log</p>
-            <h2 className="apple-display mt-3 text-4xl sm:text-5xl">실제로 이어지는 활동 기록</h2>
-            <p className="apple-copy mt-4 max-w-2xl text-lg">
-              신입생이 가장 먼저 궁금해하는 것은 지금도 활동이 이어지는지입니다. 검증된 활동 사진과 기록이 등록되면 날짜, 활동명, 후기 흐름으로 보여줍니다.
-            </p>
+  const renderWriteForm = () => (
+    <form onSubmit={submitActivity} className="activity-admin-composer activity-post-composer" aria-label="활동 기록 추가">
+      <label className="activity-compose-title-field">
+        <span>활동 제목</span>
+        <input
+          value={activityForm.title}
+          onChange={(event) => setActivityForm((prev) => ({ ...prev, title: event.target.value }))}
+          maxLength={120}
+          placeholder="제목"
+        />
+      </label>
+      <div className="activity-compose-side">
+        <label>
+          <span>활동 분류</span>
+          <select
+            value={selectedCategory}
+            onChange={(event) => setActivityForm((prev) => ({ ...prev, category: event.target.value }))}
+          >
+            {categories.map((category) => (
+              <option key={category.key} value={category.key}>{category.name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>활동 날짜</span>
+          <input
+            type="date"
+            value={activityForm.eventDate}
+            onChange={(event) => setActivityForm((prev) => ({ ...prev, eventDate: event.target.value }))}
+          />
+        </label>
+        <div className="activity-compose-actions">
+          <button
+            type="submit"
+            aria-label="활동 기록 추가"
+            disabled={savingActivity || !activityForm.title.trim() || !activityForm.eventDate}
+          >
+            {savingActivity ? '등록 중...' : '글 등록'}
+          </button>
+          <button type="button" className="activity-compose-cancel" onClick={backToList} disabled={savingActivity}>
+            취소
+          </button>
+        </div>
+      </div>
+      <div className="activity-compose-editor">
+        <div className="community-editor-toolbar activity-compose-toolbar">
+          <span>Editor</span>
+          <label className="activity-compose-file-button">
+            <Sparkles size={14} aria-hidden="true" />
+            이미지
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(event) => setActivityImage(event.target.files?.[0] || null)}
+            />
+          </label>
+          <span className="activity-compose-file-name">
+            {activityImage ? activityImage.name : '활동 사진은 한 장까지 첨부됩니다.'}
+          </span>
+        </div>
+        <label className="activity-compose-body-field">
+          <span>활동 내용</span>
+          <textarea
+            value={activityForm.description}
+            onChange={(event) => setActivityForm((prev) => ({ ...prev, description: event.target.value }))}
+            maxLength={500}
+            rows={12}
+            placeholder="본문"
+          />
+        </label>
+      </div>
+      {activityNotice && <p className="activity-admin-composer-notice">{activityNotice}</p>}
+      {submitError && <p className="activity-admin-composer-notice activity-admin-composer-error">{submitError}</p>}
+    </form>
+  )
+
+  const renderActivityDetail = () => {
+    const item = selectedActivity
+    if (!item) {
+      return <p className="px-4 py-16 text-center text-sm text-[var(--app-muted)]">활동 기록을 여는 중...</p>
+    }
+    const images = activityMediaInfos(item)
+    const files = activityFileInfos(item)
+    return (
+      <article className="activity-post-detail m-0 overflow-hidden bg-[var(--app-surface)] sm:m-5 sm:rounded-lg sm:border sm:border-[var(--app-hairline)]">
+        <div className="activity-post-detail-head border-b border-[var(--app-hairline)] px-4 py-4 sm:px-5">
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[var(--app-accent-text)]">
+            <span>{categoryLabel(item.category, item.categoryName)}</span>
+            {images.length > 0 && <span className="activity-post-mini-badge">사진 {images.length}</span>}
+            {files.length > 0 && <span className="activity-post-mini-badge">첨부 {files.length}</span>}
           </div>
-          <div className="activity-proof-note apple-soft-panel px-5 py-5">
-            <p className="text-sm font-semibold text-[var(--app-text)]">기록 방식</p>
-            <p className="mt-2 text-sm font-medium leading-6 text-[var(--app-muted)]">
-              세미나, 스터디, 프로젝트 발표, MT/행사, 수상/성과처럼 실제 확인된 항목만 활동 로그에 노출합니다.
-            </p>
+          <h2 className="break-words text-xl font-black leading-8 sm:text-2xl">{item.title}</h2>
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--app-muted)]">
+            <span className="font-bold text-[var(--app-text)]">{item.createdByName || 'COM\'s'}</span>
+            <span>{formatActivityDate(item.eventDate)}</span>
+            {item.updatedAt && <span>수정 {formatActivityDateTime(item.updatedAt)}</span>}
+            <span>조회 {item.viewCount ?? 0}</span>
+            <span>개추 {item.upvotes ?? 0}</span>
+          </div>
+        </div>
+        <div className="activity-post-detail-body min-h-[220px] px-4 py-6 sm:min-h-[280px] sm:px-5">
+          {images.length > 0 && (
+            <div className="activity-post-gallery">
+              {images.map((image) => (
+                <img key={image.id || image.url} src={image.url} alt={image.originalName || ''} loading="lazy" />
+              ))}
+            </div>
+          )}
+          <p className="activity-post-content">{item.description || '활동 내용이 아직 입력되지 않았습니다.'}</p>
+          {files.length > 0 && (
+            <div className="activity-post-files">
+              <p>첨부파일</p>
+              {files.map((file) => (
+                <a key={file.id} href={file.url} className="activity-post-file-link">
+                  <Download size={14} aria-hidden="true" />
+                  {file.originalName || '첨부파일'}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-2 border-y border-[var(--app-hairline)] bg-[var(--app-surface-soft)] px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-3 sm:py-5">
+          <button
+            type="button"
+            onClick={() => handleActivityVote(item)}
+            disabled={votingId === item.id}
+            className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:px-5 ${item.myVote === 1 ? 'border-[var(--app-accent)] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
+          >
+            <ThumbsUp size={16} />
+            개추 {item.upvotes ?? 0}
+          </button>
+        </div>
+        <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:flex-wrap sm:justify-between">
+          <button type="button" onClick={backToList} className="min-h-11 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
+            목록
+          </button>
+          {isAdmin && (
+            <button type="button" onClick={() => setMode('write')} className="apple-action-primary inline-flex min-h-11 items-center justify-center px-4 py-2 text-sm sm:min-h-0">
+              글쓰기
+            </button>
+          )}
+        </div>
+        {detailLoading && <p className="px-4 pb-4 text-xs font-semibold text-[var(--app-muted)]">최신 기록을 확인하는 중...</p>}
+      </article>
+    )
+  }
+
+  return (
+    <section id="activity-log" className={`activity-proof-section ${compact ? 'activity-proof-section-compact' : ''} scroll-mt-24 bg-[var(--app-surface-soft)] px-5 py-12 sm:py-16`}>
+      <div className="mx-auto max-w-7xl">
+        <div className="activity-board-shell apple-board-shell">
+          {mode === 'list' && (
+            <>
+              <div className="apple-board-hero px-4 py-7 sm:px-8 sm:py-10">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="apple-eyebrow">Activity log</p>
+                    <h2 className="apple-display mt-3 break-words text-4xl sm:text-6xl">COM&apos;s 활동 게시판</h2>
+                    <p className="apple-copy mt-4 max-w-2xl text-base sm:text-lg">
+                      세미나, 스터디, 프로젝트 발표, 행사 기록을 커뮤니티 글처럼 읽고 검색합니다. 실제 등록된 활동만 게시글 형태로 보여줍니다.
+                    </p>
+                  </div>
+                  {isAdmin && !isLocked && !compact && (
+                    <button type="button" onClick={() => { setActivityNotice(''); setSubmitError(''); setMode('write') }} className="apple-action-primary inline-flex w-full items-center justify-center px-5 py-3 text-sm sm:w-auto sm:py-2.5">
+                      글쓰기
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {!compact && !isLocked && !authLoading && !loading && !loadError && (
+                <div className="apple-control-strip activity-board-controls px-4 py-4 sm:px-8">
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="-mx-1 overflow-x-auto pb-1">
+                        <div className="flex min-w-max gap-2 px-1 text-sm font-bold lg:min-w-0 lg:flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => setCategoryFilter('ALL')}
+                            className={`apple-chip min-h-10 px-4 py-2 sm:min-h-9 ${categoryFilter === 'ALL' ? 'apple-chip-active' : ''}`}
+                          >
+                            전체글
+                          </button>
+                          {categories.map((category) => (
+                            <button
+                              key={category.key}
+                              type="button"
+                              onClick={() => setCategoryFilter(category.key)}
+                              className={`apple-chip min-h-10 px-4 py-2 sm:min-h-9 ${categoryFilter === category.key ? 'apple-chip-active' : ''}`}
+                            >
+                              {category.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <div className="relative flex items-center">
+                          <Search size={15} className="pointer-events-none absolute left-3 text-[var(--app-subtle)]" />
+                          <input
+                            type="search"
+                            value={searchText}
+                            onChange={(event) => setSearchText(event.target.value)}
+                            placeholder="제목, 내용, 작성자 검색"
+                            className="h-11 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-9 pr-3 text-base text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none transition focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:h-10 sm:w-64 sm:text-sm"
+                          />
+                        </div>
+                        <span className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-center text-xs font-bold text-[var(--app-subtle)]">
+                          {filteredItems.length.toLocaleString('ko-KR')}개
+                        </span>
+                      </div>
+                    </div>
+                    <div className="-mx-1 overflow-x-auto pb-1">
+                      <div className="flex min-w-max items-center gap-2 px-1 text-xs font-black text-[var(--app-muted)]">
+                        <span className="shrink-0">정렬</span>
+                        {ACTIVITY_SORT_OPTIONS.map((item) => (
+                          <button
+                            key={item.value}
+                            type="button"
+                            onClick={() => setSortMode(item.value)}
+                            className={`apple-chip min-h-9 px-3 py-1.5 ${sortMode === item.value ? 'apple-chip-active' : ''}`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                        <label className="activity-board-date-filter">
+                          <span>시작일</span>
+                          <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+                        </label>
+                        <label className="activity-board-date-filter">
+                          <span>종료일</span>
+                          <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+                        </label>
+                        {hasActiveFilters && (
+                          <button
+                            type="button"
+                            onClick={() => { setSearchText(''); setCategoryFilter('ALL'); setFromDate(''); setToDate('') }}
+                            className="apple-chip min-h-9 px-3 py-1.5"
+                          >
+                            필터 초기화
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {authLoading || loading ? (
+                <div className="activity-empty-state m-4 sm:m-8">
+                  <Sparkles size={22} aria-hidden="true" />
+                  <div>
+                    <h3>활동 기록을 불러오는 중...</h3>
+                    <p>회원 상태와 등록된 활동 기록을 확인하고 있습니다.</p>
+                  </div>
+                </div>
+              ) : isLocked ? (
+                <div className="activity-empty-state activity-locked-state m-4 sm:m-8">
+                  <Sparkles size={22} aria-hidden="true" />
+                  <div>
+                    <h3>로그인 하세요</h3>
+                    <p>회원 로그인 후 활동 기록과 일정을 확인할 수 있습니다.</p>
+                    <button type="button" onClick={() => navigate('/login')} className="apple-action-primary mt-3 inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">
+                      로그인
+                    </button>
+                  </div>
+                </div>
+              ) : error ? (
+                <div className="activity-empty-state m-4 sm:m-8">
+                  <Sparkles size={22} aria-hidden="true" />
+                  <div>
+                    <h3>활동 기록을 불러오지 못했습니다.</h3>
+                    <p>{error}</p>
+                  </div>
+                </div>
+              ) : visibleItems.length > 0 ? (
+                <>
+                  <div className="m-4 space-y-3 md:hidden">
+                    {visibleItems.map((item) => {
+                      const images = activityMediaInfos(item)
+                      const files = activityFileInfos(item)
+                      return (
+                        <article key={item.id} className="activity-board-card" onClick={() => openActivity(item)} role="button" tabIndex={0} onKeyDown={(event) => openActivityWithKeyboard(event, item)}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <span className="activity-board-category">{categoryLabel(item.category, item.categoryName)}</span>
+                              <h3>{item.title}</h3>
+                            </div>
+                            <span className="activity-board-number">#{item.id}</span>
+                          </div>
+                          {item.description && <p>{item.description}</p>}
+                          <div className="activity-board-meta">
+                            <span>{item.createdByName || 'COM\'s'}</span>
+                            <span>{formatActivityDate(item.eventDate)}</span>
+                            <span>조회 {item.viewCount ?? 0}</span>
+                            <span>개추 {item.upvotes ?? 0}</span>
+                            {images.length > 0 && <span>사진</span>}
+                            {files.length > 0 && <span>첨부</span>}
+                          </div>
+                        </article>
+                      )
+                    })}
+                  </div>
+                  <div className="m-5 hidden overflow-x-auto rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] md:block sm:m-8">
+                    <table className="apple-table activity-board-table w-full min-w-[860px] border-collapse text-sm">
+                      <thead className="border-b border-[var(--app-hairline)]">
+                        <tr>
+                          <th className="w-20 px-4 py-3 font-semibold">번호</th>
+                          <th className="w-24 px-4 py-3 font-semibold">말머리</th>
+                          <th className="px-4 py-3 text-left font-semibold">제목</th>
+                          <th className="w-36 px-4 py-3 font-semibold">글쓴이</th>
+                          <th className="w-28 px-4 py-3 font-semibold">작성일</th>
+                          <th className="w-20 px-4 py-3 font-semibold">조회</th>
+                          <th className="w-20 px-4 py-3 font-semibold">개추</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-black/10">
+                        {visibleItems.map((item) => {
+                          const images = activityMediaInfos(item)
+                          const files = activityFileInfos(item)
+                          return (
+                            <tr
+                              key={item.id}
+                              tabIndex={0}
+                              role="button"
+                              onClick={() => openActivity(item)}
+                              onKeyDown={(event) => openActivityWithKeyboard(event, item)}
+                              className="cursor-pointer text-[var(--app-muted)] transition hover:bg-[var(--app-surface-soft)] focus:bg-[var(--app-surface-soft)] focus:outline-none"
+                            >
+                              <td className="px-4 py-4 text-center text-xs text-[var(--app-subtle)]">{item.id}</td>
+                              <td className="px-4 py-4 text-center text-xs font-bold text-[var(--app-accent-text)]">{categoryLabel(item.category, item.categoryName)}</td>
+                              <td className="px-4 py-4">
+                                <h3 className="max-w-[520px] break-words text-left text-sm font-semibold text-[var(--app-text)]">{item.title}</h3>
+                                <div className="mt-1 flex flex-wrap items-center gap-1 text-xs">
+                                  {images.length > 0 && <span className="activity-board-inline-tag">[사진]</span>}
+                                  {files.length > 0 && <span className="activity-board-inline-tag">[첨부]</span>}
+                                  {item.description && <span className="activity-board-preview max-w-[420px] text-[var(--app-subtle)]">{item.description}</span>}
+                                </div>
+                              </td>
+                              <td className="px-4 py-4 text-center text-xs font-semibold">{item.createdByName || 'COM\'s'}</td>
+                              <td className="px-4 py-4 text-center text-xs text-[var(--app-subtle)]">{activityListDate(item)}</td>
+                              <td className="px-4 py-4 text-center text-xs">{item.viewCount ?? 0}</td>
+                              <td className="px-4 py-4 text-center text-xs">{item.upvotes ?? 0}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : hasActiveFilters ? (
+                <div className="activity-empty-state m-4 sm:m-8">
+                  <Sparkles size={22} aria-hidden="true" />
+                  <div>
+                    <h3>검색 결과가 없습니다.</h3>
+                    <p>다른 검색어나 필터 조건으로 다시 시도해보세요.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="activity-empty-state m-4 sm:m-8">
+                  <Sparkles size={22} aria-hidden="true" />
+                  <div>
+                    <h3>등록된 활동 기록이 없습니다.</h3>
+                    <p>확인된 활동 사진, 후기, 성과 기록이 추가되면 이 영역에 바로 표시됩니다.</p>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {mode === 'write' && (
+            <>
+              <div className="apple-board-minibar px-4 py-3 sm:px-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-[var(--app-muted)]">
+                    <span className="text-[var(--app-accent-text)]">Activity log</span>
+                    <span className="size-1 rounded-full bg-[var(--app-subtle)]" />
+                    <h1 className="text-xs font-semibold text-[var(--app-muted)]">글쓰기</h1>
+                  </div>
+                  <button type="button" onClick={backToList} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
+                    <ArrowLeft size={14} />
+                    목록
+                  </button>
+                </div>
+              </div>
+              <div className="p-0 sm:p-5">
+                {renderWriteForm()}
+              </div>
+            </>
+          )}
+
+          {mode === 'detail' && (
+            <>
+              <div className="apple-board-minibar px-4 py-3 sm:px-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-[var(--app-muted)]">
+                    <span className="text-[var(--app-accent-text)]">Activity log</span>
+                    <span className="size-1 rounded-full bg-[var(--app-subtle)]" />
+                    <span>{selectedActivity ? categoryLabel(selectedActivity.category, selectedActivity.categoryName) : '게시글'}</span>
+                    {selectedActivity?.eventDate && (
+                      <>
+                        <span className="size-1 rounded-full bg-[var(--app-subtle)]" />
+                        <span>{formatActivityDate(selectedActivity.eventDate)}</span>
+                      </>
+                    )}
+                  </div>
+                  <button type="button" onClick={backToList} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
+                    <ArrowLeft size={14} />
+                    목록
+                  </button>
+                </div>
+              </div>
+              {renderActivityDetail()}
+            </>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function useClubEvents(loadErrorMessage) {
+  const { user, loading: authLoading } = useAuth()
+  const queryClient = useQueryClient()
+
+  const query = useQuery({
+    queryKey: CLUB_EVENTS_QUERY_KEY,
+    queryFn: async () => {
+      const data = await listClubEvents()
+      return Array.isArray(data) ? data : []
+    },
+    enabled: Boolean(user) && !authLoading,
+  })
+
+  const events = query.data ?? null
+  const loading = Boolean(user && events === null && !query.error)
+  const loadError = query.error ? (query.error.message || loadErrorMessage) : ''
+
+  const prependEvent = (created) => {
+    queryClient.setQueryData(CLUB_EVENTS_QUERY_KEY, (prev) => [created, ...(Array.isArray(prev) ? prev : [])])
+  }
+
+  const mergeEvent = (updated) => {
+    queryClient.setQueryData(CLUB_EVENTS_QUERY_KEY, (prev) => {
+      const list = Array.isArray(prev) ? prev : []
+      const found = list.some((item) => item.id === updated.id)
+      return found ? list.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)) : [updated, ...list]
+    })
+  }
+
+  const removeEvent = (id) => {
+    queryClient.setQueryData(CLUB_EVENTS_QUERY_KEY, (prev) => (Array.isArray(prev) ? prev.filter((item) => item.id !== id) : []))
+  }
+
+  return { user, authLoading, events, loading, loadError, prependEvent, mergeEvent, removeEvent }
+}
+
+function toEventDateTime(value, endOfDay = false) {
+  if (!value) return ''
+  return `${value}T${endOfDay ? '23:59:00' : '00:00:00'}`
+}
+
+function formatEventWindow(event) {
+  const start = formatActivityDateTime(event.startsAt)
+  const end = formatActivityDateTime(event.endsAt)
+  return [start, end].filter(Boolean).join(' ~ ')
+}
+
+function formatFileSize(bytes) {
+  const n = Number(bytes)
+  if (!Number.isFinite(n) || n <= 0) return ''
+  if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)}MB`
+  if (n >= 1024) return `${Math.round(n / 1024)}KB`
+  return `${n}B`
+}
+
+function ClubEventSection() {
+  const navigate = useNavigate()
+  const { user, authLoading, events, loading, loadError, prependEvent, mergeEvent, removeEvent } = useClubEvents('이벤트를 불러오지 못했습니다.')
+  const [mode, setMode] = useState('list')
+  const [selectedEventId, setSelectedEventId] = useState(null)
+  const [selectedSnapshot, setSelectedSnapshot] = useState(null)
+  const [eventForm, setEventForm] = useState({
+    title: '',
+    description: '',
+    startsOn: '',
+    endsOn: '',
+  })
+  const [entryForm, setEntryForm] = useState({
+    title: '',
+    authorName: '',
+    description: '',
+  })
+  const [entryFile, setEntryFile] = useState(null)
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+  const [savingEvent, setSavingEvent] = useState(false)
+  const [savingEntry, setSavingEntry] = useState(false)
+  const [votingEntryId, setVotingEntryId] = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
+
+  const eventItems = user ? events || [] : []
+  const selectedEvent = selectedEventId == null
+    ? null
+    : eventItems.find((item) => item.id === selectedEventId) || selectedSnapshot
+  const isLocked = !authLoading && !user
+  const isAdmin = user?.role === 'ADMIN'
+  const visibleError = error || loadError
+
+  const resetEventForm = () => {
+    setEventForm({ title: '', description: '', startsOn: '', endsOn: '' })
+  }
+
+  const resetEntryForm = () => {
+    setEntryForm({ title: '', authorName: '', description: '' })
+    setEntryFile(null)
+  }
+
+  const openEvent = async (item) => {
+    setMode('detail')
+    setSelectedEventId(item.id)
+    setSelectedSnapshot(item)
+    setNotice('')
+    setError('')
+    try {
+      const detail = await getClubEvent(item.id)
+      mergeEvent(detail)
+      setSelectedSnapshot(detail)
+    } catch (err) {
+      setError(err.message || '이벤트 상세를 불러오지 못했습니다.')
+    }
+  }
+
+  const openEventWithKeyboard = (event, item) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    openEvent(item)
+  }
+
+  const submitEvent = async (event) => {
+    event.preventDefault()
+    if (!eventForm.title.trim() || !eventForm.startsOn || !eventForm.endsOn) return
+    setSavingEvent(true)
+    setNotice('')
+    setError('')
+    try {
+      const created = await createClubEvent({
+        title: eventForm.title.trim(),
+        description: eventForm.description.trim(),
+        startsAt: toEventDateTime(eventForm.startsOn),
+        endsAt: toEventDateTime(eventForm.endsOn, true),
+      })
+      prependEvent(created)
+      setSelectedEventId(created.id)
+      setSelectedSnapshot(created)
+      setMode('detail')
+      resetEventForm()
+      setNotice('이벤트를 열었습니다. 이제 회지와 작품을 업로드할 수 있습니다.')
+    } catch (err) {
+      setError(err.message || '이벤트를 만들지 못했습니다.')
+    } finally {
+      setSavingEvent(false)
+    }
+  }
+
+  const submitEntry = async (event) => {
+    event.preventDefault()
+    if (!selectedEvent || !entryForm.title.trim() || !entryFile) return
+    setSavingEntry(true)
+    setNotice('')
+    setError('')
+    try {
+      await uploadClubEventEntry(selectedEvent.id, {
+        title: entryForm.title.trim(),
+        authorName: entryForm.authorName.trim(),
+        description: entryForm.description.trim(),
+        file: entryFile,
+      })
+      const detail = await getClubEvent(selectedEvent.id)
+      mergeEvent(detail)
+      setSelectedSnapshot(detail)
+      resetEntryForm()
+      event.currentTarget.reset()
+      setNotice('작품을 이벤트에 업로드했습니다.')
+    } catch (err) {
+      setError(err.message || '작품을 업로드하지 못했습니다.')
+    } finally {
+      setSavingEntry(false)
+    }
+  }
+
+  const handleVote = async (entry) => {
+    if (!selectedEvent || votingEntryId) return
+    setVotingEntryId(entry.id)
+    setNotice('')
+    setError('')
+    try {
+      const updated = await voteClubEventEntry(selectedEvent.id, entry.id)
+      mergeEvent(updated)
+      setSelectedSnapshot(updated)
+      setNotice(`${entry.title}에 투표했습니다.`)
+    } catch (err) {
+      setError(err.message || '투표하지 못했습니다.')
+    } finally {
+      setVotingEntryId(null)
+    }
+  }
+
+  const handleDeleteEvent = async (item) => {
+    if (!window.confirm(`${item.title} 이벤트를 삭제할까요?`)) return
+    setDeletingId(`event-${item.id}`)
+    setError('')
+    try {
+      await deleteClubEvent(item.id)
+      removeEvent(item.id)
+      if (selectedEventId === item.id) {
+        setSelectedEventId(null)
+        setSelectedSnapshot(null)
+        setMode('list')
+      }
+    } catch (err) {
+      setError(err.message || '이벤트를 삭제하지 못했습니다.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const handleDeleteEntry = async (entry) => {
+    if (!selectedEvent || !window.confirm(`${entry.title} 작품을 삭제할까요?`)) return
+    setDeletingId(`entry-${entry.id}`)
+    setError('')
+    try {
+      await deleteClubEventEntry(selectedEvent.id, entry.id)
+      const detail = await getClubEvent(selectedEvent.id)
+      mergeEvent(detail)
+      setSelectedSnapshot(detail)
+    } catch (err) {
+      setError(err.message || '작품을 삭제하지 못했습니다.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const renderEventForm = () => (
+    <form onSubmit={submitEvent} className="club-event-admin-form" aria-label="이벤트 열기">
+      <label className="club-event-field club-event-field-wide">
+        <span>이벤트 제목</span>
+        <input
+          value={eventForm.title}
+          onChange={(event) => setEventForm((prev) => ({ ...prev, title: event.target.value }))}
+          maxLength={120}
+          placeholder="예: 회지 인기투표"
+        />
+      </label>
+      <label className="club-event-field">
+        <span>투표 시작일</span>
+        <input
+          type="date"
+          value={eventForm.startsOn}
+          onChange={(event) => setEventForm((prev) => ({ ...prev, startsOn: event.target.value }))}
+        />
+      </label>
+      <label className="club-event-field">
+        <span>투표 종료일</span>
+        <input
+          type="date"
+          value={eventForm.endsOn}
+          onChange={(event) => setEventForm((prev) => ({ ...prev, endsOn: event.target.value }))}
+        />
+      </label>
+      <label className="club-event-field club-event-field-wide">
+        <span>설명</span>
+        <textarea
+          value={eventForm.description}
+          onChange={(event) => setEventForm((prev) => ({ ...prev, description: event.target.value }))}
+          rows={4}
+          maxLength={500}
+          placeholder="투표 안내와 기준을 적어주세요."
+        />
+      </label>
+      <div className="club-event-form-actions">
+        <button
+          type="submit"
+          className="apple-action-primary inline-flex min-h-11 items-center justify-center px-5 py-2.5 text-sm"
+          disabled={savingEvent || !eventForm.title.trim() || !eventForm.startsOn || !eventForm.endsOn}
+        >
+          {savingEvent ? '여는 중...' : '이벤트 열기'}
+        </button>
+        <button
+          type="button"
+          className="apple-action-secondary inline-flex min-h-11 items-center justify-center px-5 py-2.5 text-sm"
+          onClick={() => setMode('list')}
+          disabled={savingEvent}
+        >
+          취소
+        </button>
+      </div>
+    </form>
+  )
+
+  const renderEntryForm = () => {
+    if (!isAdmin || !selectedEvent) return null
+    return (
+      <form onSubmit={submitEntry} className="club-event-entry-form" aria-label="이벤트 작품 업로드">
+        <div className="club-event-entry-form-head">
+          <div>
+            <p className="apple-eyebrow">Upload</p>
+            <h3>회지·작품 업로드</h3>
+          </div>
+          <span>PDF, 이미지, 압축 파일 등 50MB 이하</span>
+        </div>
+        <div className="club-event-entry-grid">
+          <label className="club-event-field">
+            <span>작품 제목</span>
+            <input
+              value={entryForm.title}
+              onChange={(event) => setEntryForm((prev) => ({ ...prev, title: event.target.value }))}
+              maxLength={120}
+              placeholder="예: 여름호"
+            />
+          </label>
+          <label className="club-event-field">
+            <span>작성자/팀</span>
+            <input
+              value={entryForm.authorName}
+              onChange={(event) => setEntryForm((prev) => ({ ...prev, authorName: event.target.value }))}
+              maxLength={80}
+              placeholder="예: 운영팀"
+            />
+          </label>
+          <label className="club-event-field club-event-field-wide">
+            <span>설명</span>
+            <textarea
+              value={entryForm.description}
+              onChange={(event) => setEntryForm((prev) => ({ ...prev, description: event.target.value }))}
+              rows={3}
+              maxLength={300}
+              placeholder="작품 설명"
+            />
+          </label>
+          <label className="club-event-upload-button">
+            <Sparkles size={15} aria-hidden="true" />
+            파일 선택
+            <input
+              type="file"
+              onChange={(event) => setEntryFile(event.target.files?.[0] || null)}
+            />
+          </label>
+          <span className="club-event-upload-name">{entryFile ? entryFile.name : '선택된 파일 없음'}</span>
+        </div>
+        <button
+          type="submit"
+          className="apple-action-primary inline-flex min-h-11 items-center justify-center px-5 py-2.5 text-sm"
+          disabled={savingEntry || !entryForm.title.trim() || !entryFile}
+        >
+          {savingEntry ? '업로드 중...' : '작품 추가'}
+        </button>
+      </form>
+    )
+  }
+
+  const renderDetail = () => {
+    if (!selectedEvent) {
+      return <p className="px-4 py-16 text-center text-sm text-[var(--app-muted)]">이벤트를 여는 중...</p>
+    }
+    const entries = Array.isArray(selectedEvent.entries) ? selectedEvent.entries : []
+    return (
+      <>
+        <div className="club-event-detail-head">
+          <button type="button" className="apple-action-secondary inline-flex items-center gap-1 px-4 py-2 text-sm" onClick={() => setMode('list')}>
+            <ArrowLeft size={14} />
+            목록
+          </button>
+          <div className="club-event-detail-title">
+            <p className="apple-eyebrow">Event contest</p>
+            <h2>{selectedEvent.title}</h2>
+            {selectedEvent.description && <p>{selectedEvent.description}</p>}
+          </div>
+          <div className="club-event-status-card">
+            <span className={selectedEvent.votingOpen ? 'club-event-status-open' : 'club-event-status-closed'}>
+              {selectedEvent.votingOpen ? '투표 진행 중' : '투표 종료'}
+            </span>
+            <strong>{selectedEvent.totalVotes ?? 0}표</strong>
+            <small>{formatEventWindow(selectedEvent)}</small>
           </div>
         </div>
 
-        {isAdmin && !isLocked && (
-          <form onSubmit={submitActivity} className="activity-admin-composer mt-8" aria-label="활동 기록 추가">
-            <div>
-              <p className="activity-admin-composer-title">관리자 활동 기록 작성</p>
-              <p className="activity-admin-composer-copy">세미나, 스터디, 프로젝트 발표, MT/행사, 성과 기록을 활동 로그에 바로 추가합니다.</p>
-            </div>
-            <label>
-              <span>활동 제목</span>
-              <input
-                value={activityForm.title}
-                onChange={(event) => setActivityForm((prev) => ({ ...prev, title: event.target.value }))}
-                maxLength={120}
-              />
-            </label>
-            <label>
-              <span>활동 날짜</span>
-              <input
-                type="date"
-                value={activityForm.eventDate}
-                onChange={(event) => setActivityForm((prev) => ({ ...prev, eventDate: event.target.value }))}
-              />
-            </label>
-            <label>
-              <span>활동 분류</span>
-              <select
-                value={selectedCategory}
-                onChange={(event) => setActivityForm((prev) => ({ ...prev, category: event.target.value }))}
-              >
-                {categories.map((category) => (
-                  <option key={category.key} value={category.key}>{category.name}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>활동 사진</span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) => setActivityImage(event.target.files?.[0] || null)}
-              />
-            </label>
-            <label className="activity-admin-composer-wide">
-              <span>활동 내용</span>
-              <textarea
-                value={activityForm.description}
-                onChange={(event) => setActivityForm((prev) => ({ ...prev, description: event.target.value }))}
-                maxLength={500}
-                rows={3}
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={savingActivity || !activityForm.title.trim() || !activityForm.eventDate}
-            >
-              {savingActivity ? '추가 중...' : '활동 기록 추가'}
-            </button>
-            {activityNotice && <p className="activity-admin-composer-notice">{activityNotice}</p>}
-          </form>
-        )}
+        {renderEntryForm()}
 
-        {!compact && !isLocked && !authLoading && !loading && !loadError && (
-          <div className="activity-log-filters mt-8 flex flex-wrap items-end gap-3">
-            <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
-              <span>검색</span>
-              <input
-                type="search"
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-                placeholder="제목, 내용, 작성자로 검색"
-                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
-              <span>분류</span>
-              <select
-                value={categoryFilter}
-                onChange={(event) => setCategoryFilter(event.target.value)}
-                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
-              >
-                <option value="ALL">전체 분류</option>
-                {categories.map((category) => (
-                  <option key={category.key} value={category.key}>{category.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
-              <span>시작일</span>
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(event) => setFromDate(event.target.value)}
-                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
-              <span>종료일</span>
-              <input
-                type="date"
-                value={toDate}
-                onChange={(event) => setToDate(event.target.value)}
-                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--app-accent)_40%,transparent)]"
-              />
-            </label>
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={() => { setSearchText(''); setCategoryFilter('ALL'); setFromDate(''); setToDate('') }}
-                className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--app-accent-text)] transition hover:bg-[var(--app-surface-soft)]"
-              >
-                필터 초기화
-              </button>
-            )}
-          </div>
-        )}
-
-        {authLoading || loading ? (
-          <div className="activity-empty-state mt-8">
-            <Sparkles size={22} aria-hidden="true" />
-            <div>
-              <h3>활동 기록을 불러오는 중...</h3>
-              <p>회원 상태와 등록된 활동 기록을 확인하고 있습니다.</p>
-            </div>
-          </div>
-        ) : isLocked ? (
-          <div className="activity-empty-state activity-locked-state mt-8">
-            <Sparkles size={22} aria-hidden="true" />
-            <div>
-              <h3>로그인 하세요</h3>
-              <p>회원 로그인 후 활동 기록과 일정을 확인할 수 있습니다.</p>
-              <button type="button" onClick={() => navigate('/login')} className="apple-action-primary mt-3 inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">
-                로그인
-              </button>
-            </div>
-          </div>
-        ) : error ? (
-          <div className="activity-empty-state mt-8">
-            <Sparkles size={22} aria-hidden="true" />
-            <div>
-              <h3>활동 기록을 불러오지 못했습니다.</h3>
-              <p>{error}</p>
-            </div>
-          </div>
-        ) : visibleItems.length > 0 ? (
-          <div className="activity-log-grid mt-8">
-            {visibleItems.map((item) => (
-              <article
-                key={item.id}
-                className="activity-log-card activity-log-card-blue"
-                onMouseEnter={() => registerActivityView(item)}
-                onFocus={() => registerActivityView(item)}
-              >
-                <div className={`activity-log-photo ${item.imageUrl ? 'activity-log-photo-has-image' : ''}`}>
-                  {item.imageUrl ? (
-                    <img src={item.imageUrl} alt="" className="activity-log-image" loading="lazy" />
-                  ) : (
-                    <>
-                      <div className="activity-log-photo-bar" aria-hidden="true">
-                        <span />
-                        <span />
-                        <span />
-                      </div>
-                      <div className="activity-log-photo-mark" aria-hidden="true">
-                        <Sparkles size={24} />
-                      </div>
-                    </>
-                  )}
-                  <div className="activity-log-photo-caption">
-                    <span>{categoryLabel(item.category, item.categoryName)}</span>
-                    <strong>{formatActivityDate(item.eventDate)}</strong>
+        {entries.length > 0 ? (
+          <div className="club-event-ranking-list">
+            {entries.map((entry) => (
+              <article key={entry.id} className={`club-event-entry-card ${entry.myVote ? 'club-event-entry-card-selected' : ''}`}>
+                <div className="club-event-rank-badge">{entry.rank}위</div>
+                <div className="club-event-entry-main">
+                  <div className="club-event-entry-title-row">
+                    <h3>{entry.title}</h3>
+                    {entry.authorName && <span>{entry.authorName}</span>}
+                  </div>
+                  {entry.description && <p>{entry.description}</p>}
+                  <div className="club-event-entry-meta">
+                    <a href={entry.downloadUrl} className="club-event-download-link">
+                      <Download size={14} aria-hidden="true" />
+                      {entry.originalName || '첨부파일'}
+                    </a>
+                    {formatFileSize(entry.fileSize) && <span>{formatFileSize(entry.fileSize)}</span>}
                   </div>
                 </div>
-                <div className="activity-log-body">
-                  <p className="activity-log-term">{item.createdByName || 'COM\'s'}</p>
-                  <h3>{item.title}</h3>
-                  {item.description && <p>{item.description}</p>}
-                  <div className="activity-log-tags" aria-label={`${item.title} 태그`}>
-                    <span>{categoryLabel(item.category, item.categoryName)}</span>
-                    {(item.imageInfos?.length ?? 0) > 0 && <span>사진 {item.imageInfos.length}장</span>}
-                    {(item.fileInfos?.length ?? 0) > 0 && <span>첨부 {item.fileInfos.length}개</span>}
-                  </div>
-                  {(item.fileInfos?.length ?? 0) > 0 && (
-                    <ul className="mt-2 flex flex-col gap-1 text-xs">
-                      {item.fileInfos.map((file) => (
-                        <li key={file.id}>
-                          <a
-                            href={file.url}
-                            className="inline-flex items-center gap-1 font-semibold text-[var(--app-accent-text)] underline-offset-2 hover:underline"
-                          >
-                            <Download size={13} aria-hidden="true" />
-                            {file.originalName || '첨부파일'}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <div className="mt-3 flex items-center gap-3 text-xs font-semibold text-[var(--app-muted)]">
-                    <span>조회 {item.viewCount ?? 0}</span>
+                <div className="club-event-entry-score">
+                  <strong>{entry.voteCount ?? 0}표</strong>
+                  <button
+                    type="button"
+                    onClick={() => handleVote(entry)}
+                    disabled={!selectedEvent.votingOpen || votingEntryId === entry.id}
+                    className={entry.myVote ? 'club-event-vote-button club-event-vote-button-selected' : 'club-event-vote-button'}
+                  >
+                    <ThumbsUp size={15} aria-hidden="true" />
+                    {entry.myVote ? '내 투표' : '투표'}
+                  </button>
+                  {isAdmin && (
                     <button
                       type="button"
-                      onClick={() => handleActivityVote(item)}
-                      disabled={votingId === item.id}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-black transition disabled:opacity-50 ${item.myVote === 1 ? 'border-[var(--app-accent)] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
+                      onClick={() => handleDeleteEntry(entry)}
+                      disabled={deletingId === `entry-${entry.id}`}
+                      className="club-event-danger-button"
+                      aria-label={`${entry.title} 삭제`}
                     >
-                      <ThumbsUp size={14} />
-                      개추 {item.upvotes ?? 0}
+                      <Trash2 size={14} aria-hidden="true" />
                     </button>
-                  </div>
+                  )}
                 </div>
               </article>
             ))}
           </div>
-        ) : hasActiveFilters ? (
-          <div className="activity-empty-state mt-8">
-            <Sparkles size={22} aria-hidden="true" />
-            <div>
-              <h3>검색 결과가 없습니다.</h3>
-              <p>다른 검색어나 필터 조건으로 다시 시도해보세요.</p>
-            </div>
-          </div>
         ) : (
-          <div className="activity-empty-state mt-8">
+          <div className="activity-empty-state m-4 sm:m-8">
             <Sparkles size={22} aria-hidden="true" />
             <div>
-              <h3>등록된 활동 기록이 없습니다.</h3>
-              <p>확인된 활동 사진, 후기, 성과 기록이 추가되면 이 영역에 바로 표시됩니다.</p>
+              <h3>아직 업로드된 작품이 없습니다.</h3>
+              <p>관리자가 회지나 작품 파일을 추가하면 랭킹이 이곳에 표시됩니다.</p>
             </div>
           </div>
         )}
+      </>
+    )
+  }
+
+  return (
+    <section id="activity-events" className="club-event-section scroll-mt-24 bg-[var(--app-surface-soft)] px-5 py-12 sm:py-16">
+      <div className="mx-auto max-w-7xl">
+        <div className="activity-board-shell apple-board-shell">
+          {mode === 'list' && (
+            <>
+              <div className="club-event-hero px-4 py-7 sm:px-8 sm:py-10">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div className="min-w-0">
+                    <p className="apple-eyebrow">Event</p>
+                    <h1 className="apple-display mt-3 break-words text-4xl sm:text-6xl">이벤트</h1>
+                    <p className="apple-copy mt-4 max-w-2xl text-base sm:text-lg">
+                      회지, 작품, 활동 결과물을 모아 투표하고 랭킹으로 확인합니다. 등록된 실제 이벤트만 보여줍니다.
+                    </p>
+                  </div>
+                  {isAdmin && !isLocked && (
+                    <button type="button" onClick={() => { setMode('write'); setError(''); setNotice('') }} className="apple-action-primary inline-flex w-full items-center justify-center px-5 py-3 text-sm sm:w-auto sm:py-2.5">
+                      이벤트 열기
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {authLoading || loading ? (
+                <div className="activity-empty-state m-4 sm:m-8">
+                  <Sparkles size={22} aria-hidden="true" />
+                  <div>
+                    <h3>이벤트를 불러오는 중...</h3>
+                    <p>회원 상태와 진행 중인 투표를 확인하고 있습니다.</p>
+                  </div>
+                </div>
+              ) : isLocked ? (
+                <div className="activity-empty-state activity-locked-state m-4 sm:m-8">
+                  <Sparkles size={22} aria-hidden="true" />
+                  <div>
+                    <h3>로그인 하세요</h3>
+                    <p>회원 로그인 후 이벤트와 인기투표에 참여할 수 있습니다.</p>
+                    <button type="button" onClick={() => navigate('/login')} className="apple-action-primary mt-3 inline-flex min-h-10 items-center justify-center px-4 py-2 text-sm">
+                      로그인
+                    </button>
+                  </div>
+                </div>
+              ) : visibleError ? (
+                <div className="activity-empty-state m-4 sm:m-8">
+                  <Sparkles size={22} aria-hidden="true" />
+                  <div>
+                    <h3>이벤트를 불러오지 못했습니다.</h3>
+                    <p>{visibleError}</p>
+                  </div>
+                </div>
+              ) : eventItems.length > 0 ? (
+                <div className="club-event-list">
+                  {eventItems.map((item) => (
+                    <article key={item.id} className="club-event-list-card">
+                      <button
+                        type="button"
+                        onClick={() => openEvent(item)}
+                        onKeyDown={(event) => openEventWithKeyboard(event, item)}
+                        className="club-event-list-button"
+                      >
+                        <span className={item.votingOpen ? 'club-event-pill club-event-pill-open' : 'club-event-pill'}>
+                          {item.votingOpen ? '진행 중' : '종료'}
+                        </span>
+                        <strong>{item.title}</strong>
+                        {item.description && <span>{item.description}</span>}
+                        <small>{formatEventWindow(item)}</small>
+                      </button>
+                      <div className="club-event-list-stats">
+                        <span>{item.entryCount ?? 0}작품</span>
+                        <span>{item.totalVotes ?? 0}표</span>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteEvent(item)}
+                            disabled={deletingId === `event-${item.id}`}
+                            className="club-event-danger-button"
+                            aria-label={`${item.title} 이벤트 삭제`}
+                          >
+                            <Trash2 size={14} aria-hidden="true" />
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="activity-empty-state m-4 sm:m-8">
+                  <Sparkles size={22} aria-hidden="true" />
+                  <div>
+                    <h3>열린 이벤트가 없습니다.</h3>
+                    <p>관리자가 회지 인기투표나 작품 이벤트를 열면 이곳에 표시됩니다.</p>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {mode === 'write' && (
+            <>
+              <div className="apple-board-minibar px-4 py-3 sm:px-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-[var(--app-muted)]">
+                    <span className="text-[var(--app-accent-text)]">Event</span>
+                    <span className="size-1 rounded-full bg-[var(--app-subtle)]" />
+                    <h1 className="text-xs font-semibold text-[var(--app-muted)]">이벤트 열기</h1>
+                  </div>
+                  <button type="button" onClick={() => setMode('list')} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
+                    <ArrowLeft size={14} />
+                    목록
+                  </button>
+                </div>
+              </div>
+              <div className="p-4 sm:p-5">{renderEventForm()}</div>
+            </>
+          )}
+
+          {mode === 'detail' && renderDetail()}
+
+          {(notice || error) && (
+            <div className={`club-event-toast ${error ? 'club-event-toast-error' : ''}`}>
+              {error || notice}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   )
@@ -1953,7 +2767,8 @@ function ClubCalendarSection({ compact = false }) {
     const rangeLabel = event.range && event.startDate !== event.endDate
       ? `${formatActivityDate(event.startDate)} ~ ${formatActivityDate(event.endDate)}`
       : formatActivityDate(event.date)
-    return [rangeLabel, event.timeLabel, event.recurring ? '정기 모임' : '날짜 일정'].filter(Boolean).join(' · ')
+    const locationLabel = event.location ? `@${event.location}` : ''
+    return [rangeLabel, event.timeLabel, locationLabel, event.recurring ? '정기 모임' : '날짜 일정'].filter(Boolean).join(' · ')
   }
 
   return (
@@ -2033,6 +2848,9 @@ function ClubCalendarSection({ compact = false }) {
                         <span className="club-calendar-event-title">{event.showTitle ? event.title : ''}</span>
                         {event.showTitle && event.timeLabel && (
                           <span className="club-calendar-event-meta">{event.timeLabel}</span>
+                        )}
+                        {event.showTitle && event.location && (
+                          <span className="club-calendar-event-meta">@{event.location}</span>
                         )}
                       </span>
                     ))}
@@ -2297,6 +3115,10 @@ function ActivitiesDetailPage() {
 
 function ActivityLogPage() {
   return <ActivityLogSection />
+}
+
+function ClubEventPage() {
+  return <ClubEventSection />
 }
 
 function MonthlyCalendarPage() {

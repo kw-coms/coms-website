@@ -101,6 +101,7 @@ export function buildCalendarDayEvents({ calendarMonth, scheduleItems = [], recu
       startTime: occ.startTime || '',
       endTime: occ.endTime || '',
       timeLabel: formatTimeLabel(occ.startTime, occ.endTime),
+      location: occ.location || '',
       recurring: true,
       range: false,
       segment: 'single',
