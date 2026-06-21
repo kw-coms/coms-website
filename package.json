@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node tests/communityExperience.test.mjs && node tests/mobileNavigation.test.mjs && node tests/miniAppsProfile.test.mjs && node tests/monthlyCalendar.test.mjs",
+    "test": "node tests/communityExperience.test.mjs && node tests/mobileNavigation.test.mjs && node tests/miniAppsProfile.test.mjs && node tests/monthlyCalendar.test.mjs && node tests/clubEvents.test.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "e2e": "npm run build && playwright test",

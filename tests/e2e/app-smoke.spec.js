@@ -5,6 +5,7 @@ import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
 const routeExpectations = [
   ['/', /KW COM's/],
   ['/activities', /배움이 매주 쌓이고,\s*서로에게 남습니다\./],
+  ['/activity-events', /회지 인기투표|로그인/],
   ['/projects', /아이디어를 실제 서비스와 제작물로\./],
   ['/apps', /COM's Apps/],
   ['/login', /로그인|아이디/],
@@ -102,6 +103,24 @@ test('apps page surfaces companion service links away from the home dashboard', 
   ]) {
     await expect(page.getByRole('link', { name: new RegExp(`${name}.*열기`) })).toHaveAttribute('href', href)
   }
+})
+
+test('club event page renders entries and ranking from real API data', async ({ page }) => {
+  await mockAdminApis(page)
+
+  await page.goto('/activity-events')
+
+  await expect(page.getByRole('heading', { name: '이벤트' })).toBeVisible()
+  const eventCard = page.locator('.club-event-list-button').filter({ hasText: '회지 인기투표' })
+  await expect(eventCard).toBeVisible()
+  await eventCard.click()
+
+  await expect(page.getByRole('heading', { name: '회지 인기투표' })).toBeVisible()
+  await expect(page.getByText('1위')).toBeVisible()
+  await expect(page.getByText('여름호')).toBeVisible()
+  await expect(page.getByText('5표')).toBeVisible()
+  await expect(page.getByRole('link', { name: /summer\.pdf/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /내 투표/ })).toBeVisible()
 })
 
 test('appearance panel directs signed-in users to account-saved font settings', async ({ page }) => {
@@ -883,7 +902,7 @@ test('signed-in members see real activity records and schedule events', async ({
   await page.goto('/activity-log')
 
   await expect(page.getByRole('heading', { name: '운영진 등록 세미나' })).toBeVisible()
-  await expect(page.getByText('관리자가 등록한 실제 활동 기록')).toBeVisible()
+  await expect(page.locator('.activity-board-table').getByText('관리자가 등록한 실제 활동 기록')).toBeVisible()
   await expect(page.getByText('운영진 등록 회의')).toHaveCount(0)
 
   await page.goto('/monthly-calendar')
@@ -932,17 +951,16 @@ test('admin can add a schedule directly from the monthly calendar', async ({ pag
 
   await page.goto('/monthly-calendar')
   await page.getByLabel('일정 제목').fill('캘린더 직접 등록 회의')
-  await page.getByLabel('일정 날짜').fill('2026-06-24')
-  await page.getByLabel('일정 분류').selectOption('MEETING')
-  await page.getByRole('button', { name: '일정 추가' }).click()
+  await page.getByLabel('시작일').fill('2026-06-24')
+  await page.getByRole('button', { name: '날짜 일정 추가' }).click()
 
   await expect.poll(() => createdPayload).toMatchObject({
     title: '캘린더 직접 등록 회의',
     kind: 'SCHEDULE',
-    category: 'MEETING',
+    category: 'GENERAL',
     eventDate: '2026-06-24',
   })
-  await expect(page.getByText('캘린더 직접 등록 회의')).toBeVisible()
+  await expect(page.locator('.club-calendar-event-title', { hasText: '캘린더 직접 등록 회의' })).toBeVisible()
 })
 
 test('admin can write an activity log entry directly from the activity log page', async ({ page }) => {
@@ -979,6 +997,7 @@ test('admin can write an activity log entry directly from the activity log page'
   })
 
   await page.goto('/activity-log')
+  await page.getByRole('button', { name: '글쓰기' }).click()
   await page.getByLabel('활동 제목').fill('활동 로그 직접 작성')
   await page.getByLabel('활동 날짜').fill('2026-06-25')
   await page.getByLabel('활동 분류').selectOption('PROJECT')
@@ -1199,16 +1218,16 @@ test('club activity card registers a view and toggles the upvote count', async (
 
   await page.goto('/activity-log')
 
-  const card = page.locator('article.activity-log-card').filter({ hasText: '조회 검증 세미나' })
-  await expect(card).toBeVisible()
-  await card.hover()
+  const row = page.locator('tr[role="button"]').filter({ hasText: '조회 검증 세미나' })
+  await expect(row).toBeVisible()
+  await row.click()
 
   await expect.poll(() => viewRegistered).toBe(true)
-  await expect(card.getByText('조회 9')).toBeVisible()
+  await expect(page.getByText('조회 9')).toBeVisible()
 
-  await card.getByRole('button', { name: /개추 2/ }).click()
+  await page.getByRole('button', { name: /개추 2/ }).click()
   await expect.poll(() => voteValue).toBe(1)
-  await expect(card.getByRole('button', { name: /개추 3/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /개추 3/ })).toBeVisible()
 })
 
 test('admin deleted post full view modal renders title, body, image, and comments', async ({ page }) => {
