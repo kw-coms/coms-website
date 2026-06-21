@@ -77,6 +77,11 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.POST, "/api/club-activities/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.PATCH, "/api/club-activities/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/club-activities/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.GET, "/api/club-events", "/api/club-events/**").authenticated();
+                auth.requestMatchers(HttpMethod.POST, "/api/club-events/*/entries/*/vote").authenticated();
+                auth.requestMatchers(HttpMethod.POST, "/api/club-events", "/api/club-events/*/entries").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.PATCH, "/api/club-events/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.DELETE, "/api/club-events/**").hasRole("ADMIN");
                 // Club projects showcase is public (the /apps route is public); admin CRUD
                 // lives under /api/admin/** and is guarded above.
                 auth.requestMatchers(HttpMethod.GET, "/api/club-projects", "/api/club-projects/**").permitAll();

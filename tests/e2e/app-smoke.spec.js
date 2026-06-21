@@ -5,6 +5,7 @@ import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
 const routeExpectations = [
   ['/', /KW COM's/],
   ['/activities', /배움이 매주 쌓이고,\s*서로에게 남습니다\./],
+  ['/activity-events', /회지 인기투표|로그인/],
   ['/projects', /아이디어를 실제 서비스와 제작물로\./],
   ['/apps', /COM's Apps/],
   ['/login', /로그인|아이디/],
@@ -102,6 +103,24 @@ test('apps page surfaces companion service links away from the home dashboard', 
   ]) {
     await expect(page.getByRole('link', { name: new RegExp(`${name}.*열기`) })).toHaveAttribute('href', href)
   }
+})
+
+test('club event page renders entries and ranking from real API data', async ({ page }) => {
+  await mockAdminApis(page)
+
+  await page.goto('/activity-events')
+
+  await expect(page.getByRole('heading', { name: '이벤트', exact: true })).toBeVisible()
+  const eventCard = page.locator('.club-event-list-button').filter({ hasText: '회지 인기투표' })
+  await expect(eventCard).toBeVisible()
+  await eventCard.click()
+
+  await expect(page.getByRole('heading', { name: '회지 인기투표' })).toBeVisible()
+  await expect(page.getByText('1위')).toBeVisible()
+  await expect(page.getByText('여름호')).toBeVisible()
+  await expect(page.getByText('5표')).toBeVisible()
+  await expect(page.getByRole('link', { name: /summer\.pdf/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /내 투표/ })).toBeVisible()
 })
 
 test('appearance panel directs signed-in users to account-saved font settings', async ({ page }) => {
