@@ -4764,7 +4764,7 @@ body {
 	border: 1px dashed color-mix(in srgb, var(--app-accent) 32%, var(--app-hairline));
 	border-radius: 0.5rem;
 	background: color-mix(in srgb, var(--app-accent) 5%, var(--app-surface-soft));
-	padding: 1rem;
+	padding: 0.8rem 0.9rem;
 	transition:
 		border-color 160ms ease,
 		background 160ms ease,
@@ -4809,6 +4809,13 @@ body {
 	font-size: 0.78rem;
 	font-weight: 800;
 	line-height: 1.45;
+}
+
+.club-event-upload-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	justify-content: flex-end;
 }
 
 .club-event-upload-button {
