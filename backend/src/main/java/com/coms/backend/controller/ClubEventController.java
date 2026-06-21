@@ -68,13 +68,18 @@ public class ClubEventController {
                                                             @RequestParam("title") String title,
                                                             @RequestParam(value = "authorName", required = false) String authorName,
                                                             @RequestParam(value = "description", required = false) String description,
+                                                            @RequestParam(value = "workType", required = false) String workType,
+                                                            @RequestParam(value = "summary", required = false) String summary,
+                                                            @RequestParam(value = "tags", required = false) String tags,
+                                                            @RequestParam(value = "externalUrl", required = false) String externalUrl,
                                                             @RequestParam(value = "files", required = false) List<MultipartFile> files,
                                                             @RequestParam(value = "file", required = false) MultipartFile legacyFile,
                                                             Authentication authentication) {
         List<MultipartFile> uploadFiles = files == null || files.isEmpty()
                 ? (legacyFile == null ? List.of() : List.of(legacyFile))
                 : files;
-        return ResponseEntity.ok(clubEventService.addEntry(id, title, authorName, description, uploadFiles, authentication.getName()));
+        return ResponseEntity.ok(clubEventService.addEntry(
+                id, title, authorName, description, workType, summary, tags, externalUrl, uploadFiles, authentication.getName()));
     }
 
     @PostMapping("/{id}/entries/{entryId}/vote")

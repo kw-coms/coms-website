@@ -117,7 +117,7 @@ test('club event page renders entries and ranking from real API data', async ({ 
 
   await expect(page.getByRole('heading', { name: '회지 인기투표' })).toBeVisible()
   await expect(page.getByText('1위')).toBeVisible()
-  await expect(page.getByText('여름호')).toBeVisible()
+  await expect(page.getByRole('heading', { name: '여름호' })).toBeVisible()
   await expect(page.getByText('5표')).toBeVisible()
   await expect(page.getByRole('link', { name: /summer\.pdf/ })).toBeVisible()
   await expect(page.getByRole('link', { name: /summer-source\.zip/ })).toBeVisible()
@@ -1291,8 +1291,26 @@ test('admin can write an activity log entry directly from the activity log page'
 test('admin can write an event entry with the community-style composer and multiple files', async ({ page }) => {
   await mockAdminApis(page)
   let entryPayload = null
+  let eventDetail = {
+    id: 1,
+    title: '회지 인기투표',
+    description: '가장 좋았던 회지를 골라주세요.',
+    startsAt: '2026-06-21T00:00:00',
+    endsAt: '2026-06-30T23:59:00',
+    votingOpen: true,
+    totalVotes: 7,
+    myEntryId: 2,
+    entryCount: 2,
+    createdByName: '관리자',
+    createdAt: '2026-06-21T12:00:00',
+    updatedAt: '2026-06-21T12:10:00',
+    entries: [],
+  }
   const pdfFile = Buffer.from('%PDF-1.4 test')
   const zipFile = Buffer.from('zip fixture')
+  await page.route('**/api/club-events/1', async (route) => {
+    await route.fulfill({ status: 200, json: eventDetail })
+  })
   await page.route('**/api/club-events/1/entries', async (route) => {
     const body = route.request().postData() || ''
     const rawBody = route.request().postDataBuffer()?.toString('latin1') || ''
@@ -1300,20 +1318,42 @@ test('admin can write an event entry with the community-style composer and multi
       title: multipartField(body, 'title'),
       authorName: multipartField(body, 'authorName'),
       description: multipartField(body, 'description'),
+      workType: multipartField(body, 'workType'),
+      summary: multipartField(body, 'summary'),
+      tags: multipartField(body, 'tags'),
+      externalUrl: multipartField(body, 'externalUrl'),
       fileFields: (rawBody.match(/name="files"/g) || []).length,
+    }
+    const createdEntry = {
+      id: 9,
+      title: entryPayload.title,
+      authorName: entryPayload.authorName,
+      description: entryPayload.description,
+      workType: entryPayload.workType,
+      summary: entryPayload.summary,
+      tags: entryPayload.tags,
+      externalUrl: entryPayload.externalUrl,
+      downloadUrl: '/api/club-events/1/entries/9/download',
+      originalName: 'autumn.pdf',
+      mimeType: 'application/pdf',
+      fileSize: pdfFile.length,
+      files: [
+        { id: 901, downloadUrl: '/api/club-events/1/entries/9/files/901/download', originalName: 'autumn.pdf', mimeType: 'application/pdf', fileSize: pdfFile.length },
+        { id: 902, downloadUrl: '/api/club-events/1/entries/9/files/902/download', originalName: 'autumn-source.zip', mimeType: 'application/zip', fileSize: zipFile.length },
+      ],
+      voteCount: 0,
+      myVote: false,
+      rank: 3,
+      createdAt: '2026-06-22T02:30:00',
+    }
+    eventDetail = {
+      ...eventDetail,
+      entryCount: 3,
+      entries: [createdEntry],
     }
     await route.fulfill({
       status: 200,
-      json: {
-        id: 9,
-        title: entryPayload.title,
-        authorName: entryPayload.authorName,
-        description: entryPayload.description,
-        voteCount: 0,
-        myVote: false,
-        rank: 3,
-        files: [],
-      },
+      json: createdEntry,
     })
   })
 
@@ -1325,24 +1365,37 @@ test('admin can write an event entry with the community-style composer and multi
   await expect(composer.locator('.community-compose-editor')).toBeVisible()
   await composer.getByLabel('글 제목').fill('가을호')
   await composer.getByLabel('작성자/팀').fill('편집팀')
-  await composer.getByLabel('첨부파일').setInputFiles([
+  await composer.getByLabel('작품 종류').selectOption('WEBZINE')
+  await composer.getByLabel('한줄 소개').fill('가을 활동을 웹진으로 정리한 회지입니다.')
+  await composer.getByLabel('태그').fill('가을호, 웹진, 소스포함')
+  await composer.getByLabel('관련 링크').fill('https://coms.kw.ac.kr/archive/autumn')
+  await composer.getByLabel('회지 작품 파일').setInputFiles([
     { name: 'autumn.pdf', mimeType: 'application/pdf', buffer: pdfFile },
     { name: 'autumn-source.zip', mimeType: 'application/zip', buffer: zipFile },
   ])
   await expect(composer.getByText('파일 2개').first()).toBeVisible()
+  await expect(composer.getByText('대표 파일: autumn.pdf')).toBeVisible()
   const eventEditor = composer.getByLabel('본문')
   await eventEditor.fill('가을 활동 회지와 제작 파일입니다.')
   await eventEditor.press('ControlOrMeta+A')
   await composer.getByRole('button', { name: '밑줄' }).click()
-  await composer.getByRole('button', { name: '글 등록' }).click()
+  await composer.getByRole('button', { name: '작품 등록' }).click()
 
   await expect.poll(() => entryPayload).toMatchObject({
     title: '가을호',
     authorName: '편집팀',
+    workType: 'WEBZINE',
+    summary: '가을 활동을 웹진으로 정리한 회지입니다.',
+    tags: '가을호, 웹진, 소스포함',
+    externalUrl: 'https://coms.kw.ac.kr/archive/autumn',
     fileFields: 2,
   })
   await expect.poll(() => entryPayload?.description || '').toContain('<u>가을 활동 회지와 제작 파일입니다.</u>')
-  await expect(page.getByText('회지 글을 이벤트에 등록했습니다.')).toBeVisible()
+  await expect(page.getByText('작품을 이벤트에 등록했습니다.')).toBeVisible()
+  await expect(page.getByText('가을 활동을 웹진으로 정리한 회지입니다.')).toBeVisible()
+  await expect(page.getByText('소스포함')).toBeVisible()
+  await expect(page.getByRole('link', { name: '관련 링크' })).toHaveAttribute('href', 'https://coms.kw.ac.kr/archive/autumn')
+  await expect(page.getByText('autumn-source.zip')).toBeVisible()
 })
 
 test('admin can register a club activity record', async ({ page }) => {
