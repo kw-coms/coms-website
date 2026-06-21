@@ -2494,6 +2494,12 @@ function mergeFileList(currentFiles, nextFiles) {
   return merged
 }
 
+function isEventImageFile(file) {
+  const type = String(file?.type || '').toLowerCase()
+  const name = String(file?.name || '').toLowerCase()
+  return type.startsWith('image/') || /\.(avif|gif|jpe?g|png|webp)$/i.test(name)
+}
+
 function ClubEventSection() {
   const navigate = useNavigate()
   const { user, authLoading, events, loading, loadError, prependEvent, mergeEvent, removeEvent } = useClubEvents('이벤트를 불러오지 못했습니다.')
@@ -2533,6 +2539,16 @@ function ClubEventSection() {
     () => entryFiles.reduce((total, file) => total + (Number(file.size) || 0), 0),
     [entryFiles],
   )
+  const entryImageFiles = useMemo(() => entryFiles.filter(isEventImageFile), [entryFiles])
+  const entryDocumentFiles = useMemo(() => entryFiles.filter((file) => !isEventImageFile(file)), [entryFiles])
+
+  const replaceEntryFileGroup = useCallback((group, nextFiles) => {
+    setEntryFiles((current) => {
+      const normalizedNext = Array.from(nextFiles || [])
+      const kept = current.filter((file) => (group === 'image' ? !isEventImageFile(file) : isEventImageFile(file)))
+      return group === 'image' ? [...normalizedNext, ...kept] : [...kept, ...normalizedNext]
+    })
+  }, [])
 
   const addEntryFiles = (files) => {
     const nextFiles = Array.from(files || [])
@@ -2706,8 +2722,8 @@ function ClubEventSection() {
   const renderEntryForm = () => {
     if (!isAdmin || !selectedEvent) return null
     return (
-      <form onSubmit={submitEntry} className="club-event-entry-form community-compose-form grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start" aria-label="이벤트 회지 글쓰기">
-        <div className="community-compose-meta club-event-entry-side order-3 flex flex-wrap gap-3 lg:col-start-2 lg:row-start-2 lg:row-span-3">
+      <form onSubmit={submitEntry} className="club-event-entry-form community-compose-form grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start" aria-label="이벤트 회지 글쓰기">
+        <div className="community-compose-meta club-event-entry-side order-5 flex flex-wrap gap-3 lg:col-start-2 lg:row-start-1 lg:row-span-4">
           <p className="activity-community-board-label w-full">작품 정보</p>
           <label className="club-event-field">
             <span>작성자/팀</span>
@@ -2734,7 +2750,8 @@ function ClubEventSection() {
             <input value={entryForm.externalUrl} onChange={(event) => setEntryForm((prev) => ({ ...prev, externalUrl: event.target.value }))} maxLength={500} placeholder="https://..." />
           </label>
           <div className="activity-compose-attachment-summary">
-            <span><Paperclip size={14} aria-hidden="true" /> 파일 {entryFiles.length}개</span>
+            <span><ImagePlus size={14} aria-hidden="true" /> 이미지 {entryImageFiles.length}개</span>
+            <span><Paperclip size={14} aria-hidden="true" /> 파일 {entryDocumentFiles.length}개</span>
             {formatFileSize(entryFileSizeTotal) && <span>총 {formatFileSize(entryFileSizeTotal)}</span>}
           </div>
           <div className="activity-compose-side-actions">
@@ -2753,8 +2770,20 @@ function ClubEventSection() {
           className="community-compose-title order-1 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm lg:col-start-1 lg:row-start-1"
         />
 
+        <div className="order-2 lg:col-start-1 lg:row-start-2">
+          <RichTextComposer
+            value={entryForm.description}
+            onChange={(description) => setEntryForm((prev) => ({ ...prev, description }))}
+            imageFiles={entryImageFiles}
+            onImageFilesChange={(files) => replaceEntryFileGroup('image', files)}
+            fileFiles={entryDocumentFiles}
+            onFileFilesChange={(files) => replaceEntryFileGroup('document', files)}
+            minHeight="24rem"
+          />
+        </div>
+
         <div
-          className={`club-event-upload-panel order-2 lg:col-start-1 lg:row-start-2 ${entryDragActive ? 'club-event-upload-panel-active' : ''}`}
+          className={`club-event-upload-panel order-3 lg:col-start-1 lg:row-start-3 ${entryDragActive ? 'club-event-upload-panel-active' : ''}`}
           onDragEnter={(event) => {
             event.preventDefault()
             setEntryDragActive(true)
@@ -2773,30 +2802,46 @@ function ClubEventSection() {
           <div className="club-event-upload-copy">
             <Upload size={22} aria-hidden="true" />
             <div>
-              <strong>회지/작품 파일 업로드</strong>
-              <span>PDF, ZIP, 이미지, 원본 파일을 여러 개 올릴 수 있습니다.</span>
+              <strong>작품 첨부 추가</strong>
+              <span>이미지는 이미지 버튼으로, PDF·ZIP·원본은 첨부파일 버튼으로 여러 개 올릴 수 있습니다.</span>
             </div>
           </div>
-          <label className="club-event-upload-button club-event-upload-button-wide">
-            <Paperclip size={15} aria-hidden="true" />
-            파일 선택
-            <input
-              aria-label="회지 작품 파일"
-              type="file"
-              multiple
-              onChange={(event) => {
-                addEntryFiles(event.target.files)
-                event.target.value = ''
-              }}
-            />
-          </label>
+          <div className="club-event-upload-actions">
+            <label className="club-event-upload-button">
+              <ImagePlus size={15} aria-hidden="true" />
+              이미지
+              <input
+                aria-label="이벤트 이미지 파일"
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                multiple
+                onChange={(event) => {
+                  addEntryFiles(event.target.files)
+                  event.target.value = ''
+                }}
+              />
+            </label>
+            <label className="club-event-upload-button">
+              <Paperclip size={15} aria-hidden="true" />
+              첨부파일
+              <input
+                aria-label="회지 작품 첨부파일"
+                type="file"
+                multiple
+                onChange={(event) => {
+                  addEntryFiles(event.target.files)
+                  event.target.value = ''
+                }}
+              />
+            </label>
+          </div>
         </div>
 
         {entryFiles.length > 0 && (
-          <div className="club-event-file-basket order-3 lg:col-start-1 lg:row-start-3" aria-label="선택한 작품 파일">
+          <div className="club-event-file-basket order-4 lg:col-start-1 lg:row-start-4" aria-label="선택한 작품 파일">
             <div className="club-event-file-basket-head">
-              <strong>선택한 파일 {entryFiles.length}개</strong>
-              <span>대표 파일: {entryFiles[0]?.name}</span>
+              <strong>선택한 첨부 {entryFiles.length}개</strong>
+              <span>이미지 {entryImageFiles.length}개 · 파일 {entryDocumentFiles.length}개</span>
               <button type="button" onClick={() => setEntryFiles([])}>전체 삭제</button>
             </div>
             <ul>
@@ -2815,16 +2860,6 @@ function ClubEventSection() {
             </ul>
           </div>
         )}
-
-        <div className="order-4 lg:col-start-1 lg:row-start-4 lg:row-span-5">
-          <RichTextComposer
-            value={entryForm.description}
-            onChange={(description) => setEntryForm((prev) => ({ ...prev, description }))}
-            fileFiles={entryFiles}
-            onFileFilesChange={setEntryFiles}
-            minHeight="24rem"
-          />
-        </div>
       </form>
     )
   }
