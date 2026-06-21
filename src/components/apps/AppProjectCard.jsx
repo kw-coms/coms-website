@@ -1,4 +1,4 @@
-import { ArrowUpRight, Download } from 'lucide-react'
+import { ArrowUpRight, Download, FileText } from 'lucide-react'
 import { apiUrl } from '../../services/apiClient.js'
 import { buildProjectStatusBadges } from '../../utils/appProjectStatus.js'
 
@@ -17,6 +17,18 @@ function fileHref(file) {
   return apiUrl(file.url)
 }
 
+function formatFileSize(bytes) {
+  const n = Number(bytes)
+  if (!Number.isFinite(n) || n <= 0) return ''
+  if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)}MB`
+  if (n >= 1024) return `${Math.round(n / 1024)}KB`
+  return `${n}B`
+}
+
+function fileLabel(file) {
+  return file?.originalName || file?.name || '배포파일'
+}
+
 export default function AppProjectCard({
   project,
   showStatusBadges = false,
@@ -26,8 +38,9 @@ export default function AppProjectCard({
 }) {
   const files = Array.isArray(project?.files) ? project.files : []
   const hasLink = Boolean(project?.linkUrl)
-  const CardTag = hasLink && interactive ? 'a' : 'div'
-  const cardProps = hasLink && interactive
+  const wholeCardLink = hasLink && interactive && files.length === 0
+  const CardTag = wholeCardLink ? 'a' : 'div'
+  const cardProps = wholeCardLink
     ? { href: project.linkUrl, target: '_blank', rel: 'noreferrer' }
     : {}
   const badges = showStatusBadges ? buildProjectStatusBadges(project) : []
@@ -62,7 +75,7 @@ export default function AppProjectCard({
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
         {hasLink && (
-          interactive ? (
+          wholeCardLink ? (
             <span className="inline-flex items-center gap-2 text-sm font-bold text-[#0066cc]">
               열기
               <ArrowUpRight size={15} aria-hidden="true" />
@@ -79,18 +92,33 @@ export default function AppProjectCard({
             </a>
           )
         )}
-        {files.map((file) => (
-          <a
-            key={file.id || file.originalName || file.url}
-            href={fileHref(file)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#0066cc] px-3 py-1.5 text-xs font-bold text-white no-underline transition hover:bg-[#0052a3]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <Download size={13} aria-hidden="true" />
-            다운로드
-          </a>
-        ))}
       </div>
+
+      {files.length > 0 && (
+        <div className="mt-4 grid gap-2" aria-label="배포 파일">
+          {files.map((file) => {
+            const size = formatFileSize(file.fileSize)
+            const href = fileHref(file)
+            return (
+              <a
+                key={file.id || file.originalName || file.url}
+                href={href}
+                className="flex min-w-0 items-center gap-2 rounded-lg border border-[#d2d2d7] bg-white/72 px-3 py-2 text-xs font-bold text-[#1d1d1f] no-underline transition hover:border-[#0066cc] hover:text-[#0066cc]"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  if (href === '#') event.preventDefault()
+                }}
+              >
+                <FileText size={14} aria-hidden="true" className="shrink-0 text-[#86868b]" />
+                <span className="min-w-0 flex-1 truncate">{fileLabel(file)}</span>
+                {size && <span className="shrink-0 text-[#86868b]">{size}</span>}
+                <Download size={13} aria-hidden="true" className="shrink-0" />
+                <span className="sr-only">다운로드</span>
+              </a>
+            )
+          })}
+        </div>
+      )}
 
       {project?.displayUrl && (
         <span className="mt-3 truncate rounded-full bg-[#f5f5f7] px-3 py-1.5 text-xs font-semibold text-[#86868b]">
