@@ -1267,7 +1267,10 @@ test('admin can write an activity log entry directly from the activity log page'
     { name: 'appendix-1.zip', mimeType: 'application/zip', buffer: textFile },
     { name: 'appendix-2.zip', mimeType: 'application/zip', buffer: textFile },
   ])
-  await page.getByLabel('본문').fill('프로젝트 발표 후기와 사진 기록')
+  const activityEditor = page.getByLabel('본문')
+  await activityEditor.fill('프로젝트 발표 후기와 사진 기록')
+  await activityEditor.press('ControlOrMeta+A')
+  await page.getByRole('button', { name: '굵게' }).click()
   await page.getByRole('button', { name: '글 등록' }).click()
 
   await expect.poll(() => createdPayload).toMatchObject({
@@ -1275,8 +1278,8 @@ test('admin can write an activity log entry directly from the activity log page'
     kind: 'ACTIVITY',
     category: 'HACKATHON',
     eventDate: '2026-06-25',
-    description: '프로젝트 발표 후기와 사진 기록',
   })
+  await expect.poll(() => createdPayload?.description || '').toMatch(/<(b|strong)>프로젝트 발표 후기와 사진 기록<\/(b|strong)>/)
   await expect.poll(() => uploadedImageFields).toBe(2)
   await expect.poll(() => uploadedFileFields).toBe(2)
   await expect(page.locator('.activity-community-list')).toBeVisible()
@@ -1327,15 +1330,18 @@ test('admin can write an event entry with the community-style composer and multi
     { name: 'autumn-source.zip', mimeType: 'application/zip', buffer: zipFile },
   ])
   await expect(composer.getByText('파일 2개').first()).toBeVisible()
-  await composer.getByLabel('본문').fill('가을 활동 회지와 제작 파일입니다.')
+  const eventEditor = composer.getByLabel('본문')
+  await eventEditor.fill('가을 활동 회지와 제작 파일입니다.')
+  await eventEditor.press('ControlOrMeta+A')
+  await composer.getByRole('button', { name: '밑줄' }).click()
   await composer.getByRole('button', { name: '글 등록' }).click()
 
   await expect.poll(() => entryPayload).toMatchObject({
     title: '가을호',
     authorName: '편집팀',
-    description: '가을 활동 회지와 제작 파일입니다.',
     fileFields: 2,
   })
+  await expect.poll(() => entryPayload?.description || '').toContain('<u>가을 활동 회지와 제작 파일입니다.</u>')
   await expect(page.getByText('회지 글을 이벤트에 등록했습니다.')).toBeVisible()
 })
 
@@ -1625,7 +1631,7 @@ test('club activity detail registers view, vote, edit, and delete only after ope
     title: '수정된 세미나',
     category: 'SEMINAR',
     eventDate: '2026-06-18',
-    description: '수정된 활동 본문입니다.',
+    description: '<p>수정된 활동 본문입니다.</p>',
   })
   await expect(page.getByRole('dialog', { name: /수정된 세미나/ })).toBeVisible()
 
