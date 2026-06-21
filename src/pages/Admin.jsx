@@ -33,6 +33,7 @@ import {
 import { listAdminFonts, setFontActive, uploadFont } from '../services/fontApi.js'
 import { buildFontFaceCss, fontFamilyValue } from '../services/fontPreferences.js'
 import { useAuth } from '../contexts/useAuth.js'
+import { sanitizeHtml } from '../utils/sanitizeHtml.js'
 import AppProjectCard from '../components/apps/AppProjectCard.jsx'
 
 const BAN_DURATIONS = [
@@ -77,6 +78,12 @@ const AUDIT_LOG_FILTERS = [
   { value: 'ADMIN_STUDENT_BAN', label: '학번 차단' },
   { value: 'ADMIN_RECRUIT_APPLICATION_STATUS_UPDATE', label: '모집 상태 변경' },
 ]
+const DELETED_CONTENT_ALLOWED_STYLES = new Set(['background-color', 'color', 'font-family'])
+const DELETED_CONTENT_SANITIZE_OPTIONS = {
+  allowedTags: ['b', 'br', 'div', 'em', 'font', 'i', 'p', 'span', 'strong', 'u'],
+  allowedAttributes: ['color', 'face', 'style'],
+  allowedStyles: DELETED_CONTENT_ALLOWED_STYLES,
+}
 
 const AUDIT_ACTION_LABELS = {
   COMMUNITY_POST_CREATE: '커뮤니티 글 작성',
@@ -3632,22 +3639,13 @@ function deletedHasFormattedText(value) {
 }
 
 function sanitizeDeletedHtml(value) {
-  if (typeof document === 'undefined') return escapeDeletedHtml(value)
+  // Deprecated compatibility adapter: new deleted-content sinks should call sanitizeHtml() directly.
+  if (typeof document === 'undefined') return sanitizeHtml(value, DELETED_CONTENT_SANITIZE_OPTIONS)
   const template = document.createElement('template')
   template.innerHTML = String(value || '')
   const container = document.createElement('div')
   appendDeletedCleanChildren(template.content, container)
-  return container.innerHTML
-    .replace(/\u200B/g, '')
-    .replace(/(<br\s*\/?>\s*)+$/gi, '')
-}
-
-function escapeDeletedHtml(value) {
-  return String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+  return sanitizeHtml(container.innerHTML, DELETED_CONTENT_SANITIZE_OPTIONS)
 }
 
 function appendDeletedCleanChildren(source, target) {

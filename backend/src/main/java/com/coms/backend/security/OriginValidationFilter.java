@@ -21,12 +21,15 @@ public class OriginValidationFilter extends OncePerRequestFilter {
 
     private final Set<String> allowedOrigins;
 
-    public OriginValidationFilter(@Value("${cors.allowed-origins:http://localhost:5173}") String allowedOrigins) {
+    public OriginValidationFilter(@Value("${cors.allowed-origins}") String allowedOrigins) {
         this.allowedOrigins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(origin -> !origin.isEmpty())
                 .map(OriginValidationFilter::normalizeOrigin)
                 .collect(Collectors.toUnmodifiableSet());
+        if (this.allowedOrigins.isEmpty()) {
+            throw new IllegalStateException("cors.allowed-origins must be configured");
+        }
     }
 
     @Override

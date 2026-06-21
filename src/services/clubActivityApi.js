@@ -1,4 +1,4 @@
-import { apiUrl, request, requestNoContent } from './apiClient.js'
+import { apiUrl, request, requestNoContent, throwApiError } from './apiClient.js'
 
 export async function listClubActivities() {
   return request('/api/club-activities')
@@ -22,8 +22,8 @@ export async function createClubActivity({ kind, category, title, description, e
     credentials: 'include',
     body: formData,
   })
+  if (!response.ok) await throwApiError(response, '활동 기록 등록 중 오류가 발생했습니다.')
   const data = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(data?.message || data?.detail || '활동 기록 등록 중 오류가 발생했습니다.')
   return data
 }
 
