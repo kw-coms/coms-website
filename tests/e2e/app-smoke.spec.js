@@ -110,7 +110,7 @@ test('club event page renders entries and ranking from real API data', async ({ 
 
   await page.goto('/activity-events')
 
-  await expect(page.getByRole('heading', { name: '이벤트' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '이벤트', exact: true })).toBeVisible()
   const eventCard = page.locator('.club-event-list-button').filter({ hasText: '회지 인기투표' })
   await expect(eventCard).toBeVisible()
   await eventCard.click()
