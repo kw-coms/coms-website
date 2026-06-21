@@ -711,6 +711,126 @@ test('community exposes my deleted posts and restore appeal for members', async 
   await expect(page.getByText('복원 요청 접수됨', { exact: true })).toBeVisible()
 })
 
+test('community detail supports comment add, reply, edit, and delete', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.addInitScript(() => {
+    window.confirm = () => true
+  })
+
+  const post = {
+    id: 77,
+    title: '댓글 테스트 글',
+    content: '댓글 기능 점검 본문',
+    category: 'GENERAL',
+    authorName: '작성자',
+    authorDisplayName: '작성자',
+    authorStudentId: '2025123456',
+    authorAdmin: false,
+    editable: true,
+    createdAt: '2026-06-21T12:00:00',
+    updatedAt: null,
+    viewCount: 3,
+    upvotes: 0,
+    downvotes: 0,
+    myVote: 0,
+    commentCount: 2,
+  }
+  let comments = [
+    {
+      id: 1,
+      authorName: '댓글러',
+      authorStudentId: '2025123456',
+      content: '첫 댓글입니다.',
+      parentCommentId: null,
+      deletable: true,
+      edited: false,
+      createdAt: '2026-06-21T12:01:00',
+    },
+    {
+      id: 2,
+      authorName: '답글러',
+      authorStudentId: '2025123457',
+      content: '첫 답글입니다.',
+      parentCommentId: 1,
+      deletable: false,
+      edited: false,
+      createdAt: '2026-06-21T12:02:00',
+    },
+  ]
+  const createdCommentPayloads = []
+  let updatedCommentPayload = null
+  let deletedCommentId = null
+
+  await page.route('**/api/community/posts', (route) => route.fulfill({ status: 200, json: [post] }))
+  await page.route('**/api/community/posts/77', (route) => route.fulfill({ status: 200, json: post }))
+  await page.route('**/api/community/posts/77/comments', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, json: comments })
+      return
+    }
+    const payload = route.request().postDataJSON()
+    createdCommentPayloads.push(payload)
+    const comment = {
+      id: 10 + createdCommentPayloads.length,
+      authorName: payload.anonymousName || '관리자',
+      authorStudentId: '2020123456',
+      content: payload.content,
+      parentCommentId: payload.parentCommentId,
+      deletable: true,
+      edited: false,
+      createdAt: '2026-06-21T12:10:00',
+    }
+    comments = [...comments, comment]
+    await route.fulfill({ status: 200, json: comment })
+  })
+  await page.route('**/api/community/posts/77/comments/*', async (route) => {
+    const commentId = Number(route.request().url().split('/').pop())
+    if (route.request().method() === 'PATCH') {
+      updatedCommentPayload = route.request().postDataJSON()
+      const updated = {
+        ...comments.find((comment) => comment.id === commentId),
+        content: updatedCommentPayload.content,
+        edited: true,
+        updatedAt: '2026-06-21T12:20:00',
+      }
+      comments = comments.map((comment) => comment.id === commentId ? updated : comment)
+      await route.fulfill({ status: 200, json: updated })
+      return
+    }
+    deletedCommentId = commentId
+    await route.fulfill({ status: 204 })
+  })
+
+  await page.goto('/community/77')
+
+  await expect(page.getByRole('heading', { name: '댓글 테스트 글' })).toBeVisible()
+  await expect(page.getByText('댓글 2')).toBeVisible()
+  await expect(page.getByText('첫 댓글입니다.')).toBeVisible()
+  await expect(page.getByText('첫 답글입니다.')).toBeVisible()
+
+  await page.getByPlaceholder('댓글을 입력하세요').fill('새 댓글입니다.')
+  await page.getByRole('button', { name: '등록' }).click()
+  expect(createdCommentPayloads[0]).toMatchObject({ content: '새 댓글입니다.', parentCommentId: null })
+  await expect(page.getByText('새 댓글입니다.')).toBeVisible()
+
+  const firstComment = page.locator('#comment-1')
+  await firstComment.getByRole('button', { name: '댓글 달기' }).click()
+  await firstComment.locator('textarea[placeholder="댓글을 입력하세요"]').fill('답글 내용')
+  await firstComment.getByRole('button', { name: '등록' }).click()
+  expect(createdCommentPayloads[1]).toMatchObject({ content: '@댓글러 답글 내용', parentCommentId: 1 })
+  await expect(page.getByText('@댓글러 답글 내용')).toBeVisible()
+
+  await firstComment.getByRole('button', { name: '수정' }).click()
+  await firstComment.locator('textarea').fill('수정된 댓글입니다.')
+  await firstComment.getByRole('button', { name: '저장' }).click()
+  expect(updatedCommentPayload).toMatchObject({ content: '수정된 댓글입니다.' })
+  await expect(page.getByText('수정된 댓글입니다.')).toBeVisible()
+
+  await firstComment.getByRole('button', { name: '삭제' }).click()
+  expect(deletedCommentId).toBe(1)
+  await expect(page.locator('#comment-1')).toHaveCount(0)
+})
+
 test('admin tracks recruit applications from overview to status update', async ({ page }) => {
   await mockAdminApis(page)
   let savedStatus = 'RECEIVED'
