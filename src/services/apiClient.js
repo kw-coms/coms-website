@@ -1,4 +1,4 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+export const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || ''
 
 const OPTIONAL_DEV_API_SKIP_KEY = 'kwcoms-dev-api-unavailable'
 const optionalDevApiInFlight = new Map()
@@ -30,11 +30,11 @@ async function readErrorBody(response) {
   }
 }
 
-function errorMessageForStatus(status, data, text = '') {
-  const serverMessage = data?.message || data?.detail || data?.error
-  if (serverMessage && serverMessage !== 'Forbidden' && serverMessage !== 'Unauthorized') {
-    return serverMessage
-  }
+function serverMessageFromBody(data) {
+  return data?.message || data?.detail || data?.error || ''
+}
+
+function errorMessageForStatus(status, fallbackMessage = '') {
   if (status === 413) {
     return '업로드 용량이 너무 큽니다. 이미지/영상 크기를 줄여 다시 시도해주세요.'
   }
@@ -44,24 +44,49 @@ function errorMessageForStatus(status, data, text = '') {
   if (status === 403) {
     return '접근 권한이 없거나 로그인 상태가 만료되었습니다. 다시 로그인해주세요.'
   }
+  if (status === 404) {
+    return '요청한 항목을 찾을 수 없습니다.'
+  }
+  if (status === 409) {
+    return fallbackMessage || '이미 처리되었거나 현재 상태와 충돌합니다. 새로고침 후 다시 시도해주세요.'
+  }
+  if (status === 400 || status === 422) {
+    return fallbackMessage || '입력값을 확인한 뒤 다시 시도해주세요.'
+  }
   if (status >= 500) {
     return `서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요. (HTTP ${status})`
   }
-  const plainText = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
-  if (plainText) {
-    return plainText.length > 140 ? `${plainText.slice(0, 140)}...` : plainText
-  }
-  return serverMessage || `요청 처리 중 오류가 발생했습니다. (HTTP ${status})`
+  return fallbackMessage || `요청 처리 중 오류가 발생했습니다. (HTTP ${status})`
 }
 
-function attachResponseDetails(error, response, text) {
-  error.status = response.status
+export function createApiError(status, data = null, text = '', fallbackMessage = '') {
+  const error = new Error(errorMessageForStatus(status, fallbackMessage))
+  error.status = status
+  error.serverMessage = serverMessageFromBody(data)
+  error.responseData = data
   error.responseText = text
   return error
 }
 
+function logInternalApiError(error) {
+  if (!import.meta.env?.DEV) return
+  if (!error?.serverMessage && !error?.responseText) return
+  console.warn('API error details hidden from user message', {
+    status: error.status,
+    serverMessage: error.serverMessage,
+    responseText: error.responseText,
+  })
+}
+
+export async function throwApiError(response, fallbackMessage = '') {
+  const { data, text } = await readErrorBody(response)
+  const error = createApiError(response.status, data, text, fallbackMessage)
+  logInternalApiError(error)
+  throw error
+}
+
 function isOptionalDevApiPath(path) {
-  return import.meta.env.DEV && !API_BASE_URL && (path === '/api/auth/me' || path === '/api/fonts')
+  return import.meta.env?.DEV && !API_BASE_URL && (path === '/api/auth/me' || path === '/api/fonts')
 }
 
 function optionalDevApiUnavailable() {
@@ -121,8 +146,7 @@ export async function request(path, options = {}) {
   }
 
   if (!response.ok) {
-    const { data, text } = await readErrorBody(response)
-    throw attachResponseDetails(new Error(errorMessageForStatus(response.status, data, text)), response, text)
+    await throwApiError(response)
   }
   const data = await response.json().catch(() => null)
   return data
@@ -142,8 +166,7 @@ export async function requestNoContent(path, options = {}) {
   }
 
   if (!response.ok) {
-    const { data, text } = await readErrorBody(response)
-    throw attachResponseDetails(new Error(errorMessageForStatus(response.status, data, text)), response, text)
+    await throwApiError(response)
   }
 }
 
@@ -157,8 +180,7 @@ export async function requestBlob(path, options = {}) {
   }
 
   if (!response.ok) {
-    const { data, text } = await readErrorBody(response)
-    throw attachResponseDetails(new Error(data?.message || data?.detail || data?.error || '요청 처리 중 오류가 발생했습니다.'), response, text)
+    await throwApiError(response)
   }
   return response.blob()
 }

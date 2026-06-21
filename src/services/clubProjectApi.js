@@ -1,4 +1,4 @@
-import { apiUrl, request, requestNoContent } from './apiClient.js'
+import { apiUrl, request, requestNoContent, throwApiError } from './apiClient.js'
 
 // ─── Public read ─────────────────────────────────────────────────────────────
 
@@ -31,8 +31,8 @@ export async function createClubProject(fields) {
     credentials: 'include',
     body: projectFormData(fields),
   })
+  if (!response.ok) await throwApiError(response, '프로젝트 등록 중 오류가 발생했습니다.')
   const data = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(data?.message || data?.detail || '프로젝트 등록 중 오류가 발생했습니다.')
   return data
 }
 
