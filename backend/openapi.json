@@ -4,6 +4,12 @@
     "title": "OpenAPI definition",
     "version": "v0"
   },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Generated server url"
+    }
+  ],
   "paths": {
     "/api/team-randomizer/rooms/{roomId}": {
       "get": {
@@ -1750,14 +1756,18 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  },
                   "file": {
                     "type": "string",
                     "format": "binary"
                   }
-                },
-                "required": [
-                  "file"
-                ]
+                }
               }
             }
           }
@@ -4845,6 +4855,56 @@
         }
       }
     },
+    "/api/club-events/{id}/entries/{entryId}/files/{fileId}/download": {
+      "get": {
+        "tags": [
+          "club-event-controller"
+        ],
+        "operationId": "downloadEntryFile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "entryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "fileId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/club-events/{id}/entries/{entryId}/download": {
       "get": {
         "tags": [
@@ -6879,6 +6939,12 @@
             "type": "integer",
             "format": "int64"
           },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntryFile"
+            }
+          },
           "voteCount": {
             "type": "integer",
             "format": "int64"
@@ -6893,6 +6959,28 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "EntryFile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "originalName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "fileSize": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
