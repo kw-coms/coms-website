@@ -354,6 +354,69 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
   await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toHaveCount(0)
 })
 
+test('admin ban tab can ban and unban student ids', async ({ page }) => {
+  await mockAdminApis(page)
+  let bannedStudents = [
+    {
+      id: 1,
+      studentId: '2025123456',
+      bannedAt: '2026-06-15T03:00:00',
+      expiresAt: '2026-06-16T03:00:00',
+    },
+  ]
+  let banPayload = null
+  let unbannedStudentId = null
+
+  await page.addInitScript(() => {
+    window.confirm = () => true
+    window.alert = () => {}
+  })
+  await page.route('**/api/admin/banned-students', async (route) => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill({ status: 200, json: bannedStudents })
+    }
+    if (route.request().method() === 'POST') {
+      banPayload = route.request().postDataJSON()
+      bannedStudents = [
+        ...bannedStudents,
+        {
+          id: 2,
+          studentId: banPayload.studentId,
+          bannedAt: '2026-06-15T04:00:00',
+          expiresAt: '2026-06-16T04:00:00',
+        },
+      ]
+      return route.fulfill({ status: 204 })
+    }
+    return route.fallback()
+  })
+  await page.route('**/api/admin/banned-students/*', async (route) => {
+    if (route.request().method() !== 'DELETE') return route.fallback()
+    unbannedStudentId = decodeURIComponent(new URL(route.request().url()).pathname.split('/').at(-1))
+    bannedStudents = bannedStudents.filter((student) => student.studentId !== unbannedStudentId)
+    return route.fulfill({ status: 204 })
+  })
+
+  await page.goto('/admin')
+  await page.getByRole('button', { name: '차단 관리' }).click()
+
+  await expect(page.getByRole('row').filter({ hasText: '2025123456' })).toBeVisible()
+  await page.getByPlaceholder('학번 10자리').fill('2026123456')
+  await page.locator('form select').selectOption('24H')
+  await page.getByRole('button', { name: '임시 차단' }).click()
+
+  await expect.poll(() => banPayload).toEqual({
+    studentId: '2026123456',
+    duration: '24H',
+  })
+  await expect(page.getByRole('row').filter({ hasText: '2026123456' })).toBeVisible()
+
+  await page.getByRole('row').filter({ hasText: '2026123456' }).getByRole('button', { name: '차단 해제' }).click()
+
+  await expect.poll(() => unbannedStudentId).toBe('2026123456')
+  await expect(page.getByRole('row').filter({ hasText: '2026123456' })).toHaveCount(0)
+})
+
 test('admin font management explains availability and uses action labels', async ({ page }) => {
   await mockAdminApis(page)
   await page.route('**/api/fonts/*/file', (route) => route.fulfill({
