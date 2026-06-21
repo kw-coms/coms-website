@@ -880,6 +880,198 @@ select {
 	font-weight: 650;
 }
 
+.rich-composer {
+	overflow: hidden;
+	min-width: 0;
+	max-width: 100%;
+	border: 1px solid color-mix(in srgb, var(--app-hairline) 86%, #000 10%);
+	border-radius: 0.5rem;
+	background: var(--app-surface);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.rich-composer-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	max-width: 100%;
+	align-items: center;
+	gap: 0.45rem;
+	border-bottom: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface-soft) 72%, transparent);
+	padding: 0.55rem 0.65rem;
+}
+
+.rich-composer-toolbar-label {
+	margin-right: 0.1rem;
+	color: var(--app-subtle);
+	font-size: 0.72rem;
+	font-weight: 950;
+	letter-spacing: 0;
+	text-transform: uppercase;
+}
+
+.rich-composer-format-group {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.2rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.45rem;
+	background: var(--app-surface);
+	padding: 0.15rem;
+}
+
+.rich-composer-button,
+.rich-composer-select-label,
+.rich-composer-color-label,
+.rich-composer-upload-button {
+	display: inline-flex;
+	min-height: 2.25rem;
+	align-items: center;
+	justify-content: center;
+	gap: 0.35rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.4rem;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font-size: 0.82rem;
+	font-weight: 850;
+}
+
+.rich-composer-button {
+	width: 2.25rem;
+	cursor: pointer;
+	padding: 0;
+}
+
+.rich-composer-button:hover,
+.rich-composer-select-label:hover,
+.rich-composer-color-label:hover,
+.rich-composer-upload-button:hover {
+	background: var(--app-surface-soft);
+}
+
+.rich-composer-select-label {
+	padding: 0 0.35rem 0 0.55rem;
+}
+
+.rich-composer-select-label select {
+	min-height: 2rem;
+	width: 7.75rem;
+	border: 0;
+	background: transparent;
+	color: var(--app-text);
+	font-size: 0.82rem;
+	font-weight: 850;
+	outline: none;
+}
+
+.rich-composer-color-label {
+	width: 2.7rem;
+	padding: 0;
+}
+
+.rich-composer-color-label input {
+	width: 1rem;
+	height: 1rem;
+	border: 0;
+	background: transparent;
+	padding: 0;
+}
+
+.rich-composer-upload-button {
+	cursor: pointer;
+	padding: 0.42rem 0.65rem;
+	color: var(--app-accent-text);
+}
+
+.rich-composer-upload-button input {
+	display: none;
+}
+
+.rich-composer-counts {
+	color: var(--app-muted);
+	font-size: 0.76rem;
+	font-weight: 850;
+}
+
+.rich-composer-surface {
+	min-height: 24rem;
+	max-width: 100%;
+	overflow-x: hidden;
+	background: var(--app-surface);
+	padding: 1rem;
+	color: var(--app-text);
+	font-size: 1rem;
+	font-weight: 500;
+	line-height: 1.85;
+	outline: none;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+	word-break: keep-all;
+}
+
+.rich-composer-surface:focus {
+	box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--app-accent) 26%, transparent);
+}
+
+.rich-composer-surface:empty::before {
+	content: attr(data-placeholder);
+	color: var(--app-subtle);
+	pointer-events: none;
+}
+
+.rich-composer-surface p,
+.activity-detail-description p,
+.club-event-detail-description p,
+.club-event-entry-description p {
+	margin: 0 0 0.75rem;
+}
+
+.rich-composer-surface h2,
+.rich-composer-surface h3 {
+	margin: 0.85rem 0 0.5rem;
+	font-weight: 950;
+	line-height: 1.28;
+}
+
+.rich-composer-surface ul,
+.rich-composer-surface ol,
+.activity-detail-description ul,
+.activity-detail-description ol,
+.club-event-entry-description ul,
+.club-event-entry-description ol {
+	margin: 0.5rem 0 0.8rem 1.25rem;
+	padding: 0;
+}
+
+.rich-composer-surface a,
+.activity-detail-description a,
+.club-event-detail-description a,
+.club-event-entry-description a {
+	color: var(--app-accent-text);
+	font-weight: 850;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+.activity-compose-attachment-list span button {
+	display: inline-flex;
+	width: 1.25rem;
+	height: 1.25rem;
+	align-items: center;
+	justify-content: center;
+	border: 0;
+	border-radius: 999px;
+	background: var(--app-surface-soft);
+	color: var(--app-muted);
+	cursor: pointer;
+}
+
+.activity-community-row-excerpt * {
+	display: inline;
+	margin: 0;
+}
+
 .activity-category-manager {
 	border: 1px solid var(--app-hairline);
 	border-radius: 0.5rem;
@@ -1347,8 +1539,35 @@ select {
 	resize: vertical;
 }
 
+.activity-detail-editor .rich-composer-select-label select {
+	min-height: 2rem;
+	width: 7.75rem;
+	border: 0;
+	background: transparent;
+	padding: 0;
+	font-size: 0.82rem;
+}
+
+.activity-detail-editor .rich-composer-color-label input {
+	min-height: auto;
+	width: 1rem;
+	height: 1rem;
+	border: 0;
+	background: transparent;
+	padding: 0;
+}
+
+.activity-detail-editor .rich-composer-upload-button input {
+	display: none;
+}
+
 .activity-detail-editor-wide {
+	display: grid;
 	grid-column: 1 / -1;
+	gap: 0.35rem;
+	color: var(--app-muted);
+	font-size: 0.76rem;
+	font-weight: 850;
 }
 
 .activity-detail-editor-actions {
@@ -4475,6 +4694,22 @@ body {
 	font-weight: 700;
 }
 
+.club-event-detail-title .club-event-detail-description {
+	max-width: 52rem;
+}
+
+.club-event-list-description {
+	color: var(--app-muted);
+	font-size: 0.9rem;
+	font-weight: 700;
+	line-height: 1.55;
+}
+
+.club-event-list-description * {
+	display: inline;
+	margin: 0;
+}
+
 .club-event-status-card {
 	display: grid;
 	gap: 0.5rem;
@@ -4558,6 +4793,13 @@ body {
 .club-event-entry-card-selected {
 	border-color: color-mix(in srgb, var(--app-accent) 42%, var(--app-hairline));
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+.club-event-entry-description {
+	color: var(--app-muted);
+	font-size: 0.95rem;
+	font-weight: 700;
+	line-height: 1.75;
 }
 
 .club-event-rank-badge {
@@ -4699,7 +4941,30 @@ body {
 	.club-event-detail-head,
 	.club-event-entry-card,
 	.club-event-admin-form {
-		grid-template-columns: 1fr;
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.activity-community-compose,
+	.club-event-entry-form.community-compose-form {
+		grid-template-columns: minmax(0, 1fr);
+		max-width: 100%;
+		overflow: hidden;
+	}
+
+	.activity-community-compose > *,
+	.club-event-entry-form.community-compose-form > *,
+	.club-event-detail-head > *,
+	.club-event-entry-card > * {
+		min-width: 0;
+	}
+
+	.activity-community-compose .activity-compose-side-card,
+	.club-event-entry-form .club-event-entry-side {
+		order: 5;
+	}
+
+	.club-event-entry-form {
+		margin: 0.75rem;
 	}
 
 	.club-event-list-stats {
