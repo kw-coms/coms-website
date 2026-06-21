@@ -100,6 +100,7 @@ test('apps page surfaces companion service links away from the home dashboard', 
     ['Game Club', 'https://coms.kw.ac.kr/gameclub/'],
     ['KW Mate', 'http://kwmate.com/'],
     ['Daily Coding', 'https://dailycoding-final.com/'],
+    ['PRDoctor', 'https://coms.kw.ac.kr/PRDoctor'],
   ]) {
     await expect(page.getByRole('link', { name: new RegExp(`${name}.*열기`) })).toHaveAttribute('href', href)
   }
@@ -1846,6 +1847,7 @@ test('apps page renders DB-driven club projects grouped by category', async ({ p
 
   const attendCard = page.locator('.apple-product-panel').filter({ hasText: '출석 체크 앱' })
   await expect(attendCard.getByText('만든 사람: 이모바일')).toBeVisible()
+  await expect(attendCard.getByText('attend.apk')).toBeVisible()
   await expect(attendCard.getByRole('link', { name: /다운로드/ })).toBeVisible()
 })
 
@@ -1858,37 +1860,75 @@ test('admin Apps management shows public-card previews with status badges', asyn
       { id: 2, key: 'APP', name: '앱', position: 1 },
     ],
   }))
+  let createdProjectPayload = null
+  const uploadedProjectFiles = []
+  const projects = [
+    {
+      id: 11,
+      category: 'WEBSITE',
+      categoryName: '웹사이트',
+      title: "COM's 포털",
+      description: '부원용 서비스 허브',
+      eyebrow: 'Portal',
+      madeBy: '김개발',
+      linkUrl: 'https://coms.kw.ac.kr/portal/',
+      displayUrl: 'coms.kw.ac.kr/portal',
+      files: [],
+    },
+    {
+      id: 12,
+      category: 'APP',
+      categoryName: '앱',
+      title: '출석 체크 앱',
+      description: '세미나 출석 관리 앱',
+      eyebrow: 'App',
+      madeBy: '이모바일',
+      linkUrl: null,
+      displayUrl: null,
+      files: [{ id: 99, url: '/api/club-projects/12/files/99', originalName: 'attend.apk' }],
+    },
+  ]
+  await page.route('**/api/club-projects/21/files', (route) => {
+    const body = route.request().postDataBuffer()?.toString('latin1') || ''
+    const nameMatch = /filename="([^"]+)"/.exec(body)
+    uploadedProjectFiles.push(nameMatch?.[1] || `file-${uploadedProjectFiles.length + 1}`)
+    projects[2] = {
+      ...projects[2],
+      files: uploadedProjectFiles.map((name, index) => ({
+        id: 200 + index,
+        url: `/api/club-projects/21/files/${200 + index}/download`,
+        originalName: name,
+        fileSize: 2048 + index,
+      })),
+    }
+    return route.fulfill({ status: 201, json: 200 + uploadedProjectFiles.length })
+  })
   await page.route('**/api/club-projects', (route) => {
     if (route.request().method() !== 'GET') return route.fallback()
-    return route.fulfill({
-      status: 200,
-      json: [
-        {
-          id: 11,
-          category: 'WEBSITE',
-          categoryName: '웹사이트',
-          title: "COM's 포털",
-          description: '부원용 서비스 허브',
-          eyebrow: 'Portal',
-          madeBy: '김개발',
-          linkUrl: 'https://coms.kw.ac.kr/portal/',
-          displayUrl: 'coms.kw.ac.kr/portal',
-          files: [],
-        },
-        {
-          id: 12,
-          category: 'APP',
-          categoryName: '앱',
-          title: '출석 체크 앱',
-          description: '세미나 출석 관리 앱',
-          eyebrow: 'App',
-          madeBy: '이모바일',
-          linkUrl: null,
-          displayUrl: null,
-          files: [{ id: 99, url: '/api/club-projects/12/files/99', originalName: 'attend.apk' }],
-        },
-      ],
-    })
+    return route.fulfill({ status: 200, json: projects })
+  })
+  await page.route('**/api/club-projects', (route) => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    const body = route.request().postData() || ''
+    createdProjectPayload = {
+      title: multipartField(body, 'title'),
+      category: multipartField(body, 'category'),
+      linkUrl: multipartField(body, 'linkUrl'),
+    }
+    const created = {
+      id: 21,
+      category: createdProjectPayload.category,
+      categoryName: '앱',
+      title: createdProjectPayload.title,
+      description: '새 앱 설명',
+      eyebrow: 'App',
+      madeBy: '관리자',
+      linkUrl: createdProjectPayload.linkUrl,
+      displayUrl: 'example.com/new-app',
+      files: [],
+    }
+    projects.push(created)
+    return route.fulfill({ status: 201, json: created })
   })
 
   await page.goto('/admin')
@@ -1906,9 +1946,23 @@ test('admin Apps management shows public-card previews with status badges', asyn
   await page.getByLabel('제목').fill('새 앱')
   await page.getByLabel('분류').selectOption('APP')
   await page.getByLabel('링크 URL (선택)').fill('https://example.com/new-app')
+  await page.getByLabel('배포 파일 (apk/zip 등, 여러 개 선택 가능)').setInputFiles([
+    { name: 'new-app.apk', mimeType: 'application/vnd.android.package-archive', buffer: Buffer.from('apk') },
+    { name: 'new-app-symbols.zip', mimeType: 'application/zip', buffer: Buffer.from('zip') },
+  ])
   const draftPreview = page.getByTestId('admin-app-preview-draft')
   await expect(draftPreview.getByText('새 앱')).toBeVisible()
   await expect(draftPreview.getByText('외부 링크')).toBeVisible()
+  await expect(draftPreview.getByText('new-app.apk')).toBeVisible()
+  await expect(page.getByText('선택한 파일 2개')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Apps 항목 등록' }).click()
+  await expect.poll(() => createdProjectPayload).toMatchObject({
+    title: '새 앱',
+    category: 'APP',
+    linkUrl: 'https://example.com/new-app',
+  })
+  await expect.poll(() => uploadedProjectFiles).toEqual(['new-app.apk', 'new-app-symbols.zip'])
 })
 
 test('monthly calendar renders recurring schedule occurrences for the selected month', async ({ page }) => {

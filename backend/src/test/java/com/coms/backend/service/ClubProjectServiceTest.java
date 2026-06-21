@@ -55,7 +55,7 @@ class ClubProjectServiceTest {
                 .satisfies(p -> {
                     assertThat(p.category()).isEqualTo("WEBSITE");
                     assertThat(p.eyebrow()).isEqualTo("PR review");
-                    assertThat(p.linkUrl()).isEqualTo("https://coms.kw.ac.kr/PRDoctor/");
+                    assertThat(p.linkUrl()).isEqualTo("https://coms.kw.ac.kr/PRDoctor");
                     assertThat(p.displayUrl()).isEqualTo("coms.kw.ac.kr/PRDoctor");
                 });
     }
