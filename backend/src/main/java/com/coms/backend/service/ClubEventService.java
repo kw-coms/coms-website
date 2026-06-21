@@ -2,9 +2,11 @@ package com.coms.backend.service;
 
 import com.coms.backend.domain.ClubEvent;
 import com.coms.backend.domain.ClubEventEntry;
+import com.coms.backend.domain.ClubEventEntryFile;
 import com.coms.backend.domain.ClubEventVote;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.ClubEventResponse;
+import com.coms.backend.repository.ClubEventEntryFileRepository;
 import com.coms.backend.repository.ClubEventEntryRepository;
 import com.coms.backend.repository.ClubEventRepository;
 import com.coms.backend.repository.ClubEventVoteRepository;
@@ -35,17 +37,20 @@ public class ClubEventService {
 
     private final ClubEventRepository eventRepository;
     private final ClubEventEntryRepository entryRepository;
+    private final ClubEventEntryFileRepository entryFileRepository;
     private final ClubEventVoteRepository voteRepository;
     private final MemberRepository memberRepository;
     private final StorageService storageService;
 
     public ClubEventService(ClubEventRepository eventRepository,
                             ClubEventEntryRepository entryRepository,
+                            ClubEventEntryFileRepository entryFileRepository,
                             ClubEventVoteRepository voteRepository,
                             MemberRepository memberRepository,
                             StorageService storageService) {
         this.eventRepository = eventRepository;
         this.entryRepository = entryRepository;
+        this.entryFileRepository = entryFileRepository;
         this.voteRepository = voteRepository;
         this.memberRepository = memberRepository;
         this.storageService = storageService;
@@ -55,10 +60,12 @@ public class ClubEventService {
     public List<ClubEventResponse> list(String studentId) {
         List<ClubEvent> events = eventRepository.findAllByOrderByCreatedAtDesc();
         Map<Long, List<ClubEventEntry>> entries = entriesByEvent(events);
+        Map<Long, List<ClubEventEntryFile>> files = filesByEntry(entries.values().stream().flatMap(List::stream).toList());
         Map<Long, List<ClubEventVote>> votes = votesByEvent(events);
         return events.stream()
                 .map(event -> toResponse(event,
                         entries.getOrDefault(event.getId(), List.of()),
+                        files,
                         votes.getOrDefault(event.getId(), List.of()),
                         studentId))
                 .toList();
@@ -67,8 +74,10 @@ public class ClubEventService {
     @Transactional(readOnly = true)
     public ClubEventResponse get(Long id, String studentId) {
         ClubEvent event = getEvent(id);
+        List<ClubEventEntry> entries = entryRepository.findByClubEventIdOrderByPositionAscCreatedAtAsc(id);
         return toResponse(event,
-                entryRepository.findByClubEventIdOrderByPositionAscCreatedAtAsc(id),
+                entries,
+                filesByEntry(entries),
                 voteRepository.findByClubEventId(id),
                 studentId);
     }
@@ -93,7 +102,7 @@ public class ClubEventService {
         event.setCreatedByName(member.getName());
         event.setCreatedAt(LocalDateTime.now());
         event.setUpdatedAt(LocalDateTime.now());
-        return toResponse(eventRepository.save(event), List.of(), List.of(), creatorStudentId);
+        return toResponse(eventRepository.save(event), List.of(), Map.of(), List.of(), creatorStudentId);
     }
 
     public ClubEventResponse updateEvent(Long id,
@@ -126,43 +135,70 @@ public class ClubEventService {
                                             String title,
                                             String authorName,
                                             String description,
-                                            MultipartFile file,
+                                            List<MultipartFile> files,
                                             String creatorStudentId) {
         requireMember(creatorStudentId);
         ClubEvent event = getEvent(eventId);
         if (title == null || title.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "작품 제목을 입력하세요.");
         }
-        if (file == null || file.isEmpty()) {
+        List<MultipartFile> uploadFiles = files == null ? List.of() : files.stream()
+                .filter(file -> file != null && !file.isEmpty())
+                .toList();
+        if (uploadFiles.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "업로드할 회지 파일을 선택하세요.");
         }
-        if (file.getSize() > MAX_ENTRY_FILE_BYTES) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이벤트 파일은 50MB 이하만 업로드할 수 있습니다.");
+        for (MultipartFile file : uploadFiles) {
+            if (file.getSize() > MAX_ENTRY_FILE_BYTES) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이벤트 파일은 50MB 이하만 업로드할 수 있습니다.");
+            }
         }
 
-        String stored = null;
+        List<String> storedNames = new ArrayList<>();
         try {
-            stored = storageService.store(file);
+            MultipartFile primaryFile = uploadFiles.get(0);
+            String primaryStored = storageService.store(primaryFile);
+            storedNames.add(primaryStored);
             ClubEventEntry entry = new ClubEventEntry();
             entry.setClubEventId(event.getId());
             entry.setTitle(title.trim());
             entry.setAuthorName(normalizeOptional(authorName));
             entry.setDescription(normalizeOptional(description));
-            entry.setStoredName(stored);
-            entry.setOriginalName(cleanOriginalFilename(file));
-            entry.setMimeType(file.getContentType() == null ? "application/octet-stream" : file.getContentType());
-            entry.setFileSize(file.getSize());
+            entry.setStoredName(primaryStored);
+            entry.setOriginalName(cleanOriginalFilename(primaryFile));
+            entry.setMimeType(contentType(primaryFile));
+            entry.setFileSize(primaryFile.getSize());
             entry.setPosition((int) entryRepository.countByClubEventId(event.getId()));
             entry.setCreatedAt(LocalDateTime.now());
             ClubEventEntry saved = entryRepository.save(entry);
+            List<ClubEventEntryFile> savedFiles = new ArrayList<>();
+            savedFiles.add(entryFileRepository.save(new ClubEventEntryFile(
+                    saved.getId(),
+                    primaryStored,
+                    cleanOriginalFilename(primaryFile),
+                    contentType(primaryFile),
+                    primaryFile.getSize(),
+                    0)));
+            for (int i = 1; i < uploadFiles.size(); i++) {
+                MultipartFile file = uploadFiles.get(i);
+                String stored = storageService.store(file);
+                storedNames.add(stored);
+                savedFiles.add(entryFileRepository.save(new ClubEventEntryFile(
+                        saved.getId(),
+                        stored,
+                        cleanOriginalFilename(file),
+                        contentType(file),
+                        file.getSize(),
+                        i)));
+            }
             event.setUpdatedAt(LocalDateTime.now());
             eventRepository.save(event);
-            return toEntryResponse(event.getId(), saved, 0, false, 0);
+            return toEntryResponse(event.getId(), saved, savedFiles, 0, false, 0);
         } catch (IOException e) {
-            if (stored != null) storageService.delete(stored);
+            storedNames.forEach(storageService::delete);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이벤트 파일 저장에 실패했습니다.");
         } catch (RuntimeException e) {
-            if (stored != null) storageService.delete(stored);
+            storedNames.forEach(storageService::delete);
             throw e;
         }
     }
@@ -203,7 +239,7 @@ public class ClubEventService {
         getEvent(eventId);
         ClubEventEntry entry = loadEntryMeta(eventId, entryId);
         voteRepository.deleteByEntryId(entry.getId());
-        storageService.delete(entry.getStoredName());
+        deleteEntryFiles(entry);
         entryRepository.delete(entry);
     }
 
@@ -211,9 +247,10 @@ public class ClubEventService {
         ClubEvent event = getEvent(id);
         List<ClubEventEntry> entries = entryRepository.findByClubEventIdOrderByPositionAscCreatedAtAsc(id);
         for (ClubEventEntry entry : entries) {
-            storageService.delete(entry.getStoredName());
+            deleteEntryFiles(entry);
         }
         voteRepository.deleteByClubEventId(id);
+        entryFileRepository.deleteByEntryIdIn(entries.stream().map(ClubEventEntry::getId).toList());
         entryRepository.deleteByClubEventId(id);
         eventRepository.delete(event);
     }
@@ -231,6 +268,22 @@ public class ClubEventService {
     @Transactional(readOnly = true)
     public Resource loadEntryResource(Long eventId, Long entryId) {
         return storageService.load(loadEntryMeta(eventId, entryId).getStoredName());
+    }
+
+    @Transactional(readOnly = true)
+    public ClubEventEntryFile loadEntryFileMeta(Long eventId, Long entryId, Long fileId) {
+        loadEntryMeta(eventId, entryId);
+        ClubEventEntryFile file = entryFileRepository.findById(fileId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!file.getEntryId().equals(entryId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return file;
+    }
+
+    @Transactional(readOnly = true)
+    public Resource loadEntryFileResource(Long eventId, Long entryId, Long fileId) {
+        return storageService.load(loadEntryFileMeta(eventId, entryId, fileId).getStoredName());
     }
 
     @Transactional(readOnly = true)
@@ -268,6 +321,10 @@ public class ClubEventService {
         return cleaned.isBlank() ? "event-entry" : cleaned;
     }
 
+    private String contentType(MultipartFile file) {
+        return file.getContentType() == null ? "application/octet-stream" : file.getContentType();
+    }
+
     private Map<Long, List<ClubEventEntry>> entriesByEvent(List<ClubEvent> events) {
         List<Long> ids = events.stream().map(ClubEvent::getId).filter(Objects::nonNull).toList();
         if (ids.isEmpty()) return Map.of();
@@ -282,8 +339,16 @@ public class ClubEventService {
                 .collect(Collectors.groupingBy(ClubEventVote::getClubEventId));
     }
 
+    private Map<Long, List<ClubEventEntryFile>> filesByEntry(List<ClubEventEntry> entries) {
+        List<Long> ids = entries.stream().map(ClubEventEntry::getId).filter(Objects::nonNull).toList();
+        if (ids.isEmpty()) return Map.of();
+        return entryFileRepository.findByEntryIdInOrderByPositionAsc(ids).stream()
+                .collect(Collectors.groupingBy(ClubEventEntryFile::getEntryId));
+    }
+
     private ClubEventResponse toResponse(ClubEvent event,
                                          List<ClubEventEntry> entries,
+                                         Map<Long, List<ClubEventEntryFile>> files,
                                          List<ClubEventVote> votes,
                                          String studentId) {
         Map<Long, Long> voteCounts = votes.stream()
@@ -304,7 +369,7 @@ public class ClubEventService {
         for (int i = 0; i < rankedEntries.size(); i++) {
             ClubEventEntry entry = rankedEntries.get(i);
             long voteCount = voteCounts.getOrDefault(entry.getId(), 0L);
-            entryResponses.add(toEntryResponse(event.getId(), entry, voteCount, entry.getId().equals(myEntryId), i + 1));
+            entryResponses.add(toEntryResponse(event.getId(), entry, files.getOrDefault(entry.getId(), List.of()), voteCount, entry.getId().equals(myEntryId), i + 1));
         }
 
         return new ClubEventResponse(
@@ -326,9 +391,11 @@ public class ClubEventService {
 
     private ClubEventResponse.Entry toEntryResponse(Long eventId,
                                                     ClubEventEntry entry,
+                                                    List<ClubEventEntryFile> files,
                                                     long voteCount,
                                                     boolean myVote,
                                                     int rank) {
+        List<ClubEventResponse.EntryFile> fileResponses = entryFilesResponse(eventId, entry, files);
         return new ClubEventResponse.Entry(
                 entry.getId(),
                 entry.getTitle(),
@@ -338,10 +405,44 @@ public class ClubEventService {
                 entry.getOriginalName(),
                 entry.getMimeType(),
                 entry.getFileSize(),
+                fileResponses,
                 voteCount,
                 myVote,
                 rank,
                 entry.getCreatedAt()
         );
+    }
+
+    private List<ClubEventResponse.EntryFile> entryFilesResponse(Long eventId,
+                                                                 ClubEventEntry entry,
+                                                                 List<ClubEventEntryFile> files) {
+        if (files == null || files.isEmpty()) {
+            return List.of(new ClubEventResponse.EntryFile(
+                    null,
+                    "/api/club-events/" + eventId + "/entries/" + entry.getId() + "/download",
+                    entry.getOriginalName(),
+                    entry.getMimeType(),
+                    entry.getFileSize()
+            ));
+        }
+        return files.stream()
+                .map(file -> new ClubEventResponse.EntryFile(
+                        file.getId(),
+                        "/api/club-events/" + eventId + "/entries/" + entry.getId() + "/files/" + file.getId() + "/download",
+                        file.getOriginalName(),
+                        file.getMimeType(),
+                        file.getFileSize()
+                ))
+                .toList();
+    }
+
+    private void deleteEntryFiles(ClubEventEntry entry) {
+        List<ClubEventEntryFile> files = entryFileRepository.findByEntryIdOrderByPositionAsc(entry.getId());
+        List<String> storedNames = new ArrayList<>(files.stream().map(ClubEventEntryFile::getStoredName).toList());
+        if (entry.getStoredName() != null && !storedNames.contains(entry.getStoredName())) {
+            storedNames.add(entry.getStoredName());
+        }
+        storedNames.forEach(storageService::delete);
+        entryFileRepository.deleteByEntryId(entry.getId());
     }
 }
