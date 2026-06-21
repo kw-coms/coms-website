@@ -47,6 +47,7 @@ import {
 } from '../services/communityApi.js'
 import { apiUrl } from '../services/apiClient.js'
 import { useAuth } from '../contexts/useAuth.js'
+import { sanitizeHtml } from '../utils/sanitizeHtml.js'
 import {
   buildDeletedPostTimeline,
   filterAndSortCommunityPosts,
@@ -88,6 +89,12 @@ const POLL_DURATION_OPTIONS = [
   { value: 0, label: '종료 없음' },
 ]
 const FORMATTED_TEXT_RE = /<\/?(strong|b|em|i|u|span|font|br|div|p)\b/i
+const EDITOR_ALLOWED_STYLES = new Set(['background-color', 'color', 'font-family'])
+const EDITOR_SANITIZE_OPTIONS = {
+  allowedTags: ['b', 'br', 'div', 'em', 'font', 'i', 'p', 'span', 'strong', 'u'],
+  allowedAttributes: ['color', 'face', 'style'],
+  allowedStyles: EDITOR_ALLOWED_STYLES,
+}
 
 let _localIdCounter = 0
 function localId() { return `blk-${++_localIdCounter}` }
@@ -144,14 +151,13 @@ function cleanEditorNode(node) {
 }
 
 function sanitizeEditorHtml(value) {
-  if (typeof document === 'undefined') return escapeHtml(value)
+  // Deprecated compatibility adapter: new HTML sinks should call sanitizeHtml() directly.
+  if (typeof document === 'undefined') return sanitizeHtml(value, EDITOR_SANITIZE_OPTIONS)
   const template = document.createElement('template')
   template.innerHTML = String(value || '')
   const container = document.createElement('div')
   appendCleanChildren(template.content, container)
-  return container.innerHTML
-    .replace(/\u200B/g, '')
-    .replace(/(<br\s*\/?>\s*)+$/gi, '')
+  return sanitizeHtml(container.innerHTML, EDITOR_SANITIZE_OPTIONS)
 }
 
 function textToEditorHtml(value) {
@@ -485,7 +491,7 @@ function renderPostBlocks(post, options = {}) {
               <div
                 key={i}
                 className="community-post-text text-size-container whitespace-pre-wrap break-words auto-text-post"
-                dangerouslySetInnerHTML={{ __html: sanitizeEditorHtml(block.content) }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(sanitizeEditorHtml(block.content), EDITOR_SANITIZE_OPTIONS) }}
               />
             )
           }
