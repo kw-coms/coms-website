@@ -28,6 +28,7 @@ import {
   listClubActivities,
   getClubActivity,
   updateClubActivity,
+  uploadClubActivityFile,
   uploadClubActivityImages,
   voteClubActivity,
   listClubActivityCategories,
@@ -1298,6 +1299,7 @@ function ActivityLogSection({ compact = false }) {
   const [viewedIds] = useState(() => new Set())
   const [submitError, setSubmitError] = useState('')
   const error = submitError || loadError
+  const [activityMode, setActivityMode] = useState('list')
   const [activityForm, setActivityForm] = useState({
     title: '',
     eventDate: '',
@@ -1305,6 +1307,7 @@ function ActivityLogSection({ compact = false }) {
     description: '',
   })
   const [activityImages, setActivityImages] = useState([])
+  const [activityFiles, setActivityFiles] = useState([])
   const [savingActivity, setSavingActivity] = useState(false)
   const [activityNotice, setActivityNotice] = useState('')
   const [selectedActivityId, setSelectedActivityId] = useState(null)
@@ -1372,11 +1375,20 @@ function ActivityLogSection({ compact = false }) {
       prependActivity(created)
       if (activityImages.length > 0) {
         await uploadClubActivityImages(created.id, activityImages)
+      }
+      if (activityFiles.length > 0) {
+        for (const file of activityFiles) {
+          await uploadClubActivityFile(created.id, file)
+        }
+      }
+      if (activityImages.length > 0 || activityFiles.length > 0) {
         await queryClient.invalidateQueries({ queryKey: CLUB_ACTIVITIES_QUERY_KEY })
       }
-      setActivityNotice('활동 기록을 추가했습니다.')
+      setActivityNotice('활동 글을 등록했습니다.')
       setActivityForm((prev) => ({ ...prev, title: '', eventDate: '', description: '' }))
       setActivityImages([])
+      setActivityFiles([])
+      setActivityMode('list')
       form.reset()
     } catch (err) {
       setSubmitError(err.message || '활동 기록을 추가하지 못했습니다.')
@@ -1503,68 +1515,110 @@ function ActivityLogSection({ compact = false }) {
             </div>
           </div>
 
-          {isAdmin && !isLocked && (
-            <form onSubmit={submitActivity} className="activity-admin-composer mt-8" aria-label="활동 기록 추가">
+          {!compact && isAdmin && !isLocked && activityMode === 'list' && (
+            <div className="activity-community-toolbar mt-8">
               <div>
-                <p className="activity-admin-composer-title">관리자 활동 기록 작성</p>
-                <p className="activity-admin-composer-copy">세미나, 스터디, 프로젝트 발표, MT/행사, 성과 기록을 활동 로그에 바로 추가합니다.</p>
+                <p className="activity-community-board-label">Activity board</p>
+                <p>활동 기록을 커뮤니티 글처럼 작성하고 목록에서 바로 열람합니다.</p>
               </div>
-              <label>
-                <span>활동 제목</span>
-                <input
-                  value={activityForm.title}
-                  onChange={(event) => setActivityForm((prev) => ({ ...prev, title: event.target.value }))}
-                  maxLength={120}
-                />
-              </label>
-              <label>
-                <span>활동 날짜</span>
-                <input
-                  type="date"
-                  value={activityForm.eventDate}
-                  onChange={(event) => setActivityForm((prev) => ({ ...prev, eventDate: event.target.value }))}
-                />
-              </label>
-              <label>
-                <span>활동 분류</span>
-                <select
-                  value={selectedCategory}
-                  onChange={(event) => setActivityForm((prev) => ({ ...prev, category: event.target.value }))}
-                >
-                  {categories.map((category) => (
-                    <option key={category.key} value={category.key}>{category.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>활동 사진</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(event) => setActivityImages(Array.from(event.target.files || []))}
-                />
-              </label>
-              <label className="activity-admin-composer-wide">
-                <span>활동 내용</span>
+              <button type="button" onClick={() => { setActivityMode('write'); setSubmitError(''); setActivityNotice('') }} className="apple-action-primary inline-flex min-h-11 items-center justify-center px-5 py-2.5 text-sm">
+                글쓰기
+              </button>
+            </div>
+          )}
+
+          {!compact && activityMode === 'write' && (
+            <form onSubmit={submitActivity} className="activity-community-compose community-compose-form mt-8 grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start" aria-label="활동 글쓰기">
+              <div className="community-compose-meta order-2 flex flex-wrap gap-2 lg:col-start-2 lg:row-start-1">
+                <label className="activity-community-side-field">
+                  <span>분류</span>
+                  <select
+                    aria-label="분류"
+                    value={selectedCategory}
+                    onChange={(event) => setActivityForm((prev) => ({ ...prev, category: event.target.value }))}
+                  >
+                    {categories.map((category) => (
+                      <option key={category.key} value={category.key}>{category.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="activity-community-side-field">
+                  <span>활동 날짜</span>
+                  <input
+                    aria-label="활동 날짜"
+                    type="date"
+                    value={activityForm.eventDate}
+                    onChange={(event) => setActivityForm((prev) => ({ ...prev, eventDate: event.target.value }))}
+                  />
+                </label>
+              </div>
+
+              <input
+                aria-label="제목"
+                value={activityForm.title}
+                onChange={(event) => setActivityForm((prev) => ({ ...prev, title: event.target.value }))}
+                maxLength={120}
+                placeholder="제목"
+                className="community-compose-title order-1 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm lg:col-start-1 lg:row-start-1"
+              />
+
+              <div className="community-compose-editor order-4 overflow-hidden rounded border border-black/15 bg-[var(--app-surface)] lg:col-start-1 lg:row-start-2 lg:row-span-5">
+                <div className="community-editor-toolbar flex flex-wrap items-center gap-2 border-b border-[var(--app-hairline)] bg-black/[0.03] px-3 py-2">
+                  <span className="mr-1 text-xs font-black uppercase text-[var(--theme-body-muted)]">Editor</span>
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+                    이미지
+                    <input
+                      aria-label="이미지"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(event) => setActivityImages(Array.from(event.target.files || []))}
+                    />
+                  </label>
+                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
+                    첨부파일
+                    <input
+                      aria-label="첨부파일"
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(event) => setActivityFiles(Array.from(event.target.files || []))}
+                    />
+                  </label>
+                  <span className="text-xs text-[var(--theme-body-muted)]">
+                    이미지 {activityImages.length}개 · 첨부 {activityFiles.length}개
+                  </span>
+                </div>
                 <textarea
+                  aria-label="본문"
                   value={activityForm.description}
                   onChange={(event) => setActivityForm((prev) => ({ ...prev, description: event.target.value }))}
-                  maxLength={500}
-                  rows={3}
+                  maxLength={5000}
+                  rows={14}
+                  placeholder="본문을 입력하세요."
+                  className="min-h-[22rem] w-full resize-y bg-[var(--app-surface)] px-4 py-4 text-base leading-8 text-[var(--app-text)] outline-none"
                 />
-              </label>
-              <button
-                type="submit"
-                disabled={savingActivity || !activityForm.title.trim() || !activityForm.eventDate}
-              >
-                {savingActivity ? '추가 중...' : '활동 기록 추가'}
-              </button>
-              {activityNotice && <p className="activity-admin-composer-notice">{activityNotice}</p>}
+              </div>
+
+              {submitError && <p className="community-compose-error order-5 text-sm font-semibold text-red-500 lg:col-start-2">{submitError}</p>}
+
+              <div className="community-compose-actions order-6 flex flex-col gap-2 sm:flex-row lg:col-start-2 lg:flex-col">
+                <button type="submit" disabled={savingActivity || !activityForm.title.trim() || !activityForm.eventDate} className="apple-action-primary min-h-11 px-5 py-2.5 text-sm disabled:opacity-50">
+                  {savingActivity ? '저장 중...' : '글 등록'}
+                </button>
+                <button type="button" disabled={savingActivity} onClick={() => setActivityMode('list')} className="apple-action-secondary min-h-11 px-5 py-2.5 text-sm">
+                  취소
+                </button>
+              </div>
             </form>
           )}
 
-          {!compact && !isLocked && !authLoading && !loading && !loadError && (
+          {activityMode === 'list' && activityNotice && (
+            <div className="activity-community-notice mt-4" role="status">{activityNotice}</div>
+          )}
+
+          {activityMode === 'list' && !compact && !isLocked && !authLoading && !loading && !loadError && (
             <div className="activity-log-filters mt-8 flex flex-wrap items-end gap-3">
               <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs font-semibold text-[var(--app-muted)]">
                 <span>검색</span>
@@ -1619,7 +1673,7 @@ function ActivityLogSection({ compact = false }) {
             </div>
           )}
 
-          {authLoading || loading ? (
+          {activityMode === 'list' && (authLoading || loading ? (
             <div className="activity-empty-state mt-8">
               <Sparkles size={22} aria-hidden="true" />
               <div>
@@ -1647,54 +1701,29 @@ function ActivityLogSection({ compact = false }) {
               </div>
             </div>
           ) : visibleItems.length > 0 ? (
-            <div className="activity-log-grid mt-8">
+            <div className="activity-community-list activity-log-grid mt-8">
               {visibleItems.map((item) => {
                 const itemImages = activityImagesFor(item)
                 const previewImage = itemImages[0]?.url || ''
                 return (
-                  <article key={item.id} className="activity-log-card activity-log-card-blue">
-                    <button
-                      type="button"
-                      className={`activity-log-photo ${previewImage ? 'activity-log-photo-has-image' : ''}`}
-                      onClick={() => openActivityDetail(item)}
-                      aria-label={`${item.title} 내용 보기`}
-                    >
-                      {previewImage ? (
-                        <img src={previewImage} alt="" className="activity-log-image" loading="lazy" />
-                      ) : (
-                        <>
-                          <div className="activity-log-photo-bar" aria-hidden="true">
-                            <span />
-                            <span />
-                            <span />
-                          </div>
-                          <div className="activity-log-photo-mark" aria-hidden="true">
-                            <Sparkles size={24} />
-                          </div>
-                        </>
-                      )}
-                      <span className="activity-log-photo-caption">
-                        <span>{categoryLabel(item.category, item.categoryName)}</span>
-                        <strong>{formatActivityDate(item.eventDate)}</strong>
+                  <article key={item.id} className="activity-log-card activity-community-row">
+                    <button type="button" className="activity-community-row-main" onClick={() => openActivityDetail(item)} aria-label={`${item.title} 내용 보기`}>
+                      <span className="activity-community-row-index">{formatActivityDate(item.eventDate)}</span>
+                      <span className="activity-community-row-content">
+                        <span className="activity-community-row-meta">
+                          <span>{categoryLabel(item.category, item.categoryName)}</span>
+                          <span>{item.createdByName || 'COM\'s'}</span>
+                          {itemImages.length > 0 && <span>사진 {itemImages.length}장</span>}
+                          {(item.fileInfos?.length ?? 0) > 0 && <span>첨부 {item.fileInfos.length}개</span>}
+                        </span>
+                        <h3>{item.title}</h3>
+                        {item.description && <span className="activity-community-row-excerpt">{item.description}</span>}
                       </span>
+                      {previewImage && <img src={previewImage} alt="" className="activity-log-image activity-community-row-thumb" loading="lazy" />}
                     </button>
-                    <div className="activity-log-body">
-                      <p className="activity-log-term">{item.createdByName || 'COM\'s'}</p>
-                      <h3>
-                        <button type="button" className="activity-log-title-button" onClick={() => openActivityDetail(item)}>
-                          {item.title}
-                        </button>
-                      </h3>
-                      {item.description && <p>{item.description}</p>}
-                      <div className="activity-log-tags" aria-label={`${item.title} 태그`}>
-                        <span>{categoryLabel(item.category, item.categoryName)}</span>
-                        {itemImages.length > 0 && <span>사진 {itemImages.length}장</span>}
-                        {(item.fileInfos?.length ?? 0) > 0 && <span>첨부 {item.fileInfos.length}개</span>}
-                      </div>
-                      <div className="activity-log-stats" aria-label={`${item.title} 반응`}>
-                        <span>조회 {item.viewCount ?? 0}</span>
-                        <span><ThumbsUp size={13} aria-hidden="true" />개추 {item.upvotes ?? 0}</span>
-                      </div>
+                    <div className="activity-community-row-stats">
+                      <span>조회 {item.viewCount ?? 0}</span>
+                      <span><ThumbsUp size={13} aria-hidden="true" />개추 {item.upvotes ?? 0}</span>
                       <button type="button" className="activity-log-open-button" onClick={() => openActivityDetail(item)}>
                         내용 보기
                       </button>
@@ -1719,7 +1748,7 @@ function ActivityLogSection({ compact = false }) {
                 <p>확인된 활동 사진, 후기, 성과 기록이 추가되면 이 영역에 바로 표시됩니다.</p>
               </div>
             </div>
-          )}
+          ))}
         </div>
       </section>
 
@@ -1932,7 +1961,7 @@ function ClubEventSection() {
   const [selectedSnapshot, setSelectedSnapshot] = useState(null)
   const [eventForm, setEventForm] = useState({ title: '', description: '', startsOn: '', endsOn: '' })
   const [entryForm, setEntryForm] = useState({ title: '', authorName: '', description: '' })
-  const [entryFile, setEntryFile] = useState(null)
+  const [entryFiles, setEntryFiles] = useState([])
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [savingEvent, setSavingEvent] = useState(false)
@@ -1954,7 +1983,7 @@ function ClubEventSection() {
 
   const resetEntryForm = () => {
     setEntryForm({ title: '', authorName: '', description: '' })
-    setEntryFile(null)
+    setEntryFiles([])
   }
 
   const openEvent = async (item) => {
@@ -2000,7 +2029,7 @@ function ClubEventSection() {
 
   const submitEntry = async (event) => {
     event.preventDefault()
-    if (!selectedEvent || !entryForm.title.trim() || !entryFile) return
+    if (!selectedEvent || !entryForm.title.trim() || entryFiles.length === 0) return
     setSavingEntry(true)
     setNotice('')
     setError('')
@@ -2009,16 +2038,16 @@ function ClubEventSection() {
         title: entryForm.title.trim(),
         authorName: entryForm.authorName.trim(),
         description: entryForm.description.trim(),
-        file: entryFile,
+        files: entryFiles,
       })
       const detail = await getClubEvent(selectedEvent.id)
       mergeEvent(detail)
       setSelectedSnapshot(detail)
       resetEntryForm()
       event.currentTarget.reset()
-      setNotice('작품을 이벤트에 업로드했습니다.')
+      setNotice('회지 글을 이벤트에 등록했습니다.')
     } catch (err) {
-      setError(err.message || '작품을 업로드하지 못했습니다.')
+      setError(err.message || '회지 글을 등록하지 못했습니다.')
     } finally {
       setSavingEntry(false)
     }
@@ -2108,17 +2137,17 @@ function ClubEventSection() {
   const renderEntryForm = () => {
     if (!isAdmin || !selectedEvent) return null
     return (
-      <form onSubmit={submitEntry} className="club-event-entry-form" aria-label="이벤트 작품 업로드">
+      <form onSubmit={submitEntry} className="club-event-entry-form community-compose-form" aria-label="이벤트 회지 글쓰기">
         <div className="club-event-entry-form-head">
           <div>
-            <p className="apple-eyebrow">Upload</p>
-            <h3>회지·작품 업로드</h3>
+            <p className="apple-eyebrow">Community entry</p>
+            <h3>회지 글쓰기</h3>
           </div>
-          <span>PDF, 이미지, 압축 파일 등 50MB 이하</span>
+          <span>본문과 PDF, 이미지, 압축 파일을 함께 등록합니다.</span>
         </div>
         <div className="club-event-entry-grid">
           <label className="club-event-field">
-            <span>작품 제목</span>
+            <span>글 제목</span>
             <input value={entryForm.title} onChange={(event) => setEntryForm((prev) => ({ ...prev, title: event.target.value }))} maxLength={120} placeholder="예: 여름호" />
           </label>
           <label className="club-event-field">
@@ -2126,18 +2155,20 @@ function ClubEventSection() {
             <input value={entryForm.authorName} onChange={(event) => setEntryForm((prev) => ({ ...prev, authorName: event.target.value }))} maxLength={80} placeholder="예: 운영팀" />
           </label>
           <label className="club-event-field club-event-field-wide">
-            <span>설명</span>
-            <textarea value={entryForm.description} onChange={(event) => setEntryForm((prev) => ({ ...prev, description: event.target.value }))} rows={3} maxLength={300} placeholder="작품 설명" />
+            <span>본문</span>
+            <textarea value={entryForm.description} onChange={(event) => setEntryForm((prev) => ({ ...prev, description: event.target.value }))} rows={5} maxLength={1000} placeholder="회지 소개, 투표 기준, 읽어볼 포인트를 적어주세요." />
           </label>
           <label className="club-event-upload-button">
             <Sparkles size={15} aria-hidden="true" />
-            파일 선택
-            <input type="file" onChange={(event) => setEntryFile(event.target.files?.[0] || null)} />
+            파일 추가
+            <input type="file" multiple onChange={(event) => setEntryFiles(Array.from(event.target.files || []))} />
           </label>
-          <span className="club-event-upload-name">{entryFile ? entryFile.name : '선택된 파일 없음'}</span>
+          <span className="club-event-upload-name">
+            {entryFiles.length > 0 ? `${entryFiles.length}개 선택됨 · ${entryFiles.map((file) => file.name).join(', ')}` : '선택된 파일 없음'}
+          </span>
         </div>
-        <button type="submit" className="apple-action-primary inline-flex min-h-11 items-center justify-center px-5 py-2.5 text-sm" disabled={savingEntry || !entryForm.title.trim() || !entryFile}>
-          {savingEntry ? '업로드 중...' : '작품 추가'}
+        <button type="submit" className="apple-action-primary inline-flex min-h-11 items-center justify-center px-5 py-2.5 text-sm" disabled={savingEntry || !entryForm.title.trim() || entryFiles.length === 0}>
+          {savingEntry ? '등록 중...' : '글 등록'}
         </button>
       </form>
     )
@@ -2167,37 +2198,52 @@ function ClubEventSection() {
         {renderEntryForm()}
         {entries.length > 0 ? (
           <div className="club-event-ranking-list">
-            {entries.map((entry) => (
-              <article key={entry.id} className={`club-event-entry-card ${entry.myVote ? 'club-event-entry-card-selected' : ''}`}>
-                <div className="club-event-rank-badge">{entry.rank}위</div>
-                <div className="club-event-entry-main">
-                  <div className="club-event-entry-title-row">
-                    <h3>{entry.title}</h3>
-                    {entry.authorName && <span>{entry.authorName}</span>}
+            {entries.map((entry) => {
+              const entryFileList = Array.isArray(entry.files) && entry.files.length > 0
+                ? entry.files
+                : (entry.downloadUrl ? [{
+                    id: `${entry.id}-legacy-file`,
+                    downloadUrl: entry.downloadUrl,
+                    originalName: entry.originalName,
+                    fileSize: entry.fileSize,
+                  }] : [])
+              return (
+                <article key={entry.id} className={`club-event-entry-card ${entry.myVote ? 'club-event-entry-card-selected' : ''}`}>
+                  <div className="club-event-rank-badge">{entry.rank}위</div>
+                  <div className="club-event-entry-main">
+                    <div className="club-event-entry-title-row">
+                      <h3>{entry.title}</h3>
+                      {entry.authorName && <span>{entry.authorName}</span>}
+                      {entryFileList.length > 1 && <span>첨부 {entryFileList.length}개</span>}
+                    </div>
+                    {entry.description && <p>{entry.description}</p>}
+                    {entryFileList.length > 0 && (
+                      <div className="club-event-entry-files" aria-label={`${entry.title} 첨부파일`}>
+                        {entryFileList.map((file) => (
+                          <a key={file.id || file.downloadUrl || file.originalName} href={file.downloadUrl} className="club-event-download-link">
+                            <Download size={14} aria-hidden="true" />
+                            <span>{file.originalName || '첨부파일'}</span>
+                            {formatFileSize(file.fileSize) && <small>{formatFileSize(file.fileSize)}</small>}
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {entry.description && <p>{entry.description}</p>}
-                  <div className="club-event-entry-meta">
-                    <a href={entry.downloadUrl} className="club-event-download-link">
-                      <Download size={14} aria-hidden="true" />
-                      {entry.originalName || '첨부파일'}
-                    </a>
-                    {formatFileSize(entry.fileSize) && <span>{formatFileSize(entry.fileSize)}</span>}
-                  </div>
-                </div>
-                <div className="club-event-entry-score">
-                  <strong>{entry.voteCount ?? 0}표</strong>
-                  <button type="button" onClick={() => handleVote(entry)} disabled={!selectedEvent.votingOpen || votingEntryId === entry.id} className={entry.myVote ? 'club-event-vote-button club-event-vote-button-selected' : 'club-event-vote-button'}>
-                    <ThumbsUp size={15} aria-hidden="true" />
-                    {entry.myVote ? '내 투표' : '투표'}
-                  </button>
-                  {isAdmin && (
-                    <button type="button" onClick={() => handleDeleteEntry(entry)} disabled={deletingId === `entry-${entry.id}`} className="club-event-danger-button" aria-label={`${entry.title} 삭제`}>
-                      <Trash2 size={14} aria-hidden="true" />
+                  <div className="club-event-entry-score">
+                    <strong>{entry.voteCount ?? 0}표</strong>
+                    <button type="button" onClick={() => handleVote(entry)} disabled={!selectedEvent.votingOpen || votingEntryId === entry.id} className={entry.myVote ? 'club-event-vote-button club-event-vote-button-selected' : 'club-event-vote-button'}>
+                      <ThumbsUp size={15} aria-hidden="true" />
+                      {entry.myVote ? '내 투표' : '투표'}
                     </button>
-                  )}
-                </div>
-              </article>
-            ))}
+                    {isAdmin && (
+                      <button type="button" onClick={() => handleDeleteEntry(entry)} disabled={deletingId === `entry-${entry.id}`} className="club-event-danger-button" aria-label={`${entry.title} 삭제`}>
+                        <Trash2 size={14} aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
+                </article>
+              )
+            })}
           </div>
         ) : (
           <div className="activity-empty-state m-4 sm:m-8">
