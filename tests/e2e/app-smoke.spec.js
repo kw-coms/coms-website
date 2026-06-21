@@ -261,6 +261,99 @@ test('admin password reset accepts simple temporary passwords without complexity
   await expect.poll(() => resetPayload).toEqual({ password: 'temp1' })
 })
 
+test('admin roster tab can add edit and delete eligible members', async ({ page }) => {
+  await mockAdminApis(page)
+  let roster = [
+    {
+      id: 1,
+      studentId: '2025123456',
+      name: '기존회원',
+      generation: 59,
+      phone: '01011112222',
+    },
+  ]
+  let addPayload = null
+  let updatePayload = null
+  let deletedId = null
+
+  await page.addInitScript(() => {
+    window.confirm = () => true
+    window.alert = () => {}
+  })
+  await page.route('**/api/admin/eligible-members', async (route) => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill({ status: 200, json: roster })
+    }
+    if (route.request().method() === 'POST') {
+      addPayload = route.request().postDataJSON()
+      roster = [
+        ...roster,
+        {
+          id: 2,
+          studentId: addPayload.studentId,
+          name: addPayload.name,
+          generation: 60,
+          phone: '',
+        },
+      ]
+      return route.fulfill({ status: 201, json: roster.at(-1) })
+    }
+    return route.fallback()
+  })
+  await page.route('**/api/admin/eligible-members/*', async (route) => {
+    const id = Number(new URL(route.request().url()).pathname.split('/').at(-1))
+    if (route.request().method() === 'PATCH') {
+      updatePayload = route.request().postDataJSON()
+      roster = roster.map((member) => (
+        member.id === id
+          ? { ...member, ...updatePayload }
+          : member
+      ))
+      return route.fulfill({ status: 204 })
+    }
+    if (route.request().method() === 'DELETE') {
+      deletedId = id
+      roster = roster.filter((member) => member.id !== id)
+      return route.fulfill({ status: 204 })
+    }
+    return route.fallback()
+  })
+
+  await page.goto('/admin')
+  await page.getByRole('button', { name: '명부 인증' }).click()
+
+  await expect(page.getByText('명부 확인 · 편집')).toBeVisible()
+  await page.getByPlaceholder('학번 (10자리)').fill('2026123456')
+  await page.getByPlaceholder('이름').fill('신규회원')
+  await page.getByRole('button', { name: '추가' }).click()
+
+  await expect.poll(() => addPayload).toEqual({
+    studentId: '2026123456',
+    name: '신규회원',
+  })
+  await expect(page.getByText('신규회원 (2026123456) 명부에 추가됐습니다.')).toBeVisible()
+  await expect(page.getByRole('row').filter({ hasText: '신규회원' })).toBeVisible()
+
+  await page.getByRole('row').filter({ hasText: '신규회원' }).getByRole('button', { name: '편집' }).click()
+  const editInputs = page.locator('td[colspan="5"]').locator('input')
+  await editInputs.nth(1).fill('수정회원')
+  await editInputs.nth(0).fill('2026123999')
+  await editInputs.nth(2).fill('01099998888')
+  await page.getByRole('button', { name: '저장' }).click()
+
+  await expect.poll(() => updatePayload).toEqual({
+    studentId: '2026123999',
+    name: '수정회원',
+    phone: '01099998888',
+  })
+  await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toBeVisible()
+
+  await page.getByRole('row').filter({ hasText: '수정회원' }).getByRole('button', { name: '삭제' }).click()
+
+  await expect.poll(() => deletedId).toBe(2)
+  await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toHaveCount(0)
+})
+
 test('admin font management explains availability and uses action labels', async ({ page }) => {
   await mockAdminApis(page)
   await page.route('**/api/fonts/*/file', (route) => route.fulfill({
