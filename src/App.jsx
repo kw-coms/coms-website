@@ -2057,8 +2057,8 @@ function ActivityLogSection({ compact = false }) {
           )}
 
           {!compact && activityMode === 'write' && (
-            <form onSubmit={submitActivity} className="activity-community-compose community-compose-form mt-8 grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start" aria-label="활동 글쓰기">
-              <div className="community-compose-meta activity-compose-side-card order-2 flex flex-wrap gap-3 lg:col-start-2 lg:row-start-2">
+            <form onSubmit={submitActivity} className="activity-community-compose community-compose-form mt-8 grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start" aria-label="활동 글쓰기">
+              <div className="community-compose-meta activity-compose-side-card order-3 flex flex-wrap gap-3 lg:col-start-2 lg:row-start-1 lg:row-span-3">
                 <p className="activity-community-board-label w-full">게시 설정</p>
                 <label className="activity-community-side-field">
                   <span>분류</span>
@@ -2105,7 +2105,7 @@ function ActivityLogSection({ compact = false }) {
                 className="community-compose-title order-1 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm lg:col-start-1 lg:row-start-1"
               />
 
-              <div className="order-4 lg:col-start-1 lg:row-start-2 lg:row-span-5">
+              <div className="order-2 lg:col-start-1 lg:row-start-2">
                 <RichTextComposer
                   value={activityForm.description}
                   onChange={(description) => setActivityForm((prev) => ({ ...prev, description }))}
@@ -2208,6 +2208,13 @@ function ActivityLogSection({ compact = false }) {
             </div>
           ) : visibleItems.length > 0 ? (
             <div className="activity-community-list activity-log-grid mt-8">
+              <div className="activity-community-table-head" aria-hidden="true">
+                <span>활동일</span>
+                <span>글</span>
+                <span>작성자</span>
+                <span>반응</span>
+                <span>미디어</span>
+              </div>
               {visibleItems.map((item) => {
                 const itemImages = activityImagesFor(item)
                 const previewImage = itemImages[0]?.url || ''
@@ -2218,22 +2225,28 @@ function ActivityLogSection({ compact = false }) {
                       <div className="activity-community-row-content">
                         <div className="activity-community-row-meta">
                           <span>{categoryLabel(item.category, item.categoryName)}</span>
-                          <span>{item.createdByName || 'COM\'s'}</span>
                           {itemImages.length > 0 && <span>사진 {itemImages.length}장</span>}
                           {(item.fileInfos?.length ?? 0) > 0 && <span>첨부 {item.fileInfos.length}개</span>}
                         </div>
                         <h3>{item.title}</h3>
                         {item.description && <RichTextContent value={item.description} className="activity-community-row-excerpt" />}
                       </div>
-                      {previewImage && <img src={previewImage} alt="" className="activity-log-image activity-community-row-thumb" loading="lazy" />}
+                      <span className="activity-community-row-author">{item.createdByName || 'COM\'s'}</span>
+                      <span className="activity-community-row-reactions">
+                        <span>조회 {item.viewCount ?? 0}</span>
+                        <span><ThumbsUp size={13} aria-hidden="true" /> 개추 {item.upvotes ?? 0}</span>
+                      </span>
+                      <span className="activity-community-row-preview">
+                        {previewImage ? (
+                          <>
+                            <img src={previewImage} alt="" className="activity-log-image activity-community-row-thumb" loading="lazy" />
+                            <span>사진</span>
+                          </>
+                        ) : (
+                          <span>없음</span>
+                        )}
+                      </span>
                     </button>
-                    <div className="activity-community-row-stats">
-                      <span>조회 {item.viewCount ?? 0}</span>
-                      <span><ThumbsUp size={13} aria-hidden="true" />개추 {item.upvotes ?? 0}</span>
-                      <button type="button" className="activity-log-open-button" onClick={() => openActivityDetail(item)}>
-                        내용 보기
-                      </button>
-                    </div>
                   </article>
                 )
               })}
