@@ -417,6 +417,76 @@ test('admin ban tab can ban and unban student ids', async ({ page }) => {
   await expect(page.getByRole('row').filter({ hasText: '2026123456' })).toHaveCount(0)
 })
 
+test('admin files tab can upload and delete archive files', async ({ page }) => {
+  await mockAdminApis(page)
+  let files = [
+    {
+      id: 1,
+      originalName: '기존자료.pdf',
+      uploadedBy: '관리자',
+      fileSize: 2048,
+    },
+  ]
+  let uploadPayload = null
+  let deletedFileId = null
+
+  await page.addInitScript(() => {
+    window.confirm = () => true
+    window.alert = () => {}
+  })
+  await page.route('**/api/files', async (route) => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill({ status: 200, json: files })
+    }
+    if (route.request().method() === 'POST') {
+      const body = route.request().postData() || ''
+      uploadPayload = {
+        title: multipartField(body, 'title'),
+        category: multipartField(body, 'category'),
+      }
+      files = [
+        ...files,
+        {
+          id: 2,
+          originalName: uploadPayload.title,
+          uploadedBy: '관리자',
+          fileSize: 7,
+        },
+      ]
+      return route.fulfill({ status: 200, json: files.at(-1) })
+    }
+    return route.fallback()
+  })
+  await page.route('**/api/files/*', async (route) => {
+    if (route.request().method() !== 'DELETE') return route.fallback()
+    deletedFileId = Number(new URL(route.request().url()).pathname.split('/').at(-1))
+    files = files.filter((file) => file.id !== deletedFileId)
+    return route.fulfill({ status: 204 })
+  })
+
+  await page.goto('/admin')
+  await page.getByRole('button', { name: '파일 관리' }).click()
+
+  await expect(page.getByText('기존자료.pdf')).toBeVisible()
+  await expect(page.getByText('관리자 · 2.0 KB')).toBeVisible()
+  await page.locator('input[type="file"]').setInputFiles({
+    name: '회의록.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('pdfbody'),
+  })
+
+  await expect.poll(() => uploadPayload).toEqual({
+    title: '회의록.pdf',
+    category: 'GENERAL',
+  })
+  await expect(page.getByText('회의록.pdf')).toBeVisible()
+
+  await page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '회의록.pdf' }).getByRole('button', { name: '삭제' }).click()
+
+  await expect.poll(() => deletedFileId).toBe(2)
+  await expect(page.getByText('회의록.pdf')).toHaveCount(0)
+})
+
 test('admin font management explains availability and uses action labels', async ({ page }) => {
   await mockAdminApis(page)
   await page.route('**/api/fonts/*/file', (route) => route.fulfill({
