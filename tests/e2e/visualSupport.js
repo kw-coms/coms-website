@@ -62,6 +62,10 @@ export async function mockAdminApis(page) {
             originalName: 'summer.pdf',
             mimeType: 'application/pdf',
             fileSize: 1200,
+            files: [
+              { id: 201, downloadUrl: '/api/club-events/1/entries/2/files/201/download', originalName: 'summer.pdf', mimeType: 'application/pdf', fileSize: 1200 },
+              { id: 202, downloadUrl: '/api/club-events/1/entries/2/files/202/download', originalName: 'summer-source.zip', mimeType: 'application/zip', fileSize: 2400 },
+            ],
             voteCount: 5,
             myVote: true,
             rank: 1,
@@ -76,6 +80,9 @@ export async function mockAdminApis(page) {
             originalName: 'spring.pdf',
             mimeType: 'application/pdf',
             fileSize: 1100,
+            files: [
+              { id: 101, downloadUrl: '/api/club-events/1/entries/1/files/101/download', originalName: 'spring.pdf', mimeType: 'application/pdf', fileSize: 1100 },
+            ],
             voteCount: 2,
             myVote: false,
             rank: 2,
@@ -110,6 +117,10 @@ export async function mockAdminApis(page) {
           originalName: 'summer.pdf',
           mimeType: 'application/pdf',
           fileSize: 1200,
+          files: [
+            { id: 201, downloadUrl: '/api/club-events/1/entries/2/files/201/download', originalName: 'summer.pdf', mimeType: 'application/pdf', fileSize: 1200 },
+            { id: 202, downloadUrl: '/api/club-events/1/entries/2/files/202/download', originalName: 'summer-source.zip', mimeType: 'application/zip', fileSize: 2400 },
+          ],
           voteCount: 5,
           myVote: true,
           rank: 1,
@@ -124,6 +135,9 @@ export async function mockAdminApis(page) {
           originalName: 'spring.pdf',
           mimeType: 'application/pdf',
           fileSize: 1100,
+          files: [
+            { id: 101, downloadUrl: '/api/club-events/1/entries/1/files/101/download', originalName: 'spring.pdf', mimeType: 'application/pdf', fileSize: 1100 },
+          ],
           voteCount: 2,
           myVote: false,
           rank: 2,
