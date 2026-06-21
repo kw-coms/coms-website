@@ -2039,7 +2039,7 @@ test('monthly calendar renders recurring schedule occurrences for the selected m
   await page.getByLabel('년도 선택').fill('2026')
   await page.getByLabel('월 선택', { exact: true }).selectOption({ label: '7월' })
 
-  await expect(page.getByText('2026년 7월')).toBeVisible()
+  await expect(page.locator('.club-calendar-title').getByText('2026년 7월')).toBeVisible()
   const recurringEvents = page.locator('.club-calendar-event-recurring').filter({ hasText: '정기 회의' })
   await expect(recurringEvents).toHaveCount(3)
   await expect(recurringEvents.first().getByText('18:00~19:00')).toBeVisible()
