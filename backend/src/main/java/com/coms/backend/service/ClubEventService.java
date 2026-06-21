@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -34,6 +35,11 @@ import java.util.stream.Collectors;
 public class ClubEventService {
 
     private static final long MAX_ENTRY_FILE_BYTES = 50L * 1024 * 1024;
+    private static final int MAX_ENTRY_WORK_TYPE_LENGTH = 40;
+    private static final int MAX_ENTRY_AUTHOR_LENGTH = 100;
+    private static final int MAX_ENTRY_SUMMARY_LENGTH = 500;
+    private static final int MAX_ENTRY_TAGS_LENGTH = 500;
+    private static final int MAX_ENTRY_EXTERNAL_URL_LENGTH = 500;
 
     private final ClubEventRepository eventRepository;
     private final ClubEventEntryRepository entryRepository;
@@ -135,6 +141,10 @@ public class ClubEventService {
                                             String title,
                                             String authorName,
                                             String description,
+                                            String workType,
+                                            String summary,
+                                            String tags,
+                                            String externalUrl,
                                             List<MultipartFile> files,
                                             String creatorStudentId) {
         requireMember(creatorStudentId);
@@ -162,8 +172,12 @@ public class ClubEventService {
             ClubEventEntry entry = new ClubEventEntry();
             entry.setClubEventId(event.getId());
             entry.setTitle(title.trim());
-            entry.setAuthorName(normalizeOptional(authorName));
+            entry.setAuthorName(normalizeOptional(authorName, MAX_ENTRY_AUTHOR_LENGTH, "작성자/팀"));
             entry.setDescription(normalizeOptional(description));
+            entry.setWorkType(normalizeOptional(workType, MAX_ENTRY_WORK_TYPE_LENGTH, "작품 종류"));
+            entry.setSummary(normalizeOptional(summary, MAX_ENTRY_SUMMARY_LENGTH, "한줄 소개"));
+            entry.setTags(normalizeOptional(tags, MAX_ENTRY_TAGS_LENGTH, "태그"));
+            entry.setExternalUrl(normalizeExternalUrl(externalUrl));
             entry.setStoredName(primaryStored);
             entry.setOriginalName(cleanOriginalFilename(primaryFile));
             entry.setMimeType(contentType(primaryFile));
@@ -310,6 +324,24 @@ public class ClubEventService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    private String normalizeOptional(String value, int maxLength, String fieldName) {
+        String normalized = normalizeOptional(value);
+        if (normalized != null && normalized.length() > maxLength) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + "은 " + maxLength + "자 이하로 입력하세요.");
+        }
+        return normalized;
+    }
+
+    private String normalizeExternalUrl(String value) {
+        String normalized = normalizeOptional(value, MAX_ENTRY_EXTERNAL_URL_LENGTH, "관련 링크");
+        if (normalized == null) return null;
+        String lower = normalized.toLowerCase(Locale.ROOT);
+        if (!lower.startsWith("https://") && !lower.startsWith("http://")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "관련 링크는 http:// 또는 https://로 시작해야 합니다.");
+        }
+        return normalized;
+    }
+
     private boolean isVotingOpen(ClubEvent event, LocalDateTime now) {
         return !now.isBefore(event.getStartsAt()) && !now.isAfter(event.getEndsAt());
     }
@@ -401,6 +433,10 @@ public class ClubEventService {
                 entry.getTitle(),
                 entry.getAuthorName(),
                 entry.getDescription(),
+                entry.getWorkType(),
+                entry.getSummary(),
+                entry.getTags(),
+                entry.getExternalUrl(),
                 "/api/club-events/" + eventId + "/entries/" + entry.getId() + "/download",
                 entry.getOriginalName(),
                 entry.getMimeType(),

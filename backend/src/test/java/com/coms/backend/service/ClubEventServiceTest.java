@@ -63,8 +63,10 @@ class ClubEventServiceTest {
                 "2026123456"
         );
         var springIssue = clubEventService.addEntry(event.id(), "봄호", "편집팀", "봄 활동 회지",
+                "MAGAZINE", "봄 활동을 묶은 회지입니다.", "봄, PDF", "https://coms.kw.ac.kr/archive/spring",
                 List.of(pdf("spring.pdf")), "2026123456");
         var summerIssue = clubEventService.addEntry(event.id(), "여름호", "운영팀", "여름 활동 회지",
+                "WEBZINE", "여름 활동을 웹진으로 정리했습니다.", "여름, 웹진", "https://coms.kw.ac.kr/archive/summer",
                 List.of(pdf("summer.pdf"), pdf("summer-source.zip")), "2026123456");
 
         var voted = clubEventService.vote(event.id(), summerIssue.id(), "2026000001");
@@ -75,6 +77,10 @@ class ClubEventServiceTest {
         assertThat(voted.entries().get(0).rank()).isEqualTo(1);
         assertThat(voted.entries().get(0).voteCount()).isEqualTo(1);
         assertThat(voted.entries().get(0).myVote()).isTrue();
+        assertThat(voted.entries().get(0).workType()).isEqualTo("WEBZINE");
+        assertThat(voted.entries().get(0).summary()).isEqualTo("여름 활동을 웹진으로 정리했습니다.");
+        assertThat(voted.entries().get(0).tags()).isEqualTo("여름, 웹진");
+        assertThat(voted.entries().get(0).externalUrl()).isEqualTo("https://coms.kw.ac.kr/archive/summer");
         assertThat(voted.entries().get(0).downloadUrl())
                 .isEqualTo("/api/club-events/" + event.id() + "/entries/" + summerIssue.id() + "/download");
         assertThat(voted.entries().get(0).files())
@@ -87,8 +93,10 @@ class ClubEventServiceTest {
         LocalDateTime now = LocalDateTime.now();
         var event = clubEventService.createEvent("회지 인기투표", null,
                 now.minusHours(1), now.plusDays(1), "2026123456");
-        var first = clubEventService.addEntry(event.id(), "1호", "A팀", null, List.of(pdf("one.pdf")), "2026123456");
-        var second = clubEventService.addEntry(event.id(), "2호", "B팀", null, List.of(pdf("two.pdf")), "2026123456");
+        var first = clubEventService.addEntry(event.id(), "1호", "A팀", null,
+                null, null, null, null, List.of(pdf("one.pdf")), "2026123456");
+        var second = clubEventService.addEntry(event.id(), "2호", "B팀", null,
+                null, null, null, null, List.of(pdf("two.pdf")), "2026123456");
 
         clubEventService.vote(event.id(), first.id(), "2026000001");
         var changed = clubEventService.vote(event.id(), second.id(), "2026000001");
@@ -115,7 +123,7 @@ class ClubEventServiceTest {
         var closed = clubEventService.createEvent("종료된 이벤트", null,
                 now.minusDays(2), now.minusDays(1), "2026123456");
         var closedEntry = clubEventService.addEntry(closed.id(), "지난 회지", "편집팀", null,
-                List.of(pdf("old.pdf")), "2026123456");
+                null, null, null, null, List.of(pdf("old.pdf")), "2026123456");
 
         assertThatThrownBy(() -> clubEventService.vote(closed.id(), closedEntry.id(), "2026000001"))
                 .isInstanceOf(ResponseStatusException.class);

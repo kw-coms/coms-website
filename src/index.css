@@ -4646,7 +4646,8 @@ body {
 }
 
 .club-event-field input,
-.club-event-field textarea {
+.club-event-field textarea,
+.club-event-field select {
 	min-height: 2.75rem;
 	width: 100%;
 	border: 1px solid var(--app-hairline);
@@ -4657,6 +4658,13 @@ body {
 	font-size: 1rem;
 	font-weight: 700;
 	outline: none;
+}
+
+.club-event-field select {
+	appearance: none;
+	background:
+		linear-gradient(45deg, transparent 50%, var(--app-muted) 50%) right 0.95rem center / 0.45rem 0.45rem no-repeat,
+		var(--app-surface-soft);
 }
 
 .club-event-field textarea {
@@ -4748,7 +4756,63 @@ body {
 	width: 100%;
 }
 
+.club-event-upload-panel {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 0.9rem;
+	align-items: center;
+	border: 1px dashed color-mix(in srgb, var(--app-accent) 32%, var(--app-hairline));
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--app-accent) 5%, var(--app-surface-soft));
+	padding: 1rem;
+	transition:
+		border-color 160ms ease,
+		background 160ms ease,
+		box-shadow 160ms ease;
+}
+
+.club-event-upload-panel-active {
+	border-color: var(--app-accent);
+	background: var(--app-accent-soft);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 26%, transparent);
+}
+
+.club-event-upload-copy {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	gap: 0.75rem;
+	color: var(--app-muted);
+}
+
+.club-event-upload-copy > svg {
+	flex: 0 0 auto;
+	color: var(--app-accent-text);
+}
+
+.club-event-upload-copy strong,
+.club-event-upload-copy span {
+	display: block;
+	min-width: 0;
+	overflow-wrap: anywhere;
+	word-break: keep-all;
+}
+
+.club-event-upload-copy strong {
+	color: var(--app-text);
+	font-size: 0.95rem;
+	font-weight: 950;
+}
+
+.club-event-upload-copy span {
+	margin-top: 0.25rem;
+	font-size: 0.78rem;
+	font-weight: 800;
+	line-height: 1.45;
+}
+
 .club-event-upload-button {
+	position: relative;
 	display: inline-flex;
 	min-height: 2.75rem;
 	width: fit-content;
@@ -4770,7 +4834,99 @@ body {
 }
 
 .club-event-upload-button input {
-	display: none;
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	cursor: pointer;
+	opacity: 0;
+}
+
+.club-event-file-basket {
+	display: grid;
+	gap: 0.65rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface-soft);
+	padding: 0.75rem;
+}
+
+.club-event-file-basket-head {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem 0.75rem;
+	align-items: center;
+	justify-content: space-between;
+	color: var(--app-muted);
+	font-size: 0.78rem;
+	font-weight: 850;
+}
+
+.club-event-file-basket-head strong {
+	color: var(--app-text);
+	font-weight: 950;
+}
+
+.club-event-file-basket-head span {
+	min-width: 0;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.club-event-file-basket-head button,
+.club-event-file-basket li button {
+	border: 0;
+	background: transparent;
+	color: var(--app-accent-text);
+	font-size: 0.76rem;
+	font-weight: 950;
+}
+
+.club-event-file-basket ul {
+	display: grid;
+	gap: 0.45rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.club-event-file-basket li {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	gap: 0.55rem;
+	align-items: center;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.45rem;
+	background: var(--app-surface);
+	padding: 0.55rem 0.65rem;
+}
+
+.club-event-file-basket li > svg {
+	color: var(--app-accent-text);
+}
+
+.club-event-file-basket li span,
+.club-event-file-basket li small {
+	display: block;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.club-event-file-basket li span {
+	color: var(--app-text);
+	font-size: 0.84rem;
+	font-weight: 900;
+}
+
+.club-event-file-basket li small {
+	margin-top: 0.15rem;
+	color: var(--app-subtle);
+	font-size: 0.72rem;
+	font-weight: 800;
 }
 
 .club-event-ranking-list {
@@ -4832,11 +4988,59 @@ body {
 	font-weight: 900;
 }
 
+.club-event-entry-title-row .club-event-work-type {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 24%, var(--app-hairline));
+	border-radius: 999px;
+	background: var(--app-accent-soft);
+	padding: 0.18rem 0.5rem;
+	color: var(--app-accent-text);
+}
+
 .club-event-entry-main p {
 	margin-top: 0.45rem;
 	color: var(--app-muted);
 	font-size: 0.9rem;
 	font-weight: 650;
+}
+
+.club-event-entry-main .club-event-entry-summary {
+	color: var(--app-text);
+	font-weight: 800;
+}
+
+.club-event-entry-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin-top: 0.6rem;
+}
+
+.club-event-entry-tags span {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.2rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 999px;
+	background: var(--app-surface-soft);
+	padding: 0.22rem 0.5rem;
+	color: var(--app-muted);
+	font-size: 0.74rem;
+	font-weight: 900;
+}
+
+.club-event-entry-external {
+	display: inline-flex;
+	width: fit-content;
+	align-items: center;
+	gap: 0.35rem;
+	margin-top: 0.65rem;
+	color: var(--app-accent-text);
+	font-size: 0.8rem;
+	font-weight: 950;
+	text-decoration: none;
 }
 
 .club-event-entry-meta {
@@ -4984,6 +5188,10 @@ body {
 
 	.club-event-detail-head {
 		padding: 0.9rem;
+	}
+
+	.club-event-upload-panel {
+		grid-template-columns: minmax(0, 1fr);
 	}
 }
 

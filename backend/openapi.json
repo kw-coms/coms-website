@@ -1748,6 +1748,38 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "workType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "summary",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "externalUrl",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -6924,6 +6956,18 @@
             "type": "string"
           },
           "description": {
+            "type": "string"
+          },
+          "workType": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "string"
+          },
+          "externalUrl": {
             "type": "string"
           },
           "downloadUrl": {
