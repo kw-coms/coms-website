@@ -1155,12 +1155,41 @@ test('admin can write an activity log entry directly from the activity log page'
   let createdPayload = null
   let uploadedImageFields = 0
   let uploadedFileFields = 0
+  let categories = [
+    { id: 1, key: 'GENERAL', name: '일반', position: 0, activityCount: 0 },
+    { id: 2, key: 'SEMINAR', name: '세미나', position: 1, activityCount: 0 },
+    { id: 3, key: 'STUDY', name: '스터디', position: 2, activityCount: 0 },
+    { id: 4, key: 'PROJECT', name: '프로젝트', position: 3, activityCount: 0 },
+    { id: 5, key: 'MEETING', name: '회의', position: 4, activityCount: 0 },
+  ]
   const onePixelPng = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
     'base64',
   )
   const textFile = Buffer.from('activity appendix')
   let activities = []
+  await page.route('**/api/club-activities/30/images/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: onePixelPng,
+    })
+  })
+  await page.route('**/api/club-activities/categories', async (route) => {
+    await route.fulfill({ status: 200, json: categories })
+  })
+  await page.route('**/api/admin/club-activity-categories', async (route) => {
+    const payload = JSON.parse(route.request().postData() || '{}')
+    const created = {
+      id: 6,
+      key: 'HACKATHON',
+      name: payload.name,
+      position: categories.length,
+      activityCount: 0,
+    }
+    categories = [...categories, created]
+    await route.fulfill({ status: 201, json: created })
+  })
   await page.route('**/api/club-activities/30/images', async (route) => {
     const body = route.request().postDataBuffer()?.toString('latin1') || ''
     uploadedImageFields = (body.match(/name="images"/g) || []).length
@@ -1219,11 +1248,17 @@ test('admin can write an activity log entry directly from the activity log page'
   })
 
   await page.goto('/activity-log')
+  await page.getByRole('button', { name: '분류 관리' }).click()
+  await expect(page.locator('.activity-category-manager')).toBeVisible()
+  await page.getByPlaceholder('예: 해커톤').fill('해커톤')
+  await page.getByRole('button', { name: '분류 추가' }).click()
+  await expect(page.getByText('분류를 추가했습니다.')).toBeVisible()
   await page.getByRole('button', { name: '글쓰기' }).click()
   await expect(page.locator('.activity-community-compose')).toBeVisible()
+  await expect(page.locator('.activity-community-compose .community-compose-editor')).toBeVisible()
   await page.getByLabel('제목').fill('활동 로그 직접 작성')
   await page.getByLabel('활동 날짜').fill('2026-06-25')
-  await page.getByLabel('분류').selectOption('PROJECT')
+  await page.getByLabel('분류').selectOption('HACKATHON')
   await page.getByLabel('이미지').setInputFiles([
     { name: 'first.png', mimeType: 'image/png', buffer: onePixelPng },
     { name: 'second.png', mimeType: 'image/png', buffer: onePixelPng },
@@ -1238,7 +1273,7 @@ test('admin can write an activity log entry directly from the activity log page'
   await expect.poll(() => createdPayload).toMatchObject({
     title: '활동 로그 직접 작성',
     kind: 'ACTIVITY',
-    category: 'PROJECT',
+    category: 'HACKATHON',
     eventDate: '2026-06-25',
     description: '프로젝트 발표 후기와 사진 기록',
   })
@@ -1248,6 +1283,60 @@ test('admin can write an activity log entry directly from the activity log page'
   await expect(page.getByRole('heading', { name: '활동 로그 직접 작성' })).toBeVisible()
   await expect(page.getByText('사진 2장')).toBeVisible()
   await expect(page.getByText('첨부 2개')).toBeVisible()
+})
+
+test('admin can write an event entry with the community-style composer and multiple files', async ({ page }) => {
+  await mockAdminApis(page)
+  let entryPayload = null
+  const pdfFile = Buffer.from('%PDF-1.4 test')
+  const zipFile = Buffer.from('zip fixture')
+  await page.route('**/api/club-events/1/entries', async (route) => {
+    const body = route.request().postData() || ''
+    const rawBody = route.request().postDataBuffer()?.toString('latin1') || ''
+    entryPayload = {
+      title: multipartField(body, 'title'),
+      authorName: multipartField(body, 'authorName'),
+      description: multipartField(body, 'description'),
+      fileFields: (rawBody.match(/name="files"/g) || []).length,
+    }
+    await route.fulfill({
+      status: 200,
+      json: {
+        id: 9,
+        title: entryPayload.title,
+        authorName: entryPayload.authorName,
+        description: entryPayload.description,
+        voteCount: 0,
+        myVote: false,
+        rank: 3,
+        files: [],
+      },
+    })
+  })
+
+  await page.goto('/activity-events')
+  await page.locator('.club-event-list-button').filter({ hasText: '회지 인기투표' }).click()
+
+  const composer = page.locator('.club-event-entry-form.community-compose-form')
+  await expect(composer).toBeVisible()
+  await expect(composer.locator('.community-compose-editor')).toBeVisible()
+  await composer.getByLabel('글 제목').fill('가을호')
+  await composer.getByLabel('작성자/팀').fill('편집팀')
+  await composer.getByLabel('첨부파일').setInputFiles([
+    { name: 'autumn.pdf', mimeType: 'application/pdf', buffer: pdfFile },
+    { name: 'autumn-source.zip', mimeType: 'application/zip', buffer: zipFile },
+  ])
+  await expect(composer.getByText('파일 2개').first()).toBeVisible()
+  await composer.getByLabel('본문').fill('가을 활동 회지와 제작 파일입니다.')
+  await composer.getByRole('button', { name: '글 등록' }).click()
+
+  await expect.poll(() => entryPayload).toMatchObject({
+    title: '가을호',
+    authorName: '편집팀',
+    description: '가을 활동 회지와 제작 파일입니다.',
+    fileFields: 2,
+  })
+  await expect(page.getByText('회지 글을 이벤트에 등록했습니다.')).toBeVisible()
 })
 
 test('admin can register a club activity record', async ({ page }) => {
