@@ -1309,6 +1309,7 @@ test('admin can write an event entry with the community-style composer and multi
   }
   const pdfFile = Buffer.from('%PDF-1.4 test')
   const zipFile = Buffer.from('zip fixture')
+  const imageFile = Buffer.from('event image fixture')
   await page.route('**/api/club-events/1', async (route) => {
     await route.fulfill({ status: 200, json: eventDetail })
   })
@@ -1339,8 +1340,9 @@ test('admin can write an event entry with the community-style composer and multi
       mimeType: 'application/pdf',
       fileSize: pdfFile.length,
       files: [
-        { id: 901, downloadUrl: '/api/club-events/1/entries/9/files/901/download', originalName: 'autumn.pdf', mimeType: 'application/pdf', fileSize: pdfFile.length },
-        { id: 902, downloadUrl: '/api/club-events/1/entries/9/files/902/download', originalName: 'autumn-source.zip', mimeType: 'application/zip', fileSize: zipFile.length },
+        { id: 901, downloadUrl: '/api/club-events/1/entries/9/files/901/download', originalName: 'cover.png', mimeType: 'image/png', fileSize: imageFile.length },
+        { id: 902, downloadUrl: '/api/club-events/1/entries/9/files/902/download', originalName: 'autumn.pdf', mimeType: 'application/pdf', fileSize: pdfFile.length },
+        { id: 903, downloadUrl: '/api/club-events/1/entries/9/files/903/download', originalName: 'autumn-source.zip', mimeType: 'application/zip', fileSize: zipFile.length },
       ],
       voteCount: 0,
       myVote: false,
@@ -1365,17 +1367,26 @@ test('admin can write an event entry with the community-style composer and multi
   await expect(composer).toBeVisible()
   await expect(composer.locator('.community-compose-editor')).toBeVisible()
   await composer.getByLabel('글 제목').fill('가을호')
+  const titleBox = await composer.getByLabel('글 제목').boundingBox()
+  const editorBox = await composer.locator('.community-compose-editor').boundingBox()
+  expect(titleBox).not.toBeNull()
+  expect(editorBox).not.toBeNull()
+  expect(editorBox.y - (titleBox.y + titleBox.height)).toBeLessThan(36)
   await composer.getByLabel('작성자/팀').fill('편집팀')
   await composer.getByLabel('작품 종류').selectOption('WEBZINE')
   await composer.getByLabel('한줄 소개').fill('가을 활동을 웹진으로 정리한 회지입니다.')
   await composer.getByLabel('태그').fill('가을호, 웹진, 소스포함')
   await composer.getByLabel('관련 링크').fill('https://coms.kw.ac.kr/archive/autumn')
-  await composer.getByLabel('회지 작품 파일').setInputFiles([
+  await composer.getByLabel('이벤트 이미지 파일').setInputFiles([
+    { name: 'cover.png', mimeType: 'image/png', buffer: imageFile },
+  ])
+  await composer.getByLabel('회지 작품 첨부파일').setInputFiles([
     { name: 'autumn.pdf', mimeType: 'application/pdf', buffer: pdfFile },
     { name: 'autumn-source.zip', mimeType: 'application/zip', buffer: zipFile },
   ])
+  await expect(composer.getByText('이미지 1개').first()).toBeVisible()
   await expect(composer.getByText('파일 2개').first()).toBeVisible()
-  await expect(composer.getByText('대표 파일: autumn.pdf')).toBeVisible()
+  await expect(composer.getByText('선택한 첨부 3개')).toBeVisible()
   const eventEditor = composer.getByLabel('본문')
   await eventEditor.fill('가을 활동 회지와 제작 파일입니다.')
   await eventEditor.press('ControlOrMeta+A')
@@ -1389,7 +1400,7 @@ test('admin can write an event entry with the community-style composer and multi
     summary: '가을 활동을 웹진으로 정리한 회지입니다.',
     tags: '가을호, 웹진, 소스포함',
     externalUrl: 'https://coms.kw.ac.kr/archive/autumn',
-    fileFields: 2,
+    fileFields: 3,
   })
   await expect.poll(() => entryPayload?.description || '').toContain('<u>가을 활동 회지와 제작 파일입니다.</u>')
   await expect(page.getByText('작품을 이벤트에 등록했습니다.')).toBeVisible()
