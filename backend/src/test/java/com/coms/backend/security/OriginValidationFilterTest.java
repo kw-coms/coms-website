@@ -9,6 +9,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class OriginValidationFilterTest {
 
@@ -40,6 +41,13 @@ class OriginValidationFilterTest {
         MockHttpServletResponse response = filter("DELETE", null, "https://evil.example/post");
 
         assertThat(response.getStatus()).isEqualTo(403);
+    }
+
+    @Test
+    void failsFastWhenAllowedOriginsAreBlank() {
+        assertThatThrownBy(() -> new OriginValidationFilter(" "))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cors.allowed-origins");
     }
 
     private MockHttpServletResponse filter(String method, String origin, String referer)
