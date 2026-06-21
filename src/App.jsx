@@ -82,6 +82,7 @@ const RecruitNotice = lazy(() => import('./pages/RecruitNotice.jsx'))
 import { getLogoAsset } from './utils/logoAssets.js'
 import { buildCalendarDayEvents, buildMonthEventSummary, visibleDayEvents } from './utils/monthlyCalendar.js'
 import { parseScheduleCsv } from './utils/scheduleCsv.js'
+import { sanitizeHtml } from './utils/sanitizeHtml.js'
 import { useAuth } from './contexts/useAuth.js'
 import { ActivityCategory } from './contract/enums.js'
 import { enumLabels } from './contract/labels.js'
@@ -239,7 +240,11 @@ function sanitizeRichTextHtml(value) {
   const raw = String(value || '')
   if (!raw.trim()) return ''
   if (typeof document === 'undefined') {
-    return /<[a-z][\s\S]*>/i.test(raw) ? raw.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '') : plainTextToRichHtml(raw)
+    return sanitizeHtml(/<[a-z][\s\S]*>/i.test(raw) ? raw : plainTextToRichHtml(raw), {
+      allowedTags: [...RICH_TEXT_ALLOWED_TAGS],
+      allowedStyles: RICH_TEXT_ALLOWED_STYLES,
+      trimTrailingBreaks: false,
+    })
   }
 
   const template = document.createElement('template')
@@ -288,7 +293,11 @@ function sanitizeRichTextHtml(value) {
   template.content.childNodes.forEach((child) => fragment.appendChild(sanitizeNode(child)))
   const container = document.createElement('div')
   container.appendChild(fragment)
-  return container.innerHTML
+  return sanitizeHtml(container.innerHTML, {
+    allowedTags: [...RICH_TEXT_ALLOWED_TAGS],
+    allowedStyles: RICH_TEXT_ALLOWED_STYLES,
+    trimTrailingBreaks: false,
+  })
 }
 
 function richTextToPlainText(value) {
