@@ -24,6 +24,18 @@ public class ClubEventEntry {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "work_type", length = 40)
+    private String workType;
+
+    @Column(columnDefinition = "TEXT")
+    private String summary;
+
+    @Column(length = 500)
+    private String tags;
+
+    @Column(name = "external_url", length = 500)
+    private String externalUrl;
+
     @Column(name = "stored_name", nullable = false, length = 255)
     private String storedName;
 
@@ -51,6 +63,14 @@ public class ClubEventEntry {
     public void setAuthorName(String authorName) { this.authorName = authorName; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+    public String getWorkType() { return workType; }
+    public void setWorkType(String workType) { this.workType = workType; }
+    public String getSummary() { return summary; }
+    public void setSummary(String summary) { this.summary = summary; }
+    public String getTags() { return tags; }
+    public void setTags(String tags) { this.tags = tags; }
+    public String getExternalUrl() { return externalUrl; }
+    public void setExternalUrl(String externalUrl) { this.externalUrl = externalUrl; }
     public String getStoredName() { return storedName; }
     public void setStoredName(String storedName) { this.storedName = storedName; }
     public String getOriginalName() { return originalName; }
