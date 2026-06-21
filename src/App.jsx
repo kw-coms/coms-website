@@ -10,6 +10,8 @@ import {
   ChevronDown,
   CircuitBoard,
   Download,
+  ExternalLink,
+  FileText,
   Grid3x3,
   Highlighter,
   ImagePlus,
@@ -26,10 +28,12 @@ import {
   Settings2,
   Sparkles,
   Sun,
+  Tag,
   ThumbsUp,
   Trash2,
   Type,
   Underline,
+  Upload,
   X,
 } from 'lucide-react'
 import { listNotices } from './services/noticeApi.js'
@@ -2448,6 +2452,48 @@ function formatFileSize(bytes) {
   return `${n}B`
 }
 
+const EMPTY_CLUB_EVENT_ENTRY_FORM = {
+  title: '',
+  authorName: '',
+  workType: 'MAGAZINE',
+  summary: '',
+  tags: '',
+  externalUrl: '',
+  description: '',
+}
+
+const CLUB_EVENT_WORK_TYPE_OPTIONS = [
+  { value: 'MAGAZINE', label: '회지' },
+  { value: 'WEBZINE', label: '웹진' },
+  { value: 'SOURCE', label: '원본/소스' },
+  { value: 'DESIGN', label: '디자인' },
+  { value: 'OTHER', label: '기타 작품' },
+]
+
+function clubEventWorkTypeLabel(value) {
+  return CLUB_EVENT_WORK_TYPE_OPTIONS.find((option) => option.value === value)?.label || ''
+}
+
+function clubEventEntryTags(value) {
+  return String(value || '')
+    .split(/[,\n#]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function mergeFileList(currentFiles, nextFiles) {
+  const merged = [...(currentFiles || [])]
+  const seen = new Set(merged.map((file) => `${file.name}:${file.size}:${file.lastModified}`))
+  for (const file of Array.from(nextFiles || [])) {
+    const key = `${file.name}:${file.size}:${file.lastModified}`
+    if (!seen.has(key)) {
+      merged.push(file)
+      seen.add(key)
+    }
+  }
+  return merged
+}
+
 function ClubEventSection() {
   const navigate = useNavigate()
   const { user, authLoading, events, loading, loadError, prependEvent, mergeEvent, removeEvent } = useClubEvents('이벤트를 불러오지 못했습니다.')
@@ -2455,8 +2501,9 @@ function ClubEventSection() {
   const [selectedEventId, setSelectedEventId] = useState(null)
   const [selectedSnapshot, setSelectedSnapshot] = useState(null)
   const [eventForm, setEventForm] = useState({ title: '', description: '', startsOn: '', endsOn: '' })
-  const [entryForm, setEntryForm] = useState({ title: '', authorName: '', description: '' })
+  const [entryForm, setEntryForm] = useState(() => ({ ...EMPTY_CLUB_EVENT_ENTRY_FORM }))
   const [entryFiles, setEntryFiles] = useState([])
+  const [entryDragActive, setEntryDragActive] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const [savingEvent, setSavingEvent] = useState(false)
@@ -2477,8 +2524,30 @@ function ClubEventSection() {
   }
 
   const resetEntryForm = () => {
-    setEntryForm({ title: '', authorName: '', description: '' })
+    setEntryForm({ ...EMPTY_CLUB_EVENT_ENTRY_FORM })
     setEntryFiles([])
+    setEntryDragActive(false)
+  }
+
+  const entryFileSizeTotal = useMemo(
+    () => entryFiles.reduce((total, file) => total + (Number(file.size) || 0), 0),
+    [entryFiles],
+  )
+
+  const addEntryFiles = (files) => {
+    const nextFiles = Array.from(files || [])
+    if (nextFiles.length === 0) return
+    setEntryFiles((current) => mergeFileList(current, nextFiles))
+  }
+
+  const removeEntryFileAt = (index) => {
+    setEntryFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))
+  }
+
+  const handleEntryDrop = (event) => {
+    event.preventDefault()
+    setEntryDragActive(false)
+    addEntryFiles(event.dataTransfer.files)
   }
 
   const openEvent = async (item) => {
@@ -2534,6 +2603,10 @@ function ClubEventSection() {
         title: entryForm.title.trim(),
         authorName: entryForm.authorName.trim(),
         description: normalizeRichTextForSubmit(entryForm.description),
+        workType: entryForm.workType,
+        summary: entryForm.summary.trim(),
+        tags: entryForm.tags.trim(),
+        externalUrl: entryForm.externalUrl.trim(),
         files: entryFiles,
       })
       const detail = await getClubEvent(selectedEvent.id)
@@ -2541,7 +2614,7 @@ function ClubEventSection() {
       setSelectedSnapshot(detail)
       resetEntryForm()
       form.reset()
-      setNotice('회지 글을 이벤트에 등록했습니다.')
+      setNotice('작품을 이벤트에 등록했습니다.')
     } catch (err) {
       setError(err.message || '회지 글을 등록하지 못했습니다.')
     } finally {
@@ -2633,19 +2706,40 @@ function ClubEventSection() {
   const renderEntryForm = () => {
     if (!isAdmin || !selectedEvent) return null
     return (
-      <form onSubmit={submitEntry} className="club-event-entry-form community-compose-form grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start" aria-label="이벤트 회지 글쓰기">
-        <div className="community-compose-meta club-event-entry-side order-2 flex flex-wrap gap-3 lg:col-start-2 lg:row-start-2">
-          <p className="activity-community-board-label w-full">게시 설정</p>
+      <form onSubmit={submitEntry} className="club-event-entry-form community-compose-form grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start" aria-label="이벤트 회지 글쓰기">
+        <div className="community-compose-meta club-event-entry-side order-3 flex flex-wrap gap-3 lg:col-start-2 lg:row-start-2 lg:row-span-3">
+          <p className="activity-community-board-label w-full">작품 정보</p>
           <label className="club-event-field">
             <span>작성자/팀</span>
             <input value={entryForm.authorName} onChange={(event) => setEntryForm((prev) => ({ ...prev, authorName: event.target.value }))} maxLength={80} placeholder="예: 운영팀" />
           </label>
+          <label className="club-event-field">
+            <span>작품 종류</span>
+            <select value={entryForm.workType} onChange={(event) => setEntryForm((prev) => ({ ...prev, workType: event.target.value }))}>
+              {CLUB_EVENT_WORK_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="club-event-field">
+            <span>한줄 소개</span>
+            <textarea value={entryForm.summary} onChange={(event) => setEntryForm((prev) => ({ ...prev, summary: event.target.value }))} maxLength={500} rows={3} placeholder="작품을 짧게 소개해주세요." />
+          </label>
+          <label className="club-event-field">
+            <span>태그</span>
+            <input value={entryForm.tags} onChange={(event) => setEntryForm((prev) => ({ ...prev, tags: event.target.value }))} maxLength={500} placeholder="예: 봄호, 웹진, 신입생" />
+          </label>
+          <label className="club-event-field">
+            <span>관련 링크</span>
+            <input value={entryForm.externalUrl} onChange={(event) => setEntryForm((prev) => ({ ...prev, externalUrl: event.target.value }))} maxLength={500} placeholder="https://..." />
+          </label>
           <div className="activity-compose-attachment-summary">
             <span><Paperclip size={14} aria-hidden="true" /> 파일 {entryFiles.length}개</span>
+            {formatFileSize(entryFileSizeTotal) && <span>총 {formatFileSize(entryFileSizeTotal)}</span>}
           </div>
           <div className="activity-compose-side-actions">
             <button type="submit" className="apple-action-primary min-h-11 px-5 py-2.5 text-sm disabled:opacity-50" disabled={savingEntry || !entryForm.title.trim() || entryFiles.length === 0}>
-              {savingEntry ? '등록 중...' : '글 등록'}
+              {savingEntry ? '등록 중...' : '작품 등록'}
             </button>
           </div>
         </div>
@@ -2659,7 +2753,70 @@ function ClubEventSection() {
           className="community-compose-title order-1 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm lg:col-start-1 lg:row-start-1"
         />
 
-        <div className="order-4 lg:col-start-1 lg:row-start-2 lg:row-span-5">
+        <div
+          className={`club-event-upload-panel order-2 lg:col-start-1 lg:row-start-2 ${entryDragActive ? 'club-event-upload-panel-active' : ''}`}
+          onDragEnter={(event) => {
+            event.preventDefault()
+            setEntryDragActive(true)
+          }}
+          onDragOver={(event) => {
+            event.preventDefault()
+            event.dataTransfer.dropEffect = 'copy'
+            setEntryDragActive(true)
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault()
+            setEntryDragActive(false)
+          }}
+          onDrop={handleEntryDrop}
+        >
+          <div className="club-event-upload-copy">
+            <Upload size={22} aria-hidden="true" />
+            <div>
+              <strong>회지/작품 파일 업로드</strong>
+              <span>PDF, ZIP, 이미지, 원본 파일을 여러 개 올릴 수 있습니다.</span>
+            </div>
+          </div>
+          <label className="club-event-upload-button club-event-upload-button-wide">
+            <Paperclip size={15} aria-hidden="true" />
+            파일 선택
+            <input
+              aria-label="회지 작품 파일"
+              type="file"
+              multiple
+              onChange={(event) => {
+                addEntryFiles(event.target.files)
+                event.target.value = ''
+              }}
+            />
+          </label>
+        </div>
+
+        {entryFiles.length > 0 && (
+          <div className="club-event-file-basket order-3 lg:col-start-1 lg:row-start-3" aria-label="선택한 작품 파일">
+            <div className="club-event-file-basket-head">
+              <strong>선택한 파일 {entryFiles.length}개</strong>
+              <span>대표 파일: {entryFiles[0]?.name}</span>
+              <button type="button" onClick={() => setEntryFiles([])}>전체 삭제</button>
+            </div>
+            <ul>
+              {entryFiles.map((file, index) => (
+                <li key={`${file.name}-${file.size}-${file.lastModified}-${index}`}>
+                  <FileText size={16} aria-hidden="true" />
+                  <div>
+                    <span>{file.name}</span>
+                    <small>{[file.type || '파일', formatFileSize(file.size)].filter(Boolean).join(' · ')}</small>
+                  </div>
+                  <button type="button" onClick={() => removeEntryFileAt(index)} aria-label={`${file.name} 제거`}>
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="order-4 lg:col-start-1 lg:row-start-4 lg:row-span-5">
           <RichTextComposer
             value={entryForm.description}
             onChange={(description) => setEntryForm((prev) => ({ ...prev, description }))}
@@ -2706,16 +2863,33 @@ function ClubEventSection() {
                     originalName: entry.originalName,
                     fileSize: entry.fileSize,
                   }] : [])
+              const tags = clubEventEntryTags(entry.tags)
+              const workTypeLabel = clubEventWorkTypeLabel(entry.workType)
               return (
                 <article key={entry.id} className={`club-event-entry-card ${entry.myVote ? 'club-event-entry-card-selected' : ''}`}>
                   <div className="club-event-rank-badge">{entry.rank}위</div>
                   <div className="club-event-entry-main">
                     <div className="club-event-entry-title-row">
                       <h3>{entry.title}</h3>
+                      {workTypeLabel && <span className="club-event-work-type"><FileText size={13} aria-hidden="true" /> {workTypeLabel}</span>}
                       {entry.authorName && <span>{entry.authorName}</span>}
                       {entryFileList.length > 1 && <span>첨부 {entryFileList.length}개</span>}
                     </div>
+                    {entry.summary && <p className="club-event-entry-summary">{entry.summary}</p>}
+                    {tags.length > 0 && (
+                      <div className="club-event-entry-tags" aria-label={`${entry.title} 태그`}>
+                        {tags.map((tag) => (
+                          <span key={tag}><Tag size={12} aria-hidden="true" />{tag}</span>
+                        ))}
+                      </div>
+                    )}
                     {entry.description && <RichTextContent value={entry.description} className="club-event-entry-description" />}
+                    {entry.externalUrl && (
+                      <a href={entry.externalUrl} className="club-event-entry-external" target="_blank" rel="noreferrer">
+                        <ExternalLink size={14} aria-hidden="true" />
+                        관련 링크
+                      </a>
+                    )}
                     {entryFileList.length > 0 && (
                       <div className="club-event-entry-files" aria-label={`${entry.title} 첨부파일`}>
                         {entryFileList.map((file) => (
