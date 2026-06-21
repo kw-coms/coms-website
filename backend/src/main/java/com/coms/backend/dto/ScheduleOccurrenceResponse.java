@@ -8,6 +8,7 @@ import java.time.LocalDate;
  */
 public record ScheduleOccurrenceResponse(
         Long recurringScheduleId,
+        Long exceptionId,
         String title,
         String description,
         LocalDate date,
@@ -16,6 +17,8 @@ public record ScheduleOccurrenceResponse(
         String location,
         String category,
         String categoryName,
-        boolean recurring
+        String colorHex,
+        boolean recurring,
+        boolean canceled
 ) {
 }

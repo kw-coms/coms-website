@@ -15,6 +15,7 @@ public record ClubActivityResponse(
         LocalDate endDate,
         String startTime,
         String endTime,
+        String colorHex,
         String imageUrl,
         String imageOriginalName,
         List<MediaInfo> imageInfos,

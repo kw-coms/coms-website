@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
-import { ArrowUpRight, Download } from 'lucide-react'
-import { apiUrl } from '../../services/apiClient.js'
 import { listClubProjects, listClubProjectCategories } from '../../services/clubProjectApi.js'
 import { companionServices } from '../../data/homeContent.js'
+import AppProjectCard from '../apps/AppProjectCard.jsx'
 
 const DEFAULT_MADE_BY = '최준혁'
 
@@ -52,57 +51,6 @@ function groupByCategory(projects, categories) {
   return groups.filter((group) => group.projects.length > 0)
 }
 
-function ProjectCard({ project }) {
-  const hasLink = Boolean(project.linkUrl)
-  const files = Array.isArray(project.files) ? project.files : []
-  const CardTag = hasLink ? 'a' : 'div'
-  const cardProps = hasLink
-    ? { href: project.linkUrl, target: '_blank', rel: 'noreferrer' }
-    : {}
-
-  return (
-    <CardTag
-      {...cardProps}
-      className="apple-product-panel group flex min-h-64 flex-col px-6 py-6 text-left no-underline transition hover:-translate-y-0.5"
-    >
-      {project.eyebrow && <p className="text-sm font-semibold text-[#0066cc]">{project.eyebrow}</p>}
-      <h3 className="mt-3 text-2xl font-semibold leading-tight text-[#1d1d1f]">{project.title}</h3>
-      {project.description && (
-        <p className="mt-3 flex-1 text-sm font-medium leading-6 text-[#6e6e73]">{project.description}</p>
-      )}
-      <p className={`text-xs font-semibold text-[#86868b] ${project.description ? 'mt-4' : 'mt-3 flex-1'}`}>
-        만든 사람: {project.madeBy || DEFAULT_MADE_BY}
-      </p>
-
-      <div className="mt-5 flex flex-wrap items-center gap-2">
-        {hasLink && (
-          <span className="inline-flex items-center gap-2 text-sm font-bold text-[#0066cc]">
-            열기
-            <ArrowUpRight size={15} aria-hidden="true" />
-          </span>
-        )}
-        {files.map((file) => (
-          <a
-            key={file.id}
-            href={apiUrl(file.url)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[#0066cc] px-3 py-1.5 text-xs font-bold text-white no-underline transition hover:bg-[#0052a3]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <Download size={13} aria-hidden="true" />
-            다운로드
-          </a>
-        ))}
-      </div>
-
-      {project.displayUrl && (
-        <span className="mt-3 truncate rounded-full bg-[#f5f5f7] px-3 py-1.5 text-xs font-semibold text-[#86868b]">
-          {project.displayUrl}
-        </span>
-      )}
-    </CardTag>
-  )
-}
-
 function CompanionServicesSection() {
   const [projects, setProjects] = useState(FALLBACK_PROJECTS)
   const [categories, setCategories] = useState(FALLBACK_CATEGORIES)
@@ -149,7 +97,7 @@ function CompanionServicesSection() {
                 </div>
                 <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {group.projects.map((project) => (
-                    <ProjectCard key={project.id} project={project} />
+                    <AppProjectCard key={project.id} project={project} />
                   ))}
                 </div>
               </div>

@@ -72,6 +72,8 @@ export function buildCalendarDayEvents({ calendarMonth, scheduleItems = [], recu
         const dateKey = toLocalDateString(current)
         const segment = segmentFor(current, startDate, endDate)
         pushDay(eventsByDay, current, {
+          activityId: item.id,
+          sourceType: 'date',
           id: `schedule-${item.id}-${dateKey}`,
           title: item.title,
           date: dateKey,
@@ -80,6 +82,7 @@ export function buildCalendarDayEvents({ calendarMonth, scheduleItems = [], recu
           startTime: item.startTime || '',
           endTime: item.endTime || '',
           timeLabel: formatTimeLabel(item.startTime, item.endTime),
+          colorHex: item.colorHex || '',
           recurring: false,
           range: startDate.getTime() !== endDate.getTime(),
           segment,
@@ -93,6 +96,9 @@ export function buildCalendarDayEvents({ calendarMonth, scheduleItems = [], recu
     if (!date) return
     if (date.getFullYear() !== calendarMonth.year || date.getMonth() !== calendarMonth.month) return
     pushDay(eventsByDay, date, {
+      recurringScheduleId: occ.recurringScheduleId,
+      exceptionId: occ.exceptionId ?? null,
+      sourceType: 'recurring',
       id: `recurring-${occ.recurringScheduleId}-${occ.date}`,
       title: occ.title,
       date: occ.date,
@@ -102,7 +108,9 @@ export function buildCalendarDayEvents({ calendarMonth, scheduleItems = [], recu
       endTime: occ.endTime || '',
       timeLabel: formatTimeLabel(occ.startTime, occ.endTime),
       location: occ.location || '',
+      colorHex: occ.colorHex || '',
       recurring: true,
+      canceled: Boolean(occ.canceled),
       range: false,
       segment: 'single',
       showTitle: true,
@@ -118,4 +126,31 @@ export function visibleDayEvents(events, limit = 3) {
     visible: list.slice(0, limit),
     overflowCount: Math.max(0, list.length - limit),
   }
+}
+
+export function buildMonthEventSummary({ eventsByDay = {}, calendarMonth, today = new Date(), limit = 3 }) {
+  const todayKey = today.getFullYear() === calendarMonth.year && today.getMonth() === calendarMonth.month
+    ? toLocalDateString(today)
+    : null
+  const seen = new Set()
+  const events = Object.values(eventsByDay)
+    .flatMap((dayEvents) => Array.isArray(dayEvents) ? dayEvents : [])
+    .filter((event) => {
+      if (!event?.date) return false
+      if (todayKey && event.date < todayKey) return false
+      if (event.range && !event.showTitle) return false
+      const key = `${event.sourceType || 'event'}-${event.activityId || event.recurringScheduleId || event.id}-${event.date}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .sort((a, b) => {
+      const byDate = (a.date || '').localeCompare(b.date || '')
+      if (byDate !== 0) return byDate
+      const byTime = (a.startTime || '').localeCompare(b.startTime || '')
+      if (byTime !== 0) return byTime
+      return (a.title || '').localeCompare(b.title || '')
+    })
+
+  return events.slice(0, limit)
 }
