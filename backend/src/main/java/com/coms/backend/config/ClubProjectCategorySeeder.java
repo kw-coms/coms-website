@@ -39,7 +39,7 @@ public class ClubProjectCategorySeeder implements ApplicationRunner {
             new String[]{"WEBSITE", "Daily Coding", "매일 코딩 문제와 기록을 이어가며 학습 루틴을 만드는 연습 공간입니다.", "Practice", "https://dailycoding-final.com/", "dailycoding-final.com"},
             new String[]{"WEBSITE", "BugSnap", "오류 화면 스크린샷을 올리면 OCR로 텍스트를 추출해 GitHub Issue용 버그 리포트 초안을 만들어주는 도구입니다.", "Bug report", "https://coms.kw.ac.kr/BugSnap/", "coms.kw.ac.kr/BugSnap"},
             new String[]{"WEBSITE", "LogDoctor", "서버 에러 로그를 붙여넣으면 원인 후보와 확인·해결 절차를 정리해주는 개발자용 로그 분석 도구입니다.", "Log triage", "https://coms.kw.ac.kr/LogDoctor/", "coms.kw.ac.kr/LogDoctor"},
-            new String[]{"WEBSITE", "PRDoctor", "GitHub PR 링크를 넣으면 변경 요약, 위험도, 보안 경고, 테스트 목록, 리뷰 코멘트 초안을 정리해주는 코드 리뷰 보조 도구입니다.", "PR review", "https://coms.kw.ac.kr/PRDoctor/", "coms.kw.ac.kr/PRDoctor"}
+            new String[]{"WEBSITE", "PRDoctor", "GitHub PR 링크를 넣으면 변경 요약, 위험도, 보안 경고, 테스트 목록, 리뷰 코멘트 초안을 정리해주는 코드 리뷰 보조 도구입니다.", "PR review", "https://coms.kw.ac.kr/PRDoctor", "coms.kw.ac.kr/PRDoctor"}
     );
 
     private static final String DEFAULT_MADE_BY = "최준혁";

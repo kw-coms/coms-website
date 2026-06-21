@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Download, Eye, RefreshCw, RotateCcw, X } from 'lucide-react'
+import { Download, Eye, RefreshCw, RotateCcw, Upload, X } from 'lucide-react'
 import { apiUrl } from '../services/apiClient.js'
 import { listMembers, updateMemberRole, deleteMember, importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember, listBannedStudents, banStudent, unbanStudent, resetMemberPassword, listAuditLogs, clearAdminCache, listCommunityReports, listDeletedCommunityPosts, getDeletedCommunityPost, restoreDeletedCommunityPost, resolveCommunityReport, listRecruitApplications, updateRecruitApplicationStatus } from '../services/adminApi.js'
 import { listFiles, createPost, deleteFile } from '../services/archiveApi.js'
@@ -1714,7 +1714,7 @@ function ClubProjectsAdminTab() {
     madeBy: '최준혁',
     linkUrl: '',
     displayUrl: '',
-    file: null,
+    files: [],
   })
 
   const loadProjects = () => {
@@ -1766,8 +1766,10 @@ function ClubProjectsAdminTab() {
         linkUrl: form.linkUrl.trim(),
         displayUrl: form.displayUrl.trim(),
       })
-      if (form.file) {
-        await uploadClubProjectFile(created.id, form.file)
+      if (form.files.length > 0) {
+        for (const file of form.files) {
+          await uploadClubProjectFile(created.id, file)
+        }
         const refreshed = await listClubProjects()
         setItems(Array.isArray(refreshed) ? refreshed : [])
       } else {
@@ -1775,7 +1777,7 @@ function ClubProjectsAdminTab() {
       }
       setNotice('Apps 항목을 등록했습니다.')
       if (fileInputRef.current) fileInputRef.current.value = ''
-      setForm((prev) => ({ ...prev, title: '', eyebrow: '', description: '', linkUrl: '', displayUrl: '', file: null }))
+      setForm((prev) => ({ ...prev, title: '', eyebrow: '', description: '', linkUrl: '', displayUrl: '', files: [] }))
     } catch (err) {
       setError(err.message || 'Apps 항목 등록 중 오류가 발생했습니다.')
     } finally {
@@ -1808,7 +1810,12 @@ function ClubProjectsAdminTab() {
     madeBy: form.madeBy.trim() || '최준혁',
     linkUrl: form.linkUrl.trim(),
     displayUrl: form.displayUrl.trim(),
-    files: form.file ? [{ id: 'draft-file', url: '#', originalName: form.file.name }] : [],
+    files: form.files.map((file, index) => ({
+      id: `draft-file-${index}`,
+      url: '#',
+      originalName: file.name,
+      fileSize: file.size,
+    })),
   }
 
   return (
@@ -1891,15 +1898,55 @@ function ClubProjectsAdminTab() {
               className={ADMIN_INPUT_CLASS}
             />
           </label>
-          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)] md:col-span-2">
-            배포 파일 (apk/zip 등, 선택)
+          <div className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)] md:col-span-2">
+            <span>배포 파일 (apk/zip 등, 여러 개 선택 가능)</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="shape-cut-sm inline-flex items-center gap-2 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white"
+              >
+                <Upload size={14} aria-hidden="true" />
+                파일 선택
+              </button>
+              <span className="text-xs font-semibold text-[var(--theme-body-muted)]">
+                {form.files.length > 0 ? `${form.files.length}개 선택됨` : '선택된 파일 없음'}
+              </span>
+            </div>
             <input
               ref={fileInputRef}
+              aria-label="배포 파일 (apk/zip 등, 여러 개 선택 가능)"
               type="file"
-              onChange={(event) => setForm((prev) => ({ ...prev, file: event.target.files?.[0] || null }))}
-              className="text-sm text-[var(--theme-body-dark)]"
+              multiple
+              onChange={(event) => setForm((prev) => ({ ...prev, files: Array.from(event.target.files || []) }))}
+              className="hidden"
             />
-          </label>
+          </div>
+          {form.files.length > 0 && (
+            <div className="rounded-lg border border-[var(--app-hairline)] bg-white/60 p-3 md:col-span-2" aria-label="선택한 Apps 배포 파일">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-bold text-[var(--theme-body-dark)]">선택한 파일 {form.files.length}개</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm((prev) => ({ ...prev, files: [] }))
+                    if (fileInputRef.current) fileInputRef.current.value = ''
+                  }}
+                  className="text-xs font-semibold text-red-500 hover:underline"
+                >
+                  전체 삭제
+                </button>
+              </div>
+              <ul className="mt-2 grid gap-1">
+                {form.files.map((file, index) => (
+                  <li key={`${file.name}-${file.size}-${file.lastModified}-${index}`} className="flex min-w-0 items-center justify-between gap-2 rounded border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-xs">
+                    <span className="min-w-0 truncate font-semibold text-[var(--theme-body-dark)]">{file.name}</span>
+                    <span className="shrink-0 text-[var(--theme-body-muted)]">{formatFileSize(file.size)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
         <div className="mt-4 rounded-lg border border-[var(--app-hairline)] bg-white/60 p-3">
           <p className="text-xs font-bold text-[var(--theme-body-dark)]">공개 카드 미리보기</p>
@@ -2012,12 +2059,14 @@ function ClubProjectAdminRow({ item, categories, onDelete, onUpdated }) {
   }
 
   const addFile = async (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
+    const files = Array.from(event.target.files || [])
+    if (files.length === 0) return
     setBusy(true)
     setRowError('')
     try {
-      await uploadClubProjectFile(item.id, file)
+      for (const file of files) {
+        await uploadClubProjectFile(item.id, file)
+      }
       await refreshFromServer()
     } catch (err) {
       setRowError(err.message || '파일을 추가하지 못했습니다.')
@@ -2168,11 +2217,22 @@ function ClubProjectAdminRow({ item, categories, onDelete, onUpdated }) {
             </ul>
             <input
               ref={fileInputRef}
+              aria-label={`${item.title} 배포 파일 추가`}
               type="file"
+              multiple
               onChange={addFile}
               disabled={busy}
-              className="mt-2 text-sm text-[var(--theme-body-dark)]"
+              className="hidden"
             />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={busy}
+              className="shape-cut-sm mt-2 inline-flex items-center gap-2 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white disabled:opacity-50"
+            >
+              <Upload size={13} aria-hidden="true" />
+              파일 추가
+            </button>
           </div>
 
           {rowError && <p className="text-xs font-semibold text-red-600 md:col-span-2">{rowError}</p>}
