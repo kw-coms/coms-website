@@ -308,6 +308,87 @@
         }
       }
     },
+    "/api/admin/recurring-schedules/{id}/exceptions/{date}": {
+      "put": {
+        "tags": [
+          "recurring-schedule-controller"
+        ],
+        "operationId": "upsertException",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecurringScheduleExceptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecurringScheduleExceptionResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "recurring-schedule-controller"
+        ],
+        "operationId": "deleteException",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/admin/members/{id}/password": {
       "put": {
         "tags": [
@@ -1639,6 +1720,39 @@
             "schema": {
               "type": "string",
               "format": "date"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "startTime",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endTime",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "colorHex",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -2993,6 +3107,39 @@
             "schema": {
               "type": "string",
               "format": "date"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "startTime",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "endTime",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "colorHex",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -5543,6 +5690,54 @@
           }
         }
       },
+      "RecurringScheduleExceptionRequest": {
+        "type": "object",
+        "properties": {
+          "canceled": {
+            "type": "boolean"
+          },
+          "startTime": {
+            "type": "string"
+          },
+          "endTime": {
+            "type": "string"
+          }
+        }
+      },
+      "RecurringScheduleExceptionResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recurringScheduleId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "exceptionDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "canceled": {
+            "type": "boolean"
+          },
+          "startTime": {
+            "type": "string"
+          },
+          "endTime": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "ResetPasswordRequest": {
         "type": "object",
         "properties": {
@@ -6263,6 +6458,19 @@
             "type": "string",
             "format": "date"
           },
+          "endDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "startTime": {
+            "type": "string"
+          },
+          "endTime": {
+            "type": "string"
+          },
+          "colorHex": {
+            "type": "string"
+          },
           "imageUrl": {
             "type": "string"
           },
@@ -6510,6 +6718,10 @@
             "type": "string",
             "maxLength": 40,
             "minLength": 0
+          },
+          "colorHex": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
           }
         },
         "required": [
@@ -6557,6 +6769,9 @@
             "type": "string"
           },
           "categoryName": {
+            "type": "string"
+          },
+          "colorHex": {
             "type": "string"
           },
           "createdByName": {
@@ -7285,6 +7500,10 @@
             "type": "integer",
             "format": "int64"
           },
+          "exceptionId": {
+            "type": "integer",
+            "format": "int64"
+          },
           "title": {
             "type": "string"
           },
@@ -7310,7 +7529,13 @@
           "categoryName": {
             "type": "string"
           },
+          "colorHex": {
+            "type": "string"
+          },
           "recurring": {
+            "type": "boolean"
+          },
+          "canceled": {
             "type": "boolean"
           }
         }

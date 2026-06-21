@@ -111,6 +111,41 @@ class ClubActivityServiceTest {
     }
 
     @Test
+    void createsAndUpdatesScheduleColor() throws Exception {
+        var created = clubActivityService.create(
+                "SCHEDULE",
+                "MEETING",
+                "색상 있는 회의",
+                null,
+                LocalDate.of(2026, 6, 4),
+                LocalDate.of(2026, 6, 4),
+                "18:00",
+                "19:00",
+                "#ff9f0a",
+                null,
+                "2026123456"
+        );
+
+        assertThat(created.colorHex()).isEqualTo("#ff9f0a");
+
+        var updated = clubActivityService.update(
+                created.id(),
+                "SCHEDULE",
+                "MEETING",
+                "색상 변경 회의",
+                null,
+                LocalDate.of(2026, 6, 5),
+                LocalDate.of(2026, 6, 5),
+                "19:00",
+                "20:00",
+                "#34c759",
+                "2026123456"
+        );
+
+        assertThat(updated.colorHex()).isEqualTo("#34c759");
+    }
+
+    @Test
     void detailFetchIncrementsViewCountAndUpvoteTogglesMyVote() throws Exception {
         var activity = clubActivityService.create("ACTIVITY", "SEMINAR", "세미나", null, LocalDate.of(2026, 6, 18), null, "2026123456");
 

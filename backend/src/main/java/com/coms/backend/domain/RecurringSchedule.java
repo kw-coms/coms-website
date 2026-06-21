@@ -50,6 +50,9 @@ public class RecurringSchedule {
     @Column(name = "end_time")
     private LocalTime endTime;
 
+    @Column(name = "color_hex", length = 7)
+    private String colorHex;
+
     @Column(length = 200)
     private String location;
 
@@ -90,6 +93,8 @@ public class RecurringSchedule {
     public void setStartTime(LocalTime startTime) { this.startTime = startTime; }
     public LocalTime getEndTime() { return endTime; }
     public void setEndTime(LocalTime endTime) { this.endTime = endTime; }
+    public String getColorHex() { return colorHex; }
+    public void setColorHex(String colorHex) { this.colorHex = colorHex; }
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }
     public String getCategory() { return category; }

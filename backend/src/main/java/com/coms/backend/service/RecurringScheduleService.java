@@ -2,10 +2,14 @@ package com.coms.backend.service;
 
 import com.coms.backend.domain.Member;
 import com.coms.backend.domain.RecurringSchedule;
+import com.coms.backend.domain.RecurringScheduleException;
+import com.coms.backend.dto.RecurringScheduleExceptionRequest;
+import com.coms.backend.dto.RecurringScheduleExceptionResponse;
 import com.coms.backend.dto.RecurringScheduleRequest;
 import com.coms.backend.dto.RecurringScheduleResponse;
 import com.coms.backend.dto.ScheduleOccurrenceResponse;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.RecurringScheduleExceptionRepository;
 import com.coms.backend.repository.RecurringScheduleRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -24,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,13 +36,16 @@ import java.util.stream.Collectors;
 public class RecurringScheduleService {
 
     private final RecurringScheduleRepository repository;
+    private final RecurringScheduleExceptionRepository exceptionRepository;
     private final MemberRepository memberRepository;
     private final ClubActivityCategoryService categoryService;
 
     public RecurringScheduleService(RecurringScheduleRepository repository,
+                                    RecurringScheduleExceptionRepository exceptionRepository,
                                     MemberRepository memberRepository,
                                     ClubActivityCategoryService categoryService) {
         this.repository = repository;
+        this.exceptionRepository = exceptionRepository;
         this.memberRepository = memberRepository;
         this.categoryService = categoryService;
     }
@@ -78,6 +86,38 @@ public class RecurringScheduleService {
         repository.delete(schedule);
     }
 
+    public RecurringScheduleExceptionResponse upsertException(Long scheduleId, LocalDate exceptionDate,
+                                                              RecurringScheduleExceptionRequest request) {
+        RecurringSchedule schedule = get(scheduleId);
+        if (exceptionDate == null || exceptionDate.isBefore(schedule.getStartDate()) || exceptionDate.isAfter(schedule.getEndDate())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "예외 날짜는 정기 일정 기간 안이어야 합니다.");
+        }
+        LocalTime startTime = parseTime(request.startTime());
+        LocalTime endTime = parseTime(request.endTime());
+        if (startTime != null && endTime != null && endTime.isBefore(startTime)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "종료 시간은 시작 시간 이후여야 합니다.");
+        }
+        RecurringScheduleException exception = exceptionRepository
+                .findByRecurringScheduleIdAndExceptionDate(scheduleId, exceptionDate)
+                .orElseGet(() -> {
+                    RecurringScheduleException created = new RecurringScheduleException();
+                    created.setRecurringScheduleId(scheduleId);
+                    created.setExceptionDate(exceptionDate);
+                    created.setCreatedAt(LocalDateTime.now());
+                    return created;
+                });
+        exception.setCanceled(request.canceled());
+        exception.setStartTime(request.canceled() ? null : startTime);
+        exception.setEndTime(request.canceled() ? null : endTime);
+        exception.setUpdatedAt(LocalDateTime.now());
+        return toExceptionResponse(exceptionRepository.save(exception));
+    }
+
+    public void deleteException(Long scheduleId, LocalDate exceptionDate) {
+        get(scheduleId);
+        exceptionRepository.deleteByRecurringScheduleIdAndExceptionDate(scheduleId, exceptionDate);
+    }
+
     @Transactional(readOnly = true)
     public RecurringSchedule get(Long id) {
         return repository.findById(id)
@@ -101,6 +141,15 @@ public class RecurringScheduleService {
 
         List<RecurringSchedule> schedules =
                 repository.findByStartDateLessThanEqualAndEndDateGreaterThanEqual(monthEnd, monthStart);
+        Map<String, RecurringScheduleException> exceptions = exceptionRepository
+                .findByRecurringScheduleIdInAndExceptionDateBetween(
+                        schedules.stream().map(RecurringSchedule::getId).toList(), monthStart, monthEnd)
+                .stream()
+                .collect(Collectors.toMap(
+                        exception -> exceptionKey(exception.getRecurringScheduleId(), exception.getExceptionDate()),
+                        Function.identity(),
+                        (first, second) -> second
+                ));
 
         List<ScheduleOccurrenceResponse> occurrences = new ArrayList<>();
         for (RecurringSchedule schedule : schedules) {
@@ -110,7 +159,7 @@ public class RecurringScheduleService {
             LocalDate rangeEnd = schedule.getEndDate().isBefore(monthEnd) ? schedule.getEndDate() : monthEnd;
             for (LocalDate date = rangeStart; !date.isAfter(rangeEnd); date = date.plusDays(1)) {
                 if (days.contains(date.getDayOfWeek())) {
-                    occurrences.add(toOccurrence(schedule, date, categoryNames));
+                    occurrences.add(toOccurrence(schedule, date, exceptions.get(exceptionKey(schedule.getId(), date)), categoryNames));
                 }
             }
         }
@@ -156,6 +205,7 @@ public class RecurringScheduleService {
         schedule.setLocation(request.location() != null && !request.location().isBlank()
                 ? request.location().trim() : null);
         schedule.setCategory(resolveCategory(request.category()));
+        schedule.setColorHex(normalizeColorHex(request.colorHex()));
     }
 
     private String resolveCategory(String value) {
@@ -165,6 +215,17 @@ public class RecurringScheduleService {
         String key = value.trim();
         categoryService.requireValidKey(key);
         return key;
+    }
+
+    private String normalizeColorHex(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        if (!normalized.matches("^#[0-9a-f]{6}$")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "색상은 #RRGGBB 형식이어야 합니다.");
+        }
+        return normalized;
     }
 
     private LocalTime parseTime(String value) {
@@ -239,26 +300,52 @@ public class RecurringScheduleService {
                 schedule.getCategory(),
                 schedule.getCategory() == null ? null
                         : categoryNames.getOrDefault(schedule.getCategory(), schedule.getCategory()),
+                schedule.getColorHex(),
                 schedule.getCreatedByName(),
                 schedule.getCreatedAt(),
                 schedule.getUpdatedAt()
         );
     }
 
+    private String exceptionKey(Long scheduleId, LocalDate date) {
+        return scheduleId + "|" + date;
+    }
+
+    private RecurringScheduleExceptionResponse toExceptionResponse(RecurringScheduleException exception) {
+        return new RecurringScheduleExceptionResponse(
+                exception.getId(),
+                exception.getRecurringScheduleId(),
+                exception.getExceptionDate(),
+                exception.isCanceled(),
+                exception.getStartTime() == null ? null : exception.getStartTime().toString(),
+                exception.getEndTime() == null ? null : exception.getEndTime().toString(),
+                exception.getCreatedAt(),
+                exception.getUpdatedAt()
+        );
+    }
+
     private ScheduleOccurrenceResponse toOccurrence(RecurringSchedule schedule, LocalDate date,
+                                                    RecurringScheduleException exception,
                                                     Map<String, String> categoryNames) {
+        LocalTime startTime = exception != null && exception.getStartTime() != null
+                ? exception.getStartTime() : schedule.getStartTime();
+        LocalTime endTime = exception != null && exception.getEndTime() != null
+                ? exception.getEndTime() : schedule.getEndTime();
         return new ScheduleOccurrenceResponse(
                 schedule.getId(),
+                exception == null ? null : exception.getId(),
                 schedule.getTitle(),
                 schedule.getDescription(),
                 date,
-                schedule.getStartTime() == null ? null : schedule.getStartTime().toString(),
-                schedule.getEndTime() == null ? null : schedule.getEndTime().toString(),
+                startTime == null ? null : startTime.toString(),
+                endTime == null ? null : endTime.toString(),
                 schedule.getLocation(),
                 schedule.getCategory(),
                 schedule.getCategory() == null ? null
                         : categoryNames.getOrDefault(schedule.getCategory(), schedule.getCategory()),
-                true
+                schedule.getColorHex(),
+                true,
+                exception != null && exception.isCanceled()
         );
     }
 }

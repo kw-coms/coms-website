@@ -19,6 +19,7 @@ public record RecurringScheduleResponse(
         String location,
         String category,
         String categoryName,
+        String colorHex,
         String createdByName,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
