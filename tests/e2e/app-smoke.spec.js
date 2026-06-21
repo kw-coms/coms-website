@@ -120,6 +120,7 @@ test('club event page renders entries and ranking from real API data', async ({ 
   await expect(page.getByText('여름호')).toBeVisible()
   await expect(page.getByText('5표')).toBeVisible()
   await expect(page.getByRole('link', { name: /summer\.pdf/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: /summer-source\.zip/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /내 투표/ })).toBeVisible()
 })
 
@@ -1153,10 +1154,12 @@ test('admin can write an activity log entry directly from the activity log page'
   await mockAdminApis(page)
   let createdPayload = null
   let uploadedImageFields = 0
+  let uploadedFileFields = 0
   const onePixelPng = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
     'base64',
   )
+  const textFile = Buffer.from('activity appendix')
   let activities = []
   await page.route('**/api/club-activities/30/images', async (route) => {
     const body = route.request().postDataBuffer()?.toString('latin1') || ''
@@ -1170,6 +1173,19 @@ test('admin can write an activity log entry directly from the activity log page'
       ],
     } : item)
     await route.fulfill({ status: 201, json: [101, 102] })
+  })
+  await page.route('**/api/club-activities/30/files', async (route) => {
+    const body = route.request().postDataBuffer()?.toString('latin1') || ''
+    uploadedFileFields += (body.match(/name="file"/g) || []).length
+    const nextId = 200 + uploadedFileFields
+    activities = activities.map((item) => item.id === 30 ? {
+      ...item,
+      fileInfos: [
+        ...(item.fileInfos || []),
+        { id: nextId, url: `/api/club-activities/30/files/${nextId}/download`, originalName: `appendix-${uploadedFileFields}.zip` },
+      ],
+    } : item)
+    await route.fulfill({ status: 201, json: nextId })
   })
   await page.route('**/api/club-activities', async (route) => {
     if (route.request().method() === 'POST') {
@@ -1203,15 +1219,21 @@ test('admin can write an activity log entry directly from the activity log page'
   })
 
   await page.goto('/activity-log')
-  await page.getByLabel('활동 제목').fill('활동 로그 직접 작성')
+  await page.getByRole('button', { name: '글쓰기' }).click()
+  await expect(page.locator('.activity-community-compose')).toBeVisible()
+  await page.getByLabel('제목').fill('활동 로그 직접 작성')
   await page.getByLabel('활동 날짜').fill('2026-06-25')
-  await page.getByLabel('활동 분류').selectOption('PROJECT')
-  await page.getByLabel('활동 사진').setInputFiles([
+  await page.getByLabel('분류').selectOption('PROJECT')
+  await page.getByLabel('이미지').setInputFiles([
     { name: 'first.png', mimeType: 'image/png', buffer: onePixelPng },
     { name: 'second.png', mimeType: 'image/png', buffer: onePixelPng },
   ])
-  await page.getByLabel('활동 내용').fill('프로젝트 발표 후기와 사진 기록')
-  await page.getByRole('button', { name: '활동 기록 추가' }).click()
+  await page.getByLabel('첨부파일').setInputFiles([
+    { name: 'appendix-1.zip', mimeType: 'application/zip', buffer: textFile },
+    { name: 'appendix-2.zip', mimeType: 'application/zip', buffer: textFile },
+  ])
+  await page.getByLabel('본문').fill('프로젝트 발표 후기와 사진 기록')
+  await page.getByRole('button', { name: '글 등록' }).click()
 
   await expect.poll(() => createdPayload).toMatchObject({
     title: '활동 로그 직접 작성',
@@ -1221,8 +1243,11 @@ test('admin can write an activity log entry directly from the activity log page'
     description: '프로젝트 발표 후기와 사진 기록',
   })
   await expect.poll(() => uploadedImageFields).toBe(2)
+  await expect.poll(() => uploadedFileFields).toBe(2)
+  await expect(page.locator('.activity-community-list')).toBeVisible()
   await expect(page.getByRole('heading', { name: '활동 로그 직접 작성' })).toBeVisible()
   await expect(page.getByText('사진 2장')).toBeVisible()
+  await expect(page.getByText('첨부 2개')).toBeVisible()
 })
 
 test('admin can register a club activity record', async ({ page }) => {

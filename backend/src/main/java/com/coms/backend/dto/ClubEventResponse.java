@@ -27,9 +27,18 @@ public record ClubEventResponse(
             String originalName,
             String mimeType,
             long fileSize,
+            List<EntryFile> files,
             long voteCount,
             boolean myVote,
             int rank,
             LocalDateTime createdAt
+    ) {}
+
+    public record EntryFile(
+            Long id,
+            String downloadUrl,
+            String originalName,
+            String mimeType,
+            long fileSize
     ) {}
 }

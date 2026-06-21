@@ -1,6 +1,7 @@
 package com.coms.backend.controller;
 
 import com.coms.backend.domain.ClubEventEntry;
+import com.coms.backend.domain.ClubEventEntryFile;
 import com.coms.backend.dto.ClubEventRequest;
 import com.coms.backend.dto.ClubEventResponse;
 import com.coms.backend.dto.ClubEventVoteRequest;
@@ -67,9 +68,13 @@ public class ClubEventController {
                                                             @RequestParam("title") String title,
                                                             @RequestParam(value = "authorName", required = false) String authorName,
                                                             @RequestParam(value = "description", required = false) String description,
-                                                            @RequestParam("file") MultipartFile file,
+                                                            @RequestParam(value = "files", required = false) List<MultipartFile> files,
+                                                            @RequestParam(value = "file", required = false) MultipartFile legacyFile,
                                                             Authentication authentication) {
-        return ResponseEntity.ok(clubEventService.addEntry(id, title, authorName, description, file, authentication.getName()));
+        List<MultipartFile> uploadFiles = files == null || files.isEmpty()
+                ? (legacyFile == null ? List.of() : List.of(legacyFile))
+                : files;
+        return ResponseEntity.ok(clubEventService.addEntry(id, title, authorName, description, uploadFiles, authentication.getName()));
     }
 
     @PostMapping("/{id}/entries/{entryId}/vote")
@@ -85,6 +90,19 @@ public class ClubEventController {
     public ResponseEntity<Resource> downloadEntry(@PathVariable Long id, @PathVariable Long entryId) {
         ClubEventEntry meta = clubEventService.loadEntryMeta(id, entryId);
         Resource resource = clubEventService.loadEntryResource(id, entryId);
+        return ResponseEntity.ok()
+                .contentType(mediaType(meta.getMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(meta.getOriginalName(), StandardCharsets.UTF_8).build().toString())
+                .body(resource);
+    }
+
+    @GetMapping("/{id}/entries/{entryId}/files/{fileId}/download")
+    public ResponseEntity<Resource> downloadEntryFile(@PathVariable Long id,
+                                                      @PathVariable Long entryId,
+                                                      @PathVariable Long fileId) {
+        ClubEventEntryFile meta = clubEventService.loadEntryFileMeta(id, entryId, fileId);
+        Resource resource = clubEventService.loadEntryFileResource(id, entryId, fileId);
         return ResponseEntity.ok()
                 .contentType(mediaType(meta.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
