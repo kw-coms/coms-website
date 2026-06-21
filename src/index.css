@@ -818,6 +818,182 @@ select {
 	outline: none;
 }
 
+.activity-compose-side-card {
+	align-content: start;
+}
+
+.activity-compose-attachment-summary {
+	display: grid;
+	width: 100%;
+	gap: 0.45rem;
+	border-top: 1px solid var(--app-hairline);
+	padding-top: 0.75rem;
+	color: var(--app-muted);
+	font-size: 0.82rem;
+	font-weight: 850;
+}
+
+.activity-compose-attachment-summary span,
+.activity-compose-attachment-list span {
+	display: inline-flex;
+	min-width: 0;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.activity-compose-side-actions {
+	display: grid;
+	width: 100%;
+	gap: 0.6rem;
+	border-top: 1px solid var(--app-hairline);
+	padding-top: 0.75rem;
+}
+
+.activity-compose-side-actions button {
+	width: 100%;
+}
+
+.activity-compose-attachment-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	border-bottom: 1px solid var(--app-hairline);
+	background: var(--app-surface-soft);
+	padding: 0.65rem 0.75rem;
+	color: var(--app-muted);
+	font-size: 0.78rem;
+	font-weight: 800;
+}
+
+.activity-compose-attachment-list span {
+	max-width: min(100%, 24rem);
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.45rem;
+	background: var(--app-surface);
+	padding: 0.35rem 0.55rem;
+	overflow-wrap: anywhere;
+}
+
+.activity-compose-textarea {
+	display: block;
+	border: 0;
+	font-weight: 650;
+}
+
+.activity-category-manager {
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface);
+	padding: 1rem;
+	box-shadow: 0 14px 34px rgba(0, 0, 0, 0.05);
+}
+
+.activity-category-manager-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.activity-category-manager-head h3 {
+	margin-top: 0.2rem;
+	color: var(--app-text);
+	font-size: 1.05rem;
+	font-weight: 950;
+}
+
+.activity-category-add-form {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: end;
+	gap: 0.75rem;
+	margin-top: 1rem;
+}
+
+.activity-category-add-form label {
+	display: grid;
+	gap: 0.4rem;
+	color: var(--app-muted);
+	font-size: 0.78rem;
+	font-weight: 900;
+}
+
+.activity-category-add-form input,
+.activity-category-edit-row input {
+	min-height: 2.75rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface-soft);
+	padding: 0.7rem 0.8rem;
+	color: var(--app-text);
+	font-size: 0.95rem;
+	font-weight: 750;
+	outline: none;
+}
+
+.activity-category-list {
+	display: grid;
+	gap: 0.5rem;
+	margin: 1rem 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.activity-category-list li {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface-soft);
+	padding: 0.75rem;
+}
+
+.activity-category-name {
+	display: grid;
+	gap: 0.2rem;
+	min-width: 0;
+}
+
+.activity-category-name strong {
+	color: var(--app-text);
+	font-size: 0.95rem;
+}
+
+.activity-category-name span {
+	color: var(--app-subtle);
+	font-size: 0.75rem;
+	font-weight: 800;
+	overflow-wrap: anywhere;
+}
+
+.activity-category-actions,
+.activity-category-edit-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.65rem;
+}
+
+.activity-category-actions button,
+.activity-category-edit-row button {
+	color: var(--app-accent-text);
+	font-size: 0.78rem;
+	font-weight: 900;
+}
+
+.activity-category-actions button:last-child {
+	color: #dc2626;
+}
+
+.activity-category-actions button:disabled,
+.activity-category-edit-row button:disabled {
+	opacity: 0.45;
+}
+
 .activity-community-list {
 	grid-template-columns: minmax(0, 1fr);
 	gap: 0;
@@ -4081,6 +4257,10 @@ body {
 		flex-direction: column;
 	}
 
+	.activity-category-add-form {
+		grid-template-columns: 1fr;
+	}
+
 	.activity-community-row-main {
 		grid-template-columns: minmax(0, 1fr);
 		gap: 0.7rem;
@@ -4321,31 +4501,16 @@ body {
 	margin: 1rem;
 }
 
-.club-event-entry-form-head {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.75rem;
-	align-items: end;
-	justify-content: space-between;
+.club-event-entry-form.community-compose-form {
+	background: var(--app-surface);
 }
 
-.club-event-entry-form-head h3 {
-	margin-top: 0.25rem;
-	font-size: 1.2rem;
-	font-weight: 950;
+.club-event-entry-side {
+	align-content: start;
 }
 
-.club-event-entry-form-head span,
-.club-event-upload-name {
-	color: var(--app-subtle);
-	font-size: 0.78rem;
-	font-weight: 800;
-}
-
-.club-event-entry-grid {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 0.75rem;
+.club-event-entry-side .club-event-field {
+	width: 100%;
 }
 
 .club-event-upload-button {
@@ -4364,12 +4529,13 @@ body {
 	font-weight: 900;
 }
 
-.club-event-upload-button input {
-	display: none;
+.club-event-upload-button-wide {
+	width: 100%;
+	justify-content: center;
 }
 
-.club-event-upload-name {
-	align-self: center;
+.club-event-upload-button input {
+	display: none;
 }
 
 .club-event-ranking-list {
@@ -4532,8 +4698,7 @@ body {
 	.club-event-list-card,
 	.club-event-detail-head,
 	.club-event-entry-card,
-	.club-event-admin-form,
-	.club-event-entry-grid {
+	.club-event-admin-form {
 		grid-template-columns: 1fr;
 	}
 
