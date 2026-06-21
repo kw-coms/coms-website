@@ -5,16 +5,21 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   Bell,
+  Bold,
   CalendarDays,
   ChevronDown,
   CircuitBoard,
   Download,
   Grid3x3,
+  Highlighter,
   ImagePlus,
+  Italic,
+  Link,
   LogOut,
   Menu,
   Megaphone,
   Moon,
+  Palette,
   Paperclip,
   Plus,
   Repeat,
@@ -23,6 +28,8 @@ import {
   Sun,
   ThumbsUp,
   Trash2,
+  Type,
+  Underline,
   X,
 } from 'lucide-react'
 import { listNotices } from './services/noticeApi.js'
@@ -129,6 +136,16 @@ const SCHEDULE_COLOR_OPTIONS = ['#0071e3', '#34c759', '#ff9f0a', '#8e5cf7', '#ff
 const DEFAULT_SCHEDULE_COLOR = SCHEDULE_COLOR_OPTIONS[0]
 const FONTS_QUERY_KEY = ['app-shell', 'fonts']
 const LATEST_NOTICE_QUERY_KEY = ['app-shell', 'latest-notice']
+const RICH_TEXT_ALLOWED_TAGS = new Set(['a', 'b', 'blockquote', 'br', 'div', 'em', 'font', 'h2', 'h3', 'i', 'li', 'ol', 'p', 'span', 'strong', 'u', 'ul'])
+const RICH_TEXT_ALLOWED_STYLES = new Set(['background-color', 'color', 'font-family', 'font-size', 'font-style', 'font-weight', 'text-align', 'text-decoration'])
+const RICH_TEXT_FONT_OPTIONS = [
+  { value: 'Pretendard Variable', label: 'Pretendard' },
+  { value: 'Noto Sans KR', label: 'Noto Sans KR' },
+  { value: 'IBM Plex Sans KR', label: 'IBM Plex Sans KR' },
+  { value: 'Nanum Gothic', label: 'Nanum Gothic' },
+  { value: 'Gowun Dodum', label: 'Gowun Dodum' },
+  { value: 'Nanum Myeongjo', label: 'Nanum Myeongjo' },
+]
 
 const floatingBarBaseClass = 'apple-topbar border-b border-[var(--app-hairline)]'
 const solidActionBtnClass = 'apple-action-primary inline-flex min-h-10 items-center justify-center px-5 py-2.5 text-sm disabled:cursor-wait disabled:opacity-60'
@@ -163,6 +180,354 @@ function formatActivityDate(value) {
   const date = parseLocalDate(value)
   if (!date) return value || ''
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function plainTextToRichHtml(value) {
+  const text = String(value || '')
+  if (!text.trim()) return ''
+  return text
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${paragraph.split('\n').map(escapeHtml).join('<br>')}</p>`)
+    .join('')
+}
+
+function isSafeRichTextUrl(value) {
+  if (!value) return false
+  try {
+    const base = typeof window === 'undefined' ? 'https://coms.kw.ac.kr' : window.location.origin
+    const url = new URL(value, base)
+    return ['http:', 'https:', 'mailto:'].includes(url.protocol)
+  } catch {
+    return false
+  }
+}
+
+function sanitizeStyleValue(value) {
+  const normalized = String(value || '').trim()
+  if (!normalized || /url\s*\(|expression\s*\(|javascript:|data:/i.test(normalized)) return ''
+  return normalized.replace(/[<>"']/g, '')
+}
+
+function sanitizeRichTextStyle(styleText) {
+  return String(styleText || '')
+    .split(';')
+    .map((chunk) => {
+      const [rawProperty, ...rawValueParts] = chunk.split(':')
+      const property = rawProperty?.trim().toLowerCase()
+      if (!property || !RICH_TEXT_ALLOWED_STYLES.has(property)) return ''
+      const value = sanitizeStyleValue(rawValueParts.join(':'))
+      return value ? `${property}: ${value}` : ''
+    })
+    .filter(Boolean)
+    .join('; ')
+}
+
+function sanitizeRichTextHtml(value) {
+  const raw = String(value || '')
+  if (!raw.trim()) return ''
+  if (typeof document === 'undefined') {
+    return /<[a-z][\s\S]*>/i.test(raw) ? raw.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '') : plainTextToRichHtml(raw)
+  }
+
+  const template = document.createElement('template')
+  template.innerHTML = /<[a-z][\s\S]*>/i.test(raw) ? raw : plainTextToRichHtml(raw)
+
+  const sanitizeNode = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.textContent || '')
+    if (node.nodeType !== Node.ELEMENT_NODE) return document.createDocumentFragment()
+
+    const source = node
+    const tagName = source.tagName.toLowerCase()
+    if (!RICH_TEXT_ALLOWED_TAGS.has(tagName)) {
+      const fragment = document.createDocumentFragment()
+      source.childNodes.forEach((child) => fragment.appendChild(sanitizeNode(child)))
+      return fragment
+    }
+
+    const outputTagName = tagName === 'font' ? 'span' : tagName
+    const clean = document.createElement(outputTagName)
+    const styleParts = []
+    const styleText = sanitizeRichTextStyle(source.getAttribute('style') || '')
+    if (styleText) styleParts.push(styleText)
+
+    if (tagName === 'font') {
+      const face = sanitizeStyleValue(source.getAttribute('face') || '')
+      const color = sanitizeStyleValue(source.getAttribute('color') || '')
+      if (face) styleParts.push(`font-family: ${face}`)
+      if (color) styleParts.push(`color: ${color}`)
+    }
+
+    if (styleParts.length > 0) clean.setAttribute('style', styleParts.join('; '))
+    if (tagName === 'a') {
+      const href = source.getAttribute('href') || ''
+      if (isSafeRichTextUrl(href)) {
+        clean.setAttribute('href', href)
+        clean.setAttribute('target', '_blank')
+        clean.setAttribute('rel', 'noopener noreferrer')
+      }
+    }
+
+    source.childNodes.forEach((child) => clean.appendChild(sanitizeNode(child)))
+    return clean
+  }
+
+  const fragment = document.createDocumentFragment()
+  template.content.childNodes.forEach((child) => fragment.appendChild(sanitizeNode(child)))
+  const container = document.createElement('div')
+  container.appendChild(fragment)
+  return container.innerHTML
+}
+
+function richTextToPlainText(value) {
+  const raw = String(value || '')
+  if (!raw.trim()) return ''
+  if (typeof document === 'undefined') return raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  const div = document.createElement('div')
+  div.innerHTML = sanitizeRichTextHtml(raw)
+  return (div.textContent || '').replace(/\s+/g, ' ').trim()
+}
+
+function isRichTextBlank(value) {
+  return richTextToPlainText(value).length === 0
+}
+
+function normalizeRichTextForSubmit(value) {
+  const html = sanitizeRichTextHtml(value)
+  return isRichTextBlank(html) ? '' : html.trim()
+}
+
+function RichTextContent({ value, className = '', as: Component = 'div' }) {
+  const html = sanitizeRichTextHtml(value)
+  if (!html) return null
+  return <Component className={className} dangerouslySetInnerHTML={{ __html: html }} />
+}
+
+function RichTextComposerButton({ label, icon, onCommand }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      className="rich-composer-button"
+      onMouseDown={(event) => {
+        event.preventDefault()
+        onCommand()
+      }}
+    >
+      {icon}
+    </button>
+  )
+}
+
+function RichTextComposer({
+  value,
+  onChange,
+  editorLabel = '본문',
+  placeholder = '본문을 입력하세요.',
+  minHeight = '26rem',
+  imageFiles = [],
+  onImageFilesChange,
+  fileFiles = [],
+  onFileFilesChange,
+}) {
+  const editorRef = useRef(null)
+  const lastHtmlRef = useRef('')
+  const savedRangeRef = useRef(null)
+
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    const safeValue = sanitizeRichTextHtml(value)
+    if (safeValue !== lastHtmlRef.current && editor.innerHTML !== safeValue) {
+      editor.innerHTML = safeValue
+      lastHtmlRef.current = safeValue
+    }
+  }, [value])
+
+  const rememberSelection = useCallback(() => {
+    const selection = window.getSelection?.()
+    if (!selection || selection.rangeCount === 0) return
+    const range = selection.getRangeAt(0)
+    if (editorRef.current?.contains(range.commonAncestorContainer)) {
+      savedRangeRef.current = range.cloneRange()
+    }
+  }, [])
+
+  const restoreSelection = useCallback(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    editor.focus()
+    const selection = window.getSelection?.()
+    if (!selection) return
+    selection.removeAllRanges()
+    if (savedRangeRef.current) {
+      selection.addRange(savedRangeRef.current)
+    } else {
+      const range = document.createRange()
+      range.selectNodeContents(editor)
+      range.collapse(false)
+      selection.addRange(range)
+    }
+  }, [])
+
+  const emitCurrentHtml = useCallback(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    const html = normalizeRichTextForSubmit(editor.innerHTML)
+    lastHtmlRef.current = html
+    onChange(html)
+  }, [onChange])
+
+  const runCommand = useCallback((command, commandValue = null) => {
+    rememberSelection()
+    restoreSelection()
+    const applied = document.execCommand(command, false, commandValue)
+    if (!applied && command === 'hiliteColor') {
+      document.execCommand('backColor', false, commandValue)
+    }
+    rememberSelection()
+    emitCurrentHtml()
+  }, [emitCurrentHtml, rememberSelection, restoreSelection])
+
+  const updateFiles = (setter, currentFiles, event) => {
+    const nextFiles = Array.from(event.target.files || [])
+    if (nextFiles.length > 0) setter([...(currentFiles || []), ...nextFiles])
+    event.target.value = ''
+  }
+
+  const removeFileAt = (setter, currentFiles, index) => {
+    setter((currentFiles || []).filter((_, fileIndex) => fileIndex !== index))
+  }
+
+  const createLink = () => {
+    restoreSelection()
+    const rawUrl = window.prompt('삽입할 링크 URL을 입력하세요.')
+    if (!rawUrl) return
+    const normalized = /^https?:\/\//i.test(rawUrl) || rawUrl.startsWith('mailto:') ? rawUrl : `https://${rawUrl}`
+    if (!isSafeRichTextUrl(normalized)) return
+    document.execCommand('createLink', false, normalized)
+    rememberSelection()
+    emitCurrentHtml()
+  }
+
+  return (
+    <div className="community-compose-editor rich-composer">
+      <div className="community-editor-toolbar rich-composer-toolbar" aria-label="편집 도구">
+        <span className="rich-composer-toolbar-label">Editor</span>
+        <div className="rich-composer-format-group" aria-label="서식">
+          <RichTextComposerButton label="굵게" icon={<Bold size={14} aria-hidden="true" />} onCommand={() => runCommand('bold')} />
+          <RichTextComposerButton label="기울임" icon={<Italic size={14} aria-hidden="true" />} onCommand={() => runCommand('italic')} />
+          <RichTextComposerButton label="밑줄" icon={<Underline size={14} aria-hidden="true" />} onCommand={() => runCommand('underline')} />
+          <RichTextComposerButton label="링크" icon={<Link size={14} aria-hidden="true" />} onCommand={createLink} />
+        </div>
+        <label className="rich-composer-select-label" title="글꼴">
+          <Type size={14} aria-hidden="true" />
+          <select
+            aria-label="글꼴"
+            defaultValue=""
+            onMouseDown={rememberSelection}
+            onChange={(event) => {
+              if (event.target.value) runCommand('fontName', event.target.value)
+              event.target.value = ''
+            }}
+          >
+            <option value="">글꼴</option>
+            {RICH_TEXT_FONT_OPTIONS.map((font) => (
+              <option key={font.value} value={font.value}>{font.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="rich-composer-color-label" title="글자색">
+          <Palette size={14} aria-hidden="true" />
+          <input aria-label="글자색" type="color" defaultValue="#1d1d1f" onMouseDown={rememberSelection} onChange={(event) => runCommand('foreColor', event.target.value)} />
+        </label>
+        <label className="rich-composer-color-label" title="형광펜">
+          <Highlighter size={14} aria-hidden="true" />
+          <input aria-label="형광펜" type="color" defaultValue="#fff4a3" onMouseDown={rememberSelection} onChange={(event) => runCommand('hiliteColor', event.target.value)} />
+        </label>
+        {onImageFilesChange && (
+          <label className="rich-composer-upload-button">
+            <ImagePlus size={14} aria-hidden="true" />
+            이미지
+            <input
+              aria-label="이미지"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(event) => updateFiles(onImageFilesChange, imageFiles, event)}
+            />
+          </label>
+        )}
+        {onFileFilesChange && (
+          <label className="rich-composer-upload-button">
+            <Paperclip size={14} aria-hidden="true" />
+            첨부파일
+            <input
+              aria-label="첨부파일"
+              type="file"
+              multiple
+              onChange={(event) => updateFiles(onFileFilesChange, fileFiles, event)}
+            />
+          </label>
+        )}
+        <span className="rich-composer-counts">
+          {onImageFilesChange && `이미지 ${imageFiles.length}개`}
+          {onImageFilesChange && onFileFilesChange ? ' · ' : ''}
+          {onFileFilesChange && `첨부 ${fileFiles.length}개`}
+        </span>
+      </div>
+      {(imageFiles.length > 0 || fileFiles.length > 0) && (
+        <div className="activity-compose-attachment-list" aria-label="선택된 첨부">
+          {imageFiles.map((file, index) => (
+            <span key={`image-${file.name}-${file.size}-${index}`}>
+              <ImagePlus size={13} aria-hidden="true" />
+              {file.name}
+              <button type="button" onClick={() => removeFileAt(onImageFilesChange, imageFiles, index)} aria-label={`${file.name} 이미지 제거`}>
+                <X size={12} aria-hidden="true" />
+              </button>
+            </span>
+          ))}
+          {fileFiles.map((file, index) => (
+            <span key={`file-${file.name}-${file.size}-${index}`}>
+              <Paperclip size={13} aria-hidden="true" />
+              {file.name}
+              <button type="button" onClick={() => removeFileAt(onFileFilesChange, fileFiles, index)} aria-label={`${file.name} 첨부 제거`}>
+                <X size={12} aria-hidden="true" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div
+        ref={editorRef}
+        role="textbox"
+        aria-label={editorLabel}
+        contentEditable
+        suppressContentEditableWarning
+        className="rich-composer-surface"
+        style={{ minHeight }}
+        data-placeholder={placeholder}
+        onInput={emitCurrentHtml}
+        onBlur={() => {
+          rememberSelection()
+          emitCurrentHtml()
+        }}
+        onKeyUp={rememberSelection}
+        onMouseUp={rememberSelection}
+        onFocus={rememberSelection}
+        onPaste={() => window.setTimeout(emitCurrentHtml, 0)}
+      />
+    </div>
+  )
 }
 
 // Categories are admin-managed (DB-backed). Prefer the server-provided display
@@ -1346,7 +1711,7 @@ function ActivityLogSection({ compact = false }) {
     if (fromDate && (item.eventDate || '') < fromDate) return false
     if (toDate && (item.eventDate || '') > toDate) return false
     if (normalizedSearch) {
-      const haystack = `${item.title || ''} ${item.description || ''} ${item.createdByName || ''}`.toLowerCase()
+      const haystack = `${item.title || ''} ${richTextToPlainText(item.description) || ''} ${item.createdByName || ''}`.toLowerCase()
       if (!haystack.includes(normalizedSearch)) return false
     }
     return true
@@ -1452,7 +1817,7 @@ function ActivityLogSection({ compact = false }) {
         kind: 'ACTIVITY',
         category: selectedCategory,
         title: activityForm.title.trim(),
-        description: activityForm.description.trim(),
+        description: normalizeRichTextForSubmit(activityForm.description),
         eventDate: activityForm.eventDate,
       })
       prependActivity(created)
@@ -1530,7 +1895,7 @@ function ActivityLogSection({ compact = false }) {
         kind: 'ACTIVITY',
         category: selectedEditorCategory,
         title: activityEditor.title.trim(),
-        description: activityEditor.description.trim(),
+        description: normalizeRichTextForSubmit(activityEditor.description),
         eventDate: activityEditor.eventDate,
       })
       mergeActivity(updated)
@@ -1736,58 +2101,15 @@ function ActivityLogSection({ compact = false }) {
                 className="community-compose-title order-1 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm lg:col-start-1 lg:row-start-1"
               />
 
-              <div className="community-compose-editor order-4 overflow-hidden rounded border border-black/15 bg-[var(--app-surface)] lg:col-start-1 lg:row-start-2 lg:row-span-5">
-                <div className="community-editor-toolbar flex flex-wrap items-center gap-2 border-b border-[var(--app-hairline)] bg-black/[0.03] px-3 py-2">
-                  <span className="mr-1 text-xs font-black uppercase text-[var(--theme-body-muted)]">Editor</span>
-                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
-                    <ImagePlus size={14} aria-hidden="true" />이미지
-                    <input
-                      aria-label="이미지"
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={(event) => setActivityImages(Array.from(event.target.files || []))}
-                    />
-                  </label>
-                  <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
-                    <Paperclip size={14} aria-hidden="true" />첨부파일
-                    <input
-                      aria-label="첨부파일"
-                      type="file"
-                      multiple
-                      className="hidden"
-                      onChange={(event) => setActivityFiles(Array.from(event.target.files || []))}
-                    />
-                  </label>
-                  <span className="text-xs text-[var(--theme-body-muted)]">
-                    이미지 {activityImages.length}개 · 첨부 {activityFiles.length}개
-                  </span>
-                </div>
-                {(activityImages.length > 0 || activityFiles.length > 0) && (
-                  <div className="activity-compose-attachment-list" aria-label="선택된 첨부">
-                    {activityImages.map((file) => (
-                      <span key={`image-${file.name}-${file.size}`}>
-                        <ImagePlus size={13} aria-hidden="true" />
-                        {file.name}
-                      </span>
-                    ))}
-                    {activityFiles.map((file) => (
-                      <span key={`file-${file.name}-${file.size}`}>
-                        <Paperclip size={13} aria-hidden="true" />
-                        {file.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <textarea
-                  aria-label="본문"
+              <div className="order-4 lg:col-start-1 lg:row-start-2 lg:row-span-5">
+                <RichTextComposer
                   value={activityForm.description}
-                  onChange={(event) => setActivityForm((prev) => ({ ...prev, description: event.target.value }))}
-                  maxLength={5000}
-                  rows={14}
-                  placeholder="본문을 입력하세요."
-                  className="activity-compose-textarea min-h-[26rem] w-full resize-y bg-[var(--app-surface)] px-4 py-4 text-base leading-8 text-[var(--app-text)] outline-none"
+                  onChange={(description) => setActivityForm((prev) => ({ ...prev, description }))}
+                  imageFiles={activityImages}
+                  onImageFilesChange={setActivityImages}
+                  fileFiles={activityFiles}
+                  onFileFilesChange={setActivityFiles}
+                  minHeight="26rem"
                 />
               </div>
 
@@ -1889,16 +2211,16 @@ function ActivityLogSection({ compact = false }) {
                   <article key={item.id} className="activity-log-card activity-community-row">
                     <button type="button" className="activity-community-row-main" onClick={() => openActivityDetail(item)} aria-label={`${item.title} 내용 보기`}>
                       <span className="activity-community-row-index">{formatActivityDate(item.eventDate)}</span>
-                      <span className="activity-community-row-content">
-                        <span className="activity-community-row-meta">
+                      <div className="activity-community-row-content">
+                        <div className="activity-community-row-meta">
                           <span>{categoryLabel(item.category, item.categoryName)}</span>
                           <span>{item.createdByName || 'COM\'s'}</span>
                           {itemImages.length > 0 && <span>사진 {itemImages.length}장</span>}
                           {(item.fileInfos?.length ?? 0) > 0 && <span>첨부 {item.fileInfos.length}개</span>}
-                        </span>
+                        </div>
                         <h3>{item.title}</h3>
-                        {item.description && <span className="activity-community-row-excerpt">{item.description}</span>}
-                      </span>
+                        {item.description && <RichTextContent value={item.description} className="activity-community-row-excerpt" />}
+                      </div>
                       {previewImage && <img src={previewImage} alt="" className="activity-log-image activity-community-row-thumb" loading="lazy" />}
                     </button>
                     <div className="activity-community-row-stats">
@@ -1984,24 +2306,17 @@ function ActivityLogSection({ compact = false }) {
                     ))}
                   </select>
                 </label>
-                <label>
-                  <span>사진 추가</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(event) => setEditImages(Array.from(event.target.files || []))}
-                  />
-                </label>
-                <label className="activity-detail-editor-wide">
+                <div className="activity-detail-editor-wide">
                   <span>활동 내용</span>
-                  <textarea
+                  <RichTextComposer
                     value={activityEditor.description}
-                    onChange={(event) => setActivityEditor((prev) => ({ ...prev, description: event.target.value }))}
-                    maxLength={500}
-                    rows={5}
+                    onChange={(description) => setActivityEditor((prev) => ({ ...prev, description }))}
+                    editorLabel="활동 내용"
+                    imageFiles={editImages}
+                    onImageFilesChange={setEditImages}
+                    minHeight="14rem"
                   />
-                </label>
+                </div>
                 <div className="activity-detail-editor-actions">
                   <button type="button" className="activity-detail-secondary" onClick={() => setActivityEditor(null)} disabled={savingEdit}>
                     취소
@@ -2021,7 +2336,7 @@ function ActivityLogSection({ compact = false }) {
                   </div>
                 )}
                 {selectedActivity.description && (
-                  <p className="activity-detail-description">{selectedActivity.description}</p>
+                  <RichTextContent value={selectedActivity.description} className="activity-detail-description" />
                 )}
                 {(selectedActivity.fileInfos?.length ?? 0) > 0 && (
                   <ul className="activity-detail-files">
@@ -2218,7 +2533,7 @@ function ClubEventSection() {
       await uploadClubEventEntry(selectedEvent.id, {
         title: entryForm.title.trim(),
         authorName: entryForm.authorName.trim(),
-        description: entryForm.description.trim(),
+        description: normalizeRichTextForSubmit(entryForm.description),
         files: entryFiles,
       })
       const detail = await getClubEvent(selectedEvent.id)
@@ -2325,11 +2640,6 @@ function ClubEventSection() {
             <span>작성자/팀</span>
             <input value={entryForm.authorName} onChange={(event) => setEntryForm((prev) => ({ ...prev, authorName: event.target.value }))} maxLength={80} placeholder="예: 운영팀" />
           </label>
-          <label className="club-event-upload-button club-event-upload-button-wide">
-            <Paperclip size={15} aria-hidden="true" />
-            파일 추가
-            <input aria-label="회지 파일" type="file" multiple onChange={(event) => setEntryFiles(Array.from(event.target.files || []))} />
-          </label>
           <div className="activity-compose-attachment-summary">
             <span><Paperclip size={14} aria-hidden="true" /> 파일 {entryFiles.length}개</span>
           </div>
@@ -2349,33 +2659,13 @@ function ClubEventSection() {
           className="community-compose-title order-1 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm lg:col-start-1 lg:row-start-1"
         />
 
-        <div className="community-compose-editor order-4 overflow-hidden rounded border border-black/15 bg-[var(--app-surface)] lg:col-start-1 lg:row-start-2 lg:row-span-5">
-          <div className="community-editor-toolbar flex flex-wrap items-center gap-2 border-b border-[var(--app-hairline)] bg-black/[0.03] px-3 py-2">
-            <span className="mr-1 text-xs font-black uppercase text-[var(--theme-body-muted)]">Editor</span>
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
-              <Paperclip size={14} aria-hidden="true" />파일 추가
-              <input aria-label="첨부파일" type="file" multiple className="hidden" onChange={(event) => setEntryFiles(Array.from(event.target.files || []))} />
-            </label>
-            <span className="text-xs text-[var(--theme-body-muted)]">파일 {entryFiles.length}개</span>
-          </div>
-          {entryFiles.length > 0 && (
-            <div className="activity-compose-attachment-list" aria-label="선택된 회지 파일">
-              {entryFiles.map((file) => (
-                <span key={`${file.name}-${file.size}`}>
-                  <Paperclip size={13} aria-hidden="true" />
-                  {file.name}
-                </span>
-              ))}
-            </div>
-          )}
-          <textarea
-            aria-label="본문"
+        <div className="order-4 lg:col-start-1 lg:row-start-2 lg:row-span-5">
+          <RichTextComposer
             value={entryForm.description}
-            onChange={(event) => setEntryForm((prev) => ({ ...prev, description: event.target.value }))}
-            rows={12}
-            maxLength={2000}
-            placeholder="본문을 입력하세요."
-            className="activity-compose-textarea min-h-[24rem] w-full resize-y bg-[var(--app-surface)] px-4 py-4 text-base leading-8 text-[var(--app-text)] outline-none"
+            onChange={(description) => setEntryForm((prev) => ({ ...prev, description }))}
+            fileFiles={entryFiles}
+            onFileFilesChange={setEntryFiles}
+            minHeight="24rem"
           />
         </div>
       </form>
@@ -2395,7 +2685,7 @@ function ClubEventSection() {
           <div className="club-event-detail-title">
             <p className="apple-eyebrow">Event contest</p>
             <h2>{selectedEvent.title}</h2>
-            {selectedEvent.description && <p>{selectedEvent.description}</p>}
+            {selectedEvent.description && <RichTextContent value={selectedEvent.description} className="club-event-detail-description" />}
           </div>
           <div className="club-event-status-card">
             <span className={selectedEvent.votingOpen ? 'club-event-status-open' : 'club-event-status-closed'}>{selectedEvent.votingOpen ? '투표 진행 중' : '투표 종료'}</span>
@@ -2425,7 +2715,7 @@ function ClubEventSection() {
                       {entry.authorName && <span>{entry.authorName}</span>}
                       {entryFileList.length > 1 && <span>첨부 {entryFileList.length}개</span>}
                     </div>
-                    {entry.description && <p>{entry.description}</p>}
+                    {entry.description && <RichTextContent value={entry.description} className="club-event-entry-description" />}
                     {entryFileList.length > 0 && (
                       <div className="club-event-entry-files" aria-label={`${entry.title} 첨부파일`}>
                         {entryFileList.map((file) => (
@@ -2519,7 +2809,7 @@ function ClubEventSection() {
                       <button type="button" onClick={() => openEvent(item)} className="club-event-list-button">
                         <span className={item.votingOpen ? 'club-event-pill club-event-pill-open' : 'club-event-pill'}>{item.votingOpen ? '진행 중' : '종료'}</span>
                         <strong>{item.title}</strong>
-                        {item.description && <span>{item.description}</span>}
+                        {item.description && <RichTextContent value={item.description} className="club-event-list-description" />}
                         <small>{formatEventWindow(item)}</small>
                       </button>
                       <div className="club-event-list-stats">
