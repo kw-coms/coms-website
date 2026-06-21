@@ -55,4 +55,15 @@ class SecurityConfigSourceTest {
         assertThat(source).doesNotContain("auth.requestMatchers(HttpMethod.HEAD, \"/api/mini-apps/*/shared\", \"/api/mini-apps/*/shared/*\").permitAll()");
         assertThat(source).contains("auth.requestMatchers(\"/api/mini-apps/**\").authenticated()");
     }
+
+    @Test
+    void corsAllowedOriginsHasNoLocalhostFallback() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/coms/backend/config/SecurityConfig.java"));
+        String properties = Files.readString(Path.of("src/main/resources/application.properties"));
+
+        assertThat(source).contains("@Value(\"${cors.allowed-origins}\")");
+        assertThat(source).doesNotContain("cors.allowed-origins:http://localhost:5173");
+        assertThat(properties).contains("cors.allowed-origins=${CORS_ALLOWED_ORIGINS}");
+        assertThat(properties).doesNotContain("CORS_ALLOWED_ORIGINS:http://localhost:5173");
+    }
 }

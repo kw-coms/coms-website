@@ -82,6 +82,7 @@ const RecruitNotice = lazy(() => import('./pages/RecruitNotice.jsx'))
 import { getLogoAsset } from './utils/logoAssets.js'
 import { buildCalendarDayEvents, buildMonthEventSummary, visibleDayEvents } from './utils/monthlyCalendar.js'
 import { parseScheduleCsv } from './utils/scheduleCsv.js'
+import { sanitizeHtml } from './utils/sanitizeHtml.js'
 import { useAuth } from './contexts/useAuth.js'
 import { ActivityCategory } from './contract/enums.js'
 import { enumLabels } from './contract/labels.js'
@@ -239,7 +240,11 @@ function sanitizeRichTextHtml(value) {
   const raw = String(value || '')
   if (!raw.trim()) return ''
   if (typeof document === 'undefined') {
-    return /<[a-z][\s\S]*>/i.test(raw) ? raw.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '') : plainTextToRichHtml(raw)
+    return sanitizeHtml(/<[a-z][\s\S]*>/i.test(raw) ? raw : plainTextToRichHtml(raw), {
+      allowedTags: [...RICH_TEXT_ALLOWED_TAGS],
+      allowedStyles: RICH_TEXT_ALLOWED_STYLES,
+      trimTrailingBreaks: false,
+    })
   }
 
   const template = document.createElement('template')
@@ -288,7 +293,11 @@ function sanitizeRichTextHtml(value) {
   template.content.childNodes.forEach((child) => fragment.appendChild(sanitizeNode(child)))
   const container = document.createElement('div')
   container.appendChild(fragment)
-  return container.innerHTML
+  return sanitizeHtml(container.innerHTML, {
+    allowedTags: [...RICH_TEXT_ALLOWED_TAGS],
+    allowedStyles: RICH_TEXT_ALLOWED_STYLES,
+    trimTrailingBreaks: false,
+  })
 }
 
 function richTextToPlainText(value) {
@@ -656,7 +665,7 @@ function ScrollToTop() {
 }
 
 function RequireAuth({ children }) {
-  const { user, loading } = useAuth()
+  const { user, loading, authError, retryAuth } = useAuth()
   const location = useLocation()
   if (loading) return (
     <PageShell>
@@ -665,17 +674,37 @@ function RequireAuth({ children }) {
       </div>
     </PageShell>
   )
+  if (authError) return (
+    <PageShell>
+      <div className="mx-auto max-w-md rounded-lg border border-[var(--app-hairline)] bg-white/82 p-8 text-center shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">{authError.message}</p>
+        <button type="button" onClick={retryAuth} className="mt-4 apple-action-primary px-5 py-2 text-sm">
+          다시 시도
+        </button>
+      </div>
+    </PageShell>
+  )
   if (!user) return <Navigate to="/login" state={{ from: location }} replace />
   return children
 }
 
 function RequireAdmin({ children }) {
-  const { user, loading } = useAuth()
+  const { user, loading, authError, retryAuth } = useAuth()
   const location = useLocation()
   if (loading) return (
     <PageShell>
       <div className="rounded-lg border border-[var(--app-hairline)] bg-white/82 p-8 text-center text-[var(--app-muted)] shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
         로그인 상태를 확인하는 중...
+      </div>
+    </PageShell>
+  )
+  if (authError) return (
+    <PageShell>
+      <div className="mx-auto max-w-md rounded-lg border border-[var(--app-hairline)] bg-white/82 p-8 text-center shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">{authError.message}</p>
+        <button type="button" onClick={retryAuth} className="mt-4 apple-action-primary px-5 py-2 text-sm">
+          다시 시도
+        </button>
       </div>
     </PageShell>
   )
