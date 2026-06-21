@@ -4,7 +4,7 @@ export async function listClubActivities() {
   return request('/api/club-activities')
 }
 
-export async function createClubActivity({ kind, category, title, description, eventDate, endDate, startTime, endTime, image }) {
+export async function createClubActivity({ kind, category, title, description, eventDate, endDate, startTime, endTime, colorHex, image }) {
   const formData = new FormData()
   formData.append('kind', kind)
   formData.append('category', category || 'GENERAL')
@@ -13,6 +13,7 @@ export async function createClubActivity({ kind, category, title, description, e
   if (endDate) formData.append('endDate', endDate)
   if (startTime) formData.append('startTime', startTime)
   if (endTime) formData.append('endTime', endTime)
+  if (colorHex) formData.append('colorHex', colorHex)
   if (description) formData.append('description', description)
   if (image) formData.append('image', image)
 
@@ -26,7 +27,7 @@ export async function createClubActivity({ kind, category, title, description, e
   return data
 }
 
-export async function updateClubActivity(id, { kind, category, title, description, eventDate, endDate, startTime, endTime }) {
+export async function updateClubActivity(id, { kind, category, title, description, eventDate, endDate, startTime, endTime, colorHex }) {
   const formData = new FormData()
   if (kind != null) formData.append('kind', kind)
   if (category != null) formData.append('category', category)
@@ -36,6 +37,7 @@ export async function updateClubActivity(id, { kind, category, title, descriptio
   if (endDate != null) formData.append('endDate', endDate)
   if (startTime != null) formData.append('startTime', startTime)
   if (endTime != null) formData.append('endTime', endTime)
+  if (colorHex != null) formData.append('colorHex', colorHex)
   return request(`/api/club-activities/${id}`, {
     method: 'PATCH',
     body: formData,
@@ -118,6 +120,19 @@ export async function updateRecurringSchedule(id, payload) {
 
 export async function deleteRecurringSchedule(id) {
   return requestNoContent(`/api/admin/recurring-schedules/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function upsertRecurringScheduleException(id, date, payload) {
+  return request(`/api/admin/recurring-schedules/${id}/exceptions/${date}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteRecurringScheduleException(id, date) {
+  return requestNoContent(`/api/admin/recurring-schedules/${id}/exceptions/${date}`, {
     method: 'DELETE',
   })
 }
