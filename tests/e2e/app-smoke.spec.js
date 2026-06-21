@@ -711,6 +711,100 @@ test('community exposes my deleted posts and restore appeal for members', async 
   await expect(page.getByText('복원 요청 접수됨', { exact: true })).toBeVisible()
 })
 
+test('community composer creates a post with editor text and file blocks', async ({ page }) => {
+  await mockAdminApis(page)
+  const posts = []
+  let createPayload = null
+  let updatePayload = null
+  let fileUploaded = false
+  let savedPost = null
+
+  await page.route('**/api/community/posts', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, json: posts })
+      return
+    }
+    createPayload = route.request().postDataJSON()
+    await route.fulfill({
+      status: 200,
+      json: {
+        id: 88,
+        title: createPayload.title,
+        content: createPayload.content,
+        category: createPayload.category,
+        authorName: '관리자',
+        authorDisplayName: '관리자',
+        authorStudentId: '2020123456',
+        editable: true,
+        createdAt: '2026-06-21T13:00:00',
+        viewCount: 0,
+        upvotes: 0,
+        downvotes: 0,
+        myVote: 0,
+        commentCount: 0,
+      },
+    })
+  })
+  await page.route('**/api/community/posts/88/files', async (route) => {
+    fileUploaded = route.request().method() === 'POST'
+    await route.fulfill({ status: 200, json: 901 })
+  })
+  await page.route('**/api/community/posts/88', async (route) => {
+    if (route.request().method() === 'PATCH') {
+      updatePayload = route.request().postDataJSON()
+      savedPost = {
+        id: 88,
+        title: updatePayload.title,
+        content: updatePayload.content,
+        category: updatePayload.category,
+        authorName: '관리자',
+        authorDisplayName: '관리자',
+        authorStudentId: '2020123456',
+        editable: true,
+        createdAt: '2026-06-21T13:00:00',
+        updatedAt: '2026-06-21T13:01:00',
+        viewCount: 0,
+        upvotes: 0,
+        downvotes: 0,
+        myVote: 0,
+        commentCount: 0,
+        fileInfos: [{ id: 901, originalName: 'source.zip', url: '/api/community/posts/88/files/901' }],
+      }
+      await route.fulfill({ status: 200, json: savedPost })
+      return
+    }
+    await route.fulfill({ status: 200, json: savedPost })
+  })
+  await page.route('**/api/community/posts/88/comments', (route) => route.fulfill({ status: 200, json: [] }))
+
+  await page.goto('/community')
+  await page.getByRole('button', { name: '글쓰기' }).click()
+
+  await page.locator('.community-compose-title').fill('구조 분리 글쓰기 테스트')
+  await page.locator('.community-compose-editor [contenteditable="true"]').fill('구조 분리 테스트 본문')
+  await page.locator('input[type="file"][accept*=".zip"]').setInputFiles({
+    name: 'source.zip',
+    mimeType: 'application/zip',
+    buffer: Buffer.from('zip-body'),
+  })
+  await page.getByRole('button', { name: '글 등록' }).click()
+
+  expect(createPayload).toMatchObject({
+    title: '구조 분리 글쓰기 테스트',
+    content: '구조 분리 테스트 본문',
+    category: 'GENERAL',
+  })
+  await expect.poll(() => fileUploaded).toBe(true)
+  await expect.poll(() => Boolean(updatePayload)).toBe(true)
+  const blocks = JSON.parse(updatePayload.content)
+  expect(blocks).toEqual(expect.arrayContaining([
+    expect.objectContaining({ type: 'text', content: '구조 분리 테스트 본문' }),
+    expect.objectContaining({ type: 'file', fileId: 901, name: 'source.zip' }),
+  ]))
+  await expect(page.getByRole('heading', { name: '구조 분리 글쓰기 테스트' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /source\.zip/ })).toBeVisible()
+})
+
 test('community detail supports comment add, reply, edit, and delete', async ({ page }) => {
   await mockAdminApis(page)
   await page.addInitScript(() => {
