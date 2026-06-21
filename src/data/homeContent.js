@@ -463,4 +463,12 @@ export const activitySectionNavItems = [
     icon: CalendarDays,
     accent: 'text-sky-500',
   },
+  {
+    id: 'activity-events',
+    label: 'Events',
+    hint: '회지·인기투표',
+    path: '/activity-events',
+    icon: Rocket,
+    accent: 'text-violet-500',
+  },
 ]

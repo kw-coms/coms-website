@@ -1033,6 +1033,332 @@ select {
 	line-height: 1.6;
 }
 
+.activity-board-shell {
+	background: var(--app-surface);
+}
+
+.activity-board-controls {
+	background: color-mix(in srgb, var(--app-surface-soft) 92%, var(--app-surface));
+}
+
+.activity-board-date-filter {
+	display: inline-flex;
+	min-height: 2.25rem;
+	align-items: center;
+	gap: 0.45rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 9999px;
+	background: var(--app-surface);
+	padding: 0.25rem 0.35rem 0.25rem 0.8rem;
+	color: var(--app-muted);
+	white-space: nowrap;
+}
+
+.activity-board-date-filter input {
+	height: 1.75rem;
+	width: 7.7rem;
+	border: 0;
+	border-radius: 9999px;
+	background: var(--app-surface-soft);
+	padding: 0 0.6rem;
+	color: var(--app-text);
+	font-size: 0.78rem;
+	font-weight: 800;
+	outline: none;
+}
+
+.activity-board-table th {
+	color: var(--app-subtle);
+	font-size: 0.78rem;
+	text-align: center;
+}
+
+.activity-board-table th:nth-child(3) {
+	text-align: left;
+}
+
+.activity-board-inline-tag {
+	color: var(--app-accent-text);
+	font-weight: 850;
+}
+
+.activity-board-preview {
+	display: inline-block;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	vertical-align: bottom;
+	white-space: nowrap;
+}
+
+.activity-board-card {
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface);
+	padding: 1rem;
+	color: var(--app-text);
+	box-shadow: 0 14px 36px rgba(0, 0, 0, 0.06);
+	cursor: pointer;
+}
+
+.activity-board-card:focus {
+	outline: none;
+	box-shadow:
+		0 0 0 3px color-mix(in srgb, var(--app-accent) 20%, transparent),
+		0 14px 36px rgba(0, 0, 0, 0.06);
+}
+
+.activity-board-category {
+	color: var(--app-accent-text);
+	font-size: 0.75rem;
+	font-weight: 900;
+}
+
+.activity-board-card h3 {
+	margin: 0.35rem 0 0;
+	font-size: 1.05rem;
+	font-weight: 900;
+	line-height: 1.35;
+}
+
+.activity-board-card p {
+	display: -webkit-box;
+	margin: 0.7rem 0 0;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 0.88rem;
+	font-weight: 650;
+	line-height: 1.55;
+}
+
+.activity-board-number {
+	flex-shrink: 0;
+	color: var(--app-subtle);
+	font-size: 0.78rem;
+	font-weight: 850;
+}
+
+.activity-board-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem 0.7rem;
+	margin-top: 0.85rem;
+	color: var(--app-subtle);
+	font-size: 0.75rem;
+	font-weight: 800;
+}
+
+.activity-post-composer {
+	grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+	align-items: start;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	padding: 0;
+	box-shadow: none;
+}
+
+.activity-post-composer .activity-compose-title-field {
+	grid-column: 1;
+}
+
+.activity-compose-title-field > span,
+.activity-compose-body-field > span {
+	margin-bottom: 0.35rem;
+	color: var(--app-muted);
+	font-size: 0.78rem;
+	font-weight: 850;
+}
+
+.activity-compose-title-field input {
+	min-height: 3.4rem;
+	border-radius: 0.55rem;
+	background: var(--app-surface);
+	font-size: 1rem;
+}
+
+.activity-compose-editor {
+	grid-column: 1;
+	overflow: hidden;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface);
+}
+
+.activity-compose-toolbar {
+	min-height: 3.1rem;
+}
+
+.activity-compose-toolbar > span:first-child {
+	margin-right: 0.3rem;
+	color: var(--app-muted);
+	font-size: 0.72rem;
+	font-weight: 950;
+	letter-spacing: 0.18em;
+	text-transform: uppercase;
+}
+
+.activity-compose-file-button {
+	position: relative;
+	display: inline-flex !important;
+	min-height: 2.25rem;
+	align-items: center;
+	gap: 0.45rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.35rem;
+	background: var(--app-surface);
+	padding: 0 0.8rem;
+	color: var(--app-text);
+	font-size: 0.84rem !important;
+	font-weight: 850 !important;
+	cursor: pointer;
+}
+
+.activity-compose-file-button input {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	opacity: 0;
+	cursor: pointer;
+}
+
+.activity-compose-file-name {
+	min-width: 0;
+	overflow: hidden;
+	color: var(--app-muted) !important;
+	font-size: 0.78rem !important;
+	font-weight: 650 !important;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.activity-compose-body-field {
+	display: block !important;
+	gap: 0 !important;
+}
+
+.activity-compose-body-field > span {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+}
+
+.activity-post-composer .activity-compose-body-field textarea {
+	min-height: 34rem;
+	border: 0;
+	border-radius: 0;
+	background: var(--app-surface);
+	padding: 1rem;
+	font-size: 0.96rem;
+	font-weight: 650;
+	line-height: 1.75;
+	resize: vertical;
+}
+
+.activity-compose-side {
+	grid-column: 2;
+	grid-row: 1 / span 2;
+	display: grid;
+	gap: 0.75rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface);
+	padding: 1rem;
+}
+
+.activity-compose-actions {
+	display: grid;
+	gap: 0.6rem;
+}
+
+.activity-post-composer .activity-compose-actions button {
+	width: 100%;
+	min-height: 3rem;
+	background: var(--app-accent);
+	color: #fff;
+}
+
+.activity-post-composer .activity-compose-actions .activity-compose-cancel {
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	color: var(--app-text);
+}
+
+.activity-admin-composer-error {
+	color: #dc2626;
+}
+
+.activity-post-mini-badge {
+	border-radius: 9999px;
+	background: var(--app-surface-soft);
+	padding: 0.2rem 0.5rem;
+	color: var(--app-muted);
+}
+
+.activity-post-detail-body {
+	color: var(--app-text);
+}
+
+.activity-post-gallery {
+	display: grid;
+	gap: 0.75rem;
+	margin-bottom: 1.4rem;
+}
+
+.activity-post-gallery img {
+	display: block;
+	width: min(100%, 46rem);
+	max-height: 34rem;
+	margin-inline: auto;
+	border-radius: 0.35rem;
+	object-fit: contain;
+	background: #000;
+}
+
+.activity-post-content {
+	margin: 0;
+	white-space: pre-wrap;
+	color: var(--app-text);
+	font-size: 1rem;
+	font-weight: 600;
+	line-height: 1.85;
+}
+
+.activity-post-files {
+	display: grid;
+	gap: 0.55rem;
+	margin-top: 2rem;
+	border-top: 1px solid var(--app-hairline);
+	padding-top: 1rem;
+}
+
+.activity-post-files p {
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 0.78rem;
+	font-weight: 900;
+}
+
+.activity-post-file-link {
+	display: flex;
+	min-height: 2.5rem;
+	align-items: center;
+	gap: 0.45rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.4rem;
+	background: var(--app-surface-soft);
+	padding: 0 0.8rem;
+	color: var(--app-accent-text);
+	font-size: 0.88rem;
+	font-weight: 850;
+}
+
 .activity-log-card-blue {
 	--activity-log-accent: #0071e3;
 }
@@ -1504,6 +1830,32 @@ select {
 	color: var(--app-accent-text);
 	font-size: 0.8rem;
 	font-weight: 800;
+}
+
+.activity-admin-composer.activity-post-composer {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+	align-items: start;
+	gap: 1.25rem;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	padding: 0;
+	box-shadow: none;
+}
+
+.activity-admin-composer.activity-post-composer .activity-compose-title-field {
+	grid-column: 1;
+}
+
+.activity-admin-composer.activity-post-composer .activity-compose-editor {
+	grid-column: 1;
+}
+
+.activity-admin-composer.activity-post-composer .activity-compose-side {
+	grid-column: 2;
+	grid-row: 1 / span 2;
+	align-self: start;
 }
 
 .club-calendar-shell {
@@ -3328,6 +3680,25 @@ select {
 		grid-column: auto;
 	}
 
+	.activity-post-composer {
+		grid-template-columns: 1fr;
+	}
+
+	.activity-post-composer .activity-compose-title-field,
+	.activity-compose-editor,
+	.activity-compose-side {
+		grid-column: auto;
+		grid-row: auto;
+	}
+
+	.activity-post-composer .activity-compose-body-field textarea {
+		min-height: 24rem;
+	}
+
+	.activity-compose-file-name {
+		flex-basis: 100%;
+	}
+
 	.club-calendar-weekdays span {
 		padding: 0.65rem 0.25rem;
 		font-size: 0.72rem;
@@ -3541,8 +3912,412 @@ body {
 		vertical-align: top !important;
 	}
 
-	.community-editor-figure[data-type='file'] {
+.community-editor-figure[data-type='file'] {
 		max-width: 100% !important;
+	}
+}
+
+.club-event-section {
+	color: var(--app-text);
+}
+
+.club-event-hero {
+	border-bottom: 1px solid var(--app-hairline);
+	background:
+		linear-gradient(135deg, color-mix(in srgb, var(--app-accent) 10%, transparent), transparent 46%),
+		var(--app-surface);
+}
+
+.club-event-list {
+	display: grid;
+	gap: 0.875rem;
+	padding: 1rem;
+}
+
+.club-event-list-card {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 1rem;
+	align-items: stretch;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface);
+	box-shadow: 0 10px 26px rgb(0 0 0 / 0.05);
+}
+
+.club-event-list-button {
+	min-width: 0;
+	padding: 1rem;
+	text-align: left;
+}
+
+.club-event-list-button strong,
+.club-event-detail-title h2,
+.club-event-entry-title-row h3 {
+	display: block;
+	overflow-wrap: anywhere;
+	word-break: keep-all;
+}
+
+.club-event-list-button strong {
+	margin-top: 0.5rem;
+	font-size: 1.2rem;
+	font-weight: 900;
+}
+
+.club-event-list-button > span:not(.club-event-pill),
+.club-event-list-button small {
+	display: block;
+	margin-top: 0.45rem;
+	color: var(--app-subtle);
+	font-size: 0.82rem;
+	font-weight: 700;
+}
+
+.club-event-pill,
+.club-event-status-card span {
+	display: inline-flex;
+	width: fit-content;
+	align-items: center;
+	border-radius: 999px;
+	border: 1px solid var(--app-hairline);
+	padding: 0.25rem 0.6rem;
+	background: var(--app-surface-soft);
+	color: var(--app-muted);
+	font-size: 0.72rem;
+	font-weight: 900;
+}
+
+.club-event-pill-open,
+.club-event-status-card .club-event-status-open {
+	border-color: color-mix(in srgb, var(--app-accent) 34%, transparent);
+	background: var(--app-accent-soft);
+	color: var(--app-accent-text);
+}
+
+.club-event-list-stats {
+	display: flex;
+	min-width: 8rem;
+	flex-direction: column;
+	justify-content: center;
+	gap: 0.5rem;
+	border-left: 1px solid var(--app-hairline);
+	padding: 1rem;
+	color: var(--app-muted);
+	font-size: 0.82rem;
+	font-weight: 900;
+	text-align: right;
+}
+
+.club-event-admin-form,
+.club-event-entry-form {
+	display: grid;
+	gap: 1rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface);
+	padding: 1rem;
+}
+
+.club-event-admin-form {
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.club-event-field {
+	display: grid;
+	gap: 0.45rem;
+	min-width: 0;
+	color: var(--app-muted);
+	font-size: 0.78rem;
+	font-weight: 900;
+}
+
+.club-event-field-wide {
+	grid-column: 1 / -1;
+}
+
+.club-event-field input,
+.club-event-field textarea {
+	min-height: 2.75rem;
+	width: 100%;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface-soft);
+	padding: 0.7rem 0.8rem;
+	color: var(--app-text);
+	font-size: 1rem;
+	font-weight: 700;
+	outline: none;
+}
+
+.club-event-field textarea {
+	min-height: 7rem;
+	resize: vertical;
+}
+
+.club-event-form-actions {
+	grid-column: 1 / -1;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.6rem;
+}
+
+.club-event-detail-head {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) minmax(12rem, 18rem);
+	gap: 1rem;
+	align-items: start;
+	border-bottom: 1px solid var(--app-hairline);
+	padding: 1rem;
+	background: var(--app-surface);
+}
+
+.club-event-detail-title h2 {
+	margin-top: 0.35rem;
+	font-size: clamp(1.6rem, 4vw, 3rem);
+	font-weight: 950;
+	line-height: 1.06;
+}
+
+.club-event-detail-title p:not(.apple-eyebrow) {
+	margin-top: 0.75rem;
+	color: var(--app-muted);
+	font-weight: 700;
+}
+
+.club-event-status-card {
+	display: grid;
+	gap: 0.5rem;
+	justify-items: end;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface-soft);
+	padding: 0.9rem;
+	text-align: right;
+}
+
+.club-event-status-card strong {
+	font-size: 1.8rem;
+	font-weight: 950;
+}
+
+.club-event-status-card small {
+	color: var(--app-subtle);
+	font-size: 0.74rem;
+	font-weight: 800;
+}
+
+.club-event-entry-form {
+	margin: 1rem;
+}
+
+.club-event-entry-form-head {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	align-items: end;
+	justify-content: space-between;
+}
+
+.club-event-entry-form-head h3 {
+	margin-top: 0.25rem;
+	font-size: 1.2rem;
+	font-weight: 950;
+}
+
+.club-event-entry-form-head span,
+.club-event-upload-name {
+	color: var(--app-subtle);
+	font-size: 0.78rem;
+	font-weight: 800;
+}
+
+.club-event-entry-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+.club-event-upload-button {
+	display: inline-flex;
+	min-height: 2.75rem;
+	width: fit-content;
+	cursor: pointer;
+	align-items: center;
+	gap: 0.45rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 999px;
+	background: var(--app-surface-soft);
+	padding: 0.65rem 1rem;
+	color: var(--app-accent-text);
+	font-size: 0.86rem;
+	font-weight: 900;
+}
+
+.club-event-upload-button input {
+	display: none;
+}
+
+.club-event-upload-name {
+	align-self: center;
+}
+
+.club-event-ranking-list {
+	display: grid;
+	gap: 0.75rem;
+	padding: 1rem;
+}
+
+.club-event-entry-card {
+	display: grid;
+	grid-template-columns: 4.5rem minmax(0, 1fr) minmax(8rem, auto);
+	gap: 1rem;
+	align-items: center;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface);
+	padding: 1rem;
+}
+
+.club-event-entry-card-selected {
+	border-color: color-mix(in srgb, var(--app-accent) 42%, var(--app-hairline));
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+.club-event-rank-badge {
+	display: inline-flex;
+	min-height: 3rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: 0.5rem;
+	background: var(--app-accent-soft);
+	color: var(--app-accent-text);
+	font-size: 1rem;
+	font-weight: 950;
+}
+
+.club-event-entry-title-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem 0.7rem;
+	align-items: center;
+}
+
+.club-event-entry-title-row h3 {
+	font-size: 1.12rem;
+	font-weight: 950;
+}
+
+.club-event-entry-title-row span {
+	color: var(--app-muted);
+	font-size: 0.8rem;
+	font-weight: 900;
+}
+
+.club-event-entry-main p {
+	margin-top: 0.45rem;
+	color: var(--app-muted);
+	font-size: 0.9rem;
+	font-weight: 650;
+}
+
+.club-event-entry-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.55rem;
+	margin-top: 0.6rem;
+	color: var(--app-subtle);
+	font-size: 0.78rem;
+	font-weight: 850;
+}
+
+.club-event-download-link {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	color: var(--app-accent-text);
+}
+
+.club-event-entry-score {
+	display: grid;
+	gap: 0.5rem;
+	justify-items: end;
+}
+
+.club-event-entry-score strong {
+	font-size: 1.1rem;
+	font-weight: 950;
+}
+
+.club-event-vote-button,
+.club-event-danger-button {
+	display: inline-flex;
+	min-height: 2.5rem;
+	align-items: center;
+	justify-content: center;
+	gap: 0.4rem;
+	border-radius: 999px;
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface-soft);
+	padding: 0.55rem 0.85rem;
+	color: var(--app-accent-text);
+	font-size: 0.82rem;
+	font-weight: 950;
+}
+
+.club-event-vote-button-selected {
+	border-color: var(--app-accent);
+	background: var(--app-accent);
+	color: white;
+}
+
+.club-event-danger-button {
+	color: #d70015;
+}
+
+.club-event-toast {
+	margin: 0 1rem 1rem;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 22%, var(--app-hairline));
+	border-radius: 0.5rem;
+	background: var(--app-accent-soft);
+	padding: 0.75rem 0.9rem;
+	color: var(--app-accent-text);
+	font-size: 0.85rem;
+	font-weight: 900;
+}
+
+.club-event-toast-error {
+	border-color: rgb(215 0 21 / 0.24);
+	background: rgb(215 0 21 / 0.08);
+	color: #b00014;
+}
+
+@media (max-width: 768px) {
+	.club-event-list-card,
+	.club-event-detail-head,
+	.club-event-entry-card,
+	.club-event-admin-form,
+	.club-event-entry-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.club-event-list-stats {
+		min-width: 0;
+		flex-direction: row;
+		justify-content: space-between;
+		border-left: 0;
+		border-top: 1px solid var(--app-hairline);
+		text-align: left;
+	}
+
+	.club-event-status-card,
+	.club-event-entry-score {
+		justify-items: stretch;
+		text-align: left;
+	}
+
+	.club-event-detail-head {
+		padding: 0.9rem;
 	}
 }
 
