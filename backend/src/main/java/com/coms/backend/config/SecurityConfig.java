@@ -34,7 +34,7 @@ public class SecurityConfig {
     @Value("${spring.h2.console.enabled:false}")
     private boolean h2ConsoleEnabled;
 
-    @Value("${cors.allowed-origins:http://localhost:5173}")
+    @Value("${cors.allowed-origins}")
     private String corsAllowedOrigins;
 
     public SecurityConfig(JwtTokenProvider jwtTokenProvider) {
@@ -146,14 +146,17 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-	List<String> allowedOrigins = Arrays.stream(corsAllowedOrigins.split(","))
-			.map(String::trim)
-			.filter(origin -> !origin.isEmpty())
-			.toList();
-	if (allowedOrigins.contains("*")) {
-		throw new IllegalStateException("CORS '*' is incompatible with allowCredentials=true");
-	}
-	config.setAllowedOrigins(allowedOrigins);
+        List<String> allowedOrigins = Arrays.stream(corsAllowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList();
+        if (allowedOrigins.isEmpty()) {
+            throw new IllegalStateException("cors.allowed-origins must be configured");
+        }
+        if (allowedOrigins.contains("*")) {
+            throw new IllegalStateException("CORS '*' is incompatible with allowCredentials=true");
+        }
+        config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "X-Bootstrap-Secret"));
         config.setAllowCredentials(true);

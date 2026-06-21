@@ -1,4 +1,4 @@
-import { apiUrl, request, requestNoContent } from './apiClient.js'
+import { apiUrl, request, requestNoContent, throwApiError } from './apiClient.js'
 
 export async function listFiles() {
   return request('/api/files')
@@ -15,8 +15,8 @@ export async function createPost({ title, description, category, file }) {
     credentials: 'include',
     body: formData,
   })
+  if (!response.ok) await throwApiError(response, '업로드 중 오류가 발생했습니다.')
   const data = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(data?.message || '업로드 중 오류가 발생했습니다.')
   return data
 }
 
