@@ -22,12 +22,13 @@ export async function updateClubEvent(id, { title, description, startsAt, endsAt
   })
 }
 
-export async function uploadClubEventEntry(id, { title, authorName, description, file }) {
+export async function uploadClubEventEntry(id, { title, authorName, description, file, files }) {
   const form = new FormData()
   form.append('title', title)
   if (authorName) form.append('authorName', authorName)
   if (description) form.append('description', description)
-  form.append('file', file)
+  const uploadFiles = Array.from(files || (file ? [file] : []))
+  uploadFiles.forEach((item) => form.append('files', item))
   return request(`/api/club-events/${id}/entries`, {
     method: 'POST',
     body: form,
