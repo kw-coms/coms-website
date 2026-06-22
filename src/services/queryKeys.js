@@ -7,4 +7,8 @@ export const queryKeys = {
     all: ['community'],
     posts: () => [...queryKeys.community.all, 'posts'],
   },
+  notices: {
+    all: ['notices'],
+    list: () => [...queryKeys.notices.all, 'list'],
+  },
 }
