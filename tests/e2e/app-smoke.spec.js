@@ -208,7 +208,7 @@ test('admin exposes a pre-deploy screen check panel', async ({ page }) => {
   await mockAdminApis(page)
 
   await page.goto('/admin')
-  await page.getByRole('button', { name: '화면 점검' }).click()
+  await page.getByRole('tab', { name: '화면 점검' }).click()
 
   await expect(page.getByRole('heading', { name: '배포 전 화면 점검' })).toBeVisible()
   await expect(page.getByText('Smoke 대상 경로')).toBeVisible()
@@ -252,7 +252,7 @@ test('admin password reset accepts simple temporary passwords without complexity
   })
 
   await page.goto('/admin')
-  await page.getByRole('button', { name: '회원 관리' }).click()
+  await page.getByRole('tab', { name: '회원 관리' }).click()
   await page.getByRole('button', { name: '비번 초기화' }).click()
   promptMessage = await page.evaluate(() => window.__adminPromptMessages[0] || '')
 
@@ -320,7 +320,7 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
   })
 
   await page.goto('/admin')
-  await page.getByRole('button', { name: '명부 인증' }).click()
+  await page.getByRole('tab', { name: '명부 인증' }).click()
 
   await expect(page.getByText('명부 확인 · 편집')).toBeVisible()
   await page.getByPlaceholder('학번 (10자리)').fill('2026123456')
@@ -398,7 +398,7 @@ test('admin ban tab can ban and unban student ids', async ({ page }) => {
   })
 
   await page.goto('/admin')
-  await page.getByRole('button', { name: '차단 관리' }).click()
+  await page.getByRole('tab', { name: '차단 관리' }).click()
 
   await expect(page.getByRole('row').filter({ hasText: '2025123456' })).toBeVisible()
   await page.getByPlaceholder('학번 10자리').fill('2026123456')
@@ -465,7 +465,7 @@ test('admin files tab can upload and delete archive files', async ({ page }) => 
   })
 
   await page.goto('/admin')
-  await page.getByRole('button', { name: '파일 관리' }).click()
+  await page.getByRole('tab', { name: '파일 관리' }).click()
 
   await expect(page.getByText('기존자료.pdf')).toBeVisible()
   await expect(page.getByText('관리자 · 2.0 KB')).toBeVisible()
@@ -503,7 +503,7 @@ test('admin font management explains availability and uses action labels', async
   }))
 
   await page.goto('/admin')
-  await page.getByRole('button', { name: '폰트 관리' }).click()
+  await page.getByRole('tab', { name: '폰트 관리' }).click()
 
   await expect(page.getByText('활성 폰트만 사이트 폰트 선택 목록에 표시됩니다.')).toBeVisible()
   await expect(page.getByRole('button', { name: '활성 폰트 비활성화' })).toBeVisible()
@@ -606,7 +606,7 @@ test('admin logs tab can expand log window and clear caches', async ({ page }) =
   })
 
   await page.goto('/admin')
-  await page.getByRole('button', { name: '로그' }).click()
+  await page.getByRole('tab', { name: '로그' }).click()
   const auditTable = page.getByRole('table')
   await expect.poll(() => requestedLimits.at(-1)).toBe('1000')
   await expect(page.getByText('커뮤니티 글 삭제')).toBeVisible()
@@ -697,7 +697,7 @@ test('admin community reports tab resolves open reports', async ({ page }) => {
   })
 
   await page.goto('/admin')
-  await page.getByRole('button', { name: '커뮤니티 관리' }).click()
+  await page.getByRole('tab', { name: '커뮤니티 관리' }).click()
 
   await expect(page.getByRole('heading', { name: '커뮤니티 신고 큐' })).toBeVisible()
   await expect(page.getByText('신고된 게시글')).toBeVisible()
@@ -834,7 +834,7 @@ test('admin deleted community posts tab preserves deletion evidence', async ({ p
   page.on('dialog', (dialog) => dialog.accept())
 
   await page.goto('/admin')
-  await page.getByRole('button', { name: '삭제 보관함' }).click()
+  await page.getByRole('tab', { name: '삭제 보관함' }).click()
 
   await expect(page.getByRole('heading', { name: '커뮤니티 삭제 보관함' })).toBeVisible()
   await expect(page.getByText('삭제 보관 대상')).toBeVisible()
@@ -1216,7 +1216,7 @@ test('admin tracks recruit applications from overview to status update', async (
   await expect(page.getByText('처리 대기 지원')).toBeVisible()
   await expect(page.getByText('1건')).toBeVisible()
 
-  await page.getByRole('button', { name: '모집 관리', exact: true }).click()
+  await page.getByRole('tab', { name: '모집 관리', exact: true }).click()
   await expect(page.getByRole('heading', { name: '모집 지원 관리' })).toBeVisible()
   await expect(page.getByText('김지원')).toBeVisible()
   await expect(page.getByText('같이 만들고 싶습니다.')).toBeVisible()
@@ -1903,7 +1903,7 @@ test('admin can register a club activity record', async ({ page }) => {
   })
 
   await page.goto('/admin')
-  await page.getByRole('button', { name: '활동 관리' }).click()
+  await page.getByRole('tab', { name: '활동 관리' }).click()
   await page.getByLabel('활동 제목').fill('운영진 등록 활동')
   await page.getByLabel('활동 날짜').fill('2026-06-18')
   await page.getByLabel('활동 종류').selectOption('ACTIVITY')
@@ -2240,7 +2240,7 @@ test('admin deleted post full view modal renders title, body, image, and comment
   }))
 
   await page.goto('/admin')
-  await page.getByRole('button', { name: '삭제 보관함' }).click()
+  await page.getByRole('tab', { name: '삭제 보관함' }).click()
 
   await expect(page.getByRole('heading', { name: '커뮤니티 삭제 보관함' })).toBeVisible()
   await page.getByRole('button', { name: '원문 보기' }).click()
@@ -2397,7 +2397,7 @@ test('admin Apps management shows public-card previews with status badges', asyn
   })
 
   await page.goto('/admin')
-  await page.getByRole('button', { name: 'Apps 관리' }).click()
+  await page.getByRole('tab', { name: 'Apps 관리' }).click()
 
   const portalPreview = page.getByTestId('admin-app-preview-11')
   await expect(portalPreview.getByText("COM's 포털")).toBeVisible()
