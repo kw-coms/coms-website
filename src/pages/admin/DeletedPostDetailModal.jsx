@@ -15,6 +15,7 @@ export default function DeletedPostDetailModal({ post, onClose, onRestore, resto
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const closeButtonRef = useRef(null)
+  const dialogRef = useRef(null)
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined
@@ -23,6 +24,29 @@ export default function DeletedPostDetailModal({ post, onClose, onRestore, resto
     return () => {
       previousActiveElement?.focus?.()
     }
+  }, [])
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined
+    const onKeyDown = (event) => {
+      if (event.key !== 'Tab') return
+      const focusable = dialogRef.current?.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      if (!focusable || focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const activeEl = document.activeElement
+      if (event.shiftKey && (activeEl === first || !dialogRef.current?.contains(activeEl))) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && activeEl === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown, true)
+    return () => document.removeEventListener('keydown', onKeyDown, true)
   }, [])
 
   useEffect(() => {
@@ -52,7 +76,7 @@ export default function DeletedPostDetailModal({ post, onClose, onRestore, resto
       aria-labelledby="deleted-post-detail-title"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}
     >
-      <div className="my-auto w-full max-w-3xl overflow-hidden rounded-2xl bg-[var(--app-surface)] shadow-2xl">
+      <div ref={dialogRef} className="my-auto w-full max-w-3xl overflow-hidden rounded-2xl bg-[var(--app-surface)] shadow-2xl">
         <div className="flex items-center justify-between gap-3 border-b border-[var(--app-hairline)] bg-[#f7f9ff] px-5 py-3">
           <div className="min-w-0">
             <p id="deleted-post-detail-title" className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#3b4890]">삭제 보관함 · 원문 보기</p>

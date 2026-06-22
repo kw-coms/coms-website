@@ -146,7 +146,7 @@ export default function CommunityListView({
       <div
         key={post.id}
         tabIndex={0}
-        role="button"
+        aria-label={`${post.title} 게시글 열기`}
         onClick={open}
         onKeyDown={(event) => openRowWithKeyboard(event, open)}
         className={`apple-soft-panel cursor-pointer p-4 text-left text-[var(--app-muted)] transition hover:-translate-y-0.5 focus:bg-[var(--app-surface-soft)] focus:outline-none ${concept ? 'concept-post-card' : ''}`}
@@ -298,8 +298,7 @@ export default function CommunityListView({
                 <tr
                   key={post.id}
                   tabIndex={0}
-                  role="button"
-                  onClick={open}
+                  aria-label={`${post.title} 게시글 열기`}
                   onKeyDown={(event) => openRowWithKeyboard(event, open)}
                   className={`cursor-pointer text-[var(--app-muted)] transition hover:bg-[var(--app-surface-soft)] focus:bg-[var(--app-surface-soft)] focus:outline-none ${concept ? 'concept-post-row' : ''}`}
                 >

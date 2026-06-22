@@ -187,6 +187,7 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }) {
     <form onSubmit={submit} className="community-compose-form grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
       <div className="community-compose-meta order-2 flex flex-wrap gap-2 lg:col-start-2 lg:row-start-1">
         <select value={effectiveCategory} onChange={(e) => setCategory(e.target.value)}
+          aria-label="게시판 분류"
           className="w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24"
         >
           {categoryOptions.map((item) => (
@@ -197,6 +198,7 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }) {
 
       <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={MAX_TITLE_LENGTH}
         placeholder="제목"
+        aria-label="제목"
         className="community-compose-title order-1 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm lg:col-start-1 lg:row-start-1"
       />
 
@@ -206,6 +208,7 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }) {
           onChange={(e) => setAnonymousName(e.target.value)}
           maxLength={MAX_ANONYMOUS_NAME_LENGTH}
           placeholder="ㅇㅇ"
+          aria-label="익명 이름"
           className="community-compose-anonymous order-3 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm lg:col-start-2 lg:row-start-2"
         />
       )}
@@ -219,18 +222,21 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }) {
               onMouseDown={(e) => e.preventDefault()}
               onTouchStart={(e) => e.preventDefault()}
               onClick={() => applyFormat('bold')}
+              aria-label="굵게"
               className="min-h-9 px-3 text-sm font-black text-[var(--theme-body-dark)] hover:bg-black/5">B</button>
             <button type="button"
               onPointerDown={(e) => e.preventDefault()}
               onMouseDown={(e) => e.preventDefault()}
               onTouchStart={(e) => e.preventDefault()}
               onClick={() => applyFormat('italic')}
+              aria-label="기울임"
               className="min-h-9 px-3 text-sm italic text-[var(--theme-body-dark)] hover:bg-black/5">I</button>
             <button type="button"
               onPointerDown={(e) => e.preventDefault()}
               onMouseDown={(e) => e.preventDefault()}
               onTouchStart={(e) => e.preventDefault()}
               onClick={() => applyFormat('underline')}
+              aria-label="밑줄"
               className="min-h-9 px-3 text-sm underline text-[var(--theme-body-dark)] hover:bg-black/5">U</button>
           </div>
           <label className="inline-flex min-h-9 items-center gap-1.5 rounded border border-black/15 bg-[var(--app-surface)] px-2 text-xs font-semibold text-[var(--theme-body-mid)] hover:bg-black/5"
