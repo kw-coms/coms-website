@@ -1,10 +1,5 @@
-import { useEffect, useState } from 'react'
-import {
-  deleteMember,
-  listMembers,
-  resetMemberPassword,
-  updateMemberRole,
-} from '../../services/adminApi.js'
+import { useState } from 'react'
+import { useAdminMembers } from './useAdminMembers.js'
 
 function parseInterests(raw) {
   if (!raw) return []
@@ -15,25 +10,13 @@ function parseInterests(raw) {
 }
 
 export default function AdminMembers({ currentUser }) {
-  const [members, setMembers] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const { members, loading, error, updateRole, removeMember, resetPassword } = useAdminMembers()
   const [expanded, setExpanded] = useState(null)
-
-  useEffect(() => {
-    let mounted = true
-    listMembers()
-      .then((data) => { if (mounted) setMembers(data) })
-      .catch((err) => { if (mounted) setError(err.message || '회원 목록을 불러오지 못했습니다.') })
-      .finally(() => { if (mounted) setLoading(false) })
-    return () => { mounted = false }
-  }, [])
 
   const handleRoleUpdate = async (member) => {
     const newRole = member.role === 'ADMIN' ? 'USER' : 'ADMIN'
     try {
-      const updated = await updateMemberRole(member.id, newRole)
-      setMembers((prev) => prev.map((m) => (m.id === member.id ? updated : m)))
+      await updateRole({ id: member.id, role: newRole })
     } catch (err) {
       alert(err.message || '역할 변경 중 오류가 발생했습니다.')
     }
@@ -42,8 +25,7 @@ export default function AdminMembers({ currentUser }) {
   const handleDelete = async (member) => {
     if (!window.confirm(`${member.name} 회원을 삭제하시겠습니까?`)) return
     try {
-      await deleteMember(member.id)
-      setMembers((prev) => prev.filter((m) => m.id !== member.id))
+      await removeMember(member.id)
     } catch (err) {
       alert(err.message || '삭제 중 오류가 발생했습니다.')
     }
@@ -53,7 +35,7 @@ export default function AdminMembers({ currentUser }) {
     const newPassword = window.prompt(`${member.name} (${member.studentId}) 회원의 새 임시 비밀번호를 입력하세요.\n(관리자 초기화는 공백만 입력할 수 없습니다.)`)
     if (!newPassword) return
     try {
-      await resetMemberPassword(member.id, newPassword)
+      await resetPassword({ id: member.id, password: newPassword })
       alert('비밀번호가 초기화되었습니다.')
     } catch (err) {
       alert(err.message || '비밀번호 초기화 중 오류가 발생했습니다.')
