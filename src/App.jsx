@@ -84,6 +84,7 @@ import { buildCalendarDayEvents, buildMonthEventSummary, visibleDayEvents } from
 import { parseScheduleCsv } from './utils/scheduleCsv.js'
 import { sanitizeHtml } from './utils/sanitizeHtml.js'
 import { useAuth } from './contexts/useAuth.js'
+import { useModalFocus } from './hooks/useModalFocus.js'
 import { ActivityCategory } from './contract/enums.js'
 import { enumLabels } from './contract/labels.js'
 import {
@@ -1906,6 +1907,8 @@ function ActivityLogSection({ compact = false }) {
     setDeletingActivity(false)
   }
 
+  const activityModalRef = useModalFocus(Boolean(selectedActivity), closeActivityDetail)
+
   const startActivityEdit = () => {
     if (!selectedActivity) return
     setActivityEditor({
@@ -2305,6 +2308,7 @@ function ActivityLogSection({ compact = false }) {
           if (event.target === event.currentTarget) closeActivityDetail()
         }}>
           <article
+            ref={activityModalRef}
             className="activity-detail-modal"
             role="dialog"
             aria-modal="true"
