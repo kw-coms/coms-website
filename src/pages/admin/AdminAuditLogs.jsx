@@ -142,6 +142,7 @@ export default function AdminAuditLogs({ formatDateTime }) {
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="사용자, 행위, 상세 검색"
+            aria-label="로그 검색"
             className="shape-cut-sm w-48 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition placeholder:text-[var(--theme-body-muted)] focus:border-black/30"
           />
           <label className="flex items-center gap-2 text-xs font-semibold text-[var(--theme-body-muted)]">

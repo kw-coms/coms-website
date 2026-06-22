@@ -122,6 +122,7 @@ export default function AdminDeletedCommunityPosts() {
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
           placeholder="제목·작성자·댓글·첨부 검색"
+          aria-label="삭제 보관함 검색"
           className="shape-cut-sm border border-[var(--app-hairline)] bg-white/80 px-3 py-2 text-xs font-semibold text-[var(--theme-body-dark)] outline-none transition placeholder:text-[var(--theme-body-muted)] focus:border-black/30"
         />
         <select
