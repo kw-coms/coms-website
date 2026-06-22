@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify.jsx'
 import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Search, Sparkles, ThumbsUp, Trash2, UsersRound } from 'lucide-react'
-import { listNotices, getNotice, createNotice, updateNotice, deleteNotice, voteNotice } from '../services/noticeApi.js'
+import { getNotice, createNotice, updateNotice, deleteNotice, voteNotice } from '../services/noticeApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 import { NoticeCategory } from '../contract/enums.js'
 import { enumLabels } from '../contract/labels.js'
+import { useNotices } from './useNotices.js'
 
 function formatDate(iso) {
   const date = new Date(iso)
@@ -141,33 +142,13 @@ export default function Notices() {
   const { id: urlId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [notices, setNotices] = useState([])
+  const { notices, setNotices, refreshNotices, loading, error } = useNotices()
   const [mode, setMode] = useState('list')
   const [selectedNotice, setSelectedNotice] = useState(null)
   const [activeCategory, setActiveCategory] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
 
   const isAdmin = user?.role === 'ADMIN'
-
-  const load = ({ showLoading = true } = {}) => {
-    if (showLoading) setLoading(true)
-    setError('')
-    listNotices()
-      .then((data) => setNotices(Array.isArray(data) ? data : []))
-      .catch((err) => setError(err.message || '공지사항을 불러오지 못했습니다.'))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    let mounted = true
-    listNotices()
-      .then((data) => { if (mounted) setNotices(Array.isArray(data) ? data : []) })
-      .catch((err) => { if (mounted) setError(err.message || '공지사항을 불러오지 못했습니다.') })
-      .finally(() => { if (mounted) setLoading(false) })
-    return () => { mounted = false }
-  }, [])
 
   const filteredNotices = useMemo(() => {
     const byCategory = activeCategory === 'ALL'
@@ -238,6 +219,7 @@ export default function Notices() {
     try {
       await deleteNotice(selectedNotice.id)
       setNotices((prev) => prev.filter((notice) => notice.id !== selectedNotice.id))
+      refreshNotices()
       backToList()
     } catch (err) {
       alert(err.message || '삭제 중 오류가 발생했습니다.')
@@ -437,7 +419,7 @@ export default function Notices() {
             <NoticeForm
               defaultCategory={activeCategory === 'ALL' ? 'GENERAL' : activeCategory}
               onCancel={backToList}
-              onSave={(notice) => { mergeNotice(notice); load({ showLoading: false }) }}
+              onSave={(notice) => { mergeNotice(notice); refreshNotices() }}
             />
           </div>
         )}
@@ -450,7 +432,7 @@ export default function Notices() {
                 setMode('list')
                 navigate('/notices/' + selectedNotice.id)
               }}
-              onSave={(notice) => { mergeNotice(notice); load({ showLoading: false }) }}
+              onSave={(notice) => { mergeNotice(notice); refreshNotices() }}
             />
           </div>
         )}
