@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   buildDeletedPostTimeline,
   filterAndSortCommunityPosts,
@@ -78,5 +79,17 @@ const timeline = buildDeletedPostTimeline({
 assert.deepEqual(timeline.map((item) => item.label), ['작성됨', '삭제됨', '복원 요청', '검토 완료', '복원됨'])
 assert.equal(timeline[1].detail, '관리자(2020123456)')
 assert.equal(timeline[3].detail, '복원 처리 완료')
+
+const postBlocksSource = readFileSync('src/pages/community/PostBlocks.jsx', 'utf8')
+
+assert.match(
+  postBlocksSource,
+  /<img\s+src=\{src\}\s+alt=\{block\.name \|\| '이미지'\}[\s\S]*?className="community-inline-media-image"[\s\S]*?loading="lazy"[\s\S]*?decoding="async"/,
+)
+
+assert.match(
+  postBlocksSource,
+  /<img\s+src=\{src\}\s+alt=\{block\.title \|\| '외부 이미지'\}[\s\S]*?className="community-inline-media-image rounded"[\s\S]*?loading="lazy"[\s\S]*?decoding="async"/,
+)
 
 console.log('community experience contract passed')
