@@ -10,7 +10,6 @@ import {
   getCommunityPost,
   listMyDeletedCommunityPosts,
   listComments,
-  listCommunityPosts,
   voteCommunityPost,
   voteCommunityPoll,
 } from '../services/communityApi.js'
@@ -32,20 +31,19 @@ import {
   paginationRange,
 } from './community/communityBoardUtils.js'
 import { MAX_COMMENT_LENGTH, useCommunityComments } from './community/useCommunityComments.js'
+import { useCommunityPosts } from './community/useCommunityPosts.js'
 
 export default function Community({ onBack }) {
   const { user } = useAuth()
   const { id: urlId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const [posts, setPosts] = useState([])
+  const { posts, setPosts, loading, error } = useCommunityPosts()
   const [deletedPosts, setDeletedPosts] = useState([])
   const [currentPost, setCurrentPost] = useState(null)
   const [mode, setMode] = useState('list')
-  const [loading, setLoading] = useState(true)
   const [deletedLoading, setDeletedLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [error, setError] = useState('')
   const [deletedError, setDeletedError] = useState('')
   const [page, setPage] = useState(1)
   const [activeCategory, setActiveCategory] = useState('ALL')
@@ -95,15 +93,6 @@ export default function Community({ onBack }) {
     setCurrentPost,
     setPosts,
   })
-
-  useEffect(() => {
-    let mounted = true
-    listCommunityPosts()
-      .then((data) => { if (mounted) setPosts(data) })
-      .catch((err) => { if (mounted) setError(err.message || '커뮤니티 글을 불러오지 못했습니다.') })
-      .finally(() => { if (mounted) setLoading(false) })
-    return () => { mounted = false }
-  }, [])
 
   const filteredPosts = useMemo(
     () => filterAndSortCommunityPosts(posts, {
