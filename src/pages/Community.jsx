@@ -2,14 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
-  ChevronsLeft,
-  ChevronsRight,
-  ChevronLeft,
-  ChevronRight,
   Pencil,
-  RotateCcw,
-  Search,
-  ShieldAlert,
   ThumbsDown,
   ThumbsUp,
   Trash2,
@@ -30,173 +23,29 @@ import {
 } from '../services/communityApi.js'
 import { useAuth } from '../contexts/useAuth.js'
 import {
-  buildDeletedPostTimeline,
   filterAndSortCommunityPosts,
 } from '../utils/communityExperience.js'
 import CommentThread from './community/CommentThread.jsx'
+import CommunityDeletedRecordsView from './community/CommunityDeletedRecordsView.jsx'
+import CommunityListView from './community/CommunityListView.jsx'
+import { BoardComposeBar, BoardDetailBar } from './community/CommunityChrome.jsx'
 import PostEditor from './community/PostEditor.jsx'
 import { renderPostBlocks } from './community/PostBlocks.jsx'
 import {
   MAX_ANONYMOUS_NAME_LENGTH,
   canAccessAnonymousBoard,
   categoryLabel,
-  categoryOptionsForUser,
-  textContentForSearch,
 } from './community/postEditorUtils.js'
+import {
+  PAGE_SIZE,
+  boardFilterOptionsForUser,
+  isConceptPost,
+  isEdited,
+  paginationRange,
+  postScore,
+} from './community/communityBoardUtils.js'
 
-const PAGE_SIZE = 30
-const CONCEPT_POST_SCORE_THRESHOLD = 5
 const MAX_COMMENT_LENGTH = 1000
-function deletedRecordText(value) {
-  const raw = String(value || '')
-  try {
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return textContentForSearch(raw)
-    return parsed.map((block) => {
-      if (!block || typeof block !== 'object') return ''
-      if (block.type === 'text') return textContentForSearch(block.content || '')
-      if (block.type === 'poll') return `투표: ${block.question || ''}`
-      if (block.type === 'externalEmbed') return block.title || block.url || ''
-      if (block.type === 'file') return block.name || '첨부파일'
-      if (block.type === 'image') return block.name || '이미지'
-      if (block.type === 'video') return block.name || '영상'
-      return ''
-    }).filter(Boolean).join(' · ')
-  } catch {
-    return textContentForSearch(raw)
-  }
-}
-
-function deletionIdentity(name, studentId) {
-  const safeName = name || '알 수 없음'
-  return studentId ? `${safeName}(${studentId})` : safeName
-}
-
-const SORT_OPTIONS = [
-  { value: 'latest', label: '최신순' },
-  { value: 'comments', label: '댓글 많은 순' },
-  { value: 'score', label: '추천순' },
-  { value: 'views', label: '조회순' },
-]
-
-function boardFilterOptionsForUser(user) {
-  return [
-    { value: 'ALL', label: '전체글' },
-    { value: 'CONCEPT', label: '개념글' },
-    ...categoryOptionsForUser(user),
-  ]
-}
-
-function postScore(post) {
-  return (post.upvotes || 0) - (post.downvotes || 0)
-}
-
-function isConceptPost(post) {
-  return post.conceptPost ?? postScore(post) >= CONCEPT_POST_SCORE_THRESHOLD
-}
-
-function isEdited(post) {
-  return Boolean(post?.edited)
-}
-
-function postImageUrls(post) {
-  return [post?.imageUrl, ...(post?.imageUrls || [])]
-    .filter(Boolean)
-    .filter((url, index, urls) => urls.indexOf(url) === index)
-}
-
-function postHasImages(post) {
-  return postImageUrls(post).length > 0
-}
-
-
-function paginationRange(currentPage, totalPages) {
-  const pages = new Set([1, totalPages])
-  for (let page = currentPage - 1; page <= currentPage + 1; page += 1) {
-    if (page >= 1 && page <= totalPages) pages.add(page)
-  }
-
-  const sorted = [...pages].sort((a, b) => a - b)
-  return sorted.flatMap((page, index) => {
-    const previous = sorted[index - 1]
-    if (index > 0 && page - previous > 1) return [`gap-${previous}-${page}`, page]
-    return [page]
-  })
-}
-
-function shortDate(iso) {
-  const date = new Date(iso)
-  const now = new Date()
-  if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
-  }
-  return date.toLocaleDateString('ko-KR', { year: '2-digit', month: '2-digit', day: '2-digit' })
-}
-
-function openRowWithKeyboard(event, open) {
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault()
-    open()
-  }
-}
-
-function clickableCell(open) {
-  return {
-    onClick: open,
-  }
-}
-
-
-function BoardHeader({ title = "COM's 게시판", children }) {
-  return (
-    <div className="apple-board-hero px-4 py-7 sm:px-8 sm:py-10">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="apple-eyebrow">Community</p>
-          <h1 className="apple-display mt-3 break-words text-4xl sm:text-6xl">{title}</h1>
-          <p className="apple-copy mt-4 max-w-2xl text-base sm:text-lg">스터디 기록, 질문, 프로젝트 공유를 말머리별로 빠르게 확인합니다.</p>
-        </div>
-        {children && <div className="flex w-full shrink-0 sm:w-auto sm:justify-end">{children}</div>}
-      </div>
-    </div>
-  )
-}
-
-function BoardDetailBar({ post, loading, children }) {
-  return (
-    <div className="apple-board-minibar px-4 py-3 sm:px-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-[var(--theme-body-muted)]">
-          <span className="text-[var(--app-accent-text)]">Community</span>
-          <span className="size-1 rounded-full bg-[var(--app-subtle)]" />
-          <span>{loading ? '글 여는 중...' : post ? categoryLabel(post.category || 'GENERAL') : '게시글'}</span>
-          {post?.createdAt && (
-            <>
-              <span className="size-1 rounded-full bg-[var(--app-subtle)]" />
-              <span>{shortDate(post.createdAt)}</span>
-            </>
-          )}
-        </div>
-        {children && <div className="flex w-full shrink-0 sm:w-auto sm:justify-end">{children}</div>}
-      </div>
-    </div>
-  )
-}
-
-function BoardComposeBar({ title, children }) {
-  return (
-    <div className="apple-board-minibar px-4 py-3 sm:px-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-[var(--theme-body-muted)]">
-          <span className="text-[var(--app-accent-text)]">Community</span>
-          <span className="size-1 rounded-full bg-[var(--app-subtle)]" />
-          <h1 className="text-xs font-semibold text-[var(--theme-body-muted)]">{title}</h1>
-        </div>
-        {children && <div className="flex w-full shrink-0 sm:w-auto sm:justify-end">{children}</div>}
-      </div>
-    </div>
-  )
-}
 
 export default function Community({ onBack }) {
   const { user } = useAuth()
@@ -291,21 +140,6 @@ export default function Community({ onBack }) {
     setPosts((prev) => prev.map((post) => (
       post.id === postId ? { ...post, commentCount: Math.max(0, Number(post.commentCount || 0) + delta) } : post
     )))
-  }
-
-  const commentCountSuffix = (post) => {
-    const count = Number(post?.commentCount || 0)
-    return count > 0 ? `[${count.toLocaleString('ko-KR')}]` : ''
-  }
-
-  const renderPostTitleWithCount = (post) => {
-    const suffix = commentCountSuffix(post)
-    return (
-      <span className="inline-flex max-w-full min-w-0 items-baseline" title={post.title}>
-        <span className="min-w-0 truncate">{post.title}</span>
-        {suffix && <span className="shrink-0 text-[0.82em] text-cyan-200">{suffix}</span>}
-      </span>
-    )
   }
 
   const replyMentionFor = (comment) => {
@@ -607,132 +441,21 @@ export default function Community({ onBack }) {
     setPage(Math.min(Math.max(nextPage, 1), totalPages))
   }
 
-  const renderPagination = (placement = 'top') => {
-    const disabledClass = 'opacity-35'
-    const iconButtonClass = 'flex size-10 items-center justify-center rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-muted)] transition enabled:hover:bg-[var(--app-surface-soft)] disabled:pointer-events-none sm:size-9'
-
-    return (
-      <div className={`flex flex-col gap-3 ${placement === 'bottom' ? 'items-center' : 'lg:flex-row lg:items-center lg:justify-between'}`}>
-        <div className="text-center text-xs font-semibold text-[var(--app-subtle)] lg:text-left">
-          {filteredPosts.length > 0
-            ? `${showingFrom.toLocaleString('ko-KR')}-${showingTo.toLocaleString('ko-KR')} / ${filteredPosts.length.toLocaleString('ko-KR')}`
-            : '0 / 0'}
-          <span className="mx-2 text-black/20">|</span>
-          {page.toLocaleString('ko-KR')} / {totalPages.toLocaleString('ko-KR')} 페이지
-        </div>
-        <div className="max-w-full overflow-x-auto pb-1">
-          <div className="flex w-max items-center justify-center gap-1.5 px-1">
-            <button
-              type="button"
-              onClick={() => goToPage(1)}
-              disabled={page === 1}
-              className={`hidden sm:flex ${iconButtonClass} ${page === 1 ? disabledClass : ''}`}
-              aria-label="첫 페이지"
-              title="첫 페이지"
-            >
-              <ChevronsLeft size={15} />
-            </button>
-            <button
-              type="button"
-              onClick={() => goToPage(page - 1)}
-              disabled={page === 1}
-              className={`${iconButtonClass} ${page === 1 ? disabledClass : ''}`}
-              aria-label="이전 페이지"
-              title="이전 페이지"
-            >
-              <ChevronLeft size={15} />
-            </button>
-            {paginationItems.map((item) => (
-              typeof item === 'string' ? (
-                <span key={item} className="flex size-10 items-center justify-center text-sm font-black text-[var(--app-subtle)] sm:size-9">...</span>
-              ) : (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => goToPage(item)}
-                  className={`flex size-10 items-center justify-center rounded-full border text-sm font-black transition sm:size-9 ${
-                    page === item
-                      ? 'border-[#0071e3] bg-[var(--app-accent)] text-white shadow-[0_8px_22px_rgba(0,113,227,0.22)]'
-                      : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-muted)] hover:bg-[var(--app-surface-soft)] hover:text-[var(--app-text)]'
-                  }`}
-                  aria-current={page === item ? 'page' : undefined}
-                >
-                  {item}
-                </button>
-              )
-            ))}
-            <button
-              type="button"
-              onClick={() => goToPage(page + 1)}
-              disabled={page === totalPages}
-              className={`${iconButtonClass} ${page === totalPages ? disabledClass : ''}`}
-              aria-label="다음 페이지"
-              title="다음 페이지"
-            >
-              <ChevronRight size={15} />
-            </button>
-            <button
-              type="button"
-              onClick={() => goToPage(totalPages)}
-              disabled={page === totalPages}
-              className={`hidden sm:flex ${iconButtonClass} ${page === totalPages ? disabledClass : ''}`}
-              aria-label="마지막 페이지"
-              title="마지막 페이지"
-            >
-              <ChevronsRight size={15} />
-            </button>
-          </div>
-        </div>
-      </div>
-    )
+  const openWrite = () => setMode('write')
+  const handleCategoryChange = (value) => {
+    setActiveCategory(value)
+    setPage(1)
   }
-
-  const renderPostCard = (post) => {
-    const open = () => openPost(post)
-    const concept = isConceptPost(post)
-
-    return (
-      <div
-        key={post.id}
-        tabIndex={0}
-        role="button"
-        onClick={open}
-        onKeyDown={(event) => openRowWithKeyboard(event, open)}
-        className={`apple-soft-panel cursor-pointer p-4 text-left text-[var(--app-muted)] transition hover:-translate-y-0.5 focus:bg-[var(--app-surface-soft)] focus:outline-none ${concept ? 'concept-post-card' : ''}`}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-black">
-              <span className="text-[var(--app-subtle)]">#{post.id}</span>
-              <span className="rounded-full bg-[#e8f8ff] px-2 py-1 text-[var(--app-accent-text)]">{categoryLabel(post.category || 'GENERAL')}</span>
-              {concept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] text-[#3a2b00]">개념글</span>}
-              {postHasImages(post) && <span className="text-[var(--app-accent-text)]">[사진]</span>}
-              {(post.videoInfos?.length > 0) && <span className="text-[var(--app-accent-text)]">[영상]</span>}
-              {isEdited(post) && <span className="text-[var(--app-subtle)]">수정</span>}
-              {post.authorAdmin && <span className="rounded bg-red-600 px-1 py-0.5 text-[10px] text-white">주딱</span>}
-            </div>
-            <h3 className="mt-2 min-w-0 text-base font-black leading-6 text-[var(--app-text)]">
-              {renderPostTitleWithCount(post)}
-            </h3>
-          </div>
-          {user?.role === 'ADMIN' && (
-            <button
-              type="button"
-              onClick={(event) => handleAdminDeleteFromList(event, post)}
-              className="shrink-0 rounded-full border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-black text-red-700 transition hover:bg-red-100"
-            >
-              삭제
-            </button>
-          )}
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-[var(--app-subtle)]">
-          <span className="min-w-0 truncate text-[var(--app-muted)]">{post.authorDisplayName || post.authorName}</span>
-          <span className="text-right">{shortDate(post.createdAt)}</span>
-          <span>조회 {post.viewCount}</span>
-          <span className="text-right">개추 {postScore(post)}</span>
-        </div>
-      </div>
-    )
+  const handleSearchChange = (value) => {
+    setSearchQuery(value)
+    setPage(1)
+  }
+  const handleSortChange = (value) => {
+    setSortMode(value)
+    setPage(1)
+  }
+  const handleAppealDraftChange = (recordId, value) => {
+    setAppealDrafts((prev) => ({ ...prev, [recordId]: value }))
   }
 
   return (
@@ -747,279 +470,46 @@ export default function Community({ onBack }) {
 
       <section className="apple-board-shell">
         {mode === 'list' && (
-          <>
-            <BoardHeader>
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                <button type="button" onClick={openDeletedRecords} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-5 py-3 text-sm sm:w-auto sm:py-2.5">
-                  <ShieldAlert size={14} />
-                  내 삭제 기록
-                </button>
-                <button type="button" onClick={() => setMode('write')} className="apple-action-primary w-full px-5 py-3 text-sm sm:w-auto sm:py-2.5">
-                  글쓰기
-                </button>
-              </div>
-            </BoardHeader>
-            <div className="apple-control-strip px-4 py-4 sm:px-8">
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="-mx-1 overflow-x-auto pb-1">
-                    <div className="flex min-w-max gap-2 px-1 text-sm font-bold lg:min-w-0 lg:flex-wrap">
-                      {boardFilterOptions.map((item) => (
-                        <button
-                          key={item.value}
-                          type="button"
-                          onClick={() => {
-                            setActiveCategory(item.value)
-                            setPage(1)
-                          }}
-                          className={`apple-chip min-h-10 px-4 py-2 sm:min-h-9 ${
-                            effectiveActiveCategory === item.value
-                              ? 'apple-chip-active'
-                              : ''
-                          }`}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <div className="relative flex items-center">
-                      <Search size={15} className="pointer-events-none absolute left-3 text-[var(--app-subtle)]" />
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => { setSearchQuery(e.target.value); setPage(1) }}
-                        placeholder="제목, 본문, 작성자 검색"
-                        className="h-11 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-9 pr-3 text-base text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none transition focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:h-10 sm:w-64 sm:text-sm"
-                      />
-                    </div>
-                    <span className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-center text-xs font-bold text-[var(--app-subtle)]">
-                      {filteredPosts.length.toLocaleString('ko-KR')}개
-                    </span>
-                  </div>
-                </div>
-                <div className="-mx-1 overflow-x-auto pb-1">
-                  <div className="flex min-w-max items-center gap-2 px-1 text-xs font-black text-[var(--app-muted)]">
-                    <span className="shrink-0">정렬</span>
-                    {SORT_OPTIONS.map((item) => (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => {
-                          setSortMode(item.value)
-                          setPage(1)
-                        }}
-                        className={`apple-chip min-h-9 px-3 py-1.5 ${sortMode === item.value ? 'apple-chip-active' : ''}`}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                    {searchQuery.trim() && (
-                      <span className="rounded-full border border-[#3b4890]/15 bg-[#f7f9ff] px-3 py-2 text-[#3b4890]">
-                        본문까지 검색 중
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="border-t border-[var(--app-hairline)] pt-4">
-                  {renderPagination('top')}
-                </div>
-              </div>
-            </div>
-            {error && <p className="mx-5 mt-5 rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 sm:mx-7">{error}</p>}
-            <div className="m-4 space-y-3 md:hidden">
-              {loading && (
-                <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-12 text-center text-sm font-semibold text-[var(--app-muted)]">불러오는 중...</div>
-              )}
-              {!loading && filteredPosts.length === 0 && (
-                <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-12 text-center text-sm font-semibold text-[var(--app-muted)]">등록된 글이 없습니다.</div>
-              )}
-              {visiblePosts.map(renderPostCard)}
-            </div>
-            <div className="m-5 hidden overflow-x-auto rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] md:block sm:m-8">
-              <table className="apple-table w-full min-w-[860px] border-collapse text-sm">
-                <thead className="border-b border-[var(--app-hairline)]">
-                  <tr>
-                    <th className="w-20 px-4 py-3 font-semibold">번호</th>
-                    <th className="w-24 px-4 py-3 font-semibold">말머리</th>
-                    <th className="px-4 py-3 text-left font-semibold">제목</th>
-                    <th className="w-36 px-4 py-3 font-semibold">글쓴이</th>
-                    <th className="w-28 px-4 py-3 font-semibold">작성일</th>
-                    <th className="w-20 px-4 py-3 font-semibold">조회</th>
-                    <th className="w-20 px-4 py-3 font-semibold">개추</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-black/10">
-                  {loading && (
-                    <tr><td colSpan="7" className="px-4 py-16 text-center text-[var(--app-muted)]">불러오는 중...</td></tr>
-                  )}
-                  {!loading && filteredPosts.length === 0 && (
-                    <tr><td colSpan="7" className="px-4 py-16 text-center text-[var(--app-muted)]">등록된 글이 없습니다.</td></tr>
-                  )}
-                  {visiblePosts.map((post) => {
-                    const open = () => openPost(post)
-                    const concept = isConceptPost(post)
-                    return (
-                    <tr
-                      key={post.id}
-                      tabIndex={0}
-                      role="button"
-                      onClick={open}
-                      onKeyDown={(event) => openRowWithKeyboard(event, open)}
-                      className={`cursor-pointer text-[var(--app-muted)] transition hover:bg-[var(--app-surface-soft)] focus:bg-[var(--app-surface-soft)] focus:outline-none ${concept ? 'concept-post-row' : ''}`}
-                    >
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-[var(--app-subtle)]">{post.id}</td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-[var(--app-accent-text)]">{categoryLabel(post.category || 'GENERAL')}</td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
-                        <span className="flex max-w-full min-w-0 items-center gap-1 text-left font-semibold text-[var(--app-text)] lg:max-w-[520px]">
-                          {concept && <span className="shrink-0 rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
-                          {renderPostTitleWithCount(post)}
-                        </span>
-                        {postHasImages(post) && <span className="ml-1 text-xs text-[var(--app-accent-text)]">[사진]</span>}
-                        {(post.videoInfos?.length > 0) && <span className="ml-1 text-xs text-[var(--app-accent-text)]">[영상]</span>}
-                        {isEdited(post) && <span className="ml-1 text-[10px] font-bold text-[var(--app-subtle)]">수정</span>}
-                        {post.authorAdmin && <span className="ml-1 rounded bg-red-600 px-1 py-0.5 text-[10px] font-black text-white">주딱</span>}
-                      </td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-semibold">
-                        <span>{post.authorDisplayName || post.authorName}</span>
-                        {user?.role === 'ADMIN' && (
-                          <button
-                            type="button"
-                            onClick={(event) => handleAdminDeleteFromList(event, post)}
-                            className="ml-2 rounded-full border border-red-200 bg-red-50 px-2 py-1 text-[10px] font-black text-red-700 hover:bg-red-100"
-                          >
-                            삭제
-                          </button>
-                        )}
-                      </td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs text-[var(--app-subtle)]">{shortDate(post.createdAt)}</td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{post.viewCount}</td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs">{postScore(post)}</td>
-                    </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="apple-control-strip border-t px-5 py-4 sm:px-8">
-              {renderPagination('bottom')}
-            </div>
-          </>
+          <CommunityListView
+            onOpenDeletedRecords={openDeletedRecords}
+            onWrite={openWrite}
+            boardFilterOptions={boardFilterOptions}
+            effectiveActiveCategory={effectiveActiveCategory}
+            onCategoryChange={handleCategoryChange}
+            searchQuery={searchQuery}
+            onSearchChange={handleSearchChange}
+            filteredPosts={filteredPosts}
+            visiblePosts={visiblePosts}
+            loading={loading}
+            error={error}
+            sortMode={sortMode}
+            onSortChange={handleSortChange}
+            page={page}
+            totalPages={totalPages}
+            paginationItems={paginationItems}
+            showingFrom={showingFrom}
+            showingTo={showingTo}
+            onPageChange={goToPage}
+            user={user}
+            onOpenPost={openPost}
+            onAdminDelete={handleAdminDeleteFromList}
+          />
         )}
 
         {mode === 'deleted' && (
-          <>
-            <BoardComposeBar title="내 삭제 기록">
-              <button type="button" onClick={backToList} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
-                <ArrowLeft size={14} />
-                목록
-              </button>
-            </BoardComposeBar>
-            <div className="space-y-3 p-4 sm:p-6">
-              <div className="rounded-lg border border-[#3b4890]/15 bg-[#f7f9ff] px-4 py-3 text-sm text-[#3b4890]">
-                관리자가 삭제한 글과 직접 삭제한 글의 원문, 사유, 처리자를 여기서 확인할 수 있습니다.
-              </div>
-              {deletedError && <p className="rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{deletedError}</p>}
-              {deletedLoading && <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-12 text-center text-sm font-semibold text-[var(--app-muted)]">삭제 기록을 불러오는 중...</div>}
-              {!deletedLoading && deletedPosts.length === 0 && (
-                <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-12 text-center text-sm font-semibold text-[var(--app-muted)]">삭제된 내 글이 없습니다.</div>
-              )}
-              {!deletedLoading && deletedPosts.map((record) => {
-                const restored = Boolean(record.restoredPostId)
-                const appealed = Boolean(record.latestAppealStatus)
-                const timeline = buildDeletedPostTimeline(record)
-                return (
-                  <article key={record.id} className="overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)]">
-                    <div className="border-b border-[var(--app-hairline)] px-4 py-4">
-                      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[#3b4890]">
-                        <span>{categoryLabel(record.category || 'GENERAL')}</span>
-                        <span className={restored ? 'rounded bg-emerald-100 px-2 py-1 text-emerald-700' : 'rounded bg-red-50 px-2 py-1 text-red-700'}>
-                          {restored ? '복원됨' : '삭제됨'}
-                        </span>
-                        {appealed && <span className="rounded bg-[#fff4cc] px-2 py-1 text-[#8a6400]">복원 요청 접수됨</span>}
-                      </div>
-                      <h2 className="break-words text-lg font-black text-[var(--app-text)]">{record.title}</h2>
-                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--theme-body-muted)]">
-                        <span>삭제 {record.deletedAt ? new Date(record.deletedAt).toLocaleString('ko-KR') : '-'}</span>
-                        <span>처리자 {deletionIdentity(record.deletedByName, record.deletedByStudentId)}</span>
-                        {record.restoredAt && <span>복원 {new Date(record.restoredAt).toLocaleString('ko-KR')}</span>}
-                      </div>
-                    </div>
-                    <div className="space-y-3 px-4 py-4 text-sm text-[#424245]">
-                      <div>
-                        <strong className="mb-1 block text-xs text-[#3b4890]">삭제 사유</strong>
-                        <p className="whitespace-pre-wrap break-words">{record.deletionReason || '사유 없음'}</p>
-                      </div>
-                      <div>
-                        <strong className="mb-1 block text-xs text-[#3b4890]">원문</strong>
-                        <p className="whitespace-pre-wrap break-words">{deletedRecordText(record.content) || '원문 미리보기가 없습니다.'}</p>
-                      </div>
-                      {record.commentCount > 0 && (
-                        <div>
-                          <strong className="mb-1 block text-xs text-[#3b4890]">함께 보관된 댓글 {record.commentCount}</strong>
-                          <p className="whitespace-pre-wrap break-words text-xs text-[var(--theme-body-muted)]">
-                            {(record.commentInfos || []).slice(0, 3).map((comment) => `${comment.authorName || '회원'}: ${comment.content}`).join('\n')}
-                          </p>
-                        </div>
-                      )}
-                      {timeline.length > 0 && (
-                        <div>
-                          <strong className="mb-2 block text-xs text-[#3b4890]">처리 타임라인</strong>
-                          <ol className="space-y-2">
-                            {timeline.map((item, index) => (
-                              <li key={`${record.id}-${item.label}-${index}`} className="grid grid-cols-[auto_1fr] gap-2 text-xs">
-                                <span className="mt-1 size-2 rounded-full bg-[#3b4890]" aria-hidden="true" />
-                                <span className="min-w-0">
-                                  <span className="font-black text-[var(--app-text)]">{item.label}</span>
-                                  {item.time && <span className="ml-2 text-[var(--theme-body-muted)]">{item.time}</span>}
-                                  {item.detail && (
-                                    <span className="block break-words text-[var(--theme-body-muted)]">
-                                      {item.label === '삭제됨' ? '처리자는 상단 기록에 표시됩니다.' : item.detail}
-                                    </span>
-                                  )}
-                                </span>
-                              </li>
-                            ))}
-                          </ol>
-                        </div>
-                      )}
-                      {restored ? (
-                        <a href={`/community/${record.restoredPostId}`} className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black text-emerald-700">
-                          <RotateCcw size={14} />
-                          복원된 글 열기
-                        </a>
-                      ) : appealed ? (
-                        <p className="rounded-lg border border-[#f0c36d]/40 bg-[#fff9e8] px-3 py-2 text-xs font-bold text-[#8a6400]">복원 요청 접수됨: {record.latestAppealMessage}</p>
-                      ) : appealOpenId === record.id ? (
-                        <div className="space-y-2">
-                          <textarea
-                            value={appealDrafts[record.id] || ''}
-                            onChange={(event) => setAppealDrafts((prev) => ({ ...prev, [record.id]: event.target.value }))}
-                            maxLength={500}
-                            rows={3}
-                            placeholder="복원이 필요한 이유를 적어주세요."
-                            className="w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2 text-base outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm"
-                          />
-                          <div className="flex flex-col gap-2 sm:flex-row">
-                            <button type="button" onClick={() => submitAppeal(record)} disabled={appealingId === record.id} className="apple-action-primary px-4 py-2 text-sm">
-                              {appealingId === record.id ? '보내는 중...' : '요청 보내기'}
-                            </button>
-                            <button type="button" onClick={() => setAppealOpenId(null)} className="apple-action-secondary px-4 py-2 text-sm">취소</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <button type="button" onClick={() => setAppealOpenId(record.id)} className="apple-action-secondary inline-flex items-center gap-1 px-4 py-2 text-sm">
-                          <RotateCcw size={14} />
-                          복원 요청
-                        </button>
-                      )}
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          </>
+          <CommunityDeletedRecordsView
+            deletedError={deletedError}
+            deletedLoading={deletedLoading}
+            deletedPosts={deletedPosts}
+            appealOpenId={appealOpenId}
+            appealDrafts={appealDrafts}
+            appealingId={appealingId}
+            onBackToList={backToList}
+            onAppealDraftChange={handleAppealDraftChange}
+            onAppealOpen={setAppealOpenId}
+            onAppealCancel={() => setAppealOpenId(null)}
+            onSubmitAppeal={submitAppeal}
+          />
         )}
 
         {mode === 'write' && (
