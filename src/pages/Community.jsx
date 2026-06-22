@@ -2,22 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
-  Pencil,
-  ThumbsDown,
-  ThumbsUp,
-  Trash2,
 } from 'lucide-react'
 import {
-  createComment,
   closeCommunityPoll,
   appealDeletedCommunityPost,
-  deleteComment,
   deleteCommunityPost,
   getCommunityPost,
   listMyDeletedCommunityPosts,
   listComments,
   listCommunityPosts,
-  updateComment,
   voteCommunityPost,
   voteCommunityPoll,
 } from '../services/communityApi.js'
@@ -25,27 +18,20 @@ import { useAuth } from '../contexts/useAuth.js'
 import {
   filterAndSortCommunityPosts,
 } from '../utils/communityExperience.js'
-import CommentThread from './community/CommentThread.jsx'
+import CommunityDetailView from './community/CommunityDetailView.jsx'
 import CommunityDeletedRecordsView from './community/CommunityDeletedRecordsView.jsx'
 import CommunityListView from './community/CommunityListView.jsx'
-import { BoardComposeBar, BoardDetailBar } from './community/CommunityChrome.jsx'
+import { BoardComposeBar } from './community/CommunityChrome.jsx'
 import PostEditor from './community/PostEditor.jsx'
-import { renderPostBlocks } from './community/PostBlocks.jsx'
 import {
-  MAX_ANONYMOUS_NAME_LENGTH,
   canAccessAnonymousBoard,
-  categoryLabel,
 } from './community/postEditorUtils.js'
 import {
   PAGE_SIZE,
   boardFilterOptionsForUser,
-  isConceptPost,
-  isEdited,
   paginationRange,
-  postScore,
 } from './community/communityBoardUtils.js'
-
-const MAX_COMMENT_LENGTH = 1000
+import { MAX_COMMENT_LENGTH, useCommunityComments } from './community/useCommunityComments.js'
 
 export default function Community({ onBack }) {
   const { user } = useAuth()
@@ -65,16 +51,6 @@ export default function Community({ onBack }) {
   const [activeCategory, setActiveCategory] = useState('ALL')
   const [sortMode, setSortMode] = useState('latest')
   const [searchQuery, setSearchQuery] = useState('')
-  const [comments, setComments] = useState([])
-  const [commentInput, setCommentInput] = useState('')
-  const [commentAnonymousName, setCommentAnonymousName] = useState('')
-  const [replyTo, setReplyTo] = useState(null)
-  const [replyInput, setReplyInput] = useState('')
-  const [replyAnonymousName, setReplyAnonymousName] = useState('')
-  const [replyMentionEnabled, setReplyMentionEnabled] = useState(true)
-  const [editingCommentId, setEditingCommentId] = useState(null)
-  const [editCommentInput, setEditCommentInput] = useState('')
-  const [commentSaving, setCommentSaving] = useState(false)
   const [pollVoting, setPollVoting] = useState('')
   const [pollClosing, setPollClosing] = useState('')
   const [appealOpenId, setAppealOpenId] = useState(null)
@@ -85,6 +61,40 @@ export default function Community({ onBack }) {
   const effectiveActiveCategory = boardFilterOptions.some((item) => item.value === activeCategory) ? activeCategory : 'ALL'
   const isAnonymousDetail = currentPost?.category === 'ANONYMOUS'
   const deletedViewRequested = useMemo(() => new URLSearchParams(location.search).get('view') === 'deleted', [location.search])
+  const {
+    comments,
+    setComments,
+    commentInput,
+    setCommentInput,
+    commentAnonymousName,
+    setCommentAnonymousName,
+    replyTo,
+    setReplyTo,
+    replyInput,
+    setReplyInput,
+    replyAnonymousName,
+    setReplyAnonymousName,
+    replyMentionEnabled,
+    setReplyMentionEnabled,
+    editingCommentId,
+    setEditingCommentId,
+    editCommentInput,
+    setEditCommentInput,
+    commentSaving,
+    resetCommentSession,
+    resetCommentNavigation,
+    replyMentionFor,
+    handleAddComment,
+    handleAddReply,
+    handleDeleteComment,
+    startEditComment,
+    handleUpdateComment,
+  } = useCommunityComments({
+    currentPost,
+    isAnonymousDetail,
+    setCurrentPost,
+    setPosts,
+  })
 
   useEffect(() => {
     let mounted = true
@@ -130,36 +140,6 @@ export default function Community({ onBack }) {
     setCurrentPost(post)
   }
 
-  const bumpCurrentPostCommentCount = (delta) => {
-    if (!currentPost || delta === 0) return
-    const postId = currentPost.id
-    setCurrentPost((prev) => {
-      if (!prev) return prev
-      return { ...prev, commentCount: Math.max(0, Number(prev.commentCount || 0) + delta) }
-    })
-    setPosts((prev) => prev.map((post) => (
-      post.id === postId ? { ...post, commentCount: Math.max(0, Number(post.commentCount || 0) + delta) } : post
-    )))
-  }
-
-  const replyMentionFor = (comment) => {
-    const name = comment?.authorName?.trim()
-    return name ? `@${name}` : ''
-  }
-
-  const buildReplyContent = (parentId) => {
-    const body = replyInput.trim()
-    if (!body) return ''
-    const parent = comments.find((comment) => comment.id === parentId)
-    const mention = replyMentionEnabled ? replyMentionFor(parent) : ''
-    const content = mention ? `${mention} ${body}` : body
-    if (content.length > MAX_COMMENT_LENGTH) {
-      alert(`태그를 포함한 답글은 ${MAX_COMMENT_LENGTH}자 이하로 입력해주세요.`)
-      return ''
-    }
-    return content
-  }
-
   useEffect(() => {
     if (mode !== 'deleted') return undefined
     let mounted = true
@@ -181,30 +161,14 @@ export default function Community({ onBack }) {
       /* eslint-disable react-hooks/set-state-in-effect */
       setMode(deletedViewRequested ? 'deleted' : 'list')
       setCurrentPost(null)
-      setComments([])
-      setCommentInput('')
-      setCommentAnonymousName('')
-      setReplyTo(null)
-      setReplyInput('')
-      setReplyAnonymousName('')
-      setReplyMentionEnabled(true)
-      setEditingCommentId(null)
-      setEditCommentInput('')
+      resetCommentSession()
       /* eslint-enable react-hooks/set-state-in-effect */
       return
     }
     const numId = Number(urlId)
     if (isNaN(numId)) { navigate('/community', { replace: true }); return }
     setDetailLoading(true)
-    setComments([])
-    setCommentInput('')
-    setCommentAnonymousName('')
-    setReplyTo(null)
-    setReplyInput('')
-    setReplyAnonymousName('')
-    setReplyMentionEnabled(true)
-    setEditingCommentId(null)
-    setEditCommentInput('')
+    resetCommentSession()
     let mounted = true
     Promise.all([
       getCommunityPost(numId),
@@ -230,107 +194,10 @@ export default function Community({ onBack }) {
     navigate('/community/' + post.id)
   }
 
-  const handleAddComment = async () => {
-    if (!commentInput.trim() || !currentPost) return
-    setCommentSaving(true)
-    try {
-      const comment = await createComment(currentPost.id, commentInput.trim(), null, isAnonymousDetail ? commentAnonymousName.trim() : '')
-      setComments((prev) => [...prev, comment])
-      bumpCurrentPostCommentCount(1)
-      setCommentInput('')
-    } catch (err) {
-      alert(err.message || '댓글 등록 실패')
-    } finally {
-      setCommentSaving(false)
-    }
-  }
-
-  const handleAddReply = async (parentId) => {
-    if (!replyInput.trim() || !currentPost) return
-    setCommentSaving(true)
-    try {
-      const content = buildReplyContent(parentId)
-      if (!content) return
-      const comment = await createComment(currentPost.id, content, parentId, isAnonymousDetail ? replyAnonymousName.trim() : '')
-      setComments((prev) => [...prev, comment])
-      bumpCurrentPostCommentCount(1)
-      setReplyInput('')
-      setReplyAnonymousName('')
-      setReplyTo(null)
-      setReplyMentionEnabled(true)
-    } catch (err) {
-      alert(err.message || '답글 등록 실패')
-    } finally {
-      setCommentSaving(false)
-    }
-  }
-
-  const handleDeleteComment = async (commentId) => {
-    if (!currentPost || !window.confirm('댓글을 삭제하시겠습니까?')) return
-    try {
-      await deleteComment(currentPost.id, commentId)
-      const toDelete = new Set([commentId])
-      let changed = true
-      while (changed) {
-        changed = false
-        comments.forEach((comment) => {
-          if (comment.parentCommentId && toDelete.has(comment.parentCommentId) && !toDelete.has(comment.id)) {
-            toDelete.add(comment.id)
-            changed = true
-          }
-        })
-      }
-      setComments((prev) => {
-        let changed = true
-        while (changed) {
-          changed = false
-          prev.forEach((comment) => {
-            if (comment.parentCommentId && toDelete.has(comment.parentCommentId) && !toDelete.has(comment.id)) {
-              toDelete.add(comment.id)
-              changed = true
-            }
-          })
-        }
-        return prev.filter((comment) => !toDelete.has(comment.id))
-      })
-      bumpCurrentPostCommentCount(-toDelete.size)
-    } catch (err) {
-      alert(err.message || '댓글 삭제 실패')
-    }
-  }
-
-  const startEditComment = (comment) => {
-    setEditingCommentId(comment.id)
-    setEditCommentInput(comment.content || '')
-    setReplyTo(null)
-    setReplyInput('')
-  }
-
-  const handleUpdateComment = async (commentId) => {
-    if (!currentPost || !editCommentInput.trim()) return
-    setCommentSaving(true)
-    try {
-      const updated = await updateComment(currentPost.id, commentId, editCommentInput.trim())
-      setComments((prev) => prev.map((comment) => (comment.id === commentId ? updated : comment)))
-      setEditingCommentId(null)
-      setEditCommentInput('')
-    } catch (err) {
-      alert(err.message || '댓글 수정 실패')
-    } finally {
-      setCommentSaving(false)
-    }
-  }
-
   const backToList = () => {
     setMode('list')
     setCurrentPost(null)
-    setComments([])
-    setCommentInput('')
-    setReplyTo(null)
-    setReplyInput('')
-    setReplyMentionEnabled(true)
-    setEditingCommentId(null)
-    setEditCommentInput('')
+    resetCommentNavigation()
     if (urlId) navigate('/community')
     else if (deletedViewRequested) navigate('/community', { replace: true })
   }
@@ -436,7 +303,6 @@ export default function Community({ onBack }) {
     }
   }
 
-  const currentPostConcept = currentPost ? isConceptPost(currentPost) : false
   const goToPage = (nextPage) => {
     setPage(Math.min(Math.max(nextPage, 1), totalPages))
   }
@@ -541,101 +407,44 @@ export default function Community({ onBack }) {
         )}
 
         {mode === 'detail' && (
-          <>
-            <BoardDetailBar post={currentPost} loading={detailLoading}>
-              <button type="button" onClick={backToList} className="apple-action-secondary inline-flex w-full items-center justify-center gap-1 px-4 py-3 text-sm sm:w-auto sm:py-2">
-                <ArrowLeft size={14} />
-                목록
-              </button>
-            </BoardDetailBar>
-            {detailLoading || !currentPost ? (
-              <p className="px-4 py-16 text-center text-sm text-[var(--theme-body-muted)]">글을 여는 중...</p>
-            ) : (
-              <article className="m-0 overflow-hidden bg-[var(--app-surface)] sm:m-5 sm:rounded-lg sm:border sm:border-[var(--app-hairline)]">
-                <div className="border-b border-[var(--app-hairline)] px-4 py-4 sm:px-5">
-                  <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[#3b4890]">
-                    <span>{categoryLabel(currentPost.category || 'GENERAL')}</span>
-                    {currentPostConcept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
-                  </div>
-                  <h2 className="break-words text-xl font-black leading-8 sm:text-2xl">{currentPost.title}</h2>
-                  <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--theme-body-muted)]">
-                    <span className="font-bold text-[var(--theme-body-mid)]">{currentPost.authorDisplayName || currentPost.authorName}</span>
-                    {currentPost.authorAdmin && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">주딱</span>}
-                    {currentPost.concept && <span className="rounded bg-yellow-400 px-1.5 py-0.5 text-[10px] font-black text-black">개념글</span>}
-                    <span>{new Date(currentPost.createdAt).toLocaleString('ko-KR')}</span>
-                    {isEdited(currentPost) && <span>수정 {new Date(currentPost.updatedAt).toLocaleString('ko-KR')}</span>}
-                    <span>조회 {currentPost.viewCount}</span>
-                    <span>개추 {postScore(currentPost)}</span>
-                  </div>
-                </div>
-                <div className="min-h-[220px] sm:min-h-[280px]">
-                  {renderPostBlocks(currentPost, {
-                    onPollVote: handlePollVote,
-                    onPollClose: currentPost?.editable ? handlePollClose : null,
-                    pollVoting,
-                    pollClosing,
-                  })}
-                </div>
-                <div className="grid grid-cols-2 gap-2 border-y border-[var(--app-hairline)] bg-[#fafafa] px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-3 sm:py-5">
-                  <button type="button" onClick={() => handleVote(1)} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === 1 ? 'border-[#0071e3] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}>
-                    <ThumbsUp size={16} />
-                    개추 {currentPost.upvotes}
-                  </button>
-                  <button type="button" onClick={() => handleVote(-1)} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === -1 ? 'border-red-600 bg-red-600 text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-red-600'}`}>
-                    <ThumbsDown size={16} />
-                    비추 {currentPost.downvotes}
-                  </button>
-                </div>
-                <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:flex-wrap sm:justify-between">
-                  <button type="button" onClick={backToList} className="min-h-11 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
-                    목록
-                  </button>
-                  {currentPost.editable && (
-                    <div className="grid grid-cols-2 gap-2 sm:flex">
-                      <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
-                        <Pencil size={14} />
-                        수정
-                      </button>
-                      <button type="button" onClick={() => handleDelete(currentPost)} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600 sm:min-h-0">
-                        <Trash2 size={14} />
-                        삭제
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <CommentThread
-                  comments={comments}
-                  commentInput={commentInput}
-                  setCommentInput={setCommentInput}
-                  commentAnonymousName={commentAnonymousName}
-                  setCommentAnonymousName={setCommentAnonymousName}
-                  replyTo={replyTo}
-                  setReplyTo={setReplyTo}
-                  replyInput={replyInput}
-                  setReplyInput={setReplyInput}
-                  replyAnonymousName={replyAnonymousName}
-                  setReplyAnonymousName={setReplyAnonymousName}
-                  replyMentionEnabled={replyMentionEnabled}
-                  setReplyMentionEnabled={setReplyMentionEnabled}
-                  editingCommentId={editingCommentId}
-                  setEditingCommentId={setEditingCommentId}
-                  editCommentInput={editCommentInput}
-                  setEditCommentInput={setEditCommentInput}
-                  commentSaving={commentSaving}
-                  isAnonymousDetail={isAnonymousDetail}
-                  maxCommentLength={MAX_COMMENT_LENGTH}
-                  maxAnonymousNameLength={MAX_ANONYMOUS_NAME_LENGTH}
-                  replyMentionFor={replyMentionFor}
-                  onAddComment={handleAddComment}
-                  onAddReply={handleAddReply}
-                  onUpdateComment={handleUpdateComment}
-                  onDeleteComment={handleDeleteComment}
-                  onStartEditComment={startEditComment}
-                />
-              </article>
-            )}
-          </>
+          <CommunityDetailView
+            currentPost={currentPost}
+            detailLoading={detailLoading}
+            comments={comments}
+            commentInput={commentInput}
+            setCommentInput={setCommentInput}
+            commentAnonymousName={commentAnonymousName}
+            setCommentAnonymousName={setCommentAnonymousName}
+            replyTo={replyTo}
+            setReplyTo={setReplyTo}
+            replyInput={replyInput}
+            setReplyInput={setReplyInput}
+            replyAnonymousName={replyAnonymousName}
+            setReplyAnonymousName={setReplyAnonymousName}
+            replyMentionEnabled={replyMentionEnabled}
+            setReplyMentionEnabled={setReplyMentionEnabled}
+            editingCommentId={editingCommentId}
+            setEditingCommentId={setEditingCommentId}
+            editCommentInput={editCommentInput}
+            setEditCommentInput={setEditCommentInput}
+            commentSaving={commentSaving}
+            isAnonymousDetail={isAnonymousDetail}
+            maxCommentLength={MAX_COMMENT_LENGTH}
+            replyMentionFor={replyMentionFor}
+            onAddComment={handleAddComment}
+            onAddReply={handleAddReply}
+            onUpdateComment={handleUpdateComment}
+            onDeleteComment={handleDeleteComment}
+            onStartEditComment={startEditComment}
+            pollVoting={pollVoting}
+            pollClosing={pollClosing}
+            onPollVote={handlePollVote}
+            onPollClose={handlePollClose}
+            onVote={handleVote}
+            onBackToList={backToList}
+            onEdit={() => setMode('edit')}
+            onDelete={handleDelete}
+          />
         )}
       </section>
     </div>
