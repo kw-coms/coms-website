@@ -75,7 +75,14 @@ export function renderPostBlocks(post, options = {}) {
           if (!src) return null
           return (
             <div key={i} className="community-post-media group relative my-2" style={mediaContainerStyle(block.width, block.align)}>
-              <img src={src} alt={block.name || '이미지'} draggable={false} className="community-inline-media-image" />
+              <img
+                src={src}
+                alt={block.name || '이미지'}
+                draggable={false}
+                className="community-inline-media-image"
+                loading="lazy"
+                decoding="async"
+              />
               <a
                 href={imageDownloadUrl(block.url)}
                 download={block.name}
@@ -131,7 +138,14 @@ export function renderPostBlocks(post, options = {}) {
             if (!src) return null
             return (
               <div key={i} className="community-post-media my-2" style={widthStyle}>
-                <img src={src} alt={block.title || '외부 이미지'} draggable={false} className="community-inline-media-image rounded" />
+                <img
+                  src={src}
+                  alt={block.title || '외부 이미지'}
+                  draggable={false}
+                  className="community-inline-media-image rounded"
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
             )
           }
@@ -246,4 +260,3 @@ export function renderPostBlocks(post, options = {}) {
     </div>
   )
 }
-
