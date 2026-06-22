@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RotateCcw, X } from 'lucide-react'
 import { getDeletedCommunityPost } from '../../services/adminApi.js'
 import DeletedPostBody from './DeletedPostBody.jsx'
@@ -14,6 +14,16 @@ export default function DeletedPostDetailModal({ post, onClose, onRestore, resto
   const [detail, setDetail] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const closeButtonRef = useRef(null)
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined
+    const previousActiveElement = document.activeElement
+    closeButtonRef.current?.focus()
+    return () => {
+      previousActiveElement?.focus?.()
+    }
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -39,15 +49,17 @@ export default function DeletedPostDetailModal({ post, onClose, onRestore, resto
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:p-8"
       role="dialog"
       aria-modal="true"
+      aria-labelledby="deleted-post-detail-title"
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}
     >
       <div className="my-auto w-full max-w-3xl overflow-hidden rounded-2xl bg-[var(--app-surface)] shadow-2xl">
         <div className="flex items-center justify-between gap-3 border-b border-[var(--app-hairline)] bg-[#f7f9ff] px-5 py-3">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#3b4890]">삭제 보관함 · 원문 보기</p>
+            <p id="deleted-post-detail-title" className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#3b4890]">삭제 보관함 · 원문 보기</p>
             <p className="truncate text-xs text-[var(--theme-body-muted)]">#{full.originalPostId} · {deletedCategoryLabel(full.category)}</p>
           </div>
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
             aria-label="닫기"

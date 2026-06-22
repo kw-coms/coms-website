@@ -157,7 +157,7 @@ test('admin member management updates member roles in place', async ({ page }) =
   })
 
   await page.goto('/admin')
-  await page.getByRole('button', { name: '회원 관리' }).click()
+  await page.getByRole('tab', { name: '회원 관리' }).click()
 
   const memberRow = page.locator('.shape-cut-sm').filter({ hasText: '일반회원' })
   await expect(memberRow).toBeVisible()

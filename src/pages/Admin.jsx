@@ -21,6 +21,22 @@ const ADMIN_TAB_IDS = new Set([
   'fonts', 'community', 'deleted-posts', 'screen-check', 'ban', 'logs',
 ])
 
+const ADMIN_TABS = [
+  { id: 'overview', label: '운영 요약' },
+  { id: 'members', label: '회원 관리' },
+  { id: 'recruit', label: '모집 관리' },
+  { id: 'roster', label: '명부 인증' },
+  { id: 'activities', label: '활동 관리' },
+  { id: 'projects', label: 'Apps 관리' },
+  { id: 'files', label: '파일 관리' },
+  { id: 'fonts', label: '폰트 관리' },
+  { id: 'community', label: '커뮤니티 관리' },
+  { id: 'deleted-posts', label: '삭제 보관함' },
+  { id: 'screen-check', label: '화면 점검' },
+  { id: 'ban', label: '차단 관리' },
+  { id: 'logs', label: '로그' },
+]
+
 export default function Admin({ onBack }) {
   const { user } = useAuth()
   const [searchParams] = useSearchParams()
@@ -28,6 +44,7 @@ export default function Admin({ onBack }) {
     const requested = searchParams.get('tab')
     return requested && ADMIN_TAB_IDS.has(requested) ? requested : 'overview'
   })
+  const activeTabLabel = ADMIN_TABS.find((tab) => tab.id === activeTab)?.label || '관리자 탭'
   const [recruitApplications, setRecruitApplications] = useState([])
   const [recruitLoading, setRecruitLoading] = useState(true)
   const [recruitError, setRecruitError] = useState('')
@@ -91,25 +108,15 @@ export default function Admin({ onBack }) {
           <h1 className="mt-2 mb-6 text-2xl font-bold sm:text-3xl">관리자 패널</h1>
 
           <div className="-mx-1 mb-6 overflow-x-auto pb-1">
-            <div className="flex min-w-max gap-2 px-1">
-              {[
-                { id: 'overview', label: '운영 요약' },
-                { id: 'members', label: '회원 관리' },
-                { id: 'recruit', label: '모집 관리' },
-                { id: 'roster', label: '명부 인증' },
-                { id: 'activities', label: '활동 관리' },
-                { id: 'projects', label: 'Apps 관리' },
-                { id: 'files', label: '파일 관리' },
-                { id: 'fonts', label: '폰트 관리' },
-                { id: 'community', label: '커뮤니티 관리' },
-                { id: 'deleted-posts', label: '삭제 보관함' },
-                { id: 'screen-check', label: '화면 점검' },
-                { id: 'ban', label: '차단 관리' },
-                { id: 'logs', label: '로그' },
-              ].map((tab) => (
+            <div className="flex min-w-max gap-2 px-1" role="tablist" aria-label="관리자 패널 섹션">
+              {ADMIN_TABS.map((tab) => (
                 <button
+                  id={`admin-tab-${tab.id}`}
                   key={tab.id}
                   type="button"
+                  role="tab"
+                  aria-selected={activeTab === tab.id}
+                  aria-controls={`admin-panel-${tab.id}`}
                   onClick={() => setActiveTab(tab.id)}
                   className={`shape-cut-sm shrink-0 px-4 py-2 text-sm font-semibold transition ${
                     activeTab === tab.id
@@ -123,37 +130,44 @@ export default function Admin({ onBack }) {
             </div>
           </div>
 
-          {activeTab === 'overview' && (
-            <OverviewTab
-              recruitApplications={recruitApplications}
-              recruitLoading={recruitLoading}
-              recruitError={recruitError}
-              onOpenRecruit={() => setActiveTab('recruit')}
-            />
-          )}
-          {activeTab === 'members' && <AdminMembers currentUser={user} />}
-          {activeTab === 'recruit' && (
-            <AdminRecruitApplications
-              applications={recruitApplications}
-              loading={recruitLoading}
-              error={recruitError}
-              onReload={loadRecruitApplications}
-              onUpdated={(updated) => {
-                setRecruitApplications((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
-              }}
-              formatDateTime={formatDateTime}
-            />
-          )}
-          {activeTab === 'roster' && <AdminRoster />}
-          {activeTab === 'activities' && <AdminActivities />}
-          {activeTab === 'projects' && <AdminAppCatalog />}
-          {activeTab === 'files' && <AdminFiles />}
-          {activeTab === 'fonts' && <AdminFonts />}
-          {activeTab === 'community' && <AdminCommunityReports formatDateTime={formatDateTime} />}
-          {activeTab === 'deleted-posts' && <AdminDeletedCommunityPosts />}
-          {activeTab === 'screen-check' && <AdminScreenCheck />}
-          {activeTab === 'ban' && <AdminBan formatDateTime={formatDateTime} />}
-          {activeTab === 'logs' && <AdminAuditLogs formatDateTime={formatDateTime} />}
+          <div
+            id={`admin-panel-${activeTab}`}
+            role="tabpanel"
+            aria-labelledby={`admin-tab-${activeTab}`}
+            aria-label={activeTabLabel}
+          >
+            {activeTab === 'overview' && (
+              <OverviewTab
+                recruitApplications={recruitApplications}
+                recruitLoading={recruitLoading}
+                recruitError={recruitError}
+                onOpenRecruit={() => setActiveTab('recruit')}
+              />
+            )}
+            {activeTab === 'members' && <AdminMembers currentUser={user} />}
+            {activeTab === 'recruit' && (
+              <AdminRecruitApplications
+                applications={recruitApplications}
+                loading={recruitLoading}
+                error={recruitError}
+                onReload={loadRecruitApplications}
+                onUpdated={(updated) => {
+                  setRecruitApplications((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+                }}
+                formatDateTime={formatDateTime}
+              />
+            )}
+            {activeTab === 'roster' && <AdminRoster />}
+            {activeTab === 'activities' && <AdminActivities />}
+            {activeTab === 'projects' && <AdminAppCatalog />}
+            {activeTab === 'files' && <AdminFiles />}
+            {activeTab === 'fonts' && <AdminFonts />}
+            {activeTab === 'community' && <AdminCommunityReports formatDateTime={formatDateTime} />}
+            {activeTab === 'deleted-posts' && <AdminDeletedCommunityPosts />}
+            {activeTab === 'screen-check' && <AdminScreenCheck />}
+            {activeTab === 'ban' && <AdminBan formatDateTime={formatDateTime} />}
+            {activeTab === 'logs' && <AdminAuditLogs formatDateTime={formatDateTime} />}
+          </div>
         </section>
       </div>
     </div>
