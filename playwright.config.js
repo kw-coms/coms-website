@@ -32,6 +32,14 @@ export default defineConfig({
       },
     },
     {
+      name: 'accessibility',
+      testMatch: /accessibility\.spec\.js/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 900 },
+      },
+    },
+    {
       name: 'mobile-visual',
       testMatch: /visual\.spec\.js/,
       use: {
