@@ -4,6 +4,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 const pkg = JSON.parse(readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8'))
 
@@ -23,9 +24,23 @@ const sentryPlugins = sentryAuthToken
     ]
   : []
 
+// The bundle visualizer is opt-in: it only runs when ANALYZE is set (e.g.
+// `ANALYZE=1 npm run build`), writing a treemap to dist/stats.html. Normal and
+// dev builds never load it, so the default build is untouched.
+const analyzePlugins = process.env.ANALYZE
+  ? [
+      visualizer({
+        filename: './dist/stats.html',
+        template: 'treemap',
+        gzipSize: true,
+        brotliSize: true,
+      }),
+    ]
+  : []
+
 export default defineConfig({
   // sentryVitePlugin must come AFTER react/tailwind so it sees the final build output.
-  plugins: [react(), tailwindcss(), ...sentryPlugins],
+  plugins: [react(), tailwindcss(), ...sentryPlugins, ...analyzePlugins],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version || '0.0.0'),
   },
