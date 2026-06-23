@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify'
 import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Search, Sparkles, ThumbsUp, Trash2, UsersRound } from 'lucide-react'
 import { getNotice, createNotice, updateNotice, deleteNotice, voteNotice } from '../services/noticeApi'
-import { searchYoutubeVideos } from '../services/communityApi'
+import { fetchLinkPreview, searchYoutubeVideos } from '../services/communityApi'
 import { useAuth } from '../contexts/useAuth'
 import { NoticeCategory } from '../contract/enums'
 import { enumLabels } from '../contract/labels'
@@ -135,6 +135,7 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: any) {
         error={error}
         onError={setError}
         searchYoutube={searchYoutubeVideos}
+        fetchLinkPreview={fetchLinkPreview}
       />
       <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
         <select

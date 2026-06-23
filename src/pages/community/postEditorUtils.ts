@@ -187,7 +187,22 @@ export function externalBlockFromUrl(value, meta: any = {}) {
   if (/\.(mp4|webm|mov)$/.test(path)) {
     return { type: 'externalEmbed', provider: 'external', kind: 'video', url: raw, title: meta.title || '외부 영상', width: 75, align: 'center', id: localId() }
   }
-  throw new Error('YouTube, 이미지 파일 URL, 영상 파일 URL만 삽입할 수 있습니다.')
+  // Any other generic https URL becomes an OpenGraph-style link-preview card. The meta
+  // (title/description/image/siteName) is populated by the link-preview API on insert;
+  // when that is unavailable we still produce a usable card showing just the domain.
+  return {
+    type: 'externalEmbed',
+    provider: 'external',
+    kind: 'link',
+    url: raw,
+    title: meta.title || url.hostname,
+    description: meta.description || '',
+    image: meta.image || '',
+    siteName: meta.siteName || url.hostname,
+    width: 75,
+    align: 'center',
+    id: localId(),
+  }
 }
 
 export function safeExternalSrc(url) {

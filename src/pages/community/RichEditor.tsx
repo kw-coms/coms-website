@@ -44,6 +44,23 @@ export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
   const safeSrc = (url) => (url && /^(blob:|\/)/i.test(url) ? url : '')
   const dragFigureId = useRef(null)
 
+  // Non-interactive editor preview of a link-preview card (mirrors the rendered
+  // PostBlocks link card; pointer-events disabled so it behaves like other figures).
+  const linkPreviewHtml = (block) => {
+    const image = safeExternalSrc(block.image)
+    let domain = block.siteName || ''
+    if (!domain) {
+      try { domain = new URL(block.url).hostname } catch { domain = '' }
+    }
+    const imageHtml = image
+      ? `<div style="aspect-ratio:1.91/1;width:100%;overflow:hidden;background:var(--app-surface-soft);pointer-events:none"><img src="${escH(image)}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;pointer-events:none"></div>`
+      : ''
+    const titleHtml = block.title ? `<p style="margin:0;font-size:14px;font-weight:700;color:var(--theme-body-dark)">${escH(block.title)}</p>` : ''
+    const descHtml = block.description ? `<p style="margin:4px 0 0;font-size:12px;color:var(--app-muted)">${escH(block.description)}</p>` : ''
+    const domainHtml = domain ? `<p style="margin:8px 0 0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--app-subtle)">${escH(domain)}</p>` : ''
+    return `${imageHtml}<div style="padding:12px 16px;pointer-events:none">${titleHtml}${descHtml}${domainHtml}</div>`
+  }
+
   const trailingTypingNode = () => document.createTextNode('\u200B')
 
   const setCaretAfter = (node) => {
@@ -193,9 +210,11 @@ export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
           ? (youtubeSrc
             ? `<div style="aspect-ratio:16/9;width:100%;background:#000;pointer-events:none"><iframe src="${escH(youtubeSrc)}" title="${title}" style="width:100%;height:100%;border:0;pointer-events:none"></iframe></div><figcaption style="${EXTERNAL_CAPTION_STYLE}">${title}</figcaption>`
             : `<figcaption style="${EXTERNAL_CAPTION_STYLE}">${title}</figcaption>`)
-          : block.kind === 'image'
-            ? `<img src="${escH(src)}" alt="${title}" draggable="false" class="community-inline-media-image" style="display:block;pointer-events:none">`
-            : `<video src="${escH(src)}" controls preload="metadata" draggable="false" style="display:block;width:100%;height:auto;pointer-events:none"></video>`
+          : block.kind === 'link'
+            ? linkPreviewHtml(block)
+            : block.kind === 'image'
+              ? `<img src="${escH(src)}" alt="${title}" draggable="false" class="community-inline-media-image" style="display:block;pointer-events:none">`
+              : `<video src="${escH(src)}" controls preload="metadata" draggable="false" style="display:block;width:100%;height:auto;pointer-events:none"></video>`
         html += `<figure class="community-editor-figure" contenteditable="false" data-block-id="${id}" data-type="externalEmbed" data-align="${align}" style="${figureInlineStyle(wPct, align) + EXTERNAL_CARD_STYLE}">${inner}</figure>\u200B`
       } else if (block.type === 'poll') {
         const id = block.id || localId()
@@ -345,6 +364,8 @@ export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
       caption.setAttribute('style', EXTERNAL_CAPTION_STYLE)
       caption.textContent = block.title || 'YouTube 영상'
       figure.appendChild(caption)
+    } else if (block.kind === 'link') {
+      figure.innerHTML = linkPreviewHtml(block)
     } else if (block.kind === 'image') {
       const img = document.createElement('img')
       img.src = src

@@ -134,6 +134,43 @@ export function renderPostBlocks(post, options: any = {}) {
               </div>
             )
           }
+          if (block.kind === 'link') {
+            const href = safeExternalSrc(block.url)
+            if (!href) return null
+            const image = safeExternalSrc(block.image)
+            let domain = block.siteName || ''
+            if (!domain) {
+              try { domain = new URL(block.url).hostname } catch { domain = '' }
+            }
+            return (
+              <div key={i} className="community-post-media my-2" style={widthStyle}>
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block overflow-hidden rounded-xl border border-[var(--app-hairline)] bg-[var(--app-surface)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition hover:border-[var(--app-hairline-strong)]"
+                >
+                  {image && (
+                    <div className="aspect-[1.91/1] w-full overflow-hidden bg-[var(--app-surface-soft)]">
+                      <img
+                        src={image}
+                        alt=""
+                        draggable={false}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </div>
+                  )}
+                  <div className="px-4 py-3">
+                    {block.title && <p className="line-clamp-2 text-sm font-bold text-[var(--theme-body-dark)]">{block.title}</p>}
+                    {block.description && <p className="mt-1 line-clamp-2 text-xs text-[var(--app-muted)]">{block.description}</p>}
+                    {domain && <p className="mt-2 truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-subtle)]">{domain}</p>}
+                  </div>
+                </a>
+              </div>
+            )
+          }
           if (block.kind === 'image') {
             const src = safeExternalSrc(block.url)
             if (!src) return null
