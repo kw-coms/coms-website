@@ -4237,6 +4237,7 @@ function HomeView() {
   const activitiesRef = useRef(null)
   const projectsRef = useRef(null)
   const recruitRef = useRef(null)
+  const heroInnerRef = useRef<HTMLDivElement | null>(null)
   const latestNoticeQuery = useQuery({
     queryKey: LATEST_NOTICE_QUERY_KEY,
     queryFn: listNotices,
@@ -4246,6 +4247,52 @@ function HomeView() {
     },
   })
   const latestNotice = latestNoticeQuery.data ?? null
+
+  // Apple-style scroll motion: reveal-on-scroll + hero parallax lift/fade.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (prefersReduced) return
+
+    const root = document.querySelector('.theme-home')
+    root?.classList.add('reveal-ready')
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-revealed')
+            io.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' },
+    )
+    const revealEls = Array.from(document.querySelectorAll('[data-reveal]'))
+    revealEls.forEach((el) => io.observe(el))
+
+    const hero = heroInnerRef.current
+    let raf = 0
+    const onScroll = () => {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        if (!hero) return
+        const vh = window.innerHeight || 1
+        const progress = Math.min(1, Math.max(0, window.scrollY / (vh * 0.85)))
+        hero.style.setProperty('--coms-sy', `${(-progress * 72).toFixed(1)}px`)
+        hero.style.setProperty('--coms-sc', `${(1 - progress * 0.06).toFixed(3)}`)
+        hero.style.setProperty('--coms-so', `${(1 - progress * 0.78).toFixed(3)}`)
+      })
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      io.disconnect()
+      window.removeEventListener('scroll', onScroll)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [])
 
   const openPanel = (id) => {
     const map = { about: aboutRef, activities: activitiesRef, projects: projectsRef, recruit: recruitRef }
@@ -4401,6 +4448,7 @@ function HomeView() {
           <div className="home-hero-surface absolute inset-0" />
           <div className="absolute inset-x-0 bottom-0 h-1/3 bg-linear-to-b from-transparent to-white/82" />
           <div
+            ref={heroInnerRef}
             className="coms-3d-stage-inner relative z-10 mx-auto w-full max-w-5xl"
             onPointerMove={(e) => {
               const r = e.currentTarget.getBoundingClientRect()
@@ -4461,11 +4509,13 @@ function HomeView() {
 
         <section className="apple-showcase-strip bg-[var(--app-surface)] px-5 py-4 sm:py-6">
           <div className="mx-auto grid max-w-7xl gap-3 lg:grid-cols-3">
-            {showcaseItems.map((item) => (
+            {showcaseItems.map((item, index) => (
               <button
                 key={item.title}
                 type="button"
                 onClick={() => openPanel(item.target)}
+                data-reveal
+                style={{ '--reveal-delay': `${index * 90}ms` } as any}
                 className="apple-product-panel apple-showcase-card group flex min-h-[12rem] flex-col px-6 py-6 text-left text-[var(--app-text)] transition hover:-translate-y-0.5"
               >
                 <p className="text-sm font-semibold text-[var(--app-accent-text)]">{item.eyebrow}</p>
@@ -4480,7 +4530,7 @@ function HomeView() {
         <section className="bg-[var(--app-surface-soft)] px-5 py-12 sm:py-16">
           <div className="mx-auto max-w-7xl">
             <div className="flex flex-wrap items-end justify-between gap-4">
-              <div>
+              <div data-reveal>
                 <p className="apple-eyebrow">Member loop</p>
                 <h2 className="apple-display mt-3 text-4xl sm:text-5xl">활동 허브</h2>
                 <p className="apple-copy mt-3 max-w-2xl text-lg">
@@ -4495,6 +4545,8 @@ function HomeView() {
                   key={item.title}
                   type="button"
                   onClick={() => goPageTop(item.route)}
+                  data-reveal
+                  style={{ '--reveal-delay': `${index * 90}ms` } as any}
                   className="apple-product-panel min-h-44 px-6 py-6 text-left transition hover:-translate-y-0.5"
                 >
                   <span className="inline-flex size-8 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-sm font-bold text-[var(--app-accent-text)]">

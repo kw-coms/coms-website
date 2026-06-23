@@ -5328,10 +5328,12 @@ body {
 }
 
 .coms-3d-stage-inner {
-	transform: rotateX(var(--coms-rx, 0deg)) rotateY(var(--coms-ry, 0deg));
+	transform: translateY(var(--coms-sy, 0px)) scale(var(--coms-sc, 1))
+		rotateX(var(--coms-rx, 0deg)) rotateY(var(--coms-ry, 0deg));
+	opacity: var(--coms-so, 1);
 	transform-style: preserve-3d;
 	transition: transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1);
-	will-change: transform;
+	will-change: transform, opacity;
 }
 
 /* Depth layers — float at different Z so the tilt yields real parallax */
@@ -5383,6 +5385,23 @@ body {
 	}
 }
 
+/* ---- Apple-style reveal-on-scroll -------------------------------------- */
+/* JS adds .reveal-ready so content stays visible if JS is unavailable. */
+.reveal-ready [data-reveal] {
+	opacity: 0;
+	transform: translateY(30px) scale(0.985);
+	transition:
+		opacity 720ms cubic-bezier(0.2, 0.7, 0.2, 1),
+		transform 720ms cubic-bezier(0.2, 0.7, 0.2, 1);
+	transition-delay: var(--reveal-delay, 0ms);
+	will-change: opacity, transform;
+}
+
+.reveal-ready [data-reveal].is-revealed {
+	opacity: 1;
+	transform: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.coms-3d-title,
 	.coms-3d-card,
@@ -5400,5 +5419,11 @@ body {
 
 	.coms-3d-title {
 		animation: none;
+	}
+
+	.reveal-ready [data-reveal] {
+		opacity: 1;
+		transform: none;
+		transition: none;
 	}
 }
