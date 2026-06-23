@@ -107,7 +107,7 @@ export default function CommunityDetailView({
                   <Pencil size={14} />
                   수정
                 </button>
-                <button type="button" onClick={() => onDelete(currentPost)} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600 sm:min-h-0">
+                <button type="button" onClick={() => onDelete(currentPost)} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 sm:min-h-0">
                   <Trash2 size={14} />
                   삭제
                 </button>

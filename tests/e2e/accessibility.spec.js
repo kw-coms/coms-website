@@ -36,15 +36,9 @@ async function mockCommunity(page) {
   await page.route('**/api/community/posts/77/comments', (route) => route.fulfill({ status: 200, json: [] }))
 }
 
-// color-contrast is excluded for now: the muted text design tokens
-// (--app-subtle / --app-muted, ~#86868b on white) sit below the 4.5:1 AA
-// threshold site-wide. That is a separate visual-design change tracked
-// independently; this suite gates on the structural a11y guarantees this
-// work targets — accessible names, roles, ARIA usage, and focus order.
 async function assertNoSeriousViolations(page) {
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa'])
-    .disableRules(['color-contrast'])
     .analyze()
   const blocking = results.violations.filter((violation) => BLOCKING_IMPACTS.includes(violation.impact))
   const summary = blocking.map((violation) => `${violation.id} (${violation.impact}): ${violation.nodes.length} node(s)`)

@@ -93,7 +93,7 @@ function CompanionServicesSection() {
               <div key={group.key}>
                 <div className="flex items-baseline gap-3">
                   <h3 className="text-2xl font-bold text-[#1d1d1f]">{group.name}</h3>
-                  <span className="text-sm font-semibold text-[#86868b]">{group.projects.length}개</span>
+                  <span className="text-sm font-semibold text-[var(--app-subtle)]">{group.projects.length}개</span>
                 </div>
                 <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {group.projects.map((project) => (
