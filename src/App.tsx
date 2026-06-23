@@ -4238,6 +4238,7 @@ function HomeView() {
   const projectsRef = useRef(null)
   const recruitRef = useRef(null)
   const heroInnerRef = useRef<HTMLDivElement | null>(null)
+  const trackRef = useRef<HTMLDivElement | null>(null)
   const latestNoticeQuery = useQuery({
     queryKey: LATEST_NOTICE_QUERY_KEY,
     queryFn: listNotices,
@@ -4248,11 +4249,12 @@ function HomeView() {
   })
   const latestNotice = latestNoticeQuery.data ?? null
 
-  // Apple-style scroll motion: reveal-on-scroll + hero parallax lift/fade.
+  // Apple-style cinematic scroll: a giant COM's wordmark shrinks as you scroll,
+  // the scene stays pinned (sticky) for a deliberate "pause", then the rest of
+  // the content cascades in. Plus reveal-on-scroll for the sections below.
   useEffect(() => {
     if (typeof window === 'undefined') return
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (prefersReduced) return
 
     const root = document.querySelector('.theme-home')
     root?.classList.add('reveal-ready')
@@ -4271,25 +4273,62 @@ function HomeView() {
     const revealEls = Array.from(document.querySelectorAll('[data-reveal]'))
     revealEls.forEach((el) => io.observe(el))
 
-    const hero = heroInnerRef.current
+    const track = trackRef.current
+    // Reduced motion (or no track): jump straight to the settled final state.
+    if (prefersReduced || !track) {
+      if (track) {
+        for (const [k, v] of [
+          ['--hero-scale', '1'],
+          ['--word-ty', '0px'],
+          ['--word-o', '0'],
+          ['--logo-p', '1'],
+          ['--tag-p', '1'],
+          ['--cta-p', '1'],
+          ['--content-p', '1'],
+        ] as const) {
+          track.style.setProperty(k, v)
+        }
+      }
+      return () => io.disconnect()
+    }
+
+    const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+    const seg = (p: number, a: number, b: number) => clamp01((p - a) / (b - a))
+    const easeOut = (t: number) => 1 - Math.pow(1 - t, 3)
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+
     let raf = 0
     const onScroll = () => {
       if (raf) return
       raf = requestAnimationFrame(() => {
         raf = 0
-        if (!hero) return
-        const vh = window.innerHeight || 1
-        const progress = Math.min(1, Math.max(0, window.scrollY / (vh * 0.85)))
-        hero.style.setProperty('--coms-sy', `${(-progress * 72).toFixed(1)}px`)
-        hero.style.setProperty('--coms-sc', `${(1 - progress * 0.06).toFixed(3)}`)
-        hero.style.setProperty('--coms-so', `${(1 - progress * 0.78).toFixed(3)}`)
+        const rect = track.getBoundingClientRect()
+        const distance = Math.max(1, track.offsetHeight - window.innerHeight)
+        const p = clamp01(-rect.top / distance)
+
+        // 0.00–0.46  giant COM's shrinks 2.4x -> 1x and lifts slightly
+        const shrink = easeOut(seg(p, 0, 0.46))
+        track.style.setProperty('--hero-scale', lerp(2.4, 1, shrink).toFixed(3))
+        track.style.setProperty('--word-ty', `${lerp(0, -14, shrink).toFixed(1)}px`)
+        // 0.38–0.58  giant word fades out as the content title takes over
+        track.style.setProperty('--word-o', (1 - easeOut(seg(p, 0.38, 0.58))).toFixed(3))
+        // 0.44–0.70  content block (logo + title) crossfades + rises in
+        track.style.setProperty('--content-p', easeOut(seg(p, 0.44, 0.7)).toFixed(3))
+        track.style.setProperty('--logo-p', easeOut(seg(p, 0.5, 0.72)).toFixed(3))
+        // 0.58–0.70  PAUSE: scene stays pinned, nothing moves (Apple-style stop)
+        // 0.70–0.86  taglines rise in
+        track.style.setProperty('--tag-p', easeOut(seg(p, 0.7, 0.86)).toFixed(3))
+        // 0.82–1.00  CTAs, notice, pills, metrics cascade in
+        track.style.setProperty('--cta-p', easeOut(seg(p, 0.82, 1)).toFixed(3))
       })
     }
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
     return () => {
       io.disconnect()
       window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
   }, [])
@@ -4443,66 +4482,77 @@ function HomeView() {
   return (
     <div className="theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
 
-      <main className="apple-home-main relative overflow-hidden">
-        <section className="apple-home-hero coms-3d-stage relative flex min-h-[calc(78svh-44px)] items-center justify-center overflow-hidden bg-[var(--app-surface-soft)] px-5 py-10 text-center sm:min-h-[calc(84svh-44px)] sm:py-12">
-          <div className="home-hero-surface absolute inset-0" />
-          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-linear-to-b from-transparent to-white/82" />
-          <div
-            ref={heroInnerRef}
-            className="coms-3d-stage-inner relative z-10 mx-auto w-full max-w-5xl"
-            onPointerMove={(e) => {
-              const r = e.currentTarget.getBoundingClientRect()
-              const px = (e.clientX - r.left) / r.width - 0.5
-              const py = (e.clientY - r.top) / r.height - 0.5
-              e.currentTarget.style.setProperty('--coms-ry', `${px * 12}deg`)
-              e.currentTarget.style.setProperty('--coms-rx', `${-py * 9}deg`)
-            }}
-            onPointerLeave={(e) => {
-              e.currentTarget.style.setProperty('--coms-ry', '0deg')
-              e.currentTarget.style.setProperty('--coms-rx', '0deg')
-            }}
-          >
-            <div className="coms-depth-sm mx-auto inline-flex items-center gap-2 rounded-full bg-white/64 px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)] shadow-[0_4px_16px_rgba(0,0,0,0.05)] backdrop-blur-xl">
-              <span className="size-2 rounded-full bg-[var(--app-accent)]" />
-              2026 Semester Ready
-            </div>
-            <div className="coms-depth-lg relative mx-auto mt-6 flex h-28 w-28 items-center justify-center sm:mt-7 sm:h-36 sm:w-36">
-              <div className="coms-3d-card absolute inset-0 rounded-[1.75rem] bg-white/82 ring-1 ring-black/5" />
-              <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="coms-logo-3d relative z-10 h-20 w-20 object-contain sm:h-24 sm:w-24" />
-            </div>
-            <p className="coms-depth-sm mt-6 text-sm font-semibold text-[var(--app-muted)]">Kwangwoon University Computer Club</p>
-            <h2 className="apple-display coms-3d-title mt-2 whitespace-nowrap text-[3.2rem] sm:text-8xl lg:text-[8.5rem]">
-              COM&apos;s
-            </h2>
-            <p className="apple-copy mx-auto mt-5 max-w-[20rem] text-lg sm:max-w-3xl sm:text-2xl">
-              배우고, 만들고, 성장하는 광운대학교 컴퓨터 학술동아리.
-            </p>
-            <div className="mt-7 flex flex-wrap justify-center gap-3">
-              <button type="button" onClick={() => openPanel('about')} className={solidActionBtnClass}>더 알아보기</button>
-              <button type="button" onClick={goRecruitPage} className={ghostActionBtnClass}>지원하기</button>
-            </div>
-            {latestNotice && (
-              <button type="button" onClick={goNotices} className="mx-auto mt-7 flex max-w-md items-center gap-2 rounded-full bg-[var(--app-surface)] px-4 py-2 text-left shadow-[0_2px_12px_rgba(0,0,0,0.08)] transition hover:shadow-[0_5px_18px_rgba(0,0,0,0.12)]">
-                <Megaphone size={14} className="shrink-0 text-[var(--app-accent-text)]" />
-                <span className="truncate text-xs font-semibold text-[var(--app-text)]">{latestNotice.title}</span>
-                <span className="ml-auto shrink-0 text-[10px] font-bold uppercase text-[var(--app-accent-text)]">공지</span>
-              </button>
-            )}
-            <div className="mx-auto mt-6 flex max-w-[21rem] flex-wrap justify-center gap-2 sm:max-w-3xl">
-              {experiencePills.map((pill) => (
-                <span key={pill} className="rounded-full bg-white/70 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-muted)] shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:px-3 sm:text-xs">
-                  {pill}
-                </span>
-              ))}
-            </div>
-            <div className="apple-hero-metrics mx-auto mt-8 hidden max-w-3xl grid-cols-3 sm:grid">
-              {heroHighlights.map((item) => (
-                <div key={item.value} className="px-5 text-center">
-                  <p className="text-[11px] font-semibold text-[var(--app-subtle)]">{item.label}</p>
-                  <p className="mt-1 text-base font-semibold text-[var(--app-text)]">{item.value}</p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--app-muted)]">{item.detail}</p>
+      <main className="apple-home-main relative overflow-x-clip">
+        <section className="coms-cinema coms-3d-stage" aria-label="COM's">
+          <div ref={trackRef} className="coms-cinema-track">
+            <div className="coms-cinema-pin">
+              <div className="home-hero-surface absolute inset-0" />
+              <div className="absolute inset-x-0 bottom-0 h-1/3 bg-linear-to-b from-transparent to-white/82" />
+
+              {/* Giant wordmark — huge at first, shrinks + fades as you scroll */}
+              <h2 className="apple-display coms-3d-title coms-cinema-word" aria-hidden="true">COM&apos;s</h2>
+
+              {/* The rest of the hero crossfades in as the wordmark settles */}
+              <div
+                ref={heroInnerRef}
+                className="coms-cinema-content relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center"
+                onPointerMove={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect()
+                  const px = (e.clientX - r.left) / r.width - 0.5
+                  const py = (e.clientY - r.top) / r.height - 0.5
+                  e.currentTarget.style.setProperty('--coms-ry', `${px * 10}deg`)
+                  e.currentTarget.style.setProperty('--coms-rx', `${-py * 8}deg`)
+                }}
+                onPointerLeave={(e) => {
+                  e.currentTarget.style.setProperty('--coms-ry', '0deg')
+                  e.currentTarget.style.setProperty('--coms-rx', '0deg')
+                }}
+              >
+                <div className="coms-cinema-logo coms-depth-lg relative flex h-20 w-20 items-center justify-center sm:h-24 sm:w-24">
+                  <div className="coms-3d-card absolute inset-0 rounded-[1.5rem] bg-white/82 ring-1 ring-black/5" />
+                  <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="coms-logo-3d relative z-10 h-14 w-14 object-contain sm:h-16 sm:w-16" />
                 </div>
-              ))}
+                <h2 className="apple-display coms-3d-title coms-cinema-title mt-4 whitespace-nowrap text-6xl sm:text-7xl">COM&apos;s</h2>
+                <div className="coms-cinema-badge coms-depth-sm mt-4 inline-flex items-center gap-2 rounded-full bg-white/64 px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)] shadow-[0_4px_16px_rgba(0,0,0,0.05)] backdrop-blur-xl">
+                  <span className="size-2 rounded-full bg-[var(--app-accent)]" />
+                  2026 Semester Ready
+                </div>
+                <p className="coms-cinema-tag coms-depth-sm mt-4 text-sm font-semibold text-[var(--app-muted)]">Kwangwoon University Computer Club</p>
+                <p className="coms-cinema-tag apple-copy mx-auto mt-3 max-w-[20rem] text-lg sm:max-w-3xl sm:text-2xl">
+                  배우고, 만들고, 성장하는 광운대학교 컴퓨터 학술동아리.
+                </p>
+                <div className="coms-cinema-cta mt-6 flex flex-wrap justify-center gap-3">
+                  <button type="button" onClick={() => openPanel('about')} className={solidActionBtnClass}>더 알아보기</button>
+                  <button type="button" onClick={goRecruitPage} className={ghostActionBtnClass}>지원하기</button>
+                </div>
+                {latestNotice && (
+                  <button type="button" onClick={goNotices} className="coms-cinema-cta mx-auto mt-6 flex max-w-md items-center gap-2 rounded-full bg-[var(--app-surface)] px-4 py-2 text-left shadow-[0_2px_12px_rgba(0,0,0,0.08)] transition hover:shadow-[0_5px_18px_rgba(0,0,0,0.12)]">
+                    <Megaphone size={14} className="shrink-0 text-[var(--app-accent-text)]" />
+                    <span className="truncate text-xs font-semibold text-[var(--app-text)]">{latestNotice.title}</span>
+                    <span className="ml-auto shrink-0 text-[10px] font-bold uppercase text-[var(--app-accent-text)]">공지</span>
+                  </button>
+                )}
+                <div className="coms-cinema-cta mx-auto mt-5 flex max-w-[21rem] flex-wrap justify-center gap-2 sm:max-w-3xl">
+                  {experiencePills.map((pill) => (
+                    <span key={pill} className="rounded-full bg-white/70 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-muted)] shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:px-3 sm:text-xs">
+                      {pill}
+                    </span>
+                  ))}
+                </div>
+                <div className="coms-cinema-cta apple-hero-metrics mx-auto mt-7 hidden max-w-3xl grid-cols-3 sm:grid">
+                  {heroHighlights.map((item) => (
+                    <div key={item.value} className="px-5 text-center">
+                      <p className="text-[11px] font-semibold text-[var(--app-subtle)]">{item.label}</p>
+                      <p className="mt-1 text-base font-semibold text-[var(--app-text)]">{item.value}</p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--app-muted)]">{item.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="coms-cinema-hint" aria-hidden="true">
+                <ChevronDown size={22} />
+              </div>
             </div>
           </div>
         </section>
