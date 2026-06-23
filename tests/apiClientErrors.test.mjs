@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { createApiError } from '../src/services/apiClient.js'
+import { createApiError } from '../src/services/apiClient.ts'
 
 const serverError = createApiError(
   500,

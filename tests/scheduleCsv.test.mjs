@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { parseScheduleCsv } from '../src/utils/scheduleCsv.js'
+import { parseScheduleCsv } from '../src/utils/scheduleCsv.ts'
 
 const parsed = parseScheduleCsv(`종류,제목,시작일,종료일,시작시간,종료시간,요일,색상
 날짜,개강 총회,2026-03-04,2026-03-04,18:00,19:00,,#ff9f0a

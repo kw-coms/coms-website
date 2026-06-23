@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { sanitizeHtml, sanitizeStyleDeclaration } from '../src/utils/sanitizeHtml.js'
+import { sanitizeHtml, sanitizeStyleDeclaration } from '../src/utils/sanitizeHtml.ts'
 
 assert.equal(
   sanitizeStyleDeclaration('color:red;background-image:url(javascript:alert(1));font-weight:bold'),

@@ -3,7 +3,7 @@ import {
   buildMonthEventSummary,
   buildCalendarDayEvents,
   visibleDayEvents,
-} from '../src/utils/monthlyCalendar.js'
+} from '../src/utils/monthlyCalendar.ts'
 
 const calendarMonth = {
   year: 2026,

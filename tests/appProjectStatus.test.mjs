@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { buildProjectStatusBadges } from '../src/utils/appProjectStatus.js'
+import { buildProjectStatusBadges } from '../src/utils/appProjectStatus.ts'
 
 assert.deepEqual(buildProjectStatusBadges({
   linkUrl: 'https://coms.kw.ac.kr/worldcup/',
