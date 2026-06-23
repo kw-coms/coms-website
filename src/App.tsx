@@ -974,7 +974,7 @@ function GlobalNavigation() {
               type="button"
               onClick={() => goNavItem(item)}
               disabled={item.auth && authLoading}
-              className={`${navClass(item.id)} disabled:cursor-wait disabled:opacity-60`}
+              className={`${navClass(item.id)} disabled:cursor-wait`}
             >
               {item.label}
               <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === item.id ? 'opacity-100' : 'opacity-0'}`} />
