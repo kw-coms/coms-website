@@ -17,7 +17,7 @@ const initialForm = {
 }
 
 const inputClass =
-  'w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-[15px] text-[#1d1d1f] outline-none placeholder:text-[#86868b] transition focus:ring-2 focus:ring-[#0071e3]/24'
+  'w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-[15px] text-[#1d1d1f] outline-none placeholder:text-[var(--app-subtle)] transition focus:ring-2 focus:ring-[#0071e3]/24'
 const labelClass = 'mb-2 block text-sm font-semibold text-[#1d1d1f]'
 
 export default function RecruitApply({ onBack }) {
@@ -270,7 +270,7 @@ export default function RecruitApply({ onBack }) {
               </div>
             </div>
 
-            <p className="text-xs leading-5 text-[#86868b]">
+            <p className="text-xs leading-5 text-[var(--app-subtle)]">
               제출 전 연락처와 이메일을 다시 확인해주세요. 제출 내용에 대한 연락은 작성한 연락처로 진행됩니다.
             </p>
           </aside>

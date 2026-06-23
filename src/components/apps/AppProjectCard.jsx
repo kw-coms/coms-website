@@ -56,7 +56,7 @@ export default function AppProjectCard({
       {project?.description && (
         <p className="mt-3 flex-1 text-sm font-medium leading-6 text-[#6e6e73]">{project.description}</p>
       )}
-      <p className={`text-xs font-semibold text-[#86868b] ${project?.description ? 'mt-4' : 'mt-3 flex-1'}`}>
+      <p className={`text-xs font-semibold text-[var(--app-subtle)] ${project?.description ? 'mt-4' : 'mt-3 flex-1'}`}>
         만든 사람: {project?.madeBy || DEFAULT_MADE_BY}
       </p>
 
@@ -109,9 +109,9 @@ export default function AppProjectCard({
                   if (href === '#') event.preventDefault()
                 }}
               >
-                <FileText size={14} aria-hidden="true" className="shrink-0 text-[#86868b]" />
+                <FileText size={14} aria-hidden="true" className="shrink-0 text-[var(--app-subtle)]" />
                 <span className="min-w-0 flex-1 truncate">{fileLabel(file)}</span>
-                {size && <span className="shrink-0 text-[#86868b]">{size}</span>}
+                {size && <span className="shrink-0 text-[var(--app-subtle)]">{size}</span>}
                 <Download size={13} aria-hidden="true" className="shrink-0" />
                 <span className="sr-only">다운로드</span>
               </a>
@@ -121,7 +121,7 @@ export default function AppProjectCard({
       )}
 
       {project?.displayUrl && (
-        <span className="mt-3 truncate rounded-full bg-[#f5f5f7] px-3 py-1.5 text-xs font-semibold text-[#86868b]">
+        <span className="mt-3 truncate rounded-full bg-[#f5f5f7] px-3 py-1.5 text-xs font-semibold text-[var(--app-subtle)]">
           {project.displayUrl}
         </span>
       )}

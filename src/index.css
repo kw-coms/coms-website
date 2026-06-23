@@ -9,8 +9,8 @@
 	--app-surface-soft: #f5f5f7;
 	--app-surface-elevated: #ffffff;
 	--app-text: #1d1d1f;
-	--app-muted: #6e6e73;
-	--app-subtle: #86868b;
+	--app-muted: #606063;
+	--app-subtle: #6f6f72;
 	--app-hairline: rgba(0, 0, 0, 0.1);
 	--app-hairline-strong: rgba(0, 0, 0, 0.16);
 	--app-accent: #0071e3;
@@ -147,7 +147,7 @@ select {
 	height: calc(var(--apple-nav-height) + env(safe-area-inset-top));
 	min-height: calc(var(--apple-nav-height) + env(safe-area-inset-top));
 	padding-top: env(safe-area-inset-top);
-	background: color-mix(in srgb, var(--app-surface) 88%, transparent) !important;
+	background: var(--app-surface) !important;
 	box-shadow: 0 1px 0 color-mix(in srgb, var(--app-hairline) 72%, transparent);
 	backdrop-filter: saturate(180%) blur(20px);
 	-webkit-backdrop-filter: saturate(180%) blur(20px);
