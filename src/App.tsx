@@ -4397,19 +4397,32 @@ function HomeView() {
     <div className="theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
 
       <main className="apple-home-main relative overflow-hidden">
-        <section className="apple-home-hero relative flex min-h-[calc(78svh-44px)] items-center justify-center overflow-hidden bg-[var(--app-surface-soft)] px-5 py-10 text-center sm:min-h-[calc(84svh-44px)] sm:py-12">
+        <section className="apple-home-hero coms-3d-stage relative flex min-h-[calc(78svh-44px)] items-center justify-center overflow-hidden bg-[var(--app-surface-soft)] px-5 py-10 text-center sm:min-h-[calc(84svh-44px)] sm:py-12">
           <div className="home-hero-surface absolute inset-0" />
           <div className="absolute inset-x-0 bottom-0 h-1/3 bg-linear-to-b from-transparent to-white/82" />
-          <div className="relative z-10 mx-auto w-full max-w-5xl">
-            <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-white/64 px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)] shadow-[0_4px_16px_rgba(0,0,0,0.05)] backdrop-blur-xl">
+          <div
+            className="coms-3d-stage-inner relative z-10 mx-auto w-full max-w-5xl"
+            onPointerMove={(e) => {
+              const r = e.currentTarget.getBoundingClientRect()
+              const px = (e.clientX - r.left) / r.width - 0.5
+              const py = (e.clientY - r.top) / r.height - 0.5
+              e.currentTarget.style.setProperty('--coms-ry', `${px * 12}deg`)
+              e.currentTarget.style.setProperty('--coms-rx', `${-py * 9}deg`)
+            }}
+            onPointerLeave={(e) => {
+              e.currentTarget.style.setProperty('--coms-ry', '0deg')
+              e.currentTarget.style.setProperty('--coms-rx', '0deg')
+            }}
+          >
+            <div className="coms-depth-sm mx-auto inline-flex items-center gap-2 rounded-full bg-white/64 px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)] shadow-[0_4px_16px_rgba(0,0,0,0.05)] backdrop-blur-xl">
               <span className="size-2 rounded-full bg-[var(--app-accent)]" />
               2026 Semester Ready
             </div>
-            <div className="relative mx-auto mt-6 flex h-28 w-28 items-center justify-center sm:mt-7 sm:h-36 sm:w-36">
+            <div className="coms-depth-lg relative mx-auto mt-6 flex h-28 w-28 items-center justify-center sm:mt-7 sm:h-36 sm:w-36">
               <div className="coms-3d-card absolute inset-0 rounded-[1.75rem] bg-white/82 ring-1 ring-black/5" />
-              <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="home-logo-float relative z-10 h-20 w-20 object-contain sm:h-24 sm:w-24" />
+              <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="coms-logo-3d relative z-10 h-20 w-20 object-contain sm:h-24 sm:w-24" />
             </div>
-            <p className="mt-6 text-sm font-semibold text-[var(--app-muted)]">Kwangwoon University Computer Club</p>
+            <p className="coms-depth-sm mt-6 text-sm font-semibold text-[var(--app-muted)]">Kwangwoon University Computer Club</p>
             <h2 className="apple-display coms-3d-title mt-2 whitespace-nowrap text-[3.2rem] sm:text-8xl lg:text-[8.5rem]">
               COM&apos;s
             </h2>
