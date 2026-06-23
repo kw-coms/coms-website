@@ -4411,7 +4411,7 @@ function HomeView() {
             </div>
             <p className="mt-6 text-sm font-semibold text-[var(--app-muted)]">Kwangwoon University Computer Club</p>
             <h2 className="apple-display mt-2 whitespace-nowrap text-[3.2rem] sm:text-8xl lg:text-[8.5rem]">
-              KW COM&apos;s
+              COM&apos;s
             </h2>
             <p className="apple-copy mx-auto mt-5 max-w-[20rem] text-lg sm:max-w-3xl sm:text-2xl">
               배우고, 만들고, 성장하는 광운대학교 컴퓨터 학술동아리.
