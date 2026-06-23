@@ -326,7 +326,71 @@ export default function Community({ onBack }: any) {
       )}
 
       <section data-reveal className="apple-board-shell">
-        {mode === 'list' && (
+        {mode === 'list' && loading && posts.length === 0 && (
+          <div className="space-y-0">
+            {/* Skeleton header bar */}
+            <div className="flex items-center justify-between border-b border-[var(--app-hairline)] px-5 py-4 sm:px-8">
+              <div className="skeleton h-5 w-24 rounded-full" />
+              <div className="flex gap-2">
+                <div className="skeleton h-9 w-24 rounded-full" />
+                <div className="skeleton h-9 w-16 rounded-full" />
+              </div>
+            </div>
+            {/* Skeleton control strip */}
+            <div className="border-b border-[var(--app-hairline)] px-5 py-4 sm:px-8">
+              <div className="flex flex-wrap gap-2">
+                {[72, 56, 80, 64, 96, 56].map((w, i) => (
+                  <div key={i} className="skeleton h-9 rounded-full" style={{ width: w }} />
+                ))}
+              </div>
+            </div>
+            {/* Skeleton post rows — mobile cards */}
+            <div className="m-4 space-y-3 md:hidden">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="apple-soft-panel p-4 space-y-3">
+                  <div className="flex gap-2">
+                    <div className="skeleton skeleton-line w-8" />
+                    <div className="skeleton skeleton-line w-16 rounded-full" />
+                  </div>
+                  <div className="skeleton skeleton-line w-3/4" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="skeleton skeleton-line w-20" />
+                    <div className="skeleton skeleton-line w-14 ml-auto" />
+                    <div className="skeleton skeleton-line w-16" />
+                    <div className="skeleton skeleton-line w-12 ml-auto" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Skeleton post rows — desktop table */}
+            <div className="m-5 hidden overflow-x-auto rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] md:block sm:m-8">
+              <table className="w-full min-w-[860px] border-collapse text-sm">
+                <thead className="border-b border-[var(--app-hairline)]">
+                  <tr>
+                    {['번호', '말머리', '제목', '글쓴이', '작성일', '조회', '개추'].map((col) => (
+                      <th key={col} className="px-4 py-3 font-semibold text-[var(--app-muted)]">{col}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/10">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <tr key={i}>
+                      <td className="px-4 py-4 text-center"><div className="skeleton skeleton-line w-8 mx-auto" /></td>
+                      <td className="px-4 py-4 text-center"><div className="skeleton skeleton-line w-14 mx-auto rounded-full" /></td>
+                      <td className="px-4 py-4"><div className="skeleton skeleton-line w-2/3" /></td>
+                      <td className="px-4 py-4 text-center"><div className="skeleton skeleton-line w-16 mx-auto" /></td>
+                      <td className="px-4 py-4 text-center"><div className="skeleton skeleton-line w-16 mx-auto" /></td>
+                      <td className="px-4 py-4 text-center"><div className="skeleton skeleton-line w-8 mx-auto" /></td>
+                      <td className="px-4 py-4 text-center"><div className="skeleton skeleton-line w-8 mx-auto" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {mode === 'list' && !(loading && posts.length === 0) && (
           <CommunityListView
             onOpenDeletedRecords={openDeletedRecords}
             onWrite={openWrite}

@@ -456,7 +456,62 @@ export default function Archive({ onBack }: any) {
 
             <div className="m-4 overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:m-7">
               {loading ? (
-                <div className="flex min-h-[12rem] items-center justify-center px-5 py-12 text-center text-sm font-medium text-[var(--app-muted)] sm:min-h-[14rem]">자료를 불러오는 중...</div>
+                <>
+                  {/* Mobile skeleton cards */}
+                  <div className="grid gap-3 p-4 md:hidden">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="apple-soft-panel p-4">
+                        <span className="flex items-center gap-2">
+                          <div className="skeleton h-6 w-20 rounded-full" />
+                          <div className="skeleton ml-auto h-4 w-10 rounded" />
+                        </span>
+                        <div className="skeleton skeleton-line mt-3 w-4/5" />
+                        <div className="skeleton skeleton-line mt-1 w-2/3" />
+                        <div className="skeleton skeleton-line mt-3 w-1/2" />
+                        <div className="mt-4 flex justify-end border-t border-[var(--app-hairline)] pt-3">
+                          <div className="skeleton h-10 w-28 rounded-full" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Desktop skeleton table */}
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="apple-table w-full min-w-[760px] text-left text-sm">
+                      <thead className="border-b border-[var(--app-hairline)]">
+                        <tr>
+                          <th className="w-16 px-4 py-3">번호</th>
+                          <th className="w-28 px-4 py-3">카테고리</th>
+                          <th className="px-4 py-3">제목</th>
+                          <th className="w-28 px-4 py-3">크기</th>
+                          <th className="w-28 px-4 py-3">작성자</th>
+                          <th className="w-36 px-4 py-3">날짜</th>
+                          <th className="w-28 px-4 py-3 text-right">동작</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--app-hairline)]">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <tr key={i}>
+                            <td className="px-4 py-4"><div className="skeleton h-4 w-8 rounded" /></td>
+                            <td className="px-4 py-4"><div className="skeleton h-6 w-20 rounded-full" /></td>
+                            <td className="px-4 py-4">
+                              <div className="skeleton h-4 w-56 rounded" />
+                              <div className="skeleton mt-1 h-3 w-36 rounded" />
+                            </td>
+                            <td className="px-4 py-4"><div className="skeleton h-4 w-14 rounded" /></td>
+                            <td className="px-4 py-4"><div className="skeleton h-4 w-16 rounded" /></td>
+                            <td className="px-4 py-4">
+                              <div className="skeleton h-4 w-24 rounded" />
+                              <div className="skeleton mt-1 h-3 w-20 rounded" />
+                            </td>
+                            <td className="px-4 py-4 text-right">
+                              <div className="skeleton ml-auto h-9 w-24 rounded-full" />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               ) : filteredFiles.length === 0 ? (
                 <div className="flex min-h-[12rem] items-center justify-center px-5 py-12 text-center text-sm font-medium text-[var(--app-muted)] sm:min-h-[14rem]">
                   {searchQuery ? '검색 결과가 없습니다.' : '등록된 자료가 없습니다.'}
