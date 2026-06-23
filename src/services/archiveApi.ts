@@ -1,5 +1,12 @@
 import { apiUrl, request, requestNoContent, throwApiError } from './apiClient'
 
+export async function voteArchiveFile(id, value) {
+  return request(`/api/files/${id}/vote`, {
+    method: 'POST',
+    body: JSON.stringify({ value }),
+  })
+}
+
 export async function listFiles() {
   return request('/api/files')
 }

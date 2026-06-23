@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Download, FileUp, RefreshCw, Search, Trash2, X } from 'lucide-react'
-import { createPosts, deleteFile, downloadUrl, listFiles } from '../services/archiveApi'
+import { ArrowLeft, Download, FileUp, RefreshCw, Search, ThumbsUp, Trash2, X } from 'lucide-react'
+import { createPosts, deleteFile, downloadUrl, listFiles, voteArchiveFile } from '../services/archiveApi'
 import { useAuth } from '../contexts/useAuth'
 import { ArchiveCategory } from '../contract/enums'
 import { enumLabels } from '../contract/labels'
@@ -308,6 +308,21 @@ export default function Archive({ onBack }: any) {
     setMode('detail')
   }
 
+  const [voting, setVoting] = useState(false)
+  const handleVote = async () => {
+    if (!detailFile || voting) return
+    setVoting(true)
+    try {
+      const updated = await voteArchiveFile(detailFile.id, detailFile.myVote === 1 ? 0 : 1)
+      setDetailFile(updated)
+      setFiles((prev) => prev.map((f) => (f.id === updated.id ? { ...f, ...updated } : f)))
+    } catch (err) {
+      setError(err.message || '추천 중 오류가 발생했습니다.')
+    } finally {
+      setVoting(false)
+    }
+  }
+
   const handleSave = (savedList, failedNames = []) => {
     const saved = Array.isArray(savedList) ? savedList : [savedList]
     setFiles((prev) => [...saved, ...prev])
@@ -462,7 +477,7 @@ export default function Archive({ onBack }: any) {
                             </span>
                           )}
                           <span className="mt-3 block truncate text-xs font-semibold text-[var(--app-subtle)]">
-                            {file.uploaderName || file.uploadedBy || '-'} · {formatDate(file.uploadedAt)}
+                            {file.uploaderName || file.uploadedBy || '-'} · {formatDate(file.uploadedAt)} · 조회 {file.viewCount ?? 0} · 개추 {file.upvotes ?? 0}
                           </span>
                         </button>
                         <div className="mt-4 flex justify-end border-t border-[var(--app-hairline)] pt-3">
@@ -521,7 +536,10 @@ export default function Archive({ onBack }: any) {
                             </td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">{formatSize(file.fileSize)}</td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">{file.uploaderName || file.uploadedBy || '-'}</td>
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">{formatDate(file.uploadedAt)}</td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
+                              <span className="block">{formatDate(file.uploadedAt)}</span>
+                              <span className="mt-0.5 block text-xs text-[var(--app-subtle)]">조회 {file.viewCount ?? 0} · 개추 {file.upvotes ?? 0}</span>
+                            </td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-right">
                               <div className="flex justify-end gap-2">
                                 <a
@@ -555,6 +573,10 @@ export default function Archive({ onBack }: any) {
                 <span className="rounded-full bg-[var(--app-accent-soft)] px-2.5 py-1 font-bold text-[var(--app-accent-text)]">{categoryLabel(detailFile.category || 'GENERAL')}</span>
                 <span>{detailFile.uploaderName || detailFile.uploadedBy || '-'} · {formatDate(detailFile.uploadedAt)}</span>
               </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--app-subtle)]">
+                <span>조회 {detailFile.viewCount ?? 0}</span>
+                <span>개추 {detailFile.upvotes ?? 0}</span>
+              </div>
             </div>
             {detailFile.description && (
               <div className="border-b border-[var(--app-hairline)] py-5">
@@ -579,6 +601,15 @@ export default function Archive({ onBack }: any) {
                 <Download size={15} />
                 다운로드
               </a>
+              <button
+                type="button"
+                onClick={handleVote}
+                disabled={voting}
+                className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-full border px-4 text-sm font-bold disabled:opacity-50 ${detailFile.myVote === 1 ? 'border-[#0071e3] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
+              >
+                <ThumbsUp size={15} />
+                개추 {detailFile.upvotes ?? 0}
+              </button>
               {isAdmin && (
                 <button
                   type="button"
