@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/useAuth'
 import { getLogoAsset } from '../utils/logoAssets'
 import { EmailVerifyStep } from '../components/EmailVerifyStep'
 import { PASSWORD_PATTERN, PASSWORD_MESSAGE } from '../utils/passwordPolicy'
+import { useScrollReveal } from '../hooks/useScrollReveal'
 
 const panelClass =
   'rounded-lg border border-black/10 bg-white/86 p-5 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:p-8'
@@ -68,6 +69,7 @@ export default function Login({ onCancel, onSuccess, goSignup }: any) {
   const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState('login')
+  useScrollReveal([step])
   const [verifyStudentId, setVerifyStudentId] = useState('')
   const [verifyError, setVerifyError] = useState('')
   const [resetForm, setResetForm] = useState(emptyResetForm)
@@ -234,7 +236,7 @@ export default function Login({ onCancel, onSuccess, goSignup }: any) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-center sm:justify-start">
+      <div className="flex justify-center sm:justify-start" data-reveal style={{ '--reveal-delay': '0ms' } as any}>
         <button
           type="button"
           onClick={goBack}
@@ -247,7 +249,7 @@ export default function Login({ onCancel, onSuccess, goSignup }: any) {
 
       <div className="rounded-lg bg-white/70 p-px shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
         <section className={panelClass}>
-          <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left">
+          <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left" data-reveal style={{ '--reveal-delay': '80ms' } as any}>
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="h-10 w-10 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
             <div className="min-w-0">
               <h2 className="text-lg font-bold leading-snug sm:text-xl">{stepTitle}</h2>
@@ -256,12 +258,12 @@ export default function Login({ onCancel, onSuccess, goSignup }: any) {
           </div>
 
           {isVerifyStep ? (
-            <div className="space-y-4">
+            <div className="space-y-4" data-reveal style={{ '--reveal-delay': '160ms' } as any}>
               {verifyError && <div className="text-sm text-red-500">{verifyError}</div>}
               <EmailVerifyStep studentId={verifyStudentId} onDone={handleVerified} />
             </div>
           ) : isResetStep ? (
-            <form onSubmit={handleResetSubmit} className="space-y-4">
+            <form onSubmit={handleResetSubmit} className="space-y-4" data-reveal style={{ '--reveal-delay': '160ms' } as any}>
               <TextInput
                 id="resetEmail"
                 label="가입 이메일"
@@ -324,7 +326,7 @@ export default function Login({ onCancel, onSuccess, goSignup }: any) {
               )}
             </form>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" data-reveal style={{ '--reveal-delay': '160ms' } as any}>
               <TextInput
                 id="identifier"
                 label="학번 또는 이메일"

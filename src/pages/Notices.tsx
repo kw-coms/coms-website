@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/useAuth'
 import { NoticeCategory } from '../contract/enums'
 import { enumLabels } from '../contract/labels'
 import { useNotices } from './useNotices'
+import { useScrollReveal } from '../hooks/useScrollReveal'
 import RichBodyEditor from '../components/richEditor/RichBodyEditor'
 import { URL_ONLY_RICH_FEATURES } from '../components/richEditor/richBodyFeatures'
 import { renderRichBody, richBodyToPlainText as noticeContentSearchText } from '../components/richEditor/renderRichBody'
@@ -168,6 +169,8 @@ export default function Notices() {
   const [activeCategory, setActiveCategory] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
 
+  useScrollReveal([notices?.length, loading])
+
   const isAdmin = user?.role === 'ADMIN'
 
   const filteredNotices = useMemo(() => {
@@ -276,7 +279,7 @@ export default function Notices() {
       )}
 
       <section className="apple-board-shell">
-        <div className="apple-board-hero px-5 py-6 sm:px-7 sm:py-7">
+        <div className="apple-board-hero px-5 py-6 sm:px-7 sm:py-7" data-reveal>
           <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
             <div className="min-w-0">
               <p className="apple-eyebrow">Notices</p>
@@ -362,7 +365,7 @@ export default function Notices() {
               <>
                 {/* 모바일 카드 목록 */}
                 <div className="mx-4 mb-4 hidden grid-cols-1 gap-2.5 max-md:grid sm:mx-6">
-                  {filteredNotices.map((notice) => {
+                  {filteredNotices.map((notice, index) => {
                     const open = () => openNotice(notice)
                     const meta = noticeCategoryMeta(notice.category || 'GENERAL')
                     return (
@@ -371,6 +374,8 @@ export default function Notices() {
                         type="button"
                         onClick={open}
                         className="notice-mobile-card apple-soft-panel text-left transition hover:bg-[var(--app-surface-soft)] focus:bg-[var(--app-surface-soft)] focus:outline-none"
+                        data-reveal
+                        style={{ '--reveal-delay': `${index * 70}ms` } as any}
                       >
                         <div className="flex min-w-0 items-center gap-2">
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${meta.badgeClass}`}>
@@ -400,7 +405,7 @@ export default function Notices() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-black/10">
-                      {filteredNotices.map((notice) => {
+                      {filteredNotices.map((notice, index) => {
                         const open = () => openNotice(notice)
                         const meta = noticeCategoryMeta(notice.category || 'GENERAL')
                         return (
@@ -411,6 +416,8 @@ export default function Notices() {
                             onClick={open}
                             onKeyDown={(event) => openRowWithKeyboard(event, open)}
                             className="cursor-pointer text-[var(--app-muted)] transition hover:bg-[var(--app-surface-soft)] focus:bg-[var(--app-surface-soft)] focus:outline-none"
+                            data-reveal
+                            style={{ '--reveal-delay': `${index * 70}ms` } as any}
                           >
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs text-[var(--app-subtle)]">{notice.id}</td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs font-bold">

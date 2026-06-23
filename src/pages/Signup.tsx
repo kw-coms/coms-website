@@ -3,6 +3,7 @@ import { CheckCircle2, Mail, Send, UserRound } from 'lucide-react'
 import { signupUser } from '../services/authApi'
 import { EmailVerifyStep } from '../components/EmailVerifyStep'
 import { PASSWORD_PATTERN } from '../utils/passwordPolicy'
+import { useScrollReveal } from '../hooks/useScrollReveal'
 
 const CURRENT_SIGNUP = 'current'
 const GRADUATE_SIGNUP = 'graduate'
@@ -147,6 +148,7 @@ function normalizeGraduateValue(value) {
 
 export default function Signup({ onBack }: any) {
   const [step, setStep] = useState('form')
+  useScrollReveal([step])
   const [signupType, setSignupType] = useState(CURRENT_SIGNUP)
   const [signedUpStudentId, setSignedUpStudentId] = useState('')
   const [signedUpEmail, setSignedUpEmail] = useState('')
@@ -264,12 +266,14 @@ export default function Signup({ onBack }: any) {
         type="button"
         onClick={onBack}
         className="apple-action-secondary px-4 py-2 text-sm"
+        data-reveal
+        style={{ '--reveal-delay': '0ms' } as any}
       >
         로그인으로 돌아가기
       </button>
 
       <section className="apple-board-shell">
-        <div className="apple-board-hero px-6 py-8 sm:px-8 sm:py-10">
+        <div className="apple-board-hero px-6 py-8 sm:px-8 sm:py-10" data-reveal style={{ '--reveal-delay': '80ms' } as any}>
           <p className="apple-eyebrow">Signup</p>
           <h1 className="apple-display mt-3 text-4xl sm:text-6xl">COM&apos;s 회원가입</h1>
           <p className="apple-copy mt-5 max-w-3xl text-base sm:text-lg">
@@ -278,7 +282,7 @@ export default function Signup({ onBack }: any) {
         </div>
 
         <div className="grid gap-0 lg:grid-cols-[1fr_320px]">
-          <div className="min-w-0 bg-[var(--app-surface)] p-6 sm:p-8">
+          <div className="min-w-0 bg-[var(--app-surface)] p-6 sm:p-8" data-reveal style={{ '--reveal-delay': '160ms' } as any}>
           {step === 'form' && (
             <form onSubmit={handleSubmit} className="grid min-w-0 gap-4 sm:gap-5">
               <div className="flex items-center gap-3">

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useScrollReveal } from '../hooks/useScrollReveal'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -54,6 +55,7 @@ export default function Community({ onBack }: any) {
   const [appealOpenId, setAppealOpenId] = useState(null)
   const [appealDrafts, setAppealDrafts] = useState({})
   const [appealingId, setAppealingId] = useState(null)
+  useScrollReveal([posts?.length, loading])
   const boardFilterOptions = useMemo(() => boardFilterOptionsForUser(user), [user])
   const canSeeAnonymous = canAccessAnonymousBoard(user)
   const effectiveActiveCategory = boardFilterOptions.some((item) => item.value === activeCategory) ? activeCategory : 'ALL'
@@ -316,14 +318,14 @@ export default function Community({ onBack }: any) {
   return (
     <div className="min-w-0 space-y-4">
       {mode === 'list' && (
-        <div className="flex justify-center sm:justify-start">
+        <div data-reveal className="flex justify-center sm:justify-start">
           <button type="button" onClick={onBack} className="apple-action-secondary w-full px-4 py-2.5 text-sm sm:w-auto">
             메인으로 돌아가기
           </button>
         </div>
       )}
 
-      <section className="apple-board-shell">
+      <section data-reveal className="apple-board-shell">
         {mode === 'list' && (
           <CommunityListView
             onOpenDeletedRecords={openDeletedRecords}
