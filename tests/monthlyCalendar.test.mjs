@@ -101,6 +101,35 @@ assert.deepEqual(summary.map((event) => ({
   { date: '2026-06-04', title: '운영 회의', canceled: true },
 ])
 
+// past event (2026-06-01) is excluded; today (2026-06-02) and future (2026-06-04) are included
+const pastDates = summary.map((e) => e.date).filter((d) => d < '2026-06-02')
+assert.equal(pastDates.length, 0, 'past events must not appear in upcoming summary')
+
+const todayEvent = summary.find((e) => e.date === '2026-06-02')
+assert.ok(todayEvent, "today's event must appear in upcoming summary")
+
+const futureEvent = summary.find((e) => e.date === '2026-06-04')
+assert.ok(futureEvent, 'future event must appear in upcoming summary')
+
+// viewing a past month: all events should be filtered out
+const summaryPastMonth = buildMonthEventSummary({
+  eventsByDay,
+  calendarMonth,
+  today: new Date(2026, 5, 30),
+  limit: 3,
+})
+assert.equal(summaryPastMonth.length, 0, 'no upcoming events when today is past all events in month')
+
+// viewing a future month: all events are upcoming
+const summaryFutureToday = buildMonthEventSummary({
+  eventsByDay,
+  calendarMonth,
+  today: new Date(2026, 4, 1),
+  limit: 3,
+})
+assert.ok(summaryFutureToday.length > 0, 'all events are upcoming when today is before the month')
+assert.ok(summaryFutureToday.find((e) => e.date === '2026-06-01'), 'earliest event included when viewing future month')
+
 const crowded = visibleDayEvents([
   { id: 1 },
   { id: 2 },

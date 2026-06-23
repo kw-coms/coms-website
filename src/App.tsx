@@ -3605,7 +3605,7 @@ function ClubCalendarSection({ compact = false }: any) {
   const monthSummary = buildMonthEventSummary({
     eventsByDay,
     calendarMonth,
-    today: new Date(selectedYear, selectedMonth, 1),
+    today: new Date(),
     limit: 3,
   })
 
