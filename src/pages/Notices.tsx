@@ -1,12 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify'
 import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Search, Sparkles, ThumbsUp, Trash2, UsersRound } from 'lucide-react'
 import { getNotice, createNotice, updateNotice, deleteNotice, voteNotice } from '../services/noticeApi'
+import { searchYoutubeVideos } from '../services/communityApi'
 import { useAuth } from '../contexts/useAuth'
 import { NoticeCategory } from '../contract/enums'
 import { enumLabels } from '../contract/labels'
 import { useNotices } from './useNotices'
+import RichBodyEditor from '../components/richEditor/RichBodyEditor'
+import { URL_ONLY_RICH_FEATURES } from '../components/richEditor/richBodyFeatures'
+import { renderRichBody, richBodyToPlainText as noticeContentSearchText } from '../components/richEditor/renderRichBody'
+import { serializeRichBody, richBodyPlainText } from '../components/richEditor/serializeRichBody'
+import { parsePostBlocks } from './community/postEditorUtils'
 
 function formatDate(iso) {
   const date = new Date(iso)
@@ -81,22 +87,34 @@ function noticeCategoryMeta(value) {
 function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: any) {
   const [formData, setFormData] = useState({
     title: initialNotice?.title || '',
-    content: initialNotice?.content || '',
     category: initialNotice?.category || defaultCategory || 'GENERAL',
   })
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const editorApiRef = useRef(null)
+  // Convert existing plain or rich content into editor blocks once at mount.
+  // Intentionally runs once: re-deriving blocks on every initialNotice change
+  // would clobber in-progress edits, so the dependency array is empty by design.
+  const initialBlocks = useMemo(
+    () => (initialNotice ? parsePostBlocks({ content: initialNotice.content }) : []),
+    [], // eslint-disable-line react-hooks/exhaustive-deps
+  )
 
   const save = async () => {
-    if (!formData.title.trim() || !formData.content.trim()) return
+    if (!formData.title.trim()) { setError('제목을 입력해주세요.'); return }
+    const blocks = editorApiRef.current?.getBlocks() || []
+    const content = serializeRichBody(blocks)
+    if (!content || !richBodyPlainText(blocks)) { setError('내용을 입력해주세요.'); return }
     setSaving(true)
+    setError('')
     try {
-      const body = { ...formData, pinned: false }
+      const body = { ...formData, content, pinned: false }
       const saved = initialNotice
         ? await updateNotice(initialNotice.id, body)
         : await createNotice(body)
       onSave(saved)
     } catch (err) {
-      alert(err.message || '저장 중 오류가 발생했습니다.')
+      setError(err.message || '저장 중 오류가 발생했습니다.')
     } finally {
       setSaving(false)
     }
@@ -110,12 +128,13 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: any) {
         placeholder="제목"
         className="w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:text-sm"
       />
-      <textarea
-        value={formData.content}
-        onChange={(e) => setFormData((p) => ({ ...p, content: e.target.value }))}
-        placeholder="내용"
-        rows={10}
-        className="w-full resize-y rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-base leading-7 text-[var(--app-text)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:rows-14 sm:text-sm"
+      <RichBodyEditor
+        initialBlocks={initialBlocks}
+        apiRef={editorApiRef}
+        features={URL_ONLY_RICH_FEATURES}
+        error={error}
+        onError={setError}
+        searchYoutube={searchYoutubeVideos}
       />
       <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center">
         <select
@@ -158,7 +177,7 @@ export default function Notices() {
     const q = searchQuery.toLowerCase()
     return byCategory.filter((notice) =>
       (notice.title || '').toLowerCase().includes(q) ||
-      (notice.content || '').toLowerCase().includes(q) ||
+      noticeContentSearchText(notice.content).toLowerCase().includes(q) ||
       (notice.author || '').toLowerCase().includes(q) ||
       noticeCategoryMeta(notice.category || 'GENERAL').label.toLowerCase().includes(q)
     )
@@ -454,7 +473,12 @@ export default function Notices() {
                 <span>개추 {selectedNotice.upvotes ?? 0}</span>
               </div>
             </div>
-            <div className="text-size-container min-h-[200px] whitespace-pre-wrap break-words px-4 py-5 auto-text-notice sm:min-h-[360px] sm:px-5 sm:py-7">{linkify(selectedNotice.content)}</div>
+            <div className="text-size-container min-h-[200px] break-words auto-text-notice sm:min-h-[360px]">
+              {renderRichBody(
+                selectedNotice.content,
+                (plain) => <div className="whitespace-pre-wrap px-4 py-5 sm:px-5 sm:py-7">{linkify(plain)}</div>,
+              )}
+            </div>
             <div className="flex items-center justify-center border-t border-[var(--app-hairline)] bg-[#fafafa] px-4 py-4 sm:px-5">
               <button
                 type="button"

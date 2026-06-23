@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Download, FileUp, RefreshCw, Search, ThumbsUp, Trash2, X } from 'lucide-react'
 import { createPosts, deleteFile, downloadUrl, listFiles, voteArchiveFile } from '../services/archiveApi'
+import { searchYoutubeVideos } from '../services/communityApi'
 import { useAuth } from '../contexts/useAuth'
 import { ArchiveCategory } from '../contract/enums'
 import { enumLabels } from '../contract/labels'
+import RichBodyEditor from '../components/richEditor/RichBodyEditor'
+import { URL_ONLY_RICH_FEATURES } from '../components/richEditor/richBodyFeatures'
+import { renderRichBody, richBodyToPlainText } from '../components/richEditor/renderRichBody'
+import { serializeRichBody } from '../components/richEditor/serializeRichBody'
 
 function formatSize(bytes) {
   if (!Number.isFinite(bytes)) return '-'
@@ -82,11 +87,12 @@ function CategorySegment({ value, onChange, items, counts }: any) {
 }
 
 function WriteForm({ onCancel, onSave }: any) {
-  const [form, setForm] = useState({ title: '', description: '', category: 'GENERAL' })
+  const [form, setForm] = useState({ title: '', category: 'GENERAL' })
   const [files, setFiles] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const fileInputRef = useRef(null)
+  const editorApiRef = useRef(null)
 
   const addFiles = (event) => {
     const picked = Array.from(event.target.files || [])
@@ -106,9 +112,11 @@ function WriteForm({ onCancel, onSave }: any) {
     setSaving(true)
     setError('')
     try {
+      const blocks = editorApiRef.current?.getBlocks() || []
+      const description = serializeRichBody(blocks)
       const results = await createPosts(files, {
         title: form.title.trim(),
-        description: form.description.trim(),
+        description,
         category: form.category,
       })
       const succeeded = results.filter((r) => r.ok)
@@ -148,17 +156,16 @@ function WriteForm({ onCancel, onSave }: any) {
         </div>
       </div>
 
-      <label className="block">
-        <span className="mb-2 block text-xs font-bold text-[var(--app-subtle)]">설명</span>
-        <textarea
-          value={form.description}
-          onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
-          rows={7}
-          maxLength={2000}
-          placeholder="선택 입력"
-          className="w-full resize-y rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-sm leading-7 text-[var(--app-text)] outline-none transition focus:ring-2 focus:ring-[#0071e3]/24"
+      <div className="block">
+        <span className="mb-2 block text-xs font-bold text-[var(--app-subtle)]">설명 (선택)</span>
+        <RichBodyEditor
+          initialBlocks={[]}
+          apiRef={editorApiRef}
+          features={URL_ONLY_RICH_FEATURES}
+          onError={setError}
+          searchYoutube={searchYoutubeVideos}
         />
-      </label>
+      </div>
 
       <div className="space-y-3 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-3 text-sm text-[var(--app-muted)]">
         <div className="flex flex-wrap items-center gap-3">
@@ -267,7 +274,7 @@ export default function Archive({ onBack }: any) {
     const q = searchQuery.toLowerCase()
     return byCategory.filter((f) =>
       (f.title || f.originalName || '').toLowerCase().includes(q) ||
-      (f.description || '').toLowerCase().includes(q) ||
+      richBodyToPlainText(f.description).toLowerCase().includes(q) ||
       (f.uploaderName || f.uploadedBy || '').toLowerCase().includes(q) ||
       categoryLabel(f.category || 'GENERAL').toLowerCase().includes(q)
     )
@@ -471,9 +478,9 @@ export default function Archive({ onBack }: any) {
                           <span className="mt-3 block line-clamp-2 text-[15px] font-bold leading-6 text-[var(--app-text)]" title={file.title || file.originalName}>
                             {file.title || file.originalName}
                           </span>
-                          {file.description && (
+                          {richBodyToPlainText(file.description) && (
                             <span className="mt-1 block line-clamp-2 text-xs leading-5 text-[var(--app-muted)]">
-                              {file.description}
+                              {richBodyToPlainText(file.description)}
                             </span>
                           )}
                           <span className="mt-3 block truncate text-xs font-semibold text-[var(--app-subtle)]">
@@ -528,9 +535,9 @@ export default function Archive({ onBack }: any) {
                               <span className="block max-w-[340px] truncate font-bold text-[var(--app-text)]" title={file.title || file.originalName}>
                                 {file.title || file.originalName}
                               </span>
-                              {file.description && (
+                              {richBodyToPlainText(file.description) && (
                                 <span className="mt-0.5 block max-w-[340px] truncate text-xs text-[var(--app-subtle)]">
-                                  {file.description}
+                                  {richBodyToPlainText(file.description)}
                                 </span>
                               )}
                             </td>
@@ -579,8 +586,11 @@ export default function Archive({ onBack }: any) {
               </div>
             </div>
             {detailFile.description && (
-              <div className="border-b border-[var(--app-hairline)] py-5">
-                <p className="whitespace-pre-wrap text-sm leading-7 text-[var(--app-muted)]">{detailFile.description}</p>
+              <div className="border-b border-[var(--app-hairline)] py-5 text-sm leading-7 text-[var(--app-muted)]">
+                {renderRichBody(
+                  detailFile.description,
+                  (plain) => <p className="whitespace-pre-wrap">{plain}</p>,
+                )}
               </div>
             )}
             <dl className="grid gap-4 border-b border-[var(--app-hairline)] py-5 text-sm sm:grid-cols-2">
