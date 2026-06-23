@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { buildAuthLoadError, isLoggedOutAuthError } from '../src/contexts/authErrors.js'
+import { buildAuthLoadError, isLoggedOutAuthError } from '../src/contexts/authErrors.ts'
 
 assert.equal(isLoggedOutAuthError({ status: 401 }), true)
 assert.equal(isLoggedOutAuthError({ status: 403 }), false)

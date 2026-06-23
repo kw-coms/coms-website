@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import {
   buildDeletedPostTimeline,
   filterAndSortCommunityPosts,
-} from '../src/utils/communityExperience.js'
+} from '../src/utils/communityExperience.ts'
 
 const posts = [
   {
@@ -80,7 +80,7 @@ assert.deepEqual(timeline.map((item) => item.label), ['작성됨', '삭제됨', 
 assert.equal(timeline[1].detail, '관리자(2020123456)')
 assert.equal(timeline[3].detail, '복원 처리 완료')
 
-const postBlocksSource = readFileSync('src/pages/community/PostBlocks.jsx', 'utf8')
+const postBlocksSource = readFileSync('src/pages/community/PostBlocks.tsx', 'utf8')
 
 assert.match(
   postBlocksSource,

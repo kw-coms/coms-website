@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node tests/communityExperience.test.mjs && node tests/mobileNavigation.test.mjs && node tests/miniAppsProfile.test.mjs && node tests/monthlyCalendar.test.mjs && node tests/scheduleCsv.test.mjs && node tests/appProjectStatus.test.mjs && node tests/clubEvents.test.mjs && node tests/adminAccessibility.test.mjs && node tests/sanitizeHtml.test.mjs && node tests/authErrors.test.mjs && node tests/apiClientErrors.test.mjs",
+    "test": "node --import tsx tests/communityExperience.test.mjs && node --import tsx tests/mobileNavigation.test.mjs && node --import tsx tests/miniAppsProfile.test.mjs && node --import tsx tests/monthlyCalendar.test.mjs && node --import tsx tests/scheduleCsv.test.mjs && node --import tsx tests/appProjectStatus.test.mjs && node --import tsx tests/clubEvents.test.mjs && node --import tsx tests/adminAccessibility.test.mjs && node --import tsx tests/sanitizeHtml.test.mjs && node --import tsx tests/authErrors.test.mjs && node --import tsx tests/apiClientErrors.test.mjs",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "e2e": "npm run build && playwright test",
     "e2e:update": "npm run build && playwright test --update-snapshots",
@@ -28,6 +29,7 @@
     "@playwright/test": "^1.60.0",
     "@sentry/vite-plugin": "^5.3.0",
     "@tailwindcss/vite": "^4.3.0",
+    "@types/node": "^26.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
@@ -36,6 +38,9 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "rollup-plugin-visualizer": "^7.0.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.0",
     "vite": "^8.0.12"
   }
 }

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const profilePage = readFileSync(new URL('../src/pages/ChangePassword.jsx', import.meta.url), 'utf8')
-const miniAppsApi = readFileSync(new URL('../src/services/miniAppsApi.js', import.meta.url), 'utf8')
+const profilePage = readFileSync(new URL('../src/pages/ChangePassword.tsx', import.meta.url), 'utf8')
+const miniAppsApi = readFileSync(new URL('../src/services/miniAppsApi.ts', import.meta.url), 'utf8')
 
 assert.match(profilePage, /미니앱 저장함/, 'profile page should show a mini app save box')
 assert.match(profilePage, /COMS 월드컵/, 'profile page should link saved worldcup documents')
