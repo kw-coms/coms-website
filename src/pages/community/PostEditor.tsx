@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import {
   createCommunityPost,
+  fetchLinkPreview,
   searchYoutubeVideos,
   updateCommunityPost,
   uploadPostFile,
@@ -143,6 +144,7 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: any)
           features={FULL_RICH_FEATURES}
           onError={(msg) => setError(msg)}
           searchYoutube={searchYoutubeVideos}
+          fetchLinkPreview={fetchLinkPreview}
         />
       </div>
 

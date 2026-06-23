@@ -16,9 +16,15 @@ import {
   mediaWidthPercent,
   pollOptionLabel,
   safeExternalSrc,
+  safeYoutubeEmbedSrc,
   textToEditorHtml,
 } from './postEditorUtils'
 import RichEditorSurface from './RichEditorSurface'
+
+// Apple-style card chrome shared by the editor's external-embed previews so they
+// match the rendered PostBlocks cards (rounded-xl + hairline + subtle shadow).
+const EXTERNAL_CARD_STYLE = 'overflow:hidden;border:1px solid var(--app-hairline);border-radius:12px;background:var(--app-surface);box-shadow:0 1px 2px rgba(0,0,0,0.04);'
+const EXTERNAL_CAPTION_STYLE = 'padding:8px 12px;font-size:12px;font-weight:600;color:var(--app-muted);pointer-events:none'
 
 export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
   const divRef = useRef(null)
@@ -37,6 +43,23 @@ export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
   const escH = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
   const safeSrc = (url) => (url && /^(blob:|\/)/i.test(url) ? url : '')
   const dragFigureId = useRef(null)
+
+  // Non-interactive editor preview of a link-preview card (mirrors the rendered
+  // PostBlocks link card; pointer-events disabled so it behaves like other figures).
+  const linkPreviewHtml = (block) => {
+    const image = safeExternalSrc(block.image)
+    let domain = block.siteName || ''
+    if (!domain) {
+      try { domain = new URL(block.url).hostname } catch { domain = '' }
+    }
+    const imageHtml = image
+      ? `<div style="aspect-ratio:1.91/1;width:100%;overflow:hidden;background:var(--app-surface-soft);pointer-events:none"><img src="${escH(image)}" alt="" draggable="false" style="width:100%;height:100%;object-fit:cover;pointer-events:none"></div>`
+      : ''
+    const titleHtml = block.title ? `<p style="margin:0;font-size:14px;font-weight:700;color:var(--theme-body-dark)">${escH(block.title)}</p>` : ''
+    const descHtml = block.description ? `<p style="margin:4px 0 0;font-size:12px;color:var(--app-muted)">${escH(block.description)}</p>` : ''
+    const domainHtml = domain ? `<p style="margin:8px 0 0;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--app-subtle)">${escH(domain)}</p>` : ''
+    return `${imageHtml}<div style="padding:12px 16px;pointer-events:none">${titleHtml}${descHtml}${domainHtml}</div>`
+  }
 
   const trailingTypingNode = () => document.createTextNode('\u200B')
 
@@ -181,13 +204,18 @@ export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
         const align = block.align || 'center'
         figMeta.current.set(id, { ...block, width: wPct, align })
         const title = escH(block.title || (block.kind === 'youtube' ? 'YouTube 영상' : '외부 콘텐츠'))
-        const src = safeExternalSrc(block.kind === 'youtube' ? block.embedUrl : block.url)
+        const youtubeSrc = safeYoutubeEmbedSrc(block.embedUrl)
+        const src = block.kind === 'youtube' ? youtubeSrc : safeExternalSrc(block.url)
         const inner = block.kind === 'youtube'
-          ? `<div style="aspect-ratio:16/9;width:100%;background:#000;pointer-events:none"><iframe src="${escH(src)}" title="${title}" style="width:100%;height:100%;border:0;pointer-events:none"></iframe></div><figcaption style="padding:6px 8px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.03);pointer-events:none">${title}</figcaption>`
-          : block.kind === 'image'
-            ? `<img src="${escH(src)}" alt="${title}" draggable="false" class="community-inline-media-image" style="pointer-events:none">`
-            : `<video src="${escH(src)}" controls preload="metadata" draggable="false" style="display:block;width:100%;height:auto;pointer-events:none"></video>`
-        html += `<figure class="community-editor-figure" contenteditable="false" data-block-id="${id}" data-type="externalEmbed" data-align="${align}" style="${figureInlineStyle(wPct, align)}">${inner}</figure>\u200B`
+          ? (youtubeSrc
+            ? `<div style="aspect-ratio:16/9;width:100%;background:#000;pointer-events:none"><iframe src="${escH(youtubeSrc)}" title="${title}" style="width:100%;height:100%;border:0;pointer-events:none"></iframe></div><figcaption style="${EXTERNAL_CAPTION_STYLE}">${title}</figcaption>`
+            : `<figcaption style="${EXTERNAL_CAPTION_STYLE}">${title}</figcaption>`)
+          : block.kind === 'link'
+            ? linkPreviewHtml(block)
+            : block.kind === 'image'
+              ? `<img src="${escH(src)}" alt="${title}" draggable="false" class="community-inline-media-image" style="display:block;pointer-events:none">`
+              : `<video src="${escH(src)}" controls preload="metadata" draggable="false" style="display:block;width:100%;height:auto;pointer-events:none"></video>`
+        html += `<figure class="community-editor-figure" contenteditable="false" data-block-id="${id}" data-type="externalEmbed" data-align="${align}" style="${figureInlineStyle(wPct, align) + EXTERNAL_CARD_STYLE}">${inner}</figure>\u200B`
       } else if (block.type === 'poll') {
         const id = block.id || localId()
         figMeta.current.set(id, { type: 'poll', pollId: block.pollId, question: block.question, options: block.options || [] })
@@ -318,28 +346,33 @@ export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
     figure.dataset.blockId = id
     figure.dataset.type = 'externalEmbed'
     figure.dataset.align = align
-    figure.setAttribute('style', figureInlineStyle(wPct, align))
-    const src = safeExternalSrc(block.kind === 'youtube' ? block.embedUrl : block.url)
+    figure.setAttribute('style', figureInlineStyle(wPct, align) + EXTERNAL_CARD_STYLE)
+    const src = safeExternalSrc(block.url)
     if (block.kind === 'youtube') {
-      const box = document.createElement('div')
-      box.setAttribute('style', 'aspect-ratio:16/9;width:100%;background:#000;pointer-events:none')
-      const iframe = document.createElement('iframe')
-      iframe.src = src
-      iframe.title = block.title || 'YouTube 영상'
-      iframe.setAttribute('style', 'width:100%;height:100%;border:0;pointer-events:none')
-      box.appendChild(iframe)
-      figure.appendChild(box)
+      const youtubeSrc = safeYoutubeEmbedSrc(block.embedUrl)
+      if (youtubeSrc) {
+        const box = document.createElement('div')
+        box.setAttribute('style', 'aspect-ratio:16/9;width:100%;background:#000;pointer-events:none')
+        const iframe = document.createElement('iframe')
+        iframe.src = youtubeSrc
+        iframe.title = block.title || 'YouTube 영상'
+        iframe.setAttribute('style', 'width:100%;height:100%;border:0;pointer-events:none')
+        box.appendChild(iframe)
+        figure.appendChild(box)
+      }
       const caption = document.createElement('figcaption')
-      caption.setAttribute('style', 'padding:6px 8px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.03);pointer-events:none')
+      caption.setAttribute('style', EXTERNAL_CAPTION_STYLE)
       caption.textContent = block.title || 'YouTube 영상'
       figure.appendChild(caption)
+    } else if (block.kind === 'link') {
+      figure.innerHTML = linkPreviewHtml(block)
     } else if (block.kind === 'image') {
       const img = document.createElement('img')
       img.src = src
       img.alt = block.title || '외부 이미지'
       img.className = 'community-inline-media-image'
       img.draggable = false
-      img.setAttribute('style', 'pointer-events:none')
+      img.setAttribute('style', 'display:block;pointer-events:none')
       figure.appendChild(img)
     } else {
       const video = document.createElement('video')
