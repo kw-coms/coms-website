@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Download, FileUp, RefreshCw, Search, Trash2, X } from 'lucide-react'
-import { createPost, deleteFile, downloadUrl, listFiles } from '../services/archiveApi'
+import { ArrowLeft, Download, FileUp, RefreshCw, Search, ThumbsUp, Trash2, X } from 'lucide-react'
+import { createPosts, deleteFile, downloadUrl, listFiles, voteArchiveFile } from '../services/archiveApi'
 import { useAuth } from '../contexts/useAuth'
 import { ArchiveCategory } from '../contract/enums'
 import { enumLabels } from '../contract/labels'
@@ -83,20 +83,41 @@ function CategorySegment({ value, onChange, items, counts }: any) {
 
 function WriteForm({ onCancel, onSave }: any) {
   const [form, setForm] = useState({ title: '', description: '', category: 'GENERAL' })
-  const [file, setFile] = useState(null)
+  const [files, setFiles] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const fileInputRef = useRef(null)
 
+  const addFiles = (event) => {
+    const picked = Array.from(event.target.files || [])
+    if (picked.length) setFiles((prev) => [...prev, ...picked])
+    // Reset so re-selecting the same file fires onChange again.
+    event.target.value = ''
+  }
+
+  const removeFile = (index) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
   const submit = async (event) => {
     event.preventDefault()
     if (!form.title.trim()) { setError('제목을 입력해주세요.'); return }
-    if (!file) { setError('파일을 선택해주세요.'); return }
+    if (files.length === 0) { setError('파일을 선택해주세요.'); return }
     setSaving(true)
     setError('')
     try {
-      const saved = await createPost({ title: form.title.trim(), description: form.description.trim(), category: form.category, file })
-      onSave(saved)
+      const results = await createPosts(files, {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        category: form.category,
+      })
+      const succeeded = results.filter((r) => r.ok)
+      const failed = results.filter((r) => !r.ok)
+      if (succeeded.length === 0) {
+        setError(failed[0]?.error?.message || '업로드 중 오류가 발생했습니다.')
+        return
+      }
+      onSave(succeeded.map((r) => r.saved), failed.map((r) => r.file.name))
     } catch (err) {
       setError(err.message || '업로드 중 오류가 발생했습니다.')
     } finally {
@@ -139,25 +160,56 @@ function WriteForm({ onCancel, onSave }: any) {
         />
       </label>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-3 text-sm text-[var(--app-muted)]">
-        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3.5 font-bold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)]">
-          <FileUp size={15} />
-          파일 선택
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-          />
-        </label>
-        <span className="min-w-0 flex-1 truncate font-medium">{file ? file.name : '선택된 파일 없음'}</span>
+      <div className="space-y-3 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-3 text-sm text-[var(--app-muted)]">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3.5 font-bold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)]">
+            <FileUp size={15} />
+            파일 선택
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={addFiles}
+            />
+          </label>
+          <span className="min-w-0 flex-1 truncate font-medium">
+            {files.length === 0 ? '선택된 파일 없음' : `${files.length}개 파일 선택됨`}
+          </span>
+        </div>
+        {files.length > 1 && (
+          <p className="text-xs font-medium text-[var(--app-subtle)]">
+            파일마다 별도 자료로 등록되며, 제목 뒤에 번호가 붙습니다. (예: {form.title.trim() || '제목'} (1))
+          </p>
+        )}
+        {files.length > 0 && (
+          <ul className="space-y-1.5">
+            {files.map((selected, index) => (
+              <li
+                key={`${selected.name}-${index}`}
+                className="flex items-center gap-2 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-2"
+              >
+                <span className="min-w-0 flex-1 truncate font-medium text-[var(--app-text)]">{selected.name}</span>
+                <span className="shrink-0 text-xs font-bold text-[var(--app-subtle)]">{formatSize(selected.size)}</span>
+                <button
+                  type="button"
+                  onClick={() => removeFile(index)}
+                  className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--app-hairline)] text-[var(--app-muted)] transition hover:bg-[var(--app-surface-elevated)]"
+                  aria-label={`${selected.name} 제거`}
+                >
+                  <X size={13} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {error && <p className="text-sm font-semibold text-red-500">{error}</p>}
       <div className="flex flex-wrap justify-end gap-2">
         <button
           type="submit"
-          disabled={saving}
+          disabled={saving || files.length === 0}
           className="apple-action-primary inline-flex min-h-10 items-center justify-center gap-2 px-5 text-sm disabled:opacity-50"
         >
           <FileUp size={15} />
@@ -256,9 +308,31 @@ export default function Archive({ onBack }: any) {
     setMode('detail')
   }
 
-  const handleSave = (saved) => {
-    setFiles((prev) => [saved, ...prev])
-    setNotice('자료가 등록되었습니다.')
+  const [voting, setVoting] = useState(false)
+  const handleVote = async () => {
+    if (!detailFile || voting) return
+    setVoting(true)
+    try {
+      const updated = await voteArchiveFile(detailFile.id, detailFile.myVote === 1 ? 0 : 1)
+      setDetailFile(updated)
+      setFiles((prev) => prev.map((f) => (f.id === updated.id ? { ...f, ...updated } : f)))
+    } catch (err) {
+      setError(err.message || '추천 중 오류가 발생했습니다.')
+    } finally {
+      setVoting(false)
+    }
+  }
+
+  const handleSave = (savedList, failedNames = []) => {
+    const saved = Array.isArray(savedList) ? savedList : [savedList]
+    setFiles((prev) => [...saved, ...prev])
+    if (failedNames.length > 0) {
+      setNotice('')
+      setError(`${saved.length}개 자료가 등록되었습니다. 실패: ${failedNames.join(', ')}`)
+    } else {
+      setError('')
+      setNotice(saved.length > 1 ? `${saved.length}개 자료가 등록되었습니다.` : '자료가 등록되었습니다.')
+    }
     setMode('list')
   }
 
@@ -403,7 +477,7 @@ export default function Archive({ onBack }: any) {
                             </span>
                           )}
                           <span className="mt-3 block truncate text-xs font-semibold text-[var(--app-subtle)]">
-                            {file.uploaderName || file.uploadedBy || '-'} · {formatDate(file.uploadedAt)}
+                            {file.uploaderName || file.uploadedBy || '-'} · {formatDate(file.uploadedAt)} · 조회 {file.viewCount ?? 0} · 개추 {file.upvotes ?? 0}
                           </span>
                         </button>
                         <div className="mt-4 flex justify-end border-t border-[var(--app-hairline)] pt-3">
@@ -462,7 +536,10 @@ export default function Archive({ onBack }: any) {
                             </td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">{formatSize(file.fileSize)}</td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">{file.uploaderName || file.uploadedBy || '-'}</td>
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">{formatDate(file.uploadedAt)}</td>
+                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
+                              <span className="block">{formatDate(file.uploadedAt)}</span>
+                              <span className="mt-0.5 block text-xs text-[var(--app-subtle)]">조회 {file.viewCount ?? 0} · 개추 {file.upvotes ?? 0}</span>
+                            </td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-right">
                               <div className="flex justify-end gap-2">
                                 <a
@@ -496,6 +573,10 @@ export default function Archive({ onBack }: any) {
                 <span className="rounded-full bg-[var(--app-accent-soft)] px-2.5 py-1 font-bold text-[var(--app-accent-text)]">{categoryLabel(detailFile.category || 'GENERAL')}</span>
                 <span>{detailFile.uploaderName || detailFile.uploadedBy || '-'} · {formatDate(detailFile.uploadedAt)}</span>
               </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--app-subtle)]">
+                <span>조회 {detailFile.viewCount ?? 0}</span>
+                <span>개추 {detailFile.upvotes ?? 0}</span>
+              </div>
             </div>
             {detailFile.description && (
               <div className="border-b border-[var(--app-hairline)] py-5">
@@ -520,6 +601,15 @@ export default function Archive({ onBack }: any) {
                 <Download size={15} />
                 다운로드
               </a>
+              <button
+                type="button"
+                onClick={handleVote}
+                disabled={voting}
+                className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-full border px-4 text-sm font-bold disabled:opacity-50 ${detailFile.myVote === 1 ? 'border-[#0071e3] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
+              >
+                <ThumbsUp size={15} />
+                개추 {detailFile.upvotes ?? 0}
+              </button>
               {isAdmin && (
                 <button
                   type="button"
