@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8')
+const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
 
 assert.match(
