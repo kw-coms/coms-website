@@ -117,6 +117,7 @@ import {
   activitySectionNavItems,
 } from './data/homeContent'
 import PageFallback from './components/home/PageFallback'
+import ComsIntro from './components/common/ComsIntro'
 import CompanionServicesSection from './components/home/CompanionServicesSection'
 
 const NOTIFICATIONS_QUERY_KEY = ['app-shell', 'notifications']
@@ -1512,9 +1513,31 @@ function AppearanceControl({
     </section>
   )
 }
+function NotFoundPage() {
+  const navigate = useNavigate()
+  return (
+    <div className="apple-detail-page theme-home relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[var(--app-surface-soft)] px-6 text-center text-[var(--app-text)]">
+      <div className="home-hero-surface absolute inset-0" />
+      <div className="relative z-10 flex flex-col items-center">
+        <img src={getLogoAsset('COMs_logo_vec')} alt="" className="coms-cinema-intrologo mb-8 w-20 sm:w-24" aria-hidden="true" />
+        <p className="apple-display coms-3d-title coms-cinema-title text-7xl sm:text-8xl">404</p>
+        <h1 className="mt-6 text-2xl font-bold text-[var(--app-text)] sm:text-3xl">페이지를 찾을 수 없어요</h1>
+        <p className="apple-copy mt-3 max-w-md text-base text-[var(--app-muted)]">
+          주소가 바뀌었거나 사라진 페이지일 수 있어요. 홈으로 돌아가 다시 찾아보세요.
+        </p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <button type="button" onClick={() => { scrollToTopInstant(); navigate('/') }} className={solidActionBtnClass}>홈으로</button>
+          <button type="button" onClick={() => navigate(-1)} className={ghostActionBtnClass}>이전으로</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [themeMode, setThemeMode] = useState(getStoredThemeMode)
   const [accentColor, setAccentColor] = useState(getStoredAccentColor)
   const [guestFontId, setGuestFontId] = useState(getStoredFontId)
@@ -1603,9 +1626,11 @@ function App() {
 
   return (
     <Suspense fallback={<PageFallback />}>
+      {location.pathname === '/' && <ComsIntro />}
       <ScrollToTop />
       <GlobalNavigation />
-      <Routes>
+      <div key={location.pathname} className="coms-page-enter">
+      <Routes location={location}>
         <Route path="/" element={<HomeView />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/activities" element={<ActivitiesDetailPage />} />
@@ -1625,8 +1650,9 @@ function App() {
         <Route path="/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
         <Route path="/recruit" element={<RecruitPage />} />
         <Route path="/recruit-notice" element={<RecruitNoticePage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      </div>
       <AppearanceControl
         accentColor={accentColor}
         setAccentColor={setAccentColor}

@@ -356,7 +356,60 @@ export default function Notices() {
                 <span className="shrink-0 text-xs font-semibold text-[var(--app-subtle)]">{filteredNotices.length}개</span>
               </div>
             </div>
-            {loading && <p className="px-4 py-16 text-center text-sm text-[var(--app-muted)]">불러오는 중...</p>}
+            {loading && (
+              <>
+                {/* 모바일 스켈레톤 카드 목록 */}
+                <div className="mx-4 mb-4 grid grid-cols-1 gap-2.5 max-md:grid sm:mx-6 md:hidden">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="apple-soft-panel flex flex-col gap-2 px-3.5 py-3.5">
+                      <div className="flex items-center gap-2">
+                        <div className="skeleton h-4 w-10 rounded-full" />
+                        <div className="skeleton h-3 w-14 rounded-full ml-auto" />
+                      </div>
+                      <div className="skeleton skeleton-line w-4/5 rounded" />
+                      <div className="skeleton skeleton-line w-1/2 rounded" />
+                      <div className="skeleton h-3 w-16 rounded-full mt-1" />
+                    </div>
+                  ))}
+                </div>
+
+                {/* 데스크탑 스켈레톤 테이블 */}
+                <div className="m-4 hidden overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] sm:m-6 md:block">
+                  <table className="apple-table w-full min-w-[760px] border-collapse text-sm">
+                    <thead className="border-b border-[var(--app-hairline)]">
+                      <tr>
+                        <th className="w-16 px-4 py-3">번호</th>
+                        <th className="w-28 px-4 py-3">분류</th>
+                        <th className="px-4 py-3 text-left">제목</th>
+                        <th className="w-28 px-4 py-3">작성자</th>
+                        <th className="w-28 px-4 py-3">작성일</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/10">
+                      {Array.from({ length: 6 }).map((_, i) => (
+                        <tr key={i}>
+                          <td className="px-4 py-3.5 text-center">
+                            <div className="skeleton h-3 w-6 rounded mx-auto" />
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            <div className="skeleton h-5 w-14 rounded-full mx-auto" />
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <div className="skeleton skeleton-line w-3/4 rounded" />
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            <div className="skeleton h-3 w-16 rounded mx-auto" />
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            <div className="skeleton h-3 w-16 rounded mx-auto" />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
             {error && <p className="mx-5 mt-5 rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-7">{error}</p>}
             {!loading && !error && filteredNotices.length === 0 && (
               <p className="px-4 py-16 text-center text-sm text-[var(--app-muted)]">등록된 글이 없습니다.</p>
