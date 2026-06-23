@@ -155,13 +155,13 @@ export default function ChangePassword({ onBack }) {
 
   const panelClass = 'rounded-lg border border-black/10 bg-white/88 p-5 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:p-8'
   const frameClass = 'rounded-lg bg-black/10 p-px'
-  const inputClass = 'w-full rounded-lg bg-white px-4 py-3 text-[#1d1d1f] outline-none placeholder:text-[#86868b] transition focus:ring-2 focus:ring-[#0071e3]/24'
+  const inputClass = 'w-full rounded-lg bg-white px-4 py-3 text-[#1d1d1f] outline-none placeholder:text-[var(--app-subtle)] transition focus:ring-2 focus:ring-[#0071e3]/24'
   const textareaClass = `${inputClass} min-h-28 resize-y leading-6`
   const btnClass = 'rounded-lg border border-black/10 bg-white px-4 py-2.5 font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-[#f5f5f7] disabled:cursor-wait disabled:opacity-60'
   const primaryBtnClass = 'rounded-lg bg-[#0071e3] px-4 py-2.5 font-semibold text-white shadow-[0_10px_28px_rgba(0,113,227,0.22)] transition hover:bg-[#0077ed] disabled:cursor-wait disabled:opacity-60'
   const cardClass = 'rounded-lg border border-black/10 bg-[#f5f5f7] p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:p-5'
   const fieldCardClass = 'rounded-lg border border-black/8 bg-white/70 p-3'
-  const helperTextClass = 'text-xs leading-5 text-[#86868b]'
+  const helperTextClass = 'text-xs leading-5 text-[var(--app-subtle)]'
   const miniAppProfiles = [
     {
       key: 'worldcup',
@@ -421,7 +421,7 @@ export default function ChangePassword({ onBack }) {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-bold text-[#0066cc]">{profile.label}</p>
-                        <p className="mt-1 text-xs font-semibold leading-5 text-[#86868b]">{profile.description}</p>
+                        <p className="mt-1 text-xs font-semibold leading-5 text-[var(--app-subtle)]">{profile.description}</p>
                       </div>
                       <span className="rounded-full bg-[#e8f3ff] px-2.5 py-1 text-xs font-bold text-[#0066cc]">
                         {profile.documents.length}개
@@ -435,7 +435,7 @@ export default function ChangePassword({ onBack }) {
                         </p>
                       ))}
                       {profile.documents.length === 0 && (
-                        <p className="text-sm font-semibold text-[#86868b]">아직 저장한 항목이 없습니다.</p>
+                        <p className="text-sm font-semibold text-[var(--app-subtle)]">아직 저장한 항목이 없습니다.</p>
                       )}
                     </div>
                   </a>

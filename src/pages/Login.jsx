@@ -15,7 +15,7 @@ const panelClass =
   'rounded-lg border border-black/10 bg-white/86 p-5 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:p-8'
 const frameClass = 'rounded-lg bg-black/10 p-px'
 const inputClass =
-  'w-full rounded-lg bg-white px-4 py-3 text-[#1d1d1f] outline-none placeholder:text-[#86868b] transition focus:ring-2 focus:ring-[#0071e3]/24'
+  'w-full rounded-lg bg-white px-4 py-3 text-[#1d1d1f] outline-none placeholder:text-[var(--app-subtle)] transition focus:ring-2 focus:ring-[#0071e3]/24'
 const btnClass =
   'flex w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 py-3 font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-not-allowed disabled:opacity-60'
 const linkButtonClass =
