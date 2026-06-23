@@ -5238,7 +5238,7 @@ body {
 	--coms-3d-highlight: rgba(255, 255, 255, 0.16);
 }
 
-/* Extruded hero title */
+/* Extruded hero title (depth comes from the parent 3D stage) */
 .coms-3d-title {
 	text-shadow:
 		0 1px 0 var(--coms-3d-highlight),
@@ -5248,8 +5248,9 @@ body {
 		0 5px 0 var(--coms-3d-depth),
 		0 6px 1px rgba(0, 0, 0, 0.10),
 		0 10px 20px rgba(0, 0, 0, 0.18);
-	transform: perspective(720px) rotateX(9deg);
+	transform: translateZ(46px) rotateX(9deg);
 	transform-origin: center 78%;
+	animation: coms-title-in 1000ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
 /* Floating logo card with depth + tilt */
@@ -5320,10 +5321,84 @@ body {
 		0 40px 90px var(--coms-3d-depth);
 }
 
+/* ---- Interactive 3D stage: pointer-driven parallax tilt ---------------- */
+.coms-3d-stage {
+	perspective: 1100px;
+	perspective-origin: center 40%;
+}
+
+.coms-3d-stage-inner {
+	transform: rotateX(var(--coms-rx, 0deg)) rotateY(var(--coms-ry, 0deg));
+	transform-style: preserve-3d;
+	transition: transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1);
+	will-change: transform;
+}
+
+/* Depth layers — float at different Z so the tilt yields real parallax */
+.coms-depth-sm {
+	transform: translateZ(20px);
+	transform-style: preserve-3d;
+}
+
+.coms-depth-md {
+	transform: translateZ(34px);
+	transform-style: preserve-3d;
+}
+
+.coms-depth-lg {
+	transform: translateZ(64px);
+	transform-style: preserve-3d;
+}
+
+/* Logo: continuous 3D bob + Y-axis wobble */
+.coms-logo-3d {
+	animation: coms-logo-3d 8s ease-in-out infinite;
+	transform-style: preserve-3d;
+}
+
+@keyframes coms-logo-3d {
+	0%,
+	100% {
+		transform: translateY(0) rotateY(0deg) rotateX(0deg);
+	}
+	25% {
+		transform: translateY(-7px) rotateY(18deg) rotateX(6deg);
+	}
+	50% {
+		transform: translateY(0) rotateY(0deg) rotateX(0deg);
+	}
+	75% {
+		transform: translateY(-7px) rotateY(-18deg) rotateX(6deg);
+	}
+}
+
+@keyframes coms-title-in {
+	0% {
+		opacity: 0;
+		transform: translateZ(46px) rotateX(-72deg);
+	}
+	100% {
+		opacity: 1;
+		transform: translateZ(46px) rotateX(9deg);
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.coms-3d-title,
 	.coms-3d-card,
-	.coms-3d-card:hover {
+	.coms-3d-card:hover,
+	.coms-3d-stage-inner,
+	.coms-depth-sm,
+	.coms-depth-md,
+	.coms-depth-lg {
 		transform: none;
+	}
+
+	.coms-logo-3d {
+		animation: none;
+	}
+
+	.coms-3d-title {
+		animation: none;
 	}
 }
