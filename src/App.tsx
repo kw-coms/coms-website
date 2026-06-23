@@ -4406,11 +4406,11 @@ function HomeView() {
               2026 Semester Ready
             </div>
             <div className="relative mx-auto mt-6 flex h-28 w-28 items-center justify-center sm:mt-7 sm:h-36 sm:w-36">
-              <div className="absolute inset-0 rounded-[1.75rem] bg-white/82 shadow-[0_18px_54px_rgba(0,0,0,0.09)] ring-1 ring-black/5" />
+              <div className="coms-3d-card absolute inset-0 rounded-[1.75rem] bg-white/82 ring-1 ring-black/5" />
               <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="home-logo-float relative z-10 h-20 w-20 object-contain sm:h-24 sm:w-24" />
             </div>
             <p className="mt-6 text-sm font-semibold text-[var(--app-muted)]">Kwangwoon University Computer Club</p>
-            <h2 className="apple-display mt-2 whitespace-nowrap text-[3.2rem] sm:text-8xl lg:text-[8.5rem]">
+            <h2 className="apple-display coms-3d-title mt-2 whitespace-nowrap text-[3.2rem] sm:text-8xl lg:text-[8.5rem]">
               COM&apos;s
             </h2>
             <p className="apple-copy mx-auto mt-5 max-w-[20rem] text-lg sm:max-w-3xl sm:text-2xl">

@@ -5224,3 +5224,106 @@ body {
 .text-size-container {
 	container-type: inline-size;
 }
+
+/* ===== 3D home design ===================================================== */
+:root {
+	--coms-3d-depth: rgba(0, 0, 0, 0.20);
+	--coms-3d-depth-soft: rgba(0, 0, 0, 0.12);
+	--coms-3d-highlight: rgba(255, 255, 255, 0.66);
+}
+
+:root[data-theme-mode='dark'] {
+	--coms-3d-depth: rgba(0, 0, 0, 0.55);
+	--coms-3d-depth-soft: rgba(0, 0, 0, 0.40);
+	--coms-3d-highlight: rgba(255, 255, 255, 0.16);
+}
+
+/* Extruded hero title */
+.coms-3d-title {
+	text-shadow:
+		0 1px 0 var(--coms-3d-highlight),
+		0 2px 0 var(--coms-3d-depth-soft),
+		0 3px 0 var(--coms-3d-depth-soft),
+		0 4px 0 var(--coms-3d-depth-soft),
+		0 5px 0 var(--coms-3d-depth),
+		0 6px 1px rgba(0, 0, 0, 0.10),
+		0 10px 20px rgba(0, 0, 0, 0.18);
+	transform: perspective(720px) rotateX(9deg);
+	transform-origin: center 78%;
+}
+
+/* Floating logo card with depth + tilt */
+.coms-3d-card {
+	box-shadow:
+		inset 0 1px 0 var(--coms-3d-highlight),
+		0 10px 24px var(--coms-3d-depth-soft),
+		0 26px 60px var(--coms-3d-depth);
+	transform: perspective(900px) rotateX(7deg);
+	transition: transform 420ms ease, box-shadow 420ms ease;
+}
+
+.coms-3d-card:hover {
+	transform: perspective(900px) rotateX(0deg) translateY(-3px);
+}
+
+/* 3D press buttons across the home page */
+.theme-home .apple-action-primary {
+	box-shadow:
+		0 3px 0 var(--coms-3d-depth),
+		0 7px 16px var(--coms-3d-depth-soft);
+	transition: background-color 160ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.theme-home .apple-action-primary:hover {
+	transform: translateY(-1px);
+	box-shadow:
+		0 4px 0 var(--coms-3d-depth),
+		0 10px 20px var(--coms-3d-depth-soft);
+}
+
+.theme-home .apple-action-primary:active {
+	transform: translateY(2px);
+	box-shadow:
+		0 1px 0 var(--coms-3d-depth),
+		0 3px 8px var(--coms-3d-depth-soft);
+}
+
+.theme-home .apple-action-secondary {
+	box-shadow:
+		0 2px 0 var(--coms-3d-depth-soft),
+		0 5px 12px var(--coms-3d-depth-soft);
+	transition: background-color 160ms ease, color 160ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.theme-home .apple-action-secondary:hover {
+	transform: translateY(-1px);
+}
+
+.theme-home .apple-action-secondary:active {
+	transform: translateY(1px);
+	box-shadow: 0 1px 4px var(--coms-3d-depth-soft);
+}
+
+/* Deeper 3D lift on showcase product cards */
+.theme-home .apple-showcase-card {
+	box-shadow:
+		inset 0 1px 0 var(--coms-3d-highlight),
+		0 14px 30px var(--coms-3d-depth-soft),
+		0 30px 70px var(--coms-3d-depth);
+	transition: transform 260ms ease, box-shadow 260ms ease;
+}
+
+.theme-home .apple-showcase-card:hover {
+	box-shadow:
+		inset 0 1px 0 var(--coms-3d-highlight),
+		0 20px 40px var(--coms-3d-depth-soft),
+		0 40px 90px var(--coms-3d-depth);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.coms-3d-title,
+	.coms-3d-card,
+	.coms-3d-card:hover {
+		transform: none;
+	}
+}
