@@ -5420,18 +5420,17 @@ body {
 	background: var(--app-surface-soft);
 }
 
-/* Giant wordmark — absolute-centered, starts ~2.4x, shrinks to 1x and fades
-   out so the content title can take its place (no overlap, always centered). */
-.coms-cinema-word {
+/* Giant logo + wordmark — absolute-centered, start ~2.4x, shrink to 1x and
+   fade out so the content title can take its place (always centered). */
+.coms-cinema-intro {
 	position: absolute;
 	left: 50%;
 	top: 50%;
-	margin: 0;
-	font-size: clamp(2.75rem, 12vw, 8.5rem);
-	line-height: 0.92;
-	white-space: nowrap;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: clamp(0.5rem, 1.4vw, 1.25rem);
 	opacity: var(--word-o, 1);
-	animation: none;
 	transform:
 		translate(-50%, -50%)
 		translateY(var(--word-ty, 0px))
@@ -5440,6 +5439,22 @@ body {
 	transition: transform 120ms linear, opacity 120ms linear;
 	will-change: transform, opacity;
 	pointer-events: none;
+}
+
+.coms-cinema-intrologo {
+	width: clamp(3.5rem, 9vw, 6.5rem);
+	height: auto;
+	object-fit: contain;
+	filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.18));
+	animation: home-logo-float 7s ease-in-out infinite;
+}
+
+.coms-cinema-word {
+	margin: 0;
+	font-size: clamp(2.75rem, 12vw, 8.5rem);
+	line-height: 0.92;
+	white-space: nowrap;
+	animation: none;
 }
 
 /* Content title reuses the 3D text-shadow but not the title-in transform. */
@@ -5519,7 +5534,7 @@ body {
 		height: auto;
 		min-height: calc(100svh - var(--apple-nav-height));
 	}
-	.coms-cinema-word {
+	.coms-cinema-intro {
 		display: none;
 	}
 	.coms-cinema-content,
@@ -5553,7 +5568,33 @@ body {
 	transform: none;
 }
 
+/* Directional reveal variants (Kakao-style side slide-ins). */
+.reveal-ready [data-reveal-dir='right'] {
+	transform: translateX(48px) scale(0.985);
+}
+.reveal-ready [data-reveal-dir='left'] {
+	transform: translateX(-48px) scale(0.985);
+}
+.reveal-ready [data-reveal-dir='right'].is-revealed,
+.reveal-ready [data-reveal-dir='left'].is-revealed {
+	transform: none;
+}
+
+/* ---- Scroll-snap "pause" on the home sections (Kakao-style) ------------ */
+/* proximity (not mandatory) so it gently settles without trapping the user. */
+html.home-snap-scroll {
+	scroll-snap-type: y proximity;
+}
+html.home-snap-scroll .home-snap-section {
+	scroll-snap-align: start;
+	scroll-snap-stop: normal;
+	scroll-margin-top: var(--apple-nav-height);
+}
+
 @media (prefers-reduced-motion: reduce) {
+	html.home-snap-scroll {
+		scroll-snap-type: none;
+	}
 	.coms-3d-title,
 	.coms-3d-card,
 	.coms-3d-card:hover,

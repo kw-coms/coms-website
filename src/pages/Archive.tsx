@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useScrollReveal } from '../hooks/useScrollReveal'
 import { ArrowLeft, Download, FileUp, RefreshCw, Search, ThumbsUp, Trash2, X } from 'lucide-react'
 import { createPosts, deleteFile, downloadUrl, listFiles, voteArchiveFile } from '../services/archiveApi'
 import { fetchLinkPreview, searchYoutubeVideos } from '../services/communityApi'
@@ -247,6 +248,8 @@ export default function Archive({ onBack }: any) {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('ALL')
 
+  useScrollReveal([files.length, loading])
+
   const isAdmin = user?.role === 'ADMIN'
 
   const loadFiles = ({ showLoading = true } = {}) => {
@@ -367,7 +370,7 @@ export default function Archive({ onBack }: any) {
       <section className="apple-board-shell">
         <div className="apple-board-hero px-5 py-6 sm:px-8 sm:py-8">
           <div className="flex flex-wrap items-end justify-between gap-5">
-            <div className="min-w-0">
+            <div className="min-w-0" data-reveal>
               <p className="apple-eyebrow">Archive</p>
               <h1 className="mt-2 text-3xl font-bold leading-tight tracking-normal sm:text-4xl">
                 {mode === 'write' ? '자료 등록' : mode === 'detail' ? '자료 상세' : '자료실'}
@@ -461,10 +464,10 @@ export default function Archive({ onBack }: any) {
               ) : (
                 <>
                 <div className="grid gap-3 p-4 md:hidden">
-                  {filteredFiles.map((file) => {
+                  {filteredFiles.map((file, index) => {
                     const open = () => openFile(file)
                     return (
-                      <article key={file.id} className="apple-soft-panel p-4">
+                      <article key={file.id} className="apple-soft-panel p-4" data-reveal style={{ '--reveal-delay': `${index * 70}ms` } as any}>
                         <button
                           type="button"
                           onClick={open}
@@ -515,7 +518,7 @@ export default function Archive({ onBack }: any) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--app-hairline)]">
-                      {filteredFiles.map((file) => {
+                      {filteredFiles.map((file, index) => {
                         const open = () => openFile(file)
                         return (
                           <tr
@@ -525,6 +528,8 @@ export default function Archive({ onBack }: any) {
                             onClick={open}
                             onKeyDown={(event) => openRowWithKeyboard(event, open)}
                             className="cursor-pointer text-[var(--app-muted)] focus:outline-none"
+                            data-reveal
+                            style={{ '--reveal-delay': `${index * 70}ms` } as any}
                           >
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-[var(--app-subtle)]">{file.id}</td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
