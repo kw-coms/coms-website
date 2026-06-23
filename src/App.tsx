@@ -820,6 +820,7 @@ function GlobalNavigation() {
   const [activityOpen, setActivityOpen] = useState(false)
   const [mobileActivityOpen, setMobileActivityOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [showTop, setShowTop] = useState(false)
   const activityWrapperRef = useRef(null)
   const activeKey = getActiveNavKey(location.pathname)
   const mobileTabs = tabs.slice(0, 3)
@@ -829,12 +830,29 @@ function GlobalNavigation() {
   const memberNavItems = navExtraItems.filter((item) => item.id !== 'notices')
   const activityNavActive = activitySectionNavItems.some((item) => item.id === activeKey)
 
-  // Kakao-style header: solidify (blur + shadow) once the page is scrolled.
+  // Kakao-style header: solidify on scroll, drive the top progress bar, and
+  // toggle the back-to-top button.
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8)
+    let raf = 0
+    const onScroll = () => {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        const y = window.scrollY
+        setScrolled(y > 8)
+        setShowTop(y > 600)
+        const max = document.documentElement.scrollHeight - window.innerHeight
+        document.documentElement.style.setProperty('--scroll-progress', (max > 0 ? y / max : 0).toFixed(4))
+      })
+    }
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    window.addEventListener('resize', onScroll)
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+      if (raf) cancelAnimationFrame(raf)
+    }
   }, [])
 
   useEffect(() => {
@@ -905,6 +923,16 @@ function GlobalNavigation() {
   )
 
   return (
+    <>
+    <div className="coms-scroll-progress" aria-hidden="true" />
+    <button
+      type="button"
+      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      className={`coms-to-top ${showTop ? 'is-visible' : ''}`}
+      aria-label="맨 위로"
+    >
+      <ChevronDown size={20} className="rotate-180" />
+    </button>
     <header className={`apple-global-nav fixed inset-x-0 top-0 z-[80] ${scrolled ? 'is-scrolled' : ''}`}>
       <div className={`${floatingBarBaseClass} relative mx-auto flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-8`}>
         <button
@@ -1156,6 +1184,7 @@ function GlobalNavigation() {
         </nav>
       )}
     </header>
+    </>
   )
 }
 
@@ -4579,7 +4608,7 @@ function HomeView() {
         </section>
 
         <section className="apple-showcase-strip bg-[var(--app-surface)] px-5 py-4 sm:py-6">
-          <div className="mx-auto grid max-w-7xl gap-3 lg:grid-cols-3">
+          <div className="coms-hscroll mx-auto max-w-7xl">
             {showcaseItems.map((item, index) => (
               <button
                 key={item.title}
@@ -4587,7 +4616,7 @@ function HomeView() {
                 onClick={() => openPanel(item.target)}
                 data-reveal
                 style={{ '--reveal-delay': `${index * 90}ms` } as any}
-                className="apple-product-panel apple-showcase-card group flex min-h-[12rem] flex-col px-6 py-6 text-left text-[var(--app-text)] transition hover:-translate-y-0.5"
+                className="coms-hslide apple-product-panel apple-showcase-card group flex min-h-[12rem] flex-col px-6 py-6 text-left text-[var(--app-text)] transition hover:-translate-y-0.5"
               >
                 <p className="text-sm font-semibold text-[var(--app-accent-text)]">{item.eyebrow}</p>
                 <h3 className="mt-3 text-3xl font-semibold leading-tight tracking-normal text-[var(--app-text)]">{item.title}</h3>
@@ -4598,6 +4627,19 @@ function HomeView() {
                 </span>
               </button>
             ))}
+          </div>
+        </section>
+
+        <section className="border-y border-[var(--app-hairline)] bg-[var(--app-surface)] py-3 sm:py-4" aria-hidden="true">
+          <div className="coms-marquee">
+            <div className="coms-marquee-track">
+              {[...experiencePills, ...experiencePills, ...experiencePills, ...experiencePills].map((pill, index) => (
+                <span key={index} className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--app-muted)]">
+                  <span className="size-1.5 rounded-full bg-[var(--app-accent)]" />
+                  {pill}
+                </span>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -4613,7 +4655,7 @@ function HomeView() {
               </div>
               <button type="button" onClick={() => goPageTop('/notices')} className={ghostActionBtnClass}>최근 공지 보기</button>
             </div>
-            <div className="mt-8 grid gap-3 md:grid-cols-3">
+            <div className="coms-hscroll mt-8">
               {activityHubItems.map((item, index) => (
                 <button
                   key={item.title}
@@ -4621,7 +4663,7 @@ function HomeView() {
                   onClick={() => goPageTop(item.route)}
                   data-reveal
                   style={{ '--reveal-delay': `${index * 90}ms` } as any}
-                  className="apple-product-panel min-h-44 px-6 py-6 text-left transition hover:-translate-y-0.5"
+                  className="coms-hslide apple-product-panel min-h-44 px-6 py-6 text-left transition hover:-translate-y-0.5"
                 >
                   <span className="inline-flex size-8 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-sm font-bold text-[var(--app-accent-text)]">
                     {index + 1}
