@@ -1360,6 +1360,10 @@ test('signed-in members see real activity records and schedule events', async ({
 })
 
 test('admin can add a schedule directly from the monthly calendar', async ({ page }) => {
+  // Pin the clock so the calendar defaults to June 2026 and the seeded
+  // 2026-06-11 schedule counts as an upcoming event in the month summary,
+  // independent of when this test actually runs.
+  await page.clock.setFixedTime(new Date('2026-06-10T09:00:00'))
   await mockAdminApis(page)
   let createdPayload = null
   let updatedPayload = null
