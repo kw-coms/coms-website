@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Download, FileUp, RefreshCw, Search, ThumbsUp, Trash2, X } from 'lucide-react'
 import { createPosts, deleteFile, downloadUrl, listFiles, voteArchiveFile } from '../services/archiveApi'
-import { searchYoutubeVideos } from '../services/communityApi'
+import { fetchLinkPreview, searchYoutubeVideos } from '../services/communityApi'
 import { useAuth } from '../contexts/useAuth'
 import { ArchiveCategory } from '../contract/enums'
 import { enumLabels } from '../contract/labels'
@@ -164,6 +164,7 @@ function WriteForm({ onCancel, onSave }: any) {
           features={URL_ONLY_RICH_FEATURES}
           onError={setError}
           searchYoutube={searchYoutubeVideos}
+          fetchLinkPreview={fetchLinkPreview}
         />
       </div>
 

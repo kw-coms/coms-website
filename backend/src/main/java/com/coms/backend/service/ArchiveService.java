@@ -51,13 +51,15 @@ public class ArchiveService {
     private final StorageService storage;
     private final MemberRepository memberRepository;
     private final ArchiveFileVoteRepository voteRepository;
+    private final RichContentSanitizer richContentSanitizer;
 
     public ArchiveService(ArchiveFileRepository repo, StorageService storage, MemberRepository memberRepository,
-                          ArchiveFileVoteRepository voteRepository) {
+                          ArchiveFileVoteRepository voteRepository, RichContentSanitizer richContentSanitizer) {
         this.repo = repo;
         this.storage = storage;
         this.memberRepository = memberRepository;
         this.voteRepository = voteRepository;
+        this.richContentSanitizer = richContentSanitizer;
     }
 
     public ArchiveFileResponse upload(String title, String description, MultipartFile file, String uploaderStudentId) throws IOException {
@@ -73,7 +75,7 @@ public class ArchiveService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
             ArchiveFile entity = new ArchiveFile();
             entity.setTitle(title != null && !title.isBlank() ? title.trim() : cleanOriginalFilename(file));
-            entity.setDescription(description != null && !description.isBlank() ? description.trim() : null);
+            entity.setDescription(sanitizeDescription(description));
             entity.setCategory(parsedCategory);
             entity.setOriginalName(cleanOriginalFilename(file));
             entity.setStoredName(stored);
@@ -190,6 +192,19 @@ public class ArchiveService {
         int myVote(String studentId) {
             return studentId == null ? 0 : byStudent.getOrDefault(studentId, 0);
         }
+    }
+
+    /**
+     * Resource descriptions now carry the same rich-editor block content as notices
+     * and community posts, so they must pass through the shared sanitizer (which
+     * rejects/normalizes externalEmbed iframes) before being stored. Blank stays null
+     * for backward compatibility with legacy plain-text descriptions.
+     */
+    private String sanitizeDescription(String description) {
+        if (description == null || description.isBlank()) {
+            return null;
+        }
+        return richContentSanitizer.sanitizeContent(description.trim());
     }
 
     private ArchiveFile.Category parseCategory(String value) {

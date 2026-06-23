@@ -22,9 +22,11 @@ export default function RichBodyEditor({
   error,
   onError,
   searchYoutube,
+  fetchLinkPreview,
 }: any) {
   const editorApiRef = apiRef
   const [externalUrl, setExternalUrl] = useState('')
+  const [externalLoading, setExternalLoading] = useState(false)
   const [youtubeQuery, setYoutubeQuery] = useState('')
   const [youtubeResults, setYoutubeResults] = useState([])
   const [youtubeSearching, setYoutubeSearching] = useState(false)
@@ -38,16 +40,40 @@ export default function RichBodyEditor({
     editorApiRef.current?.formatBlock(command, value)
   }
 
-  const insertExternalUrl = () => {
+  const insertExternalUrl = async () => {
+    let block
     try {
-      const block = externalBlockFromUrl(externalUrl)
-      editorApiRef.current?.insertExternalEmbed(block)
-      setExternalUrl('')
-      setActiveInsertTool('')
-      setError('')
+      block = externalBlockFromUrl(externalUrl)
     } catch (err) {
       setError(err.message || '외부 콘텐츠를 삽입할 수 없습니다.')
+      return
     }
+    // For generic link cards, enrich with OpenGraph meta from the backend before
+    // inserting. If the lookup fails we still insert the basic domain-only card.
+    if (block.kind === 'link' && fetchLinkPreview) {
+      setError('')
+      setExternalLoading(true)
+      try {
+        const meta = await fetchLinkPreview(block.url)
+        if (meta) {
+          block = {
+            ...block,
+            title: meta.title || block.title,
+            description: meta.description || '',
+            image: meta.image || '',
+            siteName: meta.siteName || block.siteName,
+          }
+        }
+      } catch {
+        // keep the basic card
+      } finally {
+        setExternalLoading(false)
+      }
+    }
+    editorApiRef.current?.insertExternalEmbed(block)
+    setExternalUrl('')
+    setActiveInsertTool('')
+    setError('')
   }
 
   const handleYoutubeSearch = async () => {
@@ -234,11 +260,12 @@ export default function RichBodyEditor({
             value={externalUrl}
             onChange={(e) => setExternalUrl(e.target.value)}
             onFocus={() => editorApiRef.current?.saveSelection()}
-            placeholder="외부 이미지/영상/YouTube URL"
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (!externalLoading) insertExternalUrl() } }}
+            placeholder="이미지/영상/YouTube/링크 URL"
             className="min-h-10 flex-1 rounded border border-black/15 px-3 text-sm outline-none focus:border-[#3b4890]"
           />
-          <button type="button" onClick={insertExternalUrl} className="inline-flex min-h-10 items-center justify-center gap-1 rounded border border-black/15 bg-[var(--app-surface)] px-3 text-sm font-bold text-[var(--theme-body-mid)] hover:bg-black/5">
-            <Link size={14} /> URL 삽입
+          <button type="button" onClick={insertExternalUrl} disabled={externalLoading} className="inline-flex min-h-10 items-center justify-center gap-1 rounded border border-black/15 bg-[var(--app-surface)] px-3 text-sm font-bold text-[var(--theme-body-mid)] hover:bg-black/5 disabled:opacity-50">
+            <Link size={14} /> {externalLoading ? '불러오는 중...' : 'URL 삽입'}
           </button>
         </div>
         )}

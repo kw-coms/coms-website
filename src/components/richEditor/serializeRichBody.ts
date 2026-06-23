@@ -14,6 +14,22 @@ export function serializeRichBody(blocks) {
     .map((b) => {
       if (b.type === 'text') return { type: 'text', content: b.content }
       if (b.type === 'externalEmbed') {
+        if (b.kind === 'link') {
+          // Link cards carry OG metadata and never an iframe/embedUrl; persist only the
+          // safe fields so a round-trip keeps the card intact (backend re-validates https).
+          return {
+            type: 'externalEmbed',
+            provider: b.provider,
+            kind: 'link',
+            url: b.url,
+            title: b.title,
+            description: b.description || '',
+            image: b.image || '',
+            siteName: b.siteName || '',
+            width: b.width || 75,
+            align: b.align || 'center',
+          }
+        }
         return {
           type: 'externalEmbed',
           provider: b.provider,

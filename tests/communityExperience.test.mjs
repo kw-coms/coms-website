@@ -89,7 +89,7 @@ assert.match(
 
 assert.match(
   postBlocksSource,
-  /<img\s+src=\{src\}\s+alt=\{block\.title \|\| '외부 이미지'\}[\s\S]*?className="community-inline-media-image rounded"[\s\S]*?loading="lazy"[\s\S]*?decoding="async"/,
+  /<img\s+src=\{src\}\s+alt=\{block\.title \|\| '외부 이미지'\}[\s\S]*?className="community-inline-media-image block"[\s\S]*?loading="lazy"[\s\S]*?decoding="async"/,
 )
 
 console.log('community experience contract passed')

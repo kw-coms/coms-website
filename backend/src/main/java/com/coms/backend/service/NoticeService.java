@@ -29,14 +29,17 @@ public class NoticeService {
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
     private final NoticeVoteRepository voteRepository;
+    private final RichContentSanitizer richContentSanitizer;
 
     public NoticeService(NoticeRepository repo, MemberRepository memberRepository, NotificationService notificationService,
-                         AuditLogService auditLogService, NoticeVoteRepository voteRepository) {
+                         AuditLogService auditLogService, NoticeVoteRepository voteRepository,
+                         RichContentSanitizer richContentSanitizer) {
         this.repo = repo;
         this.memberRepository = memberRepository;
         this.notificationService = notificationService;
         this.auditLogService = auditLogService;
         this.voteRepository = voteRepository;
+        this.richContentSanitizer = richContentSanitizer;
     }
 
     @Transactional(readOnly = true)
@@ -113,7 +116,7 @@ public class NoticeService {
 
     private void applyRequest(Notice notice, NoticeRequest request, String authorName) {
         notice.setTitle(request.title());
-        notice.setContent(request.content());
+        notice.setContent(richContentSanitizer.sanitizeContent(request.content()));
         notice.setAuthor(authorName);
         notice.setPinned(request.pinned());
         notice.setCategory(parseCategory(request.category()));
