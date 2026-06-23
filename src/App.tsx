@@ -4258,6 +4258,8 @@ function HomeView() {
 
     const root = document.querySelector('.theme-home')
     root?.classList.add('reveal-ready')
+    // Gentle scroll-snap so the page "pauses" at each section (Kakao-style).
+    document.documentElement.classList.add('home-snap-scroll')
 
     const io = new IntersectionObserver(
       (entries) => {
@@ -4289,7 +4291,10 @@ function HomeView() {
           track.style.setProperty(k, v)
         }
       }
-      return () => io.disconnect()
+      return () => {
+        io.disconnect()
+        document.documentElement.classList.remove('home-snap-scroll')
+      }
     }
 
     const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
@@ -4329,6 +4334,7 @@ function HomeView() {
       io.disconnect()
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
+      document.documentElement.classList.remove('home-snap-scroll')
       if (raf) cancelAnimationFrame(raf)
     }
   }, [])
@@ -4378,10 +4384,10 @@ function HomeView() {
       return (
         <div className="mx-auto w-full max-w-5xl">
           <div className="mx-auto max-w-4xl text-center">
-            <p className="apple-eyebrow">{sectionMeta[id].eyebrow}</p>
-            <h2 className="apple-display mt-4 text-5xl sm:text-6xl lg:text-7xl">{story.title}</h2>
-            <p className="apple-copy mx-auto mt-6 max-w-3xl text-xl sm:text-2xl">{story.body}</p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <p data-reveal className="apple-eyebrow">{sectionMeta[id].eyebrow}</p>
+            <h2 data-reveal style={{ '--reveal-delay': '80ms' } as any} className="apple-display mt-4 text-5xl sm:text-6xl lg:text-7xl">{story.title}</h2>
+            <p data-reveal style={{ '--reveal-delay': '160ms' } as any} className="apple-copy mx-auto mt-6 max-w-3xl text-xl sm:text-2xl">{story.body}</p>
+            <div data-reveal style={{ '--reveal-delay': '240ms' } as any} className="mt-8 flex flex-wrap justify-center gap-3">
               <button type="button" onClick={primaryAction} className={solidActionBtnClass}>
                 {story.primary}
               </button>
@@ -4394,8 +4400,8 @@ function HomeView() {
           </div>
 
           <div className="mx-auto mt-10 grid max-w-3xl gap-3 sm:grid-cols-3">
-            {metrics.map((item) => (
-              <div key={item.value} className="apple-soft-panel px-4 py-5 text-center">
+            {metrics.map((item, index) => (
+              <div key={item.value} data-reveal style={{ '--reveal-delay': `${index * 90}ms` } as any} className="apple-soft-panel px-4 py-5 text-center">
                 <p className="text-lg font-semibold text-[var(--app-text)]">{item.value}</p>
                 <p className="mt-1 text-xs font-semibold leading-5 text-[var(--app-muted)]">{item.label}</p>
               </div>
@@ -4404,11 +4410,13 @@ function HomeView() {
 
           {id === 'about' && (
             <div className="mt-10 grid gap-3 lg:grid-cols-3">
-              {showcaseItems.map((item) => (
+              {showcaseItems.map((item, index) => (
                 <button
                   key={item.title}
                   type="button"
                   onClick={() => openPanel(item.target)}
+                  data-reveal
+                  style={{ '--reveal-delay': `${index * 90}ms` } as any}
                   className="apple-product-panel group min-h-48 px-6 py-6 text-left transition hover:-translate-y-0.5"
                 >
                   <p className="apple-eyebrow">{item.eyebrow}</p>
@@ -4422,7 +4430,7 @@ function HomeView() {
           {detailItems.length > 0 && (
             <div className={`mt-10 grid gap-3 ${id === 'projects' ? 'lg:grid-cols-3' : 'sm:grid-cols-2'}`}>
               {detailItems.map((item, index) => (
-                <article key={item.title} className="apple-product-panel px-6 py-6 text-left transition hover:-translate-y-0.5">
+                <article key={item.title} data-reveal style={{ '--reveal-delay': `${index * 90}ms` } as any} className="apple-product-panel px-6 py-6 text-left transition hover:-translate-y-0.5">
                   <div className="mb-5 inline-flex size-9 items-center justify-center rounded-full bg-[var(--app-surface-soft)] text-xs font-bold text-[var(--app-accent-text)]">
                     {String(index + 1).padStart(2, '0')}
                   </div>
@@ -4448,7 +4456,7 @@ function HomeView() {
           <div className="flex items-center">
             {renderSectionContent(id)}
           </div>
-          <div className="flex items-center justify-center">
+          <div data-reveal data-reveal-dir="right" style={{ '--reveal-delay': '120ms' } as any} className="flex items-center justify-center">
             <div className="home-device apple-device-card relative aspect-square w-full max-w-md overflow-hidden rounded-lg ring-1 ring-black/5" style={{ background: meta.visual }}>
               <div className="absolute inset-0 bg-linear-to-b from-white/30 via-transparent to-black/5" />
               <div className="absolute inset-x-6 top-6 rounded-lg bg-white/78 px-5 py-4 shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
@@ -4489,8 +4497,11 @@ function HomeView() {
               <div className="home-hero-surface absolute inset-0" />
               <div className="absolute inset-x-0 bottom-0 h-1/3 bg-linear-to-b from-transparent to-white/82" />
 
-              {/* Giant wordmark — huge at first, shrinks + fades as you scroll */}
-              <h2 className="apple-display coms-3d-title coms-cinema-word" aria-hidden="true">COM&apos;s</h2>
+              {/* Giant logo + wordmark — huge at first, shrink + fade as you scroll */}
+              <div className="coms-cinema-intro" aria-hidden="true">
+                <img src={getLogoAsset('COMs_logo_vec')} alt="" className="coms-cinema-intrologo" />
+                <h2 className="apple-display coms-3d-title coms-cinema-word">COM&apos;s</h2>
+              </div>
 
               {/* The rest of the hero crossfades in as the wordmark settles */}
               <div
@@ -4613,16 +4624,16 @@ function HomeView() {
 
         <ClubCalendarSection compact />
 
-        <section ref={aboutRef} id="about" className="relative">
+        <section ref={aboutRef} id="about" className="home-snap-section relative">
           {renderSectionPanel('about')}
         </section>
-        <section ref={activitiesRef} id="activities" className="relative">
+        <section ref={activitiesRef} id="activities" className="home-snap-section relative">
           {renderSectionPanel('activities')}
         </section>
-        <section ref={projectsRef} id="projects" className="relative">
+        <section ref={projectsRef} id="projects" className="home-snap-section relative">
           {renderSectionPanel('projects')}
         </section>
-        <section ref={recruitRef} id="recruit" className="relative">
+        <section ref={recruitRef} id="recruit" className="home-snap-section relative">
           {renderSectionPanel('recruit')}
         </section>
       </main>
