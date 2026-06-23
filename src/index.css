@@ -78,8 +78,7 @@ html {
 body {
 	margin: 0;
 	min-height: 100vh;
-	overflow-x: hidden;
-	overflow-y: auto;
+	overflow-x: clip;
 	background: var(--app-bg);
 	color: var(--app-text);
 	font-family: var(--apple-font-family);
@@ -4409,8 +4408,17 @@ html,
 body,
 #root {
   min-height: 100%;
-	overflow-y: auto;
+}
+html {
 	overflow-x: hidden;
+	overflow-y: auto;
+}
+/* clip (not hidden) keeps horizontal overflow contained WITHOUT turning
+   body/#root into scroll containers — otherwise position: sticky (the home
+   cinematic hero) sticks to them instead of the page and never engages. */
+body,
+#root {
+	overflow-x: clip;
 }
 
 body {
@@ -5382,6 +5390,149 @@ body {
 	100% {
 		opacity: 1;
 		transform: translateZ(46px) rotateX(9deg);
+	}
+}
+
+/* ---- Cinematic scroll hero -------------------------------------------- */
+/* A tall track + a sticky pin: the page scrolls ~2.4 viewports while the
+   scene stays frozen, so the giant COM's wordmark can shrink, the content
+   can rise in, and there is a real "pause" mid-scroll (Apple-style). All
+   motion is driven by CSS vars JS sets on .coms-cinema-track per scroll frame. */
+.coms-cinema {
+	position: relative;
+}
+
+.coms-cinema-track {
+	height: 240vh;
+}
+
+.coms-cinema-pin {
+	position: sticky;
+	top: var(--apple-nav-height);
+	display: flex;
+	height: calc(100svh - var(--apple-nav-height));
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	padding: 1.5rem 1.25rem 3.5rem;
+	text-align: center;
+	background: var(--app-surface-soft);
+}
+
+/* Giant wordmark — absolute-centered, starts ~2.4x, shrinks to 1x and fades
+   out so the content title can take its place (no overlap, always centered). */
+.coms-cinema-word {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	margin: 0;
+	font-size: clamp(2.75rem, 12vw, 8.5rem);
+	line-height: 0.92;
+	white-space: nowrap;
+	opacity: var(--word-o, 1);
+	animation: none;
+	transform:
+		translate(-50%, -50%)
+		translateY(var(--word-ty, 0px))
+		scale(var(--hero-scale, 2.4));
+	transform-origin: center center;
+	transition: transform 120ms linear, opacity 120ms linear;
+	will-change: transform, opacity;
+	pointer-events: none;
+}
+
+/* Content title reuses the 3D text-shadow but not the title-in transform. */
+.coms-cinema-title {
+	animation: none;
+	transform: none;
+}
+
+/* The hero body crossfades + rises in as the wordmark finishes shrinking. */
+.coms-cinema-content {
+	opacity: var(--content-p, 0);
+	transform:
+		translateY(calc((1 - var(--content-p, 0)) * 42px))
+		scale(calc(0.95 + var(--content-p, 0) * 0.05))
+		rotateX(var(--coms-rx, 0deg))
+		rotateY(var(--coms-ry, 0deg));
+	transform-style: preserve-3d;
+	transition:
+		opacity 240ms linear,
+		transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+	will-change: transform, opacity;
+}
+
+/* Per-group cascade. Vars inherit from .coms-cinema-track. */
+.coms-cinema-badge {
+	opacity: var(--logo-p, 0);
+	transform: translateY(calc((1 - var(--logo-p, 0)) * 12px));
+	transition: opacity 200ms linear, transform 200ms ease;
+}
+
+.coms-cinema-logo {
+	opacity: var(--logo-p, 0);
+	transform: scale(calc(0.55 + var(--logo-p, 0) * 0.45));
+	transform-origin: center center;
+	transition: opacity 220ms linear, transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.coms-cinema-tag {
+	opacity: var(--tag-p, 0);
+	transform: translateY(calc((1 - var(--tag-p, 0)) * 16px));
+	transition: opacity 240ms linear, transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.coms-cinema-cta {
+	opacity: var(--cta-p, 0);
+	transform: translateY(calc((1 - var(--cta-p, 0)) * 20px));
+	transition: opacity 240ms linear, transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Scroll hint — fades out once the user starts scrolling. */
+.coms-cinema-hint {
+	position: absolute;
+	bottom: 1.1rem;
+	left: 50%;
+	color: var(--app-muted);
+	opacity: calc(1 - var(--logo-p, 0));
+	transform: translateX(-50%);
+	animation: coms-hint-bob 1.8s ease-in-out infinite;
+}
+
+@keyframes coms-hint-bob {
+	0%,
+	100% {
+		transform: translate(-50%, 0);
+	}
+	50% {
+		transform: translate(-50%, 7px);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.coms-cinema-track {
+		height: auto;
+	}
+	.coms-cinema-pin {
+		position: static;
+		height: auto;
+		min-height: calc(100svh - var(--apple-nav-height));
+	}
+	.coms-cinema-word {
+		display: none;
+	}
+	.coms-cinema-content,
+	.coms-cinema-badge,
+	.coms-cinema-logo,
+	.coms-cinema-tag,
+	.coms-cinema-cta {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
+	.coms-cinema-hint {
+		display: none;
 	}
 }
 
