@@ -74,6 +74,11 @@ export async function searchYoutubeVideos(query) {
   return request(`/api/community/posts/tools/youtube/search?q=${q}`)
 }
 
+export async function fetchLinkPreview(url) {
+  const u = encodeURIComponent(url)
+  return request(`/api/community/posts/tools/link-preview?url=${u}`)
+}
+
 export async function deleteCommunityPost(id, reason = '') {
   const cleanReason = reason?.trim() || ''
   return requestNoContent(`/api/community/posts/${id}`, {

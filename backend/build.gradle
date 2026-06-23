@@ -42,6 +42,11 @@ dependencies {
 	implementation 'org.apache.poi:poi-ooxml:5.4.0'
 	implementation 'org.apache.commons:commons-csv:1.11.0'
 
+	// jsoup — lenient HTML parser used to extract OpenGraph/meta tags for link-preview
+	// cards. We fetch the remote HTML ourselves (with strict SSRF guards) and only hand
+	// the already-downloaded bytes to jsoup for parsing; jsoup never performs network I/O.
+	implementation 'org.jsoup:jsoup:1.18.1'
+
 	// JWT
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'

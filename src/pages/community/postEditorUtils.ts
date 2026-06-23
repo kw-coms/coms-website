@@ -187,11 +187,39 @@ export function externalBlockFromUrl(value, meta: any = {}) {
   if (/\.(mp4|webm|mov)$/.test(path)) {
     return { type: 'externalEmbed', provider: 'external', kind: 'video', url: raw, title: meta.title || '외부 영상', width: 75, align: 'center', id: localId() }
   }
-  throw new Error('YouTube, 이미지 파일 URL, 영상 파일 URL만 삽입할 수 있습니다.')
+  // Any other generic https URL becomes an OpenGraph-style link-preview card. The meta
+  // (title/description/image/siteName) is populated by the link-preview API on insert;
+  // when that is unavailable we still produce a usable card showing just the domain.
+  return {
+    type: 'externalEmbed',
+    provider: 'external',
+    kind: 'link',
+    url: raw,
+    title: meta.title || url.hostname,
+    description: meta.description || '',
+    image: meta.image || '',
+    siteName: meta.siteName || url.hostname,
+    width: 75,
+    align: 'center',
+    id: localId(),
+  }
 }
 
 export function safeExternalSrc(url) {
   return /^https:\/\//i.test(String(url || '')) ? url : ''
+}
+
+const YOUTUBE_EMBED_ALLOWLIST = /^https:\/\/www\.youtube(-nocookie)?\.com\/embed\/[A-Za-z0-9_-]{6,20}([?&].*)?$/
+
+/**
+ * Strict allowlist for the YouTube iframe src. Only the canonical youtube.com /
+ * youtube-nocookie.com /embed/<id> form is accepted, so a stored externalEmbed
+ * block can never smuggle an arbitrary-origin iframe past the generic https check.
+ * Returns the URL when it passes, otherwise '' so the iframe is not rendered.
+ */
+export function safeYoutubeEmbedSrc(url) {
+  const value = String(url || '')
+  return YOUTUBE_EMBED_ALLOWLIST.test(value) ? value : ''
 }
 
 export function newPollBlock(question, optionText, closesAt = '') {

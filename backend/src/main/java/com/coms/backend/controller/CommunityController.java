@@ -10,6 +10,7 @@ import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
 import com.coms.backend.dto.CommunityPollVoteRequest;
 import com.coms.backend.dto.CommunityVoteRequest;
+import com.coms.backend.dto.LinkPreviewResponse;
 import com.coms.backend.dto.YouTubeSearchResponse;
 import com.coms.backend.domain.CommunityPostFile;
 import com.coms.backend.domain.CommunityPost;
@@ -17,6 +18,7 @@ import com.coms.backend.domain.DeletedCommunityPostImage;
 import com.coms.backend.domain.DeletedCommunityPostMedia;
 import com.coms.backend.service.CommunityDeletionArchiveService;
 import com.coms.backend.service.CommunityService;
+import com.coms.backend.service.LinkPreviewService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,13 +49,16 @@ public class CommunityController {
 
     private final CommunityService communityService;
     private final CommunityDeletionArchiveService communityDeletionArchiveService;
+    private final LinkPreviewService linkPreviewService;
     private final String publicBaseUrl;
 
     public CommunityController(CommunityService communityService,
                                CommunityDeletionArchiveService communityDeletionArchiveService,
+                               LinkPreviewService linkPreviewService,
                                @Value("${app.public-base-url:}") String publicBaseUrl) {
         this.communityService = communityService;
         this.communityDeletionArchiveService = communityDeletionArchiveService;
+        this.linkPreviewService = linkPreviewService;
         this.publicBaseUrl = publicBaseUrl == null ? "" : publicBaseUrl.trim();
     }
 
@@ -226,6 +231,11 @@ public class CommunityController {
     @GetMapping("/tools/youtube/search")
     public ResponseEntity<YouTubeSearchResponse> searchYouTube(@RequestParam String q) {
         return ResponseEntity.ok(communityService.searchYouTube(q));
+    }
+
+    @GetMapping("/tools/link-preview")
+    public ResponseEntity<LinkPreviewResponse> linkPreview(@RequestParam String url) {
+        return ResponseEntity.ok(linkPreviewService.preview(url));
     }
 
     @GetMapping("/{id}/image")
