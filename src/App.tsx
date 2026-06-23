@@ -819,6 +819,7 @@ function GlobalNavigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
   const [mobileActivityOpen, setMobileActivityOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const activityWrapperRef = useRef(null)
   const activeKey = getActiveNavKey(location.pathname)
   const mobileTabs = tabs.slice(0, 3)
@@ -827,6 +828,14 @@ function GlobalNavigation() {
   const noticesNavItem = navExtraItems.find((item) => item.id === 'notices')
   const memberNavItems = navExtraItems.filter((item) => item.id !== 'notices')
   const activityNavActive = activitySectionNavItems.some((item) => item.id === activeKey)
+
+  // Kakao-style header: solidify (blur + shadow) once the page is scrolled.
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   useEffect(() => {
     if (!activityOpen) return undefined
@@ -896,7 +905,7 @@ function GlobalNavigation() {
   )
 
   return (
-    <header className="apple-global-nav fixed inset-x-0 top-0 z-[80]">
+    <header className={`apple-global-nav fixed inset-x-0 top-0 z-[80] ${scrolled ? 'is-scrolled' : ''}`}>
       <div className={`${floatingBarBaseClass} relative mx-auto flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-8`}>
         <button
           type="button"
@@ -4261,13 +4270,12 @@ function HomeView() {
     // Gentle scroll-snap so the page "pauses" at each section (Kakao-style).
     document.documentElement.classList.add('home-snap-scroll')
 
+    // Repeatable reveals: re-animate every time an element re-enters view, so
+    // scrolling back up and down replays the motion.
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-revealed')
-            io.unobserve(entry.target)
-          }
+          entry.target.classList.toggle('is-revealed', entry.isIntersecting)
         })
       },
       { threshold: 0.12, rootMargin: '0px 0px -8% 0px' },
@@ -4495,7 +4503,7 @@ function HomeView() {
           <div ref={trackRef} className="coms-cinema-track">
             <div className="coms-cinema-pin">
               <div className="home-hero-surface absolute inset-0" />
-              <div className="absolute inset-x-0 bottom-0 h-1/3 bg-linear-to-b from-transparent to-white/82" />
+              <div className="coms-cinema-fade absolute inset-x-0 bottom-0 h-1/3" />
 
               {/* Giant logo + wordmark — huge at first, shrink + fade as you scroll */}
               <div className="coms-cinema-intro" aria-hidden="true">
