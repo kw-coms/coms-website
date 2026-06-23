@@ -21,6 +21,11 @@ import {
 } from './postEditorUtils'
 import RichEditorSurface from './RichEditorSurface'
 
+// Apple-style card chrome shared by the editor's external-embed previews so they
+// match the rendered PostBlocks cards (rounded-xl + hairline + subtle shadow).
+const EXTERNAL_CARD_STYLE = 'overflow:hidden;border:1px solid var(--app-hairline);border-radius:12px;background:var(--app-surface);box-shadow:0 1px 2px rgba(0,0,0,0.04);'
+const EXTERNAL_CAPTION_STYLE = 'padding:8px 12px;font-size:12px;font-weight:600;color:var(--app-muted);pointer-events:none'
+
 export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
   const divRef = useRef(null)
   const figMeta = useRef(new Map())
@@ -186,12 +191,12 @@ export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
         const src = block.kind === 'youtube' ? youtubeSrc : safeExternalSrc(block.url)
         const inner = block.kind === 'youtube'
           ? (youtubeSrc
-            ? `<div style="aspect-ratio:16/9;width:100%;background:#000;pointer-events:none"><iframe src="${escH(youtubeSrc)}" title="${title}" style="width:100%;height:100%;border:0;pointer-events:none"></iframe></div><figcaption style="padding:6px 8px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.03);pointer-events:none">${title}</figcaption>`
-            : `<figcaption style="padding:8px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.03);pointer-events:none">${title}</figcaption>`)
+            ? `<div style="aspect-ratio:16/9;width:100%;background:#000;pointer-events:none"><iframe src="${escH(youtubeSrc)}" title="${title}" style="width:100%;height:100%;border:0;pointer-events:none"></iframe></div><figcaption style="${EXTERNAL_CAPTION_STYLE}">${title}</figcaption>`
+            : `<figcaption style="${EXTERNAL_CAPTION_STYLE}">${title}</figcaption>`)
           : block.kind === 'image'
-            ? `<img src="${escH(src)}" alt="${title}" draggable="false" class="community-inline-media-image" style="pointer-events:none">`
+            ? `<img src="${escH(src)}" alt="${title}" draggable="false" class="community-inline-media-image" style="display:block;pointer-events:none">`
             : `<video src="${escH(src)}" controls preload="metadata" draggable="false" style="display:block;width:100%;height:auto;pointer-events:none"></video>`
-        html += `<figure class="community-editor-figure" contenteditable="false" data-block-id="${id}" data-type="externalEmbed" data-align="${align}" style="${figureInlineStyle(wPct, align)}">${inner}</figure>\u200B`
+        html += `<figure class="community-editor-figure" contenteditable="false" data-block-id="${id}" data-type="externalEmbed" data-align="${align}" style="${figureInlineStyle(wPct, align) + EXTERNAL_CARD_STYLE}">${inner}</figure>\u200B`
       } else if (block.type === 'poll') {
         const id = block.id || localId()
         figMeta.current.set(id, { type: 'poll', pollId: block.pollId, question: block.question, options: block.options || [] })
@@ -322,7 +327,7 @@ export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
     figure.dataset.blockId = id
     figure.dataset.type = 'externalEmbed'
     figure.dataset.align = align
-    figure.setAttribute('style', figureInlineStyle(wPct, align))
+    figure.setAttribute('style', figureInlineStyle(wPct, align) + EXTERNAL_CARD_STYLE)
     const src = safeExternalSrc(block.url)
     if (block.kind === 'youtube') {
       const youtubeSrc = safeYoutubeEmbedSrc(block.embedUrl)
@@ -337,7 +342,7 @@ export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
         figure.appendChild(box)
       }
       const caption = document.createElement('figcaption')
-      caption.setAttribute('style', 'padding:6px 8px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.03);pointer-events:none')
+      caption.setAttribute('style', EXTERNAL_CAPTION_STYLE)
       caption.textContent = block.title || 'YouTube 영상'
       figure.appendChild(caption)
     } else if (block.kind === 'image') {
@@ -346,7 +351,7 @@ export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
       img.alt = block.title || '외부 이미지'
       img.className = 'community-inline-media-image'
       img.draggable = false
-      img.setAttribute('style', 'pointer-events:none')
+      img.setAttribute('style', 'display:block;pointer-events:none')
       figure.appendChild(img)
     } else {
       const video = document.createElement('video')

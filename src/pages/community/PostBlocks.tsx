@@ -119,7 +119,7 @@ export function renderPostBlocks(post, options: any = {}) {
             const src = safeYoutubeEmbedSrc(block.embedUrl)
             if (!src) return null
             return (
-              <div key={i} className="community-post-media my-2 overflow-hidden rounded border border-[var(--app-hairline)] bg-black/[0.03]" style={widthStyle}>
+              <div key={i} className="community-post-media my-2 overflow-hidden rounded-xl border border-[var(--app-hairline)] bg-[var(--app-surface)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]" style={widthStyle}>
                 <div className="aspect-video w-full bg-black">
                   <iframe
                     src={src}
@@ -130,7 +130,7 @@ export function renderPostBlocks(post, options: any = {}) {
                     allowFullScreen
                   />
                 </div>
-                {block.title && <div className="px-3 py-2 text-xs font-bold text-[var(--theme-body-dark)]">{block.title}</div>}
+                {block.title && <div className="px-3 py-2 text-xs font-semibold text-[var(--app-muted)]">{block.title}</div>}
               </div>
             )
           }
@@ -138,12 +138,12 @@ export function renderPostBlocks(post, options: any = {}) {
             const src = safeExternalSrc(block.url)
             if (!src) return null
             return (
-              <div key={i} className="community-post-media my-2" style={widthStyle}>
+              <div key={i} className="community-post-media my-2 overflow-hidden rounded-xl border border-[var(--app-hairline)] bg-[var(--app-surface)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]" style={widthStyle}>
                 <img
                   src={src}
                   alt={block.title || '외부 이미지'}
                   draggable={false}
-                  className="community-inline-media-image rounded"
+                  className="community-inline-media-image block"
                   loading="lazy"
                   decoding="async"
                 />
@@ -154,8 +154,8 @@ export function renderPostBlocks(post, options: any = {}) {
             const src = safeExternalSrc(block.url)
             if (!src) return null
             return (
-              <div key={i} className="community-post-media my-2" style={widthStyle}>
-                <video controls preload="metadata" src={src} className="block h-auto w-full rounded" />
+              <div key={i} className="community-post-media my-2 overflow-hidden rounded-xl border border-[var(--app-hairline)] bg-[var(--app-surface)] shadow-[0_1px_2px_rgba(0,0,0,0.04)]" style={widthStyle}>
+                <video controls preload="metadata" src={src} className="block h-auto w-full" />
               </div>
             )
           }
