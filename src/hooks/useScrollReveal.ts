@@ -16,7 +16,7 @@ export function useScrollReveal(deps: unknown[] = []) {
     const root = (document.querySelector('[data-reveal-root]') as HTMLElement | null) ?? document.body
     root.classList.add('reveal-ready')
 
-    const els = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]:not(.is-revealed)'))
+    const els = Array.from(document.querySelectorAll<HTMLElement>('[data-reveal]'))
 
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (prefersReduced) {
@@ -24,13 +24,11 @@ export function useScrollReveal(deps: unknown[] = []) {
       return
     }
 
+    // Repeatable: toggle on every viewport entry/exit so the motion replays.
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-revealed')
-            io.unobserve(entry.target)
-          }
+          entry.target.classList.toggle('is-revealed', entry.isIntersecting)
         })
       },
       { threshold: 0.12, rootMargin: '0px 0px -8% 0px' },
