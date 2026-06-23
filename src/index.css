@@ -326,6 +326,28 @@ select {
 		inset 0 1px 0 rgba(255, 255, 255, 0.64);
 	backdrop-filter: blur(22px);
 	-webkit-backdrop-filter: blur(22px);
+	transition:
+		transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+		box-shadow 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Kakao-style card hover: lift 6px, faint scale, deepen shadow. The extra
+   [data-reveal] class outranks both Tailwind's hover:-translate-y utilities
+   AND the reveal `.is-revealed { transform: none }` reset (else revealed
+   cards would refuse to lift). The plain selector covers non-reveal cards. */
+.theme-home .apple-product-panel:hover,
+.theme-home [data-reveal].apple-product-panel:hover {
+	transform: translateY(-6px) scale(1.01);
+	box-shadow:
+		0 44px 120px rgba(0, 0, 0, 0.13),
+		inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.theme-home .apple-product-panel:hover,
+	.theme-home [data-reveal].apple-product-panel:hover {
+		transform: none;
+	}
 }
 
 .apple-soft-panel {
@@ -5420,6 +5442,66 @@ body {
 	background: var(--app-surface-soft);
 }
 
+/* Soft drifting aurora so the hero never feels flat. Sits behind the tint
+   overlay + content, very low contrast. */
+.coms-cinema-pin::before {
+	content: '';
+	position: absolute;
+	inset: -25%;
+	z-index: 0;
+	pointer-events: none;
+	background:
+		radial-gradient(38% 38% at 22% 28%, color-mix(in srgb, var(--app-accent) 24%, transparent), transparent 70%),
+		radial-gradient(34% 34% at 80% 22%, color-mix(in srgb, #7aa8ff 22%, transparent), transparent 70%),
+		radial-gradient(46% 46% at 62% 82%, color-mix(in srgb, var(--app-accent-soft) 60%, transparent), transparent 70%);
+	filter: blur(36px);
+	animation: coms-aurora 18s ease-in-out infinite alternate;
+	will-change: transform;
+}
+
+@keyframes coms-aurora {
+	0% {
+		transform: translate3d(-3%, -2%, 0) scale(1);
+	}
+	50% {
+		transform: translate3d(3%, 2%, 0) scale(1.08);
+	}
+	100% {
+		transform: translate3d(-2%, 3%, 0) scale(1.03);
+	}
+}
+
+/* Glow halo that pulses behind the giant logo. */
+.coms-cinema-logowrap {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.coms-cinema-logowrap::after {
+	content: '';
+	position: absolute;
+	inset: -30%;
+	z-index: -1;
+	border-radius: 50%;
+	background: radial-gradient(circle, color-mix(in srgb, var(--app-accent) 30%, transparent), transparent 65%);
+	filter: blur(24px);
+	animation: coms-logo-glow 5s ease-in-out infinite;
+}
+
+@keyframes coms-logo-glow {
+	0%,
+	100% {
+		opacity: 0.45;
+		transform: scale(0.92);
+	}
+	50% {
+		opacity: 0.85;
+		transform: scale(1.06);
+	}
+}
+
 /* Giant logo + wordmark — absolute-centered, start ~2.4x, shrink to 1x and
    fade out so the content title can take its place (always centered). */
 .coms-cinema-intro {
@@ -5555,10 +5637,10 @@ body {
 /* JS adds .reveal-ready so content stays visible if JS is unavailable. */
 .reveal-ready [data-reveal] {
 	opacity: 0;
-	transform: translateY(30px) scale(0.985);
+	transform: translateY(28px);
 	transition:
-		opacity 720ms cubic-bezier(0.2, 0.7, 0.2, 1),
-		transform 720ms cubic-bezier(0.2, 0.7, 0.2, 1);
+		opacity 640ms cubic-bezier(0.22, 1, 0.36, 1),
+		transform 640ms cubic-bezier(0.22, 1, 0.36, 1);
 	transition-delay: var(--reveal-delay, 0ms);
 	will-change: opacity, transform;
 }
@@ -5570,10 +5652,10 @@ body {
 
 /* Directional reveal variants (Kakao-style side slide-ins). */
 .reveal-ready [data-reveal-dir='right'] {
-	transform: translateX(48px) scale(0.985);
+	transform: translateX(40px);
 }
 .reveal-ready [data-reveal-dir='left'] {
-	transform: translateX(-48px) scale(0.985);
+	transform: translateX(-40px);
 }
 .reveal-ready [data-reveal-dir='right'].is-revealed,
 .reveal-ready [data-reveal-dir='left'].is-revealed {
@@ -5610,6 +5692,12 @@ html.home-snap-scroll .home-snap-section {
 	}
 
 	.coms-3d-title {
+		animation: none;
+	}
+
+	.coms-cinema-pin::before,
+	.coms-cinema-logowrap::after,
+	.coms-cinema-intrologo {
 		animation: none;
 	}
 
