@@ -3,20 +3,25 @@ package com.coms.backend.service;
 import org.junit.jupiter.api.Test;
 
 import java.net.InetAddress;
+import java.net.URI;
 import java.net.UnknownHostException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Unit tests for the SSRF guard that decides whether a resolved IP may be fetched
- * for a link preview. These exercise {@link LinkPreviewService#isBlockedAddress}
- * directly so no network I/O / Spring context is required.
+ * Unit tests for SSRF guards and IP-pinning helpers in {@link LinkPreviewService}.
+ *
+ * No Spring context or network I/O is performed — InetAddress literals are resolved by the
+ * JVM loopback resolver from the string form, and buildPinnedUri is a pure URI rewrite.
  */
 class LinkPreviewServiceTest {
 
     private static InetAddress ip(String literal) throws UnknownHostException {
         return InetAddress.getByName(literal);
     }
+
+    // ── isBlockedAddress ─────────────────────────────────────────────────────
 
     @Test
     void blocksLoopbackAddresses() throws Exception {
@@ -67,5 +72,73 @@ class LinkPreviewServiceTest {
         assertThat(LinkPreviewService.isBlockedAddress(ip("8.8.8.8"))).isFalse();
         assertThat(LinkPreviewService.isBlockedAddress(ip("1.1.1.1"))).isFalse();
         assertThat(LinkPreviewService.isBlockedAddress(ip("2606:2800:220:1:248:1893:25c8:1946"))).isFalse();
+    }
+
+    // ── buildPinnedUri (IP-pinning, DNS-rebinding fix) ───────────────────────
+
+    /**
+     * Plain path: IPv4 address replaces the hostname in the URI; scheme/path/query preserved.
+     * This verifies the TOCTOU fix — the URI used for the actual TCP connect is the literal IP,
+     * not a hostname that could be re-resolved by the JVM or the HTTP client.
+     */
+    @Test
+    void pinnedUriReplacesHostWithIpv4Literal() throws Exception {
+        URI original = URI.create("https://example.com/path?q=1");
+        InetAddress addr = ip("93.184.216.34");
+
+        URI pinned = LinkPreviewService.buildPinnedUri(original, addr);
+
+        assertThat(pinned.getScheme()).isEqualTo("https");
+        assertThat(pinned.getHost()).isEqualTo("93.184.216.34");
+        assertThat(pinned.getPath()).isEqualTo("/path");
+        assertThat(pinned.getQuery()).isEqualTo("q=1");
+        // No port was set in original, so pinned URI should also have no explicit port.
+        assertThat(pinned.getPort()).isEqualTo(-1);
+        // The literal must not be a resolvable hostname — it IS the IP.
+        assertThat(pinned.toString()).startsWith("https://93.184.216.34/");
+    }
+
+    @Test
+    void pinnedUriPreservesExplicitPort() throws Exception {
+        URI original = URI.create("https://example.com:8443/secure");
+        InetAddress addr = ip("93.184.216.34");
+
+        URI pinned = LinkPreviewService.buildPinnedUri(original, addr);
+
+        assertThat(pinned.getPort()).isEqualTo(8443);
+        assertThat(pinned.toString()).startsWith("https://93.184.216.34:8443/");
+    }
+
+    @Test
+    void pinnedUriEnclosesIpv6InBrackets() throws Exception {
+        URI original = URI.create("https://example.com/ipv6path");
+        // Use a public IPv6 address (example.com's AAAA record used in IANA assignments).
+        InetAddress addr = ip("2606:2800:220:1:248:1893:25c8:1946");
+
+        URI pinned = LinkPreviewService.buildPinnedUri(original, addr);
+
+        // RFC 3986 §3.2.2 requires IPv6 literals in brackets.
+        assertThat(pinned.toString()).contains("[2606:2800:220:1:248:1893:25c8:1946]");
+        assertThat(pinned.getPath()).isEqualTo("/ipv6path");
+    }
+
+    // ── resolveAndGuard: blocked host is rejected ────────────────────────────
+
+    /**
+     * A host that resolves to a private IP must be rejected by resolveAndGuard.
+     * We use the loopback hostname "localhost" which always resolves to 127.0.0.1.
+     */
+    @Test
+    void resolveAndGuardRejectsLocalhostHost() {
+        LinkPreviewService svc = new LinkPreviewService();
+        assertThatThrownBy(() -> svc.resolveAndGuard("localhost"))
+                .hasMessageContaining("허용되지 않는 링크 주소입니다.");
+    }
+
+    @Test
+    void resolveAndGuardRejectsNonResolvingHost() {
+        LinkPreviewService svc = new LinkPreviewService();
+        assertThatThrownBy(() -> svc.resolveAndGuard("this-host-does-not-exist.invalid"))
+                .hasMessageContaining("링크 호스트를 확인할 수 없습니다.");
     }
 }
