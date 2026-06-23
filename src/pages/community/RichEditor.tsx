@@ -16,6 +16,7 @@ import {
   mediaWidthPercent,
   pollOptionLabel,
   safeExternalSrc,
+  safeYoutubeEmbedSrc,
   textToEditorHtml,
 } from './postEditorUtils'
 import RichEditorSurface from './RichEditorSurface'
@@ -181,9 +182,12 @@ export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
         const align = block.align || 'center'
         figMeta.current.set(id, { ...block, width: wPct, align })
         const title = escH(block.title || (block.kind === 'youtube' ? 'YouTube 영상' : '외부 콘텐츠'))
-        const src = safeExternalSrc(block.kind === 'youtube' ? block.embedUrl : block.url)
+        const youtubeSrc = safeYoutubeEmbedSrc(block.embedUrl)
+        const src = block.kind === 'youtube' ? youtubeSrc : safeExternalSrc(block.url)
         const inner = block.kind === 'youtube'
-          ? `<div style="aspect-ratio:16/9;width:100%;background:#000;pointer-events:none"><iframe src="${escH(src)}" title="${title}" style="width:100%;height:100%;border:0;pointer-events:none"></iframe></div><figcaption style="padding:6px 8px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.03);pointer-events:none">${title}</figcaption>`
+          ? (youtubeSrc
+            ? `<div style="aspect-ratio:16/9;width:100%;background:#000;pointer-events:none"><iframe src="${escH(youtubeSrc)}" title="${title}" style="width:100%;height:100%;border:0;pointer-events:none"></iframe></div><figcaption style="padding:6px 8px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.03);pointer-events:none">${title}</figcaption>`
+            : `<figcaption style="padding:8px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.03);pointer-events:none">${title}</figcaption>`)
           : block.kind === 'image'
             ? `<img src="${escH(src)}" alt="${title}" draggable="false" class="community-inline-media-image" style="pointer-events:none">`
             : `<video src="${escH(src)}" controls preload="metadata" draggable="false" style="display:block;width:100%;height:auto;pointer-events:none"></video>`
@@ -319,16 +323,19 @@ export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
     figure.dataset.type = 'externalEmbed'
     figure.dataset.align = align
     figure.setAttribute('style', figureInlineStyle(wPct, align))
-    const src = safeExternalSrc(block.kind === 'youtube' ? block.embedUrl : block.url)
+    const src = safeExternalSrc(block.url)
     if (block.kind === 'youtube') {
-      const box = document.createElement('div')
-      box.setAttribute('style', 'aspect-ratio:16/9;width:100%;background:#000;pointer-events:none')
-      const iframe = document.createElement('iframe')
-      iframe.src = src
-      iframe.title = block.title || 'YouTube 영상'
-      iframe.setAttribute('style', 'width:100%;height:100%;border:0;pointer-events:none')
-      box.appendChild(iframe)
-      figure.appendChild(box)
+      const youtubeSrc = safeYoutubeEmbedSrc(block.embedUrl)
+      if (youtubeSrc) {
+        const box = document.createElement('div')
+        box.setAttribute('style', 'aspect-ratio:16/9;width:100%;background:#000;pointer-events:none')
+        const iframe = document.createElement('iframe')
+        iframe.src = youtubeSrc
+        iframe.title = block.title || 'YouTube 영상'
+        iframe.setAttribute('style', 'width:100%;height:100%;border:0;pointer-events:none')
+        box.appendChild(iframe)
+        figure.appendChild(box)
+      }
       const caption = document.createElement('figcaption')
       caption.setAttribute('style', 'padding:6px 8px;font-size:12px;font-weight:700;background:rgba(0,0,0,0.03);pointer-events:none')
       caption.textContent = block.title || 'YouTube 영상'

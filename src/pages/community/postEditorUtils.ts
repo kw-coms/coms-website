@@ -194,6 +194,19 @@ export function safeExternalSrc(url) {
   return /^https:\/\//i.test(String(url || '')) ? url : ''
 }
 
+const YOUTUBE_EMBED_ALLOWLIST = /^https:\/\/www\.youtube(-nocookie)?\.com\/embed\/[A-Za-z0-9_-]{6,20}([?&].*)?$/
+
+/**
+ * Strict allowlist for the YouTube iframe src. Only the canonical youtube.com /
+ * youtube-nocookie.com /embed/<id> form is accepted, so a stored externalEmbed
+ * block can never smuggle an arbitrary-origin iframe past the generic https check.
+ * Returns the URL when it passes, otherwise '' so the iframe is not rendered.
+ */
+export function safeYoutubeEmbedSrc(url) {
+  const value = String(url || '')
+  return YOUTUBE_EMBED_ALLOWLIST.test(value) ? value : ''
+}
+
 export function newPollBlock(question, optionText, closesAt = '') {
   const options = (Array.isArray(optionText) ? optionText : String(optionText || '').split(/\n+/))
     .map((item) => (typeof item === 'object'

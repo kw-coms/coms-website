@@ -11,6 +11,7 @@ import {
   pollOptionImageUrl,
   pollOptionLabel,
   safeExternalSrc,
+  safeYoutubeEmbedSrc,
   sanitizeEditorHtml,
 } from './postEditorUtils'
 
@@ -115,7 +116,7 @@ export function renderPostBlocks(post, options: any = {}) {
         if (block.type === 'externalEmbed') {
           const widthStyle = mediaContainerStyle(block.width, block.align)
           if (block.kind === 'youtube') {
-            const src = safeExternalSrc(block.embedUrl)
+            const src = safeYoutubeEmbedSrc(block.embedUrl)
             if (!src) return null
             return (
               <div key={i} className="community-post-media my-2 overflow-hidden rounded border border-[var(--app-hairline)] bg-black/[0.03]" style={widthStyle}>
