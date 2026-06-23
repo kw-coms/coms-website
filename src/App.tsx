@@ -4499,7 +4499,9 @@ function HomeView() {
 
               {/* Giant logo + wordmark — huge at first, shrink + fade as you scroll */}
               <div className="coms-cinema-intro" aria-hidden="true">
-                <img src={getLogoAsset('COMs_logo_vec')} alt="" className="coms-cinema-intrologo" />
+                <span className="coms-cinema-logowrap">
+                  <img src={getLogoAsset('COMs_logo_vec')} alt="" className="coms-cinema-intrologo" />
+                </span>
                 <h2 className="apple-display coms-3d-title coms-cinema-word">COM&apos;s</h2>
               </div>
 
@@ -4582,7 +4584,10 @@ function HomeView() {
                 <p className="text-sm font-semibold text-[var(--app-accent-text)]">{item.eyebrow}</p>
                 <h3 className="mt-3 text-3xl font-semibold leading-tight tracking-normal text-[var(--app-text)]">{item.title}</h3>
                 <p className="mt-4 max-w-sm leading-7 text-[var(--app-muted)]">{item.body}</p>
-                <span className="apple-action-primary mt-8 inline-flex w-fit items-center px-4 py-2 text-sm">더 보기</span>
+                <span className="apple-action-primary mt-8 inline-flex w-fit items-center gap-1 px-4 py-2 text-sm">
+                  더 보기
+                  <ChevronDown size={14} className="-rotate-90 transition-transform duration-300 group-hover:translate-x-1" />
+                </span>
               </button>
             ))}
           </div>

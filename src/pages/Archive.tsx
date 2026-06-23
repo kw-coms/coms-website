@@ -467,7 +467,7 @@ export default function Archive({ onBack }: any) {
                   {filteredFiles.map((file, index) => {
                     const open = () => openFile(file)
                     return (
-                      <article key={file.id} className="apple-soft-panel p-4" data-reveal style={{ '--reveal-delay': `${index * 70}ms` } as any}>
+                      <article key={file.id} className="apple-soft-panel p-4" data-reveal style={{ '--reveal-delay': `${Math.min(index, 6) * 55}ms` } as any}>
                         <button
                           type="button"
                           onClick={open}
@@ -529,7 +529,7 @@ export default function Archive({ onBack }: any) {
                             onKeyDown={(event) => openRowWithKeyboard(event, open)}
                             className="cursor-pointer text-[var(--app-muted)] focus:outline-none"
                             data-reveal
-                            style={{ '--reveal-delay': `${index * 70}ms` } as any}
+                            style={{ '--reveal-delay': `${Math.min(index, 6) * 55}ms` } as any}
                           >
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-[var(--app-subtle)]">{file.id}</td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
