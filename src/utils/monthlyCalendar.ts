@@ -129,15 +129,13 @@ export function visibleDayEvents(events, limit = 3) {
 }
 
 export function buildMonthEventSummary({ eventsByDay = {}, calendarMonth, today = new Date(), limit = 3 }) {
-  const todayKey = today.getFullYear() === calendarMonth.year && today.getMonth() === calendarMonth.month
-    ? toLocalDateString(today)
-    : null
+  const todayKey = toLocalDateString(today)
   const seen = new Set()
   const events = Object.values(eventsByDay)
     .flatMap((dayEvents) => Array.isArray(dayEvents) ? dayEvents : [])
     .filter((event) => {
       if (!event?.date) return false
-      if (todayKey && event.date < todayKey) return false
+      if (event.date < todayKey) return false
       if (event.range && !event.showTitle) return false
       const key = `${event.sourceType || 'event'}-${event.activityId || event.recurringScheduleId || event.id}-${event.date}`
       if (seen.has(key)) return false
