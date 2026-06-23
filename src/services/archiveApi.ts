@@ -20,6 +20,26 @@ export async function createPost({ title, description, category, file }: any) {
   return data
 }
 
+// Batch-create one resource entry per selected file by reusing the single-create
+// endpoint in a loop (no backend change). Each file gets the shared meta; when more
+// than one file is selected the title is suffixed with a 1-based index to stay distinct.
+// Returns per-file results so callers can report partial success/failure.
+export async function createPosts(files, meta) {
+  const multiple = files.length > 1
+  const results = []
+  for (let index = 0; index < files.length; index += 1) {
+    const file = files[index]
+    const title = multiple ? `${meta.title} (${index + 1})` : meta.title
+    try {
+      const saved = await createPost({ ...meta, title, file })
+      results.push({ ok: true, file, saved })
+    } catch (err) {
+      results.push({ ok: false, file, error: err })
+    }
+  }
+  return results
+}
+
 export function downloadUrl(id) {
   return apiUrl(`/api/files/${id}/download`)
 }
