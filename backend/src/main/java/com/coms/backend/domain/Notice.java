@@ -32,6 +32,9 @@ public class Notice {
     @Column(nullable = false)
     private boolean pinned = false;
 
+    @Column(name = "pinned_at")
+    private LocalDateTime pinnedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Category category = Category.GENERAL;
@@ -62,7 +65,15 @@ public class Notice {
     public String getAuthor() { return author; }
     public void setAuthor(String author) { this.author = author; }
     public boolean isPinned() { return pinned; }
-    public void setPinned(boolean pinned) { this.pinned = pinned; }
+    public void setPinned(boolean pinned) {
+        if (pinned && !this.pinned) {
+            this.pinnedAt = LocalDateTime.now();
+        } else if (!pinned) {
+            this.pinnedAt = null;
+        }
+        this.pinned = pinned;
+    }
+    public LocalDateTime getPinnedAt() { return pinnedAt; }
     public Category getCategory() { return category; }
     public void setCategory(Category category) { this.category = category; }
     public long getViewCount() { return viewCount; }

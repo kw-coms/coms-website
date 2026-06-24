@@ -68,6 +68,9 @@ export function filterAndSortCommunityPosts(posts, {
     })
 
   return [...filtered].sort((a, b) => {
+    // Pinned posts always surface first regardless of the chosen sort mode.
+    const pinDelta = Number(Boolean(b.pinned)) - Number(Boolean(a.pinned))
+    if (pinDelta !== 0) return pinDelta
     if (sort === 'comments') return Number(b.commentCount || 0) - Number(a.commentCount || 0) || timestamp(b.createdAt) - timestamp(a.createdAt)
     if (sort === 'score') return score(b) - score(a) || timestamp(b.createdAt) - timestamp(a.createdAt)
     if (sort === 'views') return Number(b.viewCount || 0) - Number(a.viewCount || 0) || timestamp(b.createdAt) - timestamp(a.createdAt)
