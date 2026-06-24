@@ -117,7 +117,7 @@ import {
   activitySectionNavItems,
 } from './data/homeContent'
 import PageFallback from './components/home/PageFallback'
-import ComsIntro from './components/common/ComsIntro'
+const ComsIntro = lazy(() => import('./components/common/ComsIntro'))
 import { ToastHost } from './components/common/Toast'
 import CompanionServicesSection from './components/home/CompanionServicesSection'
 
@@ -1627,10 +1627,11 @@ function App() {
 
   return (
     <Suspense fallback={<PageFallback />}>
+      <a href="#main-content" className="coms-skip-link">본문으로 건너뛰기</a>
       {location.pathname === '/' && <ComsIntro />}
       <ScrollToTop />
       <GlobalNavigation />
-      <div key={location.pathname} className="coms-page-enter">
+      <div key={location.pathname} id="main-content" tabIndex={-1} className="coms-page-enter">
       <Routes location={location}>
         <Route path="/" element={<HomeView />} />
         <Route path="/about" element={<AboutPage />} />
@@ -2337,7 +2338,7 @@ function ActivityLogSection({ compact = false }: any) {
                       <span className="activity-community-row-preview">
                         {previewImage ? (
                           <>
-                            <img src={previewImage} alt="" className="activity-log-image activity-community-row-thumb" loading="lazy" />
+                            <img src={previewImage} alt="" className="activity-log-image activity-community-row-thumb" loading="lazy" decoding="async" />
                             <span>사진</span>
                           </>
                         ) : (
@@ -2447,7 +2448,7 @@ function ActivityLogSection({ compact = false }: any) {
                 {activityImagesFor(selectedActivity).length > 0 && (
                   <div className="activity-detail-gallery" aria-label="활동 사진">
                     {activityImagesFor(selectedActivity).map((image, index) => (
-                      <img key={image.id || image.url || index} src={image.url} alt="" loading="lazy" />
+                      <img key={image.id || image.url || index} src={image.url} alt="" loading="lazy" decoding="async" />
                     ))}
                   </div>
                 )}

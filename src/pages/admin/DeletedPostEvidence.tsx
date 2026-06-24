@@ -31,7 +31,7 @@ export default function DeletedPostEvidence({ post }: any) {
               className="overflow-hidden rounded-md border border-[var(--app-hairline)] bg-[var(--app-surface)]"
               style={{ width: `${deletedMediaWidth(block.width)}%`, maxWidth: '100%', marginInline: block.align === 'center' ? 'auto' : block.align === 'right' ? 'auto 0' : '0 auto' }}
             >
-              <img src={apiUrl(block.url)} alt={block.name || '삭제 게시글 이미지'} className="block max-h-72 w-full object-contain" />
+              <img src={apiUrl(block.url)} alt={block.name || '삭제 게시글 이미지'} className="block max-h-72 w-full object-contain" loading="lazy" decoding="async" />
               {block.name && <figcaption className="border-t border-[var(--app-hairline)] px-2 py-1 text-[10px] font-semibold text-[var(--theme-body-muted)]">{block.name}</figcaption>}
             </figure>
           )
@@ -39,7 +39,7 @@ export default function DeletedPostEvidence({ post }: any) {
         if (block.type === 'externalImage') {
           return (
             <figure key={`external-${index}`} className="overflow-hidden rounded-md border border-[var(--app-hairline)] bg-[var(--app-surface)]">
-              <img src={block.url} alt={block.title || '외부 이미지'} className="block max-h-72 w-full object-contain" />
+              <img src={block.url} alt={block.title || '외부 이미지'} className="block max-h-72 w-full object-contain" loading="lazy" decoding="async" />
             </figure>
           )
         }
@@ -87,7 +87,7 @@ export default function DeletedPostEvidence({ post }: any) {
         <div className="grid max-w-[360px] grid-cols-2 gap-2">
           {extraImages.map((image) => (
             <figure key={image.id} className="overflow-hidden rounded-md border border-[var(--app-hairline)] bg-[var(--app-surface)]">
-              <img src={apiUrl(image.url)} alt={image.originalName || '삭제 게시글 이미지'} className="block aspect-square w-full object-contain" />
+              <img src={apiUrl(image.url)} alt={image.originalName || '삭제 게시글 이미지'} className="block aspect-square w-full object-contain" loading="lazy" decoding="async" />
               <figcaption className="truncate border-t border-[var(--app-hairline)] px-2 py-1 text-[10px] font-semibold text-[var(--theme-body-muted)]">
                 {image.kind === 'COVER' ? '대표 이미지' : image.originalName || '이미지'}
               </figcaption>
