@@ -13,6 +13,7 @@ import com.coms.backend.dto.CommunityCommentResponse;
 import com.coms.backend.dto.CommunityPollVoteRequest;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
+import com.coms.backend.dto.CommunityReputationResponse;
 import com.coms.backend.dto.YouTubeSearchResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -171,8 +172,9 @@ public class CommunityService {
         Map<Long, VoteSummary> stats = voteStats(posts);
         Map<Long, Long> commentCounts = commentCounts(posts);
         Map<Long, List<CommunityPostResponse.PollResult>> pollResults = pollResults(posts, member.getStudentId());
+        Map<String, CommunityReputationResponse> reputations = reputationTiers(authors.keySet());
         return posts.stream()
-                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, false))
+                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, reputations, false))
                 .toList();
     }
 
@@ -202,8 +204,9 @@ public class CommunityService {
         Map<Long, VoteSummary> stats = voteStats(posts);
         Map<Long, Long> commentCounts = commentCounts(posts);
         Map<Long, List<CommunityPostResponse.PollResult>> pollResults = pollResults(posts, member.getStudentId());
+        Map<String, CommunityReputationResponse> reputations = reputationTiers(authors.keySet());
         return posts.stream()
-                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, false))
+                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, reputations, false))
                 .toList();
     }
 
@@ -509,6 +512,42 @@ public class CommunityService {
         requirePostVisible(member, post);
     }
 
+    /**
+     * Computes a member-visible reputation summary for {@code targetStudentId}. The viewer must be a
+     * known member (member-visible, reusing the existing community auth). The result is derived on read
+     * from a couple of aggregate count/sum queries — no per-row scan, no denormalized score column.
+     */
+    @Transactional(readOnly = true)
+    public CommunityReputationResponse reputation(String viewerStudentId, String targetStudentId) {
+        findMember(viewerStudentId);
+        Member target = findMember(targetStudentId);
+        long posts = communityPostRepository.countByAuthorStudentId(target.getStudentId());
+        long comments = commentRepository.countByStudentId(target.getStudentId());
+        long upvotes = voteRepository.sumVoteValueByPostAuthor(target.getStudentId());
+        return CommunityReputation.compute(posts, comments, upvotes);
+    }
+
+    /**
+     * Batch reputation tiers for a set of authors on a page, so the post/comment list can badge inline
+     * without firing a request per author. Three grouped aggregate queries total, regardless of page
+     * size, so this never degrades into N+1.
+     */
+    private Map<String, CommunityReputationResponse> reputationTiers(Set<String> studentIds) {
+        if (studentIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Long> postCounts = communityPostRepository.countByAuthorStudentIds(studentIds).stream()
+                .collect(Collectors.toMap(CommunityPostRepository.AuthorCount::getStudentId, CommunityPostRepository.AuthorCount::getCount));
+        Map<String, Long> commentCounts = commentRepository.countByStudentIds(studentIds).stream()
+                .collect(Collectors.toMap(CommunityCommentRepository.AuthorCount::getStudentId, CommunityCommentRepository.AuthorCount::getCount));
+        Map<String, Long> upvoteSums = voteRepository.sumVoteValueByPostAuthors(studentIds).stream()
+                .collect(Collectors.toMap(CommunityPostVoteRepository.AuthorVoteSum::getStudentId, CommunityPostVoteRepository.AuthorVoteSum::getTotal));
+        return studentIds.stream().collect(Collectors.toMap(Function.identity(), id -> CommunityReputation.compute(
+                postCounts.getOrDefault(id, 0L),
+                commentCounts.getOrDefault(id, 0L),
+                upvoteSums.getOrDefault(id, 0L))));
+    }
+
     private Member findMember(String studentId) {
         return memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -740,10 +779,26 @@ public class CommunityService {
                                              Map<Long, Long> commentCounts,
                                              Map<Long, List<CommunityPostResponse.PollResult>> pollResults,
                                              boolean includeContent) {
+        return toResponse(post, currentMember, author, voteStats, commentCounts, pollResults,
+                reputationTiers(author == null ? Set.of() : Set.of(author.getStudentId())), includeContent);
+    }
+
+    private CommunityPostResponse toResponse(CommunityPost post,
+                                             Member currentMember,
+                                             Member author,
+                                             Map<Long, VoteSummary> voteStats,
+                                             Map<Long, Long> commentCounts,
+                                             Map<Long, List<CommunityPostResponse.PollResult>> pollResults,
+                                             Map<String, CommunityReputationResponse> reputations,
+                                             boolean includeContent) {
         boolean editable = post.getAuthorStudentId().equals(currentMember.getStudentId())
                 || currentMember.getRole() == Member.Role.ADMIN;
         boolean maskAnonymous = isAnonymousPost(post) && currentMember.getRole() != Member.Role.ADMIN;
         boolean authorAdmin = !maskAnonymous && author != null && author.getRole() == Member.Role.ADMIN;
+        CommunityReputationResponse authorReputation = maskAnonymous ? null
+                : reputations.get(post.getAuthorStudentId());
+        String authorTier = authorReputation == null ? null : authorReputation.tier();
+        String authorTierLabel = authorReputation == null ? null : authorReputation.tierLabel();
         String anonymousDisplay = anonymousDisplayName(post.getAnonymousName(), post.getIpAddress());
         String authorName = maskAnonymous ? anonymousDisplay : (author != null ? author.getName() : post.getAuthorName());
         String authorStudentId = maskAnonymous ? null : post.getAuthorStudentId();
@@ -783,6 +838,8 @@ public class CommunityService {
                 authorDisplayName,
                 isAnonymousPost(post) ? post.getAnonymousName() : null,
                 authorAdmin,
+                authorTier,
+                authorTierLabel,
                 post.getCategory().name(),
                 post.getImageStoredName() == null ? null : "/api/community/posts/" + post.getId() + "/image",
                 post.getImageOriginalName(),
@@ -1262,11 +1319,20 @@ public class CommunityService {
         requirePostVisible(member, post);
         boolean isAdmin = member.getRole() == Member.Role.ADMIN;
         boolean maskAnonymous = isAnonymousPost(post) && !isAdmin;
-        return commentRepository.findByPostIdOrderByCreatedAtAsc(postId).stream()
-                .map(c -> new CommunityCommentResponse(
-                        c.getId(), c.getPostId(), c.getParentCommentId(), c.getDepth(),
-                        maskAnonymous ? anonymousDisplayName(c.getAnonymousName(), c.getIpAddress()) : displayName(c.getStudentId(), c.getAuthorName()), c.getContent(), c.getCreatedAt(), c.getUpdatedAt(), c.isEdited(),
-                        isAdmin || c.getStudentId().equals(studentId)))
+        List<CommunityComment> comments = commentRepository.findByPostIdOrderByCreatedAtAsc(postId);
+        Map<String, CommunityReputationResponse> reputations = maskAnonymous ? Map.of()
+                : reputationTiers(comments.stream().map(CommunityComment::getStudentId).filter(Objects::nonNull).collect(Collectors.toSet()));
+        return comments.stream()
+                .map(c -> {
+                    CommunityReputationResponse reputation = maskAnonymous ? null : reputations.get(c.getStudentId());
+                    return new CommunityCommentResponse(
+                            c.getId(), c.getPostId(), c.getParentCommentId(), c.getDepth(),
+                            maskAnonymous ? anonymousDisplayName(c.getAnonymousName(), c.getIpAddress()) : displayName(c.getStudentId(), c.getAuthorName()),
+                            reputation == null ? null : reputation.tier(),
+                            reputation == null ? null : reputation.tierLabel(),
+                            c.getContent(), c.getCreatedAt(), c.getUpdatedAt(), c.isEdited(),
+                            isAdmin || c.getStudentId().equals(studentId));
+                })
                 .toList();
     }
 
@@ -1302,8 +1368,7 @@ public class CommunityService {
         }
         auditLogService.record(member.getStudentId(), "COMMUNITY_COMMENT_CREATE", "COMMUNITY_COMMENT", String.valueOf(saved.getId()),
                 "postId=" + postId + (saved.getParentCommentId() == null ? "" : ", parentCommentId=" + saved.getParentCommentId()), null);
-        return new CommunityCommentResponse(saved.getId(), saved.getPostId(), saved.getParentCommentId(), saved.getDepth(), commentAuthorName(post, member, saved),
-                saved.getContent(), saved.getCreatedAt(), saved.getUpdatedAt(), saved.isEdited(), true);
+        return toCommentResponse(post, member, saved, true);
     }
 
     public CommunityCommentResponse updateComment(Long postId, Long commentId, String studentId, CommunityCommentRequest request) {
@@ -1324,8 +1389,19 @@ public class CommunityService {
         CommunityComment saved = commentRepository.save(comment);
         auditLogService.record(member.getStudentId(), "COMMUNITY_COMMENT_UPDATE", "COMMUNITY_COMMENT", String.valueOf(saved.getId()),
                 "postId=" + postId, null);
-        return new CommunityCommentResponse(saved.getId(), saved.getPostId(), saved.getParentCommentId(), saved.getDepth(),
-                commentAuthorName(post, member, saved), saved.getContent(), saved.getCreatedAt(), saved.getUpdatedAt(), saved.isEdited(), true);
+        return toCommentResponse(post, member, saved, true);
+    }
+
+    private CommunityCommentResponse toCommentResponse(CommunityPost post, Member currentMember, CommunityComment comment, boolean deletable) {
+        boolean maskAnonymous = isAnonymousPost(post) && currentMember.getRole() != Member.Role.ADMIN;
+        CommunityReputationResponse reputation = maskAnonymous ? null
+                : reputationTiers(Set.of(comment.getStudentId())).get(comment.getStudentId());
+        return new CommunityCommentResponse(
+                comment.getId(), comment.getPostId(), comment.getParentCommentId(), comment.getDepth(),
+                commentAuthorName(post, currentMember, comment),
+                reputation == null ? null : reputation.tier(),
+                reputation == null ? null : reputation.tierLabel(),
+                comment.getContent(), comment.getCreatedAt(), comment.getUpdatedAt(), comment.isEdited(), deletable);
     }
 
     public void deleteComment(Long postId, Long commentId, String studentId) {

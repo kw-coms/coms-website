@@ -714,6 +714,59 @@ class CommunityServiceTest {
         assertThat(communityPostRepository.findById(created.id())).isEmpty();
     }
 
+    @Test
+    void reputationAggregatesPostsCommentsAndReceivedUpvotes() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member voter = member("2026123456", "투표자", Member.Role.USER);
+        memberRepository.save(author);
+        memberRepository.save(voter);
+
+        var post = communityService.create(author.getStudentId(),
+                new CommunityPostRequest("글", "내용", "GENERAL", false), null);
+        communityService.addComment(post.id(), author.getStudentId(),
+                new CommunityCommentRequest("댓글", null, null));
+        communityService.vote(voter.getStudentId(), post.id(), 1);
+
+        var reputation = communityService.reputation(voter.getStudentId(), author.getStudentId());
+
+        assertThat(reputation.breakdown().posts()).isEqualTo(1);
+        assertThat(reputation.breakdown().comments()).isEqualTo(1);
+        assertThat(reputation.breakdown().upvotes()).isEqualTo(1);
+        // 1 post * 3 + 1 comment * 1 + 1 upvote * 2 = 6
+        assertThat(reputation.score()).isEqualTo(6);
+        assertThat(reputation.tierLabel()).isEqualTo("신입");
+    }
+
+    @Test
+    void listInlinesAuthorTierForNonAnonymousPosts() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        memberRepository.save(author);
+        communityService.create(author.getStudentId(),
+                new CommunityPostRequest("글", "내용", "GENERAL", false), null);
+
+        var posts = communityService.list(author.getStudentId());
+
+        assertThat(posts).singleElement().satisfies(p -> {
+            assertThat(p.authorTier()).isEqualTo("NEWCOMER");
+            assertThat(p.authorTierLabel()).isEqualTo("신입");
+        });
+    }
+
+    @Test
+    void anonymousPostsDoNotLeakAuthorTier() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member viewer = member("2026123456", "회원", Member.Role.USER);
+        memberRepository.save(author);
+        memberRepository.save(viewer);
+        var created = communityService.create(author.getStudentId(),
+                new CommunityPostRequest("익명글", "내용", "ANONYMOUS", false, "반고닉"), null);
+
+        var detail = communityService.get(viewer.getStudentId(), created.id());
+
+        assertThat(detail.authorTier()).isNull();
+        assertThat(detail.authorTierLabel()).isNull();
+    }
+
     private Member member(String studentId, String name, Member.Role role) {
         Member member = new Member();
         member.setStudentId(studentId);

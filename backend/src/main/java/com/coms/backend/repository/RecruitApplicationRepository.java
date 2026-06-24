@@ -2,7 +2,10 @@ package com.coms.backend.repository;
 
 import com.coms.backend.domain.RecruitApplication;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -10,4 +13,7 @@ public interface RecruitApplicationRepository extends JpaRepository<RecruitAppli
     List<RecruitApplication> findAllByOrderBySubmittedAtDescIdDesc();
     long countByStatus(RecruitApplication.Status status);
     Optional<RecruitApplication> findFirstByStudentIdAndNameOrderBySubmittedAtDescIdDesc(String studentId, String name);
+
+    @Query("select r.submittedAt from RecruitApplication r where r.submittedAt >= :since")
+    List<LocalDateTime> findSubmittedAtSince(@Param("since") LocalDateTime since);
 }

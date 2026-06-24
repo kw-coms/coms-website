@@ -4,6 +4,10 @@ export async function listMembers() {
   return request('/api/admin/members')
 }
 
+export async function getAdminAnalytics() {
+  return request('/api/admin/analytics')
+}
+
 export async function listAuditLogs(limit = 1000) {
   return request(`/api/admin/audit-logs?limit=${encodeURIComponent(limit)}`)
 }
