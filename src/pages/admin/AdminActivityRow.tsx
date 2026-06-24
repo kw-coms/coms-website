@@ -198,7 +198,7 @@ export default function AdminActivityRow({ item, categories, onDelete, onUpdated
               <div className="mt-2 flex flex-wrap gap-2">
                 {(item.imageInfos || []).map((image) => (
                   <div key={image.id} className="relative">
-                    <img src={image.url} alt="" className="h-16 w-16 rounded object-cover" />
+                    <img src={image.url} alt="" className="h-16 w-16 rounded object-cover" loading="lazy" decoding="async" />
                     <button
                       type="button"
                       onClick={() => removeImage(image.id)}
