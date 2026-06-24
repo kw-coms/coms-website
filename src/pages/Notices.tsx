@@ -267,9 +267,12 @@ export default function Notices() {
   const visibleMode = !urlId && mode === 'edit' ? 'list' : mode
   const isDetail = !!urlId && !!selectedNotice && visibleMode === 'list'
   const headerTitle = visibleMode === 'write' ? '공지 작성' : visibleMode === 'edit' ? '공지 수정' : '공지사항'
+  // The list/table wants the full content width; the single-notice reading view
+  // and the write/edit forms stay narrower for readability.
+  const isListView = !urlId && visibleMode === 'list'
 
   return (
-    <div className="mx-auto w-full max-w-5xl min-w-0 space-y-4">
+    <div className={`mx-auto w-full min-w-0 space-y-4 ${isListView ? 'max-w-7xl' : 'max-w-5xl'}`}>
       {!urlId && visibleMode === 'list' && (
         <div className="flex justify-center sm:justify-start">
           <button type="button" onClick={() => navigate('/')} className="apple-action-secondary px-4 py-2 text-sm">
