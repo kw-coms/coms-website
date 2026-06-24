@@ -191,15 +191,29 @@ export default function ComsIntro() {
       setFadingOut(true)
     }
 
-    const drawEarth = (cx: number, cy: number, R: number, spin: number, alpha: number) => {
+    const drawEarth = (
+      cx: number,
+      cy: number,
+      R: number,
+      spin: number,
+      alpha: number,
+      bumpX = 0,
+      bumpY = 0,
+    ) => {
       if (alpha <= 0) return
       const block = Math.max(2, Math.round(Math.min(W, H) / 240))
       ctx.globalAlpha = alpha
       const lx = -0.55
       const ly = -0.5
       const lz = 0.66
-      for (let y = cy - R; y <= cy + R; y += block) {
-        for (let x = cx - R; x <= cx + R; x += block) {
+      // Only iterate the on-screen slice of the globe — R can be many screens
+      // wide during the dive, so the full bounding box would be millions of cells.
+      const y0 = Math.max(cy - R, -block)
+      const y1 = Math.min(cy + R, H + block)
+      const x0 = Math.max(cx - R, -block)
+      const x1 = Math.min(cx + R, W + block)
+      for (let y = y0; y <= y1; y += block) {
+        for (let x = x0; x <= x1; x += block) {
           const nx = (x - cx) / R
           const ny = (y - cy) / R
           const d2 = nx * nx + ny * ny
@@ -209,7 +223,12 @@ export default function ComsIntro() {
           const sx = nx * Math.cos(spin) + nz * Math.sin(spin)
           const lon = sx * 2.2 + 4
           const lat = ny * 2.2 + 4
-          const n = vnoise(lon * 1.7, lat * 1.7) * 0.6 + vnoise(lon * 3.4, lat * 3.4) * 0.4
+          // Guarantee a continent at the zoom target (in screen-space nx/ny so it
+          // stays put while the globe spins) — this is "Korea's location" we dive into.
+          const dbx = nx - bumpX
+          const dby = ny - bumpY
+          const landBump = 0.32 * Math.exp(-(dbx * dbx + dby * dby) / 0.05)
+          const n = vnoise(lon * 1.7, lat * 1.7) * 0.6 + vnoise(lon * 3.4, lat * 3.4) * 0.4 + landBump
           const isLand = n > 0.45
           const ice = Math.abs(ny) > 0.88
           // crisp 2-tone B&W: hard land/sea boundary -> clean pixel islands, no blur
@@ -345,20 +364,30 @@ export default function ComsIntro() {
       }
 
       const cx = W / 2
+      const min = Math.min(W, H)
+      // Focal point where the target continent (and then Korea) sits — vertically
+      // centred so the globe reads head-on, not from below.
+      const focalY = H * 0.5
+      // The spot on the globe we dive into (screen-space, upper-right ≈ East Asia).
+      const TX = 0.16
+      const TY = -0.2
 
-      // EARTH — zoom in + descend (camera drops, earth rises off top).
-      const eP = seg(t, 0, EARTH_END)
-      const eAlpha = clamp01(seg(t, 0, 350)) * (1 - easeInOut(seg(t, 1600, EARTH_END)))
-      const eR = lerp(Math.min(W, H) * 0.22, Math.min(W, H) * 0.62, easeInOut(eP))
-      const eCy = lerp(H * 0.46, H * 0.04, easeInOut(eP))
-      drawEarth(cx, eCy, eR, t * 0.0006, eAlpha)
+      // EARTH — starts as a centred globe, then one continuous accelerating dolly
+      // into the target continent. `dive` ramps the target offset in from zero so
+      // the opening frame is a centred globe (no "looking up from below"); the
+      // exponential radius growth reads as constant-speed flight.
+      const dive = easeInOut(seg(t, 0, 2700))
+      const eR = min * 0.34 * Math.pow(7, dive)
+      const eCx = cx - TX * dive * eR
+      const eCy = focalY - TY * dive * eR
+      const eAlpha = clamp01(seg(t, 0, 350)) * (1 - easeInOut(seg(t, 1900, 2700)))
+      drawEarth(eCx, eCy, eR, t * 0.00045, eAlpha, TX, TY)
 
-      // KOREA — fades in mid, zooms, keeps descending.
-      const kP = seg(t, KOREA_IN, KOREA_END)
-      const kAlpha = easeInOut(seg(t, KOREA_IN, 2400)) * (1 - easeInOut(seg(t, 3200, KOREA_END)))
-      const kScale = lerp(0.72, 1.28, easeInOut(kP))
-      const kCy = lerp(H * 0.6, H * 0.42, easeInOut(kP))
-      drawKorea(cx, kCy, kScale, kAlpha)
+      // KOREA — emerges from that same focal point, growing as the Earth blows
+      // past and fades, so the two read as one continuous descent.
+      const kAlpha = easeInOut(seg(t, 2050, 2750)) * (1 - easeInOut(seg(t, 3300, 3850)))
+      const kScale = lerp(0.4, 1.22, easeOut(seg(t, 2050, 3500)))
+      drawKorea(cx, focalY, kScale, kAlpha)
 
       // LOGO — assembles from pixels, settles, then overlay fades.
       const assemble = easeOut(seg(t, LOGO_IN, LOGO_SETTLE))
@@ -393,9 +422,14 @@ export default function ComsIntro() {
     }
   }, [])
 
-  // Any fade-out path (auto-finish or a skip click) unmounts after the transition.
+  // Any fade-out path (auto-finish or a skip click) hides the overlay after the
+  // transition. Critically, unlock body scroll NOW: this component renders null
+  // when done but stays mounted (the parent keeps it while on "/"), so the main
+  // effect's cleanup never runs — without this the body stays overflow:hidden,
+  // which turns it into a scroll container and breaks the home's sticky cinema pin.
   useEffect(() => {
     if (!fadingOut) return
+    document.body.style.overflow = ''
     const id = window.setTimeout(() => setGone(true), FADE)
     return () => window.clearTimeout(id)
   }, [fadingOut])
