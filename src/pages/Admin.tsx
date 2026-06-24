@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { listRecruitApplications } from '../services/adminApi'
 import { useAuth } from '../contexts/useAuth'
 import AdminActivities from './admin/AdminActivities'
+import AdminAnalytics from './admin/AdminAnalytics'
 import AdminAuditLogs from './admin/AdminAuditLogs'
 import AdminAppCatalog from './admin/AdminAppCatalog'
 import AdminBan from './admin/AdminBan'
@@ -17,12 +18,13 @@ import { recruitPendingCount, recruitStatusLabel } from './admin/recruitStatus'
 import AdminScreenCheck from './admin/AdminScreenCheck'
 
 const ADMIN_TAB_IDS = new Set([
-  'overview', 'members', 'recruit', 'roster', 'activities', 'projects', 'files',
+  'overview', 'analytics', 'members', 'recruit', 'roster', 'activities', 'projects', 'files',
   'fonts', 'community', 'deleted-posts', 'screen-check', 'ban', 'logs',
 ])
 
 const ADMIN_TABS = [
   { id: 'overview', label: '운영 요약' },
+  { id: 'analytics', label: '분석' },
   { id: 'members', label: '회원 관리' },
   { id: 'recruit', label: '모집 관리' },
   { id: 'roster', label: '명부 인증' },
@@ -144,6 +146,7 @@ export default function Admin({ onBack }: any) {
                 onOpenRecruit={() => setActiveTab('recruit')}
               />
             )}
+            {activeTab === 'analytics' && <AdminAnalytics />}
             {activeTab === 'members' && <AdminMembers currentUser={user} />}
             {activeTab === 'recruit' && (
               <AdminRecruitApplications
