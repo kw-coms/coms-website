@@ -60,7 +60,7 @@ export default function CommunityDetailView({
         </button>
       </BoardDetailBar>
       {detailLoading || !currentPost ? (
-        <p className="px-4 py-16 text-center text-sm text-[var(--theme-body-muted)]">글을 여는 중...</p>
+        <p className="px-4 py-10 text-center text-sm text-[var(--theme-body-muted)] sm:py-16">글을 여는 중...</p>
       ) : (
         <article className="m-0 overflow-hidden bg-[var(--app-surface)] sm:m-5 sm:rounded-lg sm:border sm:border-[var(--app-hairline)]">
           <div className="border-b border-[var(--app-hairline)] px-4 py-4 sm:px-5">
