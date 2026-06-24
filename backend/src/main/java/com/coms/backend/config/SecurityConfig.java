@@ -161,6 +161,8 @@ public class SecurityConfig {
         config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "X-Bootstrap-Secret"));
+        // Expose the pagination total so cross-origin clients can read it from the optional ?page/?size slices.
+        config.setExposedHeaders(List.of("X-Total-Count"));
         config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

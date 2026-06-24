@@ -103,6 +103,18 @@ public class ArchiveService {
         return files.stream().map(file -> toResponse(file, stats, studentId)).toList();
     }
 
+    /**
+     * Returns at most {@code limit} files in the same order as {@link #list()}, pushing the cap into the
+     * query instead of loading every row and trimming in memory. Used by the mobile home preview.
+     */
+    @Transactional(readOnly = true)
+    public List<ArchiveFileResponse> listLimited(int limit, String studentId) {
+        List<ArchiveFile> files = repo.findAllByOrderByUploadedAtDesc(
+                org.springframework.data.domain.PageRequest.of(0, limit));
+        Map<Long, VoteSummary> stats = voteStats(files);
+        return files.stream().map(file -> toResponse(file, stats, studentId)).toList();
+    }
+
     @Transactional(readOnly = true)
     public ArchiveFile get(Long id) {
         return repo.findById(id)
