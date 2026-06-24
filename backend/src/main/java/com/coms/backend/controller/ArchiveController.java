@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import com.coms.backend.web.ListPagination;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -50,8 +51,11 @@ public class ArchiveController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ArchiveFileResponse>> list(Authentication authentication) {
-        return ResponseEntity.ok(archiveService.list(authentication == null ? null : authentication.getName()));
+    public ResponseEntity<List<ArchiveFileResponse>> list(Authentication authentication,
+                                                          @RequestParam(required = false) Integer page,
+                                                          @RequestParam(required = false) Integer size) {
+        return ListPagination.paginate(
+                archiveService.list(authentication == null ? null : authentication.getName()), page, size);
     }
 
     @PostMapping("/{id}/vote")

@@ -25,6 +25,7 @@ import com.coms.backend.service.CacheMaintenanceService;
 import com.coms.backend.service.CommunityDeletionArchiveService;
 import com.coms.backend.service.EligibleMemberService;
 import com.coms.backend.service.RecruitApplicationService;
+import com.coms.backend.web.ListPagination;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
@@ -68,8 +69,9 @@ public class AdminController {
     }
 
     @GetMapping("/members")
-    public ResponseEntity<List<MemberResponse>> members() {
-        return ResponseEntity.ok(adminService.listMembers());
+    public ResponseEntity<List<MemberResponse>> members(@RequestParam(required = false) Integer page,
+                                                        @RequestParam(required = false) Integer size) {
+        return ListPagination.paginate(adminService.listMembers(), page, size);
     }
 
     @PatchMapping("/members/{id}/role")
@@ -169,8 +171,10 @@ public class AdminController {
     }
 
     @GetMapping("/recruit-applications")
-    public ResponseEntity<List<RecruitApplicationAdminResponse>> recruitApplications() {
-        return ResponseEntity.ok(recruitApplicationService.listApplications());
+    public ResponseEntity<List<RecruitApplicationAdminResponse>> recruitApplications(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        return ListPagination.paginate(recruitApplicationService.listApplications(), page, size);
     }
 
     @PatchMapping("/recruit-applications/{id}/status")

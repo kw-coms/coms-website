@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
+import com.coms.backend.web.ListPagination;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -50,8 +51,10 @@ public class ClubActivityController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ClubActivityResponse>> list(Authentication authentication) {
-        return ResponseEntity.ok(clubActivityService.list(authentication.getName()));
+    public ResponseEntity<List<ClubActivityResponse>> list(Authentication authentication,
+                                                           @RequestParam(required = false) Integer page,
+                                                           @RequestParam(required = false) Integer size) {
+        return ListPagination.paginate(clubActivityService.list(authentication.getName()), page, size);
     }
 
     @GetMapping("/{id}")

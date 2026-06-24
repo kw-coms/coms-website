@@ -64,6 +64,37 @@ assert.deepEqual(
   [2, 1],
 )
 
+// Pinned posts surface first regardless of sort mode, then the chosen sort
+// applies among the remaining (and among multiple pinned) posts.
+const pinnedPosts = [
+  { id: 10, title: 'A', category: 'GENERAL', createdAt: '2026-06-18T08:00:00', commentCount: 0, upvotes: 0, downvotes: 0, viewCount: 5 },
+  { id: 11, title: 'B', category: 'GENERAL', createdAt: '2026-06-18T09:00:00', commentCount: 100, upvotes: 0, downvotes: 0, viewCount: 5, pinned: false },
+  { id: 12, title: 'C 공지', category: 'GENERAL', createdAt: '2026-06-18T07:00:00', commentCount: 1, upvotes: 0, downvotes: 0, viewCount: 5, pinned: true },
+]
+
+// Sorting by comments would put id 11 first, but the pinned id 12 wins.
+assert.deepEqual(
+  filterAndSortCommunityPosts(pinnedPosts, { category: 'ALL', query: '', sort: 'comments', canSeeAnonymous: true }).map((p) => p.id),
+  [12, 11, 10],
+)
+
+// Latest sort: pinned still leads even though it is the oldest post.
+assert.deepEqual(
+  filterAndSortCommunityPosts(pinnedPosts, { category: 'ALL', query: '', sort: 'latest', canSeeAnonymous: true }).map((p) => p.id),
+  [12, 11, 10],
+)
+
+// Two pinned posts keep the active sort order among themselves.
+const twoPinned = [
+  { id: 20, title: 'P1', category: 'GENERAL', createdAt: '2026-06-18T08:00:00', commentCount: 2, pinned: true },
+  { id: 21, title: 'P2', category: 'GENERAL', createdAt: '2026-06-18T08:00:00', commentCount: 9, pinned: true },
+  { id: 22, title: 'N', category: 'GENERAL', createdAt: '2026-06-18T08:00:00', commentCount: 50 },
+]
+assert.deepEqual(
+  filterAndSortCommunityPosts(twoPinned, { category: 'ALL', query: '', sort: 'comments', canSeeAnonymous: true }).map((p) => p.id),
+  [21, 20, 22],
+)
+
 const timeline = buildDeletedPostTimeline({
   createdAt: '2026-06-18T08:00:00',
   deletedAt: '2026-06-18T09:00:00',

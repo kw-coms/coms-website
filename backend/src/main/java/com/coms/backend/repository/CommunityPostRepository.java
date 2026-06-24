@@ -1,6 +1,7 @@
 package com.coms.backend.repository;
 
 import com.coms.backend.domain.CommunityPost;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
@@ -9,6 +10,7 @@ import java.util.List;
 public interface CommunityPostRepository extends JpaRepository<CommunityPost, Long> {
     List<CommunityPost> findAllByOrderByCreatedAtDesc();
     List<CommunityPost> findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc();
+    List<CommunityPost> findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc(Pageable pageable);
     List<CommunityPost> findByAuthorStudentId(String authorStudentId);
     long countByAuthorStudentIdAndCreatedAtAfter(String authorStudentId, LocalDateTime createdAt);
 }

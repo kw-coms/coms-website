@@ -33,6 +33,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import com.coms.backend.web.ListPagination;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.HtmlUtils;
 
@@ -64,8 +65,10 @@ public class CommunityController {
     }
 
     @GetMapping
-    public ResponseEntity<List<CommunityPostResponse>> list(Authentication authentication) {
-        return ResponseEntity.ok(communityService.list(authentication.getName()));
+    public ResponseEntity<List<CommunityPostResponse>> list(Authentication authentication,
+                                                            @RequestParam(required = false) Integer page,
+                                                            @RequestParam(required = false) Integer size) {
+        return ListPagination.paginate(communityService.list(authentication.getName()), page, size);
     }
 
     @GetMapping("/deleted/me")
