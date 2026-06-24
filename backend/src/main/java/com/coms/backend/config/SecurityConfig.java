@@ -62,7 +62,7 @@ public class SecurityConfig {
                         "/api/auth/email-verification/request-signup", "/api/auth/email-verification/confirm-signup",
                         "/api/auth/password-reset/request", "/api/auth/password-reset/confirm").permitAll();
                 auth.requestMatchers("/api/integrations/**").hasRole("INTEGRATION");
-                auth.requestMatchers(HttpMethod.POST, "/api/recruit/apply").permitAll();
+                auth.requestMatchers(HttpMethod.POST, "/api/recruit/apply", "/api/recruit/status").permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/api/maintenance/bootstrap").permitAll();
                 auth.requestMatchers("/api/maintenance/**").hasRole("ADMIN");
                 auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
