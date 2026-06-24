@@ -10,4 +10,6 @@ public interface CommunityPostReportRepository extends JpaRepository<CommunityPo
     Optional<CommunityPostReport> findByPostIdAndReporterStudentIdAndStatus(Long postId, String reporterStudentId, CommunityPostReport.Status status);
 
     List<CommunityPostReport> findByStatusOrderByCreatedAtDesc(CommunityPostReport.Status status);
+
+    long countByStatus(CommunityPostReport.Status status);
 }

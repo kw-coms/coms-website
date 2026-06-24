@@ -3,6 +3,7 @@ package com.coms.backend.controller;
 import com.coms.backend.domain.DeletedCommunityPostImage;
 import com.coms.backend.domain.DeletedCommunityPostMedia;
 import com.coms.backend.dto.AddEligibleMemberRequest;
+import com.coms.backend.dto.AdminAnalyticsResponse;
 import com.coms.backend.dto.AuditLogResponse;
 import com.coms.backend.dto.BanStudentRequest;
 import com.coms.backend.dto.BannedStudentResponse;
@@ -18,6 +19,7 @@ import com.coms.backend.dto.RecruitApplicationAdminResponse;
 import com.coms.backend.dto.RecruitApplicationStatusUpdateRequest;
 import com.coms.backend.dto.RoleUpdateRequest;
 import com.coms.backend.dto.UpdateEligibleMemberRequest;
+import com.coms.backend.service.AdminAnalyticsService;
 import com.coms.backend.service.AdminService;
 import com.coms.backend.service.AuditLogService;
 import com.coms.backend.service.BannedStudentService;
@@ -47,6 +49,7 @@ import java.util.List;
 public class AdminController {
 
     private final AdminService adminService;
+    private final AdminAnalyticsService adminAnalyticsService;
     private final EligibleMemberService eligibleMemberService;
     private final BannedStudentService bannedStudentService;
     private final AuditLogService auditLogService;
@@ -54,18 +57,25 @@ public class AdminController {
     private final RecruitApplicationService recruitApplicationService;
     private final CommunityDeletionArchiveService communityDeletionArchiveService;
 
-    public AdminController(AdminService adminService, EligibleMemberService eligibleMemberService,
+    public AdminController(AdminService adminService, AdminAnalyticsService adminAnalyticsService,
+                           EligibleMemberService eligibleMemberService,
                            BannedStudentService bannedStudentService, AuditLogService auditLogService,
                            CacheMaintenanceService cacheMaintenanceService,
                            RecruitApplicationService recruitApplicationService,
                            CommunityDeletionArchiveService communityDeletionArchiveService) {
         this.adminService = adminService;
+        this.adminAnalyticsService = adminAnalyticsService;
         this.eligibleMemberService = eligibleMemberService;
         this.bannedStudentService = bannedStudentService;
         this.auditLogService = auditLogService;
         this.cacheMaintenanceService = cacheMaintenanceService;
         this.recruitApplicationService = recruitApplicationService;
         this.communityDeletionArchiveService = communityDeletionArchiveService;
+    }
+
+    @GetMapping("/analytics")
+    public ResponseEntity<AdminAnalyticsResponse> analytics() {
+        return ResponseEntity.ok(adminAnalyticsService.buildAnalytics());
     }
 
     @GetMapping("/members")

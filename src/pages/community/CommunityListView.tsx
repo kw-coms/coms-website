@@ -7,6 +7,7 @@ import {
   ShieldAlert,
 } from 'lucide-react'
 import { categoryLabel } from './postEditorUtils'
+import ReputationBadge from './ReputationBadge'
 import { BoardHeader } from './CommunityChrome'
 import {
   SORT_OPTIONS,
@@ -178,7 +179,10 @@ export default function CommunityListView({
           )}
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-[var(--app-subtle)]">
-          <span className="min-w-0 truncate text-[var(--app-muted)]">{post.authorDisplayName || post.authorName}</span>
+          <span className="flex min-w-0 items-center gap-1 text-[var(--app-muted)]">
+            <span className="truncate">{post.authorDisplayName || post.authorName}</span>
+            <ReputationBadge tier={post.authorTier} label={post.authorTierLabel} className="shrink-0" />
+          </span>
           <span className="text-right">{shortDate(post.createdAt)}</span>
           <span>조회 {post.viewCount}</span>
           <span className="text-right">개추 {postScore(post)}</span>
@@ -317,7 +321,10 @@ export default function CommunityListView({
                     {post.authorAdmin && <span className="ml-1 rounded bg-red-600 px-1 py-0.5 text-[10px] font-black text-white">주딱</span>}
                   </td>
                   <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-semibold">
-                    <span>{post.authorDisplayName || post.authorName}</span>
+                    <span className="inline-flex items-center gap-1">
+                      {post.authorDisplayName || post.authorName}
+                      <ReputationBadge tier={post.authorTier} label={post.authorTierLabel} />
+                    </span>
                     {user?.role === 'ADMIN' && (
                       <button
                         type="button"
