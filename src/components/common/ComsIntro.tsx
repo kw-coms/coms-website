@@ -168,7 +168,10 @@ export default function ComsIntro() {
 
     const stampKorea = (b: Float32Array, ccx: number, ccy: number, hChars: number, alpha: number) => {
       if (alpha <= 0) return
-      const wChars = hChars / asp
+      // grid is a square, geo-accurate box; chars are taller than wide, so the
+      // column span must be hChars*asp for the peninsula to keep real proportions
+      // (without this it gets horizontally squished into a thin strip).
+      const wChars = hChars * asp
       const y0 = Math.max(0, Math.floor(ccy - hChars / 2))
       const y1 = Math.min(rows - 1, Math.ceil(ccy + hChars / 2))
       const x0 = Math.max(0, Math.floor(ccx - wChars / 2))
@@ -186,6 +189,23 @@ export default function ComsIntro() {
         }
       }
     }
+
+    // ASCII block-letter "COM'S" (5 rows tall), built once.
+    const GLYPHS: Record<string, string[]> = {
+      C: ['#####', '#    ', '#    ', '#    ', '#####'],
+      O: ['#####', '#   #', '#   #', '#   #', '#####'],
+      M: ['#   #', '## ##', '# # #', '#   #', '#   #'],
+      "'": ['##', '##', '  ', '  ', '  '],
+      S: ['#####', '#    ', '#####', '    #', '#####'],
+    }
+    const logoRows = ['', '', '', '', '']
+    const word = ['C', 'O', 'M', "'", 'S']
+    word.forEach((ch, wi) => {
+      const g = GLYPHS[ch]
+      for (let r = 0; r < 5; r++) logoRows[r] += g[r] + (wi < word.length - 1 ? ' ' : '')
+    })
+    const logoW = logoRows[0].length
+    const logoGrid = logoRows.map((r) => Array.from({ length: logoW }, (_, c) => r[c] === '#'))
 
     const frame = (now: number) => {
       if (!start) start = now
@@ -226,17 +246,30 @@ export default function ComsIntro() {
 
       const lA = easeInOut(seg(t, LOGO_IN, LOGO_IN + 350))
       if (lA > 0) {
-        const big = Math.round(Math.min(W, H) * 0.15)
-        ctx.font = '700 ' + big + 'px ' + MONO
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        const full = "COM'S"
-        const shown = Math.round(seg(t, LOGO_IN, LOGO_IN + 450) * full.length)
-        const blink = Math.floor(t / 320) % 2 === 0 ? '_' : ' '
-        ctx.fillStyle = 'rgba(80,255,120,' + lA.toFixed(3) + ')'
-        ctx.fillText(full.slice(0, shown) + blink, W / 2, H * 0.5)
-        ctx.textAlign = 'left'
-        ctx.textBaseline = 'top'
+        // chunky ASCII block letters, each glyph-pixel = P×P '#' chars, typed in
+        // column by column with a blinking cursor block.
+        const P = Math.max(2, Math.min(Math.floor(rows * 0.075), Math.floor((cols - 6) / logoW)))
+        const ox = Math.round(cols / 2 - (logoW * P) / 2)
+        const oy = Math.round(rows * 0.5 - (5 * P) / 2)
+        const shown = Math.floor(seg(t, LOGO_IN, LOGO_IN + 600) * logoW)
+        ctx.font = fontPx + 'px ' + MONO
+        ctx.fillStyle = 'rgba(90,255,135,' + lA.toFixed(3) + ')'
+        for (let gr = 0; gr < 5; gr++) {
+          for (let gc = 0; gc <= shown && gc < logoW; gc++) {
+            if (!logoGrid[gr][gc]) continue
+            for (let py = 0; py < P; py++)
+              for (let px = 0; px < P; px++)
+                ctx.fillText('#', (ox + gc * P + px) * cellW, (oy + gr * P + py) * cellH)
+          }
+        }
+        // blinking cursor block just past the typed columns
+        const cc = Math.min(shown + 1, logoW)
+        if (Math.floor(t / 300) % 2 === 0) {
+          for (let gr = 0; gr < 5; gr++)
+            for (let py = 0; py < P; py++)
+              for (let px = 0; px < P; px++)
+                ctx.fillText('#', (ox + cc * P + px) * cellW, (oy + gr * P + py) * cellH)
+        }
       }
 
       ctx.font = fontPx + 'px ' + MONO
