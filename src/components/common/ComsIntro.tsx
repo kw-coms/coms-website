@@ -8,11 +8,14 @@ import { getLogoAsset } from '../../utils/logoAssets'
  * their crisp final form before the whole overlay fades away to reveal the home.
  *
  * No image assets for Earth/Korea — both are drawn block-by-block on a canvas so
- * they read as chunky pixel art. Plays once per browser session, is skippable
- * (click / key / scroll / touch), and is skipped entirely under reduced-motion.
+ * they read as pixel art. Plays once per page load (in-app navigation back to the
+ * home does NOT replay it; a fresh visit / reload does), is skippable (click / key
+ * / scroll / touch), and is skipped entirely under reduced-motion.
  */
 
-const SEEN_KEY = 'coms-intro-seen'
+// Module-level so an SPA route change back to "/" doesn't replay it, but a full
+// page reload (which re-imports the module) does.
+let introPlayed = false
 
 // Phase timeline (ms from start). Windows overlap so phases crossfade.
 const EARTH_END = 2200
@@ -48,32 +51,78 @@ function vnoise(x: number, y: number) {
   return lerp(lerp(a, b, u), lerp(c, d, u), v)
 }
 
-// Korean peninsula, stylized 0/1 bitmap (north at top).
-// ponytail: evocative silhouette, not cartographically exact.
-const KOREA = [
-  '0001111000000000',
-  '0011111100000000',
-  '0011111110000000',
-  '0001111111000000',
-  '0001111111100000',
-  '0000111111100000',
-  '0000011111110000',
-  '0000011111111000',
-  '0000001111111000',
-  '0000001111111100',
-  '0000001111111100',
-  '0000011111111000',
-  '0000011111110000',
-  '0000011111110000',
-  '0000001111110000',
-  '0000000111110000',
-  '0000000111100000',
-  '0000000111000000',
-  '0000000110000000',
-  '0000000100000000',
-  '0000000000000000',
-  '0000001100000000',
-].map((r) => r.split('').map((c) => c === '1'))
+// Korean peninsula as a normalized outline (x,y in 0..1, north at top, west at
+// left), traced to approximate the real coastline: NW border, the wide northern
+// body, a fairly straight east coast, the jagged south-west, and the southern
+// tip. Filled + sampled to a high-res grid at runtime so it reads as an accurate
+// pixel silhouette instead of a hand-typed bitmap. ponytail: hand-traced, not
+// survey-grade — good enough to read unmistakably as Korea.
+const KOREA_OUTLINE: Array<[number, number]> = [
+  [0.34, 0.04], // NW border (toward the mainland)
+  [0.46, 0.02],
+  [0.58, 0.05],
+  [0.62, 0.12], // NE shoulder
+  [0.7, 0.16],
+  [0.78, 0.2],
+  [0.74, 0.27],
+  [0.8, 0.33], // east bulge
+  [0.76, 0.42],
+  [0.78, 0.5],
+  [0.72, 0.58],
+  [0.74, 0.66], // SE (Busan side)
+  [0.66, 0.72],
+  [0.6, 0.8],
+  [0.52, 0.84],
+  [0.46, 0.9], // southern tip
+  [0.42, 0.86],
+  [0.38, 0.8],
+  [0.32, 0.82], // SW coast
+  [0.34, 0.74],
+  [0.27, 0.7],
+  [0.31, 0.62],
+  [0.24, 0.56],
+  [0.3, 0.5],
+  [0.22, 0.44],
+  [0.27, 0.37],
+  [0.2, 0.31],
+  [0.26, 0.24],
+  [0.21, 0.18],
+  [0.27, 0.1],
+]
+const JEJU: [number, number, number] = [0.4, 0.97, 0.045] // cx, cy, radius (island)
+
+// Rasterize the outline to a boolean grid of the given resolution (once).
+function buildKoreaGrid(gw: number, gh: number): boolean[][] {
+  const cv = document.createElement('canvas')
+  cv.width = gw
+  cv.height = gh
+  const c = cv.getContext('2d')
+  if (!c) return []
+  c.fillStyle = '#fff'
+  c.beginPath()
+  KOREA_OUTLINE.forEach(([x, y], i) => {
+    const px = x * gw
+    const py = y * gh
+    if (i === 0) c.moveTo(px, py)
+    else c.lineTo(px, py)
+  })
+  c.closePath()
+  c.fill()
+  // Jeju as a separate filled circle
+  c.beginPath()
+  c.arc(JEJU[0] * gw, JEJU[1] * gh, JEJU[2] * gw, 0, Math.PI * 2)
+  c.fill()
+  const data = c.getImageData(0, 0, gw, gh).data
+  const grid: boolean[][] = []
+  for (let r = 0; r < gh; r++) {
+    const row: boolean[] = []
+    for (let col = 0; col < gw; col++) {
+      row.push(data[(r * gw + col) * 4 + 3] > 128)
+    }
+    grid.push(row)
+  }
+  return grid
+}
 
 export default function ComsIntro() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -82,16 +131,16 @@ export default function ComsIntro() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (window.sessionStorage.getItem(SEEN_KEY)) {
+    if (introPlayed || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      introPlayed = true
       setGone(true)
       return
     }
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      window.sessionStorage.setItem(SEEN_KEY, '1')
-      setGone(true)
-      return
-    }
-    window.sessionStorage.setItem(SEEN_KEY, '1')
+    introPlayed = true
+
+    const koreaGrid = buildKoreaGrid(76, 108)
+    const koreaCols = koreaGrid[0]?.length ?? 0
+    const koreaRows = koreaGrid.length
 
     const canvas = canvasRef.current
     if (!canvas) return
@@ -187,35 +236,23 @@ export default function ComsIntro() {
     }
 
     const drawKorea = (cx: number, cy: number, scale: number, alpha: number) => {
-      if (alpha <= 0) return
-      const cols = KOREA[0].length
-      const rows = KOREA.length
-      // Subdivide each bitmap cell into f×f small pixels (small-pixel look) but
-      // keep the whole silhouette on screen with low-variance, near-solid land so
-      // it reads as the peninsula, not static.
-      const f = 3
-      const px = Math.max(3, Math.round(Math.min(W, H) * 0.0095 * scale))
-      const gw = cols * f * px
-      const gh = rows * f * px
+      if (alpha <= 0 || koreaRows === 0) return
+      // One small pixel per grid cell — the grid is already high-res, so the
+      // silhouette is detailed and the pixels stay tiny.
+      const px = Math.max(2, Math.round(Math.min(W, H) * 0.006 * scale))
+      const gw = koreaCols * px
+      const gh = koreaRows * px
       const ox = cx - gw / 2
       const oy = cy - gh / 2
       ctx.globalAlpha = alpha
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          if (!KOREA[r][c]) continue
-          for (let sy = 0; sy < f; sy++) {
-            for (let sx = 0; sx < f; sx++) {
-              const shade = 0.86 + hash(c * f + sx + 1.3, r * f + sy + 2.7) * 0.14
-              const v = Math.round(212 * shade)
-              ctx.fillStyle = `rgb(${v},${v},${v})`
-              ctx.fillRect(
-                Math.round(ox + (c * f + sx) * px),
-                Math.round(oy + (r * f + sy) * px),
-                px,
-                px,
-              )
-            }
-          }
+      for (let r = 0; r < koreaRows; r++) {
+        const row = koreaGrid[r]
+        for (let c = 0; c < koreaCols; c++) {
+          if (!row[c]) continue
+          const shade = 0.88 + hash(c + 1.3, r + 2.7) * 0.12
+          const v = Math.round(214 * shade)
+          ctx.fillStyle = `rgb(${v},${v},${v})`
+          ctx.fillRect(Math.round(ox + c * px), Math.round(oy + r * px), px, px)
         }
       }
       ctx.globalAlpha = 1
