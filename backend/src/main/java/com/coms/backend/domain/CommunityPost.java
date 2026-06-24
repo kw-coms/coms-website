@@ -50,6 +50,12 @@ public class CommunityPost {
     @Column(nullable = false)
     private boolean edited = false;
 
+    @Column(nullable = false)
+    private boolean pinned = false;
+
+    @Column(name = "pinned_at")
+    private LocalDateTime pinnedAt;
+
     public void markEdited() {
         edited = true;
         updatedAt = LocalDateTime.now();
@@ -89,4 +95,14 @@ public class CommunityPost {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public boolean isEdited() { return edited; }
     public void setEdited(boolean edited) { this.edited = edited; }
+    public boolean isPinned() { return pinned; }
+    public void setPinned(boolean pinned) {
+        if (pinned && !this.pinned) {
+            this.pinnedAt = LocalDateTime.now();
+        } else if (!pinned) {
+            this.pinnedAt = null;
+        }
+        this.pinned = pinned;
+    }
+    public LocalDateTime getPinnedAt() { return pinnedAt; }
 }

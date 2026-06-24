@@ -69,6 +69,7 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/**").permitAll();
                 auth.requestMatchers(HttpMethod.POST, "/api/notices/*/vote").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/notices").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.PATCH, "/api/notices/*/pin").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.PUT, "/api/notices/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/notices/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.GET, "/api/club-activities", "/api/club-activities/**").authenticated();
@@ -100,6 +101,7 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.POST, "/api/files/*/vote").authenticated();
                 auth.requestMatchers(HttpMethod.DELETE, "/api/files/**").hasRole("ADMIN");
                 auth.requestMatchers("/api/files", "/api/files/**").authenticated();
+                auth.requestMatchers(HttpMethod.PATCH, "/api/community/posts/*/pin").hasRole("ADMIN");
                 auth.requestMatchers("/api/community/**").authenticated();
                 // Actuator: health and info public, everything else requires ADMIN
                 auth.requestMatchers("/actuator/health", "/actuator/info").permitAll();
