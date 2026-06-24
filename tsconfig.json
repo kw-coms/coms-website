@@ -7,8 +7,17 @@
     "jsx": "react-jsx",
     "allowJs": true,
     "checkJs": false,
+    // Incremental strictness: zero-cost strict sub-flags are on (real safety,
+    // no code churn). strictNullChecks (588) and noImplicitAny (829) are the
+    // remaining big lifts — ponytail: enable per-module as App.tsx is split,
+    // not in one 1400-edit sweep on a live site. noImplicitReturns skipped: its
+    // only hits were intentional useEffect conditional-cleanup returns (noise).
     "strict": false,
     "noImplicitAny": false,
+    "noImplicitThis": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "alwaysStrict": true,
     "noEmit": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
