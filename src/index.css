@@ -6044,3 +6044,236 @@ html.home-snap-scroll .home-snap-section {
 		animation: none;
 	}
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   DESIGN POLISH + MICRO-ANIMATION PASS
+   Subtle, Apple/Kakao-style motion. Every animation reuses the existing
+   --app-* tokens and the shared cubic-bezier(0.22, 1, 0.36, 1) easing, and
+   every motion is disabled under prefers-reduced-motion: reduce.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ---- 1. Card stagger utility ----------------------------------------- */
+/* Add `.coms-stagger` to a grid/list and set `--i` (the child's index) on
+   each card to cascade its reveal. Layers on top of any per-element
+   --reveal-delay; the page-enter wrapper keeps its opacity-only transition so
+   the sticky-pin fix is never affected (no transform added here). */
+.reveal-ready .coms-stagger > [data-reveal] {
+	transition-delay: calc(var(--reveal-delay, 0ms) + var(--i, 0) * 70ms);
+}
+
+/* ---- 2. Button press feedback ---------------------------------------- */
+/* A quick settle on press for the primary/secondary action buttons. The
+   theme-home variants already define their own :active depth press, so this
+   only targets the non-home routes to avoid double transforms. */
+.apple-route .apple-action-primary,
+.apple-route .apple-action-secondary {
+	transition:
+		background-color 160ms ease,
+		color 160ms ease,
+		transform 120ms cubic-bezier(0.22, 1, 0.36, 1),
+		box-shadow 120ms ease,
+		opacity 160ms ease;
+}
+.apple-route .apple-action-primary:active,
+.apple-route .apple-action-secondary:active {
+	transform: scale(0.97);
+}
+
+/* ---- 3. Input focus glow --------------------------------------------- */
+/* Soft outward accent ring, in addition to the existing inset ring color. */
+.theme-home input,
+.theme-home textarea,
+.theme-home select,
+.apple-route input,
+.apple-route textarea,
+.apple-route select {
+	transition: box-shadow 200ms ease, border-color 200ms ease;
+}
+.theme-home input:focus,
+.theme-home input:focus-visible,
+.theme-home textarea:focus,
+.theme-home textarea:focus-visible,
+.theme-home select:focus,
+.theme-home select:focus-visible,
+.apple-route input:focus,
+.apple-route input:focus-visible,
+.apple-route textarea:focus,
+.apple-route textarea:focus-visible,
+.apple-route select:focus,
+.apple-route select:focus-visible {
+	box-shadow: 0 0 0 4px color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+/* ---- 4. Table row hover accent --------------------------------------- */
+/* A left accent bar fades in on hover via an inset box-shadow. */
+.apple-table tbody tr {
+	transition: background-color 160ms ease, box-shadow 200ms ease;
+	box-shadow: inset 0 0 0 0 var(--app-accent);
+}
+.apple-table tbody tr:hover,
+.apple-table tbody tr:focus {
+	box-shadow: inset 3px 0 0 0 var(--app-accent);
+}
+
+/* ---- 5. Empty-state entrance ----------------------------------------- */
+.activity-empty-state,
+.calendar-empty-state {
+	animation: coms-empty-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes coms-empty-in {
+	0% {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	100% {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* ---- 6. Chevron rotate (CSS-toggled fallback) ------------------------ */
+/* Existing JS already toggles Tailwind's `rotate-180`; this gives a smooth
+   200ms turn and a class-based hook (.is-open) for any non-Tailwind chevron. */
+.coms-chevron {
+	transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.coms-chevron.is-open {
+	transform: rotate(180deg);
+}
+
+/* ---- 7. Skeleton wave (staggered by row) ----------------------------- */
+/* Each skeleton ripples slightly after the previous so the shimmer travels
+   down the list instead of pulsing all at once. Set --i on a row to tune, or
+   rely on the nth-child cascade below. */
+.skeleton::after {
+	animation-delay: calc(var(--i, 0) * 120ms);
+}
+.skeleton:nth-child(2)::after { animation-delay: 120ms; }
+.skeleton:nth-child(3)::after { animation-delay: 240ms; }
+.skeleton:nth-child(4)::after { animation-delay: 360ms; }
+.skeleton:nth-child(5)::after { animation-delay: 480ms; }
+.skeleton:nth-child(6)::after { animation-delay: 600ms; }
+
+/* ---- 8. Toast component ---------------------------------------------- */
+.coms-toast-host {
+	position: fixed;
+	top: calc(var(--apple-nav-height, 56px) + 0.75rem);
+	right: 1rem;
+	z-index: 120;
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+	pointer-events: none;
+	max-width: min(22rem, calc(100vw - 2rem));
+}
+.coms-toast {
+	pointer-events: auto;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	border-radius: 0.75rem;
+	border: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 92%, transparent);
+	color: var(--app-text);
+	padding: 0.7rem 0.85rem;
+	box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+	backdrop-filter: saturate(180%) blur(18px);
+	-webkit-backdrop-filter: saturate(180%) blur(18px);
+	font-size: 0.875rem;
+	font-weight: 600;
+	line-height: 1.45;
+	animation: coms-toast-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.coms-toast.is-leaving {
+	animation: coms-toast-out 240ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+.coms-toast-success {
+	border-color: color-mix(in srgb, var(--app-accent) 42%, var(--app-hairline));
+}
+.coms-toast-success::before,
+.coms-toast-error::before {
+	content: '';
+	flex: 0 0 auto;
+	width: 4px;
+	align-self: stretch;
+	border-radius: 9999px;
+	background: var(--app-accent);
+}
+.coms-toast-error::before {
+	background: #ff3b30;
+}
+.coms-toast-message {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.coms-toast-close {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.4rem;
+	height: 1.4rem;
+	border-radius: 9999px;
+	color: var(--app-muted);
+	font-size: 1.1rem;
+	line-height: 1;
+	transition: background-color 160ms ease, color 160ms ease;
+}
+.coms-toast-close:hover {
+	background: var(--app-surface-soft);
+	color: var(--app-text);
+}
+@keyframes coms-toast-in {
+	0% {
+		opacity: 0;
+		transform: translateX(16px);
+	}
+	100% {
+		opacity: 1;
+		transform: none;
+	}
+}
+@keyframes coms-toast-out {
+	0% {
+		opacity: 1;
+		transform: none;
+	}
+	100% {
+		opacity: 0;
+		transform: translateX(16px);
+	}
+}
+
+/* ---- Reduced-motion: disable / soften every polish animation --------- */
+@media (prefers-reduced-motion: reduce) {
+	.reveal-ready .coms-stagger > [data-reveal] {
+		transition-delay: 0ms;
+	}
+	.apple-route .apple-action-primary:active,
+	.apple-route .apple-action-secondary:active {
+		transform: none;
+	}
+	.apple-table tbody tr {
+		transition: background-color 160ms ease;
+	}
+	.activity-empty-state,
+	.calendar-empty-state {
+		animation: none;
+	}
+	.coms-chevron {
+		transition: none;
+	}
+	.skeleton::after,
+	.skeleton:nth-child(2)::after,
+	.skeleton:nth-child(3)::after,
+	.skeleton:nth-child(4)::after,
+	.skeleton:nth-child(5)::after,
+	.skeleton:nth-child(6)::after {
+		animation: none;
+		animation-delay: 0ms;
+	}
+	.coms-toast,
+	.coms-toast.is-leaving {
+		animation: none;
+	}
+}

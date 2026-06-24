@@ -10,6 +10,7 @@ import { BUILT_IN_FONTS, fontFamilyValue } from '../services/fontPreferences'
 import { listProfileMiniAppDocuments } from '../services/miniAppsApi'
 import { useAuth } from '../contexts/useAuth'
 import { getLogoAsset } from '../utils/logoAssets'
+import { showToast } from '../components/common/Toast'
 import { PASSWORD_PATTERN, PASSWORD_MESSAGE } from '../utils/passwordPolicy'
 const OTHER_INTEREST = '기타'
 const INTEREST_OPTIONS = ['보안', '웹', '앱']
@@ -212,6 +213,7 @@ export default function ChangePassword({ onBack }: any) {
       setInterestDraft(null)
       setOtherInterestDraft(null)
       setProfileMessage('회원 정보가 저장되었습니다.')
+      showToast({ message: '회원 정보가 저장되었습니다.', tone: 'success' })
     } catch (err) {
       setError(err.message || '회원 정보 저장 중 오류가 발생했습니다.')
     } finally {
