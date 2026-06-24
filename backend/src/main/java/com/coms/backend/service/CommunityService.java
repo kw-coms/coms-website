@@ -176,6 +176,37 @@ public class CommunityService {
                 .toList();
     }
 
+    /**
+     * Returns at most {@code limit} posts visible to the viewer, in the same order as {@link #list(String)},
+     * used by the mobile home preview. Bounds the query instead of loading every row and trimming in memory.
+     * A bounded window is fetched (a small multiple of {@code limit}) so the per-viewer visibility filter
+     * still has enough candidates to fill {@code limit} entries without scanning the whole table.
+     */
+    @Transactional(readOnly = true)
+    public List<CommunityPostResponse> listLimited(String studentId, int limit) {
+        Member member = findMember(studentId);
+        int window = Math.max(limit * 4, limit);
+        List<CommunityPost> posts = communityPostRepository
+                .findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc(
+                        org.springframework.data.domain.PageRequest.of(0, window))
+                .stream()
+                .filter(post -> canViewPost(member, post))
+                .limit(limit)
+                .toList();
+        Map<String, Member> authors = memberRepository.findByStudentIdIn(posts.stream()
+                        .map(CommunityPost::getAuthorStudentId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(Member::getStudentId, Function.identity()));
+        Map<Long, VoteSummary> stats = voteStats(posts);
+        Map<Long, Long> commentCounts = commentCounts(posts);
+        Map<Long, List<CommunityPostResponse.PollResult>> pollResults = pollResults(posts, member.getStudentId());
+        return posts.stream()
+                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, false))
+                .toList();
+    }
+
     public CommunityPostResponse get(String studentId, Long id) {
         Member member = findMember(studentId);
         CommunityPost post = communityPostRepository.findById(id)

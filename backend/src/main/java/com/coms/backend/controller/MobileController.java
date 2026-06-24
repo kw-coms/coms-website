@@ -59,9 +59,9 @@ public class MobileController {
     public ResponseEntity<MobileHomeResponse> home(Authentication authentication) {
         String studentId = authentication.getName();
         return ResponseEntity.ok(new MobileHomeResponse(
-                noticeService.list().stream().limit(5).toList(),
-                communityService.list(studentId).stream().limit(5).toList(),
-                archiveService.list().stream().limit(4).toList(),
+                noticeService.listLimited(5),
+                communityService.listLimited(studentId, 5),
+                archiveService.listLimited(4, null),
                 notificationService.summary(studentId),
                 notificationService.list(studentId)
         ));
