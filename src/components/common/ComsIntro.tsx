@@ -110,15 +110,25 @@ export default function ComsIntro() {
 
     const RAMP = " .,:;irs20A#@"
     const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace'
-    // Pull the live site theme tokens so the boot screen matches the home page
-    // (light ink-on-paper by default, auto-adapts in dark mode).
-    const cs = getComputedStyle(document.documentElement)
-    const theme = (name: string, fb: string) => cs.getPropertyValue(name).trim() || fb
-    const C_BG = theme('--app-surface-soft', '#f5f5f7')
-    const C_INK = theme('--app-text', '#1d1d1f')
-    const C_ACCENT = theme('--app-accent', '#0071e3')
-    const C_SOFT = theme('--app-accent-soft', '#e8f3ff')
-    const C_MUTED = theme('--app-muted', '#606063')
+    // Live site theme tokens so the boot screen matches the home page in BOTH
+    // light and dark. Read every frame (not once at mount): this child effect
+    // runs before the parent App effect that sets [data-theme-mode], so at mount
+    // the dark tokens aren't applied yet — by the first rAF they are, and this
+    // also picks up a live light/dark toggle.
+    let C_BG = '#f5f5f7'
+    let C_INK = '#1d1d1f'
+    let C_ACCENT = '#0071e3'
+    let C_SOFT = '#e8f3ff'
+    let C_MUTED = '#606063'
+    const readTheme = () => {
+      const cs = getComputedStyle(document.documentElement)
+      const t = (name: string, fb: string) => cs.getPropertyValue(name).trim() || fb
+      C_BG = t('--app-surface-soft', C_BG)
+      C_INK = t('--app-text', C_INK)
+      C_ACCENT = t('--app-accent', C_ACCENT)
+      C_SOFT = t('--app-accent-soft', C_SOFT)
+      C_MUTED = t('--app-muted', C_MUTED)
+    }
     let W = 0, H = 0, dpr = 1
     let cols = 0, rows = 0, cellW = 0, cellH = 0, fontPx = 0, asp = 1
     const resize = () => {
@@ -220,6 +230,7 @@ export default function ComsIntro() {
       if (!start) start = now
       const t = now - start
       if (t >= DONE && !finishing) finish()
+      readTheme()
 
       // paper background + a soft accent wash in the corner, like the home hero
       ctx.fillStyle = C_BG
