@@ -3,6 +3,8 @@ package com.coms.backend.service;
 import com.coms.backend.domain.RecruitApplication;
 import com.coms.backend.dto.RecruitApplicationAdminResponse;
 import com.coms.backend.dto.RecruitApplicationRequest;
+import com.coms.backend.dto.RecruitApplicationStatusLookupRequest;
+import com.coms.backend.dto.RecruitApplicationStatusResponse;
 import com.coms.backend.dto.RecruitApplicationStatusUpdateRequest;
 import com.coms.backend.repository.RecruitApplicationRepository;
 import org.slf4j.Logger;
@@ -29,6 +31,18 @@ public class RecruitApplicationService {
     private static final Logger log = LoggerFactory.getLogger(RecruitApplicationService.class);
     private static final int MAX_APPLICATIONS_PER_WINDOW = 5;
     private static final Duration RATE_LIMIT_WINDOW = Duration.ofMinutes(10);
+    // Status lookups are read-only but must be throttled to stop applicants (or scrapers)
+    // from brute-forcing studentId/name pairs to learn who applied.
+    private static final int MAX_STATUS_LOOKUPS_PER_WINDOW = 10;
+    private static final Duration STATUS_LOOKUP_WINDOW = Duration.ofMinutes(10);
+
+    private static final Map<RecruitApplication.Status, String> STATUS_LABELS = Map.of(
+            RecruitApplication.Status.RECEIVED, "지원 완료",
+            RecruitApplication.Status.REVIEWING, "검토 중",
+            RecruitApplication.Status.ACCEPTED, "합격",
+            RecruitApplication.Status.HOLD, "면접",
+            RecruitApplication.Status.REJECTED, "불합격"
+    );
 
     private final JavaMailSender mailSender;
     private final RecruitApplicationRepository recruitApplicationRepository;
@@ -37,6 +51,7 @@ public class RecruitApplicationService {
     private final String from;
     private final String to;
     private final Map<String, Deque<LocalDateTime>> submissionAttemptsByClient = new ConcurrentHashMap<>();
+    private final Map<String, Deque<LocalDateTime>> statusLookupAttemptsByClient = new ConcurrentHashMap<>();
 
     public RecruitApplicationService(JavaMailSender mailSender,
                                      RecruitApplicationRepository recruitApplicationRepository,
@@ -54,7 +69,8 @@ public class RecruitApplicationService {
 
     @Transactional
     public void sendApplication(RecruitApplicationRequest request, String clientIp) {
-        enforceRateLimit(clientIp);
+        enforceRateLimit(submissionAttemptsByClient, clientIp, MAX_APPLICATIONS_PER_WINDOW, RATE_LIMIT_WINDOW,
+                "지원서 제출 요청이 많습니다. 잠시 후 다시 시도해주세요.");
 
         // Persist + alert admins first so an application is never lost — even when
         // email is disabled or the SMTP server is unreachable. Email is best-effort.
@@ -79,6 +95,23 @@ public class RecruitApplicationService {
             // submission just because the notification email could not be delivered.
             log.warn("Recruit application saved but notification email failed for studentId={}", request.studentId(), e);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public RecruitApplicationStatusResponse lookupStatus(RecruitApplicationStatusLookupRequest request, String clientIp) {
+        enforceRateLimit(statusLookupAttemptsByClient, clientIp, MAX_STATUS_LOOKUPS_PER_WINDOW, STATUS_LOOKUP_WINDOW,
+                "지원 현황 조회 요청이 많습니다. 잠시 후 다시 시도해주세요.");
+
+        // Generic 404 on no match: never reveal whether the studentId or the name was the
+        // mismatch, so the endpoint cannot be used as an enumeration oracle.
+        return recruitApplicationRepository
+                .findFirstByStudentIdAndNameOrderBySubmittedAtDescIdDesc(trim(request.studentId()), trim(request.name()))
+                .map(application -> RecruitApplicationStatusResponse.from(application, statusLabel(application.getStatus())))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "일치하는 지원 내역을 찾을 수 없습니다."));
+    }
+
+    private static String statusLabel(RecruitApplication.Status status) {
+        return STATUS_LABELS.getOrDefault(status, status.name());
     }
 
     @Transactional(readOnly = true)
@@ -121,32 +154,33 @@ public class RecruitApplicationService {
         return application;
     }
 
-    private void enforceRateLimit(String clientIp) {
+    private void enforceRateLimit(Map<String, Deque<LocalDateTime>> attemptsByClient, String clientIp,
+                                  int maxPerWindow, Duration window, String message) {
         String key = clientIp == null || clientIp.isBlank() ? "unknown" : clientIp;
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime cutoff = now.minus(RATE_LIMIT_WINDOW);
-        Deque<LocalDateTime> attempts = submissionAttemptsByClient.computeIfAbsent(key, ignored -> new ArrayDeque<>());
+        LocalDateTime cutoff = now.minus(window);
+        Deque<LocalDateTime> attempts = attemptsByClient.computeIfAbsent(key, ignored -> new ArrayDeque<>());
 
         synchronized (attempts) {
             while (!attempts.isEmpty() && attempts.peekFirst().isBefore(cutoff)) {
                 attempts.removeFirst();
             }
-            if (attempts.size() >= MAX_APPLICATIONS_PER_WINDOW) {
-                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "지원서 제출 요청이 많습니다. 잠시 후 다시 시도해주세요.");
+            if (attempts.size() >= maxPerWindow) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, message);
             }
             attempts.addLast(now);
         }
 
-        evictExpiredClients(cutoff);
+        evictExpiredClients(attemptsByClient, cutoff);
     }
 
     // Purge clients whose entire window has expired so the in-memory map cannot leak memory.
-    private void evictExpiredClients(LocalDateTime cutoff) {
-        submissionAttemptsByClient.forEach((key, attempts) -> {
+    private void evictExpiredClients(Map<String, Deque<LocalDateTime>> attemptsByClient, LocalDateTime cutoff) {
+        attemptsByClient.forEach((key, attempts) -> {
             synchronized (attempts) {
                 LocalDateTime last = attempts.peekLast();
                 if (last == null || last.isBefore(cutoff)) {
-                    submissionAttemptsByClient.remove(key, attempts);
+                    attemptsByClient.remove(key, attempts);
                 }
             }
         });

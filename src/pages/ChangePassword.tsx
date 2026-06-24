@@ -8,6 +8,7 @@ import {
 import { listFonts } from '../services/fontApi'
 import { BUILT_IN_FONTS, fontFamilyValue } from '../services/fontPreferences'
 import { listProfileMiniAppDocuments } from '../services/miniAppsApi'
+import { getNotificationPreferences, updateNotificationPreferences } from '../services/notificationApi'
 import { useAuth } from '../contexts/useAuth'
 import { getLogoAsset } from '../utils/logoAssets'
 import { showToast } from '../components/common/Toast'
@@ -87,6 +88,109 @@ function InterestsSelector({ selected, onChange, otherText, onOtherChange, input
         </div>
       )}
     </div>
+  )
+}
+
+const NOTIFICATION_CATEGORIES = [
+  { key: 'commentOnPost', label: '내 글의 새 댓글', description: '내가 쓴 게시글에 댓글이 달리면 알려드립니다.' },
+  { key: 'replyOnComment', label: '내 댓글의 답글', description: '내가 쓴 댓글에 답글이 달리면 알려드립니다.' },
+  { key: 'noticeCreated', label: '새 공지사항', description: '새로운 공지가 등록되면 알려드립니다.' },
+  { key: 'externalInvite', label: '초대 알림', description: '다른 회원이 보낸 초대를 알려드립니다.' },
+  { key: 'communityPostRestored', label: '글 복원 안내', description: '내 글이 삭제 보관함에서 복원되면 알려드립니다.' },
+  { key: 'communityPostDeleted', label: '글 삭제 안내', description: '내 글이 관리자에 의해 삭제되면 알려드립니다.' },
+  { key: 'recruitApplication', label: '새 지원서 (관리자)', description: '새 지원서가 도착하면 알려드립니다.' },
+]
+
+function NotificationToggle({ checked, onChange, label, description, disabled }: any) {
+  return (
+    <label className="flex items-start justify-between gap-4 rounded-lg border border-black/8 bg-white/70 p-3">
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-[#1d1d1f]">{label}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-[var(--app-subtle)]">{description}</span>
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]/40 disabled:cursor-wait disabled:opacity-60 ${
+          checked ? 'bg-[#0071e3]' : 'bg-black/20'
+        }`}
+      >
+        <span
+          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+            checked ? 'translate-x-5' : 'translate-x-1'
+          }`}
+        />
+      </button>
+    </label>
+  )
+}
+
+function NotificationPreferencesSection({ cardClass, helperTextClass, primaryBtnClass }: any) {
+  const [prefs, setPrefs] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState('')
+
+  useEffect(() => {
+    let mounted = true
+    getNotificationPreferences()
+      .then((data) => { if (mounted) { setPrefs(data); setLoading(false) } })
+      .catch((err) => {
+        if (mounted) { setLoadError(err?.message || '알림 설정을 불러오지 못했습니다.'); setLoading(false) }
+      })
+    return () => { mounted = false }
+  }, [])
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!prefs) return
+    setSaving(true)
+    try {
+      const updated = await updateNotificationPreferences(prefs)
+      setPrefs(updated)
+      showToast({ message: '알림 설정이 저장되었습니다.', tone: 'success' })
+    } catch (err) {
+      showToast({ message: err?.message || '알림 설정 저장 중 오류가 발생했습니다.', tone: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className={`${cardClass} mt-4 space-y-4`}>
+      <div>
+        <h3 className="text-base font-bold">알림 설정</h3>
+        <p className={helperTextClass}>받고 싶은 알림 종류를 선택할 수 있습니다. 끈 항목은 더 이상 받지 않습니다.</p>
+      </div>
+
+      {loading && <p className={helperTextClass}>알림 설정을 불러오는 중...</p>}
+      {loadError && <p className="text-sm text-red-500">{loadError}</p>}
+
+      {!loading && !loadError && prefs && (
+        <>
+          <div className="space-y-2">
+            {NOTIFICATION_CATEGORIES.map((category) => (
+              <NotificationToggle
+                key={category.key}
+                label={category.label}
+                description={category.description}
+                checked={Boolean(prefs[category.key])}
+                disabled={saving}
+                onChange={(next) => setPrefs((prev) => ({ ...prev, [category.key]: next }))}
+              />
+            ))}
+          </div>
+
+          <button type="submit" className={primaryBtnClass} disabled={saving}>
+            {saving ? '저장 중...' : '알림 설정 저장'}
+          </button>
+        </>
+      )}
+    </form>
   )
 }
 
@@ -445,6 +549,12 @@ export default function ChangePassword({ onBack }: any) {
               })}
             </div>
           </div>
+
+          <NotificationPreferencesSection
+            cardClass={cardClass}
+            helperTextClass={helperTextClass}
+            primaryBtnClass={primaryBtnClass}
+          />
 
           <div className={`${cardClass} mt-4`}>
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

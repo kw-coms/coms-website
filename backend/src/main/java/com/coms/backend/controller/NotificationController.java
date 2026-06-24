@@ -1,6 +1,8 @@
 package com.coms.backend.controller;
 
 import com.coms.backend.dto.MemberExternalInviteRequest;
+import com.coms.backend.dto.NotificationPreferencesRequest;
+import com.coms.backend.dto.NotificationPreferencesResponse;
 import com.coms.backend.dto.NotificationResponse;
 import com.coms.backend.dto.NotificationSummaryResponse;
 import com.coms.backend.service.NotificationService;
@@ -43,6 +45,17 @@ public class NotificationController {
     public ResponseEntity<Void> markAllRead(Authentication authentication) {
         notificationService.markAllRead(authentication.getName());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/preferences")
+    public ResponseEntity<NotificationPreferencesResponse> getPreferences(Authentication authentication) {
+        return ResponseEntity.ok(notificationService.getPreferences(authentication.getName()));
+    }
+
+    @PutMapping("/preferences")
+    public ResponseEntity<NotificationPreferencesResponse> updatePreferences(Authentication authentication,
+                                                                             @Valid @RequestBody NotificationPreferencesRequest request) {
+        return ResponseEntity.ok(notificationService.updatePreferences(authentication.getName(), request));
     }
 
     @PostMapping("/external-invite")

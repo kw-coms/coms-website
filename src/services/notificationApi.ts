@@ -15,3 +15,14 @@ export async function markNotificationRead(id) {
 export async function markAllNotificationsRead() {
   return requestNoContent('/api/notifications/read-all', { method: 'PATCH' })
 }
+
+export async function getNotificationPreferences() {
+  return request('/api/notifications/preferences')
+}
+
+export async function updateNotificationPreferences(preferences) {
+  return request('/api/notifications/preferences', {
+    method: 'PUT',
+    body: JSON.stringify(preferences),
+  })
+}
