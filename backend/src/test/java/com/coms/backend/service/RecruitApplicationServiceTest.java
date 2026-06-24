@@ -1,6 +1,8 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.RecruitApplication;
+import com.coms.backend.dto.RecruitApplicationStatusLookupRequest;
+import com.coms.backend.dto.RecruitApplicationStatusResponse;
 import com.coms.backend.dto.RecruitApplicationStatusUpdateRequest;
 import com.coms.backend.dto.RecruitApplicationRequest;
 import com.coms.backend.repository.RecruitApplicationRepository;
@@ -185,6 +187,71 @@ class RecruitApplicationServiceTest {
         ))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void lookupStatusReturnsFriendlyLabelForMatchingApplicant() {
+        RecruitApplication application = new RecruitApplication();
+        application.setStudentId("2026123456");
+        application.setName("홍길동");
+        application.setStatus(RecruitApplication.Status.REVIEWING);
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.findFirstByStudentIdAndNameOrderBySubmittedAtDescIdDesc("2026123456", "홍길동"))
+                .thenReturn(Optional.of(application));
+        RecruitApplicationService service = newService(repository);
+
+        RecruitApplicationStatusResponse response = service.lookupStatus(
+                new RecruitApplicationStatusLookupRequest("홍길동", "2026123456"), "203.0.113.10");
+
+        assertThat(response.status()).isEqualTo("REVIEWING");
+        assertThat(response.statusLabel()).isEqualTo("검토 중");
+        assertThat(response.submittedAt()).isNotNull();
+    }
+
+    @Test
+    void lookupStatusReturnsGenericNotFoundWhenNoMatch() {
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.findFirstByStudentIdAndNameOrderBySubmittedAtDescIdDesc(any(), any()))
+                .thenReturn(Optional.empty());
+        RecruitApplicationService service = newService(repository);
+
+        assertThatThrownBy(() -> service.lookupStatus(
+                new RecruitApplicationStatusLookupRequest("없는사람", "9999999999"), "203.0.113.11"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void lookupStatusRateLimitsRepeatedLookupsFromSameClient() {
+        RecruitApplication application = new RecruitApplication();
+        application.setStudentId("2026123456");
+        application.setName("홍길동");
+        application.setStatus(RecruitApplication.Status.RECEIVED);
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.findFirstByStudentIdAndNameOrderBySubmittedAtDescIdDesc(any(), any()))
+                .thenReturn(Optional.of(application));
+        RecruitApplicationService service = newService(repository);
+        RecruitApplicationStatusLookupRequest lookup =
+                new RecruitApplicationStatusLookupRequest("홍길동", "2026123456");
+
+        for (int i = 0; i < 10; i++) {
+            service.lookupStatus(lookup, "203.0.113.12");
+        }
+
+        assertThatThrownBy(() -> service.lookupStatus(lookup, "203.0.113.12"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+    }
+
+    private static RecruitApplicationService newService(RecruitApplicationRepository repository) {
+        return new RecruitApplicationService(
+                mock(JavaMailSender.class),
+                repository,
+                mock(NotificationService.class),
+                true,
+                "no-reply@coms.kw.ac.kr",
+                "recruit@coms.kw.ac.kr"
+        );
     }
 
     private static RecruitApplicationRequest sampleRequest() {

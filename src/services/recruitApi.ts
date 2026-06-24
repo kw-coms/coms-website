@@ -6,3 +6,10 @@ export async function submitRecruitApplication(payload) {
     body: JSON.stringify(payload),
   })
 }
+
+export async function lookupRecruitStatus(payload) {
+  return request('/api/recruit/status', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
