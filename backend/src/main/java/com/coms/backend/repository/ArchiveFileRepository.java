@@ -1,6 +1,7 @@
 package com.coms.backend.repository;
 
 import com.coms.backend.domain.ArchiveFile;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -10,6 +11,8 @@ import java.util.List;
 
 public interface ArchiveFileRepository extends JpaRepository<ArchiveFile, Long> {
     List<ArchiveFile> findAllByOrderByUploadedAtDesc();
+
+    List<ArchiveFile> findAllByOrderByUploadedAtDesc(Pageable pageable);
 
     @Modifying
     @Query("UPDATE ArchiveFile a SET a.viewCount = a.viewCount + 1 WHERE a.id = :id")

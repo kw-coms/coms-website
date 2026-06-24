@@ -54,6 +54,18 @@ public class NoticeService {
         return notices.stream().map(notice -> toResponse(notice, stats, studentId)).toList();
     }
 
+    /**
+     * Returns at most {@code limit} notices in the same order as {@link #list()}, pushing the cap into
+     * the query instead of loading every row and trimming in memory. Used by the mobile home preview.
+     */
+    @Transactional(readOnly = true)
+    public List<NoticeResponse> listLimited(int limit) {
+        List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc(
+                org.springframework.data.domain.PageRequest.of(0, limit));
+        Map<Long, VoteSummary> stats = voteStats(notices);
+        return notices.stream().map(notice -> toResponse(notice, stats, null)).toList();
+    }
+
     @Transactional(readOnly = true)
     public NoticeResponse get(Long id) {
         return toResponse(getEntity(id), Map.of(), null);

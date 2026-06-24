@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import com.coms.backend.web.ListPagination;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -39,8 +40,10 @@ public class ClubEventController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ClubEventResponse>> list(Authentication authentication) {
-        return ResponseEntity.ok(clubEventService.list(authentication.getName()));
+    public ResponseEntity<List<ClubEventResponse>> list(Authentication authentication,
+                                                        @RequestParam(required = false) Integer page,
+                                                        @RequestParam(required = false) Integer size) {
+        return ListPagination.paginate(clubEventService.list(authentication.getName()), page, size);
     }
 
     @GetMapping("/{id}")
