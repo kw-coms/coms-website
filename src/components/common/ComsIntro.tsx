@@ -83,13 +83,31 @@ function buildKoreaGrid(size: number): boolean[][] {
 
 const FADE = 420
 
+// True when the user prefers reduced motion — the intro (canvas animation) is
+// skipped entirely in that case so no motion plays and no canvas work runs.
+function prefersReducedMotion() {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+}
+
 export default function ComsIntro() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const [gone, setGone] = useState(false)
+  // Skip the intro outright under reduced-motion: start `gone` so the overlay
+  // never renders and the mount effect bails before any canvas work. This is
+  // gated ONLY on the media query, never on the once-per-load flag, so a normal
+  // load still plays.
+  const [gone, setGone] = useState(prefersReducedMotion)
   const [fadingOut, setFadingOut] = useState(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (prefersReducedMotion()) {
+      setGone(true)
+      return
+    }
     if (introPlayed) {
       setGone(true)
       return
