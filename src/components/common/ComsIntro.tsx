@@ -52,44 +52,74 @@ function vnoise(x: number, y: number) {
 }
 
 // Korean peninsula as a normalized outline (x,y in 0..1, north at top, west at
-// left), traced to approximate the real coastline: NW border, the wide northern
-// body, a fairly straight east coast, the jagged south-west, and the southern
-// tip. Filled + sampled to a high-res grid at runtime so it reads as an accurate
-// pixel silhouette instead of a hand-typed bitmap. ponytail: hand-traced, not
-// survey-grade — good enough to read unmistakably as Korea.
+// left), traced clockwise from the NW border to capture the signature shape:
+// a slanted northern border, a smooth convex EAST coast with the Gangwon bulge,
+// the jagged Busan/Yeosu/Goheung south coast down to the Haenam tip, and a deeply
+// indented WEST coast (Jeolla bulge, Taean peninsula, Gyeonggi/Incheon bays).
+// Filled + sampled to a high-res grid at runtime so the coastline detail reads.
+// ponytail: hand-traced, not survey-grade — reads clearly as Korea.
 const KOREA_OUTLINE: Array<[number, number]> = [
-  [0.34, 0.04], // NW border (toward the mainland)
-  [0.46, 0.02],
-  [0.58, 0.05],
-  [0.62, 0.12], // NE shoulder
-  [0.7, 0.16],
-  [0.78, 0.2],
-  [0.74, 0.27],
-  [0.8, 0.33], // east bulge
-  [0.76, 0.42],
-  [0.78, 0.5],
-  [0.72, 0.58],
-  [0.74, 0.66], // SE (Busan side)
-  [0.66, 0.72],
-  [0.6, 0.8],
-  [0.52, 0.84],
-  [0.46, 0.9], // southern tip
-  [0.42, 0.86],
-  [0.38, 0.8],
-  [0.32, 0.82], // SW coast
-  [0.34, 0.74],
-  [0.27, 0.7],
-  [0.31, 0.62],
-  [0.24, 0.56],
-  [0.3, 0.5],
-  [0.22, 0.44],
-  [0.27, 0.37],
-  [0.2, 0.31],
-  [0.26, 0.24],
-  [0.21, 0.18],
-  [0.27, 0.1],
+  // north border (NW low → NE high, clean slant)
+  [0.33, 0.155],
+  [0.41, 0.115],
+  [0.49, 0.085],
+  [0.56, 0.062],
+  [0.605, 0.055],
+  [0.632, 0.082], // NE corner (Tumen)
+  // east coast (fairly straight, single Gangwon bulge — keeps the body slim)
+  [0.642, 0.15],
+  [0.655, 0.22],
+  [0.672, 0.28], // easternmost (Gangwon)
+  [0.662, 0.35],
+  [0.652, 0.42],
+  [0.643, 0.49],
+  [0.636, 0.55],
+  [0.626, 0.61],
+  [0.612, 0.665],
+  [0.596, 0.71],
+  [0.582, 0.742], // Busan (SE corner)
+  // south coast (jagged peninsulas, west-bound)
+  [0.55, 0.758],
+  [0.566, 0.78],
+  [0.527, 0.772],
+  [0.534, 0.808], // Yeosu peninsula
+  [0.5, 0.785],
+  [0.482, 0.812],
+  [0.49, 0.842], // Goheung peninsula
+  [0.452, 0.815],
+  [0.43, 0.84],
+  [0.416, 0.882], // Haenam — southern tip
+  [0.39, 0.842],
+  [0.376, 0.815],
+  // west coast (deeply indented bays, north-bound)
+  [0.35, 0.8], // SW Jeolla (wide)
+  [0.322, 0.772],
+  [0.348, 0.74],
+  [0.3, 0.722],
+  [0.332, 0.69],
+  [0.288, 0.662],
+  [0.322, 0.63],
+  [0.282, 0.598],
+  [0.314, 0.562],
+  [0.264, 0.535], // Taean peninsula (westernmost mid)
+  [0.246, 0.5],
+  [0.292, 0.482],
+  [0.256, 0.448], // Gyeonggi bay
+  [0.296, 0.42], // Incheon
+  [0.266, 0.385],
+  [0.292, 0.345],
+  [0.258, 0.3],
+  [0.288, 0.25],
+  [0.264, 0.2],
+  [0.295, 0.165],
 ]
-const JEJU: [number, number, number] = [0.4, 0.97, 0.045] // cx, cy, radius (island)
+// Islands: [cx, cy, radius] in the same normalized space.
+const ISLANDS: Array<[number, number, number]> = [
+  [0.392, 0.95, 0.05], // Jeju
+  [0.556, 0.772, 0.015], // Geoje
+  [0.274, 0.43, 0.012], // Ganghwa
+  [0.78, 0.4, 0.01], // Ulleungdo
+]
 
 // Rasterize the outline to a boolean grid of the given resolution (once).
 function buildKoreaGrid(gw: number, gh: number): boolean[][] {
@@ -108,10 +138,12 @@ function buildKoreaGrid(gw: number, gh: number): boolean[][] {
   })
   c.closePath()
   c.fill()
-  // Jeju as a separate filled circle
-  c.beginPath()
-  c.arc(JEJU[0] * gw, JEJU[1] * gh, JEJU[2] * gw, 0, Math.PI * 2)
-  c.fill()
+  // Separate islands
+  for (const [ix, iy, ir] of ISLANDS) {
+    c.beginPath()
+    c.arc(ix * gw, iy * gh, ir * gw, 0, Math.PI * 2)
+    c.fill()
+  }
   const data = c.getImageData(0, 0, gw, gh).data
   const grid: boolean[][] = []
   for (let r = 0; r < gh; r++) {
@@ -138,7 +170,7 @@ export default function ComsIntro() {
     }
     introPlayed = true
 
-    const koreaGrid = buildKoreaGrid(76, 108)
+    const koreaGrid = buildKoreaGrid(132, 188)
     const koreaCols = koreaGrid[0]?.length ?? 0
     const koreaRows = koreaGrid.length
 
@@ -258,7 +290,7 @@ export default function ComsIntro() {
       if (alpha <= 0 || koreaRows === 0) return
       // One small pixel per grid cell — the grid is already high-res, so the
       // silhouette is detailed and the pixels stay tiny.
-      const px = Math.max(2, Math.round(Math.min(W, H) * 0.006 * scale))
+      const px = Math.max(2, Math.round(Math.min(W, H) * 0.0038 * scale))
       const gw = koreaCols * px
       const gh = koreaRows * px
       const ox = cx - gw / 2
