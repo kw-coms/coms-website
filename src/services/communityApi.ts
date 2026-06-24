@@ -8,6 +8,10 @@ export async function getCommunityPost(id) {
   return request(`/api/community/posts/${id}`)
 }
 
+export async function getMemberReputation(studentId) {
+  return request(`/api/community/members/${encodeURIComponent(studentId)}/reputation`)
+}
+
 export async function createCommunityPost(body, image = null) {
   if (image) {
     const form = new FormData()

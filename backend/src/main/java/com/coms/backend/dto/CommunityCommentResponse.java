@@ -8,6 +8,8 @@ public record CommunityCommentResponse(
         Long parentCommentId,
         int depth,
         String authorName,
+        String authorTier,
+        String authorTierLabel,
         String content,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,

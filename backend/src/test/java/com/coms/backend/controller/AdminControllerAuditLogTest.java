@@ -1,5 +1,6 @@
 package com.coms.backend.controller;
 
+import com.coms.backend.service.AdminAnalyticsService;
 import com.coms.backend.service.AdminService;
 import com.coms.backend.service.AuditLogService;
 import com.coms.backend.service.BannedStudentService;
@@ -21,6 +22,7 @@ import static org.mockito.Mockito.when;
 class AdminControllerAuditLogTest {
 
     private final AdminService adminService = mock(AdminService.class);
+    private final AdminAnalyticsService adminAnalyticsService = mock(AdminAnalyticsService.class);
     private final EligibleMemberService eligibleMemberService = mock(EligibleMemberService.class);
     private final BannedStudentService bannedStudentService = mock(BannedStudentService.class);
     private final AuditLogService auditLogService = mock(AuditLogService.class);
@@ -29,6 +31,7 @@ class AdminControllerAuditLogTest {
     private final CommunityDeletionArchiveService communityDeletionArchiveService = mock(CommunityDeletionArchiveService.class);
     private final AdminController controller = new AdminController(
             adminService,
+            adminAnalyticsService,
             eligibleMemberService,
             bannedStudentService,
             auditLogService,
