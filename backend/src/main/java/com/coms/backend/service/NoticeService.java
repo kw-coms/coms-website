@@ -49,7 +49,7 @@ public class NoticeService {
 
     @Transactional(readOnly = true)
     public List<NoticeResponse> list(String studentId) {
-        List<Notice> notices = repo.findAllByOrderByPinnedDescCreatedAtDesc();
+        List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc();
         Map<Long, VoteSummary> stats = voteStats(notices);
         return notices.stream().map(notice -> toResponse(notice, stats, studentId)).toList();
     }
@@ -100,6 +100,13 @@ public class NoticeService {
         Notice notice = getEntity(id);
         applyRequest(notice, request, authorName(authorStudentId));
         auditLogService.record(authorStudentId, "NOTICE_UPDATE", "NOTICE", String.valueOf(notice.getId()), "title=" + notice.getTitle(), null);
+        return toResponse(notice, voteStats(List.of(notice)), authorStudentId);
+    }
+
+    public NoticeResponse setPinned(String authorStudentId, Long id, boolean pinned) {
+        Notice notice = getEntity(id);
+        notice.setPinned(pinned);
+        auditLogService.record(authorStudentId, "NOTICE_PIN", "NOTICE", String.valueOf(notice.getId()), "pinned=" + pinned, null);
         return toResponse(notice, voteStats(List.of(notice)), authorStudentId);
     }
 

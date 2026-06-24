@@ -8,6 +8,7 @@ import com.coms.backend.dto.DeletedCommunityPostAppealResponse;
 import com.coms.backend.dto.DeletedCommunityPostResponse;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
+import com.coms.backend.dto.PinRequest;
 import com.coms.backend.dto.CommunityPollVoteRequest;
 import com.coms.backend.dto.CommunityVoteRequest;
 import com.coms.backend.dto.LinkPreviewResponse;
@@ -205,6 +206,13 @@ public class CommunityController {
                 image,
                 resolveClientIp(servletRequest)
         ));
+    }
+
+    @PatchMapping("/{id}/pin")
+    public ResponseEntity<CommunityPostResponse> pin(Authentication authentication,
+                                                     @PathVariable Long id,
+                                                     @Valid @RequestBody PinRequest request) {
+        return ResponseEntity.ok(communityService.setPinned(authentication.getName(), id, request.pinned()));
     }
 
     @PostMapping("/{id}/vote")

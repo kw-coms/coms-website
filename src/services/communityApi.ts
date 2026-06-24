@@ -49,6 +49,13 @@ export async function updateCommunityPost(id, body, image = null) {
   })
 }
 
+export async function pinCommunityPost(id, pinned) {
+  return request(`/api/community/posts/${id}/pin`, {
+    method: 'PATCH',
+    body: JSON.stringify({ pinned }),
+  })
+}
+
 export async function voteCommunityPost(id, value) {
   return request(`/api/community/posts/${id}/vote`, {
     method: 'POST',
