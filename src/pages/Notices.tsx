@@ -9,6 +9,7 @@ import { NoticeCategory } from '../contract/enums'
 import { enumLabels } from '../contract/labels'
 import { useNotices } from './useNotices'
 import { useScrollReveal } from '../hooks/useScrollReveal'
+import { useVisibleCount } from '../hooks/useVisibleCount'
 import RichBodyEditor from '../components/richEditor/RichBodyEditor'
 import { URL_ONLY_RICH_FEATURES } from '../components/richEditor/richBodyFeatures'
 import { renderRichBody, richBodyToPlainText as noticeContentSearchText } from '../components/richEditor/renderRichBody'
@@ -186,6 +187,12 @@ export default function Notices() {
       noticeCategoryMeta(notice.category || 'GENERAL').label.toLowerCase().includes(q)
     )
   }, [activeCategory, notices, searchQuery])
+  const { visible, canLoadMore, loadMore, total } = useVisibleCount(
+    filteredNotices.length,
+    20,
+    `${activeCategory}|${searchQuery}`,
+  )
+  const visibleNotices = filteredNotices.slice(0, visible)
   const featuredNotices = useMemo(
     () => NOTICE_CATEGORY_OPTIONS
       .map((category) => ({
@@ -421,7 +428,7 @@ export default function Notices() {
               <>
                 {/* 모바일 카드 목록 */}
                 <div className="mx-4 mb-4 hidden grid-cols-1 gap-2.5 max-md:grid sm:mx-6">
-                  {filteredNotices.map((notice, index) => {
+                  {visibleNotices.map((notice, index) => {
                     const open = () => openNotice(notice)
                     const meta = noticeCategoryMeta(notice.category || 'GENERAL')
                     return (
@@ -459,7 +466,7 @@ export default function Notices() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-black/10">
-                      {filteredNotices.map((notice, index) => {
+                      {visibleNotices.map((notice, index) => {
                         const open = () => openNotice(notice)
                         const meta = noticeCategoryMeta(notice.category || 'GENERAL')
                         return (
@@ -487,6 +494,21 @@ export default function Notices() {
                       })}
                     </tbody>
                   </table>
+                </div>
+
+                <div className="flex flex-col items-center gap-2 px-4 pb-5 sm:px-6">
+                  <span className="text-xs font-semibold text-[var(--app-subtle)]">
+                    전체 {total}개 중 {visibleNotices.length}개 표시
+                  </span>
+                  {canLoadMore && (
+                    <button
+                      type="button"
+                      onClick={loadMore}
+                      className="apple-action-secondary inline-flex min-h-10 items-center justify-center px-6 text-sm"
+                    >
+                      더 보기
+                    </button>
+                  )}
                 </div>
               </>
             )}
