@@ -29,7 +29,8 @@ public record CommunityPostResponse(
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         boolean edited,
-        boolean editable
+        boolean editable,
+        boolean pinned
 ) {
     public record MediaInfo(Long id, String url, String originalName) {}
     public record PollResult(String pollId, List<Long> optionCounts, Integer myOption, LocalDateTime closesAt, LocalDateTime closedAt, boolean closed) {}

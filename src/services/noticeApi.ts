@@ -16,6 +16,13 @@ export async function updateNotice(id, body) {
   return request(`/api/notices/${id}`, { method: 'PUT', body: JSON.stringify(body) })
 }
 
+export async function pinNotice(id, pinned) {
+  return request(`/api/notices/${id}/pin`, {
+    method: 'PATCH',
+    body: JSON.stringify({ pinned }),
+  })
+}
+
 export async function voteNotice(id, value) {
   return request(`/api/notices/${id}/vote`, {
     method: 'POST',

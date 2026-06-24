@@ -1,6 +1,8 @@
 import {
   ArrowLeft,
   Pencil,
+  Pin,
+  PinOff,
   ThumbsDown,
   ThumbsUp,
   Trash2,
@@ -48,6 +50,9 @@ export default function CommunityDetailView({
   onBackToList,
   onEdit,
   onDelete,
+  isAdmin,
+  pinning,
+  onPin,
 }: any) {
   const currentPostConcept = currentPost ? isConceptPost(currentPost) : false
 
@@ -65,6 +70,7 @@ export default function CommunityDetailView({
         <article className="m-0 overflow-hidden bg-[var(--app-surface)] sm:m-5 sm:rounded-lg sm:border sm:border-[var(--app-hairline)]">
           <div className="border-b border-[var(--app-hairline)] px-4 py-4 sm:px-5">
             <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[#3b4890]">
+              {currentPost.pinned && <span className="rounded bg-[#fff1d6] px-1.5 py-0.5 text-[10px] font-black text-[#9a6a00]">고정</span>}
               <span>{categoryLabel(currentPost.category || 'GENERAL')}</span>
               {currentPostConcept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
             </div>
@@ -101,6 +107,12 @@ export default function CommunityDetailView({
             <button type="button" onClick={onBackToList} className="min-h-11 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
               목록
             </button>
+            {isAdmin && (
+              <button type="button" onClick={onPin} disabled={pinning} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold disabled:opacity-50 sm:min-h-0">
+                {currentPost.pinned ? <PinOff size={14} /> : <Pin size={14} />}
+                {currentPost.pinned ? '고정 해제' : '고정'}
+              </button>
+            )}
             {currentPost.editable && (
               <div className="grid grid-cols-2 gap-2 sm:flex">
                 <button type="button" onClick={onEdit} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">

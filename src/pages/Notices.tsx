@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify'
-import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Search, Sparkles, ThumbsUp, Trash2, UsersRound } from 'lucide-react'
-import { getNotice, createNotice, updateNotice, deleteNotice, voteNotice } from '../services/noticeApi'
+import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Pin, PinOff, Search, Sparkles, ThumbsUp, Trash2, UsersRound } from 'lucide-react'
+import { getNotice, createNotice, updateNotice, deleteNotice, voteNotice, pinNotice } from '../services/noticeApi'
+import { showToast } from '../components/common/Toast'
 import { fetchLinkPreview, searchYoutubeVideos } from '../services/communityApi'
 import { useAuth } from '../contexts/useAuth'
 import { NoticeCategory } from '../contract/enums'
@@ -256,6 +257,24 @@ export default function Notices() {
     }
   }
 
+  const [pinning, setPinning] = useState(false)
+  const handlePinSelected = async () => {
+    if (!selectedNotice || pinning) return
+    setPinning(true)
+    const nextPinned = !selectedNotice.pinned
+    try {
+      const updated = await pinNotice(selectedNotice.id, nextPinned)
+      setSelectedNotice(updated)
+      setNotices((prev) => prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
+      refreshNotices()
+      showToast({ message: nextPinned ? '공지를 고정했습니다.' : '고정을 해제했습니다.', tone: 'success' })
+    } catch (err) {
+      showToast({ message: err.message || '고정 처리 중 오류가 발생했습니다.', tone: 'error' })
+    } finally {
+      setPinning(false)
+    }
+  }
+
   const [voting, setVoting] = useState(false)
   const handleNoticeVote = async () => {
     if (!selectedNotice || voting) return
@@ -439,6 +458,9 @@ export default function Notices() {
                         className="notice-mobile-card apple-soft-panel text-left transition hover:bg-[var(--app-surface-soft)] focus:bg-[var(--app-surface-soft)] focus:outline-none"
                       >
                         <div className="flex min-w-0 items-center gap-2">
+                          {notice.pinned && (
+                            <span className="rounded-full bg-[#fff1d6] px-2 py-0.5 text-[10px] font-black text-[#9a6a00]">고정</span>
+                          )}
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${meta.badgeClass}`}>
                             {meta.label}
                           </span>
@@ -483,8 +505,9 @@ export default function Notices() {
                               <span className={`inline-flex rounded-full px-2.5 py-1 ${meta.badgeClass}`}>{meta.shortLabel}</span>
                             </td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5">
-                              <span className="block max-w-[440px] truncate text-left font-semibold text-[var(--app-text)]">
-                                {notice.title}
+                              <span className="flex max-w-[440px] items-center gap-1.5 text-left font-semibold text-[var(--app-text)]">
+                                {notice.pinned && <span className="shrink-0 rounded bg-[#fff1d6] px-1.5 py-0.5 text-[10px] font-black text-[#9a6a00]">고정</span>}
+                                <span className="min-w-0 truncate">{notice.title}</span>
                               </span>
                             </td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs">{notice.author}</td>
@@ -578,6 +601,10 @@ export default function Notices() {
               </button>
               {isAdmin && (
                 <div className="grid grid-cols-2 gap-2 sm:flex">
+                  <button type="button" onClick={handlePinSelected} disabled={pinning} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold disabled:opacity-50 sm:min-h-0">
+                    {selectedNotice.pinned ? <PinOff size={14} /> : <Pin size={14} />}
+                    {selectedNotice.pinned ? '고정 해제' : '고정'}
+                  </button>
                   <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
                     <Pencil size={14} />
                     수정

@@ -159,7 +159,7 @@ public class CommunityService {
     @Transactional(readOnly = true)
     public List<CommunityPostResponse> list(String studentId) {
         Member member = findMember(studentId);
-        List<CommunityPost> posts = communityPostRepository.findAllByOrderByCreatedAtDesc().stream()
+        List<CommunityPost> posts = communityPostRepository.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc().stream()
                 .filter(post -> canViewPost(member, post))
                 .toList();
         Map<String, Member> authors = memberRepository.findByStudentIdIn(posts.stream()
@@ -239,6 +239,21 @@ public class CommunityService {
         }
         CommunityPost saved = communityPostRepository.save(post);
         auditLogService.record(member.getStudentId(), "COMMUNITY_POST_UPDATE", "COMMUNITY_POST", String.valueOf(saved.getId()), safeTitle(saved.getTitle()), null);
+        return toResponse(saved, member,
+                memberRepository.findByStudentId(saved.getAuthorStudentId()).orElse(null),
+                voteStats(List.of(saved)), commentCounts(List.of(saved)), pollResults(List.of(saved), member.getStudentId()), true);
+    }
+
+    public CommunityPostResponse setPinned(String studentId, Long id, boolean pinned) {
+        Member member = findMember(studentId);
+        if (member.getRole() != Member.Role.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        CommunityPost post = communityPostRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        post.setPinned(pinned);
+        CommunityPost saved = communityPostRepository.save(post);
+        auditLogService.record(member.getStudentId(), "COMMUNITY_POST_PIN", "COMMUNITY_POST", String.valueOf(saved.getId()), "pinned=" + pinned, null);
         return toResponse(saved, member,
                 memberRepository.findByStudentId(saved.getAuthorStudentId()).orElse(null),
                 voteStats(List.of(saved)), commentCounts(List.of(saved)), pollResults(List.of(saved), member.getStudentId()), true);
@@ -754,7 +769,8 @@ public class CommunityService {
                 post.getCreatedAt(),
                 post.getUpdatedAt(),
                 post.isEdited(),
-                editable
+                editable,
+                post.isPinned()
         );
     }
 

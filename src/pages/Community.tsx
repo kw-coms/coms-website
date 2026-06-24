@@ -11,9 +11,11 @@ import {
   getCommunityPost,
   listMyDeletedCommunityPosts,
   listComments,
+  pinCommunityPost,
   voteCommunityPost,
   voteCommunityPoll,
 } from '../services/communityApi'
+import { showToast } from '../components/common/Toast'
 import { useAuth } from '../contexts/useAuth'
 import {
   filterAndSortCommunityPosts,
@@ -268,6 +270,22 @@ export default function Community({ onBack }: any) {
     }
   }
 
+  const [pinning, setPinning] = useState(false)
+  const handlePin = async () => {
+    if (!currentPost || pinning) return
+    setPinning(true)
+    const nextPinned = !currentPost.pinned
+    try {
+      const updated = await pinCommunityPost(currentPost.id, nextPinned)
+      mergePost(updated)
+      showToast({ message: nextPinned ? '게시글을 고정했습니다.' : '고정을 해제했습니다.', tone: 'success' })
+    } catch (err) {
+      showToast({ message: err.message || '고정 처리 중 오류가 발생했습니다.', tone: 'error' })
+    } finally {
+      setPinning(false)
+    }
+  }
+
   const handlePollVote = async (pollId, optionIndex) => {
     if (!currentPost) return
     setPollVoting(pollId)
@@ -499,6 +517,9 @@ export default function Community({ onBack }: any) {
             onBackToList={backToList}
             onEdit={() => setMode('edit')}
             onDelete={handleDelete}
+            isAdmin={user?.role === 'ADMIN'}
+            pinning={pinning}
+            onPin={handlePin}
           />
         )}
       </section>

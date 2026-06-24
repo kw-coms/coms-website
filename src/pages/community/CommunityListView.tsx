@@ -155,6 +155,7 @@ export default function CommunityListView({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-black">
               <span className="text-[var(--app-subtle)]">#{post.id}</span>
+              {post.pinned && <span className="rounded bg-[#fff1d6] px-1.5 py-0.5 text-[10px] text-[#9a6a00]">고정</span>}
               <span className="rounded-full bg-[#e8f8ff] px-2 py-1 text-[var(--app-accent-text)]">{categoryLabel(post.category || 'GENERAL')}</span>
               {concept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] text-[#3a2b00]">개념글</span>}
               {postHasImages(post) && <span className="text-[var(--app-accent-text)]">[사진]</span>}
@@ -306,6 +307,7 @@ export default function CommunityListView({
                   <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-[var(--app-accent-text)]">{categoryLabel(post.category || 'GENERAL')}</td>
                   <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
                     <span className="flex max-w-full min-w-0 items-center gap-1 text-left font-semibold text-[var(--app-text)] lg:max-w-[520px]">
+                      {post.pinned && <span className="shrink-0 rounded bg-[#fff1d6] px-1.5 py-0.5 text-[10px] font-black text-[#9a6a00]">고정</span>}
                       {concept && <span className="shrink-0 rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
                       {renderPostTitleWithCount(post)}
                     </span>

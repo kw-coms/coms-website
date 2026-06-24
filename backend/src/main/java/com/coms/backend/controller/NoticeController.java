@@ -3,6 +3,7 @@ package com.coms.backend.controller;
 import com.coms.backend.dto.EngagementVoteRequest;
 import com.coms.backend.dto.NoticeRequest;
 import com.coms.backend.dto.NoticeResponse;
+import com.coms.backend.dto.PinRequest;
 import com.coms.backend.service.NoticeService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -10,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -61,6 +63,13 @@ public class NoticeController {
                                                  @PathVariable Long id,
                                                  @Valid @RequestBody NoticeRequest request) {
         return ResponseEntity.ok(noticeService.update(authentication.getName(), id, request));
+    }
+
+    @PatchMapping("/{id}/pin")
+    public ResponseEntity<NoticeResponse> pin(Authentication authentication,
+                                              @PathVariable Long id,
+                                              @Valid @RequestBody PinRequest request) {
+        return ResponseEntity.ok(noticeService.setPinned(authentication.getName(), id, request.pinned()));
     }
 
     @DeleteMapping("/{id}")
