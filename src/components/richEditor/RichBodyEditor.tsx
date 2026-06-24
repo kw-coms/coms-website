@@ -288,7 +288,7 @@ export default function RichBodyEditor({
           <div className="grid gap-2 sm:grid-cols-2">
             {youtubeResults.map((item) => (
               <button key={item.videoId} type="button" onClick={() => insertYoutubeResult(item)} className="flex gap-2 rounded border border-[var(--app-hairline)] bg-black/[0.03] p-2 text-left hover:bg-black/[0.06]">
-                {item.thumbnailUrl && <img src={item.thumbnailUrl} alt="" className="h-16 w-24 rounded object-cover" />}
+                {item.thumbnailUrl && <img src={item.thumbnailUrl} alt="" className="h-16 w-24 rounded object-cover" loading="lazy" decoding="async" />}
                 <span className="min-w-0">
                   <span className="line-clamp-2 text-sm font-bold text-[var(--theme-body-dark)]">{item.title}</span>
                   <span className="mt-1 block truncate text-xs text-[var(--theme-body-muted)]">{item.channelTitle}</span>

@@ -6020,6 +6020,45 @@ html.home-snap-scroll .home-snap-section {
 	}
 }
 
+/* ---- Skip link (a11y) ------------------------------------------------- */
+/* Visually hidden until keyboard-focused, then pinned top-left so the first
+   Tab press reveals a jump to the main content landmark. Uses the shared
+   --app-* tokens to match the surrounding chrome. */
+.coms-skip-link {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 10000;
+	transform: translateY(-120%);
+	padding: 0.6rem 1rem;
+	margin: 0.5rem;
+	border-radius: 0.5rem;
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	color: var(--app-accent);
+	font-size: 0.85rem;
+	font-weight: 700;
+	text-decoration: none;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+	transition: transform 160ms ease;
+}
+.coms-skip-link:focus,
+.coms-skip-link:focus-visible {
+	transform: translateY(0);
+	outline: 2px solid var(--app-accent);
+	outline-offset: 2px;
+}
+/* The main-content landmark is programmatically focusable (tabIndex -1) so the
+   skip link can move focus to it; suppress the focus ring on that move. */
+#main-content:focus {
+	outline: none;
+}
+@media (prefers-reduced-motion: reduce) {
+	.coms-skip-link {
+		transition: none;
+	}
+}
+
 /* ---- Page enter transition ------------------------------------------- */
 /* Opacity-only: a `transform` (even translateY(0)) lingers after the animation
    and would become the containing block for the home's `position: sticky` cinema
