@@ -5,12 +5,16 @@ import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.domain.DeletedCommunityPost;
 import com.coms.backend.domain.Member;
 import com.coms.backend.domain.Notification;
+import com.coms.backend.domain.NotificationPreference;
 import com.coms.backend.domain.Notice;
 import com.coms.backend.dto.MemberExternalInviteRequest;
+import com.coms.backend.dto.NotificationPreferencesRequest;
+import com.coms.backend.dto.NotificationPreferencesResponse;
 import com.coms.backend.dto.NotificationResponse;
 import com.coms.backend.dto.NotificationSummaryResponse;
 import com.coms.backend.repository.EligibleMemberRepository;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.NotificationPreferenceRepository;
 import com.coms.backend.repository.NotificationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,6 +54,7 @@ public class NotificationService {
     private static final int MAX_INVITE_RECIPIENTS_PER_BATCH = 20;
 
     private final NotificationRepository notificationRepository;
+    private final NotificationPreferenceRepository notificationPreferenceRepository;
     private final MemberRepository memberRepository;
     private final EligibleMemberRepository eligibleMemberRepository;
     private final EmailVerificationSender mailSender;
@@ -58,17 +63,58 @@ public class NotificationService {
     private final Map<String, Deque<LocalDateTime>> inviteAttemptsBySender = new ConcurrentHashMap<>();
 
     public NotificationService(NotificationRepository notificationRepository,
+                               NotificationPreferenceRepository notificationPreferenceRepository,
                                MemberRepository memberRepository,
                                EligibleMemberRepository eligibleMemberRepository,
                                EmailVerificationSender mailSender,
                                PushNotificationSender pushNotificationSender,
                                @Value("${notification.external-invite.allowed-hosts:coms.kw.ac.kr}") String allowedHosts) {
         this.notificationRepository = notificationRepository;
+        this.notificationPreferenceRepository = notificationPreferenceRepository;
         this.memberRepository = memberRepository;
         this.eligibleMemberRepository = eligibleMemberRepository;
         this.mailSender = mailSender;
         this.pushNotificationSender = pushNotificationSender;
         this.acceptUrlAllowedHosts = parseAllowedHosts(allowedHosts);
+    }
+
+    /**
+     * Whether the recipient has the given notification category enabled. Defaults to true
+     * (all categories on) for members who have never saved preferences, so existing behavior
+     * is unchanged until a member explicitly opts out.
+     */
+    @Transactional(readOnly = true)
+    public boolean isCategoryEnabled(String recipientStudentId, Notification.Type type) {
+        if (recipientStudentId == null || recipientStudentId.isBlank()) {
+            return true;
+        }
+        return notificationPreferenceRepository.findByMemberStudentId(recipientStudentId)
+                .map(preference -> preference.isEnabled(type))
+                .orElse(true);
+    }
+
+    @Transactional(readOnly = true)
+    public NotificationPreferencesResponse getPreferences(String memberStudentId) {
+        return notificationPreferenceRepository.findByMemberStudentId(memberStudentId)
+                .map(NotificationPreferencesResponse::from)
+                .orElseGet(() -> NotificationPreferencesResponse.from(new NotificationPreference(memberStudentId)));
+    }
+
+    public NotificationPreferencesResponse updatePreferences(String memberStudentId, NotificationPreferencesRequest request) {
+        if (memberStudentId == null || memberStudentId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Member required");
+        }
+        NotificationPreference preference = notificationPreferenceRepository.findByMemberStudentId(memberStudentId)
+                .orElseGet(() -> new NotificationPreference(memberStudentId));
+        preference.setCommentOnPost(request.commentOnPost());
+        preference.setReplyOnComment(request.replyOnComment());
+        preference.setNoticeCreated(request.noticeCreated());
+        preference.setExternalInvite(request.externalInvite());
+        preference.setCommunityPostRestored(request.communityPostRestored());
+        preference.setCommunityPostDeleted(request.communityPostDeleted());
+        preference.setRecruitApplication(request.recruitApplication());
+        preference.touch();
+        return NotificationPreferencesResponse.from(notificationPreferenceRepository.save(preference));
     }
 
     /**
@@ -337,6 +383,10 @@ public class NotificationService {
                 unknown.add(recipient);
                 continue;
             }
+            if (!isCategoryEnabled(recipient, Notification.Type.EXTERNAL_INVITE)) {
+                rejected += 1;
+                continue;
+            }
             try {
                 Notification saved = notifyExternalInvite(recipient, label, request.getMessage(), safeAcceptUrl, false);
                 saved.setActorStudentId(senderStudentId);
@@ -356,7 +406,9 @@ public class NotificationService {
         String message = studentId.isBlank()
                 ? "새 지원서가 도착했습니다: " + applicantName
                 : "새 지원서가 도착했습니다: " + applicantName + " (" + studentId + ")";
-        List<Member> admins = memberRepository.findByRole(Member.Role.ADMIN);
+        List<Member> admins = memberRepository.findByRole(Member.Role.ADMIN).stream()
+                .filter(admin -> isCategoryEnabled(admin.getStudentId(), Notification.Type.RECRUIT_APPLICATION))
+                .toList();
         List<Notification> notifications = admins.stream()
                 .map(admin -> build(
                         admin.getStudentId(),
@@ -379,7 +431,9 @@ public class NotificationService {
 
     public void notifyNoticeCreated(Notice notice) {
         String message = "New notice: " + notice.getTitle();
-        List<Member> members = memberRepository.findAll();
+        List<Member> members = memberRepository.findAll().stream()
+                .filter(member -> isCategoryEnabled(member.getStudentId(), Notification.Type.NOTICE_CREATED))
+                .toList();
         List<Notification> notifications = members.stream()
                 .map(member -> build(
                         member.getStudentId(),
@@ -435,6 +489,9 @@ public class NotificationService {
                                    Long noticeId,
                                    String message) {
         if (recipientStudentId == null || recipientStudentId.equals(actorStudentId)) {
+            return;
+        }
+        if (!isCategoryEnabled(recipientStudentId, type)) {
             return;
         }
         notificationRepository.save(build(recipientStudentId, actorStudentId, type, postId, commentId, noticeId, message));

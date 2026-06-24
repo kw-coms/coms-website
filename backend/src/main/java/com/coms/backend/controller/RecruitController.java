@@ -2,6 +2,8 @@ package com.coms.backend.controller;
 
 import com.coms.backend.dto.RecruitApplicationRequest;
 import com.coms.backend.dto.RecruitApplicationResponse;
+import com.coms.backend.dto.RecruitApplicationStatusLookupRequest;
+import com.coms.backend.dto.RecruitApplicationStatusResponse;
 import com.coms.backend.service.RecruitApplicationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -30,6 +32,12 @@ public class RecruitController {
                                                             HttpServletRequest servletRequest) {
         recruitApplicationService.sendApplication(request, resolveClientIp(servletRequest));
         return ResponseEntity.ok(new RecruitApplicationResponse("지원서가 제출되었습니다."));
+    }
+
+    @PostMapping("/status")
+    public ResponseEntity<RecruitApplicationStatusResponse> status(@Valid @RequestBody RecruitApplicationStatusLookupRequest request,
+                                                                   HttpServletRequest servletRequest) {
+        return ResponseEntity.ok(recruitApplicationService.lookupStatus(request, resolveClientIp(servletRequest)));
     }
 
     private static String resolveClientIp(HttpServletRequest request) {
