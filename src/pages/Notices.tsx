@@ -415,7 +415,7 @@ export default function Notices() {
             )}
             {error && <p className="mx-5 mt-5 rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-7">{error}</p>}
             {!loading && !error && filteredNotices.length === 0 && (
-              <p className="px-4 py-16 text-center text-sm text-[var(--app-muted)]">등록된 글이 없습니다.</p>
+              <p className="px-4 py-10 text-center text-sm text-[var(--app-muted)] sm:py-16">등록된 글이 없습니다.</p>
             )}
             {!loading && !error && filteredNotices.length > 0 && (
               <>
