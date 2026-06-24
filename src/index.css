@@ -5579,7 +5579,11 @@ body {
 	overflow: hidden;
 	padding: 1.5rem 1.25rem 3.5rem;
 	text-align: center;
-	background: var(--app-surface-soft);
+	/* layered depth: soft top glow, accent wash, bottom vignette — not flat */
+	background:
+		radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--app-accent-soft) 55%, transparent), transparent 55%),
+		radial-gradient(90% 70% at 50% 120%, color-mix(in srgb, var(--app-text) 8%, transparent), transparent 60%),
+		linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-soft) 100%);
 }
 
 /* Soft drifting aurora so the hero never feels flat. Sits behind the tint
@@ -5597,6 +5601,24 @@ body {
 	filter: blur(36px);
 	animation: coms-aurora 18s ease-in-out infinite alternate;
 	will-change: transform;
+}
+
+/* Dark mode: deeper background + stronger aurora + a glow under the wordmark
+   so the white COM's lifts off the dark instead of sitting flat. */
+:root[data-theme-mode='dark'] .coms-cinema-pin {
+	background:
+		radial-gradient(120% 85% at 50% -12%, color-mix(in srgb, var(--app-accent) 26%, transparent), transparent 58%),
+		radial-gradient(100% 90% at 50% 118%, rgba(0, 0, 0, 0.55), transparent 62%),
+		linear-gradient(180deg, color-mix(in srgb, var(--app-surface-elevated) 70%, var(--app-bg)) 0%, var(--app-bg) 100%);
+}
+:root[data-theme-mode='dark'] .coms-cinema-pin::before {
+	opacity: 0.85;
+	filter: blur(44px);
+}
+:root[data-theme-mode='dark'] .coms-cinema-title,
+:root[data-theme-mode='dark'] .coms-cinema-word {
+	filter: drop-shadow(0 6px 26px color-mix(in srgb, var(--app-accent) 45%, transparent))
+		drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
 }
 
 @keyframes coms-aurora {
