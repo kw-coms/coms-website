@@ -87,7 +87,7 @@ export default function DeletedPostDetailModal({ post, onClose, onRestore, resto
             type="button"
             onClick={onClose}
             aria-label="닫기"
-            className="shrink-0 rounded-full p-1.5 text-[var(--theme-body-muted)] transition hover:bg-black/5 hover:text-[var(--theme-body-dark)]"
+            className="inline-flex shrink-0 items-center justify-center rounded-full p-2.5 text-[var(--theme-body-muted)] transition hover:bg-black/5 hover:text-[var(--theme-body-dark)] sm:p-1.5"
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
