@@ -39,3 +39,6 @@ out/
 ### Runtime / Local ###
 data/
 .omc/
+
+### User uploads (never commit user-uploaded files) ###
+uploads/

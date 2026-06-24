@@ -3,8 +3,10 @@ package com.coms.backend.service;
 import com.coms.backend.domain.MobilePushToken;
 import com.coms.backend.dto.PushTokenRequest;
 import com.coms.backend.repository.MobilePushTokenRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 
@@ -21,6 +23,12 @@ public class MobilePushTokenService {
     public void register(String memberStudentId, PushTokenRequest request) {
         MobilePushToken token = repository.findByToken(request.token())
                 .orElseGet(MobilePushToken::new);
+        // Reject re-binding a token already owned by a different member (IDOR): an authenticated
+        // user must not be able to hijack another account's FCM token by re-registering it.
+        // Re-registration by the same owner (or claiming an unowned new row) stays allowed.
+        if (token.getMemberStudentId() != null && !token.getMemberStudentId().equals(memberStudentId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This push token is registered to another account.");
+        }
         token.setMemberStudentId(memberStudentId);
         token.setToken(request.token());
         token.setPlatform(normalize(request.platform(), 64));
