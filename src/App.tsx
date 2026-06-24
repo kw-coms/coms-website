@@ -118,7 +118,8 @@ import {
 } from './data/homeContent'
 import PageFallback from './components/home/PageFallback'
 const ComsIntro = lazy(() => import('./components/common/ComsIntro'))
-import { ToastHost } from './components/common/Toast'
+import { ToastHost, showToast } from './components/common/Toast'
+import { buildIcsCalendar } from './utils/icsExport'
 import CompanionServicesSection from './components/home/CompanionServicesSection'
 
 const NOTIFICATIONS_QUERY_KEY = ['app-shell', 'notifications']
@@ -3822,6 +3823,32 @@ function ClubCalendarSection({ compact = false }: any) {
     return [rangeLabel, event.timeLabel, event.canceled ? '취소됨' : '', event.recurring ? '정기 모임' : '날짜 일정'].filter(Boolean).join(' · ')
   }
 
+  const exportCalendarIcs = () => {
+    // Flatten the visible month, dropping canceled occurrences and the
+    // duplicated middle/end segments of multi-day ranges (kept only on the
+    // showTitle day) so each event becomes a single VEVENT.
+    const events = Object.values(eventsByDay)
+      .flatMap((dayEvents: any) => (Array.isArray(dayEvents) ? dayEvents : []))
+      .filter((event: any) => !event.canceled && !(event.range && !event.showTitle))
+
+    if (events.length === 0) {
+      showToast({ message: '내보낼 일정이 없습니다.', tone: 'default' })
+      return
+    }
+
+    const ics = buildIcsCalendar(events, { calendarName: `COM's 동아리 일정 · ${calendarMonth.title}` })
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `coms-calendar-${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}.ics`
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    URL.revokeObjectURL(url)
+    showToast({ message: `${calendarMonth.title} 일정 ${events.length}개를 .ics로 내보냈습니다.`, tone: 'success' })
+  }
+
   return (
     <section id="monthly-calendar" className={`club-calendar-section ${compact ? 'club-calendar-section-compact' : ''} scroll-mt-24 bg-[var(--app-surface-soft)] px-5 py-12 sm:py-16`}>
       <div className="mx-auto max-w-7xl">
@@ -3867,6 +3894,15 @@ function ClubCalendarSection({ compact = false }: any) {
               ))}
             </select>
           </label>
+          <button
+            type="button"
+            onClick={exportCalendarIcs}
+            disabled={isLocked || !hasAnyEvent}
+            className="apple-action-secondary inline-flex min-h-10 items-center justify-center gap-2 px-4 text-sm disabled:opacity-50"
+          >
+            <Download size={15} aria-hidden="true" />
+            캘린더 내보내기 (.ics)
+          </button>
         </div>
 
         {isAdmin && !isLocked && (

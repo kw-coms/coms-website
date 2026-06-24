@@ -1,6 +1,8 @@
-import { ArrowUpRight, Download, FileText } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowUpRight, Download, FileText, PanelTopOpen } from 'lucide-react'
 import { apiUrl } from '../../services/apiClient'
 import { buildProjectStatusBadges } from '../../utils/appProjectStatus'
+import AppEmbedModal from './AppEmbedModal'
 
 const DEFAULT_MADE_BY = '최준혁'
 
@@ -36,9 +38,18 @@ export default function AppProjectCard({
   className = '',
   testId,
 }: any) {
+  const [embedOpen, setEmbedOpen] = useState(false)
   const files = Array.isArray(project?.files) ? project.files : []
   const hasLink = Boolean(project?.linkUrl)
-  const wholeCardLink = hasLink && interactive && files.length === 0
+  const canEmbed = hasLink && interactive
+  // Keep the whole card clickable only when there's nothing interactive nested
+  // inside it (no embed button, no download files) — anchors can't wrap buttons.
+  const wholeCardLink = hasLink && interactive && files.length === 0 && !canEmbed
+  const openEmbed = (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setEmbedOpen(true)
+  }
   const CardTag = wholeCardLink ? 'a' : 'div'
   const cardProps = wholeCardLink
     ? { href: project.linkUrl, target: '_blank', rel: 'noreferrer' }
@@ -73,7 +84,7 @@ export default function AppProjectCard({
         </div>
       )}
 
-      <div className="mt-5 flex flex-wrap items-center gap-2">
+      <div className="mt-5 flex flex-wrap items-center gap-3">
         {hasLink && (
           wholeCardLink ? (
             <span className="inline-flex items-center gap-2 text-sm font-bold text-[#0066cc]">
@@ -91,6 +102,16 @@ export default function AppProjectCard({
               <ArrowUpRight size={15} aria-hidden="true" />
             </a>
           )
+        )}
+        {canEmbed && (
+          <button
+            type="button"
+            onClick={openEmbed}
+            className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--app-accent-text)]"
+          >
+            <PanelTopOpen size={15} aria-hidden="true" />
+            여기서 열기
+          </button>
         )}
       </div>
 
@@ -124,6 +145,15 @@ export default function AppProjectCard({
         <span className="mt-3 truncate rounded-full bg-[#f5f5f7] px-3 py-1.5 text-xs font-semibold text-[var(--app-subtle)]">
           {project.displayUrl}
         </span>
+      )}
+
+      {canEmbed && (
+        <AppEmbedModal
+          open={embedOpen}
+          title={project?.title || '미니 앱'}
+          url={project.linkUrl}
+          onClose={() => setEmbedOpen(false)}
+        />
       )}
     </CardTag>
   )
