@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useScrollReveal } from '../hooks/useScrollReveal'
+import { useVisibleCount } from '../hooks/useVisibleCount'
 import { ArrowLeft, Download, FileUp, RefreshCw, Search, ThumbsUp, Trash2, X } from 'lucide-react'
 import { createPosts, deleteFile, downloadUrl, listFiles, voteArchiveFile } from '../services/archiveApi'
 import { fetchLinkPreview, searchYoutubeVideos } from '../services/communityApi'
@@ -284,6 +285,13 @@ export default function Archive({ onBack }: any) {
     )
   }, [activeCategory, files, searchQuery])
 
+  const { visible, canLoadMore, loadMore, total } = useVisibleCount(
+    filteredFiles.length,
+    20,
+    `${activeCategory}|${searchQuery}`,
+  )
+  const visibleFiles = filteredFiles.slice(0, visible)
+
   const categoryCounts = useMemo(() => {
     const counts = {
       ALL: files.length,
@@ -519,7 +527,7 @@ export default function Archive({ onBack }: any) {
               ) : (
                 <>
                 <div className="grid gap-3 p-4 md:hidden">
-                  {filteredFiles.map((file, index) => {
+                  {visibleFiles.map((file, index) => {
                     const open = () => openFile(file)
                     return (
                       <article key={file.id} className="apple-soft-panel p-4" data-reveal style={{ '--reveal-delay': `${Math.min(index, 6) * 55}ms` } as any}>
@@ -573,7 +581,7 @@ export default function Archive({ onBack }: any) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--app-hairline)]">
-                      {filteredFiles.map((file, index) => {
+                      {visibleFiles.map((file, index) => {
                         const open = () => openFile(file)
                         return (
                           <tr
@@ -625,6 +633,20 @@ export default function Archive({ onBack }: any) {
                       })}
                     </tbody>
                   </table>
+                </div>
+                <div className="flex flex-col items-center gap-2 border-t border-[var(--app-hairline)] px-4 py-5">
+                  <span className="text-xs font-bold text-[var(--app-subtle)]">
+                    전체 {total}개 중 {visibleFiles.length}개 표시
+                  </span>
+                  {canLoadMore && (
+                    <button
+                      type="button"
+                      onClick={loadMore}
+                      className="apple-action-secondary inline-flex min-h-10 items-center justify-center px-6 text-sm"
+                    >
+                      더 보기
+                    </button>
+                  )}
                 </div>
                 </>
               )}
