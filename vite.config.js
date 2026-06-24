@@ -50,6 +50,22 @@ export default defineConfig({
     // sourceMappingURL comment is written into the bundles — the maps are never
     // publicly discoverable, and the plugin deletes them from dist after upload.
     sourcemap: sentryAuthToken ? 'hidden' : false,
+    rollupOptions: {
+      output: {
+        // Split heavy vendors into their own long-cached chunks so they
+        // parallelize and survive app-code redeploys. ponytail: coarse grouping
+        // by package, finer splits only if a chunk actually gets too big.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('@sentry')) return 'vendor-sentry'
+          if (id.includes('dompurify')) return 'vendor-dompurify'
+          if (id.includes('@tanstack')) return 'vendor-query'
+          if (id.includes('lucide-react')) return 'vendor-icons'
+          if (id.includes('react-router')) return 'vendor-router'
+          if (id.includes('/react-dom/') || id.includes('/react/') || id.includes('/scheduler/')) return 'vendor-react'
+        },
+      },
+    },
   },
 
   server: {
