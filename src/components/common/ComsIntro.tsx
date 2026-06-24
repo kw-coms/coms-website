@@ -110,6 +110,15 @@ export default function ComsIntro() {
 
     const RAMP = " .,:;irs20A#@"
     const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace'
+    // Pull the live site theme tokens so the boot screen matches the home page
+    // (light ink-on-paper by default, auto-adapts in dark mode).
+    const cs = getComputedStyle(document.documentElement)
+    const theme = (name: string, fb: string) => cs.getPropertyValue(name).trim() || fb
+    const C_BG = theme('--app-surface-soft', '#f5f5f7')
+    const C_INK = theme('--app-text', '#1d1d1f')
+    const C_ACCENT = theme('--app-accent', '#0071e3')
+    const C_SOFT = theme('--app-accent-soft', '#e8f3ff')
+    const C_MUTED = theme('--app-muted', '#606063')
     let W = 0, H = 0, dpr = 1
     let cols = 0, rows = 0, cellW = 0, cellH = 0, fontPx = 0, asp = 1
     const resize = () => {
@@ -212,8 +221,16 @@ export default function ComsIntro() {
       const t = now - start
       if (t >= DONE && !finishing) finish()
 
-      ctx.fillStyle = '#000'
+      // paper background + a soft accent wash in the corner, like the home hero
+      ctx.fillStyle = C_BG
       ctx.fillRect(0, 0, W, H)
+      const wash = ctx.createRadialGradient(W * 0.82, H * 0.16, 0, W * 0.82, H * 0.16, Math.max(W, H) * 0.6)
+      wash.addColorStop(0, C_SOFT)
+      wash.addColorStop(1, C_BG)
+      ctx.globalAlpha = 0.6
+      ctx.fillStyle = wash
+      ctx.fillRect(0, 0, W, H)
+      ctx.globalAlpha = 1
       ctx.textBaseline = 'top'
       ctx.textAlign = 'left'
       ctx.font = fontPx + 'px ' + MONO
@@ -233,16 +250,17 @@ export default function ComsIntro() {
       }
 
       const rampN = RAMP.length - 1
+      ctx.fillStyle = C_INK
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
           const v = b[row * cols + col]
           if (v <= 0.05) continue
           const ch = RAMP[Math.min(rampN, Math.max(1, Math.round(v * rampN)))]
-          const g = Math.round(120 + v * 135)
-          ctx.fillStyle = 'rgba(56,' + g + ',92,' + (0.35 + v * 0.6).toFixed(3) + ')'
+          ctx.globalAlpha = 0.12 + v * 0.8
           ctx.fillText(ch, col * cellW, row * cellH)
         }
       }
+      ctx.globalAlpha = 1
 
       const lA = easeInOut(seg(t, LOGO_IN, LOGO_IN + 350))
       if (lA > 0) {
@@ -253,7 +271,8 @@ export default function ComsIntro() {
         const oy = Math.round(rows * 0.5 - (5 * P) / 2)
         const shown = Math.floor(seg(t, LOGO_IN, LOGO_IN + 600) * logoW)
         ctx.font = fontPx + 'px ' + MONO
-        ctx.fillStyle = 'rgba(90,255,135,' + lA.toFixed(3) + ')'
+        ctx.globalAlpha = lA
+        ctx.fillStyle = C_INK
         for (let gr = 0; gr < 5; gr++) {
           for (let gc = 0; gc <= shown && gc < logoW; gc++) {
             if (!logoGrid[gr][gc]) continue
@@ -262,20 +281,24 @@ export default function ComsIntro() {
                 ctx.fillText('#', (ox + gc * P + px) * cellW, (oy + gr * P + py) * cellH)
           }
         }
-        // blinking underline cursor, one blank column past the word so it never
-        // touches the final S (a touching block made the S read as a 9).
+        // blinking accent underline cursor, one blank column past the word so it
+        // never touches the final S (a touching block made the S read as a 9).
         const cc = Math.min(shown + 2, logoW + 1)
         if (Math.floor(t / 300) % 2 === 0) {
+          ctx.fillStyle = C_ACCENT
           for (let py = 0; py < P; py++)
             for (let px = 0; px < P * 2; px++)
               ctx.fillText('#', (ox + cc * P + px) * cellW, (oy + 4 * P + py) * cellH)
         }
+        ctx.globalAlpha = 1
       }
 
       ctx.font = fontPx + 'px ' + MONO
-      ctx.fillStyle = 'rgba(56,200,96,0.5)'
+      ctx.fillStyle = C_MUTED
+      ctx.globalAlpha = 0.55
       const dots = '.'.repeat(Math.floor(t / 250) % 4)
       ctx.fillText('kw-coms://boot ' + dots, cellW, H - cellH * 2)
+      ctx.globalAlpha = 1
 
       if (!finishing || t < DONE + 50) raf = requestAnimationFrame(frame)
     }
@@ -310,14 +333,14 @@ export default function ComsIntro() {
   return (
     <div
       onClick={() => setFadingOut(true)}
-      style={{ position: 'fixed', inset: 0, zIndex: 9999, opacity: fadingOut ? 0 : 1, transition: 'opacity ' + FADE + 'ms ease', background: '#000', cursor: 'pointer' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, opacity: fadingOut ? 0 : 1, transition: 'opacity ' + FADE + 'ms ease', background: 'var(--app-surface-soft)', cursor: 'pointer' }}
       aria-hidden="true"
     >
       <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setFadingOut(true) }}
-        style={{ position: 'absolute', right: 18, bottom: 16, padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(80,255,120,0.4)', background: 'rgba(0,0,0,0.4)', color: 'rgba(120,255,150,0.9)', fontSize: 12, fontFamily: 'ui-monospace, monospace', fontWeight: 600 }}
+        style={{ position: 'absolute', right: 18, bottom: 16, padding: '6px 14px', borderRadius: 999, border: '1px solid var(--app-hairline)', background: 'var(--app-surface)', color: 'var(--app-muted)', fontSize: 12, fontFamily: 'ui-monospace, monospace', fontWeight: 600, boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}
       >
         skip ›
       </button>
