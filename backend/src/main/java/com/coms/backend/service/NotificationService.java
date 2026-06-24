@@ -22,13 +22,17 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Transactional
@@ -37,6 +41,13 @@ public class NotificationService {
     private static final int ACTOR_LABEL_MAX = 100;
     private static final int MAX_EXTERNAL_INVITES_PER_MINUTE = 10;
     private static final int MAX_EXTERNAL_INVITES_PER_DAY = 200;
+    // Per-sender sliding window mirroring RecruitApplicationService.enforceRateLimit: bounds how
+    // many invite batches a single member can fire over a 10-minute window (defense against
+    // sustained abuse, complementing the tighter per-minute/per-day DB caps above), and each
+    // batch is capped so one request cannot fan out to an unbounded recipient list.
+    private static final int MAX_INVITE_BATCHES_PER_WINDOW = 30;
+    private static final Duration INVITE_RATE_LIMIT_WINDOW = Duration.ofMinutes(10);
+    private static final int MAX_INVITE_RECIPIENTS_PER_BATCH = 20;
 
     private final NotificationRepository notificationRepository;
     private final MemberRepository memberRepository;
@@ -44,6 +55,7 @@ public class NotificationService {
     private final EmailVerificationSender mailSender;
     private final PushNotificationSender pushNotificationSender;
     private final Set<String> acceptUrlAllowedHosts;
+    private final Map<String, Deque<LocalDateTime>> inviteAttemptsBySender = new ConcurrentHashMap<>();
 
     public NotificationService(NotificationRepository notificationRepository,
                                MemberRepository memberRepository,
@@ -239,6 +251,46 @@ public class NotificationService {
         }
     }
 
+    // Per-sender sliding window, mirroring RecruitApplicationService.enforceRateLimit: caps how
+    // many invite batches a single member can fire within the window and purges expired senders
+    // so the in-memory map cannot leak memory.
+    private void enforceInviteBatchRateLimit(String senderStudentId) {
+        String key = senderStudentId == null || senderStudentId.isBlank() ? "unknown" : senderStudentId;
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime cutoff = now.minus(INVITE_RATE_LIMIT_WINDOW);
+        Deque<LocalDateTime> attempts = inviteAttemptsBySender.computeIfAbsent(key, ignored -> new ArrayDeque<>());
+
+        synchronized (attempts) {
+            while (!attempts.isEmpty() && attempts.peekFirst().isBefore(cutoff)) {
+                attempts.removeFirst();
+            }
+            if (attempts.size() >= MAX_INVITE_BATCHES_PER_WINDOW) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "초대 요청이 많습니다. 잠시 후 다시 시도해주세요.");
+            }
+            attempts.addLast(now);
+        }
+
+        evictExpiredInviteSenders(cutoff);
+    }
+
+    // Test-support: clears the in-memory per-sender invite window so isolated tests don't
+    // inherit each other's batch counts against the shared singleton service.
+    void resetInviteRateLimiter() {
+        inviteAttemptsBySender.clear();
+    }
+
+    private void evictExpiredInviteSenders(LocalDateTime cutoff) {
+        inviteAttemptsBySender.forEach((key, attempts) -> {
+            synchronized (attempts) {
+                LocalDateTime last = attempts.peekLast();
+                if (last == null || last.isBefore(cutoff)) {
+                    inviteAttemptsBySender.remove(key, attempts);
+                }
+            }
+        });
+    }
+
     public record ExternalInviteBatchResult(int accepted, List<String> unknown, int rejected) {}
 
     public ExternalInviteBatchResult notifyExternalInviteFromMember(String senderStudentId, MemberExternalInviteRequest request) {
@@ -248,7 +300,14 @@ public class NotificationService {
         Member sender = memberRepository.findByStudentId(senderStudentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sender is not a registered member"));
 
+        enforceInviteBatchRateLimit(senderStudentId);
         enforceExternalInviteRateLimit(senderStudentId);
+
+        if (request.getRecipientStudentIds() != null
+                && request.getRecipientStudentIds().size() > MAX_INVITE_RECIPIENTS_PER_BATCH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "한 번에 최대 " + MAX_INVITE_RECIPIENTS_PER_BATCH + "명까지 초대할 수 있습니다.");
+        }
 
         String rawLabel = (request.getActorLabel() == null || request.getActorLabel().isBlank())
                 ? sender.getName()

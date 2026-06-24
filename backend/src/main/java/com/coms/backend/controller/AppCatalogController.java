@@ -3,6 +3,7 @@ package com.coms.backend.controller;
 import com.coms.backend.dto.AppCatalogRequest;
 import com.coms.backend.dto.AppCatalogResponse;
 import com.coms.backend.service.AppCatalogService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -34,13 +35,13 @@ public class AppCatalogController {
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
-    public ResponseEntity<AppCatalogResponse> create(@RequestBody AppCatalogRequest request) {
+    public ResponseEntity<AppCatalogResponse> create(@Valid @RequestBody AppCatalogRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(appCatalogService.create(request));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
-    public ResponseEntity<AppCatalogResponse> update(@PathVariable Long id, @RequestBody AppCatalogRequest request) {
+    public ResponseEntity<AppCatalogResponse> update(@PathVariable Long id, @Valid @RequestBody AppCatalogRequest request) {
         return ResponseEntity.ok(appCatalogService.update(id, request));
     }
 

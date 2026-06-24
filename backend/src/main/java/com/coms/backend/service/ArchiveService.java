@@ -117,9 +117,8 @@ public class ArchiveService {
     }
 
     public void incrementView(Long id) {
-        ArchiveFile file = get(id);
-        file.incrementViewCount();
-        repo.save(file);
+        // Atomic increment avoids the lost-update race of read-then-save under concurrent views.
+        repo.incrementViewCount(id);
     }
 
     public ArchiveFileResponse vote(String studentId, Long id, int value) {
