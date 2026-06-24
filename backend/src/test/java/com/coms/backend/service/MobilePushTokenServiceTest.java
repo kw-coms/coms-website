@@ -7,9 +7,13 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
 
+import org.springframework.web.server.ResponseStatusException;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,10 +37,10 @@ class MobilePushTokenServiceTest {
     }
 
     @Test
-    void reassignsAnExistingTokenToTheCurrentMember() {
+    void reRegistersAnExistingTokenForItsCurrentOwner() {
         MobilePushTokenRepository repository = mock(MobilePushTokenRepository.class);
         MobilePushToken existing = new MobilePushToken();
-        existing.setMemberStudentId("2025000000");
+        existing.setMemberStudentId("2026123456");
         existing.setToken("push-token");
         existing.setEnabled(false);
         when(repository.findByToken("push-token")).thenReturn(Optional.of(existing));
@@ -47,6 +51,25 @@ class MobilePushTokenServiceTest {
         assertThat(existing.getMemberStudentId()).isEqualTo("2026123456");
         assertThat(existing.isEnabled()).isTrue();
         verify(repository).save(existing);
+    }
+
+    @Test
+    void rejectsRebindingATokenOwnedByAnotherMember() {
+        MobilePushTokenRepository repository = mock(MobilePushTokenRepository.class);
+        MobilePushToken existing = new MobilePushToken();
+        existing.setMemberStudentId("2025000000");
+        existing.setToken("push-token");
+        existing.setEnabled(true);
+        when(repository.findByToken("push-token")).thenReturn(Optional.of(existing));
+        MobilePushTokenService service = new MobilePushTokenService(repository);
+
+        assertThatThrownBy(() ->
+                service.register("2026123456", new PushTokenRequest("push-token", null, null)))
+                .isInstanceOf(ResponseStatusException.class);
+
+        // The other member's token must be left untouched and never persisted under the caller.
+        assertThat(existing.getMemberStudentId()).isEqualTo("2025000000");
+        verify(repository, never()).save(any(MobilePushToken.class));
     }
 
     private MobilePushToken captureSavedToken(MobilePushTokenRepository repository) {

@@ -2,6 +2,7 @@ package com.coms.backend.controller;
 
 import com.coms.backend.dto.CommunityPostReportRequest;
 import com.coms.backend.dto.CommunityPostReportResponse;
+import com.coms.backend.dto.CommunityReportResolveRequest;
 import com.coms.backend.service.CommunityPostReportService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -15,7 +16,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 public class CommunityReportController {
@@ -41,8 +41,8 @@ public class CommunityReportController {
 
     @PatchMapping("/api/admin/community/reports/{id}")
     public ResponseEntity<CommunityPostReportResponse> resolve(@PathVariable Long id,
-                                                               @RequestBody Map<String, String> body,
+                                                               @Valid @RequestBody CommunityReportResolveRequest request,
                                                                Authentication authentication) {
-        return ResponseEntity.ok(reportService.resolve(id, authentication.getName(), body.get("action"), body.get("note")));
+        return ResponseEntity.ok(reportService.resolve(id, authentication.getName(), request.action(), request.note()));
     }
 }

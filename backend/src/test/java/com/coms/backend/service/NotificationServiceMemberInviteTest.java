@@ -47,6 +47,7 @@ class NotificationServiceMemberInviteTest {
     @BeforeEach
     void setUp() {
         notificationRepository.deleteAll();
+        notificationService.resetInviteRateLimiter();
         sender = memberRepository.findByStudentId("2026100001").orElseGet(() -> {
             Member fresh = new Member();
             fresh.setStudentId("2026100001");

@@ -98,7 +98,7 @@ public class RecurringScheduleController {
     public ResponseEntity<RecurringScheduleExceptionResponse> upsertException(
             @PathVariable Long id,
             @PathVariable LocalDate date,
-            @RequestBody RecurringScheduleExceptionRequest request,
+            @Valid @RequestBody RecurringScheduleExceptionRequest request,
             Authentication authentication) {
         RecurringScheduleExceptionResponse response = recurringScheduleService.upsertException(id, date, request);
         auditLogService.record(authentication.getName(), "ADMIN_RECURRING_SCHEDULE_EXCEPTION_UPSERT",
