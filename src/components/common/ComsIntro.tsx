@@ -382,7 +382,11 @@ export default function ComsIntro() {
         const sc = lerp(0.9, 1, easeOut(seg(t, CUBE_IN, CUBE_IN + 550)))
         const cyc = H * 0.43
         ctx.globalAlpha = cubeA
+        // the cube asset is black; invert it in dark mode so it reads white,
+        // matching how the home page renders it (filter: invert(1)).
+        ctx.filter = dark ? 'invert(1) brightness(1.08)' : 'none'
         ctx.drawImage(logoImg, W / 2 - (sz * sc) / 2, cyc - (sz * sc) / 2, sz * sc, sz * sc)
+        ctx.filter = 'none'
         ctx.fillStyle = C_INK
         ctx.font = '700 ' + Math.round(sz * 0.4) + 'px ui-sans-serif, system-ui, -apple-system, sans-serif'
         ctx.textAlign = 'center'
