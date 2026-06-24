@@ -248,7 +248,7 @@ export default function ComsIntro() {
       if (lA > 0) {
         // chunky ASCII block letters, each glyph-pixel = P×P '#' chars, typed in
         // column by column with a blinking cursor block.
-        const P = Math.max(2, Math.min(Math.floor(rows * 0.075), Math.floor((cols - 6) / logoW)))
+        const P = Math.max(2, Math.min(Math.floor(rows * 0.07), Math.floor((cols - 14) / (logoW + 3))))
         const ox = Math.round(cols / 2 - (logoW * P) / 2)
         const oy = Math.round(rows * 0.5 - (5 * P) / 2)
         const shown = Math.floor(seg(t, LOGO_IN, LOGO_IN + 600) * logoW)
@@ -262,13 +262,13 @@ export default function ComsIntro() {
                 ctx.fillText('#', (ox + gc * P + px) * cellW, (oy + gr * P + py) * cellH)
           }
         }
-        // blinking cursor block just past the typed columns
-        const cc = Math.min(shown + 1, logoW)
+        // blinking underline cursor, one blank column past the word so it never
+        // touches the final S (a touching block made the S read as a 9).
+        const cc = Math.min(shown + 2, logoW + 1)
         if (Math.floor(t / 300) % 2 === 0) {
-          for (let gr = 0; gr < 5; gr++)
-            for (let py = 0; py < P; py++)
-              for (let px = 0; px < P; px++)
-                ctx.fillText('#', (ox + cc * P + px) * cellW, (oy + gr * P + py) * cellH)
+          for (let py = 0; py < P; py++)
+            for (let px = 0; px < P * 2; px++)
+              ctx.fillText('#', (ox + cc * P + px) * cellW, (oy + 4 * P + py) * cellH)
         }
       }
 
