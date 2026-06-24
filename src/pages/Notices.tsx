@@ -430,8 +430,6 @@ export default function Notices() {
                         type="button"
                         onClick={open}
                         className="notice-mobile-card apple-soft-panel text-left transition hover:bg-[var(--app-surface-soft)] focus:bg-[var(--app-surface-soft)] focus:outline-none"
-                        data-reveal
-                        style={{ '--reveal-delay': `${Math.min(index, 6) * 55}ms` } as any}
                       >
                         <div className="flex min-w-0 items-center gap-2">
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${meta.badgeClass}`}>
@@ -472,8 +470,6 @@ export default function Notices() {
                             onClick={open}
                             onKeyDown={(event) => openRowWithKeyboard(event, open)}
                             className="cursor-pointer text-[var(--app-muted)] transition hover:bg-[var(--app-surface-soft)] focus:bg-[var(--app-surface-soft)] focus:outline-none"
-                            data-reveal
-                            style={{ '--reveal-delay': `${Math.min(index, 6) * 55}ms` } as any}
                           >
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs text-[var(--app-subtle)]">{notice.id}</td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs font-bold">
