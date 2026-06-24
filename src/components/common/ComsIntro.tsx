@@ -1,28 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { getLogoAsset } from '../../utils/logoAssets'
 
 /**
- * One-time cinematic boot intro: a procedural pixel Earth spins and zooms while
- * the camera descends, crossfades into a pixel silhouette of the Korean
- * peninsula, then the COM's logo + wordmark assemble out of pixels and snap into
- * their crisp final form before the whole overlay fades away to reveal the home.
- *
- * No image assets for Earth/Korea — both are drawn block-by-block on a canvas so
- * they read as pixel art. Plays once per page load (in-app navigation back to the
- * home does NOT replay it; a fresh visit / reload does), is skippable (click / key
- * / scroll / touch), and is skipped entirely under reduced-motion.
+ * Terminal-style boot intro (green ASCII on black): an ASCII Earth spins, the
+ * camera rises into an ASCII silhouette of the Korean peninsula, then "COM'S"
+ * types in with a blinking cursor before the overlay fades to reveal the home.
+ * Reuses the real-GeoJSON Korea grid; renders as monospace characters whose
+ * density tracks brightness. Short (~2.6s), skippable, plays once per page load.
  */
 
 // Module-level so an SPA route change back to "/" doesn't replay it, but a full
 // page reload (which re-imports the module) does.
 let introPlayed = false
-
-// Phase timeline (ms from start). Windows overlap so phases crossfade.
-// Tight (~3.5s) so the boot intro doesn't feel long.
-const LOGO_IN = 2300
-const LOGO_SETTLE = 3100
-const DONE = 3500
-const FADE = 450 // overlay fade-out duration
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 const seg = (t: number, a: number, b: number) => clamp01((t - a) / (b - a))
@@ -87,6 +75,8 @@ function buildKoreaGrid(size: number): boolean[][] {
   return grid
 }
 
+const FADE = 420
+
 export default function ComsIntro() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [gone, setGone] = useState(false)
@@ -94,277 +84,167 @@ export default function ComsIntro() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (introPlayed || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      introPlayed = true
+    if (introPlayed) {
       setGone(true)
       return
     }
     introPlayed = true
-
-    const koreaGrid = buildKoreaGrid(224)
-    const koreaCols = koreaGrid[0]?.length ?? 0
-    const koreaRows = koreaGrid.length
 
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    // Lock the page so the intro can't be scrolled past mid-play.
+    const koreaGrid = buildKoreaGrid(224)
+    const kN = koreaGrid.length
+
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
-    let W = 0
-    let H = 0
-    let dpr = 1
+    // phase timeline (ms) — short so it never reads as a long load
+    const EARTH_OUT = 1150
+    const KOREA_IN = 850
+    const KOREA_OUT = 1950
+    const LOGO_IN = 1800
+    const DONE = 2600
+
+    const RAMP = " .,:;irs20A#@"
+    const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace'
+    let W = 0, H = 0, dpr = 1
+    let cols = 0, rows = 0, cellW = 0, cellH = 0, fontPx = 0, asp = 1
     const resize = () => {
       dpr = Math.min(2, window.devicePixelRatio || 1)
       W = window.innerWidth
       H = window.innerHeight
       canvas.width = Math.round(W * dpr)
       canvas.height = Math.round(H * dpr)
-      canvas.style.width = `${W}px`
-      canvas.style.height = `${H}px`
+      canvas.style.width = W + 'px'
+      canvas.style.height = H + 'px'
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      fontPx = Math.max(10, Math.round(Math.min(W, H) / 54))
+      cellW = Math.max(6, Math.round(fontPx * 0.6))
+      cellH = Math.max(8, Math.round(fontPx * 0.95))
+      asp = cellH / cellW
+      cols = Math.ceil(W / cellW) + 1
+      rows = Math.ceil(H / cellH) + 1
     }
     resize()
-
-    const logo = new Image()
-    logo.src = getLogoAsset('COMs_logo_vec')
-    let logoReady = false
-    logo.onload = () => {
-      logoReady = true
-    }
-
-    // Stars for the space backdrop (fixed, twinkle a touch).
-    const stars = Array.from({ length: 90 }, (_, i) => ({
-      x: hash(i, 7) * W,
-      y: hash(i, 99) * H,
-      r: hash(i, 31) > 0.85 ? 2 : 1,
-      tw: hash(i, 53),
-    }))
 
     let raf = 0
     let start = 0
     let finishing = false
-
     const finish = () => {
       if (finishing) return
       finishing = true
       setFadingOut(true)
     }
 
-    const drawEarth = (
-      cx: number,
-      cy: number,
-      R: number,
-      spin: number,
-      alpha: number,
-      bumpX = 0,
-      bumpY = 0,
-    ) => {
+    const stampEarth = (b: Float32Array, ccx: number, ccy: number, R: number, spin: number, alpha: number) => {
       if (alpha <= 0) return
-      const block = Math.max(2, Math.round(Math.min(W, H) / 240))
-      ctx.globalAlpha = alpha
-      const lx = -0.55
-      const ly = -0.5
-      const lz = 0.66
-      // Only iterate the on-screen slice of the globe — R can be many screens
-      // wide during the dive, so the full bounding box would be millions of cells.
-      const y0 = Math.max(cy - R, -block)
-      const y1 = Math.min(cy + R, H + block)
-      const x0 = Math.max(cx - R, -block)
-      const x1 = Math.min(cx + R, W + block)
-      for (let y = y0; y <= y1; y += block) {
-        for (let x = x0; x <= x1; x += block) {
-          const nx = (x - cx) / R
-          const ny = (y - cy) / R
+      const lx = -0.5, ly = -0.5, lz = 0.71
+      const y0 = Math.max(0, Math.floor(ccy - R / asp))
+      const y1 = Math.min(rows - 1, Math.ceil(ccy + R / asp))
+      const x0 = Math.max(0, Math.floor(ccx - R))
+      const x1 = Math.min(cols - 1, Math.ceil(ccx + R))
+      for (let row = y0; row <= y1; row++) {
+        for (let col = x0; col <= x1; col++) {
+          const nx = (col - ccx) / R
+          const ny = ((row - ccy) * asp) / R
           const d2 = nx * nx + ny * ny
           if (d2 > 1) continue
           const nz = Math.sqrt(1 - d2)
-          // spin: rotate sample longitude over time
           const sx = nx * Math.cos(spin) + nz * Math.sin(spin)
           const lon = sx * 2.2 + 4
           const lat = ny * 2.2 + 4
-          // Guarantee a continent at the zoom target (in screen-space nx/ny so it
-          // stays put while the globe spins) — this is "Korea's location" we dive into.
-          const dbx = nx - bumpX
-          const dby = ny - bumpY
-          const landBump = 0.32 * Math.exp(-(dbx * dbx + dby * dby) / 0.05)
-          const n = vnoise(lon * 1.7, lat * 1.7) * 0.6 + vnoise(lon * 3.4, lat * 3.4) * 0.4 + landBump
-          const isLand = n > 0.45
-          const ice = Math.abs(ny) > 0.88
-          // crisp 2-tone B&W: hard land/sea boundary -> clean pixel islands, no blur
-          let g: number
-          if (ice) g = 240
-          else if (isLand) g = 222 + Math.round(vnoise(lon * 6, lat * 6) * 24)
-          else g = 30 + Math.round(vnoise(lon * 6, lat * 6) * 16)
-          const lambert = clamp01(nx * lx + ny * ly + nz * lz) * 0.25 + 0.82
-          const v = Math.min(255, Math.round(g * lambert))
-          ctx.fillStyle = `rgb(${v},${v},${v})`
-          ctx.fillRect(Math.round(x), Math.round(y), block, block)
+          const n = vnoise(lon * 1.7, lat * 1.7) * 0.6 + vnoise(lon * 3.4, lat * 3.4) * 0.4
+          const land = n > 0.46
+          const lam = clamp01(nx * lx + ny * ly + nz * lz) * 0.55 + 0.45
+          const v = (land ? 0.6 + (n - 0.46) * 0.7 : 0.18) * lam
+          const i = row * cols + col
+          if (v * alpha > b[i]) b[i] = v * alpha
         }
       }
-      // soft white atmosphere rim
-      ctx.globalAlpha = alpha * 0.45
-      const grad = ctx.createRadialGradient(cx, cy, R * 0.9, cx, cy, R * 1.12)
-      grad.addColorStop(0, 'rgba(255,255,255,0)')
-      grad.addColorStop(1, 'rgba(255,255,255,0.3)')
-      ctx.fillStyle = grad
-      ctx.beginPath()
-      ctx.arc(cx, cy, R * 1.12, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.globalAlpha = 1
     }
 
-    const drawKorea = (cx: number, cy: number, scale: number, alpha: number) => {
-      if (alpha <= 0 || koreaRows === 0) return
-      // One small pixel per grid cell — the grid is already high-res, so the
-      // silhouette is detailed and the pixels stay tiny.
-      const px = Math.max(2, Math.round(Math.min(W, H) * 0.0033 * scale))
-      const gw = koreaCols * px
-      const gh = koreaRows * px
-      const ox = cx - gw / 2
-      const oy = cy - gh / 2
-      ctx.globalAlpha = alpha
-      for (let r = 0; r < koreaRows; r++) {
-        const row = koreaGrid[r]
-        for (let c = 0; c < koreaCols; c++) {
-          if (!row[c]) continue
-          const shade = 0.88 + hash(c + 1.3, r + 2.7) * 0.12
-          const v = Math.round(214 * shade)
-          ctx.fillStyle = `rgb(${v},${v},${v})`
-          ctx.fillRect(Math.round(ox + c * px), Math.round(oy + r * px), px, px)
+    const stampKorea = (b: Float32Array, ccx: number, ccy: number, hChars: number, alpha: number) => {
+      if (alpha <= 0) return
+      const wChars = hChars / asp
+      const y0 = Math.max(0, Math.floor(ccy - hChars / 2))
+      const y1 = Math.min(rows - 1, Math.ceil(ccy + hChars / 2))
+      const x0 = Math.max(0, Math.floor(ccx - wChars / 2))
+      const x1 = Math.min(cols - 1, Math.ceil(ccx + wChars / 2))
+      for (let row = y0; row <= y1; row++) {
+        const gy = Math.floor(((row - ccy) / hChars + 0.5) * kN)
+        if (gy < 0 || gy >= kN) continue
+        const gr = koreaGrid[gy]
+        for (let col = x0; col <= x1; col++) {
+          const gx = Math.floor(((col - ccx) / wChars + 0.5) * kN)
+          if (gx < 0 || gx >= kN || !gr[gx]) continue
+          const i = row * cols + col
+          const v = (0.78 + hash(col + 1.1, row + 2.3) * 0.22) * alpha
+          if (v > b[i]) b[i] = v
         }
       }
-      ctx.globalAlpha = 1
-    }
-
-    // Offscreen pixel-sample of the logo so it can assemble block by block.
-    const drawLogo = (cx: number, cy: number, size: number, assemble: number) => {
-      const logoSize = size
-      const lx = cx - logoSize / 2
-      const ly = cy - logoSize / 2
-      if (assemble >= 1 && logoReady) {
-        // settled: crisp logo + wordmark
-        ctx.drawImage(logo, lx, ly, logoSize, logoSize)
-      } else if (logoReady) {
-        const block = Math.max(2, Math.round(logoSize / 96))
-        // render logo small into a temp canvas, sample block centers
-        const tmp = document.createElement('canvas')
-        const n = Math.max(8, Math.round(logoSize / block))
-        tmp.width = n
-        tmp.height = n
-        const tctx = tmp.getContext('2d')
-        if (tctx) {
-          tctx.drawImage(logo, 0, 0, n, n)
-          const data = tctx.getImageData(0, 0, n, n).data
-          for (let gy = 0; gy < n; gy++) {
-            for (let gx = 0; gx < n; gx++) {
-              const i = (gy * n + gx) * 4
-              const a = data[i + 3]
-              if (a < 30) continue
-              // each block has a random reveal threshold → assembles over time
-              const delay = hash(gx + 11, gy + 17)
-              if (assemble < delay) continue
-              ctx.fillStyle = `rgba(${data[i]},${data[i + 1]},${data[i + 2]},${(a / 255).toFixed(3)})`
-              ctx.fillRect(
-                Math.round(lx + gx * block),
-                Math.round(ly + gy * block),
-                block,
-                block,
-              )
-            }
-          }
-        }
-      }
-      // wordmark assembles in just under the logo
-      const wordSize = Math.round(logoSize * 0.42)
-      ctx.save()
-      ctx.font = `700 ${wordSize}px ui-sans-serif, system-ui, -apple-system, sans-serif`
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      const wy = cy + logoSize * 0.78
-      if (assemble >= 1) {
-        ctx.fillStyle = '#141414'
-        ctx.fillText("COM's", cx, wy)
-      } else {
-        ctx.globalAlpha = easeOut(seg(assemble, 0.35, 1))
-        ctx.fillStyle = '#141414'
-        ctx.fillText("COM's", cx, wy)
-        ctx.globalAlpha = 1
-      }
-      ctx.restore()
     }
 
     const frame = (now: number) => {
       if (!start) start = now
       const t = now - start
-      if (t >= DONE && !finishing) {
-        finish()
-      }
+      if (t >= DONE && !finishing) finish()
 
-      // Background: deep space → home surface as logo settles.
-      const spaceFade = easeInOut(seg(t, LOGO_IN, LOGO_SETTLE))
-      ctx.clearRect(0, 0, W, H)
-      const bg = ctx.createLinearGradient(0, 0, 0, H)
-      const bgTop = Math.round(lerp(10, 248, spaceFade))
-      const bgBot = Math.round(lerp(4, 240, spaceFade))
-      bg.addColorStop(0, `rgb(${bgTop},${bgTop},${bgTop})`)
-      bg.addColorStop(1, `rgb(${bgBot},${bgBot},${bgBot})`)
-      ctx.fillStyle = bg
+      ctx.fillStyle = '#000'
       ctx.fillRect(0, 0, W, H)
+      ctx.textBaseline = 'top'
+      ctx.textAlign = 'left'
+      ctx.font = fontPx + 'px ' + MONO
 
-      // Stars fade out as we descend out of space.
-      const starA = (1 - spaceFade) * 0.9
-      if (starA > 0.01) {
-        for (const s of stars) {
-          ctx.globalAlpha = starA * (0.5 + 0.5 * Math.abs(Math.sin(t * 0.002 + s.tw * 6)))
-          ctx.fillStyle = '#fff'
-          ctx.fillRect(s.x, s.y, s.r, s.r)
+      const b = new Float32Array(cols * rows)
+      const ccx = cols / 2
+
+      const eAlpha = clamp01(seg(t, 0, 220)) * (1 - easeInOut(seg(t, 800, EARTH_OUT)))
+      if (eAlpha > 0) {
+        const R = lerp(rows * 0.30, rows * 0.42, easeInOut(seg(t, 0, EARTH_OUT)))
+        stampEarth(b, ccx, rows * 0.46, R, t * 0.0016, eAlpha)
+      }
+      const kAlpha = easeInOut(seg(t, KOREA_IN, KOREA_IN + 260)) * (1 - easeInOut(seg(t, 1700, KOREA_OUT)))
+      if (kAlpha > 0) {
+        const hC = lerp(rows * 0.5, rows * 0.82, easeOut(seg(t, KOREA_IN, 1900)))
+        stampKorea(b, ccx, rows * 0.48, hC, kAlpha)
+      }
+
+      const rampN = RAMP.length - 1
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          const v = b[row * cols + col]
+          if (v <= 0.05) continue
+          const ch = RAMP[Math.min(rampN, Math.max(1, Math.round(v * rampN)))]
+          const g = Math.round(120 + v * 135)
+          ctx.fillStyle = 'rgba(56,' + g + ',92,' + (0.35 + v * 0.6).toFixed(3) + ')'
+          ctx.fillText(ch, col * cellW, row * cellH)
         }
-        ctx.globalAlpha = 1
       }
 
-      const cx = W / 2
-      const min = Math.min(W, H)
-      // Focal point where the target continent (and then Korea) sits — vertically
-      // centred so the globe reads head-on, not from below.
-      const focalY = H * 0.5
-      // The spot on the globe we dive into (screen-space, upper-right ≈ East Asia).
-      const TX = 0.16
-      const TY = -0.2
-
-      // EARTH — starts as a centred globe, then one continuous accelerating dolly
-      // into the target continent. `dive` ramps the target offset in from zero so
-      // the opening frame is a centred globe (no "looking up from below"); the
-      // exponential radius growth reads as constant-speed flight.
-      const dive = easeInOut(seg(t, 0, 1650))
-      const eR = min * 0.34 * Math.pow(7, dive)
-      const eCx = cx - TX * dive * eR
-      const eCy = focalY - TY * dive * eR
-      const eAlpha = clamp01(seg(t, 0, 300)) * (1 - easeInOut(seg(t, 1150, 1650)))
-      drawEarth(eCx, eCy, eR, t * 0.00045, eAlpha, TX, TY)
-
-      // KOREA — emerges from that same focal point, growing as the Earth blows
-      // past and fades, so the two read as one continuous descent.
-      const kAlpha = easeInOut(seg(t, 1300, 1750)) * (1 - easeInOut(seg(t, 2200, 2600)))
-      const kScale = lerp(0.4, 1.22, easeOut(seg(t, 1300, 2350)))
-      drawKorea(cx, focalY, kScale, kAlpha)
-
-      // LOGO — assembles from pixels, settles, then overlay fades.
-      const assemble = easeOut(seg(t, LOGO_IN, LOGO_SETTLE))
-      const logoAlpha = easeInOut(seg(t, LOGO_IN, LOGO_IN + 350))
-      if (logoAlpha > 0) {
-        const pop = 1 + 0.06 * (1 - easeOut(seg(t, LOGO_SETTLE, LOGO_SETTLE + 250))) * (assemble >= 1 ? 1 : 0)
-        ctx.globalAlpha = logoAlpha
-        drawLogo(cx, H * 0.44, Math.min(W, H) * 0.34 * pop, assemble)
-        ctx.globalAlpha = 1
+      const lA = easeInOut(seg(t, LOGO_IN, LOGO_IN + 350))
+      if (lA > 0) {
+        const big = Math.round(Math.min(W, H) * 0.15)
+        ctx.font = '700 ' + big + 'px ' + MONO
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        const full = "COM'S"
+        const shown = Math.round(seg(t, LOGO_IN, LOGO_IN + 450) * full.length)
+        const blink = Math.floor(t / 320) % 2 === 0 ? '_' : ' '
+        ctx.fillStyle = 'rgba(80,255,120,' + lA.toFixed(3) + ')'
+        ctx.fillText(full.slice(0, shown) + blink, W / 2, H * 0.5)
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'top'
       }
 
-      if (!finishing || t < DONE + 50) {
-        raf = requestAnimationFrame(frame)
-      }
+      ctx.font = fontPx + 'px ' + MONO
+      ctx.fillStyle = 'rgba(56,200,96,0.5)'
+      const dots = '.'.repeat(Math.floor(t / 250) % 4)
+      ctx.fillText('kw-coms://boot ' + dots, cellW, H - cellH * 2)
+
+      if (!finishing || t < DONE + 50) raf = requestAnimationFrame(frame)
     }
     raf = requestAnimationFrame(frame)
 
@@ -385,11 +265,6 @@ export default function ComsIntro() {
     }
   }, [])
 
-  // Any fade-out path (auto-finish or a skip click) hides the overlay after the
-  // transition. Critically, unlock body scroll NOW: this component renders null
-  // when done but stays mounted (the parent keeps it while on "/"), so the main
-  // effect's cleanup never runs — without this the body stays overflow:hidden,
-  // which turns it into a scroll container and breaks the home's sticky cinema pin.
   useEffect(() => {
     if (!fadingOut) return
     document.body.style.overflow = ''
@@ -402,39 +277,16 @@ export default function ComsIntro() {
   return (
     <div
       onClick={() => setFadingOut(true)}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9999,
-        opacity: fadingOut ? 0 : 1,
-        transition: `opacity ${FADE}ms ease`,
-        background: '#080808',
-        cursor: 'pointer',
-      }}
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, opacity: fadingOut ? 0 : 1, transition: 'opacity ' + FADE + 'ms ease', background: '#000', cursor: 'pointer' }}
       aria-hidden="true"
     >
       <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
       <button
         type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          setFadingOut(true)
-        }}
-        style={{
-          position: 'absolute',
-          right: 20,
-          bottom: 20,
-          padding: '6px 14px',
-          borderRadius: 999,
-          border: '1px solid rgba(255,255,255,0.25)',
-          background: 'rgba(255,255,255,0.08)',
-          color: 'rgba(255,255,255,0.85)',
-          fontSize: 13,
-          fontWeight: 600,
-          backdropFilter: 'blur(8px)',
-        }}
+        onClick={(e) => { e.stopPropagation(); setFadingOut(true) }}
+        style={{ position: 'absolute', right: 18, bottom: 16, padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(80,255,120,0.4)', background: 'rgba(0,0,0,0.4)', color: 'rgba(120,255,150,0.9)', fontSize: 12, fontFamily: 'ui-monospace, monospace', fontWeight: 600 }}
       >
-        Skip
+        skip ›
       </button>
     </div>
   )
