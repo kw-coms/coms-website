@@ -118,6 +118,7 @@ import {
 } from './data/homeContent'
 import PageFallback from './components/home/PageFallback'
 import ComsIntro from './components/common/ComsIntro'
+import { ToastHost } from './components/common/Toast'
 import CompanionServicesSection from './components/home/CompanionServicesSection'
 
 const NOTIFICATIONS_QUERY_KEY = ['app-shell', 'notifications']
@@ -1664,6 +1665,7 @@ function App() {
         fontSelectionLocked={Boolean(user)}
         onOpenAccountSettings={openAccountSettings}
       />
+      <ToastHost />
     </Suspense>
   )
 }
