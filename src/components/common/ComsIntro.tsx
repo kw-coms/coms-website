@@ -1,4 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { getLogoAsset } from '../../utils/logoAssets'
+
+// Kwangwoon University position inside the normalized Korea grid (computed from
+// the same projection as the coastline rings).
+const KW_NX = 0.4725
+const KW_NY = 0.5432
 
 /**
  * Terminal-style boot intro (green ASCII on black): an ASCII Earth spins, the
@@ -101,12 +107,31 @@ export default function ComsIntro() {
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
-    // phase timeline (ms) — short so it never reads as a long load
+    // real COM's cube logo for the finale (bridges into the home page)
+    const logoImg = new Image()
+    logoImg.src = getLogoAsset('COMs_logo_vec')
+    let logoReady = false
+    logoImg.onload = () => { logoReady = true }
+
+    // phase timeline (ms): earth → korea(+KW lock) → ASCII COM'S → real cube logo
     const EARTH_OUT = 1150
     const KOREA_IN = 850
-    const KOREA_OUT = 1950
-    const LOGO_IN = 1800
-    const DONE = 2600
+    const KOREA_OUT = 2400
+    const PIN_IN = 1500
+    const LOGO_IN = 2000 // ASCII COM'S types
+    const LOGO_OUT = 2600
+    const CUBE_IN = 2750 // real cube logo fades in
+    const DONE = 3700
+
+    // boot-sequence log lines [appearAt ms, text]
+    const BOOT_LOG: Array<[number, string]> = [
+      [0, 'kw-coms://boot --init'],
+      [250, 'acquiring uplink ........ ok'],
+      [650, 'scanning planet ......... ok'],
+      [1150, 'locating KR  37.6N 127.0E'],
+      [1700, 'lock: Kwangwoon Univ.'],
+      [2150, 'launch COM’S _'],
+    ]
 
     const RAMP = " .,:;irs20A#@"
     const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace'
@@ -128,6 +153,14 @@ export default function ComsIntro() {
       C_ACCENT = t('--app-accent', C_ACCENT)
       C_SOFT = t('--app-accent-soft', C_SOFT)
       C_MUTED = t('--app-muted', C_MUTED)
+    }
+    const lum = (hex: string) => {
+      const m = hex.replace('#', '')
+      if (m.length < 6) return 0.5
+      const r = parseInt(m.slice(0, 2), 16)
+      const g = parseInt(m.slice(2, 4), 16)
+      const bl = parseInt(m.slice(4, 6), 16)
+      return (0.299 * r + 0.587 * g + 0.114 * bl) / 255
     }
     let W = 0, H = 0, dpr = 1
     let cols = 0, rows = 0, cellW = 0, cellH = 0, fontPx = 0, asp = 1
@@ -242,23 +275,29 @@ export default function ComsIntro() {
       ctx.fillStyle = wash
       ctx.fillRect(0, 0, W, H)
       ctx.globalAlpha = 1
+      // subtle vignette for depth (deeper in dark mode)
+      const dark = lum(C_BG) < 0.4
+      const vig = ctx.createRadialGradient(W / 2, H * 0.5, Math.min(W, H) * 0.32, W / 2, H * 0.5, Math.max(W, H) * 0.72)
+      vig.addColorStop(0, 'rgba(0,0,0,0)')
+      vig.addColorStop(1, dark ? 'rgba(0,0,0,0.34)' : 'rgba(0,0,0,0.05)')
+      ctx.fillStyle = vig
+      ctx.fillRect(0, 0, W, H)
       ctx.textBaseline = 'top'
       ctx.textAlign = 'left'
       ctx.font = fontPx + 'px ' + MONO
 
       const b = new Float32Array(cols * rows)
       const ccx = cols / 2
+      const koreaCcy = rows * 0.48
 
       const eAlpha = clamp01(seg(t, 0, 220)) * (1 - easeInOut(seg(t, 800, EARTH_OUT)))
       if (eAlpha > 0) {
         const R = lerp(rows * 0.30, rows * 0.42, easeInOut(seg(t, 0, EARTH_OUT)))
         stampEarth(b, ccx, rows * 0.46, R, t * 0.0016, eAlpha)
       }
-      const kAlpha = easeInOut(seg(t, KOREA_IN, KOREA_IN + 260)) * (1 - easeInOut(seg(t, 1700, KOREA_OUT)))
-      if (kAlpha > 0) {
-        const hC = lerp(rows * 0.5, rows * 0.82, easeOut(seg(t, KOREA_IN, 1900)))
-        stampKorea(b, ccx, rows * 0.48, hC, kAlpha)
-      }
+      const kAlpha = easeInOut(seg(t, KOREA_IN, KOREA_IN + 260)) * (1 - easeInOut(seg(t, 2100, KOREA_OUT)))
+      const hC = lerp(rows * 0.5, rows * 0.82, easeOut(seg(t, KOREA_IN, 1900)))
+      if (kAlpha > 0) stampKorea(b, ccx, koreaCcy, hC, kAlpha)
 
       const rampN = RAMP.length - 1
       ctx.fillStyle = C_INK
@@ -273,14 +312,48 @@ export default function ComsIntro() {
       }
       ctx.globalAlpha = 1
 
-      const lA = easeInOut(seg(t, LOGO_IN, LOGO_IN + 350))
+      // KW lock-on reticle on the peninsula (accent HUD), contracts then pulses
+      const pinA = easeOut(seg(t, PIN_IN, PIN_IN + 300)) * (1 - easeInOut(seg(t, 2150, KOREA_OUT)))
+      if (pinA > 0.01) {
+        const wC = hC * asp
+        const px = (ccx + (KW_NX - 0.5) * wC) * cellW
+        const py = (koreaCcy + (KW_NY - 0.5) * hC) * cellH
+        const lock = easeOut(seg(t, PIN_IN, PIN_IN + 450))
+        const ring = lerp(Math.min(W, H) * 0.12, Math.min(W, H) * 0.035, lock)
+        ctx.save()
+        ctx.globalAlpha = pinA
+        ctx.strokeStyle = C_ACCENT
+        ctx.fillStyle = C_ACCENT
+        ctx.lineWidth = Math.max(1.5, Math.min(W, H) / 640)
+        ctx.beginPath()
+        ctx.arc(px, py, ring, 0, Math.PI * 2)
+        ctx.stroke()
+        const tk = ring * 0.5
+        ;[[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dy]) => {
+          ctx.beginPath()
+          ctx.moveTo(px + dx * (ring - tk), py + dy * (ring - tk))
+          ctx.lineTo(px + dx * (ring + tk * 0.45), py + dy * (ring + tk * 0.45))
+          ctx.stroke()
+        })
+        ctx.beginPath()
+        ctx.arc(px, py, ring * 0.13 * (1 + 0.4 * Math.sin(t * 0.012)), 0, Math.PI * 2)
+        ctx.fill()
+        ctx.globalAlpha = pinA * easeOut(seg(t, PIN_IN + 250, PIN_IN + 650))
+        ctx.font = '600 ' + Math.round(fontPx * 0.95) + 'px ' + MONO
+        ctx.textBaseline = 'middle'
+        ctx.fillText("광운대 COM'S", px + ring + 8, py)
+        ctx.restore()
+        ctx.textBaseline = 'top'
+        ctx.textAlign = 'left'
+      }
+
+      // ASCII COM'S types in, then dissolves into the real cube logo
+      const lA = easeInOut(seg(t, LOGO_IN, LOGO_IN + 300)) * (1 - easeInOut(seg(t, LOGO_OUT, LOGO_OUT + 260)))
       if (lA > 0) {
-        // chunky ASCII block letters, each glyph-pixel = P×P '#' chars, typed in
-        // column by column with a blinking cursor block.
         const P = Math.max(2, Math.min(Math.floor(rows * 0.07), Math.floor((cols - 14) / (logoW + 3))))
         const ox = Math.round(cols / 2 - (logoW * P) / 2)
-        const oy = Math.round(rows * 0.5 - (5 * P) / 2)
-        const shown = Math.floor(seg(t, LOGO_IN, LOGO_IN + 600) * logoW)
+        const oy = Math.round(rows * 0.42 - (5 * P) / 2)
+        const shown = Math.floor(seg(t, LOGO_IN, LOGO_IN + 500) * logoW)
         ctx.font = fontPx + 'px ' + MONO
         ctx.globalAlpha = lA
         ctx.fillStyle = C_INK
@@ -292,8 +365,6 @@ export default function ComsIntro() {
                 ctx.fillText('#', (ox + gc * P + px) * cellW, (oy + gr * P + py) * cellH)
           }
         }
-        // blinking accent underline cursor, one blank column past the word so it
-        // never touches the final S (a touching block made the S read as a 9).
         const cc = Math.min(shown + 2, logoW + 1)
         if (Math.floor(t / 300) % 2 === 0) {
           ctx.fillStyle = C_ACCENT
@@ -304,11 +375,36 @@ export default function ComsIntro() {
         ctx.globalAlpha = 1
       }
 
-      ctx.font = fontPx + 'px ' + MONO
+      // Real COM's cube logo finale — bridges into the home page
+      const cubeA = easeInOut(seg(t, CUBE_IN, CUBE_IN + 450))
+      if (cubeA > 0 && logoReady) {
+        const sz = Math.min(W, H) * 0.2
+        const sc = lerp(0.9, 1, easeOut(seg(t, CUBE_IN, CUBE_IN + 550)))
+        const cyc = H * 0.43
+        ctx.globalAlpha = cubeA
+        ctx.drawImage(logoImg, W / 2 - (sz * sc) / 2, cyc - (sz * sc) / 2, sz * sc, sz * sc)
+        ctx.fillStyle = C_INK
+        ctx.font = '700 ' + Math.round(sz * 0.4) + 'px ui-sans-serif, system-ui, -apple-system, sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText("COM's", W / 2, cyc + sz * 0.74)
+        ctx.globalAlpha = 1
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'top'
+      }
+
+      // boot-sequence log, typed line by line, top-left
+      ctx.font = Math.round(fontPx * 0.92) + 'px ' + MONO
       ctx.fillStyle = C_MUTED
-      ctx.globalAlpha = 0.55
-      const dots = '.'.repeat(Math.floor(t / 250) % 4)
-      ctx.fillText('kw-coms://boot ' + dots, cellW, H - cellH * 2)
+      let ly = cellH * 1.3
+      for (const [at, text] of BOOT_LOG) {
+        if (t < at) break
+        const shownC = Math.min(text.length, Math.floor((t - at) / 24))
+        const caret = shownC < text.length && Math.floor(t / 280) % 2 === 0 ? '▮' : ''
+        ctx.globalAlpha = 0.5
+        ctx.fillText('› ' + text.slice(0, shownC) + caret, cellW * 1.6, ly)
+        ly += cellH * 1.45
+      }
       ctx.globalAlpha = 1
 
       if (!finishing || t < DONE + 50) raf = requestAnimationFrame(frame)
