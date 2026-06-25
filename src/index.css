@@ -588,8 +588,8 @@ select {
 
 .home-hero-surface {
 	background-image:
-		linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 88%, transparent), color-mix(in srgb, var(--app-accent-soft) 30%, transparent) 42%, color-mix(in srgb, var(--app-surface) 80%, transparent)),
-		linear-gradient(90deg, transparent 0, color-mix(in srgb, var(--app-surface) 70%, transparent) 50%, transparent 100%);
+		linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 78%, transparent), color-mix(in srgb, var(--app-accent-soft) 46%, transparent) 44%, color-mix(in srgb, var(--app-surface) 66%, transparent)),
+		linear-gradient(90deg, transparent 0, color-mix(in srgb, var(--app-surface) 52%, transparent) 50%, transparent 100%);
 }
 
 .home-device {
@@ -5581,8 +5581,9 @@ body {
 	text-align: center;
 	/* layered depth: soft top glow, accent wash, bottom vignette — not flat */
 	background:
-		radial-gradient(120% 80% at 50% -10%, color-mix(in srgb, var(--app-accent-soft) 55%, transparent), transparent 55%),
-		radial-gradient(90% 70% at 50% 120%, color-mix(in srgb, var(--app-text) 8%, transparent), transparent 60%),
+		radial-gradient(120% 90% at 50% -12%, color-mix(in srgb, var(--app-accent-soft) 95%, transparent), transparent 58%),
+		radial-gradient(70% 55% at 50% -6%, color-mix(in srgb, var(--app-accent) 18%, transparent), transparent 60%),
+		radial-gradient(95% 75% at 50% 122%, color-mix(in srgb, var(--app-text) 11%, transparent), transparent 62%),
 		linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-soft) 100%);
 }
 
@@ -5595,10 +5596,11 @@ body {
 	z-index: 0;
 	pointer-events: none;
 	background:
-		radial-gradient(38% 38% at 22% 28%, color-mix(in srgb, var(--app-accent) 24%, transparent), transparent 70%),
-		radial-gradient(34% 34% at 80% 22%, color-mix(in srgb, #7aa8ff 22%, transparent), transparent 70%),
-		radial-gradient(46% 46% at 62% 82%, color-mix(in srgb, var(--app-accent-soft) 60%, transparent), transparent 70%);
-	filter: blur(36px);
+		radial-gradient(40% 40% at 20% 26%, color-mix(in srgb, var(--app-accent) 42%, transparent), transparent 72%),
+		radial-gradient(36% 36% at 82% 20%, color-mix(in srgb, #6f9dff 38%, transparent), transparent 72%),
+		radial-gradient(34% 34% at 88% 66%, color-mix(in srgb, #a0c4ff 30%, transparent), transparent 72%),
+		radial-gradient(50% 50% at 60% 86%, color-mix(in srgb, var(--app-accent-soft) 92%, transparent), transparent 72%);
+	filter: blur(40px) saturate(118%);
 	animation: coms-aurora 18s ease-in-out infinite alternate;
 	will-change: transform;
 }
@@ -5712,6 +5714,7 @@ body {
 	margin: 0;
 	font-size: clamp(2.75rem, 12vw, 8.5rem);
 	line-height: 0.92;
+	letter-spacing: -0.025em;
 	white-space: nowrap;
 	animation: none;
 }
@@ -5720,6 +5723,16 @@ body {
 .coms-cinema-title {
 	animation: none;
 	transform: none;
+	letter-spacing: -0.02em;
+}
+
+/* Light-mode lift: subtle layered shadow + faint accent halo so the wordmark
+   reads with depth instead of sitting flat (dark mode has its own stronger
+   rule below). */
+.coms-cinema-title,
+.coms-cinema-word {
+	filter: drop-shadow(0 10px 28px color-mix(in srgb, var(--app-accent) 24%, transparent))
+		drop-shadow(0 2px 5px rgba(0, 0, 0, 0.12));
 }
 
 /* The hero body crossfades + rises in as the wordmark finishes shrinking. */
@@ -5986,10 +5999,15 @@ html.home-snap-scroll .home-snap-section {
 }
 .coms-marquee-track {
 	display: inline-flex;
-	gap: 1rem;
+	align-items: center;
+	gap: 3rem;
+	padding-block: 0.35rem;
 	white-space: nowrap;
 	will-change: transform;
-	animation: coms-marquee 26s linear infinite;
+	animation: coms-marquee 32s linear infinite;
+}
+.coms-marquee-track > span {
+	letter-spacing: 0.02em;
 }
 .coms-marquee:hover .coms-marquee-track {
 	animation-play-state: paused;
