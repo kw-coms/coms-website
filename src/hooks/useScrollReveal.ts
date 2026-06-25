@@ -24,14 +24,21 @@ export function useScrollReveal(deps: unknown[] = []) {
       return
     }
 
-    // Repeatable: toggle on every viewport entry/exit so the motion replays.
+    // One-way reveal: show on first entry, then stop observing so content
+    // never un-reveals. threshold:0 (any pixel) is required because a tall
+    // element (e.g. a full post list on a phone) can never reach a fractional
+    // threshold — its max visible ratio is viewport/elementHeight, which on
+    // mobile drops below 0.12 and would leave content stuck at opacity:0.
+    // ponytail: dropped replay-on-scroll-up; keeping content visible wins.
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          entry.target.classList.toggle('is-revealed', entry.isIntersecting)
+          if (!entry.isIntersecting) return
+          entry.target.classList.add('is-revealed')
+          io.unobserve(entry.target)
         })
       },
-      { threshold: 0.12, rootMargin: '0px 0px -8% 0px' },
+      { threshold: 0, rootMargin: '0px 0px -8% 0px' },
     )
     els.forEach((el) => io.observe(el))
 
