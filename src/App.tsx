@@ -614,7 +614,7 @@ function GlobalNavigation() {
                     key={item.id}
                     type="button"
                     onClick={() => closeAndGo(item.path)}
-                    className="flex w-full items-start gap-3 px-6 py-3 text-left transition hover:bg-black/[0.03]"
+                    className="apple-mobile-menu-item apple-mobile-menu-subitem"
                   >
                     <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]">
                       <item.icon size={13} aria-hidden="true" />
