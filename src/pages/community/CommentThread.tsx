@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import { MessageSquare, Send } from 'lucide-react'
 import { linkify } from '../../utils/linkify'
-import ReputationBadge from './ReputationBadge'
 
 export default function CommentThread({
   comments,
@@ -156,7 +155,6 @@ function CommentNode({
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-xs font-bold text-[var(--theme-body-dark)]">{comment.authorName}</span>
-            <ReputationBadge tier={comment.authorTier} label={comment.authorTierLabel} />
             <span className="text-[11px] text-[var(--theme-body-muted)]">{new Date(comment.createdAt).toLocaleString('ko-KR')}</span>
             {comment.edited && (
               <span className="text-[11px] font-bold text-[var(--theme-body-muted)]">

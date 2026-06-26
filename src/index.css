@@ -2616,6 +2616,71 @@ select {
 	font-size: 0.74rem;
 }
 
+.club-calendar-mobile-agenda {
+	display: none;
+	border-bottom: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 94%, var(--app-surface-soft));
+	padding: 0.9rem 1rem;
+}
+
+.club-calendar-mobile-agenda > div {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.75rem;
+}
+
+.club-calendar-mobile-agenda strong {
+	min-width: 0;
+	color: var(--app-text);
+	font-size: 0.9rem;
+	font-style: normal;
+	font-weight: 850;
+}
+
+.club-calendar-mobile-agenda span,
+.club-calendar-mobile-agenda em {
+	color: var(--app-muted);
+	font-size: 0.74rem;
+	font-style: normal;
+	font-weight: 750;
+}
+
+.club-calendar-mobile-agenda ul {
+	display: grid;
+	gap: 0.45rem;
+	margin: 0.7rem 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.club-calendar-mobile-agenda li {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	gap: 0.18rem 0.55rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.45rem;
+	background: var(--app-surface);
+	padding: 0.58rem 0.7rem;
+}
+
+.club-calendar-mobile-agenda li > span {
+	grid-row: 1 / span 2;
+	align-self: center;
+	border-radius: 9999px;
+	background: var(--app-accent-soft);
+	padding: 0.2rem 0.5rem;
+	color: var(--app-accent-text);
+	font-weight: 900;
+}
+
+.club-calendar-mobile-agenda li > strong,
+.club-calendar-mobile-agenda li > em {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .club-calendar-weekdays,
 .club-calendar-grid {
 	display: grid;
@@ -3370,29 +3435,13 @@ select {
 	backdrop-filter: saturate(180%) blur(22px);
 	-webkit-backdrop-filter: saturate(180%) blur(22px);
 	transform-origin: top center;
-	animation: menu-slide-down 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+	animation: menu-slide-down 160ms ease-out both;
 }
 
 @keyframes menu-slide-down {
 	0% {
 		opacity: 0;
-		transform: translateY(-12px);
-	}
-	100% {
-		opacity: 1;
-		transform: translateY(0);
-	}
-}
-
-/* Mobile menu items cascade in. */
-.apple-mobile-menu-panel .apple-mobile-menu-item {
-	animation: menu-item-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@keyframes menu-item-in {
-	0% {
-		opacity: 0;
-		transform: translateY(-6px);
+		transform: translateY(-4px);
 	}
 	100% {
 		opacity: 1;
@@ -3418,6 +3467,17 @@ select {
 .apple-mobile-menu-notification {
 	border: 0;
 	background: transparent;
+}
+
+.apple-mobile-menu-subitem {
+	min-height: 3.75rem;
+	align-items: flex-start;
+	padding: 0.75rem 1.25rem 0.75rem 1.5rem;
+	background: color-mix(in srgb, var(--app-surface-soft) 54%, transparent);
+}
+
+.apple-mobile-menu-subitem > span:last-child {
+	min-width: 0;
 }
 
 .apple-mobile-menu-item:hover {
@@ -4477,6 +4537,77 @@ select {
 		display: none;
 	}
 
+	.community-mobile-posts {
+		margin: 0.75rem !important;
+	}
+
+	.community-post-card-mobile {
+		padding: 0.95rem !important;
+	}
+
+	.community-post-card-tags {
+		gap: 0.35rem !important;
+	}
+
+	.community-post-card-title {
+		font-size: 0.98rem !important;
+		line-height: 1.45 !important;
+	}
+
+	.community-post-card-title > span {
+		display: flex;
+		align-items: flex-start;
+	}
+
+	.community-post-card-title > span > span:first-child {
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+
+	.community-post-card-meta {
+		grid-template-columns: 1fr !important;
+		gap: 0.42rem !important;
+	}
+
+	.community-post-card-meta > span {
+		text-align: left !important;
+	}
+
+	.community-pagination {
+		align-items: stretch !important;
+	}
+
+	.community-pagination-summary {
+		text-align: left !important;
+	}
+
+	.community-pagination-strip {
+		margin-inline: -0.25rem;
+		overflow-x: auto;
+		scrollbar-width: none;
+	}
+
+	.community-pagination-strip::-webkit-scrollbar {
+		display: none;
+	}
+
+	.community-pagination-pages {
+		width: 100%;
+		min-width: 0;
+		justify-content: space-between;
+		gap: 0.35rem !important;
+	}
+
+	.community-pagination-pages > button,
+	.community-pagination-pages > span {
+		min-width: 2.5rem;
+		min-height: 2.5rem;
+	}
+
+	.club-calendar-mobile-agenda {
+		display: block;
+	}
+
 	.appearance-color-row > div > button {
 		aspect-ratio: 1 / 1;
 	}
@@ -4511,6 +4642,30 @@ select {
 		right: 0.3rem;
 		padding: 0.1rem 0.3rem;
 		font-size: 0.55rem;
+	}
+
+	.club-calendar-weekdays span {
+		font-size: 0.66rem;
+	}
+
+	.club-calendar-event-title,
+	.club-calendar-event-meta {
+		display: none;
+	}
+
+	.club-calendar-event {
+		width: 100%;
+		justify-content: center;
+		min-height: 0.55rem;
+		padding: 0;
+		border-radius: 9999px;
+		color: transparent;
+	}
+
+	.club-calendar-event-icon,
+	.club-calendar-event-badge,
+	.club-calendar-event-selected-mark {
+		display: none;
 	}
 }
 

@@ -49,6 +49,7 @@ function removeToast(id: number) {
   timers.set(id, cleanup)
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function showToast(input: ToastInput | string): number {
   const normalized: ToastInput = typeof input === 'string' ? { message: input } : input
   const id = nextId++
@@ -67,6 +68,7 @@ export function showToast(input: ToastInput | string): number {
   return id
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function dismissToast(id: number) {
   const timer = timers.get(id)
   if (timer) {
@@ -81,7 +83,6 @@ export function ToastHost() {
 
   useEffect(() => {
     listeners.add(setItems)
-    setItems(toasts)
     return () => {
       listeners.delete(setItems)
     }

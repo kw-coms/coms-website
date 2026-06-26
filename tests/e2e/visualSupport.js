@@ -3,6 +3,25 @@ export async function mockOptionalApis(page) {
   await page.route('**/api/auth/refresh', (route) => route.fulfill({ status: 401, json: { message: 'Unauthorized' } }))
   await page.route('**/api/fonts', (route) => route.fulfill({ status: 200, json: [] }))
   await page.route('**/api/notices', (route) => route.fulfill({ status: 200, json: [] }))
+  await page.route('**/api/club-projects/categories', (route) => route.fulfill({
+    status: 200,
+    json: [
+      { id: 1, key: 'WEBSITE', name: '웹사이트', position: 1 },
+      { id: 2, key: 'APP', name: '앱', position: 2 },
+      { id: 3, key: 'GAME', name: '게임', position: 3 },
+    ],
+  }))
+  await page.route('**/api/club-projects', (route) => route.fulfill({
+    status: 200,
+    json: [
+      { id: 1, category: 'WEBSITE', categoryName: '웹사이트', title: 'Food Club', description: '식사 모임 허브', eyebrow: 'Meal loop', madeBy: '최준혁', linkUrl: 'https://coms.kw.ac.kr/foodclub/', displayUrl: 'coms.kw.ac.kr/foodclub', files: [] },
+      { id: 2, category: 'WEBSITE', categoryName: '웹사이트', title: 'TeamMate', description: '팀 편성 도구', eyebrow: 'Team randomizer', madeBy: '최준혁', linkUrl: 'https://coms.kw.ac.kr/team-randomizer/', displayUrl: 'coms.kw.ac.kr/team-randomizer', files: [] },
+      { id: 3, category: 'GAME', categoryName: '게임', title: 'Game Club', description: '게임 이벤트 공간', eyebrow: 'Playground', madeBy: '최준혁', linkUrl: 'https://coms.kw.ac.kr/gameclub/', displayUrl: 'coms.kw.ac.kr/gameclub', files: [] },
+      { id: 4, category: 'WEBSITE', categoryName: '웹사이트', title: 'KW Mate', description: '광운대 생활 연결 서비스', eyebrow: 'Campus utility', madeBy: '최준혁', linkUrl: 'http://kwmate.com/', displayUrl: 'kwmate.com', files: [] },
+      { id: 5, category: 'WEBSITE', categoryName: '웹사이트', title: 'Daily Coding', description: '매일 코딩 연습 공간', eyebrow: 'Practice', madeBy: '최준혁', linkUrl: 'https://dailycoding-final.com/', displayUrl: 'dailycoding-final.com', files: [] },
+      { id: 6, category: 'WEBSITE', categoryName: '웹사이트', title: 'PRDoctor', description: 'PR 리뷰 보조 도구', eyebrow: 'PR review', madeBy: '최준혁', linkUrl: 'https://coms.kw.ac.kr/PRDoctor', displayUrl: 'coms.kw.ac.kr/PRDoctor', files: [] },
+    ],
+  }))
 }
 
 export async function mockAdminApis(page) {
