@@ -8,7 +8,6 @@ import {
   Trash2,
 } from 'lucide-react'
 import CommentThread from './CommentThread'
-import ReputationBadge from './ReputationBadge'
 import { BoardDetailBar } from './CommunityChrome'
 import { renderPostBlocks } from './PostBlocks'
 import { isConceptPost, isEdited, postScore } from './communityBoardUtils'
@@ -78,7 +77,6 @@ export default function CommunityDetailView({
             <h2 className="break-words text-xl font-black leading-8 sm:text-2xl">{currentPost.title}</h2>
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--theme-body-muted)]">
               <span className="font-bold text-[var(--theme-body-mid)]">{currentPost.authorDisplayName || currentPost.authorName}</span>
-              <ReputationBadge tier={currentPost.authorTier} label={currentPost.authorTierLabel} />
               {currentPost.authorAdmin && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">주딱</span>}
               {currentPost.concept && <span className="rounded bg-yellow-400 px-1.5 py-0.5 text-[10px] font-black text-black">개념글</span>}
               <span>{new Date(currentPost.createdAt).toLocaleString('ko-KR')}</span>

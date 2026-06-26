@@ -1275,6 +1275,45 @@ test('top navigation groups activity log and monthly calendar under Activity', a
   await page.getByRole('menu').getByRole('button', { name: /^Activity/ }).click()
   await expect(page.getByRole('menu').getByRole('button', { name: /Activity log/ })).toBeVisible()
   await expect(page.getByRole('menu').getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
+  const mobileSubitemBox = await page.getByRole('menu').getByRole('button', { name: /Activity log/ }).boundingBox()
+  expect(mobileSubitemBox.height).toBeGreaterThanOrEqual(44)
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+})
+
+test('community list stays dense but readable on mobile', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/community/posts', (route) => route.fulfill({
+    status: 200,
+    json: Array.from({ length: 12 }, (_, index) => ({
+      id: index + 1,
+      title: `아주 긴 모바일 게시글 제목입니다 ${index + 1}번째 항목에서 줄바꿈과 카드 폭을 같이 확인합니다`,
+      content: '모바일 카드 폭 점검용 본문',
+      category: index % 2 === 0 ? 'QUESTION' : 'GENERAL',
+      authorName: '모바일작성자',
+      authorDisplayName: '모바일작성자',
+      authorStudentId: '2025123456',
+      authorAdmin: false,
+      createdAt: '2026-06-21T12:00:00',
+      updatedAt: '2026-06-21T12:00:00',
+      viewCount: 20 + index,
+      upvoteCount: index,
+      downvoteCount: 0,
+      commentCount: index % 3,
+      pinned: index === 0,
+      imageInfos: index % 4 === 0 ? [{ id: index + 10, url: '/image.png', originalName: 'image.png' }] : [],
+      videoInfos: [],
+      fileInfos: [],
+    })),
+  }))
+
+  await page.setViewportSize({ width: 360, height: 780 })
+  await page.goto('/community')
+
+  await expect(page.locator('.community-post-card-mobile').first()).toBeVisible()
+  await expect(page.locator('.community-pagination-pages').first()).toBeVisible()
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+  const firstCardBox = await page.locator('.community-post-card-mobile').first().boundingBox()
+  expect(firstCardBox.width).toBeLessThanOrEqual(360)
 })
 
 test('activities page does not embed the activity log or monthly calendar', async ({ page }) => {
@@ -2489,6 +2528,11 @@ test('monthly calendar renders recurring schedule occurrences for the selected m
   await expect(recurringEvents.first().getByText('18:00~19:00')).toBeVisible()
   await expect(recurringEvents.first().getByText('@동아리방')).toHaveCount(0)
   await expect(page.locator('.club-calendar-event-badge', { hasText: '취소됨' })).toBeVisible()
+
+  await page.setViewportSize({ width: 390, height: 844 })
+  await expect(page.getByTestId('calendar-mobile-agenda')).toBeVisible()
+  await expect(page.getByTestId('calendar-mobile-agenda')).toContainText('정기 회의')
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
 })
 
 test('monthly calendar paints the selected date and recurring occurrence', async ({ page }) => {

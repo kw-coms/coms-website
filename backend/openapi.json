@@ -95,6 +95,54 @@
         }
       }
     },
+    "/api/notifications/preferences": {
+      "get": {
+        "tags": [
+          "notification-controller"
+        ],
+        "operationId": "getPreferences",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferencesResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "notification-controller"
+        ],
+        "operationId": "updatePreferences",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationPreferencesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPreferencesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/notices/{id}": {
       "get": {
         "tags": [
@@ -425,6 +473,36 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/recruit/status": {
+      "post": {
+        "tags": [
+          "recruit-controller"
+        ],
+        "operationId": "status",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecruitApplicationStatusLookupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecruitApplicationStatusResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -850,6 +928,26 @@
           "archive-controller"
         ],
         "operationId": "list_1",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -977,6 +1075,26 @@
           "community-controller"
         ],
         "operationId": "list_2",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -1664,6 +1782,26 @@
           "club-event-controller"
         ],
         "operationId": "list_4",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -1873,6 +2011,26 @@
           "club-activity-controller"
         ],
         "operationId": "list_5",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -2855,6 +3013,47 @@
         }
       }
     },
+    "/api/notices/{id}/pin": {
+      "patch": {
+        "tags": [
+          "notice-controller"
+        ],
+        "operationId": "pin",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoticeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/community/posts/{id}": {
       "get": {
         "tags": [
@@ -2998,6 +3197,47 @@
                     "format": "binary"
                   }
                 }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityPostResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/community/posts/{id}/pin": {
+      "patch": {
+        "tags": [
+          "community-controller"
+        ],
+        "operationId": "pin_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PinRequest"
               }
             }
           },
@@ -3780,10 +4020,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "string"
-                }
+                "$ref": "#/components/schemas/CommunityReportResolveRequest"
               }
             }
           },
@@ -4718,6 +4955,36 @@
         }
       }
     },
+    "/api/community/posts/tools/link-preview": {
+      "get": {
+        "tags": [
+          "community-controller"
+        ],
+        "operationId": "linkPreview",
+        "parameters": [
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkPreviewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/community/posts/deleted/{id}/media/{mediaId}": {
       "get": {
         "tags": [
@@ -4816,6 +5083,36 @@
                   "items": {
                     "$ref": "#/components/schemas/DeletedCommunityPostResponse"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/community/members/{studentId}/reputation": {
+      "get": {
+        "tags": [
+          "community-reputation-controller"
+        ],
+        "operationId": "reputation",
+        "parameters": [
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityReputationResponse"
                 }
               }
             }
@@ -5226,6 +5523,26 @@
           "admin-controller"
         ],
         "operationId": "recruitApplications",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -5249,6 +5566,26 @@
           "admin-controller"
         ],
         "operationId": "members",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -5488,6 +5825,26 @@
                   "items": {
                     "$ref": "#/components/schemas/AuditLogResponse"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/analytics": {
+      "get": {
+        "tags": [
+          "admin-controller"
+        ],
+        "operationId": "analytics",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAnalyticsResponse"
                 }
               }
             }
@@ -5922,6 +6279,67 @@
           }
         }
       },
+      "NotificationPreferencesRequest": {
+        "type": "object",
+        "properties": {
+          "commentOnPost": {
+            "type": "boolean"
+          },
+          "replyOnComment": {
+            "type": "boolean"
+          },
+          "noticeCreated": {
+            "type": "boolean"
+          },
+          "externalInvite": {
+            "type": "boolean"
+          },
+          "communityPostRestored": {
+            "type": "boolean"
+          },
+          "communityPostDeleted": {
+            "type": "boolean"
+          },
+          "recruitApplication": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "commentOnPost",
+          "communityPostDeleted",
+          "communityPostRestored",
+          "externalInvite",
+          "noticeCreated",
+          "recruitApplication",
+          "replyOnComment"
+        ]
+      },
+      "NotificationPreferencesResponse": {
+        "type": "object",
+        "properties": {
+          "commentOnPost": {
+            "type": "boolean"
+          },
+          "replyOnComment": {
+            "type": "boolean"
+          },
+          "noticeCreated": {
+            "type": "boolean"
+          },
+          "externalInvite": {
+            "type": "boolean"
+          },
+          "communityPostRestored": {
+            "type": "boolean"
+          },
+          "communityPostDeleted": {
+            "type": "boolean"
+          },
+          "recruitApplication": {
+            "type": "boolean"
+          }
+        }
+      },
       "NoticeRequest": {
         "type": "object",
         "properties": {
@@ -6079,16 +6497,24 @@
         "type": "object",
         "properties": {
           "title": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
           },
           "eyebrow": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
           },
           "body": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0
           },
           "href": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 0
           },
           "sortOrder": {
             "type": "integer",
@@ -6128,10 +6554,14 @@
             "type": "boolean"
           },
           "startTime": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 0
           },
           "endTime": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 0
           }
         }
       },
@@ -6175,6 +6605,36 @@
           "password": {
             "type": "string",
             "minLength": 1
+          }
+        }
+      },
+      "RecruitApplicationStatusLookupRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 30,
+            "minLength": 0
+          },
+          "studentId": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\d{10}"
+          }
+        }
+      },
+      "RecruitApplicationStatusResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "statusLabel": {
+            "type": "string"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -6474,6 +6934,12 @@
           "authorAdmin": {
             "type": "boolean"
           },
+          "authorTier": {
+            "type": "string"
+          },
+          "authorTierLabel": {
+            "type": "string"
+          },
           "category": {
             "type": "string"
           },
@@ -6548,6 +7014,9 @@
             "type": "boolean"
           },
           "editable": {
+            "type": "boolean"
+          },
+          "pinned": {
             "type": "boolean"
           }
         }
@@ -6726,6 +7195,12 @@
             "format": "int32"
           },
           "authorName": {
+            "type": "string"
+          },
+          "authorTier": {
+            "type": "string"
+          },
+          "authorTierLabel": {
             "type": "string"
           },
           "content": {
@@ -7620,6 +8095,14 @@
           }
         }
       },
+      "PinRequest": {
+        "type": "object",
+        "properties": {
+          "pinned": {
+            "type": "boolean"
+          }
+        }
+      },
       "UpdateProfileRequest": {
         "type": "object",
         "properties": {
@@ -7809,6 +8292,21 @@
           }
         }
       },
+      "CommunityReportResolveRequest": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "maxLength": 16,
+            "minLength": 0
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        }
+      },
       "NotificationSummaryResponse": {
         "type": "object",
         "properties": {
@@ -7919,6 +8417,26 @@
             "items": {
               "$ref": "#/components/schemas/Item"
             }
+          }
+        }
+      },
+      "LinkPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "siteName": {
+            "type": "string"
           }
         }
       },
@@ -8101,6 +8619,41 @@
           }
         }
       },
+      "Breakdown": {
+        "type": "object",
+        "properties": {
+          "posts": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "comments": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "upvotes": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CommunityReputationResponse": {
+        "type": "object",
+        "properties": {
+          "score": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "tier": {
+            "type": "string"
+          },
+          "tierLabel": {
+            "type": "string"
+          },
+          "breakdown": {
+            "$ref": "#/components/schemas/Breakdown"
+          }
+        }
+      },
       "ScheduleOccurrenceResponse": {
         "type": "object",
         "properties": {
@@ -8245,6 +8798,89 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "AdminAnalyticsResponse": {
+        "type": "object",
+        "properties": {
+          "totalMembers": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "membersByRole": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatusCount"
+            }
+          },
+          "totalNotices": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalCommunityPosts": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalCommunityComments": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalClubActivities": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalClubEvents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalArchiveFiles": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recruitApplicationsByStatus": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatusCount"
+            }
+          },
+          "communityReportsOpen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "communityReportsResolved": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recruitApplicationsByMonth": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MonthlyCount"
+            }
+          }
+        }
+      },
+      "MonthlyCount": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "StatusCount": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
