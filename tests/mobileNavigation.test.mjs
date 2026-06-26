@@ -34,4 +34,28 @@ assert.match(
   'mobile notification row should not add a separate card-like button surface',
 )
 
+assert.match(
+  app,
+  /className="apple-mobile-menu-item apple-mobile-menu-subitem"/,
+  'mobile Activity submenu rows should reuse the shared menu item touch sizing',
+)
+
+assert.match(
+  css,
+  /\.apple-mobile-menu-subitem \{[\s\S]*?min-height: 3\.75rem;[\s\S]*?align-items: flex-start;[\s\S]*?padding: 0\.75rem 1\.25rem 0\.75rem 1\.5rem;/,
+  'mobile Activity submenu rows should keep stable finger-sized hit areas',
+)
+
+assert.doesNotMatch(
+  css,
+  /\.apple-mobile-menu-panel \.apple-mobile-menu-item \{[\s\S]*?animation:/,
+  'mobile menu should not stagger every row with a separate cascade animation',
+)
+
+assert.match(
+  css,
+  /animation: menu-slide-down 160ms ease-out both;/,
+  'mobile menu panel should use a short, restrained open animation',
+)
+
 console.log('mobile navigation contract passed')
