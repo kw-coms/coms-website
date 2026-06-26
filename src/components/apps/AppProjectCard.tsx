@@ -41,10 +41,10 @@ export default function AppProjectCard({
   const [embedOpen, setEmbedOpen] = useState(false)
   const files = Array.isArray(project?.files) ? project.files : []
   const hasLink = Boolean(project?.linkUrl)
-  const canEmbed = hasLink && interactive
   // Keep the whole card clickable only when there's nothing interactive nested
   // inside it (no embed button, no download files) — anchors can't wrap buttons.
-  const wholeCardLink = hasLink && interactive && files.length === 0 && !canEmbed
+  const wholeCardLink = hasLink && interactive && files.length === 0
+  const canEmbed = hasLink && interactive && !wholeCardLink
   const openEmbed = (event) => {
     event.preventDefault()
     event.stopPropagation()
@@ -96,6 +96,7 @@ export default function AppProjectCard({
               href={project.linkUrl}
               target="_blank"
               rel="noreferrer"
+              aria-label={`${project?.title || '앱'} 열기`}
               className="inline-flex items-center gap-2 text-sm font-bold text-[#0066cc] no-underline"
             >
               열기
@@ -107,6 +108,7 @@ export default function AppProjectCard({
           <button
             type="button"
             onClick={openEmbed}
+            aria-label={`${project?.title || '앱'} 여기서 열기`}
             className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--app-accent-text)]"
           >
             <PanelTopOpen size={15} aria-hidden="true" />

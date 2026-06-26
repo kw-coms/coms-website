@@ -765,7 +765,7 @@ function ClubCalendarSection({ compact = false }: any) {
         )}
 
         {!isLocked && monthSummary.length > 0 && (
-          <div className="calendar-month-summary mt-6">
+          <div className="calendar-month-summary mt-6" data-testid="calendar-month-summary">
             <div>
               <p>이번 달 예정 일정 {monthSummary.length}개</p>
               <span>{calendarMonth.title}에서 먼저 확인할 일정입니다.</span>
@@ -782,6 +782,23 @@ function ClubCalendarSection({ compact = false }: any) {
         )}
 
         <div className="club-calendar-shell mt-8">
+          {!isLocked && monthSummary.length > 0 && (
+            <div className="club-calendar-mobile-agenda" data-testid="calendar-mobile-agenda">
+              <div>
+                <strong>모바일 일정 요약</strong>
+                <span>{calendarMonth.title} 일정 {monthSummary.length}개</span>
+              </div>
+              <ul>
+                {monthSummary.map((event) => (
+                  <li key={`mobile-summary-${event.id}`}>
+                    <span>{parseLocalDate(event.date)?.getDate()}일</span>
+                    <strong>{event.title}</strong>
+                    <em>{eventMeta(event)}</em>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="club-calendar-weekdays" aria-hidden="true">
             {calendarWeekdays.map((weekday) => (
               <span key={weekday}>{weekday}</span>

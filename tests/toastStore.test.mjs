@@ -61,7 +61,7 @@ try {
   // removeToast on an already-leaving toast does not stack duplicate cleanup
   // timers. Drive it: fire duration, then verify exactly one cleanup pending.
   scheduled.clear()
-  const idC2 = showToast({ message: '재진입', duration: 100 })
+  showToast({ message: '재진입', duration: 100 })
   flush() // duration fires -> one cleanup scheduled
   assert.equal(scheduled.size, 1, 'exactly one cleanup timer for a leaving toast')
   flush()

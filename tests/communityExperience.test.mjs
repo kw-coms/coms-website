@@ -112,6 +112,9 @@ assert.equal(timeline[1].detail, '관리자(2020123456)')
 assert.equal(timeline[3].detail, '복원 처리 완료')
 
 const postBlocksSource = readFileSync('src/pages/community/PostBlocks.tsx', 'utf8')
+const communityListSource = readFileSync('src/pages/community/CommunityListView.tsx', 'utf8')
+const communityDetailSource = readFileSync('src/pages/community/CommunityDetailView.tsx', 'utf8')
+const commentThreadSource = readFileSync('src/pages/community/CommentThread.tsx', 'utf8')
 
 assert.match(
   postBlocksSource,
@@ -122,5 +125,17 @@ assert.match(
   postBlocksSource,
   /<img\s+src=\{src\}\s+alt=\{block\.title \|\| '외부 이미지'\}[\s\S]*?className="community-inline-media-image block"[\s\S]*?loading="lazy"[\s\S]*?decoding="async"/,
 )
+
+for (const [name, source] of [
+  ['list', communityListSource],
+  ['detail', communityDetailSource],
+  ['comments', commentThreadSource],
+]) {
+  assert.doesNotMatch(
+    source,
+    /ReputationBadge|authorTierLabel/,
+    `community ${name} should not render reputation/activity tier badges`,
+  )
+}
 
 console.log('community experience contract passed')
