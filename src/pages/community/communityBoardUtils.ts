@@ -42,17 +42,6 @@ export function boardFilterOptionsForUser(user) {
   ]
 }
 
-const TIER_STYLES = {
-  NEWCOMER: 'bg-[#eef1f6] text-[#5b6472]',
-  ACTIVE: 'bg-[#e8f8ff] text-[var(--app-accent-text)]',
-  EXCELLENT: 'bg-[#e9f7ec] text-[#1f7a3d]',
-  VETERAN: 'bg-[#f3ecff] text-[#5b3da8]',
-}
-
-export function reputationTierStyle(tier) {
-  return TIER_STYLES[tier] || TIER_STYLES.NEWCOMER
-}
-
 export function postScore(post) {
   return (post.upvotes || 0) - (post.downvotes || 0)
 }

@@ -7,7 +7,6 @@ import {
   ShieldAlert,
 } from 'lucide-react'
 import { categoryLabel } from './postEditorUtils'
-import ReputationBadge from './ReputationBadge'
 import { BoardHeader } from './CommunityChrome'
 import {
   SORT_OPTIONS,
@@ -64,16 +63,16 @@ export default function CommunityListView({
     const iconButtonClass = 'flex size-10 items-center justify-center rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-muted)] transition enabled:hover:bg-[var(--app-surface-soft)] disabled:pointer-events-none sm:size-9'
 
     return (
-      <div className={`flex flex-col gap-3 ${placement === 'bottom' ? 'items-center' : 'lg:flex-row lg:items-center lg:justify-between'}`}>
-        <div className="text-center text-xs font-semibold text-[var(--app-subtle)] lg:text-left">
+      <div className={`community-pagination flex flex-col gap-3 ${placement === 'bottom' ? 'items-center' : 'lg:flex-row lg:items-center lg:justify-between'}`}>
+        <div className="community-pagination-summary text-center text-xs font-semibold text-[var(--app-subtle)] lg:text-left">
           {filteredPosts.length > 0
             ? `${showingFrom.toLocaleString('ko-KR')}-${showingTo.toLocaleString('ko-KR')} / ${filteredPosts.length.toLocaleString('ko-KR')}`
             : '0 / 0'}
           <span className="mx-2 text-black/20">|</span>
           {page.toLocaleString('ko-KR')} / {totalPages.toLocaleString('ko-KR')} 페이지
         </div>
-        <div className="max-w-full overflow-x-auto pb-1">
-          <div className="flex w-max items-center justify-center gap-1.5 px-1">
+        <div className="community-pagination-strip max-w-full overflow-x-auto pb-1">
+          <div className="community-pagination-pages flex w-max items-center justify-center gap-1.5 px-1">
             <button
               type="button"
               onClick={() => onPageChange(1)}
@@ -150,11 +149,11 @@ export default function CommunityListView({
         aria-label={`${post.title} 게시글 열기`}
         onClick={open}
         onKeyDown={(event) => openRowWithKeyboard(event, open)}
-        className={`apple-soft-panel cursor-pointer p-4 text-left text-[var(--app-muted)] transition hover:-translate-y-0.5 focus:bg-[var(--app-surface-soft)] focus:outline-none ${concept ? 'concept-post-card' : ''}`}
+        className={`community-post-card-mobile apple-soft-panel cursor-pointer p-4 text-left text-[var(--app-muted)] transition hover:-translate-y-0.5 focus:bg-[var(--app-surface-soft)] focus:outline-none ${concept ? 'concept-post-card' : ''}`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-black">
+            <div className="community-post-card-tags flex flex-wrap items-center gap-1.5 text-[11px] font-black">
               <span className="text-[var(--app-subtle)]">#{post.id}</span>
               {post.pinned && <span className="rounded bg-[#fff1d6] px-1.5 py-0.5 text-[10px] text-[#9a6a00]">고정</span>}
               <span className="rounded-full bg-[#e8f8ff] px-2 py-1 text-[var(--app-accent-text)]">{categoryLabel(post.category || 'GENERAL')}</span>
@@ -164,7 +163,7 @@ export default function CommunityListView({
               {isEdited(post) && <span className="text-[var(--app-subtle)]">수정</span>}
               {post.authorAdmin && <span className="rounded bg-red-600 px-1 py-0.5 text-[10px] text-white">주딱</span>}
             </div>
-            <h3 className="mt-2 min-w-0 text-base font-black leading-6 text-[var(--app-text)]">
+            <h3 className="community-post-card-title mt-2 min-w-0 text-base font-black leading-6 text-[var(--app-text)]">
               {renderPostTitleWithCount(post)}
             </h3>
           </div>
@@ -178,10 +177,9 @@ export default function CommunityListView({
             </button>
           )}
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-[var(--app-subtle)]">
+        <div className="community-post-card-meta mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-[var(--app-subtle)]">
           <span className="flex min-w-0 items-center gap-1 text-[var(--app-muted)]">
             <span className="truncate">{post.authorDisplayName || post.authorName}</span>
-            <ReputationBadge tier={post.authorTier} label={post.authorTierLabel} className="shrink-0" />
           </span>
           <span className="text-right">{shortDate(post.createdAt)}</span>
           <span>조회 {post.viewCount}</span>
@@ -267,7 +265,7 @@ export default function CommunityListView({
         </div>
       </div>
       {error && <p className="mx-5 mt-5 rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 sm:mx-7">{error}</p>}
-      <div className="m-4 space-y-3 md:hidden">
+      <div className="community-mobile-posts m-4 space-y-3 md:hidden">
         {loading && (
           <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-12 text-center text-sm font-semibold text-[var(--app-muted)]">불러오는 중...</div>
         )}
@@ -323,7 +321,6 @@ export default function CommunityListView({
                   <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-semibold">
                     <span className="inline-flex items-center gap-1">
                       {post.authorDisplayName || post.authorName}
-                      <ReputationBadge tier={post.authorTier} label={post.authorTierLabel} />
                     </span>
                     {user?.role === 'ADMIN' && (
                       <button

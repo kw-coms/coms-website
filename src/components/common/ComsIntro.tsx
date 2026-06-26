@@ -99,19 +99,12 @@ export default function ComsIntro() {
   // never renders and the mount effect bails before any canvas work. This is
   // gated ONLY on the media query, never on the once-per-load flag, so a normal
   // load still plays.
-  const [gone, setGone] = useState(prefersReducedMotion)
+  const [gone, setGone] = useState(() => prefersReducedMotion() || introPlayed)
   const [fadingOut, setFadingOut] = useState(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    if (prefersReducedMotion()) {
-      setGone(true)
-      return
-    }
-    if (introPlayed) {
-      setGone(true)
-      return
-    }
+    if (prefersReducedMotion() || introPlayed) return
     introPlayed = true
 
     const canvas = canvasRef.current
