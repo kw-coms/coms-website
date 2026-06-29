@@ -31,6 +31,7 @@ import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -186,12 +187,12 @@ public class CommunityService {
     @Transactional(readOnly = true)
     public List<CommunityPostResponse> listBookmarked(String studentId) {
         Member member = findMember(studentId);
-        List<CommunityPost> posts = bookmarkRepository.findByStudentIdOrderByCreatedAtDesc(member.getStudentId()).stream()
-                .map(CommunityPostBookmark::getPost)
+        List<CommunityPost> posts = bookmarkRepository.findBookmarkedPostsByStudentId(member.getStudentId()).stream()
                 .filter(Objects::nonNull)
                 .filter(post -> canViewPost(member, post))
                 .toList();
-        return mapPosts(posts, member);
+        // Every post in this list is bookmarked by definition, so skip the per-row existence check.
+        return mapPosts(posts, member, Boolean.TRUE);
     }
 
     @Transactional(readOnly = true)
@@ -205,6 +206,10 @@ public class CommunityService {
     }
 
     private List<CommunityPostResponse> mapPosts(List<CommunityPost> posts, Member member) {
+        return mapPosts(posts, member, null);
+    }
+
+    private List<CommunityPostResponse> mapPosts(List<CommunityPost> posts, Member member, Boolean bookmarkedOverride) {
         Map<String, Member> authors = memberRepository.findByStudentIdIn(posts.stream()
                         .map(CommunityPost::getAuthorStudentId)
                         .filter(Objects::nonNull)
@@ -216,7 +221,7 @@ public class CommunityService {
         Map<Long, List<CommunityPostResponse.PollResult>> pollResults = pollResults(posts, member.getStudentId());
         Map<String, CommunityReputationResponse> reputations = reputationTiers(authors.keySet());
         return posts.stream()
-                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, reputations, false))
+                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, reputations, false, bookmarkedOverride))
                 .toList();
     }
 
@@ -405,7 +410,13 @@ public class CommunityService {
         CommunityPostBookmark bookmark = new CommunityPostBookmark();
         bookmark.setPost(post);
         bookmark.setStudentId(member.getStudentId());
-        bookmarkRepository.save(bookmark);
+        try {
+            bookmarkRepository.saveAndFlush(bookmark);
+        } catch (DataIntegrityViolationException e) {
+            // A concurrent request already inserted the same (post, student) bookmark and tripped the
+            // unique constraint. Treat it as success and report the actual post-operation DB state.
+            return bookmarkRepository.existsByPostIdAndStudentId(post.getId(), member.getStudentId());
+        }
         return true;
     }
 
@@ -850,6 +861,18 @@ public class CommunityService {
                                              Map<Long, List<CommunityPostResponse.PollResult>> pollResults,
                                              Map<String, CommunityReputationResponse> reputations,
                                              boolean includeContent) {
+        return toResponse(post, currentMember, author, voteStats, commentCounts, pollResults, reputations, includeContent, null);
+    }
+
+    private CommunityPostResponse toResponse(CommunityPost post,
+                                             Member currentMember,
+                                             Member author,
+                                             Map<Long, VoteSummary> voteStats,
+                                             Map<Long, Long> commentCounts,
+                                             Map<Long, List<CommunityPostResponse.PollResult>> pollResults,
+                                             Map<String, CommunityReputationResponse> reputations,
+                                             boolean includeContent,
+                                             Boolean bookmarkedOverride) {
         boolean editable = post.getAuthorStudentId().equals(currentMember.getStudentId())
                 || currentMember.getRole() == Member.Role.ADMIN;
         boolean maskAnonymous = isAnonymousPost(post) && currentMember.getRole() != Member.Role.ADMIN;
@@ -888,7 +911,9 @@ public class CommunityService {
                         "/api/community/posts/" + post.getId() + "/files/" + file.getId() + "/download",
                         file.getOriginalName()))
                 .toList();
-        boolean bookmarked = bookmarkRepository.existsByPostIdAndStudentId(post.getId(), currentMember.getStudentId());
+        boolean bookmarked = bookmarkedOverride != null
+                ? bookmarkedOverride
+                : bookmarkRepository.existsByPostIdAndStudentId(post.getId(), currentMember.getStudentId());
         return new CommunityPostResponse(
                 post.getId(),
                 post.getTitle(),

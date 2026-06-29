@@ -1,12 +1,14 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.CommunityPost;
+import com.coms.backend.domain.CommunityPostBookmark;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.CommunityCommentRequest;
 import com.coms.backend.dto.CommunityPollVoteRequest;
 import com.coms.backend.dto.CommunityPostRequest;
 import com.coms.backend.dto.CommunityPostResponse;
 import com.coms.backend.repository.CommunityPollVoteRepository;
+import com.coms.backend.repository.CommunityPostBookmarkRepository;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.CommunityCommentRepository;
@@ -17,13 +19,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest(properties = {
         "jwt.secret=test-secret-key-with-at-least-32-chars",
@@ -55,6 +62,9 @@ class CommunityServiceTest {
     @Autowired
     private CommunityPostFileRepository fileRepository;
 
+    @MockitoSpyBean
+    private CommunityPostBookmarkRepository bookmarkRepository;
+
     @BeforeEach
     void setUp() {
         fileRepository.deleteAll();
@@ -62,6 +72,7 @@ class CommunityServiceTest {
         commentRepository.deleteAll();
         pollVoteRepository.deleteAll();
         voteRepository.deleteAll();
+        bookmarkRepository.deleteAll();
         communityPostRepository.deleteAll();
         memberRepository.deleteAll();
     }
@@ -765,6 +776,63 @@ class CommunityServiceTest {
 
         assertThat(detail.authorTier()).isNull();
         assertThat(detail.authorTierLabel()).isNull();
+    }
+
+    @Test
+    void toggleBookmarkRecoversFromConcurrentInsertConstraintViolation() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var created = communityService.create(user.getStudentId(),
+                new CommunityPostRequest("질문", "내용", "GENERAL", false), null);
+
+        // A concurrent request already bookmarked the same post.
+        CommunityPostBookmark concurrent = new CommunityPostBookmark();
+        concurrent.setPost(communityPostRepository.findById(created.id()).orElseThrow());
+        concurrent.setStudentId(user.getStudentId());
+        bookmarkRepository.saveAndFlush(concurrent);
+        // The existence pre-check misses the concurrent row, so the service takes the INSERT branch;
+        // that INSERT trips uk_community_post_bookmarks_post_student (simulated via the stubbed throw).
+        // The recovery path then re-reads the now-visible row and reports the real bookmarked state.
+        doReturn(false).doReturn(true)
+                .when(bookmarkRepository).existsByPostIdAndStudentId(created.id(), user.getStudentId());
+        doThrow(new DataIntegrityViolationException("uk_community_post_bookmarks_post_student"))
+                .when(bookmarkRepository).saveAndFlush(any());
+
+        boolean bookmarked = communityService.toggleBookmark(created.id(), user.getStudentId());
+
+        assertThat(bookmarked).isTrue();
+        assertThat(bookmarkRepository.findByStudentIdOrderByCreatedAtDesc(user.getStudentId())).hasSize(1);
+    }
+
+    @Test
+    void toggleBookmarkInsertsThenRemovesOnSecondCall() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var created = communityService.create(user.getStudentId(),
+                new CommunityPostRequest("질문", "내용", "GENERAL", false), null);
+
+        assertThat(communityService.toggleBookmark(created.id(), user.getStudentId())).isTrue();
+        assertThat(communityService.toggleBookmark(created.id(), user.getStudentId())).isFalse();
+        assertThat(bookmarkRepository.existsByPostIdAndStudentId(created.id(), user.getStudentId())).isFalse();
+    }
+
+    @Test
+    void listBookmarkedReturnsBookmarkedPostsMarkedBookmarked() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var bookmarkedPost = communityService.create(user.getStudentId(),
+                new CommunityPostRequest("저장한 글", "내용", "GENERAL", false), null);
+        communityService.create(user.getStudentId(),
+                new CommunityPostRequest("저장 안 한 글", "내용", "GENERAL", false), null);
+
+        communityService.toggleBookmark(bookmarkedPost.id(), user.getStudentId());
+
+        var bookmarked = communityService.listBookmarked(user.getStudentId());
+
+        assertThat(bookmarked).singleElement().satisfies(post -> {
+            assertThat(post.id()).isEqualTo(bookmarkedPost.id());
+            assertThat(post.bookmarked()).isTrue();
+        });
     }
 
     private Member member(String studentId, String name, Member.Role role) {
