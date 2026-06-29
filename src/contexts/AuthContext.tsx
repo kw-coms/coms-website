@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type PropsWithChildren } from 'react'
+import type { ApiError } from '../services/apiClient'
 import { getCurrentUser, logoutUser } from '../services/authApi'
 import { setUserContext } from '../services/observability'
 import { buildAuthLoadError, isLoggedOutAuthError } from './authErrors'
 import { AuthContext } from './useAuth'
 
-export function AuthProvider({ children }: any) {
+export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState(null)
@@ -20,9 +21,9 @@ export function AuthProvider({ children }: any) {
     // A transient blip (backend restart / deploy window / network hiccup) should
     // not log the user out. Retry /me a few times on non-auth errors (no status
     // or 5xx) with backoff before giving up; a real 401/403 is not retried.
-    const isTransient = (error: any) => {
+    const isTransient = (error: unknown) => {
       if (isLoggedOutAuthError(error)) return false
-      const status = Number(error?.status)
+      const status = Number((error as Partial<ApiError>)?.status)
       return !Number.isFinite(status) || status >= 500
     }
     const delays = [600, 1500]

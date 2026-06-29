@@ -4,7 +4,18 @@ export async function listClubActivities() {
   return request('/api/club-activities')
 }
 
-export async function createClubActivity({ kind, category, title, description, eventDate, endDate, startTime, endTime, colorHex, image }: any) {
+export async function createClubActivity({ kind, category, title, description, eventDate, endDate, startTime, endTime, colorHex, image }: {
+  kind: string
+  category?: string
+  title: string
+  description?: string
+  eventDate: string
+  endDate?: string
+  startTime?: string
+  endTime?: string
+  colorHex?: string
+  image?: File
+}) {
   const formData = new FormData()
   formData.append('kind', kind)
   formData.append('category', category || 'GENERAL')
@@ -27,7 +38,17 @@ export async function createClubActivity({ kind, category, title, description, e
   return data
 }
 
-export async function updateClubActivity(id, { kind, category, title, description, eventDate, endDate, startTime, endTime, colorHex }: any) {
+export async function updateClubActivity(id, { kind, category, title, description, eventDate, endDate, startTime, endTime, colorHex }: {
+  kind?: string
+  category?: string
+  title?: string
+  description?: string
+  eventDate?: string
+  endDate?: string
+  startTime?: string
+  endTime?: string
+  colorHex?: string
+}) {
   const formData = new FormData()
   if (kind != null) formData.append('kind', kind)
   if (category != null) formData.append('category', category)
@@ -63,9 +84,9 @@ export async function deleteClubActivity(id) {
 
 // ─── Multi-media (mirrors the community media endpoints) ──────────────────────
 
-export async function uploadClubActivityImages(id, files) {
+export async function uploadClubActivityImages(id, files: Iterable<unknown>) {
   const form = new FormData()
-  Array.from(files).forEach((file: any) => form.append('images', file))
+  Array.from(files).forEach((file) => form.append('images', file as File))
   return request(`/api/club-activities/${id}/images`, {
     method: 'POST',
     body: form,
@@ -143,14 +164,21 @@ export async function listClubActivityCategories() {
   return request('/api/club-activities/categories')
 }
 
-export async function createClubActivityCategory({ key, name, position }: any) {
+export async function createClubActivityCategory({ key, name, position }: {
+  key?: string
+  name: string
+  position?: number
+}) {
   return request('/api/admin/club-activity-categories', {
     method: 'POST',
     body: JSON.stringify({ key, name, position }),
   })
 }
 
-export async function updateClubActivityCategory(id, { name, position }: any) {
+export async function updateClubActivityCategory(id, { name, position }: {
+  name?: string
+  position?: number
+}) {
   return request(`/api/admin/club-activity-categories/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ name, position }),

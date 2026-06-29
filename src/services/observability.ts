@@ -13,7 +13,7 @@ function pickEnvironment() {
   return import.meta.env.VITE_SENTRY_ENV || import.meta.env.MODE || 'production'
 }
 
-export async function initObservability({ release }: any = {}) {
+export async function initObservability({ release }: { release?: string } = {}) {
   if (initialized) return
   const dsn = pickDsn()
   if (!dsn) return
