@@ -32,11 +32,12 @@ export const POLL_DURATION_OPTIONS = [
   { value: 10080, label: '7일' },
   { value: 0, label: '종료 없음' },
 ]
-const FORMATTED_TEXT_RE = /<\/?(strong|b|em|i|u|span|font|br|div|p)\b/i
+const FORMATTED_TEXT_RE = /<\/?(strong|b|em|i|u|span|font|br|div|p|pre|code)\b/i
 const EDITOR_ALLOWED_STYLES = new Set(['background-color', 'color', 'font-family'])
+const SAFE_CODE_CLASS_RE = /^language-[a-z0-9]+$/i
 export const EDITOR_SANITIZE_OPTIONS = {
-  allowedTags: ['b', 'br', 'div', 'em', 'font', 'i', 'p', 'span', 'strong', 'u'],
-  allowedAttributes: ['color', 'face', 'style'],
+  allowedTags: ['b', 'br', 'code', 'div', 'em', 'font', 'i', 'p', 'pre', 'span', 'strong', 'u'],
+  allowedAttributes: ['class', 'color', 'face', 'style'],
   allowedStyles: EDITOR_ALLOWED_STYLES,
 }
 
@@ -64,6 +65,14 @@ function cleanEditorNode(node) {
 
   const tag = node.tagName.toLowerCase()
   if (tag === 'br') return document.createElement('br')
+  if (tag === 'pre' || tag === 'code') {
+    const el = document.createElement(tag)
+    // Preserve a single `language-*` hint; drop any other class (styling/CSS-injection surface).
+    const className = (node.getAttribute('class') || '').trim()
+    if (SAFE_CODE_CLASS_RE.test(className)) el.setAttribute('class', className)
+    appendCleanChildren(node, el)
+    return el
+  }
   if (['b', 'strong', 'i', 'em', 'u'].includes(tag)) {
     const el = document.createElement(tag)
     appendCleanChildren(node, el)
