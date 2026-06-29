@@ -5,6 +5,9 @@
 // live in ./RichText. No behavior change.
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { sanitizeHtml } from '../utils/sanitizeHtml'
+// Single source of truth: the rich-text URL guard lives in sanitizeHtml.ts.
+// Re-exported under the legacy name so existing importers keep working.
+export { isSafeUrl as isSafeRichTextUrl } from '../utils/sanitizeHtml'
 import { useAuth } from '../contexts/useAuth'
 import { ActivityCategory } from '../contract/enums'
 import { enumLabels } from '../contract/labels'
@@ -31,8 +34,6 @@ export const WEEKDAY_SHORT = {
 }
 export const SCHEDULE_COLOR_OPTIONS = ['#0071e3', '#34c759', '#ff9f0a', '#8e5cf7', '#ff3b30', '#00a7c7']
 export const DEFAULT_SCHEDULE_COLOR = SCHEDULE_COLOR_OPTIONS[0]
-const RICH_TEXT_ALLOWED_TAGS = new Set(['a', 'b', 'blockquote', 'br', 'div', 'em', 'font', 'h2', 'h3', 'i', 'li', 'ol', 'p', 'span', 'strong', 'u', 'ul'])
-const RICH_TEXT_ALLOWED_STYLES = new Set(['background-color', 'color', 'font-family', 'font-size', 'font-style', 'font-weight', 'text-align', 'text-decoration'])
 export const RICH_TEXT_FONT_OPTIONS = [
   { value: 'Pretendard Variable', label: 'Pretendard' },
   { value: 'Noto Sans KR', label: 'Noto Sans KR' },
@@ -93,99 +94,15 @@ function plainTextToRichHtml(value) {
     .join('')
 }
 
-export function isSafeRichTextUrl(value) {
-  if (!value) return false
-  try {
-    const base = typeof window === 'undefined' ? 'https://coms.kw.ac.kr' : window.location.origin
-    const url = new URL(value, base)
-    return ['http:', 'https:', 'mailto:'].includes(url.protocol)
-  } catch {
-    return false
-  }
-}
-
-function sanitizeStyleValue(value) {
-  const normalized = String(value || '').trim()
-  if (!normalized || /url\s*\(|expression\s*\(|javascript:|data:/i.test(normalized)) return ''
-  return normalized.replace(/[<>"']/g, '')
-}
-
-function sanitizeRichTextStyle(styleText) {
-  return String(styleText || '')
-    .split(';')
-    .map((chunk) => {
-      const [rawProperty, ...rawValueParts] = chunk.split(':')
-      const property = rawProperty?.trim().toLowerCase()
-      if (!property || !RICH_TEXT_ALLOWED_STYLES.has(property)) return ''
-      const value = sanitizeStyleValue(rawValueParts.join(':'))
-      return value ? `${property}: ${value}` : ''
-    })
-    .filter(Boolean)
-    .join('; ')
-}
-
+// Thin wrapper over the unified sanitizer. Plain-text input (no HTML tags) is
+// first promoted to paragraph markup, then handed to the single source of
+// truth via the shared 'richText' profile. No bespoke DOM-walking or
+// duplicated URL/style guards live here anymore.
 export function sanitizeRichTextHtml(value) {
   const raw = String(value || '')
   if (!raw.trim()) return ''
-  if (typeof document === 'undefined') {
-    return sanitizeHtml(/<[a-z][\s\S]*>/i.test(raw) ? raw : plainTextToRichHtml(raw), {
-      allowedTags: [...RICH_TEXT_ALLOWED_TAGS],
-      allowedStyles: RICH_TEXT_ALLOWED_STYLES,
-      trimTrailingBreaks: false,
-    })
-  }
-
-  const template = document.createElement('template')
-  template.innerHTML = /<[a-z][\s\S]*>/i.test(raw) ? raw : plainTextToRichHtml(raw)
-
-  const sanitizeNode = (node) => {
-    if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.textContent || '')
-    if (node.nodeType !== Node.ELEMENT_NODE) return document.createDocumentFragment()
-
-    const source = node
-    const tagName = source.tagName.toLowerCase()
-    if (!RICH_TEXT_ALLOWED_TAGS.has(tagName)) {
-      const fragment = document.createDocumentFragment()
-      source.childNodes.forEach((child) => fragment.appendChild(sanitizeNode(child)))
-      return fragment
-    }
-
-    const outputTagName = tagName === 'font' ? 'span' : tagName
-    const clean = document.createElement(outputTagName)
-    const styleParts = []
-    const styleText = sanitizeRichTextStyle(source.getAttribute('style') || '')
-    if (styleText) styleParts.push(styleText)
-
-    if (tagName === 'font') {
-      const face = sanitizeStyleValue(source.getAttribute('face') || '')
-      const color = sanitizeStyleValue(source.getAttribute('color') || '')
-      if (face) styleParts.push(`font-family: ${face}`)
-      if (color) styleParts.push(`color: ${color}`)
-    }
-
-    if (styleParts.length > 0) clean.setAttribute('style', styleParts.join('; '))
-    if (tagName === 'a') {
-      const href = source.getAttribute('href') || ''
-      if (isSafeRichTextUrl(href)) {
-        clean.setAttribute('href', href)
-        clean.setAttribute('target', '_blank')
-        clean.setAttribute('rel', 'noopener noreferrer')
-      }
-    }
-
-    source.childNodes.forEach((child) => clean.appendChild(sanitizeNode(child)))
-    return clean
-  }
-
-  const fragment = document.createDocumentFragment()
-  template.content.childNodes.forEach((child) => fragment.appendChild(sanitizeNode(child)))
-  const container = document.createElement('div')
-  container.appendChild(fragment)
-  return sanitizeHtml(container.innerHTML, {
-    allowedTags: [...RICH_TEXT_ALLOWED_TAGS],
-    allowedStyles: RICH_TEXT_ALLOWED_STYLES,
-    trimTrailingBreaks: false,
-  })
+  const html = /<[a-z][\s\S]*>/i.test(raw) ? raw : plainTextToRichHtml(raw)
+  return sanitizeHtml(html, { profile: 'richText' })
 }
 
 function richTextToPlainText(value) {

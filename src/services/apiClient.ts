@@ -175,7 +175,7 @@ export async function requestBlob(path, options: any = {}) {
 
   let response = await fetchOnce()
   const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
-  if (response.status === 401 && canRefresh) {
+  if ((response.status === 401 || response.status === 403) && canRefresh) {
     if (await tryRefreshToken()) response = await fetchOnce()
   }
 
