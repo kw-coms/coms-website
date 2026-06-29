@@ -1,6 +1,7 @@
 import { Download } from 'lucide-react'
 import { linkify } from '../../utils/linkify'
 import { apiUrl } from '../../services/apiClient'
+import { PostBlocksContent } from './PostBlocksContent'
 import {
   formatPollDate,
   hasFormattedText,
@@ -49,8 +50,11 @@ export function renderPostBlocks(post, options: any = {}) {
     }
     return { ...base, display: 'block', clear: 'both', margin: '0.75rem auto' }
   }
+  // Re-run highlighting whenever the rendered text changes. Block ids/urls are
+  // stable for a given post, so this key only changes when the body actually does.
+  const contentKey = blocks.map((block) => `${block.type}:${block.content ?? block.url ?? ''}`).join('|')
   return (
-    <div className="px-4 py-5 sm:px-5">
+    <PostBlocksContent contentKey={contentKey}>
       {blocks.map((block, i) => {
         if (block.type === 'text') {
           if (!block.content.trim()) return null
@@ -293,6 +297,6 @@ export function renderPostBlocks(post, options: any = {}) {
           </div>
         </div>
       )}
-    </div>
+    </PostBlocksContent>
   )
 }
