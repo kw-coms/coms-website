@@ -8,21 +8,41 @@ export async function getClubEvent(id) {
   return request(`/api/club-events/${id}`)
 }
 
-export async function createClubEvent({ title, description, startsAt, endsAt }: any) {
+export async function createClubEvent({ title, description, startsAt, endsAt }: {
+  title: string
+  description?: string
+  startsAt?: string
+  endsAt?: string
+}) {
   return request('/api/club-events', {
     method: 'POST',
     body: JSON.stringify({ title, description, startsAt, endsAt }),
   })
 }
 
-export async function updateClubEvent(id, { title, description, startsAt, endsAt }: any) {
+export async function updateClubEvent(id, { title, description, startsAt, endsAt }: {
+  title?: string
+  description?: string
+  startsAt?: string
+  endsAt?: string
+}) {
   return request(`/api/club-events/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ title, description, startsAt, endsAt }),
   })
 }
 
-export async function uploadClubEventEntry(id, { title, authorName, description, workType, summary, tags, externalUrl, file, files }: any) {
+export async function uploadClubEventEntry(id, { title, authorName, description, workType, summary, tags, externalUrl, file, files }: {
+  title: string
+  authorName?: string
+  description?: string
+  workType?: string
+  summary?: string
+  tags?: string
+  externalUrl?: string
+  file?: File
+  files?: Iterable<File>
+}) {
   const form = new FormData()
   form.append('title', title)
   if (authorName) form.append('authorName', authorName)
@@ -32,7 +52,7 @@ export async function uploadClubEventEntry(id, { title, authorName, description,
   if (tags) form.append('tags', tags)
   if (externalUrl) form.append('externalUrl', externalUrl)
   const uploadFiles = Array.from(files || (file ? [file] : []))
-  uploadFiles.forEach((item: any) => form.append('files', item))
+  uploadFiles.forEach((item) => form.append('files', item))
   return request(`/api/club-events/${id}/entries`, {
     method: 'POST',
     body: form,

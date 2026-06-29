@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, type PropsWithChildren } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import PageShell from '../components/PageShell'
@@ -14,7 +14,7 @@ export function ScrollToTop() {
   return null
 }
 
-export function RequireAuth({ children }: any) {
+export function RequireAuth({ children }: PropsWithChildren) {
   const { user, loading, authError } = useAuth()
   const location = useLocation()
   if (loading) return (
@@ -31,7 +31,7 @@ export function RequireAuth({ children }: any) {
   return children
 }
 
-export function RequireAdmin({ children }: any) {
+export function RequireAdmin({ children }: PropsWithChildren) {
   const { user, loading, authError } = useAuth()
   const location = useLocation()
   if (loading) return (
