@@ -24,9 +24,15 @@ public class JwtTokenProvider {
     public JwtTokenProvider(
             @Value("${jwt.secret}") String secret,
             @Value("${jwt.expiration}") long expiration) {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("jwt.secret must be configured — set a strong JWT_SECRET");
+        }
+        if ("change-me".equals(secret)) {
+            throw new IllegalStateException("jwt.secret is set to the default placeholder 'change-me' — set a strong JWT_SECRET");
+        }
         byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
         if (keyBytes.length < 32) {
-            throw new IllegalArgumentException("jwt.secret must be at least 32 characters");
+            throw new IllegalStateException("jwt.secret must be at least 32 characters — set a strong JWT_SECRET");
         }
         this.key = Keys.hmacShaKeyFor(keyBytes);
         this.expiration = expiration;

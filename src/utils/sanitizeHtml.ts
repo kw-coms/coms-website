@@ -33,6 +33,39 @@ const DEFAULT_ALLOWED_STYLES = new Set([
   'text-decoration',
 ])
 
+// Rich-text editor / home-shell surfaces legitimately render a slightly
+// different tag set than plain post bodies (no <mark>, but otherwise the same
+// formatting tags). Exposed as a named profile so every HTML sink shares ONE
+// allow-list source of truth instead of hand-rolling a second sanitizer.
+const RICH_TEXT_ALLOWED_TAGS = [
+  'a',
+  'b',
+  'blockquote',
+  'br',
+  'div',
+  'em',
+  'font',
+  'h2',
+  'h3',
+  'i',
+  'li',
+  'ol',
+  'p',
+  'span',
+  'strong',
+  'u',
+  'ul',
+]
+
+export const SANITIZE_PROFILES = {
+  richText: {
+    allowedTags: RICH_TEXT_ALLOWED_TAGS,
+    allowedAttributes: DEFAULT_ALLOWED_ATTRIBUTES,
+    allowedStyles: DEFAULT_ALLOWED_STYLES,
+    trimTrailingBreaks: false,
+  },
+}
+
 const DANGEROUS_STYLE_VALUE_RE = /url\s*\(|expression\s*\(|javascript:|data:/i
 const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
 
@@ -65,7 +98,7 @@ export function sanitizeStyleDeclaration(styleText, allowedStyles = DEFAULT_ALLO
     .join('; ')
 }
 
-function isSafeUrl(value) {
+export function isSafeUrl(value) {
   if (!value) return false
   try {
     const base = typeof window === 'undefined' ? 'https://coms.kw.ac.kr' : window.location.origin
@@ -115,10 +148,16 @@ export function sanitizeHtml(value, options: any = {}) {
     return escapeHtml(raw)
   }
 
+  const profile = (options.profile && SANITIZE_PROFILES[options.profile]) || {}
+  const allowedTags = options.allowedTags || profile.allowedTags || DEFAULT_ALLOWED_TAGS
+  const allowedAttributes = options.allowedAttributes || profile.allowedAttributes || DEFAULT_ALLOWED_ATTRIBUTES
+  const allowedStyles = options.allowedStyles || profile.allowedStyles || DEFAULT_ALLOWED_STYLES
+  const trimTrailingBreaks = [options.trimTrailingBreaks, profile.trimTrailingBreaks].find((flag) => flag !== undefined) ?? true
+
   const clean = DOMPurify.sanitize(raw, {
     USE_PROFILES: { html: true },
-    ALLOWED_TAGS: options.allowedTags || DEFAULT_ALLOWED_TAGS,
-    ALLOWED_ATTR: options.allowedAttributes || DEFAULT_ALLOWED_ATTRIBUTES,
+    ALLOWED_TAGS: allowedTags,
+    ALLOWED_ATTR: allowedAttributes,
     ALLOW_ARIA_ATTR: false,
     ALLOW_DATA_ATTR: false,
     FORBID_TAGS: ['embed', 'iframe', 'math', 'object', 'script', 'style', 'svg', 'template'],
@@ -129,10 +168,10 @@ export function sanitizeHtml(value, options: any = {}) {
   template.innerHTML = clean
   const container = document.createElement('div')
   container.appendChild(template.content.cloneNode(true))
-  postProcessAttributes(container, options.allowedStyles || DEFAULT_ALLOWED_STYLES)
+  postProcessAttributes(container, allowedStyles)
 
   const html = container.innerHTML.replace(/\u200B/g, '')
-  return options.trimTrailingBreaks === false
+  return trimTrailingBreaks === false
     ? html
     : html.replace(/(<br\s*\/?>\s*)+$/gi, '')
 }
