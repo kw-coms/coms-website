@@ -4279,12 +4279,48 @@ select {
 
 	.apple-section-grid {
 		min-height: auto !important;
-		gap: 2rem !important;
-		padding: 3rem 1rem !important;
+		gap: 1.25rem !important;
+		padding: 1.75rem 1rem !important;
+	}
+
+	/* Tighten the per-section vertical rhythm: the inner content stacks into
+	   one tall column on phones, so big mt-10 (2.5rem) gaps created the empty
+	   feel. Pull the major content blocks closer together. */
+	.apple-section-grid .mt-10 {
+		margin-top: 1.25rem !important;
+	}
+	.apple-section-grid .mt-8 {
+		margin-top: 1rem !important;
+	}
+	.apple-section-grid .mt-6 {
+		margin-top: 0.85rem !important;
+	}
+
+	/* Metric trio: render 3-up on phones instead of stacking into 3 rows. */
+	.apple-section-grid .sm\:grid-cols-3 {
+		grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+		gap: 0.5rem !important;
+	}
+	.apple-section-grid .apple-soft-panel {
+		padding: 0.85rem 0.5rem !important;
+	}
+
+	/* About showcase + project/activity detail cards: shrink the forced
+	   min-height so each card is content-sized, not a 12rem block. */
+	.apple-section-grid .apple-product-panel.group,
+	.apple-section-grid article.apple-product-panel {
+		min-height: 0 !important;
+		padding: 1.25rem !important;
 	}
 
 	.apple-device-card {
-		max-width: min(22rem, 92vw) !important;
+		max-width: min(15rem, 66vw) !important;
+	}
+
+	/* Detail/showcase card paragraphs: tighten leading so the text-heavy 1-up
+	   project/activity cards are not so tall. */
+	.apple-section-grid .apple-product-panel p {
+		line-height: 1.4 !important;
 	}
 
 	.apple-showcase-card {
@@ -5975,6 +6011,79 @@ body {
 	}
 	.coms-cinema-hint {
 		display: none;
+	}
+}
+
+/* ---- Mobile home: tame the desktop "cinematic scroll" ------------------ */
+/* On phones the 240vh pinned hero + the per-section snap turned the home
+   page into an ~11,800px scroll with huge empty bands. Mirror the proven
+   reduced-motion collapse so the hero is ~one screen and natural scrolling
+   returns. Desktop (>=768px) is untouched. */
+@media (max-width: 767px) {
+	/* 1. Collapse the scroll-driven hero to a single screen. */
+	.coms-cinema-track {
+		height: auto;
+	}
+	.coms-cinema-pin {
+		position: static;
+		height: auto;
+		min-height: calc(100svh - var(--apple-nav-height));
+		padding-bottom: 2.5rem;
+	}
+	.coms-cinema-intro,
+	.coms-cinema-hint {
+		display: none;
+	}
+	.coms-cinema-content,
+	.coms-cinema-badge,
+	.coms-cinema-logo,
+	.coms-cinema-tag,
+	.coms-cinema-cta {
+		opacity: 1 !important;
+		transform: none !important;
+		transition: none !important;
+	}
+
+	/* 2. Disable scroll-snap so natural scrolling returns (no janky
+	   snapping on multi-screen-tall sections). The base rule at the bottom of
+	   this file (html.home-snap-scroll{scroll-snap-type:y proximity}) has the
+	   same specificity but appears later in source, so bump specificity here
+	   with :root to guarantee this override wins. */
+	html.home-snap-scroll:root {
+		scroll-snap-type: none !important;
+	}
+	html.home-snap-scroll .home-snap-section {
+		scroll-snap-align: none !important;
+	}
+
+	/* 3b. Trim oversized desktop display type inside the home sections so the
+	   stacked single-column content is not artificially tall on phones.
+	   Scoped to the home section grid + hero only — page copy elsewhere is
+	   untouched. */
+	.apple-section-grid .apple-display {
+		font-size: 2.25rem !important;
+		line-height: 1.05 !important;
+	}
+	.apple-section-grid .apple-copy {
+		font-size: 1.0625rem !important;
+		margin-top: 1rem !important;
+	}
+	.coms-cinema-title {
+		font-size: 3.25rem !important;
+	}
+
+	/* 3c. The about-showcase cards (short body, button.apple-product-panel.group)
+	   stack into a ~500px column on phones — render them 2-up. The project /
+	   activity DETAIL cards (article, long paragraphs) stay 1-up because a
+	   narrow 2-up column balloons their text vertically; instead just tighten
+	   their gap. */
+	.apple-section-grid .lg\:grid-cols-3:has(> .apple-product-panel.group) {
+		grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+		gap: 0.6rem !important;
+	}
+	.apple-section-grid .lg\:grid-cols-3,
+	.apple-section-grid .sm\:grid-cols-2 {
+		gap: 0.6rem !important;
 	}
 }
 
