@@ -156,37 +156,37 @@ export default function CommunityDetailView({
             })}
           </div>
           <div className="grid grid-cols-2 gap-2 border-y border-[var(--app-hairline)] bg-[#fafafa] px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-3 sm:py-5">
-            <button type="button" onClick={() => onVote(1)} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === 1 ? 'border-[#0071e3] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}>
+            <button type="button" onClick={() => onVote(1)} className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:w-auto sm:px-5 ${currentPost.myVote === 1 ? 'border-[#0071e3] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}>
               <ThumbsUp size={16} />
               개추 {currentPost.upvotes}
             </button>
-            <button type="button" onClick={() => onVote(-1)} className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:px-5 ${currentPost.myVote === -1 ? 'border-red-600 bg-red-600 text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-red-600'}`}>
+            <button type="button" onClick={() => onVote(-1)} className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:w-auto sm:px-5 ${currentPost.myVote === -1 ? 'border-red-600 bg-red-600 text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-red-600'}`}>
               <ThumbsDown size={16} />
               비추 {currentPost.downvotes}
             </button>
             <BookmarkButton post={currentPost} onToggle={onToggleBookmark} pending={bookmarkPending} variant="full" />
           </div>
-          <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:flex-wrap sm:justify-between">
-            <button type="button" onClick={onBackToList} className="min-h-11 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
+          <div className="grid grid-cols-2 gap-2 px-4 py-4 sm:flex sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2.5">
+            <button type="button" onClick={onBackToList} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
               목록
             </button>
             {isAdmin && (
-              <button type="button" onClick={onPin} disabled={pinning} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold disabled:opacity-50 sm:min-h-0">
+              <button type="button" onClick={onPin} disabled={pinning} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold disabled:opacity-50 sm:min-h-0">
                 {currentPost.pinned ? <PinOff size={14} /> : <Pin size={14} />}
                 {currentPost.pinned ? '고정 해제' : '고정'}
               </button>
             )}
             {currentPost.editable && (
-              <div className="grid grid-cols-2 gap-2 sm:flex">
-                <button type="button" onClick={onEdit} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
+              <>
+                <button type="button" onClick={onEdit} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
                   <Pencil size={14} />
                   수정
                 </button>
-                <button type="button" onClick={() => onDelete(currentPost)} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 sm:min-h-0">
+                <button type="button" onClick={() => onDelete(currentPost)} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 sm:min-h-0">
                   <Trash2 size={14} />
                   삭제
                 </button>
-              </div>
+              </>
             )}
           </div>
 
