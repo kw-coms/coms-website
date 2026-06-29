@@ -73,8 +73,15 @@ function errorMessageForStatus(status, fallbackMessage = '') {
   return fallbackMessage || `요청 처리 중 오류가 발생했습니다. (HTTP ${status})`
 }
 
+export interface ApiError extends Error {
+  status: number
+  serverMessage: string
+  responseData: unknown
+  responseText: string
+}
+
 export function createApiError(status, data = null, text = '', fallbackMessage = '') {
-  const error: any = new Error(errorMessageForStatus(status, fallbackMessage))
+  const error = new Error(errorMessageForStatus(status, fallbackMessage)) as ApiError
   error.status = status
   error.serverMessage = serverMessageFromBody(data)
   error.responseData = data
@@ -121,7 +128,7 @@ function isDevBackendUnavailableError(error) {
   return error?.status >= 500 || /Failed to fetch|NetworkError|Load failed/i.test(error?.message || '')
 }
 
-export async function requestOptional(path, options: any = {}, fallback = null) {
+export async function requestOptional(path, options: RequestInit = {}, fallback = null) {
   if (!isOptionalDevApiPath(path)) return request(path, options)
   if (optionalDevApiUnavailable()) return fallback
 
@@ -145,7 +152,7 @@ export async function requestOptional(path, options: any = {}, fallback = null) 
   return optionalDevApiInFlight.get(key)
 }
 
-export async function request(path, options: any = {}) {
+export async function request(path, options: RequestInit = {}) {
   const isFormData = options.body instanceof FormData
   const headers = isFormData
     ? options.headers
@@ -166,7 +173,7 @@ export async function request(path, options: any = {}) {
   return data
 }
 
-export async function requestNoContent(path, options: any = {}) {
+export async function requestNoContent(path, options: RequestInit = {}) {
   const isFormData = options.body instanceof FormData
   const headers = (options.body && !isFormData)
     ? { 'Content-Type': 'application/json', ...options.headers }
@@ -184,7 +191,7 @@ export async function requestNoContent(path, options: any = {}) {
   }
 }
 
-export async function requestBlob(path, options: any = {}) {
+export async function requestBlob(path, options: RequestInit = {}) {
   const fetchOnce = () => fetch(apiUrl(path), { credentials: 'include', ...options })
 
   let response = await fetchOnce()
