@@ -32,7 +32,7 @@ export function hexToRgb(hex) {
   }
 }
 
-export function rgbToHex({ r, g, b }: any) {
+export function rgbToHex({ r, g, b }: { r: number; g: number; b: number }) {
   return `#${[r, g, b].map((value) => Math.round(value).toString(16).padStart(2, '0')).join('')}`
 }
 

@@ -68,14 +68,21 @@ export async function deleteClubProjectFile(id, fileId) {
 
 // ─── Admin-managed categories (CRUD) ─────────────────────────────────────────
 
-export async function createClubProjectCategory({ key, name, position }: any) {
+export async function createClubProjectCategory({ key, name, position }: {
+  key?: string
+  name: string
+  position?: number
+}) {
   return request('/api/admin/club-project-categories', {
     method: 'POST',
     body: JSON.stringify({ key, name, position }),
   })
 }
 
-export async function updateClubProjectCategory(id, { name, position }: any) {
+export async function updateClubProjectCategory(id, { name, position }: {
+  name?: string
+  position?: number
+}) {
   return request(`/api/admin/club-project-categories/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({ name, position }),

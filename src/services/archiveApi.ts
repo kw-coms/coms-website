@@ -11,7 +11,12 @@ export async function listFiles() {
   return request('/api/files')
 }
 
-export async function createPost({ title, description, category, file }: any) {
+export async function createPost({ title, description, category, file }: {
+  title: string
+  description?: string
+  category?: string
+  file: File
+}) {
   const formData = new FormData()
   formData.append('title', title)
   if (description) formData.append('description', description)

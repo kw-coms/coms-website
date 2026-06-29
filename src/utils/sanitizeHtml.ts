@@ -169,14 +169,23 @@ function postProcessAttributes(container, allowedStyles) {
   })
 }
 
-export function sanitizeHtml(value, options: any = {}) {
+export interface SanitizeHtmlOptions {
+  profile?: keyof typeof SANITIZE_PROFILES
+  allowedTags?: string[]
+  allowedAttributes?: string[]
+  allowedStyles?: Set<string>
+  trimTrailingBreaks?: boolean
+}
+
+export function sanitizeHtml(value, options: SanitizeHtmlOptions = {}) {
   const raw = String(value || '')
   if (!raw.trim()) return ''
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     return escapeHtml(raw)
   }
 
-  const profile = (options.profile && SANITIZE_PROFILES[options.profile]) || {}
+  const profile: Partial<(typeof SANITIZE_PROFILES)[keyof typeof SANITIZE_PROFILES]> =
+    (options.profile && SANITIZE_PROFILES[options.profile]) || {}
   const allowedTags = options.allowedTags || profile.allowedTags || DEFAULT_ALLOWED_TAGS
   const allowedAttributes = options.allowedAttributes || profile.allowedAttributes || DEFAULT_ALLOWED_ATTRIBUTES
   const allowedStyles = options.allowedStyles || profile.allowedStyles || DEFAULT_ALLOWED_STYLES

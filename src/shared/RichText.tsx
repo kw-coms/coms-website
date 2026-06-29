@@ -1,7 +1,7 @@
 // Rich-text content renderer + contentEditable composer used across the home
 // feature sections. Split from homeUi.ts so this file only exports components
 // (keeps Fast Refresh / react-refresh happy). Behavior unchanged.
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, type ElementType, type ReactNode } from 'react'
 import { Bold, Highlighter, ImagePlus, Italic, Link, Palette, Paperclip, Type, Underline, X } from 'lucide-react'
 import {
   RICH_TEXT_FONT_OPTIONS,
@@ -10,13 +10,21 @@ import {
   sanitizeRichTextHtml,
 } from './homeUi'
 
-export function RichTextContent({ value, className = '', as: Component = 'div' }: any) {
+export function RichTextContent({ value, className = '', as: Component = 'div' }: {
+  value: string
+  className?: string
+  as?: ElementType
+}) {
   const html = sanitizeRichTextHtml(value)
   if (!html) return null
   return <Component className={className} dangerouslySetInnerHTML={{ __html: html }} />
 }
 
-function RichTextComposerButton({ label, icon, onCommand }: any) {
+function RichTextComposerButton({ label, icon, onCommand }: {
+  label: string
+  icon: ReactNode
+  onCommand: () => void
+}) {
   return (
     <button
       type="button"
@@ -43,7 +51,17 @@ export function RichTextComposer({
   onImageFilesChange,
   fileFiles = [],
   onFileFilesChange,
-}: any) {
+}: {
+  value: string
+  onChange: (html: string) => void
+  editorLabel?: string
+  placeholder?: string
+  minHeight?: string
+  imageFiles?: File[]
+  onImageFilesChange?: (files: File[]) => void
+  fileFiles?: File[]
+  onFileFilesChange?: (files: File[]) => void
+}) {
   const editorRef = useRef(null)
   const lastHtmlRef = useRef('')
   const savedRangeRef = useRef(null)

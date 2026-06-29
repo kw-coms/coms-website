@@ -55,7 +55,40 @@ function sortDayEvents(eventsByDay) {
   return eventsByDay
 }
 
-export function buildCalendarDayEvents({ calendarMonth, scheduleItems = [], recurringOccurrences = [] }: any) {
+interface CalendarMonth {
+  year: number
+  month: number
+  days: unknown[]
+}
+
+interface ScheduleItem {
+  kind?: string
+  id?: string | number
+  title?: string
+  eventDate?: string
+  endDate?: string
+  startTime?: string
+  endTime?: string
+  colorHex?: string
+}
+
+interface RecurringOccurrence {
+  date?: string
+  recurringScheduleId?: string | number
+  exceptionId?: string | number | null
+  title?: string
+  startTime?: string
+  endTime?: string
+  location?: string
+  colorHex?: string
+  canceled?: boolean
+}
+
+export function buildCalendarDayEvents({ calendarMonth, scheduleItems = [], recurringOccurrences = [] }: {
+  calendarMonth: CalendarMonth
+  scheduleItems?: ScheduleItem[]
+  recurringOccurrences?: RecurringOccurrence[]
+}) {
   const eventsByDay = {}
 
   scheduleItems
