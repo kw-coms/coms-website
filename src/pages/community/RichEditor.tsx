@@ -283,6 +283,29 @@ export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
     }
   }
 
+  // Wrap the current selection (or insert an empty block) in <pre><code>. The
+  // code element carries no language class by default; the sanitizer only ever
+  // keeps a `language-*` class, so we never emit an unconstrained class here.
+  const insertCodeBlock = () => {
+    const pre = document.createElement('pre')
+    const code = document.createElement('code')
+    const sel = window.getSelection()
+    const selectedText = (savedRange.current && !savedRange.current.collapsed)
+      ? savedRange.current.toString()
+      : (sel && sel.rangeCount > 0 && !sel.isCollapsed ? sel.toString() : '')
+    code.textContent = selectedText || '​'
+    pre.appendChild(code)
+    insertAtCursor(pre)
+    // Place the caret inside the code element so the user can keep typing code.
+    const after = document.createRange()
+    after.selectNodeContents(code)
+    after.collapse(false)
+    const selection = window.getSelection()
+    selection?.removeAllRanges()
+    selection?.addRange(after)
+    savedRange.current = after.cloneRange()
+  }
+
   const insertFile = (file) => {
     const isImage = ALLOWED_IMAGE_TYPES.includes(file.type)
     const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type)
@@ -416,6 +439,7 @@ export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
       insertFiles: (files) => { saveSelection(); files.forEach(insertFile) },
       insertExternalEmbed: (block) => { saveSelection(); insertExternalEmbed(block) },
       insertPoll: (block) => { saveSelection(); insertPoll(block) },
+      insertCodeBlock: () => { saveSelection(); insertCodeBlock() },
       formatBlock,
       saveSelection,
       getBlocks: () => divRef.current ? domToBlocks(divRef.current, figMeta.current) : [],

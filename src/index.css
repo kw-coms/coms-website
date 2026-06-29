@@ -6620,3 +6620,39 @@ html.home-snap-scroll .home-snap-section {
 		animation: none;
 	}
 }
+
+/* community code blocks */
+/* Styles formatted code inside rendered community post bodies. Uses the shared
+   surface/hairline tokens so block code reads correctly in both light and dark
+   mode. Block code (<pre><code>) scrolls horizontally for long lines; inline
+   <code> renders as a small chip. */
+.community-post-text pre {
+	margin: 0.75rem 0;
+	padding: 0.85rem 1rem;
+	background: var(--app-surface-soft);
+	border: 1px solid var(--app-hairline);
+	border-radius: 10px;
+	overflow-x: auto;
+	white-space: pre;
+}
+.community-post-text pre code {
+	display: block;
+	padding: 0;
+	background: none;
+	border: 0;
+	border-radius: 0;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	font-size: 0.85em;
+	line-height: 1.6;
+	color: var(--theme-body-dark);
+	white-space: pre;
+}
+.community-post-text code {
+	padding: 0.1em 0.4em;
+	background: var(--app-surface-soft);
+	border: 1px solid var(--app-hairline);
+	border-radius: 5px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	font-size: 0.85em;
+	color: var(--theme-body-dark);
+}
