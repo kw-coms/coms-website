@@ -28,6 +28,8 @@ const Signup = lazy(() => import('./pages/Signup'))
 const Notices = lazy(() => import('./pages/Notices'))
 const Admin = lazy(() => import('./pages/Admin'))
 const Community = lazy(() => import('./pages/Community'))
+const CommunityBookmarks = lazy(() => import('./pages/community/CommunityBookmarks'))
+const CommunityMemberProfile = lazy(() => import('./pages/community/CommunityMemberProfile'))
 const ChangePassword = lazy(() => import('./pages/ChangePassword'))
 const RecruitApply = lazy(() => import('./pages/RecruitApply'))
 const RecruitNotice = lazy(() => import('./pages/RecruitNotice'))
@@ -276,6 +278,24 @@ function CommunityPage() {
   return (
     <PageShell wide full>
       <Community onBack={() => navigate('/')} />
+    </PageShell>
+  )
+}
+
+function CommunityBookmarksPage() {
+  const navigate = useNavigate()
+  return (
+    <PageShell wide full>
+      <CommunityBookmarks onBack={() => navigate('/community')} />
+    </PageShell>
+  )
+}
+
+function CommunityMemberProfilePage() {
+  const navigate = useNavigate()
+  return (
+    <PageShell wide full>
+      <CommunityMemberProfile onBack={() => navigate('/community')} />
     </PageShell>
   )
 }
@@ -1154,6 +1174,8 @@ function App() {
         <Route path="/notices/:id" element={<RequireAuth><NoticesPage /></RequireAuth>} />
         <Route path="/resources" element={<RequireAuth><ArchivePage /></RequireAuth>} />
         <Route path="/community" element={<RequireAuth><CommunityPage /></RequireAuth>} />
+        <Route path="/community/bookmarks" element={<RequireAuth><CommunityBookmarksPage /></RequireAuth>} />
+        <Route path="/community/members/:studentId" element={<RequireAuth><CommunityMemberProfilePage /></RequireAuth>} />
         <Route path="/community/:id" element={<RequireAuth><CommunityPage /></RequireAuth>} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />

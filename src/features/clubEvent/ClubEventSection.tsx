@@ -9,6 +9,7 @@ import {
   deleteClubEventEntry,
   getClubEvent,
   listClubEvents,
+  rsvpClubEvent,
   uploadClubEventEntry,
   voteClubEventEntry,
 } from '../../services/clubEventApi'
@@ -108,6 +109,12 @@ function clubEventWorkTypeLabel(value) {
   return CLUB_EVENT_WORK_TYPE_OPTIONS.find((option) => option.value === value)?.label || ''
 }
 
+const CLUB_EVENT_RSVP_OPTIONS = [
+  { value: 'GOING', label: '참석', countKey: 'goingCount' },
+  { value: 'MAYBE', label: '미정', countKey: 'maybeCount' },
+  { value: 'NOT_GOING', label: '불참', countKey: 'notGoingCount' },
+]
+
 function clubEventEntryTags(value) {
   return String(value || '')
     .split(/[,\n#]+/)
@@ -149,6 +156,7 @@ function ClubEventSection() {
   const [savingEvent, setSavingEvent] = useState(false)
   const [savingEntry, setSavingEntry] = useState(false)
   const [votingEntryId, setVotingEntryId] = useState(null)
+  const [rsvpPending, setRsvpPending] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
 
   const eventItems = user ? events || [] : []
@@ -286,6 +294,24 @@ function ClubEventSection() {
       setError(err.message || '투표하지 못했습니다.')
     } finally {
       setVotingEntryId(null)
+    }
+  }
+
+  const handleRsvp = async (status) => {
+    if (!selectedEvent || rsvpPending) return
+    setRsvpPending(status)
+    setNotice('')
+    setError('')
+    try {
+      const updated = await rsvpClubEvent(selectedEvent.id, status)
+      mergeEvent(updated)
+      setSelectedSnapshot(updated)
+      const label = CLUB_EVENT_RSVP_OPTIONS.find((option) => option.value === status)?.label || ''
+      setNotice(`참석 여부를 '${label}'(으)로 표시했습니다.`)
+    } catch (err) {
+      setError(err.message || '참석 여부를 저장하지 못했습니다.')
+    } finally {
+      setRsvpPending(null)
     }
   }
 
@@ -517,6 +543,30 @@ function ClubEventSection() {
             <span className={selectedEvent.votingOpen ? 'club-event-status-open' : 'club-event-status-closed'}>{selectedEvent.votingOpen ? '투표 진행 중' : '투표 종료'}</span>
             <strong>{selectedEvent.totalVotes ?? 0}표</strong>
             <small>{formatEventWindow(selectedEvent)}</small>
+          </div>
+        </div>
+        <div className="club-event-rsvp" aria-label="참석 여부">
+          <p className="club-event-rsvp-label">참석 여부</p>
+          <div className="club-event-rsvp-group" role="group" aria-label="참석 여부 선택">
+            {CLUB_EVENT_RSVP_OPTIONS.map((option) => {
+              const count = Number(selectedEvent[option.countKey]) || 0
+              const selected = selectedEvent.myRsvpStatus === option.value
+              const pending = rsvpPending === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handleRsvp(option.value)}
+                  disabled={Boolean(rsvpPending)}
+                  aria-pressed={selected}
+                  aria-label={`${option.label} ${count}명${selected ? ' (선택됨)' : ''}`}
+                  className={`club-event-rsvp-button ${selected ? 'club-event-rsvp-button-selected' : ''} ${pending ? 'club-event-rsvp-button-pending' : ''}`}
+                >
+                  <span className="club-event-rsvp-button-name">{option.label}</span>
+                  <span className="club-event-rsvp-button-count">{pending ? '...' : count}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
         {(notice || error) && <div className={`club-event-toast mx-4 mt-4 ${error ? 'club-event-toast-error' : ''}`}>{error || notice}</div>}

@@ -15,6 +15,7 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
     List<CommunityPost> findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc();
     List<CommunityPost> findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc(Pageable pageable);
     List<CommunityPost> findByAuthorStudentId(String authorStudentId);
+    List<CommunityPost> findByAuthorStudentIdOrderByCreatedAtDesc(String authorStudentId);
     long countByAuthorStudentIdAndCreatedAtAfter(String authorStudentId, LocalDateTime createdAt);
     long countByAuthorStudentId(String authorStudentId);
 

@@ -9,6 +9,8 @@ import {
 } from 'lucide-react'
 import CommentThread from './CommentThread'
 import { BoardDetailBar } from './CommunityChrome'
+import BookmarkButton from './BookmarkButton'
+import AuthorName from './AuthorName'
 import { renderPostBlocks } from './PostBlocks'
 import { isConceptPost, isEdited, postScore } from './communityBoardUtils'
 import { MAX_ANONYMOUS_NAME_LENGTH, categoryLabel } from './postEditorUtils'
@@ -53,6 +55,8 @@ export default function CommunityDetailView({
   isAdmin,
   pinning,
   onPin,
+  onToggleBookmark,
+  bookmarkPending,
 }: any) {
   const currentPostConcept = currentPost ? isConceptPost(currentPost) : false
 
@@ -76,7 +80,7 @@ export default function CommunityDetailView({
             </div>
             <h2 className="break-words text-xl font-black leading-8 sm:text-2xl">{currentPost.title}</h2>
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--theme-body-muted)]">
-              <span className="font-bold text-[var(--theme-body-mid)]">{currentPost.authorDisplayName || currentPost.authorName}</span>
+              <AuthorName post={currentPost} className="font-bold text-[var(--theme-body-mid)]" />
               {currentPost.authorAdmin && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">주딱</span>}
               {currentPost.concept && <span className="rounded bg-yellow-400 px-1.5 py-0.5 text-[10px] font-black text-black">개념글</span>}
               <span>{new Date(currentPost.createdAt).toLocaleString('ko-KR')}</span>
@@ -102,6 +106,7 @@ export default function CommunityDetailView({
               <ThumbsDown size={16} />
               비추 {currentPost.downvotes}
             </button>
+            <BookmarkButton post={currentPost} onToggle={onToggleBookmark} pending={bookmarkPending} variant="full" />
           </div>
           <div className="flex flex-col gap-2 px-4 py-4 sm:flex-row sm:flex-wrap sm:justify-between">
             <button type="button" onClick={onBackToList} className="min-h-11 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">

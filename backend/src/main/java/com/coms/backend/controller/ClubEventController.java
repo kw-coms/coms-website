@@ -4,6 +4,7 @@ import com.coms.backend.domain.ClubEventEntry;
 import com.coms.backend.domain.ClubEventEntryFile;
 import com.coms.backend.dto.ClubEventRequest;
 import com.coms.backend.dto.ClubEventResponse;
+import com.coms.backend.dto.ClubEventRsvpRequest;
 import com.coms.backend.dto.ClubEventVoteRequest;
 import com.coms.backend.service.ClubEventService;
 import jakarta.validation.Valid;
@@ -92,6 +93,13 @@ public class ClubEventController {
                                                   Authentication authentication) {
         Long requestedEntryId = request == null || request.entryId() == null ? entryId : request.entryId();
         return ResponseEntity.ok(clubEventService.vote(id, requestedEntryId, authentication.getName()));
+    }
+
+    @PostMapping("/{id}/rsvp")
+    public ResponseEntity<ClubEventResponse> rsvp(@PathVariable Long id,
+                                                  @Valid @RequestBody ClubEventRsvpRequest request,
+                                                  Authentication authentication) {
+        return ResponseEntity.ok(clubEventService.rsvp(id, authentication.getName(), request.status()));
     }
 
     @GetMapping("/{id}/entries/{entryId}/download")
