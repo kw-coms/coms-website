@@ -3,7 +3,11 @@ import { confirmSignupEmailVerification, requestSignupEmailVerification } from '
 
 const RESEND_COOLDOWN_SECONDS = 60
 
-export function EmailVerifyStep({ studentId, email, onDone }: any) {
+export function EmailVerifyStep({ studentId, email, onDone }: {
+  studentId?: string | null
+  email?: string
+  onDone: () => void
+}) {
   const [code, setCode] = useState('')
   const [verifying, setVerifying] = useState(false)
   const [resending, setResending] = useState(false)

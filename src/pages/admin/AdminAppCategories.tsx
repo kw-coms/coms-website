@@ -6,7 +6,10 @@ import {
 } from '../../services/clubProjectApi'
 
 const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
-export default function AdminAppCategories({ categories, onChanged }: any) {
+export default function AdminAppCategories({ categories, onChanged }: {
+  categories: { id: string | number; name: string; key?: string; projectCount?: number }[]
+  onChanged: () => void
+}) {
   const [newName, setNewName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')

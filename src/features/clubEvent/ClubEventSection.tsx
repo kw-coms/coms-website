@@ -125,7 +125,7 @@ function clubEventEntryTags(value) {
 function mergeFileList(currentFiles, nextFiles) {
   const merged = [...(currentFiles || [])]
   const seen = new Set(merged.map((file) => `${file.name}:${file.size}:${file.lastModified}`))
-  for (const file of Array.from(nextFiles || []) as any[]) {
+  for (const file of Array.from(nextFiles || []) as File[]) {
     const key = `${file.name}:${file.size}:${file.lastModified}`
     if (!seen.has(key)) {
       merged.push(file)

@@ -7,12 +7,19 @@ import {
 
 export const MAX_COMMENT_LENGTH = 1000
 
+type CommentablePost = { id: number; commentCount?: number; [key: string]: unknown }
+
 export function useCommunityComments({
   currentPost,
   isAnonymousDetail,
   setCurrentPost,
   setPosts,
-}: any) {
+}: {
+  currentPost: CommentablePost | null
+  isAnonymousDetail: boolean
+  setCurrentPost: (updater: (prev: CommentablePost | null) => CommentablePost | null) => void
+  setPosts: (updater: (prev: CommentablePost[]) => CommentablePost[]) => void
+}) {
   const [comments, setComments] = useState([])
   const [commentInput, setCommentInput] = useState('')
   const [commentAnonymousName, setCommentAnonymousName] = useState('')

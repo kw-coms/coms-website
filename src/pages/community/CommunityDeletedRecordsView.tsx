@@ -4,6 +4,24 @@ import { categoryLabel } from './postEditorUtils'
 import { BoardComposeBar } from './CommunityChrome'
 import { deletedRecordText, deletionIdentity } from './communityBoardUtils'
 
+type DeletedRecord = {
+  id: string | number
+  title?: string
+  content?: string
+  category?: string
+  commentCount?: number
+  commentInfos?: { authorName?: string; content?: string }[]
+  deletedAt?: string
+  deletedByName?: string
+  deletedByStudentId?: string
+  deletionReason?: string
+  restoredPostId?: string | number
+  restoredAt?: string
+  latestAppealStatus?: string
+  latestAppealMessage?: string
+  [key: string]: unknown
+}
+
 export default function CommunityDeletedRecordsView({
   deletedError,
   deletedLoading,
@@ -16,7 +34,19 @@ export default function CommunityDeletedRecordsView({
   onAppealOpen,
   onAppealCancel,
   onSubmitAppeal,
-}: any) {
+}: {
+  deletedError?: string
+  deletedLoading?: boolean
+  deletedPosts: DeletedRecord[]
+  appealOpenId: string | number | null
+  appealDrafts: Record<string | number, string>
+  appealingId: string | number | null
+  onBackToList: () => void
+  onAppealDraftChange: (id: string | number, value: string) => void
+  onAppealOpen: (id: string | number) => void
+  onAppealCancel: () => void
+  onSubmitAppeal: (record: DeletedRecord) => void
+}) {
   return (
     <>
       <BoardComposeBar title="내 삭제 기록">

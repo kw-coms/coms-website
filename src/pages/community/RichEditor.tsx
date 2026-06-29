@@ -26,7 +26,13 @@ import RichEditorSurface from './RichEditorSurface'
 const EXTERNAL_CARD_STYLE = 'overflow:hidden;border:1px solid var(--app-hairline);border-radius:12px;background:var(--app-surface);box-shadow:0 1px 2px rgba(0,0,0,0.04);'
 const EXTERNAL_CAPTION_STYLE = 'padding:8px 12px;font-size:12px;font-weight:600;color:var(--app-muted);pointer-events:none'
 
-export default function RichEditor({ initialBlocks, apiRef, onError }: any) {
+type EditorBlock = { type?: string; options?: unknown[]; [key: string]: unknown }
+
+export default function RichEditor({ initialBlocks, apiRef, onError }: {
+  initialBlocks: EditorBlock[]
+  apiRef?: { current: unknown } | null
+  onError?: (message: string) => void
+}) {
   const divRef = useRef(null)
   const figMeta = useRef(new Map())
   const savedRange = useRef(null)

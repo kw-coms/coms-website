@@ -13,6 +13,20 @@ import {
 // Single community post row (card layout). This is the canonical row used by the
 // main board mobile list, the 내 스크랩 page, and the member profile page so the
 // presentation stays identical everywhere. Admin delete is optional.
+type CommunityPostRowData = {
+  id: number
+  title?: string
+  category?: string
+  createdAt?: string
+  viewCount?: number
+  commentCount?: number
+  pinned?: boolean
+  authorAdmin?: boolean
+  videoInfos?: unknown[]
+  bookmarked?: boolean
+  [key: string]: unknown
+}
+
 export default function CommunityPostRow({
   post,
   onOpen,
@@ -20,7 +34,14 @@ export default function CommunityPostRow({
   bookmarkPending,
   showAdminDelete = false,
   onAdminDelete,
-}: any) {
+}: {
+  post: CommunityPostRowData
+  onOpen: (post: CommunityPostRowData) => void
+  onToggleBookmark: (post: { id: number; bookmarked?: boolean }) => void
+  bookmarkPending?: boolean
+  showAdminDelete?: boolean
+  onAdminDelete?: (event: React.MouseEvent, post: CommunityPostRowData) => void
+}) {
   const open = () => onOpen(post)
   const concept = isConceptPost(post)
   const commentCount = Number(post?.commentCount || 0)

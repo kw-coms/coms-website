@@ -37,7 +37,7 @@ import { MAX_COMMENT_LENGTH, useCommunityComments } from './community/useCommuni
 import { useCommunityPosts } from './community/useCommunityPosts'
 import { useBookmarkMutation } from './community/useBookmarkMutation'
 
-export default function Community({ onBack }: any) {
+export default function Community({ onBack }: { onBack: () => void }) {
   const { user } = useAuth()
   const { id: urlId } = useParams()
   const navigate = useNavigate()

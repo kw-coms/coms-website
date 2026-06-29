@@ -20,7 +20,7 @@ export function useAdminMembers() {
   })
 
   const roleMutation = useMutation({
-    mutationFn: ({ id, role }: any) => updateMemberRole(id, role),
+    mutationFn: ({ id, role }: { id: string | number; role: string }) => updateMemberRole(id, role),
     onSuccess: (updated) => {
       queryClient.setQueryData(adminMembersQueryKey, (prev) => (
         (Array.isArray(prev) ? prev : []).map((member) => (member.id === updated.id ? updated : member))
@@ -40,7 +40,7 @@ export function useAdminMembers() {
   })
 
   const passwordMutation = useMutation({
-    mutationFn: ({ id, password }: any) => resetMemberPassword(id, password),
+    mutationFn: ({ id, password }: { id: string | number; password: string }) => resetMemberPassword(id, password),
   })
 
   return {

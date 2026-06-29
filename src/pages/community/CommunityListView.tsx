@@ -23,6 +23,20 @@ import {
   shortDate,
 } from './communityBoardUtils'
 
+type ListPost = {
+  id: number
+  title?: string
+  category?: string
+  commentCount?: number
+  bookmarked?: boolean
+  pinned?: boolean
+  authorAdmin?: boolean
+  videoInfos?: unknown[]
+  viewCount?: number
+  createdAt?: string
+  [key: string]: unknown
+}
+
 export default function CommunityListView({
   onOpenDeletedRecords,
   onWrite,
@@ -49,7 +63,33 @@ export default function CommunityListView({
   onOpenBookmarks,
   onToggleBookmark,
   bookmarkPending,
-}: any) {
+}: {
+  onOpenDeletedRecords: () => void
+  onWrite: () => void
+  boardFilterOptions: { value: string; label: string }[]
+  effectiveActiveCategory: string
+  onCategoryChange: (value: string) => void
+  searchQuery: string
+  onSearchChange: (value: string) => void
+  filteredPosts: ListPost[]
+  visiblePosts: ListPost[]
+  loading: boolean
+  error: string
+  sortMode: string
+  onSortChange: (value: string) => void
+  page: number
+  totalPages: number
+  paginationItems: (number | string)[]
+  showingFrom: number
+  showingTo: number
+  onPageChange: (page: number | string) => void
+  user?: { role?: string } | null
+  onOpenPost: (post: ListPost) => void
+  onAdminDelete: (event: React.MouseEvent, post: ListPost) => void
+  onOpenBookmarks: () => void
+  onToggleBookmark: (post: { id: number; bookmarked?: boolean }) => void
+  bookmarkPending?: boolean
+}) {
   const commentCountSuffix = (post) => {
     const count = Number(post?.commentCount || 0)
     return count > 0 ? `[${count.toLocaleString('ko-KR')}]` : ''

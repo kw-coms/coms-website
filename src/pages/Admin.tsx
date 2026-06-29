@@ -39,7 +39,15 @@ const ADMIN_TABS = [
   { id: 'logs', label: '로그' },
 ]
 
-export default function Admin({ onBack }: any) {
+type RecruitApplication = {
+  id: string | number
+  name: string
+  department: string
+  status: string
+  [key: string]: unknown
+}
+
+export default function Admin({ onBack }: { onBack: () => void }) {
   const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState(() => {
@@ -47,7 +55,7 @@ export default function Admin({ onBack }: any) {
     return requested && ADMIN_TAB_IDS.has(requested) ? requested : 'overview'
   })
   const activeTabLabel = ADMIN_TABS.find((tab) => tab.id === activeTab)?.label || '관리자 탭'
-  const [recruitApplications, setRecruitApplications] = useState([])
+  const [recruitApplications, setRecruitApplications] = useState<RecruitApplication[]>([])
   const [recruitLoading, setRecruitLoading] = useState(true)
   const [recruitError, setRecruitError] = useState('')
 
@@ -155,7 +163,8 @@ export default function Admin({ onBack }: any) {
                 error={recruitError}
                 onReload={loadRecruitApplications}
                 onUpdated={(updated) => {
-                  setRecruitApplications((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+                  const next = updated as RecruitApplication
+                  setRecruitApplications((prev) => prev.map((item) => (item.id === next.id ? next : item)))
                 }}
                 formatDateTime={formatDateTime}
               />
@@ -177,7 +186,12 @@ export default function Admin({ onBack }: any) {
   )
 }
 
-function OverviewTab({ recruitApplications, recruitLoading, recruitError, onOpenRecruit }: any) {
+function OverviewTab({ recruitApplications, recruitLoading, recruitError, onOpenRecruit }: {
+  recruitApplications: RecruitApplication[]
+  recruitLoading: boolean
+  recruitError: string
+  onOpenRecruit: () => void
+}) {
   const pendingCount = recruitPendingCount(recruitApplications)
   const latestApplication = recruitApplications[0]
   const cards = [
