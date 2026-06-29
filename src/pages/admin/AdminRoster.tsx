@@ -67,7 +67,7 @@ export default function AdminRoster() {
     setAddResult('')
     setAddError('')
     try {
-      const payload: any = { name: addForm.name.trim() }
+      const payload: { name: string; studentId?: string; admissionYear?: string; generation?: string } = { name: addForm.name.trim() }
       if (!isGraduate) {
         payload.studentId = addForm.studentId.trim()
       } else if (addForm.admissionYear.trim()) {

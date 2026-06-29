@@ -10,7 +10,25 @@ import {
 
 const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
 
-export default function AdminActivityRow({ item, categories, onDelete, onUpdated }: any) {
+type MediaInfo = { id: string | number; url?: string; originalName?: string }
+type ActivityItem = {
+  id: string | number
+  category?: string
+  categoryName?: string
+  title?: string
+  description?: string
+  eventDate?: string
+  kind?: string
+  imageInfos?: MediaInfo[]
+  fileInfos?: MediaInfo[]
+}
+
+export default function AdminActivityRow({ item, categories, onDelete, onUpdated }: {
+  item: ActivityItem
+  categories: { key?: string; name: string }[]
+  onDelete: (item: ActivityItem) => void
+  onUpdated: (updated: unknown) => void
+}) {
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [rowError, setRowError] = useState('')

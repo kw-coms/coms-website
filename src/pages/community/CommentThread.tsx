@@ -2,6 +2,42 @@ import { useMemo } from 'react'
 import { MessageSquare, Send } from 'lucide-react'
 import { linkify } from '../../utils/linkify'
 
+type Comment = {
+  id: string | number
+  authorName?: string
+  content?: string
+  createdAt?: string
+  updatedAt?: string
+  edited?: boolean
+  deletable?: boolean
+  parentCommentId?: string | number | null
+  children?: Comment[]
+}
+
+type CommentNodeSharedProps = {
+  replyTo: string | number | null
+  setReplyTo: (id: string | number | null) => void
+  replyInput: string
+  setReplyInput: (value: string) => void
+  replyAnonymousName: string
+  setReplyAnonymousName: (value: string) => void
+  replyMentionEnabled: boolean
+  setReplyMentionEnabled: (value: boolean) => void
+  editingCommentId: string | number | null
+  setEditingCommentId: (id: string | number | null) => void
+  editCommentInput: string
+  setEditCommentInput: (value: string) => void
+  commentSaving: boolean
+  isAnonymousDetail: boolean
+  maxCommentLength: number
+  maxAnonymousNameLength: number
+  replyMentionFor: (comment: Comment) => string
+  onAddReply: (parentId: string | number) => void
+  onUpdateComment: (id: string | number) => void
+  onDeleteComment: (id: string | number) => void
+  onStartEditComment: (comment: Comment) => void
+}
+
 export default function CommentThread({
   comments,
   commentInput,
@@ -30,7 +66,14 @@ export default function CommentThread({
   onUpdateComment,
   onDeleteComment,
   onStartEditComment,
-}: any) {
+}: CommentNodeSharedProps & {
+  comments: Comment[]
+  commentInput: string
+  setCommentInput: (value: string) => void
+  commentAnonymousName: string
+  setCommentAnonymousName: (value: string) => void
+  onAddComment: () => void
+}) {
   const commentTree = useMemo(() => buildCommentTree(comments), [comments])
 
   return (
@@ -138,7 +181,10 @@ function CommentNode({
   onUpdateComment,
   onDeleteComment,
   onStartEditComment,
-}: any) {
+}: CommentNodeSharedProps & {
+  comment: Comment
+  level: number
+}) {
   const depth = Math.min(level, 6)
   const indent = depth === 0 ? 0 : `clamp(8px, ${depth * 3}vw, ${depth * 16}px)`
   const isEditing = editingCommentId === comment.id

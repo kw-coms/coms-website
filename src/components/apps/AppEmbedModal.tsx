@@ -38,7 +38,7 @@ export default function AppEmbedModal({ open, title, url, onClose }: {
       }}
     >
       <div
-        ref={containerRef as any}
+        ref={containerRef as React.RefObject<HTMLDivElement>}
         className="flex h-full w-full flex-col overflow-hidden bg-[var(--app-surface)] text-[var(--app-text)] shadow-2xl sm:h-[85vh] sm:max-w-5xl sm:rounded-2xl"
       >
         <header className="flex shrink-0 items-center gap-3 border-b border-[var(--app-hairline)] bg-[var(--app-surface-soft)] px-4 py-3">

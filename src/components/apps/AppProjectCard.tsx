@@ -31,13 +31,30 @@ function fileLabel(file) {
   return file?.originalName || file?.name || '배포파일'
 }
 
+type AppProject = {
+  title?: string
+  eyebrow?: string
+  description?: string
+  madeBy?: string
+  linkUrl?: string
+  displayUrl?: string
+  files?: { id?: string | number; url?: string; originalName?: string; name?: string; size?: number; fileSize?: number }[]
+  [key: string]: unknown
+}
+
 export default function AppProjectCard({
   project,
   showStatusBadges = false,
   interactive = true,
   className = '',
   testId,
-}: any) {
+}: {
+  project: AppProject
+  showStatusBadges?: boolean
+  interactive?: boolean
+  className?: string
+  testId?: string
+}) {
   const [embedOpen, setEmbedOpen] = useState(false)
   const files = Array.isArray(project?.files) ? project.files : []
   const hasLink = Boolean(project?.linkUrl)

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, type NavigateOptions, type To } from 'react-router-dom'
 import {
   CalendarDays,
   ChevronDown,
@@ -112,12 +112,12 @@ export default function GlobalNavigation() {
     return () => window.cancelAnimationFrame(frame)
   }, [location.hash, location.pathname])
 
-  const goPageTop = (to, options?: any) => {
+  const goPageTop = (to: To, options?: NavigateOptions) => {
     scrollToTopInstant()
     navigate(to, options)
   }
 
-  const closeAndGo = (to, options?: any) => {
+  const closeAndGo = (to: To, options?: NavigateOptions) => {
     setMobileMenuOpen(false)
     setMobileActivityOpen(false)
     goPageTop(to, options)
@@ -296,8 +296,8 @@ export default function GlobalNavigation() {
           className="apple-mobile-menu-panel mx-auto md:hidden"
         >
           <div className="flex flex-col divide-y divide-[var(--app-hairline)]">
-            {primaryNavItems.map((item: any) => (
-              <button key={item.id} type="button" onClick={() => closeAndGo(`${item.path}${item.hash || ''}`)} className="apple-mobile-menu-item">
+            {primaryNavItems.map((item) => (
+              <button key={item.id} type="button" onClick={() => closeAndGo(`${item.path}${(item as { hash?: string }).hash || ''}`)} className="apple-mobile-menu-item">
                 <item.icon size={15} className={item.accent} />
                 <span>{item.label}</span>
                 <span className="ml-auto text-xs text-[var(--app-muted)]">{item.hint}</span>

@@ -45,7 +45,17 @@ function TextField({
   autoComplete,
   inputMode,
   maxLength,
-}: any) {
+}: {
+  id: string
+  label: string
+  value: string
+  onChange: React.ChangeEventHandler<HTMLInputElement>
+  placeholder?: string
+  type?: string
+  autoComplete?: string
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
+  maxLength?: number
+}) {
   return (
     <div className="min-w-0">
       <label className={labelClass} htmlFor={id}>{label}</label>
@@ -65,7 +75,10 @@ function TextField({
   )
 }
 
-function SignupTypeSelector({ value, onChange }: any) {
+function SignupTypeSelector({ value, onChange }: {
+  value: string
+  onChange: (id: string) => void
+}) {
   return (
     <div className="grid gap-2 sm:grid-cols-2" aria-label="가입 구분">
       {SIGNUP_TYPES.map((type) => (
@@ -87,7 +100,12 @@ function SignupTypeSelector({ value, onChange }: any) {
   )
 }
 
-function InterestsSelector({ selected, onChange, otherText, onOtherChange }: any) {
+function InterestsSelector({ selected, onChange, otherText, onOtherChange }: {
+  selected: string[]
+  onChange: (next: string[]) => void
+  otherText: string
+  onOtherChange: (value: string) => void
+}) {
   const toggle = (option) => {
     const next = selected.includes(option)
       ? selected.filter((item) => item !== option)
@@ -146,7 +164,7 @@ function normalizeGraduateValue(value) {
   return value.trim().replace(/[^0-9]/g, '')
 }
 
-export default function Signup({ onBack }: any) {
+export default function Signup({ onBack }: { onBack: () => void }) {
   const [step, setStep] = useState('form')
   useScrollReveal([step])
   const [signupType, setSignupType] = useState(CURRENT_SIGNUP)
@@ -267,13 +285,13 @@ export default function Signup({ onBack }: any) {
         onClick={onBack}
         className="apple-action-secondary px-4 py-2 text-sm"
         data-reveal
-        style={{ '--reveal-delay': '0ms' } as any}
+        style={{ '--reveal-delay': '0ms' } as React.CSSProperties}
       >
         로그인으로 돌아가기
       </button>
 
       <section className="apple-board-shell">
-        <div className="apple-board-hero px-6 py-8 sm:px-8 sm:py-10" data-reveal style={{ '--reveal-delay': '80ms' } as any}>
+        <div className="apple-board-hero px-6 py-8 sm:px-8 sm:py-10" data-reveal style={{ '--reveal-delay': '80ms' } as React.CSSProperties}>
           <p className="apple-eyebrow">Signup</p>
           <h1 className="apple-display mt-3 text-4xl sm:text-6xl">COM&apos;s 회원가입</h1>
           <p className="apple-copy mt-5 max-w-3xl text-base sm:text-lg">
@@ -282,7 +300,7 @@ export default function Signup({ onBack }: any) {
         </div>
 
         <div className="grid gap-0 lg:grid-cols-[1fr_320px]">
-          <div className="min-w-0 bg-[var(--app-surface)] p-6 sm:p-8" data-reveal style={{ '--reveal-delay': '160ms' } as any}>
+          <div className="min-w-0 bg-[var(--app-surface)] p-6 sm:p-8" data-reveal style={{ '--reveal-delay': '160ms' } as React.CSSProperties}>
           {step === 'form' && (
             <form onSubmit={handleSubmit} className="grid min-w-0 gap-4 sm:gap-5">
               <div className="flex items-center gap-3">

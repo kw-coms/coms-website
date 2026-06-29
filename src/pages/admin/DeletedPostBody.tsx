@@ -8,7 +8,15 @@ import {
   sanitizeDeletedHtml,
 } from './deletedCommunityPostUtils'
 
-export default function DeletedPostBody({ post }: any) {
+type DeletedMedia = { id: string | number; url?: string; originalName?: string; kind?: string }
+type DeletedPost = {
+  imageInfos?: DeletedMedia[]
+  videoInfos?: DeletedMedia[]
+  fileInfos?: DeletedMedia[]
+  [key: string]: unknown
+}
+
+export default function DeletedPostBody({ post }: { post: DeletedPost }) {
   const blocks = deletedPostBlocks(post)
   const usedImageIds = new Set(blocks.filter((block) => block.type === 'image' && block.imageInfo?.id).map((block) => block.imageInfo.id))
   const usedVideoIds = new Set(blocks.filter((block) => block.type === 'video' && block.mediaInfo?.id).map((block) => block.mediaInfo.id))

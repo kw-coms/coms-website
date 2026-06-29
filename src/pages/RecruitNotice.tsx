@@ -24,7 +24,7 @@ const processSteps = [
   '오리엔테이션 이후 정기 세미나와 스터디, 프로젝트 활동에 참여합니다.',
 ]
 
-export default function RecruitNotice({ onBack, onApply }: any) {
+export default function RecruitNotice({ onBack, onApply }: { onBack: () => void; onApply: () => void }) {
   return (
     <div className="w-full min-w-0 space-y-4">
       <button

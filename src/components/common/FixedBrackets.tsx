@@ -7,7 +7,7 @@ const bracketImgStyle = {
   willChange: 'transform',
 }
 
-function BracketSvg({ mirrored = false }: any) {
+function BracketSvg({ mirrored = false }: { mirrored?: boolean }) {
   return (
     <svg
       viewBox="0 0 187 560"
@@ -29,7 +29,11 @@ function BracketSvg({ mirrored = false }: any) {
   )
 }
 
-export default function FixedBrackets({ color = '#67e8f9', leftX, rightX }: any = {}) {
+export default function FixedBrackets({ color = '#67e8f9', leftX, rightX }: {
+  color?: string
+  leftX?: number
+  rightX?: number
+} = {}) {
   if (typeof leftX !== 'number' || typeof rightX !== 'number') return null
 
   return (

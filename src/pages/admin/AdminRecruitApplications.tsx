@@ -2,7 +2,30 @@ import { useState } from 'react'
 import { updateRecruitApplicationStatus } from '../../services/adminApi'
 import { RECRUIT_STATUS_OPTIONS, recruitStatusLabel } from './recruitStatus'
 
-export default function AdminRecruitApplications({ applications, loading, error, onReload, onUpdated, formatDateTime }: any) {
+type RecruitApplicationItem = {
+  id: string | number
+  name?: string
+  studentId?: string
+  department?: string
+  grade?: string
+  email?: string
+  phone?: string
+  status?: string
+  submittedAt?: string
+  adminNote?: string
+  expectation?: string
+  motive?: string
+  interests?: string
+}
+
+export default function AdminRecruitApplications({ applications, loading, error, onReload, onUpdated, formatDateTime }: {
+  applications: RecruitApplicationItem[]
+  loading: boolean
+  error: string
+  onReload: () => void
+  onUpdated: (updated: unknown) => void
+  formatDateTime: (value: string) => string
+}) {
   const [drafts, setDrafts] = useState({})
   const [savingId, setSavingId] = useState(null)
   const [message, setMessage] = useState('')
