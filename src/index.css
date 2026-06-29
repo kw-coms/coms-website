@@ -6880,3 +6880,19 @@ html.home-snap-scroll .home-snap-section {
 .club-event-rsvp-button-pending {
 	opacity: 0.7;
 }
+
+/* =========================================================================
+   Mobile (≤767px) reading polish — community / notices / archive
+   Scoped to phones only so desktop (≥768px) is visually unchanged. These
+   only raise the lower bound of fluid type so body copy clears ~15px on a
+   narrow container; the clamp max is left intact, so wide containers (and
+   therefore desktop) render exactly as before.
+   ========================================================================= */
+@media (max-width: 767px) {
+	/* Comment body could bottom out near ~13px on a phone-width container.
+	   Lift the floor to ~15px for comfortable reading without touching the
+	   desktop ceiling (0.98rem). */
+	.auto-text-comment {
+		font-size: clamp(0.94rem, 0.9rem + 0.18cqw, 0.98rem);
+	}
+}

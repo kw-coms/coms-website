@@ -78,7 +78,7 @@ function CategorySegment({ value, onChange, items, counts }: {
             type="button"
             aria-pressed={selected}
             onClick={() => onChange(item.value)}
-            className={`inline-flex min-h-9 min-w-0 flex-1 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-bold transition sm:min-h-8 sm:flex-none sm:px-3.5 ${selected ? 'bg-[var(--app-surface)] text-[var(--app-text)] shadow-[0_1px_2px_rgba(0,0,0,0.08)]' : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'}`}
+            className={`inline-flex min-h-10 min-w-0 flex-1 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-[13px] font-bold transition sm:min-h-8 sm:flex-none sm:px-3.5 sm:text-xs ${selected ? 'bg-[var(--app-surface)] text-[var(--app-text)] shadow-[0_1px_2px_rgba(0,0,0,0.08)]' : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'}`}
           >
             <span className="whitespace-nowrap">{item.label}</span>
             {counts && (
@@ -180,7 +180,7 @@ function WriteForm({ onCancel, onSave }: {
 
       <div className="space-y-3 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-3 text-sm text-[var(--app-muted)]">
         <div className="flex flex-wrap items-center gap-3">
-          <label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3.5 font-bold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)]">
+          <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 font-bold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)] sm:min-h-10 sm:px-3.5">
             <FileUp size={15} />
             파일 선택
             <input
@@ -224,11 +224,11 @@ function WriteForm({ onCancel, onSave }: {
       </div>
 
       {error && <p className="text-sm font-semibold text-red-500">{error}</p>}
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
         <button
           type="submit"
           disabled={saving || files.length === 0}
-          className="apple-action-primary inline-flex min-h-10 items-center justify-center gap-2 px-5 text-sm disabled:opacity-50"
+          className="apple-action-primary inline-flex min-h-12 items-center justify-center gap-2 px-5 text-sm disabled:opacity-50 sm:min-h-10"
         >
           <FileUp size={15} />
           {saving ? '업로드 중...' : '등록'}
@@ -236,7 +236,7 @@ function WriteForm({ onCancel, onSave }: {
         <button
           type="button"
           onClick={onCancel}
-          className="apple-action-secondary inline-flex min-h-10 items-center justify-center gap-1.5 px-4 text-sm"
+          className="apple-action-secondary inline-flex min-h-12 items-center justify-center gap-1.5 px-4 text-sm sm:min-h-10"
         >
           <X size={14} />
           취소
@@ -402,7 +402,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
               <button
                 type="button"
                 onClick={() => setMode('write')}
-                className="apple-action-primary inline-flex min-h-10 items-center justify-center gap-2 px-5 text-sm"
+                className="apple-action-primary inline-flex min-h-11 items-center justify-center gap-2 px-5 text-sm max-md:w-full sm:min-h-10"
               >
                 <FileUp size={15} />
                 자료 올리기
@@ -411,7 +411,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
               <button
                 type="button"
                 onClick={backToList}
-                className="apple-action-secondary inline-flex min-h-10 items-center justify-center gap-2 px-4 text-sm"
+                className="apple-action-secondary inline-flex min-h-11 items-center justify-center gap-2 px-4 text-sm max-md:w-full sm:min-h-10"
               >
                 <ArrowLeft size={15} />
                 목록
@@ -443,7 +443,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="세미나, 프로젝트, 작성자 검색"
-                    className="h-10 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-8 pr-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none transition focus:ring-2 focus:ring-[#0071e3]/24 sm:w-64"
+                    className="h-11 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-8 pr-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none transition focus:ring-2 focus:ring-[#0071e3]/24 sm:h-10 sm:w-64"
                   />
                 </div>
                 <div className="text-xs font-bold text-[var(--app-subtle)]">{filteredFiles.length}개</div>
@@ -562,10 +562,10 @@ export default function Archive({ onBack }: { onBack: () => void }) {
                             {file.uploaderName || file.uploadedBy || '-'} · {formatDate(file.uploadedAt)} · 조회 {file.viewCount ?? 0} · 개추 {file.upvotes ?? 0}
                           </span>
                         </button>
-                        <div className="mt-4 flex justify-end border-t border-[var(--app-hairline)] pt-3">
+                        <div className="mt-3.5 flex justify-end border-t border-[var(--app-hairline)] pt-3.5">
                           <a
                             href={downloadUrl(file.id)}
-                            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3.5 text-sm font-bold text-[var(--app-accent-text)] transition hover:bg-[var(--app-surface-elevated)]"
+                            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 text-sm font-bold text-[var(--app-accent-text)] transition hover:bg-[var(--app-surface-elevated)]"
                           >
                             <Download size={15} />
                             다운로드
@@ -650,7 +650,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
                     <button
                       type="button"
                       onClick={loadMore}
-                      className="apple-action-secondary inline-flex min-h-10 items-center justify-center px-6 text-sm"
+                      className="apple-action-secondary inline-flex min-h-11 items-center justify-center px-6 text-sm sm:min-h-10"
                     >
                       더 보기
                     </button>
@@ -694,10 +694,10 @@ export default function Archive({ onBack }: { onBack: () => void }) {
                 <dd className="mt-1 font-bold text-[var(--app-text)]">{formatSize(detailFile.fileSize)}</dd>
               </div>
             </dl>
-            <div className="mt-5 flex flex-wrap gap-2">
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               <a
                 href={downloadUrl(detailFile.id)}
-                className="apple-action-primary inline-flex min-h-10 items-center justify-center gap-2 px-4 text-sm"
+                className="apple-action-primary inline-flex min-h-12 items-center justify-center gap-2 px-4 text-sm max-md:col-span-2 sm:min-h-10"
               >
                 <Download size={15} />
                 다운로드
@@ -706,7 +706,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
                 type="button"
                 onClick={handleVote}
                 disabled={voting}
-                className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-full border px-4 text-sm font-bold disabled:opacity-50 ${detailFile.myVote === 1 ? 'border-[#0071e3] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
+                className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-4 text-sm font-bold disabled:opacity-50 sm:min-h-10 ${detailFile.myVote === 1 ? 'border-[#0071e3] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
               >
                 <ThumbsUp size={15} />
                 개추 {detailFile.upvotes ?? 0}
@@ -715,7 +715,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
                 <button
                   type="button"
                   onClick={() => handleDelete(detailFile.id)}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-700 transition hover:bg-red-100"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 text-sm font-bold text-red-700 transition hover:bg-red-100 sm:min-h-10"
                 >
                   <Trash2 size={15} />
                   삭제
