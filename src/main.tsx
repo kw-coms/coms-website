@@ -10,8 +10,6 @@ import { captureError, initObservability } from './services/observability'
 
 const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0'
 
-initObservability({ release: `coms-website@${APP_VERSION}` })
-
 class ErrorBoundary extends Component<any, any> {
   constructor(props) {
     super(props)
@@ -58,3 +56,12 @@ createRoot(document.getElementById('root')).render(
     </ErrorBoundary>
   </StrictMode>,
 )
+
+// Defer Sentry off the critical path: only load @sentry/react after first paint,
+// when the browser is idle. initObservability already no-ops without a DSN.
+const startObservability = () => initObservability({ release: `coms-website@${APP_VERSION}` })
+if (typeof requestIdleCallback === 'function') {
+  requestIdleCallback(startObservability)
+} else {
+  setTimeout(startObservability, 0)
+}

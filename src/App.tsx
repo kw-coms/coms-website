@@ -179,7 +179,7 @@ function ScrollToTop() {
 }
 
 function RequireAuth({ children }: any) {
-  const { user, loading, authError, retryAuth } = useAuth()
+  const { user, loading, authError } = useAuth()
   const location = useLocation()
   if (loading) return (
     <PageShell>
@@ -188,22 +188,15 @@ function RequireAuth({ children }: any) {
       </div>
     </PageShell>
   )
-  if (authError) return (
-    <PageShell>
-      <div className="mx-auto max-w-md rounded-lg border border-[var(--app-hairline)] bg-white/82 p-8 text-center shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
-        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">{authError.message}</p>
-        <button type="button" onClick={retryAuth} className="mt-4 apple-action-primary px-5 py-2 text-sm">
-          다시 시도
-        </button>
-      </div>
-    </PageShell>
-  )
-  if (!user) return <Navigate to="/login" state={{ from: location }} replace />
+  // Auth could not be confirmed (not logged in, or a transient error): send the
+  // user to the login screen rather than a dead-end "retry" error. Carry `from`
+  // so they return here after logging in.
+  if (authError || !user) return <Navigate to="/login" state={{ from: location, authIssue: Boolean(authError) }} replace />
   return children
 }
 
 function RequireAdmin({ children }: any) {
-  const { user, loading, authError, retryAuth } = useAuth()
+  const { user, loading, authError } = useAuth()
   const location = useLocation()
   if (loading) return (
     <PageShell>
@@ -212,17 +205,7 @@ function RequireAdmin({ children }: any) {
       </div>
     </PageShell>
   )
-  if (authError) return (
-    <PageShell>
-      <div className="mx-auto max-w-md rounded-lg border border-[var(--app-hairline)] bg-white/82 p-8 text-center shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
-        <p className="text-sm font-semibold text-[var(--theme-body-dark)]">{authError.message}</p>
-        <button type="button" onClick={retryAuth} className="mt-4 apple-action-primary px-5 py-2 text-sm">
-          다시 시도
-        </button>
-      </div>
-    </PageShell>
-  )
-  if (!user) return <Navigate to="/login" state={{ from: location }} replace />
+  if (authError || !user) return <Navigate to="/login" state={{ from: location, authIssue: Boolean(authError) }} replace />
   if (user.role !== 'ADMIN') return <Navigate to="/" replace />
   return children
 }
