@@ -12,6 +12,20 @@ export async function getMemberReputation(studentId) {
   return request(`/api/community/members/${encodeURIComponent(studentId)}/reputation`)
 }
 
+export async function toggleBookmark(id) {
+  return request(`/api/community/posts/${id}/bookmark`, {
+    method: 'POST',
+  })
+}
+
+export async function listBookmarkedPosts(page = 0, size = 100) {
+  return request(`/api/community/posts/bookmarked/me?page=${page}&size=${size}`)
+}
+
+export async function listPostsByAuthor(studentId, page = 0, size = 100) {
+  return request(`/api/community/posts/by-author/${encodeURIComponent(studentId)}?page=${page}&size=${size}`)
+}
+
 export async function createCommunityPost(body, image = null) {
   if (image) {
     const form = new FormData()

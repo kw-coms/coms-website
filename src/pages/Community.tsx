@@ -35,6 +35,7 @@ import {
 } from './community/communityBoardUtils'
 import { MAX_COMMENT_LENGTH, useCommunityComments } from './community/useCommunityComments'
 import { useCommunityPosts } from './community/useCommunityPosts'
+import { useBookmarkMutation } from './community/useBookmarkMutation'
 
 export default function Community({ onBack }: any) {
   const { user } = useAuth()
@@ -123,6 +124,16 @@ export default function Community({ onBack }: any) {
       setPage(totalPages)
     }
   }, [page, totalPages])
+
+  const bookmarkMutation = useBookmarkMutation({
+    onToggled: (postId, bookmarked) => {
+      setCurrentPost((prev) => (prev && prev.id === postId ? { ...prev, bookmarked } : prev))
+    },
+  })
+  const handleToggleBookmark = (post) => {
+    if (!post || bookmarkMutation.isPending) return
+    bookmarkMutation.mutate(post)
+  }
 
   const mergePost = (post) => {
     setPosts((prev) => {
@@ -432,6 +443,9 @@ export default function Community({ onBack }: any) {
             user={user}
             onOpenPost={openPost}
             onAdminDelete={handleAdminDeleteFromList}
+            onOpenBookmarks={() => navigate('/community/bookmarks')}
+            onToggleBookmark={handleToggleBookmark}
+            bookmarkPending={bookmarkMutation.isPending}
           />
         )}
 
@@ -520,6 +534,8 @@ export default function Community({ onBack }: any) {
             isAdmin={user?.role === 'ADMIN'}
             pinning={pinning}
             onPin={handlePin}
+            onToggleBookmark={handleToggleBookmark}
+            bookmarkPending={bookmarkMutation.isPending}
           />
         )}
       </section>

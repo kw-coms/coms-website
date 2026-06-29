@@ -3,12 +3,14 @@ package com.coms.backend.service;
 import com.coms.backend.domain.ClubEvent;
 import com.coms.backend.domain.ClubEventEntry;
 import com.coms.backend.domain.ClubEventEntryFile;
+import com.coms.backend.domain.ClubEventRsvp;
 import com.coms.backend.domain.ClubEventVote;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.ClubEventResponse;
 import com.coms.backend.repository.ClubEventEntryFileRepository;
 import com.coms.backend.repository.ClubEventEntryRepository;
 import com.coms.backend.repository.ClubEventRepository;
+import com.coms.backend.repository.ClubEventRsvpRepository;
 import com.coms.backend.repository.ClubEventVoteRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.springframework.core.io.Resource;
@@ -45,6 +47,7 @@ public class ClubEventService {
     private final ClubEventEntryRepository entryRepository;
     private final ClubEventEntryFileRepository entryFileRepository;
     private final ClubEventVoteRepository voteRepository;
+    private final ClubEventRsvpRepository rsvpRepository;
     private final MemberRepository memberRepository;
     private final StorageService storageService;
 
@@ -52,12 +55,14 @@ public class ClubEventService {
                             ClubEventEntryRepository entryRepository,
                             ClubEventEntryFileRepository entryFileRepository,
                             ClubEventVoteRepository voteRepository,
+                            ClubEventRsvpRepository rsvpRepository,
                             MemberRepository memberRepository,
                             StorageService storageService) {
         this.eventRepository = eventRepository;
         this.entryRepository = entryRepository;
         this.entryFileRepository = entryFileRepository;
         this.voteRepository = voteRepository;
+        this.rsvpRepository = rsvpRepository;
         this.memberRepository = memberRepository;
         this.storageService = storageService;
     }
@@ -68,11 +73,13 @@ public class ClubEventService {
         Map<Long, List<ClubEventEntry>> entries = entriesByEvent(events);
         Map<Long, List<ClubEventEntryFile>> files = filesByEntry(entries.values().stream().flatMap(List::stream).toList());
         Map<Long, List<ClubEventVote>> votes = votesByEvent(events);
+        Map<Long, List<ClubEventRsvp>> rsvps = rsvpsByEvent(events);
         return events.stream()
                 .map(event -> toResponse(event,
                         entries.getOrDefault(event.getId(), List.of()),
                         files,
                         votes.getOrDefault(event.getId(), List.of()),
+                        rsvps.getOrDefault(event.getId(), List.of()),
                         studentId))
                 .toList();
     }
@@ -85,6 +92,7 @@ public class ClubEventService {
                 entries,
                 filesByEntry(entries),
                 voteRepository.findByClubEventId(id),
+                rsvpRepository.findByClubEventId(id),
                 studentId);
     }
 
@@ -108,7 +116,7 @@ public class ClubEventService {
         event.setCreatedByName(member.getName());
         event.setCreatedAt(LocalDateTime.now());
         event.setUpdatedAt(LocalDateTime.now());
-        return toResponse(eventRepository.save(event), List.of(), Map.of(), List.of(), creatorStudentId);
+        return toResponse(eventRepository.save(event), List.of(), Map.of(), List.of(), List.of(), creatorStudentId);
     }
 
     public ClubEventResponse updateEvent(Long id,
@@ -249,6 +257,31 @@ public class ClubEventService {
         return get(event.getId(), studentId);
     }
 
+    public ClubEventResponse rsvp(Long eventId, String studentId, String status) {
+        requireMember(studentId);
+        ClubEvent event = getEvent(eventId);
+        ClubEventRsvp.Status parsedStatus = parseRsvpStatus(status);
+
+        Optional<ClubEventRsvp> existing = rsvpRepository.findByClubEventIdAndStudentId(event.getId(), studentId);
+        if (existing.isPresent()) {
+            ClubEventRsvp rsvp = existing.get();
+            if (rsvp.getStatus() != parsedStatus) {
+                rsvp.setStatus(parsedStatus);
+                rsvp.setUpdatedAt(LocalDateTime.now());
+                rsvpRepository.save(rsvp);
+            }
+        } else {
+            ClubEventRsvp rsvp = new ClubEventRsvp();
+            rsvp.setClubEventId(event.getId());
+            rsvp.setStudentId(studentId);
+            rsvp.setStatus(parsedStatus);
+            rsvp.setCreatedAt(LocalDateTime.now());
+            rsvp.setUpdatedAt(LocalDateTime.now());
+            rsvpRepository.save(rsvp);
+        }
+        return get(event.getId(), studentId);
+    }
+
     public void deleteEntry(Long eventId, Long entryId) {
         getEvent(eventId);
         ClubEventEntry entry = loadEntryMeta(eventId, entryId);
@@ -264,6 +297,7 @@ public class ClubEventService {
             deleteEntryFiles(entry);
         }
         voteRepository.deleteByClubEventId(id);
+        rsvpRepository.deleteByClubEventId(id);
         entryFileRepository.deleteByEntryIdIn(entries.stream().map(ClubEventEntry::getId).toList());
         entryRepository.deleteByClubEventId(id);
         eventRepository.delete(event);
@@ -371,6 +405,24 @@ public class ClubEventService {
                 .collect(Collectors.groupingBy(ClubEventVote::getClubEventId));
     }
 
+    private Map<Long, List<ClubEventRsvp>> rsvpsByEvent(List<ClubEvent> events) {
+        List<Long> ids = events.stream().map(ClubEvent::getId).filter(Objects::nonNull).toList();
+        if (ids.isEmpty()) return Map.of();
+        return rsvpRepository.findByClubEventIdIn(ids).stream()
+                .collect(Collectors.groupingBy(ClubEventRsvp::getClubEventId));
+    }
+
+    private ClubEventRsvp.Status parseRsvpStatus(String status) {
+        if (status == null || status.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "참석 응답 상태를 입력하세요.");
+        }
+        try {
+            return ClubEventRsvp.Status.valueOf(status.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "참석 응답 상태가 올바르지 않습니다.");
+        }
+    }
+
     private Map<Long, List<ClubEventEntryFile>> filesByEntry(List<ClubEventEntry> entries) {
         List<Long> ids = entries.stream().map(ClubEventEntry::getId).filter(Objects::nonNull).toList();
         if (ids.isEmpty()) return Map.of();
@@ -382,7 +434,16 @@ public class ClubEventService {
                                          List<ClubEventEntry> entries,
                                          Map<Long, List<ClubEventEntryFile>> files,
                                          List<ClubEventVote> votes,
+                                         List<ClubEventRsvp> rsvps,
                                          String studentId) {
+        Map<ClubEventRsvp.Status, Long> rsvpCounts = rsvps.stream()
+                .collect(Collectors.groupingBy(ClubEventRsvp::getStatus, Collectors.counting()));
+        String myRsvpStatus = rsvps.stream()
+                .filter(rsvp -> studentId != null && studentId.equals(rsvp.getStudentId()))
+                .map(rsvp -> rsvp.getStatus().name())
+                .findFirst()
+                .orElse(null);
+
         Map<Long, Long> voteCounts = votes.stream()
                 .collect(Collectors.groupingBy(ClubEventVote::getEntryId, Collectors.counting()));
         Long myEntryId = votes.stream()
@@ -415,6 +476,10 @@ public class ClubEventService {
                 myEntryId,
                 entries.size(),
                 entryResponses,
+                rsvpCounts.getOrDefault(ClubEventRsvp.Status.GOING, 0L),
+                rsvpCounts.getOrDefault(ClubEventRsvp.Status.MAYBE, 0L),
+                rsvpCounts.getOrDefault(ClubEventRsvp.Status.NOT_GOING, 0L),
+                myRsvpStatus,
                 event.getCreatedByName(),
                 event.getCreatedAt(),
                 event.getUpdatedAt()

@@ -76,6 +76,21 @@ public class CommunityController {
         return ResponseEntity.ok(communityDeletionArchiveService.mine(authentication.getName()));
     }
 
+    @GetMapping("/bookmarked/me")
+    public ResponseEntity<List<CommunityPostResponse>> myBookmarkedPosts(Authentication authentication,
+                                                                         @RequestParam(required = false) Integer page,
+                                                                         @RequestParam(required = false) Integer size) {
+        return ListPagination.paginate(communityService.listBookmarked(authentication.getName()), page, size);
+    }
+
+    @GetMapping("/by-author/{studentId}")
+    public ResponseEntity<List<CommunityPostResponse>> postsByAuthor(Authentication authentication,
+                                                                     @PathVariable String studentId,
+                                                                     @RequestParam(required = false) Integer page,
+                                                                     @RequestParam(required = false) Integer size) {
+        return ListPagination.paginate(communityService.listByAuthor(studentId, authentication.getName()), page, size);
+    }
+
     @GetMapping("/deleted/{id}/images/{imageId}")
     public ResponseEntity<Resource> deletedImage(Authentication authentication, @PathVariable Long id, @PathVariable Long imageId) {
         DeletedCommunityPostImage meta = communityDeletionArchiveService.loadOwnImageMeta(id, imageId, authentication.getName());
@@ -223,6 +238,13 @@ public class CommunityController {
                                                       @PathVariable Long id,
                                                       @Valid @RequestBody CommunityVoteRequest request) {
         return ResponseEntity.ok(communityService.vote(authentication.getName(), id, request.value()));
+    }
+
+    @PostMapping("/{id}/bookmark")
+    public ResponseEntity<BookmarkToggleResponse> toggleBookmark(Authentication authentication,
+                                                                 @PathVariable Long id) {
+        boolean bookmarked = communityService.toggleBookmark(id, authentication.getName());
+        return ResponseEntity.ok(new BookmarkToggleResponse(bookmarked));
     }
 
     @PostMapping("/{id}/poll-votes")
@@ -514,6 +536,8 @@ public class CommunityController {
     private String html(String value) {
         return HtmlUtils.htmlEscape(value == null ? "" : value, StandardCharsets.UTF_8.name());
     }
+
+    private record BookmarkToggleResponse(boolean bookmarked) {}
 
     private record CommunityShareData(Long id,
                                       String title,

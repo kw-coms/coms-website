@@ -46,6 +46,13 @@ export async function voteClubEventEntry(id, entryId) {
   })
 }
 
+export async function rsvpClubEvent(id, status) {
+  return request(`/api/club-events/${id}/rsvp`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  })
+}
+
 export async function deleteClubEvent(id) {
   return requestNoContent(`/api/club-events/${id}`, {
     method: 'DELETE',
