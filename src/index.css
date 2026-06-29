@@ -6657,6 +6657,164 @@ html.home-snap-scroll .home-snap-section {
 	color: var(--theme-body-dark);
 }
 
+/* highlight.js theme (GitHub light + dark), bundled LOCALLY — the live-site CSP
+   blocks external stylesheet hosts, so no theme is loaded from a CDN. Scoped to
+   .community-post-text .hljs so it only affects highlighted post code, and made
+   dark-mode aware via the existing :root[data-theme-mode='dark'] attribute. Base
+   block layout (padding/scroll/background) stays on .community-post-text pre
+   above; these rules only add token colors. Token classes mirror github.css /
+   github-dark.css from highlight.js. */
+.community-post-text .hljs {
+	color: #24292e;
+}
+.community-post-text .hljs-doctag,
+.community-post-text .hljs-keyword,
+.community-post-text .hljs-meta .hljs-keyword,
+.community-post-text .hljs-template-tag,
+.community-post-text .hljs-template-variable,
+.community-post-text .hljs-type,
+.community-post-text .hljs-variable.language_ {
+	color: #d73a49;
+}
+.community-post-text .hljs-title,
+.community-post-text .hljs-title.class_,
+.community-post-text .hljs-title.class_.inherited__,
+.community-post-text .hljs-title.function_ {
+	color: #6f42c1;
+}
+.community-post-text .hljs-attr,
+.community-post-text .hljs-attribute,
+.community-post-text .hljs-literal,
+.community-post-text .hljs-meta,
+.community-post-text .hljs-number,
+.community-post-text .hljs-operator,
+.community-post-text .hljs-variable,
+.community-post-text .hljs-selector-attr,
+.community-post-text .hljs-selector-class,
+.community-post-text .hljs-selector-id {
+	color: #005cc5;
+}
+.community-post-text .hljs-regexp,
+.community-post-text .hljs-string,
+.community-post-text .hljs-meta .hljs-string {
+	color: #032f62;
+}
+.community-post-text .hljs-built_in,
+.community-post-text .hljs-symbol {
+	color: #e36209;
+}
+.community-post-text .hljs-comment,
+.community-post-text .hljs-code,
+.community-post-text .hljs-formula {
+	color: #6a737d;
+}
+.community-post-text .hljs-name,
+.community-post-text .hljs-quote,
+.community-post-text .hljs-selector-tag,
+.community-post-text .hljs-selector-pseudo {
+	color: #22863a;
+}
+.community-post-text .hljs-subst {
+	color: #24292e;
+}
+.community-post-text .hljs-section {
+	color: #005cc5;
+	font-weight: bold;
+}
+.community-post-text .hljs-bullet {
+	color: #735c0f;
+}
+.community-post-text .hljs-emphasis {
+	color: #24292e;
+	font-style: italic;
+}
+.community-post-text .hljs-strong {
+	color: #24292e;
+	font-weight: bold;
+}
+.community-post-text .hljs-addition {
+	color: #22863a;
+	background-color: #f0fff4;
+}
+.community-post-text .hljs-deletion {
+	color: #b31d28;
+	background-color: #ffeef0;
+}
+
+:root[data-theme-mode='dark'] .community-post-text .hljs {
+	color: #c9d1d9;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-doctag,
+:root[data-theme-mode='dark'] .community-post-text .hljs-keyword,
+:root[data-theme-mode='dark'] .community-post-text .hljs-meta .hljs-keyword,
+:root[data-theme-mode='dark'] .community-post-text .hljs-template-tag,
+:root[data-theme-mode='dark'] .community-post-text .hljs-template-variable,
+:root[data-theme-mode='dark'] .community-post-text .hljs-type,
+:root[data-theme-mode='dark'] .community-post-text .hljs-variable.language_ {
+	color: #ff7b72;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-title,
+:root[data-theme-mode='dark'] .community-post-text .hljs-title.class_,
+:root[data-theme-mode='dark'] .community-post-text .hljs-title.class_.inherited__,
+:root[data-theme-mode='dark'] .community-post-text .hljs-title.function_ {
+	color: #d2a8ff;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-attr,
+:root[data-theme-mode='dark'] .community-post-text .hljs-attribute,
+:root[data-theme-mode='dark'] .community-post-text .hljs-literal,
+:root[data-theme-mode='dark'] .community-post-text .hljs-meta,
+:root[data-theme-mode='dark'] .community-post-text .hljs-number,
+:root[data-theme-mode='dark'] .community-post-text .hljs-operator,
+:root[data-theme-mode='dark'] .community-post-text .hljs-variable,
+:root[data-theme-mode='dark'] .community-post-text .hljs-selector-attr,
+:root[data-theme-mode='dark'] .community-post-text .hljs-selector-class,
+:root[data-theme-mode='dark'] .community-post-text .hljs-selector-id {
+	color: #79c0ff;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-regexp,
+:root[data-theme-mode='dark'] .community-post-text .hljs-string,
+:root[data-theme-mode='dark'] .community-post-text .hljs-meta .hljs-string {
+	color: #a5d6ff;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-built_in,
+:root[data-theme-mode='dark'] .community-post-text .hljs-symbol {
+	color: #ffa657;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-comment,
+:root[data-theme-mode='dark'] .community-post-text .hljs-code,
+:root[data-theme-mode='dark'] .community-post-text .hljs-formula {
+	color: #8b949e;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-name,
+:root[data-theme-mode='dark'] .community-post-text .hljs-quote,
+:root[data-theme-mode='dark'] .community-post-text .hljs-selector-tag,
+:root[data-theme-mode='dark'] .community-post-text .hljs-selector-pseudo {
+	color: #7ee787;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-subst {
+	color: #c9d1d9;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-section {
+	color: #1f6feb;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-bullet {
+	color: #f2cc60;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-emphasis {
+	color: #c9d1d9;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-strong {
+	color: #c9d1d9;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-addition {
+	color: #aff5b4;
+	background-color: #033a16;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-deletion {
+	color: #ffdcd7;
+	background-color: #67060c;
+}
+
 .club-event-rsvp {
 	margin: 0 1rem;
 	display: grid;
