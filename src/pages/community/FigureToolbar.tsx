@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MEDIA_ALIGN_OPTIONS } from './postEditorUtils'
 
-function MediaAlignControls({ value, onChange }: any) {
+function MediaAlignControls({ value, onChange }: {
+  value: string
+  onChange: (value: string) => void
+}) {
   return (
     <div className="flex items-center gap-1 rounded-full border border-[var(--app-hairline)] bg-white/85 px-2 py-1 shadow-sm">
       {MEDIA_ALIGN_OPTIONS.map((option) => (
@@ -20,9 +23,17 @@ function MediaAlignControls({ value, onChange }: any) {
 }
 
 
-export default function FigureToolbar({ editorRef, figId, meta, onResize, onAlign, onDelete, onDeselect }: any) {
-  const toolbarRef = useRef(null)
-  const [rect, setRect] = useState(null)
+export default function FigureToolbar({ editorRef, figId, meta, onResize, onAlign, onDelete, onDeselect }: {
+  editorRef: React.RefObject<HTMLElement | null>
+  figId?: string | null
+  meta?: { align?: string } | null
+  onResize: (pct: number) => void
+  onAlign: (align: string) => void
+  onDelete: () => void
+  onDeselect: () => void
+}) {
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const [rect, setRect] = useState<DOMRect | null>(null)
 
   useEffect(() => {
     const el = editorRef.current
@@ -51,7 +62,7 @@ export default function FigureToolbar({ editorRef, figId, meta, onResize, onAlig
   const startResize = (e, fromRight) => {
     e.preventDefault()
     e.stopPropagation()
-    const figEl = editorRef.current?.querySelector(`[data-block-id="${figId}"]`)
+    const figEl = editorRef.current?.querySelector(`[data-block-id="${figId}"]`) as HTMLElement | null
     if (!figEl) return
     const startX = e.clientX
     const startW = figEl.offsetWidth

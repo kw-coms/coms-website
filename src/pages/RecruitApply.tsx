@@ -38,7 +38,7 @@ function RecruitStatusCheck() {
   const [studentId, setStudentId] = useState('')
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<{ status?: string; statusLabel?: string; submittedAt?: string } | null>(null)
   const [notFound, setNotFound] = useState(false)
 
   const activeIndex = result ? stageIndexFor(result.status) : -1
@@ -211,7 +211,7 @@ function RecruitStatusCheck() {
   )
 }
 
-export default function RecruitApply({ onBack }: any) {
+export default function RecruitApply({ onBack }: { onBack: () => void }) {
   const [form, setForm] = useState(initialForm)
   const [interests, setInterests] = useState([])
   const [otherInterest, setOtherInterest] = useState('')

@@ -87,7 +87,12 @@ function noticeCategoryMeta(value) {
   return NOTICE_CATEGORY_META[value] || NOTICE_CATEGORY_META.GENERAL
 }
 
-function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: any) {
+function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
+  initialNotice?: { id?: number; title?: string; category?: string; content?: string; [key: string]: unknown } | null
+  defaultCategory?: string
+  onCancel: () => void
+  onSave: (saved: unknown) => void
+}) {
   const [formData, setFormData] = useState({
     title: initialNotice?.title || '',
     category: initialNotice?.category || defaultCategory || 'GENERAL',

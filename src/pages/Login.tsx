@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, KeyRound, LogIn, Mail, RotateCcw, UserPlus } from 'lucide-react'
+import { ArrowLeft, KeyRound, LogIn, Mail, RotateCcw, UserPlus, type LucideIcon } from 'lucide-react'
 import {
   confirmPasswordReset,
   loginUser,
@@ -29,7 +29,16 @@ const emptyResetForm = {
   newPasswordConfirm: '',
 }
 
-function TextInput({ id, label, value, onChange, type = 'text', placeholder, autoComplete, inputMode }: any) {
+function TextInput({ id, label, value, onChange, type = 'text', placeholder, autoComplete, inputMode }: {
+  id: string
+  label: string
+  value: string
+  onChange: React.ChangeEventHandler<HTMLInputElement>
+  type?: string
+  placeholder?: string
+  autoComplete?: string
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
+}) {
   return (
     <div>
       <label htmlFor={id} className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">{label}</label>
@@ -49,7 +58,11 @@ function TextInput({ id, label, value, onChange, type = 'text', placeholder, aut
   )
 }
 
-function ActionButton({ children, icon: Icon, loading = false, ...props }: any) {
+function ActionButton({ children, icon: Icon, loading = false, ...props }: {
+  children: React.ReactNode
+  icon?: LucideIcon
+  loading?: boolean
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <div className={frameClass}>
       <button type="submit" className={btnClass} disabled={loading} {...props}>
@@ -60,7 +73,11 @@ function ActionButton({ children, icon: Icon, loading = false, ...props }: any) 
   )
 }
 
-export default function Login({ onCancel, onSuccess, goSignup }: any) {
+export default function Login({ onCancel, onSuccess, goSignup }: {
+  onCancel: () => void
+  onSuccess: () => void
+  goSignup: () => void
+}) {
   const { login } = useAuth()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
@@ -236,7 +253,7 @@ export default function Login({ onCancel, onSuccess, goSignup }: any) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-center sm:justify-start" data-reveal style={{ '--reveal-delay': '0ms' } as any}>
+      <div className="flex justify-center sm:justify-start" data-reveal style={{ '--reveal-delay': '0ms' } as React.CSSProperties}>
         <button
           type="button"
           onClick={goBack}
@@ -249,7 +266,7 @@ export default function Login({ onCancel, onSuccess, goSignup }: any) {
 
       <div className="rounded-lg bg-white/70 p-px shadow-[0_24px_70px_rgba(0,0,0,0.1)]">
         <section className={panelClass}>
-          <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left" data-reveal style={{ '--reveal-delay': '80ms' } as any}>
+          <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left" data-reveal style={{ '--reveal-delay': '80ms' } as React.CSSProperties}>
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="h-10 w-10 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
             <div className="min-w-0">
               <h2 className="text-lg font-bold leading-snug sm:text-xl">{stepTitle}</h2>
@@ -258,12 +275,12 @@ export default function Login({ onCancel, onSuccess, goSignup }: any) {
           </div>
 
           {isVerifyStep ? (
-            <div className="space-y-4" data-reveal style={{ '--reveal-delay': '160ms' } as any}>
+            <div className="space-y-4" data-reveal style={{ '--reveal-delay': '160ms' } as React.CSSProperties}>
               {verifyError && <div className="text-sm text-red-500">{verifyError}</div>}
               <EmailVerifyStep studentId={verifyStudentId} onDone={handleVerified} />
             </div>
           ) : isResetStep ? (
-            <form onSubmit={handleResetSubmit} className="space-y-4" data-reveal style={{ '--reveal-delay': '160ms' } as any}>
+            <form onSubmit={handleResetSubmit} className="space-y-4" data-reveal style={{ '--reveal-delay': '160ms' } as React.CSSProperties}>
               <TextInput
                 id="resetEmail"
                 label="가입 이메일"
@@ -326,7 +343,7 @@ export default function Login({ onCancel, onSuccess, goSignup }: any) {
               )}
             </form>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4" data-reveal style={{ '--reveal-delay': '160ms' } as any}>
+            <form onSubmit={handleSubmit} className="space-y-4" data-reveal style={{ '--reveal-delay': '160ms' } as React.CSSProperties}>
               <TextInput
                 id="identifier"
                 label="학번 또는 이메일"

@@ -9,7 +9,7 @@ function parseInterests(raw) {
   })
 }
 
-export default function AdminMembers({ currentUser }: any) {
+export default function AdminMembers({ currentUser }: { currentUser: { studentId?: string } }) {
   const { members, loading, error, updateRole, removeMember, resetPassword } = useAdminMembers()
   const [expanded, setExpanded] = useState(null)
 

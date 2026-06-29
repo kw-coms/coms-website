@@ -60,7 +60,12 @@ function calendarFormFromDateSchedule(schedule) {
   }
 }
 
-function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSchedule, onDateEditDone }: any) {
+function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSchedule, onDateEditDone }: {
+  onDateCreated?: (created: unknown) => void
+  onDateUpdated?: (updated: unknown) => void
+  editingDateSchedule?: { id?: string | number; category?: string; description?: string; [key: string]: unknown } | null
+  onDateEditDone?: () => void
+}) {
   const queryClient = useQueryClient()
   const { user, loading: authLoading } = useAuth()
   const [form, setForm] = useState(() => calendarFormFromDateSchedule(editingDateSchedule))
@@ -398,7 +403,7 @@ function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSch
                 key={color}
                 type="button"
                 className={form.colorHex === color ? 'is-active' : ''}
-                style={{ '--calendar-swatch-color': color } as any}
+                style={{ '--calendar-swatch-color': color } as React.CSSProperties}
                 onClick={() => setForm((prev) => ({ ...prev, colorHex: color }))}
                 aria-label={`${color} 색상 선택`}
                 aria-pressed={form.colorHex === color}
@@ -490,7 +495,7 @@ function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSch
   )
 }
 
-function ClubCalendarSection({ compact = false }: any) {
+function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user, authLoading, records, loading, loadError, prependActivity, mergeActivity, removeActivity } = useClubActivities('일정을 불러오지 못했습니다.')
@@ -514,7 +519,7 @@ function ClubCalendarSection({ compact = false }: any) {
     scheduleItems,
     recurringOccurrences: user ? occurrences : [],
   })
-  const hasAnyEvent = Object.values(eventsByDay).some((list: any) => list.length > 0)
+  const hasAnyEvent = Object.values(eventsByDay).some((list) => Array.isArray(list) && list.length > 0)
   const isLocked = !authLoading && !user
   const isAdmin = user?.role === 'ADMIN'
   const selectedDayEvents = selectedDay ? eventsByDay[selectedDay] || [] : []
@@ -677,8 +682,8 @@ function ClubCalendarSection({ compact = false }: any) {
     // duplicated middle/end segments of multi-day ranges (kept only on the
     // showTitle day) so each event becomes a single VEVENT.
     const events = Object.values(eventsByDay)
-      .flatMap((dayEvents: any) => (Array.isArray(dayEvents) ? dayEvents : []))
-      .filter((event: any) => !event.canceled && !(event.range && !event.showTitle))
+      .flatMap((dayEvents) => (Array.isArray(dayEvents) ? dayEvents : []))
+      .filter((event) => !event.canceled && !(event.range && !event.showTitle))
 
     if (events.length === 0) {
       showToast({ message: '내보낼 일정이 없습니다.', tone: 'default' })
@@ -832,7 +837,7 @@ function ClubCalendarSection({ compact = false }: any) {
                         title={[event.title, eventMeta(event)].filter(Boolean).join(' · ')}
                         onClick={() => selectCalendarEvent(day, event)}
                         aria-pressed={activeSelectedEventId === event.id}
-                        style={event.colorHex ? { '--calendar-event-color': event.colorHex } as any : undefined}
+                        style={event.colorHex ? { '--calendar-event-color': event.colorHex } as React.CSSProperties : undefined}
                       >
                         {event.recurring && <Repeat size={11} aria-label="반복 일정" className="club-calendar-event-icon" />}
                         <span className="club-calendar-event-title">{event.showTitle ? event.title : ''}</span>
@@ -876,7 +881,7 @@ function ClubCalendarSection({ compact = false }: any) {
                   <li
                     key={`detail-${event.id}`}
                     className={`${event.canceled ? 'calendar-day-detail-canceled' : ''} ${activeSelectedEventId === event.id ? 'calendar-day-detail-selected' : ''}`}
-                    style={event.colorHex ? { '--calendar-event-color': event.colorHex } as any : undefined}
+                    style={event.colorHex ? { '--calendar-event-color': event.colorHex } as React.CSSProperties : undefined}
                   >
                     <span className="calendar-day-detail-dot" aria-hidden="true" />
                     <div>

@@ -57,7 +57,65 @@ export default function CommunityDetailView({
   onPin,
   onToggleBookmark,
   bookmarkPending,
-}: any) {
+}: {
+  currentPost: {
+    id: number
+    title?: string
+    category?: string
+    createdAt?: string
+    updatedAt?: string
+    viewCount?: number
+    upvotes?: number
+    downvotes?: number
+    myVote?: number
+    pinned?: boolean
+    authorAdmin?: boolean
+    concept?: boolean
+    editable?: boolean
+    bookmarked?: boolean
+    [key: string]: unknown
+  }
+  detailLoading?: boolean
+  comments: { id: string | number; [key: string]: unknown }[]
+  commentInput: string
+  setCommentInput: (value: string) => void
+  commentAnonymousName: string
+  setCommentAnonymousName: (value: string) => void
+  replyTo: string | number | null
+  setReplyTo: (id: string | number | null) => void
+  replyInput: string
+  setReplyInput: (value: string) => void
+  replyAnonymousName: string
+  setReplyAnonymousName: (value: string) => void
+  replyMentionEnabled: boolean
+  setReplyMentionEnabled: (value: boolean) => void
+  editingCommentId: string | number | null
+  setEditingCommentId: (id: string | number | null) => void
+  editCommentInput: string
+  setEditCommentInput: (value: string) => void
+  commentSaving: boolean
+  isAnonymousDetail: boolean
+  maxCommentLength: number
+  replyMentionFor: (comment: { id: string | number; [key: string]: unknown }) => string
+  onAddComment: () => void
+  onAddReply: (parentId: string | number) => void
+  onUpdateComment: (id: string | number) => void
+  onDeleteComment: (id: string | number) => void
+  onStartEditComment: (comment: { id: string | number; [key: string]: unknown }) => void
+  pollVoting?: string
+  pollClosing?: string
+  onPollVote: (...args: unknown[]) => void
+  onPollClose: (...args: unknown[]) => void
+  onVote: (value: number) => void
+  onBackToList: () => void
+  onEdit: () => void
+  onDelete: (post: unknown) => void
+  isAdmin?: boolean
+  pinning?: boolean
+  onPin: () => void
+  onToggleBookmark: (post: { id: number; bookmarked?: boolean }) => void
+  bookmarkPending?: boolean
+}) {
   const currentPostConcept = currentPost ? isConceptPost(currentPost) : false
 
   return (

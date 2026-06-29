@@ -12,7 +12,17 @@ export default function AppearanceControl({
   onFontChange,
   fontSelectionLocked = false,
   onOpenAccountSettings,
-}: any) {
+}: {
+  accentColor?: string
+  setAccentColor: (value: string) => void
+  themeMode?: string
+  setThemeMode: (value: string) => void
+  activeFonts?: { id: string | number; name: string }[]
+  selectedFontId?: string | number | null
+  onFontChange?: (value: string) => void
+  fontSelectionLocked?: boolean
+  onOpenAccountSettings?: () => void
+}) {
   const accent = normalizeHex(accentColor)
   const isDark = themeMode === 'dark'
   const fontSelectValue = selectedFontId ? String(selectedFontId) : ''

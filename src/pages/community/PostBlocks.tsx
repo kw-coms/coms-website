@@ -14,7 +14,12 @@ import {
   sanitizeEditorHtml,
 } from './postEditorUtils'
 
-export function renderPostBlocks(post, options: any = {}) {
+export function renderPostBlocks(post, options: {
+  onPollVote?: (...args: unknown[]) => void
+  onPollClose?: ((...args: unknown[]) => void) | null
+  pollVoting?: string
+  pollClosing?: string
+} = {}) {
   const blocks = parsePostBlocks(post)
   const { onPollVote, onPollClose, pollVoting, pollClosing } = options
   const imageDownloadUrl = (url) => {
@@ -34,14 +39,15 @@ export function renderPostBlocks(post, options: any = {}) {
     }))
     .filter((item, index, items) => item.href && items.findIndex((candidate) => candidate.href === item.href) === index)
   const allAttachments = attachments
-  const mediaContainerStyle = (width, align): any => {
+  const mediaContainerStyle = (width, align): React.CSSProperties => {
+    // Includes the non-standard WebkitUserDrag vendor prop, so cast to CSSProperties.
     const base = {
       width: `${mediaWidthPercent(width)}%`,
       maxWidth: '100%',
       userSelect: 'none',
       WebkitUserDrag: 'none',
       textAlign: align === 'right' ? 'right' : align === 'center' ? 'center' : 'left',
-    }
+    } as React.CSSProperties
     if (align === 'left') {
       return { ...base, display: 'block', float: 'left', margin: '0.25rem 1rem 0.75rem 0' }
     }

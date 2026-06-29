@@ -62,7 +62,12 @@ function categoryLabel(value) {
   return ARCHIVE_CATEGORIES.find((item) => item.value === value)?.label || '일반 자료'
 }
 
-function CategorySegment({ value, onChange, items, counts }: any) {
+function CategorySegment({ value, onChange, items, counts }: {
+  value: string
+  onChange: (value: string) => void
+  items: { value: string; label: string }[]
+  counts?: Record<string, number>
+}) {
   return (
     <div className="flex w-full max-w-full items-center gap-1 overflow-x-auto rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.62)] sm:inline-flex sm:w-auto">
       {items.map((item) => {
@@ -88,7 +93,10 @@ function CategorySegment({ value, onChange, items, counts }: any) {
   )
 }
 
-function WriteForm({ onCancel, onSave }: any) {
+function WriteForm({ onCancel, onSave }: {
+  onCancel: () => void
+  onSave: (savedList: unknown[], failedNames: string[]) => void
+}) {
   const [form, setForm] = useState({ title: '', category: 'GENERAL' })
   const [files, setFiles] = useState([])
   const [saving, setSaving] = useState(false)
@@ -238,7 +246,7 @@ function WriteForm({ onCancel, onSave }: any) {
   )
 }
 
-export default function Archive({ onBack }: any) {
+export default function Archive({ onBack }: { onBack: () => void }) {
   const { user } = useAuth()
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
@@ -530,7 +538,7 @@ export default function Archive({ onBack }: any) {
                   {visibleFiles.map((file, index) => {
                     const open = () => openFile(file)
                     return (
-                      <article key={file.id} className="apple-soft-panel p-4" data-reveal style={{ '--reveal-delay': `${Math.min(index, 6) * 55}ms` } as any}>
+                      <article key={file.id} className="apple-soft-panel p-4" data-reveal style={{ '--reveal-delay': `${Math.min(index, 6) * 55}ms` } as React.CSSProperties}>
                         <button
                           type="button"
                           onClick={open}
@@ -592,7 +600,7 @@ export default function Archive({ onBack }: any) {
                             onKeyDown={(event) => openRowWithKeyboard(event, open)}
                             className="cursor-pointer text-[var(--app-muted)] focus:outline-none"
                             data-reveal
-                            style={{ '--reveal-delay': `${Math.min(index, 6) * 55}ms` } as any}
+                            style={{ '--reveal-delay': `${Math.min(index, 6) * 55}ms` } as React.CSSProperties}
                           >
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-[var(--app-subtle)]">{file.id}</td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">

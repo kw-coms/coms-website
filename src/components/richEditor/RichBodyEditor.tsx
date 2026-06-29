@@ -9,6 +9,15 @@ import {
 } from '../../pages/community/postEditorUtils'
 import { FULL_RICH_FEATURES } from './richBodyFeatures'
 
+type EditorApi = {
+  formatBlock: (command: string, value?: unknown) => void
+  insertCodeBlock: () => void
+  insertExternalEmbed: (block: unknown) => void
+  insertFiles: (files: File[]) => void
+  insertPoll: (poll: unknown) => void
+  saveSelection: () => void
+}
+
 /**
  * Reusable rich-body editor: toolbar + insert panels + contenteditable surface.
  * Used by the community PostEditor (all features) and by notices/resources
@@ -23,7 +32,15 @@ export default function RichBodyEditor({
   onError,
   searchYoutube,
   fetchLinkPreview,
-}: any) {
+}: {
+  initialBlocks: { type?: string; [key: string]: unknown }[]
+  apiRef?: { current: EditorApi | null } | null
+  features?: Record<string, boolean>
+  error?: string
+  onError?: (message: string) => void
+  searchYoutube?: (query: string) => Promise<{ items?: unknown[] } | null>
+  fetchLinkPreview?: (url: string) => Promise<{ title?: string; description?: string; image?: string; siteName?: string } | null>
+}) {
   const editorApiRef = apiRef
   const [externalUrl, setExternalUrl] = useState('')
   const [externalLoading, setExternalLoading] = useState(false)

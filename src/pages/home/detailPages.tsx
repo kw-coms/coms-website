@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, type LucideIcon } from 'lucide-react'
 import {
   aboutDetailCards,
   aboutDetailFlow,
@@ -54,9 +54,22 @@ export function DetailStoryPage({
   outputsTitle,
   outputsBody = '학기마다 쌓인 활동은 다음 부원이 참고할 수 있는 자료와 경험으로 남습니다.',
   outputs,
-}: any) {
+}: {
+  eyebrow?: React.ReactNode
+  title?: React.ReactNode
+  body?: React.ReactNode
+  visualTitle?: React.ReactNode
+  visualSubtitle?: React.ReactNode
+  visualRows: string[]
+  cards: { title: string; eyebrow: string; body: string; icon: LucideIcon }[]
+  flow: string[][]
+  outputsEyebrow?: string
+  outputsTitle?: React.ReactNode
+  outputsBody?: string
+  outputs: string[]
+}) {
   const navigate = useNavigate()
-  const titleRef = useRef(null)
+  const titleRef = useRef<HTMLHeadingElement>(null)
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return undefined
@@ -73,12 +86,12 @@ export function DetailStoryPage({
       frameId = window.requestAnimationFrame(() => {
         if (!active) return
 
-        const phrases: any[] = Array.from(titleEl.querySelectorAll('.apple-detail-title-phrase'))
+        const phrases = Array.from(titleEl.querySelectorAll('.apple-detail-title-phrase')) as HTMLElement[]
         if (phrases.length === 0) return
 
         const availableWidth = titleEl.clientWidth
         const currentFit = Number.parseFloat(getComputedStyle(titleEl).getPropertyValue('--apple-title-fit')) || 1
-        const widestPhrase = phrases.reduce((max: number, phrase: any) => Math.max(max, phrase.scrollWidth / currentFit), 0)
+        const widestPhrase = phrases.reduce((max: number, phrase) => Math.max(max, phrase.scrollWidth / currentFit), 0)
         if (!availableWidth || !widestPhrase) return
 
         const nextFit = Math.min(1, Math.max(DETAIL_TITLE_MIN_FIT, (availableWidth - 2) / widestPhrase))

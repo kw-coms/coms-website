@@ -1,7 +1,10 @@
 import { categoryLabel } from './postEditorUtils'
 import { shortDate } from './communityBoardUtils'
 
-export function BoardHeader({ title = "COM's 게시판", children }: any) {
+export function BoardHeader({ title = "COM's 게시판", children }: {
+  title?: string
+  children?: React.ReactNode
+}) {
   return (
     <div className="apple-board-hero px-4 py-7 sm:px-8 sm:py-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -16,7 +19,11 @@ export function BoardHeader({ title = "COM's 게시판", children }: any) {
   )
 }
 
-export function BoardDetailBar({ post, loading, children }: any) {
+export function BoardDetailBar({ post, loading, children }: {
+  post?: { category?: string; createdAt?: string } | null
+  loading?: boolean
+  children?: React.ReactNode
+}) {
   return (
     <div className="apple-board-minibar px-4 py-3 sm:px-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -37,7 +44,10 @@ export function BoardDetailBar({ post, loading, children }: any) {
   )
 }
 
-export function BoardComposeBar({ title, children }: any) {
+export function BoardComposeBar({ title, children }: {
+  title?: string
+  children?: React.ReactNode
+}) {
   return (
     <div className="apple-board-minibar px-4 py-3 sm:px-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

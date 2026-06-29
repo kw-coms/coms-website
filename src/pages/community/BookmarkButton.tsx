@@ -2,7 +2,12 @@ import { Bookmark } from 'lucide-react'
 
 // Scrap / 스크랩 toggle. Filled icon when the viewer has bookmarked the post.
 // Used on list rows (compact) and on the detail action bar (full).
-export default function BookmarkButton({ post, onToggle, pending = false, variant = 'compact' }: any) {
+export default function BookmarkButton({ post, onToggle, pending = false, variant = 'compact' }: {
+  post: { id: number; bookmarked?: boolean }
+  onToggle: (post: { id: number; bookmarked?: boolean }) => void
+  pending?: boolean
+  variant?: 'compact' | 'full'
+}) {
   const bookmarked = Boolean(post?.bookmarked)
   const label = bookmarked ? '스크랩 해제' : '스크랩'
 

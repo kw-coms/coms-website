@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, type NavigateOptions, type To } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, Megaphone } from 'lucide-react'
 import { listNotices } from '../../services/noticeApi'
@@ -142,7 +142,7 @@ export default function HomeView() {
   }
 
   const goNotices = () => navigate('/notices')
-  const goPageTop = (to, options?: any) => {
+  const goPageTop = (to: To, options?: NavigateOptions) => {
     scrollToTopInstant()
     navigate(to, options)
   }
@@ -176,9 +176,9 @@ export default function HomeView() {
         <div className="mx-auto w-full max-w-5xl">
           <div className="mx-auto max-w-4xl text-center">
             <p data-reveal className="apple-eyebrow">{sectionMeta[id].eyebrow}</p>
-            <h2 data-reveal style={{ '--reveal-delay': '80ms' } as any} className="apple-display mt-4 text-5xl sm:text-6xl lg:text-7xl">{story.title}</h2>
-            <p data-reveal style={{ '--reveal-delay': '160ms' } as any} className="apple-copy mx-auto mt-6 max-w-3xl text-xl sm:text-2xl">{story.body}</p>
-            <div data-reveal style={{ '--reveal-delay': '240ms' } as any} className="mt-8 flex flex-wrap justify-center gap-3">
+            <h2 data-reveal style={{ '--reveal-delay': '80ms' } as React.CSSProperties} className="apple-display mt-4 text-5xl sm:text-6xl lg:text-7xl">{story.title}</h2>
+            <p data-reveal style={{ '--reveal-delay': '160ms' } as React.CSSProperties} className="apple-copy mx-auto mt-6 max-w-3xl text-xl sm:text-2xl">{story.body}</p>
+            <div data-reveal style={{ '--reveal-delay': '240ms' } as React.CSSProperties} className="mt-8 flex flex-wrap justify-center gap-3">
               <button type="button" onClick={primaryAction} className={solidActionBtnClass}>
                 {story.primary}
               </button>
@@ -192,7 +192,7 @@ export default function HomeView() {
 
           <div className="mx-auto mt-10 grid max-w-3xl gap-3 sm:grid-cols-3">
             {metrics.map((item, index) => (
-              <div key={item.value} data-reveal style={{ '--reveal-delay': `${index * 90}ms` } as any} className="apple-soft-panel px-4 py-5 text-center">
+              <div key={item.value} data-reveal style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties} className="apple-soft-panel px-4 py-5 text-center">
                 <p className="text-lg font-semibold text-[var(--app-text)]">{item.value}</p>
                 <p className="mt-1 text-xs font-semibold leading-5 text-[var(--app-muted)]">{item.label}</p>
               </div>
@@ -207,7 +207,7 @@ export default function HomeView() {
                   type="button"
                   onClick={() => openPanel(item.target)}
                   data-reveal
-                  style={{ '--reveal-delay': `${index * 90}ms` } as any}
+                  style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties}
                   className="apple-product-panel group min-h-48 px-6 py-6 text-left transition hover:-translate-y-0.5"
                 >
                   <p className="apple-eyebrow">{item.eyebrow}</p>
@@ -221,7 +221,7 @@ export default function HomeView() {
           {detailItems.length > 0 && (
             <div className={`mt-10 grid gap-3 ${id === 'projects' ? 'lg:grid-cols-3' : 'sm:grid-cols-2'}`}>
               {detailItems.map((item, index) => (
-                <article key={item.title} data-reveal style={{ '--reveal-delay': `${index * 90}ms` } as any} className="apple-product-panel px-6 py-6 text-left transition hover:-translate-y-0.5">
+                <article key={item.title} data-reveal style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties} className="apple-product-panel px-6 py-6 text-left transition hover:-translate-y-0.5">
                   <div className="mb-5 inline-flex size-9 items-center justify-center rounded-full bg-[var(--app-surface-soft)] text-xs font-bold text-[var(--app-accent-text)]">
                     {String(index + 1).padStart(2, '0')}
                   </div>
@@ -247,7 +247,7 @@ export default function HomeView() {
           <div className="flex items-center">
             {renderSectionContent(id)}
           </div>
-          <div data-reveal data-reveal-dir="right" style={{ '--reveal-delay': '120ms' } as any} className="flex items-center justify-center">
+          <div data-reveal data-reveal-dir="right" style={{ '--reveal-delay': '120ms' } as React.CSSProperties} className="flex items-center justify-center">
             <div className="home-device apple-device-card relative aspect-square w-full max-w-md overflow-hidden rounded-lg ring-1 ring-black/5" style={{ background: meta.visual }}>
               <div className="absolute inset-0 bg-linear-to-b from-white/30 via-transparent to-black/5" />
               <div className="absolute inset-x-6 top-6 rounded-lg bg-white/78 px-5 py-4 shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
@@ -369,7 +369,7 @@ export default function HomeView() {
                 type="button"
                 onClick={() => openPanel(item.target)}
                 data-reveal
-                style={{ '--reveal-delay': `${index * 90}ms` } as any}
+                style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties}
                 className="coms-hslide apple-product-panel apple-showcase-card group flex min-h-[12rem] flex-col px-6 py-6 text-left text-[var(--app-text)] transition hover:-translate-y-0.5"
               >
                 <p className="text-sm font-semibold text-[var(--app-accent-text)]">{item.eyebrow}</p>
@@ -416,7 +416,7 @@ export default function HomeView() {
                   type="button"
                   onClick={() => goPageTop(item.route)}
                   data-reveal
-                  style={{ '--reveal-delay': `${index * 90}ms` } as any}
+                  style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties}
                   className="coms-hslide apple-product-panel min-h-44 px-6 py-6 text-left transition hover:-translate-y-0.5"
                 >
                   <span className="inline-flex size-8 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-sm font-bold text-[var(--app-accent-text)]">
