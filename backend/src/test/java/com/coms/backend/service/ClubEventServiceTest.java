@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.Member;
 import com.coms.backend.repository.ClubEventEntryRepository;
 import com.coms.backend.repository.ClubEventRepository;
+import com.coms.backend.repository.ClubEventRsvpRepository;
 import com.coms.backend.repository.ClubEventVoteRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,10 +41,14 @@ class ClubEventServiceTest {
     private ClubEventVoteRepository clubEventVoteRepository;
 
     @Autowired
+    private ClubEventRsvpRepository clubEventRsvpRepository;
+
+    @Autowired
     private MemberRepository memberRepository;
 
     @BeforeEach
     void setUp() {
+        clubEventRsvpRepository.deleteAll();
         clubEventVoteRepository.deleteAll();
         clubEventEntryRepository.deleteAll();
         clubEventRepository.deleteAll();
@@ -131,6 +136,36 @@ class ClubEventServiceTest {
         var open = clubEventService.createEvent("진행 중 이벤트", null,
                 now.minusHours(1), now.plusDays(1), "2026123456");
         assertThatThrownBy(() -> clubEventService.vote(open.id(), closedEntry.id(), "2026000001"))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void memberRsvpUpsertsExactlyOneRowAndAggregatesCounts() {
+        LocalDateTime now = LocalDateTime.now();
+        var event = clubEventService.createEvent("정기 모임", "참석 응답을 남겨주세요.",
+                now.minusHours(1), now.plusDays(1), "2026123456");
+
+        var going = clubEventService.rsvp(event.id(), "2026000001", "GOING");
+        assertThat(going.myRsvpStatus()).isEqualTo("GOING");
+        assertThat(going.goingCount()).isEqualTo(1);
+        assertThat(going.maybeCount()).isZero();
+        assertThat(going.notGoingCount()).isZero();
+
+        var changed = clubEventService.rsvp(event.id(), "2026000001", "NOT_GOING");
+        assertThat(changed.myRsvpStatus()).isEqualTo("NOT_GOING");
+        assertThat(changed.goingCount()).isZero();
+        assertThat(changed.notGoingCount()).isEqualTo(1);
+
+        assertThat(clubEventRsvpRepository.findByClubEventId(event.id())).hasSize(1);
+    }
+
+    @Test
+    void rsvpRejectsUnknownStatus() {
+        LocalDateTime now = LocalDateTime.now();
+        var event = clubEventService.createEvent("정기 모임", null,
+                now.minusHours(1), now.plusDays(1), "2026123456");
+
+        assertThatThrownBy(() -> clubEventService.rsvp(event.id(), "2026000001", "DEFINITELY"))
                 .isInstanceOf(ResponseStatusException.class);
     }
 

@@ -80,6 +80,7 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.DELETE, "/api/club-activities/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.GET, "/api/club-events", "/api/club-events/**").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/club-events/*/entries/*/vote").authenticated();
+                auth.requestMatchers(HttpMethod.POST, "/api/club-events/*/rsvp").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/club-events", "/api/club-events/*/entries").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.PATCH, "/api/club-events/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/club-events/**").hasRole("ADMIN");

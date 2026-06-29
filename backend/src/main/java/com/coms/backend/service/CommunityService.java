@@ -2,6 +2,7 @@ package com.coms.backend.service;
 
 import com.coms.backend.domain.CommunityComment;
 import com.coms.backend.domain.CommunityPost;
+import com.coms.backend.domain.CommunityPostBookmark;
 import com.coms.backend.domain.CommunityPostImage;
 import com.coms.backend.domain.CommunityPostFile;
 import com.coms.backend.domain.CommunityPostVideo;
@@ -25,6 +26,7 @@ import com.coms.backend.repository.CommunityPostImageRepository;
 import com.coms.backend.repository.CommunityPostFileRepository;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVideoRepository;
+import com.coms.backend.repository.CommunityPostBookmarkRepository;
 import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -88,6 +90,7 @@ public class CommunityService {
 
     private final CommunityPostRepository communityPostRepository;
     private final CommunityPostVoteRepository voteRepository;
+    private final CommunityPostBookmarkRepository bookmarkRepository;
     private final MemberRepository memberRepository;
     private final StorageService storageService;
     private final CommunityCommentRepository commentRepository;
@@ -106,6 +109,7 @@ public class CommunityService {
 
     public CommunityService(CommunityPostRepository communityPostRepository,
                             CommunityPostVoteRepository voteRepository,
+                            CommunityPostBookmarkRepository bookmarkRepository,
                             MemberRepository memberRepository,
                             StorageService storageService,
                             CommunityCommentRepository commentRepository,
@@ -122,6 +126,7 @@ public class CommunityService {
                             @Value("${jwt.secret:}") String jwtSecret) {
         this.communityPostRepository = communityPostRepository;
         this.voteRepository = voteRepository;
+        this.bookmarkRepository = bookmarkRepository;
         this.memberRepository = memberRepository;
         this.commentRepository = commentRepository;
         this.storageService = storageService;
@@ -163,6 +168,43 @@ public class CommunityService {
         List<CommunityPost> posts = communityPostRepository.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc().stream()
                 .filter(post -> canViewPost(member, post))
                 .toList();
+        Map<String, Member> authors = memberRepository.findByStudentIdIn(posts.stream()
+                        .map(CommunityPost::getAuthorStudentId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(Member::getStudentId, Function.identity()));
+        Map<Long, VoteSummary> stats = voteStats(posts);
+        Map<Long, Long> commentCounts = commentCounts(posts);
+        Map<Long, List<CommunityPostResponse.PollResult>> pollResults = pollResults(posts, member.getStudentId());
+        Map<String, CommunityReputationResponse> reputations = reputationTiers(authors.keySet());
+        return posts.stream()
+                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, reputations, false))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CommunityPostResponse> listBookmarked(String studentId) {
+        Member member = findMember(studentId);
+        List<CommunityPost> posts = bookmarkRepository.findByStudentIdOrderByCreatedAtDesc(member.getStudentId()).stream()
+                .map(CommunityPostBookmark::getPost)
+                .filter(Objects::nonNull)
+                .filter(post -> canViewPost(member, post))
+                .toList();
+        return mapPosts(posts, member);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CommunityPostResponse> listByAuthor(String authorStudentId, String viewerStudentId) {
+        Member member = findMember(viewerStudentId);
+        List<CommunityPost> posts = communityPostRepository.findByAuthorStudentIdOrderByCreatedAtDesc(authorStudentId).stream()
+                .filter(post -> !isAnonymousPost(post))
+                .filter(post -> canViewPost(member, post))
+                .toList();
+        return mapPosts(posts, member);
+    }
+
+    private List<CommunityPostResponse> mapPosts(List<CommunityPost> posts, Member member) {
         Map<String, Member> authors = memberRepository.findByStudentIdIn(posts.stream()
                         .map(CommunityPost::getAuthorStudentId)
                         .filter(Objects::nonNull)
@@ -351,6 +393,22 @@ public class CommunityService {
                 voteStats(List.of(post)), commentCounts(List.of(post)), pollResults(List.of(post), member.getStudentId()), true);
     }
 
+    public boolean toggleBookmark(Long postId, String studentId) {
+        Member member = findMember(studentId);
+        CommunityPost post = communityPostRepository.findById(postId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        requirePostVisible(member, post);
+        if (bookmarkRepository.existsByPostIdAndStudentId(post.getId(), member.getStudentId())) {
+            bookmarkRepository.deleteByPostIdAndStudentId(post.getId(), member.getStudentId());
+            return false;
+        }
+        CommunityPostBookmark bookmark = new CommunityPostBookmark();
+        bookmark.setPost(post);
+        bookmark.setStudentId(member.getStudentId());
+        bookmarkRepository.save(bookmark);
+        return true;
+    }
+
     public CommunityPostResponse votePoll(String studentId, Long id, CommunityPollVoteRequest request) {
         Member member = findMember(studentId);
         CommunityPost post = communityPostRepository.findById(id)
@@ -443,6 +501,7 @@ public class CommunityService {
         posts.forEach(this::deletePostData);
         pollVoteRepository.deleteByStudentId(studentId);
         voteRepository.deleteByStudentId(studentId);
+        bookmarkRepository.deleteByStudentId(studentId);
         Set<Long> deletedCommentIds = new java.util.HashSet<>();
         commentRepository.findByStudentId(studentId).forEach(comment -> deleteCommentTree(comment, deletedCommentIds));
     }
@@ -829,6 +888,7 @@ public class CommunityService {
                         "/api/community/posts/" + post.getId() + "/files/" + file.getId() + "/download",
                         file.getOriginalName()))
                 .toList();
+        boolean bookmarked = bookmarkRepository.existsByPostIdAndStudentId(post.getId(), currentMember.getStudentId());
         return new CommunityPostResponse(
                 post.getId(),
                 post.getTitle(),
@@ -858,7 +918,8 @@ public class CommunityService {
                 post.getUpdatedAt(),
                 post.isEdited(),
                 editable,
-                post.isPinned()
+                post.isPinned(),
+                bookmarked
         );
     }
 
@@ -1462,6 +1523,7 @@ public class CommunityService {
         clearExtraImages(post.getId(), preservedStoredNames);
         pollVoteRepository.deleteByPostId(post.getId());
         voteRepository.deleteByPost(post);
+        bookmarkRepository.deleteByPostId(post.getId());
         commentRepository.deleteByPostId(post.getId());
         communityPostRepository.delete(post);
     }
