@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "e2e": "npm run build && playwright test",
     "e2e:update": "npm run build && playwright test --update-snapshots",
-    "smoke": "npm run build && playwright test --project=smoke"
+    "smoke": "npm run build && playwright test --project=smoke",
+    "test:e2e:backend": "node scripts/e2e-backend.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.59.0",
