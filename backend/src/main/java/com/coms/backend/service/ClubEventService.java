@@ -14,6 +14,7 @@ import com.coms.backend.repository.ClubEventRsvpRepository;
 import com.coms.backend.repository.ClubEventVoteRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.springframework.core.io.Resource;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -239,12 +240,7 @@ public class ClubEventService {
 
         Optional<ClubEventVote> existing = voteRepository.findByClubEventIdAndStudentId(event.getId(), studentId);
         if (existing.isPresent()) {
-            ClubEventVote vote = existing.get();
-            if (!vote.getEntryId().equals(entry.getId())) {
-                vote.setEntryId(entry.getId());
-                vote.setUpdatedAt(LocalDateTime.now());
-                voteRepository.save(vote);
-            }
+            applyVote(existing.get(), entry);
         } else {
             ClubEventVote vote = new ClubEventVote();
             vote.setClubEventId(event.getId());
@@ -252,9 +248,24 @@ public class ClubEventService {
             vote.setStudentId(studentId);
             vote.setCreatedAt(LocalDateTime.now());
             vote.setUpdatedAt(LocalDateTime.now());
-            voteRepository.save(vote);
+            try {
+                voteRepository.saveAndFlush(vote);
+            } catch (DataIntegrityViolationException e) {
+                // A concurrent request already inserted this member's vote and tripped the unique
+                // constraint. Re-read it and reconcile the chosen entry instead of failing with a 500.
+                voteRepository.findByClubEventIdAndStudentId(event.getId(), studentId)
+                        .ifPresent(reread -> applyVote(reread, entry));
+            }
         }
         return get(event.getId(), studentId);
+    }
+
+    private void applyVote(ClubEventVote vote, ClubEventEntry entry) {
+        if (!vote.getEntryId().equals(entry.getId())) {
+            vote.setEntryId(entry.getId());
+            vote.setUpdatedAt(LocalDateTime.now());
+            voteRepository.save(vote);
+        }
     }
 
     public ClubEventResponse rsvp(Long eventId, String studentId, String status) {
@@ -264,12 +275,7 @@ public class ClubEventService {
 
         Optional<ClubEventRsvp> existing = rsvpRepository.findByClubEventIdAndStudentId(event.getId(), studentId);
         if (existing.isPresent()) {
-            ClubEventRsvp rsvp = existing.get();
-            if (rsvp.getStatus() != parsedStatus) {
-                rsvp.setStatus(parsedStatus);
-                rsvp.setUpdatedAt(LocalDateTime.now());
-                rsvpRepository.save(rsvp);
-            }
+            applyRsvp(existing.get(), parsedStatus);
         } else {
             ClubEventRsvp rsvp = new ClubEventRsvp();
             rsvp.setClubEventId(event.getId());
@@ -277,9 +283,24 @@ public class ClubEventService {
             rsvp.setStatus(parsedStatus);
             rsvp.setCreatedAt(LocalDateTime.now());
             rsvp.setUpdatedAt(LocalDateTime.now());
-            rsvpRepository.save(rsvp);
+            try {
+                rsvpRepository.saveAndFlush(rsvp);
+            } catch (DataIntegrityViolationException e) {
+                // A concurrent request already inserted this member's RSVP and tripped the unique
+                // constraint. Re-read it and reconcile the chosen status instead of failing with a 500.
+                rsvpRepository.findByClubEventIdAndStudentId(event.getId(), studentId)
+                        .ifPresent(reread -> applyRsvp(reread, parsedStatus));
+            }
         }
         return get(event.getId(), studentId);
+    }
+
+    private void applyRsvp(ClubEventRsvp rsvp, ClubEventRsvp.Status parsedStatus) {
+        if (rsvp.getStatus() != parsedStatus) {
+            rsvp.setStatus(parsedStatus);
+            rsvp.setUpdatedAt(LocalDateTime.now());
+            rsvpRepository.save(rsvp);
+        }
     }
 
     public void deleteEntry(Long eventId, Long entryId) {

@@ -1,5 +1,7 @@
 package com.coms.backend.service;
 
+import com.coms.backend.domain.ClubEventRsvp;
+import com.coms.backend.domain.ClubEventVote;
 import com.coms.backend.domain.Member;
 import com.coms.backend.repository.ClubEventEntryRepository;
 import com.coms.backend.repository.ClubEventRepository;
@@ -10,15 +12,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest(properties = {
         "jwt.secret=test-secret-key-with-at-least-32-chars",
@@ -37,10 +45,10 @@ class ClubEventServiceTest {
     @Autowired
     private ClubEventEntryRepository clubEventEntryRepository;
 
-    @Autowired
+    @MockitoSpyBean
     private ClubEventVoteRepository clubEventVoteRepository;
 
-    @Autowired
+    @MockitoSpyBean
     private ClubEventRsvpRepository clubEventRsvpRepository;
 
     @Autowired
@@ -167,6 +175,73 @@ class ClubEventServiceTest {
 
         assertThatThrownBy(() -> clubEventService.rsvp(event.id(), "2026000001", "DEFINITELY"))
                 .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void voteRecoversFromConcurrentInsertConstraintViolation() throws Exception {
+        LocalDateTime now = LocalDateTime.now();
+        var event = clubEventService.createEvent("회지 인기투표", null,
+                now.minusHours(1), now.plusDays(1), "2026123456");
+        var first = clubEventService.addEntry(event.id(), "1호", "A팀", null,
+                null, null, null, null, List.of(pdf("one.pdf")), "2026123456");
+        var second = clubEventService.addEntry(event.id(), "2호", "B팀", null,
+                null, null, null, null, List.of(pdf("two.pdf")), "2026123456");
+
+        // A concurrent request already inserted this member's vote (here for `first`).
+        ClubEventVote stored = clubEventVoteRepository.saveAndFlush(
+                vote(event.id(), first.id(), "2026000001", now));
+        // The service's pre-read misses the concurrent row, so it takes the INSERT branch; that INSERT
+        // trips uk_club_event_votes (simulated via the stubbed throw). The recovery path then re-reads
+        // the now-visible row and reconciles the chosen entry.
+        doReturn(Optional.empty()).doReturn(Optional.of(stored))
+                .when(clubEventVoteRepository).findByClubEventIdAndStudentId(event.id(), "2026000001");
+        doThrow(new DataIntegrityViolationException("uk_club_event_votes"))
+                .when(clubEventVoteRepository).saveAndFlush(any());
+
+        var voted = clubEventService.vote(event.id(), second.id(), "2026000001");
+
+        assertThat(voted.myEntryId()).isEqualTo(second.id());
+        assertThat(voted.totalVotes()).isEqualTo(1);
+        assertThat(clubEventVoteRepository.findByClubEventId(event.id())).hasSize(1);
+    }
+
+    @Test
+    void rsvpRecoversFromConcurrentInsertConstraintViolation() {
+        LocalDateTime now = LocalDateTime.now();
+        var event = clubEventService.createEvent("정기 모임", null,
+                now.minusHours(1), now.plusDays(1), "2026123456");
+
+        // A concurrent request already inserted this member's RSVP (here MAYBE).
+        ClubEventRsvp concurrent = new ClubEventRsvp();
+        concurrent.setClubEventId(event.id());
+        concurrent.setStudentId("2026000001");
+        concurrent.setStatus(ClubEventRsvp.Status.MAYBE);
+        concurrent.setCreatedAt(now);
+        concurrent.setUpdatedAt(now);
+        ClubEventRsvp stored = clubEventRsvpRepository.saveAndFlush(concurrent);
+        // The pre-read misses the concurrent row, so the service takes the INSERT branch; that INSERT
+        // trips uk_club_event_rsvps_event_student (simulated via the stubbed throw). The recovery path
+        // then re-reads the now-visible row and reconciles the chosen status.
+        doReturn(Optional.empty()).doReturn(Optional.of(stored))
+                .when(clubEventRsvpRepository).findByClubEventIdAndStudentId(event.id(), "2026000001");
+        doThrow(new DataIntegrityViolationException("uk_club_event_rsvps_event_student"))
+                .when(clubEventRsvpRepository).saveAndFlush(any());
+
+        var going = clubEventService.rsvp(event.id(), "2026000001", "GOING");
+
+        assertThat(going.myRsvpStatus()).isEqualTo("GOING");
+        assertThat(going.goingCount()).isEqualTo(1);
+        assertThat(clubEventRsvpRepository.findByClubEventId(event.id())).hasSize(1);
+    }
+
+    private ClubEventVote vote(Long eventId, Long entryId, String studentId, LocalDateTime at) {
+        ClubEventVote vote = new ClubEventVote();
+        vote.setClubEventId(eventId);
+        vote.setEntryId(entryId);
+        vote.setStudentId(studentId);
+        vote.setCreatedAt(at);
+        vote.setUpdatedAt(at);
+        return vote;
     }
 
     private MockMultipartFile pdf(String filename) {
