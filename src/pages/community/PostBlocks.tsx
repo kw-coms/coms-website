@@ -1,9 +1,7 @@
 import { Download } from 'lucide-react'
 import { linkify } from '../../utils/linkify'
 import { apiUrl } from '../../services/apiClient'
-import { sanitizeHtml } from '../../utils/sanitizeHtml'
 import {
-  EDITOR_SANITIZE_OPTIONS,
   formatPollDate,
   hasFormattedText,
   mediaWidthPercent,
@@ -61,7 +59,7 @@ export function renderPostBlocks(post, options: any = {}) {
               <div
                 key={i}
                 className="community-post-text text-size-container whitespace-pre-wrap break-words auto-text-post"
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(sanitizeEditorHtml(block.content), EDITOR_SANITIZE_OPTIONS) }}
+                dangerouslySetInnerHTML={{ __html: sanitizeEditorHtml(block.content) }}
               />
             )
           }
