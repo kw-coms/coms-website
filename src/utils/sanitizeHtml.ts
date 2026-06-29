@@ -5,6 +5,7 @@ const DEFAULT_ALLOWED_TAGS = [
   'b',
   'blockquote',
   'br',
+  'code',
   'div',
   'em',
   'font',
@@ -15,13 +16,14 @@ const DEFAULT_ALLOWED_TAGS = [
   'mark',
   'ol',
   'p',
+  'pre',
   'span',
   'strong',
   'u',
   'ul',
 ]
 
-const DEFAULT_ALLOWED_ATTRIBUTES = ['color', 'face', 'href', 'rel', 'style', 'target']
+const DEFAULT_ALLOWED_ATTRIBUTES = ['class', 'color', 'face', 'href', 'rel', 'style', 'target']
 const DEFAULT_ALLOWED_STYLES = new Set([
   'background-color',
   'color',
@@ -43,6 +45,7 @@ const RICH_TEXT_ALLOWED_TAGS = [
   'blockquote',
   'br',
   'div',
+  'code',
   'em',
   'font',
   'h2',
@@ -51,6 +54,7 @@ const RICH_TEXT_ALLOWED_TAGS = [
   'li',
   'ol',
   'p',
+  'pre',
   'span',
   'strong',
   'u',
@@ -68,6 +72,21 @@ export const SANITIZE_PROFILES = {
 
 const DANGEROUS_STYLE_VALUE_RE = /url\s*\(|expression\s*\(|javascript:|data:/i
 const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
+// `class` is allowed ONLY so a single language hint (e.g. `language-js`) can ride
+// along on code/pre for syntax highlighting. Anything else is a CSS-injection /
+// styling-hijack surface, so we constrain it to this exact shape and strip class
+// from every other tag in postProcessAttributes below.
+const SAFE_CODE_CLASS_RE = /^language-[a-z0-9]+$/i
+
+// Pure (DOM-free) decision used by postProcessAttributes so the class-attribute
+// constraint is a single source of truth and unit-testable without a browser:
+// keep a `language-*` class only on <code>/<pre>, strip class everywhere else.
+export function sanitizeClassAttribute(tagName, rawClass) {
+  const tag = String(tagName || '').toLowerCase()
+  const value = String(rawClass || '').trim()
+  if ((tag === 'code' || tag === 'pre') && SAFE_CODE_CLASS_RE.test(value)) return value
+  return ''
+}
 
 function escapeHtml(value) {
   return String(value || '')
@@ -126,6 +145,15 @@ function postProcessAttributes(container, allowedStyles) {
     else element.removeAttribute('face')
     if (color) element.setAttribute('color', color)
     else element.removeAttribute('color')
+  })
+
+  container.querySelectorAll('[class]').forEach((element) => {
+    const safeClass = sanitizeClassAttribute(element.tagName, element.getAttribute('class'))
+    if (safeClass) {
+      element.setAttribute('class', safeClass)
+    } else {
+      element.removeAttribute('class')
+    }
   })
 
   container.querySelectorAll('a').forEach((element) => {

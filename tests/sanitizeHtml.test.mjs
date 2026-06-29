@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { sanitizeHtml, sanitizeStyleDeclaration, SANITIZE_PROFILES } from '../src/utils/sanitizeHtml.ts'
+import { sanitizeHtml, sanitizeStyleDeclaration, sanitizeClassAttribute, SANITIZE_PROFILES } from '../src/utils/sanitizeHtml.ts'
 
 assert.equal(
   sanitizeStyleDeclaration('color:red;background-image:url(javascript:alert(1));font-weight:bold'),
@@ -48,3 +48,41 @@ assert.equal(
   sanitizeStyleDeclaration('text-align:center;font-weight:bold;text-decoration:underline', richText.allowedStyles),
   'text-align: center; font-weight: bold; text-decoration: underline',
 )
+
+// --- code blocks: <pre>/<code> are allowed and the `class` attribute is
+// constrained to a single `language-*` hint on code/pre only. The class
+// decision is exercised directly via sanitizeClassAttribute (the DOM-free
+// single source of truth used by the browser post-process pass) so it is
+// testable without a headless DOM. ---
+
+// 5. <pre>/<code> are now in BOTH allow-lists (post body + rich editor).
+for (const tag of ['pre', 'code']) {
+  assert.ok(SANITIZE_PROFILES.richText.allowedTags.includes(tag), `rich tag <${tag}> must be allowed`)
+}
+// `class` is allowed at the attribute level (its values are then constrained).
+assert.ok(SANITIZE_PROFILES.richText.allowedAttributes.includes('class'), 'class attribute must be allow-listed')
+
+// 6. A `language-js` hint survives on <code>/<pre> with the class value intact.
+assert.equal(sanitizeClassAttribute('code', 'language-js'), 'language-js')
+assert.equal(sanitizeClassAttribute('pre', 'language-py3'), 'language-py3')
+assert.equal(sanitizeClassAttribute('CODE', 'language-TS'), 'language-TS', 'tag/class matching is case-insensitive')
+
+// 7. A <code class="language-js" onclick=alert(1)> keeps the class but the
+//    event handler is never allow-listed, so onclick is dropped. (The class
+//    survives; onclick is rejected by the attribute allow-list.)
+assert.ok(!SANITIZE_PROFILES.richText.allowedAttributes.includes('onclick'))
+assert.equal(sanitizeClassAttribute('code', 'language-js'), 'language-js')
+
+// 8. A <div class="evil"> has its class stripped entirely (class only rides on code/pre).
+assert.equal(sanitizeClassAttribute('div', 'evil'), '')
+assert.equal(sanitizeClassAttribute('span', 'language-js'), '', 'language-* is only honored on code/pre')
+// Non-language classes on code/pre are also stripped (no arbitrary class survives).
+assert.equal(sanitizeClassAttribute('code', 'hljs theme-dark'), '')
+assert.equal(sanitizeClassAttribute('pre', 'language-js evil'), '', 'multi-class with a non-language token is rejected')
+
+// 9. A <script> inside a code block is still neutralized — never emitted as live
+//    markup. Server-side (no DOM) the whole body is HTML-escaped; the rich
+//    profile additionally drops <script> from the allow-list in the browser.
+const codeWithScript = sanitizeHtml('<pre><code><script>alert(1)</script></code></pre>', { profile: 'richText' })
+assert.ok(!codeWithScript.includes('<script>'), 'script inside a code block must not survive as live markup')
+assert.ok(!richText.allowedTags.includes('script'))

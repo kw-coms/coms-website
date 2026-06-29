@@ -159,6 +159,13 @@ export default function RichBodyEditor({
             onClick={() => applyFormat('underline')}
             aria-label="밑줄"
             className="min-h-9 px-3 text-sm underline text-[var(--theme-body-dark)] hover:bg-black/5">U</button>
+          <button type="button"
+            onPointerDown={(e) => e.preventDefault()}
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => e.preventDefault()}
+            onClick={() => editorApiRef.current?.insertCodeBlock()}
+            aria-label="코드"
+            className="min-h-9 px-3 font-mono text-sm text-[var(--theme-body-dark)] hover:bg-black/5">코드</button>
         </div>
         )}
         {features.font && (
