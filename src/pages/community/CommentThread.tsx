@@ -140,13 +140,13 @@ export default function CommentThread({
           className="min-h-24 rounded border border-black/15 bg-[#fafafa] px-3 py-2 text-base outline-none focus:border-[#3b4890] focus:bg-[var(--app-surface)] sm:text-sm"
           disabled={commentSaving}
         />
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
           <p className="text-xs font-semibold text-[var(--theme-body-muted)]">Enter는 줄바꿈, Ctrl/⌘+Enter 또는 버튼으로 등록</p>
           <button
             type="button"
             onClick={onAddComment}
             disabled={commentSaving || !commentInput.trim()}
-            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded bg-[#3b4890] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#2d3a7a] disabled:opacity-40"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded bg-[#3b4890] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#2d3a7a] disabled:opacity-40 sm:min-h-11 sm:w-auto"
           >
             <Send size={13} />
             등록
@@ -229,14 +229,14 @@ function CommentNode({
                   type="button"
                   onClick={() => onUpdateComment(comment.id)}
                   disabled={commentSaving || !editCommentInput.trim()}
-                  className="rounded bg-[#3b4890] px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                  className="inline-flex min-h-11 items-center justify-center rounded bg-[#3b4890] px-4 py-2 text-xs font-bold text-white disabled:opacity-40 sm:min-h-0 sm:px-3"
                 >
                   저장
                 </button>
                 <button
                   type="button"
                   onClick={() => { setEditingCommentId(null); setEditCommentInput('') }}
-                  className="rounded border border-black/15 bg-[var(--app-surface)] px-3 py-2 text-xs font-bold text-[var(--theme-body-muted)]"
+                  className="inline-flex min-h-11 items-center justify-center rounded border border-black/15 bg-[var(--app-surface)] px-4 py-2 text-xs font-bold text-[var(--theme-body-muted)] sm:min-h-0 sm:px-3"
                 >
                   취소
                 </button>
@@ -246,7 +246,7 @@ function CommentNode({
             <p className="text-size-container auto-text-comment whitespace-pre-wrap break-words text-[var(--theme-body-dark)]">{linkify(comment.content)}</p>
           )}
           {!isEditing && (
-            <div className="mt-2 flex flex-wrap items-center gap-3">
+            <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-0.5 max-md:-ml-2 sm:mt-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => {
@@ -257,7 +257,7 @@ function CommentNode({
                   setEditingCommentId(null)
                   setEditCommentInput('')
                 }}
-                className="text-xs font-bold text-[#3b4890] hover:underline"
+                className="inline-flex min-h-11 items-center px-2 text-xs font-bold text-[#3b4890] hover:underline sm:min-h-0 sm:px-0"
               >
                 댓글 달기
               </button>
@@ -265,7 +265,7 @@ function CommentNode({
                 <button
                   type="button"
                   onClick={() => onStartEditComment(comment)}
-                  className="text-xs font-bold text-[#3b4890] hover:underline"
+                  className="inline-flex min-h-11 items-center px-2 text-xs font-bold text-[#3b4890] hover:underline sm:min-h-0 sm:px-0"
                 >
                   수정
                 </button>
@@ -274,7 +274,7 @@ function CommentNode({
                 <button
                   type="button"
                   onClick={() => onDeleteComment(comment.id)}
-                  className="text-xs font-bold text-red-500 hover:underline"
+                  className="inline-flex min-h-11 items-center px-2 text-xs font-bold text-red-500 hover:underline sm:min-h-0 sm:px-0"
                 >
                   삭제
                 </button>
@@ -326,14 +326,14 @@ function CommentNode({
                   type="button"
                   onClick={() => onAddReply(comment.id)}
                   disabled={commentSaving || !replyInput.trim()}
-                  className="rounded bg-[#3b4890] px-3 py-2 text-xs font-bold text-white disabled:opacity-40"
+                  className="inline-flex min-h-11 items-center justify-center rounded bg-[#3b4890] px-4 py-2 text-xs font-bold text-white disabled:opacity-40 sm:min-h-0 sm:px-3"
                 >
                   등록
                 </button>
                 <button
                   type="button"
                   onClick={() => { setReplyTo(null); setReplyInput(''); setReplyAnonymousName('') }}
-                  className="rounded border border-black/15 bg-[var(--app-surface)] px-3 py-2 text-xs font-bold text-[var(--theme-body-muted)]"
+                  className="inline-flex min-h-11 items-center justify-center rounded border border-black/15 bg-[var(--app-surface)] px-4 py-2 text-xs font-bold text-[var(--theme-body-muted)] sm:min-h-0 sm:px-3"
                 >
                   취소
                 </button>

@@ -358,14 +358,14 @@ export default function Notices() {
                 })}
               </div>
             )}
-            <div className="apple-control-strip flex flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6">
+            <div className="apple-control-strip flex flex-col gap-3 px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6 sm:py-3">
               <div className="grid grid-cols-2 gap-2 text-sm font-bold sm:flex sm:flex-wrap">
                 {NOTICE_FILTERS.map(({ value, label, icon: Icon }) => (
                   <button
                     key={value}
                     type="button"
                     onClick={() => setActiveCategory(value)}
-                    className={`apple-chip inline-flex min-w-0 items-center justify-center gap-2 px-3 py-2 sm:px-4 ${
+                    className={`apple-chip inline-flex min-h-11 min-w-0 items-center justify-center gap-2 px-3 py-2 sm:min-h-0 sm:px-4 ${
                       activeCategory === value
                         ? 'apple-chip-active'
                         : ''
@@ -384,7 +384,7 @@ export default function Notices() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="제목, 작성자 검색"
-                    className="w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-8 pr-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:w-64"
+                    className="h-11 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-8 pr-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:h-auto sm:w-64"
                   />
                 </div>
                 <span className="shrink-0 text-xs font-semibold text-[var(--app-subtle)]">{filteredNotices.length}개</span>
@@ -532,7 +532,7 @@ export default function Notices() {
                     <button
                       type="button"
                       onClick={loadMore}
-                      className="apple-action-secondary inline-flex min-h-10 items-center justify-center px-6 text-sm"
+                      className="apple-action-secondary inline-flex min-h-11 items-center justify-center px-6 text-sm sm:min-h-10"
                     >
                       더 보기
                     </button>
@@ -600,25 +600,25 @@ export default function Notices() {
                 개추 {selectedNotice.upvotes ?? 0}
               </button>
             </div>
-            <div className="flex flex-col gap-2 border-t border-[var(--app-hairline)] px-4 py-4 sm:flex-row sm:flex-wrap sm:justify-between sm:px-5">
-              <button type="button" onClick={backToList} className="apple-action-secondary min-h-11 px-4 py-2 text-sm sm:min-h-0">
+            <div className="grid grid-cols-2 gap-2 border-t border-[var(--app-hairline)] px-4 py-4 sm:flex sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2.5 sm:px-5">
+              <button type="button" onClick={backToList} className="apple-action-secondary inline-flex min-h-12 items-center justify-center px-4 py-2 text-sm max-md:col-span-2 sm:min-h-0">
                 목록
               </button>
               {isAdmin && (
-                <div className="grid grid-cols-2 gap-2 sm:flex">
-                  <button type="button" onClick={handlePinSelected} disabled={pinning} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold disabled:opacity-50 sm:min-h-0">
+                <>
+                  <button type="button" onClick={handlePinSelected} disabled={pinning} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold disabled:opacity-50 max-md:col-span-2 sm:min-h-0">
                     {selectedNotice.pinned ? <PinOff size={14} /> : <Pin size={14} />}
                     {selectedNotice.pinned ? '고정 해제' : '고정'}
                   </button>
-                  <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
+                  <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
                     <Pencil size={14} />
                     수정
                   </button>
-                  <button type="button" onClick={deleteSelected} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 sm:min-h-0">
+                  <button type="button" onClick={deleteSelected} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 sm:min-h-0">
                     <Trash2 size={14} />
                     삭제
                   </button>
-                </div>
+                </>
               )}
             </div>
           </article>
