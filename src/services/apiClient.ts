@@ -15,9 +15,23 @@ export function apiUrl(path) {
   return `${baseUrl}${normalizedPath}`
 }
 
+// Single-flight the refresh: when several requests get 401 at once, they must
+// share ONE /api/auth/refresh call. Otherwise each fires its own refresh, which
+// (with refresh-token rotation) is wasteful and can interleave Set-Cookie writes.
+let refreshInFlight: Promise<boolean> | null = null
 async function tryRefreshToken() {
-  const res = await fetch(apiUrl('/api/auth/refresh'), { method: 'POST', credentials: 'include' })
-  return res.ok
+  if (refreshInFlight) return refreshInFlight
+  refreshInFlight = (async () => {
+    try {
+      const res = await fetch(apiUrl('/api/auth/refresh'), { method: 'POST', credentials: 'include' })
+      return res.ok
+    } catch {
+      return false
+    } finally {
+      refreshInFlight = null
+    }
+  })()
+  return refreshInFlight
 }
 
 async function readErrorBody(response) {
