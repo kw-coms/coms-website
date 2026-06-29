@@ -17,21 +17,35 @@ export function AuthProvider({ children }: any) {
   useEffect(() => {
     let mounted = true
 
-    getCurrentUser()
-      .then((data) => {
-        if (mounted) {
-          setUser(data)
-          setAuthError(null)
+    // A transient blip (backend restart / deploy window / network hiccup) should
+    // not log the user out. Retry /me a few times on non-auth errors (no status
+    // or 5xx) with backoff before giving up; a real 401/403 is not retried.
+    const isTransient = (error: any) => {
+      if (isLoggedOutAuthError(error)) return false
+      const status = Number(error?.status)
+      return !Number.isFinite(status) || status >= 500
+    }
+    const delays = [600, 1500]
+    const load = async () => {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const data = await getCurrentUser()
+          if (mounted) { setUser(data); setAuthError(null) }
+          return
+        } catch (error) {
+          if (attempt < delays.length && isTransient(error)) {
+            await new Promise((r) => setTimeout(r, delays[attempt]))
+            if (!mounted) return
+            continue
+          }
+          if (!mounted) return
+          setUser(null)
+          setAuthError(isLoggedOutAuthError(error) ? null : buildAuthLoadError(error))
+          return
         }
-      })
-      .catch((error) => {
-        if (!mounted) return
-        setUser(null)
-        setAuthError(isLoggedOutAuthError(error) ? null : buildAuthLoadError(error))
-      })
-      .finally(() => {
-        if (mounted) setLoading(false)
-      })
+      }
+    }
+    load().finally(() => { if (mounted) setLoading(false) })
 
     return () => {
       mounted = false
