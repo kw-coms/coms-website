@@ -14,6 +14,10 @@ public record ClubEventResponse(
         Long myEntryId,
         int entryCount,
         List<Entry> entries,
+        long goingCount,
+        long maybeCount,
+        long notGoingCount,
+        String myRsvpStatus,
         String createdByName,
         LocalDateTime createdAt,
         LocalDateTime updatedAt

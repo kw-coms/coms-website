@@ -7,6 +7,9 @@ export const queryKeys = {
   community: {
     all: ['community'],
     posts: () => [...queryKeys.community.all, 'posts'],
+    bookmarks: () => [...queryKeys.community.all, 'bookmarks'],
+    byAuthor: (studentId) => [...queryKeys.community.all, 'by-author', String(studentId)],
+    reputation: (studentId) => [...queryKeys.community.all, 'reputation', String(studentId)],
   },
   notices: {
     all: ['notices'],

@@ -6656,3 +6656,69 @@ html.home-snap-scroll .home-snap-section {
 	font-size: 0.85em;
 	color: var(--theme-body-dark);
 }
+
+.club-event-rsvp {
+	margin: 0 1rem;
+	display: grid;
+	gap: 0.5rem;
+}
+
+.club-event-rsvp-label {
+	font-size: 0.74rem;
+	font-weight: 900;
+	letter-spacing: 0.02em;
+	color: var(--app-muted);
+}
+
+.club-event-rsvp-group {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.4rem;
+	padding: 0.3rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 999px;
+	background: var(--app-surface-soft);
+}
+
+.club-event-rsvp-button {
+	display: inline-flex;
+	min-height: 2.5rem;
+	align-items: center;
+	justify-content: center;
+	gap: 0.4rem;
+	border-radius: 999px;
+	border: 1px solid transparent;
+	background: transparent;
+	padding: 0.45rem 0.6rem;
+	color: var(--app-accent-text);
+	font-size: 0.82rem;
+	font-weight: 950;
+	transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.club-event-rsvp-button:hover:not(:disabled):not(.club-event-rsvp-button-selected) {
+	background: var(--app-accent-soft);
+}
+
+.club-event-rsvp-button-count {
+	font-variant-numeric: tabular-nums;
+	opacity: 0.85;
+}
+
+.club-event-rsvp-button-selected {
+	border-color: var(--app-accent);
+	background: var(--app-accent);
+	color: white;
+}
+
+.club-event-rsvp-button-selected .club-event-rsvp-button-count {
+	opacity: 1;
+}
+
+.club-event-rsvp-button:disabled {
+	cursor: not-allowed;
+}
+
+.club-event-rsvp-button-pending {
+	opacity: 0.7;
+}
