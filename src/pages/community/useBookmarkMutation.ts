@@ -35,18 +35,18 @@ export function useBookmarkMutation(options = {}) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (post: any) => {
+    mutationFn: async (post: { id: number; bookmarked?: boolean }) => {
       const result = await toggleBookmark(post.id)
       return { postId: post.id, bookmarked: Boolean(result?.bookmarked) }
     },
-    onMutate: async (post: any) => {
+    onMutate: async (post: { id: number; bookmarked?: boolean }) => {
       const previous = Boolean(post.bookmarked)
       const optimistic = !previous
       setBookmarkEverywhere(queryClient, post.id, optimistic)
       onToggled?.(post.id, optimistic)
       return { postId: post.id, previous }
     },
-    onError: (err: any, _post, context: any) => {
+    onError: (err: Error, _post, context: { postId: number; previous: boolean } | undefined) => {
       if (context) {
         setBookmarkEverywhere(queryClient, context.postId, context.previous)
         onToggled?.(context.postId, context.previous)

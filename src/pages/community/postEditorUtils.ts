@@ -165,7 +165,15 @@ function youtubeEmbedUrl(videoId) {
   return `https://www.youtube.com/embed/${videoId}`
 }
 
-export function externalBlockFromUrl(value, meta: any = {}) {
+export function externalBlockFromUrl(value, meta: {
+  title?: string
+  thumbnailUrl?: string
+  description?: string
+  image?: string
+  siteName?: string
+  width?: number
+  align?: string
+} = {}) {
   const raw = String(value || '').trim()
   let url
   try {
@@ -391,7 +399,7 @@ function canvasToBlob(canvas, type, quality) {
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality))
 }
 
-export async function optimizeImageFile(file: any) {
+export async function optimizeImageFile(file: File) {
   if (!ALLOWED_IMAGE_TYPES.includes(file.type) || file.type === 'image/gif') return file
   if (typeof createImageBitmap !== 'function') return file
 
@@ -414,7 +422,7 @@ export async function optimizeImageFile(file: any) {
   bitmap.close?.()
 
   const outputType = file.type === 'image/png' ? 'image/webp' : file.type
-  const blob: any = await canvasToBlob(canvas, outputType, IMAGE_OPTIMIZE_QUALITY)
+  const blob = await canvasToBlob(canvas, outputType, IMAGE_OPTIMIZE_QUALITY) as Blob | null
   if (!blob || blob.size >= file.size) return file
 
   const nextName = outputType === file.type ? file.name : file.name.replace(/\.[^.]+$/, '.webp')

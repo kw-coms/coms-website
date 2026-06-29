@@ -19,7 +19,26 @@ export default function RichEditorSurface({
   handleFigureResize,
   handleFigureAlign,
   handleFigureDelete,
-}: any) {
+}: {
+  divRef: React.RefObject<HTMLDivElement | null>
+  dropIndicator: { left: number; top: number; height: number } | null
+  selectedFigId: string | null
+  draggingFigId: string | null
+  selectedMeta: { align?: string } | null
+  savedRangeRef: React.MutableRefObject<Range | null>
+  saveSelection: () => void
+  updateDropIndicator: (x: number, y: number) => Range | null
+  insertAtRange: (fig: Element, range: Range | null) => void
+  attachFigureClick: (fig: Element) => void
+  dragFigureIdRef: React.MutableRefObject<string | null>
+  setDraggingFigId: (id: string | null) => void
+  setDropIndicator: (value: { left: number; top: number; height: number } | null) => void
+  setSelectedFigId: (id: string | null) => void
+  insertFile: (file: File) => void
+  handleFigureResize: (pct: number) => void
+  handleFigureAlign: (align: string) => void
+  handleFigureDelete: () => void
+}) {
   return (
     <div className="relative">
       <div
@@ -29,7 +48,7 @@ export default function RichEditorSurface({
         onMouseUp={saveSelection}
         onKeyUp={saveSelection}
         onFocus={saveSelection}
-        onClick={(e: any) => { if (!e.target.closest?.('figure')) setSelectedFigId(null); saveSelection() }}
+        onClick={(e) => { if (!(e.target as Element).closest?.('figure')) setSelectedFigId(null); saveSelection() }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
@@ -85,7 +104,7 @@ export default function RichEditorSurface({
           document.execCommand('insertText', false, text)
         }}
         className="min-h-[420px] w-full overflow-x-auto whitespace-pre bg-[var(--app-surface)] px-4 py-5 text-sm leading-7 text-[var(--theme-body-dark)] outline-none sm:px-5"
-        {...({ placeholder: '내용을 입력하세요. 이미지, 동영상을 드래그하거나 툴바에서 삽입할 수 있습니다.' } as any)}
+        {...({ placeholder: '내용을 입력하세요. 이미지, 동영상을 드래그하거나 툴바에서 삽입할 수 있습니다.' } as Record<string, string>)}
       />
       {dropIndicator && (
         <div

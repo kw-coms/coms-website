@@ -28,7 +28,7 @@ import {
 } from '../../shared/homeUi'
 import { RichTextComposer, RichTextContent } from '../../shared/RichText'
 
-function ActivityLogSection({ compact = false }: any) {
+function ActivityLogSection({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user, authLoading, records, loading, loadError, prependActivity, mergeActivity, removeActivity } = useClubActivities('활동 기록을 불러오지 못했습니다.')

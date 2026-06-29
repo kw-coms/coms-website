@@ -48,7 +48,14 @@ function parseInterests(value) {
   return { selected, other: custom.join(' / ') }
 }
 
-function InterestsSelector({ selected, onChange, otherText, onOtherChange, inputClass, frameClass }: any) {
+function InterestsSelector({ selected, onChange, otherText, onOtherChange, inputClass, frameClass }: {
+  selected: string[]
+  onChange: (next: string[]) => void
+  otherText: string
+  onOtherChange: (value: string) => void
+  inputClass: string
+  frameClass: string
+}) {
   const toggle = (option) => {
     const next = selected.includes(option)
       ? selected.filter((item) => item !== option)
@@ -101,7 +108,13 @@ const NOTIFICATION_CATEGORIES = [
   { key: 'recruitApplication', label: '새 지원서 (관리자)', description: '새 지원서가 도착하면 알려드립니다.' },
 ]
 
-function NotificationToggle({ checked, onChange, label, description, disabled }: any) {
+function NotificationToggle({ checked, onChange, label, description, disabled }: {
+  checked: boolean
+  onChange: (next: boolean) => void
+  label: string
+  description: string
+  disabled?: boolean
+}) {
   return (
     <label className="flex items-start justify-between gap-4 rounded-lg border border-black/8 bg-white/70 p-3">
       <span className="min-w-0">
@@ -129,8 +142,12 @@ function NotificationToggle({ checked, onChange, label, description, disabled }:
   )
 }
 
-function NotificationPreferencesSection({ cardClass, helperTextClass, primaryBtnClass }: any) {
-  const [prefs, setPrefs] = useState<any>(null)
+function NotificationPreferencesSection({ cardClass, helperTextClass, primaryBtnClass }: {
+  cardClass: string
+  helperTextClass: string
+  primaryBtnClass: string
+}) {
+  const [prefs, setPrefs] = useState<Record<string, boolean> | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
@@ -194,9 +211,9 @@ function NotificationPreferencesSection({ cardClass, helperTextClass, primaryBtn
   )
 }
 
-export default function ChangePassword({ onBack }: any) {
+export default function ChangePassword({ onBack }: { onBack: () => void }) {
   const { user, refreshUser, setUser } = useAuth()
-  const [profileDraft, setProfileDraft] = useState<any>({})
+  const [profileDraft, setProfileDraft] = useState<Record<string, string>>({})
   const [verificationCode, setVerificationCode] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')

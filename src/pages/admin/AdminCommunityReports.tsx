@@ -11,7 +11,7 @@ const COMMUNITY_REPORT_REASONS = {
   OTHER: '기타',
 }
 
-export default function AdminCommunityReports({ formatDateTime }: any) {
+export default function AdminCommunityReports({ formatDateTime }: { formatDateTime: (value: string) => string }) {
   const [reports, setReports] = useState([])
   const [notes, setNotes] = useState({})
   const [loading, setLoading] = useState(true)

@@ -10,7 +10,26 @@ import {
 import AppProjectCard from '../../components/apps/AppProjectCard'
 
 const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
-export default function AdminAppCatalogRow({ item, categories, onDelete, onUpdated }: any) {
+type MediaInfo = { id: string | number; url?: string; originalName?: string }
+type ProjectItem = {
+  id: string | number
+  category?: string
+  categoryName?: string
+  title?: string
+  eyebrow?: string
+  description?: string
+  madeBy?: string
+  linkUrl?: string
+  displayUrl?: string
+  files?: MediaInfo[]
+}
+
+export default function AdminAppCatalogRow({ item, categories, onDelete, onUpdated }: {
+  item: ProjectItem
+  categories: { key?: string; name: string }[]
+  onDelete: (item: ProjectItem) => void
+  onUpdated: (updated: unknown) => void
+}) {
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [rowError, setRowError] = useState('')

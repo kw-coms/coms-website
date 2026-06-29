@@ -41,7 +41,7 @@ const AUDIT_ACTION_LABELS = {
   ADMIN_CACHE_CLEAR: '캐시 초기화',
 }
 
-export default function AdminAuditLogs({ formatDateTime }: any) {
+export default function AdminAuditLogs({ formatDateTime }: { formatDateTime: (value: string) => string }) {
   const [logs, setLogs] = useState([])
   const [limit, setLimit] = useState(1000)
   const [actionFilter, setActionFilter] = useState('ALL')

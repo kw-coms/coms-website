@@ -7,9 +7,25 @@ import { getNotificationSummary, listNotifications, markAllNotificationsRead, ma
 import { useAuth } from '../contexts/useAuth'
 
 const NOTIFICATIONS_QUERY_KEY = ['app-shell', 'notifications']
-const EMPTY_NOTIFICATIONS = { items: [], unreadCount: 0 }
 
-export default function NotificationButton({ alignLeft = false, variant = 'icon' }: any) {
+type NotificationItem = {
+  id: string | number
+  read?: boolean
+  acceptUrl?: string
+  type?: string
+  noticeId?: string | number
+  postId?: string | number
+  commentId?: string | number
+  [key: string]: unknown
+}
+type NotificationData = { items: NotificationItem[]; unreadCount: number }
+
+const EMPTY_NOTIFICATIONS: NotificationData = { items: [], unreadCount: 0 }
+
+export default function NotificationButton({ alignLeft = false, variant = 'icon' }: {
+  alignLeft?: boolean
+  variant?: 'icon' | string
+}) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -38,7 +54,7 @@ export default function NotificationButton({ alignLeft = false, variant = 'icon'
   const openNotification = async (item) => {
     try {
       await markNotificationRead(item.id)
-      queryClient.setQueryData(NOTIFICATIONS_QUERY_KEY, (prev: any) => {
+      queryClient.setQueryData(NOTIFICATIONS_QUERY_KEY, (prev: NotificationData | undefined) => {
         const base = prev ?? EMPTY_NOTIFICATIONS
         return {
           items: base.items.map((n) => (n.id === item.id ? { ...n, read: true } : n)),
@@ -65,7 +81,7 @@ export default function NotificationButton({ alignLeft = false, variant = 'icon'
 
   const readAll = async () => {
     await markAllNotificationsRead()
-    queryClient.setQueryData(NOTIFICATIONS_QUERY_KEY, (prev: any) => {
+    queryClient.setQueryData(NOTIFICATIONS_QUERY_KEY, (prev: NotificationData | undefined) => {
       const base = prev ?? EMPTY_NOTIFICATIONS
       return { items: base.items.map((item) => ({ ...item, read: true })), unreadCount: 0 }
     })

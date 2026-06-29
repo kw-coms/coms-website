@@ -15,7 +15,7 @@ export function useAdminAnalytics() {
     analytics: query.data ?? null,
     loading: query.isPending,
     fetching: query.isFetching,
-    error: query.error ? ((query.error as any).message || '분석 데이터를 불러오지 못했습니다.') : '',
+    error: query.error ? (query.error.message || '분석 데이터를 불러오지 못했습니다.') : '',
     refetch: query.refetch,
   }
 }

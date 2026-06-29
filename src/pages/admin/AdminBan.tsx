@@ -14,7 +14,7 @@ const BAN_DURATIONS = [
   { value: '3Y', label: '3년' },
 ]
 
-export default function AdminBan({ formatDateTime }: any) {
+export default function AdminBan({ formatDateTime }: { formatDateTime: (value: string) => string }) {
   const [banned, setBanned] = useState([])
   const [loading, setLoading] = useState(true)
   const [input, setInput] = useState('')

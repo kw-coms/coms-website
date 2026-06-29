@@ -25,11 +25,15 @@ function statusAccent(key: string) {
   return STATUS_ACCENTS[key] || '99, 102, 241'
 }
 
-function formatNumber(value: any) {
+type CountRow = { key: string; count: number }
+type MonthRow = { month: string; count: number }
+type StatCard = { label: string; value: number; hint: string; alert?: boolean }
+
+function formatNumber(value: number | string | null | undefined) {
   return Number(value || 0).toLocaleString('ko-KR')
 }
 
-function formatMonth(month: any) {
+function formatMonth(month: string) {
   if (typeof month !== 'string') return month
   const [, mm] = month.split('-')
   return mm ? `${Number(mm)}월` : month
@@ -41,7 +45,7 @@ const cardBase =
 export default function AdminAnalytics() {
   const { analytics, loading, fetching, error, refetch } = useAdminAnalytics()
 
-  const statCards = analytics
+  const statCards: StatCard[] = analytics
     ? [
         { label: '전체 회원', value: analytics.totalMembers, hint: '가입 완료 기준' },
         { label: '공지', value: analytics.totalNotices, hint: '게시된 공지' },
@@ -59,15 +63,15 @@ export default function AdminAnalytics() {
       ]
     : []
 
-  const membersByRole = analytics?.membersByRole || []
-  const roleTotal = membersByRole.reduce((sum: number, r: any) => sum + Number(r.count || 0), 0)
+  const membersByRole: CountRow[] = analytics?.membersByRole || []
+  const roleTotal = membersByRole.reduce((sum: number, r) => sum + Number(r.count || 0), 0)
 
-  const recruitByStatus = analytics?.recruitApplicationsByStatus || []
-  const recruitTotal = recruitByStatus.reduce((sum: number, r: any) => sum + Number(r.count || 0), 0)
-  const recruitMax = recruitByStatus.reduce((max: number, item: any) => Math.max(max, item.count || 0), 0)
+  const recruitByStatus: CountRow[] = analytics?.recruitApplicationsByStatus || []
+  const recruitTotal = recruitByStatus.reduce((sum: number, r) => sum + Number(r.count || 0), 0)
+  const recruitMax = recruitByStatus.reduce((max: number, item) => Math.max(max, item.count || 0), 0)
 
-  const monthly = analytics?.recruitApplicationsByMonth || []
-  const monthlyMax = monthly.reduce((max: number, item: any) => Math.max(max, item.count || 0), 0)
+  const monthly: MonthRow[] = analytics?.recruitApplicationsByMonth || []
+  const monthlyMax = monthly.reduce((max: number, item) => Math.max(max, item.count || 0), 0)
   const reportsResolved = Number(analytics?.communityReportsResolved || 0)
   const reportsOpen = Number(analytics?.communityReportsOpen || 0)
   const reportsTotal = reportsResolved + reportsOpen
@@ -120,7 +124,7 @@ export default function AdminAnalytics() {
         <>
           {/* Stat card grid — mobile-first 2-up, scaling to 4-up */}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {statCards.map((card: any) => (
+            {statCards.map((card) => (
               <div
                 key={card.label}
                 className={`${cardBase} group relative overflow-hidden p-4 transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_var(--theme-shadow-glass)]`}
@@ -154,7 +158,7 @@ export default function AdminAnalytics() {
                 {membersByRole.length === 0 ? (
                   <EmptyRow />
                 ) : (
-                  membersByRole.map((role: any) => {
+                  membersByRole.map((role) => {
                     const pct = roleTotal > 0 ? Math.round((Number(role.count || 0) / roleTotal) * 100) : 0
                     return (
                       <BarRow
@@ -181,7 +185,7 @@ export default function AdminAnalytics() {
                 {recruitByStatus.length === 0 ? (
                   <EmptyRow />
                 ) : (
-                  recruitByStatus.map((item: any) => {
+                  recruitByStatus.map((item) => {
                     const pct = recruitMax > 0 ? Math.round((Number(item.count || 0) / recruitMax) * 100) : 0
                     return (
                       <BarRow
@@ -248,7 +252,14 @@ export default function AdminAnalytics() {
   )
 }
 
-function BarRow({ label, count, pct, accent, track, showPct }: any) {
+function BarRow({ label, count, pct, accent, track, showPct }: {
+  label: string
+  count: number
+  pct: number
+  accent: string
+  track?: string
+  showPct?: boolean
+}) {
   return (
     <div className="flex items-center gap-3">
       <span className="w-16 shrink-0 truncate text-xs font-semibold text-[var(--theme-body-muted)]" title={label}>
@@ -277,7 +288,7 @@ function EmptyRow() {
 
 const BAR_H = 120
 
-function MonthlyBarChart({ monthly, monthlyMax }: { monthly: any[]; monthlyMax: number }) {
+function MonthlyBarChart({ monthly, monthlyMax }: { monthly: MonthRow[]; monthlyMax: number }) {
   return (
     <div className="relative mt-6 pl-7">
       {/* Y-axis gridlines — absolutely positioned inside BAR_H region */}
@@ -298,7 +309,7 @@ function MonthlyBarChart({ monthly, monthlyMax }: { monthly: any[]; monthlyMax: 
 
       {/* Count labels above bars */}
       <div className="flex gap-1.5 sm:gap-3">
-        {monthly.map((item: any) => (
+        {monthly.map((item) => (
           <div key={item.month} className="flex flex-1 justify-center">
             <span className="text-xs font-bold tabular-nums text-[var(--theme-body-dark)] opacity-70">
               {formatNumber(item.count)}
@@ -309,7 +320,7 @@ function MonthlyBarChart({ monthly, monthlyMax }: { monthly: any[]; monthlyMax: 
 
       {/* Bar area: explicit px height on container + px height on each bar — % never used */}
       <div className="flex items-end gap-1.5 sm:gap-3" style={{ height: BAR_H }}>
-        {monthly.map((item: any) => {
+        {monthly.map((item) => {
           const ratio = monthlyMax > 0 ? Number(item.count || 0) / monthlyMax : 0
           const barPx = Math.max(Math.round(ratio * BAR_H), Number(item.count || 0) > 0 ? 5 : 2)
           return (
@@ -327,7 +338,7 @@ function MonthlyBarChart({ monthly, monthlyMax }: { monthly: any[]; monthlyMax: 
 
       {/* Month labels below bars */}
       <div className="mt-2 flex gap-1.5 sm:gap-3">
-        {monthly.map((item: any) => (
+        {monthly.map((item) => (
           <div key={item.month} className="flex flex-1 justify-center">
             <span className="text-xs text-[var(--theme-body-muted)]">{formatMonth(item.month)}</span>
           </div>

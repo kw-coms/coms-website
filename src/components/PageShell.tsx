@@ -1,4 +1,9 @@
-export default function PageShell({ children, wide = false, full = false, transition = true }: any) {
+export default function PageShell({ children, wide = false, full = false, transition = true }: {
+  children: React.ReactNode
+  wide?: boolean
+  full?: boolean
+  transition?: boolean
+}) {
   return (
     <div className="apple-route relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
       <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white via-[#f5f5f7] to-white" />

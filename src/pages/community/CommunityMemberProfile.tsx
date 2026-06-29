@@ -7,7 +7,7 @@ import { BoardComposeBar } from './CommunityChrome'
 import CommunityPostRow from './CommunityPostRow'
 import { useBookmarkMutation } from './useBookmarkMutation'
 
-export default function CommunityMemberProfile({ onBack }: any) {
+export default function CommunityMemberProfile({ onBack }: { onBack: () => void }) {
   const { studentId } = useParams()
   const navigate = useNavigate()
   const bookmarkMutation = useBookmarkMutation()
@@ -99,7 +99,7 @@ export default function CommunityMemberProfile({ onBack }: any) {
 
         {postsQuery.isError && (
           <p className="mx-4 mt-4 rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 sm:mx-8">
-            {(postsQuery.error as any)?.message || '작성한 글을 불러오지 못했습니다.'}
+            {postsQuery.error?.message || '작성한 글을 불러오지 못했습니다.'}
           </p>
         )}
 

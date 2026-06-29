@@ -20,7 +20,12 @@ import {
   textContentForSearch,
 } from './postEditorUtils'
 
-export default function PostEditor({ initialPost, onCancel, onSave, user }: any) {
+export default function PostEditor({ initialPost, onCancel, onSave, user }: {
+  initialPost?: { id?: number; title?: string; category?: string; anonymousName?: string; imageUrl?: string; [key: string]: unknown } | null
+  onCancel: () => void
+  onSave: (saved: unknown) => void
+  user?: { role?: string; [key: string]: unknown } | null
+}) {
   const isEditing = Boolean(initialPost)
   const [title, setTitle] = useState(initialPost?.title || '')
   const [category, setCategory] = useState(initialPost?.category || 'GENERAL')

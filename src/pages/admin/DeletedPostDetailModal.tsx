@@ -10,8 +10,42 @@ import {
   formatDateTime,
 } from './deletedCommunityPostUtils'
 
-export default function DeletedPostDetailModal({ post, onClose, onRestore, restoring, restoreDisabled }: any) {
-  const [detail, setDetail] = useState(null)
+type DeletedPostDetail = {
+  id: string | number
+  restoredPostId?: string | number
+  restoredAt?: string
+  originalPostId?: string | number
+  category?: string
+  title?: string
+  authorName?: string
+  authorStudentId?: string
+  originalCreatedAt?: string
+  originalUpdatedAt?: string
+  viewCount?: number
+  deletedByName?: string
+  deletedByStudentId?: string
+  deletedByRole?: string
+  deletedAt?: string
+  deletionReason?: string
+  latestAppealStatus?: string
+  latestAppealRequesterName?: string
+  latestAppealRequesterStudentId?: string
+  latestAppealCreatedAt?: string
+  latestAppealMessage?: string
+  latestAppealResolutionNote?: string
+  commentCount?: number
+  commentInfos?: unknown[]
+  [key: string]: unknown
+}
+
+export default function DeletedPostDetailModal({ post, onClose, onRestore, restoring, restoreDisabled }: {
+  post: DeletedPostDetail
+  onClose: () => void
+  onRestore: (full: DeletedPostDetail) => void
+  restoring?: boolean
+  restoreDisabled?: boolean
+}) {
+  const [detail, setDetail] = useState<DeletedPostDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const closeButtonRef = useRef(null)
@@ -19,7 +53,7 @@ export default function DeletedPostDetailModal({ post, onClose, onRestore, resto
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined
-    const previousActiveElement: any = document.activeElement
+    const previousActiveElement = document.activeElement as HTMLElement | null
     closeButtonRef.current?.focus()
     return () => {
       previousActiveElement?.focus?.()
