@@ -30,6 +30,9 @@ RUN npm run build
 FROM nginx:1.27-alpine
 
 COPY nginx.frontend.conf /etc/nginx/conf.d/default.conf
+# Kept outside conf.d/ so nginx's `include conf.d/*.conf` does not load this
+# header-only snippet as a standalone server; it is `include`d per-location instead.
+COPY security-headers.conf /etc/nginx/security-headers.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80
