@@ -1,23 +1,24 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
+const nav = readFileSync(new URL('../src/components/GlobalNavigation.tsx', import.meta.url), 'utf8')
+const notificationButton = readFileSync(new URL('../src/components/NotificationButton.tsx', import.meta.url), 'utf8')
 const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
 
 assert.match(
-  app,
+  nav,
   /<NotificationButton alignLeft variant="mobileMenu" \/>/,
   'mobile menu should render notifications as a menu row',
 )
 
 assert.match(
-  app,
+  notificationButton,
   /variant === 'mobileMenu'/,
   'notification button should keep a dedicated mobile menu variant',
 )
 
 assert.match(
-  app,
+  notificationButton,
   /apple-mobile-menu-item apple-mobile-menu-notification/,
   'mobile notification row should reuse the shared menu item sizing',
 )
@@ -35,7 +36,7 @@ assert.match(
 )
 
 assert.match(
-  app,
+  nav,
   /className="apple-mobile-menu-item apple-mobile-menu-subitem"/,
   'mobile Activity submenu rows should reuse the shared menu item touch sizing',
 )
