@@ -54,7 +54,7 @@ export function BoardComposeBar({ title, children }: {
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-[var(--theme-body-muted)]">
           <span className="text-[var(--app-accent-text)]">Community</span>
           <span className="size-1 rounded-full bg-[var(--app-subtle)]" />
-          <h1 className="text-xs font-semibold text-[var(--theme-body-muted)]">{title}</h1>
+          <h2 className="text-xs font-semibold text-[var(--theme-body-muted)]">{title}</h2>
         </div>
         {children && <div className="flex w-full shrink-0 sm:w-auto sm:justify-end">{children}</div>}
       </div>

@@ -77,7 +77,9 @@ html {
 
 body {
 	margin: 0;
-	min-height: 100vh;
+	/* svh = small viewport height: stays correct when mobile browser chrome
+	   shows/hides, unlike 100vh which overshoots and leaves a scroll gap. */
+	min-height: 100svh;
 	overflow-x: clip;
 	background: var(--app-bg);
 	color: var(--app-text);
@@ -92,7 +94,7 @@ body {
 }
 
 #root {
-	min-height: 100vh;
+	min-height: 100svh;
 }
 
 ::selection {
@@ -4620,6 +4622,7 @@ select {
 	.community-pagination-strip {
 		margin-inline: -0.25rem;
 		overflow-x: auto;
+		touch-action: pan-x pinch-zoom;
 		scrollbar-width: none;
 	}
 
@@ -4873,6 +4876,7 @@ body {
 	.community-editor-toolbar {
 		flex-wrap: nowrap !important;
 		overflow-x: auto;
+		touch-action: pan-x pinch-zoom;
 		overscroll-behavior-x: contain;
 		-webkit-overflow-scrolling: touch;
 	}
@@ -6640,6 +6644,8 @@ html.home-snap-scroll .home-snap-section {
 	border: 1px solid var(--app-hairline);
 	border-radius: 10px;
 	overflow-x: auto;
+	/* let a vertical swipe scroll the page, not get trapped scrolling the code */
+	touch-action: pan-x pinch-zoom;
 	white-space: pre;
 }
 .community-post-text pre code {

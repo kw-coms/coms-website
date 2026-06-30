@@ -69,7 +69,7 @@ function CategorySegment({ value, onChange, items, counts }: {
   counts?: Record<string, number>
 }) {
   return (
-    <div className="flex w-full max-w-full items-center gap-1 overflow-x-auto rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.62)] sm:inline-flex sm:w-auto">
+    <div className="flex w-full max-w-full items-center gap-1 overflow-x-auto touch-pan-x rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.62)] sm:inline-flex sm:w-auto">
       {items.map((item) => {
         const selected = value === item.value
         return (
@@ -542,7 +542,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
                         <button
                           type="button"
                           onClick={open}
-                          className="block w-full text-left focus:outline-none"
+                          className="block w-full text-left focus:outline-none focus:bg-[var(--app-surface-soft)]"
                         >
                           <span className="flex min-w-0 items-center gap-2">
                             <span className="rounded-full bg-[var(--app-accent-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--app-accent-text)]">
@@ -598,7 +598,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
                             role="button"
                             onClick={open}
                             onKeyDown={(event) => openRowWithKeyboard(event, open)}
-                            className="cursor-pointer text-[var(--app-muted)] focus:outline-none"
+                            className="cursor-pointer text-[var(--app-muted)] focus:outline-none focus:bg-[var(--app-surface-soft)]"
                             data-reveal
                             style={{ '--reveal-delay': `${Math.min(index, 6) * 55}ms` } as React.CSSProperties}
                           >
