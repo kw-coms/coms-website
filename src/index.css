@@ -6169,6 +6169,13 @@ html.home-snap-scroll .home-snap-section {
 	display: flex;
 	gap: 0.75rem;
 	overflow-x: auto;
+	/* Cross-axis must not become an auto scroll container, and a vertical drag
+	   must fall through to the page — otherwise the card row eats the page's
+	   vertical scroll on touch ("걸림"). pan-x = this element scrolls horizontally
+	   only; vertical pan + pinch-zoom go to the page. */
+	overflow-y: hidden;
+	touch-action: pan-x pinch-zoom;
+	overscroll-behavior-x: contain;
 	padding-bottom: 0.5rem;
 	scroll-snap-type: x mandatory;
 	scroll-padding-left: 1.25rem;
