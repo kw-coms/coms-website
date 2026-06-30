@@ -34,15 +34,16 @@ import GlobalNavigation from './components/GlobalNavigation'
 import AppearanceControl from './components/AppearanceControl'
 import NotFoundPage from './components/NotFoundPage'
 import HomeView from './pages/home/HomeView'
-import {
-  AboutPage,
-  ActivitiesDetailPage,
-  ActivityLogPage,
-  ClubEventPage,
-  MonthlyCalendarPage,
-  AppsPage,
-  ProjectsDetailPage,
-} from './pages/home/detailPages'
+// Detail pages pull in the heavy activity-log / club-event / calendar sections.
+// They are not the landing route, so lazy-load them out of the main bundle
+// (App already wraps <Routes> in <Suspense fallback={<PageFallback />}>).
+const AboutPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.AboutPage })))
+const ActivitiesDetailPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.ActivitiesDetailPage })))
+const ActivityLogPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.ActivityLogPage })))
+const ClubEventPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.ClubEventPage })))
+const MonthlyCalendarPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.MonthlyCalendarPage })))
+const AppsPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.AppsPage })))
+const ProjectsDetailPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.ProjectsDetailPage })))
 
 const ComsIntro = lazy(() => import('./components/common/ComsIntro'))
 
