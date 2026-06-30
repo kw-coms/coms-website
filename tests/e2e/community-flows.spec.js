@@ -190,4 +190,12 @@ test('community composer inserts a poll block that survives re-render', async ({
   // A later re-render (typing a title) must NOT recreate the editor and wipe the block.
   await page.locator('.community-compose-title').fill('투표 글')
   await expect(pollFigure).toHaveCount(1)
+
+  // Inserting a second block must NOT replace the first (node-selected) one.
+  await page.getByRole('button', { name: '투표' }).click()
+  await page.getByRole('textbox', { name: '투표 제목 입력' }).fill('저녁 메뉴 투표')
+  await page.getByRole('textbox', { name: '보기 1' }).fill('치킨')
+  await page.getByRole('textbox', { name: '보기 2' }).fill('피자')
+  await page.getByRole('button', { name: '본문에 추가' }).click()
+  await expect(pollFigure).toHaveCount(2)
 })

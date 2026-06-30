@@ -185,7 +185,11 @@ export default function TiptapTextEditor({ initialBlocks, apiRef, onError }: {
   const insertPmBlock = useCallback((block: EditorBlock) => {
     if (!editor) return
     const node = blockJsonToPmDoc([block]).content[0]
-    if (node) editor.chain().focus().insertContent(node).run()
+    if (!node) return
+    // Insert AFTER the current selection. With a figure node-selected (the state right
+    // after inserting a block), plain insertContent would REPLACE it — so inserting two
+    // blocks in a row would delete the first. selection.to sits past a selected node.
+    editor.chain().focus().insertContentAt(editor.state.selection.to, node).run()
   }, [editor])
 
   const insertFile = useCallback((file: File) => {
