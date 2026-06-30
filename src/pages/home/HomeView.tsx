@@ -248,7 +248,7 @@ export default function HomeView() {
             {renderSectionContent(id)}
           </div>
           <div data-reveal data-reveal-dir="right" style={{ '--reveal-delay': '120ms' } as React.CSSProperties} className="flex items-center justify-center">
-            <div className="home-device apple-device-card relative aspect-square w-full max-w-md overflow-hidden rounded-lg ring-1 ring-black/5" style={{ background: meta.visual }}>
+            <div className="home-device apple-device-card relative aspect-square min-h-[30rem] w-full max-w-md overflow-hidden rounded-lg ring-1 ring-black/5" style={{ background: meta.visual }}>
               <div className="absolute inset-0 bg-linear-to-b from-white/30 via-transparent to-black/5" />
               <div className="absolute inset-x-6 top-6 rounded-lg bg-white/78 px-5 py-4 shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
                 <div className="mb-4 flex items-center gap-1.5">
