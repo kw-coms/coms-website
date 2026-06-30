@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { listFiles, createPost, deleteFile } from '../../services/archiveApi'
 import { showToast } from '../../components/common/Toast'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
 
 export default function AdminFiles() {
   const [files, setFiles] = useState([])
@@ -40,7 +41,7 @@ export default function AdminFiles() {
   }
 
   const handleDelete = async (id) => {
-    if (!window.confirm('파일을 삭제하시겠습니까?')) return
+    if (!(await confirmDialog({ message: '파일을 삭제하시겠습니까?', tone: 'danger' }))) return
     try {
       await deleteFile(id)
       setFiles((prev) => prev.filter((f) => f.id !== id))

@@ -182,3 +182,44 @@ export async function mockAdminApis(page) {
     },
   }))
 }
+
+// Auto-drive the app's confirm/prompt modal (ConfirmDialog.tsx) in e2e flows:
+// when a modal appears, capture its message, fill the input (for prompts) with
+// `promptValue`, and click the confirm button. Replaces window.confirm/prompt
+// overrides now that the app uses an in-DOM modal. Captured messages are exposed
+// on window.__modalPromptMessages.
+export async function autoDriveModals(page, { promptValue = '' } = {}) {
+  await page.addInitScript((value) => {
+    window.__modalPromptMessages = []
+    const setNativeValue = (el, v) => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+      setter.call(el, v)
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+    }
+    const driven = new WeakSet()
+    const drive = () => {
+      const card = document.querySelector('.coms-confirm-card')
+      // Wait until the confirm button has actually rendered before acting — the
+      // card and its contents can mount across separate mutations.
+      const ok = card && card.querySelector('.coms-confirm-ok')
+      if (!card || !ok || driven.has(card)) return
+      driven.add(card)
+      window.__modalPromptMessages.push(card.querySelector('.coms-confirm-message')?.textContent || '')
+      const input = card.querySelector('.coms-confirm-input')
+      if (input) {
+        setNativeValue(input, value)
+        setTimeout(() => ok.click(), 0)
+      } else {
+        ok.click()
+      }
+    }
+    const start = () => {
+      new MutationObserver(drive).observe(document.body, { childList: true, subtree: true })
+      // Interval fallback in case the relevant mutation is missed.
+      setInterval(drive, 30)
+      drive()
+    }
+    if (document.body) start()
+    else window.addEventListener('DOMContentLoaded', start)
+  }, promptValue)
+}

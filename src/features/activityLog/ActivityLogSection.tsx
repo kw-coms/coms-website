@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
@@ -140,7 +141,7 @@ function ActivityLogSection({ compact = false }: { compact?: boolean }) {
 
   const removeActivityCategory = async (category) => {
     if (categoryBusy) return
-    if (!window.confirm(`'${category.name}' 분류를 삭제할까요?`)) return
+    if (!(await confirmDialog({ message: `'${category.name}' 분류를 삭제할까요?`, tone: 'danger' }))) return
     setCategoryBusy(true)
     setCategoryError('')
     setCategoryNotice('')
@@ -283,7 +284,7 @@ function ActivityLogSection({ compact = false }: { compact?: boolean }) {
 
   const deleteSelectedActivity = async () => {
     if (!selectedActivity || deletingActivity) return
-    if (!window.confirm('이 활동 기록을 삭제할까요?')) return
+    if (!(await confirmDialog({ message: '이 활동 기록을 삭제할까요?', tone: 'danger' }))) return
     setDeletingActivity(true)
     setSubmitError('')
     try {

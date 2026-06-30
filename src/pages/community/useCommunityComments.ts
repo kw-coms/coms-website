@@ -5,6 +5,7 @@ import {
   updateComment,
 } from '../../services/communityApi'
 import { showToast } from '../../components/common/Toast'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
 
 export const MAX_COMMENT_LENGTH = 1000
 
@@ -122,7 +123,7 @@ export function useCommunityComments({
   }
 
   const handleDeleteComment = async (commentId) => {
-    if (!currentPost || !window.confirm('댓글을 삭제하시겠습니까?')) return
+    if (!currentPost || !(await confirmDialog({ message: '댓글을 삭제하시겠습니까?', tone: 'danger' }))) return
     try {
       await deleteComment(currentPost.id, commentId)
       const toDelete = new Set([commentId])

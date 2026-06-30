@@ -4,6 +4,7 @@ import {
   deleteClubActivityCategory,
   updateClubActivityCategory,
 } from '../../services/clubActivityApi'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
 
 const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
 
@@ -50,7 +51,7 @@ export default function AdminActivityCategories({ categories, onChanged }: {
   }
 
   const removeCategory = async (category) => {
-    if (!window.confirm(`'${category.name}' 분류를 삭제하시겠습니까?`)) return
+    if (!(await confirmDialog({ message: `'${category.name}' 분류를 삭제하시겠습니까?`, tone: 'danger' }))) return
     setBusy(true)
     setError('')
     try {
