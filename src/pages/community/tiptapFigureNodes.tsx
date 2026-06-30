@@ -16,6 +16,7 @@ export const FileBlock = Node.create({
     return {
       blockId: { default: null },
       fileId: { default: null },
+      presentFields: { default: [], rendered: false },
       status: { default: 'saved' },
       file: { default: null },
       name: { default: null },
@@ -48,6 +49,7 @@ function mediaBlock(name: 'imageBlock' | 'videoBlock', dataType: 'image' | 'vide
       return {
         blockId: { default: null },
         mediaId: { default: null },
+        presentFields: { default: [], rendered: false },
         status: { default: 'saved' },
         file: { default: null },
         name: { default: null },
@@ -86,6 +88,7 @@ export const EmbedBlock = Node.create({
   addAttributes() {
     return {
       blockId: { default: null },
+      presentFields: { default: [], rendered: false },
       provider: { default: 'external' },
       kind: { default: 'link' },
       url: { default: null },
@@ -123,6 +126,7 @@ export const PollBlock = Node.create({
   addAttributes() {
     return {
       blockId: { default: null },
+      presentFields: { default: [], rendered: false },
       pollId: { default: null },
       question: { default: '투표' },
       options: { default: [] },

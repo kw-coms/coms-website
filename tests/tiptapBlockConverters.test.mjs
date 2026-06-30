@@ -1,13 +1,63 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 
+import { Editor } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Underline from '@tiptap/extension-underline'
+import Link from '@tiptap/extension-link'
+import { Color } from '@tiptap/extension-color'
+import { BackgroundColor, FontFamily, TextStyle } from '@tiptap/extension-text-style'
+import { isSafeUrl } from '../src/utils/sanitizeHtml.ts'
+import { EmbedBlock, FileBlock, ImageBlock, PollBlock, VideoBlock } from '../src/pages/community/tiptapFigureNodes.tsx'
 import {
   blockJsonToPmDoc,
   pmDocToBlockJson,
 } from '../src/pages/community/tiptapBlockConverters.ts'
 import { EDITOR_SANITIZE_OPTIONS } from '../src/pages/community/postEditorUtils.ts'
 
+const realPostBlockFixtures = JSON.parse(
+  readFileSync(new URL('./fixtures/communityRealPostBlocks.json', import.meta.url), 'utf8'),
+)
+
 function assertRoundTrip(name, blocks) {
   assert.deepEqual(pmDocToBlockJson(blockJsonToPmDoc(blocks)), blocks, name)
+}
+
+function createHeadlessCommunityEditor(blocks) {
+  return new Editor({
+    element: null,
+    extensions: [
+      StarterKit.configure({
+        heading: false,
+        blockquote: false,
+        bulletList: false,
+        orderedList: false,
+        listItem: false,
+        horizontalRule: false,
+      }),
+      TextStyle,
+      Color.configure({ types: ['textStyle'] }),
+      BackgroundColor.configure({ types: ['textStyle'] }),
+      FontFamily.configure({ types: ['textStyle'] }),
+      Underline,
+      FileBlock,
+      ImageBlock,
+      VideoBlock,
+      EmbedBlock,
+      PollBlock,
+      Link.configure({
+        autolink: false,
+        linkOnPaste: false,
+        openOnClick: false,
+        HTMLAttributes: {
+          rel: 'noopener noreferrer',
+          target: '_blank',
+        },
+        isAllowedUri: (url) => isSafeUrl(url),
+      }),
+    ],
+    content: blockJsonToPmDoc(blocks),
+  })
 }
 
 const plainTextBlocks = [
@@ -136,6 +186,7 @@ assert.deepEqual(blockJsonToPmDoc(fileBlocks), {
     {
       type: 'fileBlock',
       attrs: {
+        presentFields: ['fileId', 'name'],
         fileId: 42,
         name: '과제.zip',
       },
@@ -161,6 +212,7 @@ assert.deepEqual(blockJsonToPmDoc(imageBlocks), {
     {
       type: 'imageBlock',
       attrs: {
+        presentFields: ['mediaId', 'name', 'width', 'align'],
         mediaId: 7,
         name: '활동.png',
         width: 55,
@@ -181,6 +233,7 @@ assert.deepEqual(blockJsonToPmDoc(videoBlocks), {
     {
       type: 'videoBlock',
       attrs: {
+        presentFields: ['mediaId', 'name', 'width', 'align'],
         mediaId: 8,
         name: '발표.mp4',
         width: 75,
@@ -220,6 +273,7 @@ assert.deepEqual(blockJsonToPmDoc(embedBlocks), {
     {
       type: 'embedBlock',
       attrs: {
+        presentFields: ['provider', 'kind', 'url', 'embedUrl', 'title', 'thumbnailUrl', 'width', 'align'],
         provider: 'youtube',
         kind: 'youtube',
         url: 'https://www.youtube.com/watch?v=abcdef123',
@@ -233,6 +287,7 @@ assert.deepEqual(blockJsonToPmDoc(embedBlocks), {
     {
       type: 'embedBlock',
       attrs: {
+        presentFields: ['provider', 'kind', 'url', 'title', 'width', 'align'],
         provider: 'external',
         kind: 'link',
         url: 'https://example.com/post',
@@ -264,6 +319,7 @@ assert.deepEqual(blockJsonToPmDoc(pollBlocks), {
     {
       type: 'pollBlock',
       attrs: {
+        presentFields: ['pollId', 'question', 'options', 'closesAt'],
         pollId: 'poll-abc',
         question: '점심 메뉴?',
         options: [
@@ -446,6 +502,37 @@ assert.deepEqual(sanitizerSubsetBlocks, [
     content: '<strong>굵게</strong><br><em>기울임</em><u>밑줄</u><code>코드</code><a href="https://example.com" target="_blank" rel="noopener noreferrer">링크</a><span style="color: #123456; background-color: #fff3a3; font-family: Pretendard">색상</span><pre><code class="language-js">const ok = true;</code></pre>',
   },
 ])
+
+assert.ok(realPostBlockFixtures.length >= 10 && realPostBlockFixtures.length <= 20)
+for (const fixture of realPostBlockFixtures) {
+  assertRoundTrip(`production community post ${fixture.postId} round-trips saved block JSON`, fixture.blocks)
+}
+
+const editorWarnings = []
+const originalWarn = console.warn
+console.warn = (...args) => {
+  editorWarnings.push(args.join(' '))
+}
+try {
+  for (const fixture of realPostBlockFixtures) {
+    const editor = createHeadlessCommunityEditor(fixture.blocks)
+    try {
+      assert.deepEqual(
+        pmDocToBlockJson(editor.getJSON()),
+        fixture.blocks,
+        `headless TipTap editor.getJSON() preserves production post ${fixture.postId}`,
+      )
+    } finally {
+      editor.destroy()
+    }
+  }
+} finally {
+  console.warn = originalWarn
+}
+assert.deepEqual(
+  editorWarnings.filter((warning) => !warning.includes('Duplicate extension names')),
+  [],
+)
 
 const pendingFile = { name: 'new.png', size: 100, type: 'image/png' }
 assert.deepEqual(

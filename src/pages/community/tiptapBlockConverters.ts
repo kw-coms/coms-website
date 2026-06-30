@@ -227,6 +227,43 @@ function copyDefinedAttr(source: Record<string, unknown>, target: Record<string,
   if (value !== undefined) target[targetKey] = value
 }
 
+const FILE_BLOCK_FIELDS = ['id', 'fileId', 'file', 'name', 'status', 'url']
+const MEDIA_BLOCK_FIELDS = ['id', 'mediaId', 'file', 'name', 'preview', 'status', 'url', 'width', 'align', 'legacy']
+const EMBED_BLOCK_FIELDS = ['id', 'provider', 'kind', 'url', 'embedUrl', 'title', 'thumbnailUrl', 'description', 'image', 'siteName', 'width', 'align']
+const POLL_BLOCK_FIELDS = ['id', 'pollId', 'question', 'options', 'closesAt', 'closedAt']
+
+function presentBlockFields(block: PostBlock, fields: string[]) {
+  return fields.filter((field) => block[field] !== undefined)
+}
+
+function setPresentFields(attrs: Record<string, unknown>, fields: string[]) {
+  if (fields.length) attrs.presentFields = fields
+}
+
+function sameValue(a: unknown, b: unknown) {
+  if (Array.isArray(a) || Array.isArray(b)) return JSON.stringify(a) === JSON.stringify(b)
+  return Object.is(a, b)
+}
+
+function shouldCopyAttr(attrs: Record<string, unknown>, blockKey: string, attrKey: string, defaultValue: unknown) {
+  const value = attrs[attrKey]
+  if (value === undefined) return false
+  const presentFields = attrs.presentFields
+  if (!Array.isArray(presentFields)) return value !== null
+  if (presentFields.includes(blockKey)) return true
+  return !sameValue(value, defaultValue)
+}
+
+function copyPreservedAttr(
+  attrs: Record<string, unknown>,
+  block: PostBlock,
+  blockKey: string,
+  attrKey = blockKey,
+  defaultValue: unknown = null,
+) {
+  if (shouldCopyAttr(attrs, blockKey, attrKey, defaultValue)) block[blockKey] = attrs[attrKey]
+}
+
 function fileBlockToPmNode(block: PostBlock): PmNode {
   const attrs: Record<string, unknown> = {}
   const blockId = optionalStringAttr(block.id)
@@ -234,6 +271,7 @@ function fileBlockToPmNode(block: PostBlock): PmNode {
   const name = optionalStringAttr(block.name)
   const url = optionalStringAttr(block.url)
   const status = optionalStringAttr(block.status)
+  setPresentFields(attrs, presentBlockFields(block, FILE_BLOCK_FIELDS))
   if (blockId) attrs.blockId = blockId
   if (fileId !== undefined) attrs.fileId = fileId
   if (block.file) attrs.file = block.file
@@ -252,6 +290,7 @@ function mediaBlockToPmNode(block: PostBlock, nodeType: 'imageBlock' | 'videoBlo
   const preview = optionalStringAttr(block.preview)
   const status = optionalStringAttr(block.status)
   const align = optionalStringAttr(block.align)
+  setPresentFields(attrs, presentBlockFields(block, MEDIA_BLOCK_FIELDS))
   if (blockId) attrs.blockId = blockId
   if (mediaId !== undefined) attrs.mediaId = mediaId
   if (block.file) attrs.file = block.file
@@ -261,12 +300,13 @@ function mediaBlockToPmNode(block: PostBlock, nodeType: 'imageBlock' | 'videoBlo
   if (status) attrs.status = status
   if (block.width !== undefined) attrs.width = block.width
   if (align) attrs.align = align
-  if (block.legacy) attrs.legacy = block.legacy
+  if (block.legacy !== undefined) attrs.legacy = block.legacy
   return Object.keys(attrs).length ? { type: nodeType, attrs } : { type: nodeType }
 }
 
 function embedBlockToPmNode(block: PostBlock): PmNode {
   const attrs: Record<string, unknown> = {}
+  setPresentFields(attrs, presentBlockFields(block, EMBED_BLOCK_FIELDS))
   for (const key of ['id', 'provider', 'kind', 'url', 'embedUrl', 'title', 'thumbnailUrl', 'description', 'image', 'siteName', 'align']) {
     copyDefinedAttr(block, attrs, key, key === 'id' ? 'blockId' : key)
   }
@@ -276,6 +316,7 @@ function embedBlockToPmNode(block: PostBlock): PmNode {
 
 function pollBlockToPmNode(block: PostBlock): PmNode {
   const attrs: Record<string, unknown> = {}
+  setPresentFields(attrs, presentBlockFields(block, POLL_BLOCK_FIELDS))
   for (const key of ['id', 'pollId', 'question', 'closesAt', 'closedAt']) {
     copyDefinedAttr(block, attrs, key, key === 'id' ? 'blockId' : key)
   }
@@ -335,48 +376,58 @@ function renderCodeBlock(node: PmNode) {
 function fileBlockToPostBlock(node: PmNode): PostBlock {
   const attrs = node.attrs || {}
   const block: PostBlock = { type: 'file' }
-  if (typeof attrs.blockId === 'string') block.id = attrs.blockId
-  if (typeof attrs.fileId === 'number') block.fileId = attrs.fileId
-  if (attrs.file) block.file = attrs.file
-  if (typeof attrs.name === 'string') block.name = attrs.name
-  if (typeof attrs.status === 'string') block.status = attrs.status
-  if (typeof attrs.url === 'string') block.url = attrs.url
+  copyPreservedAttr(attrs, block, 'id', 'blockId', null)
+  copyPreservedAttr(attrs, block, 'fileId', 'fileId', null)
+  copyPreservedAttr(attrs, block, 'file', 'file', null)
+  copyPreservedAttr(attrs, block, 'name', 'name', null)
+  copyPreservedAttr(attrs, block, 'status', 'status', 'saved')
+  copyPreservedAttr(attrs, block, 'url', 'url', null)
   return block
 }
 
 function mediaBlockToPostBlock(node: PmNode, type: 'image' | 'video'): PostBlock {
   const attrs = node.attrs || {}
   const block: PostBlock = { type }
-  if (typeof attrs.blockId === 'string') block.id = attrs.blockId
-  if (typeof attrs.mediaId === 'number') block.mediaId = attrs.mediaId
-  if (attrs.file) block.file = attrs.file
-  if (typeof attrs.preview === 'string') block.preview = attrs.preview
-  if (typeof attrs.name === 'string') block.name = attrs.name
-  if (attrs.width !== undefined) block.width = attrs.width
-  if (typeof attrs.align === 'string') block.align = attrs.align
-  if (typeof attrs.status === 'string') block.status = attrs.status
-  if (typeof attrs.url === 'string') block.url = attrs.url
-  if (attrs.legacy != null) block.legacy = attrs.legacy
+  copyPreservedAttr(attrs, block, 'id', 'blockId', null)
+  copyPreservedAttr(attrs, block, 'mediaId', 'mediaId', null)
+  copyPreservedAttr(attrs, block, 'file', 'file', null)
+  copyPreservedAttr(attrs, block, 'preview', 'preview', null)
+  copyPreservedAttr(attrs, block, 'name', 'name', null)
+  copyPreservedAttr(attrs, block, 'width', 'width', 75)
+  copyPreservedAttr(attrs, block, 'align', 'align', 'center')
+  copyPreservedAttr(attrs, block, 'status', 'status', 'saved')
+  copyPreservedAttr(attrs, block, 'url', 'url', null)
+  copyPreservedAttr(attrs, block, 'legacy', 'legacy', null)
   return block
 }
 
 function embedBlockToPostBlock(node: PmNode): PostBlock {
   const attrs = node.attrs || {}
   const block: PostBlock = { type: 'externalEmbed' }
-  for (const key of ['provider', 'kind', 'url', 'embedUrl', 'title', 'thumbnailUrl', 'description', 'image', 'siteName', 'align']) {
-    if (attrs[key] !== undefined) block[key] = attrs[key]
-  }
-  if (attrs.width !== undefined) block.width = attrs.width
+  copyPreservedAttr(attrs, block, 'id', 'blockId', null)
+  copyPreservedAttr(attrs, block, 'provider', 'provider', 'external')
+  copyPreservedAttr(attrs, block, 'kind', 'kind', 'link')
+  copyPreservedAttr(attrs, block, 'url', 'url', null)
+  copyPreservedAttr(attrs, block, 'embedUrl', 'embedUrl', null)
+  copyPreservedAttr(attrs, block, 'title', 'title', null)
+  copyPreservedAttr(attrs, block, 'thumbnailUrl', 'thumbnailUrl', null)
+  copyPreservedAttr(attrs, block, 'description', 'description', null)
+  copyPreservedAttr(attrs, block, 'image', 'image', null)
+  copyPreservedAttr(attrs, block, 'siteName', 'siteName', null)
+  copyPreservedAttr(attrs, block, 'width', 'width', 75)
+  copyPreservedAttr(attrs, block, 'align', 'align', 'center')
   return block
 }
 
 function pollBlockToPostBlock(node: PmNode): PostBlock {
   const attrs = node.attrs || {}
   const block: PostBlock = { type: 'poll' }
-  for (const key of ['pollId', 'question', 'closesAt', 'closedAt']) {
-    if (attrs[key] !== undefined) block[key] = attrs[key]
-  }
-  block.options = Array.isArray(attrs.options) ? attrs.options : []
+  copyPreservedAttr(attrs, block, 'id', 'blockId', null)
+  copyPreservedAttr(attrs, block, 'pollId', 'pollId', null)
+  copyPreservedAttr(attrs, block, 'question', 'question', '투표')
+  copyPreservedAttr(attrs, block, 'options', 'options', [])
+  copyPreservedAttr(attrs, block, 'closesAt', 'closesAt', null)
+  copyPreservedAttr(attrs, block, 'closedAt', 'closedAt', null)
   return block
 }
 
@@ -405,25 +456,34 @@ export function pmDocToBlockJson(doc: PmDoc | PmNode): PostBlock[] {
     blocks.push({ type: 'text', content: textContent })
     textContent = ''
   }
+  let previousTextNodeType = ''
   for (const node of doc.content || []) {
     if (node.type === 'paragraph') {
+      if (previousTextNodeType === 'paragraph') flushText()
       textContent += renderParagraph(node)
+      previousTextNodeType = 'paragraph'
     } else if (node.type === 'codeBlock') {
       textContent += renderCodeBlock(node)
+      previousTextNodeType = 'codeBlock'
     } else if (node.type === 'fileBlock') {
       flushText()
+      previousTextNodeType = ''
       blocks.push(fileBlockToPostBlock(node))
     } else if (node.type === 'imageBlock') {
       flushText()
+      previousTextNodeType = ''
       blocks.push(mediaBlockToPostBlock(node, 'image'))
     } else if (node.type === 'videoBlock') {
       flushText()
+      previousTextNodeType = ''
       blocks.push(mediaBlockToPostBlock(node, 'video'))
     } else if (node.type === 'embedBlock') {
       flushText()
+      previousTextNodeType = ''
       blocks.push(embedBlockToPostBlock(node))
     } else if (node.type === 'pollBlock') {
       flushText()
+      previousTextNodeType = ''
       blocks.push(pollBlockToPostBlock(node))
     } else {
       throw new Error(`Unsupported node type for P1 converter: ${node.type}`)
