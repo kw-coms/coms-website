@@ -1,0 +1,14 @@
+{
+  "name": "KW COM's",
+  "short_name": "COM's",
+  "description": "광운대학교 중앙 컴퓨터 학술동아리",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "/coms-logo.png", "sizes": "256x256", "type": "image/png", "purpose": "any" }
+  ]
+}
