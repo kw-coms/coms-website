@@ -92,6 +92,10 @@ export default function TiptapTextEditor({ initialBlocks, apiRef, onError }: {
   const editorContentRef = useRef<HTMLDivElement | null>(null)
   const insertFileRef = useRef<(file: File) => void>(() => undefined)
   const savedSelectionRef = useRef<{ from: number; to: number } | null>(null)
+  // Keep onError out of useEditor/callback deps: a fresh onError identity per render
+  // must NOT recreate the editor (that wipes inserted blocks). Read the latest via ref.
+  const onErrorRef = useRef(onError)
+  useEffect(() => { onErrorRef.current = onError }, [onError])
   const [selectedFigure, setSelectedFigure] = useState<SelectedFigure>(null)
   // ponytail: placeholder via isEmpty overlay — no @tiptap/extension-placeholder dep.
   // Seed from initial blocks; onTransaction keeps it live thereafter.
@@ -109,6 +113,11 @@ export default function TiptapTextEditor({ initialBlocks, apiRef, onError }: {
         orderedList: false,
         listItem: false,
         horizontalRule: false,
+        // StarterKit v3 bundles link + underline; disable so our configured ones
+        // (isAllowedUri security, no openOnClick) are the only copies — kills the
+        // "Duplicate extension names" warning.
+        link: false,
+        underline: false,
       }),
       TextStyle,
       Color.configure({ types: ['textStyle'] }),
@@ -169,7 +178,7 @@ export default function TiptapTextEditor({ initialBlocks, apiRef, onError }: {
       setIsEmpty(editor.isEmpty)
     },
     immediatelyRender: false,
-  }, [initialContent, onError])
+  }, [initialContent])
 
   const currentBlocks = useCallback(() => (editor ? pmDocToBlockJson(editor.getJSON()) : []), [editor])
 
@@ -184,15 +193,15 @@ export default function TiptapTextEditor({ initialBlocks, apiRef, onError }: {
     const isImage = ALLOWED_IMAGE_TYPES.includes(file.type)
     const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type)
     const isFileType = isAllowedArchiveFile(file)
-    if (!isImage && !isVideo && !isFileType) { onError?.('지원하지 않는 파일 형식입니다.'); return }
+    if (!isImage && !isVideo && !isFileType) { onErrorRef.current?.('지원하지 않는 파일 형식입니다.'); return }
     const blocks = currentBlocks()
-    if (isImage && blocks.filter((block) => block.type === 'image').length >= MAX_EXTRA_IMAGES) { onError?.('이미지는 최대 5개까지 추가할 수 있습니다.'); return }
-    if (isVideo && blocks.filter((block) => block.type === 'video').length >= MAX_VIDEOS) { onError?.('영상은 최대 3개까지 추가할 수 있습니다.'); return }
-    if (isFileType && blocks.filter((block) => block.type === 'file').length >= MAX_FILES) { onError?.('첨부파일은 최대 5개까지 추가할 수 있습니다.'); return }
-    if (isImage && file.size > MAX_IMAGE_BYTES) { onError?.('이미지는 5MB 이하만 업로드할 수 있습니다.'); return }
-    if (isVideo && file.size > MAX_VIDEO_BYTES) { onError?.('영상은 100MB 이하만 업로드할 수 있습니다.'); return }
-    if (isFileType && file.size > MAX_FILE_BYTES) { onError?.('첨부파일은 50MB 이하만 업로드할 수 있습니다.'); return }
-    onError?.('')
+    if (isImage && blocks.filter((block) => block.type === 'image').length >= MAX_EXTRA_IMAGES) { onErrorRef.current?.('이미지는 최대 5개까지 추가할 수 있습니다.'); return }
+    if (isVideo && blocks.filter((block) => block.type === 'video').length >= MAX_VIDEOS) { onErrorRef.current?.('영상은 최대 3개까지 추가할 수 있습니다.'); return }
+    if (isFileType && blocks.filter((block) => block.type === 'file').length >= MAX_FILES) { onErrorRef.current?.('첨부파일은 최대 5개까지 추가할 수 있습니다.'); return }
+    if (isImage && file.size > MAX_IMAGE_BYTES) { onErrorRef.current?.('이미지는 5MB 이하만 업로드할 수 있습니다.'); return }
+    if (isVideo && file.size > MAX_VIDEO_BYTES) { onErrorRef.current?.('영상은 100MB 이하만 업로드할 수 있습니다.'); return }
+    if (isFileType && file.size > MAX_FILE_BYTES) { onErrorRef.current?.('첨부파일은 50MB 이하만 업로드할 수 있습니다.'); return }
+    onErrorRef.current?.('')
 
     const type = isImage ? 'image' : isVideo ? 'video' : 'file'
     const id = localId()
@@ -207,7 +216,7 @@ export default function TiptapTextEditor({ initialBlocks, apiRef, onError }: {
       width: 75,
       align: 'center',
     })
-  }, [currentBlocks, editor, insertPmBlock, onError])
+  }, [currentBlocks, editor, insertPmBlock])
 
   useEffect(() => {
     insertFileRef.current = insertFile
@@ -262,7 +271,7 @@ export default function TiptapTextEditor({ initialBlocks, apiRef, onError }: {
       getBlocks: currentBlocks,
       updateFigureMeta: (id: string, changes: Record<string, unknown>) => updateFigureNodeAttrs(id, changes),
     }
-  }, [apiRef, currentBlocks, editor, insertExternalEmbed, insertFile, insertPoll, onError, updateFigureNodeAttrs])
+  }, [apiRef, currentBlocks, editor, insertExternalEmbed, insertFile, insertPoll, updateFigureNodeAttrs])
 
   const updateSelectedFigureAttrs = (changes: Record<string, unknown>) => {
     if (!editor || !selectedFigure) return

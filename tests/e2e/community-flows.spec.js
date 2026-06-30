@@ -170,3 +170,24 @@ test('admin member management updates member roles in place', async ({ page }) =
   await expect.poll(() => rolePayloads.at(-1)).toEqual({ role: 'USER' })
   await expect(memberRow.getByRole('button', { name: '관리자 지정' })).toBeVisible()
 })
+
+test('community composer inserts a poll block that survives re-render', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/community/posts', (route) => route.fulfill({ status: 200, json: [] }))
+
+  await page.goto('/community')
+  await page.getByRole('button', { name: '글쓰기' }).click()
+  await page.getByRole('button', { name: '투표' }).click()
+  await page.getByRole('textbox', { name: '투표 제목 입력' }).fill('점심 메뉴 투표')
+  await page.getByRole('textbox', { name: '보기 1' }).fill('김밥')
+  await page.getByRole('textbox', { name: '보기 2' }).fill('라면')
+  await page.getByRole('button', { name: '본문에 추가' }).click()
+
+  const pollFigure = page.locator('.community-editor-figure[data-type="poll"]')
+  await expect(pollFigure).toHaveCount(1)
+  await expect(pollFigure).toContainText('점심 메뉴 투표')
+
+  // A later re-render (typing a title) must NOT recreate the editor and wipe the block.
+  await page.locator('.community-compose-title').fill('투표 글')
+  await expect(pollFigure).toHaveCount(1)
+})
