@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 import { visualizer } from 'rollup-plugin-visualizer'
+import { VitePWA } from 'vite-plugin-pwa'
 
 const pkg = JSON.parse(readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8'))
 
@@ -38,9 +39,36 @@ const analyzePlugins = process.env.ANALYZE
     ]
   : []
 
+// Installable PWA + offline app shell. Conservative config:
+//  - autoUpdate so a new deploy activates on the next visit (no stale-stuck SW)
+//  - manifest:false — we ship our own public/manifest.webmanifest, already linked
+//  - API + bot share routes are NEVER served the cached SPA shell (always network)
+//  - disabled in dev so it never interferes with the dev server
+const pwaPlugin = VitePWA({
+  // A service worker intercepts requests in headless Playwright and is hard to
+  // reason about in e2e; disable it for test builds (PWA_DISABLE=1). The SW is an
+  // additive layer over identical app logic, so smoke coverage is unaffected.
+  disable: process.env.PWA_DISABLE === '1',
+  registerType: 'autoUpdate',
+  injectRegister: 'auto',
+  manifest: false,
+  includeAssets: ['favicon.svg', 'coms-logo.png'],
+  workbox: {
+    globPatterns: ['**/*.{js,css,html,svg,png,woff,woff2}'],
+    cleanupOutdatedCaches: true,
+    clientsClaim: true,
+    skipWaiting: true,
+    navigateFallback: '/index.html',
+    navigateFallbackDenylist: [/^\/api\//, /\/(share|share-data|share-image)$/],
+    // Don't precache giant rarely-used author/editor chunks into the install.
+    maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+  },
+  devOptions: { enabled: false },
+})
+
 export default defineConfig({
   // sentryVitePlugin must come AFTER react/tailwind so it sees the final build output.
-  plugins: [react(), tailwindcss(), ...sentryPlugins, ...analyzePlugins],
+  plugins: [react(), tailwindcss(), pwaPlugin, ...sentryPlugins, ...analyzePlugins],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version || '0.0.0'),
   },
