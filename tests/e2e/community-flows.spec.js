@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { Buffer } from 'node:buffer'
-import { mockAdminApis } from './visualSupport.js'
+import { mockAdminApis, autoDriveModals } from './visualSupport.js'
 
 const onePixelGif = Buffer.from(
   'R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==',
@@ -9,10 +9,7 @@ const onePixelGif = Buffer.from(
 
 test('community composer uploads an inline image and deletes the saved post', async ({ page }) => {
   await mockAdminApis(page)
-  await page.addInitScript(() => {
-    window.confirm = () => true
-    window.prompt = () => '작성자 요청 정리'
-  })
+  await autoDriveModals(page, { promptValue: '작성자 요청 정리' })
 
   let posts = []
   let createPayload = null

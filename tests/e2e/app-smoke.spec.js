@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { Buffer } from 'node:buffer'
-import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
+import { mockAdminApis, mockOptionalApis, autoDriveModals } from './visualSupport.js'
 
 const routeExpectations = [
   ['/', /KW COM's/],
@@ -242,19 +242,12 @@ test('admin password reset accepts simple temporary passwords without complexity
     resetPayload = route.request().postDataJSON()
     await route.fulfill({ status: 204 })
   })
-  await page.addInitScript(() => {
-    window.__adminPromptMessages = []
-    window.prompt = (message) => {
-      window.__adminPromptMessages.push(message)
-      return 'temp1'
-    }
-    window.alert = () => {}
-  })
+  await autoDriveModals(page, { promptValue: 'temp1' })
 
   await page.goto('/admin')
   await page.getByRole('tab', { name: '회원 관리' }).click()
   await page.getByRole('button', { name: '비번 초기화' }).click()
-  promptMessage = await page.evaluate(() => window.__adminPromptMessages[0] || '')
+  promptMessage = await page.evaluate(() => window.__modalPromptMessages[0] || '')
 
   expect(promptMessage).not.toContain('특수문자')
   expect(promptMessage).not.toContain('8자')
@@ -276,10 +269,7 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
   let updatePayload = null
   let deletedId = null
 
-  await page.addInitScript(() => {
-    window.confirm = () => true
-    window.alert = () => {}
-  })
+  await autoDriveModals(page)
   await page.route('**/api/admin/eligible-members', async (route) => {
     if (route.request().method() === 'GET') {
       return route.fulfill({ status: 200, json: roster })
@@ -367,10 +357,7 @@ test('admin ban tab can ban and unban student ids', async ({ page }) => {
   let banPayload = null
   let unbannedStudentId = null
 
-  await page.addInitScript(() => {
-    window.confirm = () => true
-    window.alert = () => {}
-  })
+  await autoDriveModals(page)
   await page.route('**/api/admin/banned-students', async (route) => {
     if (route.request().method() === 'GET') {
       return route.fulfill({ status: 200, json: bannedStudents })
@@ -430,10 +417,7 @@ test('admin files tab can upload and delete archive files', async ({ page }) => 
   let uploadPayload = null
   let deletedFileId = null
 
-  await page.addInitScript(() => {
-    window.confirm = () => true
-    window.alert = () => {}
-  })
+  await autoDriveModals(page)
   await page.route('**/api/files', async (route) => {
     if (route.request().method() === 'GET') {
       return route.fulfill({ status: 200, json: files })
@@ -670,7 +654,7 @@ test('admin community reports tab resolves open reports', async ({ page }) => {
   ]
   let resolvePayload = null
 
-  await page.addInitScript(() => { window.confirm = () => true })
+  await autoDriveModals(page)
   await page.route('**/api/admin/community/reports', (route) => route.fulfill({ status: 200, json: reports }))
   await page.route('**/api/admin/community/reports/9', async (route) => {
     expect(route.request().method()).toBe('PATCH')
@@ -711,6 +695,7 @@ test('admin community reports tab resolves open reports', async ({ page }) => {
 
 test('admin deleted community posts tab preserves deletion evidence', async ({ page }) => {
   await mockAdminApis(page)
+  await autoDriveModals(page)
   const onePixelPng = Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
     'base64',
@@ -1033,9 +1018,7 @@ test('community composer creates a post with editor text and file blocks', async
 
 test('community detail supports comment add, reply, edit, and delete', async ({ page }) => {
   await mockAdminApis(page)
-  await page.addInitScript(() => {
-    window.confirm = () => true
-  })
+  await autoDriveModals(page)
 
   const post = {
     id: 77,
@@ -1147,7 +1130,7 @@ test('community detail supports comment add, reply, edit, and delete', async ({ 
   await expect(page.getByText('수정된 댓글입니다.')).toBeVisible()
 
   await firstComment.getByRole('button', { name: '삭제' }).click()
-  expect(deletedCommentId).toBe(1)
+  await expect.poll(() => deletedCommentId).toBe(1)
   await expect(page.locator('#comment-1')).toHaveCount(0)
 })
 
@@ -1404,6 +1387,7 @@ test('admin can add a schedule directly from the monthly calendar', async ({ pag
   // independent of when this test actually runs.
   await page.clock.setFixedTime(new Date('2026-06-10T09:00:00'))
   await mockAdminApis(page)
+  await autoDriveModals(page)
   let createdPayload = null
   let updatedPayload = null
   let deletedId = null
@@ -2038,6 +2022,7 @@ test('notice detail registers a view and toggles the upvote count', async ({ pag
 
 test('club activity detail registers view, vote, edit, and delete only after opening', async ({ page }) => {
   await mockAdminApis(page)
+  await autoDriveModals(page)
   let viewRegistered = false
   let voteValue = null
   let upvotes = 2

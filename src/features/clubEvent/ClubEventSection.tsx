@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Download, ExternalLink, FileText, ImagePlus, Paperclip, Sparkles, Tag, ThumbsUp, Trash2, Upload, X } from 'lucide-react'
@@ -316,7 +317,7 @@ function ClubEventSection() {
   }
 
   const handleDeleteEvent = async (item) => {
-    if (!window.confirm(`${item.title} 이벤트를 삭제할까요?`)) return
+    if (!(await confirmDialog({ message: `${item.title} 이벤트를 삭제할까요?`, tone: 'danger' }))) return
     setDeletingId(`event-${item.id}`)
     setError('')
     try {
@@ -335,7 +336,7 @@ function ClubEventSection() {
   }
 
   const handleDeleteEntry = async (entry) => {
-    if (!selectedEvent || !window.confirm(`${entry.title} 작품을 삭제할까요?`)) return
+    if (!selectedEvent || !(await confirmDialog({ message: `${entry.title} 작품을 삭제할까요?`, tone: 'danger' }))) return
     setDeletingId(`entry-${entry.id}`)
     setError('')
     try {

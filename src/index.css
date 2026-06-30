@@ -6909,3 +6909,109 @@ html.home-snap-scroll .home-snap-section {
 		font-size: clamp(0.94rem, 0.9rem + 0.18cqw, 0.98rem);
 	}
 }
+
+/* ─── Confirm / prompt modal (ConfirmDialog.tsx) ───────────────────────────── */
+.coms-confirm-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 10001;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1.25rem;
+	background: rgba(0, 0, 0, 0.42);
+	backdrop-filter: blur(2px);
+	animation: coms-confirm-fade 120ms ease-out;
+}
+.coms-confirm-card {
+	width: 100%;
+	max-width: 24rem;
+	border-radius: 16px;
+	background: var(--app-surface);
+	border: 1px solid var(--app-hairline);
+	box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
+	padding: 1.4rem 1.4rem 1.1rem;
+	animation: coms-confirm-pop 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.coms-confirm-title {
+	margin: 0 0 0.35rem;
+	font-size: 1rem;
+	font-weight: 700;
+	color: var(--app-text);
+}
+.coms-confirm-message {
+	margin: 0;
+	font-size: 0.92rem;
+	line-height: 1.55;
+	color: var(--app-muted);
+	white-space: pre-line;
+}
+.coms-confirm-input {
+	margin-top: 0.9rem;
+	width: 100%;
+	border: 1px solid var(--app-hairline);
+	border-radius: 10px;
+	background: var(--app-surface-soft);
+	padding: 0.6rem 0.75rem;
+	font-size: 0.92rem;
+	color: var(--app-text);
+	outline: none;
+}
+.coms-confirm-input:focus-visible {
+	border-color: var(--app-accent);
+	box-shadow: 0 0 0 3px var(--app-accent-soft);
+}
+.coms-confirm-actions {
+	margin-top: 1.2rem;
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.5rem;
+}
+.coms-confirm-cancel,
+.coms-confirm-ok {
+	min-height: 2.5rem;
+	padding: 0 1.1rem;
+	border-radius: 999px;
+	font-size: 0.88rem;
+	font-weight: 700;
+	transition: background 140ms ease, opacity 140ms ease;
+}
+.coms-confirm-cancel {
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	color: var(--app-muted);
+}
+.coms-confirm-cancel:hover {
+	background: var(--app-surface-soft);
+}
+.coms-confirm-ok {
+	background: var(--app-accent);
+	color: #fff;
+}
+.coms-confirm-ok:hover {
+	background: var(--app-accent-hover);
+}
+.coms-confirm-ok.is-danger {
+	background: #ff3b30;
+}
+.coms-confirm-ok.is-danger:hover {
+	background: #e0291f;
+}
+.coms-confirm-ok:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+@keyframes coms-confirm-fade {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+@keyframes coms-confirm-pop {
+	from { opacity: 0; transform: translateY(8px) scale(0.98); }
+	to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.coms-confirm-backdrop,
+	.coms-confirm-card {
+		animation: none;
+	}
+}

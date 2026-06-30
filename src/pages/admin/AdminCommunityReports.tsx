@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { listCommunityReports, resolveCommunityReport } from '../../services/adminApi'
 import { showToast } from '../../components/common/Toast'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
 
 const COMMUNITY_REPORT_REASONS = {
   SPAM: '스팸/홍보',
@@ -47,7 +48,7 @@ export default function AdminCommunityReports({ formatDateTime }: { formatDateTi
 
   const resolveReport = async (report, action) => {
     const verb = action === 'ACCEPT' ? '처리 완료' : '기각'
-    if (!window.confirm(`신고 #${report.id}을 ${verb}하시겠습니까?`)) return
+    if (!(await confirmDialog({ message: `신고 #${report.id}을 ${verb}하시겠습니까?`, tone: 'danger' }))) return
     setWorkingId(report.id)
     try {
       await resolveCommunityReport(report.id, { action, note: notes[report.id] || '' })

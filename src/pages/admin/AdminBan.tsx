@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { listBannedStudents, banStudent, unbanStudent } from '../../services/adminApi'
 import { showToast } from '../../components/common/Toast'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
 
 const BAN_DURATIONS = [
   { value: '6H', label: '6시간' },
@@ -53,7 +54,7 @@ export default function AdminBan({ formatDateTime }: { formatDateTime: (value: s
   }
 
   const handleUnban = async (studentId) => {
-    if (!window.confirm(`${studentId} 차단을 해제하시겠습니까?`)) return
+    if (!(await confirmDialog({ message: `${studentId} 차단을 해제하시겠습니까?`, tone: 'danger' }))) return
     try {
       await unbanStudent(studentId)
       await load()
