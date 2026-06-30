@@ -202,7 +202,7 @@ export default function AdminAuditLogs({ formatDateTime }: { formatDateTime: (va
         <p className="text-sm text-[var(--theme-body-muted)]">선택한 종류의 로그가 없습니다.</p>
       )}
       {!loading && !error && visibleLogs.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-[var(--app-hairline)]">
+        <div className="overflow-x-auto touch-pan-x rounded-lg border border-[var(--app-hairline)]">
           <table className="w-max min-w-full text-left text-sm">
             <thead className="bg-[var(--app-surface)] text-xs font-semibold text-[var(--theme-body-muted)]">
               <tr>

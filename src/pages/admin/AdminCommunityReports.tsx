@@ -89,7 +89,7 @@ export default function AdminCommunityReports({ formatDateTime }: { formatDateTi
         <p className="text-sm text-[var(--theme-body-muted)]">처리 대기 중인 신고가 없습니다.</p>
       )}
       {!loading && !error && reports.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-[var(--app-hairline)]">
+        <div className="overflow-x-auto touch-pan-x rounded-lg border border-[var(--app-hairline)]">
           <table className="w-max min-w-full text-left text-sm">
             <thead className="bg-[var(--app-surface)] text-xs font-semibold text-[var(--theme-body-muted)]">
               <tr>

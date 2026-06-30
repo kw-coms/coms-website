@@ -351,6 +351,7 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
                 </select>
                 {form.grade === '기타' && (
                   <input
+                    aria-label="기타 학년 정보"
                     value={otherGrade}
                     onChange={(event) => setOtherGrade(event.target.value)}
                     maxLength={50}
@@ -392,6 +393,7 @@ export default function RecruitApply({ onBack }: { onBack: () => void }) {
               </div>
               {interests.includes('기타') && (
                 <input
+                  aria-label="기타 관심 분야"
                   value={otherInterest}
                   onChange={(event) => setOtherInterest(event.target.value)}
                   maxLength={100}
