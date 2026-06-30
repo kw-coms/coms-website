@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAdminMembers } from './useAdminMembers'
+import { showToast } from '../../components/common/Toast'
 
 function parseInterests(raw) {
   if (!raw) return []
@@ -18,7 +19,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
     try {
       await updateRole({ id: member.id, role: newRole })
     } catch (err) {
-      alert(err.message || '역할 변경 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '역할 변경 중 오류가 발생했습니다.', tone: 'error' })
     }
   }
 
@@ -27,7 +28,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
     try {
       await removeMember(member.id)
     } catch (err) {
-      alert(err.message || '삭제 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '삭제 중 오류가 발생했습니다.', tone: 'error' })
     }
   }
 
@@ -36,9 +37,9 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
     if (!newPassword) return
     try {
       await resetPassword({ id: member.id, password: newPassword })
-      alert('비밀번호가 초기화되었습니다.')
+      showToast({ message: '비밀번호가 초기화되었습니다.', tone: 'success' })
     } catch (err) {
-      alert(err.message || '비밀번호 초기화 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '비밀번호 초기화 중 오류가 발생했습니다.', tone: 'error' })
     }
   }
 

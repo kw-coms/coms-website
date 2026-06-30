@@ -219,7 +219,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
       : ''
     if (reason === null) return
     if (user?.role === 'ADMIN' && post.authorStudentId !== user.studentId && !reason.trim()) {
-      alert('관리자가 다른 회원의 글을 삭제하려면 삭제 사유가 필요합니다.')
+      showToast({ message: '관리자가 다른 회원의 글을 삭제하려면 삭제 사유가 필요합니다.', tone: 'error' })
       return
     }
     try {
@@ -227,7 +227,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
       setPosts((prev) => prev.filter((item) => item.id !== post.id))
       backToList()
     } catch (err) {
-      alert(err.message || '삭제 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '삭제 중 오류가 발생했습니다.', tone: 'error' })
     }
   }
 
@@ -244,7 +244,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
   const submitAppeal = async (record) => {
     const message = (appealDrafts[record.id] || '').trim()
     if (!message) {
-      alert('복원 요청 사유를 입력해주세요.')
+      showToast({ message: '복원 요청 사유를 입력해주세요.', tone: 'error' })
       return
     }
     setAppealingId(record.id)
@@ -265,7 +265,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
       setAppealOpenId(null)
       setAppealDrafts((prev) => ({ ...prev, [record.id]: '' }))
     } catch (err) {
-      alert(err.message || '복원 요청을 보내지 못했습니다.')
+      showToast({ message: err.message || '복원 요청을 보내지 못했습니다.', tone: 'error' })
     } finally {
       setAppealingId(null)
     }
@@ -277,7 +277,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
       const updated = await voteCommunityPost(currentPost.id, value)
       mergePost(updated)
     } catch (err) {
-      alert(err.message || '투표 처리 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '투표 처리 중 오류가 발생했습니다.', tone: 'error' })
     }
   }
 
@@ -304,7 +304,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
       const updated = await voteCommunityPoll(currentPost.id, pollId, optionIndex)
       mergePost(updated)
     } catch (err) {
-      alert(err.message || '투표 처리 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '투표 처리 중 오류가 발생했습니다.', tone: 'error' })
     } finally {
       setPollVoting('')
     }
@@ -317,7 +317,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
       const updated = await closeCommunityPoll(currentPost.id, pollId)
       mergePost(updated)
     } catch (err) {
-      alert(err.message || '투표 종료 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '투표 종료 중 오류가 발생했습니다.', tone: 'error' })
     } finally {
       setPollClosing('')
     }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { listCommunityReports, resolveCommunityReport } from '../../services/adminApi'
+import { showToast } from '../../components/common/Toast'
 
 const COMMUNITY_REPORT_REASONS = {
   SPAM: '스팸/홍보',
@@ -57,7 +58,7 @@ export default function AdminCommunityReports({ formatDateTime }: { formatDateTi
         return next
       })
     } catch (err) {
-      alert(err.message || '신고 처리 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '신고 처리 중 오류가 발생했습니다.', tone: 'error' })
     } finally {
       setWorkingId(null)
     }
