@@ -92,6 +92,7 @@ export function useCommunityComments({
       setComments((prev) => [...prev, comment])
       bumpCurrentPostCommentCount(1)
       setCommentInput('')
+      showToast({ message: '댓글을 등록했습니다.', tone: 'success' })
     } catch (err) {
       showToast({ message: err.message || '댓글 등록 실패', tone: 'error' })
     } finally {
@@ -112,6 +113,7 @@ export function useCommunityComments({
       setReplyAnonymousName('')
       setReplyTo(null)
       setReplyMentionEnabled(true)
+      showToast({ message: '답글을 등록했습니다.', tone: 'success' })
     } catch (err) {
       showToast({ message: err.message || '답글 등록 실패', tone: 'error' })
     } finally {
@@ -148,6 +150,7 @@ export function useCommunityComments({
         return prev.filter((comment) => !toDelete.has(comment.id))
       })
       bumpCurrentPostCommentCount(-toDelete.size)
+      showToast({ message: '댓글을 삭제했습니다.', tone: 'success' })
     } catch (err) {
       showToast({ message: err.message || '댓글 삭제 실패', tone: 'error' })
     }
@@ -168,6 +171,7 @@ export function useCommunityComments({
       setComments((prev) => prev.map((comment) => (comment.id === commentId ? updated : comment)))
       setEditingCommentId(null)
       setEditCommentInput('')
+      showToast({ message: '댓글을 수정했습니다.', tone: 'success' })
     } catch (err) {
       showToast({ message: err.message || '댓글 수정 실패', tone: 'error' })
     } finally {

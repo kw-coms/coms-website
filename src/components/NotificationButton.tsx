@@ -129,7 +129,7 @@ export default function NotificationButton({ alignLeft = false, variant = 'icon'
         onClick={toggle}
         className={mobileMenu
           ? 'apple-mobile-menu-item apple-mobile-menu-notification'
-          : 'relative inline-flex size-8 items-center justify-center rounded-full text-[var(--theme-body-dark)] transition hover:bg-black/5'}
+          : 'relative inline-flex size-9 items-center justify-center rounded-full text-[var(--theme-body-dark)] transition hover:bg-black/5'}
         aria-label="notifications"
       >
         {mobileMenu ? (
