@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "npm run typecheck && npm run lint && node --import tsx tests/communityExperience.test.mjs && node --import tsx tests/mobileNavigation.test.mjs && node --import tsx tests/miniAppsProfile.test.mjs && node --import tsx tests/monthlyCalendar.test.mjs && node --import tsx tests/scheduleCsv.test.mjs && node --import tsx tests/icsExport.test.mjs && node --import tsx tests/appProjectStatus.test.mjs && node --import tsx tests/clubEvents.test.mjs && node --import tsx tests/adminAccessibility.test.mjs && node --import tsx tests/sanitizeHtml.test.mjs && node --import tsx tests/richBodyEditor.test.mjs && node --import tsx tests/authErrors.test.mjs && node --import tsx tests/apiClientErrors.test.mjs && node --import tsx tests/visibleCount.test.mjs && node --import tsx tests/toastStore.test.mjs",
+    "test": "npm run typecheck && npm run lint && node --import tsx tests/communityExperience.test.mjs && node --import tsx tests/mobileNavigation.test.mjs && node --import tsx tests/miniAppsProfile.test.mjs && node --import tsx tests/monthlyCalendar.test.mjs && node --import tsx tests/scheduleCsv.test.mjs && node --import tsx tests/icsExport.test.mjs && node --import tsx tests/appProjectStatus.test.mjs && node --import tsx tests/clubEvents.test.mjs && node --import tsx tests/adminAccessibility.test.mjs && node --import tsx tests/sanitizeHtml.test.mjs && node --import tsx tests/richBodyEditor.test.mjs && node --import tsx tests/tiptapBlockConverters.test.mjs && node --import tsx tests/authErrors.test.mjs && node --import tsx tests/apiClientErrors.test.mjs && node --import tsx tests/visibleCount.test.mjs && node --import tsx tests/toastStore.test.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
@@ -18,6 +18,12 @@
   "dependencies": {
     "@sentry/react": "^10.59.0",
     "@tanstack/react-query": "^5.101.0",
+    "@tiptap/extension-color": "^3.27.1",
+    "@tiptap/extension-link": "^3.27.1",
+    "@tiptap/extension-text-style": "^3.27.1",
+    "@tiptap/extension-underline": "^3.27.1",
+    "@tiptap/react": "^3.27.1",
+    "@tiptap/starter-kit": "^3.27.1",
     "dompurify": "^3.4.11",
     "highlight.js": "^11.11.1",
     "lucide-react": "^0.542.0",
