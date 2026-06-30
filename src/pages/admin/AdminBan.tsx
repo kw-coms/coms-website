@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { listBannedStudents, banStudent, unbanStudent } from '../../services/adminApi'
+import { showToast } from '../../components/common/Toast'
 
 const BAN_DURATIONS = [
   { value: '6H', label: '6시간' },
@@ -57,7 +58,7 @@ export default function AdminBan({ formatDateTime }: { formatDateTime: (value: s
       await unbanStudent(studentId)
       await load()
     } catch (err) {
-      alert(err.message || '해제 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '해제 중 오류가 발생했습니다.', tone: 'error' })
     }
   }
 

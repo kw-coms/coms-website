@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { listAdminFonts, setFontActive, uploadFont } from '../../services/fontApi'
+import { showToast } from '../../components/common/Toast'
 import { buildFontFaceCss, fontFamilyValue } from '../../services/fontPreferences'
 
 export default function AdminFonts() {
@@ -53,7 +54,7 @@ export default function AdminFonts() {
       const updated = await setFontActive(font.id, !font.active)
       setFonts((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
     } catch (err) {
-      alert(err.message || '폰트 상태를 변경하지 못했습니다.')
+      showToast({ message: err.message || '폰트 상태를 변경하지 못했습니다.', tone: 'error' })
     }
   }
 

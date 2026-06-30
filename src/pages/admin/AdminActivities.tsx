@@ -7,6 +7,7 @@ import {
   uploadClubActivityFile,
   uploadClubActivityImages,
 } from '../../services/clubActivityApi'
+import { showToast } from '../../components/common/Toast'
 import AdminActivityCategories from './AdminActivityCategories'
 import AdminActivityRow from './AdminActivityRow'
 
@@ -113,7 +114,7 @@ export default function AdminActivities() {
       await deleteClubActivity(item.id)
       setItems((prev) => prev.filter((entry) => entry.id !== item.id))
     } catch (err) {
-      alert(err.message || '활동 기록을 삭제하지 못했습니다.')
+      showToast({ message: err.message || '활동 기록을 삭제하지 못했습니다.', tone: 'error' })
     }
   }
 

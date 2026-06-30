@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Upload } from 'lucide-react'
+import { showToast } from '../../components/common/Toast'
 import {
   createClubProject,
   deleteClubProject,
@@ -112,7 +113,7 @@ export default function AdminAppCatalog() {
       await deleteClubProject(item.id)
       setItems((prev) => prev.filter((entry) => entry.id !== item.id))
     } catch (err) {
-      alert(err.message || 'Apps 항목을 삭제하지 못했습니다.')
+      showToast({ message: err.message || 'Apps 항목을 삭제하지 못했습니다.', tone: 'error' })
     }
   }
 
