@@ -4,6 +4,7 @@ import {
   deleteComment,
   updateComment,
 } from '../../services/communityApi'
+import { showToast } from '../../components/common/Toast'
 
 export const MAX_COMMENT_LENGTH = 1000
 
@@ -77,7 +78,7 @@ export function useCommunityComments({
     const mention = replyMentionEnabled ? replyMentionFor(parent) : ''
     const content = mention ? `${mention} ${body}` : body
     if (content.length > MAX_COMMENT_LENGTH) {
-      alert(`태그를 포함한 답글은 ${MAX_COMMENT_LENGTH}자 이하로 입력해주세요.`)
+      showToast({ message: `태그를 포함한 답글은 ${MAX_COMMENT_LENGTH}자 이하로 입력해주세요.`, tone: 'error' })
       return ''
     }
     return content
@@ -92,7 +93,7 @@ export function useCommunityComments({
       bumpCurrentPostCommentCount(1)
       setCommentInput('')
     } catch (err) {
-      alert(err.message || '댓글 등록 실패')
+      showToast({ message: err.message || '댓글 등록 실패', tone: 'error' })
     } finally {
       setCommentSaving(false)
     }
@@ -112,7 +113,7 @@ export function useCommunityComments({
       setReplyTo(null)
       setReplyMentionEnabled(true)
     } catch (err) {
-      alert(err.message || '답글 등록 실패')
+      showToast({ message: err.message || '답글 등록 실패', tone: 'error' })
     } finally {
       setCommentSaving(false)
     }
@@ -148,7 +149,7 @@ export function useCommunityComments({
       })
       bumpCurrentPostCommentCount(-toDelete.size)
     } catch (err) {
-      alert(err.message || '댓글 삭제 실패')
+      showToast({ message: err.message || '댓글 삭제 실패', tone: 'error' })
     }
   }
 
@@ -168,7 +169,7 @@ export function useCommunityComments({
       setEditingCommentId(null)
       setEditCommentInput('')
     } catch (err) {
-      alert(err.message || '댓글 수정 실패')
+      showToast({ message: err.message || '댓글 수정 실패', tone: 'error' })
     } finally {
       setCommentSaving(false)
     }

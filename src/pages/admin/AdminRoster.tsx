@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember } from '../../services/adminApi'
+import { showToast } from '../../components/common/Toast'
 
 export default function AdminRoster() {
   const fileInputRef = useRef(null)
@@ -104,7 +105,7 @@ export default function AdminRoster() {
       setEditingId(null)
       await loadRoster()
     } catch (err) {
-      alert(err.message || '수정 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '수정 중 오류가 발생했습니다.', tone: 'error' })
     } finally {
       setEditSaving(false)
     }
@@ -116,7 +117,7 @@ export default function AdminRoster() {
       await deleteEligibleMember(member.id)
       setRoster((prev) => prev.filter((m) => m.id !== member.id))
     } catch (err) {
-      alert(err.message || '삭제 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '삭제 중 오류가 발생했습니다.', tone: 'error' })
     }
   }
 
