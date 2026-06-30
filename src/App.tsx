@@ -6,6 +6,7 @@ import { BUILT_IN_FONTS, buildFontFaceCss, fontFamilyValue, injectBuiltinFontSty
 import { useAuth } from './contexts/useAuth'
 import PageFallback from './components/home/PageFallback'
 import { ToastHost } from './components/common/Toast'
+import { ConfirmHost } from './components/common/ConfirmDialog'
 import {
   ACCENT_COLOR_KEY,
   FONT_SELECTION_KEY,
@@ -183,6 +184,7 @@ function App() {
         onOpenAccountSettings={openAccountSettings}
       />
       <ToastHost />
+      <ConfirmHost />
     </Suspense>
   )
 }

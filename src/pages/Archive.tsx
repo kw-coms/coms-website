@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { confirmDialog } from '../components/common/ConfirmDialog'
 import { useScrollReveal } from '../hooks/useScrollReveal'
 import { useVisibleCount } from '../hooks/useVisibleCount'
 import { ArrowLeft, Download, FileUp, RefreshCw, Search, ThumbsUp, Trash2, X } from 'lucide-react'
@@ -314,7 +315,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
   }, [files])
 
   const handleDelete = async (id) => {
-    if (!window.confirm('자료를 삭제하시겠습니까?')) return
+    if (!(await confirmDialog({ message: '자료를 삭제하시겠습니까?', tone: 'danger' }))) return
     setError('')
     setNotice('')
     try {

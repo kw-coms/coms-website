@@ -10,6 +10,7 @@ import {
 import { showToast } from '../../components/common/Toast'
 import AdminActivityCategories from './AdminActivityCategories'
 import AdminActivityRow from './AdminActivityRow'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
 
 const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
 
@@ -109,7 +110,7 @@ export default function AdminActivities() {
   }
 
   const handleDelete = async (item) => {
-    if (!window.confirm(`${item.title} 기록을 삭제하시겠습니까?`)) return
+    if (!(await confirmDialog({ message: `${item.title} 기록을 삭제하시겠습니까?`, tone: 'danger' }))) return
     try {
       await deleteClubActivity(item.id)
       setItems((prev) => prev.filter((entry) => entry.id !== item.id))

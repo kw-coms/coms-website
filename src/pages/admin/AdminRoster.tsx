@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember } from '../../services/adminApi'
 import { showToast } from '../../components/common/Toast'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
 
 export default function AdminRoster() {
   const fileInputRef = useRef(null)
@@ -112,7 +113,7 @@ export default function AdminRoster() {
   }
 
   const handleDelete = async (member) => {
-    if (!window.confirm(`${member.name} (${member.studentId}) 항목을 명부에서 삭제하시겠습니까?`)) return
+    if (!(await confirmDialog({ message: `${member.name} (${member.studentId}) 항목을 명부에서 삭제하시겠습니까?`, tone: 'danger' }))) return
     try {
       await deleteEligibleMember(member.id)
       setRoster((prev) => prev.filter((m) => m.id !== member.id))

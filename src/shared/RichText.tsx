@@ -2,6 +2,7 @@
 // feature sections. Split from homeUi.ts so this file only exports components
 // (keeps Fast Refresh / react-refresh happy). Behavior unchanged.
 import { useCallback, useEffect, useRef, type ElementType, type ReactNode } from 'react'
+import { promptDialog } from '../components/common/ConfirmDialog'
 import { Bold, Highlighter, ImagePlus, Italic, Link, Palette, Paperclip, Type, Underline, X } from 'lucide-react'
 import {
   RICH_TEXT_FONT_OPTIONS,
@@ -131,9 +132,9 @@ export function RichTextComposer({
     setter((currentFiles || []).filter((_, fileIndex) => fileIndex !== index))
   }
 
-  const createLink = () => {
+  const createLink = async () => {
     restoreSelection()
-    const rawUrl = window.prompt('삽입할 링크 URL을 입력하세요.')
+    const rawUrl = await promptDialog({ message: '삽입할 링크 URL을 입력하세요.', placeholder: 'https://' })
     if (!rawUrl) return
     const normalized = /^https?:\/\//i.test(rawUrl) || rawUrl.startsWith('mailto:') ? rawUrl : `https://${rawUrl}`
     if (!isSafeRichTextUrl(normalized)) return

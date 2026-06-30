@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarDays, Download, Repeat, Trash2, X } from 'lucide-react'
@@ -286,7 +287,7 @@ function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editingDateSch
   }
 
   const remove = async (schedule) => {
-    if (typeof window !== 'undefined' && !window.confirm(`'${schedule.title}' 정기 모임을 삭제할까요?`)) return
+    if (!(await confirmDialog({ message: `'${schedule.title}' 정기 모임을 삭제할까요?`, tone: 'danger' }))) return
     setError('')
     setNotice('')
     try {
@@ -586,7 +587,7 @@ function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
 
   const deleteDateSchedule = async (event) => {
     if (!event.activityId) return
-    if (typeof window !== 'undefined' && !window.confirm(`'${event.title}' 날짜 일정을 삭제할까요?`)) return
+    if (!(await confirmDialog({ message: `'${event.title}' 날짜 일정을 삭제할까요?`, tone: 'danger' }))) return
     setCalendarNotice('')
     setCalendarActionError('')
     try {

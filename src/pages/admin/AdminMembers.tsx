@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAdminMembers } from './useAdminMembers'
 import { showToast } from '../../components/common/Toast'
+import { confirmDialog, promptDialog } from '../../components/common/ConfirmDialog'
 
 function parseInterests(raw) {
   if (!raw) return []
@@ -24,7 +25,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
   }
 
   const handleDelete = async (member) => {
-    if (!window.confirm(`${member.name} 회원을 삭제하시겠습니까?`)) return
+    if (!(await confirmDialog({ message: `${member.name} 회원을 삭제하시겠습니까?`, tone: 'danger' }))) return
     try {
       await removeMember(member.id)
     } catch (err) {
@@ -33,7 +34,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
   }
 
   const handlePasswordReset = async (member) => {
-    const newPassword = window.prompt(`${member.name} (${member.studentId}) 회원의 새 임시 비밀번호를 입력하세요.\n(관리자 초기화는 공백만 입력할 수 없습니다.)`)
+    const newPassword = await promptDialog({ message: `${member.name} (${member.studentId}) 회원의 새 임시 비밀번호를 입력하세요.\n(관리자 초기화는 공백만 입력할 수 없습니다.)` })
     if (!newPassword) return
     try {
       await resetPassword({ id: member.id, password: newPassword })
