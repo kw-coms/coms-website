@@ -32,12 +32,12 @@ export const POLL_DURATION_OPTIONS = [
   { value: 10080, label: '7일' },
   { value: 0, label: '종료 없음' },
 ]
-const FORMATTED_TEXT_RE = /<\/?(strong|b|em|i|u|span|font|br|div|p|pre|code)\b/i
+const FORMATTED_TEXT_RE = /<\/?(a|strong|b|em|i|u|span|font|br|div|p|pre|code)\b/i
 const EDITOR_ALLOWED_STYLES = new Set(['background-color', 'color', 'font-family'])
 const SAFE_CODE_CLASS_RE = /^language-[a-z0-9]+$/i
 export const EDITOR_SANITIZE_OPTIONS = {
-  allowedTags: ['b', 'br', 'code', 'div', 'em', 'font', 'i', 'p', 'pre', 'span', 'strong', 'u'],
-  allowedAttributes: ['class', 'color', 'face', 'style'],
+  allowedTags: ['a', 'b', 'br', 'code', 'div', 'em', 'font', 'i', 'p', 'pre', 'span', 'strong', 'u'],
+  allowedAttributes: ['class', 'color', 'face', 'href', 'rel', 'style', 'target'],
   allowedStyles: EDITOR_ALLOWED_STYLES,
 }
 
@@ -75,6 +75,19 @@ function cleanEditorNode(node) {
   }
   if (['b', 'strong', 'i', 'em', 'u'].includes(tag)) {
     const el = document.createElement(tag)
+    appendCleanChildren(node, el)
+    return el
+  }
+  if (tag === 'a') {
+    const el = document.createElement('a')
+    const href = node.getAttribute('href') || ''
+    try {
+      const base = typeof window === 'undefined' ? 'https://coms.kw.ac.kr' : window.location.origin
+      const url = new URL(href, base)
+      if (['http:', 'https:', 'mailto:'].includes(url.protocol)) el.setAttribute('href', href)
+    } catch {
+      // Keep the link text but drop an invalid href.
+    }
     appendCleanChildren(node, el)
     return el
   }
@@ -355,40 +368,18 @@ export function figureInlineStyle(wPct, align) {
   return `${base};display:block;clear:both;width:${wPct}%;margin:0.75rem auto;`
 }
 
-export function domToBlocks(editorEl, figMeta) {
-  const blocks = []
-  let html = ''
-  const flushText = () => {
-    const clean = sanitizeEditorHtml(html)
-    if (clean) blocks.push({ type: 'text', content: clean, id: localId() })
-    html = ''
-  }
-  const walk = (node) => {
-    if (node.nodeType === Node.TEXT_NODE) { html += escapeHtml(node.textContent.replace(/\u200B/g, '')); return }
-    if (node.nodeName === 'BR') { html += '<br>'; return }
-    if (node.nodeName === 'FIGURE') {
-      flushText()
-      const id = node.dataset.blockId
-      const meta = figMeta.get(id)
-      if (meta) {
-        const m = (node.style.width || '').match(/^(\d+(?:\.\d+)?)%$/)
-        const wPct = m ? Math.round(Number(m[1])) : (meta.width || 75)
-        blocks.push({ ...meta, id, width: wPct, align: node.dataset.align || meta.align || 'center' })
-      }
-      return
-    }
-    const isBlock = ['DIV', 'P', 'H1', 'H2', 'H3'].includes(node.nodeName)
-    if (isBlock && html && !html.endsWith('<br>')) html += '<br>'
-    if (!isBlock && node.nodeType === Node.ELEMENT_NODE) {
-      html += sanitizeEditorHtml(node.outerHTML)
-      return
-    }
-    for (const child of node.childNodes) walk(child)
-    if (isBlock && html && !html.endsWith('<br>')) html += '<br>'
-  }
-  for (const child of editorEl.childNodes) walk(child)
-  flushText()
-  return blocks
+// React's style prop needs an object, not the CSS string figureInlineStyle returns.
+export function styleTextToObject(styleText) {
+  return Object.fromEntries(
+    String(styleText || '')
+      .split(';')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const [property, ...valueParts] = part.split(':')
+        return [property.replace(/-([a-z])/g, (_, char) => char.toUpperCase()), valueParts.join(':').trim()]
+      }),
+  )
 }
 
 export function isAllowedArchiveFile(file) {
