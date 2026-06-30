@@ -157,7 +157,7 @@ export default function AdminDeletedCommunityPosts() {
         <p className="text-sm text-[var(--theme-body-muted)]">조건에 맞는 삭제 게시글이 없습니다.</p>
       )}
       {!loading && !error && visiblePosts.length > 0 && (
-        <div className="overflow-x-auto rounded-lg border border-[var(--app-hairline)]">
+        <div className="overflow-x-auto touch-pan-x rounded-lg border border-[var(--app-hairline)]">
           <table className="w-max min-w-full text-left text-sm">
             <thead className="bg-[var(--app-surface)] text-xs font-semibold text-[var(--theme-body-muted)]">
               <tr>

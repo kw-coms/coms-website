@@ -713,7 +713,7 @@ function ActivityLogSection({ compact = false }: { compact?: boolean }) {
                 {activityImagesFor(selectedActivity).length > 0 && (
                   <div className="activity-detail-gallery" aria-label="활동 사진">
                     {activityImagesFor(selectedActivity).map((image, index) => (
-                      <img key={image.id || image.url || index} src={image.url} alt="" loading="lazy" decoding="async" />
+                      <img key={image.id || image.url || index} src={image.url} alt={image.originalName || `활동 사진 ${index + 1}`} loading="lazy" decoding="async" />
                     ))}
                   </div>
                 )}
