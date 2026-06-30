@@ -1,6 +1,6 @@
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
 import { apiUrl } from '../../services/apiClient'
-import { figureInlineStyle, mediaWidthPercent } from './postEditorUtils'
+import { figureInlineStyle, mediaWidthPercent, styleTextToObject } from './postEditorUtils'
 
 function safeMediaSrc(value: unknown) {
   const url = String(value || '')
@@ -24,7 +24,7 @@ export default function TiptapMediaBlockView({ node, selected }: NodeViewProps) 
       data-align={align}
       contentEditable={false}
       draggable="true"
-      style={figureInlineStyle(width, align)}
+      style={styleTextToObject(figureInlineStyle(width, align))}
     >
       {isImage ? (
         <img

@@ -1,5 +1,5 @@
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
-import { figureInlineStyle, mediaWidthPercent, safeExternalSrc, safeYoutubeEmbedSrc } from './postEditorUtils'
+import { figureInlineStyle, mediaWidthPercent, safeExternalSrc, safeYoutubeEmbedSrc, styleTextToObject } from './postEditorUtils'
 
 const EXTERNAL_CARD_STYLE = {
   overflow: 'hidden',
@@ -84,18 +84,5 @@ export default function TiptapEmbedBlockView({ node, selected }: NodeViewProps) 
         </>
       )}
     </NodeViewWrapper>
-  )
-}
-
-function styleTextToObject(styleText: string) {
-  return Object.fromEntries(
-    styleText
-      .split(';')
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((part) => {
-        const [property, ...valueParts] = part.split(':')
-        return [property.replace(/-([a-z])/g, (_, char) => char.toUpperCase()), valueParts.join(':').trim()]
-      }),
   )
 }

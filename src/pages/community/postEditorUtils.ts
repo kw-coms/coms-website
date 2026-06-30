@@ -368,6 +368,20 @@ export function figureInlineStyle(wPct, align) {
   return `${base};display:block;clear:both;width:${wPct}%;margin:0.75rem auto;`
 }
 
+// React's style prop needs an object, not the CSS string figureInlineStyle returns.
+export function styleTextToObject(styleText) {
+  return Object.fromEntries(
+    String(styleText || '')
+      .split(';')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const [property, ...valueParts] = part.split(':')
+        return [property.replace(/-([a-z])/g, (_, char) => char.toUpperCase()), valueParts.join(':').trim()]
+      }),
+  )
+}
+
 export function isAllowedArchiveFile(file) {
   return file?.name?.toLowerCase().endsWith('.zip') && ALLOWED_FILE_TYPES.includes(file.type || 'application/octet-stream')
 }
