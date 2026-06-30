@@ -258,7 +258,7 @@ export default function Notices() {
       refreshNotices()
       backToList()
     } catch (err) {
-      alert(err.message || '삭제 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '삭제 중 오류가 발생했습니다.', tone: 'error' })
     }
   }
 
@@ -289,7 +289,7 @@ export default function Notices() {
       setSelectedNotice(updated)
       setNotices((prev) => prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
     } catch (err) {
-      alert(err.message || '추천 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '추천 중 오류가 발생했습니다.', tone: 'error' })
     } finally {
       setVoting(false)
     }

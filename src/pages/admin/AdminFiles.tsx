@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { listFiles, createPost, deleteFile } from '../../services/archiveApi'
+import { showToast } from '../../components/common/Toast'
 
 export default function AdminFiles() {
   const [files, setFiles] = useState([])
@@ -31,7 +32,7 @@ export default function AdminFiles() {
       await createPost({ title: file.name, file })
       loadFiles()
     } catch (err) {
-      alert(err.message || '업로드 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '업로드 중 오류가 발생했습니다.', tone: 'error' })
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -44,7 +45,7 @@ export default function AdminFiles() {
       await deleteFile(id)
       setFiles((prev) => prev.filter((f) => f.id !== id))
     } catch (err) {
-      alert(err.message || '삭제 중 오류가 발생했습니다.')
+      showToast({ message: err.message || '삭제 중 오류가 발생했습니다.', tone: 'error' })
     }
   }
 
