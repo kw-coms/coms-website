@@ -2,3 +2,5 @@ User-agent: *
 Allow: /
 Disallow: /admin
 Disallow: /settings
+
+Sitemap: https://coms.kw.ac.kr/sitemap.xml
