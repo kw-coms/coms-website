@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import {
   buildDeletedPostTimeline,
   filterAndSortCommunityPosts,
@@ -112,6 +112,9 @@ assert.equal(timeline[1].detail, '관리자(2020123456)')
 assert.equal(timeline[3].detail, '복원 처리 완료')
 
 const postBlocksSource = readFileSync('src/pages/community/PostBlocks.tsx', 'utf8')
+const richEditorSource = readFileSync('src/pages/community/RichEditor.tsx', 'utf8')
+const postEditorUtilsSource = readFileSync('src/pages/community/postEditorUtils.ts', 'utf8')
+const tiptapTextEditorSource = readFileSync('src/pages/community/TiptapTextEditor.tsx', 'utf8')
 const communityListSource = readFileSync('src/pages/community/CommunityListView.tsx', 'utf8')
 const communityDetailSource = readFileSync('src/pages/community/CommunityDetailView.tsx', 'utf8')
 const commentThreadSource = readFileSync('src/pages/community/CommentThread.tsx', 'utf8')
@@ -125,6 +128,19 @@ assert.match(
   postBlocksSource,
   /<img\s+src=\{src\}\s+alt=\{block\.title \|\| '외부 이미지'\}[\s\S]*?className="community-inline-media-image block"[\s\S]*?loading="lazy"[\s\S]*?decoding="async"/,
 )
+
+assert.match(tiptapTextEditorSource, /import FigureToolbar from '\.\/FigureToolbar'/)
+assert.match(tiptapTextEditorSource, /if \(this\.editor\.isActive\('codeBlock'\)\) return false/)
+assert.match(tiptapTextEditorSource, /savedSelectionRef = useRef<\{ from: number; to: number \} \| null>\(null\)/)
+assert.match(tiptapTextEditorSource, /savedSelectionRef\.current = \{ from: editor\.state\.selection\.from, to: editor\.state\.selection\.to \}/)
+assert.match(tiptapTextEditorSource, /setTextSelection\(savedSelectionRef\.current\)/)
+assert.match(tiptapTextEditorSource, /tr\.setNodeMarkup\(selection\.from, undefined, \{ \.\.\.node\.attrs, \.\.\.changes \}\)/)
+assert.match(tiptapTextEditorSource, /updateFigureMeta: \(id: string, changes: Record<string, unknown>\) => updateFigureNodeAttrs\(id, changes\)/)
+assert.match(tiptapTextEditorSource, /tr\.setNodeMarkup\(pos, undefined, \{ \.\.\.node\.attrs, \.\.\.changes \}\)/)
+assert.match(tiptapTextEditorSource, /deleteSelection\(\)\.run\(\)/)
+assert.doesNotMatch(richEditorSource, /document\.execCommand|VITE_COMMUNITY_TIPTAP_P0|LegacyRichEditor|RichEditorSurface|domToBlocks/)
+assert.doesNotMatch(postEditorUtilsSource, /export function domToBlocks/)
+assert.equal(existsSync('src/pages/community/RichEditorSurface.tsx'), false)
 
 for (const [name, source] of [
   ['list', communityListSource],

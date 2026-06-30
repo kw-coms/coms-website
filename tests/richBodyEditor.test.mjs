@@ -10,8 +10,12 @@ import {
 } from '../src/components/richEditor/renderRichBody.tsx'
 import {
   externalBlockFromUrl,
+  EDITOR_SANITIZE_OPTIONS,
   safeYoutubeEmbedSrc,
 } from '../src/pages/community/postEditorUtils.ts'
+import { renderPostBlocks } from '../src/pages/community/PostBlocks.tsx'
+import { isTiptapSupportedEditorBlocks, tiptapHtmlToEditorHtml } from '../src/pages/community/tiptapTextEditorHtml.ts'
+import { SANITIZE_PROFILES } from '../src/utils/sanitizeHtml.ts'
 
 // --- serialize: text + externalEmbed blocks round-trip through JSON ---
 const blocks = [
@@ -156,5 +160,40 @@ assert.equal(safeYoutubeEmbedSrc('https://www.youtube.com/watch?v=abc123'), '')
 assert.equal(safeYoutubeEmbedSrc('javascript:alert(1)'), '')
 assert.equal(safeYoutubeEmbedSrc('https://www.youtube.com.evil.com/embed/abc123'), '')
 assert.equal(safeYoutubeEmbedSrc(''), '')
+
+// --- TipTap P0 text/mark compatibility ---
+const tiptapInlineHtml = '<p><strong>굵게</strong> <em>기울임</em> <u>밑줄</u> <a href="https://example.com/post">링크</a> <span style="color:#123456;background-color:#fff3a3">색상</span></p><p>둘째 줄</p>'
+const legacyInlineHtml = '<strong>굵게</strong> <em>기울임</em> <u>밑줄</u> <a href="https://example.com/post">링크</a> <span style="color:#123456;background-color:#fff3a3">색상</span><br>둘째 줄'
+assert.equal(tiptapHtmlToEditorHtml(tiptapInlineHtml), legacyInlineHtml)
+
+for (const tag of ['a', 'strong', 'em', 'u', 'span']) {
+  assert.ok(EDITOR_SANITIZE_OPTIONS.allowedTags.includes(tag), `editor sanitizer must allow <${tag}>`)
+  assert.ok(SANITIZE_PROFILES.richText.allowedTags.includes(tag), `richText sanitizer must allow <${tag}>`)
+}
+for (const attr of ['href', 'rel', 'target', 'style']) {
+  assert.ok(EDITOR_SANITIZE_OPTIONS.allowedAttributes.includes(attr), `editor sanitizer must allow ${attr}`)
+  assert.ok(SANITIZE_PROFILES.richText.allowedAttributes.includes(attr), `richText sanitizer must allow ${attr}`)
+}
+for (const style of ['color', 'background-color']) {
+  assert.ok(EDITOR_SANITIZE_OPTIONS.allowedStyles.has(style), `editor sanitizer must allow ${style}`)
+  assert.ok(SANITIZE_PROFILES.richText.allowedStyles.has(style), `richText sanitizer must allow ${style}`)
+}
+
+function flattenReactChildren(value) {
+  if (Array.isArray(value)) return value.flatMap(flattenReactChildren)
+  return value ? [value] : []
+}
+
+function renderedTextHtml(content) {
+  const rendered = renderPostBlocks({ content: JSON.stringify([{ type: 'text', content }]) })
+  const textNode = flattenReactChildren(rendered.props.children)
+    .find((node) => node?.props?.dangerouslySetInnerHTML)
+  return textNode?.props?.dangerouslySetInnerHTML?.__html
+}
+
+assert.equal(renderedTextHtml(tiptapHtmlToEditorHtml(tiptapInlineHtml)), renderedTextHtml(legacyInlineHtml))
+
+assert.equal(isTiptapSupportedEditorBlocks([{ type: 'image' }, { type: 'video' }, { type: 'file' }, { type: 'externalEmbed' }, { type: 'poll' }]), true)
+assert.equal(isTiptapSupportedEditorBlocks([{ type: 'unknownBlock' }]), false)
 
 console.log('rich body editor contract passed')
