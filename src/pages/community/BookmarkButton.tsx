@@ -47,7 +47,7 @@ export default function BookmarkButton({ post, onToggle, pending = false, varian
       aria-pressed={bookmarked}
       aria-label={label}
       title={label}
-      className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full border transition disabled:opacity-50 ${
+      className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full border transition disabled:opacity-50 ${
         bookmarked
           ? 'border-[var(--app-accent-border)] bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]'
           : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-subtle)] hover:text-[var(--app-accent-text)]'
