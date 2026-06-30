@@ -85,6 +85,7 @@ function InterestsSelector({ selected, onChange, otherText, onOtherChange, input
           <p className="text-xs font-semibold text-[var(--theme-body-muted)]/80">기타 관심 분야</p>
           <div className={frameClass}>
             <input
+              aria-label="기타 관심 분야"
               value={otherText}
               onChange={(event) => onOtherChange(event.target.value)}
               placeholder="기타 관심 분야를 입력하세요"

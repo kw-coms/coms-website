@@ -93,7 +93,7 @@ export default function AdminBan({ formatDateTime }: { formatDateTime: (value: s
       ) : banned.length === 0 ? (
         <p className="text-sm text-[var(--theme-body-muted)]">차단된 학번이 없습니다.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto touch-pan-x">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--app-hairline)] text-left text-xs font-semibold uppercase tracking-wide text-[var(--theme-body-muted)]">

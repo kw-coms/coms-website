@@ -219,7 +219,7 @@ export default function CommunityListView({
       <div className="apple-control-strip px-4 py-4 sm:px-8">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="-mx-1 overflow-x-auto pb-1">
+            <div className="-mx-1 overflow-x-auto pb-1 touch-pan-x">
               <div className="flex min-w-max gap-2 px-1 text-sm font-bold lg:min-w-0 lg:flex-wrap">
                 {boardFilterOptions.map((item) => (
                   <button
@@ -253,7 +253,7 @@ export default function CommunityListView({
               </span>
             </div>
           </div>
-          <div className="-mx-1 overflow-x-auto pb-1">
+          <div className="-mx-1 overflow-x-auto pb-1 touch-pan-x">
             <div className="flex min-w-max items-center gap-2 px-1 text-xs font-black text-[var(--app-muted)]">
               <span className="shrink-0">정렬</span>
               {SORT_OPTIONS.map((item) => (
