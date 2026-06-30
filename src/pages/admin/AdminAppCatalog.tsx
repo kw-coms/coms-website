@@ -11,6 +11,7 @@ import {
 import AppProjectCard from '../../components/apps/AppProjectCard'
 import AdminAppCatalogRow from './AdminAppCatalogRow'
 import AdminAppCategories from './AdminAppCategories'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
 
 const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
 
@@ -108,7 +109,7 @@ export default function AdminAppCatalog() {
   }
 
   const handleDelete = async (item) => {
-    if (!window.confirm(`${item.title} Apps 항목을 삭제하시겠습니까?`)) return
+    if (!(await confirmDialog({ message: `${item.title} Apps 항목을 삭제하시겠습니까?`, tone: 'danger' }))) return
     try {
       await deleteClubProject(item.id)
       setItems((prev) => prev.filter((entry) => entry.id !== item.id))

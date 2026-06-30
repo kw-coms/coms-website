@@ -10,6 +10,7 @@ import {
   deletedPostMatchesStatus,
   formatDateTime,
 } from './deletedCommunityPostUtils'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
 
 export default function AdminDeletedCommunityPosts() {
   const [posts, setPosts] = useState([])
@@ -54,7 +55,7 @@ export default function AdminDeletedCommunityPosts() {
   }, [limit])
 
   const restorePost = async (post) => {
-    if (!window.confirm(`"${post.title || '삭제된 게시글'}"을 커뮤니티에 되돌리겠습니까?`)) return
+    if (!(await confirmDialog({ message: `"${post.title || '삭제된 게시글'}"을 커뮤니티에 되돌리겠습니까?`, tone: 'danger' }))) return
     setRestoringId(post.id)
     setError('')
     try {

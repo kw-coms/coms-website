@@ -4,6 +4,7 @@ import { linkify } from '../utils/linkify'
 import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Pin, PinOff, Search, Sparkles, ThumbsUp, Trash2, UsersRound } from 'lucide-react'
 import { getNotice, createNotice, updateNotice, deleteNotice, voteNotice, pinNotice } from '../services/noticeApi'
 import { showToast } from '../components/common/Toast'
+import { confirmDialog } from '../components/common/ConfirmDialog'
 import { fetchLinkPreview, searchYoutubeVideos } from '../services/communityApi'
 import { useAuth } from '../contexts/useAuth'
 import { NoticeCategory } from '../contract/enums'
@@ -251,7 +252,7 @@ export default function Notices() {
   }
 
   const deleteSelected = async () => {
-    if (!selectedNotice || !window.confirm('공지사항을 삭제하시겠습니까?')) return
+    if (!selectedNotice || !(await confirmDialog({ message: '공지사항을 삭제하시겠습니까?', tone: 'danger' }))) return
     try {
       await deleteNotice(selectedNotice.id)
       setNotices((prev) => prev.filter((notice) => notice.id !== selectedNotice.id))

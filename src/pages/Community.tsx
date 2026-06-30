@@ -16,6 +16,7 @@ import {
   voteCommunityPoll,
 } from '../services/communityApi'
 import { showToast } from '../components/common/Toast'
+import { confirmDialog, promptDialog } from '../components/common/ConfirmDialog'
 import { useAuth } from '../contexts/useAuth'
 import {
   filterAndSortCommunityPosts,
@@ -213,9 +214,9 @@ export default function Community({ onBack }: { onBack: () => void }) {
   }
 
   const handleDelete = async (post) => {
-    if (!window.confirm('게시글을 삭제하시겠습니까?')) return
+    if (!(await confirmDialog({ message: '게시글을 삭제하시겠습니까?', tone: 'danger' }))) return
     const reason = user?.role === 'ADMIN'
-      ? window.prompt('삭제 사유를 입력하세요. 감사 로그에 기록됩니다.', '')
+      ? await promptDialog({ message: '삭제 사유를 입력하세요. 감사 로그에 기록됩니다.', defaultValue: '' })
       : ''
     if (reason === null) return
     if (user?.role === 'ADMIN' && post.authorStudentId !== user.studentId && !reason.trim()) {
@@ -311,7 +312,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
   }
 
   const handlePollClose = async (pollId) => {
-    if (!currentPost || !window.confirm('투표를 종료하시겠습니까? 종료 후에는 다시 투표할 수 없습니다.')) return
+    if (!currentPost || !(await confirmDialog({ message: '투표를 종료하시겠습니까? 종료 후에는 다시 투표할 수 없습니다.', tone: 'danger' }))) return
     setPollClosing(pollId)
     try {
       const updated = await closeCommunityPoll(currentPost.id, pollId)
