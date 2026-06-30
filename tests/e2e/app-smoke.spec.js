@@ -1319,6 +1319,9 @@ test('activity records and calendar redirect guests to login', async ({ page }) 
 })
 
 test('signed-in members see real activity records and schedule events', async ({ page }) => {
+  // Pin "today" to June 2026 so the seeded June events stay current regardless of
+  // when this runs (the activity log + calendar default to the current month).
+  await page.clock.setFixedTime(new Date('2026-06-19T09:00:00'))
   await mockAdminApis(page)
   await page.route('**/api/club-activities/1/image', (route) => route.fulfill({
     status: 200,
