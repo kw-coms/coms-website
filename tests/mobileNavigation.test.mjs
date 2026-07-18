@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs'
 
 const nav = readFileSync(new URL('../src/components/GlobalNavigation.tsx', import.meta.url), 'utf8')
 const notificationButton = readFileSync(new URL('../src/components/NotificationButton.tsx', import.meta.url), 'utf8')
-const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
+const indexCss = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8')
+const css = [...indexCss.matchAll(/@import "(\.\/.+?)";/g)]
+  .map((m) => readFileSync(new URL(`../src/${m[1]}`, import.meta.url), 'utf8'))
+  .join('\n')
 
 assert.match(
   nav,
