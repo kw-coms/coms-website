@@ -14,10 +14,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest(properties = {
         "jwt.secret=test-secret-key-with-at-least-32-chars",
@@ -34,7 +41,7 @@ class NotificationServicePreferencesTest {
     @Autowired
     private NotificationRepository notificationRepository;
 
-    @Autowired
+    @MockitoSpyBean
     private NotificationPreferenceRepository notificationPreferenceRepository;
 
     @Autowired
@@ -128,6 +135,20 @@ class NotificationServicePreferencesTest {
         List<Notification> commenterNotifs =
                 notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(commenter.getStudentId());
         assertThat(commenterNotifs).hasSize(1);
+    }
+
+    @Test
+    void noticeFanOutBatchesPreferenceLookupsInsteadOfPerMember() {
+        saveMember("2026910011", "회원A");
+        saveMember("2026910012", "회원B");
+        clearInvocations(notificationPreferenceRepository);
+
+        Notice notice = new Notice();
+        notice.setTitle("배치 공지");
+        notificationService.notifyNoticeCreated(notice);
+
+        verify(notificationPreferenceRepository, never()).findByMemberStudentId(anyString());
+        verify(notificationPreferenceRepository, times(1)).findByMemberStudentIdIn(any());
     }
 
     private Member saveMember(String studentId, String name) {

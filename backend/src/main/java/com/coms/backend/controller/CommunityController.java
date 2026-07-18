@@ -68,7 +68,12 @@ public class CommunityController {
     public ResponseEntity<List<CommunityPostResponse>> list(Authentication authentication,
                                                             @RequestParam(required = false) Integer page,
                                                             @RequestParam(required = false) Integer size) {
-        return ListPagination.paginate(communityService.list(authentication.getName()), page, size);
+        if (page == null && size == null) {
+            return ResponseEntity.ok(communityService.list(authentication.getName()));
+        }
+        ListPagination.Resolved resolved = ListPagination.resolve(page, size);
+        CommunityService.PagedPosts paged = communityService.listPaged(authentication.getName(), resolved.page(), resolved.size());
+        return ListPagination.paginated(paged.items(), paged.total());
     }
 
     @GetMapping("/deleted/me")

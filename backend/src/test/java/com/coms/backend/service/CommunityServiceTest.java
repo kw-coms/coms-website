@@ -14,6 +14,7 @@ import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.CommunityCommentRepository;
 import com.coms.backend.repository.CommunityPostFileRepository;
 import com.coms.backend.repository.CommunityPostImageRepository;
+import com.coms.backend.repository.CommunityPostVideoRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,8 +30,14 @@ import org.springframework.web.server.ResponseStatusException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest(properties = {
         "jwt.secret=test-secret-key-with-at-least-32-chars",
@@ -56,11 +63,14 @@ class CommunityServiceTest {
     @Autowired
     private CommunityCommentRepository commentRepository;
 
-    @Autowired
+    @MockitoSpyBean
     private CommunityPostImageRepository imageRepository;
 
-    @Autowired
+    @MockitoSpyBean
     private CommunityPostFileRepository fileRepository;
+
+    @MockitoSpyBean
+    private CommunityPostVideoRepository videoRepository;
 
     @MockitoSpyBean
     private CommunityPostBookmarkRepository bookmarkRepository;
@@ -833,6 +843,83 @@ class CommunityServiceTest {
             assertThat(post.id()).isEqualTo(bookmarkedPost.id());
             assertThat(post.bookmarked()).isTrue();
         });
+    }
+
+    @Test
+    void listBatchesMediaAndBookmarkLookupsInsteadOfPerPost() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var postWithImage = communityService.create(user.getStudentId(),
+                new CommunityPostRequest("이미지 글", "내용", "GENERAL", false), null);
+        var postWithFile = communityService.create(user.getStudentId(),
+                new CommunityPostRequest("첨부 글", "내용", "GENERAL", false), null);
+        MockMultipartFile image = new MockMultipartFile("images", "ok.png", "image/png", "png".getBytes());
+        MockMultipartFile zip = new MockMultipartFile("file", "source.zip", "application/zip", "zip".getBytes());
+        communityService.addImages(user.getStudentId(), postWithImage.id(), java.util.List.of(image));
+        communityService.addFile(user.getStudentId(), postWithFile.id(), zip);
+        communityService.toggleBookmark(postWithFile.id(), user.getStudentId());
+        clearInvocations(imageRepository, fileRepository, videoRepository, bookmarkRepository);
+
+        var posts = communityService.list(user.getStudentId());
+
+        // Batched: one IN-query per media/bookmark kind for the whole page, never a per-post lookup.
+        verify(imageRepository, never()).findByPostIdOrderByPositionAsc(anyLong());
+        verify(imageRepository, times(1)).findByPostIdInOrderByPositionAsc(any());
+        verify(fileRepository, never()).findByPostIdOrderByPositionAsc(anyLong());
+        verify(fileRepository, times(1)).findByPostIdInOrderByPositionAsc(any());
+        verify(videoRepository, never()).findByPostIdOrderByPositionAsc(anyLong());
+        verify(videoRepository, times(1)).findByPostIdInOrderByPositionAsc(any());
+        verify(bookmarkRepository, never()).existsByPostIdAndStudentId(anyLong(), anyString());
+        verify(bookmarkRepository, times(1)).findByPostIdInAndStudentId(any(), anyString());
+
+        // Batching must not change the actual data returned.
+        assertThat(posts).filteredOn(p -> p.id().equals(postWithImage.id())).singleElement().satisfies(p -> {
+            assertThat(p.imageUrls()).singleElement().asString()
+                    .startsWith("/api/community/posts/" + postWithImage.id() + "/images/");
+            assertThat(p.fileInfos()).isEmpty();
+            assertThat(p.bookmarked()).isFalse();
+        });
+        assertThat(posts).filteredOn(p -> p.id().equals(postWithFile.id())).singleElement().satisfies(p -> {
+            assertThat(p.imageUrls()).isEmpty();
+            assertThat(p.fileInfos()).singleElement()
+                    .satisfies(file -> assertThat(file.originalName()).isEqualTo("source.zip"));
+            assertThat(p.bookmarked()).isTrue();
+        });
+    }
+
+    @Test
+    void listPagedMatchesUnpagedListContentAndRespectsAnonymousVisibility() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member viewer = member("2026123456", "회원", Member.Role.USER);
+        Member graduate = member("2018123456", "졸업생", Member.Role.USER);
+        memberRepository.save(author);
+        memberRepository.save(viewer);
+        memberRepository.save(graduate);
+        for (int i = 0; i < 3; i++) {
+            communityService.create(author.getStudentId(),
+                    new CommunityPostRequest("글" + i, "내용", "GENERAL", false), null);
+        }
+        communityService.create(author.getStudentId(),
+                new CommunityPostRequest("익명글", "내용", "ANONYMOUS", false), null);
+
+        var fullList = communityService.list(viewer.getStudentId());
+        var firstPage = communityService.listPaged(viewer.getStudentId(), 0, 2);
+        var secondPage = communityService.listPaged(viewer.getStudentId(), 1, 2);
+
+        assertThat(firstPage.total()).isEqualTo(fullList.size());
+        assertThat(firstPage.items()).hasSize(2);
+        assertThat(secondPage.items()).hasSize(2);
+        java.util.List<Long> pagedIds = new java.util.ArrayList<>();
+        pagedIds.addAll(firstPage.items().stream().map(CommunityPostResponse::id).toList());
+        pagedIds.addAll(secondPage.items().stream().map(CommunityPostResponse::id).toList());
+        assertThat(pagedIds).containsExactlyElementsOf(fullList.stream().map(CommunityPostResponse::id).toList());
+
+        // A graduate can't see ANONYMOUS posts either way: paged total must match the filtered list.
+        var graduateFullList = communityService.list(graduate.getStudentId());
+        var graduatePaged = communityService.listPaged(graduate.getStudentId(), 0, 10);
+        assertThat(graduatePaged.total()).isEqualTo(graduateFullList.size()).isEqualTo(3);
+        assertThat(graduatePaged.items()).extracting(CommunityPostResponse::id)
+                .containsExactlyElementsOf(graduateFullList.stream().map(CommunityPostResponse::id).toList());
     }
 
     private Member member(String studentId, String name, Member.Role role) {
