@@ -1,0 +1,364 @@
+.calendar-day-detail {
+	border-top: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 92%, var(--app-surface-soft));
+	padding: 1rem;
+}
+
+.calendar-day-detail-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+}
+
+.calendar-day-detail-header div {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0.5rem;
+}
+
+.calendar-day-detail-header strong {
+	color: var(--app-text);
+	font-size: 0.95rem;
+	font-weight: 850;
+}
+
+.calendar-day-detail-header span {
+	color: var(--app-muted);
+	font-size: 0.78rem;
+	font-weight: 750;
+}
+
+.calendar-day-detail-header button {
+	display: inline-flex;
+	width: 2rem;
+	height: 2rem;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid var(--app-hairline);
+	border-radius: 9999px;
+	background: var(--app-surface);
+	color: var(--app-muted);
+	cursor: pointer;
+}
+
+.calendar-day-detail ul {
+	display: grid;
+	gap: 0.5rem;
+	margin: 0.8rem 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.calendar-day-detail li {
+	display: flex;
+	gap: 0.55rem;
+	align-items: flex-start;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface);
+	padding: 0.65rem 0.75rem;
+	transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.calendar-day-detail li > div {
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.calendar-day-detail-canceled {
+	background: color-mix(in srgb, #dc2626 6%, var(--app-surface));
+}
+
+.calendar-day-detail-selected {
+	border-color: color-mix(in srgb, var(--calendar-event-color, var(--app-accent)) 64%, var(--app-hairline));
+	background:
+		linear-gradient(90deg, color-mix(in srgb, var(--calendar-event-color, var(--app-accent)) 13%, transparent), transparent 74%),
+		var(--app-surface);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--calendar-event-color, var(--app-accent)) 28%, transparent);
+}
+
+.calendar-day-detail-selected .calendar-day-detail-dot {
+	background: color-mix(in srgb, var(--calendar-event-color, var(--app-accent)) 72%, #34c759);
+	box-shadow: 0 0 0 4px color-mix(in srgb, var(--calendar-event-color, var(--app-accent)) 14%, transparent);
+}
+
+.calendar-day-detail-dot {
+	width: 0.5rem;
+	height: 0.5rem;
+	margin-top: 0.35rem;
+	border-radius: 9999px;
+	background: var(--app-accent);
+	flex: 0 0 auto;
+}
+
+.calendar-day-detail li strong,
+.calendar-day-detail li span {
+	display: block;
+}
+
+.calendar-day-detail-title-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.45rem;
+}
+
+.calendar-day-detail li strong {
+	color: var(--app-text);
+	font-size: 0.9rem;
+	font-weight: 850;
+}
+
+.calendar-day-detail li span {
+	margin-top: 0.15rem;
+	color: var(--app-muted);
+	font-size: 0.78rem;
+	font-weight: 650;
+}
+
+.calendar-day-detail-selected-badge {
+	display: inline-flex !important;
+	margin-top: 0 !important;
+	border: 1px solid color-mix(in srgb, var(--calendar-event-color, var(--app-accent)) 42%, transparent);
+	border-radius: 9999px;
+	background: color-mix(in srgb, var(--calendar-event-color, var(--app-accent)) 13%, var(--app-surface));
+	padding: 0.12rem 0.45rem;
+	color: var(--app-accent-text) !important;
+	font-size: 0.62rem !important;
+	font-weight: 900 !important;
+	line-height: 1.2;
+}
+
+.calendar-day-detail-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin-top: 0.55rem;
+}
+
+.calendar-day-detail-actions button,
+.calendar-exception-editor button {
+	min-height: 2rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 9999px;
+	background: var(--app-surface-soft);
+	padding: 0 0.75rem;
+	color: var(--app-text);
+	font-size: 0.74rem;
+	font-weight: 850;
+	cursor: pointer;
+}
+
+.calendar-day-detail-actions button.is-danger {
+	color: #dc2626;
+}
+
+.calendar-day-detail-actions button:disabled,
+.calendar-exception-editor button:disabled {
+	cursor: not-allowed;
+	opacity: 0.55;
+}
+
+.calendar-exception-editor {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(7rem, 1fr)) auto;
+	gap: 0.45rem;
+	margin-top: 0.6rem;
+	border-top: 1px solid var(--app-hairline);
+	padding-top: 0.6rem;
+}
+
+.calendar-exception-editor label {
+	display: grid;
+	gap: 0.25rem;
+	color: var(--app-muted);
+	font-size: 0.7rem;
+	font-weight: 850;
+}
+
+.calendar-exception-editor input {
+	width: 100%;
+	min-height: 2rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.45rem;
+	background: var(--app-surface-soft);
+	padding: 0 0.55rem;
+	color: var(--app-text);
+	font-size: 0.82rem;
+	font-weight: 750;
+	outline: none;
+}
+
+.calendar-day-detail-message {
+	margin: 0.75rem 0 0;
+	color: var(--app-accent-text);
+	font-size: 0.8rem;
+	font-weight: 850;
+}
+
+.calendar-day-detail-message.is-error {
+	color: #dc2626;
+}
+
+/* Recurring (repeating) schedule admin manager */
+.recurring-schedule-list {
+	display: grid;
+	gap: 0.5rem;
+	list-style: none;
+	padding: 0;
+	margin: 0;
+}
+
+.recurring-schedule-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.6rem;
+	padding: 0.6rem 0.85rem;
+	background: var(--app-surface);
+}
+
+.recurring-schedule-item-selected {
+	border-color: color-mix(in srgb, var(--app-accent) 58%, var(--app-hairline));
+	background:
+		linear-gradient(90deg, color-mix(in srgb, var(--app-accent) 12%, transparent), transparent 82%),
+		var(--app-surface);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 22%, transparent);
+}
+
+.recurring-schedule-item-main {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+	min-width: 0;
+}
+
+.recurring-schedule-item-title {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.3rem;
+	font-weight: 800;
+	font-size: 0.92rem;
+	color: var(--app-text);
+}
+
+.recurring-schedule-item-badge {
+	border: 1px solid color-mix(in srgb, var(--app-accent) 42%, transparent);
+	border-radius: 9999px;
+	background: color-mix(in srgb, var(--app-accent) 13%, var(--app-surface));
+	padding: 0.1rem 0.42rem;
+	color: var(--app-accent-text);
+	font-size: 0.62rem;
+	font-weight: 900;
+	line-height: 1.2;
+}
+
+.recurring-schedule-item-meta {
+	font-size: 0.78rem;
+	font-weight: 600;
+	color: var(--app-muted);
+}
+
+.recurring-schedule-item-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	flex: 0 0 auto;
+}
+
+.recurring-schedule-item-actions button {
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface-soft);
+	padding: 0.3rem 0.6rem;
+	font-size: 0.8rem;
+	font-weight: 700;
+	color: var(--app-text);
+	cursor: pointer;
+}
+
+.recurring-schedule-delete {
+	display: inline-flex;
+	align-items: center;
+	color: #dc2626;
+}
+
+.recurring-weekday-picker {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: center;
+	gap: 0.75rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.6rem;
+	padding: 0.45rem 0.65rem;
+}
+
+.recurring-weekday-label {
+	white-space: nowrap;
+	font-size: 0.8rem;
+	font-weight: 700;
+	color: var(--app-muted);
+}
+
+.recurring-weekday-options {
+	display: grid;
+	grid-template-columns: repeat(7, minmax(0, 1fr));
+	gap: 0.35rem;
+}
+
+.recurring-weekday-option {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.45rem;
+	min-height: 2rem;
+	padding: 0.2rem 0.45rem;
+	font-size: 0.82rem;
+	font-weight: 800;
+	cursor: pointer;
+	user-select: none;
+}
+
+.recurring-weekday-option.is-active {
+	background: color-mix(in srgb, var(--app-accent) 18%, var(--app-surface));
+	border-color: color-mix(in srgb, var(--app-accent) 55%, transparent);
+}
+
+.recurring-weekday-option input {
+	position: absolute;
+	pointer-events: none;
+	opacity: 0;
+	accent-color: var(--app-accent);
+}
+
+.recurring-cancel-edit {
+	background: var(--app-surface-soft);
+}
+
+.calendar-empty-state {
+	border-top: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 88%, var(--app-surface-soft));
+	padding: 1rem;
+	color: var(--app-muted);
+	font-size: 0.9rem;
+	font-weight: 700;
+	line-height: 1.6;
+	text-align: center;
+}
+
+.calendar-empty-state strong,
+.calendar-empty-state span {
+	display: inline-block;
+	margin-inline: 0.2rem;
+}
+
+.apple-home-hero > .relative.z-10 {
+	transform: translateY(-3vh);
+}
+
