@@ -7,6 +7,7 @@ import { useAuth } from './contexts/useAuth'
 import PageFallback from './components/home/PageFallback'
 import { ToastHost } from './components/common/Toast'
 import { ConfirmHost } from './components/common/ConfirmDialog'
+import RouteErrorBoundary from './components/common/RouteErrorBoundary'
 import {
   ACCENT_COLOR_KEY,
   FONT_SELECTION_KEY,
@@ -147,6 +148,7 @@ function App() {
       <ScrollToTop />
       <GlobalNavigation />
       <div key={location.pathname} id="main-content" tabIndex={-1} className="coms-page-enter">
+      <RouteErrorBoundary>
       <Routes location={location}>
         <Route path="/" element={<HomeView />} />
         <Route path="/about" element={<AboutPage />} />
@@ -171,6 +173,7 @@ function App() {
         <Route path="/recruit-notice" element={<RecruitNoticePage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      </RouteErrorBoundary>
       </div>
       <AppearanceControl
         accentColor={accentColor}

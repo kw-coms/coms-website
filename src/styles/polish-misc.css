@@ -628,3 +628,51 @@
 		animation: none;
 	}
 }
+
+/* ---- 9. Skeleton primitive extras (components/common/Skeleton.tsx) ---- */
+.skeleton-circle {
+	border-radius: 9999px;
+}
+
+/* ---- 10. ErrorState (components/common/ErrorState.tsx) ---------------- */
+/* Mirrors .activity-empty-state's icon + heading + message layout so error
+   panels read as part of the same design language as the app's existing
+   empty states, with an optional retry action underneath. */
+.coms-error-state {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	border: 1px dashed var(--app-hairline-strong);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--app-surface) 78%, transparent);
+	padding: 1.25rem;
+	color: var(--app-muted);
+	animation: coms-empty-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.coms-error-state svg {
+	flex-shrink: 0;
+	color: #ff3b30;
+}
+.coms-error-state h3 {
+	margin: 0;
+	color: var(--app-text);
+	font-size: 1rem;
+	font-weight: 800;
+}
+.coms-error-state p {
+	margin: 0.35rem 0 0;
+	font-size: 0.9rem;
+	font-weight: 600;
+	line-height: 1.6;
+}
+.coms-error-state-retry {
+	margin-top: 0.75rem;
+	padding: 0.5rem 1rem;
+	font-size: 0.82rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.coms-error-state {
+		animation: none;
+	}
+}
