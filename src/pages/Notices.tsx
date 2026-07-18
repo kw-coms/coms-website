@@ -5,6 +5,8 @@ import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Pin, PinOff, Search, S
 import { getNotice, createNotice, updateNotice, deleteNotice, voteNotice, pinNotice } from '../services/noticeApi'
 import { showToast } from '../components/common/Toast'
 import { confirmDialog } from '../components/common/ConfirmDialog'
+import { Skeleton, SkeletonLine, SkeletonGroup } from '../components/common/Skeleton'
+import ErrorState from '../components/common/ErrorState'
 import { fetchLinkPreview, searchYoutubeVideos } from '../services/communityApi'
 import { useAuth } from '../contexts/useAuth'
 import { NoticeCategory } from '../contract/enums'
@@ -392,18 +394,18 @@ export default function Notices() {
               </div>
             </div>
             {loading && (
-              <>
+              <SkeletonGroup>
                 {/* 모바일 스켈레톤 카드 목록 */}
                 <div className="mx-4 mb-4 grid grid-cols-1 gap-2.5 max-md:grid sm:mx-6 md:hidden">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="apple-soft-panel flex flex-col gap-2 px-3.5 py-3.5">
                       <div className="flex items-center gap-2">
-                        <div className="skeleton h-4 w-10 rounded-full" />
-                        <div className="skeleton h-3 w-14 rounded-full ml-auto" />
+                        <Skeleton className="h-4 w-10 rounded-full" />
+                        <Skeleton className="h-3 w-14 rounded-full ml-auto" />
                       </div>
-                      <div className="skeleton skeleton-line w-4/5 rounded" />
-                      <div className="skeleton skeleton-line w-1/2 rounded" />
-                      <div className="skeleton h-3 w-16 rounded-full mt-1" />
+                      <SkeletonLine className="w-4/5 rounded" />
+                      <SkeletonLine className="w-1/2 rounded" />
+                      <Skeleton className="h-3 w-16 rounded-full mt-1" />
                     </div>
                   ))}
                 </div>
@@ -424,28 +426,30 @@ export default function Notices() {
                       {Array.from({ length: 6 }).map((_, i) => (
                         <tr key={i}>
                           <td className="px-4 py-3.5 text-center">
-                            <div className="skeleton h-3 w-6 rounded mx-auto" />
+                            <Skeleton className="h-3 w-6 rounded mx-auto" />
                           </td>
                           <td className="px-4 py-3.5 text-center">
-                            <div className="skeleton h-5 w-14 rounded-full mx-auto" />
+                            <Skeleton className="h-5 w-14 rounded-full mx-auto" />
                           </td>
                           <td className="px-4 py-3.5">
-                            <div className="skeleton skeleton-line w-3/4 rounded" />
+                            <SkeletonLine className="w-3/4 rounded" />
                           </td>
                           <td className="px-4 py-3.5 text-center">
-                            <div className="skeleton h-3 w-16 rounded mx-auto" />
+                            <Skeleton className="h-3 w-16 rounded mx-auto" />
                           </td>
                           <td className="px-4 py-3.5 text-center">
-                            <div className="skeleton h-3 w-16 rounded mx-auto" />
+                            <Skeleton className="h-3 w-16 rounded mx-auto" />
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </>
+              </SkeletonGroup>
             )}
-            {error && <p className="mx-5 mt-5 rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm text-red-700 sm:mx-7">{error}</p>}
+            {!loading && error && (
+              <ErrorState className="mx-5 mt-5 sm:mx-7" message={error} onRetry={refreshNotices} />
+            )}
             {!loading && !error && filteredNotices.length === 0 && (
               <p className="px-4 py-10 text-center text-sm text-[var(--app-muted)] sm:py-16">등록된 글이 없습니다.</p>
             )}
@@ -565,6 +569,21 @@ export default function Notices() {
               onSave={(notice) => { mergeNotice(notice); refreshNotices() }}
             />
           </div>
+        )}
+
+        {!!urlId && !selectedNotice && visibleMode === 'list' && (
+          <SkeletonGroup label="공지를 여는 중">
+            <div className="m-3 space-y-4 rounded-lg bg-[var(--app-surface)] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.10)] sm:m-6 sm:p-6">
+              <Skeleton className="h-5 w-20 rounded-full" />
+              <SkeletonLine className="h-7 w-3/4" />
+              <SkeletonLine className="w-1/3" />
+              <div className="space-y-2 pt-2">
+                <SkeletonLine className="w-full" />
+                <SkeletonLine className="w-full" />
+                <SkeletonLine className="w-5/6" />
+              </div>
+            </div>
+          </SkeletonGroup>
         )}
 
         {isDetail && (

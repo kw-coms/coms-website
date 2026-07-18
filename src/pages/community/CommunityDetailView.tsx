@@ -14,6 +14,7 @@ import AuthorName from './AuthorName'
 import { renderPostBlocks } from './PostBlocks'
 import { isConceptPost, isEdited, postScore } from './communityBoardUtils'
 import { MAX_ANONYMOUS_NAME_LENGTH, categoryLabel } from './postEditorUtils'
+import { Skeleton, SkeletonLine, SkeletonGroup } from '../../components/common/Skeleton'
 
 export default function CommunityDetailView({
   currentPost,
@@ -127,7 +128,22 @@ export default function CommunityDetailView({
         </button>
       </BoardDetailBar>
       {detailLoading || !currentPost ? (
-        <p className="px-4 py-10 text-center text-sm text-[var(--theme-body-muted)] sm:py-16">글을 여는 중...</p>
+        <SkeletonGroup label="글을 여는 중">
+          <div className="m-0 space-y-4 p-4 sm:m-5 sm:space-y-5 sm:p-5">
+            <div className="flex gap-2">
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-5 w-20 rounded-full" />
+            </div>
+            <SkeletonLine className="h-7 w-3/4" />
+            <SkeletonLine className="w-1/3" />
+            <div className="space-y-2 pt-2">
+              <SkeletonLine className="w-full" />
+              <SkeletonLine className="w-full" />
+              <SkeletonLine className="w-5/6" />
+              <SkeletonLine className="w-2/3" />
+            </div>
+          </div>
+        </SkeletonGroup>
       ) : (
         <article className="m-0 overflow-hidden bg-[var(--app-surface)] sm:m-5 sm:rounded-lg sm:border sm:border-[var(--app-hairline)]">
           <div className="border-b border-[var(--app-hairline)] px-4 py-4 sm:px-5">
