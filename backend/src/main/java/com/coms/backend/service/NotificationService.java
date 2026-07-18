@@ -254,6 +254,9 @@ public class NotificationService {
         return saved;
     }
 
+    // Trust model: the non-allowlist path is reachable only via the HMAC-authenticated
+    // integration API, where partner clubs legitimately link to their own domains. The
+    // member-initiated batch path always enforces the host allowlist.
     private String sanitizeAcceptUrl(String acceptUrl) {
         return sanitizeAcceptUrl(acceptUrl, false);
     }
@@ -270,6 +273,13 @@ public class NotificationService {
                     || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))
                     || host == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "acceptUrl must be an http(s) URL");
+            }
+            if (parsed.getUserInfo() != null) {
+                // Blocks "https://trusted.host@evil.com/" phishing URLs.
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "acceptUrl must not contain userinfo");
+            }
+            if (acceptUrl.chars().anyMatch(c -> c < 0x20 || c == 0x7f)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "acceptUrl contains control characters");
             }
             if (enforceHostAllowlist && !acceptUrlAllowedHosts.isEmpty()
                     && !acceptUrlAllowedHosts.contains(host.toLowerCase())) {
