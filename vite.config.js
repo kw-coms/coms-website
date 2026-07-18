@@ -49,15 +49,17 @@ const pwaPlugin = VitePWA({
   // reason about in e2e; disable it for test builds (PWA_DISABLE=1). The SW is an
   // additive layer over identical app logic, so smoke coverage is unaffected.
   disable: process.env.PWA_DISABLE === '1',
-  registerType: 'autoUpdate',
-  injectRegister: 'auto',
+  // 'prompt' + no skipWaiting: a new deploy waits until the user accepts the
+  // in-app refresh toast (src/pwaUpdatePrompt.ts) instead of swapping assets
+  // under an active session and breaking lazy-loaded chunks.
+  registerType: 'prompt',
+  injectRegister: false,
   manifest: false,
   includeAssets: ['favicon.svg', 'coms-logo.png'],
   workbox: {
     globPatterns: ['**/*.{js,css,html,svg,png,woff,woff2}'],
     cleanupOutdatedCaches: true,
     clientsClaim: true,
-    skipWaiting: true,
     navigateFallback: '/index.html',
     navigateFallbackDenylist: [/^\/api\//, /\/(share|share-data|share-image)$/],
     // Don't precache giant rarely-used author/editor chunks into the install.
