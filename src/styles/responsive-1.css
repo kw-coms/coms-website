@@ -1,0 +1,748 @@
+@keyframes home-logo-float {
+	0%,
+	100% {
+		transform: translate3d(0, 0, 0);
+	}
+
+	50% {
+		transform: translate3d(0, -8px, 0);
+	}
+}
+
+.home-logo-float {
+	animation: home-logo-float 7s ease-in-out infinite;
+	will-change: transform;
+}
+
+.apple-route .shape-cut,
+.apple-route .shape-cut-sm,
+.apple-route .shape-cut-top {
+	clip-path: none;
+	border-radius: 0.5rem;
+}
+
+.apple-route input,
+.apple-route textarea,
+.apple-route select {
+	letter-spacing: 0;
+}
+
+@keyframes page-transition-in {
+	from {
+		opacity: 0;
+	}
+
+	to {
+		opacity: 1;
+	}
+}
+
+.page-transition {
+	animation: page-transition-in 180ms ease-out both;
+}
+
+@media (min-width: 1280px) {
+	.apple-detail-hero {
+		grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.72fr) !important;
+		padding-left: max(3rem, calc((100vw - 1320px) / 2)) !important;
+		padding-right: max(3rem, calc((100vw - 1320px) / 2)) !important;
+	}
+
+	.apple-section-grid,
+	.apple-home-hero > .relative.z-10,
+	.apple-home-hero + section > div {
+		max-width: 1180px !important;
+	}
+
+	.apple-detail-visual,
+	.apple-device-card {
+		max-width: 26rem !important;
+	}
+}
+
+@media (min-width: 1536px) {
+	.apple-home-hero {
+		min-height: calc(84svh - var(--apple-nav-height)) !important;
+	}
+
+	.apple-section-grid {
+		max-width: 1240px !important;
+	}
+}
+
+@media (max-width: 1180px) {
+	.activity-log-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 767px) {
+	:root {
+		--apple-nav-height: 58px;
+	}
+
+	html {
+		scroll-behavior: auto;
+	}
+
+	.apple-detail-main {
+		padding-top: calc(var(--apple-nav-height) + var(--apple-mobile-tabs-height) + env(safe-area-inset-top));
+	}
+
+	.apple-page-shell-main {
+		padding-left: 1rem !important;
+		padding-right: 1rem !important;
+	}
+
+	.apple-page-shell-main-full {
+		padding-top: calc(var(--apple-nav-height) + env(safe-area-inset-top) + 1.25rem) !important;
+		padding-bottom: 5rem !important;
+	}
+
+	.apple-detail-home-button {
+		margin-bottom: 1rem;
+	}
+
+	.apple-home-hero {
+		min-height: calc(68svh - var(--apple-nav-height)) !important;
+		padding-top: 1.75rem !important;
+		padding-bottom: 2rem !important;
+	}
+
+	.apple-home-hero .apple-display {
+		font-size: clamp(2.65rem, 11.5vw, 3.35rem) !important;
+		line-height: 1.02;
+	}
+
+	.apple-home-hero > .relative.z-10 {
+		transform: translateY(-4vh);
+	}
+
+	.apple-detail-hero {
+		min-height: auto !important;
+		grid-template-columns: 1fr !important;
+		gap: 2rem !important;
+		padding: 3.25rem 1rem 3rem !important;
+	}
+
+	.apple-detail-hero > .relative.z-10 {
+		width: 100%;
+		max-width: 360px !important;
+		overflow: hidden;
+	}
+
+	.apple-detail-hero .apple-display {
+		width: 100%;
+		max-width: 360px !important;
+		font-size: calc(clamp(2.25rem, 8.6vw, 2.78rem) * var(--apple-title-fit, 1)) !important;
+		line-height: 1.14;
+		overflow-wrap: normal;
+		white-space: normal !important;
+		word-break: keep-all;
+		text-wrap: balance;
+	}
+
+	.apple-detail-hero .apple-eyebrow,
+	.apple-detail-hero .apple-copy {
+		max-width: 360px !important;
+		margin-left: auto;
+		margin-right: auto;
+		overflow-wrap: anywhere;
+	}
+
+	.apple-detail-hero .apple-copy {
+		font-size: 1rem !important;
+		line-height: 1.65;
+	}
+
+	.apple-detail-visual {
+		max-width: min(24rem, 100%) !important;
+		padding: 1rem !important;
+		box-shadow: 0 16px 38px rgba(0, 0, 0, 0.1) !important;
+	}
+
+	.apple-detail-card {
+		min-height: auto !important;
+		padding: 1.25rem !important;
+	}
+
+	.apple-detail-card h3 {
+		font-size: 1.6rem !important;
+	}
+
+	.apple-flow-row,
+	.apple-output-row {
+		padding: 1rem !important;
+	}
+
+	.apple-output-row {
+		align-items: flex-start !important;
+	}
+
+	.apple-output-row p {
+		font-size: 1rem !important;
+	}
+
+	.apple-section-grid {
+		min-height: auto !important;
+		gap: 1.25rem !important;
+		padding: 1.75rem 1rem !important;
+	}
+
+	/* Tighten the per-section vertical rhythm: the inner content stacks into
+	   one tall column on phones, so big mt-10 (2.5rem) gaps created the empty
+	   feel. Pull the major content blocks closer together. */
+	.apple-section-grid .mt-10 {
+		margin-top: 1.25rem !important;
+	}
+	.apple-section-grid .mt-8 {
+		margin-top: 1rem !important;
+	}
+	.apple-section-grid .mt-6 {
+		margin-top: 0.85rem !important;
+	}
+
+	/* Metric trio: render 3-up on phones instead of stacking into 3 rows. */
+	.apple-section-grid .sm\:grid-cols-3 {
+		grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+		gap: 0.5rem !important;
+	}
+	.apple-section-grid .apple-soft-panel {
+		padding: 0.85rem 0.5rem !important;
+	}
+
+	/* About showcase + project/activity detail cards: shrink the forced
+	   min-height so each card is content-sized, not a 12rem block. */
+	.apple-section-grid .apple-product-panel.group,
+	.apple-section-grid article.apple-product-panel {
+		min-height: 0 !important;
+		padding: 1.25rem !important;
+	}
+
+	.apple-device-card {
+		max-width: min(15rem, 66vw) !important;
+	}
+
+	/* Detail/showcase card paragraphs: tighten leading so the text-heavy 1-up
+	   project/activity cards are not so tall. */
+	.apple-section-grid .apple-product-panel p {
+		line-height: 1.4 !important;
+	}
+
+	.apple-showcase-card {
+		min-height: 10.5rem !important;
+		padding: 1.25rem !important;
+	}
+
+	.apple-showcase-card h3 {
+		font-size: 1.5rem !important;
+	}
+
+	.activity-log-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.activity-log-card {
+		min-height: auto;
+	}
+
+	.activity-log-photo {
+		min-height: 11rem;
+	}
+
+	.activity-detail-backdrop {
+		align-items: end;
+		padding: 0.75rem;
+	}
+
+	.activity-detail-modal {
+		max-height: 88vh;
+	}
+
+	.activity-detail-header {
+		padding: 1rem;
+	}
+
+	.activity-detail-header h3 {
+		font-size: 1.32rem;
+	}
+
+	.activity-detail-gallery {
+		grid-template-columns: 1fr;
+		padding: 0.85rem 1rem 0;
+	}
+
+	.activity-detail-gallery img:first-child {
+		grid-row: auto;
+		min-height: auto;
+		aspect-ratio: 4 / 3;
+	}
+
+	.activity-detail-description,
+	.activity-detail-files,
+	.activity-detail-actions {
+		padding-inline: 1rem;
+	}
+
+	.activity-detail-admin-actions {
+		width: 100%;
+		margin-left: 0;
+	}
+
+	.activity-detail-admin-actions button {
+		flex: 1;
+	}
+
+	.activity-detail-editor {
+		grid-template-columns: 1fr;
+		padding: 1rem;
+	}
+
+	.activity-empty-state {
+		align-items: flex-start;
+		padding: 1rem;
+	}
+
+	.club-calendar-title {
+		width: 100%;
+		justify-content: center;
+	}
+
+	.club-calendar-controls {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+		gap: 0.5rem;
+	}
+
+	.club-calendar-controls label {
+		min-width: 0;
+		min-height: 2.75rem;
+		justify-content: space-between;
+		padding: 0.3rem 0.4rem 0.3rem 0.8rem;
+	}
+
+	.club-calendar-controls input,
+	.club-calendar-controls select {
+		min-width: 0;
+		width: 100%;
+		height: 2.15rem;
+		padding: 0 0.55rem;
+		font-size: 0.85rem;
+	}
+
+	.club-calendar-controls label span {
+		flex-shrink: 0;
+	}
+
+	.calendar-admin-composer {
+		grid-template-columns: 1fr;
+	}
+
+	.calendar-admin-composer-wide {
+		grid-column: auto;
+	}
+
+	.calendar-csv-import,
+	.calendar-month-summary {
+		grid-template-columns: 1fr;
+	}
+
+	.calendar-csv-import-actions {
+		grid-template-columns: 1fr;
+	}
+
+	.calendar-month-summary li {
+		align-items: flex-start;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.calendar-month-summary li strong,
+	.calendar-month-summary li span {
+		width: 100%;
+		white-space: normal;
+	}
+
+	.calendar-exception-editor {
+		grid-template-columns: 1fr;
+	}
+
+	.calendar-admin-composer-heading,
+	.calendar-admin-mode-tabs,
+	.calendar-color-picker,
+	.calendar-admin-composer-unified .calendar-admin-composer-wide {
+		grid-column: auto;
+	}
+
+	.calendar-color-picker {
+		grid-template-columns: 1fr;
+		align-items: stretch;
+	}
+
+	.calendar-color-swatches {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+
+	.recurring-weekday-picker {
+		grid-template-columns: 1fr;
+	}
+
+	.recurring-weekday-options {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+
+	.activity-admin-composer {
+		grid-template-columns: 1fr;
+	}
+
+	.activity-admin-composer-wide {
+		grid-column: auto;
+	}
+
+	.activity-post-composer {
+		grid-template-columns: 1fr;
+	}
+
+	.activity-post-composer .activity-compose-title-field,
+	.activity-compose-editor,
+	.activity-compose-side {
+		grid-column: auto;
+		grid-row: auto;
+	}
+
+	.activity-post-composer .activity-compose-body-field textarea {
+		min-height: 24rem;
+	}
+
+	.activity-compose-file-name {
+		flex-basis: 100%;
+	}
+
+	.club-calendar-weekdays span {
+		padding: 0.65rem 0.25rem;
+		font-size: 0.72rem;
+	}
+
+	.club-calendar-day {
+		min-height: 4.65rem;
+		padding: 0.3rem 0.28rem;
+	}
+
+	.club-calendar-day-number {
+		width: 1.85rem;
+		height: 1.85rem;
+		font-size: 0.78rem;
+	}
+
+	.club-calendar-events {
+		gap: 0.25rem;
+		margin-top: 0.35rem;
+	}
+
+	.club-calendar-event {
+		padding: 0.25rem 0.32rem;
+		font-size: 0.64rem;
+	}
+
+	.apple-board-shell {
+		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08) !important;
+	}
+
+	.notice-mobile-card {
+		display: grid;
+		min-height: 7rem;
+		grid-template-rows: auto minmax(3rem, auto) auto;
+		row-gap: 0.35rem;
+		padding: 0.875rem 1rem 0.8rem;
+	}
+
+	.notice-mobile-title-frame {
+		display: flex;
+		min-height: 3rem;
+		align-items: center;
+	}
+
+	.apple-board-hero {
+		padding: 1.5rem 1.25rem !important;
+	}
+
+	.apple-board-hero .apple-display {
+		font-size: clamp(2.4rem, 11vw, 3.1rem) !important;
+		line-height: 1.04;
+	}
+
+	.apple-control-strip {
+		scrollbar-width: none;
+	}
+
+	.apple-control-strip::-webkit-scrollbar {
+		display: none;
+	}
+
+	.community-mobile-posts {
+		margin: 0.75rem !important;
+	}
+
+	.community-post-card-mobile {
+		padding: 0.95rem !important;
+	}
+
+	.community-post-card-tags {
+		gap: 0.35rem !important;
+	}
+
+	.community-post-card-title {
+		font-size: 0.98rem !important;
+		line-height: 1.45 !important;
+	}
+
+	.community-post-card-title > span {
+		display: flex;
+		align-items: flex-start;
+	}
+
+	.community-post-card-title > span > span:first-child {
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+
+	.community-post-card-meta {
+		grid-template-columns: 1fr !important;
+		gap: 0.42rem !important;
+	}
+
+	.community-post-card-meta > span {
+		text-align: left !important;
+	}
+
+	.community-pagination {
+		align-items: stretch !important;
+	}
+
+	.community-pagination-summary {
+		text-align: left !important;
+	}
+
+	.community-pagination-strip {
+		margin-inline: -0.25rem;
+		overflow-x: auto;
+		touch-action: pan-x pinch-zoom;
+		scrollbar-width: none;
+	}
+
+	.community-pagination-strip::-webkit-scrollbar {
+		display: none;
+	}
+
+	.community-pagination-pages {
+		width: 100%;
+		min-width: 0;
+		justify-content: space-between;
+		gap: 0.35rem !important;
+	}
+
+	.community-pagination-pages > button,
+	.community-pagination-pages > span {
+		min-width: 2.5rem;
+		min-height: 2.5rem;
+	}
+
+	.club-calendar-mobile-agenda {
+		display: block;
+	}
+
+	.appearance-color-row > div > button {
+		aspect-ratio: 1 / 1;
+	}
+}
+
+/* Narrow phones (360–430px): keep the 7-column calendar legible without horizontal scroll. */
+@media (max-width: 430px) {
+	.club-calendar-day {
+		padding: 0.25rem 0.18rem;
+	}
+
+	.club-calendar-day-number {
+		width: 1.7rem;
+		height: 1.7rem;
+		font-size: 0.72rem;
+	}
+
+	.club-calendar-events {
+		gap: 0.2rem;
+		margin-top: 0.3rem;
+	}
+
+	.club-calendar-event {
+		min-height: 1.35rem;
+		gap: 0.15rem;
+		padding: 0.2rem 0.22rem;
+		font-size: 0.58rem;
+	}
+
+	.club-calendar-day-selected-label {
+		top: 0.35rem;
+		right: 0.3rem;
+		padding: 0.1rem 0.3rem;
+		font-size: 0.55rem;
+	}
+
+	.club-calendar-weekdays span {
+		font-size: 0.66rem;
+	}
+
+	.club-calendar-event-title,
+	.club-calendar-event-meta {
+		display: none;
+	}
+
+	.club-calendar-event {
+		width: 100%;
+		justify-content: center;
+		min-height: 0.55rem;
+		padding: 0;
+		border-radius: 9999px;
+		color: transparent;
+	}
+
+	.club-calendar-event-icon,
+	.club-calendar-event-badge,
+	.club-calendar-event-selected-mark {
+		display: none;
+	}
+}
+
+@media (hover: none), (pointer: coarse) {
+	.home-logo-float,
+	.animate-blob {
+		animation: none !important;
+	}
+
+	.apple-topbar,
+	.apple-product-panel,
+	.apple-detail-visual,
+	[class*="backdrop-blur"] {
+		backdrop-filter: none !important;
+		-webkit-backdrop-filter: none !important;
+	}
+
+	.apple-product-panel {
+		box-shadow: 0 12px 34px rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.52);
+	}
+
+	.theme-home .hover\:-translate-y-0\.5:hover,
+	.apple-route .hover\:-translate-y-0\.5:hover {
+		transform: none !important;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html {
+		scroll-behavior: auto;
+	}
+
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+
+	.home-logo-float {
+		animation: none;
+	}
+
+	.page-transition {
+		animation: none;
+	}
+}
+
+.logo-emboss {
+	filter: brightness(1.2) contrast(1.15) drop-shadow(0 0 20px rgba(51, 255, 255, 0.18))
+		drop-shadow(0 0 60px rgba(178, 109, 255, 0.14));
+	opacity: 0.92;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+html {
+	overflow-x: hidden;
+	overflow-y: auto;
+}
+/* clip (not hidden) keeps horizontal overflow contained WITHOUT turning
+   body/#root into scroll containers — otherwise position: sticky (the home
+   cinematic hero) sticks to them instead of the page and never engages. */
+body,
+#root {
+	overflow-x: clip;
+}
+
+body {
+  margin: 0;
+}
+
+.auto-text-post {
+	font-size: clamp(0.95rem, 0.88rem + 0.28cqw, 1.12rem);
+	line-height: 1.85;
+}
+
+.community-post-text {
+	display: block;
+	clear: both;
+	margin: 0.75rem 0;
+}
+
+.inline-image,
+.inline-icon {
+	display: inline-block;
+	width: 1em;
+	height: 1em;
+	vertical-align: -0.125em;
+	object-fit: contain;
+	margin: 0 0.15em;
+	-webkit-user-drag: none;
+	user-select: none;
+}
+
+.community-inline-media-image {
+	display: block;
+	width: 100%;
+	height: auto;
+	-webkit-user-drag: none;
+	user-select: none;
+}
+
+.community-editor-toolbar {
+	scrollbar-width: thin;
+}
+
+.community-compose-form {
+	background: transparent;
+}
+
+.community-compose-meta,
+.community-compose-actions,
+.community-compose-error {
+	border-radius: 8px;
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	padding: 0.75rem;
+}
+
+.community-compose-title,
+.community-compose-editor {
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.community-compose-editor [contenteditable='true'] {
+	min-height: clamp(24rem, 52vh, 42rem);
+}
+
+.community-editor-figure {
+	max-width: 100%;
+}
+
