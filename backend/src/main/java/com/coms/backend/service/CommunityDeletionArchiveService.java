@@ -33,6 +33,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -199,6 +200,7 @@ public class CommunityDeletionArchiveService {
     }
 
     @Transactional(readOnly = true)
+    @PreAuthorize("hasRole('ADMIN')")
     public DeletedCommunityPostImage loadImageMeta(Long deletedPostId, Long imageId) {
         return deletedImageRepository.findById(imageId)
                 .filter(image -> image.getDeletedPostId().equals(deletedPostId))
@@ -218,12 +220,14 @@ public class CommunityDeletionArchiveService {
     }
 
     @Transactional(readOnly = true)
+    @PreAuthorize("hasRole('ADMIN')")
     public Resource loadImage(Long deletedPostId, Long imageId) {
         DeletedCommunityPostImage image = loadImageMeta(deletedPostId, imageId);
         return storageService.load(image.getStoredName());
     }
 
     @Transactional(readOnly = true)
+    @PreAuthorize("hasRole('ADMIN')")
     public DeletedCommunityPostMedia loadMediaMeta(Long deletedPostId, Long mediaId) {
         return deletedMediaRepository.findById(mediaId)
                 .filter(media -> media.getDeletedPostId().equals(deletedPostId))
@@ -243,6 +247,7 @@ public class CommunityDeletionArchiveService {
     }
 
     @Transactional(readOnly = true)
+    @PreAuthorize("hasRole('ADMIN')")
     public Resource loadMedia(Long deletedPostId, Long mediaId) {
         DeletedCommunityPostMedia media = loadMediaMeta(deletedPostId, mediaId);
         return storageService.load(media.getStoredName());

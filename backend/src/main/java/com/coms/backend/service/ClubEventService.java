@@ -16,6 +16,7 @@ import com.coms.backend.repository.MemberRepository;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -38,6 +39,8 @@ import java.util.stream.Collectors;
 public class ClubEventService {
 
     private static final long MAX_ENTRY_FILE_BYTES = 50L * 1024 * 1024;
+    private static final int MAX_TITLE_LENGTH = 150;
+    private static final int MAX_DESCRIPTION_LENGTH = 2_000;
     private static final int MAX_ENTRY_WORK_TYPE_LENGTH = 40;
     private static final int MAX_ENTRY_AUTHOR_LENGTH = 100;
     private static final int MAX_ENTRY_SUMMARY_LENGTH = 500;
@@ -97,6 +100,7 @@ public class ClubEventService {
                 studentId);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public ClubEventResponse createEvent(String title,
                                          String description,
                                          LocalDateTime startsAt,
@@ -109,8 +113,8 @@ public class ClubEventService {
         Member member = requireMember(creatorStudentId);
 
         ClubEvent event = new ClubEvent();
-        event.setTitle(title.trim());
-        event.setDescription(normalizeOptional(description));
+        event.setTitle(boundedTitle(title));
+        event.setDescription(normalizeOptional(description, MAX_DESCRIPTION_LENGTH, "설명"));
         event.setStartsAt(startsAt);
         event.setEndsAt(endsAt);
         event.setCreatedBy(member.getStudentId());
@@ -120,6 +124,7 @@ public class ClubEventService {
         return toResponse(eventRepository.save(event), List.of(), Map.of(), List.of(), List.of(), creatorStudentId);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public ClubEventResponse updateEvent(Long id,
                                          String title,
                                          String description,
@@ -132,10 +137,10 @@ public class ClubEventService {
             if (title.isBlank()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이벤트 제목을 입력하세요.");
             }
-            event.setTitle(title.trim());
+            event.setTitle(boundedTitle(title));
         }
         if (description != null) {
-            event.setDescription(normalizeOptional(description));
+            event.setDescription(normalizeOptional(description, MAX_DESCRIPTION_LENGTH, "설명"));
         }
         LocalDateTime nextStart = startsAt == null ? event.getStartsAt() : startsAt;
         LocalDateTime nextEnd = endsAt == null ? event.getEndsAt() : endsAt;
@@ -146,6 +151,7 @@ public class ClubEventService {
         return get(eventRepository.save(event).getId(), editorStudentId);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public ClubEventResponse.Entry addEntry(Long eventId,
                                             String title,
                                             String authorName,
@@ -180,9 +186,9 @@ public class ClubEventService {
             storedNames.add(primaryStored);
             ClubEventEntry entry = new ClubEventEntry();
             entry.setClubEventId(event.getId());
-            entry.setTitle(title.trim());
+            entry.setTitle(boundedTitle(title));
             entry.setAuthorName(normalizeOptional(authorName, MAX_ENTRY_AUTHOR_LENGTH, "작성자/팀"));
-            entry.setDescription(normalizeOptional(description));
+            entry.setDescription(normalizeOptional(description, MAX_DESCRIPTION_LENGTH, "설명"));
             entry.setWorkType(normalizeOptional(workType, MAX_ENTRY_WORK_TYPE_LENGTH, "작품 종류"));
             entry.setSummary(normalizeOptional(summary, MAX_ENTRY_SUMMARY_LENGTH, "한줄 소개"));
             entry.setTags(normalizeOptional(tags, MAX_ENTRY_TAGS_LENGTH, "태그"));
@@ -303,6 +309,7 @@ public class ClubEventService {
         }
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteEntry(Long eventId, Long entryId) {
         getEvent(eventId);
         ClubEventEntry entry = loadEntryMeta(eventId, entryId);
@@ -311,6 +318,7 @@ public class ClubEventService {
         entryRepository.delete(entry);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteEvent(Long id) {
         ClubEvent event = getEvent(id);
         List<ClubEventEntry> entries = entryRepository.findByClubEventIdOrderByPositionAscCreatedAtAsc(id);
@@ -373,6 +381,14 @@ public class ClubEventService {
         if (endsAt.isBefore(startsAt)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "투표 종료는 시작 이후여야 합니다.");
         }
+    }
+
+    private String boundedTitle(String title) {
+        String trimmed = title.trim();
+        if (trimmed.length() > MAX_TITLE_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "제목은 " + MAX_TITLE_LENGTH + "자 이하로 입력하세요.");
+        }
+        return trimmed;
     }
 
     private String normalizeOptional(String value) {
