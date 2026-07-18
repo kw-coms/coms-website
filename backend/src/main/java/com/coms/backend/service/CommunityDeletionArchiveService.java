@@ -432,16 +432,54 @@ public class CommunityDeletionArchiveService {
     }
 
     private List<DeletedCommunityPostResponse> toResponses(List<DeletedCommunityPost> snapshots, String mediaBasePath) {
-        Map<Long, DeletedCommunityPostAppeal> latestAppeals = latestAppeals(snapshots.stream().map(DeletedCommunityPost::getId).toList());
+        List<Long> snapshotIds = snapshots.stream().map(DeletedCommunityPost::getId).toList();
+        Map<Long, DeletedCommunityPostAppeal> latestAppeals = latestAppeals(snapshotIds);
+        Map<Long, List<DeletedCommunityPostImage>> imagesBySnapshot = deletedImageRepository
+                .findByDeletedPostIdInOrderByPositionAsc(snapshotIds).stream()
+                .collect(java.util.stream.Collectors.groupingBy(DeletedCommunityPostImage::getDeletedPostId));
+        Map<Long, List<DeletedCommunityPostMedia>> mediaBySnapshot = deletedMediaRepository
+                .findByDeletedPostIdInOrderByPositionAsc(snapshotIds).stream()
+                .collect(java.util.stream.Collectors.groupingBy(DeletedCommunityPostMedia::getDeletedPostId));
+        Map<Long, List<DeletedCommunityPostComment>> commentsBySnapshot = deletedCommentRepository
+                .findByDeletedPostIdInOrderByDepthAscCreatedAtAsc(snapshotIds).stream()
+                .collect(java.util.stream.Collectors.groupingBy(DeletedCommunityPostComment::getDeletedPostId));
         return snapshots.stream()
-                .map(snapshot -> toResponse(snapshot, mediaBasePath, latestAppeals.get(snapshot.getId())))
+                .map(snapshot -> toResponse(snapshot, mediaBasePath, latestAppeals.get(snapshot.getId()),
+                        imagesBySnapshot.getOrDefault(snapshot.getId(), List.of()),
+                        mediaBySnapshot.getOrDefault(snapshot.getId(), List.of()),
+                        commentsBySnapshot.getOrDefault(snapshot.getId(), List.of())))
                 .toList();
     }
 
     private DeletedCommunityPostResponse toResponse(DeletedCommunityPost snapshot,
                                                     String mediaBasePath,
                                                     DeletedCommunityPostAppeal latestAppeal) {
-        List<DeletedCommunityPostResponse.ImageInfo> imageInfos = deletedImageRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId()).stream()
+        return toResponse(snapshot, mediaBasePath, latestAppeal, null, null, null);
+    }
+
+    /**
+     * {@code images}/{@code media}/{@code comments} are batch-prefetched by snapshot ID for list
+     * responses (see {@link #toResponses}); when {@code null} (the single-snapshot {@link #detail}
+     * path) each falls back to a per-snapshot repository query. {@code media} backs both the video
+     * and file sections, fetched once instead of twice.
+     */
+    private DeletedCommunityPostResponse toResponse(DeletedCommunityPost snapshot,
+                                                    String mediaBasePath,
+                                                    DeletedCommunityPostAppeal latestAppeal,
+                                                    List<DeletedCommunityPostImage> images,
+                                                    List<DeletedCommunityPostMedia> media,
+                                                    List<DeletedCommunityPostComment> comments) {
+        List<DeletedCommunityPostImage> resolvedImages = images != null
+                ? images
+                : deletedImageRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId());
+        List<DeletedCommunityPostMedia> resolvedMedia = media != null
+                ? media
+                : deletedMediaRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId());
+        List<DeletedCommunityPostComment> resolvedComments = comments != null
+                ? comments
+                : deletedCommentRepository.findByDeletedPostIdOrderByDepthAscCreatedAtAsc(snapshot.getId());
+
+        List<DeletedCommunityPostResponse.ImageInfo> imageInfos = resolvedImages.stream()
                 .map(image -> new DeletedCommunityPostResponse.ImageInfo(
                         image.getId(),
                         image.getOriginalImageId(),
@@ -450,28 +488,27 @@ public class CommunityDeletionArchiveService {
                         image.getOriginalName()
                 ))
                 .toList();
-        List<DeletedCommunityPostResponse.MediaInfo> videoInfos = deletedMediaRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId()).stream()
-                .filter(media -> DeletedCommunityPostMedia.KIND_VIDEO.equals(media.getKind()))
-                .map(media -> new DeletedCommunityPostResponse.MediaInfo(
-                        media.getId(),
-                        media.getOriginalMediaId(),
-                        media.getKind(),
-                        mediaBasePath + "/" + snapshot.getId() + "/media/" + media.getId(),
-                        media.getOriginalName()
+        List<DeletedCommunityPostResponse.MediaInfo> videoInfos = resolvedMedia.stream()
+                .filter(m -> DeletedCommunityPostMedia.KIND_VIDEO.equals(m.getKind()))
+                .map(m -> new DeletedCommunityPostResponse.MediaInfo(
+                        m.getId(),
+                        m.getOriginalMediaId(),
+                        m.getKind(),
+                        mediaBasePath + "/" + snapshot.getId() + "/media/" + m.getId(),
+                        m.getOriginalName()
                 ))
                 .toList();
-        List<DeletedCommunityPostResponse.MediaInfo> fileInfos = deletedMediaRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId()).stream()
-                .filter(media -> DeletedCommunityPostMedia.KIND_FILE.equals(media.getKind()))
-                .map(media -> new DeletedCommunityPostResponse.MediaInfo(
-                        media.getId(),
-                        media.getOriginalMediaId(),
-                        media.getKind(),
-                        mediaBasePath + "/" + snapshot.getId() + "/media/" + media.getId(),
-                        media.getOriginalName()
+        List<DeletedCommunityPostResponse.MediaInfo> fileInfos = resolvedMedia.stream()
+                .filter(m -> DeletedCommunityPostMedia.KIND_FILE.equals(m.getKind()))
+                .map(m -> new DeletedCommunityPostResponse.MediaInfo(
+                        m.getId(),
+                        m.getOriginalMediaId(),
+                        m.getKind(),
+                        mediaBasePath + "/" + snapshot.getId() + "/media/" + m.getId(),
+                        m.getOriginalName()
                 ))
                 .toList();
-        List<DeletedCommunityPostComment> comments = deletedCommentRepository.findByDeletedPostIdOrderByDepthAscCreatedAtAsc(snapshot.getId());
-        List<DeletedCommunityPostResponse.CommentInfo> commentInfos = comments.stream()
+        List<DeletedCommunityPostResponse.CommentInfo> commentInfos = resolvedComments.stream()
                 .map(comment -> new DeletedCommunityPostResponse.CommentInfo(
                         comment.getOriginalCommentId(),
                         comment.getOriginalParentCommentId(),
@@ -503,7 +540,7 @@ public class CommunityDeletionArchiveService {
                 imageInfos,
                 videoInfos,
                 fileInfos,
-                comments.size(),
+                resolvedComments.size(),
                 commentInfos,
                 snapshot.getRestoredPostId(),
                 snapshot.getRestoredByStudentId(),

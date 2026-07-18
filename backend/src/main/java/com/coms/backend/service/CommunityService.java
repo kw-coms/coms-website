@@ -179,8 +179,13 @@ public class CommunityService {
         Map<Long, Long> commentCounts = commentCounts(posts);
         Map<Long, List<CommunityPostResponse.PollResult>> pollResults = pollResults(posts, member.getStudentId());
         Map<String, CommunityReputationResponse> reputations = reputationTiers(authors.keySet());
+        Map<Long, List<CommunityPostImage>> images = imagesByPost(posts);
+        Map<Long, List<CommunityPostVideo>> videos = videosByPost(posts);
+        Map<Long, List<CommunityPostFile>> files = filesByPost(posts);
+        Set<Long> bookmarked = bookmarkedPostIds(posts, member.getStudentId());
         return posts.stream()
-                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, reputations, false))
+                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, reputations,
+                        false, null, images, videos, files, bookmarked))
                 .toList();
     }
 
@@ -220,8 +225,15 @@ public class CommunityService {
         Map<Long, Long> commentCounts = commentCounts(posts);
         Map<Long, List<CommunityPostResponse.PollResult>> pollResults = pollResults(posts, member.getStudentId());
         Map<String, CommunityReputationResponse> reputations = reputationTiers(authors.keySet());
+        Map<Long, List<CommunityPostImage>> images = imagesByPost(posts);
+        Map<Long, List<CommunityPostVideo>> videos = videosByPost(posts);
+        Map<Long, List<CommunityPostFile>> files = filesByPost(posts);
+        // Skip the batched bookmark lookup when every post's bookmarked state is already known
+        // (e.g. listBookmarked, where bookmarkedOverride pins it to true for the whole page).
+        Set<Long> bookmarked = bookmarkedOverride == null ? bookmarkedPostIds(posts, member.getStudentId()) : Set.of();
         return posts.stream()
-                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, reputations, false, bookmarkedOverride))
+                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, reputations,
+                        false, bookmarkedOverride, images, videos, files, bookmarked))
                 .toList();
     }
 
@@ -252,10 +264,61 @@ public class CommunityService {
         Map<Long, Long> commentCounts = commentCounts(posts);
         Map<Long, List<CommunityPostResponse.PollResult>> pollResults = pollResults(posts, member.getStudentId());
         Map<String, CommunityReputationResponse> reputations = reputationTiers(authors.keySet());
+        Map<Long, List<CommunityPostImage>> images = imagesByPost(posts);
+        Map<Long, List<CommunityPostVideo>> videos = videosByPost(posts);
+        Map<Long, List<CommunityPostFile>> files = filesByPost(posts);
+        Set<Long> bookmarked = bookmarkedPostIds(posts, member.getStudentId());
         return posts.stream()
-                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, reputations, false))
+                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, reputations,
+                        false, null, images, videos, files, bookmarked))
                 .toList();
     }
+
+    /**
+     * Real DB-paginated variant of {@link #list(String)} for the {@code page}/{@code size} query
+     * params on {@code GET /api/community/posts}: fetches only the requested page (plus a matching
+     * COUNT) instead of loading and mapping every post before slicing in memory. The per-viewer
+     * anonymous-post visibility rule in {@link #canViewPost} collapses to a single boolean (can this
+     * viewer see ANONYMOUS posts at all?) that doesn't depend on any other post field, so it moves
+     * into the query instead of a post-fetch Java filter.
+     */
+    @Transactional(readOnly = true)
+    public PagedPosts listPaged(String studentId, int page, int size) {
+        Member member = findMember(studentId);
+        boolean canSeeAnonymous = member.getRole() == Member.Role.ADMIN || !isGraduate(member);
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        List<CommunityPost> posts;
+        long total;
+        if (canSeeAnonymous) {
+            posts = communityPostRepository.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc(pageable);
+            total = communityPostRepository.count();
+        } else {
+            posts = communityPostRepository.findByCategoryNotOrderByPinnedDescPinnedAtDescCreatedAtDesc(
+                    CommunityPost.Category.ANONYMOUS, pageable);
+            total = communityPostRepository.countByCategoryNot(CommunityPost.Category.ANONYMOUS);
+        }
+        Map<String, Member> authors = memberRepository.findByStudentIdIn(posts.stream()
+                        .map(CommunityPost::getAuthorStudentId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(Member::getStudentId, Function.identity()));
+        Map<Long, VoteSummary> stats = voteStats(posts);
+        Map<Long, Long> commentCounts = commentCounts(posts);
+        Map<Long, List<CommunityPostResponse.PollResult>> pollResults = pollResults(posts, member.getStudentId());
+        Map<String, CommunityReputationResponse> reputations = reputationTiers(authors.keySet());
+        Map<Long, List<CommunityPostImage>> images = imagesByPost(posts);
+        Map<Long, List<CommunityPostVideo>> videos = videosByPost(posts);
+        Map<Long, List<CommunityPostFile>> files = filesByPost(posts);
+        Set<Long> bookmarked = bookmarkedPostIds(posts, member.getStudentId());
+        List<CommunityPostResponse> responses = posts.stream()
+                .map(post -> toResponse(post, member, authors.get(post.getAuthorStudentId()), stats, commentCounts, pollResults, reputations,
+                        false, null, images, videos, files, bookmarked))
+                .toList();
+        return new PagedPosts(responses, total);
+    }
+
+    public record PagedPosts(List<CommunityPostResponse> items, long total) {}
 
     public CommunityPostResponse get(String studentId, Long id) {
         Member member = findMember(studentId);
@@ -873,6 +936,29 @@ public class CommunityService {
                                              Map<String, CommunityReputationResponse> reputations,
                                              boolean includeContent,
                                              Boolean bookmarkedOverride) {
+        return toResponse(post, currentMember, author, voteStats, commentCounts, pollResults, reputations,
+                includeContent, bookmarkedOverride, null, null, null, null);
+    }
+
+    /**
+     * Full response assembly. {@code imagesByPost}/{@code videosByPost}/{@code filesByPost}/
+     * {@code bookmarkedPostIds} are batch-prefetched maps for list responses (see
+     * {@link #imagesByPost(List)} etc.); when {@code null} (single-post callers) each falls back
+     * to the original per-post repository query, so that path is unchanged.
+     */
+    private CommunityPostResponse toResponse(CommunityPost post,
+                                             Member currentMember,
+                                             Member author,
+                                             Map<Long, VoteSummary> voteStats,
+                                             Map<Long, Long> commentCounts,
+                                             Map<Long, List<CommunityPostResponse.PollResult>> pollResults,
+                                             Map<String, CommunityReputationResponse> reputations,
+                                             boolean includeContent,
+                                             Boolean bookmarkedOverride,
+                                             Map<Long, List<CommunityPostImage>> imagesByPost,
+                                             Map<Long, List<CommunityPostVideo>> videosByPost,
+                                             Map<Long, List<CommunityPostFile>> filesByPost,
+                                             Set<Long> bookmarkedPostIds) {
         boolean editable = post.getAuthorStudentId().equals(currentMember.getStudentId())
                 || currentMember.getRole() == Member.Role.ADMIN;
         boolean maskAnonymous = isAnonymousPost(post) && currentMember.getRole() != Member.Role.ADMIN;
@@ -887,7 +973,9 @@ public class CommunityService {
         String authorDisplayName = maskAnonymous ? anonymousDisplay : displayName(post.getAuthorStudentId(), authorName);
         VoteSummary votes = voteStats.getOrDefault(post.getId(), VoteSummary.EMPTY);
         long commentCount = commentCounts.getOrDefault(post.getId(), 0L);
-        List<CommunityPostImage> extraImages = imageRepository.findByPostIdOrderByPositionAsc(post.getId());
+        List<CommunityPostImage> extraImages = imagesByPost != null
+                ? imagesByPost.getOrDefault(post.getId(), List.of())
+                : imageRepository.findByPostIdOrderByPositionAsc(post.getId());
         List<String> imageUrls = extraImages.stream()
                 .map(img -> "/api/community/posts/" + post.getId() + "/images/" + img.getId())
                 .toList();
@@ -897,15 +985,19 @@ public class CommunityService {
                         "/api/community/posts/" + post.getId() + "/images/" + img.getId(),
                         img.getOriginalName()))
                 .toList();
-        List<CommunityPostResponse.MediaInfo> videoInfos = videoRepository.findByPostIdOrderByPositionAsc(post.getId())
-                .stream()
+        List<CommunityPostVideo> videos = videosByPost != null
+                ? videosByPost.getOrDefault(post.getId(), List.of())
+                : videoRepository.findByPostIdOrderByPositionAsc(post.getId());
+        List<CommunityPostResponse.MediaInfo> videoInfos = videos.stream()
                 .map(vid -> new CommunityPostResponse.MediaInfo(
                         vid.getId(),
                         "/api/community/posts/" + post.getId() + "/videos/" + vid.getId(),
                         vid.getOriginalName()))
                 .toList();
-        List<CommunityPostResponse.MediaInfo> fileInfos = fileRepository.findByPostIdOrderByPositionAsc(post.getId())
-                .stream()
+        List<CommunityPostFile> files = filesByPost != null
+                ? filesByPost.getOrDefault(post.getId(), List.of())
+                : fileRepository.findByPostIdOrderByPositionAsc(post.getId());
+        List<CommunityPostResponse.MediaInfo> fileInfos = files.stream()
                 .map(file -> new CommunityPostResponse.MediaInfo(
                         file.getId(),
                         "/api/community/posts/" + post.getId() + "/files/" + file.getId() + "/download",
@@ -913,7 +1005,9 @@ public class CommunityService {
                 .toList();
         boolean bookmarked = bookmarkedOverride != null
                 ? bookmarkedOverride
-                : bookmarkRepository.existsByPostIdAndStudentId(post.getId(), currentMember.getStudentId());
+                : bookmarkedPostIds != null
+                        ? bookmarkedPostIds.contains(post.getId())
+                        : bookmarkRepository.existsByPostIdAndStudentId(post.getId(), currentMember.getStudentId());
         return new CommunityPostResponse(
                 post.getId(),
                 post.getTitle(),
@@ -1295,6 +1389,49 @@ public class CommunityService {
         }
         return commentRepository.countByPostIds(postIds).stream()
                 .collect(Collectors.toMap(CommunityCommentRepository.CommentCount::getPostId, CommunityCommentRepository.CommentCount::getCount));
+    }
+
+    /**
+     * Batches the per-post image/video/file/bookmark lookups that {@link #toResponse} would
+     * otherwise issue one-by-one for every post in a list, mirroring the voteStats/commentCounts/
+     * pollResults batching pattern above so listing a page of posts stays at a fixed number of
+     * queries regardless of page size.
+     */
+    private Map<Long, List<CommunityPostImage>> imagesByPost(List<CommunityPost> posts) {
+        List<Long> postIds = posts.stream().map(CommunityPost::getId).filter(Objects::nonNull).toList();
+        if (postIds.isEmpty()) {
+            return Map.of();
+        }
+        return imageRepository.findByPostIdInOrderByPositionAsc(postIds).stream()
+                .collect(Collectors.groupingBy(CommunityPostImage::getPostId));
+    }
+
+    private Map<Long, List<CommunityPostVideo>> videosByPost(List<CommunityPost> posts) {
+        List<Long> postIds = posts.stream().map(CommunityPost::getId).filter(Objects::nonNull).toList();
+        if (postIds.isEmpty()) {
+            return Map.of();
+        }
+        return videoRepository.findByPostIdInOrderByPositionAsc(postIds).stream()
+                .collect(Collectors.groupingBy(CommunityPostVideo::getPostId));
+    }
+
+    private Map<Long, List<CommunityPostFile>> filesByPost(List<CommunityPost> posts) {
+        List<Long> postIds = posts.stream().map(CommunityPost::getId).filter(Objects::nonNull).toList();
+        if (postIds.isEmpty()) {
+            return Map.of();
+        }
+        return fileRepository.findByPostIdInOrderByPositionAsc(postIds).stream()
+                .collect(Collectors.groupingBy(CommunityPostFile::getPostId));
+    }
+
+    private Set<Long> bookmarkedPostIds(List<CommunityPost> posts, String studentId) {
+        List<Long> postIds = posts.stream().map(CommunityPost::getId).filter(Objects::nonNull).toList();
+        if (postIds.isEmpty()) {
+            return Set.of();
+        }
+        return bookmarkRepository.findByPostIdInAndStudentId(postIds, studentId).stream()
+                .map(bookmark -> bookmark.getPost().getId())
+                .collect(Collectors.toSet());
     }
 
     private Map<Long, VoteSummary> voteStats(List<CommunityPost> posts) {
