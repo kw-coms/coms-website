@@ -17,6 +17,8 @@ import {
 } from '../services/communityApi'
 import { showToast } from '../components/common/Toast'
 import { confirmDialog, promptDialog } from '../components/common/ConfirmDialog'
+import { Skeleton, SkeletonLine, SkeletonGroup } from '../components/common/Skeleton'
+import ErrorState from '../components/common/ErrorState'
 import { useAuth } from '../contexts/useAuth'
 import {
   filterAndSortCommunityPosts,
@@ -43,7 +45,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
   const { id: urlId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { posts, setPosts, loading, error } = useCommunityPosts()
+  const { posts, setPosts, refreshPosts, loading, error } = useCommunityPosts()
   const [deletedPosts, setDeletedPosts] = useState([])
   const [currentPost, setCurrentPost] = useState(null)
   const [mode, setMode] = useState('list')
@@ -145,6 +147,9 @@ export default function Community({ onBack }: { onBack: () => void }) {
     setCurrentPost(post)
   }
 
+  const [deletedReloadToken, setDeletedReloadToken] = useState(0)
+  const retryDeletedPosts = () => setDeletedReloadToken((token) => token + 1)
+
   useEffect(() => {
     if (mode !== 'deleted') return undefined
     let mounted = true
@@ -159,7 +164,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
       .catch((err) => { if (mounted) setDeletedError(err.message || '삭제 기록을 불러오지 못했습니다.') })
       .finally(() => { if (mounted) setDeletedLoading(false) })
     return () => { mounted = false }
-  }, [mode])
+  }, [mode, deletedReloadToken])
 
   useEffect(() => {
     if (!urlId) {
@@ -357,70 +362,76 @@ export default function Community({ onBack }: { onBack: () => void }) {
 
       <section data-reveal className="apple-board-shell">
         {mode === 'list' && loading && posts.length === 0 && (
-          <div className="space-y-0">
-            {/* Skeleton header bar */}
-            <div className="flex items-center justify-between border-b border-[var(--app-hairline)] px-5 py-4 sm:px-8">
-              <div className="skeleton h-5 w-24 rounded-full" />
-              <div className="flex gap-2">
-                <div className="skeleton h-9 w-24 rounded-full" />
-                <div className="skeleton h-9 w-16 rounded-full" />
+          <SkeletonGroup>
+            <div className="space-y-0">
+              {/* Skeleton header bar */}
+              <div className="flex items-center justify-between border-b border-[var(--app-hairline)] px-5 py-4 sm:px-8">
+                <Skeleton className="h-5 w-24 rounded-full" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-9 w-24 rounded-full" />
+                  <Skeleton className="h-9 w-16 rounded-full" />
+                </div>
               </div>
-            </div>
-            {/* Skeleton control strip */}
-            <div className="border-b border-[var(--app-hairline)] px-5 py-4 sm:px-8">
-              <div className="flex flex-wrap gap-2">
-                {[72, 56, 80, 64, 96, 56].map((w, i) => (
-                  <div key={i} className="skeleton h-9 rounded-full" style={{ width: w }} />
+              {/* Skeleton control strip */}
+              <div className="border-b border-[var(--app-hairline)] px-5 py-4 sm:px-8">
+                <div className="flex flex-wrap gap-2">
+                  {[72, 56, 80, 64, 96, 56].map((w, i) => (
+                    <Skeleton key={i} className="h-9 rounded-full" style={{ width: w }} />
+                  ))}
+                </div>
+              </div>
+              {/* Skeleton post rows — mobile cards */}
+              <div className="m-4 space-y-3 md:hidden">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="apple-soft-panel p-4 space-y-3">
+                    <div className="flex gap-2">
+                      <SkeletonLine className="w-8" />
+                      <SkeletonLine className="w-16 rounded-full" />
+                    </div>
+                    <SkeletonLine className="w-3/4" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <SkeletonLine className="w-20" />
+                      <SkeletonLine className="w-14 ml-auto" />
+                      <SkeletonLine className="w-16" />
+                      <SkeletonLine className="w-12 ml-auto" />
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
-            {/* Skeleton post rows — mobile cards */}
-            <div className="m-4 space-y-3 md:hidden">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="apple-soft-panel p-4 space-y-3">
-                  <div className="flex gap-2">
-                    <div className="skeleton skeleton-line w-8" />
-                    <div className="skeleton skeleton-line w-16 rounded-full" />
-                  </div>
-                  <div className="skeleton skeleton-line w-3/4" />
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="skeleton skeleton-line w-20" />
-                    <div className="skeleton skeleton-line w-14 ml-auto" />
-                    <div className="skeleton skeleton-line w-16" />
-                    <div className="skeleton skeleton-line w-12 ml-auto" />
-                  </div>
-                </div>
-              ))}
-            </div>
-            {/* Skeleton post rows — desktop table */}
-            <div className="m-5 hidden overflow-x-auto rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] md:block sm:m-8">
-              <table className="w-full min-w-[860px] border-collapse text-sm">
-                <thead className="border-b border-[var(--app-hairline)]">
-                  <tr>
-                    {['번호', '말머리', '제목', '글쓴이', '작성일', '조회', '개추'].map((col) => (
-                      <th key={col} className="px-4 py-3 font-semibold text-[var(--app-muted)]">{col}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-black/10">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <tr key={i}>
-                      <td className="px-4 py-4 text-center"><div className="skeleton skeleton-line w-8 mx-auto" /></td>
-                      <td className="px-4 py-4 text-center"><div className="skeleton skeleton-line w-14 mx-auto rounded-full" /></td>
-                      <td className="px-4 py-4"><div className="skeleton skeleton-line w-2/3" /></td>
-                      <td className="px-4 py-4 text-center"><div className="skeleton skeleton-line w-16 mx-auto" /></td>
-                      <td className="px-4 py-4 text-center"><div className="skeleton skeleton-line w-16 mx-auto" /></td>
-                      <td className="px-4 py-4 text-center"><div className="skeleton skeleton-line w-8 mx-auto" /></td>
-                      <td className="px-4 py-4 text-center"><div className="skeleton skeleton-line w-8 mx-auto" /></td>
+              {/* Skeleton post rows — desktop table */}
+              <div className="m-5 hidden overflow-x-auto rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] md:block sm:m-8">
+                <table className="w-full min-w-[860px] border-collapse text-sm">
+                  <thead className="border-b border-[var(--app-hairline)]">
+                    <tr>
+                      {['번호', '말머리', '제목', '글쓴이', '작성일', '조회', '개추'].map((col) => (
+                        <th key={col} className="px-4 py-3 font-semibold text-[var(--app-muted)]">{col}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-black/10">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <tr key={i}>
+                        <td className="px-4 py-4 text-center"><SkeletonLine className="w-8 mx-auto" /></td>
+                        <td className="px-4 py-4 text-center"><SkeletonLine className="w-14 mx-auto rounded-full" /></td>
+                        <td className="px-4 py-4"><SkeletonLine className="w-2/3" /></td>
+                        <td className="px-4 py-4 text-center"><SkeletonLine className="w-16 mx-auto" /></td>
+                        <td className="px-4 py-4 text-center"><SkeletonLine className="w-16 mx-auto" /></td>
+                        <td className="px-4 py-4 text-center"><SkeletonLine className="w-8 mx-auto" /></td>
+                        <td className="px-4 py-4 text-center"><SkeletonLine className="w-8 mx-auto" /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          </SkeletonGroup>
         )}
 
-        {mode === 'list' && !(loading && posts.length === 0) && (
+        {mode === 'list' && !loading && Boolean(error) && filteredPosts.length === 0 && (
+          <ErrorState className="m-4 sm:m-8" message={error} onRetry={refreshPosts} />
+        )}
+
+        {mode === 'list' && !(loading && posts.length === 0) && !(!loading && Boolean(error) && filteredPosts.length === 0) && (
           <CommunityListView
             onOpenDeletedRecords={openDeletedRecords}
             onWrite={openWrite}
@@ -463,6 +474,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
             onAppealOpen={setAppealOpenId}
             onAppealCancel={() => setAppealOpenId(null)}
             onSubmitAppeal={submitAppeal}
+            onRetry={retryDeletedPosts}
           />
         )}
 
