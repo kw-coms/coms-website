@@ -27,6 +27,10 @@ function ActivityLogSection({ compact = false }: { compact?: boolean }) {
     category: '',
     description: '',
   })
+  // Attachment drafts live here (not in ActivityComposer) so toggling back to
+  // list view doesn't unmount them away while the text draft survives.
+  const [activityImages, setActivityImages] = useState([])
+  const [activityFiles, setActivityFiles] = useState([])
   const [activityNotice, setActivityNotice] = useState('')
   const [selectedActivityId, setSelectedActivityId] = useState(null)
 
@@ -124,6 +128,10 @@ function ActivityLogSection({ compact = false }: { compact?: boolean }) {
               categories={categories}
               activityForm={activityForm}
               setActivityForm={setActivityForm}
+              activityImages={activityImages}
+              setActivityImages={setActivityImages}
+              activityFiles={activityFiles}
+              setActivityFiles={setActivityFiles}
               prependActivity={prependActivity}
               submitError={submitError}
               setSubmitError={setSubmitError}
