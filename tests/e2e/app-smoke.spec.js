@@ -905,7 +905,7 @@ test('community exposes my deleted posts and restore appeal for members', async 
       },
     })
   })
-  await page.route('**/api/community/posts', (route) => route.fulfill({ status: 200, json: [] }))
+  await page.route('**/api/community/posts{,?*}', (route) => route.fulfill({ status: 200, json: [] }))
 
   await page.goto('/community?view=deleted')
 
@@ -930,7 +930,7 @@ test('community composer creates a post with editor text and file blocks', async
   let fileUploaded = false
   let savedPost = null
 
-  await page.route('**/api/community/posts', async (route) => {
+  await page.route('**/api/community/posts{,?*}', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({ status: 200, json: posts })
       return
@@ -1064,7 +1064,7 @@ test('community detail supports comment add, reply, edit, and delete', async ({ 
   let updatedCommentPayload = null
   let deletedCommentId = null
 
-  await page.route('**/api/community/posts', (route) => route.fulfill({ status: 200, json: [post] }))
+  await page.route('**/api/community/posts{,?*}', (route) => route.fulfill({ status: 200, json: [post] }))
   await page.route('**/api/community/posts/77', (route) => route.fulfill({ status: 200, json: post }))
   await page.route('**/api/community/posts/77/comments', async (route) => {
     if (route.request().method() === 'GET') {
@@ -1265,7 +1265,7 @@ test('top navigation groups activity log and monthly calendar under Activity', a
 
 test('community list stays dense but readable on mobile', async ({ page }) => {
   await mockAdminApis(page)
-  await page.route('**/api/community/posts', (route) => route.fulfill({
+  await page.route('**/api/community/posts{,?*}', (route) => route.fulfill({
     status: 200,
     json: Array.from({ length: 12 }, (_, index) => ({
       id: index + 1,
