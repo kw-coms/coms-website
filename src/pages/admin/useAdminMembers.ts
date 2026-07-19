@@ -47,6 +47,7 @@ export function useAdminMembers() {
     members: membersQuery.data ?? [],
     loading: membersQuery.isPending,
     error: membersQuery.error ? (membersQuery.error.message || '회원 목록을 불러오지 못했습니다.') : '',
+    refetch: membersQuery.refetch,
     updateRole: roleMutation.mutateAsync,
     removeMember: deleteMutation.mutateAsync,
     resetPassword: passwordMutation.mutateAsync,

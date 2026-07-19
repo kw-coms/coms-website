@@ -6,6 +6,7 @@ import { queryKeys } from '../../services/queryKeys'
 import { BoardComposeBar } from './CommunityChrome'
 import CommunityPostRow from './CommunityPostRow'
 import { useBookmarkMutation } from './useBookmarkMutation'
+import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
 export default function CommunityBookmarks({ onBack }: { onBack: () => void }) {
   const navigate = useNavigate()
@@ -59,7 +60,19 @@ export default function CommunityBookmarks({ onBack }: { onBack: () => void }) {
 
         <div className="m-4 space-y-3 sm:m-8">
           {isPending && (
-            <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-12 text-center text-sm font-semibold text-[var(--app-muted)]">불러오는 중...</div>
+            <SkeletonGroup label="스크랩한 글을 불러오는 중">
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-4 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-3 w-20" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </SkeletonGroup>
           )}
           {!isPending && !error && posts.length === 0 && (
             <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-12 text-center text-sm font-semibold text-[var(--app-muted)]">스크랩한 글이 없습니다.</div>

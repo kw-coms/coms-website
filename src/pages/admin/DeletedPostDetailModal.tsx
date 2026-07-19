@@ -9,6 +9,7 @@ import {
   deletedPostIdentity,
   formatDateTime,
 } from './deletedCommunityPostUtils'
+import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
 type DeletedPostDetail = {
   id: string | number
@@ -155,7 +156,15 @@ export default function DeletedPostDetailModal({ post, onClose, onRestore, resto
             </div>
 
             {error && <p className="mt-3 shape-cut-sm bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-700">{error}</p>}
-            {loading && <p className="mt-3 text-xs text-[var(--theme-body-muted)]">원문을 불러오는 중...</p>}
+            {loading && (
+              <SkeletonGroup label="원문을 불러오는 중">
+                <div className="mt-3 space-y-2">
+                  <Skeleton variant="line" className="w-full" />
+                  <Skeleton variant="line" className="w-full" />
+                  <Skeleton variant="line" className="w-2/3" />
+                </div>
+              </SkeletonGroup>
+            )}
 
             <div className="mt-4 border-t border-[var(--app-hairline)] pt-4 text-sm text-[var(--theme-body-dark)]">
               <DeletedPostBody post={full} />
