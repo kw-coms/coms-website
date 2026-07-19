@@ -888,7 +888,7 @@
 }
 
 .activity-log-card-blue {
-	--activity-log-accent: #0071e3;
+	--activity-log-accent: var(--app-accent);
 }
 
 .activity-log-card-violet {

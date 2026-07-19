@@ -16,11 +16,11 @@ const panelClass =
   'rounded-lg border border-black/10 bg-white/86 p-5 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:p-8'
 const frameClass = 'rounded-lg bg-black/10 p-px'
 const inputClass =
-  'w-full rounded-lg bg-white px-4 py-3 text-[#1d1d1f] outline-none placeholder:text-[var(--app-subtle)] transition focus:ring-2 focus:ring-[#0071e3]/24'
+  'w-full rounded-lg bg-white px-4 py-3 text-[#1d1d1f] outline-none placeholder:text-[var(--app-subtle)] transition focus:ring-2 focus:ring-[var(--app-accent)]/24'
 const btnClass =
-  'flex w-full items-center justify-center gap-2 rounded-lg bg-[#0071e3] px-4 py-3 font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-not-allowed disabled:opacity-60'
+  'flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--app-accent)] px-4 py-3 font-semibold text-white transition hover:bg-[var(--app-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60'
 const linkButtonClass =
-  'w-full rounded-full border border-black/10 bg-white/70 px-4 py-2 text-center font-semibold text-[#0066cc] transition hover:bg-white sm:w-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-left'
+  'w-full rounded-full border border-black/10 bg-white/70 px-4 py-2 text-center font-semibold text-[var(--app-accent-text)] transition hover:bg-white sm:w-auto sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:text-left'
 
 const emptyResetForm = {
   email: '',
@@ -323,7 +323,7 @@ export default function Login({ onCancel, onSuccess, goSignup }: {
                 </div>
               )}
 
-              {resetMessage && <div className="text-sm text-[#0066cc]">{resetMessage}</div>}
+              {resetMessage && <div className="text-sm text-[var(--app-accent-text)]">{resetMessage}</div>}
               {resetError && <div className="text-sm text-red-500">{resetError}</div>}
 
               <ActionButton icon={resetRequested ? KeyRound : Mail} loading={resetLoading}>
@@ -373,7 +373,7 @@ export default function Login({ onCancel, onSuccess, goSignup }: {
                 자동 로그인
               </label>
 
-              {notice && <div className="text-sm text-[#0066cc]">{notice}</div>}
+              {notice && <div className="text-sm text-[var(--app-accent-text)]">{notice}</div>}
               {error && <div className="text-sm text-red-500">{error}</div>}
 
               <ActionButton icon={LogIn} loading={loading}>
