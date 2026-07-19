@@ -922,6 +922,60 @@ class CommunityServiceTest {
                 .containsExactlyElementsOf(graduateFullList.stream().map(CommunityPostResponse::id).toList());
     }
 
+    @Test
+    void searchMatchesTitleOrContentPaginatesAndRespectsAnonymousVisibility() {
+        Member author = member("2025123456", "작성자", Member.Role.USER);
+        Member viewer = member("2026123456", "회원", Member.Role.USER);
+        Member graduate = member("2018123456", "졸업생", Member.Role.USER);
+        memberRepository.save(author);
+        memberRepository.save(viewer);
+        memberRepository.save(graduate);
+        communityService.create(author.getStudentId(), new CommunityPostRequest("리액트 훅 질문", "훅 사용법", "GENERAL", false), null);
+        communityService.create(author.getStudentId(), new CommunityPostRequest("자바 정리", "스프링과 리액트 비교", "GENERAL", false), null);
+        communityService.create(author.getStudentId(), new CommunityPostRequest("점심 잡담", "뭐 먹지", "GENERAL", false), null);
+        communityService.create(author.getStudentId(), new CommunityPostRequest("익명 리액트 글", "비밀", "ANONYMOUS", false), null);
+
+        var firstPage = communityService.searchPaged(viewer.getStudentId(), "리액트", 0, 2);
+        var secondPage = communityService.searchPaged(viewer.getStudentId(), "리액트", 1, 2);
+        assertThat(firstPage.total()).isEqualTo(3);
+        assertThat(firstPage.items()).hasSize(2);
+        assertThat(secondPage.items()).hasSize(1);
+        java.util.List<String> titles = new java.util.ArrayList<>();
+        firstPage.items().forEach(p -> titles.add(p.title()));
+        secondPage.items().forEach(p -> titles.add(p.title()));
+        assertThat(titles).containsExactlyInAnyOrder("리액트 훅 질문", "자바 정리", "익명 리액트 글");
+
+        // A graduate cannot see ANONYMOUS posts: they are excluded from the search too.
+        var graduateResults = communityService.searchPaged(graduate.getStudentId(), "리액트", 0, 10);
+        assertThat(graduateResults.total()).isEqualTo(2);
+        assertThat(graduateResults.items()).extracting(CommunityPostResponse::title)
+                .containsExactlyInAnyOrder("리액트 훅 질문", "자바 정리");
+
+        // No keyword match returns an empty page rather than everything.
+        assertThat(communityService.searchPaged(viewer.getStudentId(), "존재하지않는단어", 0, 10).total()).isZero();
+    }
+
+    @Test
+    void searchBlankReturnsEmptyAndTreatsLikeWildcardsLiterally() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        communityService.create(user.getStudentId(), new CommunityPostRequest("50% 할인 공지", "이벤트", "GENERAL", false), null);
+        communityService.create(user.getStudentId(), new CommunityPostRequest("그냥 글", "내용", "GENERAL", false), null);
+
+        var blank = communityService.searchPaged(user.getStudentId(), "   ", 0, 10);
+        assertThat(blank.items()).isEmpty();
+        assertThat(blank.total()).isZero();
+
+        // '%' must be matched literally, not act as a wildcard that returns every post.
+        var literalPercent = communityService.searchPaged(user.getStudentId(), "50%", 0, 10);
+        assertThat(literalPercent.total()).isEqualTo(1);
+        assertThat(literalPercent.items()).singleElement()
+                .satisfies(p -> assertThat(p.title()).isEqualTo("50% 할인 공지"));
+
+        var bareWildcard = communityService.searchPaged(user.getStudentId(), "%", 0, 10);
+        assertThat(bareWildcard.total()).isEqualTo(1);
+    }
+
     private Member member(String studentId, String name, Member.Role role) {
         Member member = new Member();
         member.setStudentId(studentId);

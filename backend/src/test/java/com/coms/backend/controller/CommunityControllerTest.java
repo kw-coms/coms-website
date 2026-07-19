@@ -147,6 +147,17 @@ class CommunityControllerTest {
     }
 
     @Test
+    void searchReturnsMatchingPostsWithTotalCountHeader() throws Exception {
+        communityService.create(AUTHOR, new CommunityPostRequest("리액트 질문", "훅 사용법", "GENERAL", false), null);
+        communityService.create(AUTHOR, new CommunityPostRequest("자바 잡담", "점심 뭐먹지", "GENERAL", false), null);
+
+        mockMvc.perform(get("/api/community/posts/search").param("q", "리액트").cookie(authCookie))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("X-Total-Count", "1"))
+                .andExpect(jsonPath("$[0].title").value("리액트 질문"));
+    }
+
+    @Test
     void rejectsUnsafePostContent() throws Exception {
         mockMvc.perform(write(post("/api/community/posts"))
                         .content("{\"title\":\"제목\",\"content\":\"<script>alert(1)</script>\",\"category\":\"GENERAL\"}"))

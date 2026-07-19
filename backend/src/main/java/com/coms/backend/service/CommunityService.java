@@ -66,6 +66,7 @@ public class CommunityService {
     private static final int MAX_DELETE_REASON_LENGTH = 300;
     private static final long CONCEPT_POST_SCORE_THRESHOLD = 5;
     private static final int MAX_POSTS_PER_MINUTE = 5;
+    private static final int MAX_SEARCH_QUERY_LENGTH = 100;
 
     private final CommunityPostRepository communityPostRepository;
     private final CommunityPostVoteRepository voteRepository;
@@ -198,6 +199,35 @@ public class CommunityService {
     }
 
     public record PagedPosts(List<CommunityPostResponse> items, long total) {}
+
+    /**
+     * Keyword search over post title/content with real DB-side pagination, honouring the same
+     * visibility rules as {@link #listPaged}: a viewer who can't see ANONYMOUS posts has them
+     * excluded in SQL. The query is trimmed and length-capped, and LIKE metacharacters are escaped so
+     * user input can't inject wildcards; a blank query short-circuits to an empty page.
+     */
+    @Transactional(readOnly = true)
+    public PagedPosts searchPaged(String studentId, String query, int page, int size) {
+        Member member = access.requireMember(studentId);
+        String keyword = query == null ? "" : query.trim();
+        if (keyword.isEmpty()) {
+            return new PagedPosts(List.of(), 0);
+        }
+        if (keyword.length() > MAX_SEARCH_QUERY_LENGTH) {
+            keyword = keyword.substring(0, MAX_SEARCH_QUERY_LENGTH);
+        }
+        String escaped = escapeLikePattern(keyword);
+        Pageable pageable = PageRequest.of(page, size);
+        org.springframework.data.domain.Page<CommunityPost> result = access.canSeeAnonymous(member)
+                ? communityPostRepository.searchByKeyword(escaped, pageable)
+                : communityPostRepository.searchByKeywordExcludingCategory(escaped, CommunityPost.Category.ANONYMOUS, pageable);
+        return new PagedPosts(mapPosts(result.getContent(), member, null), result.getTotalElements());
+    }
+
+    /** Escapes LIKE metacharacters against the {@code '!'} escape char used by the search queries. */
+    private static String escapeLikePattern(String value) {
+        return value.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+    }
 
     private List<CommunityPostResponse> mapPosts(List<CommunityPost> posts, Member member, Boolean bookmarkedOverride) {
         Map<String, Member> authors = authorsByStudentId(posts);
