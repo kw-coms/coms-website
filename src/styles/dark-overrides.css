@@ -1,0 +1,767 @@
+:root[data-theme-mode='dark'] .home-hero-surface {
+	background-image:
+		linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 42%, transparent), color-mix(in srgb, var(--app-accent-soft) 45%, transparent) 48%, color-mix(in srgb, var(--app-bg) 92%, transparent)),
+		linear-gradient(90deg, transparent 0, color-mix(in srgb, var(--app-accent-soft) 34%, transparent) 50%, transparent 100%);
+}
+
+:root[data-theme-mode='dark'] .home-device {
+	box-shadow:
+		0 34px 85px rgba(0, 0, 0, 0.36),
+		inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme-mode='dark'] .theme-home img[alt*="KW COM"],
+:root[data-theme-mode='dark'] .apple-route img[alt*="KW COM"],
+:root[data-theme-mode='dark'] .apple-global-nav img[alt*="KW COM"] {
+	filter: invert(1) brightness(1.08) drop-shadow(0 10px 24px rgba(0, 0, 0, 0.22));
+}
+
+.apple-global-nav-menu {
+	display: flex !important;
+	position: relative !important;
+	right: auto !important;
+	top: auto !important;
+	width: 2.75rem;
+	height: 2.75rem;
+	min-height: 2.75rem;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
+	border-radius: 9999px;
+	border: 0;
+	background: transparent;
+	color: var(--app-text) !important;
+	box-shadow: none;
+	transition: background-color 160ms ease, opacity 160ms ease, transform 160ms ease;
+}
+
+.apple-global-nav-menu:hover {
+	background: color-mix(in srgb, var(--app-text) 6%, transparent);
+}
+
+.apple-global-nav-menu:active {
+	transform: scale(0.96);
+}
+
+.apple-global-nav-menu:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 2px;
+}
+
+:root[data-theme-mode='dark'] .apple-global-nav-menu {
+	color: var(--app-text) !important;
+	background: transparent;
+}
+
+/* The global nav (and its desktop Activity dropdown) renders outside the
+   .apple-route / .theme-home page wrappers, so it does not inherit the
+   utility remaps below. Mirror the essential ones here so the bar, its
+   hairline border, the dropdown surface, and the admin button stay legible
+   in dark mode. */
+:root[data-theme-mode='dark'] .apple-global-nav .border-black\/10,
+:root[data-theme-mode='dark'] .apple-global-nav .border-black\/8,
+:root[data-theme-mode='dark'] .apple-global-nav .border-black\/5 {
+	border-color: var(--app-hairline) !important;
+}
+
+:root[data-theme-mode='dark'] .apple-global-nav .bg-white {
+	background-color: var(--app-surface) !important;
+}
+
+:root[data-theme-mode='dark'] .apple-global-nav .bg-\[\#e8f3ff\] {
+	background-color: var(--app-accent-soft) !important;
+}
+
+:root[data-theme-mode='dark'] .apple-global-nav .text-\[\#0066cc\] {
+	color: var(--app-accent-text) !important;
+}
+
+:root[data-theme-mode='dark'] .apple-global-nav .text-\[\#1d1d1f\] {
+	color: var(--app-text) !important;
+}
+
+:root[data-theme-mode='dark'] .apple-global-nav .text-\[\#86868b\],
+:root[data-theme-mode='dark'] .apple-global-nav .text-\[\#6e6e73\] {
+	color: var(--app-muted) !important;
+}
+
+:root[data-theme-mode='dark'] .apple-global-nav .hover\:bg-\[\#f5f5f7\]:hover {
+	background-color: var(--app-surface-elevated) !important;
+}
+
+:root[data-theme-mode='dark'] .apple-global-nav .text-\[\#b45309\] {
+	color: #fbbf24 !important;
+}
+
+:root[data-theme-mode='dark'] .apple-global-nav .hover\:bg-amber-100\/70:hover {
+	background-color: color-mix(in srgb, #f59e0b 18%, transparent) !important;
+}
+
+.apple-mobile-menu-panel {
+	max-height: calc(100dvh - var(--apple-nav-height, 44px) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	-webkit-overflow-scrolling: touch;
+	border-bottom: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 94%, transparent);
+	box-shadow: 0 18px 40px rgba(0, 0, 0, 0.1);
+	backdrop-filter: saturate(180%) blur(22px);
+	-webkit-backdrop-filter: saturate(180%) blur(22px);
+	transform-origin: top center;
+	animation: menu-slide-down 160ms ease-out both;
+}
+
+@keyframes menu-slide-down {
+	0% {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+	100% {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.apple-mobile-menu-item {
+	display: flex;
+	min-height: 3.25rem;
+	width: 100%;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0 1.25rem;
+	color: var(--app-text);
+	font-size: 0.925rem;
+	font-weight: 700;
+	letter-spacing: 0;
+	text-align: left;
+	transition: background-color 160ms ease, color 160ms ease;
+}
+
+.apple-mobile-menu-notification {
+	border: 0;
+	background: transparent;
+}
+
+.apple-mobile-menu-subitem {
+	min-height: 3.75rem;
+	align-items: flex-start;
+	padding: 0.75rem 1.25rem 0.75rem 1.5rem;
+	background: color-mix(in srgb, var(--app-surface-soft) 54%, transparent);
+}
+
+.apple-mobile-menu-subitem > span:last-child {
+	min-width: 0;
+}
+
+.apple-mobile-menu-item:hover {
+	background: color-mix(in srgb, var(--app-surface-elevated) 80%, transparent);
+}
+
+.apple-mobile-menu-item-accent {
+	color: var(--app-accent-text);
+}
+
+.apple-mobile-menu-item-warning {
+	color: #b45309;
+}
+
+:root[data-theme-mode='dark'] .apple-mobile-menu-item-warning {
+	color: #fbbf24;
+}
+
+.apple-mobile-menu-item-warning:hover {
+	background: color-mix(in srgb, #f59e0b 12%, transparent);
+}
+
+@media (min-width: 768px) {
+	.apple-mobile-tabs {
+		display: none !important;
+	}
+
+	.apple-global-nav-menu {
+		display: none !important;
+	}
+}
+
+.theme-home,
+.apple-route {
+	background: var(--app-bg) !important;
+	color: var(--app-text) !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home [data-panel] {
+	background: var(--app-bg) !important;
+}
+
+.theme-home .bg-\[\#0071e3\],
+.apple-route .bg-\[\#0071e3\],
+.theme-home .bg-\[\#3b4890\],
+.apple-route .bg-\[\#3b4890\] {
+	background-color: var(--app-accent) !important;
+}
+
+.theme-home .hover\:bg-\[\#0077ed\]:hover,
+.apple-route .hover\:bg-\[\#0077ed\]:hover,
+.theme-home .hover\:bg-\[\#2d3a7a\]:hover,
+.apple-route .hover\:bg-\[\#2d3a7a\]:hover {
+	background-color: var(--app-accent-hover) !important;
+}
+
+.theme-home .bg-\[\#e8f3ff\],
+.apple-route .bg-\[\#e8f3ff\],
+.theme-home .bg-\[\#e8f8ff\],
+.apple-route .bg-\[\#e8f8ff\],
+.theme-home .bg-cyan-50,
+.apple-route .bg-cyan-50 {
+	background-color: var(--app-accent-soft) !important;
+}
+
+.theme-home .text-\[\#0066cc\],
+.apple-route .text-\[\#0066cc\],
+.theme-home .text-\[\#0071e3\],
+.apple-route .text-\[\#0071e3\],
+.theme-home .text-\[\#3b4890\],
+.apple-route .text-\[\#3b4890\] {
+	color: var(--app-accent-text) !important;
+}
+
+.theme-home .border-\[\#0071e3\],
+.apple-route .border-\[\#0071e3\],
+.theme-home .border-\[\#0071e3\]\/20,
+.apple-route .border-\[\#0071e3\]\/20,
+.theme-home .border-\[\#0071e3\]\/40,
+.apple-route .border-\[\#0071e3\]\/40,
+.theme-home .focus\:border-\[\#3b4890\]:focus,
+.apple-route .focus\:border-\[\#3b4890\]:focus {
+	border-color: var(--app-accent-border) !important;
+}
+
+.theme-home .text-\[\#1d1d1f\],
+.apple-route .text-\[\#1d1d1f\],
+.theme-home .text-\[\#1d1d1f\]\/72,
+.apple-route .text-\[\#1d1d1f\]\/72,
+.theme-home .text-\[\#1d1d1f\]\/78,
+.apple-route .text-\[\#1d1d1f\]\/78,
+.theme-home .hover\:text-\[\#1d1d1f\]:hover,
+.apple-route .hover\:text-\[\#1d1d1f\]:hover {
+	color: var(--app-text) !important;
+}
+
+.theme-home .text-\[\#6e6e73\],
+.apple-route .text-\[\#6e6e73\],
+.theme-home .text-\[\#86868b\],
+.apple-route .text-\[\#86868b\],
+.theme-home .placeholder\:text-\[\#86868b\]::placeholder,
+.apple-route .placeholder\:text-\[\#86868b\]::placeholder {
+	color: var(--app-muted) !important;
+}
+
+/* Dark-mode: dark brand/ink text colors that were not previously remapped
+   (these render dark-on-dark and become unreadable). */
+:root[data-theme-mode='dark'] .theme-home .text-\[\#23306d\],
+:root[data-theme-mode='dark'] .apple-route .text-\[\#23306d\] {
+	color: #aab8ff !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home .text-\[\#4b587c\],
+:root[data-theme-mode='dark'] .apple-route .text-\[\#4b587c\] {
+	color: var(--app-muted) !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home .text-\[\#424245\],
+:root[data-theme-mode='dark'] .apple-route .text-\[\#424245\] {
+	color: var(--app-text) !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home .text-\[\#6e56cf\],
+:root[data-theme-mode='dark'] .apple-route .text-\[\#6e56cf\],
+:root[data-theme-mode='dark'] .theme-popover .text-\[\#6e56cf\] {
+	color: #c4b5ff !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home .text-\[\#248a3d\],
+:root[data-theme-mode='dark'] .apple-route .text-\[\#248a3d\],
+:root[data-theme-mode='dark'] .theme-popover .text-\[\#248a3d\] {
+	color: #5fd37e !important;
+}
+
+/* Concept/appeal amber inks sit on warm tinted chips; keep them readable
+   on the dark tinted backgrounds those chips fall back to. */
+:root[data-theme-mode='dark'] .theme-home .text-\[\#3a2b00\],
+:root[data-theme-mode='dark'] .apple-route .text-\[\#3a2b00\] {
+	color: #3a2b00 !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home .text-\[\#8a6400\],
+:root[data-theme-mode='dark'] .apple-route .text-\[\#8a6400\] {
+	color: #ffcf7a !important;
+}
+
+.theme-home .bg-white,
+.apple-route .bg-white,
+.theme-popover .bg-white,
+.appearance-panel .bg-white {
+	background-color: var(--app-surface) !important;
+}
+
+.theme-home .bg-\[\#f5f5f7\],
+.apple-route .bg-\[\#f5f5f7\],
+.theme-home .bg-\[\#fafafa\],
+.apple-route .bg-\[\#fafafa\],
+.theme-home .bg-\[\#f5f5f5\],
+.apple-route .bg-\[\#f5f5f5\],
+.appearance-panel .bg-\[\#f5f5f7\] {
+	background-color: var(--app-surface-soft) !important;
+}
+
+.theme-home .bg-white\/95,
+.apple-route .bg-white\/95 {
+	background-color: color-mix(in srgb, var(--app-surface) 95%, transparent) !important;
+}
+
+.theme-home .bg-white\/88,
+.apple-route .bg-white\/88,
+.appearance-panel.bg-white\/88 {
+	background-color: color-mix(in srgb, var(--app-surface) 88%, transparent) !important;
+}
+
+.theme-home .bg-white\/86,
+.apple-route .bg-white\/86,
+.theme-home .bg-white\/82,
+.apple-route .bg-white\/82,
+.theme-home .bg-white\/80,
+.apple-route .bg-white\/80,
+.theme-home .bg-white\/78,
+.apple-route .bg-white\/78,
+.theme-home .bg-white\/76,
+.apple-route .bg-white\/76,
+.theme-home .bg-white\/72,
+.apple-route .bg-white\/72,
+.theme-home .bg-white\/70,
+.apple-route .bg-white\/70,
+.theme-home .bg-white\/64,
+.apple-route .bg-white\/64,
+.theme-home .bg-white\/60,
+.apple-route .bg-white\/60 {
+	background-color: color-mix(in srgb, var(--app-surface) 82%, transparent) !important;
+}
+
+.theme-home .hover\:bg-white:hover,
+.apple-route .hover\:bg-white:hover,
+.theme-home .hover\:bg-white\/20:hover,
+.apple-route .hover\:bg-white\/20:hover,
+.theme-home .hover\:bg-white\/24:hover,
+.apple-route .hover\:bg-white\/24:hover,
+.theme-home .hover\:bg-white\/60:hover,
+.apple-route .hover\:bg-white\/60:hover,
+.theme-home .hover\:bg-white\/78:hover,
+.apple-route .hover\:bg-white\/78:hover,
+.theme-home .hover\:bg-white\/80:hover,
+.apple-route .hover\:bg-white\/80:hover,
+.theme-home .focus\:bg-white:focus,
+.apple-route .focus\:bg-white:focus,
+.theme-home .focus\:bg-white\/80:focus,
+.apple-route .focus\:bg-white\/80:focus {
+	background-color: var(--app-surface-elevated) !important;
+	color: var(--app-text) !important;
+}
+
+.theme-home .hover\:bg-\[\#f5f5f7\]:hover,
+.apple-route .hover\:bg-\[\#f5f5f7\]:hover,
+.theme-home .focus\:bg-\[\#f5f5f7\]:focus,
+.apple-route .focus\:bg-\[\#f5f5f7\]:focus {
+	background-color: var(--app-surface-soft) !important;
+}
+
+.theme-home .border-black\/5,
+.apple-route .border-black\/5,
+.theme-home .border-black\/8,
+.apple-route .border-black\/8,
+.theme-home .border-black\/10,
+.apple-route .border-black\/10,
+.theme-home .border-black\/15,
+.apple-route .border-black\/15 {
+	border-color: var(--app-hairline) !important;
+}
+
+.theme-home .bg-black\/3,
+.apple-route .bg-black\/3,
+.theme-home .bg-black\/5,
+.apple-route .bg-black\/5,
+.theme-home .bg-black\/8,
+.apple-route .bg-black\/8 {
+	background-color: color-mix(in srgb, var(--app-text) 5%, transparent) !important;
+}
+
+.theme-home .bg-black\/10,
+.apple-route .bg-black\/10,
+.theme-home .bg-black\/15,
+.apple-route .bg-black\/15 {
+	background-color: color-mix(in srgb, var(--app-text) 8%, transparent) !important;
+}
+
+.theme-home .bg-black\/60,
+.apple-route .bg-black\/60 {
+	background-color: color-mix(in srgb, var(--app-bg) 86%, transparent) !important;
+}
+
+.theme-home .bg-white\/50,
+.apple-route .bg-white\/50,
+.theme-home .bg-white\/24,
+.apple-route .bg-white\/24,
+.theme-home .bg-white\/16,
+.apple-route .bg-white\/16 {
+	background-color: color-mix(in srgb, var(--app-surface) 70%, transparent) !important;
+}
+
+.theme-home .bg-\[\#dce6ff\],
+.apple-route .bg-\[\#dce6ff\],
+.theme-home .bg-\[\#eef3ff\],
+.apple-route .bg-\[\#eef3ff\],
+.theme-home .bg-\[\#f4f6ff\],
+.apple-route .bg-\[\#f4f6ff\],
+.theme-home .bg-\[\#f7f9ff\],
+.apple-route .bg-\[\#f7f9ff\],
+.theme-home .bg-\[\#f8faff\],
+.apple-route .bg-\[\#f8faff\],
+.theme-home .bg-\[\#f2efff\],
+.apple-route .bg-\[\#f2efff\],
+.theme-home .bg-\[\#3b4890\]\/10,
+.apple-route .bg-\[\#3b4890\]\/10 {
+	background-color: var(--app-accent-soft) !important;
+}
+
+.theme-home .bg-\[\#eafaf2\],
+.apple-route .bg-\[\#eafaf2\] {
+	background-color: color-mix(in srgb, #34c759 18%, var(--app-surface)) !important;
+}
+
+.theme-home .bg-\[\#fff8e8\],
+.apple-route .bg-\[\#fff8e8\] {
+	background-color: color-mix(in srgb, #ff9f0a 18%, var(--app-surface)) !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home .bg-\[\#ffe2a2\],
+:root[data-theme-mode='dark'] .apple-route .bg-\[\#ffe2a2\],
+:root[data-theme-mode='dark'] .theme-home .bg-yellow-50,
+:root[data-theme-mode='dark'] .apple-route .bg-yellow-50 {
+	background-color: color-mix(in srgb, #f59e0b 28%, var(--app-surface)) !important;
+}
+
+/* Warm "appeal" chips (held #8a6400 ink) -> dark amber tint in dark mode. */
+.theme-home .bg-\[\#fff4cc\],
+.apple-route .bg-\[\#fff4cc\],
+.theme-home .bg-\[\#fff9e8\],
+.apple-route .bg-\[\#fff9e8\] {
+	background-color: color-mix(in srgb, #ff9f0a 14%, var(--app-surface)) !important;
+}
+
+/* Light neutral / pale-blue surfaces that previously stayed near-white. */
+.theme-home .bg-\[\#f5f5f5\],
+.apple-route .bg-\[\#f5f5f5\] {
+	background-color: var(--app-surface-soft) !important;
+}
+
+.theme-home .bg-\[\#e8ecff\],
+.apple-route .bg-\[\#e8ecff\],
+.theme-home .hover\:bg-\[\#e8ecff\]:hover,
+.apple-route .hover\:bg-\[\#e8ecff\]:hover {
+	background-color: var(--app-accent-soft) !important;
+}
+
+/* Translucent white surfaces not covered by the opacity ladder above. */
+.theme-home .bg-white\/85,
+.apple-route .bg-white\/85,
+.theme-home .bg-white\/75,
+.apple-route .bg-white\/75,
+.theme-home .bg-white\/55,
+.apple-route .bg-white\/55 {
+	background-color: color-mix(in srgb, var(--app-surface) 82%, transparent) !important;
+}
+
+.concept-post-card,
+.concept-post-row {
+	color: #4a2f00 !important;
+}
+
+.concept-post-card h3,
+.concept-post-card .text-\[\#1d1d1f\],
+.concept-post-row .text-\[\#1d1d1f\] {
+	color: #2a1900 !important;
+}
+
+:root[data-theme-mode='dark'] .concept-post-card,
+:root[data-theme-mode='dark'] .concept-post-row {
+	color: #ffd793 !important;
+}
+
+:root[data-theme-mode='dark'] .concept-post-card h3,
+:root[data-theme-mode='dark'] .concept-post-card .text-\[\#1d1d1f\],
+:root[data-theme-mode='dark'] .concept-post-row .text-\[\#1d1d1f\] {
+	color: var(--app-text) !important;
+}
+
+.theme-popover .bg-cyan-50,
+.theme-popover .bg-\[\#e8f3ff\],
+.theme-popover .bg-\[\#e8f8ff\] {
+	background-color: var(--app-accent-soft) !important;
+}
+
+.notification-row {
+	position: relative;
+	transition: background-color 160ms ease;
+}
+
+.notification-row .notification-dot {
+	display: inline-block;
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 9999px;
+	flex-shrink: 0;
+}
+
+.notification-row-unread {
+	background-color: color-mix(in srgb, var(--app-accent) 9%, var(--app-surface)) !important;
+	color: var(--app-text);
+	box-shadow: inset 3px 0 0 var(--app-accent);
+}
+
+.notification-row-unread .notification-dot {
+	background-color: var(--app-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 22%, transparent);
+}
+
+.notification-row-unread:hover {
+	background-color: color-mix(in srgb, var(--app-accent) 16%, var(--app-surface)) !important;
+}
+
+.notification-row-read {
+	background-color: var(--app-surface) !important;
+	color: var(--app-muted);
+}
+
+.notification-row-read .notification-dot {
+	background-color: color-mix(in srgb, var(--app-muted) 35%, transparent);
+}
+
+.notification-row-read:hover {
+	background-color: var(--app-surface-soft) !important;
+}
+
+.concept-post-card,
+.concept-post-row {
+	position: relative;
+	color: var(--app-text) !important;
+	background-color: color-mix(in srgb, #ffb340 14%, var(--app-surface)) !important;
+	background-image: linear-gradient(
+		90deg,
+		color-mix(in srgb, #ffb340 20%, var(--app-surface)) 0,
+		color-mix(in srgb, #ffb340 8%, var(--app-surface)) 100%
+	) !important;
+	box-shadow: inset 3px 0 0 #ff9f0a;
+}
+
+.concept-post-card h3,
+.concept-post-card .text-\[\#1d1d1f\],
+.concept-post-row .text-\[\#1d1d1f\] {
+	color: var(--app-text) !important;
+}
+
+:root[data-theme-mode='dark'] .concept-post-card,
+:root[data-theme-mode='dark'] .concept-post-row {
+	background-color: color-mix(in srgb, #ff9f0a 18%, var(--app-surface)) !important;
+	background-image: linear-gradient(
+		90deg,
+		color-mix(in srgb, #ff9f0a 26%, var(--app-surface)) 0,
+		color-mix(in srgb, #ff9f0a 10%, var(--app-surface)) 100%
+	) !important;
+	box-shadow: inset 3px 0 0 #ffb340;
+}
+
+.theme-home .bg-\[\#f0c36d\],
+.apple-route .bg-\[\#f0c36d\] {
+	background-color: #d8a14d !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home .bg-amber-100,
+:root[data-theme-mode='dark'] .apple-route .bg-amber-100 {
+	background-color: color-mix(in srgb, #f59e0b 22%, var(--app-surface)) !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home .text-amber-600,
+:root[data-theme-mode='dark'] .apple-route .text-amber-600,
+:root[data-theme-mode='dark'] .theme-home .text-amber-700,
+:root[data-theme-mode='dark'] .apple-route .text-amber-700,
+:root[data-theme-mode='dark'] .theme-home .text-amber-800,
+:root[data-theme-mode='dark'] .apple-route .text-amber-800 {
+	color: #fbbf24 !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home .bg-red-50,
+:root[data-theme-mode='dark'] .apple-route .bg-red-50,
+:root[data-theme-mode='dark'] .theme-home .bg-red-100,
+:root[data-theme-mode='dark'] .apple-route .bg-red-100 {
+	background-color: color-mix(in srgb, #ef4444 22%, var(--app-surface)) !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home .text-red-500,
+:root[data-theme-mode='dark'] .apple-route .text-red-500,
+:root[data-theme-mode='dark'] .theme-home .text-red-600,
+:root[data-theme-mode='dark'] .apple-route .text-red-600,
+:root[data-theme-mode='dark'] .theme-home .text-red-700,
+:root[data-theme-mode='dark'] .apple-route .text-red-700 {
+	color: #f87171 !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_1px_2px_rgba(0,0,0,0.04)]"],
+:root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_1px_2px_rgba(0,0,0,0.05)]"],
+:root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_1px_2px_rgba(0,0,0,0.08)]"],
+:root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_1px_2px_rgba(0,0,0,0.04)]"],
+:root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_1px_2px_rgba(0,0,0,0.05)]"],
+:root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_1px_2px_rgba(0,0,0,0.08)]"] {
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_8px_24px_rgba(0,0,0,0.05)]"],
+:root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_8px_24px_rgba(0,0,0,0.06)]"],
+:root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_4px_16px_rgba(0,0,0,0.05)]"],
+:root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_2px_12px_rgba(0,0,0,0.08)]"],
+:root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_5px_18px_rgba(0,0,0,0.12)]"],
+:root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_8px_24px_rgba(0,0,0,0.05)]"],
+:root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_8px_24px_rgba(0,0,0,0.06)]"],
+:root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_4px_16px_rgba(0,0,0,0.05)]"],
+:root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_2px_12px_rgba(0,0,0,0.08)]"],
+:root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_5px_18px_rgba(0,0,0,0.12)]"] {
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_18px_45px_rgba(0,0,0,0.08)]"],
+:root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_18px_50px_rgba(0,0,0,0.10)]"],
+:root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_18px_54px_rgba(0,0,0,0.09)]"],
+:root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_24px_70px_rgba(0,0,0,0.12)]"],
+:root[data-theme-mode='dark'] .theme-home [class*="shadow-[0_32px_90px_rgba(0,0,0,0.12)]"],
+:root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_18px_45px_rgba(0,0,0,0.08)]"],
+:root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_18px_50px_rgba(0,0,0,0.10)]"],
+:root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_18px_54px_rgba(0,0,0,0.09)]"],
+:root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_24px_70px_rgba(0,0,0,0.12)]"],
+:root[data-theme-mode='dark'] .apple-route [class*="shadow-[0_32px_90px_rgba(0,0,0,0.12)]"] {
+	box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55) !important;
+}
+
+.theme-home .divide-black\/8 > :not([hidden]) ~ :not([hidden]),
+.apple-route .divide-black\/8 > :not([hidden]) ~ :not([hidden]),
+.theme-home .divide-black\/10 > :not([hidden]) ~ :not([hidden]),
+.apple-route .divide-black\/10 > :not([hidden]) ~ :not([hidden]) {
+	border-color: var(--app-hairline) !important;
+}
+
+.theme-home input,
+.theme-home textarea,
+.theme-home select,
+.apple-route input,
+.apple-route textarea,
+.apple-route select {
+	background-color: var(--app-surface) !important;
+	color: var(--app-text) !important;
+	border-color: var(--app-hairline) !important;
+}
+
+.theme-home input:focus,
+.theme-home textarea:focus,
+.theme-home select:focus,
+.apple-route input:focus,
+.apple-route textarea:focus,
+.apple-route select:focus {
+	border-color: var(--app-accent-border) !important;
+	--tw-ring-color: color-mix(in srgb, var(--app-accent) 24%, transparent) !important;
+}
+
+.theme-home .bg-linear-to-br,
+.apple-route .bg-linear-to-br {
+	background-image: linear-gradient(135deg, var(--app-surface), var(--app-surface-soft) 58%, var(--app-accent-soft)) !important;
+}
+
+.theme-home .bg-linear-to-b,
+.apple-route .bg-linear-to-b {
+	background-image: linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 85%, transparent), transparent 48%, color-mix(in srgb, var(--app-bg) 88%, transparent)) !important;
+}
+
+.theme-popover {
+	background-color: color-mix(in srgb, var(--app-surface) 92%, transparent) !important;
+	color: var(--app-text) !important;
+	border-color: var(--app-hairline) !important;
+}
+
+.apple-footer-surface {
+	background-color: var(--app-surface-soft) !important;
+	color: var(--app-muted);
+}
+
+.apple-footer-surface .appearance-panel {
+	background: transparent !important;
+	color: var(--app-text) !important;
+	border-color: var(--app-hairline) !important;
+	box-shadow: none !important;
+	backdrop-filter: none !important;
+	-webkit-backdrop-filter: none !important;
+}
+
+.apple-footer-note,
+.apple-footer-directory,
+.apple-footer-bottom {
+	border-color: var(--app-hairline) !important;
+}
+
+.apple-footer-surface a {
+	text-decoration: none;
+}
+
+.appearance-mode-toggle,
+.appearance-color-row > label,
+.appearance-color-row > button {
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48);
+}
+
+:root[data-theme-mode='dark'] .appearance-mode-toggle,
+:root[data-theme-mode='dark'] .appearance-color-row > label,
+:root[data-theme-mode='dark'] .appearance-color-row > button {
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.appearance-panel .text-\[\#1d1d1f\],
+.theme-popover .text-\[var\(--theme-body-dark\)\] {
+	color: var(--app-text) !important;
+}
+
+.appearance-panel .text-\[\#6e6e73\],
+.appearance-panel .text-\[\#86868b\],
+.theme-popover .text-\[var\(--theme-body-muted\)\] {
+	color: var(--app-muted) !important;
+}
+
+.appearance-panel .border-black\/10,
+.theme-popover .border-black\/10,
+.theme-popover .border-black\/8 {
+	border-color: var(--app-hairline) !important;
+}
+
+/* Notification dropdown (a .theme-popover portal rendered to <body>): the
+   navy accent text and the actor chip need to track the theme so they stay
+   visible on the dark popover surface. */
+.theme-popover .text-\[\#3b4890\] {
+	color: var(--app-accent-text) !important;
+}
+
+.theme-popover .bg-black\/5 {
+	background-color: color-mix(in srgb, var(--app-text) 8%, transparent) !important;
+}
+
+.theme-popover .border-black\/5 {
+	border-color: var(--app-hairline) !important;
+}
+
+:root[data-theme-mode='dark'] .theme-home .shadow-\[0_24px_70px_rgba\(0\,0\,0\,0\.1\)\],
+:root[data-theme-mode='dark'] .apple-route .shadow-\[0_24px_70px_rgba\(0\,0\,0\,0\.1\)\] {
+	box-shadow: 0 24px 70px rgba(0, 0, 0, 0.38) !important;
+}
+

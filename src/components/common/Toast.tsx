@@ -8,10 +8,16 @@ import { createPortal } from 'react-dom'
 
 type ToastTone = 'default' | 'success' | 'error'
 
+type ToastAction = {
+  label: string
+  onClick: () => void
+}
+
 type ToastInput = {
   message: string
   tone?: ToastTone
   duration?: number
+  action?: ToastAction
 }
 
 type ToastItem = ToastInput & {
@@ -58,6 +64,7 @@ export function showToast(input: ToastInput | string): number {
     message: normalized.message,
     tone: normalized.tone ?? 'default',
     duration: normalized.duration ?? DEFAULT_DURATION,
+    action: normalized.action,
     leaving: false,
   }
   toasts = [...toasts, item]
@@ -99,6 +106,18 @@ export function ToastHost() {
           role="status"
         >
           <span className="coms-toast-message">{toast.message}</span>
+          {toast.action ? (
+            <button
+              type="button"
+              className="coms-toast-action"
+              onClick={() => {
+                toast.action?.onClick()
+                dismissToast(toast.id)
+              }}
+            >
+              {toast.action.label}
+            </button>
+          ) : null}
           <button
             type="button"
             className="coms-toast-close"

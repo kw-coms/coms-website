@@ -57,3 +57,39 @@ jobs:
 
       - name: Smoke test
         run: npm run smoke
+
+      # Reuses the PWA-disabled build produced by `npm run smoke`.
+      # mobile-visual is excluded: its screenshot baselines are darwin-only.
+      - name: Accessibility e2e
+        run: npx playwright test --project=accessibility
+
+  backend-e2e:
+    name: Real-backend auth e2e
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Backend-auth e2e
+        run: npm run test:e2e:backend

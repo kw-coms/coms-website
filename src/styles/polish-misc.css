@@ -1,0 +1,678 @@
+/* ════════════════════════════════════════════════════════════════════════
+   DESIGN POLISH + MICRO-ANIMATION PASS
+   Subtle, Apple/Kakao-style motion. Every animation reuses the existing
+   --app-* tokens and the shared cubic-bezier(0.22, 1, 0.36, 1) easing, and
+   every motion is disabled under prefers-reduced-motion: reduce.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ---- 1. Card stagger utility ----------------------------------------- */
+/* Add `.coms-stagger` to a grid/list and set `--i` (the child's index) on
+   each card to cascade its reveal. Layers on top of any per-element
+   --reveal-delay; the page-enter wrapper keeps its opacity-only transition so
+   the sticky-pin fix is never affected (no transform added here). */
+.reveal-ready .coms-stagger > [data-reveal] {
+	transition-delay: calc(var(--reveal-delay, 0ms) + var(--i, 0) * 70ms);
+}
+
+/* ---- 2. Button press feedback ---------------------------------------- */
+/* A quick settle on press for the primary/secondary action buttons. The
+   theme-home variants already define their own :active depth press, so this
+   only targets the non-home routes to avoid double transforms. */
+.apple-route .apple-action-primary,
+.apple-route .apple-action-secondary {
+	transition:
+		background-color 160ms ease,
+		color 160ms ease,
+		transform 120ms cubic-bezier(0.22, 1, 0.36, 1),
+		box-shadow 120ms ease,
+		opacity 160ms ease;
+}
+.apple-route .apple-action-primary:active,
+.apple-route .apple-action-secondary:active {
+	transform: scale(0.97);
+}
+
+/* ---- 3. Input focus glow --------------------------------------------- */
+/* Soft outward accent ring, in addition to the existing inset ring color. */
+.theme-home input,
+.theme-home textarea,
+.theme-home select,
+.apple-route input,
+.apple-route textarea,
+.apple-route select {
+	transition: box-shadow 200ms ease, border-color 200ms ease;
+}
+.theme-home input:focus,
+.theme-home input:focus-visible,
+.theme-home textarea:focus,
+.theme-home textarea:focus-visible,
+.theme-home select:focus,
+.theme-home select:focus-visible,
+.apple-route input:focus,
+.apple-route input:focus-visible,
+.apple-route textarea:focus,
+.apple-route textarea:focus-visible,
+.apple-route select:focus,
+.apple-route select:focus-visible {
+	box-shadow: 0 0 0 4px color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+/* ---- 4. Table row hover accent --------------------------------------- */
+/* A left accent bar fades in on hover via an inset box-shadow. */
+.apple-table tbody tr {
+	transition: background-color 160ms ease, box-shadow 200ms ease;
+	box-shadow: inset 0 0 0 0 var(--app-accent);
+}
+.apple-table tbody tr:hover,
+.apple-table tbody tr:focus {
+	box-shadow: inset 3px 0 0 0 var(--app-accent);
+}
+
+/* ---- 5. Empty-state entrance ----------------------------------------- */
+.activity-empty-state,
+.calendar-empty-state {
+	animation: coms-empty-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes coms-empty-in {
+	0% {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+	100% {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* ---- 6. Chevron rotate (CSS-toggled fallback) ------------------------ */
+/* Existing JS already toggles Tailwind's `rotate-180`; this gives a smooth
+   200ms turn and a class-based hook (.is-open) for any non-Tailwind chevron. */
+.coms-chevron {
+	transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.coms-chevron.is-open {
+	transform: rotate(180deg);
+}
+
+/* ---- 7. Skeleton wave (staggered by row) ----------------------------- */
+/* Each skeleton ripples slightly after the previous so the shimmer travels
+   down the list instead of pulsing all at once. Set --i on a row to tune, or
+   rely on the nth-child cascade below. */
+.skeleton::after {
+	animation-delay: calc(var(--i, 0) * 120ms);
+}
+.skeleton:nth-child(2)::after { animation-delay: 120ms; }
+.skeleton:nth-child(3)::after { animation-delay: 240ms; }
+.skeleton:nth-child(4)::after { animation-delay: 360ms; }
+.skeleton:nth-child(5)::after { animation-delay: 480ms; }
+.skeleton:nth-child(6)::after { animation-delay: 600ms; }
+
+/* ---- 8. Toast component ---------------------------------------------- */
+.coms-toast-host {
+	position: fixed;
+	top: calc(var(--apple-nav-height, 56px) + 0.75rem);
+	right: 1rem;
+	z-index: 120;
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+	pointer-events: none;
+	max-width: min(22rem, calc(100vw - 2rem));
+}
+.coms-toast {
+	pointer-events: auto;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	border-radius: 0.75rem;
+	border: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 92%, transparent);
+	color: var(--app-text);
+	padding: 0.7rem 0.85rem;
+	box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+	backdrop-filter: saturate(180%) blur(18px);
+	-webkit-backdrop-filter: saturate(180%) blur(18px);
+	font-size: 0.875rem;
+	font-weight: 600;
+	line-height: 1.45;
+	animation: coms-toast-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.coms-toast.is-leaving {
+	animation: coms-toast-out 240ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+.coms-toast-success {
+	border-color: color-mix(in srgb, var(--app-accent) 42%, var(--app-hairline));
+}
+.coms-toast-success::before,
+.coms-toast-error::before {
+	content: '';
+	flex: 0 0 auto;
+	width: 4px;
+	align-self: stretch;
+	border-radius: 9999px;
+	background: var(--app-accent);
+}
+.coms-toast-error::before {
+	background: #ff3b30;
+}
+.coms-toast-message {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.coms-toast-action {
+	flex: 0 0 auto;
+	padding: 0.25rem 0.7rem;
+	border-radius: 9999px;
+	background: var(--app-accent);
+	color: #fff;
+	font-size: 0.82rem;
+	font-weight: 600;
+	line-height: 1.2;
+	transition: filter 160ms ease;
+}
+.coms-toast-action:hover {
+	filter: brightness(1.08);
+}
+.coms-toast-close {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.4rem;
+	height: 1.4rem;
+	border-radius: 9999px;
+	color: var(--app-muted);
+	font-size: 1.1rem;
+	line-height: 1;
+	transition: background-color 160ms ease, color 160ms ease;
+}
+.coms-toast-close:hover {
+	background: var(--app-surface-soft);
+	color: var(--app-text);
+}
+@keyframes coms-toast-in {
+	0% {
+		opacity: 0;
+		transform: translateX(16px);
+	}
+	100% {
+		opacity: 1;
+		transform: none;
+	}
+}
+@keyframes coms-toast-out {
+	0% {
+		opacity: 1;
+		transform: none;
+	}
+	100% {
+		opacity: 0;
+		transform: translateX(16px);
+	}
+}
+
+/* ---- Reduced-motion: disable / soften every polish animation --------- */
+@media (prefers-reduced-motion: reduce) {
+	.reveal-ready .coms-stagger > [data-reveal] {
+		transition-delay: 0ms;
+	}
+	.apple-route .apple-action-primary:active,
+	.apple-route .apple-action-secondary:active {
+		transform: none;
+	}
+	.apple-table tbody tr {
+		transition: background-color 160ms ease;
+	}
+	.activity-empty-state,
+	.calendar-empty-state {
+		animation: none;
+	}
+	.coms-chevron {
+		transition: none;
+	}
+	.skeleton::after,
+	.skeleton:nth-child(2)::after,
+	.skeleton:nth-child(3)::after,
+	.skeleton:nth-child(4)::after,
+	.skeleton:nth-child(5)::after,
+	.skeleton:nth-child(6)::after {
+		animation: none;
+		animation-delay: 0ms;
+	}
+	.coms-toast,
+	.coms-toast.is-leaving {
+		animation: none;
+	}
+}
+
+/* community code blocks */
+/* Styles formatted code inside rendered community post bodies. Uses the shared
+   surface/hairline tokens so block code reads correctly in both light and dark
+   mode. Block code (<pre><code>) scrolls horizontally for long lines; inline
+   <code> renders as a small chip. */
+.community-post-text pre {
+	margin: 0.75rem 0;
+	padding: 0.85rem 1rem;
+	background: var(--app-surface-soft);
+	border: 1px solid var(--app-hairline);
+	border-radius: 10px;
+	overflow-x: auto;
+	/* let a vertical swipe scroll the page, not get trapped scrolling the code */
+	touch-action: pan-x pinch-zoom;
+	white-space: pre;
+}
+.community-post-text pre code {
+	display: block;
+	padding: 0;
+	background: none;
+	border: 0;
+	border-radius: 0;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	font-size: 0.85em;
+	line-height: 1.6;
+	color: var(--theme-body-dark);
+	white-space: pre;
+}
+.community-post-text code {
+	padding: 0.1em 0.4em;
+	background: var(--app-surface-soft);
+	border: 1px solid var(--app-hairline);
+	border-radius: 5px;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	font-size: 0.85em;
+	color: var(--theme-body-dark);
+}
+
+/* highlight.js theme (GitHub light + dark), bundled LOCALLY — the live-site CSP
+   blocks external stylesheet hosts, so no theme is loaded from a CDN. Scoped to
+   .community-post-text .hljs so it only affects highlighted post code, and made
+   dark-mode aware via the existing :root[data-theme-mode='dark'] attribute. Base
+   block layout (padding/scroll/background) stays on .community-post-text pre
+   above; these rules only add token colors. Token classes mirror github.css /
+   github-dark.css from highlight.js. */
+.community-post-text .hljs {
+	color: #24292e;
+}
+.community-post-text .hljs-doctag,
+.community-post-text .hljs-keyword,
+.community-post-text .hljs-meta .hljs-keyword,
+.community-post-text .hljs-template-tag,
+.community-post-text .hljs-template-variable,
+.community-post-text .hljs-type,
+.community-post-text .hljs-variable.language_ {
+	color: #d73a49;
+}
+.community-post-text .hljs-title,
+.community-post-text .hljs-title.class_,
+.community-post-text .hljs-title.class_.inherited__,
+.community-post-text .hljs-title.function_ {
+	color: #6f42c1;
+}
+.community-post-text .hljs-attr,
+.community-post-text .hljs-attribute,
+.community-post-text .hljs-literal,
+.community-post-text .hljs-meta,
+.community-post-text .hljs-number,
+.community-post-text .hljs-operator,
+.community-post-text .hljs-variable,
+.community-post-text .hljs-selector-attr,
+.community-post-text .hljs-selector-class,
+.community-post-text .hljs-selector-id {
+	color: #005cc5;
+}
+.community-post-text .hljs-regexp,
+.community-post-text .hljs-string,
+.community-post-text .hljs-meta .hljs-string {
+	color: #032f62;
+}
+.community-post-text .hljs-built_in,
+.community-post-text .hljs-symbol {
+	color: #e36209;
+}
+.community-post-text .hljs-comment,
+.community-post-text .hljs-code,
+.community-post-text .hljs-formula {
+	color: #6a737d;
+}
+.community-post-text .hljs-name,
+.community-post-text .hljs-quote,
+.community-post-text .hljs-selector-tag,
+.community-post-text .hljs-selector-pseudo {
+	color: #22863a;
+}
+.community-post-text .hljs-subst {
+	color: #24292e;
+}
+.community-post-text .hljs-section {
+	color: #005cc5;
+	font-weight: bold;
+}
+.community-post-text .hljs-bullet {
+	color: #735c0f;
+}
+.community-post-text .hljs-emphasis {
+	color: #24292e;
+	font-style: italic;
+}
+.community-post-text .hljs-strong {
+	color: #24292e;
+	font-weight: bold;
+}
+.community-post-text .hljs-addition {
+	color: #22863a;
+	background-color: #f0fff4;
+}
+.community-post-text .hljs-deletion {
+	color: #b31d28;
+	background-color: #ffeef0;
+}
+
+:root[data-theme-mode='dark'] .community-post-text .hljs {
+	color: #c9d1d9;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-doctag,
+:root[data-theme-mode='dark'] .community-post-text .hljs-keyword,
+:root[data-theme-mode='dark'] .community-post-text .hljs-meta .hljs-keyword,
+:root[data-theme-mode='dark'] .community-post-text .hljs-template-tag,
+:root[data-theme-mode='dark'] .community-post-text .hljs-template-variable,
+:root[data-theme-mode='dark'] .community-post-text .hljs-type,
+:root[data-theme-mode='dark'] .community-post-text .hljs-variable.language_ {
+	color: #ff7b72;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-title,
+:root[data-theme-mode='dark'] .community-post-text .hljs-title.class_,
+:root[data-theme-mode='dark'] .community-post-text .hljs-title.class_.inherited__,
+:root[data-theme-mode='dark'] .community-post-text .hljs-title.function_ {
+	color: #d2a8ff;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-attr,
+:root[data-theme-mode='dark'] .community-post-text .hljs-attribute,
+:root[data-theme-mode='dark'] .community-post-text .hljs-literal,
+:root[data-theme-mode='dark'] .community-post-text .hljs-meta,
+:root[data-theme-mode='dark'] .community-post-text .hljs-number,
+:root[data-theme-mode='dark'] .community-post-text .hljs-operator,
+:root[data-theme-mode='dark'] .community-post-text .hljs-variable,
+:root[data-theme-mode='dark'] .community-post-text .hljs-selector-attr,
+:root[data-theme-mode='dark'] .community-post-text .hljs-selector-class,
+:root[data-theme-mode='dark'] .community-post-text .hljs-selector-id {
+	color: #79c0ff;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-regexp,
+:root[data-theme-mode='dark'] .community-post-text .hljs-string,
+:root[data-theme-mode='dark'] .community-post-text .hljs-meta .hljs-string {
+	color: #a5d6ff;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-built_in,
+:root[data-theme-mode='dark'] .community-post-text .hljs-symbol {
+	color: #ffa657;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-comment,
+:root[data-theme-mode='dark'] .community-post-text .hljs-code,
+:root[data-theme-mode='dark'] .community-post-text .hljs-formula {
+	color: #8b949e;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-name,
+:root[data-theme-mode='dark'] .community-post-text .hljs-quote,
+:root[data-theme-mode='dark'] .community-post-text .hljs-selector-tag,
+:root[data-theme-mode='dark'] .community-post-text .hljs-selector-pseudo {
+	color: #7ee787;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-subst {
+	color: #c9d1d9;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-section {
+	color: #1f6feb;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-bullet {
+	color: #f2cc60;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-emphasis {
+	color: #c9d1d9;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-strong {
+	color: #c9d1d9;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-addition {
+	color: #aff5b4;
+	background-color: #033a16;
+}
+:root[data-theme-mode='dark'] .community-post-text .hljs-deletion {
+	color: #ffdcd7;
+	background-color: #67060c;
+}
+
+.club-event-rsvp {
+	margin: 0 1rem;
+	display: grid;
+	gap: 0.5rem;
+}
+
+.club-event-rsvp-label {
+	font-size: 0.74rem;
+	font-weight: 900;
+	letter-spacing: 0.02em;
+	color: var(--app-muted);
+}
+
+.club-event-rsvp-group {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.4rem;
+	padding: 0.3rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 999px;
+	background: var(--app-surface-soft);
+}
+
+.club-event-rsvp-button {
+	display: inline-flex;
+	min-height: 2.5rem;
+	align-items: center;
+	justify-content: center;
+	gap: 0.4rem;
+	border-radius: 999px;
+	border: 1px solid transparent;
+	background: transparent;
+	padding: 0.45rem 0.6rem;
+	color: var(--app-accent-text);
+	font-size: 0.82rem;
+	font-weight: 950;
+	transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.club-event-rsvp-button:hover:not(:disabled):not(.club-event-rsvp-button-selected) {
+	background: var(--app-accent-soft);
+}
+
+.club-event-rsvp-button-count {
+	font-variant-numeric: tabular-nums;
+	opacity: 0.85;
+}
+
+.club-event-rsvp-button-selected {
+	border-color: var(--app-accent);
+	background: var(--app-accent);
+	color: white;
+}
+
+.club-event-rsvp-button-selected .club-event-rsvp-button-count {
+	opacity: 1;
+}
+
+.club-event-rsvp-button:disabled {
+	cursor: not-allowed;
+}
+
+.club-event-rsvp-button-pending {
+	opacity: 0.7;
+}
+
+/* =========================================================================
+   Mobile (≤767px) reading polish — community / notices / archive
+   Scoped to phones only so desktop (≥768px) is visually unchanged. These
+   only raise the lower bound of fluid type so body copy clears ~15px on a
+   narrow container; the clamp max is left intact, so wide containers (and
+   therefore desktop) render exactly as before.
+   ========================================================================= */
+@media (max-width: 767px) {
+	/* Comment body could bottom out near ~13px on a phone-width container.
+	   Lift the floor to ~15px for comfortable reading without touching the
+	   desktop ceiling (0.98rem). */
+	.auto-text-comment {
+		font-size: clamp(0.94rem, 0.9rem + 0.18cqw, 0.98rem);
+	}
+}
+
+/* ─── Confirm / prompt modal (ConfirmDialog.tsx) ───────────────────────────── */
+.coms-confirm-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 10001;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1.25rem;
+	background: rgba(0, 0, 0, 0.42);
+	backdrop-filter: blur(2px);
+	animation: coms-confirm-fade 120ms ease-out;
+}
+.coms-confirm-card {
+	width: 100%;
+	max-width: 24rem;
+	border-radius: 16px;
+	background: var(--app-surface);
+	border: 1px solid var(--app-hairline);
+	box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
+	padding: 1.4rem 1.4rem 1.1rem;
+	animation: coms-confirm-pop 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.coms-confirm-title {
+	margin: 0 0 0.35rem;
+	font-size: 1rem;
+	font-weight: 700;
+	color: var(--app-text);
+}
+.coms-confirm-message {
+	margin: 0;
+	font-size: 0.92rem;
+	line-height: 1.55;
+	color: var(--app-muted);
+	white-space: pre-line;
+}
+.coms-confirm-input {
+	margin-top: 0.9rem;
+	width: 100%;
+	border: 1px solid var(--app-hairline);
+	border-radius: 10px;
+	background: var(--app-surface-soft);
+	padding: 0.6rem 0.75rem;
+	font-size: 0.92rem;
+	color: var(--app-text);
+	outline: none;
+}
+.coms-confirm-input:focus-visible {
+	border-color: var(--app-accent);
+	box-shadow: 0 0 0 3px var(--app-accent-soft);
+}
+.coms-confirm-actions {
+	margin-top: 1.2rem;
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.5rem;
+}
+.coms-confirm-cancel,
+.coms-confirm-ok {
+	min-height: 2.5rem;
+	padding: 0 1.1rem;
+	border-radius: 999px;
+	font-size: 0.88rem;
+	font-weight: 700;
+	transition: background 140ms ease, opacity 140ms ease;
+}
+.coms-confirm-cancel {
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	color: var(--app-muted);
+}
+.coms-confirm-cancel:hover {
+	background: var(--app-surface-soft);
+}
+.coms-confirm-ok {
+	background: var(--app-accent);
+	color: #fff;
+}
+.coms-confirm-ok:hover {
+	background: var(--app-accent-hover);
+}
+.coms-confirm-ok.is-danger {
+	background: #ff3b30;
+}
+.coms-confirm-ok.is-danger:hover {
+	background: #e0291f;
+}
+.coms-confirm-ok:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+@keyframes coms-confirm-fade {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+@keyframes coms-confirm-pop {
+	from { opacity: 0; transform: translateY(8px) scale(0.98); }
+	to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+	.coms-confirm-backdrop,
+	.coms-confirm-card {
+		animation: none;
+	}
+}
+
+/* ---- 9. Skeleton primitive extras (components/common/Skeleton.tsx) ---- */
+.skeleton-circle {
+	border-radius: 9999px;
+}
+
+/* ---- 10. ErrorState (components/common/ErrorState.tsx) ---------------- */
+/* Mirrors .activity-empty-state's icon + heading + message layout so error
+   panels read as part of the same design language as the app's existing
+   empty states, with an optional retry action underneath. */
+.coms-error-state {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	border: 1px dashed var(--app-hairline-strong);
+	border-radius: 0.5rem;
+	background: color-mix(in srgb, var(--app-surface) 78%, transparent);
+	padding: 1.25rem;
+	color: var(--app-muted);
+	animation: coms-empty-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.coms-error-state svg {
+	flex-shrink: 0;
+	color: #ff3b30;
+}
+.coms-error-state h3 {
+	margin: 0;
+	color: var(--app-text);
+	font-size: 1rem;
+	font-weight: 800;
+}
+.coms-error-state p {
+	margin: 0.35rem 0 0;
+	font-size: 0.9rem;
+	font-weight: 600;
+	line-height: 1.6;
+}
+.coms-error-state-retry {
+	margin-top: 0.75rem;
+	padding: 0.5rem 1rem;
+	font-size: 0.82rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.coms-error-state {
+		animation: none;
+	}
+}
