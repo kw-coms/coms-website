@@ -8,7 +8,7 @@ export default function TiptapPollBlockView({ node, selected }: NodeViewProps) {
   return (
     <NodeViewWrapper
       as="figure"
-      className={`community-editor-figure ${selected ? 'ring-2 ring-[#3b4890]/30' : ''}`}
+      className={`community-editor-figure ${selected ? 'ring-2 ring-[var(--app-brand)]/30' : ''}`}
       data-block-id={blockId}
       data-type="poll"
       contentEditable={false}

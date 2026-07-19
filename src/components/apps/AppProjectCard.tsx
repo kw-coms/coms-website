@@ -7,7 +7,7 @@ import AppEmbedModal from './AppEmbedModal'
 const DEFAULT_MADE_BY = '최준혁'
 
 const STATUS_TONE_CLASS = {
-  ready: 'bg-[#e8f3ff] text-[#0066cc]',
+  ready: 'bg-[#e8f3ff] text-[var(--app-accent-text)]',
   hosted: 'bg-[#eaf8ee] text-[#248a3d]',
   external: 'bg-[#fff4de] text-[#b76e00]',
   download: 'bg-[#f0ecff] text-[#6e3fd8]',
@@ -79,7 +79,7 @@ export default function AppProjectCard({
       data-testid={testId}
       className={`apple-product-panel group flex min-h-64 flex-col px-6 py-6 text-left no-underline transition hover:-translate-y-0.5 ${className}`}
     >
-      {project?.eyebrow && <p className="text-sm font-semibold text-[#0066cc]">{project.eyebrow}</p>}
+      {project?.eyebrow && <p className="text-sm font-semibold text-[var(--app-accent-text)]">{project.eyebrow}</p>}
       <h3 className="mt-3 text-2xl font-semibold leading-tight text-[#1d1d1f]">{project?.title || '입력 중인 Apps 항목'}</h3>
       {project?.description && (
         <p className="mt-3 flex-1 text-sm font-medium leading-6 text-[#6e6e73]">{project.description}</p>
@@ -104,7 +104,7 @@ export default function AppProjectCard({
       <div className="mt-5 flex flex-wrap items-center gap-3">
         {hasLink && (
           wholeCardLink ? (
-            <span className="inline-flex items-center gap-2 text-sm font-bold text-[#0066cc]">
+            <span className="inline-flex items-center gap-2 text-sm font-bold text-[var(--app-accent-text)]">
               열기
               <ArrowUpRight size={15} aria-hidden="true" />
             </span>
@@ -114,7 +114,7 @@ export default function AppProjectCard({
               target="_blank"
               rel="noreferrer"
               aria-label={`${project?.title || '앱'} 열기`}
-              className="inline-flex items-center gap-2 text-sm font-bold text-[#0066cc] no-underline"
+              className="inline-flex items-center gap-2 text-sm font-bold text-[var(--app-accent-text)] no-underline"
             >
               열기
               <ArrowUpRight size={15} aria-hidden="true" />
@@ -143,7 +143,7 @@ export default function AppProjectCard({
               <a
                 key={file.id || file.originalName || file.url}
                 href={href}
-                className="flex min-w-0 items-center gap-2 rounded-lg border border-[#d2d2d7] bg-white/72 px-3 py-2 text-xs font-bold text-[#1d1d1f] no-underline transition hover:border-[#0066cc] hover:text-[#0066cc]"
+                className="flex min-w-0 items-center gap-2 rounded-lg border border-[#d2d2d7] bg-white/72 px-3 py-2 text-xs font-bold text-[#1d1d1f] no-underline transition hover:border-[var(--app-accent-text)] hover:text-[var(--app-accent-text)]"
                 onClick={(event) => {
                   event.stopPropagation()
                   if (href === '#') event.preventDefault()
