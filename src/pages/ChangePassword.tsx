@@ -9,6 +9,13 @@ import { listFonts } from '../services/fontApi'
 import { BUILT_IN_FONTS, fontFamilyValue } from '../services/fontPreferences'
 import { listProfileMiniAppDocuments } from '../services/miniAppsApi'
 import { getNotificationPreferences, updateNotificationPreferences } from '../services/notificationApi'
+import {
+  getPushPermission,
+  isPushAvailable,
+  isPushEnabledOnServer,
+  subscribeToPush,
+  unsubscribeFromPush,
+} from '../services/webPush'
 import { useAuth } from '../contexts/useAuth'
 import { getLogoAsset } from '../utils/logoAssets'
 import { showToast } from '../components/common/Toast'
@@ -143,6 +150,84 @@ function NotificationToggle({ checked, onChange, label, description, disabled }:
   )
 }
 
+const PUSH_ENABLED_STORAGE_KEY = 'coms.push.enabled'
+
+// Device push opt-in. Renders nothing unless the browser supports push, the
+// Firebase web config is present, and the server reports push enabled — so an
+// unconfigured deploy shows no dead control. Permission is only requested from
+// the explicit toggle click, never on load.
+function PushNotificationCard({ helperTextClass }: { helperTextClass: string }) {
+  const [supported] = useState(isPushAvailable)
+  const [available, setAvailable] = useState(false)
+  const [ready, setReady] = useState(false)
+  const [permission, setPermission] = useState(getPushPermission)
+  const [enabled, setEnabled] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!supported) return
+    let mounted = true
+    isPushEnabledOnServer().then((serverEnabled) => {
+      if (!mounted) return
+      setAvailable(serverEnabled)
+      if (serverEnabled) {
+        const stored = window.localStorage.getItem(PUSH_ENABLED_STORAGE_KEY) === 'true'
+        setEnabled(stored && getPushPermission() === 'granted')
+      }
+      setReady(true)
+    })
+    return () => { mounted = false }
+  }, [supported])
+
+  const persistEnabled = (next: boolean) => {
+    try { window.localStorage.setItem(PUSH_ENABLED_STORAGE_KEY, String(next)) } catch { /* ignore quota */ }
+    setEnabled(next)
+  }
+
+  const handleToggle = async (next: boolean) => {
+    if (busy) return
+    setBusy(true)
+    try {
+      if (next) {
+        const result = await subscribeToPush()
+        setPermission(getPushPermission())
+        if (result.status === 'subscribed') {
+          persistEnabled(true)
+          showToast({ message: '이 기기에서 푸시 알림을 켰습니다.', tone: 'success' })
+        } else if (result.status === 'denied') {
+          showToast({ message: '브라우저에서 알림 권한이 차단되어 있습니다. 브라우저 설정에서 허용해 주세요.', tone: 'error' })
+        } else if (result.status === 'error') {
+          showToast({ message: result.message, tone: 'error' })
+        }
+      } else {
+        await unsubscribeFromPush()
+        persistEnabled(false)
+        showToast({ message: '이 기기에서 푸시 알림을 껐습니다.', tone: 'success' })
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!supported || !ready || !available) return null
+
+  const blocked = permission === 'denied'
+  return (
+    <div className="space-y-2">
+      <NotificationToggle
+        label="이 기기 푸시 알림"
+        description={blocked
+          ? '브라우저에서 알림이 차단되어 있습니다. 브라우저 설정에서 이 사이트의 알림을 허용해 주세요.'
+          : '이 브라우저에서 푸시 알림을 받습니다. 처음 켤 때 브라우저 권한을 요청합니다.'}
+        checked={enabled && !blocked}
+        disabled={busy || blocked}
+        onChange={handleToggle}
+      />
+      <p className={helperTextClass}>알림 종류별 수신 여부는 아래에서 조정할 수 있습니다.</p>
+    </div>
+  )
+}
+
 function NotificationPreferencesSection({ cardClass, helperTextClass, primaryBtnClass }: {
   cardClass: string
   helperTextClass: string
@@ -184,6 +269,8 @@ function NotificationPreferencesSection({ cardClass, helperTextClass, primaryBtn
         <h3 className="text-base font-bold">알림 설정</h3>
         <p className={helperTextClass}>받고 싶은 알림 종류를 선택할 수 있습니다. 끈 항목은 더 이상 받지 않습니다.</p>
       </div>
+
+      <PushNotificationCard helperTextClass={helperTextClass} />
 
       {loading && <p className={helperTextClass}>알림 설정을 불러오는 중...</p>}
       {loadError && <p className="text-sm text-red-500">{loadError}</p>}
