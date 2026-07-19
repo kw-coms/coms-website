@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { listBannedStudents, banStudent, unbanStudent } from '../../services/adminApi'
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
+import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
 const BAN_DURATIONS = [
   { value: '6H', label: '6시간' },
@@ -91,7 +92,17 @@ export default function AdminBan({ formatDateTime }: { formatDateTime: (value: s
       </form>
 
       {loading ? (
-        <p className="text-sm text-[var(--theme-body-muted)]">불러오는 중...</p>
+        <SkeletonGroup label="차단 목록을 불러오는 중">
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-3 py-3">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+            ))}
+          </div>
+        </SkeletonGroup>
       ) : banned.length === 0 ? (
         <p className="text-sm text-[var(--theme-body-muted)]">차단된 학번이 없습니다.</p>
       ) : (
