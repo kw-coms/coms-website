@@ -13,6 +13,7 @@ import com.coms.backend.repository.ClubActivityVoteRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -39,6 +40,8 @@ public class ClubActivityService {
 
     private static final long MAX_IMAGE_BYTES = 20L * 1024 * 1024;
     private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
+    private static final int MAX_TITLE_LENGTH = 150;
+    private static final int MAX_DESCRIPTION_LENGTH = 2_000;
     private static final int MAX_IMAGES_PER_ACTIVITY = 12;
     private static final int MAX_FILES_PER_ACTIVITY = 10;
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
@@ -116,6 +119,7 @@ public class ClubActivityService {
         return toResponse(activity, studentId);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public ClubActivityResponse create(String kind,
                                        String category,
                                        String title,
@@ -126,6 +130,7 @@ public class ClubActivityService {
         return create(kind, category, title, description, eventDate, eventDate, null, null, image, creatorStudentId);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public ClubActivityResponse create(String kind,
                                        String category,
                                        String title,
@@ -139,6 +144,7 @@ public class ClubActivityService {
         return create(kind, category, title, description, eventDate, endDate, startTime, endTime, null, image, creatorStudentId);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public ClubActivityResponse create(String kind,
                                        String category,
                                        String title,
@@ -170,8 +176,8 @@ public class ClubActivityService {
         ClubActivity activity = new ClubActivity();
         activity.setKind(parsedKind);
         activity.setCategory(categoryKey);
-        activity.setTitle(title.trim());
-        activity.setDescription(description != null && !description.isBlank() ? description.trim() : null);
+        activity.setTitle(boundedText(title, MAX_TITLE_LENGTH, "제목"));
+        activity.setDescription(description != null && !description.isBlank() ? boundedText(description, MAX_DESCRIPTION_LENGTH, "설명") : null);
         activity.setEventDate(eventDate);
         activity.setEndDate(normalizedEndDate);
         activity.setStartTime(parsedStartTime);
@@ -212,6 +218,7 @@ public class ClubActivityService {
         }
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public ClubActivityResponse update(Long id,
                                        String kind,
                                        String category,
@@ -222,6 +229,7 @@ public class ClubActivityService {
         return update(id, kind, category, title, description, eventDate, null, null, null, editorStudentId);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public ClubActivityResponse update(Long id,
                                        String kind,
                                        String category,
@@ -235,6 +243,7 @@ public class ClubActivityService {
         return update(id, kind, category, title, description, eventDate, endDate, startTime, endTime, null, editorStudentId);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public ClubActivityResponse update(Long id,
                                        String kind,
                                        String category,
@@ -257,10 +266,10 @@ public class ClubActivityService {
             if (title.isBlank()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Activity title is required.");
             }
-            activity.setTitle(title.trim());
+            activity.setTitle(boundedText(title, MAX_TITLE_LENGTH, "제목"));
         }
         if (description != null) {
-            activity.setDescription(description.isBlank() ? null : description.trim());
+            activity.setDescription(description.isBlank() ? null : boundedText(description, MAX_DESCRIPTION_LENGTH, "설명"));
         }
         if (eventDate != null) {
             activity.setEventDate(eventDate);
@@ -288,6 +297,7 @@ public class ClubActivityService {
         return toResponse(saved, editorStudentId);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public List<Long> addImages(Long id, List<MultipartFile> images) {
         if (images == null || images.isEmpty()) return List.of();
         ClubActivity activity = get(id);
@@ -316,6 +326,7 @@ public class ClubActivityService {
         return createdIds;
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteImage(Long id, Long imageId) {
         ClubActivityImage image = imageRepository.findById(imageId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -326,6 +337,7 @@ public class ClubActivityService {
         imageRepository.delete(image);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public Long addFile(Long id, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부할 파일을 선택하세요.");
@@ -350,6 +362,7 @@ public class ClubActivityService {
         }
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public void deleteFile(Long id, Long fileId) {
         ClubActivityFile file = fileRepository.findById(fileId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -396,6 +409,7 @@ public class ClubActivityService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     public void delete(Long id) {
         ClubActivity activity = get(id);
         for (ClubActivityImage image : imageRepository.findByClubActivityIdOrderByPositionAsc(id)) {
@@ -595,5 +609,13 @@ public class ClubActivityService {
         int myVote(String studentId) {
             return studentId == null ? 0 : byStudent.getOrDefault(studentId, 0);
         }
+    }
+
+    private String boundedText(String value, int maxLength, String fieldName) {
+        String trimmed = value.trim();
+        if (trimmed.length() > maxLength) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + "은 " + maxLength + "자 이하로 입력하세요.");
+        }
+        return trimmed;
     }
 }

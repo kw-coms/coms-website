@@ -80,6 +80,12 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:3000:80"
+    healthcheck:
+      # nginx:1.27-alpine has BusyBox wget but no curl.
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
       - coms-backend
 

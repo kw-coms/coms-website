@@ -1,0 +1,597 @@
+@keyframes blob {
+	0%,
+	100% {
+		transform: translate3d(0, 0, 0) scale(1);
+	}
+
+	33% {
+		transform: translate3d(28px, -18px, 0) scale(1.08);
+	}
+
+	66% {
+		transform: translate3d(-20px, 22px, 0) scale(0.94);
+	}
+}
+
+.animate-blob {
+	animation: blob 18s ease-in-out infinite;
+}
+
+.tech-grid {
+	background-image: linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+	background-size: 5rem 5rem;
+}
+
+.home-hero-surface {
+	background-image:
+		linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 78%, transparent), color-mix(in srgb, var(--app-accent-soft) 46%, transparent) 44%, color-mix(in srgb, var(--app-surface) 66%, transparent)),
+		linear-gradient(90deg, transparent 0, color-mix(in srgb, var(--app-surface) 52%, transparent) 50%, transparent 100%);
+}
+
+.home-device {
+	background: linear-gradient(135deg, var(--app-accent-soft), var(--app-surface-soft) 58%, var(--app-surface)) !important;
+	box-shadow:
+		0 34px 85px rgba(0, 0, 0, 0.12),
+		inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.apple-hero-metrics {
+	border-top: 1px solid var(--app-hairline);
+	border-bottom: 1px solid var(--app-hairline);
+	padding: 0.95rem 0;
+}
+
+.apple-hero-metrics > div + div {
+	border-left: 1px solid var(--app-hairline);
+}
+
+.apple-showcase-strip {
+	background: var(--app-bg) !important;
+}
+
+.activity-proof-section,
+.club-calendar-section {
+	color: var(--app-text);
+}
+
+.activity-proof-section-compact {
+	padding-top: 3.5rem;
+}
+
+.activity-proof-note {
+	background: color-mix(in srgb, var(--app-surface) 88%, transparent) !important;
+}
+
+.activity-log-grid {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+.activity-log-card {
+	display: grid;
+	min-height: 31rem;
+	overflow: hidden;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface);
+	box-shadow: 0 18px 48px rgba(0, 0, 0, 0.08);
+}
+
+.activity-log-photo {
+	position: relative;
+	display: block;
+	width: 100%;
+	min-height: 13.5rem;
+	overflow: hidden;
+	border: 0;
+	padding: 0;
+	text-align: left;
+	background:
+		linear-gradient(145deg, color-mix(in srgb, var(--activity-log-accent) 70%, #ffffff), color-mix(in srgb, var(--activity-log-accent) 15%, var(--app-surface)) 62%),
+		linear-gradient(90deg, rgba(255, 255, 255, 0.32), transparent);
+	cursor: pointer;
+	appearance: none;
+}
+
+.activity-log-photo::before,
+.activity-log-photo::after {
+	content: '';
+	position: absolute;
+	border: 1px solid rgba(255, 255, 255, 0.42);
+	background: rgba(255, 255, 255, 0.18);
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+}
+
+.activity-log-photo::before {
+	left: 1rem;
+	top: 4.4rem;
+	width: 44%;
+	height: 38%;
+	border-radius: 1rem;
+	transform: rotate(-5deg);
+}
+
+.activity-log-photo::after {
+	right: 1rem;
+	top: 2.2rem;
+	width: 38%;
+	height: 46%;
+	border-radius: 1.4rem;
+	transform: rotate(6deg);
+}
+
+.activity-log-photo-has-image::before,
+.activity-log-photo-has-image::after {
+	display: none;
+}
+
+.activity-log-image {
+	display: block;
+	width: 100%;
+	height: 100%;
+	min-height: 13.5rem;
+	object-fit: cover;
+}
+
+.activity-log-photo-bar {
+	position: absolute;
+	left: 1rem;
+	top: 1rem;
+	z-index: 1;
+	display: flex;
+	gap: 0.35rem;
+}
+
+.activity-log-photo-bar span {
+	display: block;
+	width: 0.55rem;
+	height: 0.55rem;
+	border-radius: 9999px;
+	background: rgba(255, 255, 255, 0.75);
+}
+
+.activity-log-photo-mark {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	z-index: 2;
+	display: flex;
+	width: 4.75rem;
+	height: 4.75rem;
+	transform: translate(-50%, -50%);
+	align-items: center;
+	justify-content: center;
+	border-radius: 1.5rem;
+	background: rgba(255, 255, 255, 0.82);
+	color: color-mix(in srgb, var(--activity-log-accent) 72%, #1d1d1f);
+	box-shadow: 0 18px 46px rgba(0, 0, 0, 0.16);
+}
+
+.activity-log-photo-caption {
+	position: absolute;
+	inset-inline: 1rem;
+	bottom: 1rem;
+	z-index: 3;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	border-radius: 9999px;
+	background: rgba(255, 255, 255, 0.82);
+	padding: 0.6rem 0.75rem;
+	color: #1d1d1f;
+	font-size: 0.75rem;
+	font-weight: 800;
+	box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+}
+
+.activity-log-photo-caption span {
+	color: color-mix(in srgb, var(--activity-log-accent) 74%, #1d1d1f);
+}
+
+.activity-log-body {
+	display: flex;
+	flex-direction: column;
+	padding: 1.35rem;
+}
+
+.activity-log-term {
+	margin: 0;
+	color: var(--app-accent-text);
+	font-size: 0.78rem;
+	font-weight: 800;
+}
+
+.activity-log-body h3 {
+	margin: 0.55rem 0 0;
+	color: var(--app-text);
+	font-size: 1.45rem;
+	font-weight: 750;
+	line-height: 1.2;
+}
+
+.activity-log-title-button {
+	display: block;
+	width: 100%;
+	margin: 0;
+	border: 0;
+	background: transparent;
+	padding: 0;
+	color: var(--app-text);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.activity-log-photo:focus-visible,
+.activity-log-title-button:focus-visible {
+	outline: 3px solid color-mix(in srgb, var(--app-accent) 34%, transparent);
+	outline-offset: 3px;
+}
+
+.activity-log-body p:not(.activity-log-term) {
+	margin: 0.8rem 0 0;
+	color: var(--app-muted);
+	font-size: 0.925rem;
+	font-weight: 600;
+	line-height: 1.75;
+}
+
+.activity-log-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin-top: auto;
+	padding-top: 1.2rem;
+}
+
+.activity-log-tags span {
+	border: 1px solid var(--app-hairline);
+	border-radius: 9999px;
+	background: var(--app-surface-soft);
+	padding: 0.35rem 0.55rem;
+	color: var(--app-muted);
+	font-size: 0.72rem;
+	font-weight: 800;
+}
+
+.activity-log-stats {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+	margin-top: 1rem;
+	color: var(--app-muted);
+	font-size: 0.78rem;
+	font-weight: 850;
+}
+
+.activity-log-stats span {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.28rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 9999px;
+	background: var(--app-surface-soft);
+	padding: 0.35rem 0.55rem;
+}
+
+.activity-community-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface-soft);
+	padding: 1rem;
+	color: var(--app-muted);
+	font-size: 0.92rem;
+	font-weight: 700;
+}
+
+.activity-community-board-label {
+	margin: 0 0 0.25rem;
+	color: var(--app-text);
+	font-size: 0.82rem;
+	font-weight: 950;
+	text-transform: uppercase;
+	letter-spacing: 0;
+}
+
+.activity-community-compose {
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.5rem;
+	background: var(--app-surface-soft);
+}
+
+.activity-community-notice {
+	border: 1px solid color-mix(in srgb, var(--app-accent) 26%, var(--app-hairline));
+	border-radius: 0.5rem;
+	background: var(--app-accent-soft);
+	padding: 0.75rem 0.9rem;
+	color: var(--app-accent-text);
+	font-size: 0.86rem;
+	font-weight: 900;
+}
+
+.activity-community-side-field {
+	display: grid;
+	width: 100%;
+	gap: 0.45rem;
+	color: var(--app-muted);
+	font-size: 0.76rem;
+	font-weight: 900;
+}
+
+.activity-community-side-field select,
+.activity-community-side-field input {
+	min-height: 2.55rem;
+	width: 100%;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.45rem;
+	background: var(--app-surface);
+	padding: 0.55rem 0.7rem;
+	color: var(--app-text);
+	font-size: 0.9rem;
+	font-weight: 750;
+	outline: none;
+}
+
+.activity-compose-side-card {
+	align-content: start;
+}
+
+.activity-compose-attachment-summary {
+	display: grid;
+	width: 100%;
+	gap: 0.45rem;
+	border-top: 1px solid var(--app-hairline);
+	padding-top: 0.75rem;
+	color: var(--app-muted);
+	font-size: 0.82rem;
+	font-weight: 850;
+}
+
+.activity-compose-attachment-summary span,
+.activity-compose-attachment-list span {
+	display: inline-flex;
+	min-width: 0;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.activity-compose-side-actions {
+	display: grid;
+	width: 100%;
+	gap: 0.6rem;
+	border-top: 1px solid var(--app-hairline);
+	padding-top: 0.75rem;
+}
+
+.activity-compose-side-actions button {
+	width: 100%;
+}
+
+.activity-compose-attachment-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	border-bottom: 1px solid var(--app-hairline);
+	background: var(--app-surface-soft);
+	padding: 0.65rem 0.75rem;
+	color: var(--app-muted);
+	font-size: 0.78rem;
+	font-weight: 800;
+}
+
+.activity-compose-attachment-list span {
+	max-width: min(100%, 24rem);
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.45rem;
+	background: var(--app-surface);
+	padding: 0.35rem 0.55rem;
+	overflow-wrap: anywhere;
+}
+
+.activity-compose-textarea {
+	display: block;
+	border: 0;
+	font-weight: 650;
+}
+
+.rich-composer {
+	overflow: hidden;
+	min-width: 0;
+	max-width: 100%;
+	border: 1px solid color-mix(in srgb, var(--app-hairline) 86%, #000 10%);
+	border-radius: 0.5rem;
+	background: var(--app-surface);
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.rich-composer-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	max-width: 100%;
+	align-items: center;
+	gap: 0.45rem;
+	border-bottom: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface-soft) 72%, transparent);
+	padding: 0.55rem 0.65rem;
+}
+
+.rich-composer-toolbar-label {
+	margin-right: 0.1rem;
+	color: var(--app-subtle);
+	font-size: 0.72rem;
+	font-weight: 950;
+	letter-spacing: 0;
+	text-transform: uppercase;
+}
+
+.rich-composer-format-group {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.2rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.45rem;
+	background: var(--app-surface);
+	padding: 0.15rem;
+}
+
+.rich-composer-button,
+.rich-composer-select-label,
+.rich-composer-color-label,
+.rich-composer-upload-button {
+	display: inline-flex;
+	min-height: 2.25rem;
+	align-items: center;
+	justify-content: center;
+	gap: 0.35rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.4rem;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font-size: 0.82rem;
+	font-weight: 850;
+}
+
+.rich-composer-button {
+	width: 2.25rem;
+	cursor: pointer;
+	padding: 0;
+}
+
+.rich-composer-button:hover,
+.rich-composer-select-label:hover,
+.rich-composer-color-label:hover,
+.rich-composer-upload-button:hover {
+	background: var(--app-surface-soft);
+}
+
+.rich-composer-select-label {
+	padding: 0 0.35rem 0 0.55rem;
+}
+
+.rich-composer-select-label select {
+	min-height: 2rem;
+	width: 7.75rem;
+	border: 0;
+	background: transparent;
+	color: var(--app-text);
+	font-size: 0.82rem;
+	font-weight: 850;
+	outline: none;
+}
+
+.rich-composer-color-label {
+	width: 2.7rem;
+	padding: 0;
+}
+
+.rich-composer-color-label input {
+	width: 1rem;
+	height: 1rem;
+	border: 0;
+	background: transparent;
+	padding: 0;
+}
+
+.rich-composer-upload-button {
+	cursor: pointer;
+	padding: 0.42rem 0.65rem;
+	color: var(--app-accent-text);
+}
+
+.rich-composer-upload-button input {
+	display: none;
+}
+
+.rich-composer-counts {
+	color: var(--app-muted);
+	font-size: 0.76rem;
+	font-weight: 850;
+}
+
+.rich-composer-surface {
+	min-height: 24rem;
+	max-width: 100%;
+	overflow-x: hidden;
+	background: var(--app-surface);
+	padding: 1rem;
+	color: var(--app-text);
+	font-size: 1rem;
+	font-weight: 500;
+	line-height: 1.85;
+	outline: none;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+	word-break: keep-all;
+}
+
+.rich-composer-surface:focus {
+	box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--app-accent) 26%, transparent);
+}
+
+.rich-composer-surface:empty::before {
+	content: attr(data-placeholder);
+	color: var(--app-subtle);
+	pointer-events: none;
+}
+
+.rich-composer-surface p,
+.activity-detail-description p,
+.club-event-detail-description p,
+.club-event-entry-description p {
+	margin: 0 0 0.75rem;
+}
+
+.rich-composer-surface h2,
+.rich-composer-surface h3 {
+	margin: 0.85rem 0 0.5rem;
+	font-weight: 950;
+	line-height: 1.28;
+}
+
+.rich-composer-surface ul,
+.rich-composer-surface ol,
+.activity-detail-description ul,
+.activity-detail-description ol,
+.club-event-entry-description ul,
+.club-event-entry-description ol {
+	margin: 0.5rem 0 0.8rem 1.25rem;
+	padding: 0;
+}
+
+.rich-composer-surface a,
+.activity-detail-description a,
+.club-event-detail-description a,
+.club-event-entry-description a {
+	color: var(--app-accent-text);
+	font-weight: 850;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+.activity-compose-attachment-list span button {
+	display: inline-flex;
+	width: 1.25rem;
+	height: 1.25rem;
+	align-items: center;
+	justify-content: center;
+	border: 0;
+	border-radius: 999px;
+	background: var(--app-surface-soft);
+	color: var(--app-muted);
+	cursor: pointer;
+}
+
+.activity-community-row-excerpt * {
+	display: inline;
+	margin: 0;
+}
+

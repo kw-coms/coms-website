@@ -86,4 +86,20 @@ class RichContentSanitizerTest {
         assertThat(sanitizer.sanitizeContent("")).isEmpty();
         assertThat(sanitizer.sanitizeContent(null)).isNull();
     }
+
+    @Test
+    void sanitizeContentIsIdempotentForAlreadyEscapedText() throws Exception {
+        String content = "[{\"type\":\"text\",\"content\":\"A &amp; B<br>C &lt;tag&gt; &quot;q&quot;\"}]";
+        String once = sanitizer.sanitizeContent(content);
+        assertThat(mapper.readTree(once).get(0).get("content").asText())
+                .isEqualTo("A &amp; B<br>C &lt;tag&gt; &quot;q&quot;");
+        assertThat(sanitizer.sanitizeContent(once)).isEqualTo(once);
+    }
+
+    @Test
+    void sanitizeContentStillEscapesBareAmpersand() throws Exception {
+        String content = "[{\"type\":\"text\",\"content\":\"A & B\"}]";
+        String result = sanitizer.sanitizeContent(content);
+        assertThat(mapper.readTree(result).get(0).get("content").asText()).isEqualTo("A &amp; B");
+    }
 }

@@ -590,4 +590,40 @@ assert.throws(
   /Unsupported node type for P1 converter: unknownBlock/,
 )
 
+// Legacy plain-text posts store raw \n. ProseMirror forbids newlines inside text
+// nodes, so the converter must map them to hardBreaks or the editor silently
+// drops every line break when such a post is edited.
+const legacyNewlineBlocks = [
+  { type: 'text', content: '첫 줄\n둘째 줄\n\n넷째 줄' },
+]
+
+assert.deepEqual(blockJsonToPmDoc(legacyNewlineBlocks), {
+  type: 'doc',
+  content: [
+    {
+      type: 'paragraph',
+      content: [
+        { type: 'text', text: '첫 줄' },
+        { type: 'hardBreak' },
+        { type: 'text', text: '둘째 줄' },
+        { type: 'hardBreak' },
+        { type: 'hardBreak' },
+        { type: 'text', text: '넷째 줄' },
+      ],
+    },
+  ],
+})
+
+assert.deepEqual(pmDocToBlockJson(blockJsonToPmDoc(legacyNewlineBlocks)), [
+  { type: 'text', content: '첫 줄<br>둘째 줄<br><br>넷째 줄' },
+])
+
+{
+  const editor = createHeadlessCommunityEditor(legacyNewlineBlocks)
+  assert.deepEqual(pmDocToBlockJson(editor.getJSON()), [
+    { type: 'text', content: '첫 줄<br>둘째 줄<br><br>넷째 줄' },
+  ], 'real editor round trip keeps legacy newlines')
+  editor.destroy()
+}
+
 console.log('tiptap block converter golden tests passed')

@@ -21,9 +21,14 @@ export function useCommunityPosts() {
     })
   }
 
+  const refreshPosts = () => {
+    queryClient.invalidateQueries({ queryKey: communityPostsQueryKey })
+  }
+
   return {
     posts: query.data ?? [],
     setPosts,
+    refreshPosts,
     loading: query.isPending,
     error: query.error ? (query.error.message || '커뮤니티 글을 불러오지 못했습니다.') : '',
   }

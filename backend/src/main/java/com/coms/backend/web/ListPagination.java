@@ -60,4 +60,33 @@ public final class ListPagination {
                 .header("X-Total-Count", Integer.toString(total))
                 .body(slice);
     }
+
+    /**
+     * Zero-based page and clamped page size resolved from optional query params, using the same
+     * defaults and bounds as {@link #paginate}. For callers (e.g. a Pageable-backed repository
+     * query) that fetch only the requested page from the database instead of slicing an in-memory
+     * list.
+     */
+    public record Resolved(int page, int size) {
+    }
+
+    public static Resolved resolve(Integer page, Integer size) {
+        int resolvedPage = page == null ? 0 : page;
+        int resolvedSize = size == null ? DEFAULT_SIZE : size;
+        if (resolvedPage < 0 || resolvedSize < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page must be >= 0 and size must be >= 1.");
+        }
+        return new Resolved(resolvedPage, Math.min(resolvedSize, MAX_SIZE));
+    }
+
+    /**
+     * Builds the paginated response for a slice that was already fetched from the database for the
+     * given page (see {@link #resolve}), paired with the row count for the unpaged total. Same
+     * bare-array-plus-{@code X-Total-Count} shape as {@link #paginate}.
+     */
+    public static <T> ResponseEntity<List<T>> paginated(List<T> pageItems, long total) {
+        return ResponseEntity.ok()
+                .header("X-Total-Count", Long.toString(total))
+                .body(pageItems);
+    }
 }
