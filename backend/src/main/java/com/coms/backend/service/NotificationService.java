@@ -34,9 +34,12 @@ import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -91,6 +94,24 @@ public class NotificationService {
         return notificationPreferenceRepository.findByMemberStudentId(recipientStudentId)
                 .map(preference -> preference.isEnabled(type))
                 .orElse(true);
+    }
+
+    /**
+     * Batch-loads preferences for a fan-out notification (e.g. notice/recruit-application blasts)
+     * so recipients can be filtered in memory instead of issuing one preference lookup per member.
+     * Members without a saved preference default to enabled, matching {@link #isCategoryEnabled}.
+     */
+    private Map<String, NotificationPreference> preferencesByStudentId(Set<String> studentIds) {
+        if (studentIds.isEmpty()) {
+            return Map.of();
+        }
+        return notificationPreferenceRepository.findByMemberStudentIdIn(studentIds).stream()
+                .collect(Collectors.toMap(NotificationPreference::getMemberStudentId, Function.identity()));
+    }
+
+    private boolean isCategoryEnabled(Map<String, NotificationPreference> preferences, String studentId, Notification.Type type) {
+        NotificationPreference preference = preferences.get(studentId);
+        return preference == null || preference.isEnabled(type);
     }
 
     @Transactional(readOnly = true)
@@ -254,6 +275,9 @@ public class NotificationService {
         return saved;
     }
 
+    // Trust model: the non-allowlist path is reachable only via the HMAC-authenticated
+    // integration API, where partner clubs legitimately link to their own domains. The
+    // member-initiated batch path always enforces the host allowlist.
     private String sanitizeAcceptUrl(String acceptUrl) {
         return sanitizeAcceptUrl(acceptUrl, false);
     }
@@ -270,6 +294,13 @@ public class NotificationService {
                     || !(scheme.equalsIgnoreCase("http") || scheme.equalsIgnoreCase("https"))
                     || host == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "acceptUrl must be an http(s) URL");
+            }
+            if (parsed.getUserInfo() != null) {
+                // Blocks "https://trusted.host@evil.com/" phishing URLs.
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "acceptUrl must not contain userinfo");
+            }
+            if (acceptUrl.chars().anyMatch(c -> c < 0x20 || c == 0x7f)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "acceptUrl contains control characters");
             }
             if (enforceHostAllowlist && !acceptUrlAllowedHosts.isEmpty()
                     && !acceptUrlAllowedHosts.contains(host.toLowerCase())) {
@@ -406,8 +437,13 @@ public class NotificationService {
         String message = studentId.isBlank()
                 ? "새 지원서가 도착했습니다: " + applicantName
                 : "새 지원서가 도착했습니다: " + applicantName + " (" + studentId + ")";
-        List<Member> admins = memberRepository.findByRole(Member.Role.ADMIN).stream()
-                .filter(admin -> isCategoryEnabled(admin.getStudentId(), Notification.Type.RECRUIT_APPLICATION))
+        List<Member> allAdmins = memberRepository.findByRole(Member.Role.ADMIN);
+        Map<String, NotificationPreference> adminPreferences = preferencesByStudentId(allAdmins.stream()
+                .map(Member::getStudentId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet()));
+        List<Member> admins = allAdmins.stream()
+                .filter(admin -> isCategoryEnabled(adminPreferences, admin.getStudentId(), Notification.Type.RECRUIT_APPLICATION))
                 .toList();
         List<Notification> notifications = admins.stream()
                 .map(admin -> build(
@@ -431,8 +467,13 @@ public class NotificationService {
 
     public void notifyNoticeCreated(Notice notice) {
         String message = "New notice: " + notice.getTitle();
-        List<Member> members = memberRepository.findAll().stream()
-                .filter(member -> isCategoryEnabled(member.getStudentId(), Notification.Type.NOTICE_CREATED))
+        List<Member> allMembers = memberRepository.findAll();
+        Map<String, NotificationPreference> memberPreferences = preferencesByStudentId(allMembers.stream()
+                .map(Member::getStudentId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet()));
+        List<Member> members = allMembers.stream()
+                .filter(member -> isCategoryEnabled(memberPreferences, member.getStudentId(), Notification.Type.NOTICE_CREATED))
                 .toList();
         List<Notification> notifications = members.stream()
                 .map(member -> build(

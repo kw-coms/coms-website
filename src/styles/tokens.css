@@ -1,0 +1,68 @@
+
+:root {
+	color-scheme: light;
+	--apple-font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Apple SD Gothic Neo', 'Segoe UI', 'Malgun Gothic', sans-serif;
+	font-family: var(--apple-font-family);
+	--app-bg: #f5f5f7;
+	--app-surface: #ffffff;
+	--app-surface-soft: #f5f5f7;
+	--app-surface-elevated: #ffffff;
+	--app-text: #1d1d1f;
+	--app-muted: #606063;
+	--app-subtle: #6f6f72;
+	--app-hairline: rgba(0, 0, 0, 0.1);
+	--app-hairline-strong: rgba(0, 0, 0, 0.16);
+	--app-accent: #0071e3;
+	--app-accent-hover: #0077ed;
+	--app-accent-soft: #e8f3ff;
+	--app-accent-text: #0066cc;
+	--app-accent-border: color-mix(in srgb, var(--app-accent) 42%, transparent);
+	--apple-nav-height: 44px;
+	--apple-mobile-tabs-height: 44px;
+	--theme-bg: var(--app-bg);
+	--theme-text: var(--app-text);
+	--theme-accent: var(--app-accent);
+	--theme-title: var(--app-text);
+	--theme-body-dark: var(--app-text);
+	--theme-body-mid: #3c3c43;
+	--theme-body-soft: var(--app-surface-soft);
+	--theme-body-muted: var(--app-muted);
+	--theme-white: #ffffff;
+	--theme-glow-violet: #b26dff;
+	--theme-surface-96: rgba(255, 255, 255, 0.96);
+	--theme-surface-94: rgba(255, 255, 255, 0.94);
+	--theme-surface-70: rgba(255, 255, 255, 0.7);
+	--theme-border-soft: rgba(255, 255, 255, 0.7);
+	--theme-shadow-glass: rgba(255, 255, 255, 0.24);
+}
+
+:root[data-theme-mode='dark'] {
+	color-scheme: dark;
+	--app-bg: #0f1115;
+	--app-surface: #1c1d22;
+	--app-surface-soft: #17191f;
+	--app-surface-elevated: #24262c;
+	--app-text: #f5f5f7;
+	--app-muted: #aeaeb4;
+	--app-subtle: #9a9aa1;
+	--app-hairline: rgba(255, 255, 255, 0.16);
+	--app-hairline-strong: rgba(255, 255, 255, 0.26);
+	--app-accent: #2997ff;
+	--app-accent-hover: #4aa8ff;
+	--app-accent-soft: rgba(41, 151, 255, 0.16);
+	--app-accent-text: #6cb6ff;
+	--app-accent-border: color-mix(in srgb, var(--app-accent) 42%, transparent);
+	--theme-bg: var(--app-bg);
+	--theme-text: var(--app-text);
+	--theme-title: var(--app-text);
+	--theme-body-dark: var(--app-text);
+	--theme-body-mid: #d1d1d6;
+	--theme-body-soft: var(--app-surface-elevated);
+	--theme-body-muted: var(--app-muted);
+	--theme-white: var(--app-surface);
+	--theme-surface-96: rgba(28, 29, 34, 0.96);
+	--theme-surface-94: rgba(28, 29, 34, 0.94);
+	--theme-surface-70: rgba(28, 29, 34, 0.7);
+	--theme-border-soft: rgba(255, 255, 255, 0.16);
+	--theme-shadow-glass: rgba(0, 0, 0, 0.28);
+}

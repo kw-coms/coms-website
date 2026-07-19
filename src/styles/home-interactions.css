@@ -1,0 +1,809 @@
+/* ===== 3D home design ===================================================== */
+:root {
+	--coms-3d-depth: rgba(0, 0, 0, 0.20);
+	--coms-3d-depth-soft: rgba(0, 0, 0, 0.12);
+	--coms-3d-highlight: rgba(255, 255, 255, 0.66);
+}
+
+:root[data-theme-mode='dark'] {
+	--coms-3d-depth: rgba(0, 0, 0, 0.55);
+	--coms-3d-depth-soft: rgba(0, 0, 0, 0.40);
+	--coms-3d-highlight: rgba(255, 255, 255, 0.16);
+}
+
+/* Extruded hero title (depth comes from the parent 3D stage) */
+.coms-3d-title {
+	text-shadow:
+		0 1px 0 var(--coms-3d-highlight),
+		0 2px 0 var(--coms-3d-depth-soft),
+		0 3px 0 var(--coms-3d-depth-soft),
+		0 4px 0 var(--coms-3d-depth-soft),
+		0 5px 0 var(--coms-3d-depth),
+		0 6px 1px rgba(0, 0, 0, 0.10),
+		0 10px 20px rgba(0, 0, 0, 0.18);
+	transform: translateZ(46px) rotateX(9deg);
+	transform-origin: center 78%;
+	animation: coms-title-in 1000ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Floating logo card with depth + tilt */
+.coms-3d-card {
+	box-shadow:
+		inset 0 1px 0 var(--coms-3d-highlight),
+		0 10px 24px var(--coms-3d-depth-soft),
+		0 26px 60px var(--coms-3d-depth);
+	transform: perspective(900px) rotateX(7deg);
+	transition: transform 420ms ease, box-shadow 420ms ease;
+}
+
+.coms-3d-card:hover {
+	transform: perspective(900px) rotateX(0deg) translateY(-3px);
+}
+
+/* 3D press buttons across the home page */
+.theme-home .apple-action-primary {
+	box-shadow:
+		0 3px 0 var(--coms-3d-depth),
+		0 7px 16px var(--coms-3d-depth-soft);
+	transition: background-color 160ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.theme-home .apple-action-primary:hover {
+	transform: translateY(-1px);
+	box-shadow:
+		0 4px 0 var(--coms-3d-depth),
+		0 10px 20px var(--coms-3d-depth-soft);
+}
+
+.theme-home .apple-action-primary:active {
+	transform: translateY(2px);
+	box-shadow:
+		0 1px 0 var(--coms-3d-depth),
+		0 3px 8px var(--coms-3d-depth-soft);
+}
+
+.theme-home .apple-action-secondary {
+	box-shadow:
+		0 2px 0 var(--coms-3d-depth-soft),
+		0 5px 12px var(--coms-3d-depth-soft);
+	transition: background-color 160ms ease, color 160ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.theme-home .apple-action-secondary:hover {
+	transform: translateY(-1px);
+}
+
+.theme-home .apple-action-secondary:active {
+	transform: translateY(1px);
+	box-shadow: 0 1px 4px var(--coms-3d-depth-soft);
+}
+
+/* Deeper 3D lift on showcase product cards */
+.theme-home .apple-showcase-card {
+	box-shadow:
+		inset 0 1px 0 var(--coms-3d-highlight),
+		0 14px 30px var(--coms-3d-depth-soft),
+		0 30px 70px var(--coms-3d-depth);
+	transition: transform 260ms ease, box-shadow 260ms ease;
+}
+
+.theme-home .apple-showcase-card:hover {
+	box-shadow:
+		inset 0 1px 0 var(--coms-3d-highlight),
+		0 20px 40px var(--coms-3d-depth-soft),
+		0 40px 90px var(--coms-3d-depth);
+}
+
+/* ---- Interactive 3D stage: pointer-driven parallax tilt ---------------- */
+.coms-3d-stage {
+	perspective: 1100px;
+	perspective-origin: center 40%;
+}
+
+.coms-3d-stage-inner {
+	transform: translateY(var(--coms-sy, 0px)) scale(var(--coms-sc, 1))
+		rotateX(var(--coms-rx, 0deg)) rotateY(var(--coms-ry, 0deg));
+	opacity: var(--coms-so, 1);
+	transform-style: preserve-3d;
+	transition: transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1);
+	will-change: transform, opacity;
+}
+
+/* Depth layers — float at different Z so the tilt yields real parallax */
+.coms-depth-sm {
+	transform: translateZ(20px);
+	transform-style: preserve-3d;
+}
+
+.coms-depth-md {
+	transform: translateZ(34px);
+	transform-style: preserve-3d;
+}
+
+.coms-depth-lg {
+	transform: translateZ(64px);
+	transform-style: preserve-3d;
+}
+
+/* Logo: continuous 3D bob + Y-axis wobble */
+.coms-logo-3d {
+	animation: coms-logo-3d 8s ease-in-out infinite;
+	transform-style: preserve-3d;
+}
+
+@keyframes coms-logo-3d {
+	0%,
+	100% {
+		transform: translateY(0) rotateY(0deg) rotateX(0deg);
+	}
+	25% {
+		transform: translateY(-7px) rotateY(18deg) rotateX(6deg);
+	}
+	50% {
+		transform: translateY(0) rotateY(0deg) rotateX(0deg);
+	}
+	75% {
+		transform: translateY(-7px) rotateY(-18deg) rotateX(6deg);
+	}
+}
+
+@keyframes coms-title-in {
+	0% {
+		opacity: 0;
+		transform: translateZ(46px) rotateX(-72deg);
+	}
+	100% {
+		opacity: 1;
+		transform: translateZ(46px) rotateX(9deg);
+	}
+}
+
+/* ---- Cinematic scroll hero -------------------------------------------- */
+/* A tall track + a sticky pin: the page scrolls ~2.4 viewports while the
+   scene stays frozen, so the giant COM's wordmark can shrink, the content
+   can rise in, and there is a real "pause" mid-scroll (Apple-style). All
+   motion is driven by CSS vars JS sets on .coms-cinema-track per scroll frame. */
+.coms-cinema {
+	position: relative;
+}
+
+.coms-cinema-track {
+	height: 240vh;
+}
+
+.coms-cinema-pin {
+	position: sticky;
+	top: var(--apple-nav-height);
+	display: flex;
+	height: calc(100svh - var(--apple-nav-height));
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	padding: 1.5rem 1.25rem 3.5rem;
+	text-align: center;
+	/* layered depth: soft top glow, accent wash, bottom vignette — not flat */
+	background:
+		radial-gradient(120% 90% at 50% -12%, color-mix(in srgb, var(--app-accent-soft) 95%, transparent), transparent 58%),
+		radial-gradient(70% 55% at 50% -6%, color-mix(in srgb, var(--app-accent) 18%, transparent), transparent 60%),
+		radial-gradient(95% 75% at 50% 122%, color-mix(in srgb, var(--app-text) 11%, transparent), transparent 62%),
+		linear-gradient(180deg, var(--app-surface) 0%, var(--app-surface-soft) 100%);
+}
+
+/* Soft drifting aurora so the hero never feels flat. Sits behind the tint
+   overlay + content, very low contrast. */
+.coms-cinema-pin::before {
+	content: '';
+	position: absolute;
+	inset: -25%;
+	z-index: 0;
+	pointer-events: none;
+	background:
+		radial-gradient(40% 40% at 20% 26%, color-mix(in srgb, var(--app-accent) 42%, transparent), transparent 72%),
+		radial-gradient(36% 36% at 82% 20%, color-mix(in srgb, #6f9dff 38%, transparent), transparent 72%),
+		radial-gradient(34% 34% at 88% 66%, color-mix(in srgb, #a0c4ff 30%, transparent), transparent 72%),
+		radial-gradient(50% 50% at 60% 86%, color-mix(in srgb, var(--app-accent-soft) 92%, transparent), transparent 72%);
+	filter: blur(40px) saturate(118%);
+	animation: coms-aurora 18s ease-in-out infinite alternate;
+	will-change: transform;
+}
+
+/* Dark mode: deeper background + stronger aurora + a glow under the wordmark
+   so the white COM's lifts off the dark instead of sitting flat. */
+:root[data-theme-mode='dark'] .coms-cinema-pin {
+	background:
+		radial-gradient(120% 85% at 50% -12%, color-mix(in srgb, var(--app-accent) 26%, transparent), transparent 58%),
+		radial-gradient(100% 90% at 50% 118%, rgba(0, 0, 0, 0.55), transparent 62%),
+		linear-gradient(180deg, color-mix(in srgb, var(--app-surface-elevated) 70%, var(--app-bg)) 0%, var(--app-bg) 100%);
+}
+:root[data-theme-mode='dark'] .coms-cinema-pin::before {
+	opacity: 0.85;
+	filter: blur(44px);
+}
+:root[data-theme-mode='dark'] .coms-cinema-title,
+:root[data-theme-mode='dark'] .coms-cinema-word {
+	filter: drop-shadow(0 6px 26px color-mix(in srgb, var(--app-accent) 45%, transparent))
+		drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+}
+
+@keyframes coms-aurora {
+	0% {
+		transform: translate3d(-3%, -2%, 0) scale(1);
+	}
+	50% {
+		transform: translate3d(3%, 2%, 0) scale(1.08);
+	}
+	100% {
+		transform: translate3d(-2%, 3%, 0) scale(1.03);
+	}
+}
+
+/* Glow halo that pulses behind the giant logo. */
+.coms-cinema-logowrap {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.coms-cinema-logowrap::after {
+	content: '';
+	position: absolute;
+	inset: -30%;
+	z-index: -1;
+	border-radius: 50%;
+	background: radial-gradient(circle, color-mix(in srgb, var(--app-accent) 30%, transparent), transparent 65%);
+	filter: blur(24px);
+	animation: coms-logo-glow 5s ease-in-out infinite;
+}
+
+@keyframes coms-logo-glow {
+	0%,
+	100% {
+		opacity: 0.45;
+		transform: scale(0.92);
+	}
+	50% {
+		opacity: 0.85;
+		transform: scale(1.06);
+	}
+}
+
+/* Giant logo + wordmark — absolute-centered, start ~2.4x, shrink to 1x and
+   fade out so the content title can take its place (always centered). */
+.coms-cinema-intro {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: clamp(0.5rem, 1.4vw, 1.25rem);
+	opacity: var(--word-o, 1);
+	transform:
+		translate(-50%, -50%)
+		translateY(var(--word-ty, 0px))
+		scale(var(--hero-scale, 2.4));
+	transform-origin: center center;
+	transition: transform 120ms linear, opacity 120ms linear;
+	will-change: transform, opacity;
+	pointer-events: none;
+}
+
+.coms-cinema-intrologo {
+	width: clamp(3.5rem, 9vw, 6.5rem);
+	height: auto;
+	object-fit: contain;
+	filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.18));
+	animation: home-logo-float 7s ease-in-out infinite;
+}
+
+/* Giant intro logo has alt="" (decorative) so it misses the global KW-logo
+   dark invert — handle it explicitly so it isn't a black cube on dark. */
+:root[data-theme-mode='dark'] .coms-cinema-intrologo {
+	filter: invert(1) brightness(1.08) drop-shadow(0 14px 30px rgba(0, 0, 0, 0.4));
+}
+
+/* Theme-aware bottom vignette (was a hard-coded white fade — ugly on dark). */
+.coms-cinema-fade {
+	background-image: linear-gradient(
+		to bottom,
+		transparent,
+		color-mix(in srgb, var(--app-surface-soft) 92%, transparent)
+	);
+}
+
+.coms-cinema-word {
+	margin: 0;
+	font-size: clamp(2.75rem, 12vw, 8.5rem);
+	line-height: 0.92;
+	letter-spacing: -0.025em;
+	white-space: nowrap;
+	animation: none;
+}
+
+/* Content title reuses the 3D text-shadow but not the title-in transform. */
+.coms-cinema-title {
+	animation: none;
+	transform: none;
+	letter-spacing: -0.02em;
+}
+
+/* Light-mode lift: subtle layered shadow + faint accent halo so the wordmark
+   reads with depth instead of sitting flat (dark mode has its own stronger
+   rule below). */
+.coms-cinema-title,
+.coms-cinema-word {
+	filter: drop-shadow(0 10px 28px color-mix(in srgb, var(--app-accent) 24%, transparent))
+		drop-shadow(0 2px 5px rgba(0, 0, 0, 0.12));
+}
+
+/* The hero body crossfades + rises in as the wordmark finishes shrinking. */
+.coms-cinema-content {
+	opacity: var(--content-p, 0);
+	transform:
+		translateY(calc((1 - var(--content-p, 0)) * 42px))
+		scale(calc(0.95 + var(--content-p, 0) * 0.05))
+		rotateX(var(--coms-rx, 0deg))
+		rotateY(var(--coms-ry, 0deg));
+	transform-style: preserve-3d;
+	transition:
+		opacity 240ms linear,
+		transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+	will-change: transform, opacity;
+}
+
+/* Per-group cascade. Vars inherit from .coms-cinema-track. */
+.coms-cinema-badge {
+	opacity: var(--logo-p, 0);
+	transform: translateY(calc((1 - var(--logo-p, 0)) * 12px));
+	transition: opacity 200ms linear, transform 200ms ease;
+}
+
+.coms-cinema-logo {
+	opacity: var(--logo-p, 0);
+	transform: scale(calc(0.55 + var(--logo-p, 0) * 0.45));
+	transform-origin: center center;
+	transition: opacity 220ms linear, transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.coms-cinema-tag {
+	opacity: var(--tag-p, 0);
+	transform: translateY(calc((1 - var(--tag-p, 0)) * 16px));
+	transition: opacity 240ms linear, transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.coms-cinema-cta {
+	opacity: var(--cta-p, 0);
+	transform: translateY(calc((1 - var(--cta-p, 0)) * 20px));
+	transition: opacity 240ms linear, transform 240ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Scroll hint — fades out once the user starts scrolling. */
+.coms-cinema-hint {
+	position: absolute;
+	bottom: 1.1rem;
+	left: 50%;
+	color: var(--app-muted);
+	opacity: calc(1 - var(--logo-p, 0));
+	transform: translateX(-50%);
+	animation: coms-hint-bob 1.8s ease-in-out infinite;
+}
+
+@keyframes coms-hint-bob {
+	0%,
+	100% {
+		transform: translate(-50%, 0);
+	}
+	50% {
+		transform: translate(-50%, 7px);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.coms-cinema-track {
+		height: auto;
+	}
+	.coms-cinema-pin {
+		position: static;
+		height: auto;
+		min-height: calc(100svh - var(--apple-nav-height));
+	}
+	.coms-cinema-intro {
+		display: none;
+	}
+	.coms-cinema-content,
+	.coms-cinema-badge,
+	.coms-cinema-logo,
+	.coms-cinema-tag,
+	.coms-cinema-cta {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
+	.coms-cinema-hint {
+		display: none;
+	}
+}
+
+/* ---- Mobile home: tame the desktop "cinematic scroll" ------------------ */
+/* On phones the 240vh pinned hero + the per-section snap turned the home
+   page into an ~11,800px scroll with huge empty bands. Mirror the proven
+   reduced-motion collapse so the hero is ~one screen and natural scrolling
+   returns. Desktop (>=768px) is untouched. */
+@media (max-width: 767px) {
+	/* 1. Collapse the scroll-driven hero to a single screen. */
+	.coms-cinema-track {
+		height: auto;
+	}
+	.coms-cinema-pin {
+		position: static;
+		height: auto;
+		min-height: calc(100svh - var(--apple-nav-height));
+		padding-bottom: 2.5rem;
+	}
+	.coms-cinema-intro,
+	.coms-cinema-hint {
+		display: none;
+	}
+	.coms-cinema-content,
+	.coms-cinema-badge,
+	.coms-cinema-logo,
+	.coms-cinema-tag,
+	.coms-cinema-cta {
+		opacity: 1 !important;
+		transform: none !important;
+		transition: none !important;
+	}
+
+	/* 2. Disable scroll-snap so natural scrolling returns (no janky
+	   snapping on multi-screen-tall sections). The base rule at the bottom of
+	   this file (html.home-snap-scroll{scroll-snap-type:y proximity}) has the
+	   same specificity but appears later in source, so bump specificity here
+	   with :root to guarantee this override wins. */
+	html.home-snap-scroll:root {
+		scroll-snap-type: none !important;
+	}
+	html.home-snap-scroll .home-snap-section {
+		scroll-snap-align: none !important;
+	}
+
+	/* 3b. Trim oversized desktop display type inside the home sections so the
+	   stacked single-column content is not artificially tall on phones.
+	   Scoped to the home section grid + hero only — page copy elsewhere is
+	   untouched. */
+	.apple-section-grid .apple-display {
+		font-size: 2.25rem !important;
+		line-height: 1.05 !important;
+	}
+	.apple-section-grid .apple-copy {
+		font-size: 1.0625rem !important;
+		margin-top: 1rem !important;
+	}
+	.coms-cinema-title {
+		font-size: 3.25rem !important;
+	}
+
+	/* 3c. The about-showcase cards (short body, button.apple-product-panel.group)
+	   stack into a ~500px column on phones — render them 2-up. The project /
+	   activity DETAIL cards (article, long paragraphs) stay 1-up because a
+	   narrow 2-up column balloons their text vertically; instead just tighten
+	   their gap. */
+	.apple-section-grid .lg\:grid-cols-3:has(> .apple-product-panel.group) {
+		grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+		gap: 0.6rem !important;
+	}
+	.apple-section-grid .lg\:grid-cols-3,
+	.apple-section-grid .sm\:grid-cols-2 {
+		gap: 0.6rem !important;
+	}
+}
+
+/* ---- Apple-style reveal-on-scroll -------------------------------------- */
+/* JS adds .reveal-ready so content stays visible if JS is unavailable. */
+.reveal-ready [data-reveal] {
+	opacity: 0;
+	transform: translateY(28px);
+	transition:
+		opacity 640ms cubic-bezier(0.22, 1, 0.36, 1),
+		transform 640ms cubic-bezier(0.22, 1, 0.36, 1);
+	transition-delay: var(--reveal-delay, 0ms);
+	will-change: opacity, transform;
+}
+
+.reveal-ready [data-reveal].is-revealed {
+	opacity: 1;
+	transform: none;
+}
+
+/* Directional reveal variants (Kakao-style side slide-ins). */
+.reveal-ready [data-reveal-dir='right'] {
+	transform: translateX(40px);
+}
+.reveal-ready [data-reveal-dir='left'] {
+	transform: translateX(-40px);
+}
+.reveal-ready [data-reveal-dir='right'].is-revealed,
+.reveal-ready [data-reveal-dir='left'].is-revealed {
+	transform: none;
+}
+
+/* ---- Scroll-snap "pause" on the home sections (Kakao-style) ------------ */
+/* proximity (not mandatory) so it gently settles without trapping the user. */
+html.home-snap-scroll {
+	scroll-snap-type: y proximity;
+}
+html.home-snap-scroll .home-snap-section {
+	scroll-snap-align: start;
+	scroll-snap-stop: normal;
+	scroll-margin-top: var(--apple-nav-height);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html.home-snap-scroll {
+		scroll-snap-type: none;
+	}
+	.coms-3d-title,
+	.coms-3d-card,
+	.coms-3d-card:hover,
+	.coms-3d-stage-inner,
+	.coms-depth-sm,
+	.coms-depth-md,
+	.coms-depth-lg {
+		transform: none;
+	}
+
+	.coms-logo-3d {
+		animation: none;
+	}
+
+	.coms-3d-title {
+		animation: none;
+	}
+
+	.coms-cinema-pin::before,
+	.coms-cinema-logowrap::after,
+	.coms-cinema-intrologo {
+		animation: none;
+	}
+
+	.reveal-ready [data-reveal] {
+		opacity: 1;
+		transform: none;
+		transition: none;
+	}
+}
+
+/* ---- Mobile swipe carousel (desktop keeps its grid) ------------------- */
+/* Cards stack into a long column on phones; turn them into a peeking,
+   snap-scrolling row instead. At lg the grid takes over again. */
+.coms-hscroll {
+	display: flex;
+	gap: 0.75rem;
+	overflow-x: auto;
+	/* Cross-axis must not become an auto scroll container, and a vertical drag
+	   must fall through to the page — otherwise the card row eats the page's
+	   vertical scroll on touch ("걸림"). pan-x = this element scrolls horizontally
+	   only; vertical pan + pinch-zoom go to the page. */
+	overflow-y: hidden;
+	touch-action: pan-x pinch-zoom;
+	overscroll-behavior-x: contain;
+	padding-bottom: 0.5rem;
+	scroll-snap-type: x mandatory;
+	scroll-padding-left: 1.25rem;
+	-webkit-overflow-scrolling: touch;
+	scrollbar-width: none;
+}
+.coms-hscroll::-webkit-scrollbar {
+	display: none;
+}
+.coms-hslide {
+	flex: 0 0 82%;
+	scroll-snap-align: start;
+}
+@media (min-width: 640px) {
+	.coms-hslide {
+		flex-basis: 47%;
+	}
+}
+@media (min-width: 1024px) {
+	.coms-hscroll {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		overflow: visible;
+		padding-bottom: 0;
+	}
+	.coms-hslide {
+		flex: initial;
+	}
+}
+
+/* ---- Top scroll-progress bar ----------------------------------------- */
+.coms-scroll-progress {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 90;
+	height: 3px;
+	width: 100%;
+	transform: scaleX(var(--scroll-progress, 0));
+	transform-origin: 0 50%;
+	background: linear-gradient(
+		90deg,
+		var(--app-accent),
+		color-mix(in srgb, var(--app-accent) 55%, #7aa8ff)
+	);
+	box-shadow: 0 0 10px color-mix(in srgb, var(--app-accent) 50%, transparent);
+	pointer-events: none;
+	will-change: transform;
+}
+
+/* ---- Back-to-top floating button ------------------------------------- */
+.coms-to-top {
+	position: fixed;
+	right: 1.1rem;
+	bottom: 1.1rem;
+	z-index: 85;
+	display: inline-flex;
+	height: 2.75rem;
+	width: 2.75rem;
+	align-items: center;
+	justify-content: center;
+	border-radius: 9999px;
+	border: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 86%, transparent);
+	color: var(--app-text);
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+	backdrop-filter: saturate(180%) blur(18px);
+	-webkit-backdrop-filter: saturate(180%) blur(18px);
+	opacity: 0;
+	transform: translateY(12px) scale(0.9);
+	pointer-events: none;
+	transition:
+		opacity 260ms cubic-bezier(0.22, 1, 0.36, 1),
+		transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+		background-color 160ms ease;
+}
+.coms-to-top.is-visible {
+	opacity: 1;
+	transform: translateY(0) scale(1);
+	pointer-events: auto;
+}
+.coms-to-top:hover {
+	background: var(--app-surface);
+	transform: translateY(-2px) scale(1.04);
+}
+
+/* ---- Infinite keyword marquee (Kakao-style slide) -------------------- */
+.coms-marquee {
+	overflow: hidden;
+	-webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+	mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.coms-marquee-track {
+	display: inline-flex;
+	align-items: center;
+	gap: 3rem;
+	padding-block: 0.35rem;
+	white-space: nowrap;
+	will-change: transform;
+	animation: coms-marquee 32s linear infinite;
+}
+.coms-marquee-track > span {
+	letter-spacing: 0.02em;
+}
+.coms-marquee:hover .coms-marquee-track {
+	animation-play-state: paused;
+}
+@keyframes coms-marquee {
+	from {
+		transform: translateX(0);
+	}
+	to {
+		transform: translateX(-50%);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.coms-marquee-track {
+		animation: none;
+	}
+	.coms-to-top {
+		transition: none;
+	}
+}
+
+/* ---- Loading skeleton (shimmer) -------------------------------------- */
+.skeleton {
+	position: relative;
+	overflow: hidden;
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--app-text) 8%, transparent);
+}
+.skeleton::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	transform: translateX(-100%);
+	background: linear-gradient(
+		90deg,
+		transparent,
+		color-mix(in srgb, var(--app-text) 7%, transparent),
+		transparent
+	);
+	animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.skeleton-line {
+	height: 0.9rem;
+	border-radius: 6px;
+}
+@keyframes skeleton-shimmer {
+	to {
+		transform: translateX(100%);
+	}
+}
+
+/* ---- Skip link (a11y) ------------------------------------------------- */
+/* Visually hidden until keyboard-focused, then pinned top-left so the first
+   Tab press reveals a jump to the main content landmark. Uses the shared
+   --app-* tokens to match the surrounding chrome. */
+.coms-skip-link {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 10000;
+	transform: translateY(-120%);
+	padding: 0.6rem 1rem;
+	margin: 0.5rem;
+	border-radius: 0.5rem;
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	color: var(--app-accent);
+	font-size: 0.85rem;
+	font-weight: 700;
+	text-decoration: none;
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+	transition: transform 160ms ease;
+}
+.coms-skip-link:focus,
+.coms-skip-link:focus-visible {
+	transform: translateY(0);
+	outline: 2px solid var(--app-accent);
+	outline-offset: 2px;
+}
+/* The main-content landmark is programmatically focusable (tabIndex -1) so the
+   skip link can move focus to it; suppress the focus ring on that move. */
+#main-content:focus {
+	outline: none;
+}
+@media (prefers-reduced-motion: reduce) {
+	.coms-skip-link {
+		transition: none;
+	}
+}
+
+/* ---- Page enter transition ------------------------------------------- */
+/* Opacity-only: a `transform` (even translateY(0)) lingers after the animation
+   and would become the containing block for the home's `position: sticky` cinema
+   pin, breaking it. Fading avoids creating that containing block. */
+.coms-page-enter {
+	animation: coms-page-in 360ms ease both;
+}
+@keyframes coms-page-in {
+	0% {
+		opacity: 0;
+	}
+	100% {
+		opacity: 1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.skeleton::after {
+		animation: none;
+	}
+	.coms-page-enter {
+		animation: none;
+	}
+}
+

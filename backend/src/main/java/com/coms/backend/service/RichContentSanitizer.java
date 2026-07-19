@@ -184,13 +184,63 @@ public class RichContentSanitizer {
         return Set.of("left", "center", "right").contains(align) ? align : "left";
     }
 
+    private static final Set<String> FORBIDDEN_TAG_PREFIXES = Set.of(
+            "script", "iframe", "svg", "object", "embed", "style", "img", "math",
+            "link", "meta", "form", "base", "video", "audio", "source");
+
     void rejectUnsafeText(String value) {
-        String lower = value.toLowerCase(Locale.ROOT);
-        if (lower.contains("<script") || lower.contains("</script")
-                || lower.contains("<iframe") || lower.contains("javascript:")
-                || lower.matches(".*\\son[a-z]+\\s*=.*")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 내용이 포함되어 있습니다.");
+        // Check both the raw value and an entity-decoded pass so encodings like
+        // &#x3C;script&#x3E; or java&#115;cript: cannot slip through.
+        for (String candidate : new String[] {value, decodeEntities(value)}) {
+            String lower = candidate.toLowerCase(Locale.ROOT);
+            boolean unsafe = lower.contains("javascript:")
+                    || lower.contains("vbscript:")
+                    || lower.contains("data:text/html")
+                    || lower.contains("expression(")
+                    || lower.matches(".*\\son[a-z]+\\s*=.*");
+            if (!unsafe) {
+                for (String tag : FORBIDDEN_TAG_PREFIXES) {
+                    if (lower.contains("<" + tag) || lower.contains("</" + tag)) {
+                        unsafe = true;
+                        break;
+                    }
+                }
+            }
+            if (unsafe) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 내용이 포함되어 있습니다.");
+            }
         }
+    }
+
+    private String decodeEntities(String value) {
+        Matcher matcher = Pattern.compile("&(#x?[0-9a-fA-F]+|lt|gt|quot|amp|colon|sol);?").matcher(value);
+        StringBuilder out = new StringBuilder();
+        while (matcher.find()) {
+            String entity = matcher.group(1);
+            String replacement;
+            try {
+                if (entity.startsWith("#x") || entity.startsWith("#X")) {
+                    replacement = String.valueOf((char) Integer.parseInt(entity.substring(2), 16));
+                } else if (entity.startsWith("#")) {
+                    replacement = String.valueOf((char) Integer.parseInt(entity.substring(1)));
+                } else {
+                    replacement = switch (entity) {
+                        case "lt" -> "<";
+                        case "gt" -> ">";
+                        case "quot" -> "\"";
+                        case "amp" -> "&";
+                        case "colon" -> ":";
+                        case "sol" -> "/";
+                        default -> matcher.group();
+                    };
+                }
+            } catch (NumberFormatException e) {
+                replacement = matcher.group();
+            }
+            matcher.appendReplacement(out, Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(out);
+        return out.toString();
     }
 
     private String sanitizeRichText(String html) {
@@ -245,9 +295,14 @@ public class RichContentSanitizer {
         style.append(key).append(':').append(cleanValue);
     }
 
+    // Only escape ampersands that do not already start an entity: the frontend
+    // sends text-block content pre-escaped, so a blind replace("&", "&amp;")
+    // stacks one extra entity layer on every save/edit round trip.
+    private static final Pattern BARE_AMPERSAND =
+            Pattern.compile("&(?!(?:[a-zA-Z][a-zA-Z0-9]{1,31}|#\\d{1,7}|#x[0-9a-fA-F]{1,6});)");
+
     private String escapeHtml(String value) {
-        return value
-                .replace("&", "&amp;")
+        return BARE_AMPERSAND.matcher(value).replaceAll("&amp;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;")
                 .replace("\"", "&quot;");

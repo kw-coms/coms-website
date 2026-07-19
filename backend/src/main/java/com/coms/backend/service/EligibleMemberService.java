@@ -38,6 +38,9 @@ public class EligibleMemberService {
     private static final Pattern GENERATION_PATTERN = Pattern.compile("\\d{1,3}");
     private static final int GRADUATE_AFTER_YEARS = 7;
     private static final int FIRST_GENERATION_YEAR = 1966;
+    private static final long MAX_IMPORT_FILE_BYTES = 5L * 1024 * 1024;
+    private static final int MAX_IMPORT_ROWS = 5_000;
+    private static final int MAX_TEXT_LENGTH = 200;
 
     public EligibleMemberService(EligibleMemberRepository eligibleMemberRepository,
                                   com.coms.backend.repository.BannedStudentRepository bannedStudentRepository,
@@ -217,6 +220,9 @@ public class EligibleMemberService {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부 파일을 선택해주세요.");
         }
+        if (file.getSize() > MAX_IMPORT_FILE_BYTES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부 파일은 5MB 이하여야 합니다.");
+        }
 
         String filename = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(Locale.ROOT);
         String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
@@ -249,6 +255,9 @@ public class EligibleMemberService {
             }
 
             for (CSVRecord record : parser) {
+                if (imported + skipped >= MAX_IMPORT_ROWS) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부는 한 번에 최대 " + MAX_IMPORT_ROWS + "행까지 가져올 수 있습니다.");
+                }
                 String name = normalize(safeGet(record, colMap.get("name")));
                 if (name.isBlank()) {
                     skipped++;
@@ -334,6 +343,9 @@ public class EligibleMemberService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부에는 이름과 학번 또는 기수 컬럼이 필요합니다.");
             }
 
+            if (sheet.getLastRowNum() - headerRowIndex > MAX_IMPORT_ROWS) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부는 한 번에 최대 " + MAX_IMPORT_ROWS + "행까지 가져올 수 있습니다.");
+            }
             for (int i = headerRowIndex + 1; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
                 if (row == null) continue;
@@ -449,7 +461,8 @@ public class EligibleMemberService {
     }
 
     private String normalize(String value) {
-        return value == null ? "" : value.trim();
+        String trimmed = value == null ? "" : value.trim();
+        return trimmed.length() > MAX_TEXT_LENGTH ? trimmed.substring(0, MAX_TEXT_LENGTH) : trimmed;
     }
 
     private String normalizePhone(String value) {
