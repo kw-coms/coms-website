@@ -11,6 +11,7 @@ import {
   formatDateTime,
 } from './deletedCommunityPostUtils'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
+import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
 export default function AdminDeletedCommunityPosts() {
   const [posts, setPosts] = useState([])
@@ -149,7 +150,21 @@ export default function AdminDeletedCommunityPosts() {
         </select>
       </div>
 
-      {loading && <p className="text-sm text-[var(--theme-body-muted)]">삭제 보관함을 불러오는 중...</p>}
+      {loading && (
+        <SkeletonGroup label="삭제 보관함을 불러오는 중">
+          <div className="overflow-hidden rounded-lg border border-[var(--app-hairline)]">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 border-b border-black/10 px-3 py-3 last:border-b-0">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-3 flex-1" />
+              </div>
+            ))}
+          </div>
+        </SkeletonGroup>
+      )}
       {error && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
       {!loading && !error && posts.length === 0 && (
         <p className="text-sm text-[var(--theme-body-muted)]">보관된 삭제 게시글이 없습니다.</p>

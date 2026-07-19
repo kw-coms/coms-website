@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Download, RefreshCw, RotateCcw } from 'lucide-react'
 import { clearAdminCache, listAuditLogs } from '../../services/adminApi'
+import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
 const AUDIT_LOG_LIMITS = [300, 1000, 2000]
 
@@ -193,7 +194,21 @@ export default function AdminAuditLogs({ formatDateTime }: { formatDateTime: (va
 
       {cacheMessage && <p className="shape-cut-sm bg-[var(--app-accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-accent-text)]">{cacheMessage}</p>}
       {cacheError && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{cacheError}</p>}
-      {loading && <p className="text-sm text-[var(--theme-body-muted)]">로그를 불러오는 중...</p>}
+      {loading && (
+        <SkeletonGroup label="로그를 불러오는 중">
+          <div className="overflow-hidden rounded-lg border border-[var(--app-hairline)]">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 border-b border-black/10 px-3 py-3 last:border-b-0">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-3 w-28" />
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-3 flex-1" />
+              </div>
+            ))}
+          </div>
+        </SkeletonGroup>
+      )}
       {error && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
       {!loading && !error && logs.length === 0 && (
         <p className="text-sm text-[var(--theme-body-muted)]">저장된 로그가 없습니다.</p>

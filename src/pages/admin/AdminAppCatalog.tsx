@@ -12,6 +12,7 @@ import AppProjectCard from '../../components/apps/AppProjectCard'
 import AdminAppCatalogRow from './AdminAppCatalogRow'
 import AdminAppCategories from './AdminAppCategories'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
+import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
 const ADMIN_INPUT_CLASS = 'shape-cut-sm border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50'
 
@@ -303,7 +304,19 @@ export default function AdminAppCatalog() {
       </form>
 
       {loading ? (
-        <p className="text-sm text-[var(--theme-body-muted)]">Apps 항목을 불러오는 중...</p>
+        <SkeletonGroup label="Apps 항목을 불러오는 중">
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="shape-cut-sm flex items-center justify-between gap-3 border border-[var(--app-hairline)] bg-black/5 px-4 py-3">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+                <Skeleton className="h-3 w-16" />
+              </div>
+            ))}
+          </div>
+        </SkeletonGroup>
       ) : items.length === 0 ? (
         <p className="text-sm text-[var(--theme-body-muted)]">등록된 Apps 항목이 없습니다.</p>
       ) : (

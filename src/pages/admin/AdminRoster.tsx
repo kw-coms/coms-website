@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember } from '../../services/adminApi'
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
+import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
 export default function AdminRoster() {
   const fileInputRef = useRef(null)
@@ -244,7 +245,20 @@ export default function AdminRoster() {
           </button>
         </div>
 
-        {loadingRoster && <p className="mt-4 text-sm text-[var(--theme-body-muted)]">명부를 불러오는 중...</p>}
+        {loadingRoster && (
+          <SkeletonGroup label="명부를 불러오는 중">
+            <div className="mt-4 overflow-hidden rounded-lg border border-[var(--app-hairline)]">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4 border-b border-black/10 px-3 py-3 last:border-b-0">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-3 w-12" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              ))}
+            </div>
+          </SkeletonGroup>
+        )}
         {rosterError && <p className="mt-4 shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{rosterError}</p>}
         {!loadingRoster && !rosterError && roster.length === 0 && (
           <p className="mt-4 text-sm text-[var(--theme-body-muted)]">등록된 명부가 없습니다.</p>
