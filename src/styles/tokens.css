@@ -17,9 +17,12 @@
 	--app-accent-soft: #e8f3ff;
 	--app-accent-text: #0066cc;
 	--app-accent-border: color-mix(in srgb, var(--app-accent) 42%, transparent);
-	--app-brand: #3b4890;
-	--app-brand-strong: #2d3a7a;
-	--app-brand-soft: #eef3ff;
+	/* Brand tokens alias the accent for now: dark-overrides.css has long remapped
+	   the raw navy hex utilities to the accent in BOTH themes, so the painted UI
+	   never showed real navy. Point these at actual brand values to rebrand. */
+	--app-brand: var(--app-accent);
+	--app-brand-strong: var(--app-accent-hover);
+	--app-brand-soft: var(--app-accent-soft);
 	--app-danger: #ff3b30;
 	--apple-nav-height: 44px;
 	--apple-mobile-tabs-height: 44px;
@@ -56,9 +59,6 @@
 	--app-accent-soft: rgba(41, 151, 255, 0.16);
 	--app-accent-text: #6cb6ff;
 	--app-accent-border: color-mix(in srgb, var(--app-accent) 42%, transparent);
-	--app-brand: #7e8ce8;
-	--app-brand-strong: #95a1ef;
-	--app-brand-soft: rgba(126, 140, 232, 0.16);
 	--app-danger: #ff453a;
 	--theme-bg: var(--app-bg);
 	--theme-text: var(--app-text);
