@@ -68,7 +68,7 @@ export function WriteForm({ onCancel, onSave }: {
             onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
             maxLength={200}
             placeholder="자료 제목"
-            className="h-12 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 text-sm text-[var(--app-text)] outline-none transition focus:ring-2 focus:ring-[#0071e3]/24"
+            className="h-12 w-full rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 text-sm text-[var(--app-text)] outline-none transition focus:ring-2 focus:ring-[var(--app-accent)]/24"
           />
         </label>
         <div>

@@ -163,7 +163,7 @@ export default function NotificationButton({ alignLeft = false, variant = 'icon'
         >
           <div className="flex items-center justify-between border-b border-[var(--app-hairline)] px-4 py-3">
             <span className="text-sm font-black">알림</span>
-            <button type="button" onClick={readAll} className="text-xs font-bold text-[#3b4890] hover:underline">모두 읽음</button>
+            <button type="button" onClick={readAll} className="text-xs font-bold text-[var(--app-brand)] hover:underline">모두 읽음</button>
           </div>
           <div className="max-h-80 overflow-auto">
             {items.length === 0 ? (
@@ -183,7 +183,7 @@ export default function NotificationButton({ alignLeft = false, variant = 'icon'
                     )}
                     <span className={`block ${item.read ? 'font-medium' : 'font-bold'}`}>{item.message}</span>
                     {item.acceptUrl && (
-                      <span className="mt-1 block text-[11px] font-bold text-[#3b4890]">눌러서 수락하러 가기 →</span>
+                      <span className="mt-1 block text-[11px] font-bold text-[var(--app-brand)]">눌러서 수락하러 가기 →</span>
                     )}
                     <span className="mt-1 block text-[11px] text-[var(--theme-body-muted)]">{new Date(item.createdAt).toLocaleString('ko-KR')}</span>
                   </span>

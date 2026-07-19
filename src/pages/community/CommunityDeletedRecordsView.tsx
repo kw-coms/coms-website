@@ -60,7 +60,7 @@ export default function CommunityDeletedRecordsView({
         </button>
       </BoardComposeBar>
       <div className="space-y-3 p-4 sm:p-6">
-        <div className="rounded-lg border border-[#3b4890]/15 bg-[#f7f9ff] px-4 py-3 text-sm text-[#3b4890]">
+        <div className="rounded-lg border border-[var(--app-brand)]/15 bg-[#f7f9ff] px-4 py-3 text-sm text-[var(--app-brand)]">
           관리자가 삭제한 글과 직접 삭제한 글의 원문, 사유, 처리자를 여기서 확인할 수 있습니다.
         </div>
         {!deletedLoading && deletedError && (
@@ -92,7 +92,7 @@ export default function CommunityDeletedRecordsView({
           return (
             <article key={record.id} className="overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)]">
               <div className="border-b border-[var(--app-hairline)] px-4 py-4">
-                <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[#3b4890]">
+                <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[var(--app-brand)]">
                   <span>{categoryLabel(record.category || 'GENERAL')}</span>
                   <span className={restored ? 'rounded bg-emerald-100 px-2 py-1 text-emerald-700' : 'rounded bg-red-50 px-2 py-1 text-red-700'}>
                     {restored ? '복원됨' : '삭제됨'}
@@ -108,16 +108,16 @@ export default function CommunityDeletedRecordsView({
               </div>
               <div className="space-y-3 px-4 py-4 text-sm text-[#424245]">
                 <div>
-                  <strong className="mb-1 block text-xs text-[#3b4890]">삭제 사유</strong>
+                  <strong className="mb-1 block text-xs text-[var(--app-brand)]">삭제 사유</strong>
                   <p className="whitespace-pre-wrap break-words">{record.deletionReason || '사유 없음'}</p>
                 </div>
                 <div>
-                  <strong className="mb-1 block text-xs text-[#3b4890]">원문</strong>
+                  <strong className="mb-1 block text-xs text-[var(--app-brand)]">원문</strong>
                   <p className="whitespace-pre-wrap break-words">{deletedRecordText(record.content) || '원문 미리보기가 없습니다.'}</p>
                 </div>
                 {record.commentCount > 0 && (
                   <div>
-                    <strong className="mb-1 block text-xs text-[#3b4890]">함께 보관된 댓글 {record.commentCount}</strong>
+                    <strong className="mb-1 block text-xs text-[var(--app-brand)]">함께 보관된 댓글 {record.commentCount}</strong>
                     <p className="whitespace-pre-wrap break-words text-xs text-[var(--theme-body-muted)]">
                       {(record.commentInfos || []).slice(0, 3).map((comment) => `${comment.authorName || '회원'}: ${comment.content}`).join('\n')}
                     </p>
@@ -125,11 +125,11 @@ export default function CommunityDeletedRecordsView({
                 )}
                 {timeline.length > 0 && (
                   <div>
-                    <strong className="mb-2 block text-xs text-[#3b4890]">처리 타임라인</strong>
+                    <strong className="mb-2 block text-xs text-[var(--app-brand)]">처리 타임라인</strong>
                     <ol className="space-y-2">
                       {timeline.map((item, index) => (
                         <li key={`${record.id}-${item.label}-${index}`} className="grid grid-cols-[auto_1fr] gap-2 text-xs">
-                          <span className="mt-1 size-2 rounded-full bg-[#3b4890]" aria-hidden="true" />
+                          <span className="mt-1 size-2 rounded-full bg-[var(--app-brand)]" aria-hidden="true" />
                           <span className="min-w-0">
                             <span className="font-black text-[var(--app-text)]">{item.label}</span>
                             {item.time && <span className="ml-2 text-[var(--theme-body-muted)]">{item.time}</span>}

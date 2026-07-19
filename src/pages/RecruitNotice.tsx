@@ -56,7 +56,7 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
         <div className="grid gap-0 lg:grid-cols-[1fr_320px]">
           <article className="space-y-8 p-6 sm:p-8">
             <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 text-sm font-bold text-[#0066cc]">
+              <div className="inline-flex items-center gap-2 text-sm font-bold text-[var(--app-accent-text)]">
                 <PenLine size={16} />
                 모집 안내
               </div>
@@ -74,7 +74,7 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
             <div className="grid gap-3 md:grid-cols-3">
               {recruitDetails.map(({ title, icon: Icon, body }) => (
                 <div key={title} className="apple-soft-panel bg-[#f5f5f7] p-4">
-                  <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-[#e8f3ff] text-[#0066cc]">
+                  <div className="mb-3 flex size-10 items-center justify-center rounded-lg bg-[#e8f3ff] text-[var(--app-accent-text)]">
                     <Icon size={19} />
                   </div>
                   <h2 className="text-base font-black">{title}</h2>
@@ -83,12 +83,12 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
               ))}
             </div>
 
-            <div className="rounded-lg border border-[#0071e3]/20 bg-[#e8f3ff] p-5">
+            <div className="rounded-lg border border-[var(--app-accent)]/20 bg-[#e8f3ff] p-5">
               <h2 className="text-lg font-black text-[#1d1d1f]">지원 절차</h2>
               <div className="mt-4 space-y-3">
                 {processSteps.map((step) => (
                   <div key={step} className="flex gap-3 text-sm leading-6 text-[#6e6e73]">
-                    <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-[#0066cc]" />
+                    <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-[var(--app-accent-text)]" />
                     <span>{step}</span>
                   </div>
                 ))}
@@ -99,7 +99,7 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
           <aside className="flex flex-col justify-between gap-8 bg-[#f5f5f7] p-6 text-[#1d1d1f] sm:p-8">
             <div className="space-y-6">
               <div>
-                <p className="text-sm font-semibold text-[#0066cc]">Welcome</p>
+                <p className="text-sm font-semibold text-[var(--app-accent-text)]">Welcome</p>
                 <p className="mt-4 text-sm leading-7 text-[#6e6e73]">
                   COM&apos;s는 혼자서는 막막했던 공부를 함께 이어가는 공간입니다. 기초부터 차근차근 시작해도 좋고,
                   이미 만든 것이 있다면 더 큰 프로젝트로 확장해도 좋습니다.
@@ -111,7 +111,7 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
                   <Mail size={16} />
                   문의
                 </div>
-                <a href="mailto:kwcoms69@gmail.com" className="mt-2 block break-all text-sm text-[#0066cc] hover:text-[#0077ed]">
+                <a href="mailto:kwcoms69@gmail.com" className="mt-2 block break-all text-sm text-[var(--app-accent-text)] hover:text-[var(--app-accent-hover)]">
                   kwcoms69@gmail.com
                 </a>
               </div>
