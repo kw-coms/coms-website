@@ -144,7 +144,12 @@ function parseInlineHtmlToPm(contentHtml: string, { trimTrailingHardBreak = true
   while ((match = tokenRe.exec(String(contentHtml || '')))) {
     const token = match[0]
     if (!token.startsWith('<')) {
-      pushText(content, decodeHtml(token), activeMarks)
+      // Legacy plain-text content stores raw \n; ProseMirror forbids newlines in
+      // text nodes, so map each one to a hardBreak (kept even when consecutive).
+      decodeHtml(token).split('\n').forEach((part, index) => {
+        if (index) content.push({ type: 'hardBreak' })
+        pushText(content, part, activeMarks)
+      })
       continue
     }
 

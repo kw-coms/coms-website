@@ -295,9 +295,14 @@ public class RichContentSanitizer {
         style.append(key).append(':').append(cleanValue);
     }
 
+    // Only escape ampersands that do not already start an entity: the frontend
+    // sends text-block content pre-escaped, so a blind replace("&", "&amp;")
+    // stacks one extra entity layer on every save/edit round trip.
+    private static final Pattern BARE_AMPERSAND =
+            Pattern.compile("&(?!(?:[a-zA-Z][a-zA-Z0-9]{1,31}|#\\d{1,7}|#x[0-9a-fA-F]{1,6});)");
+
     private String escapeHtml(String value) {
-        return value
-                .replace("&", "&amp;")
+        return BARE_AMPERSAND.matcher(value).replaceAll("&amp;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;")
                 .replace("\"", "&quot;");
