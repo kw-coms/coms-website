@@ -1,7 +1,19 @@
 import { request, requestNoContent } from './apiClient'
 
 export async function listCommunityPosts() {
-  return request('/api/community/posts')
+  // The backend list endpoint is DB-paginated (default 20, max 200 per page), but the
+  // board UI still filters/sorts/paginates client-side over the full list, so fetch
+  // every page. ponytail: fine at club scale; move filter/sort/search server-side if
+  // the board outgrows a few thousand posts.
+  const size = 200
+  const all = []
+  for (let page = 0; ; page += 1) {
+    const batch = await request(`/api/community/posts?page=${page}&size=${size}`)
+    if (!Array.isArray(batch) || batch.length === 0) break
+    all.push(...batch)
+    if (batch.length < size) break
+  }
+  return all
 }
 
 export async function getCommunityPost(id) {
