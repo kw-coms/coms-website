@@ -6,7 +6,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.Locale;
 
 /**
  * Community text handling: input validation, the denylist safety gate for user text, rich-content
@@ -39,12 +38,9 @@ class CommunityTextService {
     }
 
     void rejectUnsafeText(String value) {
-        String lower = value.toLowerCase(Locale.ROOT);
-        if (lower.contains("<script") || lower.contains("</script")
-                || lower.contains("<iframe") || lower.contains("javascript:")
-                || lower.matches(".*\\son[a-z]+\\s*=.*")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 내용이 포함되어 있습니다.");
-        }
+        // Delegate to the hardened entity-decoding check; keeping a local copy
+        // here silently reverted the denylist->widened-check security fix.
+        richContentSanitizer.rejectUnsafeText(value);
     }
 
     String sanitizeContent(String content) {
