@@ -799,7 +799,7 @@
 }
 
 .club-calendar-event-project {
-	background: color-mix(in srgb, #0071e3 20%, var(--app-surface));
+	background: color-mix(in srgb, var(--app-accent) 20%, var(--app-surface));
 }
 
 .club-calendar-event-recruit {

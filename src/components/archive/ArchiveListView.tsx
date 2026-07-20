@@ -54,7 +54,7 @@ export function ArchiveListView({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="세미나, 프로젝트, 작성자 검색"
-              className="h-11 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-8 pr-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none transition focus:ring-2 focus:ring-[#0071e3]/24 sm:h-10 sm:w-64"
+              className="h-11 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-8 pr-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none transition focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:h-10 sm:w-64"
             />
           </div>
           <div className="text-xs font-bold text-[var(--app-subtle)]">{filteredFiles.length}개</div>
@@ -62,7 +62,7 @@ export function ArchiveListView({
       </div>
 
       {notice && (
-        <div className="mx-5 mt-5 rounded-lg border border-[#0071e3]/20 bg-[#e8f3ff] px-4 py-3 text-sm font-bold text-[#0066cc] sm:mx-7">
+        <div className="mx-5 mt-5 rounded-lg border border-[var(--app-accent)]/20 bg-[#e8f3ff] px-4 py-3 text-sm font-bold text-[var(--app-accent-text)] sm:mx-7">
           {notice}
         </div>
       )}

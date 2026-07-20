@@ -65,11 +65,11 @@ export function EmailVerifyStep({ studentId, email, onDone }: {
   }
 
   const inputClass =
-    'w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-[15px] text-[#1d1d1f] outline-none placeholder:text-[var(--app-subtle)] transition focus:ring-2 focus:ring-[#0071e3]/24'
+    'w-full rounded-lg border border-black/10 bg-white px-4 py-3 text-[15px] text-[#1d1d1f] outline-none placeholder:text-[var(--app-subtle)] transition focus:ring-2 focus:ring-[var(--app-accent)]/24'
 
   return (
     <div className="space-y-5">
-      <div className="rounded-lg border border-[#0071e3]/20 bg-[#e8f3ff] px-4 py-3 text-sm text-[#0066cc]">
+      <div className="rounded-lg border border-[var(--app-accent)]/20 bg-[#e8f3ff] px-4 py-3 text-sm text-[var(--app-accent-text)]">
         <p className="font-semibold">이메일로 인증코드를 발송했습니다.</p>
         <p className="mt-1 text-xs opacity-80">
           {email ? `${email} 받은편지함을 확인해주세요.` : '가입하신 이메일 받은편지함을 확인해주세요.'}{' '}
@@ -98,7 +98,7 @@ export function EmailVerifyStep({ studentId, email, onDone }: {
         <button
           type="submit"
           disabled={verifying || code.length !== 6}
-          className="w-full rounded-lg bg-[#0071e3] px-4 py-3 text-base font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-lg bg-[var(--app-accent)] px-4 py-3 text-base font-semibold text-white transition hover:bg-[var(--app-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {verifying ? '인증 중...' : '인증 완료'}
         </button>
@@ -110,7 +110,7 @@ export function EmailVerifyStep({ studentId, email, onDone }: {
           type="button"
           onClick={handleResend}
           disabled={cooldown > 0 || resending}
-          className="font-semibold text-[#0066cc] disabled:cursor-not-allowed disabled:opacity-50"
+          className="font-semibold text-[var(--app-accent-text)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {resending ? '전송 중...' : cooldown > 0 ? `재전송 (${cooldown}s)` : '코드 재전송'}
         </button>

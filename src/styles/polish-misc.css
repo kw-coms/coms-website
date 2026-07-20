@@ -57,6 +57,17 @@
 	box-shadow: 0 0 0 4px color-mix(in srgb, var(--app-accent) 18%, transparent);
 }
 
+/* Global keyboard-focus ring for buttons and links inside the app routes.
+   Scoped to the wrapper classes so it does not fight the field ring above
+   (which targets input/textarea/select). */
+.theme-home button:focus-visible,
+.theme-home a:focus-visible,
+.apple-route button:focus-visible,
+.apple-route a:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 2px;
+}
+
 /* ---- 4. Table row hover accent --------------------------------------- */
 /* A left accent bar fades in on hover via an inset box-shadow. */
 .apple-table tbody tr {
@@ -651,7 +662,7 @@
 }
 .coms-error-state svg {
 	flex-shrink: 0;
-	color: #ff3b30;
+	color: var(--app-danger);
 }
 .coms-error-state h3 {
 	margin: 0;

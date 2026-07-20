@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { listFiles, createPost, deleteFile } from '../../services/archiveApi'
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
+import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
 export default function AdminFiles() {
   const [files, setFiles] = useState([])
@@ -65,7 +66,19 @@ export default function AdminFiles() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-[var(--theme-body-muted)]">불러오는 중...</p>
+        <SkeletonGroup label="파일 목록을 불러오는 중">
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="shape-cut-sm flex items-center justify-between gap-3 border border-[var(--app-hairline)] bg-black/5 px-4 py-3">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+                <Skeleton className="h-3 w-10" />
+              </div>
+            ))}
+          </div>
+        </SkeletonGroup>
       ) : files.length === 0 ? (
         <p className="text-sm text-[var(--theme-body-muted)]">등록된 파일이 없습니다.</p>
       ) : (

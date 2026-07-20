@@ -60,7 +60,7 @@ export function ArchiveDetailView({
           type="button"
           onClick={onVote}
           disabled={voting}
-          className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-4 text-sm font-bold disabled:opacity-50 sm:min-h-10 ${detailFile.myVote === 1 ? 'border-[#0071e3] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
+          className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-4 text-sm font-bold disabled:opacity-50 sm:min-h-10 ${detailFile.myVote === 1 ? 'border-[var(--app-accent)] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
         >
           <ThumbsUp size={15} />
           개추 {detailFile.upvotes ?? 0}

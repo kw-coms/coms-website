@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { listAdminFonts, setFontActive, uploadFont } from '../../services/fontApi'
 import { showToast } from '../../components/common/Toast'
 import { buildFontFaceCss, fontFamilyValue } from '../../services/fontPreferences'
+import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
 export default function AdminFonts() {
   const [fonts, setFonts] = useState([])
@@ -93,7 +94,20 @@ export default function AdminFonts() {
       </p>
 
       {loading ? (
-        <p className="text-sm text-[var(--theme-body-muted)]">폰트를 불러오는 중...</p>
+        <SkeletonGroup label="폰트 목록을 불러오는 중">
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="shape-cut-sm flex flex-wrap items-center justify-between gap-3 border border-[var(--app-hairline)] bg-black/5 px-4 py-3">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-4 w-56" />
+                </div>
+                <Skeleton className="h-7 w-20" />
+              </div>
+            ))}
+          </div>
+        </SkeletonGroup>
       ) : fonts.length === 0 ? (
         <p className="text-sm text-[var(--theme-body-muted)]">등록된 폰트가 없습니다.</p>
       ) : (

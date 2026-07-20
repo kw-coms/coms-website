@@ -614,7 +614,7 @@ export default function Notices() {
                 type="button"
                 onClick={handleNoticeVote}
                 disabled={voting}
-                className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-5 py-3 text-sm font-black disabled:opacity-50 ${selectedNotice.myVote === 1 ? 'border-[#0071e3] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
+                className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-5 py-3 text-sm font-black disabled:opacity-50 ${selectedNotice.myVote === 1 ? 'border-[var(--app-accent)] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
               >
                 <ThumbsUp size={16} />
                 개추 {selectedNotice.upvotes ?? 0}
