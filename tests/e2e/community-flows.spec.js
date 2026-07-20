@@ -62,7 +62,7 @@ test('community composer uploads an inline image and deletes the saved post', as
     }
     await route.fulfill({ status: 200, json: savedPost })
   })
-  await page.route('**/api/community/posts', async (route) => {
+  await page.route('**/api/community/posts{,?*}', async (route) => {
     if (route.request().method() === 'GET') {
       await route.fulfill({ status: 200, json: posts })
       return
@@ -170,7 +170,7 @@ test('admin member management updates member roles in place', async ({ page }) =
 
 test('community composer inserts a poll block that survives re-render', async ({ page }) => {
   await mockAdminApis(page)
-  await page.route('**/api/community/posts', (route) => route.fulfill({ status: 200, json: [] }))
+  await page.route('**/api/community/posts{,?*}', (route) => route.fulfill({ status: 200, json: [] }))
 
   await page.goto('/community')
   await page.getByRole('button', { name: '글쓰기' }).click()

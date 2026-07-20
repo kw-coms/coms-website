@@ -12,6 +12,7 @@ import { BoardHeader } from './CommunityChrome'
 import BookmarkButton from './BookmarkButton'
 import AuthorName from './AuthorName'
 import CommunityPostRow from './CommunityPostRow'
+import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 import {
   SORT_OPTIONS,
   clickableCell,
@@ -281,7 +282,20 @@ export default function CommunityListView({
       {error && <p className="mx-5 mt-5 rounded-lg border border-red-300/30 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 sm:mx-7">{error}</p>}
       <div className="community-mobile-posts m-4 space-y-3 md:hidden">
         {loading && (
-          <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-12 text-center text-sm font-semibold text-[var(--app-muted)]">불러오는 중...</div>
+          <SkeletonGroup label="게시글을 불러오는 중">
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-4 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-3 w-20" />
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-3 w-12" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SkeletonGroup>
         )}
         {!loading && filteredPosts.length === 0 && (
           <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-12 text-center text-sm font-semibold text-[var(--app-muted)]">등록된 글이 없습니다.</div>
@@ -302,9 +316,20 @@ export default function CommunityListView({
             </tr>
           </thead>
           <tbody className="divide-y divide-black/10">
-            {loading && (
-              <tr><td colSpan={7} className="px-4 py-16 text-center text-[var(--app-muted)]">불러오는 중...</td></tr>
-            )}
+            {loading && Array.from({ length: 6 }).map((_, i) => (
+              <tr key={i}>
+                <td colSpan={7} className="px-4 py-4">
+                  <div className="flex items-center gap-4" role={i === 0 ? 'status' : undefined} aria-label={i === 0 ? '게시글을 불러오는 중' : undefined}>
+                    <Skeleton className="h-3 w-8" />
+                    <Skeleton className="h-3 w-14" />
+                    <Skeleton className="h-4 flex-1" />
+                    <Skeleton className="h-3 w-20" />
+                    <Skeleton className="h-3 w-16" />
+                    <Skeleton className="h-3 w-10" />
+                  </div>
+                </td>
+              </tr>
+            ))}
             {!loading && filteredPosts.length === 0 && (
               <tr><td colSpan={7} className="px-4 py-16 text-center text-[var(--app-muted)]">등록된 글이 없습니다.</td></tr>
             )}

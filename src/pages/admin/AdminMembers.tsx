@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useAdminMembers } from './useAdminMembers'
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog, promptDialog } from '../../components/common/ConfirmDialog'
+import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
+import ErrorState from '../../components/common/ErrorState'
 
 function parseInterests(raw) {
   if (!raw) return []
@@ -12,7 +14,7 @@ function parseInterests(raw) {
 }
 
 export default function AdminMembers({ currentUser }: { currentUser: { studentId?: string } }) {
-  const { members, loading, error, updateRole, removeMember, resetPassword } = useAdminMembers()
+  const { members, loading, error, refetch, updateRole, removeMember, resetPassword } = useAdminMembers()
   const [expanded, setExpanded] = useState(null)
 
   const handleRoleUpdate = async (member) => {
@@ -44,8 +46,26 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
     }
   }
 
-  if (loading) return <p className="text-sm text-[var(--theme-body-muted)]">불러오는 중...</p>
-  if (error) return <p className="text-sm text-red-500">{error}</p>
+  if (loading) {
+    return (
+      <SkeletonGroup label="회원 목록을 불러오는 중">
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="shape-cut-sm border border-[var(--app-hairline)] bg-black/5 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-56" />
+                </div>
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </SkeletonGroup>
+    )
+  }
+  if (error) return <ErrorState message={error} onRetry={() => refetch()} />
   if (members.length === 0) return <p className="text-sm text-[var(--theme-body-muted)]">회원이 없습니다.</p>
 
   return (
