@@ -257,19 +257,19 @@ export default function RichBodyEditor({
         )}
         {features.urlEmbed && (
         <button type="button" onClick={() => setActiveInsertTool((tool) => tool === 'url' ? '' : 'url')}
-          className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'url' ? 'border-[var(--app-brand)] bg-[var(--app-brand-soft)] text-[var(--app-brand)]' : 'border-black/15 bg-[var(--app-surface)] text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
+          className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'url' ? 'border-[var(--app-accent-border)] bg-[var(--app-brand-soft)] text-[var(--app-accent-text)]' : 'border-black/15 bg-[var(--app-surface)] text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
           <Link size={14} />URL 삽입
         </button>
         )}
         {features.videoSearch && (
         <button type="button" onClick={() => setActiveInsertTool((tool) => tool === 'youtube' ? '' : 'youtube')}
-          className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'youtube' ? 'border-[var(--app-brand)] bg-[var(--app-brand-soft)] text-[var(--app-brand)]' : 'border-black/15 bg-[var(--app-surface)] text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
+          className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'youtube' ? 'border-[var(--app-accent-border)] bg-[var(--app-brand-soft)] text-[var(--app-accent-text)]' : 'border-black/15 bg-[var(--app-surface)] text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
           <Search size={14} />영상 검색
         </button>
         )}
         {features.poll && (
         <button type="button" onClick={() => setActiveInsertTool((tool) => tool === 'poll' ? '' : 'poll')}
-          className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'poll' ? 'border-[var(--app-brand)] bg-[var(--app-brand-soft)] text-[var(--app-brand)]' : 'border-black/15 bg-[var(--app-surface)] text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
+          className={`inline-flex min-h-9 items-center gap-1.5 rounded border px-3 py-2 text-sm font-semibold transition ${activeInsertTool === 'poll' ? 'border-[var(--app-accent-border)] bg-[var(--app-brand-soft)] text-[var(--app-accent-text)]' : 'border-black/15 bg-[var(--app-surface)] text-[var(--theme-body-mid)] hover:bg-black/5'}`}>
           <Plus size={14} />투표
         </button>
         )}
@@ -286,7 +286,7 @@ export default function RichBodyEditor({
             onFocus={() => editorApiRef.current?.saveSelection()}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (!externalLoading) insertExternalUrl() } }}
             placeholder="이미지/영상/YouTube/링크 URL"
-            className="min-h-10 flex-1 rounded border border-black/15 px-3 text-sm outline-none focus:border-[var(--app-brand)]"
+            className="min-h-10 flex-1 rounded border border-black/15 px-3 text-sm outline-none focus:border-[var(--app-accent-border)]"
           />
           <button type="button" onClick={insertExternalUrl} disabled={externalLoading} className="inline-flex min-h-10 items-center justify-center gap-1 rounded border border-black/15 bg-[var(--app-surface)] px-3 text-sm font-bold text-[var(--theme-body-mid)] hover:bg-black/5 disabled:opacity-50">
             <Link size={14} /> {externalLoading ? '불러오는 중...' : 'URL 삽입'}
@@ -302,7 +302,7 @@ export default function RichBodyEditor({
             onChange={(e) => setYoutubeQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleYoutubeSearch() } }}
             placeholder="YouTube 영상 검색"
-            className="min-h-10 flex-1 rounded border border-black/15 px-3 text-sm outline-none focus:border-[var(--app-brand)]"
+            className="min-h-10 flex-1 rounded border border-black/15 px-3 text-sm outline-none focus:border-[var(--app-accent-border)]"
           />
           <button type="button" onClick={handleYoutubeSearch} disabled={youtubeSearching} className="inline-flex min-h-10 items-center justify-center gap-1 rounded border border-black/15 bg-[var(--app-surface)] px-3 text-sm font-bold text-[var(--theme-body-mid)] hover:bg-black/5 disabled:opacity-50">
             <Search size={14} /> {youtubeSearching ? '검색 중...' : '영상 검색'}
@@ -324,7 +324,7 @@ export default function RichBodyEditor({
         </>
         )}
         {activeInsertTool === 'poll' && features.poll && (
-        <div className="rounded-xl border border-[var(--app-brand)]/15 bg-[#f7f9ff] p-3">
+        <div className="rounded-xl border border-[var(--app-accent-border)]/15 bg-[#f7f9ff] p-3">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-sm font-black text-[#23306d]">투표 만들기</p>
@@ -339,7 +339,7 @@ export default function RichBodyEditor({
             value={pollQuestion}
             onChange={(e) => setPollQuestion(e.target.value)}
             placeholder="투표 제목 입력"
-            className="mb-2 min-h-11 w-full rounded-lg border border-[var(--app-brand)]/15 bg-[var(--app-surface)] px-3 text-sm font-semibold outline-none focus:border-[var(--app-brand)]"
+            className="mb-2 min-h-11 w-full rounded-lg border border-[var(--app-accent-border)]/15 bg-[var(--app-surface)] px-3 text-sm font-semibold outline-none focus:border-[var(--app-accent-border)]"
           />
           <div className="mb-3">
             <div className="mb-2 text-xs font-black text-[#23306d]">종료 시간</div>
@@ -352,8 +352,8 @@ export default function RichBodyEditor({
                     type="button"
                     onClick={() => setPollDurationMinutes(option.value)}
                     className={`min-h-10 rounded-full border px-3 text-xs font-black transition sm:text-sm ${selected
-                      ? 'border-[var(--app-brand)] bg-[var(--app-brand)] text-white shadow-sm'
-                      : 'border-[var(--app-brand)]/15 bg-[var(--app-surface)] text-[#23306d] hover:border-[var(--app-brand)]/40 hover:bg-[#f4f6ff]'
+                      ? 'border-[var(--app-accent-border)] bg-[var(--app-brand)] text-white shadow-sm'
+                      : 'border-[var(--app-accent-border)]/15 bg-[var(--app-surface)] text-[#23306d] hover:border-[var(--app-accent-border)]/40 hover:bg-[#f4f6ff]'
                     }`}
                     aria-pressed={selected}
                   >
@@ -375,14 +375,14 @@ export default function RichBodyEditor({
                   value={option.label}
                   onChange={(e) => updatePollOption(index, 'label', e.target.value)}
                   placeholder={`보기 ${index + 1}`}
-                  className="min-h-10 flex-1 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-sm outline-none focus:border-[var(--app-brand)]"
+                  className="min-h-10 flex-1 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-sm outline-none focus:border-[var(--app-accent-border)]"
                 />
                 <input
                   type="url"
                   value={option.imageUrl}
                   onChange={(e) => updatePollOption(index, 'imageUrl', e.target.value)}
                   placeholder="보기 이미지 URL(선택)"
-                  className="min-h-10 flex-1 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-sm outline-none focus:border-[var(--app-brand)]"
+                  className="min-h-10 flex-1 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-sm outline-none focus:border-[var(--app-accent-border)]"
                 />
                 <button
                   type="button"
@@ -399,7 +399,7 @@ export default function RichBodyEditor({
             type="button"
             onClick={addPollOption}
             disabled={pollOptionInputs.length >= 10}
-            className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--app-brand)]/45 bg-white/70 text-sm font-bold text-[var(--app-brand)] transition hover:bg-[var(--app-surface)] disabled:opacity-40"
+            className="mt-2 flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--app-accent-border)]/45 bg-white/70 text-sm font-bold text-[var(--app-accent-text)] transition hover:bg-[var(--app-surface)] disabled:opacity-40"
           >
             <Plus size={16} /> 보기 추가
           </button>

@@ -147,7 +147,7 @@ export default function CommunityDetailView({
       ) : (
         <article className="m-0 overflow-hidden bg-[var(--app-surface)] sm:m-5 sm:rounded-lg sm:border sm:border-[var(--app-hairline)]">
           <div className="border-b border-[var(--app-hairline)] px-4 py-4 sm:px-5">
-            <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[var(--app-brand)]">
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[var(--app-accent-text)]">
               {currentPost.pinned && <span className="rounded bg-[#fff1d6] px-1.5 py-0.5 text-[10px] font-black text-[#9a6a00]">고정</span>}
               <span>{categoryLabel(currentPost.category || 'GENERAL')}</span>
               {currentPostConcept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
