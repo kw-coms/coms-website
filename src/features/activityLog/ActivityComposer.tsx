@@ -9,6 +9,10 @@ function ActivityComposer({
   categories,
   activityForm,
   setActivityForm,
+  activityImages,
+  setActivityImages,
+  activityFiles,
+  setActivityFiles,
   prependActivity,
   submitError,
   setSubmitError,
@@ -16,8 +20,6 @@ function ActivityComposer({
   setActivityMode,
 }) {
   const queryClient = useQueryClient()
-  const [activityImages, setActivityImages] = useState([])
-  const [activityFiles, setActivityFiles] = useState([])
   const [savingActivity, setSavingActivity] = useState(false)
 
   const selectedCategory = activityForm.category || categories[0]?.key || ''

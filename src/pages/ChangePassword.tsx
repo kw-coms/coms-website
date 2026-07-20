@@ -26,8 +26,8 @@ const INTEREST_OPTIONS = ['보안', '웹', '앱']
 function choiceButtonClass(active) {
   return `min-h-11 rounded-lg px-4 py-2 text-sm font-semibold transition ${
     active
-      ? 'bg-[#0071e3] text-white'
-      : 'border border-black/10 bg-[#f5f5f7] text-[#1d1d1f] hover:bg-white'
+      ? 'bg-[var(--app-accent)] text-white'
+      : 'border border-black/10 bg-[var(--app-surface-soft)] text-[var(--app-text)] hover:bg-white'
   }`
 }
 
@@ -124,9 +124,9 @@ function NotificationToggle({ checked, onChange, label, description, disabled }:
   disabled?: boolean
 }) {
   return (
-    <label className="flex items-start justify-between gap-4 rounded-lg border border-black/8 bg-white/70 p-3">
+    <label className="flex items-start justify-between gap-4 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] p-3">
       <span className="min-w-0">
-        <span className="block text-sm font-semibold text-[#1d1d1f]">{label}</span>
+        <span className="block text-sm font-semibold text-[var(--app-text)]">{label}</span>
         <span className="mt-0.5 block text-xs leading-5 text-[var(--app-subtle)]">{description}</span>
       </span>
       <button
@@ -136,8 +136,8 @@ function NotificationToggle({ checked, onChange, label, description, disabled }:
         aria-label={label}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]/40 disabled:cursor-wait disabled:opacity-60 ${
-          checked ? 'bg-[#0071e3]' : 'bg-black/20'
+        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 disabled:cursor-wait disabled:opacity-60 ${
+          checked ? 'bg-[var(--app-accent)]' : 'bg-black/20'
         }`}
       >
         <span
@@ -363,14 +363,14 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
     { label: '공백 없음', ok: newPassword.length > 0 && !/\s/.test(newPassword) },
   ]
 
-  const panelClass = 'rounded-lg border border-black/10 bg-white/88 p-5 text-[#1d1d1f] shadow-[0_24px_70px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:p-8'
+  const panelClass = 'rounded-lg border border-black/10 bg-white/88 p-5 text-[var(--app-text)] shadow-[0_24px_70px_rgba(0,0,0,0.1)] backdrop-blur-xl sm:p-8'
   const frameClass = 'rounded-lg bg-black/10 p-px'
-  const inputClass = 'w-full rounded-lg bg-white px-4 py-3 text-[#1d1d1f] outline-none placeholder:text-[var(--app-subtle)] transition focus:ring-2 focus:ring-[#0071e3]/24'
+  const inputClass = 'w-full rounded-lg bg-white px-4 py-3 text-[var(--app-text)] outline-none placeholder:text-[var(--app-subtle)] transition focus:ring-2 focus:ring-[var(--app-accent)]/24'
   const textareaClass = `${inputClass} min-h-28 resize-y leading-6`
-  const btnClass = 'rounded-lg border border-black/10 bg-white px-4 py-2.5 font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-[#f5f5f7] disabled:cursor-wait disabled:opacity-60'
-  const primaryBtnClass = 'rounded-lg bg-[#0071e3] px-4 py-2.5 font-semibold text-white shadow-[0_10px_28px_rgba(0,113,227,0.22)] transition hover:bg-[#0077ed] disabled:cursor-wait disabled:opacity-60'
-  const cardClass = 'rounded-lg border border-black/10 bg-[#f5f5f7] p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:p-5'
-  const fieldCardClass = 'rounded-lg border border-black/8 bg-white/70 p-3'
+  const btnClass = 'rounded-lg border border-black/10 bg-white px-4 py-2.5 font-semibold text-[var(--app-text)] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-[var(--app-surface-soft)] disabled:cursor-wait disabled:opacity-60'
+  const primaryBtnClass = 'rounded-lg bg-[var(--app-accent)] px-4 py-2.5 font-semibold text-white shadow-[0_10px_28px_rgba(0,113,227,0.22)] transition hover:bg-[var(--app-accent-hover)] disabled:cursor-wait disabled:opacity-60'
+  const cardClass = 'rounded-lg border border-black/10 bg-[var(--app-surface-soft)] p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:p-5'
+  const fieldCardClass = 'rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] p-3'
   const helperTextClass = 'text-xs leading-5 text-[var(--app-subtle)]'
   const miniAppProfiles = [
     {
@@ -500,7 +500,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
         <button
           type="button"
           onClick={onBack}
-          className="rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-semibold text-[#1d1d1f] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-white"
+          className="rounded-full border border-black/10 bg-white/80 px-4 py-2 text-sm font-semibold text-[var(--app-text)] shadow-[0_1px_2px_rgba(0,0,0,0.05)] transition hover:bg-white"
         >
           돌아가기
         </button>
@@ -584,7 +584,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
               </div>
               <p
                 data-testid="account-font-preview"
-                className="mt-3 rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[#1d1d1f]"
+                className="mt-3 rounded-lg border border-black/10 bg-white px-4 py-3 text-base text-[var(--app-text)]"
                 style={{ fontFamily: fontFamilyValue(selectedFont) }}
               >
                 한글 English 123 · 선택한 폰트 미리보기
@@ -604,7 +604,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
               </div>
             </div>
 
-            {profileMessage && <div className="text-sm text-[#0066cc]">{profileMessage}</div>}
+            {profileMessage && <div className="text-sm text-[var(--app-accent-text)]">{profileMessage}</div>}
 
             <button type="submit" className={primaryBtnClass} disabled={loadingAction === 'profile'}>
               {loadingAction === 'profile' ? '저장 중...' : '회원 정보 저장'}
@@ -631,17 +631,17 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-bold text-[#0066cc]">{profile.label}</p>
+                        <p className="text-sm font-bold text-[var(--app-accent-text)]">{profile.label}</p>
                         <p className="mt-1 text-xs font-semibold leading-5 text-[var(--app-subtle)]">{profile.description}</p>
                       </div>
-                      <span className="rounded-full bg-[#e8f3ff] px-2.5 py-1 text-xs font-bold text-[#0066cc]">
+                      <span className="rounded-full bg-[var(--app-accent-soft)] px-2.5 py-1 text-xs font-bold text-[var(--app-accent-text)]">
                         {profile.documents.length}개
                       </span>
                     </div>
-                    <p className="mt-3 text-xs font-semibold text-[#6e6e73]">공유 중 {sharedCount}개</p>
+                    <p className="mt-3 text-xs font-semibold text-[var(--app-muted)]">공유 중 {sharedCount}개</p>
                     <div className="mt-3 space-y-1">
                       {profile.documents.slice(0, 2).map((document) => (
-                        <p key={`${document.contentType}-${document.contentId}`} className="truncate text-sm font-semibold text-[#1d1d1f]">
+                        <p key={`${document.contentType}-${document.contentId}`} className="truncate text-sm font-semibold text-[var(--app-text)]">
                           {document.contentType === 'result' ? '결과' : '템플릿'} · {document.title}
                         </p>
                       ))}
@@ -668,7 +668,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
                 <p className="text-sm text-[var(--theme-body-muted)]/85">{user?.email || '-'}</p>
                 <p className={helperTextClass}>인증이 필요한 기능을 쓰기 전에 이메일 상태를 확인합니다.</p>
               </div>
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${user?.emailVerified ? 'bg-[#e8f3ff] text-[#0066cc]' : 'bg-amber-100 text-amber-800'}`}>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${user?.emailVerified ? 'bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]' : 'bg-amber-100 text-amber-800'}`}>
                 {user?.emailVerified ? '인증 완료' : '미인증'}
               </span>
             </div>
@@ -694,7 +694,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
               </form>
             )}
 
-            {emailMessage && <div className="mt-3 text-sm text-[#0066cc]">{emailMessage}</div>}
+            {emailMessage && <div className="mt-3 text-sm text-[var(--app-accent-text)]">{emailMessage}</div>}
           </div>
 
           <form onSubmit={handlePasswordSubmit} className={`${cardClass} mt-4 space-y-4`}>
@@ -745,14 +745,14 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
               </div>
             </div>
 
-            <div className="rounded-lg border border-black/8 bg-white/70 p-3">
+            <div className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] p-3">
               <p className="mb-2 text-xs font-bold text-[var(--theme-body-muted)]/85">비밀번호 조건</p>
               <div className="flex flex-wrap gap-2">
                 {passwordChecks.map((check) => (
                   <span
                     key={check.label}
                     className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      check.ok ? 'bg-[#e8f3ff] text-[#0066cc]' : 'bg-white/64 text-[var(--theme-body-muted)]'
+                      check.ok ? 'bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]' : 'bg-white/64 text-[var(--theme-body-muted)]'
                     }`}
                   >
                     {check.ok ? '✓ ' : ''}{check.label}
@@ -761,7 +761,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
               </div>
             </div>
 
-            {passwordMessage && <div className="text-sm text-[#0066cc]">{passwordMessage}</div>}
+            {passwordMessage && <div className="text-sm text-[var(--app-accent-text)]">{passwordMessage}</div>}
 
             <button type="submit" className={btnClass} disabled={loadingAction === 'password'}>
               {loadingAction === 'password' ? '변경 중...' : '비밀번호 변경'}

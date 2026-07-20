@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-react'
 import { listCommunityReports, resolveCommunityReport } from '../../services/adminApi'
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
+import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
 const COMMUNITY_REPORT_REASONS = {
   SPAM: '스팸/홍보',
@@ -85,7 +86,21 @@ export default function AdminCommunityReports({ formatDateTime }: { formatDateTi
         </button>
       </div>
 
-      {loading && <p className="text-sm text-[var(--theme-body-muted)]">신고 목록을 불러오는 중...</p>}
+      {loading && (
+        <SkeletonGroup label="신고 목록을 불러오는 중">
+          <div className="overflow-hidden rounded-lg border border-[var(--app-hairline)]">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 border-b border-black/10 px-3 py-3 last:border-b-0">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-3 flex-1" />
+                <Skeleton className="h-7 w-16" />
+              </div>
+            ))}
+          </div>
+        </SkeletonGroup>
+      )}
       {error && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
       {!loading && !error && reports.length === 0 && (
         <p className="text-sm text-[var(--theme-body-muted)]">처리 대기 중인 신고가 없습니다.</p>

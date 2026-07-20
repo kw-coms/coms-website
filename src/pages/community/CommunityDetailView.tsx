@@ -147,7 +147,7 @@ export default function CommunityDetailView({
       ) : (
         <article className="m-0 overflow-hidden bg-[var(--app-surface)] sm:m-5 sm:rounded-lg sm:border sm:border-[var(--app-hairline)]">
           <div className="border-b border-[var(--app-hairline)] px-4 py-4 sm:px-5">
-            <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[#3b4890]">
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[var(--app-accent-text)]">
               {currentPost.pinned && <span className="rounded bg-[#fff1d6] px-1.5 py-0.5 text-[10px] font-black text-[#9a6a00]">고정</span>}
               <span>{categoryLabel(currentPost.category || 'GENERAL')}</span>
               {currentPostConcept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
@@ -172,7 +172,7 @@ export default function CommunityDetailView({
             })}
           </div>
           <div className="grid grid-cols-2 gap-2 border-y border-[var(--app-hairline)] bg-[#fafafa] px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-3 sm:py-5">
-            <button type="button" onClick={() => onVote(1)} className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:w-auto sm:px-5 ${currentPost.myVote === 1 ? 'border-[#0071e3] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}>
+            <button type="button" onClick={() => onVote(1)} className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:w-auto sm:px-5 ${currentPost.myVote === 1 ? 'border-[var(--app-accent)] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}>
               <ThumbsUp size={16} />
               개추 {currentPost.upvotes}
             </button>

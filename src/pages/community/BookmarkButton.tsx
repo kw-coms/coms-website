@@ -28,7 +28,7 @@ export default function BookmarkButton({ post, onToggle, pending = false, varian
         title={label}
         className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black transition disabled:opacity-50 max-md:col-span-2 sm:w-auto sm:px-5 ${
           bookmarked
-            ? 'border-[#0071e3] bg-[var(--app-accent)] text-white'
+            ? 'border-[var(--app-accent)] bg-[var(--app-accent)] text-white'
             : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'
         }`}
       >

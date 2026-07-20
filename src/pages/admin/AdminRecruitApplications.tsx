@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { updateRecruitApplicationStatus } from '../../services/adminApi'
 import { RECRUIT_STATUS_OPTIONS, recruitStatusLabel } from './recruitStatus'
+import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
 type RecruitApplicationItem = {
   id: string | number
@@ -84,7 +85,27 @@ export default function AdminRecruitApplications({ applications, loading, error,
 
       {message && <p className="shape-cut-sm bg-[var(--app-accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-accent-text)]">{message}</p>}
       {saveError && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{saveError}</p>}
-      {loading && <p className="text-sm text-[var(--theme-body-muted)]">지원서를 불러오는 중...</p>}
+      {loading && (
+        <SkeletonGroup label="지원서를 불러오는 중">
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="space-y-2">
+                    <Skeleton className="h-5 w-32" />
+                    <Skeleton className="h-3 w-64" />
+                  </div>
+                  <Skeleton className="h-8 w-20" />
+                </div>
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                  <Skeleton className="h-16 w-full" />
+                  <Skeleton className="h-16 w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </SkeletonGroup>
+      )}
       {error && <p className="shape-cut-sm bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
       {!loading && !error && applications.length === 0 && (
         <p className="text-sm text-[var(--theme-body-muted)]">아직 접수된 지원서가 없습니다.</p>
