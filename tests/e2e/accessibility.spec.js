@@ -6,6 +6,12 @@ import { mockAdminApis } from './visualSupport.js'
 // issues that we surface in the attachment but do not gate on yet.
 const BLOCKING_IMPACTS = ['serious', 'critical']
 
+// The route-enter fade (.coms-page-enter) animates opacity for 360ms; if axe
+// scans mid-fade it measures semi-transparent text against the backdrop and
+// reports bogus color-contrast violations. The app disables the fade under
+// prefers-reduced-motion, so run the scans in that mode for determinism.
+test.use({ reducedMotion: 'reduce' })
+
 const samplePost = {
   id: 77,
   title: '접근성 점검 게시글',
@@ -26,7 +32,7 @@ const samplePost = {
 }
 
 async function mockCommunity(page) {
-  await page.route('**/api/community/posts', (route) => {
+  await page.route('**/api/community/posts{,?*}', (route) => {
     if (route.request().method() === 'GET') {
       return route.fulfill({ status: 200, json: [samplePost] })
     }
@@ -49,6 +55,18 @@ test('home page has no serious or critical accessibility violations', async ({ p
   await mockAdminApis(page)
   await page.goto('/')
   await expect(page.locator('body')).toContainText("KW COM's")
+  // The lower home sections lazy-mount as they scroll into view; axe scanning
+  // while a section is mid-mount reads its not-yet-revealed (transparent) text
+  // as bogus color-contrast violations. Walk the page to mount everything and
+  // let it settle before analyzing.
+  await page.evaluate(async () => {
+    for (let y = 0; y <= document.body.scrollHeight; y += 800) {
+      window.scrollTo(0, y)
+      await new Promise((resolve) => setTimeout(resolve, 60))
+    }
+    window.scrollTo(0, 0)
+  })
+  await page.waitForTimeout(700)
   await assertNoSeriousViolations(page)
 })
 

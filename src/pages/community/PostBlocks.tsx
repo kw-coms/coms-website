@@ -218,8 +218,8 @@ export function renderPostBlocks(post, options: {
               ? `${formatPollDate(result.closesAt)} 종료`
               : '진행 중'
           return (
-            <div key={i} className="my-4 clear-both overflow-hidden rounded-xl border border-[var(--app-brand)]/15 bg-[var(--app-surface)] shadow-[0_14px_36px_rgba(35,48,109,0.12)]">
-              <div className="border-b border-[var(--app-brand)]/10 bg-gradient-to-r from-[var(--app-brand)] to-[#5061b5] px-4 py-3 text-white">
+            <div key={i} className="my-4 clear-both overflow-hidden rounded-xl border border-[var(--app-accent-border)]/15 bg-[var(--app-surface)] shadow-[0_14px_36px_rgba(35,48,109,0.12)]">
+              <div className="border-b border-[var(--app-accent-border)]/10 bg-gradient-to-r from-[var(--app-brand)] to-[#5061b5] px-4 py-3 text-white">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="rounded-full bg-white/16 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em]">Poll</span>
                   <div className="flex flex-wrap items-center gap-2">
@@ -252,12 +252,12 @@ export function renderPostBlocks(post, options: {
                       type="button"
                       onClick={() => onPollVote?.(block.pollId, index)}
                       disabled={!onPollVote || pollVoting === block.pollId || closed || voted}
-                      className={`relative w-full overflow-hidden rounded-lg border px-3 py-3 text-left text-sm font-semibold transition ${selected ? 'border-[var(--app-brand)] bg-[#f7f9ff] text-[#23306d] ring-2 ring-[var(--app-brand)]/10' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--theme-body-dark)] hover:border-[var(--app-brand)]/30 hover:bg-[#f8faff]'}`}
+                      className={`relative w-full overflow-hidden rounded-lg border px-3 py-3 text-left text-sm font-semibold transition ${selected ? 'border-[var(--app-accent-border)] bg-[#f7f9ff] text-[#23306d] ring-2 ring-[var(--app-brand)]/10' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--theme-body-dark)] hover:border-[var(--app-accent-border)]/30 hover:bg-[#f8faff]'}`}
                     >
                       <span className="absolute inset-y-0 left-0 bg-[#dce6ff]" style={{ width: `${pct}%` }} />
                       <span className="relative flex items-center justify-between gap-3">
                         <span className="flex min-w-0 items-center gap-2">
-                          <span className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px] ${selected ? 'border-[var(--app-brand)] bg-[var(--app-brand)] text-white' : 'border-black/15 bg-[var(--app-surface)] text-[var(--theme-body-muted)]'}`}>
+                          <span className={`flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px] ${selected ? 'border-[var(--app-accent-border)] bg-[var(--app-brand)] text-white' : 'border-black/15 bg-[var(--app-surface)] text-[var(--theme-body-muted)]'}`}>
                             {index + 1}
                           </span>
                           {imageUrl && (
@@ -267,7 +267,7 @@ export function renderPostBlocks(post, options: {
                           )}
                           <span className="min-w-0 break-words">{label}</span>
                         </span>
-                        <span className="shrink-0 text-xs font-black text-[var(--app-brand)]">{count.toLocaleString('ko-KR')}표 · {pct}%</span>
+                        <span className="shrink-0 text-xs font-black text-[var(--app-accent-text)]">{count.toLocaleString('ko-KR')}표 · {pct}%</span>
                       </span>
                     </button>
                   )
@@ -294,7 +294,7 @@ export function renderPostBlocks(post, options: {
                 key={attachment.key}
                 href={attachment.href}
                 download={attachment.name}
-                className="inline-flex min-h-10 items-center gap-2 rounded border border-[var(--app-hairline)] bg-black/[0.03] px-3 py-2 text-sm font-semibold text-[var(--app-brand)] transition hover:bg-black/[0.06] hover:underline"
+                className="inline-flex min-h-10 items-center gap-2 rounded border border-[var(--app-hairline)] bg-black/[0.03] px-3 py-2 text-sm font-semibold text-[var(--app-accent-text)] transition hover:bg-black/[0.06] hover:underline"
               >
                 <Download size={14} />
                 <span className="break-all">{attachment.name}</span>

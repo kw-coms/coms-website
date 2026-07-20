@@ -79,8 +79,8 @@ export default function CommentThread({
   return (
     <div className="border-t border-[var(--app-hairline)]">
       <div className="flex items-center gap-2 bg-[var(--app-surface-soft)] px-4 py-3">
-        <MessageSquare size={15} className="text-[var(--app-brand)]" />
-        <span className="text-sm font-black text-[var(--app-brand)]">댓글 {comments.length}</span>
+        <MessageSquare size={15} className="text-[var(--app-accent-text)]" />
+        <span className="text-sm font-black text-[var(--app-accent-text)]">댓글 {comments.length}</span>
       </div>
       {comments.length > 0 && (
         <div className="divide-y divide-black/8">
@@ -121,7 +121,7 @@ export default function CommentThread({
             onChange={(e) => setCommentAnonymousName(e.target.value)}
             maxLength={maxAnonymousNameLength}
             placeholder="ㅇㅇ"
-            className="rounded border border-black/15 bg-[var(--app-surface-soft)] px-3 py-2 text-base outline-none focus:border-[var(--app-brand)] focus:bg-[var(--app-surface)] sm:text-sm"
+            className="rounded border border-black/15 bg-[var(--app-surface-soft)] px-3 py-2 text-base outline-none focus:border-[var(--app-accent-border)] focus:bg-[var(--app-surface)] sm:text-sm"
             disabled={commentSaving}
           />
         )}
@@ -137,7 +137,7 @@ export default function CommentThread({
           placeholder="댓글을 입력하세요"
           maxLength={maxCommentLength}
           rows={3}
-          className="min-h-24 rounded border border-black/15 bg-[var(--app-surface-soft)] px-3 py-2 text-base outline-none focus:border-[var(--app-brand)] focus:bg-[var(--app-surface)] sm:text-sm"
+          className="min-h-24 rounded border border-black/15 bg-[var(--app-surface-soft)] px-3 py-2 text-base outline-none focus:border-[var(--app-accent-border)] focus:bg-[var(--app-surface)] sm:text-sm"
           disabled={commentSaving}
         />
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
@@ -195,7 +195,7 @@ function CommentNode({
     <div className="divide-y divide-black/8">
       <div
         id={`comment-${comment.id}`}
-        className={`scroll-mt-28 flex items-start gap-3 px-4 py-3 ${level > 0 ? 'border-l-2 border-[var(--app-brand)]/20 bg-black/[0.02]' : ''}`}
+        className={`scroll-mt-28 flex items-start gap-3 px-4 py-3 ${level > 0 ? 'border-l-2 border-[var(--app-accent-border)]/20 bg-black/[0.02]' : ''}`}
         style={{ marginLeft: indent }}
       >
         <div className="min-w-0 flex-1">
@@ -221,7 +221,7 @@ function CommentNode({
                 }}
                 maxLength={maxCommentLength}
                 rows={3}
-                className="w-full rounded border border-black/15 bg-[var(--app-surface-soft)] px-3 py-2 text-base outline-none focus:border-[var(--app-brand)] focus:bg-[var(--app-surface)] sm:text-sm"
+                className="w-full rounded border border-black/15 bg-[var(--app-surface-soft)] px-3 py-2 text-base outline-none focus:border-[var(--app-accent-border)] focus:bg-[var(--app-surface)] sm:text-sm"
                 disabled={commentSaving}
               />
               <div className="flex flex-wrap gap-2">
@@ -257,7 +257,7 @@ function CommentNode({
                   setEditingCommentId(null)
                   setEditCommentInput('')
                 }}
-                className="inline-flex min-h-11 items-center px-2 text-xs font-bold text-[var(--app-brand)] hover:underline sm:min-h-0 sm:px-0"
+                className="inline-flex min-h-11 items-center px-2 text-xs font-bold text-[var(--app-accent-text)] hover:underline sm:min-h-0 sm:px-0"
               >
                 댓글 달기
               </button>
@@ -265,7 +265,7 @@ function CommentNode({
                 <button
                   type="button"
                   onClick={() => onStartEditComment(comment)}
-                  className="inline-flex min-h-11 items-center px-2 text-xs font-bold text-[var(--app-brand)] hover:underline sm:min-h-0 sm:px-0"
+                  className="inline-flex min-h-11 items-center px-2 text-xs font-bold text-[var(--app-accent-text)] hover:underline sm:min-h-0 sm:px-0"
                 >
                   수정
                 </button>
@@ -284,12 +284,12 @@ function CommentNode({
           {isReplying && (
             <div className="mt-2 space-y-2">
               {replyMentionEnabled && mention && (
-                <div className="inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--app-brand)]/20 bg-[var(--app-brand-soft)] px-2.5 py-1 text-xs font-bold text-[var(--app-brand)]">
+                <div className="inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--app-accent-border)]/20 bg-[var(--app-brand-soft)] px-2.5 py-1 text-xs font-bold text-[var(--app-accent-text)]">
                   <span className="truncate">{mention}</span>
                   <button
                     type="button"
                     onClick={() => setReplyMentionEnabled(false)}
-                    className="rounded-full px-1 text-[var(--app-brand)]/70 hover:bg-[var(--app-brand)]/10 hover:text-[var(--app-brand)]"
+                    className="rounded-full px-1 text-[var(--app-accent-text)]/70 hover:bg-[var(--app-brand)]/10 hover:text-[var(--app-accent-text)]"
                     aria-label="답글 태그 제거"
                   >
                     ×
@@ -302,7 +302,7 @@ function CommentNode({
                   onChange={(e) => setReplyAnonymousName(e.target.value)}
                   maxLength={maxAnonymousNameLength}
                   placeholder="ㅇㅇ"
-                  className="w-full rounded border border-black/15 bg-[var(--app-surface-soft)] px-3 py-2 text-base outline-none focus:border-[var(--app-brand)] focus:bg-[var(--app-surface)] sm:text-sm"
+                  className="w-full rounded border border-black/15 bg-[var(--app-surface-soft)] px-3 py-2 text-base outline-none focus:border-[var(--app-accent-border)] focus:bg-[var(--app-surface)] sm:text-sm"
                   disabled={commentSaving}
                 />
               )}
@@ -318,7 +318,7 @@ function CommentNode({
                 placeholder="댓글을 입력하세요"
                 maxLength={Math.max(0, maxCommentLength - (replyMentionEnabled ? mention.length + 1 : 0))}
                 rows={3}
-                className="w-full rounded border border-black/15 bg-[var(--app-surface-soft)] px-3 py-2 text-base outline-none focus:border-[var(--app-brand)] focus:bg-[var(--app-surface)] sm:text-sm"
+                className="w-full rounded border border-black/15 bg-[var(--app-surface-soft)] px-3 py-2 text-base outline-none focus:border-[var(--app-accent-border)] focus:bg-[var(--app-surface)] sm:text-sm"
                 disabled={commentSaving}
               />
               <div className="flex flex-wrap gap-2">
