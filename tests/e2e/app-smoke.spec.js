@@ -2463,6 +2463,10 @@ test('admin Apps management shows public-card previews with status badges', asyn
 
 test('monthly calendar renders recurring schedule occurrences for the selected month', async ({ page }) => {
   await mockAdminApis(page)
+  // The month summary / mobile agenda only lists events on or after "today",
+  // and the mocked occurrences are fixed July 2026 dates — freeze the clock so
+  // the test doesn't rot as the real date moves past them.
+  await page.clock.setFixedTime(new Date('2026-07-01T09:00:00'))
   // The calendar requests occurrences for the visible month; only July 2026
   // (year=2026&month=7) returns recurring occurrences. Other months are empty.
   await page.unroute('**/api/club-activities/schedule**')
