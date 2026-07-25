@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/useAuth'
 import PageShell from '../components/PageShell'
 import { scrollToTopInstant } from '../utils/themeColors'
+import { canAccessOperationsPanel } from '../utils/roleAccess'
 
 export function ScrollToTop() {
   const { pathname } = useLocation()
@@ -42,6 +43,6 @@ export function RequireAdmin({ children }: PropsWithChildren) {
     </PageShell>
   )
   if (authError || !user) return <Navigate to="/login" state={{ from: location, authIssue: Boolean(authError) }} replace />
-  if (user.role !== 'ADMIN') return <Navigate to="/" replace />
+  if (!canAccessOperationsPanel(user.role)) return <Navigate to="/" replace />
   return children
 }

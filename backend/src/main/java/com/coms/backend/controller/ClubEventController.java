@@ -6,6 +6,7 @@ import com.coms.backend.dto.ClubEventRequest;
 import com.coms.backend.dto.ClubEventResponse;
 import com.coms.backend.dto.ClubEventRsvpRequest;
 import com.coms.backend.dto.ClubEventVoteRequest;
+import com.coms.backend.service.AuditLogService;
 import com.coms.backend.service.ClubEventService;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
@@ -35,9 +36,11 @@ import java.util.List;
 public class ClubEventController {
 
     private final ClubEventService clubEventService;
+    private final AuditLogService auditLogService;
 
-    public ClubEventController(ClubEventService clubEventService) {
+    public ClubEventController(ClubEventService clubEventService, AuditLogService auditLogService) {
         this.clubEventService = clubEventService;
+        this.auditLogService = auditLogService;
     }
 
     @GetMapping
@@ -55,16 +58,20 @@ public class ClubEventController {
     @PostMapping
     public ResponseEntity<ClubEventResponse> create(@Valid @RequestBody ClubEventRequest request,
                                                     Authentication authentication) {
-        return ResponseEntity.ok(clubEventService.createEvent(
-                request.title(), request.description(), request.startsAt(), request.endsAt(), authentication.getName()));
+        ClubEventResponse response = clubEventService.createEvent(
+                request.title(), request.description(), request.startsAt(), request.endsAt(), authentication.getName());
+        recordEventAudit(authentication, "ADMIN_CLUB_EVENT_CREATE", response);
+        return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{id}")
     public ResponseEntity<ClubEventResponse> update(@PathVariable Long id,
                                                     @Valid @RequestBody ClubEventRequest request,
                                                     Authentication authentication) {
-        return ResponseEntity.ok(clubEventService.updateEvent(
-                id, request.title(), request.description(), request.startsAt(), request.endsAt(), authentication.getName()));
+        ClubEventResponse response = clubEventService.updateEvent(
+                id, request.title(), request.description(), request.startsAt(), request.endsAt(), authentication.getName());
+        recordEventAudit(authentication, "ADMIN_CLUB_EVENT_UPDATE", response);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping(path = "/{id}/entries", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -82,8 +89,10 @@ public class ClubEventController {
         List<MultipartFile> uploadFiles = files == null || files.isEmpty()
                 ? (legacyFile == null ? List.of() : List.of(legacyFile))
                 : files;
-        return ResponseEntity.ok(clubEventService.addEntry(
-                id, title, authorName, description, workType, summary, tags, externalUrl, uploadFiles, authentication.getName()));
+        ClubEventResponse.Entry response = clubEventService.addEntry(
+                id, title, authorName, description, workType, summary, tags, externalUrl, uploadFiles, authentication.getName());
+        recordEntryAudit(authentication, "ADMIN_CLUB_EVENT_ENTRY_CREATE", id, response);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/{id}/entries/{entryId}/vote")
@@ -127,15 +136,100 @@ public class ClubEventController {
     }
 
     @DeleteMapping("/{id}/entries/{entryId}")
-    public ResponseEntity<Void> deleteEntry(@PathVariable Long id, @PathVariable Long entryId) {
+    public ResponseEntity<Void> deleteEntry(@PathVariable Long id,
+                                            @PathVariable Long entryId,
+                                            Authentication authentication) {
+        ClubEventEntry entry = clubEventService.loadEntryMeta(id, entryId);
         clubEventService.deleteEntry(id, entryId);
+        recordEntryAudit(authentication, "ADMIN_CLUB_EVENT_ENTRY_DELETE", id, entry);
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteEvent(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteEvent(@PathVariable Long id, Authentication authentication) {
+        ClubEventResponse event = clubEventService.get(id, authentication.getName());
         clubEventService.deleteEvent(id);
+        recordEventAudit(authentication, "ADMIN_CLUB_EVENT_DELETE", event);
         return ResponseEntity.noContent().build();
+    }
+
+    private void recordEventAudit(Authentication authentication, String action, ClubEventResponse event) {
+        auditLogService.record(
+                authentication.getName(),
+                action,
+                "CLUB_EVENT",
+                String.valueOf(event.id()),
+                eventDetail(event),
+                null
+        );
+    }
+
+    private void recordEntryAudit(Authentication authentication,
+                                  String action,
+                                  Long eventId,
+                                  ClubEventResponse.Entry entry) {
+        auditLogService.record(
+                authentication.getName(),
+                action,
+                "CLUB_EVENT_ENTRY",
+                String.valueOf(entry.id()),
+                entryDetail(eventId, entry),
+                null
+        );
+    }
+
+    private void recordEntryAudit(Authentication authentication,
+                                  String action,
+                                  Long eventId,
+                                  ClubEventEntry entry) {
+        auditLogService.record(
+                authentication.getName(),
+                action,
+                "CLUB_EVENT_ENTRY",
+                String.valueOf(entry.getId()),
+                entryDetail(eventId, entry),
+                null
+        );
+    }
+
+    private String eventDetail(ClubEventResponse event) {
+        StringBuilder detail = new StringBuilder();
+        append(detail, "title", event.title());
+        append(detail, "description", event.description());
+        append(detail, "startsAt", event.startsAt());
+        append(detail, "endsAt", event.endsAt());
+        append(detail, "entryCount", event.entryCount());
+        return detail.toString();
+    }
+
+    private String entryDetail(Long eventId, ClubEventResponse.Entry entry) {
+        StringBuilder detail = new StringBuilder();
+        append(detail, "eventId", eventId);
+        append(detail, "title", entry.title());
+        append(detail, "author", entry.authorName());
+        append(detail, "workType", entry.workType());
+        append(detail, "file", entry.originalName());
+        return detail.toString();
+    }
+
+    private String entryDetail(Long eventId, ClubEventEntry entry) {
+        StringBuilder detail = new StringBuilder();
+        append(detail, "eventId", eventId);
+        append(detail, "title", entry.getTitle());
+        append(detail, "author", entry.getAuthorName());
+        append(detail, "workType", entry.getWorkType());
+        append(detail, "file", entry.getOriginalName());
+        return detail.toString();
+    }
+
+    private void append(StringBuilder detail, String key, Object value) {
+        if (value == null) {
+            return;
+        }
+        if (!detail.isEmpty()) {
+            detail.append('\n');
+        }
+        detail.append(key).append('=').append(value);
     }
 
     private MediaType mediaType(String mimeType) {

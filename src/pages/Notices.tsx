@@ -19,6 +19,7 @@ import { URL_ONLY_RICH_FEATURES } from '../components/richEditor/richBodyFeature
 import { renderRichBody, richBodyToPlainText as noticeContentSearchText } from '../components/richEditor/renderRichBody'
 import { serializeRichBody, richBodyPlainText } from '../components/richEditor/serializeRichBody'
 import { parsePostBlocks } from './community/postEditorUtils'
+import { canManageContent } from '../utils/roleAccess'
 
 function formatDate(iso) {
   const date = new Date(iso)
@@ -181,7 +182,7 @@ export default function Notices() {
 
   useScrollReveal([notices?.length, loading])
 
-  const isAdmin = user?.role === 'ADMIN'
+  const isAdmin = canManageContent(user?.role)
 
   const filteredNotices = useMemo(() => {
     const byCategory = activeCategory === 'ALL'

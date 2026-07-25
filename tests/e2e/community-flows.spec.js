@@ -162,6 +162,10 @@ test('admin member management updates member roles in place', async ({ page }) =
 
   await expect.poll(() => rolePayloads.at(-1)).toEqual({ role: 'ADMIN' })
   await expect(memberRow.getByText('관리자')).toBeVisible()
+  await memberRow.getByRole('button', { name: '운영진으로' }).click()
+
+  await expect.poll(() => rolePayloads.at(-1)).toEqual({ role: 'OFFICER' })
+  await expect(memberRow.getByText('운영진')).toBeVisible()
   await memberRow.getByRole('button', { name: '일반 회원으로' }).click()
 
   await expect.poll(() => rolePayloads.at(-1)).toEqual({ role: 'USER' })

@@ -14,6 +14,8 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -83,16 +85,13 @@ public class ClubProjectService {
             project.setEyebrow(eyebrow.isBlank() ? null : eyebrow.trim());
         }
         if (madeBy != null) {
-            if (madeBy.isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "만든 사람을 입력하세요.");
-            }
-            project.setMadeBy(madeBy.trim());
+            project.setMadeBy(madeBy.isBlank() ? null : madeBy.trim());
         }
         if (linkUrl != null) {
-            project.setLinkUrl(linkUrl.isBlank() ? null : linkUrl.trim());
+            project.setLinkUrl(cleanProjectUrl(linkUrl, true));
         }
         if (displayUrl != null) {
-            project.setDisplayUrl(displayUrl.isBlank() ? null : displayUrl.trim());
+            project.setDisplayUrl(cleanProjectUrl(displayUrl, false));
         }
         if (position != null) {
             project.setPosition(position);
@@ -175,9 +174,9 @@ public class ClubProjectService {
         project.setTitle(title.trim());
         project.setDescription(description != null && !description.isBlank() ? description.trim() : null);
         project.setEyebrow(eyebrow != null && !eyebrow.isBlank() ? eyebrow.trim() : null);
-        project.setMadeBy(madeBy != null && !madeBy.isBlank() ? madeBy.trim() : "최준혁");
-        project.setLinkUrl(linkUrl != null && !linkUrl.isBlank() ? linkUrl.trim() : null);
-        project.setDisplayUrl(displayUrl != null && !displayUrl.isBlank() ? displayUrl.trim() : null);
+        project.setMadeBy(madeBy != null && !madeBy.isBlank() ? madeBy.trim() : null);
+        project.setLinkUrl(cleanProjectUrl(linkUrl, true));
+        project.setDisplayUrl(cleanProjectUrl(displayUrl, false));
     }
 
     private String resolveCategory(String value) {
@@ -200,6 +199,44 @@ public class ClubProjectService {
         String rawName = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().replace("\\", "/");
         String filename = StringUtils.getFilename(rawName);
         return StringUtils.cleanPath(filename == null ? "" : filename);
+    }
+
+    private String cleanProjectUrl(String value, boolean requireScheme) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (containsControlCharacter(trimmed)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "프로젝트 링크는 http(s) 형식이어야 합니다.");
+        }
+        String parseTarget = requireScheme || hasScheme(trimmed) ? trimmed : "https://" + trimmed;
+        URI uri;
+        try {
+            uri = new URI(parseTarget);
+        } catch (URISyntaxException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "프로젝트 링크는 http(s) 형식이어야 합니다.");
+        }
+        String scheme = uri.getScheme();
+        if (scheme == null || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "프로젝트 링크는 http(s) 형식이어야 합니다.");
+        }
+        if (uri.getRawUserInfo() != null || uri.getHost() == null || uri.getHost().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "프로젝트 링크는 http(s) 형식이어야 합니다.");
+        }
+        return trimmed;
+    }
+
+    private boolean containsControlCharacter(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            if (Character.isISOControl(value.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasScheme(String value) {
+        return value.matches("^[A-Za-z][A-Za-z0-9+.-]*:.*");
     }
 
     private Map<Long, List<ClubProjectFile>> filesByProject(List<ClubProject> projects) {

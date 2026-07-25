@@ -34,6 +34,8 @@ function createHeadlessCommunityEditor(blocks) {
         orderedList: false,
         listItem: false,
         horizontalRule: false,
+        link: false,
+        underline: false,
       }),
       TextStyle,
       Color.configure({ types: ['textStyle'] }),
