@@ -5,8 +5,8 @@ const adminSource = readFileSync('src/pages/Admin.tsx', 'utf8')
 const deletedPostModalSource = readFileSync('src/pages/admin/DeletedPostDetailModal.tsx', 'utf8')
 
 assert.match(adminSource, /role="tablist"\s+aria-label="관리자 패널 섹션"/)
-assert.match(adminSource, /role="tab"[\s\S]*?aria-selected=\{activeTab === tab\.id\}[\s\S]*?aria-controls=\{`admin-panel-\$\{tab\.id\}`\}/)
-assert.match(adminSource, /role="tabpanel"[\s\S]*?aria-labelledby=\{`admin-tab-\$\{activeTab\}`\}/)
+assert.match(adminSource, /role="tab"[\s\S]*?aria-selected=\{resolvedActiveTab === tab\.id\}[\s\S]*?aria-controls=\{`admin-panel-\$\{tab\.id\}`\}/)
+assert.match(adminSource, /role="tabpanel"[\s\S]*?aria-labelledby=\{`admin-tab-\$\{resolvedActiveTab\}`\}/)
 
 assert.match(deletedPostModalSource, /aria-modal="true"[\s\S]*?aria-labelledby="deleted-post-detail-title"/)
 assert.match(deletedPostModalSource, /const closeButtonRef = useRef\(null\)/)

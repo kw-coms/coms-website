@@ -18,6 +18,7 @@ import ClubEventListCard from './ClubEventListCard'
 import { CLUB_EVENT_RSVP_OPTIONS, toEventDateTime } from './clubEventUtils'
 import { useClubEventEntryForm } from './useClubEventEntryForm'
 import { useClubEvents } from './useClubEvents'
+import { canManageContent } from '../../utils/roleAccess'
 
 function ClubEventSection() {
   const navigate = useNavigate()
@@ -55,7 +56,7 @@ function ClubEventSection() {
     ? null
     : eventItems.find((item) => item.id === selectedEventId) || selectedSnapshot
   const isLocked = !authLoading && !user
-  const isAdmin = user?.role === 'ADMIN'
+  const isAdmin = canManageContent(user?.role)
   const visibleError = error || loadError
 
   const resetEventForm = () => {

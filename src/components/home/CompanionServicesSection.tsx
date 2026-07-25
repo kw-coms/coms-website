@@ -1,34 +1,9 @@
 import { useEffect, useState } from 'react'
 import { listClubProjects, listClubProjectCategories } from '../../services/clubProjectApi'
-import { companionServices } from '../../data/homeContent'
 import AppProjectCard from '../apps/AppProjectCard'
 
-const DEFAULT_MADE_BY = '최준혁'
-
-// Graceful fallback used when the backend is unavailable (mirrors how other
-// sections degrade). Built from the original hardcoded companionServices so the
-// section keeps rendering the same links offline.
-const FALLBACK_CATEGORIES = [
-  { key: 'WEBSITE', name: '웹사이트' },
-  { key: 'APP', name: '앱' },
-  { key: 'GAME', name: '게임' },
-]
-
-const FALLBACK_PROJECTS = companionServices.map((service, index) => ({
-  id: `fallback-${index}`,
-  category: service.title === 'Game Club' ? 'GAME' : 'WEBSITE',
-  categoryName: service.title === 'Game Club' ? '게임' : '웹사이트',
-  title: service.title,
-  description: service.body,
-  eyebrow: service.eyebrow,
-  madeBy: DEFAULT_MADE_BY,
-  linkUrl: service.href,
-  displayUrl: service.domain,
-  files: [],
-}))
-
 function groupByCategory(projects, categories) {
-  const order = categories.length > 0 ? categories : FALLBACK_CATEGORIES
+  const order = categories.length > 0 ? categories : []
   const groups = order.map((category) => ({
     key: category.key,
     name: category.name,
@@ -52,8 +27,9 @@ function groupByCategory(projects, categories) {
 }
 
 function CompanionServicesSection() {
-  const [projects, setProjects] = useState(FALLBACK_PROJECTS)
-  const [categories, setCategories] = useState(FALLBACK_CATEGORIES)
+  const [projects, setProjects] = useState([])
+  const [categories, setCategories] = useState([])
+  const [loadState, setLoadState] = useState('loading')
 
   useEffect(() => {
     let mounted = true
@@ -62,12 +38,15 @@ function CompanionServicesSection() {
         if (!mounted) return
         const projectList = Array.isArray(projectData) ? projectData : []
         const categoryList = Array.isArray(categoryData) ? categoryData : []
-        // Only replace the fallback when the API actually returns content.
-        if (projectList.length > 0) setProjects(projectList)
-        if (categoryList.length > 0) setCategories(categoryList)
+        setProjects(projectList)
+        setCategories(categoryList)
+        setLoadState('ready')
       })
       .catch(() => {
-        // Keep the fallback when the backend is unavailable.
+        if (!mounted) return
+        setProjects([])
+        setCategories([])
+        setLoadState('error')
       })
     return () => { mounted = false }
   }, [])
@@ -85,7 +64,9 @@ function CompanionServicesSection() {
           </p>
         </div>
 
-        {groups.length === 0 ? (
+        {loadState === 'error' ? (
+          <p className="mt-8 text-sm font-medium text-[#b3261e]">프로젝트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
+        ) : groups.length === 0 ? (
           <p className="mt-8 text-sm font-medium text-[#6e6e73]">등록된 프로젝트가 아직 없습니다.</p>
         ) : (
           <div className="mt-10 space-y-12">

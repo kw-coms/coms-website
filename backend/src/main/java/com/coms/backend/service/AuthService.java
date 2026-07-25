@@ -38,6 +38,7 @@ public class AuthService implements UserDetailsService {
     private static final int MAX_PASSWORD_RESET_ATTEMPTS = 5;
     private static final int MAX_EMAIL_VERIFICATION_ATTEMPTS = 5;
     private static final int MAX_FAILURES_PER_ID = 5;
+    private static final int MAX_FAILURES_PER_IP = 5;
     private static final int LOCKOUT_WINDOW_MINUTES = 15;
     private static final int GRADUATE_AFTER_YEARS = 7;
 
@@ -114,19 +115,20 @@ public class AuthService implements UserDetailsService {
     }
 
     public AuthResponse login(LoginRequest request, String clientIp) {
-        checkLoginLockout(request.identifier(), clientIp);
+        String normalizedIdentifier = normalizeLoginIdentifier(request.identifier());
+        checkLoginLockout(normalizedIdentifier, clientIp);
 
-        Member member = findMemberByIdentifier(request.identifier())
+        Member member = findMemberByIdentifier(normalizedIdentifier)
                 .orElseGet(() -> {
-                    loginFailureRepository.save(new LoginFailure(request.identifier(), clientIp));
-                    auditLogService.record(null, "LOGIN_FAILURE", "AUTH", null, "identifier=" + maskIdentifier(request.identifier()), clientIp);
+                    recordLoginFailure(normalizedIdentifier, clientIp);
+                    auditLogService.record(null, "LOGIN_FAILURE", "AUTH", null, "identifier=" + maskIdentifier(normalizedIdentifier), clientIp);
                     throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
                 });
 
         bannedStudentService.ensureNotBanned(member.getStudentId());
 
         if (!passwordEncoder.matches(request.password(), member.getPassword())) {
-            loginFailureRepository.save(new LoginFailure(request.identifier(), clientIp));
+            recordLoginFailure(normalizedIdentifier, clientIp);
             auditLogService.record(member.getStudentId(), "LOGIN_FAILURE", "AUTH", null, "bad_credentials", clientIp);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
@@ -150,13 +152,18 @@ public class AuthService implements UserDetailsService {
         return new AuthResponse(token, member.getStudentId(), member.getName(), "로그인 성공", refreshToken);
     }
 
-    private void checkLoginLockout(String studentId, String clientIp) {
+    private void checkLoginLockout(String identifier, String clientIp) {
         LocalDateTime windowStart = LocalDateTime.now().minusMinutes(LOCKOUT_WINDOW_MINUTES);
-        long failures = loginFailureRepository.countByStudentIdAndAttemptedAtAfter(studentId, windowStart);
-        if (failures >= MAX_FAILURES_PER_ID) {
+        long identifierFailures = identifier == null ? 0 : loginFailureRepository.countByStudentIdAndAttemptedAtAfter(identifier, windowStart);
+        long ipFailures = normalizeNullable(clientIp) == null ? 0 : loginFailureRepository.countByIpAndAttemptedAtAfter(clientIp, windowStart);
+        if (identifierFailures >= MAX_FAILURES_PER_ID || ipFailures >= MAX_FAILURES_PER_IP) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "로그인 시도 횟수가 초과되었습니다. " + LOCKOUT_WINDOW_MINUTES + "분 후 다시 시도해주세요.");
         }
+    }
+
+    private void recordLoginFailure(String identifier, String clientIp) {
+        loginFailureRepository.save(new LoginFailure(identifier, clientIp));
     }
 
     private String claimSignupStudentId(SignupRequest request, SignupType signupType) {
@@ -188,6 +195,14 @@ public class AuthService implements UserDetailsService {
         }
         return memberRepository.findByStudentId(normalized)
                 .or(() -> memberRepository.findByEmailIgnoreCase(normalized));
+    }
+
+    private String normalizeLoginIdentifier(String identifier) {
+        String normalized = normalizeNullable(identifier);
+        if (normalized == null) {
+            return null;
+        }
+        return normalized.contains("@") ? normalized.toLowerCase(Locale.ROOT) : normalized;
     }
 
     private String maskIdentifier(String identifier) {
