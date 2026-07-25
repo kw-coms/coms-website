@@ -70,7 +70,7 @@ public class Member {
     private String selectedBuiltinFontKey;
 
     public enum Role {
-        USER, ADMIN
+        USER, OFFICER, ADMIN
     }
 
     public Long getId() { return id; }

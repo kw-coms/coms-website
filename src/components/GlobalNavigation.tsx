@@ -20,6 +20,7 @@ import {
 } from '../data/homeContent'
 import { scrollToTopInstant } from '../utils/themeColors'
 import NotificationButton from './NotificationButton'
+import { canAccessOperationsPanel } from '../utils/roleAccess'
 
 const floatingBarBaseClass = 'apple-topbar border-b border-[var(--app-hairline)]'
 
@@ -257,8 +258,10 @@ export default function GlobalNavigation() {
           <div className="ml-auto hidden items-center gap-1 md:flex">
             <NotificationButton />
             <button type="button" onClick={() => goPageTop('/settings')} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)]" title="계정 설정">{user.name}</button>
-            {user.role === 'ADMIN' && (
-              <button type="button" onClick={() => goPageTop('/admin')} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[#b45309] transition hover:bg-amber-100/70">관리자</button>
+            {canAccessOperationsPanel(user.role) && (
+              <button type="button" onClick={() => goPageTop('/admin')} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[#b45309] transition hover:bg-amber-100/70">
+                {user.role === 'ADMIN' ? '관리자' : '임원'}
+              </button>
             )}
             <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)]">
               <LogOut size={14} />
@@ -378,9 +381,9 @@ export default function GlobalNavigation() {
                     <span>{user.name}</span>
                     <span className="ml-auto text-xs text-[var(--app-muted)]">계정 설정</span>
                   </button>
-                  {user.role === 'ADMIN' && (
+                  {canAccessOperationsPanel(user.role) && (
                     <button type="button" onClick={() => closeAndGo('/admin')} className="apple-mobile-menu-item apple-mobile-menu-item-warning">
-                      <span>관리자 패널</span>
+                      <span>{user.role === 'ADMIN' ? '관리자 패널' : '임원 패널'}</span>
                     </button>
                   )}
                   <NotificationButton alignLeft variant="mobileMenu" />

@@ -21,6 +21,7 @@ import {
   useScheduleOccurrences,
 } from '../../shared/homeUi'
 import { CalendarScheduleComposer } from './CalendarScheduleComposer'
+import { canManageContent } from '../../utils/roleAccess'
 
 function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate()
@@ -48,7 +49,7 @@ function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
   })
   const hasAnyEvent = Object.values(eventsByDay).some((list) => Array.isArray(list) && list.length > 0)
   const isLocked = !authLoading && !user
-  const isAdmin = user?.role === 'ADMIN'
+  const isAdmin = canManageContent(user?.role)
   const selectedDayEvents = selectedDay ? eventsByDay[selectedDay] || [] : []
   const activeSelectedEventId = selectedDayEvents.some((event) => event.id === selectedEventId) ? selectedEventId : null
   const monthSummary = buildMonthEventSummary({

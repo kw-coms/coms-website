@@ -67,6 +67,14 @@ public class ClubActivityCategoryService {
         return toResponse(saved, count);
     }
 
+    @Transactional(readOnly = true)
+    public ClubActivityCategoryResponse get(Long id) {
+        ClubActivityCategory category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "분류를 찾을 수 없습니다."));
+        long count = activityRepository.countByCategory(category.getKey());
+        return toResponse(category, count);
+    }
+
     public void delete(Long id) {
         ClubActivityCategory category = categoryRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "분류를 찾을 수 없습니다."));

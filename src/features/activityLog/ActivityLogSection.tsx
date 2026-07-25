@@ -11,6 +11,7 @@ import ActivityDetailModal from './ActivityDetailModal'
 import ActivityFilterBar from './ActivityFilterBar'
 import ActivityListItem from './ActivityListItem'
 import { useActivityFilters } from './useActivityFilters'
+import { canManageContent } from '../../utils/roleAccess'
 
 function ActivityLogSection({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate()
@@ -49,7 +50,7 @@ function ActivityLogSection({ compact = false }: { compact?: boolean }) {
   } = useActivityFilters(allActivityItems, compact)
   const selectedActivity = allActivityItems.find((item) => item.id === selectedActivityId) || null
   const isLocked = !authLoading && !user
-  const isAdmin = user?.role === 'ADMIN'
+  const isAdmin = canManageContent(user?.role)
 
   // Register a view once per activity per mount when the card is opened.
   const registerActivityView = async (item) => {

@@ -1,15 +1,18 @@
 name: Deploy COMS Website
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
     branches:
       - main
   workflow_dispatch:
     inputs:
       deploy_ref:
         description: "Branch, tag, or commit SHA to deploy"
-        required: false
-        default: main
+        required: true
 
 concurrency:
   group: deploy-${{ github.workflow }}
@@ -17,6 +20,15 @@ concurrency:
 
 jobs:
   deploy:
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (
+          github.event.workflow_run.event == 'push' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.conclusion == 'success'
+        )
+      }}
     runs-on: ubuntu-latest
 
     steps:
@@ -26,15 +38,16 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '~/apps/coms-website' }}
           DEPLOY_REPO: https://github.com/kw-coms/coms-website.git
-          DEPLOY_REF: ${{ github.event.inputs.deploy_ref || github.ref_name }}
+          DEPLOY_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_ref || github.event.workflow_run.head_sha }}
           PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL || 'https://coms.kw.ac.kr' }}
         run: |
           set -euo pipefail
 
-          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_SSH_KEY" ]; then
-            echo "Missing deploy secrets. Set DEPLOY_HOST, DEPLOY_USER, and DEPLOY_SSH_KEY." >&2
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_SSH_KEY" ] || [ -z "$DEPLOY_SSH_KNOWN_HOSTS" ]; then
+            echo "Missing deploy secrets. Set DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, and DEPLOY_SSH_KNOWN_HOSTS." >&2
             exit 1
           fi
 
@@ -42,9 +55,20 @@ jobs:
           echo "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-          ssh-keyscan -p "$DEPLOY_PORT" "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          ssh-keygen -l -f ~/.ssh/known_hosts >/dev/null
+          if [ "$DEPLOY_PORT" = "22" ]; then
+            if ! ssh-keygen -F "$DEPLOY_HOST" -f ~/.ssh/known_hosts >/dev/null && ! ssh-keygen -F "[$DEPLOY_HOST]:$DEPLOY_PORT" -f ~/.ssh/known_hosts >/dev/null; then
+              echo "DEPLOY_SSH_KNOWN_HOSTS does not contain an expected key for $DEPLOY_HOST." >&2
+              exit 1
+            fi
+          elif ! ssh-keygen -F "[$DEPLOY_HOST]:$DEPLOY_PORT" -f ~/.ssh/known_hosts >/dev/null; then
+            echo "DEPLOY_SSH_KNOWN_HOSTS does not contain an expected key for [$DEPLOY_HOST]:$DEPLOY_PORT." >&2
+            exit 1
+          fi
 
-          ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o UserKnownHostsFile=~/.ssh/known_hosts -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
             "DEPLOY_PATH=${DEPLOY_PATH@Q} DEPLOY_REPO=${DEPLOY_REPO@Q} DEPLOY_REF=${DEPLOY_REF@Q} PUBLIC_BASE_URL=${PUBLIC_BASE_URL@Q} bash -c 'tmp=\$(mktemp /tmp/coms-deploy.XXXXXX); cat > \"\$tmp\"; bash \"\$tmp\"; status=\$?; rm -f \"\$tmp\"; exit \"\$status\"'" << 'REMOTE'
             set -euo pipefail
 

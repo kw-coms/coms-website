@@ -85,10 +85,47 @@ class ClubProjectServiceTest {
     }
 
     @Test
-    void defaultsMadeByToChoiJunhyukWhenBlank() {
+    void doesNotDefaultMadeByWhenBlank() {
         var created = clubProjectService.create("WEBSITE", "기본 제작자", null, null,
                 "  ", null, null, null);
-        assertThat(created.madeBy()).isEqualTo("최준혁");
+        assertThat(created.madeBy()).isNull();
+    }
+
+    @Test
+    void emptyRepositoryReturnsNoPublicProjects() {
+        clubProjectRepository.deleteAll();
+        assertThat(clubProjectService.list()).isEmpty();
+    }
+
+    @Test
+    void rejectsDangerousProjectUrls() {
+        assertThatThrownBy(() -> clubProjectService.create("WEBSITE", "스크립트 링크", null, null,
+                "최준혁", "javascript:alert(1)", null, null))
+                .isInstanceOf(ResponseStatusException.class);
+
+        assertThatThrownBy(() -> clubProjectService.create("WEBSITE", "사용자정보 링크", null, null,
+                "최준혁", "https://user@example.com/app", null, null))
+                .isInstanceOf(ResponseStatusException.class);
+
+        assertThatThrownBy(() -> clubProjectService.create("WEBSITE", "제어문자 링크", null, null,
+                "최준혁", "https://example.com/\napp", null, null))
+                .isInstanceOf(ResponseStatusException.class);
+
+        assertThatThrownBy(() -> clubProjectService.create("WEBSITE", "표시 링크", null, null,
+                "최준혁", "https://example.com/app", "javascript:alert(1)", null))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void acceptsOnlyHttpProjectUrls() {
+        var created = clubProjectService.create("WEBSITE", "정상 링크", null, null,
+                "최준혁", " https://example.com/app?q=1 ", " example.com/app ", null);
+        assertThat(created.linkUrl()).isEqualTo("https://example.com/app?q=1");
+        assertThat(created.displayUrl()).isEqualTo("example.com/app");
+
+        var explicitDisplayUrl = clubProjectService.create("WEBSITE", "표시 정상 링크", null, null,
+                "최준혁", "https://example.com/app", " https://example.com/app ", null);
+        assertThat(explicitDisplayUrl.displayUrl()).isEqualTo("https://example.com/app");
     }
 
     @Test

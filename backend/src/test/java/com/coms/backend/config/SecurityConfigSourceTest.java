@@ -22,20 +22,34 @@ class SecurityConfigSourceTest {
     void noticeMutationsRequireAdminAndArchiveUploadRequiresLogin() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/coms/backend/config/SecurityConfig.java"));
 
-        assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/notices\").hasRole(\"ADMIN\")");
-        assertThat(source).contains("auth.requestMatchers(HttpMethod.PUT, \"/api/notices/**\").hasRole(\"ADMIN\")");
-        assertThat(source).contains("auth.requestMatchers(HttpMethod.DELETE, \"/api/notices/**\").hasRole(\"ADMIN\")");
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.GET, \"/api/notices\", \"/api/notices/**\").authenticated()");
+        assertThat(source).doesNotContain("auth.requestMatchers(HttpMethod.GET, \"/api/notices\", \"/api/notices/**\").permitAll()");
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/notices\").hasAnyRole(\"ADMIN\", \"OFFICER\")");
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.PATCH, \"/api/notices/*/pin\").hasAnyRole(\"ADMIN\", \"OFFICER\")");
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.PUT, \"/api/notices/**\").hasAnyRole(\"ADMIN\", \"OFFICER\")");
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.DELETE, \"/api/notices/**\").hasAnyRole(\"ADMIN\", \"OFFICER\")");
         assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/files\").authenticated()");
         assertThat(source).contains("auth.requestMatchers(HttpMethod.DELETE, \"/api/files/**\").hasRole(\"ADMIN\")");
     }
 
     @Test
-    void clubActivityRecordsAreMemberReadableAndAdminWritable() throws Exception {
+    void clubActivityRecordsAreMemberReadableAndOfficerWritable() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/coms/backend/config/SecurityConfig.java"));
 
         assertThat(source).contains("auth.requestMatchers(HttpMethod.GET, \"/api/club-activities\", \"/api/club-activities/**\").authenticated()");
-        assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/club-activities\").hasRole(\"ADMIN\")");
-        assertThat(source).contains("auth.requestMatchers(HttpMethod.DELETE, \"/api/club-activities/**\").hasRole(\"ADMIN\")");
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/club-activities\").hasAnyRole(\"ADMIN\", \"OFFICER\")");
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.DELETE, \"/api/club-activities/**\").hasAnyRole(\"ADMIN\", \"OFFICER\")");
+    }
+
+    @Test
+    void publicSettingsAndOfficerContentAdminRoutesPrecedeSensitiveAdminBoundary() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/coms/backend/config/SecurityConfig.java"));
+
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.GET, \"/api/site-settings\").permitAll()");
+        assertThat(source).contains("auth.requestMatchers(\"/api/admin/site-settings\", \"/api/admin/club-activity-categories/**\",");
+        assertThat(source).contains("\"/api/admin/club-project-categories/**\", \"/api/admin/recurring-schedules/**\").hasAnyRole(\"ADMIN\", \"OFFICER\")");
+        assertThat(source.indexOf("/api/admin/site-settings"))
+                .isLessThan(source.indexOf("auth.requestMatchers(\"/api/admin/**\").hasRole(\"ADMIN\")"));
     }
 
     @Test
