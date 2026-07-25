@@ -100,7 +100,7 @@ public class ClubEventService {
                 studentId);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
     public ClubEventResponse createEvent(String title,
                                          String description,
                                          LocalDateTime startsAt,
@@ -124,7 +124,7 @@ public class ClubEventService {
         return toResponse(eventRepository.save(event), List.of(), Map.of(), List.of(), List.of(), creatorStudentId);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
     public ClubEventResponse updateEvent(Long id,
                                          String title,
                                          String description,
@@ -151,7 +151,7 @@ public class ClubEventService {
         return get(eventRepository.save(event).getId(), editorStudentId);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
     public ClubEventResponse.Entry addEntry(Long eventId,
                                             String title,
                                             String authorName,
@@ -309,7 +309,7 @@ public class ClubEventService {
         }
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
     public void deleteEntry(Long eventId, Long entryId) {
         getEvent(eventId);
         ClubEventEntry entry = loadEntryMeta(eventId, entryId);
@@ -318,7 +318,7 @@ public class ClubEventService {
         entryRepository.delete(entry);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
     public void deleteEvent(Long id) {
         ClubEvent event = getEvent(id);
         List<ClubEventEntry> entries = entryRepository.findByClubEventIdOrderByPositionAscCreatedAtAsc(id);

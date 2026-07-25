@@ -3,6 +3,7 @@ import { useNavigate, useLocation, type NavigateOptions, type To } from 'react-r
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, Megaphone } from 'lucide-react'
 import { listNotices } from '../../services/noticeApi'
+import { getPublicSiteSettings } from '../../services/siteSettingsApi'
 import {
   activityDetails,
   projectDetails,
@@ -19,10 +20,13 @@ import { getLogoAsset } from '../../utils/logoAssets'
 import { ghostActionBtnClass, solidActionBtnClass } from '../../shared/homeUi'
 import ClubCalendarSection from '../../features/clubCalendar/ClubCalendarSection'
 import { scrollToTopInstant } from '../../utils/themeColors'
+import { useAuth } from '../../contexts/useAuth'
 
 const LATEST_NOTICE_QUERY_KEY = ['app-shell', 'latest-notice']
+const SITE_SETTINGS_QUERY_KEY = ['site-settings', 'public']
 
 export default function HomeView() {
+  const { user } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const aboutRef = useRef(null)
@@ -34,12 +38,18 @@ export default function HomeView() {
   const latestNoticeQuery = useQuery({
     queryKey: LATEST_NOTICE_QUERY_KEY,
     queryFn: listNotices,
+    enabled: Boolean(user),
     select: (data) => {
       const notices = Array.isArray(data) ? data : []
       return notices.find((n) => (n.category || 'GENERAL') === 'GENERAL') ?? null
     },
   })
   const latestNotice = latestNoticeQuery.data ?? null
+  const siteSettingsQuery = useQuery({
+    queryKey: SITE_SETTINGS_QUERY_KEY,
+    queryFn: getPublicSiteSettings,
+  })
+  const siteSettings = siteSettingsQuery.data
 
   // Apple-style cinematic scroll: a giant COM's wordmark shrinks as you scroll,
   // the scene stays pinned (sticky) for a deliberate "pause", then the rest of
@@ -316,14 +326,16 @@ export default function HomeView() {
                   <div className="coms-3d-card absolute inset-0 rounded-[1.5rem] bg-white/82 ring-1 ring-black/5" />
                   <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="coms-logo-3d relative z-10 h-14 w-14 object-contain sm:h-16 sm:w-16" />
                 </div>
-                <h2 className="apple-display coms-3d-title coms-cinema-title mt-4 whitespace-nowrap text-6xl sm:text-7xl">COM&apos;s</h2>
+                <h2 className="apple-display coms-3d-title coms-cinema-title mt-4 whitespace-nowrap text-6xl sm:text-7xl">
+                  {siteSettings?.homeHeroTitle || 'COM\'s'}
+                </h2>
                 <div className="coms-cinema-badge coms-depth-sm mt-4 inline-flex items-center gap-2 rounded-full bg-white/64 px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)] shadow-[0_4px_16px_rgba(0,0,0,0.05)] backdrop-blur-xl">
                   <span className="size-2 rounded-full bg-[var(--app-accent)]" />
-                  2026 Semester Ready
+                  {siteSettings?.semesterLabel || '2026 Semester Ready'}
                 </div>
                 <p className="coms-cinema-tag coms-depth-sm mt-4 text-sm font-semibold text-[var(--app-muted)]">Kwangwoon University Computer Club</p>
                 <p className="coms-cinema-tag apple-copy mx-auto mt-3 max-w-[20rem] text-lg sm:max-w-3xl sm:text-2xl">
-                  배우고, 만들고, 성장하는 광운대학교 컴퓨터 학술동아리.
+                  {siteSettings?.homeHeroCopy || '배우고, 만들고, 성장하는 광운대학교 컴퓨터 학술동아리.'}
                 </p>
                 <div className="coms-cinema-cta mt-6 flex flex-wrap justify-center gap-3">
                   <button type="button" onClick={() => openPanel('about')} className={solidActionBtnClass}>더 알아보기</button>
