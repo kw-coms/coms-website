@@ -13,12 +13,23 @@ function parseInterests(raw) {
   })
 }
 
+const ROLE_LABELS = {
+  ADMIN: '관리자',
+  OFFICER: '운영진',
+  USER: '일반 회원',
+}
+
 export default function AdminMembers({ currentUser }: { currentUser: { studentId?: string } }) {
   const { members, loading, error, refetch, updateRole, removeMember, resetPassword } = useAdminMembers()
   const [expanded, setExpanded] = useState(null)
 
   const handleRoleUpdate = async (member) => {
-    const newRole = member.role === 'ADMIN' ? 'USER' : 'ADMIN'
+    const nextRoleByCurrent = {
+      ADMIN: 'OFFICER',
+      OFFICER: 'USER',
+      USER: 'ADMIN',
+    }
+    const newRole = nextRoleByCurrent[member.role] || 'USER'
     try {
       await updateRole({ id: member.id, role: newRole })
     } catch (err) {
@@ -83,8 +94,10 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold text-[var(--theme-body-dark)]">{member.name}</span>
                   <span className="text-xs text-[var(--theme-body-muted)]">{member.studentId}</span>
-                  {member.role === 'ADMIN' && (
-                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-700">관리자</span>
+                  {member.role !== 'USER' && (
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-700">
+                      {ROLE_LABELS[member.role] || member.role}
+                    </span>
                   )}
                 </div>
                 <p className="mt-0.5 text-xs text-[var(--theme-body-muted)]">
@@ -110,7 +123,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
                       onClick={() => handleRoleUpdate(member)}
                       className="text-xs font-semibold text-blue-500 transition hover:underline"
                     >
-                      {member.role === 'ADMIN' ? '일반 회원으로' : '관리자 지정'}
+                      {member.role === 'ADMIN' ? '운영진으로' : member.role === 'OFFICER' ? '일반 회원으로' : '관리자 지정'}
                     </button>
                     <button
                       type="button"

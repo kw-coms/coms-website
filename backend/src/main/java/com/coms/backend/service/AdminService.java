@@ -61,6 +61,7 @@ public class AdminService {
     public DeletedMemberSnapshot deleteMember(Long id) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        ensureNotFinalAdmin(member, "마지막 관리자는 삭제할 수 없습니다.");
         DeletedMemberSnapshot snapshot = DeletedMemberSnapshot.from(member);
         communityService.deleteCommunityDataForMember(member.getStudentId());
         deleteEngagementVotesForMember(member.getStudentId());
@@ -71,6 +72,7 @@ public class AdminService {
     public DeletedMemberSnapshot deleteByStudentId(String studentId) {
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        ensureNotFinalAdmin(member, "마지막 관리자는 탈퇴할 수 없습니다.");
         DeletedMemberSnapshot snapshot = DeletedMemberSnapshot.from(member);
         communityService.deleteCommunityDataForMember(member.getStudentId());
         deleteEngagementVotesForMember(member.getStudentId());
@@ -81,6 +83,12 @@ public class AdminService {
     private void deleteEngagementVotesForMember(String studentId) {
         noticeVoteRepository.deleteByStudentId(studentId);
         clubActivityVoteRepository.deleteByStudentId(studentId);
+    }
+
+    private void ensureNotFinalAdmin(Member member, String message) {
+        if (member.getRole() == Member.Role.ADMIN && memberRepository.countByRole(Member.Role.ADMIN) <= 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, message);
+        }
     }
 
     public void resetPassword(Long id, String newPassword) {

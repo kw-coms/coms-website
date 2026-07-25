@@ -30,7 +30,7 @@ public class ClubProject {
     @Column(length = 60)
     private String eyebrow;
 
-    @Column(name = "made_by", nullable = false, length = 100)
+    @Column(name = "made_by", length = 100)
     private String madeBy;
 
     @Column(name = "link_url", length = 500)
