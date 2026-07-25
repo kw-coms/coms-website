@@ -1,10 +1,6 @@
-import { useState } from 'react'
-import { ArrowUpRight, Download, FileText, PanelTopOpen } from 'lucide-react'
+import { ArrowUpRight, Download, FileText } from 'lucide-react'
 import { apiUrl } from '../../services/apiClient'
 import { buildProjectStatusBadges } from '../../utils/appProjectStatus'
-import AppEmbedModal from './AppEmbedModal'
-
-const DEFAULT_MADE_BY = '최준혁'
 
 const STATUS_TONE_CLASS = {
   ready: 'bg-[#e8f3ff] text-[var(--app-accent-text)]',
@@ -55,18 +51,11 @@ export default function AppProjectCard({
   className?: string
   testId?: string
 }) {
-  const [embedOpen, setEmbedOpen] = useState(false)
   const files = Array.isArray(project?.files) ? project.files : []
   const hasLink = Boolean(project?.linkUrl)
   // Keep the whole card clickable only when there's nothing interactive nested
   // inside it (no embed button, no download files) — anchors can't wrap buttons.
   const wholeCardLink = hasLink && interactive && files.length === 0
-  const canEmbed = hasLink && interactive && !wholeCardLink
-  const openEmbed = (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    setEmbedOpen(true)
-  }
   const CardTag = wholeCardLink ? 'a' : 'div'
   const cardProps = wholeCardLink
     ? { href: project.linkUrl, target: '_blank', rel: 'noreferrer' }
@@ -84,9 +73,11 @@ export default function AppProjectCard({
       {project?.description && (
         <p className="mt-3 flex-1 text-sm font-medium leading-6 text-[#6e6e73]">{project.description}</p>
       )}
-      <p className={`text-xs font-semibold text-[var(--app-subtle)] ${project?.description ? 'mt-4' : 'mt-3 flex-1'}`}>
-        만든 사람: {project?.madeBy || DEFAULT_MADE_BY}
-      </p>
+      {project?.madeBy && (
+        <p className={`text-xs font-semibold text-[var(--app-subtle)] ${project?.description ? 'mt-4' : 'mt-3 flex-1'}`}>
+          만든 사람: {project.madeBy}
+        </p>
+      )}
 
       {badges.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-1.5" aria-label="앱 상태">
@@ -120,17 +111,6 @@ export default function AppProjectCard({
               <ArrowUpRight size={15} aria-hidden="true" />
             </a>
           )
-        )}
-        {canEmbed && (
-          <button
-            type="button"
-            onClick={openEmbed}
-            aria-label={`${project?.title || '앱'} 여기서 열기`}
-            className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--app-accent-text)]"
-          >
-            <PanelTopOpen size={15} aria-hidden="true" />
-            여기서 열기
-          </button>
         )}
       </div>
 
@@ -166,14 +146,6 @@ export default function AppProjectCard({
         </span>
       )}
 
-      {canEmbed && (
-        <AppEmbedModal
-          open={embedOpen}
-          title={project?.title || '미니 앱'}
-          url={project.linkUrl}
-          onClose={() => setEmbedOpen(false)}
-        />
-      )}
     </CardTag>
   )
 }

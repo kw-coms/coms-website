@@ -19,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -38,6 +39,7 @@ public class IntegrationHmacFilter extends OncePerRequestFilter {
     private static final String PATH_PREFIX = "/api/integrations/";
     private static final String SIGNATURE_HEADER = "X-Integration-Signature";
     private static final String TIMESTAMP_HEADER = "X-Integration-Timestamp";
+    private static final int MAX_REQUEST_BODY_BYTES = 1024 * 1024;
 
     private final byte[] secretBytes;
     private final Clock clock;
@@ -83,7 +85,18 @@ public class IntegrationHmacFilter extends OncePerRequestFilter {
             return;
         }
 
-        byte[] body = request.getInputStream().readAllBytes();
+        if (request.getContentLengthLong() > MAX_REQUEST_BODY_BYTES) {
+            response.sendError(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE, "Integration request body too large");
+            return;
+        }
+
+        byte[] body;
+        try {
+            body = readBodyWithinLimit(request);
+        } catch (RequestBodyTooLargeException e) {
+            response.sendError(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE, "Integration request body too large");
+            return;
+        }
         String expected = hmacHex(timestampHeader.trim() + "." + new String(body, StandardCharsets.UTF_8));
         if (!constantTimeEquals(expected, signatureHeader.trim())) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Bad signature");
@@ -101,6 +114,22 @@ public class IntegrationHmacFilter extends OncePerRequestFilter {
         } finally {
             SecurityContextHolder.clearContext();
         }
+    }
+
+    private static byte[] readBodyWithinLimit(HttpServletRequest request) throws IOException, RequestBodyTooLargeException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream(Math.min(Math.max(request.getContentLength(), 0), MAX_REQUEST_BODY_BYTES));
+        byte[] buffer = new byte[8192];
+        int total = 0;
+        int read;
+        var input = request.getInputStream();
+        while ((read = input.read(buffer)) != -1) {
+            total += read;
+            if (total > MAX_REQUEST_BODY_BYTES) {
+                throw new RequestBodyTooLargeException();
+            }
+            out.write(buffer, 0, read);
+        }
+        return out.toByteArray();
     }
 
     String hmacHex(String payload) {
@@ -125,6 +154,9 @@ public class IntegrationHmacFilter extends OncePerRequestFilter {
             return false;
         }
         return MessageDigest.isEqual(aBytes, bBytes);
+    }
+
+    private static final class RequestBodyTooLargeException extends Exception {
     }
 
     private static final class CachedBodyRequest extends HttpServletRequestWrapper {

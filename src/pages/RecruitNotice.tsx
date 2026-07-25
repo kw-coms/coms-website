@@ -1,4 +1,6 @@
 import { ArrowLeft, CalendarDays, CheckCircle2, Mail, PenLine, Rocket, Users, X } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { getPublicSiteSettings } from '../services/siteSettingsApi'
 
 const recruitDetails = [
   {
@@ -25,6 +27,13 @@ const processSteps = [
 ]
 
 export default function RecruitNotice({ onBack, onApply }: { onBack: () => void; onApply: () => void }) {
+  const siteSettingsQuery = useQuery({
+    queryKey: ['site-settings', 'public'],
+    queryFn: getPublicSiteSettings,
+  })
+  const siteSettings = siteSettingsQuery.data
+  const contactLinks = siteSettings?.contactLinks || [{ label: 'Mail', href: 'mailto:kwcoms69@gmail.com' }]
+
   return (
     <div className="w-full min-w-0 space-y-4">
       <button
@@ -41,7 +50,9 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
           <div>
             <p className="apple-eyebrow">Recruit Notice</p>
             <h1 className="apple-display mt-4 text-4xl sm:text-6xl">COM&apos;s 신입 부원 모집 공지</h1>
-            <p className="apple-copy mt-5 max-w-3xl text-base sm:text-lg">광운대학교 중앙 컴퓨터 학술동아리에서 함께 배울 새 멤버를 기다립니다.</p>
+            <p className="apple-copy mt-5 max-w-3xl text-base sm:text-lg">
+              {siteSettings?.recruitmentStatus || '광운대학교 중앙 컴퓨터 학술동아리에서 함께 배울 새 멤버를 기다립니다.'}
+            </p>
           </div>
           <button
             type="button"
@@ -78,7 +89,9 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
                     <Icon size={19} />
                   </div>
                   <h2 className="text-base font-black">{title}</h2>
-                  <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">{body}</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
+                    {title === '모집 일정' ? (siteSettings?.recruitmentPeriod || body) : body}
+                  </p>
                 </div>
               ))}
             </div>
@@ -111,9 +124,11 @@ export default function RecruitNotice({ onBack, onApply }: { onBack: () => void;
                   <Mail size={16} />
                   문의
                 </div>
-                <a href="mailto:kwcoms69@gmail.com" className="mt-2 block break-all text-sm text-[var(--app-accent-text)] hover:text-[var(--app-accent-hover)]">
-                  kwcoms69@gmail.com
-                </a>
+                {contactLinks.map((link) => (
+                  <a key={`${link.label}-${link.href}`} href={link.href} className="mt-2 block break-all text-sm text-[var(--app-accent-text)] hover:text-[var(--app-accent-hover)]">
+                    {link.label}
+                  </a>
+                ))}
               </div>
             </div>
 

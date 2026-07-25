@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class IntegrationHmacFilterTest {
     private static final String SECRET = "unit-test-secret-1234567890-abcdef";
     private static final long FIXED_EPOCH = 1_700_000_000L;
+    private static final int MAX_BODY_BYTES = 1024 * 1024;
     private static final Clock FIXED_CLOCK = Clock.fixed(Instant.ofEpochSecond(FIXED_EPOCH), ZoneOffset.UTC);
 
     private final IntegrationHmacFilter filter = new IntegrationHmacFilter(SECRET, FIXED_CLOCK);
@@ -82,6 +83,65 @@ class IntegrationHmacFilterTest {
         filter.doFilter(request, response, new MockFilterChain());
 
         assertThat(response.getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void allowsBodyAtConfiguredSizeLimit() throws Exception {
+        String body = "a".repeat(MAX_BODY_BYTES);
+        String timestamp = String.valueOf(FIXED_EPOCH);
+        String signature = sign(SECRET, timestamp + "." + body);
+
+        MockFilterChain chain = new MockFilterChain();
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/integrations/notifications");
+        request.addHeader("X-Integration-Signature", signature);
+        request.addHeader("X-Integration-Timestamp", timestamp);
+        request.setContent(body.getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+    }
+
+    @Test
+    void rejectsOversizedContentLengthBeforeReadingBody() throws Exception {
+        String timestamp = String.valueOf(FIXED_EPOCH);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/integrations/notifications") {
+            @Override
+            public long getContentLengthLong() {
+                return MAX_BODY_BYTES + 1L;
+            }
+        };
+        request.addHeader("X-Integration-Signature", "unused");
+        request.addHeader("X-Integration-Timestamp", timestamp);
+        request.setContent("{}".getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(413);
+    }
+
+    @Test
+    void rejectsOversizedChunkedBodyWhileReading() throws Exception {
+        String body = "a".repeat(MAX_BODY_BYTES + 1);
+        String timestamp = String.valueOf(FIXED_EPOCH);
+        String signature = sign(SECRET, timestamp + "." + body);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/integrations/notifications") {
+            @Override
+            public long getContentLengthLong() {
+                return -1;
+            }
+        };
+        request.addHeader("X-Integration-Signature", signature);
+        request.addHeader("X-Integration-Timestamp", timestamp);
+        request.setContent(body.getBytes(StandardCharsets.UTF_8));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, new MockFilterChain());
+
+        assertThat(response.getStatus()).isEqualTo(413);
     }
 
     @Test

@@ -107,7 +107,7 @@ export async function throwApiError(response, fallbackMessage = '') {
 }
 
 function isOptionalDevApiPath(path) {
-  return import.meta.env?.DEV && !API_BASE_URL && (path === '/api/auth/me' || path === '/api/fonts')
+  return import.meta.env?.DEV && !API_BASE_URL && (path === '/api/auth/me' || path === '/api/fonts' || path === '/api/site-settings')
 }
 
 function optionalDevApiUnavailable() {

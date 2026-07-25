@@ -1,0 +1,103 @@
+package com.coms.backend.config;
+
+import com.coms.backend.domain.Member;
+import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.security.JwtTokenProvider;
+import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest(properties = {
+        "jwt.secret=test-secret-key-with-at-least-32-chars",
+        "cors.allowed-origins=https://coms.kw.ac.kr",
+        "spring.datasource.url=jdbc:h2:mem:operations-security-test;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1"
+})
+@AutoConfigureMockMvc
+@Transactional
+class OperationsSecurityIntegrationTest {
+
+    private static final String ORIGIN = "https://coms.kw.ac.kr";
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private MemberRepository memberRepository;
+
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    private Cookie officerCookie;
+    private Cookie userCookie;
+
+    @BeforeEach
+    void setUp() {
+        memberRepository.deleteAll();
+        memberRepository.save(member("2026000001", Member.Role.OFFICER));
+        memberRepository.save(member("2026000002", Member.Role.USER));
+        officerCookie = authCookie("2026000001");
+        userCookie = authCookie("2026000002");
+    }
+
+    @Test
+    void publicSettingsStayPublicWhileNoticesRequireMembership() throws Exception {
+        mockMvc.perform(get("/api/site-settings"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/notices"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void regularMemberCannotPublishNotice() throws Exception {
+        mockMvc.perform(post("/api/notices")
+                        .cookie(userCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void officerCanReachContentWritesButNotSensitiveAdminApis() throws Exception {
+        mockMvc.perform(post("/api/notices")
+                        .cookie(officerCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"임원 공지","content":"운영 안내","pinned":false,"category":"GENERAL"}
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/admin/site-settings").cookie(officerCookie))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/admin/members").cookie(officerCookie))
+                .andExpect(status().isForbidden());
+    }
+
+    private Cookie authCookie(String studentId) {
+        return new Cookie("token", jwtTokenProvider.generateToken(studentId, 0));
+    }
+
+    private Member member(String studentId, Member.Role role) {
+        Member member = new Member();
+        member.setStudentId(studentId);
+        member.setName(role.name());
+        member.setEmail(studentId + "@example.com");
+        member.setPassword("unused");
+        member.setRole(role);
+        member.setEmailVerified(true);
+        return member;
+    }
+}
