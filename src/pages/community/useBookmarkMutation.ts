@@ -40,6 +40,11 @@ export function useBookmarkMutation(options = {}) {
       return { postId: post.id, bookmarked: Boolean(result?.bookmarked) }
     },
     onMutate: async (post: { id: number; bookmarked?: boolean }) => {
+      // Cancel any in-flight list refetch first: the board list is a multi-page serial fetch that
+      // can be seconds long, and if it resolves after our optimistic patch it overwrites the star
+      // with a pre-bookmark snapshot — the star empties right after the "스크랩했습니다" toast.
+      await queryClient.cancelQueries({ queryKey: queryKeys.community.posts() })
+      await queryClient.cancelQueries({ queryKey: queryKeys.community.bookmarks() })
       const previous = Boolean(post.bookmarked)
       const optimistic = !previous
       setBookmarkEverywhere(queryClient, post.id, optimistic)

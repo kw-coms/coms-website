@@ -427,11 +427,14 @@ export default function Community({ onBack }: { onBack: () => void }) {
           </SkeletonGroup>
         )}
 
-        {mode === 'list' && !loading && Boolean(error) && filteredPosts.length === 0 && (
+        {/* Gate the full-view error on posts.length (nothing loaded), not filteredPosts.length —
+            otherwise a search that simply matched nothing unmounts the list along with its own
+            search box, trapping the user with no way to clear the term. */}
+        {mode === 'list' && !loading && Boolean(error) && posts.length === 0 && (
           <ErrorState className="m-4 sm:m-8" message={error} onRetry={refreshPosts} />
         )}
 
-        {mode === 'list' && !(loading && posts.length === 0) && !(!loading && Boolean(error) && filteredPosts.length === 0) && (
+        {mode === 'list' && !(loading && posts.length === 0) && !(!loading && Boolean(error) && posts.length === 0) && (
           <CommunityListView
             onOpenDeletedRecords={openDeletedRecords}
             onWrite={openWrite}
