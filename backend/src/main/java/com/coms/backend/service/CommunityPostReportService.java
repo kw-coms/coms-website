@@ -39,20 +39,26 @@ public class CommunityPostReportService {
     private final CommunityPostRepository postRepository;
     private final AuditLogService auditLogService;
     private final MemberRepository memberRepository;
+    private final CommunityAccess access;
 
     public CommunityPostReportService(CommunityPostReportRepository reportRepository,
                                       CommunityPostRepository postRepository,
                                       AuditLogService auditLogService,
-                                      MemberRepository memberRepository) {
+                                      MemberRepository memberRepository,
+                                      CommunityAccess access) {
         this.reportRepository = reportRepository;
         this.postRepository = postRepository;
         this.auditLogService = auditLogService;
         this.memberRepository = memberRepository;
+        this.access = access;
     }
 
     public CommunityPostReportResponse report(Long postId, String reporterStudentId, CommunityPostReportRequest request) {
         CommunityPost post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "신고할 글을 찾을 수 없습니다."));
+        // Gate on visibility so a caller can't report — and thereby deanonymize — a post they
+        // aren't allowed to see (graduates are blocked from the anonymous board).
+        access.requireVisible(access.requireAuthenticatedMember(reporterStudentId), post);
         String reason = request.reason() == null ? "" : request.reason().trim().toUpperCase();
         if (!ALLOWED_REASONS.contains(reason)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "지원하지 않는 신고 사유입니다.");
@@ -71,7 +77,7 @@ public class CommunityPostReportService {
         report.setReason(reason);
         report.setDetail(request.detail());
         report.setCreatedAt(LocalDateTime.now());
-        return CommunityPostReportResponse.from(reportRepository.save(report));
+        return CommunityPostReportResponse.forReporter(reportRepository.save(report));
     }
 
     @Transactional(readOnly = true)

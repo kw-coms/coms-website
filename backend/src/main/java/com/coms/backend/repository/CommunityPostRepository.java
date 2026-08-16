@@ -4,6 +4,7 @@ import com.coms.backend.domain.CommunityPost;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -12,6 +13,12 @@ import java.util.Collection;
 import java.util.List;
 
 public interface CommunityPostRepository extends JpaRepository<CommunityPost, Long> {
+    // Atomic increment so concurrent reads don't lose view counts (read-modify-write would).
+    // clearAutomatically evicts the now-stale managed entity so a follow-up read sees the new value.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update CommunityPost p set p.viewCount = p.viewCount + 1 where p.id = :id")
+    void incrementViewCount(@Param("id") Long id);
+
     List<CommunityPost> findAllByOrderByCreatedAtDesc();
     List<CommunityPost> findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc();
     List<CommunityPost> findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc(Pageable pageable);
