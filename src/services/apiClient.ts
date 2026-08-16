@@ -15,6 +15,17 @@ export function apiUrl(path) {
   return `${baseUrl}${normalizedPath}`
 }
 
+// Session-expiry notification: AuthProvider registers a handler so that when a refresh fails on
+// a 401, the auth session is cleared and route guards redirect to /login — otherwise the app keeps
+// rendering a logged-in shell whose every panel errors with "로그인이 만료되었습니다".
+let sessionExpiredHandler: (() => void) | null = null
+export function setSessionExpiredHandler(handler: (() => void) | null) {
+  sessionExpiredHandler = handler
+}
+function notifySessionExpired() {
+  sessionExpiredHandler?.()
+}
+
 // Single-flight the refresh: when several requests get 401 at once, they must
 // share ONE /api/auth/refresh call. Otherwise each fires its own refresh, which
 // (with refresh-token rotation) is wasteful and can interleave Set-Cookie writes.
@@ -169,6 +180,7 @@ export async function request(path, options: RequestInit = {}) {
   const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
   if ((response.status === 401 || response.status === 403) && canRefresh) {
     if (await tryRefreshToken()) response = await fetchOnce()
+    else if (response.status === 401) notifySessionExpired()
   }
 
   if (!response.ok) {
@@ -189,6 +201,7 @@ export async function requestNoContent(path, options: RequestInit = {}) {
   const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
   if ((response.status === 401 || response.status === 403) && canRefresh) {
     if (await tryRefreshToken()) response = await fetchOnce()
+    else if (response.status === 401) notifySessionExpired()
   }
 
   if (!response.ok) {
@@ -203,6 +216,7 @@ export async function requestBlob(path, options: RequestInit = {}) {
   const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
   if ((response.status === 401 || response.status === 403) && canRefresh) {
     if (await tryRefreshToken()) response = await fetchOnce()
+    else if (response.status === 401) notifySessionExpired()
   }
 
   if (!response.ok) {

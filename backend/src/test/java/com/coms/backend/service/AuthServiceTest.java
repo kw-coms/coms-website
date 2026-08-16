@@ -306,6 +306,20 @@ class AuthServiceTest {
     }
 
     @Test
+    void bannedMemberWithWrongPasswordGetsGenericUnauthorized() {
+        // Ban status must not be disclosed to someone who hasn't proven account ownership,
+        // otherwise a known 학번 is an unthrottled ban-status oracle.
+        saveMember("2026123467", true);
+        bannedStudentService.ban("2026123467", "6H");
+
+        assertThatThrownBy(() -> authService.login(new com.coms.backend.dto.LoginRequest("2026123467", "WrongPassword1!", false), "127.0.0.1"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
+                    assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+                    assertThat(ex.getReason()).doesNotContain("차단");
+                });
+    }
+
+    @Test
     void loadUserByUsernameRejectsBannedMemberToStopExistingJwtSessions() {
         saveMember("2026123466", true);
         bannedStudentService.ban("2026123466", "6H");

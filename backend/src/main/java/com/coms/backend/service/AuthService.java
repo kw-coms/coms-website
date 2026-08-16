@@ -22,9 +22,14 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.Year;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Transactional
@@ -41,6 +46,11 @@ public class AuthService implements UserDetailsService {
     private static final int MAX_FAILURES_PER_IP = 5;
     private static final int LOCKOUT_WINDOW_MINUTES = 15;
     private static final int GRADUATE_AFTER_YEARS = 7;
+    private static final int MAX_SIGNUP_EMAIL_REQUESTS_PER_WINDOW = 5;
+    private static final Duration SIGNUP_EMAIL_REQUEST_WINDOW = Duration.ofMinutes(10);
+
+    // Sliding-window limiter for the unauthenticated request-signup path, keyed on client IP.
+    private final Map<String, Deque<LocalDateTime>> signupEmailAttemptsByClient = new ConcurrentHashMap<>();
 
     private enum SignupType {
         CURRENT, GRADUATE
@@ -125,13 +135,16 @@ public class AuthService implements UserDetailsService {
                     throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
                 });
 
-        bannedStudentService.ensureNotBanned(member.getStudentId());
-
         if (!passwordEncoder.matches(request.password(), member.getPassword())) {
             recordLoginFailure(normalizedIdentifier, clientIp);
             auditLogService.record(member.getStudentId(), "LOGIN_FAILURE", "AUTH", null, "bad_credentials", clientIp);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
+
+        // After the password check: ban status is a moderation decision, so only disclose it to
+        // someone who proved they own the account — otherwise a known 학번 is an unthrottled
+        // ban-status oracle (the ban branch never records a login failure).
+        bannedStudentService.ensureNotBanned(member.getStudentId());
 
         if (requiresEmailVerification(member)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "이메일 인증이 완료되지 않았습니다. 가입 시 받은 인증 이메일을 확인해주세요.");
@@ -337,21 +350,50 @@ public class AuthService implements UserDetailsService {
         );
     }
 
-    public boolean requestSignupEmailVerification(String studentId) {
-        Member member = findMemberByIdentifier(studentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."));
-        bannedStudentService.ensureNotBanned(member.getStudentId());
-        if (member.isEmailVerified()) {
-            return true;
-        }
-        enforceEmailVerificationResendCooldown(member);
-        String code = newSixDigitCode();
-        member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
-        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
-        member.resetEmailVerificationAttempts();
-        memberRepository.save(member);
-        emailVerificationSender.sendVerificationCode(member.getEmail(), code);
+    public boolean requestSignupEmailVerification(String studentId, String clientIp) {
+        // permitAll endpoint: an unmasked 404-vs-200 and a real email on hit made this an
+        // unauthenticated member-enumeration and mail-bomb oracle. Rate-limit by IP and always
+        // return the same response — never reveal whether the identifier resolves to an account.
+        enforceSignupEmailRateLimit(clientIp);
+        findMemberByIdentifier(studentId).ifPresent(member -> {
+            if (bannedStudentService.isBanned(member.getStudentId()) || member.isEmailVerified()) {
+                return;
+            }
+            try {
+                enforceEmailVerificationResendCooldown(member);
+            } catch (ResponseStatusException cooldownActive) {
+                return; // per-account cooldown running; stay silent so it isn't a timing oracle
+            }
+            String code = newSixDigitCode();
+            member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
+            member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
+            member.resetEmailVerificationAttempts();
+            memberRepository.save(member);
+            emailVerificationSender.sendVerificationCode(member.getEmail(), code);
+        });
         return false;
+    }
+
+    private void enforceSignupEmailRateLimit(String clientIp) {
+        String key = clientIp == null || clientIp.isBlank() ? "unknown" : clientIp;
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime cutoff = now.minus(SIGNUP_EMAIL_REQUEST_WINDOW);
+        Deque<LocalDateTime> attempts = signupEmailAttemptsByClient.computeIfAbsent(key, ignored -> new ArrayDeque<>());
+        synchronized (attempts) {
+            while (!attempts.isEmpty() && attempts.peekFirst().isBefore(cutoff)) {
+                attempts.removeFirst();
+            }
+            if (attempts.size() >= MAX_SIGNUP_EMAIL_REQUESTS_PER_WINDOW) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 시도해주세요.");
+            }
+            attempts.addLast(now);
+        }
+        signupEmailAttemptsByClient.entrySet().removeIf(entry -> {
+            Deque<LocalDateTime> q = entry.getValue();
+            synchronized (q) {
+                return q.isEmpty() || q.peekLast().isBefore(cutoff);
+            }
+        });
     }
 
     public boolean confirmSignupEmailVerification(String studentId, String code) {

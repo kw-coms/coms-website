@@ -230,10 +230,12 @@ public class AuthController {
 
     @PostMapping("/email-verification/request-signup")
     public ResponseEntity<EmailVerificationStatusResponse> requestSignupEmail(
-            @Valid @RequestBody RequestSignupEmailRequest request) {
-        boolean verified = authService.requestSignupEmailVerification(request.studentId());
-        String message = verified ? "이미 이메일 인증이 완료되었습니다." : "인증코드를 이메일로 보냈습니다.";
-        return ResponseEntity.ok(new EmailVerificationStatusResponse(message, verified));
+            @Valid @RequestBody RequestSignupEmailRequest request,
+            HttpServletRequest servletRequest) {
+        // Constant response regardless of whether the identifier resolves — the service masks
+        // enumeration and rate-limits by IP internally.
+        authService.requestSignupEmailVerification(request.studentId(), resolveClientIp(servletRequest));
+        return ResponseEntity.ok(new EmailVerificationStatusResponse("인증코드를 이메일로 보냈습니다.", false));
     }
 
     @PostMapping("/email-verification/confirm-signup")

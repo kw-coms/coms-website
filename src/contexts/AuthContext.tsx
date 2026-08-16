@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type PropsWithChildren } from 'react'
 import type { ApiError } from '../services/apiClient'
 import { getCurrentUser, logoutUser } from '../services/authApi'
+import { setSessionExpiredHandler } from '../services/apiClient'
 import { setUserContext } from '../services/observability'
+import { queryClient } from '../services/queryClient'
 import { buildAuthLoadError, isLoggedOutAuthError } from './authErrors'
 import { AuthContext } from './useAuth'
 
@@ -14,6 +16,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     setUserContext(user)
   }, [user])
+
+  // A 401 that survives a token refresh means the session is truly gone: clear it so route
+  // guards redirect to /login instead of leaving a logged-in shell whose every panel errors.
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      setUser(null)
+      queryClient.clear()
+    })
+    return () => setSessionExpiredHandler(null)
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -72,6 +84,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     } finally {
       setUser(null)
       setAuthError(null)
+      // Drop every cached query so the next account on a shared device can't see the previous
+      // user's community list, bookmarks, or vote state (query keys aren't scoped per user).
+      queryClient.clear()
     }
   }, [])
 

@@ -35,12 +35,16 @@ class CommunityPostReportServiceTest {
     @Autowired
     private MemberRepository memberRepository;
 
+    private static final String REPORTER_ID = "2026123456";
+
     @BeforeEach
     void clean() {
         auditLogRepository.deleteAll();
         reportRepository.deleteAll();
         postRepository.deleteAll();
         memberRepository.deleteAll();
+        // report() now requires the reporter to be a resolvable, permitted member.
+        memberRepository.save(member(REPORTER_ID, "신고자", Member.Role.USER));
     }
 
     @Test
@@ -52,7 +56,7 @@ class CommunityPostReportServiceTest {
         post.setAuthorName("작성자");
         CommunityPost saved = postRepository.save(post);
 
-        reportService.report(saved.getId(), "2026123456", new CommunityPostReportRequest("SPAM", "홍보"));
+        reportService.report(saved.getId(), REPORTER_ID, new CommunityPostReportRequest("SPAM", "홍보"));
 
         assertThat(reportService.listOpen())
                 .singleElement()
@@ -71,11 +75,13 @@ class CommunityPostReportServiceTest {
         post.setAuthorName("작성자");
         CommunityPost saved = postRepository.save(post);
 
-        var response = reportService.report(saved.getId(), "2026123456", new CommunityPostReportRequest("ABUSE", "비방"));
+        var response = reportService.report(saved.getId(), REPORTER_ID, new CommunityPostReportRequest("ABUSE", "비방"));
 
+        // The reporter-facing response must NOT carry the author's identity (deanonymization),
+        // but the persisted report keeps the full snapshot for admin moderation.
         assertThat(response.postTitle()).isEqualTo("스냅샷 대상 글");
-        assertThat(response.postAuthorStudentId()).isEqualTo("2025123456");
-        assertThat(response.postAuthorName()).isEqualTo("작성자");
+        assertThat(response.postAuthorStudentId()).isNull();
+        assertThat(response.postAuthorName()).isNull();
         assertThat(reportRepository.findById(response.id()))
                 .get()
                 .satisfies(report -> {
@@ -86,6 +92,24 @@ class CommunityPostReportServiceTest {
     }
 
     @Test
+    void graduateCannotReportAnonymousPostToDeanonymizeIt() {
+        // Graduates are blocked from viewing the anonymous board; reporting must not be a bypass.
+        memberRepository.save(member("2015123456", "졸업생", Member.Role.USER));
+        CommunityPost post = new CommunityPost();
+        post.setTitle("익명 글");
+        post.setContent("본문");
+        post.setCategory(CommunityPost.Category.ANONYMOUS);
+        post.setAuthorStudentId("2025123456");
+        post.setAuthorName("익명작성자");
+        CommunityPost saved = postRepository.save(post);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                        reportService.report(saved.getId(), "2015123456", new CommunityPostReportRequest("ABUSE", "x")))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(reportRepository.count()).isZero();
+    }
+
+    @Test
     void openReportKeepsSnapshotAfterReportedPostIsDeleted() {
         CommunityPost post = new CommunityPost();
         post.setTitle("삭제될 신고 글");
@@ -93,7 +117,7 @@ class CommunityPostReportServiceTest {
         post.setAuthorStudentId("2025123456");
         post.setAuthorName("작성자");
         CommunityPost saved = postRepository.saveAndFlush(post);
-        var report = reportService.report(saved.getId(), "2026123456", new CommunityPostReportRequest("SPAM", "홍보"));
+        var report = reportService.report(saved.getId(), REPORTER_ID, new CommunityPostReportRequest("SPAM", "홍보"));
 
         postRepository.deleteById(saved.getId());
         postRepository.flush();
@@ -119,7 +143,7 @@ class CommunityPostReportServiceTest {
         post.setAuthorStudentId("2025123456");
         post.setAuthorName("작성자");
         CommunityPost saved = postRepository.save(post);
-        var report = reportService.report(saved.getId(), "2026123456", new CommunityPostReportRequest("PRIVACY", "개인정보 포함"));
+        var report = reportService.report(saved.getId(), REPORTER_ID, new CommunityPostReportRequest("PRIVACY", "개인정보 포함"));
 
         reportService.resolve(report.id(), resolver.getStudentId(), "ACCEPT", "게시글 삭제 완료");
 
@@ -153,7 +177,7 @@ class CommunityPostReportServiceTest {
         post.setAuthorStudentId("2025123456");
         post.setAuthorName("작성자");
         CommunityPost saved = postRepository.save(post);
-        var report = reportService.report(saved.getId(), "2026123456", new CommunityPostReportRequest("MISLEADING", "오해 소지"));
+        var report = reportService.report(saved.getId(), REPORTER_ID, new CommunityPostReportRequest("MISLEADING", "오해 소지"));
 
         reportService.resolve(report.id(), resolver.getStudentId(), "REJECT", "운영 기준상 문제 없음");
 
