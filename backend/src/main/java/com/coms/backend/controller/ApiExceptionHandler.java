@@ -18,8 +18,12 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, String>> handleResponseStatus(ResponseStatusException ex) {
-        String message = ex.getReason() == null ? "요청 처리 중 오류가 발생했습니다." : ex.getReason();
-        return ResponseEntity.status(ex.getStatusCode()).body(Map.of("message", message));
+        if (ex.getReason() == null) {
+            // No intentional user-facing reason: send an empty body so the frontend applies its
+            // own status-specific copy (e.g. the generic session-expired text for 401).
+            return ResponseEntity.status(ex.getStatusCode()).build();
+        }
+        return ResponseEntity.status(ex.getStatusCode()).body(Map.of("message", ex.getReason()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
