@@ -262,8 +262,9 @@ public class CommunityService {
         Member member = access.requireMember(studentId);
         CommunityPost post = requirePost(id);
         access.requireVisible(member, post);
-        post.incrementViewCount();
-        CommunityPost saved = communityPostRepository.save(post);
+        communityPostRepository.incrementViewCount(post.getId());
+        // The atomic update cleared the persistence context; re-read to render the fresh count.
+        CommunityPost saved = requirePost(id);
         return toResponse(saved, member, memberRepository.findByStudentId(saved.getAuthorStudentId()).orElse(null),
                 voteStats(List.of(saved)), commentCounts(List.of(saved)), pollResults(List.of(saved), member.getStudentId()), true);
     }
@@ -391,7 +392,16 @@ public class CommunityService {
             vote.setPost(post);
             vote.setStudentId(member.getStudentId());
             vote.setValue(value);
-            voteRepository.save(vote);
+            try {
+                voteRepository.saveAndFlush(vote);
+            } catch (DataIntegrityViolationException e) {
+                // A concurrent request (double-click / retry) already inserted this member's vote and
+                // tripped the unique constraint. Converge on the requested value instead of 500ing.
+                voteRepository.findByPostAndStudentId(post, member.getStudentId()).ifPresent(existingVote -> {
+                    existingVote.setValue(value);
+                    voteRepository.save(existingVote);
+                });
+            }
         }
         auditLogService.record(member.getStudentId(), "COMMUNITY_POST_VOTE", "COMMUNITY_POST", String.valueOf(post.getId()), "value=" + value, null);
         return toResponse(post, member, memberRepository.findByStudentId(post.getAuthorStudentId()).orElse(null),
@@ -445,7 +455,13 @@ public class CommunityService {
             vote.setPollId(poll.pollId());
             vote.setStudentId(member.getStudentId());
             vote.setOptionIndex(optionIndex);
-            pollVoteRepository.save(vote);
+            try {
+                pollVoteRepository.saveAndFlush(vote);
+            } catch (DataIntegrityViolationException e) {
+                // Two concurrent submissions both passed the existence check above; the unique
+                // constraint rejected the loser. Surface the same intended message, not a 500.
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 투표했습니다. 투표는 변경하거나 취소할 수 없습니다.");
+            }
         }
         auditLogService.record(member.getStudentId(), "COMMUNITY_POLL_VOTE", "COMMUNITY_POST", String.valueOf(post.getId()), "pollId=" + poll.pollId(), null);
         return toResponse(post, member, memberRepository.findByStudentId(post.getAuthorStudentId()).orElse(null),

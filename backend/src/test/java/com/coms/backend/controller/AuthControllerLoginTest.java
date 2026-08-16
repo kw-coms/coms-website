@@ -83,4 +83,15 @@ class AuthControllerLoginTest {
     void missingRememberMeNormalizesToFalse() {
         assertThat(new LoginRequest("a", "b", null).rememberMe()).isFalse();
     }
+
+    @Test
+    void malformedJsonBodyIsBadRequestNotServerError() throws Exception {
+        // Unparseable input is the caller's fault: ApiExceptionHandler must map it to 400, not let
+        // it fall through to the catch-all as HTTP 500.
+        mockMvc.perform(post("/api/auth/login")
+                        .header(HttpHeaders.ORIGIN, ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ this is not valid json"))
+                .andExpect(status().isBadRequest());
+    }
 }
