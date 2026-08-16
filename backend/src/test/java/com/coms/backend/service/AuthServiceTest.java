@@ -264,6 +264,16 @@ class AuthServiceTest {
     }
 
     @Test
+    void loginTreatsMissingRememberMeAsFalse() {
+        saveMember("2026123476", true);
+
+        var response = authService.login(new com.coms.backend.dto.LoginRequest("2026123476", "Password1!", null), "127.0.0.1");
+
+        assertThat(response.token()).isNotBlank();
+        assertThat(response.studentId()).isEqualTo("2026123476");
+    }
+
+    @Test
     void loginSucceedsWithEmailIdentifier() {
         Member member = saveMember("2026123475", true);
 

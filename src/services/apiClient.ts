@@ -53,10 +53,10 @@ function errorMessageForStatus(status, fallbackMessage = '') {
     return '업로드 용량이 너무 큽니다. 이미지/영상 크기를 줄여 다시 시도해주세요.'
   }
   if (status === 401) {
-    return '로그인이 만료되었습니다. 다시 로그인해주세요.'
+    return fallbackMessage || '로그인이 만료되었습니다. 다시 로그인해주세요.'
   }
   if (status === 403) {
-    return '접근 권한이 없거나 로그인 상태가 만료되었습니다. 다시 로그인해주세요.'
+    return fallbackMessage || '접근 권한이 없거나 로그인 상태가 만료되었습니다. 다시 로그인해주세요.'
   }
   if (status === 404) {
     return '요청한 항목을 찾을 수 없습니다.'
@@ -81,7 +81,12 @@ export interface ApiError extends Error {
 }
 
 export function createApiError(status, data = null, text = '', fallbackMessage = '') {
-  const error = new Error(errorMessageForStatus(status, fallbackMessage)) as ApiError
+  // On 401/403, `message` carries the backend's intentional user-facing text (wrong password,
+  // unverified email — ResponseStatusException reasons via ApiExceptionHandler). Other statuses
+  // keep the b955a1a policy of hiding server text; `error`/`detail` are framework defaults
+  // ("Forbidden") and are never shown.
+  const authMessage = (status === 401 || status === 403) ? data?.message : ''
+  const error = new Error(errorMessageForStatus(status, fallbackMessage || authMessage || '')) as ApiError
   error.status = status
   error.serverMessage = serverMessageFromBody(data)
   error.responseData = data

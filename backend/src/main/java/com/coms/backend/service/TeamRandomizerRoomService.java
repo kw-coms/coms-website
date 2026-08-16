@@ -76,7 +76,7 @@ public class TeamRandomizerRoomService {
 
     private String requireOwner(String ownerStudentId) {
         String owner = clean(ownerStudentId);
-        if (owner.isBlank()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Owner required");
+        if (owner.isBlank()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         return owner;
     }
 

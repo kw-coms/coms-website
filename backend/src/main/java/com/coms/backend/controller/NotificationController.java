@@ -63,7 +63,7 @@ public class NotificationController {
                                                                   @RequestHeader(value = "X-Requested-With", required = false) String requestedWith,
                                                                   @Valid @RequestBody MemberExternalInviteRequest request) {
         if (requestedWith == null || !"XMLHttpRequest".equalsIgnoreCase(requestedWith)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "X-Requested-With required");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         ExternalInviteBatchResult result = notificationService.notifyExternalInviteFromMember(authentication.getName(), request);
         return ResponseEntity.ok(Map.of(
