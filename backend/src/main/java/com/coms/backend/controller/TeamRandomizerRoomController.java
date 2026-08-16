@@ -44,7 +44,7 @@ public class TeamRandomizerRoomController {
 
     private void requireXmlHttpRequest(String requestedWith) {
         if (requestedWith == null || !"XMLHttpRequest".equalsIgnoreCase(requestedWith)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "X-Requested-With required");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
     }
 }

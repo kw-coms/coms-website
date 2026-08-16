@@ -123,7 +123,7 @@ public class NotificationService {
 
     public NotificationPreferencesResponse updatePreferences(String memberStudentId, NotificationPreferencesRequest request) {
         if (memberStudentId == null || memberStudentId.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Member required");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
         NotificationPreference preference = notificationPreferenceRepository.findByMemberStudentId(memberStudentId)
                 .orElseGet(() -> new NotificationPreference(memberStudentId));
@@ -372,10 +372,10 @@ public class NotificationService {
 
     public ExternalInviteBatchResult notifyExternalInviteFromMember(String senderStudentId, MemberExternalInviteRequest request) {
         if (senderStudentId == null || senderStudentId.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sender required");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
         Member sender = memberRepository.findByStudentId(senderStudentId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sender is not a registered member"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
 
         enforceInviteBatchRateLimit(senderStudentId);
         enforceExternalInviteRateLimit(senderStudentId);

@@ -81,8 +81,12 @@ services:
     ports:
       - "127.0.0.1:3000:80"
     healthcheck:
-      # nginx:1.27-alpine has BusyBox wget but no curl.
-      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
+      # nginx:1.27-alpine has BusyBox wget but no curl. Use 127.0.0.1, not
+      # localhost: in-container "localhost" resolution is unreliable (observed
+      # connection-refused on the prod host — ::1 vs the IPv4-only `listen 80`,
+      # plus the host DNS search domain returning NXDOMAIN), which kept this
+      # healthcheck permanently failing while the site itself was healthy.
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
