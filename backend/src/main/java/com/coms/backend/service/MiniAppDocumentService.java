@@ -42,7 +42,7 @@ public class MiniAppDocumentService {
         String owner = requireText(ownerStudentId, "Owner required", 50);
         String cleanContentId = requireText(contentId, "contentId required", 120);
         Member member = memberRepository.findByStudentId(owner)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Member required"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
 
         MiniAppDocument document = repository.findByAppAndContentTypeAndOwnerStudentIdAndContentId(cleanApp, cleanType, owner, cleanContentId)
                 .orElseGet(MiniAppDocument::new);

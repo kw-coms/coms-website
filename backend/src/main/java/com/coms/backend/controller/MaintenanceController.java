@@ -74,7 +74,7 @@ public class MaintenanceController {
         verifyBootstrapSecret(providedSecret);
         boolean adminExists = memberRepository.existsByRole(Member.Role.ADMIN);
         if (adminExists) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bootstrap already completed.");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "이미 초기 설정이 완료되어 다시 실행할 수 없습니다.");
         }
 
         EligibleMember eligible = eligibleMemberRepository
