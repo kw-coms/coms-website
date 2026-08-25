@@ -174,7 +174,10 @@ public class NotificationService {
                 null,
                 message
         );
-        if (post.getAuthorStudentId() != null && !post.getAuthorStudentId().equals(comment.getStudentId())) {
+        // Push must respect the same per-category preference as the in-app row —
+        // createIfDifferent already filters, but it runs its check internally.
+        if (post.getAuthorStudentId() != null && !post.getAuthorStudentId().equals(comment.getStudentId())
+                && isCategoryEnabled(post.getAuthorStudentId(), Notification.Type.COMMENT_ON_POST)) {
             sendPush(post.getAuthorStudentId(), "새 댓글", message,
                     Map.of("type", "COMMENT_ON_POST", "postId", String.valueOf(post.getId())));
         }
@@ -191,7 +194,8 @@ public class NotificationService {
                 null,
                 message
         );
-        if (parent.getStudentId() != null && !parent.getStudentId().equals(reply.getStudentId())) {
+        if (parent.getStudentId() != null && !parent.getStudentId().equals(reply.getStudentId())
+                && isCategoryEnabled(parent.getStudentId(), Notification.Type.REPLY_ON_COMMENT)) {
             sendPush(parent.getStudentId(), "새 답글", message,
                     Map.of("type", "REPLY_ON_COMMENT", "postId", String.valueOf(post.getId())));
         }

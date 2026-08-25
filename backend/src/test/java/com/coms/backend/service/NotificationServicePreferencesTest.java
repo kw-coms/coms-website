@@ -44,6 +44,9 @@ class NotificationServicePreferencesTest {
     @MockitoSpyBean
     private NotificationPreferenceRepository notificationPreferenceRepository;
 
+    @MockitoSpyBean
+    private PushNotificationSender pushNotificationSender;
+
     @Autowired
     private MemberRepository memberRepository;
 
@@ -149,6 +152,30 @@ class NotificationServicePreferencesTest {
 
         verify(notificationPreferenceRepository, never()).findByMemberStudentId(anyString());
         verify(notificationPreferenceRepository, times(1)).findByMemberStudentIdIn(any());
+    }
+
+    @Test
+    void disabledCategoryAlsoSuppressesPushDispatch() {
+        // Regression: the push used to fire outside the preference check, so a
+        // member who turned off comment notifications still got the FCM push.
+        notificationService.updatePreferences(
+                author.getStudentId(),
+                new NotificationPreferencesRequest(false, true, true, true, true, true, true));
+
+        CommunityPost post = new CommunityPost();
+        post.setAuthorStudentId(author.getStudentId());
+        CommunityComment comment = new CommunityComment(
+                null, commenter.getStudentId(), commenter.getName(), "댓글 내용", null, 0);
+
+        notificationService.notifyPostComment(post, comment);
+        verify(pushNotificationSender, never()).sendToMember(anyString(), anyString(), anyString(), any());
+
+        // Re-enabled → the push goes out again.
+        notificationService.updatePreferences(
+                author.getStudentId(),
+                new NotificationPreferencesRequest(true, true, true, true, true, true, true));
+        notificationService.notifyPostComment(post, comment);
+        verify(pushNotificationSender, times(1)).sendToMember(anyString(), anyString(), anyString(), any());
     }
 
     private Member saveMember(String studentId, String name) {
