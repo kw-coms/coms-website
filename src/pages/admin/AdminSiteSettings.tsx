@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import {
   defaultSiteSettings,
   getAdminSiteSettings,
+  getClubRoom,
   publishSiteSettings,
+  updateClubRoom,
   type SiteSettings,
 } from '../../services/siteSettingsApi'
 import { showToast } from '../../components/common/Toast'
@@ -20,6 +22,60 @@ function textToLinks(value: string) {
       return { label: label?.trim() || '', href: hrefParts.join('|').trim() }
     })
     .filter((link) => link.label && link.href)
+}
+
+function ClubRoomAdminCard() {
+  const [doorCode, setDoorCode] = useState('')
+  const [loaded, setLoaded] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let mounted = true
+    getClubRoom()
+      .then((data) => { if (mounted) { setDoorCode(data?.doorCode || ''); setLoaded(true) } })
+      .catch(() => { if (mounted) setLoaded(true) })
+    return () => { mounted = false }
+  }, [])
+
+  const save = async (event) => {
+    event.preventDefault()
+    setSaving(true)
+    try {
+      const saved = await updateClubRoom(doorCode.trim())
+      setDoorCode(saved?.doorCode || '')
+      showToast({ message: '동아리방 비밀번호가 저장되었습니다.' })
+    } catch (err) {
+      showToast({ message: err.message || '저장 중 오류가 발생했습니다.', tone: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form onSubmit={save} className="rounded-lg border border-[var(--app-hairline)] bg-white/60 p-4">
+      <h2 className="text-base font-bold text-[var(--theme-body-dark)]">동아리방 비밀번호</h2>
+      <p className="mt-1 text-sm text-[var(--theme-body-muted)]">
+        회원(준회원 제외)에게 설정 페이지에서 표시됩니다. 비우고 저장하면 표시가 사라집니다.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          value={doorCode}
+          onChange={(event) => setDoorCode(event.target.value)}
+          maxLength={60}
+          placeholder={loaded ? '예: 1234' : '불러오는 중...'}
+          disabled={!loaded || saving}
+          className="w-48 rounded-lg border border-[var(--app-hairline)] bg-white px-3 py-2 font-mono text-sm font-bold tracking-widest text-[var(--theme-body-dark)]"
+        />
+        <button
+          type="submit"
+          disabled={!loaded || saving}
+          className="rounded-full bg-[var(--app-accent)] px-4 py-2 text-sm font-bold text-white transition hover:bg-[var(--app-accent-hover)] disabled:opacity-50"
+        >
+          {saving ? '저장 중...' : '저장'}
+        </button>
+      </div>
+    </form>
+  )
 }
 
 export default function AdminSiteSettings() {
@@ -78,6 +134,7 @@ export default function AdminSiteSettings() {
 
   return (
     <div className="space-y-5">
+      <ClubRoomAdminCard />
       <div>
         <h2 className="text-xl font-bold text-[var(--theme-body-dark)]">사이트 문구 관리</h2>
         <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
