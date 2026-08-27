@@ -147,7 +147,8 @@ public class NotificationService {
             return;
         }
         try {
-            pushNotificationSender.sendToMember(recipientStudentId, title, body, data);
+            // Async: fan-out loops enqueue instead of blocking the request thread.
+            pushNotificationSender.sendToMemberAsync(recipientStudentId, title, body, data);
         } catch (RuntimeException e) {
             log.warn("Push dispatch to {} failed (ignored)", recipientStudentId, e);
         }
@@ -469,19 +470,47 @@ public class NotificationService {
         }
     }
 
+    /**
+     * Moderation alert: a new community report notifies 부회장(VICE_PRESIDENT)
+     * 이상 so the queue doesn't rely on someone happening to open the admin
+     * panel. Carries the postId so tapping lands on the reported post.
+     */
+    public void notifyCommunityReport(CommunityPost post) {
+        if (post == null || post.getId() == null) {
+            return;
+        }
+        String message = "커뮤니티 신고 접수: " + (post.getTitle() == null ? "제목 없음" : post.getTitle());
+        List<String> moderators = memberRepository.findStudentIdsByRoleIn(
+                List.of(Member.Role.VICE_PRESIDENT, Member.Role.ADMIN));
+        List<Notification> notifications = moderators.stream()
+                .map(studentId -> build(
+                        studentId,
+                        null,
+                        Notification.Type.COMMUNITY_REPORT,
+                        post.getId(),
+                        null,
+                        null,
+                        message
+                ))
+                .toList();
+        notificationRepository.saveAll(notifications);
+        Map<String, String> data = Map.of("type", "COMMUNITY_REPORT", "postId", String.valueOf(post.getId()));
+        for (String studentId : moderators) {
+            sendPush(studentId, "새 신고", message, data);
+        }
+    }
+
     public void notifyNoticeCreated(Notice notice) {
         String message = "새 공지: " + notice.getTitle();
-        List<Member> allMembers = memberRepository.findAll();
-        Map<String, NotificationPreference> memberPreferences = preferencesByStudentId(allMembers.stream()
-                .map(Member::getStudentId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet()));
-        List<Member> members = allMembers.stream()
-                .filter(member -> isCategoryEnabled(memberPreferences, member.getStudentId(), Notification.Type.NOTICE_CREATED))
+        // Ids-only projection: fan-out never needs the full Member entity.
+        List<String> allStudentIds = memberRepository.findAllStudentIds();
+        Map<String, NotificationPreference> memberPreferences = preferencesByStudentId(Set.copyOf(allStudentIds));
+        List<String> recipients = allStudentIds.stream()
+                .filter(studentId -> isCategoryEnabled(memberPreferences, studentId, Notification.Type.NOTICE_CREATED))
                 .toList();
-        List<Notification> notifications = members.stream()
-                .map(member -> build(
-                        member.getStudentId(),
+        List<Notification> notifications = recipients.stream()
+                .map(studentId -> build(
+                        studentId,
                         null,
                         Notification.Type.NOTICE_CREATED,
                         null,
@@ -492,8 +521,8 @@ public class NotificationService {
                 .toList();
         notificationRepository.saveAll(notifications);
         Map<String, String> data = Map.of("type", "NOTICE_CREATED", "noticeId", String.valueOf(notice.getId()));
-        for (Member member : members) {
-            sendPush(member.getStudentId(), "새 공지", message, data);
+        for (String studentId : recipients) {
+            sendPush(studentId, "새 공지", message, data);
         }
     }
 

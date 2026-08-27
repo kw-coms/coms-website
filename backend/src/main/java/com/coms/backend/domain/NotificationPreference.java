@@ -57,6 +57,8 @@ public class NotificationPreference {
             case COMMUNITY_POST_RESTORED -> communityPostRestored;
             case COMMUNITY_POST_DELETED -> communityPostDeleted;
             case RECRUIT_APPLICATION -> recruitApplication;
+            // Moderation alert for 부회장+ recipients only — always on, no opt-out toggle.
+            case COMMUNITY_REPORT -> true;
         };
     }
 
