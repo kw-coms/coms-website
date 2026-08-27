@@ -63,5 +63,7 @@ export const ActivityKind = /** @type {const} */ ({
 // Member.Role
 export const MemberRole = /** @type {const} */ ({
   USER: "USER",
+  OFFICER: "OFFICER",
+  VICE_PRESIDENT: "VICE_PRESIDENT",
   ADMIN: "ADMIN",
 });

@@ -41,8 +41,17 @@ class CommunityAccess {
         return post.getCategory() == CommunityPost.Category.ANONYMOUS;
     }
 
+    /**
+     * 부회장(VICE_PRESIDENT) 이상 = community moderator: may view/moderate the
+     * anonymous board, edit/delete others' posts and comments, and see
+     * unmasked authors. 회장(ADMIN) inherits via Role.isAtLeast.
+     */
+    boolean isModerator(Member member) {
+        return member.getRole().isAtLeast(Member.Role.VICE_PRESIDENT);
+    }
+
     boolean canView(Member member, CommunityPost post) {
-        return !isAnonymous(post) || member.getRole() == Member.Role.ADMIN || !isGraduate(member);
+        return !isAnonymous(post) || isModerator(member) || !isGraduate(member);
     }
 
     void requireVisible(Member member, CommunityPost post) {
@@ -52,14 +61,14 @@ class CommunityAccess {
     }
 
     void requireCategoryAllowed(Member member, CommunityPost.Category category) {
-        if (category == CommunityPost.Category.ANONYMOUS && member.getRole() != Member.Role.ADMIN && isGraduate(member)) {
+        if (category == CommunityPost.Category.ANONYMOUS && !isModerator(member) && isGraduate(member)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid community category.");
         }
     }
 
     void requireOwnerOrAdmin(CommunityPost post, Member member) {
         requireVisible(member, post);
-        if (!post.getAuthorStudentId().equals(member.getStudentId()) && member.getRole() != Member.Role.ADMIN) {
+        if (!post.getAuthorStudentId().equals(member.getStudentId()) && !isModerator(member)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
     }
@@ -74,6 +83,6 @@ class CommunityAccess {
     }
 
     boolean canSeeAnonymous(Member member) {
-        return member.getRole() == Member.Role.ADMIN || !isGraduate(member);
+        return isModerator(member) || !isGraduate(member);
     }
 }
