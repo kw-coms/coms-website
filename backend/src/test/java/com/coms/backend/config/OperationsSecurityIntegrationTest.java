@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -39,14 +40,17 @@ class OperationsSecurityIntegrationTest {
 
     private Cookie officerCookie;
     private Cookie userCookie;
+    private Cookie vicePresidentCookie;
 
     @BeforeEach
     void setUp() {
         memberRepository.deleteAll();
         memberRepository.save(member("2026000001", Member.Role.OFFICER));
         memberRepository.save(member("2026000002", Member.Role.USER));
+        memberRepository.save(member("2026000003", Member.Role.VICE_PRESIDENT));
         officerCookie = authCookie("2026000001");
         userCookie = authCookie("2026000002");
+        vicePresidentCookie = authCookie("2026000003");
     }
 
     @Test
@@ -84,6 +88,48 @@ class OperationsSecurityIntegrationTest {
 
         mockMvc.perform(get("/api/admin/members").cookie(officerCookie))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void vicePresidentInheritsOfficerContentWritesViaRoleHierarchy() throws Exception {
+        // The RoleHierarchy bean must make hasAnyRole("ADMIN","OFFICER") admit
+        // VICE_PRESIDENT — this is the load-bearing assumption of the tier split.
+        mockMvc.perform(post("/api/notices")
+                        .cookie(vicePresidentCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"부회장 공지","content":"운영 안내","pinned":false,"category":"GENERAL"}
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/admin/members").cookie(vicePresidentCookie))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void archiveAuthorEditIsVicePresidentPlusOnly() throws Exception {
+        mockMvc.perform(patch("/api/files/1/author")
+                        .cookie(userCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"uploaderName\":\"홍길동\"}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(patch("/api/files/1/author")
+                        .cookie(officerCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"uploaderName\":\"홍길동\"}"))
+                .andExpect(status().isForbidden());
+
+        // VP passes the security gate; 404 because file 1 doesn't exist here.
+        mockMvc.perform(patch("/api/files/1/author")
+                        .cookie(vicePresidentCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"uploaderName\":\"홍길동\"}"))
+                .andExpect(status().isNotFound());
     }
 
     private Cookie authCookie(String studentId) {

@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -46,6 +48,22 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * Privilege ladder: 회장(ADMIN) > 부회장(VICE_PRESIDENT) > 임원(OFFICER) > USER.
+     * Both authorizeHttpRequests and @PreAuthorize pick this bean up, so a rule
+     * written as hasRole("OFFICER") means "OFFICER or higher" — existing
+     * hasAnyRole("ADMIN", "OFFICER") rules automatically admit VICE_PRESIDENT.
+     * Mirrors Member.Role's ordinal order; keep the two in sync.
+     */
+    @Bean
+    public RoleHierarchy roleHierarchy() {
+        return RoleHierarchyImpl.withDefaultRolePrefix()
+                .role("ADMIN").implies("VICE_PRESIDENT")
+                .role("VICE_PRESIDENT").implies("OFFICER")
+                .role("OFFICER").implies("USER")
+                .build();
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
                                            UserDetailsService userDetailsService,
@@ -68,6 +86,8 @@ public class SecurityConfig {
                 auth.requestMatchers("/api/maintenance/**").hasRole("ADMIN");
                 auth.requestMatchers("/api/admin/site-settings", "/api/admin/club-activity-categories/**",
                         "/api/admin/club-project-categories/**", "/api/admin/recurring-schedules/**").hasAnyRole("ADMIN", "OFFICER");
+                // 부회장(VICE_PRESIDENT)+ community moderation surface (reports, deleted-post archive).
+                auth.requestMatchers("/api/admin/community/**").hasRole("VICE_PRESIDENT");
                 auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/**").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/notices/*/vote").authenticated();
@@ -103,9 +123,10 @@ public class SecurityConfig {
                 auth.requestMatchers("/api/mini-apps/**").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/files").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/files/*/vote").authenticated();
-                auth.requestMatchers(HttpMethod.DELETE, "/api/files/**").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.DELETE, "/api/files/**").hasRole("VICE_PRESIDENT");
+                auth.requestMatchers(HttpMethod.PATCH, "/api/files/**").hasRole("VICE_PRESIDENT");
                 auth.requestMatchers("/api/files", "/api/files/**").authenticated();
-                auth.requestMatchers(HttpMethod.PATCH, "/api/community/posts/*/pin").hasRole("ADMIN");
+                auth.requestMatchers(HttpMethod.PATCH, "/api/community/posts/*/pin").hasRole("VICE_PRESIDENT");
                 auth.requestMatchers("/api/community/**").authenticated();
                 // Actuator: health and info public, everything else requires ADMIN
                 auth.requestMatchers("/actuator/health", "/actuator/info").permitAll();

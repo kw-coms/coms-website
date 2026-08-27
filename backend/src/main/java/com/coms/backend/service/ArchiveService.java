@@ -91,6 +91,27 @@ public class ArchiveService {
         }
     }
 
+    /**
+     * Moderator-only (부회장 이상, enforced by the PATCH /api/files/** rule in
+     * SecurityConfig): override the displayed 작성자 of an archive entry.
+     * uploaderName is a free-text display snapshot with no FK, so this is a
+     * plain column update; uploadedBy (the owning account) never changes.
+     */
+    public ArchiveFileResponse updateAuthor(Long id, String uploaderName, String editorStudentId) {
+        ArchiveFile entity = repo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        String cleaned = uploaderName == null ? null : uploaderName.trim();
+        if (cleaned == null || cleaned.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "작성자 이름을 입력해주세요.");
+        }
+        if (cleaned.length() > 60) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "작성자 이름은 60자 이하여야 합니다.");
+        }
+        entity.setUploaderName(cleaned);
+        ArchiveFile saved = repo.save(entity);
+        return toResponse(saved, voteStats(List.of(saved)), editorStudentId);
+    }
+
     @Transactional(readOnly = true)
     public List<ArchiveFileResponse> list() {
         return list(null);

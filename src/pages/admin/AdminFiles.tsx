@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { listFiles, createPost, deleteFile } from '../../services/archiveApi'
+import { listFiles, createPost, deleteFile, updateArchiveAuthor } from '../../services/archiveApi'
 import { showToast } from '../../components/common/Toast'
-import { confirmDialog } from '../../components/common/ConfirmDialog'
+import { confirmDialog, promptDialog } from '../../components/common/ConfirmDialog'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
 export default function AdminFiles() {
@@ -38,6 +38,25 @@ export default function AdminFiles() {
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleAuthorEdit = async (file) => {
+    const name = await promptDialog({
+      message: '자료실에 표시할 작성자 이름을 입력하세요.',
+      defaultValue: file.uploaderName || '',
+    })
+    if (name === null) return
+    if (!name.trim()) {
+      showToast({ message: '작성자 이름을 입력해주세요.', tone: 'error' })
+      return
+    }
+    try {
+      const updated = await updateArchiveAuthor(file.id, name.trim())
+      setFiles((prev) => prev.map((item) => (item.id === file.id ? { ...item, uploaderName: updated.uploaderName } : item)))
+      showToast({ message: '작성자가 변경되었습니다.' })
+    } catch (err) {
+      showToast({ message: err.message || '작성자 변경 중 오류가 발생했습니다.', tone: 'error' })
     }
   }
 
@@ -91,9 +110,16 @@ export default function AdminFiles() {
               <div>
                 <p className="font-semibold text-[var(--theme-body-dark)]">{file.originalName}</p>
                 <p className="text-xs text-[var(--theme-body-muted)]">
-                  {file.uploadedBy} · {formatFileSize(file.fileSize)}
+                  작성자 {file.uploaderName || file.uploadedBy || '-'} · {formatFileSize(file.fileSize)}
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => handleAuthorEdit(file)}
+                className="text-xs font-semibold text-blue-500 transition hover:underline"
+              >
+                작성자 변경
+              </button>
               <button
                 type="button"
                 onClick={() => handleDelete(file.id)}

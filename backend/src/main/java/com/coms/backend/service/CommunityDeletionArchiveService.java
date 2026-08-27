@@ -200,7 +200,7 @@ public class CommunityDeletionArchiveService {
     }
 
     @Transactional(readOnly = true)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('VICE_PRESIDENT')")
     public DeletedCommunityPostImage loadImageMeta(Long deletedPostId, Long imageId) {
         return deletedImageRepository.findById(imageId)
                 .filter(image -> image.getDeletedPostId().equals(deletedPostId))
@@ -220,14 +220,14 @@ public class CommunityDeletionArchiveService {
     }
 
     @Transactional(readOnly = true)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('VICE_PRESIDENT')")
     public Resource loadImage(Long deletedPostId, Long imageId) {
         DeletedCommunityPostImage image = loadImageMeta(deletedPostId, imageId);
         return storageService.load(image.getStoredName());
     }
 
     @Transactional(readOnly = true)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('VICE_PRESIDENT')")
     public DeletedCommunityPostMedia loadMediaMeta(Long deletedPostId, Long mediaId) {
         return deletedMediaRepository.findById(mediaId)
                 .filter(media -> media.getDeletedPostId().equals(deletedPostId))
@@ -247,7 +247,7 @@ public class CommunityDeletionArchiveService {
     }
 
     @Transactional(readOnly = true)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('VICE_PRESIDENT')")
     public Resource loadMedia(Long deletedPostId, Long mediaId) {
         DeletedCommunityPostMedia media = loadMediaMeta(deletedPostId, mediaId);
         return storageService.load(media.getStoredName());
@@ -257,7 +257,7 @@ public class CommunityDeletionArchiveService {
     public DeletedCommunityPostRestoreResponse restore(Long deletedPostId, String adminStudentId) {
         Member admin = memberRepository.findByStudentId(adminStudentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        if (admin.getRole() != Member.Role.ADMIN) {
+        if (!admin.getRole().isAtLeast(Member.Role.VICE_PRESIDENT)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         DeletedCommunityPost snapshot = repository.findById(deletedPostId)
