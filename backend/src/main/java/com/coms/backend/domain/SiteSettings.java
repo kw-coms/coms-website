@@ -30,7 +30,9 @@ public class SiteSettings {
 
     // 동아리방 출입 비밀번호 — NEVER exposed through the public site-settings
     // response; read via the member-gated /api/club-room endpoint only.
-    @Column(name = "club_room_code", nullable = false, length = 60)
+    // columnDefinition carries the DEFAULT so hibernate-generated test schemas
+    // accept inserts that omit the column (mirrors V82).
+    @Column(name = "club_room_code", nullable = false, length = 60, columnDefinition = "VARCHAR(60) NOT NULL DEFAULT ''")
     private String clubRoomCode = "";
 
     @Column(name = "created_at", nullable = false)
