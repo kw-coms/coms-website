@@ -188,10 +188,10 @@ public class CommunityService {
         List<CommunityPost> posts;
         long total;
         if (access.canSeeAnonymous(member)) {
-            posts = communityPostRepository.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc(pageable);
+            posts = communityPostRepository.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(pageable);
             total = communityPostRepository.count();
         } else {
-            posts = communityPostRepository.findByCategoryNotOrderByPinnedDescPinnedAtDescCreatedAtDesc(
+            posts = communityPostRepository.findByCategoryNotOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(
                     CommunityPost.Category.ANONYMOUS, pageable);
             total = communityPostRepository.countByCategoryNot(CommunityPost.Category.ANONYMOUS);
         }
