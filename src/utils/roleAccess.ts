@@ -3,21 +3,23 @@ type Role = string | null | undefined
 // Privilege ladder, mirroring the backend's Member.Role + RoleHierarchy:
 // 회장(ADMIN) > 부회장(VICE_PRESIDENT) > 임원(OFFICER) > 일반 회원(USER).
 const ROLE_RANK: Record<string, number> = {
-  USER: 0,
-  OFFICER: 1,
-  VICE_PRESIDENT: 2,
-  ADMIN: 3,
+  ASSOCIATE: 0,
+  USER: 1,
+  OFFICER: 2,
+  VICE_PRESIDENT: 3,
+  ADMIN: 4,
 }
 
 export const ROLE_LABELS: Record<string, string> = {
   ADMIN: '회장',
   VICE_PRESIDENT: '부회장',
   OFFICER: '임원',
-  USER: '일반 회원',
+  USER: '회원',
+  ASSOCIATE: '준회원',
 }
 
 // Roles assignable from the member-management screen, highest first.
-export const ASSIGNABLE_ROLES = ['ADMIN', 'VICE_PRESIDENT', 'OFFICER', 'USER'] as const
+export const ASSIGNABLE_ROLES = ['ADMIN', 'VICE_PRESIDENT', 'OFFICER', 'USER', 'ASSOCIATE'] as const
 
 const OFFICER_TAB_IDS = new Set(['activities', 'projects', 'site-settings'])
 // 부회장 additionally moderates community + archive.
@@ -25,6 +27,11 @@ const VICE_PRESIDENT_TAB_IDS = new Set([...OFFICER_TAB_IDS, 'files', 'community'
 
 export function roleAtLeast(role: Role, tier: keyof typeof ROLE_RANK) {
   return (ROLE_RANK[role || ''] ?? -1) >= ROLE_RANK[tier]
+}
+
+// 동아리방 비밀번호: 회원(USER) 이상 — 준회원(ASSOCIATE) 제외.
+export function canSeeClubRoom(role: Role) {
+  return roleAtLeast(role, 'USER')
 }
 
 export function canManageContent(role: Role) {

@@ -1,5 +1,17 @@
 import { request, requestOptional } from './apiClient'
 
+// 동아리방 출입 비밀번호 — 회원(USER) 이상 전용 endpoint.
+export function getClubRoom(): Promise<{ doorCode: string }> {
+  return request('/api/club-room')
+}
+
+export function updateClubRoom(doorCode: string): Promise<{ doorCode: string }> {
+  return request('/api/admin/club-room', {
+    method: 'PUT',
+    body: JSON.stringify({ doorCode }),
+  })
+}
+
 export type SiteSettingsContactLink = {
   label: string
   href: string

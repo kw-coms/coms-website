@@ -54,6 +54,17 @@ assert.deepEqual(
 )
 assert.equal(defaultOperationsTab('VICE_PRESIDENT', 'files'), 'files')
 assert.equal(defaultOperationsTab('VICE_PRESIDENT', 'members'), 'activities')
-assert.deepEqual(ROLE_LABELS, { ADMIN: '회장', VICE_PRESIDENT: '부회장', OFFICER: '임원', USER: '일반 회원' })
+assert.deepEqual(ROLE_LABELS, { ADMIN: '회장', VICE_PRESIDENT: '부회장', OFFICER: '임원', USER: '회원', ASSOCIATE: '준회원' })
 
 console.log('role access policy passed')
+
+// 준회원(ASSOCIATE): 회원과 동일하되 동아리방 비밀번호만 차단.
+const { canSeeClubRoom } = await import('../src/utils/roleAccess.ts')
+assert.equal(canSeeClubRoom('ASSOCIATE'), false)
+assert.equal(canSeeClubRoom('USER'), true)
+assert.equal(canSeeClubRoom('OFFICER'), true)
+assert.equal(ROLE_LABELS.ASSOCIATE, '준회원')
+assert.equal(ROLE_LABELS.USER, '회원')
+assert.equal(canManageContent('ASSOCIATE'), false)
+assert.equal(canModerateCommunity('ASSOCIATE'), false)
+assert.deepEqual(adminTabsForRole('ASSOCIATE', tabs), [])

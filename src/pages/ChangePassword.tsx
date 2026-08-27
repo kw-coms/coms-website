@@ -20,6 +20,8 @@ import { useAuth } from '../contexts/useAuth'
 import { getLogoAsset } from '../utils/logoAssets'
 import { showToast } from '../components/common/Toast'
 import { PASSWORD_PATTERN, PASSWORD_MESSAGE } from '../utils/passwordPolicy'
+import { getClubRoom } from '../services/siteSettingsApi'
+import { canSeeClubRoom } from '../utils/roleAccess'
 const OTHER_INTEREST = '기타'
 const INTEREST_OPTIONS = ['보안', '웹', '앱']
 
@@ -224,6 +226,46 @@ function PushNotificationCard({ helperTextClass }: { helperTextClass: string }) 
         onChange={handleToggle}
       />
       <p className={helperTextClass}>알림 종류별 수신 여부는 아래에서 조정할 수 있습니다.</p>
+    </div>
+  )
+}
+
+function ClubRoomSection({ cardClass, helperTextClass }: { cardClass: string; helperTextClass: string }) {
+  const [doorCode, setDoorCode] = useState<string | null>(null)
+  const [revealed, setRevealed] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let mounted = true
+    getClubRoom()
+      .then((data) => { if (mounted) setDoorCode(data?.doorCode || '') })
+      .catch(() => { if (mounted) setError('동아리방 정보를 불러오지 못했습니다.') })
+    return () => { mounted = false }
+  }, [])
+
+  return (
+    <div className={`${cardClass} mt-4`}>
+      <h3 className="text-base font-bold">동아리방</h3>
+      <p className={helperTextClass}>동아리방 출입 비밀번호는 회원에게만 표시됩니다. 외부에 공유하지 마세요.</p>
+      {error && <p className="mt-2 text-sm font-semibold text-red-500">{error}</p>}
+      {!error && doorCode !== null && (
+        doorCode === '' ? (
+          <p className="mt-3 text-sm font-semibold text-[var(--app-subtle)]">아직 등록된 비밀번호가 없습니다.</p>
+        ) : (
+          <div className="mt-3 flex items-center gap-3">
+            <span className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 font-mono text-lg font-bold tracking-[0.2em] text-[var(--app-text)]">
+              {revealed ? doorCode : '•'.repeat(Math.max(doorCode.length, 4))}
+            </span>
+            <button
+              type="button"
+              onClick={() => setRevealed((value) => !value)}
+              className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-1.5 text-xs font-bold text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+            >
+              {revealed ? '가리기' : '보기'}
+            </button>
+          </div>
+        )
+      )}
     </div>
   )
 }
@@ -654,6 +696,10 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
               })}
             </div>
           </div>
+
+          {canSeeClubRoom(user?.role) && (
+            <ClubRoomSection cardClass={cardClass} helperTextClass={helperTextClass} />
+          )}
 
           <NotificationPreferencesSection
             cardClass={cardClass}

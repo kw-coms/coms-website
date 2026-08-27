@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -41,6 +42,7 @@ class OperationsSecurityIntegrationTest {
     private Cookie officerCookie;
     private Cookie userCookie;
     private Cookie vicePresidentCookie;
+    private Cookie associateCookie;
 
     @BeforeEach
     void setUp() {
@@ -48,9 +50,40 @@ class OperationsSecurityIntegrationTest {
         memberRepository.save(member("2026000001", Member.Role.OFFICER));
         memberRepository.save(member("2026000002", Member.Role.USER));
         memberRepository.save(member("2026000003", Member.Role.VICE_PRESIDENT));
+        memberRepository.save(member("2026000004", Member.Role.ASSOCIATE));
         officerCookie = authCookie("2026000001");
         userCookie = authCookie("2026000002");
         vicePresidentCookie = authCookie("2026000003");
+        associateCookie = authCookie("2026000004");
+    }
+
+    @Test
+    void clubRoomCodeIsMemberPlusWhileAssociatesStayOut() throws Exception {
+        // 준회원 = identical to 회원 everywhere except below-USER gates: they can
+        // read notices, but the club-room door code is 403.
+        mockMvc.perform(get("/api/notices").cookie(associateCookie))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/club-room").cookie(associateCookie))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/club-room").cookie(userCookie))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/club-room").cookie(officerCookie))
+                .andExpect(status().isOk());
+
+        // 임원+ may rotate the code; 회원 may not.
+        mockMvc.perform(put("/api/admin/club-room")
+                        .cookie(userCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"doorCode\":\"0000\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/admin/club-room")
+                        .cookie(officerCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"doorCode\":\"0000\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test
