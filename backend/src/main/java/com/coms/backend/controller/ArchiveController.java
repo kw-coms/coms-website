@@ -1,6 +1,7 @@
 package com.coms.backend.controller;
 
 import com.coms.backend.domain.ArchiveFile;
+import com.coms.backend.dto.ArchiveAuthorUpdateRequest;
 import com.coms.backend.dto.ArchiveFileResponse;
 import com.coms.backend.dto.EngagementVoteRequest;
 import com.coms.backend.service.ArchiveService;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -56,6 +58,14 @@ public class ArchiveController {
                                                           @RequestParam(required = false) Integer size) {
         return ListPagination.paginate(
                 archiveService.list(authentication == null ? null : authentication.getName()), page, size);
+    }
+
+    // 부회장 이상 전용 — SecurityConfig의 PATCH /api/files/** hasRole("VICE_PRESIDENT") 규칙이 게이트.
+    @PatchMapping("/{id}/author")
+    public ResponseEntity<ArchiveFileResponse> updateAuthor(@PathVariable Long id,
+                                                            @Valid @RequestBody ArchiveAuthorUpdateRequest request,
+                                                            Authentication authentication) {
+        return ResponseEntity.ok(archiveService.updateAuthor(id, request.uploaderName(), authentication.getName()));
     }
 
     @PostMapping("/{id}/vote")

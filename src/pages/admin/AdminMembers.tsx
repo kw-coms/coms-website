@@ -4,6 +4,7 @@ import { showToast } from '../../components/common/Toast'
 import { confirmDialog, promptDialog } from '../../components/common/ConfirmDialog'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 import ErrorState from '../../components/common/ErrorState'
+import { ASSIGNABLE_ROLES, ROLE_LABELS } from '../../utils/roleAccess'
 
 function parseInterests(raw) {
   if (!raw) return []
@@ -13,23 +14,14 @@ function parseInterests(raw) {
   })
 }
 
-const ROLE_LABELS = {
-  ADMIN: '관리자',
-  OFFICER: '운영진',
-  USER: '일반 회원',
-}
+
 
 export default function AdminMembers({ currentUser }: { currentUser: { studentId?: string } }) {
   const { members, loading, error, refetch, updateRole, removeMember, resetPassword } = useAdminMembers()
   const [expanded, setExpanded] = useState(null)
 
-  const handleRoleUpdate = async (member) => {
-    const nextRoleByCurrent = {
-      ADMIN: 'OFFICER',
-      OFFICER: 'USER',
-      USER: 'ADMIN',
-    }
-    const newRole = nextRoleByCurrent[member.role] || 'USER'
+  const handleRoleUpdate = async (member, newRole) => {
+    if (!newRole || newRole === member.role) return
     try {
       await updateRole({ id: member.id, role: newRole })
     } catch (err) {
@@ -118,13 +110,16 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
                 )}
                 {!isSelf && (
                   <>
-                    <button
-                      type="button"
-                      onClick={() => handleRoleUpdate(member)}
-                      className="text-xs font-semibold text-blue-500 transition hover:underline"
+                    <select
+                      value={member.role || 'USER'}
+                      onChange={(event) => handleRoleUpdate(member, event.target.value)}
+                      aria-label={`${member.name} 역할 변경`}
+                      className="rounded border border-[var(--app-hairline)] bg-[var(--app-surface)] px-1.5 py-0.5 text-xs font-semibold text-[var(--app-text)]"
                     >
-                      {member.role === 'ADMIN' ? '운영진으로' : member.role === 'OFFICER' ? '일반 회원으로' : '관리자 지정'}
-                    </button>
+                      {ASSIGNABLE_ROLES.map((role) => (
+                        <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+                      ))}
+                    </select>
                     <button
                       type="button"
                       onClick={() => handlePasswordReset(member)}

@@ -19,6 +19,7 @@ import AdminScreenCheck from './admin/AdminScreenCheck'
 import AdminSiteSettings from './admin/AdminSiteSettings'
 import {
   adminTabsForRole,
+  ROLE_LABELS,
   canAccessOperationsPanel,
   canManageSensitiveAdmin,
   defaultOperationsTab,
@@ -135,7 +136,7 @@ export default function Admin({ onBack }: { onBack: () => void }) {
       <div className="shape-cut bg-[var(--theme-surface-70)] p-px shadow-[0_22px_70px_var(--theme-shadow-glass)]">
         <section className="shape-cut bg-[var(--theme-surface-96)] p-5 text-[var(--theme-body-dark)] shadow-[0_22px_70px_var(--theme-shadow-glass)] backdrop-blur-md supports-[backdrop-filter]:bg-[var(--theme-surface-94)] sm:p-8">
           <p className="text-sm font-semibold uppercase tracking-[0.35em] text-[var(--theme-body-muted)]/80">
-            {isSensitiveAdmin ? 'Admin' : 'Officer'}
+            {ROLE_LABELS[user?.role] || 'Officer'}
           </p>
           <h1 className="mt-2 mb-6 text-2xl font-bold sm:text-3xl">운영 패널</h1>
 

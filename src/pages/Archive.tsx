@@ -10,6 +10,7 @@ import { ArchiveDetailView } from '../components/archive/ArchiveDetailView'
 import { ArchiveListView } from '../components/archive/ArchiveListView'
 import { WriteForm } from '../components/archive/WriteForm'
 import { categoryLabel } from '../components/archive/archiveUtils'
+import { canManageArchive } from '../utils/roleAccess'
 
 export default function Archive({ onBack }: { onBack: () => void }) {
   const { user } = useAuth()
@@ -24,7 +25,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
 
   useScrollReveal([files.length, loading])
 
-  const isAdmin = user?.role === 'ADMIN'
+  const isAdmin = canManageArchive(user?.role)
 
   const loadFiles = ({ showLoading = true } = {}) => {
     if (showLoading) setLoading(true)

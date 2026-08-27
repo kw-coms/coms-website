@@ -301,7 +301,7 @@ public class CommunityService {
         Member member = access.requireMember(studentId);
         CommunityPost post = requirePost(id);
         access.requireVisible(member, post);
-        if (!post.getAuthorStudentId().equals(member.getStudentId()) && member.getRole() != Member.Role.ADMIN) {
+        if (!post.getAuthorStudentId().equals(member.getStudentId()) && !access.isModerator(member)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         SanitizedPost sanitized = validateRequest(request);
@@ -329,7 +329,7 @@ public class CommunityService {
 
     public CommunityPostResponse setPinned(String studentId, Long id, boolean pinned) {
         Member member = access.requireMember(studentId);
-        if (member.getRole() != Member.Role.ADMIN) {
+        if (!access.isModerator(member)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         CommunityPost post = requirePost(id);
@@ -349,11 +349,11 @@ public class CommunityService {
         Member member = access.requireMember(studentId);
         CommunityPost post = requirePost(id);
         access.requireVisible(member, post);
-        if (!post.getAuthorStudentId().equals(member.getStudentId()) && member.getRole() != Member.Role.ADMIN) {
+        if (!post.getAuthorStudentId().equals(member.getStudentId()) && !access.isModerator(member)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         String normalizedReason = textService.normalizeDeleteReason(reason, MAX_DELETE_REASON_LENGTH);
-        if (member.getRole() == Member.Role.ADMIN
+        if (access.isModerator(member)
                 && !post.getAuthorStudentId().equals(member.getStudentId())
                 && normalizedReason == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "관리자 삭제 사유를 입력해주세요.");
@@ -934,8 +934,8 @@ public class CommunityService {
                                              Map<Long, List<CommunityPostFile>> filesByPost,
                                              Set<Long> bookmarkedPostIds) {
         boolean editable = post.getAuthorStudentId().equals(currentMember.getStudentId())
-                || currentMember.getRole() == Member.Role.ADMIN;
-        boolean maskAnonymous = access.isAnonymous(post) && currentMember.getRole() != Member.Role.ADMIN;
+                || access.isModerator(currentMember);
+        boolean maskAnonymous = access.isAnonymous(post) && !access.isModerator(currentMember);
         boolean authorAdmin = !maskAnonymous && author != null && author.getRole() == Member.Role.ADMIN;
         CommunityReputationResponse authorReputation = maskAnonymous ? null
                 : reputations.get(post.getAuthorStudentId());
