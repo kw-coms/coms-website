@@ -39,18 +39,21 @@ public class CommunityPostReportService {
     private final CommunityPostRepository postRepository;
     private final AuditLogService auditLogService;
     private final MemberRepository memberRepository;
+    private final NotificationService notificationService;
     private final CommunityAccess access;
 
     public CommunityPostReportService(CommunityPostReportRepository reportRepository,
                                       CommunityPostRepository postRepository,
                                       AuditLogService auditLogService,
                                       MemberRepository memberRepository,
-                                      CommunityAccess access) {
+                                      CommunityAccess access,
+                                      NotificationService notificationService) {
         this.reportRepository = reportRepository;
         this.postRepository = postRepository;
         this.auditLogService = auditLogService;
         this.memberRepository = memberRepository;
         this.access = access;
+        this.notificationService = notificationService;
     }
 
     public CommunityPostReportResponse report(Long postId, String reporterStudentId, CommunityPostReportRequest request) {
@@ -77,7 +80,9 @@ public class CommunityPostReportService {
         report.setReason(reason);
         report.setDetail(request.detail());
         report.setCreatedAt(LocalDateTime.now());
-        return CommunityPostReportResponse.forReporter(reportRepository.save(report));
+        CommunityPostReport saved = reportRepository.save(report);
+        notificationService.notifyCommunityReport(post);
+        return CommunityPostReportResponse.forReporter(saved);
     }
 
     @Transactional(readOnly = true)
