@@ -15,11 +15,30 @@ final class CommunityDisplayNames {
     }
 
     static String generationFromStudentId(String studentId) {
-        if (studentId == null || !studentId.matches("\\d{10}")) {
+        Integer admissionYear = admissionYearFromStudentId(studentId);
+        if (admissionYear == null) {
             return "";
         }
-        int admissionYear = Integer.parseInt(studentId.substring(0, 4));
         int generation = admissionYear - 1966;
         return generation > 0 ? generation + "기" : "";
+    }
+
+    /**
+     * Admission year from either id shape: a 10-digit 학번 (year = first four
+     * digits) or a graduate synthetic id "G{year}-{rosterId}" minted at
+     * graduate signup — without this, graduates showed a bare name (and their
+     * raw G-id leaked wherever the id itself is displayed).
+     */
+    private static Integer admissionYearFromStudentId(String studentId) {
+        if (studentId == null) {
+            return null;
+        }
+        if (studentId.matches("\\d{10}")) {
+            return Integer.parseInt(studentId.substring(0, 4));
+        }
+        if (studentId.matches("G\\d{4}-\\d+")) {
+            return Integer.parseInt(studentId.substring(1, 5));
+        }
+        return null;
     }
 }
