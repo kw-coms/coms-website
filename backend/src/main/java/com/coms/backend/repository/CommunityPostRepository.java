@@ -30,7 +30,10 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
     // Real DB-side pagination for the community post list (see CommunityService#listPaged). The
     // visibility rule for anonymous posts collapses to "category != ANONYMOUS" once we know the
     // viewer can't see anonymous posts, so it moves into SQL instead of an in-memory filter.
-    List<CommunityPost> findByCategoryNotOrderByPinnedDescPinnedAtDescCreatedAtDesc(CommunityPost.Category category, Pageable pageable);
+    // The trailing IdDesc tiebreaker matters: createdAt ties make the order non-deterministic
+    // across queries, so offset pages could overlap or skip rows without it.
+    List<CommunityPost> findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(Pageable pageable);
+    List<CommunityPost> findByCategoryNotOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(CommunityPost.Category category, Pageable pageable);
     long countByCategoryNot(CommunityPost.Category category);
 
     // Keyword search over title/content for the community post search endpoint (see
@@ -40,7 +43,7 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
     @Query(value = "select p from CommunityPost p where "
             + "(lower(p.title) like lower(concat('%', :keyword, '%')) escape '!' "
             + "or lower(p.content) like lower(concat('%', :keyword, '%')) escape '!') "
-            + "order by p.pinned desc, p.pinnedAt desc, p.createdAt desc",
+            + "order by p.pinned desc, p.pinnedAt desc, p.createdAt desc, p.id desc",
             countQuery = "select count(p) from CommunityPost p where "
                     + "(lower(p.title) like lower(concat('%', :keyword, '%')) escape '!' "
                     + "or lower(p.content) like lower(concat('%', :keyword, '%')) escape '!')")
@@ -49,7 +52,7 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
     @Query(value = "select p from CommunityPost p where p.category <> :excludedCategory and "
             + "(lower(p.title) like lower(concat('%', :keyword, '%')) escape '!' "
             + "or lower(p.content) like lower(concat('%', :keyword, '%')) escape '!') "
-            + "order by p.pinned desc, p.pinnedAt desc, p.createdAt desc",
+            + "order by p.pinned desc, p.pinnedAt desc, p.createdAt desc, p.id desc",
             countQuery = "select count(p) from CommunityPost p where p.category <> :excludedCategory and "
                     + "(lower(p.title) like lower(concat('%', :keyword, '%')) escape '!' "
                     + "or lower(p.content) like lower(concat('%', :keyword, '%')) escape '!')")
