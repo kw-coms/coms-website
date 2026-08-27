@@ -158,18 +158,23 @@ test('admin member management updates member roles in place', async ({ page }) =
 
   const memberRow = page.locator('.shape-cut-sm').filter({ hasText: '일반회원' })
   await expect(memberRow).toBeVisible()
-  await memberRow.getByRole('button', { name: '관리자 지정' }).click()
+  const roleSelect = memberRow.getByRole('combobox', { name: '일반회원 역할 변경' })
+  await roleSelect.selectOption('ADMIN')
 
   await expect.poll(() => rolePayloads.at(-1)).toEqual({ role: 'ADMIN' })
-  await expect(memberRow.getByText('관리자')).toBeVisible()
-  await memberRow.getByRole('button', { name: '운영진으로' }).click()
+  await expect(roleSelect).toHaveValue('ADMIN')
+  await roleSelect.selectOption('VICE_PRESIDENT')
+
+  await expect.poll(() => rolePayloads.at(-1)).toEqual({ role: 'VICE_PRESIDENT' })
+  await expect(roleSelect).toHaveValue('VICE_PRESIDENT')
+  await roleSelect.selectOption('OFFICER')
 
   await expect.poll(() => rolePayloads.at(-1)).toEqual({ role: 'OFFICER' })
-  await expect(memberRow.getByText('운영진')).toBeVisible()
-  await memberRow.getByRole('button', { name: '일반 회원으로' }).click()
+  await expect(roleSelect).toHaveValue('OFFICER')
+  await roleSelect.selectOption('USER')
 
   await expect.poll(() => rolePayloads.at(-1)).toEqual({ role: 'USER' })
-  await expect(memberRow.getByRole('button', { name: '관리자 지정' })).toBeVisible()
+  await expect(roleSelect).toHaveValue('USER')
 })
 
 test('community composer inserts a poll block that survives re-render', async ({ page }) => {
