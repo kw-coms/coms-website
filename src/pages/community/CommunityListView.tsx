@@ -13,6 +13,7 @@ import BookmarkButton from './BookmarkButton'
 import AuthorName from './AuthorName'
 import CommunityPostRow from './CommunityPostRow'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
+import { canModerateCommunity } from '../../utils/roleAccess'
 import {
   SORT_OPTIONS,
   clickableCell,
@@ -194,7 +195,7 @@ export default function CommunityListView({
         onOpen={onOpenPost}
         onToggleBookmark={onToggleBookmark}
         bookmarkPending={bookmarkPending}
-        showAdminDelete={user?.role === 'ADMIN'}
+        showAdminDelete={canModerateCommunity(user?.role)}
         onAdminDelete={onAdminDelete}
       />
     )
@@ -362,7 +363,7 @@ export default function CommunityListView({
                       <AuthorName post={post} />
                       <BookmarkButton post={post} onToggle={onToggleBookmark} pending={bookmarkPending} />
                     </span>
-                    {user?.role === 'ADMIN' && (
+                    {canModerateCommunity(user?.role) && (
                       <button
                         type="button"
                         onClick={(event) => onAdminDelete(event, post)}

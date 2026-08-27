@@ -63,7 +63,7 @@ class CommunityCommentService {
         Member member = access.requireAuthenticatedMember(studentId);
         CommunityPost post = requirePost(postId);
         access.requireVisible(member, post);
-        boolean isAdmin = member.getRole() == Member.Role.ADMIN;
+        boolean isAdmin = access.isModerator(member);
         boolean maskAnonymous = access.isAnonymous(post) && !isAdmin;
         List<CommunityComment> comments = commentRepository.findByPostIdOrderByCreatedAtAsc(postId);
         Map<String, CommunityReputationResponse> reputations = maskAnonymous ? Map.of()
@@ -122,7 +122,7 @@ class CommunityCommentService {
         Member member = access.requireAuthenticatedMember(studentId);
         CommunityPost post = requirePost(postId);
         access.requireVisible(member, post);
-        if (!comment.getStudentId().equals(studentId) && member.getRole() != Member.Role.ADMIN) {
+        if (!comment.getStudentId().equals(studentId) && !access.isModerator(member)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         String content = textService.normalizeBounded(request.content(), "댓글", MAX_COMMENT_LENGTH);
@@ -141,7 +141,7 @@ class CommunityCommentService {
         Member member = access.requireAuthenticatedMember(studentId);
         CommunityPost post = requirePost(postId);
         access.requireVisible(member, post);
-        if (!comment.getStudentId().equals(studentId) && member.getRole() != Member.Role.ADMIN) {
+        if (!comment.getStudentId().equals(studentId) && !access.isModerator(member)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         String detail = commentDeletionAuditDetail(post, comment, member);
@@ -157,7 +157,7 @@ class CommunityCommentService {
     }
 
     private CommunityCommentResponse toCommentResponse(CommunityPost post, Member currentMember, CommunityComment comment, boolean deletable) {
-        boolean maskAnonymous = access.isAnonymous(post) && currentMember.getRole() != Member.Role.ADMIN;
+        boolean maskAnonymous = access.isAnonymous(post) && !access.isModerator(currentMember);
         CommunityReputationResponse reputation = maskAnonymous ? null
                 : reputationService.reputationTiers(Set.of(comment.getStudentId())).get(comment.getStudentId());
         return new CommunityCommentResponse(
@@ -169,7 +169,7 @@ class CommunityCommentService {
     }
 
     private String commentAuthorName(CommunityPost post, Member currentMember, CommunityComment comment) {
-        return access.isAnonymous(post) && currentMember.getRole() != Member.Role.ADMIN
+        return access.isAnonymous(post) && !access.isModerator(currentMember)
                 ? anonymousIdentity.anonymousDisplayName(comment.getAnonymousName(), comment.getIpAddress())
                 : CommunityDisplayNames.displayName(comment.getStudentId(), comment.getAuthorName());
     }

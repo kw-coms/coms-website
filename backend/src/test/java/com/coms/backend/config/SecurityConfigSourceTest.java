@@ -29,7 +29,15 @@ class SecurityConfigSourceTest {
         assertThat(source).contains("auth.requestMatchers(HttpMethod.PUT, \"/api/notices/**\").hasAnyRole(\"ADMIN\", \"OFFICER\")");
         assertThat(source).contains("auth.requestMatchers(HttpMethod.DELETE, \"/api/notices/**\").hasAnyRole(\"ADMIN\", \"OFFICER\")");
         assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/files\").authenticated()");
-        assertThat(source).contains("auth.requestMatchers(HttpMethod.DELETE, \"/api/files/**\").hasRole(\"ADMIN\")");
+        // Archive moderation is 부회장(VICE_PRESIDENT)+ — ADMIN inherits via the
+        // RoleHierarchy bean. The explicit PATCH matcher must exist so the new
+        // author-edit endpoint doesn't fall through to the authenticated()
+        // catch-all for /api/files/**.
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.DELETE, \"/api/files/**\").hasRole(\"VICE_PRESIDENT\")");
+        assertThat(source).contains("auth.requestMatchers(HttpMethod.PATCH, \"/api/files/**\").hasRole(\"VICE_PRESIDENT\")");
+        assertThat(source.indexOf("auth.requestMatchers(HttpMethod.PATCH, \"/api/files/**\")"))
+                .isLessThan(source.indexOf("auth.requestMatchers(\"/api/files\", \"/api/files/**\").authenticated()"));
+        assertThat(source).contains("public RoleHierarchy roleHierarchy()");
     }
 
     @Test

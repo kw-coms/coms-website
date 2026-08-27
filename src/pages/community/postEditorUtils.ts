@@ -1,4 +1,5 @@
 import { sanitizeHtml } from '../../utils/sanitizeHtml'
+import { canModerateCommunity } from '../../utils/roleAccess'
 
 export const MAX_TITLE_LENGTH = 120
 export const MAX_ANONYMOUS_NAME_LENGTH = 20
@@ -156,7 +157,7 @@ function isGraduateStudentId(studentId) {
 }
 
 export function canAccessAnonymousBoard(user) {
-  return user?.role === 'ADMIN' || !isGraduateStudentId(user?.studentId)
+  return canModerateCommunity(user?.role) || !isGraduateStudentId(user?.studentId)
 }
 
 function youtubeVideoIdFromUrl(value) {

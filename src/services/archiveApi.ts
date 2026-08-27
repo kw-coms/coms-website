@@ -36,6 +36,13 @@ export async function createPost({ title, description, category, file }: {
 // endpoint in a loop (no backend change). Each file gets the shared meta; when more
 // than one file is selected the title is suffixed with a 1-based index to stay distinct.
 // Returns per-file results so callers can report partial success/failure.
+export function updateArchiveAuthor(id, uploaderName) {
+  return request(`/api/files/${id}/author`, {
+    method: 'PATCH',
+    body: JSON.stringify({ uploaderName }),
+  })
+}
+
 export async function createPosts(files, meta) {
   const multiple = files.length > 1
   const results = []

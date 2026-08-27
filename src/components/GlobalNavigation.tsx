@@ -20,7 +20,7 @@ import {
 } from '../data/homeContent'
 import { scrollToTopInstant } from '../utils/themeColors'
 import NotificationButton from './NotificationButton'
-import { canAccessOperationsPanel } from '../utils/roleAccess'
+import { ROLE_LABELS, canAccessOperationsPanel } from '../utils/roleAccess'
 
 const floatingBarBaseClass = 'apple-topbar border-b border-[var(--app-hairline)]'
 
@@ -260,7 +260,7 @@ export default function GlobalNavigation() {
             <button type="button" onClick={() => goPageTop('/settings')} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)]" title="계정 설정">{user.name}</button>
             {canAccessOperationsPanel(user.role) && (
               <button type="button" onClick={() => goPageTop('/admin')} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[#b45309] transition hover:bg-amber-100/70">
-                {user.role === 'ADMIN' ? '관리자' : '임원'}
+                {ROLE_LABELS[user.role] || '임원'}
               </button>
             )}
             <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)]">
@@ -383,7 +383,7 @@ export default function GlobalNavigation() {
                   </button>
                   {canAccessOperationsPanel(user.role) && (
                     <button type="button" onClick={() => closeAndGo('/admin')} className="apple-mobile-menu-item apple-mobile-menu-item-warning">
-                      <span>{user.role === 'ADMIN' ? '관리자 패널' : '임원 패널'}</span>
+                      <span>{(ROLE_LABELS[user.role] || '임원') + ' 패널'}</span>
                     </button>
                   )}
                   <NotificationButton alignLeft variant="mobileMenu" />

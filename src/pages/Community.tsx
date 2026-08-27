@@ -39,6 +39,7 @@ import {
 import { MAX_COMMENT_LENGTH, useCommunityComments } from './community/useCommunityComments'
 import { useCommunityPosts } from './community/useCommunityPosts'
 import { useBookmarkMutation } from './community/useBookmarkMutation'
+import { canModerateCommunity } from '../utils/roleAccess'
 
 export default function Community({ onBack }: { onBack: () => void }) {
   const { user } = useAuth()
@@ -220,11 +221,11 @@ export default function Community({ onBack }: { onBack: () => void }) {
 
   const handleDelete = async (post) => {
     if (!(await confirmDialog({ message: '게시글을 삭제하시겠습니까?', tone: 'danger' }))) return
-    const reason = user?.role === 'ADMIN'
+    const reason = canModerateCommunity(user?.role)
       ? await promptDialog({ message: '삭제 사유를 입력하세요. 감사 로그에 기록됩니다.', defaultValue: '' })
       : ''
     if (reason === null) return
-    if (user?.role === 'ADMIN' && post.authorStudentId !== user.studentId && !reason.trim()) {
+    if (canModerateCommunity(user?.role) && post.authorStudentId !== user.studentId && !reason.trim()) {
       showToast({ message: '관리자가 다른 회원의 글을 삭제하려면 삭제 사유가 필요합니다.', tone: 'error' })
       return
     }
@@ -547,7 +548,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
             onBackToList={backToList}
             onEdit={() => setMode('edit')}
             onDelete={handleDelete}
-            isAdmin={user?.role === 'ADMIN'}
+            isAdmin={canModerateCommunity(user?.role)}
             pinning={pinning}
             onPin={handlePin}
             onToggleBookmark={handleToggleBookmark}
