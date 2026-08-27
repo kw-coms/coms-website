@@ -55,6 +55,16 @@ public class PushNotificationSender {
     }
 
     /**
+     * Async variant used by notification fan-out: dispatches on the bounded
+     * push executor so notice/comment creation never blocks on FCM latency.
+     * Same never-throws contract (and @Async errors would be swallowed anyway).
+     */
+    @org.springframework.scheduling.annotation.Async("pushExecutor")
+    public void sendToMemberAsync(String studentId, String title, String body, java.util.Map<String, String> data) {
+        sendToMember(studentId, title, body, data);
+    }
+
+    /**
      * Sends an FCM push to every enabled device token registered for the given member.
      * All failures are swallowed and logged; this method never throws.
      */

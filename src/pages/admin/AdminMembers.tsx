@@ -4,7 +4,7 @@ import { showToast } from '../../components/common/Toast'
 import { confirmDialog, promptDialog } from '../../components/common/ConfirmDialog'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 import ErrorState from '../../components/common/ErrorState'
-import { ASSIGNABLE_ROLES, ROLE_LABELS } from '../../utils/roleAccess'
+import { ASSIGNABLE_ROLES, ROLE_LABELS, roleAtLeast } from '../../utils/roleAccess'
 
 function parseInterests(raw) {
   if (!raw) return []
@@ -86,7 +86,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold text-[var(--theme-body-dark)]">{member.name}</span>
                   <span className="text-xs text-[var(--theme-body-muted)]">{member.studentId}</span>
-                  {member.role !== 'USER' && (
+                  {roleAtLeast(member.role, 'OFFICER') && (
                     <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-700">
                       {ROLE_LABELS[member.role] || member.role}
                     </span>

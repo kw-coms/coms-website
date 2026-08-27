@@ -70,6 +70,8 @@ export default function NotificationButton({ alignLeft = false, variant = 'icon'
       window.open(item.acceptUrl, '_blank', 'noopener,noreferrer')
     } else if (item.type === 'COMMUNITY_POST_DELETED') {
       navigate('/community?view=deleted')
+    } else if (item.type === 'COMMUNITY_REPORT') {
+      navigate('/admin?tab=community')
     } else if (item.type === 'RECRUIT_APPLICATION') {
       navigate('/admin?tab=recruit')
     } else if (item.noticeId) {

@@ -22,7 +22,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -168,14 +170,15 @@ class NotificationServicePreferencesTest {
                 null, commenter.getStudentId(), commenter.getName(), "댓글 내용", null, 0);
 
         notificationService.notifyPostComment(post, comment);
-        verify(pushNotificationSender, never()).sendToMember(anyString(), anyString(), anyString(), any());
+        // Push dispatch is async now — give the executor a beat before asserting absence.
+        verify(pushNotificationSender, after(500).never()).sendToMember(anyString(), anyString(), anyString(), any());
 
         // Re-enabled → the push goes out again.
         notificationService.updatePreferences(
                 author.getStudentId(),
                 new NotificationPreferencesRequest(true, true, true, true, true, true, true));
         notificationService.notifyPostComment(post, comment);
-        verify(pushNotificationSender, times(1)).sendToMember(anyString(), anyString(), anyString(), any());
+        verify(pushNotificationSender, timeout(2000).times(1)).sendToMember(anyString(), anyString(), anyString(), any());
     }
 
     private Member saveMember(String studentId, String name) {
