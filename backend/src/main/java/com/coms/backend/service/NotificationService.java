@@ -164,7 +164,7 @@ public class NotificationService {
     }
 
     public void notifyPostComment(CommunityPost post, CommunityComment comment) {
-        String message = comment.getAuthorName() + " commented on your post.";
+        String message = comment.getAuthorName() + "님이 내 글에 댓글을 남겼습니다.";
         createIfDifferent(
                 post.getAuthorStudentId(),
                 comment.getStudentId(),
@@ -184,7 +184,7 @@ public class NotificationService {
     }
 
     public void notifyCommentReply(CommunityPost post, CommunityComment parent, CommunityComment reply) {
-        String message = reply.getAuthorName() + " replied to your comment.";
+        String message = reply.getAuthorName() + "님이 내 댓글에 답글을 남겼습니다.";
         createIfDifferent(
                 parent.getStudentId(),
                 reply.getStudentId(),
@@ -470,7 +470,7 @@ public class NotificationService {
     }
 
     public void notifyNoticeCreated(Notice notice) {
-        String message = "New notice: " + notice.getTitle();
+        String message = "새 공지: " + notice.getTitle();
         List<Member> allMembers = memberRepository.findAll();
         Map<String, NotificationPreference> memberPreferences = preferencesByStudentId(allMembers.stream()
                 .map(Member::getStudentId)
