@@ -1,10 +1,6 @@
 import { useAdminAnalytics } from './useAdminAnalytics'
 import { recruitStatusLabel } from './recruitStatus'
-
-const ROLE_LABELS: Record<string, string> = {
-  USER: '일반 회원',
-  ADMIN: '운영진',
-}
+import { ROLE_LABELS } from '../../utils/roleAccess'
 
 // Per-status accent tints. Kept as inline rgb so we stay Tailwind-utility-only
 // (no index.css edits) while still giving each state a distinct, legible color
