@@ -72,12 +72,14 @@ public class Member {
     /**
      * Ordered privilege tiers — ordinal position IS the rank, so keep the
      * declaration in ascending order of power:
-     * USER(일반 회원) < OFFICER(임원) < VICE_PRESIDENT(부회장) < ADMIN(회장).
+     * ASSOCIATE(준회원) < USER(회원) < OFFICER(임원) < VICE_PRESIDENT(부회장)
+     * < ADMIN(회장). 준회원 is identical to 회원 except below-USER gates (e.g.
+     * the club-room door code).
      * Stored as a plain VARCHAR (no check constraint), so adding a tier needs
      * no migration. Spring's RoleHierarchy in SecurityConfig mirrors this.
      */
     public enum Role {
-        USER, OFFICER, VICE_PRESIDENT, ADMIN;
+        ASSOCIATE, USER, OFFICER, VICE_PRESIDENT, ADMIN;
 
         /** True when this role's rank is at or above the given tier. */
         public boolean isAtLeast(Role other) {

@@ -28,6 +28,13 @@ public class SiteSettings {
     @Column(name = "contact_links_json", nullable = false, columnDefinition = "TEXT")
     private String contactLinksJson;
 
+    // 동아리방 출입 비밀번호 — NEVER exposed through the public site-settings
+    // response; read via the member-gated /api/club-room endpoint only.
+    // columnDefinition carries the DEFAULT so hibernate-generated test schemas
+    // accept inserts that omit the column (mirrors V82).
+    @Column(name = "club_room_code", nullable = false, length = 60, columnDefinition = "VARCHAR(60) NOT NULL DEFAULT ''")
+    private String clubRoomCode = "";
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -59,6 +66,8 @@ public class SiteSettings {
     public String getHomeHeroCopy() { return homeHeroCopy; }
     public void setHomeHeroCopy(String homeHeroCopy) { this.homeHeroCopy = homeHeroCopy; }
     public String getContactLinksJson() { return contactLinksJson; }
+    public String getClubRoomCode() { return clubRoomCode == null ? "" : clubRoomCode; }
+    public void setClubRoomCode(String clubRoomCode) { this.clubRoomCode = clubRoomCode == null ? "" : clubRoomCode; }
     public void setContactLinksJson(String contactLinksJson) { this.contactLinksJson = contactLinksJson; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

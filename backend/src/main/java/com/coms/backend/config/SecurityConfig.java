@@ -61,6 +61,7 @@ public class SecurityConfig {
                 .role("ADMIN").implies("VICE_PRESIDENT")
                 .role("VICE_PRESIDENT").implies("OFFICER")
                 .role("OFFICER").implies("USER")
+                .role("USER").implies("ASSOCIATE")
                 .build();
     }
 
@@ -82,9 +83,11 @@ public class SecurityConfig {
                 auth.requestMatchers("/api/integrations/**").hasRole("INTEGRATION");
                 auth.requestMatchers(HttpMethod.POST, "/api/recruit/apply", "/api/recruit/status").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/api/site-settings").permitAll();
+                // 동아리방 비밀번호: 회원(USER) 이상 — 준회원(ASSOCIATE)은 제외.
+                auth.requestMatchers("/api/club-room").hasRole("USER");
                 auth.requestMatchers(HttpMethod.POST, "/api/maintenance/bootstrap").permitAll();
                 auth.requestMatchers("/api/maintenance/**").hasRole("ADMIN");
-                auth.requestMatchers("/api/admin/site-settings", "/api/admin/club-activity-categories/**",
+                auth.requestMatchers("/api/admin/site-settings", "/api/admin/club-room", "/api/admin/club-activity-categories/**",
                         "/api/admin/club-project-categories/**", "/api/admin/recurring-schedules/**").hasAnyRole("ADMIN", "OFFICER");
                 // 부회장(VICE_PRESIDENT)+ community moderation surface (reports, deleted-post archive).
                 auth.requestMatchers("/api/admin/community/**").hasRole("VICE_PRESIDENT");
