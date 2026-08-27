@@ -93,6 +93,10 @@ class CommunityServiceTest {
         assertThat(CommunityService.generationFromStudentId("2025123456")).isEqualTo("59기");
         assertThat(CommunityService.generationFromStudentId("2024123456")).isEqualTo("58기");
         assertThat(CommunityService.displayName("2026123456", "관리자")).isEqualTo("60기 관리자");
+        // Graduate synthetic ids (G{admissionYear}-{rosterId}) carry the same 기수.
+        assertThat(CommunityService.generationFromStudentId("G2015-42")).isEqualTo("49기");
+        assertThat(CommunityService.displayName("G2015-42", "졸업생")).isEqualTo("49기 졸업생");
+        assertThat(CommunityService.generationFromStudentId("G15-42")).isEmpty();
     }
 
     @Test
