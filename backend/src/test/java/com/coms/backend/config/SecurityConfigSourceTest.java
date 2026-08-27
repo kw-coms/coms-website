@@ -54,7 +54,10 @@ class SecurityConfigSourceTest {
         String source = Files.readString(Path.of("src/main/java/com/coms/backend/config/SecurityConfig.java"));
 
         assertThat(source).contains("auth.requestMatchers(HttpMethod.GET, \"/api/site-settings\").permitAll()");
-        assertThat(source).contains("auth.requestMatchers(\"/api/admin/site-settings\", \"/api/admin/club-activity-categories/**\",");
+        assertThat(source).contains("auth.requestMatchers(\"/api/admin/site-settings\", \"/api/admin/club-room\", \"/api/admin/club-activity-categories/**\",");
+        // 동아리방 비밀번호: 회원(USER) 이상만 — 준회원(ASSOCIATE)은 hierarchy상 미달로 403.
+        assertThat(source).contains("auth.requestMatchers(\"/api/club-room\").hasRole(\"USER\")");
+        assertThat(source).contains(".role(\"USER\").implies(\"ASSOCIATE\")");
         assertThat(source).contains("\"/api/admin/club-project-categories/**\", \"/api/admin/recurring-schedules/**\").hasAnyRole(\"ADMIN\", \"OFFICER\")");
         assertThat(source.indexOf("/api/admin/site-settings"))
                 .isLessThan(source.indexOf("auth.requestMatchers(\"/api/admin/**\").hasRole(\"ADMIN\")"));

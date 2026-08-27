@@ -36,6 +36,16 @@ public class SiteSettingsService {
         return toResponse(siteSettingsRepository.findById(SINGLETON_ID).orElseGet(this::createDefaults));
     }
 
+    public String clubRoomCode() {
+        return siteSettingsRepository.findById(SINGLETON_ID).orElseGet(this::createDefaults).getClubRoomCode();
+    }
+
+    public String updateClubRoomCode(String doorCode) {
+        SiteSettings settings = siteSettingsRepository.findById(SINGLETON_ID).orElseGet(this::createDefaults);
+        settings.setClubRoomCode(doorCode == null ? "" : doorCode.trim());
+        return siteSettingsRepository.save(settings).getClubRoomCode();
+    }
+
     public SiteSettingsResponse publish(SiteSettingsRequest request) {
         SiteSettings settings = siteSettingsRepository.findById(SINGLETON_ID).orElseGet(this::createDefaults);
         settings.setSemesterLabel(required(request.semesterLabel(), "Semester label is required."));
