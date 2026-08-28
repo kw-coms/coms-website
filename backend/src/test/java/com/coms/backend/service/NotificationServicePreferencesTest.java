@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -180,14 +181,15 @@ class NotificationServicePreferencesTest {
         // Verify at the enqueue point (called synchronously) — asserting on the
         // executor-side sendToMember is racy AND spy/async proxy ordering can
         // route the async hop past the spy entirely on some contexts.
-        verify(pushNotificationSender, never()).sendToMemberAsync(anyString(), eq("새 댓글"), anyString(), any());
+        drainPushExecutor();
+        verify(pushNotificationSender, never()).sendToMember(anyString(), eq("새 댓글"), anyString(), any());
 
         // Re-enabled → the push goes out again.
         notificationService.updatePreferences(
                 author.getStudentId(),
                 new NotificationPreferencesRequest(true, true, true, true, true, true, true));
         notificationService.notifyPostComment(post, comment);
-        verify(pushNotificationSender, times(1)).sendToMemberAsync(anyString(), eq("새 댓글"), anyString(), any());
+        verify(pushNotificationSender, timeout(3000).times(1)).sendToMember(anyString(), eq("새 댓글"), anyString(), any());
     }
 
     /**
