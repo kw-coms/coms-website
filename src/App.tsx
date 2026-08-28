@@ -108,11 +108,11 @@ function App() {
 
   useEffect(() => {
     const root = document.documentElement
-    if (selectedFont) {
-      root.style.setProperty('--apple-font-family', fontFamilyValue(selectedFont))
-    } else {
-      root.style.removeProperty('--apple-font-family')
-    }
+    // Site default is Pretendard (BUILT_IN_FONTS[0]) — the bare system stack
+    // only ever showed on Windows as Malgun Gothic. A user's explicit pick
+    // still overrides; stylesheets are already injected above.
+    const applied = selectedFont ?? BUILT_IN_FONTS[0]
+    root.style.setProperty('--apple-font-family', fontFamilyValue(applied))
   }, [selectedFont])
 
   const handleGuestFontChange = (value) => {
