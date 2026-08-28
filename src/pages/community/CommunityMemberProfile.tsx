@@ -1,4 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom'
+import { displayStudentId } from '../../utils/roleAccess'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, Award, ThumbsUp, MessageSquare, FileText } from 'lucide-react'
 import { getMemberReputation, listPostsByAuthor } from '../../services/communityApi'
@@ -32,7 +33,7 @@ export default function CommunityMemberProfile({ onBack }: { onBack: () => void 
   const posts = postsQuery.data ?? []
   const breakdown = reputation?.breakdown ?? {}
   // The author's display name comes from their posts when available.
-  const memberName = posts[0]?.authorDisplayName || posts[0]?.authorName || reputation?.name || studentId
+  const memberName = posts[0]?.authorDisplayName || posts[0]?.authorName || reputation?.name || displayStudentId(studentId)
 
   const openPost = (post) => navigate(`/community/${post.id}`)
   const handleToggleBookmark = (post) => {
