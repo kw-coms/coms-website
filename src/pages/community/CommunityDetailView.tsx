@@ -1,3 +1,4 @@
+import Chip from '../../components/common/Chip'
 import {
   ArrowLeft,
   Pencil,
@@ -228,14 +229,14 @@ export default function CommunityDetailView({
         <article className="m-0 overflow-hidden bg-[var(--app-surface)] sm:m-5 sm:rounded-lg sm:border sm:border-[var(--app-hairline)]">
           <div className="border-b border-[var(--app-hairline)] px-4 py-4 sm:px-5">
             <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-black text-[var(--app-accent-text)]">
-              {currentPost.pinned && <span className="rounded bg-[#fff1d6] px-1.5 py-0.5 text-[10px] font-black text-[#9a6a00]">고정</span>}
+              {currentPost.pinned && <Chip variant="pinned">고정</Chip>}
               <span>{categoryLabel(currentPost.category || 'GENERAL')}</span>
-              {currentPostConcept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
+              {currentPostConcept && <Chip variant="concept">개념글</Chip>}
             </div>
             <h2 className="break-words text-xl font-black leading-8 sm:text-2xl">{currentPost.title}</h2>
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--theme-body-muted)]">
               <AuthorName post={currentPost} className="font-bold text-[var(--theme-body-mid)]" />
-              {currentPost.authorAdmin && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">주딱</span>}
+              {currentPost.authorAdmin && <Chip variant="admin">운영진</Chip>}
               {currentPost.concept && <span className="rounded bg-yellow-400 px-1.5 py-0.5 text-[10px] font-black text-black">개념글</span>}
               <span>{new Date(currentPost.createdAt).toLocaleString('ko-KR')}</span>
               {isEdited(currentPost) && <span>수정 {new Date(currentPost.updatedAt).toLocaleString('ko-KR')}</span>}
