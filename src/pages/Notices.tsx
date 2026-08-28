@@ -20,6 +20,7 @@ import { renderRichBody, richBodyToPlainText as noticeContentSearchText } from '
 import { serializeRichBody, richBodyPlainText } from '../components/richEditor/serializeRichBody'
 import { parsePostBlocks } from './community/postEditorUtils'
 import { canManageContent } from '../utils/roleAccess'
+import Chip from '../components/common/Chip'
 
 function formatDate(iso) {
   const date = new Date(iso)
@@ -470,7 +471,7 @@ export default function Notices() {
                       >
                         <div className="flex min-w-0 items-center gap-2">
                           {notice.pinned && (
-                            <span className="rounded-full bg-[#fff1d6] px-2 py-0.5 text-[10px] font-black text-[#9a6a00]">고정</span>
+                            <Chip variant="pinned">고정</Chip>
                           )}
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${meta.badgeClass}`}>
                             {meta.label}
@@ -517,7 +518,7 @@ export default function Notices() {
                             </td>
                             <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5">
                               <span className="flex max-w-[440px] items-center gap-1.5 text-left font-semibold text-[var(--app-text)]">
-                                {notice.pinned && <span className="shrink-0 rounded bg-[#fff1d6] px-1.5 py-0.5 text-[10px] font-black text-[#9a6a00]">고정</span>}
+                                {notice.pinned && <Chip variant="pinned">고정</Chip>}
                                 <span className="min-w-0 truncate">{notice.title}</span>
                               </span>
                             </td>

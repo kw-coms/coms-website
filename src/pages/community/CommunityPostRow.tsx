@@ -1,4 +1,5 @@
 import { categoryLabel } from './postEditorUtils'
+import Chip from '../../components/common/Chip'
 import BookmarkButton from './BookmarkButton'
 import AuthorName from './AuthorName'
 import {
@@ -59,13 +60,13 @@ export default function CommunityPostRow({
         <div className="min-w-0 flex-1">
           <div className="community-post-card-tags flex flex-wrap items-center gap-1.5 text-[11px] font-black">
             <span className="text-[var(--app-subtle)]">#{post.id}</span>
-            {post.pinned && <span className="rounded bg-[#fff1d6] px-1.5 py-0.5 text-[10px] text-[#9a6a00]">고정</span>}
-            <span className="rounded-full bg-[#e8f8ff] px-2 py-1 text-[var(--app-accent-text)]">{categoryLabel(post.category || 'GENERAL')}</span>
-            {concept && <span className="rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] text-[#3a2b00]">개념글</span>}
+            {post.pinned && <Chip variant="pinned">고정</Chip>}
+            <Chip variant="category">{categoryLabel(post.category || 'GENERAL')}</Chip>
+            {concept && <Chip variant="concept">개념글</Chip>}
             {postHasImages(post) && <span className="text-[var(--app-accent-text)]">[사진]</span>}
             {(post.videoInfos?.length > 0) && <span className="text-[var(--app-accent-text)]">[영상]</span>}
             {isEdited(post) && <span className="text-[var(--app-subtle)]">수정</span>}
-            {post.authorAdmin && <span className="rounded bg-red-600 px-1 py-0.5 text-[10px] text-white">주딱</span>}
+            {post.authorAdmin && <Chip variant="admin">운영진</Chip>}
           </div>
           <h3 className="community-post-card-title mt-2 min-w-0 text-base font-black leading-6 text-[var(--app-text)]">
             <span className="inline-flex max-w-full min-w-0 items-baseline" title={post.title}>
