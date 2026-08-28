@@ -130,6 +130,8 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.PATCH, "/api/files/**").hasRole("VICE_PRESIDENT");
                 auth.requestMatchers("/api/files", "/api/files/**").authenticated();
                 auth.requestMatchers(HttpMethod.PATCH, "/api/community/posts/*/pin").hasRole("VICE_PRESIDENT");
+                // 작성자 변경은 회장 전용.
+                auth.requestMatchers(HttpMethod.PATCH, "/api/community/posts/*/author").hasRole("ADMIN");
                 auth.requestMatchers("/api/community/**").authenticated();
                 // Actuator: health and info public, everything else requires ADMIN
                 auth.requestMatchers("/actuator/health", "/actuator/info").permitAll();

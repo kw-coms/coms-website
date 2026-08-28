@@ -165,6 +165,17 @@ class OperationsSecurityIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void communityAuthorEditIsPresidentOnly() throws Exception {
+        // 작성자 변경 is 회장 전용 — even 부회장 must be refused.
+        mockMvc.perform(patch("/api/community/posts/1/author")
+                        .cookie(vicePresidentCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"홍길동\"}"))
+                .andExpect(status().isForbidden());
+    }
+
     private Cookie authCookie(String studentId) {
         return new Cookie("token", jwtTokenProvider.generateToken(studentId, 0));
     }
