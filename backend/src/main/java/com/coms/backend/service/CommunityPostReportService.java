@@ -1,6 +1,8 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.CommunityPost;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.coms.backend.domain.CommunityPostReport;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.CommunityPostReportRequest;
@@ -25,6 +27,8 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class CommunityPostReportService {
+
+    private static final Logger log = LoggerFactory.getLogger(CommunityPostReportService.class);
 
     private static final Set<String> ALLOWED_REASONS = Set.of(
             "SPAM",
@@ -81,7 +85,13 @@ public class CommunityPostReportService {
         report.setDetail(request.detail());
         report.setCreatedAt(LocalDateTime.now());
         CommunityPostReport saved = reportRepository.save(report);
-        notificationService.notifyCommunityReport(post);
+        try {
+            // Moderator alert is best-effort: a failure here must never roll
+            // back the member's report (both services share the transaction).
+            notificationService.notifyCommunityReport(post);
+        } catch (RuntimeException e) {
+            log.warn("Community report moderator alert failed (report {} kept)", saved.getId(), e);
+        }
         return CommunityPostReportResponse.forReporter(saved);
     }
 
