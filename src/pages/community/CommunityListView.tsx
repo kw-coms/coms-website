@@ -1,3 +1,4 @@
+import Chip from '../../components/common/Chip'
 import {
   Bookmark,
   ChevronsLeft,
@@ -102,7 +103,7 @@ export default function CommunityListView({
     return (
       <span className="inline-flex max-w-full min-w-0 items-baseline" title={post.title}>
         <span className="min-w-0 truncate">{post.title}</span>
-        {suffix && <span className="shrink-0 text-[0.82em] text-cyan-200">{suffix}</span>}
+        {suffix && <span className="shrink-0 text-[0.82em] font-bold text-[var(--app-accent-text)]">{suffix}</span>}
       </span>
     )
   }
@@ -349,14 +350,14 @@ export default function CommunityListView({
                   <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-center text-xs font-bold text-[var(--app-accent-text)]">{categoryLabel(post.category || 'GENERAL')}</td>
                   <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
                     <span className="flex max-w-full min-w-0 items-center gap-1 text-left font-semibold text-[var(--app-text)] lg:max-w-[520px]">
-                      {post.pinned && <span className="shrink-0 rounded bg-[#fff1d6] px-1.5 py-0.5 text-[10px] font-black text-[#9a6a00]">고정</span>}
-                      {concept && <span className="shrink-0 rounded bg-[#f0c36d] px-1.5 py-0.5 text-[10px] font-black text-[#3a2b00]">개념글</span>}
+                      {post.pinned && <Chip variant="pinned">고정</Chip>}
+                      {concept && <Chip variant="concept">개념글</Chip>}
                       {renderPostTitleWithCount(post)}
                     </span>
                     {postHasImages(post) && <span className="ml-1 text-xs text-[var(--app-accent-text)]">[사진]</span>}
                     {(post.videoInfos?.length > 0) && <span className="ml-1 text-xs text-[var(--app-accent-text)]">[영상]</span>}
                     {isEdited(post) && <span className="ml-1 text-[10px] font-bold text-[var(--app-subtle)]">수정</span>}
-                    {post.authorAdmin && <span className="ml-1 rounded bg-red-600 px-1 py-0.5 text-[10px] font-black text-white">주딱</span>}
+                    {post.authorAdmin && <Chip variant="admin" className="ml-1">운영진</Chip>}
                   </td>
                   <td className="px-4 py-4 text-center text-xs font-semibold">
                     <span className="inline-flex items-center gap-2">
