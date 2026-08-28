@@ -4,7 +4,7 @@ import { showToast } from '../../components/common/Toast'
 import { confirmDialog, promptDialog } from '../../components/common/ConfirmDialog'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 import ErrorState from '../../components/common/ErrorState'
-import { ASSIGNABLE_ROLES, ROLE_LABELS, roleAtLeast } from '../../utils/roleAccess'
+import { ASSIGNABLE_ROLES, ROLE_BADGE_CLASSES, ROLE_LABELS, roleAtLeast } from '../../utils/roleAccess'
 
 function parseInterests(raw) {
   if (!raw) return []
@@ -87,7 +87,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
                   <span className="font-semibold text-[var(--theme-body-dark)]">{member.name}</span>
                   <span className="text-xs text-[var(--theme-body-muted)]">{member.studentId}</span>
                   {roleAtLeast(member.role, 'OFFICER') && (
-                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-amber-700">
+                    <span className={`rounded px-1.5 py-0.5 text-xs font-bold ${ROLE_BADGE_CLASSES[member.role] || ROLE_BADGE_CLASSES.USER}`}>
                       {ROLE_LABELS[member.role] || member.role}
                     </span>
                   )}
