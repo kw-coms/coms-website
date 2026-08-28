@@ -1,3 +1,4 @@
+import RoleTag from '../../components/common/RoleTag'
 import Chip from '../../components/common/Chip'
 import {
   ArrowLeft,
@@ -236,7 +237,7 @@ export default function CommunityDetailView({
             <h2 className="break-words text-xl font-black leading-8 sm:text-2xl">{currentPost.title}</h2>
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--theme-body-muted)]">
               <AuthorName post={currentPost} className="font-bold text-[var(--theme-body-mid)]" />
-              {currentPost.authorAdmin && <Chip variant="admin">운영진</Chip>}
+              {currentPost.authorRole ? <RoleTag role={String(currentPost.authorRole)} /> : currentPost.authorAdmin && <Chip variant="admin">운영진</Chip>}
               {currentPost.concept && <span className="rounded bg-yellow-400 px-1.5 py-0.5 text-[10px] font-black text-black">개념글</span>}
               <span>{new Date(currentPost.createdAt).toLocaleString('ko-KR')}</span>
               {isEdited(currentPost) && <span>수정 {new Date(currentPost.updatedAt).toLocaleString('ko-KR')}</span>}
