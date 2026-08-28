@@ -480,6 +480,7 @@ public class NotificationService {
      * 이상 so the queue doesn't rely on someone happening to open the admin
      * panel. Carries the postId so tapping lands on the reported post.
      */
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void notifyCommunityReport(CommunityPost post) {
         if (post == null || post.getId() == null) {
             return;
