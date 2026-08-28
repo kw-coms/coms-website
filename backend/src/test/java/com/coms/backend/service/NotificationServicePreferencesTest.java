@@ -13,7 +13,9 @@ import com.coms.backend.repository.NotificationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.util.List;
@@ -21,10 +23,9 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -50,6 +51,10 @@ class NotificationServicePreferencesTest {
     private PushNotificationSender pushNotificationSender;
 
     @Autowired
+    @Qualifier("pushExecutor")
+    private TaskExecutor pushExecutor;
+
+    @Autowired
     private MemberRepository memberRepository;
 
     private Member author;
@@ -59,6 +64,8 @@ class NotificationServicePreferencesTest {
     void setUp() {
         notificationRepository.deleteAll();
         notificationPreferenceRepository.deleteAll();
+        drainPushExecutor();
+        clearInvocations(pushNotificationSender);
         author = saveMember("2026910001", "글쓴이");
         commenter = saveMember("2026910002", "댓글러");
     }
@@ -170,15 +177,32 @@ class NotificationServicePreferencesTest {
                 null, commenter.getStudentId(), commenter.getName(), "댓글 내용", null, 0);
 
         notificationService.notifyPostComment(post, comment);
-        // Push dispatch is async now — give the executor a beat before asserting absence.
-        verify(pushNotificationSender, after(500).never()).sendToMember(anyString(), anyString(), anyString(), any());
+        // Verify at the enqueue point (called synchronously) — asserting on the
+        // executor-side sendToMember is racy AND spy/async proxy ordering can
+        // route the async hop past the spy entirely on some contexts.
+        verify(pushNotificationSender, never()).sendToMemberAsync(anyString(), eq("새 댓글"), anyString(), any());
 
         // Re-enabled → the push goes out again.
         notificationService.updatePreferences(
                 author.getStudentId(),
                 new NotificationPreferencesRequest(true, true, true, true, true, true, true));
         notificationService.notifyPostComment(post, comment);
-        verify(pushNotificationSender, timeout(2000).times(1)).sendToMember(anyString(), anyString(), anyString(), any());
+        verify(pushNotificationSender, times(1)).sendToMemberAsync(anyString(), eq("새 댓글"), anyString(), any());
+    }
+
+    /**
+     * Async push tasks enqueued by a previous test would otherwise execute
+     * during THIS test against the freshly-reset spy — drain the queue by
+     * waiting on a marker task before every test.
+     */
+    private void drainPushExecutor() {
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        pushExecutor.execute(latch::countDown);
+        try {
+            latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private Member saveMember(String studentId, String name) {

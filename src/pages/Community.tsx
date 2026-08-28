@@ -5,6 +5,7 @@ import {
   ArrowLeft,
 } from 'lucide-react'
 import {
+  updateCommunityPostAuthor,
   closeCommunityPoll,
   appealDeletedCommunityPost,
   deleteCommunityPost,
@@ -39,7 +40,7 @@ import {
 import { MAX_COMMENT_LENGTH, useCommunityComments } from './community/useCommunityComments'
 import { useCommunityPosts } from './community/useCommunityPosts'
 import { useBookmarkMutation } from './community/useBookmarkMutation'
-import { canModerateCommunity } from '../utils/roleAccess'
+import { canManageSensitiveAdmin, canModerateCommunity } from '../utils/roleAccess'
 
 export default function Community({ onBack }: { onBack: () => void }) {
   const { user } = useAuth()
@@ -289,6 +290,13 @@ export default function Community({ onBack }: { onBack: () => void }) {
   }
 
   const [pinning, setPinning] = useState(false)
+  const handleAuthorUpdate = async (payload) => {
+    const updated = await updateCommunityPostAuthor(currentPost.id, payload)
+    setCurrentPost(updated)
+    setPosts((prev) => prev.map((post) => (post.id === updated.id ? { ...post, ...updated } : post)))
+    showToast({ message: '작성자가 변경되었습니다.' })
+  }
+
   const handlePin = async () => {
     if (!currentPost || pinning) return
     setPinning(true)
@@ -549,6 +557,8 @@ export default function Community({ onBack }: { onBack: () => void }) {
             onEdit={() => setMode('edit')}
             onDelete={handleDelete}
             isAdmin={canModerateCommunity(user?.role)}
+            isPresident={canManageSensitiveAdmin(user?.role)}
+            onUpdateAuthor={handleAuthorUpdate}
             pinning={pinning}
             onPin={handlePin}
             onToggleBookmark={handleToggleBookmark}

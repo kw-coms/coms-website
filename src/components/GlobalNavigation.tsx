@@ -20,7 +20,7 @@ import {
 } from '../data/homeContent'
 import { scrollToTopInstant } from '../utils/themeColors'
 import NotificationButton from './NotificationButton'
-import { ROLE_LABELS, canAccessOperationsPanel } from '../utils/roleAccess'
+import { ROLE_BADGE_CLASSES, ROLE_LABELS, canAccessOperationsPanel } from '../utils/roleAccess'
 
 const floatingBarBaseClass = 'apple-topbar border-b border-[var(--app-hairline)]'
 
@@ -259,7 +259,7 @@ export default function GlobalNavigation() {
             <NotificationButton />
             <button type="button" onClick={() => goPageTop('/settings')} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)]" title="계정 설정">{user.name}</button>
             {canAccessOperationsPanel(user.role) && (
-              <button type="button" onClick={() => goPageTop('/admin')} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[#b45309] transition hover:bg-amber-100/70">
+              <button type="button" onClick={() => goPageTop('/admin')} className={`rounded-full px-2.5 py-1 text-xs font-semibold transition hover:opacity-80 ${ROLE_BADGE_CLASSES[user.role] || ROLE_BADGE_CLASSES.OFFICER}`}>
                 {ROLE_LABELS[user.role] || '임원'}
               </button>
             )}
