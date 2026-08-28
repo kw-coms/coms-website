@@ -12,6 +12,7 @@ public record CommunityPostResponse(
         String authorDisplayName,
         String anonymousName,
         boolean authorAdmin,
+        String authorRole,
         String authorTier,
         String authorTierLabel,
         String category,

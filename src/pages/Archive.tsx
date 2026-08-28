@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { confirmDialog } from '../components/common/ConfirmDialog'
+import { confirmDialog, promptDialog } from '../components/common/ConfirmDialog'
 import { useScrollReveal } from '../hooks/useScrollReveal'
 import { useVisibleCount } from '../hooks/useVisibleCount'
 import { ArrowLeft, FileUp } from 'lucide-react'
-import { deleteFile, listFiles, voteArchiveFile } from '../services/archiveApi'
+import { deleteFile, listFiles, voteArchiveFile, updateArchiveAuthor } from '../services/archiveApi'
 import { useAuth } from '../contexts/useAuth'
 import { richBodyToPlainText } from '../components/richEditor/renderRichBody'
 import { ArchiveDetailView } from '../components/archive/ArchiveDetailView'
@@ -11,6 +11,7 @@ import { ArchiveListView } from '../components/archive/ArchiveListView'
 import { WriteForm } from '../components/archive/WriteForm'
 import { categoryLabel } from '../components/archive/archiveUtils'
 import { canManageArchive } from '../utils/roleAccess'
+import { showToast } from '../components/common/Toast'
 
 export default function Archive({ onBack }: { onBack: () => void }) {
   const { user } = useAuth()
@@ -134,6 +135,22 @@ export default function Archive({ onBack }: { onBack: () => void }) {
     setDetailFile(null)
   }
 
+  const handleAuthorEdit = async (file) => {
+    const name = await promptDialog({ message: '자료실에 표시할 작성자 이름을 입력하세요.', defaultValue: file.uploaderName || '' })
+    if (name === null) return
+    if (!name.trim()) {
+      showToast({ message: '작성자 이름을 입력해주세요.', tone: 'error' })
+      return
+    }
+    try {
+      const updated = await updateArchiveAuthor(file.id, name.trim())
+      setFiles((prev) => prev.map((item) => (item.id === file.id ? { ...item, uploaderName: updated.uploaderName } : item)))
+      showToast({ message: '작성자가 변경되었습니다.' })
+    } catch (err) {
+      showToast({ message: err.message || '작성자 변경 중 오류가 발생했습니다.', tone: 'error' })
+    }
+  }
+
   return (
     <div className="w-full space-y-4 text-[var(--app-text)]">
       {mode === 'list' && (
@@ -214,6 +231,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
 
         {mode === 'detail' && detailFile && (
           <ArchiveDetailView
+            onAuthorEdit={handleAuthorEdit}
             detailFile={detailFile}
             isAdmin={isAdmin}
             voting={voting}

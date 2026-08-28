@@ -972,6 +972,9 @@ public class CommunityService {
                 || access.isModerator(currentMember);
         boolean maskAnonymous = access.isAnonymous(post) && !access.isModerator(currentMember);
         boolean authorAdmin = !maskAnonymous && author != null && author.getRole() == Member.Role.ADMIN;
+        // 직급 노출: 익명 마스킹이 아닐 때만, 임원 이상만 의미 있으므로 그 외는 null.
+        String authorRole = maskAnonymous || author == null || !author.getRole().isAtLeast(Member.Role.OFFICER)
+                ? null : author.getRole().name();
         CommunityReputationResponse authorReputation = maskAnonymous ? null
                 : reputations.get(post.getAuthorStudentId());
         String authorTier = authorReputation == null ? null : authorReputation.tier();
@@ -1026,6 +1029,7 @@ public class CommunityService {
                 authorDisplayName,
                 access.isAnonymous(post) ? post.getAnonymousName() : null,
                 authorAdmin,
+                authorRole,
                 authorTier,
                 authorTierLabel,
                 post.getCategory().name(),

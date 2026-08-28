@@ -1,3 +1,4 @@
+import RoleTag from '../../components/common/RoleTag'
 import Chip from '../../components/common/Chip'
 import {
   Bookmark,
@@ -34,6 +35,7 @@ type ListPost = {
   bookmarked?: boolean
   pinned?: boolean
   authorAdmin?: boolean
+  authorRole?: string
   videoInfos?: unknown[]
   viewCount?: number
   createdAt?: string
@@ -357,7 +359,7 @@ export default function CommunityListView({
                     {postHasImages(post) && <span className="ml-1 text-xs text-[var(--app-accent-text)]">[사진]</span>}
                     {(post.videoInfos?.length > 0) && <span className="ml-1 text-xs text-[var(--app-accent-text)]">[영상]</span>}
                     {isEdited(post) && <span className="ml-1 text-[10px] font-bold text-[var(--app-subtle)]">수정</span>}
-                    {post.authorAdmin && <Chip variant="admin" className="ml-1">운영진</Chip>}
+                    {post.authorRole ? <RoleTag role={post.authorRole} className="ml-1" /> : post.authorAdmin && <Chip variant="admin" className="ml-1">운영진</Chip>}
                   </td>
                   <td className="px-4 py-4 text-center text-xs font-semibold">
                     <span className="inline-flex items-center gap-2">

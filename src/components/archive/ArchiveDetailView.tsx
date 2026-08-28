@@ -6,12 +6,14 @@ import { categoryLabel, formatDate, formatSize } from './archiveUtils'
 export function ArchiveDetailView({
   detailFile,
   isAdmin,
+  onAuthorEdit,
   voting,
   onVote,
   onDelete,
 }: {
   detailFile: any
   isAdmin: boolean
+  onAuthorEdit?: (file: { id: number; uploaderName?: string }) => void
   voting: boolean
   onVote: () => void
   onDelete: (id: number) => void
@@ -65,6 +67,15 @@ export function ArchiveDetailView({
           <ThumbsUp size={15} />
           개추 {detailFile.upvotes ?? 0}
         </button>
+        {isAdmin && onAuthorEdit && (
+          <button
+            type="button"
+            onClick={() => onAuthorEdit(detailFile)}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 text-sm font-bold sm:min-h-10"
+          >
+            작성자 변경
+          </button>
+        )}
         {isAdmin && (
           <button
             type="button"
