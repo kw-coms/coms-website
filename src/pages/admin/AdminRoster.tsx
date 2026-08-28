@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { displayStudentId } from '../../utils/roleAccess'
 import { importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember } from '../../services/adminApi'
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
@@ -312,7 +313,7 @@ export default function AdminRoster() {
                       </td>
                     ) : (
                       <>
-                        <td className="px-3 py-3 font-mono text-xs text-[var(--theme-body-dark)]">{member.studentId || '-'}</td>
+                        <td className="px-3 py-3 font-mono text-xs text-[var(--theme-body-dark)]">{displayStudentId(member.studentId) || '-'}</td>
                         <td className="px-3 py-3 font-semibold text-[var(--theme-body-dark)]">{member.name}</td>
                         <td className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{member.generation ? `${member.generation}기` : '-'}</td>
                         <td className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{member.phone || '-'}</td>
