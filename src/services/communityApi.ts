@@ -79,6 +79,14 @@ export async function updateCommunityPost(id, body, image = null) {
   })
 }
 
+// 회장 전용 — 회원 재지정(studentId) 또는 표시 이름만 변경(name), 둘 중 하나.
+export async function updateCommunityPostAuthor(id, { studentId, name }) {
+  return request(`/api/community/posts/${id}/author`, {
+    method: 'PATCH',
+    body: JSON.stringify(studentId ? { studentId } : { name }),
+  })
+}
+
 export async function pinCommunityPost(id, pinned) {
   return request(`/api/community/posts/${id}/pin`, {
     method: 'PATCH',

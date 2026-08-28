@@ -341,6 +341,41 @@ public class CommunityService {
                 voteStats(List.of(saved)), commentCounts(List.of(saved)), pollResults(List.of(saved), member.getStudentId()), true);
     }
 
+    /**
+     * 회장(ADMIN) 전용 — the URL rule in SecurityConfig gates it; the in-service
+     * check keeps the invariant if the endpoint is ever re-wired. Two modes:
+     * reassign to an existing member, or override only the display name.
+     */
+    public CommunityPostResponse updateAuthor(String adminStudentId, Long id, String newAuthorStudentId, String newAuthorName) {
+        Member admin = access.requireMember(adminStudentId);
+        if (admin.getRole() != Member.Role.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        CommunityPost post = requirePost(id);
+        String cleanedId = newAuthorStudentId == null ? "" : newAuthorStudentId.trim();
+        String cleanedName = newAuthorName == null ? "" : newAuthorName.trim();
+        if (cleanedId.isEmpty() == cleanedName.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "회원 선택 또는 이름 직접 입력 중 하나만 지정해주세요.");
+        }
+        String detail;
+        if (!cleanedId.isEmpty()) {
+            Member newAuthor = memberRepository.findByStudentId(cleanedId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 학번의 회원을 찾을 수 없습니다."));
+            post.setAuthorStudentId(newAuthor.getStudentId());
+            post.setAuthorName(newAuthor.getName());
+            detail = "authorStudentId=" + newAuthor.getStudentId();
+        } else {
+            post.setAuthorName(cleanedName);
+            detail = "authorName=(custom)";
+        }
+        CommunityPost saved = communityPostRepository.save(post);
+        auditLogService.record(admin.getStudentId(), "COMMUNITY_POST_AUTHOR_UPDATE", "COMMUNITY_POST",
+                String.valueOf(saved.getId()), detail, null);
+        return toResponse(saved, admin,
+                memberRepository.findByStudentId(saved.getAuthorStudentId()).orElse(null),
+                voteStats(List.of(saved)), commentCounts(List.of(saved)), pollResults(List.of(saved), admin.getStudentId()), true);
+    }
+
     public void delete(String studentId, Long id) {
         delete(studentId, id, null);
     }

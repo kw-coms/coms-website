@@ -1,5 +1,6 @@
 package com.coms.backend.controller;
 
+import com.coms.backend.dto.CommunityAuthorUpdateRequest;
 import com.coms.backend.dto.CommunityCommentRequest;
 import com.coms.backend.dto.CommunityCommentResponse;
 import com.coms.backend.dto.CommunityDeleteRequest;
@@ -239,6 +240,14 @@ public class CommunityController {
                 image,
                 resolveClientIp(servletRequest)
         ));
+    }
+
+    // 회장 전용 — SecurityConfig의 PATCH /api/community/posts/*/author hasRole("ADMIN") 규칙이 게이트.
+    @PatchMapping("/{id}/author")
+    public ResponseEntity<CommunityPostResponse> updateAuthor(Authentication authentication,
+                                                              @PathVariable Long id,
+                                                              @Valid @RequestBody CommunityAuthorUpdateRequest request) {
+        return ResponseEntity.ok(communityService.updateAuthor(authentication.getName(), id, request.studentId(), request.name()));
     }
 
     @PatchMapping("/{id}/pin")

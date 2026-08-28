@@ -18,6 +18,15 @@ export const ROLE_LABELS: Record<string, string> = {
   ASSOCIATE: '준회원',
 }
 
+// 직급별 뱃지 색 (Tailwind utility pairs, light bg + dark text tone).
+export const ROLE_BADGE_CLASSES: Record<string, string> = {
+  ADMIN: 'bg-rose-100 text-rose-700',
+  VICE_PRESIDENT: 'bg-violet-100 text-violet-700',
+  OFFICER: 'bg-amber-100 text-amber-700',
+  USER: 'bg-sky-100 text-sky-700',
+  ASSOCIATE: 'bg-zinc-100 text-zinc-500',
+}
+
 // Roles assignable from the member-management screen, highest first.
 export const ASSIGNABLE_ROLES = ['ADMIN', 'VICE_PRESIDENT', 'OFFICER', 'USER', 'ASSOCIATE'] as const
 
