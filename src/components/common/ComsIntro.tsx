@@ -16,7 +16,17 @@ const KW_NY = 0.5432
 
 // Module-level so an SPA route change back to "/" doesn't replay it, but a full
 // page reload (which re-imports the module) does.
-let introPlayed = false
+const INTRO_SESSION_KEY = 'coms.intro.played:v1'
+
+function introAlreadyPlayed() {
+  try {
+    return sessionStorage.getItem(INTRO_SESSION_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+let introPlayed = introAlreadyPlayed()
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 const seg = (t: number, a: number, b: number) => clamp01((t - a) / (b - a))
@@ -106,6 +116,11 @@ export default function ComsIntro() {
     if (typeof window === 'undefined') return
     if (prefersReducedMotion() || introPlayed) return
     introPlayed = true
+    try {
+      sessionStorage.setItem(INTRO_SESSION_KEY, '1')
+    } catch {
+      // Session gating is best-effort.
+    }
 
     const canvas = canvasRef.current
     if (!canvas) return
