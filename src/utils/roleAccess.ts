@@ -18,21 +18,20 @@ export const ROLE_LABELS: Record<string, string> = {
   ASSOCIATE: '준회원',
 }
 
-// 직급별 뱃지 색 (Tailwind utility pairs, light bg + dark text tone).
-export const ROLE_BADGE_CLASSES: Record<string, string> = {
-  ADMIN: 'bg-rose-100 text-rose-700',
-  VICE_PRESIDENT: 'bg-violet-100 text-violet-700',
-  OFFICER: 'bg-amber-100 text-amber-700',
-  USER: 'bg-sky-100 text-sky-700',
-  ASSOCIATE: 'bg-zinc-100 text-zinc-500',
-}
-
 // Roles assignable from the member-management screen, highest first.
 export const ASSIGNABLE_ROLES = ['ADMIN', 'VICE_PRESIDENT', 'OFFICER', 'USER', 'ASSOCIATE'] as const
 
 const OFFICER_TAB_IDS = new Set(['activities', 'projects', 'site-settings'])
 // 부회장 additionally moderates community + archive.
 const VICE_PRESIDENT_TAB_IDS = new Set([...OFFICER_TAB_IDS, 'files', 'community', 'deleted-posts'])
+
+// 졸업생 합성 ID(G{입학연도}-{명부번호})는 내부 키 — 화면에는 입학연도만.
+export function displayStudentId(studentId?: string | null) {
+  const raw = String(studentId || '')
+  const match = raw.match(/^G(\d{4})-\d+$/)
+  if (match) return `${match[1]} (졸업생)`
+  return raw
+}
 
 export function roleAtLeast(role: Role, tier: keyof typeof ROLE_RANK) {
   return (ROLE_RANK[role || ''] ?? -1) >= ROLE_RANK[tier]
