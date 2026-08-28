@@ -62,6 +62,7 @@ public class NotificationService {
     private final EligibleMemberRepository eligibleMemberRepository;
     private final EmailVerificationSender mailSender;
     private final PushNotificationSender pushNotificationSender;
+    private final org.springframework.core.task.TaskExecutor pushExecutor;
     private final Set<String> acceptUrlAllowedHosts;
     private final Map<String, Deque<LocalDateTime>> inviteAttemptsBySender = new ConcurrentHashMap<>();
 
@@ -71,7 +72,8 @@ public class NotificationService {
                                EligibleMemberRepository eligibleMemberRepository,
                                EmailVerificationSender mailSender,
                                PushNotificationSender pushNotificationSender,
-                               @Value("${notification.external-invite.allowed-hosts:coms.kw.ac.kr}") String allowedHosts) {
+                               @Value("${notification.external-invite.allowed-hosts:coms.kw.ac.kr}") String allowedHosts,
+                               @org.springframework.beans.factory.annotation.Qualifier("pushExecutor") org.springframework.core.task.TaskExecutor pushExecutor) {
         this.notificationRepository = notificationRepository;
         this.notificationPreferenceRepository = notificationPreferenceRepository;
         this.memberRepository = memberRepository;
@@ -79,6 +81,7 @@ public class NotificationService {
         this.mailSender = mailSender;
         this.pushNotificationSender = pushNotificationSender;
         this.acceptUrlAllowedHosts = parseAllowedHosts(allowedHosts);
+        this.pushExecutor = pushExecutor;
     }
 
     /**
@@ -147,8 +150,10 @@ public class NotificationService {
             return;
         }
         try {
-            // Async: fan-out loops enqueue instead of blocking the request thread.
-            pushNotificationSender.sendToMemberAsync(recipientStudentId, title, body, data);
+            // Enqueue on the bounded executor so fan-out never blocks the request
+            // thread. Deliberately NOT @Async on the sender: an AOP proxy there
+            // routes around @MockitoSpyBean depending on context-cache order.
+            pushExecutor.execute(() -> pushNotificationSender.sendToMember(recipientStudentId, title, body, data));
         } catch (RuntimeException e) {
             log.warn("Push dispatch to {} failed (ignored)", recipientStudentId, e);
         }
