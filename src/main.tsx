@@ -7,7 +7,7 @@ import App from './App'
 import { AuthProvider } from './contexts/AuthContext'
 import { queryClient } from './services/queryClient'
 import { captureError, initObservability } from './services/observability'
-import { setupPwaUpdatePrompt } from './pwaUpdatePrompt'
+import { setupPwaAutoUpdate } from './pwaAutoUpdate'
 
 const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0'
 
@@ -67,4 +67,4 @@ if (typeof requestIdleCallback === 'function') {
   setTimeout(startObservability, 0)
 }
 
-setupPwaUpdatePrompt()
+setupPwaAutoUpdate()

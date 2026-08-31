@@ -49,10 +49,12 @@ const pwaPlugin = VitePWA({
   // reason about in e2e; disable it for test builds (PWA_DISABLE=1). The SW is an
   // additive layer over identical app logic, so smoke coverage is unaffected.
   disable: process.env.PWA_DISABLE === '1',
-  // 'prompt' + no skipWaiting: a new deploy waits until the user accepts the
-  // in-app refresh toast (src/pwaUpdatePrompt.ts) instead of swapping assets
-  // under an active session and breaking lazy-loaded chunks.
-  registerType: 'prompt',
+  // autoUpdate: a new deploy activates on the SW's next install check, no user
+  // prompt. Stale tabs that lose a lazy chunk to the swap recover via the
+  // vite:preloadError reload guard (src/pwaAutoUpdate.ts). Note: with
+  // injectRegister:false the plugin does NOT force skipWaiting/clientsClaim,
+  // so they are set explicitly in workbox below — all three must stay in sync.
+  registerType: 'autoUpdate',
   injectRegister: false,
   manifest: false,
   includeAssets: ['favicon.svg', 'coms-logo.png'],
@@ -63,6 +65,7 @@ const pwaPlugin = VitePWA({
     // and only adds event listeners, leaving the precache/offline logic intact.
     importScripts: ['/push-listener.js'],
     cleanupOutdatedCaches: true,
+    skipWaiting: true,
     clientsClaim: true,
     navigateFallback: '/index.html',
     navigateFallbackDenylist: [
