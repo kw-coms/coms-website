@@ -33,7 +33,7 @@ public class EligibleMemberService {
     private final Clock clock;
 
     private static final Pattern STUDENT_ID_PATTERN = Pattern.compile("\\d{10}");
-    private static final Pattern NAME_PATTERN = Pattern.compile("[가-힣]{3}");
+    private static final Pattern NAME_PATTERN = Pattern.compile("[가-힣]{2,10}");
     private static final Pattern TWO_DIGIT_YEAR_PATTERN = Pattern.compile("\\d{2}");
     private static final Pattern GENERATION_PATTERN = Pattern.compile("\\d{1,3}");
     private static final int GRADUATE_AFTER_YEARS = 7;
@@ -154,7 +154,7 @@ public class EligibleMemberService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
         }
         if (!NAME_PATTERN.matcher(normalizedName).matches()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름은 한글 3자리여야 합니다.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름은 한글 2~10자여야 합니다.");
         }
 
         if (bannedStudentRepository.existsByStudentId(normalizedStudentId)) {
@@ -193,7 +193,7 @@ public class EligibleMemberService {
     public String validateAndClaimGraduateSignup(String name, String verificationType, String verificationValue) {
         String normalizedName = normalize(name);
         if (!NAME_PATTERN.matcher(normalizedName).matches()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름은 한글 3자리여야 합니다.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름은 한글 2~10자여야 합니다.");
         }
 
         int admissionYear = admissionYearFromGraduateVerification(verificationType, verificationValue);
