@@ -98,7 +98,7 @@ class EligibleMemberServiceTest {
 
     @Test
     void rejectsInvalidNameFormat() {
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024123456", "홍길", null, null))
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024123456", "김", null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
                 .isEqualTo(HttpStatus.BAD_REQUEST.value());
