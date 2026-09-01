@@ -116,8 +116,11 @@ public class AdminController {
     public ResponseEntity<Void> addEligibleMember(Authentication authentication, @Valid @RequestBody AddEligibleMemberRequest request) {
         if (request.studentId() != null && !request.studentId().isBlank()) {
             eligibleMemberService.addSingle(request.studentId(), request.name(), request.generation(), request.phone());
+        } else if (request.admissionYear() != null && !request.admissionYear().isBlank()) {
+            eligibleMemberService.addGraduateSingle(request.name(), request.admissionYear(), request.generation(), request.phone());
         } else {
-            eligibleMemberService.addGraduateSingle(request.name(), request.admissionYear(), request.generation());
+            // 학번 미상 재학생: 이름+기수(+전화)만으로 임시 등록. 학번은 나중에 편집으로 채운다.
+            eligibleMemberService.addPendingByGeneration(request.name(), request.generation(), request.phone());
         }
         auditLogService.record(authentication.getName(), "ADMIN_ELIGIBLE_MEMBER_ADD", "ELIGIBLE_MEMBER",
                 request.studentId(), "name=" + request.name(), null);
@@ -202,10 +205,16 @@ public class AdminController {
             Authentication authentication,
             @PathVariable Long id,
             @Valid @RequestBody RecruitApplicationStatusUpdateRequest request) {
-        RecruitApplicationAdminResponse response = recruitApplicationService.updateStatus(id, request);
+        RecruitApplicationAdminResponse response = recruitApplicationService.updateStatus(id, request, authentication.getName());
         auditLogService.record(authentication.getName(), "ADMIN_RECRUIT_APPLICATION_STATUS_UPDATE", "RECRUIT_APPLICATION",
                 String.valueOf(id), "status=" + response.status(), null);
         return ResponseEntity.ok(response);
+    }
+
+    /** 최근 100건의 합격 이관 이력 (지원서는 이관 시 삭제되므로 이 로그가 원본 기록). */
+    @GetMapping("/recruit-promotions")
+    public ResponseEntity<List<com.coms.backend.dto.RecruitPromotionLogResponse>> recruitPromotions() {
+        return ResponseEntity.ok(recruitApplicationService.listPromotions());
     }
 
     @GetMapping("/audit-logs")
