@@ -16,6 +16,13 @@ export async function updateNotice(id, body) {
   return request(`/api/notices/${id}`, { method: 'PUT', body: JSON.stringify(body) })
 }
 
+export async function updateNoticeAuthor(id, name) {
+  return request(`/api/notices/${id}/author`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  })
+}
+
 export async function pinNotice(id, pinned) {
   return request(`/api/notices/${id}/pin`, {
     method: 'PATCH',

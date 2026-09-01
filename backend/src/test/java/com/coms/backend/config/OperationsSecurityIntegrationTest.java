@@ -166,6 +166,26 @@ class OperationsSecurityIntegrationTest {
     }
 
     @Test
+    void noticeAuthorEditIsPresidentOnly() throws Exception {
+        // 작성자 변경 is 회장 전용 — 부회장도 거부.
+        mockMvc.perform(patch("/api/notices/1/author")
+                        .cookie(vicePresidentCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"홍길동\"}"))
+                .andExpect(status().isForbidden());
+
+        memberRepository.save(member("2026000005", Member.Role.ADMIN));
+        // ADMIN passes the gate; 404 because notice 1 doesn't exist here.
+        mockMvc.perform(patch("/api/notices/1/author")
+                        .cookie(authCookie("2026000005"))
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"홍길동\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void communityAuthorEditIsPresidentOnly() throws Exception {
         // 작성자 변경 is 회장 전용 — even 부회장 must be refused.
         mockMvc.perform(patch("/api/community/posts/1/author")

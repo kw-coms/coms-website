@@ -108,9 +108,23 @@ public class NoticeService {
         return toResponse(saved, voteStats(List.of(saved)), authorStudentId);
     }
 
+    // 회장 전용 — SecurityConfig의 PATCH /api/notices/*/author hasRole("ADMIN") 규칙이 게이트.
+    public NoticeResponse updateAuthor(String editorStudentId, Long id, String author) {
+        Notice notice = getEntity(id);
+        String cleaned = author == null ? "" : author.trim();
+        if (cleaned.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "작성자 이름을 입력해주세요.");
+        }
+        notice.setAuthor(cleaned);
+        auditLogService.record(editorStudentId, "NOTICE_AUTHOR_UPDATE", "NOTICE", String.valueOf(notice.getId()), "author=" + cleaned, null);
+        return toResponse(notice, voteStats(List.of(notice)), editorStudentId);
+    }
+
     public NoticeResponse update(String authorStudentId, Long id, NoticeRequest request) {
         Notice notice = getEntity(id);
-        applyRequest(notice, request, authorName(authorStudentId));
+        // Keep the displayed author on edits — previously every edit stomped it with the
+        // editor's own name, which silently undid 회장 author overrides.
+        applyRequest(notice, request, notice.getAuthor());
         auditLogService.record(authorStudentId, "NOTICE_UPDATE", "NOTICE", String.valueOf(notice.getId()), "title=" + notice.getTitle(), null);
         return toResponse(notice, voteStats(List.of(notice)), authorStudentId);
     }

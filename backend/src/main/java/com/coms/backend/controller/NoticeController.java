@@ -1,6 +1,7 @@
 package com.coms.backend.controller;
 
 import com.coms.backend.dto.EngagementVoteRequest;
+import com.coms.backend.dto.NoticeAuthorUpdateRequest;
 import com.coms.backend.dto.NoticeRequest;
 import com.coms.backend.dto.NoticeResponse;
 import com.coms.backend.dto.PinRequest;
@@ -70,6 +71,14 @@ public class NoticeController {
                                               @PathVariable Long id,
                                               @Valid @RequestBody PinRequest request) {
         return ResponseEntity.ok(noticeService.setPinned(authentication.getName(), id, request.pinned()));
+    }
+
+    // 회장 전용 — SecurityConfig의 PATCH /api/notices/*/author hasRole("ADMIN") 규칙이 게이트.
+    @PatchMapping("/{id}/author")
+    public ResponseEntity<NoticeResponse> updateAuthor(Authentication authentication,
+                                                       @PathVariable Long id,
+                                                       @Valid @RequestBody NoticeAuthorUpdateRequest request) {
+        return ResponseEntity.ok(noticeService.updateAuthor(authentication.getName(), id, request.name()));
     }
 
     @DeleteMapping("/{id}")
