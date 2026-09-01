@@ -8,6 +8,7 @@ import com.coms.backend.dto.CommunityCommentResponse;
 import com.coms.backend.dto.CommunityReputationResponse;
 import com.coms.backend.repository.CommunityCommentRepository;
 import com.coms.backend.repository.CommunityPostRepository;
+import com.coms.backend.repository.MemberRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,7 @@ class CommunityCommentService {
     private final AnonymousIdentityService anonymousIdentity;
     private final CommunityReputationService reputationService;
     private final CommunityTextService textService;
+    private final MemberRepository memberRepository;
 
     CommunityCommentService(CommunityCommentRepository commentRepository,
                             CommunityPostRepository communityPostRepository,
@@ -47,7 +49,8 @@ class CommunityCommentService {
                             CommunityAccess access,
                             AnonymousIdentityService anonymousIdentity,
                             CommunityReputationService reputationService,
-                            CommunityTextService textService) {
+                            CommunityTextService textService,
+                            MemberRepository memberRepository) {
         this.commentRepository = commentRepository;
         this.communityPostRepository = communityPostRepository;
         this.notificationService = notificationService;
@@ -56,6 +59,7 @@ class CommunityCommentService {
         this.anonymousIdentity = anonymousIdentity;
         this.reputationService = reputationService;
         this.textService = textService;
+        this.memberRepository = memberRepository;
     }
 
     @Transactional(readOnly = true)
@@ -68,12 +72,13 @@ class CommunityCommentService {
         List<CommunityComment> comments = commentRepository.findByPostIdOrderByCreatedAtAsc(postId);
         Map<String, CommunityReputationResponse> reputations = maskAnonymous ? Map.of()
                 : reputationService.reputationTiers(comments.stream().map(CommunityComment::getStudentId).filter(Objects::nonNull).collect(Collectors.toSet()));
+        Map<String, String> generations = maskAnonymous ? Map.of() : authorGenerations(comments);
         return comments.stream()
                 .map(c -> {
                     CommunityReputationResponse reputation = maskAnonymous ? null : reputations.get(c.getStudentId());
                     return new CommunityCommentResponse(
                             c.getId(), c.getPostId(), c.getParentCommentId(), c.getDepth(),
-                            maskAnonymous ? anonymousIdentity.anonymousDisplayName(c.getAnonymousName(), c.getIpAddress()) : CommunityDisplayNames.displayName(c.getStudentId(), c.getAuthorName()),
+                            maskAnonymous ? anonymousIdentity.anonymousDisplayName(c.getAnonymousName(), c.getIpAddress()) : CommunityDisplayNames.displayName(generations.get(c.getStudentId()), c.getStudentId(), c.getAuthorName()),
                             reputation == null ? null : reputation.tier(),
                             reputation == null ? null : reputation.tierLabel(),
                             c.getContent(), c.getCreatedAt(), c.getUpdatedAt(), c.isEdited(),
@@ -169,9 +174,24 @@ class CommunityCommentService {
     }
 
     private String commentAuthorName(CommunityPost post, Member currentMember, CommunityComment comment) {
-        return access.isAnonymous(post) && !access.isModerator(currentMember)
-                ? anonymousIdentity.anonymousDisplayName(comment.getAnonymousName(), comment.getIpAddress())
-                : CommunityDisplayNames.displayName(comment.getStudentId(), comment.getAuthorName());
+        if (access.isAnonymous(post) && !access.isModerator(currentMember)) {
+            return anonymousIdentity.anonymousDisplayName(comment.getAnonymousName(), comment.getIpAddress());
+        }
+        String generation = memberRepository.findByStudentId(comment.getStudentId())
+                .map(Member::getGeneration).orElse(null);
+        return CommunityDisplayNames.displayName(generation, comment.getStudentId(), comment.getAuthorName());
+    }
+
+    /** studentId → stored 기수 for every distinct comment author, in one query. */
+    private Map<String, String> authorGenerations(List<CommunityComment> comments) {
+        Set<String> ids = comments.stream().map(CommunityComment::getStudentId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return memberRepository.findByStudentIdIn(ids).stream()
+                .filter(m -> m.getGeneration() != null)
+                .collect(Collectors.toMap(Member::getStudentId, Member::getGeneration));
     }
 
     private void applyAnonymousCommentFields(CommunityPost post, CommunityComment comment, String anonymousName, String clientIp) {

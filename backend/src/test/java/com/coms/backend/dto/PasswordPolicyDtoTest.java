@@ -37,6 +37,7 @@ class PasswordPolicyDtoTest {
                 null,
                 null,
                 null,
+                null,
                 null
         ));
 

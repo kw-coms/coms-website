@@ -6,5 +6,6 @@ public record AddEligibleMemberRequest(
         @NotBlank String name,
         String studentId,
         String admissionYear,
-        String generation
+        String generation,
+        String phone
 ) {}

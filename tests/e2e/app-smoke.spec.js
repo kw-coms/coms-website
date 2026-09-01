@@ -328,19 +328,23 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
     studentId: '2026123456',
     name: '신규회원',
   })
+  // 기수/전화번호 입력칸은 비워 뒀으므로 payload에 실리지 않아야 한다.
   await expect(page.getByText('신규회원 (2026123456) 명부에 추가됐습니다.')).toBeVisible()
   await expect(page.getByRole('row').filter({ hasText: '신규회원' })).toBeVisible()
 
   await page.getByRole('row').filter({ hasText: '신규회원' }).getByRole('button', { name: '편집' }).click()
+  // 편집 인라인 폼: 학번 / 이름 / 기수 / 전화번호 순.
   const editInputs = page.locator('td[colspan="5"]').locator('input')
   await editInputs.nth(1).fill('수정회원')
   await editInputs.nth(0).fill('2026123999')
-  await editInputs.nth(2).fill('01099998888')
+  await editInputs.nth(2).fill('60')
+  await editInputs.nth(3).fill('01099998888')
   await page.getByRole('button', { name: '저장' }).click()
 
   await expect.poll(() => updatePayload).toEqual({
     studentId: '2026123999',
     name: '수정회원',
+    generation: '60',
     phone: '01099998888',
   })
   await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toBeVisible()
