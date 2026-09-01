@@ -45,6 +45,11 @@ public class Member {
 
     private String department;
 
+    // 기수 — entered at signup / editable by 회장; NOT derived from studentId
+    // (편입생은 학번 연도와 기수가 다를 수 있다).
+    @Column(length = 10)
+    private String generation;
+
     private String phone;
 
     @Column(columnDefinition = "TEXT")
@@ -119,6 +124,8 @@ public class Member {
     public int incrementTokenVersion() { return ++this.tokenVersion; }
     public String getDepartment() { return department; }
     public void setDepartment(String department) { this.department = department; }
+    public String getGeneration() { return generation; }
+    public void setGeneration(String generation) { this.generation = generation; }
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
     public String getAspiration() { return aspiration; }

@@ -109,6 +109,7 @@ public class AuthService implements UserDetailsService {
         member.setEmailVerified(false);
         member.setPassword(passwordEncoder.encode(request.password()));
         member.setDepartment(request.department() == null ? null : request.department().trim());
+        member.setGeneration(resolveSignupGeneration(request, studentId));
         member.setPhone(request.phone() == null ? null : request.phone().trim());
         member.setAspiration(signupType == SignupType.CURRENT ? normalizeNullable(request.aspiration()) : null);
         member.setInterests(signupType == SignupType.CURRENT ? normalizeNullable(request.interests()) : null);
@@ -203,6 +204,27 @@ public class AuthService implements UserDetailsService {
         return studentId;
     }
 
+    /**
+     * 기수 is what the applicant entered (source of truth — 편입생 학번 연도 ≠ 기수).
+     * Falls back to the studentId-derived value only for clients that predate the
+     * 기수 signup field (stale PWA bundles); the form itself requires it.
+     */
+    private String resolveSignupGeneration(SignupRequest request, String studentId) {
+        String entered = normalizeNullable(request.generation());
+        if (entered != null) {
+            return entered;
+        }
+        if (studentId != null && studentId.matches("\\d{10}")) {
+            int generation = Integer.parseInt(studentId.substring(0, 4)) - 1966;
+            return generation > 0 ? String.valueOf(generation) : null;
+        }
+        if (studentId != null && studentId.matches("G\\d{4}-\\d+")) {
+            int generation = Integer.parseInt(studentId.substring(1, 5)) - 1966;
+            return generation > 0 ? String.valueOf(generation) : null;
+        }
+        return null;
+    }
+
     private java.util.Optional<Member> findMemberByIdentifier(String identifier) {
         String normalized = normalizeNullable(identifier);
         if (normalized == null) {
@@ -242,6 +264,7 @@ public class AuthService implements UserDetailsService {
                 member.getEmail(),
                 member.isEmailVerified(),
                 member.getDepartment(),
+                member.getGeneration(),
                 member.getPhone(),
                 member.getRole().name(),
                 member.getAspiration(),
@@ -344,6 +367,7 @@ public class AuthService implements UserDetailsService {
                 member.getEmail(),
                 member.isEmailVerified(),
                 member.getDepartment(),
+                member.getGeneration(),
                 member.getPhone(),
                 member.getRole().name(),
                 member.getAspiration(),

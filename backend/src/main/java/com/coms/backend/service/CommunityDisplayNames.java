@@ -9,9 +9,26 @@ final class CommunityDisplayNames {
     private CommunityDisplayNames() {}
 
     static String displayName(String studentId, String name) {
+        return displayName(null, studentId, name);
+    }
+
+    /**
+     * Preferred overload: {@code generation} is the member's stored 기수 (editable, source of
+     * truth since 편입생 학번 연도 ≠ 기수). Falls back to the studentId-derived value for
+     * members created before the column existed or when no member row is available.
+     */
+    static String displayName(String generation, String studentId, String name) {
         String trimmedName = name == null ? "" : name.trim();
-        String generation = generationFromStudentId(studentId);
-        return generation.isBlank() ? trimmedName : generation + " " + trimmedName;
+        String label = generationLabel(generation, studentId);
+        return label.isBlank() ? trimmedName : label + " " + trimmedName;
+    }
+
+    static String generationLabel(String generation, String studentId) {
+        String stored = generation == null ? "" : generation.trim();
+        if (stored.matches("\\d{1,3}")) {
+            return stored + "기";
+        }
+        return generationFromStudentId(studentId);
     }
 
     static String generationFromStudentId(String studentId) {

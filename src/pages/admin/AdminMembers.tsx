@@ -18,7 +18,7 @@ function parseInterests(raw) {
 
 
 export default function AdminMembers({ currentUser }: { currentUser: { studentId?: string } }) {
-  const { members, loading, error, refetch, updateRole, removeMember, resetPassword } = useAdminMembers()
+  const { members, loading, error, refetch, updateRole, updateGeneration, removeMember, resetPassword } = useAdminMembers()
   const [expanded, setExpanded] = useState(null)
 
   const handleRoleUpdate = async (member, newRole) => {
@@ -27,6 +27,24 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
       await updateRole({ id: member.id, role: newRole })
     } catch (err) {
       showToast({ message: err.message || '역할 변경 중 오류가 발생했습니다.', tone: 'error' })
+    }
+  }
+
+  const handleGenerationEdit = async (member) => {
+    const generation = await promptDialog({
+      message: `${member.name} 회원의 기수를 입력하세요. (숫자만, 예: 60)`,
+      defaultValue: member.generation || '',
+    })
+    if (generation === null) return
+    if (!/^\d{1,3}$/.test(generation.trim())) {
+      showToast({ message: '기수는 숫자(1~3자리)로 입력해주세요.', tone: 'error' })
+      return
+    }
+    try {
+      await updateGeneration({ id: member.id, generation: generation.trim() })
+      showToast({ message: '기수가 변경되었습니다.' })
+    } catch (err) {
+      showToast({ message: err.message || '기수 변경 중 오류가 발생했습니다.', tone: 'error' })
     }
   }
 
@@ -87,6 +105,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-semibold text-[var(--theme-body-dark)]">{member.name}</span>
                   <span className="text-xs text-[var(--theme-body-muted)]">{displayStudentId(member.studentId)}</span>
+                  {member.generation && <span className="text-xs font-semibold text-[var(--theme-body-muted)]">{member.generation}기</span>}
                   <RoleTag role={member.role} />
                 </div>
                 <p className="mt-0.5 text-xs text-[var(--theme-body-muted)]">
@@ -117,6 +136,13 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
                         <option key={role} value={role}>{ROLE_LABELS[role]}</option>
                       ))}
                     </select>
+                    <button
+                      type="button"
+                      onClick={() => handleGenerationEdit(member)}
+                      className="text-xs font-semibold text-blue-500 transition hover:underline"
+                    >
+                      기수 변경
+                    </button>
                     <button
                       type="button"
                       onClick={() => handlePasswordReset(member)}

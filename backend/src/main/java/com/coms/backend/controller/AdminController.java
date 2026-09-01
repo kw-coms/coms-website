@@ -94,6 +94,16 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
+    @PatchMapping("/members/{id}/generation")
+    public ResponseEntity<MemberResponse> updateGeneration(Authentication authentication,
+                                                           @PathVariable Long id,
+                                                           @Valid @RequestBody com.coms.backend.dto.GenerationUpdateRequest request) {
+        MemberResponse response = adminService.updateGeneration(id, request.generation());
+        auditLogService.record(authentication.getName(), "ADMIN_MEMBER_GENERATION_UPDATE", "MEMBER", String.valueOf(id),
+                "targetStudentId=" + response.studentId() + ", generation=" + response.generation(), null);
+        return ResponseEntity.ok(response);
+    }
+
     @DeleteMapping("/members/{id}")
     public ResponseEntity<Void> deleteMember(Authentication authentication, @PathVariable Long id) {
         AdminService.DeletedMemberSnapshot deleted = adminService.deleteMember(id);
@@ -105,7 +115,7 @@ public class AdminController {
     @PostMapping("/eligible-members")
     public ResponseEntity<Void> addEligibleMember(Authentication authentication, @Valid @RequestBody AddEligibleMemberRequest request) {
         if (request.studentId() != null && !request.studentId().isBlank()) {
-            eligibleMemberService.addSingle(request.studentId(), request.name());
+            eligibleMemberService.addSingle(request.studentId(), request.name(), request.generation(), request.phone());
         } else {
             eligibleMemberService.addGraduateSingle(request.name(), request.admissionYear(), request.generation());
         }
@@ -123,7 +133,7 @@ public class AdminController {
     public ResponseEntity<Void> updateEligibleMember(Authentication authentication,
                                                      @PathVariable Long id,
                                                      @Valid @RequestBody UpdateEligibleMemberRequest request) {
-        eligibleMemberService.updateEligibleMember(id, request.studentId(), request.name(), request.phone());
+        eligibleMemberService.updateEligibleMember(id, request.studentId(), request.name(), request.generation(), request.phone());
         auditLogService.record(authentication.getName(), "ADMIN_ELIGIBLE_MEMBER_UPDATE", "ELIGIBLE_MEMBER",
                 String.valueOf(id), "studentId=" + request.studentId() + ", name=" + request.name(), null);
         return ResponseEntity.noContent().build();
