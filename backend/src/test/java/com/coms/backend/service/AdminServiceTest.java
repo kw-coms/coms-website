@@ -1,9 +1,17 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.Member;
+import com.coms.backend.repository.ArchiveFileVoteRepository;
 import com.coms.backend.repository.ClubActivityVoteRepository;
+import com.coms.backend.repository.ClubEventRsvpRepository;
+import com.coms.backend.repository.ClubEventVoteRepository;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.MiniAppDocumentRepository;
+import com.coms.backend.repository.MobilePushTokenRepository;
 import com.coms.backend.repository.NoticeVoteRepository;
+import com.coms.backend.repository.NotificationPreferenceRepository;
+import com.coms.backend.repository.NotificationRepository;
+import com.coms.backend.repository.TeamRandomizerRoomRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,7 +37,15 @@ class AdminServiceTest {
             mock(PasswordEncoder.class),
             communityService,
             noticeVoteRepository,
-            clubActivityVoteRepository
+            clubActivityVoteRepository,
+            mock(ClubEventVoteRepository.class),
+            mock(ClubEventRsvpRepository.class),
+            mock(ArchiveFileVoteRepository.class),
+            mock(NotificationRepository.class),
+            mock(NotificationPreferenceRepository.class),
+            mock(MobilePushTokenRepository.class),
+            mock(MiniAppDocumentRepository.class),
+            mock(TeamRandomizerRoomRepository.class)
     );
 
     @Test

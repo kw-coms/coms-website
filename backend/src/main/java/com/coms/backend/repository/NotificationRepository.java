@@ -11,4 +11,5 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findByRecipientStudentIdAndReadAtIsNull(String recipientStudentId);
     long countByRecipientStudentIdAndReadAtIsNull(String recipientStudentId);
     long countByActorStudentIdAndTypeAndCreatedAtAfter(String actorStudentId, Notification.Type type, LocalDateTime threshold);
+    void deleteByRecipientStudentId(String recipientStudentId);
 }

@@ -1,7 +1,9 @@
 package com.coms.backend.repository;
 
 import com.coms.backend.domain.Member;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 
 import java.util.Collection;
 import java.util.List;
@@ -9,6 +11,12 @@ import java.util.Optional;
 
 public interface MemberRepository extends JpaRepository<Member, Long> {
     Optional<Member> findByStudentId(String studentId);
+
+    // Serializes concurrent verification-code confirms so attempt counters can't be
+    // lost to read-modify-write races (SELECT ... FOR UPDATE).
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select m from Member m where m.id = :id")
+    Optional<Member> findWithLockById(@org.springframework.data.repository.query.Param("id") Long id);
     Optional<Member> findByEmail(String email);
     Optional<Member> findByEmailIgnoreCase(String email);
     List<Member> findByStudentIdIn(Collection<String> studentIds);
