@@ -114,6 +114,17 @@ class NoticeServiceTest {
         assertThat(updated.title()).isEqualTo("수정");
     }
 
+    @Test
+    void authorOverrideSurvivesLaterEdits() {
+        var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
+
+        var overridden = noticeService.updateAuthor("2026123000", notice.id(), "  동아리 임원진  ");
+        assertThat(overridden.author()).isEqualTo("동아리 임원진");
+
+        var updated = noticeService.update("2026123000", notice.id(), new NoticeRequest("수정", "내용", null, false, "GENERAL"));
+        assertThat(updated.author()).isEqualTo("동아리 임원진");
+    }
+
     private Member admin(String studentId, String name) {
         Member member = new Member();
         member.setStudentId(studentId);
