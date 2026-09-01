@@ -19,14 +19,48 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Manual deploys must not bypass CI: resolve deploy_ref to a commit SHA and require a
+  # successful CI workflow run for that exact SHA before anything reaches the server.
+  verify-manual-ref:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.verify.outputs.sha }}
+    steps:
+      - name: Require successful CI run for deploy_ref
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_REF: ${{ github.event.inputs.deploy_ref }}
+        run: |
+          set -euo pipefail
+          SHA="$(gh api "repos/$GITHUB_REPOSITORY/commits/$DEPLOY_REF" --jq .sha)"
+          echo "Resolved $DEPLOY_REF -> $SHA"
+          CONCLUSION="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$SHA&status=completed&per_page=1" \
+            --jq '.workflow_runs[0].conclusion // "none"')"
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "Refusing manual deploy: no successful CI run found for $SHA (latest completed conclusion: $CONCLUSION)." >&2
+            echo "Run the CI workflow for this ref and retry once it is green." >&2
+            exit 1
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
   deploy:
+    needs: [verify-manual-ref]
     if: >-
       ${{
-        github.event_name == 'workflow_dispatch' ||
+        always() &&
         (
-          github.event.workflow_run.event == 'push' &&
-          github.event.workflow_run.head_branch == 'main' &&
-          github.event.workflow_run.conclusion == 'success'
+          (
+            github.event_name == 'workflow_dispatch' &&
+            needs.verify-manual-ref.result == 'success'
+          ) ||
+          (
+            github.event_name == 'workflow_run' &&
+            github.event.workflow_run.event == 'push' &&
+            github.event.workflow_run.head_branch == 'main' &&
+            github.event.workflow_run.conclusion == 'success'
+          )
         )
       }}
     runs-on: ubuntu-latest
@@ -41,7 +75,9 @@ jobs:
           DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '~/apps/coms-website' }}
           DEPLOY_REPO: https://github.com/kw-coms/coms-website.git
-          DEPLOY_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_ref || github.event.workflow_run.head_sha }}
+          # Manual deploys use the CI-verified SHA (not the raw ref) so the branch cannot
+          # move between verification and deploy.
+          DEPLOY_REF: ${{ github.event_name == 'workflow_dispatch' && needs.verify-manual-ref.outputs.sha || github.event.workflow_run.head_sha }}
           PUBLIC_BASE_URL: ${{ secrets.PUBLIC_BASE_URL || 'https://coms.kw.ac.kr' }}
         run: |
           set -euo pipefail

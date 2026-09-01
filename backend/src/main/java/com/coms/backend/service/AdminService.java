@@ -4,9 +4,17 @@ import com.coms.backend.domain.Member;
 import com.coms.backend.dto.LoginAuditResponse;
 import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.RoleUpdateRequest;
+import com.coms.backend.repository.ArchiveFileVoteRepository;
 import com.coms.backend.repository.ClubActivityVoteRepository;
+import com.coms.backend.repository.ClubEventRsvpRepository;
+import com.coms.backend.repository.ClubEventVoteRepository;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.MiniAppDocumentRepository;
+import com.coms.backend.repository.MobilePushTokenRepository;
 import com.coms.backend.repository.NoticeVoteRepository;
+import com.coms.backend.repository.NotificationPreferenceRepository;
+import com.coms.backend.repository.NotificationRepository;
+import com.coms.backend.repository.TeamRandomizerRoomRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -26,14 +34,35 @@ public class AdminService {
     private final CommunityService communityService;
     private final NoticeVoteRepository noticeVoteRepository;
     private final ClubActivityVoteRepository clubActivityVoteRepository;
+    private final ClubEventVoteRepository clubEventVoteRepository;
+    private final ClubEventRsvpRepository clubEventRsvpRepository;
+    private final ArchiveFileVoteRepository archiveFileVoteRepository;
+    private final NotificationRepository notificationRepository;
+    private final NotificationPreferenceRepository notificationPreferenceRepository;
+    private final MobilePushTokenRepository mobilePushTokenRepository;
+    private final MiniAppDocumentRepository miniAppDocumentRepository;
+    private final TeamRandomizerRoomRepository teamRandomizerRoomRepository;
 
     public AdminService(MemberRepository memberRepository, PasswordEncoder passwordEncoder, CommunityService communityService,
-                        NoticeVoteRepository noticeVoteRepository, ClubActivityVoteRepository clubActivityVoteRepository) {
+                        NoticeVoteRepository noticeVoteRepository, ClubActivityVoteRepository clubActivityVoteRepository,
+                        ClubEventVoteRepository clubEventVoteRepository, ClubEventRsvpRepository clubEventRsvpRepository,
+                        ArchiveFileVoteRepository archiveFileVoteRepository, NotificationRepository notificationRepository,
+                        NotificationPreferenceRepository notificationPreferenceRepository,
+                        MobilePushTokenRepository mobilePushTokenRepository, MiniAppDocumentRepository miniAppDocumentRepository,
+                        TeamRandomizerRoomRepository teamRandomizerRoomRepository) {
         this.memberRepository = memberRepository;
         this.passwordEncoder = passwordEncoder;
         this.communityService = communityService;
         this.noticeVoteRepository = noticeVoteRepository;
         this.clubActivityVoteRepository = clubActivityVoteRepository;
+        this.clubEventVoteRepository = clubEventVoteRepository;
+        this.clubEventRsvpRepository = clubEventRsvpRepository;
+        this.archiveFileVoteRepository = archiveFileVoteRepository;
+        this.notificationRepository = notificationRepository;
+        this.notificationPreferenceRepository = notificationPreferenceRepository;
+        this.mobilePushTokenRepository = mobilePushTokenRepository;
+        this.miniAppDocumentRepository = miniAppDocumentRepository;
+        this.teamRandomizerRoomRepository = teamRandomizerRoomRepository;
     }
 
     @Transactional(readOnly = true)
@@ -63,8 +92,7 @@ public class AdminService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         ensureNotFinalAdmin(member, "마지막 관리자는 삭제할 수 없습니다.");
         DeletedMemberSnapshot snapshot = DeletedMemberSnapshot.from(member);
-        communityService.deleteCommunityDataForMember(member.getStudentId());
-        deleteEngagementVotesForMember(member.getStudentId());
+        purgePersonalDataForMember(member.getStudentId());
         memberRepository.delete(member);
         return snapshot;
     }
@@ -74,15 +102,29 @@ public class AdminService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         ensureNotFinalAdmin(member, "마지막 관리자는 탈퇴할 수 없습니다.");
         DeletedMemberSnapshot snapshot = DeletedMemberSnapshot.from(member);
-        communityService.deleteCommunityDataForMember(member.getStudentId());
-        deleteEngagementVotesForMember(member.getStudentId());
+        purgePersonalDataForMember(member.getStudentId());
         memberRepository.delete(member);
         return snapshot;
     }
 
-    private void deleteEngagementVotesForMember(String studentId) {
+    /**
+     * Removes every piece of member data keyed by 학번 so a future signup with the same
+     * student id cannot inherit the previous owner's notifications, documents, rooms, or
+     * push tokens. Moderation/audit records (audit logs, deleted-post archive, bans) are
+     * intentionally kept.
+     */
+    private void purgePersonalDataForMember(String studentId) {
+        communityService.deleteCommunityDataForMember(studentId);
         noticeVoteRepository.deleteByStudentId(studentId);
         clubActivityVoteRepository.deleteByStudentId(studentId);
+        clubEventVoteRepository.deleteByStudentId(studentId);
+        clubEventRsvpRepository.deleteByStudentId(studentId);
+        archiveFileVoteRepository.deleteByStudentId(studentId);
+        notificationRepository.deleteByRecipientStudentId(studentId);
+        notificationPreferenceRepository.deleteByMemberStudentId(studentId);
+        mobilePushTokenRepository.deleteByMemberStudentId(studentId);
+        miniAppDocumentRepository.deleteByOwnerStudentId(studentId);
+        teamRandomizerRoomRepository.deleteByOwnerStudentId(studentId);
     }
 
     private void ensureNotFinalAdmin(Member member, String message) {

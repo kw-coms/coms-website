@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface TeamRandomizerRoomRepository extends JpaRepository<TeamRandomizerRoom, Long> {
     Optional<TeamRandomizerRoom> findByOwnerStudentIdAndRoomId(String ownerStudentId, String roomId);
+
+    void deleteByOwnerStudentId(String ownerStudentId);
 }

@@ -59,8 +59,8 @@ class EligibleMemberServiceTest {
                     assertThat(member.name()).isEqualTo("홍길동");
                     assertThat(member.generation()).isEqualTo("58");
                 });
-        eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null);
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024000000", "홍길동", null, null))
+        eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, "010-1234-5678");
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024000000", "홍길동", null, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
                 .isEqualTo(HttpStatus.FORBIDDEN.value());
@@ -72,25 +72,45 @@ class EligibleMemberServiceTest {
                 new String[]{"2024123456", "홍길동"});
         eligibleMemberService.importRoster(file);
 
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024123456", "김철수", null, null))
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024123456", "김철수", null, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
                 .isEqualTo(HttpStatus.FORBIDDEN.value());
     }
 
     @Test
+    void rejectsSignupWhenRosterPhoneDoesNotMatch() throws Exception {
+        MockMultipartFile file = workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "홍길동", "010-1234-5678"});
+        eligibleMemberService.importRoster(file);
+
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, "01099998888"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
+                .isEqualTo(HttpStatus.FORBIDDEN.value());
+
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, null))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
+                .isEqualTo(HttpStatus.FORBIDDEN.value());
+
+        // Hyphen/format differences must not lock out the legitimate member.
+        eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, "01012345678");
+    }
+
+    @Test
     void rejectsInvalidStudentIdFormat() {
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("123456789", "홍길동", null, null))
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("123456789", "홍길동", null, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
                 .isEqualTo(HttpStatus.BAD_REQUEST.value());
 
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("12345678901", "홍길동", null, null))
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("12345678901", "홍길동", null, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
                 .isEqualTo(HttpStatus.BAD_REQUEST.value());
 
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("학부2024123456", "홍길동", null, null))
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("학부2024123456", "홍길동", null, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
                 .isEqualTo(HttpStatus.BAD_REQUEST.value());
@@ -98,12 +118,12 @@ class EligibleMemberServiceTest {
 
     @Test
     void rejectsInvalidNameFormat() {
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024123456", "김", null, null))
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024123456", "김", null, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
                 .isEqualTo(HttpStatus.BAD_REQUEST.value());
 
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024123456", "Hong GilDong", null, null))
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024123456", "Hong GilDong", null, null, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode().value())
                 .isEqualTo(HttpStatus.BAD_REQUEST.value());
@@ -117,7 +137,7 @@ class EligibleMemberServiceTest {
         assertThat(eligibleMemberService.importRoster(file).imported()).isEqualTo(1);
         assertThat(eligibleMemberService.importRoster(file).skipped()).isEqualTo(1);
 
-        eligibleMemberService.validateAndClaimSignup("2019123456", "김철수", "YEAR", "19");
+        eligibleMemberService.validateAndClaimSignup("2019123456", "김철수", "YEAR", "19", "01011112222");
 
         assertThat(eligibleMemberRepository.findByStudentId("2019123456")).isPresent();
         assertThat(eligibleMemberRepository.findByVerificationKey("김철수|2019")).isPresent();
@@ -126,11 +146,11 @@ class EligibleMemberServiceTest {
     @Test
     void graduateCanVerifyByGenerationButCurrentStudentCannotUseRelaxedVerification() throws Exception {
         eligibleMemberService.importRoster(workbookFile(new String[]{"이름", "기수"}, new String[]{"홍길동", "53기"}));
-        eligibleMemberService.validateAndClaimSignup("2019123456", "홍길동", "GENERATION", "53기");
+        eligibleMemberService.validateAndClaimSignup("2019123456", "홍길동", "GENERATION", "53기", null);
 
         eligibleMemberRepository.deleteAll();
         eligibleMemberService.importRoster(workbookFile(new String[]{"이름", "기수"}, new String[]{"홍길동", "54기"}));
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2020123456", "홍길동", "GENERATION", "54"))
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2020123456", "홍길동", "GENERATION", "54", null))
                 .isInstanceOf(ResponseStatusException.class);
     }
 
@@ -138,9 +158,9 @@ class EligibleMemberServiceTest {
     void graduateVerificationMustMatchSubmittedFullStudentId() throws Exception {
         eligibleMemberService.importRoster(workbookFile(new String[]{"이름", "기수"}, new String[]{"홍길동", "53기"}));
 
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2019123456", "홍길동", "YEAR", "18"))
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2019123456", "홍길동", "YEAR", "18", null))
                 .isInstanceOf(ResponseStatusException.class);
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2019123456", "홍길동", "GENERATION", "52"))
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2019123456", "홍길동", "GENERATION", "52", null))
                 .isInstanceOf(ResponseStatusException.class);
     }
 
@@ -148,9 +168,9 @@ class EligibleMemberServiceTest {
     void claimedGraduateRosterCannotBeReusedByAnotherStudentId() throws Exception {
         MockMultipartFile file = workbookFile(new String[]{"이름", "기수"}, new String[]{"홍길동", "53기"});
         eligibleMemberService.importRoster(file);
-        eligibleMemberService.validateAndClaimSignup("2019123456", "홍길동", "GENERATION", "53");
+        eligibleMemberService.validateAndClaimSignup("2019123456", "홍길동", "GENERATION", "53", null);
 
-        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2019999999", "홍길동", "GENERATION", "53"))
+        assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2019999999", "홍길동", "GENERATION", "53", null))
                 .isInstanceOf(ResponseStatusException.class);
         assertThat(eligibleMemberService.importRoster(file).skipped()).isEqualTo(1);
     }
@@ -213,7 +233,7 @@ class EligibleMemberServiceTest {
     @Test
     void adminUpdateKeepsClaimKeyAlignedWithEditedIdentity() throws Exception {
         eligibleMemberService.importRoster(workbookFile(new String[]{"이름", "기수"}, new String[]{"홍길동", "53기"}));
-        eligibleMemberService.validateAndClaimSignup("2019123456", "홍길동", "YEAR", "19");
+        eligibleMemberService.validateAndClaimSignup("2019123456", "홍길동", "YEAR", "19", null);
         var claimed = eligibleMemberRepository.findByStudentId("2019123456").orElseThrow();
 
         eligibleMemberService.updateEligibleMember(claimed.getId(), "2018123456", "김철수", null);
