@@ -97,6 +97,7 @@ test.describe('real backend auth', () => {
     await page.goto('/signup')
 
     await page.locator('#studentId').fill(studentId)
+    await page.locator('#generation').fill('60')
     await page.locator('#name').fill(name)
     await page.locator('#email').fill(`e2e-${Date.now()}@example.com`)
     await page.locator('#password').fill('Member1234!@')

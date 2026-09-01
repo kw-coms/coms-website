@@ -99,7 +99,7 @@ export default function AdminRoster() {
 
   const startEdit = (member) => {
     setEditingId(member.id)
-    setEditForm({ studentId: member.studentId || '', name: member.name, phone: member.phone || '', generation: member.generation || '' })
+    setEditForm({ studentId: member.studentId || '', name: member.name, phone: member.phone || '', generation: member.generation == null ? '' : String(member.generation) })
   }
 
   const handleEditSave = async (id) => {
