@@ -144,6 +144,7 @@ function InterestsSelector({ selected, onChange, otherText, onOtherChange }: {
 
 const initialForm = {
   studentId: '',
+  generation: '',
   name: '',
   graduateVerificationType: 'YEAR',
   graduateVerificationValue: '',
@@ -206,6 +207,8 @@ export default function Signup({ onBack }: { onBack: () => void }) {
 
     if (isCurrentSignup && !studentId) return '학번을 입력해주세요.'
     if (isCurrentSignup && !STUDENT_ID_PATTERN.test(studentId)) return '학번은 숫자 10자리여야 합니다.'
+    if (isCurrentSignup && !form.generation.trim()) return '기수를 입력해주세요.'
+    if (isCurrentSignup && !/^\d{1,3}$/.test(form.generation.trim())) return '기수는 숫자로 입력해주세요. (예: 60)'
     if (!name) return '이름을 입력해주세요.'
     if (!NAME_PATTERN.test(name)) return '이름은 한글 2~10자여야 합니다.'
     if (isCurrentSignup && isGraduateStudentId) return '졸업생은 졸업생 회원가입을 선택해주세요.'
@@ -250,6 +253,9 @@ export default function Signup({ onBack }: { onBack: () => void }) {
       const result = await signupUser({
         signupType: isGraduateSignup ? 'GRADUATE' : 'CURRENT',
         studentId: isGraduateSignup ? null : studentId,
+        generation: isGraduateSignup
+          ? (form.graduateVerificationType === 'GENERATION' ? normalizeGraduateValue(form.graduateVerificationValue) || null : null)
+          : form.generation.trim(),
         name: form.name.trim(),
         graduateVerificationType: isGraduateSignup ? form.graduateVerificationType : null,
         graduateVerificationValue: isGraduateSignup ? form.graduateVerificationValue.trim() : null,
@@ -326,6 +332,17 @@ export default function Signup({ onBack }: { onBack: () => void }) {
                     inputMode="numeric"
                     maxLength={10}
                     autoComplete="username"
+                  />
+                )}
+                {isCurrentSignup && (
+                  <TextField
+                    id="generation"
+                    label="기수"
+                    value={form.generation}
+                    onChange={handleChange}
+                    placeholder="예: 60"
+                    inputMode="numeric"
+                    maxLength={3}
                   />
                 )}
                 <TextField

@@ -133,6 +133,17 @@ public class AdminService {
         }
     }
 
+    public MemberResponse updateGeneration(Long id, String generation) {
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        String cleaned = generation == null ? "" : generation.trim();
+        if (!cleaned.matches("\\d{1,3}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "기수는 숫자(1~3자리)여야 합니다.");
+        }
+        member.setGeneration(cleaned);
+        return toResponse(memberRepository.save(member));
+    }
+
     public void resetPassword(Long id, String newPassword) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -165,6 +176,7 @@ public class AdminService {
                 member.getEmail(),
                 member.isEmailVerified(),
                 member.getDepartment(),
+                member.getGeneration(),
                 member.getPhone(),
                 member.getRole().name(),
                 member.getAspiration(),

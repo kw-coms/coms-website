@@ -3,6 +3,7 @@ import {
   deleteMember,
   listMembers,
   resetMemberPassword,
+  updateMemberGeneration,
   updateMemberRole,
 } from '../../services/adminApi'
 import { queryKeys } from '../../services/queryKeys'
@@ -21,6 +22,16 @@ export function useAdminMembers() {
 
   const roleMutation = useMutation({
     mutationFn: ({ id, role }: { id: string | number; role: string }) => updateMemberRole(id, role),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(adminMembersQueryKey, (prev) => (
+        (Array.isArray(prev) ? prev : []).map((member) => (member.id === updated.id ? updated : member))
+      ))
+      queryClient.invalidateQueries({ queryKey: adminMembersQueryKey })
+    },
+  })
+
+  const generationMutation = useMutation({
+    mutationFn: ({ id, generation }: { id: string | number; generation: string }) => updateMemberGeneration(id, generation),
     onSuccess: (updated) => {
       queryClient.setQueryData(adminMembersQueryKey, (prev) => (
         (Array.isArray(prev) ? prev : []).map((member) => (member.id === updated.id ? updated : member))
@@ -49,6 +60,7 @@ export function useAdminMembers() {
     error: membersQuery.error ? (membersQuery.error.message || '회원 목록을 불러오지 못했습니다.') : '',
     refetch: membersQuery.refetch,
     updateRole: roleMutation.mutateAsync,
+    updateGeneration: generationMutation.mutateAsync,
     removeMember: deleteMutation.mutateAsync,
     resetPassword: passwordMutation.mutateAsync,
   }

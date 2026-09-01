@@ -358,6 +358,7 @@ class AuthServiceTest {
                 "new@example.com",
                 "Password1!",
                 "컴퓨터공학과",
+                null,
                 "01012345678",
                 "동아리에서 프로젝트를 만들고 싶습니다.",
                 "웹",
@@ -389,6 +390,7 @@ class AuthServiceTest {
                 null,
                 null,
                 null,
+                null,
                 "GRADUATE"
         ))).isInstanceOf(ResponseStatusException.class);
 
@@ -398,7 +400,7 @@ class AuthServiceTest {
 
     @Test
     void currentSignupRequiresInterestsAndAspiration() {
-        eligibleMemberService.addSingle("2026123463", "홍길동");
+        eligibleMemberService.addSingle("2026123463", "홍길동", null, null);
 
         assertThatThrownBy(() -> authService.signup(new SignupRequest(
                 "2026123463",
@@ -411,6 +413,7 @@ class AuthServiceTest {
                 null,
                 null,
                 null,
+                null,
                 "CURRENT"
         ))).isInstanceOf(ResponseStatusException.class);
 
@@ -419,7 +422,7 @@ class AuthServiceTest {
 
     @Test
     void currentSignupPersistsInterestsAndAspiration() {
-        eligibleMemberService.addSingle("2026123467", "홍길동");
+        eligibleMemberService.addSingle("2026123467", "홍길동", null, null);
 
         var response = authService.signup(new SignupRequest(
                 "2026123467",
@@ -429,6 +432,7 @@ class AuthServiceTest {
                 "current-profile@example.com",
                 "Password1!",
                 "컴퓨터공학과",
+                null,
                 "01012345678",
                 "신입 부원으로 열심히 활동하겠습니다.",
                 "보안,웹",
@@ -452,6 +456,7 @@ class AuthServiceTest {
                 "19",
                 "graduate-year@example.com",
                 "Password1!",
+                null,
                 null,
                 null,
                 "이 값은 졸업생 가입에서 저장되지 않아야 합니다.",
@@ -478,6 +483,7 @@ class AuthServiceTest {
                 "53",
                 "graduate-generation@example.com",
                 "Password1!",
+                null,
                 null,
                 null,
                 null,

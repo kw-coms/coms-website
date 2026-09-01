@@ -122,7 +122,7 @@ public class MaintenanceController {
         boolean nameAlreadyCorrect = eligibleMemberRepository.findByStudentId(req.studentId())
                 .map(member -> req.name().equals(member.getName()))
                 .orElse(false);
-        eligibleMemberService.addSingle(req.studentId(), req.name());
+        eligibleMemberService.addSingle(req.studentId(), req.name(), null, null);
         return ResponseEntity.ok(Map.of(
                 "message", nameAlreadyCorrect ? "Already in roster." : "Upserted.",
                 "studentId", req.studentId(),

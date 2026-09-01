@@ -50,14 +50,18 @@ public class EligibleMemberService {
         this.clock = clock;
     }
 
-    public void addSingle(String studentId, String name) {
+    public void addSingle(String studentId, String name, String generation, String phone) {
         String normalized = normalize(studentId);
         if (!STUDENT_ID_PATTERN.matcher(normalized).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
         }
         EligibleMember member = eligibleMemberRepository.findByStudentId(normalized)
                 .orElseGet(EligibleMember::new);
-        applyExactStudentIdentity(member, normalized, name);
+        applyExactStudentIdentity(member, normalized, name, generation);
+        String normalizedPhone = normalizePhone(phone);
+        if (!normalizedPhone.isBlank()) {
+            member.setPhone(normalizedPhone);
+        }
         eligibleMemberRepository.save(member);
     }
 
@@ -121,14 +125,18 @@ public class EligibleMemberService {
                 .toList();
     }
 
-    public void updateEligibleMember(Long id, String studentId, String name, String phone) {
+    public void updateEligibleMember(Long id, String studentId, String name, String generation, String phone) {
         EligibleMember member = eligibleMemberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "명부에서 해당 항목을 찾을 수 없습니다."));
         String normalizedStudentId = normalize(studentId);
         if (!normalizedStudentId.isBlank()) {
-            applyExactStudentIdentity(member, normalizedStudentId, name);
+            applyExactStudentIdentity(member, normalizedStudentId, name, generation);
         } else {
             member.setName(normalize(name));
+            String explicitGeneration = normalizeGeneration(generation);
+            if (!explicitGeneration.isBlank()) {
+                member.setGeneration(explicitGeneration);
+            }
             if (member.getVerificationKey() != null) {
                 member.setVerificationKey(verificationKey(member.getName(), member.getAdmissionYear()));
             }
@@ -543,11 +551,16 @@ public class EligibleMemberService {
         return normalize(name).toLowerCase(Locale.ROOT) + "|" + admissionYear;
     }
 
-    private void applyExactStudentIdentity(EligibleMember member, String studentId, String name) {
+    private void applyExactStudentIdentity(EligibleMember member, String studentId, String name, String generation) {
         String normalizedStudentId = normalize(studentId);
         member.setStudentId(normalizedStudentId);
         member.setName(normalize(name));
-        member.setGeneration(calculateGeneration(normalizedStudentId));
+        // 기수: explicit admin input wins over the studentId-derived value (편입생 등
+        // 학번 연도와 기수가 다를 수 있다). Derivation stays as the no-input default.
+        String explicitGeneration = normalizeGeneration(generation);
+        member.setGeneration(explicitGeneration.isBlank()
+                ? calculateGeneration(normalizedStudentId)
+                : explicitGeneration);
         member.setAdmissionYear(admissionYear(normalizedStudentId, null));
         if (member.getVerificationKey() != null) {
             member.setVerificationKey(verificationKey(member.getName(), member.getAdmissionYear()));
