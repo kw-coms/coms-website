@@ -57,6 +57,10 @@ export async function updateMemberRole(id, role) {
   })
 }
 
+export async function listRecruitPromotions() {
+  return request('/api/admin/recruit-promotions')
+}
+
 export async function updateMemberGeneration(id, generation) {
   return request(`/api/admin/members/${id}/generation`, {
     method: 'PATCH',

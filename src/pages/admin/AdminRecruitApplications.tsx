@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { updateRecruitApplicationStatus } from '../../services/adminApi'
+import { useEffect, useState } from 'react'
+import { listRecruitPromotions, updateRecruitApplicationStatus } from '../../services/adminApi'
 import { RECRUIT_STATUS_OPTIONS, recruitStatusLabel } from './recruitStatus'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
@@ -31,6 +31,14 @@ export default function AdminRecruitApplications({ applications, loading, error,
   const [savingId, setSavingId] = useState(null)
   const [message, setMessage] = useState('')
   const [saveError, setSaveError] = useState('')
+  const [promotions, setPromotions] = useState<any[]>([])
+
+  const loadPromotions = () => {
+    listRecruitPromotions()
+      .then((data) => setPromotions(Array.isArray(data) ? data : []))
+      .catch(() => setPromotions([]))
+  }
+  useEffect(loadPromotions, [])
 
   const updateDraft = (id, patch) => {
     setDrafts((prev) => ({
@@ -57,7 +65,12 @@ export default function AdminRecruitApplications({ applications, loading, error,
           adminNote: updated.adminNote || '',
         },
       }))
-      setMessage(`${updated.name} 지원서를 저장했습니다.`)
+      if (updated.status === 'ACCEPTED') {
+        setMessage(`${updated.name} 합격 — 명부에 등록하고 지원서를 정리했습니다.`)
+        loadPromotions()
+      } else {
+        setMessage(`${updated.name} 지원서를 저장했습니다.`)
+      }
     } catch (err) {
       setSaveError(err.message || '지원서 상태를 저장하지 못했습니다.')
     } finally {
@@ -191,6 +204,54 @@ export default function AdminRecruitApplications({ applications, loading, error,
           })}
         </div>
       )}
+
+      <div className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-[var(--theme-body-dark)]">합격 이관 이력 (최근 100건)</h3>
+            <p className="mt-1 text-xs text-[var(--theme-body-muted)]">합격 처리된 지원서는 명부로 이관 후 삭제되며, 이 목록이 원본 기록입니다.</p>
+          </div>
+          <button
+            type="button"
+            onClick={loadPromotions}
+            className="shape-cut-sm border border-[var(--app-hairline)] bg-white/60 px-3 py-1.5 text-xs font-semibold text-[var(--theme-body-dark)] hover:bg-white/80"
+          >
+            새로고침
+          </button>
+        </div>
+        {promotions.length === 0 ? (
+          <p className="mt-3 text-sm text-[var(--theme-body-muted)]">이관 기록이 없습니다.</p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-xs">
+              <thead className="border-b border-[var(--app-hairline)] text-[var(--theme-body-muted)]">
+                <tr>
+                  <th className="px-2 py-2">이관일</th>
+                  <th className="px-2 py-2">이름</th>
+                  <th className="px-2 py-2">학번</th>
+                  <th className="px-2 py-2">기수</th>
+                  <th className="px-2 py-2">학과</th>
+                  <th className="px-2 py-2">전화번호</th>
+                  <th className="px-2 py-2">처리자</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/10">
+                {promotions.map((log) => (
+                  <tr key={log.id} className="text-[var(--theme-body-dark)]">
+                    <td className="px-2 py-2 whitespace-nowrap">{formatDateTime(log.promotedAt)}</td>
+                    <td className="px-2 py-2 font-semibold">{log.name}</td>
+                    <td className="px-2 py-2 font-mono">{log.studentId || '-'}</td>
+                    <td className="px-2 py-2">{log.generation ? `${log.generation}기` : '-'}</td>
+                    <td className="px-2 py-2">{log.department || '-'}</td>
+                    <td className="px-2 py-2">{log.phone || '-'}</td>
+                    <td className="px-2 py-2">{log.promotedBy || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
