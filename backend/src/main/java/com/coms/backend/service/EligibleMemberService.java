@@ -146,7 +146,8 @@ public class EligibleMemberService {
         return snapshot;
     }
 
-    public void validateAndClaimSignup(String studentId, String name, String verificationType, String verificationValue) {
+    public void validateAndClaimSignup(String studentId, String name, String verificationType, String verificationValue,
+                                       String phone) {
         String normalizedStudentId = normalize(studentId);
         String normalizedName = normalize(name);
 
@@ -166,6 +167,7 @@ public class EligibleMemberService {
             if (!exact.get().getName().equals(normalizedName)) {
                 throw invalidRoster();
             }
+            requirePhoneMatchWhenRosterHasPhone(exact.get(), phone);
             return;
         }
 
@@ -186,11 +188,13 @@ public class EligibleMemberService {
                 && !normalizedStudentId.equals(match.getStudentId())) {
             throw invalidRoster();
         }
+        requirePhoneMatchWhenRosterHasPhone(match, phone);
         match.setStudentId(normalizedStudentId);
         eligibleMemberRepository.save(match);
     }
 
-    public String validateAndClaimGraduateSignup(String name, String verificationType, String verificationValue) {
+    public String validateAndClaimGraduateSignup(String name, String verificationType, String verificationValue,
+                                                 String phone) {
         String normalizedName = normalize(name);
         if (!NAME_PATTERN.matcher(normalizedName).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름은 한글 2~10자여야 합니다.");
@@ -207,6 +211,7 @@ public class EligibleMemberService {
         }
 
         EligibleMember match = matches.getFirst();
+        requirePhoneMatchWhenRosterHasPhone(match, phone);
         String accountId = normalize(match.getStudentId());
         if (accountId.isBlank()) {
             accountId = generateGraduateAccountId(match);
@@ -546,6 +551,22 @@ public class EligibleMemberService {
         member.setAdmissionYear(admissionYear(normalizedStudentId, null));
         if (member.getVerificationKey() != null) {
             member.setVerificationKey(verificationKey(member.getName(), member.getAdmissionYear()));
+        }
+    }
+
+    /**
+     * When the roster row carries a phone number, the signup must present the same number.
+     * Student id + name pairs are semi-public (roster leaks, class lists), so without this an
+     * attacker could claim someone else's account slot with their own email. Mismatches reuse
+     * the generic roster error so the endpoint doesn't become a phone-number oracle.
+     */
+    private void requirePhoneMatchWhenRosterHasPhone(EligibleMember rosterEntry, String phone) {
+        String rosterPhone = normalizePhone(rosterEntry.getPhone());
+        if (rosterPhone.isBlank()) {
+            return;
+        }
+        if (!rosterPhone.equals(normalizePhone(phone))) {
+            throw invalidRoster();
         }
     }
 

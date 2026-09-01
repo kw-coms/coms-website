@@ -9,6 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.net.ssl.*;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URI;
@@ -76,24 +79,43 @@ public class LinkPreviewService {
                     .GET()
                     .build();
 
-            HttpResponse<byte[]> response = pinnedClient.send(request,
-                    HttpResponse.BodyHandlers.ofByteArray());
-            if (response.statusCode() >= 300) {
-                return fallback(rawUrl, fallbackTitle);
+            // Stream the body and stop reading at MAX_BODY_BYTES: ofByteArray() would buffer
+            // an attacker-sized response entirely in heap before we could truncate it.
+            HttpResponse<InputStream> response = pinnedClient.send(request,
+                    HttpResponse.BodyHandlers.ofInputStream());
+            try (InputStream bodyStream = response.body()) {
+                if (response.statusCode() >= 300) {
+                    return fallback(rawUrl, fallbackTitle);
+                }
+                String contentType = response.headers().firstValue("Content-Type").orElse("");
+                if (!contentType.toLowerCase(Locale.ROOT).contains("text/html")) {
+                    return fallback(rawUrl, fallbackTitle);
+                }
+                byte[] body = readAtMost(bodyStream, MAX_BODY_BYTES);
+                String html = new String(body, StandardCharsets.UTF_8);
+                return parse(rawUrl, host, html);
             }
-            String contentType = response.headers().firstValue("Content-Type").orElse("");
-            if (!contentType.toLowerCase(Locale.ROOT).contains("text/html")) {
-                return fallback(rawUrl, fallbackTitle);
-            }
-            byte[] body = response.body();
-            String html = new String(body, 0, Math.min(body.length, MAX_BODY_BYTES),
-                    StandardCharsets.UTF_8);
-            return parse(rawUrl, host, html);
         } catch (ResponseStatusException e) {
             throw e;
         } catch (Exception e) {
             return fallback(rawUrl, fallbackTitle);
         }
+    }
+
+    /** Reads up to {@code maxBytes} from the stream and discards the rest without buffering it. */
+    static byte[] readAtMost(InputStream in, int maxBytes) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream(Math.min(maxBytes, 16 * 1024));
+        byte[] buffer = new byte[8 * 1024];
+        int remaining = maxBytes;
+        while (remaining > 0) {
+            int read = in.read(buffer, 0, Math.min(buffer.length, remaining));
+            if (read < 0) {
+                break;
+            }
+            out.write(buffer, 0, read);
+            remaining -= read;
+        }
+        return out.toByteArray();
     }
 
     private URI parseAndValidate(String rawUrl) {
