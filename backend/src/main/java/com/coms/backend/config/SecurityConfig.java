@@ -96,6 +96,8 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.POST, "/api/notices/*/vote").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/notices").hasAnyRole("ADMIN", "OFFICER");
                 auth.requestMatchers(HttpMethod.PATCH, "/api/notices/*/pin").hasAnyRole("ADMIN", "OFFICER");
+                // 작성자 변경은 회장 전용 (커뮤니티 /posts/*/author 규칙과 동일 정책).
+                auth.requestMatchers(HttpMethod.PATCH, "/api/notices/*/author").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.PUT, "/api/notices/**").hasAnyRole("ADMIN", "OFFICER");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/notices/**").hasAnyRole("ADMIN", "OFFICER");
                 auth.requestMatchers(HttpMethod.GET, "/api/club-activities", "/api/club-activities/**").authenticated();
