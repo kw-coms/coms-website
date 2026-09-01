@@ -6,6 +6,7 @@ import com.coms.backend.dto.RecruitApplicationStatusResponse;
 import com.coms.backend.dto.RecruitApplicationStatusUpdateRequest;
 import com.coms.backend.dto.RecruitApplicationRequest;
 import com.coms.backend.repository.RecruitApplicationRepository;
+import com.coms.backend.repository.RecruitPromotionLogRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
@@ -36,6 +37,9 @@ class RecruitApplicationServiceTest {
                 mailSender,
                 repository,
                 mock(NotificationService.class),
+                mock(EligibleMemberService.class),
+                mock(RecruitPromotionLogRepository.class),
+                java.time.Clock.systemDefaultZone(),
                 true,
                 "no-reply@coms.kw.ac.kr",
                 "recruit@coms.kw.ac.kr"
@@ -76,6 +80,9 @@ class RecruitApplicationServiceTest {
                 mailSender,
                 repository,
                 notificationService,
+                mock(EligibleMemberService.class),
+                mock(RecruitPromotionLogRepository.class),
+                java.time.Clock.systemDefaultZone(),
                 false,
                 "no-reply@coms.kw.ac.kr",
                 "recruit@coms.kw.ac.kr"
@@ -98,6 +105,9 @@ class RecruitApplicationServiceTest {
                 mock(JavaMailSender.class),
                 repository,
                 mock(NotificationService.class),
+                mock(EligibleMemberService.class),
+                mock(RecruitPromotionLogRepository.class),
+                java.time.Clock.systemDefaultZone(),
                 true,
                 "no-reply@coms.kw.ac.kr",
                 "recruit@coms.kw.ac.kr"
@@ -122,6 +132,9 @@ class RecruitApplicationServiceTest {
                 mailSender,
                 repository,
                 notificationService,
+                mock(EligibleMemberService.class),
+                mock(RecruitPromotionLogRepository.class),
+                java.time.Clock.systemDefaultZone(),
                 true,
                 "no-reply@coms.kw.ac.kr",
                 "recruit@coms.kw.ac.kr"
@@ -152,6 +165,9 @@ class RecruitApplicationServiceTest {
                 mock(JavaMailSender.class),
                 repository,
                 mock(NotificationService.class),
+                mock(EligibleMemberService.class),
+                mock(RecruitPromotionLogRepository.class),
+                java.time.Clock.systemDefaultZone(),
                 true,
                 "no-reply@coms.kw.ac.kr",
                 "recruit@coms.kw.ac.kr"
@@ -159,13 +175,78 @@ class RecruitApplicationServiceTest {
 
         var response = service.updateStatus(
                 1L,
-                new RecruitApplicationStatusUpdateRequest("ACCEPTED", "OT 안내 완료")
+                new RecruitApplicationStatusUpdateRequest("ACCEPTED", "OT 안내 완료"), "admin"
         );
 
         assertThat(application.getStatus()).isEqualTo(RecruitApplication.Status.ACCEPTED);
         assertThat(application.getAdminNote()).isEqualTo("OT 안내 완료");
         assertThat(response.status()).isEqualTo("ACCEPTED");
         assertThat(response.adminNote()).isEqualTo("OT 안내 완료");
+    }
+
+    @Test
+    void acceptedStatusPromotesToRosterLogsAndDeletesApplication() {
+        RecruitApplication application = new RecruitApplication();
+        application.setName("박경택");
+        application.setStudentId("2026403003");
+        application.setPhone("01023870490");
+        application.setDepartment("소프트웨어학부");
+        application.setStatus(RecruitApplication.Status.REVIEWING);
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.findById(1L)).thenReturn(Optional.of(application));
+        EligibleMemberService eligible = mock(EligibleMemberService.class);
+        RecruitPromotionLogRepository promotionLogs = mock(RecruitPromotionLogRepository.class);
+        java.time.Clock fixed = java.time.Clock.fixed(java.time.Instant.parse("2026-09-02T00:00:00Z"), java.time.ZoneId.of("Asia/Seoul"));
+        RecruitApplicationService service = new RecruitApplicationService(
+                mock(JavaMailSender.class),
+                repository,
+                mock(NotificationService.class),
+                eligible,
+                promotionLogs,
+                fixed,
+                true,
+                "no-reply@coms.kw.ac.kr",
+                "recruit@coms.kw.ac.kr"
+        );
+
+        service.updateStatus(1L, new RecruitApplicationStatusUpdateRequest("ACCEPTED", null), "2026402040");
+
+        // 2026 - 1966 = 60기 as the joining cohort, regardless of the studentId year.
+        verify(eligible).addSingle("2026403003", "박경택", "60", "01023870490");
+        ArgumentCaptor<com.coms.backend.domain.RecruitPromotionLog> logCaptor =
+                ArgumentCaptor.forClass(com.coms.backend.domain.RecruitPromotionLog.class);
+        verify(promotionLogs).save(logCaptor.capture());
+        assertThat(logCaptor.getValue().getName()).isEqualTo("박경택");
+        assertThat(logCaptor.getValue().getGeneration()).isEqualTo("60");
+        assertThat(logCaptor.getValue().getPromotedBy()).isEqualTo("2026402040");
+        verify(repository).delete(application);
+    }
+
+    @Test
+    void nonAcceptedStatusDoesNotTouchRosterOrDeleteApplication() {
+        RecruitApplication application = new RecruitApplication();
+        application.setStatus(RecruitApplication.Status.RECEIVED);
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.findById(1L)).thenReturn(Optional.of(application));
+        EligibleMemberService eligible = mock(EligibleMemberService.class);
+        RecruitPromotionLogRepository promotionLogs = mock(RecruitPromotionLogRepository.class);
+        RecruitApplicationService service = new RecruitApplicationService(
+                mock(JavaMailSender.class),
+                repository,
+                mock(NotificationService.class),
+                eligible,
+                promotionLogs,
+                java.time.Clock.systemDefaultZone(),
+                true,
+                "no-reply@coms.kw.ac.kr",
+                "recruit@coms.kw.ac.kr"
+        );
+
+        service.updateStatus(1L, new RecruitApplicationStatusUpdateRequest("REVIEWING", null), "admin");
+
+        verify(eligible, never()).addSingle(any(), any(), any(), any());
+        verify(promotionLogs, never()).save(any());
+        verify(repository, never()).delete(any(RecruitApplication.class));
     }
 
     @Test
@@ -176,6 +257,9 @@ class RecruitApplicationServiceTest {
                 mock(JavaMailSender.class),
                 repository,
                 mock(NotificationService.class),
+                mock(EligibleMemberService.class),
+                mock(RecruitPromotionLogRepository.class),
+                java.time.Clock.systemDefaultZone(),
                 true,
                 "no-reply@coms.kw.ac.kr",
                 "recruit@coms.kw.ac.kr"
@@ -183,7 +267,7 @@ class RecruitApplicationServiceTest {
 
         assertThatThrownBy(() -> service.updateStatus(
                 1L,
-                new RecruitApplicationStatusUpdateRequest("MAYBE", "애매함")
+                new RecruitApplicationStatusUpdateRequest("MAYBE", "애매함"), "admin"
         ))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
@@ -248,6 +332,9 @@ class RecruitApplicationServiceTest {
                 mock(JavaMailSender.class),
                 repository,
                 mock(NotificationService.class),
+                mock(EligibleMemberService.class),
+                mock(RecruitPromotionLogRepository.class),
+                java.time.Clock.systemDefaultZone(),
                 true,
                 "no-reply@coms.kw.ac.kr",
                 "recruit@coms.kw.ac.kr"

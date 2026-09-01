@@ -64,7 +64,7 @@ export default function AdminRoster() {
     e.preventDefault()
     const isGraduate = addForm.mode === 'graduate'
     if (!addForm.name.trim()) return
-    if (!isGraduate && !addForm.studentId.trim()) return
+    if (!isGraduate && !addForm.studentId.trim() && !addForm.generation.trim()) return
     if (isGraduate && !addForm.admissionYear.trim() && !addForm.generation.trim()) return
     if (isGraduate && !addForm.admissionYear.trim() && parseInt(addForm.generation.trim(), 10) < 1) return
     setAdding(true)
@@ -73,17 +73,18 @@ export default function AdminRoster() {
     try {
       const payload: { name: string; studentId?: string; admissionYear?: string; generation?: string; phone?: string } = { name: addForm.name.trim() }
       if (!isGraduate) {
-        payload.studentId = addForm.studentId.trim()
+        // 학번 미상이면 이름+기수(+전화)만으로 임시 등록되고, 학번은 나중에 편집으로 채운다.
+        if (addForm.studentId.trim()) payload.studentId = addForm.studentId.trim()
         if (addForm.generation.trim()) payload.generation = addForm.generation.trim()
-        if (addForm.phone.trim()) payload.phone = addForm.phone.trim()
       } else if (addForm.admissionYear.trim()) {
         payload.admissionYear = addForm.admissionYear.trim()
       } else {
         payload.generation = addForm.generation.trim()
       }
+      if (addForm.phone.trim()) payload.phone = addForm.phone.trim()
       await addEligibleMember(payload)
       const label = !isGraduate
-        ? `${addForm.name} (${addForm.studentId})`
+        ? `${addForm.name} (${addForm.studentId.trim() || `${addForm.generation}기 · 학번 미입력`})`
         : addForm.admissionYear.trim()
           ? `${addForm.name} (${addForm.admissionYear}학번)`
           : `${addForm.name} (${addForm.generation}기)`
@@ -193,7 +194,7 @@ export default function AdminRoster() {
               <input
                 value={addForm.generation}
                 onChange={(e) => setAddForm((p) => ({ ...p, generation: e.target.value.replace(/[^0-9]/g, '') }))}
-                placeholder="기수 (미입력 시 학번 기준)"
+                placeholder="기수 (학번 없으면 필수)"
                 maxLength={3}
                 inputMode="numeric"
                 className="shape-cut-sm w-44 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
@@ -225,6 +226,14 @@ export default function AdminRoster() {
                 inputMode="numeric"
                 className="shape-cut-sm w-32 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
               />
+              <input
+                value={addForm.phone}
+                onChange={(e) => setAddForm((p) => ({ ...p, phone: e.target.value.replace(/[^0-9]/g, '') }))}
+                placeholder="전화번호 (선택)"
+                maxLength={11}
+                inputMode="tel"
+                className="shape-cut-sm w-40 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+              />
             </div>
           )}
           <input
@@ -239,7 +248,7 @@ export default function AdminRoster() {
             disabled={
               adding || !addForm.name.trim() ||
               (addForm.mode === 'current'
-                ? !addForm.studentId.trim()
+                ? !addForm.studentId.trim() && !addForm.generation.trim()
                 : !addForm.admissionYear.trim() && !addForm.generation.trim())
             }
             className="shape-cut-sm bg-[var(--theme-text)] px-4 py-2 text-sm font-semibold text-[var(--theme-bg)] transition hover:opacity-90 disabled:opacity-50"
