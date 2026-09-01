@@ -10,4 +10,6 @@ public interface MobilePushTokenRepository extends JpaRepository<MobilePushToken
     Optional<MobilePushToken> findByToken(String token);
 
     List<MobilePushToken> findByMemberStudentIdAndEnabledTrue(String memberStudentId);
+
+    void deleteByMemberStudentId(String memberStudentId);
 }

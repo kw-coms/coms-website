@@ -345,7 +345,7 @@ class AuthServiceTest {
 
         when(repo.existsByStudentId("2026123462")).thenReturn(false);
         when(repo.existsByEmail("new@example.com")).thenReturn(false);
-        doNothing().when(eligible).validateAndClaimSignup("2026123462", "홍길동", null, null);
+        doNothing().when(eligible).validateAndClaimSignup("2026123462", "홍길동", null, null, "01012345678");
         when(repo.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
         doThrow(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "이메일 발송에 실패했습니다."))
                 .when(sender).sendVerificationCode(anyString(), anyString());

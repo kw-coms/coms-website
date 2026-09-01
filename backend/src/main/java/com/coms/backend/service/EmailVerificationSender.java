@@ -51,7 +51,7 @@ public class EmailVerificationSender {
 
     public void sendExternalInvite(String to, String subject, String text) {
         if (!mailEnabled) {
-            log.info("External invite mail skipped for {} (mail disabled)", to);
+            log.info("External invite mail skipped for {} (mail disabled)", mask(to));
             return;
         }
         try {
@@ -61,8 +61,9 @@ public class EmailVerificationSender {
             message.setSubject(subject);
             message.setText(text);
             mailSender.send(message);
+            log.info("External invite mail sent to {}", mask(to));
         } catch (RuntimeException e) {
-            log.warn("Failed to send external invite mail to {}", to, e);
+            log.warn("Failed to send external invite mail to {}", mask(to), e);
         }
     }
 
@@ -82,9 +83,24 @@ public class EmailVerificationSender {
             message.setSubject(subject);
             message.setText(text);
             mailSender.send(message);
+            // Success used to be silent, which made "mail isn't arriving" reports
+            // undiagnosable from logs alone (had to correlate against DB code hashes).
+            log.info("{} sent to {}", logLabel, mask(to));
         } catch (RuntimeException e) {
-            log.warn("Failed to send {} to {}", logLabel, to, e);
+            log.warn("Failed to send {} to {}", logLabel, mask(to), e);
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "이메일 발송에 실패했습니다.");
         }
+    }
+
+    /** Masks the local part so delivery logs don't hold full addresses (e.g. cho***@gmail.com). */
+    private static String mask(String email) {
+        if (email == null || email.isBlank()) {
+            return "unknown";
+        }
+        int at = email.indexOf('@');
+        if (at <= 0) {
+            return "***";
+        }
+        return email.substring(0, Math.min(3, at)) + "***" + email.substring(at);
     }
 }

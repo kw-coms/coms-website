@@ -184,7 +184,8 @@ public class AuthService implements UserDetailsService {
             return eligibleMemberService.validateAndClaimGraduateSignup(
                     request.name(),
                     request.graduateVerificationType(),
-                    request.graduateVerificationValue()
+                    request.graduateVerificationValue(),
+                    request.phone()
             );
         }
 
@@ -196,7 +197,8 @@ public class AuthService implements UserDetailsService {
                 studentId,
                 request.name(),
                 request.graduateVerificationType(),
-                request.graduateVerificationValue()
+                request.graduateVerificationValue(),
+                request.phone()
         );
         return studentId;
     }
@@ -289,6 +291,7 @@ public class AuthService implements UserDetailsService {
         }
 
         Member member = findPasswordResetMember(studentId, normalizedEmail)
+                .flatMap(found -> memberRepository.findWithLockById(found.getId()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "인증 정보가 올바르지 않습니다."));
         bannedStudentService.ensureNotBanned(member.getStudentId());
 
@@ -420,6 +423,7 @@ public class AuthService implements UserDetailsService {
 
     public boolean confirmEmailVerification(String studentId, String code) {
         Member member = findMemberByIdentifier(studentId)
+                .flatMap(found -> memberRepository.findWithLockById(found.getId()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         bannedStudentService.ensureNotBanned(member.getStudentId());
 

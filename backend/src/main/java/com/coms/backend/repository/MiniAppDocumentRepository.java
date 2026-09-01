@@ -16,4 +16,6 @@ public interface MiniAppDocumentRepository extends JpaRepository<MiniAppDocument
     List<MiniAppDocument> findByAppAndOwnerStudentIdOrderByUpdatedAtDesc(String app, String ownerStudentId);
 
     List<MiniAppDocument> findTop100ByAppAndSharedTrueOrderBySharedAtDesc(String app);
+
+    void deleteByOwnerStudentId(String ownerStudentId);
 }
