@@ -146,10 +146,10 @@ export function ArchiveListView({
         ) : (
           <>
           <div className="grid gap-3 p-4 md:hidden">
-            {visibleFiles.map((file, index) => {
+            {visibleFiles.map((file) => {
               const open = () => onOpenFile(file)
               return (
-                <article key={file.id} className="apple-soft-panel p-4" data-reveal style={{ '--reveal-delay': `${Math.min(index, 6) * 55}ms` } as React.CSSProperties}>
+                <article key={file.id} className="apple-soft-panel p-4">
                   <button
                     type="button"
                     onClick={open}
@@ -200,7 +200,7 @@ export function ArchiveListView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--app-hairline)]">
-                {visibleFiles.map((file, index) => {
+                {visibleFiles.map((file) => {
                   const open = () => onOpenFile(file)
                   return (
                     <tr
@@ -210,8 +210,6 @@ export function ArchiveListView({
                       onClick={open}
                       onKeyDown={(event) => openRowWithKeyboard(event, open)}
                       className="cursor-pointer text-[var(--app-muted)] focus:outline-none focus:bg-[var(--app-surface-soft)]"
-                      data-reveal
-                      style={{ '--reveal-delay': `${Math.min(index, 6) * 55}ms` } as React.CSSProperties}
                     >
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-[var(--app-subtle)]">{file.id}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
