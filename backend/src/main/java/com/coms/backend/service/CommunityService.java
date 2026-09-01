@@ -982,7 +982,8 @@ public class CommunityService {
         String anonymousDisplay = anonymousIdentity.anonymousDisplayName(post.getAnonymousName(), post.getIpAddress());
         String authorName = maskAnonymous ? anonymousDisplay : (author != null ? author.getName() : post.getAuthorName());
         String authorStudentId = maskAnonymous ? null : post.getAuthorStudentId();
-        String authorDisplayName = maskAnonymous ? anonymousDisplay : CommunityDisplayNames.displayName(post.getAuthorStudentId(), authorName);
+        String authorDisplayName = maskAnonymous ? anonymousDisplay
+                : CommunityDisplayNames.displayName(author == null ? null : author.getGeneration(), post.getAuthorStudentId(), authorName);
         VoteSummary votes = voteStats.getOrDefault(post.getId(), VoteSummary.EMPTY);
         long commentCount = commentCounts.getOrDefault(post.getId(), 0L);
         List<CommunityPostImage> extraImages = imagesByPost != null

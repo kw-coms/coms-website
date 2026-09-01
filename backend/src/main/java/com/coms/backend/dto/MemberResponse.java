@@ -7,6 +7,7 @@ public record MemberResponse(
         String email,
         boolean emailVerified,
         String department,
+        String generation,
         String phone,
         String role,
         String aspiration,

@@ -236,7 +236,7 @@ class EligibleMemberServiceTest {
         eligibleMemberService.validateAndClaimSignup("2019123456", "홍길동", "YEAR", "19", null);
         var claimed = eligibleMemberRepository.findByStudentId("2019123456").orElseThrow();
 
-        eligibleMemberService.updateEligibleMember(claimed.getId(), "2018123456", "김철수", null);
+        eligibleMemberService.updateEligibleMember(claimed.getId(), "2018123456", "김철수", null, null);
 
         assertThat(eligibleMemberRepository.findByVerificationKey("김철수|2018")).isPresent();
         assertThat(eligibleMemberRepository.findByVerificationKey("홍길동|2019")).isEmpty();

@@ -13,12 +13,12 @@ export default function AdminRoster() {
   const [roster, setRoster] = useState([])
   const [loadingRoster, setLoadingRoster] = useState(true)
   const [rosterError, setRosterError] = useState('')
-  const [addForm, setAddForm] = useState({ mode: 'current', studentId: '', name: '', admissionYear: '', generation: '' })
+  const [addForm, setAddForm] = useState({ mode: 'current', studentId: '', name: '', admissionYear: '', generation: '', phone: '' })
   const [adding, setAdding] = useState(false)
   const [addResult, setAddResult] = useState('')
   const [addError, setAddError] = useState('')
   const [editingId, setEditingId] = useState(null)
-  const [editForm, setEditForm] = useState({ studentId: '', name: '', phone: '' })
+  const [editForm, setEditForm] = useState({ studentId: '', name: '', phone: '', generation: '' })
   const [editSaving, setEditSaving] = useState(false)
 
   const loadRoster = async () => {
@@ -71,9 +71,11 @@ export default function AdminRoster() {
     setAddResult('')
     setAddError('')
     try {
-      const payload: { name: string; studentId?: string; admissionYear?: string; generation?: string } = { name: addForm.name.trim() }
+      const payload: { name: string; studentId?: string; admissionYear?: string; generation?: string; phone?: string } = { name: addForm.name.trim() }
       if (!isGraduate) {
         payload.studentId = addForm.studentId.trim()
+        if (addForm.generation.trim()) payload.generation = addForm.generation.trim()
+        if (addForm.phone.trim()) payload.phone = addForm.phone.trim()
       } else if (addForm.admissionYear.trim()) {
         payload.admissionYear = addForm.admissionYear.trim()
       } else {
@@ -86,7 +88,7 @@ export default function AdminRoster() {
           ? `${addForm.name} (${addForm.admissionYear}학번)`
           : `${addForm.name} (${addForm.generation}기)`
       setAddResult(`${label} 명부에 추가됐습니다.`)
-      setAddForm((p) => ({ ...p, studentId: '', name: '', admissionYear: '', generation: '' }))
+      setAddForm((p) => ({ ...p, studentId: '', name: '', admissionYear: '', generation: '', phone: '' }))
       await loadRoster()
     } catch (err) {
       setAddError(err.message || '추가 중 오류가 발생했습니다.')
@@ -97,14 +99,14 @@ export default function AdminRoster() {
 
   const startEdit = (member) => {
     setEditingId(member.id)
-    setEditForm({ studentId: member.studentId || '', name: member.name, phone: member.phone || '' })
+    setEditForm({ studentId: member.studentId || '', name: member.name, phone: member.phone || '', generation: member.generation == null ? '' : String(member.generation) })
   }
 
   const handleEditSave = async (id) => {
     if (!editForm.name.trim()) return
     setEditSaving(true)
     try {
-      await updateEligibleMember(id, editForm.studentId.trim() || null, editForm.name.trim(), editForm.phone.trim())
+      await updateEligibleMember(id, editForm.studentId.trim() || null, editForm.name.trim(), editForm.phone.trim(), editForm.generation.trim())
       setEditingId(null)
       await loadRoster()
     } catch (err) {
@@ -180,13 +182,31 @@ export default function AdminRoster() {
         </div>
         <form onSubmit={handleAdd} className="mt-3 flex flex-wrap gap-2">
           {addForm.mode === 'current' ? (
-            <input
-              value={addForm.studentId}
-              onChange={(e) => setAddForm((p) => ({ ...p, studentId: e.target.value }))}
-              placeholder="학번 (10자리)"
-              maxLength={10}
-              className="shape-cut-sm w-40 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
-            />
+            <div className="flex flex-wrap gap-2">
+              <input
+                value={addForm.studentId}
+                onChange={(e) => setAddForm((p) => ({ ...p, studentId: e.target.value }))}
+                placeholder="학번 (10자리)"
+                maxLength={10}
+                className="shape-cut-sm w-40 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+              />
+              <input
+                value={addForm.generation}
+                onChange={(e) => setAddForm((p) => ({ ...p, generation: e.target.value.replace(/[^0-9]/g, '') }))}
+                placeholder="기수 (미입력 시 학번 기준)"
+                maxLength={3}
+                inputMode="numeric"
+                className="shape-cut-sm w-44 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+              />
+              <input
+                value={addForm.phone}
+                onChange={(e) => setAddForm((p) => ({ ...p, phone: e.target.value.replace(/[^0-9]/g, '') }))}
+                placeholder="전화번호 (선택)"
+                maxLength={11}
+                inputMode="tel"
+                className="shape-cut-sm w-40 border border-[var(--app-hairline)] bg-white/70 px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none focus:ring-2 focus:ring-[var(--theme-accent)]/50"
+              />
+            </div>
           ) : (
             <div className="flex flex-wrap gap-2">
               <input
@@ -302,6 +322,10 @@ export default function AdminRoster() {
                             <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} maxLength={20} className={`${inputCls} w-28`} />
                           </div>
                           <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] text-[var(--theme-body-muted)]">기수</span>
+                            <input value={editForm.generation} onChange={(e) => setEditForm((p) => ({ ...p, generation: e.target.value.replace(/[^0-9]/g, '') }))} maxLength={3} placeholder="60" className={`${inputCls} w-16`} />
+                          </div>
+                          <div className="flex flex-col gap-0.5">
                             <span className="text-[10px] text-[var(--theme-body-muted)]">전화번호</span>
                             <input value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} maxLength={11} placeholder="01012345678" className={`${inputCls} w-36`} />
                           </div>
@@ -337,7 +361,7 @@ export default function AdminRoster() {
         <p className="text-sm font-semibold text-[var(--theme-body-dark)]">명부 일괄 업로드</p>
         <p className="mt-2 text-sm leading-6 text-[var(--theme-body-muted)]">
           엑셀(.xlsx) 또는 구글 폼 CSV를 업로드하면 회원가입 시 학번·이름을 대조합니다.
-          전화번호 열이 있으면 저장해 관리자가 확인할 수 있습니다. 기수는 학번에서 자동 계산됩니다.
+          전화번호 열이 있으면 저장해 관리자가 확인할 수 있습니다. 기수는 직접 입력한 값이 우선이며, 미입력 시 학번에서 자동 계산됩니다.
         </p>
 
         <input

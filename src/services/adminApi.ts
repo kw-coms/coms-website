@@ -57,6 +57,13 @@ export async function updateMemberRole(id, role) {
   })
 }
 
+export async function updateMemberGeneration(id, generation) {
+  return request(`/api/admin/members/${id}/generation`, {
+    method: 'PATCH',
+    body: JSON.stringify({ generation }),
+  })
+}
+
 export async function deleteMember(id) {
   return requestNoContent(`/api/admin/members/${id}`, {
     method: 'DELETE',
@@ -74,10 +81,10 @@ export async function addEligibleMember(payload) {
   })
 }
 
-export async function updateEligibleMember(id, studentId, name, phone) {
+export async function updateEligibleMember(id, studentId, name, phone, generation) {
   return requestNoContent(`/api/admin/eligible-members/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ studentId, name, phone: phone || null }),
+    body: JSON.stringify({ studentId, name, phone: phone || null, generation: generation || null }),
   })
 }
 
