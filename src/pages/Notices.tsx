@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify'
 import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Pin, PinOff, Search, Sparkles, ThumbsUp, Trash2, UsersRound } from 'lucide-react'
-import { getNotice, createNotice, updateNotice, deleteNotice, voteNotice, pinNotice } from '../services/noticeApi'
+import { getNotice, createNotice, updateNotice, deleteNotice, voteNotice, pinNotice, updateNoticeAuthor } from '../services/noticeApi'
 import { showToast } from '../components/common/Toast'
-import { confirmDialog } from '../components/common/ConfirmDialog'
+import { confirmDialog, promptDialog } from '../components/common/ConfirmDialog'
 import { Skeleton, SkeletonLine, SkeletonGroup } from '../components/common/Skeleton'
 import ErrorState from '../components/common/ErrorState'
 import { fetchLinkPreview, searchYoutubeVideos } from '../services/communityApi'
@@ -19,7 +19,7 @@ import { URL_ONLY_RICH_FEATURES } from '../components/richEditor/richBodyFeature
 import { renderRichBody, richBodyToPlainText as noticeContentSearchText } from '../components/richEditor/renderRichBody'
 import { serializeRichBody, richBodyPlainText } from '../components/richEditor/serializeRichBody'
 import { parsePostBlocks } from './community/postEditorUtils'
-import { canManageContent } from '../utils/roleAccess'
+import { canManageContent, canManageSensitiveAdmin } from '../utils/roleAccess'
 import Chip from '../components/common/Chip'
 
 function formatDate(iso) {
@@ -282,6 +282,25 @@ export default function Notices() {
       showToast({ message: err.message || '고정 처리 중 오류가 발생했습니다.', tone: 'error' })
     } finally {
       setPinning(false)
+    }
+  }
+
+  // 회장 전용 작성자 변경 (자료실과 동일한 prompt 방식).
+  const handleAuthorEdit = async () => {
+    if (!selectedNotice) return
+    const name = await promptDialog({ message: '공지에 표시할 작성자 이름을 입력하세요.', defaultValue: selectedNotice.author || '' })
+    if (name === null) return
+    if (!name.trim()) {
+      showToast({ message: '작성자 이름을 입력해주세요.', tone: 'error' })
+      return
+    }
+    try {
+      const updated = await updateNoticeAuthor(selectedNotice.id, name.trim())
+      setSelectedNotice(updated)
+      setNotices((prev) => prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
+      showToast({ message: '작성자가 변경되었습니다.', tone: 'success' })
+    } catch (err) {
+      showToast({ message: err.message || '작성자 변경 중 오류가 발생했습니다.', tone: 'error' })
     }
   }
 
@@ -626,6 +645,11 @@ export default function Notices() {
               <button type="button" onClick={backToList} className="apple-action-secondary inline-flex min-h-12 items-center justify-center px-4 py-2 text-sm max-md:col-span-2 sm:min-h-0">
                 목록
               </button>
+              {canManageSensitiveAdmin(user?.role) && (
+                <button type="button" onClick={handleAuthorEdit} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
+                  작성자 변경
+                </button>
+              )}
               {isAdmin && (
                 <>
                   <button type="button" onClick={handlePinSelected} disabled={pinning} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold disabled:opacity-50 max-md:col-span-2 sm:min-h-0">
