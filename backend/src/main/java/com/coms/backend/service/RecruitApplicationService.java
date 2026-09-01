@@ -1,12 +1,15 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.RecruitApplication;
+import com.coms.backend.domain.RecruitPromotionLog;
 import com.coms.backend.dto.RecruitApplicationAdminResponse;
+import com.coms.backend.dto.RecruitPromotionLogResponse;
 import com.coms.backend.dto.RecruitApplicationRequest;
 import com.coms.backend.dto.RecruitApplicationStatusLookupRequest;
 import com.coms.backend.dto.RecruitApplicationStatusResponse;
 import com.coms.backend.dto.RecruitApplicationStatusUpdateRequest;
 import com.coms.backend.repository.RecruitApplicationRepository;
+import com.coms.backend.repository.RecruitPromotionLogRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,8 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.Year;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
@@ -44,9 +49,14 @@ public class RecruitApplicationService {
             RecruitApplication.Status.REJECTED, "불합격"
     );
 
+    private static final int FIRST_GENERATION_YEAR = 1966;
+
     private final JavaMailSender mailSender;
     private final RecruitApplicationRepository recruitApplicationRepository;
     private final NotificationService notificationService;
+    private final EligibleMemberService eligibleMemberService;
+    private final RecruitPromotionLogRepository promotionLogRepository;
+    private final Clock clock;
     private final boolean mailEnabled;
     private final String from;
     private final String to;
@@ -56,12 +66,18 @@ public class RecruitApplicationService {
     public RecruitApplicationService(JavaMailSender mailSender,
                                      RecruitApplicationRepository recruitApplicationRepository,
                                      NotificationService notificationService,
+                                     EligibleMemberService eligibleMemberService,
+                                     RecruitPromotionLogRepository promotionLogRepository,
+                                     Clock clock,
                                      @Value("${mail.enabled:false}") boolean mailEnabled,
                                      @Value("${mail.from:no-reply@coms.kw.ac.kr}") String from,
                                      @Value("${recruit.mail.to:kwcoms69@gmail.com}") String to) {
         this.mailSender = mailSender;
         this.recruitApplicationRepository = recruitApplicationRepository;
         this.notificationService = notificationService;
+        this.eligibleMemberService = eligibleMemberService;
+        this.promotionLogRepository = promotionLogRepository;
+        this.clock = clock;
         this.mailEnabled = mailEnabled;
         this.from = from;
         this.to = to;
@@ -122,12 +138,52 @@ public class RecruitApplicationService {
     }
 
     @Transactional
-    public RecruitApplicationAdminResponse updateStatus(Long id, RecruitApplicationStatusUpdateRequest request) {
+    public RecruitApplicationAdminResponse updateStatus(Long id, RecruitApplicationStatusUpdateRequest request, String adminStudentId) {
         RecruitApplication application = recruitApplicationRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "지원서를 찾을 수 없습니다."));
-        application.setStatus(parseStatus(request.status()));
+        RecruitApplication.Status status = parseStatus(request.status());
+        application.setStatus(status);
         application.setAdminNote(trimToNull(request.adminNote()));
-        return RecruitApplicationAdminResponse.from(application);
+        RecruitApplicationAdminResponse response = RecruitApplicationAdminResponse.from(application);
+        if (status == RecruitApplication.Status.ACCEPTED) {
+            promote(application, adminStudentId);
+        }
+        return response;
+    }
+
+    /**
+     * 합격 처리: 지원서를 명부로 이관하고(현재 연도 기수, 전화번호 포함), 이관 이력을
+     * 별도 로그로 남긴 뒤 지원서를 삭제한다. 명부 upsert가 실패하면 전체가 롤백되어
+     * 지원서가 사라지는 일은 없다.
+     */
+    private void promote(RecruitApplication application, String adminStudentId) {
+        String generation = String.valueOf(Year.now(clock).getValue() - FIRST_GENERATION_YEAR);
+        eligibleMemberService.addSingle(
+                application.getStudentId(),
+                application.getName(),
+                generation,
+                application.getPhone()
+        );
+
+        RecruitPromotionLog log = new RecruitPromotionLog();
+        log.setApplicationId(application.getId());
+        log.setName(application.getName());
+        log.setStudentId(application.getStudentId());
+        log.setDepartment(application.getDepartment());
+        log.setPhone(application.getPhone());
+        log.setEmail(application.getEmail());
+        log.setGeneration(generation);
+        log.setPromotedBy(adminStudentId);
+        promotionLogRepository.save(log);
+
+        recruitApplicationRepository.delete(application);
+    }
+
+    @Transactional(readOnly = true)
+    public List<RecruitPromotionLogResponse> listPromotions() {
+        return promotionLogRepository.findTop100ByOrderByPromotedAtDescIdDesc().stream()
+                .map(RecruitPromotionLogResponse::from)
+                .toList();
     }
 
     private static RecruitApplication.Status parseStatus(String rawStatus) {

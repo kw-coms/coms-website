@@ -187,6 +187,11 @@ export default function Admin({ onBack }: { onBack: () => void }) {
                 onReload={loadRecruitApplications}
                 onUpdated={(updated) => {
                   const next = updated as RecruitApplication
+                  if (next.status === 'ACCEPTED') {
+                    // 합격 처리 시 서버가 지원서를 명부로 이관 후 삭제한다 — 목록에서도 제거.
+                    setRecruitApplications((prev) => prev.filter((item) => item.id !== next.id))
+                    return
+                  }
                   setRecruitApplications((prev) => prev.map((item) => (item.id === next.id ? next : item)))
                 }}
                 formatDateTime={formatDateTime}

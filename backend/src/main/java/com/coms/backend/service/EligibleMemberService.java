@@ -66,6 +66,10 @@ public class EligibleMemberService {
     }
 
     public void addGraduateSingle(String name, String twoDigitYearStr, String generationStr) {
+        addGraduateSingle(name, twoDigitYearStr, generationStr, null);
+    }
+
+    public void addGraduateSingle(String name, String twoDigitYearStr, String generationStr, String phone) {
         String normalizedName = normalize(name);
 
         Integer admissionYear = null;
@@ -91,8 +95,15 @@ public class EligibleMemberService {
 
         String generation = String.valueOf(admissionYear - FIRST_GENERATION_YEAR);
         String verificationKey = verificationKey(normalizedName, admissionYear);
+        String normalizedPhone = normalizePhone(phone);
 
-        if (eligibleMemberRepository.findByVerificationKey(verificationKey).isPresent()) {
+        Optional<EligibleMember> existing = eligibleMemberRepository.findByVerificationKey(verificationKey);
+        if (existing.isPresent()) {
+            // 중복 등록은 무시하되 전화번호는 보강한다.
+            if (!normalizedPhone.isBlank()) {
+                existing.get().setPhone(normalizedPhone);
+                eligibleMemberRepository.save(existing.get());
+            }
             return;
         }
 
@@ -102,6 +113,43 @@ public class EligibleMemberService {
         member.setAdmissionYear(admissionYear);
         member.setGeneration(generation);
         member.setVerificationKey(verificationKey);
+        member.setPhone(normalizedPhone.isBlank() ? null : normalizedPhone);
+        eligibleMemberRepository.save(member);
+    }
+
+    /**
+     * 학번 미상 등록: 이름+기수(+전화)만으로 명부 행을 만든다. 졸업 연령대 기수는 기존
+     * 졸업생 등록(인증 키 발급)으로 위임하고, 현역 기수는 학번 없는 임시 행이 된다 —
+     * 가입 매칭에는 걸리지 않으며(학번 없음 + 재학생 연도라 졸업생 경로도 불가) 관리자가
+     * 편집으로 학번을 채우는 순간부터 가입 가능해진다.
+     */
+    public void addPendingByGeneration(String name, String generationStr, String phone) {
+        String normalizedName = normalize(name);
+        if (normalizedName.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름을 입력해주세요.");
+        }
+        String digits = normalizeGeneration(generationStr);
+        if (!digits.matches("\\d{1,3}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번이 없으면 기수를 입력해주세요.");
+        }
+        int admissionYear = Integer.parseInt(digits) + FIRST_GENERATION_YEAR;
+        if (isGraduate(admissionYear)) {
+            addGraduateSingle(normalizedName, null, digits, phone);
+            return;
+        }
+        // 같은 이름+기수 임시 행이 이미 있으면 전화번호만 보강.
+        List<EligibleMember> existing = eligibleMemberRepository.findAllByNameAndAdmissionYear(normalizedName, admissionYear);
+        EligibleMember member = existing.stream()
+                .filter(m -> m.getStudentId() == null || m.getStudentId().isBlank())
+                .findFirst()
+                .orElseGet(EligibleMember::new);
+        member.setName(normalizedName);
+        member.setGeneration(digits);
+        member.setAdmissionYear(admissionYear);
+        String normalizedPhone = normalizePhone(phone);
+        if (!normalizedPhone.isBlank()) {
+            member.setPhone(normalizedPhone);
+        }
         eligibleMemberRepository.save(member);
     }
 
@@ -478,8 +526,20 @@ public class EligibleMemberService {
         return trimmed.length() > MAX_TEXT_LENGTH ? trimmed.substring(0, MAX_TEXT_LENGTH) : trimmed;
     }
 
+    /**
+     * Digits-only, normalized to domestic 010-style form: {@code +82 10-...}/{@code 8210...}
+     * become {@code 010...}, and a 10-digit {@code 10...} (leading zero stripped by a
+     * spreadsheet) gets its zero back.
+     */
     private String normalizePhone(String value) {
-        return normalize(value).replaceAll("[^0-9]", "");
+        String digits = normalize(value).replaceAll("[^0-9]", "");
+        if (digits.startsWith("82") && digits.length() >= 11) {
+            digits = "0" + digits.substring(2);
+        }
+        if (digits.matches("1[0-9]{9}")) {
+            digits = "0" + digits;
+        }
+        return digits;
     }
 
     private boolean isGraduate(int admissionYear) {
