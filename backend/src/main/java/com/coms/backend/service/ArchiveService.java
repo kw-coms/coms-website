@@ -272,6 +272,11 @@ public class ArchiveService {
         if (extension == null || !ALLOWED_EXTENSIONS.contains(extension.toLowerCase(Locale.ROOT))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "허용되지 않는 자료실 파일 확장자입니다.");
         }
+        // The extension is client-supplied, so for the formats with a dependable signature check
+        // that the bytes agree with it — otherwise `payload.exe.zip` gets stored as an archive.
+        if (!UploadSniffer.matchesExtension(extension, UploadSniffer.header(file))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일 내용이 확장자와 일치하지 않습니다.");
+        }
     }
 
     /**

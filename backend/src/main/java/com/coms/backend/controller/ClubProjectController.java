@@ -106,8 +106,10 @@ public class ClubProjectController {
         ClubProjectFile meta = projectService.loadFileMeta(id, fileId);
         Resource resource = projectService.loadFileResource(id, fileId);
         String filename = meta.getOriginalName() == null || meta.getOriginalName().isBlank() ? "download" : meta.getOriginalName();
+        // Always octet-stream + attachment: this endpoint is public, and echoing back the
+        // client-supplied mime type would let an upload choose how browsers render it.
         return ResponseEntity.ok()
-                .contentType(mediaType(meta.getMimeType()))
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                         .filename(filename, StandardCharsets.UTF_8).build().toString())
                 .body(resource);
