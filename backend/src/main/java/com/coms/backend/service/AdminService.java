@@ -8,12 +8,14 @@ import com.coms.backend.repository.ArchiveFileVoteRepository;
 import com.coms.backend.repository.ClubActivityVoteRepository;
 import com.coms.backend.repository.ClubEventRsvpRepository;
 import com.coms.backend.repository.ClubEventVoteRepository;
+import com.coms.backend.repository.LoginFailureRepository;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.MiniAppDocumentRepository;
 import com.coms.backend.repository.MobilePushTokenRepository;
 import com.coms.backend.repository.NoticeVoteRepository;
 import com.coms.backend.repository.NotificationPreferenceRepository;
 import com.coms.backend.repository.NotificationRepository;
+import com.coms.backend.repository.RecruitApplicationRepository;
 import com.coms.backend.repository.TeamRandomizerRoomRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -42,6 +44,8 @@ public class AdminService {
     private final MobilePushTokenRepository mobilePushTokenRepository;
     private final MiniAppDocumentRepository miniAppDocumentRepository;
     private final TeamRandomizerRoomRepository teamRandomizerRoomRepository;
+    private final RecruitApplicationRepository recruitApplicationRepository;
+    private final LoginFailureRepository loginFailureRepository;
 
     public AdminService(MemberRepository memberRepository, PasswordEncoder passwordEncoder, CommunityService communityService,
                         NoticeVoteRepository noticeVoteRepository, ClubActivityVoteRepository clubActivityVoteRepository,
@@ -49,7 +53,9 @@ public class AdminService {
                         ArchiveFileVoteRepository archiveFileVoteRepository, NotificationRepository notificationRepository,
                         NotificationPreferenceRepository notificationPreferenceRepository,
                         MobilePushTokenRepository mobilePushTokenRepository, MiniAppDocumentRepository miniAppDocumentRepository,
-                        TeamRandomizerRoomRepository teamRandomizerRoomRepository) {
+                        TeamRandomizerRoomRepository teamRandomizerRoomRepository,
+                        RecruitApplicationRepository recruitApplicationRepository,
+                        LoginFailureRepository loginFailureRepository) {
         this.memberRepository = memberRepository;
         this.passwordEncoder = passwordEncoder;
         this.communityService = communityService;
@@ -63,6 +69,8 @@ public class AdminService {
         this.mobilePushTokenRepository = mobilePushTokenRepository;
         this.miniAppDocumentRepository = miniAppDocumentRepository;
         this.teamRandomizerRoomRepository = teamRandomizerRoomRepository;
+        this.recruitApplicationRepository = recruitApplicationRepository;
+        this.loginFailureRepository = loginFailureRepository;
     }
 
     @Transactional(readOnly = true)
@@ -110,8 +118,8 @@ public class AdminService {
     /**
      * Removes every piece of member data keyed by 학번 so a future signup with the same
      * student id cannot inherit the previous owner's notifications, documents, rooms, or
-     * push tokens. Moderation/audit records (audit logs, deleted-post archive, bans) are
-     * intentionally kept.
+     * push tokens. Moderation/audit records (audit logs, promotion logs, deleted-post archive,
+     * bans) are intentionally kept.
      */
     private void purgePersonalDataForMember(String studentId) {
         communityService.deleteCommunityDataForMember(studentId);
@@ -125,6 +133,10 @@ public class AdminService {
         mobilePushTokenRepository.deleteByMemberStudentId(studentId);
         miniAppDocumentRepository.deleteByOwnerStudentId(studentId);
         teamRandomizerRoomRepository.deleteByOwnerStudentId(studentId);
+        // 지원서에는 이름/연락처/이메일이 그대로 남고, 로그인 실패 기록에는 학번과 IP 가 남는다.
+        // 둘 다 감사 기록이 아니라 개인정보이므로 탈퇴 시 함께 지운다.
+        recruitApplicationRepository.deleteByStudentId(studentId);
+        loginFailureRepository.deleteByStudentId(studentId);
     }
 
     private void ensureNotFinalAdmin(Member member, String message) {
