@@ -65,6 +65,22 @@ public class EligibleMemberService {
         eligibleMemberRepository.save(member);
     }
 
+    /**
+     * 자동 이관(합격 처리) 전용 가드. {@link #addSingle} 은 학번 기준 upsert라, 같은 학번이
+     * 이미 다른 사람 이름으로 명부에 있으면 그 행의 이름/기수/전화번호를 조용히 덮어쓴다.
+     * 관리자가 직접 등록/정정하는 경로는 덮어쓰기가 의도된 동작이므로 이 검사를 쓰지 않고,
+     * 사람이 확인하지 않는 자동 이관 경로에서만 호출한다.
+     */
+    public void ensureStudentIdNotTakenByOtherName(String studentId, String name) {
+        String normalizedStudentId = normalize(studentId);
+        String normalizedName = normalize(name);
+        eligibleMemberRepository.findByStudentId(normalizedStudentId).ifPresent(existing -> {
+            if (existing.getName() != null && !existing.getName().equals(normalizedName)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 다른 이름으로 명부에 등록된 학번입니다.");
+            }
+        });
+    }
+
     public void addGraduateSingle(String name, String twoDigitYearStr, String generationStr) {
         addGraduateSingle(name, twoDigitYearStr, generationStr, null);
     }
