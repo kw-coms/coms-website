@@ -38,6 +38,20 @@ public class MobilePushTokenService {
         repository.save(token);
     }
 
+    /**
+     * Unregisters one device token for the calling member. Scoped to the caller's own rows so a
+     * member cannot delete somebody else's registration, and idempotent: an unknown or
+     * already-removed token still succeeds rather than telling the caller it existed.
+     */
+    public void unregister(String memberStudentId, String token) {
+        if (token == null || token.isBlank()) {
+            return;
+        }
+        repository.findByToken(token.trim())
+                .filter(existing -> memberStudentId.equals(existing.getMemberStudentId()))
+                .ifPresent(repository::delete);
+    }
+
     private String normalize(String value, int maxLength) {
         if (value == null || value.isBlank()) return null;
         String trimmed = value.trim();
