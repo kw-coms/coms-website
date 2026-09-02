@@ -72,6 +72,46 @@ class MobilePushTokenServiceTest {
         verify(repository, never()).save(any(MobilePushToken.class));
     }
 
+    @Test
+    void unregisterDeletesTheCallersOwnToken() {
+        MobilePushTokenRepository repository = mock(MobilePushTokenRepository.class);
+        MobilePushToken owned = new MobilePushToken();
+        owned.setMemberStudentId("2026123456");
+        owned.setToken("push-token");
+        when(repository.findByToken("push-token")).thenReturn(Optional.of(owned));
+        MobilePushTokenService service = new MobilePushTokenService(repository);
+
+        service.unregister("2026123456", "  push-token  ");
+
+        verify(repository).delete(owned);
+    }
+
+    @Test
+    void unregisterNeverDeletesAnotherMembersToken() {
+        MobilePushTokenRepository repository = mock(MobilePushTokenRepository.class);
+        MobilePushToken someoneElses = new MobilePushToken();
+        someoneElses.setMemberStudentId("2025000000");
+        someoneElses.setToken("push-token");
+        when(repository.findByToken("push-token")).thenReturn(Optional.of(someoneElses));
+        MobilePushTokenService service = new MobilePushTokenService(repository);
+
+        service.unregister("2026123456", "push-token");
+
+        verify(repository, never()).delete(any(MobilePushToken.class));
+    }
+
+    @Test
+    void unregisterIsIdempotentForAnUnknownToken() {
+        MobilePushTokenRepository repository = mock(MobilePushTokenRepository.class);
+        when(repository.findByToken("gone")).thenReturn(Optional.empty());
+        MobilePushTokenService service = new MobilePushTokenService(repository);
+
+        service.unregister("2026123456", "gone");
+        service.unregister("2026123456", "  ");
+
+        verify(repository, never()).delete(any(MobilePushToken.class));
+    }
+
     private MobilePushToken captureSavedToken(MobilePushTokenRepository repository) {
         var captor = org.mockito.ArgumentCaptor.forClass(MobilePushToken.class);
         verify(repository).save(captor.capture());
