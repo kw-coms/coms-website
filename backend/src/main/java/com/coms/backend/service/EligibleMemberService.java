@@ -1,6 +1,7 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.EligibleMember;
+import com.coms.backend.domain.Member;
 import com.coms.backend.dto.EligibleMemberResponse;
 import com.coms.backend.dto.EligibleMemberImportResponse;
 import com.coms.backend.repository.EligibleMemberRepository;
@@ -50,7 +51,15 @@ public class EligibleMemberService {
         this.clock = clock;
     }
 
+    /** 관리자 수기 등록/보정 경로. 이 행으로 가입하면 일반 회원(USER)이 된다. */
     public void addSingle(String studentId, String name, String generation, String phone) {
+        addSingle(studentId, name, generation, phone, Member.Role.USER);
+    }
+
+    /**
+     * @param initialRole 이 행으로 가입할 때 부여할 등급. 리크루팅 합격 이관만 ASSOCIATE(준회원)을 넘긴다.
+     */
+    public void addSingle(String studentId, String name, String generation, String phone, Member.Role initialRole) {
         String normalized = normalize(studentId);
         if (!STUDENT_ID_PATTERN.matcher(normalized).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
@@ -58,11 +67,28 @@ public class EligibleMemberService {
         EligibleMember member = eligibleMemberRepository.findByStudentId(normalized)
                 .orElseGet(EligibleMember::new);
         applyExactStudentIdentity(member, normalized, name, generation);
+        member.setInitialRole(allowedInitialRole(initialRole));
         String normalizedPhone = normalizePhone(phone);
         if (!normalizedPhone.isBlank()) {
             member.setPhone(normalizedPhone);
         }
         eligibleMemberRepository.save(member);
+    }
+
+    /**
+     * 가입 시 명부가 지정한 등급. 명부 행이 없으면(있을 수 없는 경로) 기본값 USER.
+     * 명부는 사람이 채우는 데이터이므로 준회원/회원 외의 등급으로는 절대 승격시키지 않는다.
+     */
+    @Transactional(readOnly = true)
+    public Member.Role resolveSignupRole(String studentId) {
+        return eligibleMemberRepository.findByStudentId(normalize(studentId))
+                .map(EligibleMember::getInitialRole)
+                .map(EligibleMemberService::allowedInitialRole)
+                .orElse(Member.Role.USER);
+    }
+
+    private static Member.Role allowedInitialRole(Member.Role role) {
+        return role == Member.Role.ASSOCIATE ? Member.Role.ASSOCIATE : Member.Role.USER;
     }
 
     /**
@@ -184,7 +210,8 @@ public class EligibleMemberService {
                         member.getStudentId(),
                         member.getName(),
                         member.getGeneration(),
-                        member.getPhone()
+                        member.getPhone(),
+                        member.getInitialRole().name()
                 ))
                 .toList();
     }

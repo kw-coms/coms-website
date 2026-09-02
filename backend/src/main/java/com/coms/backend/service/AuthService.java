@@ -116,6 +116,9 @@ public class AuthService implements UserDetailsService {
 
         Member member = new Member();
         member.setStudentId(studentId);
+        // 명부 행이 등급을 정한다: 리크루팅 합격으로 이관된 행은 준회원(ASSOCIATE),
+        // 관리자가 직접 넣은 행은 기존과 동일하게 회원(USER).
+        member.setRole(eligibleMemberService.resolveSignupRole(studentId));
         member.setName(request.name().trim());
         member.setEmail(request.email().trim());
         member.setEmailVerified(false);
