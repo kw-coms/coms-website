@@ -51,10 +51,14 @@ export async function setUserContext(user) {
       Sentry.setUser(null)
       return
     }
-    Sentry.setUser({
-      id: String(user.id || user.studentId || 'member'),
-      username: user.name || undefined,
-    })
+    // Sentry is a third-party processor: send ONLY the opaque internal id. The
+    // member's real name and 학번 are personal data and must never leave the app —
+    // an id is enough to correlate an error with a member in our own DB.
+    if (!user.id) {
+      Sentry.setUser(null)
+      return
+    }
+    Sentry.setUser({ id: String(user.id) })
   } catch {
     // ignore
   }
