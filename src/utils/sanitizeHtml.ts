@@ -191,8 +191,11 @@ export function sanitizeHtml(value, options: SanitizeHtmlOptions = {}) {
   const allowedStyles = options.allowedStyles || profile.allowedStyles || DEFAULT_ALLOWED_STYLES
   const trimTrailingBreaks = [options.trimTrailingBreaks, profile.trimTrailingBreaks].find((flag) => flag !== undefined) ?? true
 
+  // NO `USE_PROFILES` here: DOMPurify OVERWRITES ALLOWED_TAGS/ALLOWED_ATTR with the
+  // built-in profile set when USE_PROFILES is present (purify: `ALLOWED_TAGS = addToSet({}, text)`
+  // then `addToSet(ALLOWED_TAGS, html)`), which silently re-admitted <img>/<form>/<input>/<table>
+  // and every default HTML attribute. The explicit allow-lists below are the only source of truth.
   const clean = DOMPurify.sanitize(raw, {
-    USE_PROFILES: { html: true },
     ALLOWED_TAGS: allowedTags,
     ALLOWED_ATTR: allowedAttributes,
     ALLOW_ARIA_ATTR: false,

@@ -6,12 +6,20 @@ export async function listCommunityPosts() {
   // every page. ponytail: fine at club scale; move filter/sort/search server-side if
   // the board outgrows a few thousand posts.
   const size = 200
+  // Hard stop: an unbounded `for (;;)` walks forever if the backend ever returns a
+  // full page for every offset (a paging bug, a proxy replaying one page), pinning
+  // the tab. 50 * 200 = 10,000 posts is far past club scale — hitting it is a bug
+  // worth seeing in the console, not a board worth rendering.
+  const maxPages = 50
   const all = []
-  for (let page = 0; ; page += 1) {
+  for (let page = 0; page < maxPages; page += 1) {
     const batch = await request(`/api/community/posts?page=${page}&size=${size}`)
     if (!Array.isArray(batch) || batch.length === 0) break
     all.push(...batch)
     if (batch.length < size) break
+    if (page === maxPages - 1) {
+      console.warn(`커뮤니티 게시글이 ${maxPages}페이지(${maxPages * size}건) 상한에 도달해 이후 페이지를 불러오지 않았습니다.`)
+    }
   }
   return all
 }
@@ -22,6 +30,17 @@ export async function getCommunityPost(id) {
 
 export async function getMemberReputation(studentId) {
   return request(`/api/community/members/${encodeURIComponent(studentId)}/reputation`)
+}
+
+// Body shape mirrors backend CommunityPostReportRequest (reason: one of the six
+// ALLOWED_REASONS in CommunityPostReportService, detail: <=500 chars, nullable) and
+// coms-member-app's reportCommunityPost, so both clients post the same thing.
+// A second OPEN report on the same post by the same member answers 409.
+export async function reportCommunityPost(id, reason, detail) {
+  return request(`/api/community/posts/${id}/reports`, {
+    method: 'POST',
+    body: JSON.stringify({ reason, detail: detail || null }),
+  })
 }
 
 export async function toggleBookmark(id) {

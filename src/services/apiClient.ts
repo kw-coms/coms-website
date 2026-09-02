@@ -30,11 +30,19 @@ function notifySessionExpired() {
 // share ONE /api/auth/refresh call. Otherwise each fires its own refresh, which
 // (with refresh-token rotation) is wasteful and can interleave Set-Cookie writes.
 let refreshInFlight: Promise<boolean> | null = null
+// Bumped once per SUCCESSFUL refresh. A request that was already in flight when
+// someone else rotated the token gets a 401 from the token it was sent with, not
+// from the current one — refreshing again would rotate a perfectly good session
+// (and, with refresh-token rotation, can invalidate it). Comparing the generation
+// captured before the request against the current one tells the two cases apart:
+// if it moved, just retry; the cookie is already fresh.
+let refreshGeneration = 0
 async function tryRefreshToken() {
   if (refreshInFlight) return refreshInFlight
   refreshInFlight = (async () => {
     try {
       const res = await fetch(apiUrl('/api/auth/refresh'), { method: 'POST', credentials: 'include' })
+      if (res.ok) refreshGeneration += 1
       return res.ok
     } catch {
       return false
@@ -43,6 +51,17 @@ async function tryRefreshToken() {
     }
   })()
   return refreshInFlight
+}
+
+// Shared 401/403 recovery for request / requestNoContent / requestBlob, which all
+// ran an identical copy of this block.
+async function recoverFromAuthFailure(path, response, generationBeforeRequest, fetchOnce) {
+  const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
+  if (!canRefresh || (response.status !== 401 && response.status !== 403)) return response
+  if (refreshGeneration > generationBeforeRequest) return fetchOnce()
+  if (await tryRefreshToken()) return fetchOnce()
+  if (response.status === 401) notifySessionExpired()
+  return response
 }
 
 async function readErrorBody(response) {
@@ -174,14 +193,14 @@ export async function request(path, options: RequestInit = {}) {
     ? options.headers
     : { 'Content-Type': 'application/json', ...options.headers }
 
-  const fetchOnce = () => fetch(apiUrl(path), { credentials: 'include', ...options, headers })
+  // `credentials` AFTER the spread: a caller passing its own `options.credentials`
+  // (or a spread RequestInit carrying an explicit `credentials: 'same-origin'`)
+  // silently dropped the session cookie when it came first.
+  const fetchOnce = () => fetch(apiUrl(path), { ...options, headers, credentials: 'include' })
 
+  const generationBeforeRequest = refreshGeneration
   let response = await fetchOnce()
-  const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
-  if ((response.status === 401 || response.status === 403) && canRefresh) {
-    if (await tryRefreshToken()) response = await fetchOnce()
-    else if (response.status === 401) notifySessionExpired()
-  }
+  response = await recoverFromAuthFailure(path, response, generationBeforeRequest, fetchOnce)
 
   if (!response.ok) {
     await throwApiError(response)
@@ -195,14 +214,11 @@ export async function requestNoContent(path, options: RequestInit = {}) {
   const headers = (options.body && !isFormData)
     ? { 'Content-Type': 'application/json', ...options.headers }
     : options.headers
-  const fetchOnce = () => fetch(apiUrl(path), { credentials: 'include', ...options, headers })
+  const fetchOnce = () => fetch(apiUrl(path), { ...options, headers, credentials: 'include' })
 
+  const generationBeforeRequest = refreshGeneration
   let response = await fetchOnce()
-  const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
-  if ((response.status === 401 || response.status === 403) && canRefresh) {
-    if (await tryRefreshToken()) response = await fetchOnce()
-    else if (response.status === 401) notifySessionExpired()
-  }
+  response = await recoverFromAuthFailure(path, response, generationBeforeRequest, fetchOnce)
 
   if (!response.ok) {
     await throwApiError(response)
@@ -210,14 +226,11 @@ export async function requestNoContent(path, options: RequestInit = {}) {
 }
 
 export async function requestBlob(path, options: RequestInit = {}) {
-  const fetchOnce = () => fetch(apiUrl(path), { credentials: 'include', ...options })
+  const fetchOnce = () => fetch(apiUrl(path), { ...options, credentials: 'include' })
 
+  const generationBeforeRequest = refreshGeneration
   let response = await fetchOnce()
-  const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
-  if ((response.status === 401 || response.status === 403) && canRefresh) {
-    if (await tryRefreshToken()) response = await fetchOnce()
-    else if (response.status === 401) notifySessionExpired()
-  }
+  response = await recoverFromAuthFailure(path, response, generationBeforeRequest, fetchOnce)
 
   if (!response.ok) {
     await throwApiError(response)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { listRecruitPromotions, updateRecruitApplicationStatus } from '../../services/adminApi'
 import { RECRUIT_STATUS_OPTIONS, recruitStatusLabel } from './recruitStatus'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
@@ -19,6 +19,20 @@ type RecruitApplicationItem = {
   interests?: string
 }
 
+// Mirrors backend/openapi.json → RecruitPromotionLogResponse.
+type RecruitPromotion = {
+  id: number
+  applicationId?: number
+  name?: string
+  studentId?: string
+  department?: string
+  phone?: string
+  email?: string
+  generation?: string
+  promotedBy?: string
+  promotedAt?: string
+}
+
 export default function AdminRecruitApplications({ applications, loading, error, onReload, onUpdated, formatDateTime }: {
   applications: RecruitApplicationItem[]
   loading: boolean
@@ -31,12 +45,21 @@ export default function AdminRecruitApplications({ applications, loading, error,
   const [savingId, setSavingId] = useState(null)
   const [message, setMessage] = useState('')
   const [saveError, setSaveError] = useState('')
-  const [promotions, setPromotions] = useState<any[]>([])
+  const [promotions, setPromotions] = useState<RecruitPromotion[]>([])
+
+  // The promotion log is fetched on mount, from the 새로고침 button and after every
+  // 합격 save; any of those can resolve after the admin has switched tabs, so gate
+  // the setState on a mounted flag rather than warning on an unmounted update.
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
 
   const loadPromotions = () => {
     listRecruitPromotions()
-      .then((data) => setPromotions(Array.isArray(data) ? data : []))
-      .catch(() => setPromotions([]))
+      .then((data) => { if (mounted.current) setPromotions(Array.isArray(data) ? data : []) })
+      .catch(() => { if (mounted.current) setPromotions([]) })
   }
   useEffect(loadPromotions, [])
 
@@ -55,7 +78,10 @@ export default function AdminRecruitApplications({ applications, loading, error,
     try {
       const updated = await updateRecruitApplicationStatus(application.id, {
         status: draft.status || application.status,
-        adminNote: draft.adminNote || '',
+        // `?? application.adminNote` — a status-only save has no adminNote key in the
+        // draft, and `draft.adminNote || ''` sent an empty string that WIPED the
+        // stored 운영 메모. Only an edit the admin actually made may clear it.
+        adminNote: draft.adminNote ?? application.adminNote ?? '',
       })
       onUpdated(updated)
       setDrafts((prev) => ({
@@ -68,6 +94,10 @@ export default function AdminRecruitApplications({ applications, loading, error,
       if (updated.status === 'ACCEPTED') {
         setMessage(`${updated.name} 합격 — 명부에 등록하고 지원서를 정리했습니다.`)
         loadPromotions()
+        // The parent drops the row optimistically on ACCEPTED. Re-fetch the list so a
+        // backend transfer that did NOT actually happen reappears instead of silently
+        // vanishing from the admin's view.
+        onReload()
       } else {
         setMessage(`${updated.name} 지원서를 저장했습니다.`)
       }
