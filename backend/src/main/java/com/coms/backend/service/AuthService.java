@@ -48,9 +48,17 @@ public class AuthService implements UserDetailsService {
     private static final int GRADUATE_AFTER_YEARS = 7;
     private static final int MAX_SIGNUP_EMAIL_REQUESTS_PER_WINDOW = 5;
     private static final Duration SIGNUP_EMAIL_REQUEST_WINDOW = Duration.ofMinutes(10);
+    // 30/h matches the signup-email step above (5 per 10 min). New members often sign up
+    // together from the club room or campus Wi-Fi behind one NAT IP; this must not trip
+    // before the email limiter already does.
+    private static final int MAX_SIGNUPS_PER_WINDOW = 30;
+    private static final Duration SIGNUP_WINDOW = Duration.ofHours(1);
 
     // Sliding-window limiter for the unauthenticated request-signup path, keyed on client IP.
     private final Map<String, Deque<LocalDateTime>> signupEmailAttemptsByClient = new ConcurrentHashMap<>();
+    // Same limiter for the unauthenticated signup path itself: without it a single IP can
+    // create unlimited accounts (and trigger one verification mail each).
+    private final Map<String, Deque<LocalDateTime>> signupAttemptsByClient = new ConcurrentHashMap<>();
 
     private enum SignupType {
         CURRENT, GRADUATE
@@ -89,7 +97,11 @@ public class AuthService implements UserDetailsService {
         this.clock = clock;
     }
 
-    public AuthResponse signup(SignupRequest request) {
+    public AuthResponse signup(SignupRequest request, String clientIp) {
+        // permitAll endpoint: without a per-IP cap one client can mass-create accounts and
+        // fire one verification mail per attempt. Same sliding-window shape as the
+        // request-signup-email path, with its own (longer) window.
+        enforceSignupRateLimit(clientIp);
         if (memberRepository.existsByEmail(request.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다.");
         }
@@ -402,20 +414,31 @@ public class AuthService implements UserDetailsService {
     }
 
     private void enforceSignupEmailRateLimit(String clientIp) {
+        enforceIpRateLimit(signupEmailAttemptsByClient, clientIp,
+                MAX_SIGNUP_EMAIL_REQUESTS_PER_WINDOW, SIGNUP_EMAIL_REQUEST_WINDOW);
+    }
+
+    private void enforceSignupRateLimit(String clientIp) {
+        enforceIpRateLimit(signupAttemptsByClient, clientIp, MAX_SIGNUPS_PER_WINDOW, SIGNUP_WINDOW);
+    }
+
+    /** Sliding-window per-IP limiter shared by the unauthenticated signup paths. */
+    private static void enforceIpRateLimit(Map<String, Deque<LocalDateTime>> attemptsByClient,
+                                           String clientIp, int maxPerWindow, Duration window) {
         String key = clientIp == null || clientIp.isBlank() ? "unknown" : clientIp;
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime cutoff = now.minus(SIGNUP_EMAIL_REQUEST_WINDOW);
-        Deque<LocalDateTime> attempts = signupEmailAttemptsByClient.computeIfAbsent(key, ignored -> new ArrayDeque<>());
+        LocalDateTime cutoff = now.minus(window);
+        Deque<LocalDateTime> attempts = attemptsByClient.computeIfAbsent(key, ignored -> new ArrayDeque<>());
         synchronized (attempts) {
             while (!attempts.isEmpty() && attempts.peekFirst().isBefore(cutoff)) {
                 attempts.removeFirst();
             }
-            if (attempts.size() >= MAX_SIGNUP_EMAIL_REQUESTS_PER_WINDOW) {
+            if (attempts.size() >= maxPerWindow) {
                 throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 시도해주세요.");
             }
             attempts.addLast(now);
         }
-        signupEmailAttemptsByClient.entrySet().removeIf(entry -> {
+        attemptsByClient.entrySet().removeIf(entry -> {
             Deque<LocalDateTime> q = entry.getValue();
             synchronized (q) {
                 return q.isEmpty() || q.peekLast().isBefore(cutoff);

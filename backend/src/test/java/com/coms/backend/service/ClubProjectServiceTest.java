@@ -20,6 +20,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Transactional
 class ClubProjectServiceTest {
 
+    // 업로드 검증이 매직 바이트를 확인하므로 픽스처도 실제 시그니처를 가져야 한다(apk 는 ZIP).
+    private static final byte[] ZIP_BYTES = {0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00};
+
     @Autowired
     private ClubProjectService clubProjectService;
 
@@ -144,7 +147,7 @@ class ClubProjectServiceTest {
         var project = clubProjectService.create("APP", "배포 앱", null, null, "최준혁", null, null, null);
 
         var fileId = clubProjectService.addFile(project.id(),
-                new MockMultipartFile("file", "app-release.apk", "application/vnd.android.package-archive", "apk-bytes".getBytes()));
+                new MockMultipartFile("file", "app-release.apk", "application/vnd.android.package-archive", ZIP_BYTES));
         assertThat(fileId).isNotNull();
 
         var withFile = clubProjectService.list().stream()

@@ -22,6 +22,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
@@ -149,6 +151,23 @@ public class NotificationService {
         if (recipientStudentId == null || recipientStudentId.isBlank()) {
             return;
         }
+        // The in-app notification row is written in the caller's transaction. Enqueueing before
+        // it commits meant a rolled-back transaction still delivered a push for a notification
+        // that does not exist — and the sender could read the row before it was visible. Defer
+        // to after commit when a transaction is running; otherwise dispatch straight away.
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    enqueuePush(recipientStudentId, title, body, data);
+                }
+            });
+            return;
+        }
+        enqueuePush(recipientStudentId, title, body, data);
+    }
+
+    private void enqueuePush(String recipientStudentId, String title, String body, Map<String, String> data) {
         try {
             // Enqueue on the bounded executor so fan-out never blocks the request
             // thread. Deliberately NOT @Async on the sender: an AOP proxy there

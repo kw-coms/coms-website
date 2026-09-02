@@ -40,6 +40,7 @@ public class PushNotificationSender {
     private static final String FIREBASE_APP_NAME = "coms-push";
 
     private final MobilePushTokenRepository pushTokenRepository;
+    private final PushTokenPruner pushTokenPruner;
     private final boolean enabled;
     private final String credentialsPath;
 
@@ -47,9 +48,11 @@ public class PushNotificationSender {
     private volatile boolean initFailed;
 
     public PushNotificationSender(MobilePushTokenRepository pushTokenRepository,
+                                  PushTokenPruner pushTokenPruner,
                                   @Value("${push.enabled:false}") boolean enabled,
                                   @Value("${push.firebase.credentials-path:}") String credentialsPath) {
         this.pushTokenRepository = pushTokenRepository;
+        this.pushTokenPruner = pushTokenPruner;
         this.enabled = enabled;
         this.credentialsPath = credentialsPath == null ? "" : credentialsPath.trim();
     }
@@ -104,13 +107,19 @@ public class PushNotificationSender {
     /**
      * Removes tokens that FCM reports as unregistered/invalid. Best-effort only — any error
      * here is swallowed so it can never break the caller.
+     *
+     * <p>The delete is delegated to {@link PushTokenPruner} because {@link #sendToMember} runs
+     * in a {@code readOnly = true} transaction: issuing the delete here would never be flushed,
+     * so invalid tokens accumulated forever and every later send wasted a slot on them.
+     *
+     * <p>Package-private for testing.
      */
-    private void pruneInvalidTokens(List<MobilePushToken> tokens,
-                                    List<String> registrationTokens,
-                                    BatchResponse response) {
+    void pruneInvalidTokens(List<MobilePushToken> tokens,
+                            List<String> registrationTokens,
+                            BatchResponse response) {
         try {
             List<SendResponse> responses = response.getResponses();
-            List<MobilePushToken> toDelete = new ArrayList<>();
+            List<Long> toDelete = new ArrayList<>();
             for (int i = 0; i < responses.size(); i++) {
                 SendResponse r = responses.get(i);
                 if (r.isSuccessful() || r.getException() == null) {
@@ -125,15 +134,17 @@ public class PushNotificationSender {
                     tokens.stream()
                             .filter(t -> badToken.equals(t.getToken()))
                             .findFirst()
+                            .map(MobilePushToken::getId)
                             .ifPresent(toDelete::add);
                 }
             }
             if (!toDelete.isEmpty()) {
-                pushTokenRepository.deleteAll(toDelete);
+                pushTokenPruner.deleteTokens(toDelete);
                 log.info("Pruned {} invalid FCM token(s)", toDelete.size());
             }
         } catch (Exception e) {
-            log.debug("Token pruning skipped: {}", e.toString());
+            // warn, not debug: a pruning failure means dead tokens keep being retried forever.
+            log.warn("Invalid FCM token pruning failed (ignored): {}", e.toString());
         }
     }
 

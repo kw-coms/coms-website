@@ -8,12 +8,14 @@ import com.coms.backend.repository.ArchiveFileVoteRepository;
 import com.coms.backend.repository.ClubActivityVoteRepository;
 import com.coms.backend.repository.ClubEventRsvpRepository;
 import com.coms.backend.repository.ClubEventVoteRepository;
+import com.coms.backend.repository.LoginFailureRepository;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.MiniAppDocumentRepository;
 import com.coms.backend.repository.MobilePushTokenRepository;
 import com.coms.backend.repository.NoticeVoteRepository;
 import com.coms.backend.repository.NotificationPreferenceRepository;
 import com.coms.backend.repository.NotificationRepository;
+import com.coms.backend.repository.RecruitApplicationRepository;
 import com.coms.backend.repository.TeamRandomizerRoomRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -42,6 +44,8 @@ public class AdminService {
     private final MobilePushTokenRepository mobilePushTokenRepository;
     private final MiniAppDocumentRepository miniAppDocumentRepository;
     private final TeamRandomizerRoomRepository teamRandomizerRoomRepository;
+    private final RecruitApplicationRepository recruitApplicationRepository;
+    private final LoginFailureRepository loginFailureRepository;
 
     public AdminService(MemberRepository memberRepository, PasswordEncoder passwordEncoder, CommunityService communityService,
                         NoticeVoteRepository noticeVoteRepository, ClubActivityVoteRepository clubActivityVoteRepository,
@@ -49,7 +53,9 @@ public class AdminService {
                         ArchiveFileVoteRepository archiveFileVoteRepository, NotificationRepository notificationRepository,
                         NotificationPreferenceRepository notificationPreferenceRepository,
                         MobilePushTokenRepository mobilePushTokenRepository, MiniAppDocumentRepository miniAppDocumentRepository,
-                        TeamRandomizerRoomRepository teamRandomizerRoomRepository) {
+                        TeamRandomizerRoomRepository teamRandomizerRoomRepository,
+                        RecruitApplicationRepository recruitApplicationRepository,
+                        LoginFailureRepository loginFailureRepository) {
         this.memberRepository = memberRepository;
         this.passwordEncoder = passwordEncoder;
         this.communityService = communityService;
@@ -63,6 +69,8 @@ public class AdminService {
         this.mobilePushTokenRepository = mobilePushTokenRepository;
         this.miniAppDocumentRepository = miniAppDocumentRepository;
         this.teamRandomizerRoomRepository = teamRandomizerRoomRepository;
+        this.recruitApplicationRepository = recruitApplicationRepository;
+        this.loginFailureRepository = loginFailureRepository;
     }
 
     @Transactional(readOnly = true)
@@ -110,8 +118,8 @@ public class AdminService {
     /**
      * Removes every piece of member data keyed by 학번 so a future signup with the same
      * student id cannot inherit the previous owner's notifications, documents, rooms, or
-     * push tokens. Moderation/audit records (audit logs, deleted-post archive, bans) are
-     * intentionally kept.
+     * push tokens. Moderation/audit records (audit logs, promotion logs, deleted-post archive,
+     * bans) are intentionally kept.
      */
     private void purgePersonalDataForMember(String studentId) {
         communityService.deleteCommunityDataForMember(studentId);
@@ -125,6 +133,26 @@ public class AdminService {
         mobilePushTokenRepository.deleteByMemberStudentId(studentId);
         miniAppDocumentRepository.deleteByOwnerStudentId(studentId);
         teamRandomizerRoomRepository.deleteByOwnerStudentId(studentId);
+        // 지원서에는 이름/연락처/이메일이 그대로 남고, 로그인 실패 기록에는 학번과 IP 가 남는다.
+        // 둘 다 감사 기록이 아니라 개인정보이므로 탈퇴 시 함께 지운다.
+        recruitApplicationRepository.deleteByStudentId(studentId);
+        loginFailureRepository.deleteByStudentId(studentId);
+    }
+
+    /**
+     * 기수의 유일한 검증 지점. 1..99 범위만 허용하고(존재하지 않는 0기, "000" 거부),
+     * 앞자리 0 을 떼어 "07" 과 "7" 이 서로 다른 기수처럼 저장되지 않게 정규화한다.
+     */
+    private static String normalizeGeneration(String generation) {
+        String cleaned = generation == null ? "" : generation.trim();
+        if (!cleaned.matches("\\d{1,3}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "기수는 숫자여야 합니다.");
+        }
+        int value = Integer.parseInt(cleaned);
+        if (value < 1 || value > 99) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "기수는 1에서 99 사이여야 합니다.");
+        }
+        return String.valueOf(value);
     }
 
     private void ensureNotFinalAdmin(Member member, String message) {
@@ -136,11 +164,7 @@ public class AdminService {
     public MemberResponse updateGeneration(Long id, String generation) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        String cleaned = generation == null ? "" : generation.trim();
-        if (!cleaned.matches("\\d{1,3}")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "기수는 숫자(1~3자리)여야 합니다.");
-        }
-        member.setGeneration(cleaned);
+        member.setGeneration(normalizeGeneration(generation));
         return toResponse(memberRepository.save(member));
     }
 

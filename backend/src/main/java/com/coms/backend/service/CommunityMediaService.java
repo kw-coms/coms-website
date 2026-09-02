@@ -94,9 +94,7 @@ class CommunityMediaService {
             MultipartFile image = images.get(i);
             if (image == null || image.isEmpty()) continue;
             String contentType = image.getContentType() == null ? "" : image.getContentType();
-            if (!ALLOWED_IMAGE_TYPES.contains(contentType)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "JPG, PNG, GIF, WebP 이미지만 업로드할 수 있습니다.");
-            }
+            requireSniffedImage(image, contentType);
             if (image.getSize() > MAX_IMAGE_BYTES) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지는 5MB 이하만 업로드할 수 있습니다.");
             }
@@ -200,7 +198,7 @@ class CommunityMediaService {
         }
         String originalName = file.getOriginalFilename() == null ? "" : file.getOriginalFilename();
         String contentType = file.getContentType() == null ? "" : file.getContentType();
-        if (!isAllowedArchiveFile(originalName, contentType)) {
+        if (!isAllowedArchiveFile(file, originalName, contentType)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "ZIP 압축파일만 업로드할 수 있습니다.");
         }
         if (file.getSize() > MAX_FILE_BYTES) {
@@ -238,9 +236,7 @@ class CommunityMediaService {
             return;
         }
         String contentType = image.getContentType() == null ? "" : image.getContentType();
-        if (!ALLOWED_IMAGE_TYPES.contains(contentType)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "JPG, PNG, GIF, WebP 이미지만 업로드할 수 있습니다.");
-        }
+        requireSniffedImage(image, contentType);
         if (image.getSize() > MAX_IMAGE_BYTES) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지는 5MB 이하만 업로드할 수 있습니다.");
         }
@@ -371,9 +367,31 @@ class CommunityMediaService {
         storageService.delete(storedName);
     }
 
-    private boolean isAllowedArchiveFile(String originalName, String contentType) {
+    /**
+     * Rejects anything that is not really a ZIP. The declared extension and content-type are both
+     * client-supplied — {@code payload.exe.zip} with a blank content-type used to sail through —
+     * so the archive signature in the actual bytes is the check that matters.
+     */
+    private boolean isAllowedArchiveFile(MultipartFile file, String originalName, String contentType) {
         String lowerName = originalName.toLowerCase(Locale.ROOT);
-        return lowerName.endsWith(".zip") && (contentType == null || contentType.isBlank() || ALLOWED_FILE_TYPES.contains(contentType));
+        return lowerName.endsWith(".zip")
+                && (contentType == null || contentType.isBlank() || ALLOWED_FILE_TYPES.contains(contentType))
+                && UploadSniffer.isZip(UploadSniffer.header(file));
+    }
+
+    /**
+     * Requires the upload to really be one of the four image formats we serve inline, AND to match
+     * the type the client declared. Serving a declared {@code image/png} whose bytes are HTML back
+     * inline is a stored-XSS primitive, so a mismatch is rejected rather than corrected.
+     */
+    private void requireSniffedImage(MultipartFile image, String contentType) {
+        if (!ALLOWED_IMAGE_TYPES.contains(contentType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "JPG, PNG, GIF, WebP 이미지만 업로드할 수 있습니다.");
+        }
+        UploadSniffer.ImageType sniffed = UploadSniffer.imageType(UploadSniffer.header(image));
+        if (sniffed == null || !sniffed.mimeType().equals(contentType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 파일 내용이 형식과 일치하지 않습니다.");
+        }
     }
 
     private String normalizeArchiveMime(String contentType) {

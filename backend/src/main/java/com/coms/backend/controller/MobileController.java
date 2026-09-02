@@ -12,10 +12,12 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -82,6 +84,18 @@ public class MobileController {
     public ResponseEntity<Void> registerPushToken(Authentication authentication,
                                                   @Valid @RequestBody PushTokenRequest request) {
         mobilePushTokenService.register(authentication.getName(), request);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Unregisters a device token on logout / notification opt-out. Keyed on {@code token}
+     * because that is what the POST above uses as the device's identity ({@code deviceId} is
+     * optional metadata there, not a key). Only the caller's own rows are removed.
+     */
+    @DeleteMapping("/push-tokens")
+    public ResponseEntity<Void> deletePushToken(Authentication authentication,
+                                                @RequestParam String token) {
+        mobilePushTokenService.unregister(authentication.getName(), token);
         return ResponseEntity.noContent().build();
     }
 }

@@ -363,7 +363,7 @@ class AuthServiceTest {
                 "동아리에서 프로젝트를 만들고 싶습니다.",
                 "웹",
                 "CURRENT"
-        )))
+        ), "203.0.113.1"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
     }
@@ -392,7 +392,7 @@ class AuthServiceTest {
                 null,
                 null,
                 "GRADUATE"
-        ))).isInstanceOf(ResponseStatusException.class);
+        ), "203.0.113.2")).isInstanceOf(ResponseStatusException.class);
 
         EligibleMember rolledBack = eligibleMemberRepository.findByVerificationKey("홍길동|2019").orElseThrow();
         assertThat(rolledBack.getStudentId()).isNull();
@@ -415,7 +415,7 @@ class AuthServiceTest {
                 null,
                 null,
                 "CURRENT"
-        ))).isInstanceOf(ResponseStatusException.class);
+        ), "203.0.113.3")).isInstanceOf(ResponseStatusException.class);
 
         assertThat(memberRepository.existsByStudentId("2026123463")).isFalse();
     }
@@ -437,7 +437,7 @@ class AuthServiceTest {
                 "신입 부원으로 열심히 활동하겠습니다.",
                 "보안,웹",
                 "CURRENT"
-        ));
+        ), "203.0.113.4");
 
         assertThat(response.studentId()).isEqualTo("2026123467");
         Member saved = memberRepository.findByStudentId("2026123467").orElseThrow();
@@ -462,7 +462,7 @@ class AuthServiceTest {
                 "이 값은 졸업생 가입에서 저장되지 않아야 합니다.",
                 "웹",
                 "GRADUATE"
-        ));
+        ), "203.0.113.5");
 
         assertThat(response.studentId()).startsWith("G2019-");
         Member saved = memberRepository.findByStudentId(response.studentId()).orElseThrow();
@@ -489,12 +489,60 @@ class AuthServiceTest {
                 null,
                 null,
                 "GRADUATE"
-        ));
+        ), "203.0.113.6");
 
         assertThat(response.studentId()).startsWith("G2019-");
         assertThat(memberRepository.findByStudentId(response.studentId())).isPresent();
         EligibleMember claimed = eligibleMemberRepository.findByStudentId(response.studentId()).orElseThrow();
         assertThat(claimed.getGeneration()).isEqualTo("53");
+    }
+
+    @Test
+    @DisplayName("signup is rate-limited per client IP so one host cannot mass-create accounts")
+    void signupRateLimitsRepeatedAttemptsFromSameClientIp() {
+        MemberRepository repo = mock(MemberRepository.class);
+        FontService fontService = mock(FontService.class);
+        when(fontService.isSelectable(null)).thenReturn(true);
+        AuthService service = new AuthService(repo, mock(LoginFailureRepository.class),
+                mock(EligibleMemberService.class), passwordEncoder, mock(JwtTokenProvider.class),
+                mock(EmailVerificationSender.class), fontService, mock(BannedStudentService.class),
+                mock(AuditLogService.class), Clock.systemDefaultZone());
+
+        // Every attempt is rejected as a duplicate email, but the limiter runs first and
+        // still counts it — otherwise failed probes would be a free pass.
+        when(repo.existsByEmail("taken@example.com")).thenReturn(true);
+
+        for (int i = 0; i < 30; i++) {
+            assertThatThrownBy(() -> service.signup(signupRequest("taken@example.com"), "198.51.100.7"))
+                    .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                            assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+        }
+
+        assertThatThrownBy(() -> service.signup(signupRequest("taken@example.com"), "198.51.100.7"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+
+        // A different IP has its own window.
+        assertThatThrownBy(() -> service.signup(signupRequest("taken@example.com"), "198.51.100.8"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+    }
+
+    private static SignupRequest signupRequest(String email) {
+        return new SignupRequest(
+                "2026123999",
+                "홍길동",
+                null,
+                null,
+                email,
+                "Password1!",
+                "컴퓨터공학과",
+                null,
+                "01012345678",
+                "동아리에서 프로젝트를 만들고 싶습니다.",
+                "웹",
+                "CURRENT"
+        );
     }
 
     private Member saveMember(String studentId, boolean emailVerified) {

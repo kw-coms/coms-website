@@ -45,8 +45,14 @@ class YouTubeSearchService {
         }
         try {
             String encoded = URLEncoder.encode(trimmed, StandardCharsets.UTF_8);
-            URI uri = URI.create("https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=8&q=" + encoded + "&key=" + URLEncoder.encode(youtubeApiKey, StandardCharsets.UTF_8));
-            HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(5)).GET().build();
+            URI uri = URI.create("https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=8&q=" + encoded);
+            // The key travels in a header, not the query string: URLs end up in proxy access
+            // logs, error reports and stack traces, which would leak the credential.
+            HttpRequest request = HttpRequest.newBuilder(uri)
+                    .timeout(Duration.ofSeconds(5))
+                    .header("X-goog-api-key", youtubeApiKey)
+                    .GET()
+                    .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() >= 400) {
                 throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "YouTube 검색 응답이 올바르지 않습니다.");

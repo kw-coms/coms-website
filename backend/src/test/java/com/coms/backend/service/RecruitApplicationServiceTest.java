@@ -20,6 +20,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -220,6 +221,41 @@ class RecruitApplicationServiceTest {
         assertThat(logCaptor.getValue().getGeneration()).isEqualTo("60");
         assertThat(logCaptor.getValue().getPromotedBy()).isEqualTo("2026402040");
         verify(repository).delete(application);
+    }
+
+    @Test
+    void acceptedStatusAbortsWhenStudentIdBelongsToAnotherNameOnTheRoster() {
+        RecruitApplication application = new RecruitApplication();
+        application.setName("홍길동");
+        application.setStudentId("2026403003");
+        application.setStatus(RecruitApplication.Status.REVIEWING);
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.findById(1L)).thenReturn(Optional.of(application));
+        EligibleMemberService eligible = mock(EligibleMemberService.class);
+        RecruitPromotionLogRepository promotionLogs = mock(RecruitPromotionLogRepository.class);
+        doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "이미 다른 이름으로 명부에 등록된 학번입니다."))
+                .when(eligible).ensureStudentIdNotTakenByOtherName("2026403003", "홍길동");
+        RecruitApplicationService service = new RecruitApplicationService(
+                mock(JavaMailSender.class),
+                repository,
+                mock(NotificationService.class),
+                eligible,
+                promotionLogs,
+                java.time.Clock.systemDefaultZone(),
+                true,
+                "no-reply@coms.kw.ac.kr",
+                "recruit@coms.kw.ac.kr"
+        );
+
+        assertThatThrownBy(() -> service.updateStatus(
+                1L, new RecruitApplicationStatusUpdateRequest("ACCEPTED", null), "admin"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+
+        // 명부 덮어쓰기·이관 로그·지원서 삭제 모두 일어나지 않아야 한다(트랜잭션 롤백 대상).
+        verify(eligible, never()).addSingle(any(), any(), any(), any());
+        verify(promotionLogs, never()).save(any());
+        verify(repository, never()).delete(any(RecruitApplication.class));
     }
 
     @Test

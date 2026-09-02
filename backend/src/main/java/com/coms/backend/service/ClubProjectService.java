@@ -18,8 +18,10 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,6 +31,7 @@ public class ClubProjectService {
     // Distributables (apk/zip and similar). Generous limit so app/game builds fit.
     private static final long MAX_FILE_BYTES = 200L * 1024 * 1024;
     private static final int MAX_FILES_PER_PROJECT = 10;
+    private static final Set<String> ALLOWED_DISTRIBUTABLE_EXTENSIONS = Set.of("zip", "apk", "pdf");
 
     private final ClubProjectRepository repository;
     private final ClubProjectFileRepository fileRepository;
@@ -118,6 +121,7 @@ public class ClubProjectService {
         if (file.getSize() > MAX_FILE_BYTES) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "배포 파일은 200MB 이하만 업로드할 수 있습니다.");
         }
+        validateDistributable(file);
         List<ClubProjectFile> existing = fileRepository.findByClubProjectIdOrderByPositionAsc(id);
         if (existing.size() >= MAX_FILES_PER_PROJECT) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -193,6 +197,24 @@ public class ClubProjectService {
                 .mapToInt(ClubProject::getPosition)
                 .max()
                 .orElse(-1) + 1;
+    }
+
+    /**
+     * Distributables are downloaded by the public, so the upload is restricted to the three
+     * formats this feature exists for, verified by signature rather than by the client-supplied
+     * extension: zip and apk are both ZIP containers, pdf starts with {@code %PDF}.
+     */
+    private void validateDistributable(MultipartFile file) {
+        String extension = StringUtils.getFilenameExtension(cleanOriginalFilename(file));
+        String normalized = extension == null ? "" : extension.toLowerCase(Locale.ROOT);
+        if (!ALLOWED_DISTRIBUTABLE_EXTENSIONS.contains(normalized)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "배포 파일은 ZIP, APK, PDF만 업로드할 수 있습니다.");
+        }
+        byte[] header = UploadSniffer.header(file);
+        boolean matches = "pdf".equals(normalized) ? UploadSniffer.isPdf(header) : UploadSniffer.isZip(header);
+        if (!matches) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일 내용이 확장자와 일치하지 않습니다.");
+        }
     }
 
     private String cleanOriginalFilename(MultipartFile file) {

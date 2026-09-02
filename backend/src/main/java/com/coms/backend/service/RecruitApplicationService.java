@@ -157,6 +157,9 @@ public class RecruitApplicationService {
      * 지원서가 사라지는 일은 없다.
      */
     private void promote(RecruitApplication application, String adminStudentId) {
+        // 명부는 학번 기준 upsert다. 같은 학번이 이미 다른 이름으로 등록돼 있으면 그 행을
+        // 덮어쓰지 말고 409로 중단한다 — 예외가 트랜잭션을 롤백하므로 상태 변경도 되돌아간다.
+        eligibleMemberService.ensureStudentIdNotTakenByOtherName(application.getStudentId(), application.getName());
         String generation = String.valueOf(Year.now(clock).getValue() - FIRST_GENERATION_YEAR);
         eligibleMemberService.addSingle(
                 application.getStudentId(),
