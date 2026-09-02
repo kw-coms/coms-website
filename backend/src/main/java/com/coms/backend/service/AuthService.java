@@ -48,7 +48,10 @@ public class AuthService implements UserDetailsService {
     private static final int GRADUATE_AFTER_YEARS = 7;
     private static final int MAX_SIGNUP_EMAIL_REQUESTS_PER_WINDOW = 5;
     private static final Duration SIGNUP_EMAIL_REQUEST_WINDOW = Duration.ofMinutes(10);
-    private static final int MAX_SIGNUPS_PER_WINDOW = 5;
+    // 30/h matches the signup-email step above (5 per 10 min). New members often sign up
+    // together from the club room or campus Wi-Fi behind one NAT IP; this must not trip
+    // before the email limiter already does.
+    private static final int MAX_SIGNUPS_PER_WINDOW = 30;
     private static final Duration SIGNUP_WINDOW = Duration.ofHours(1);
 
     // Sliding-window limiter for the unauthenticated request-signup path, keyed on client IP.

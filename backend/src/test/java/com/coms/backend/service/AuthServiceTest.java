@@ -512,7 +512,7 @@ class AuthServiceTest {
         // still counts it — otherwise failed probes would be a free pass.
         when(repo.existsByEmail("taken@example.com")).thenReturn(true);
 
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 30; i++) {
             assertThatThrownBy(() -> service.signup(signupRequest("taken@example.com"), "198.51.100.7"))
                     .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                             assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
