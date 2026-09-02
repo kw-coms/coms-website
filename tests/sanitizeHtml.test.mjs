@@ -1,46 +1,74 @@
+// setupDom MUST come first: it installs jsdom's window/document on globalThis
+// before dompurify is imported (transitively, via sanitizeHtml). Without it
+// DOMPurify reports isSupported=false, sanitize() returns its input untouched,
+// and sanitizeHtml() takes its DOM-free escapeHtml() branch — so every assertion
+// below would be exercising HTML-escaping instead of the actual sanitizer.
+import './setupDom.mjs'
+
 import assert from 'node:assert/strict'
 
 import { sanitizeHtml, sanitizeStyleDeclaration, sanitizeClassAttribute, SANITIZE_PROFILES } from '../src/utils/sanitizeHtml.ts'
+
+const rich = (html) => sanitizeHtml(html, { profile: 'richText' })
+const richText = SANITIZE_PROFILES.richText
+
+// ─── the DOM-free helpers (unchanged contract) ───────────────────────────────
 
 assert.equal(
   sanitizeStyleDeclaration('color:red;background-image:url(javascript:alert(1));font-weight:bold'),
   'color: red; font-weight: bold',
 )
 
-assert.equal(
-  sanitizeHtml('<img src=x onerror=alert(1)>'),
-  '&lt;img src=x onerror=alert(1)&gt;',
-)
+// ─── script / event handlers / javascript: are stripped ──────────────────────
 
-// --- rich-text profile (the home/editor sanitizer is now a thin wrapper) ---
-// The richText profile is the SINGLE source of truth for the home-shell + rich
-// editor allow-list. These cases pin its config (enforced by DOMPurify in the
-// browser) and verify the public entry point never emits raw executable markup.
-
-const richText = SANITIZE_PROFILES.richText
-
-// 1. A <script> tag is never allowed and is neutralized at the entry point.
 assert.ok(!richText.allowedTags.includes('script'))
-const scriptOut = sanitizeHtml('<script>alert(1)</script>', { profile: 'richText' })
-assert.ok(!scriptOut.includes('<script'), 'script tag must not survive')
-assert.equal(scriptOut, '&lt;script&gt;alert(1)&lt;/script&gt;')
+assert.equal(rich('<script>alert(1)</script>'), '', 'script tag and its content must be removed')
+assert.equal(rich('<pre><code><script>alert(1)</script></code></pre>'), '<pre><code></code></pre>')
 
-// 2. Event-handler attributes (onclick, …) are not in the allow-list and never
-//    reach the sink as live markup.
+// An onerror-bearing <img> is dropped whole — tag AND attribute.
+assert.equal(sanitizeHtml('<img src=x onerror=alert(1)>'), '')
+
+// The tag survives, the event handler never does.
 assert.ok(!richText.allowedAttributes.includes('onclick'))
-const onclickOut = sanitizeHtml('<p onclick="alert(1)">hi</p>', { profile: 'richText' })
-assert.ok(!onclickOut.includes('<p'), 'onclick-bearing tag must not survive as live markup')
+assert.equal(rich('<p onclick="alert(1)">hi</p>'), '<p>hi</p>')
 
-// 3. A javascript: href is rejected by the shared URL guard and never emitted
-//    as a live anchor.
-const jsHrefOut = sanitizeHtml('<a href="javascript:alert(1)">x</a>', { profile: 'richText' })
-assert.ok(!jsHrefOut.includes('<a'), 'javascript: anchor must not survive as live markup')
+// ─── the richText profile does NOT admit layout / form tags ──────────────────
+// These four are the regression guard for the USE_PROFILES bug: DOMPurify
+// OVERWRITES ALLOWED_TAGS/ALLOWED_ATTR when USE_PROFILES is set, so the explicit
+// allow-list above it was dead config and the full default HTML profile applied.
+// Against that code these four assertions fail (verified by re-adding the line):
+//   <img src=x onerror=…> -> '<img src="x">',  <form>/<input> -> echoed back,
+//   <table> -> '<table><tbody><tr><td>cell</td></tr></tbody></table>'.
+for (const tag of ['img', 'form', 'input', 'table']) {
+  assert.ok(!richText.allowedTags.includes(tag), `<${tag}> must not be in the richText allow-list`)
+}
+assert.equal(rich('<img src="https://example.com/a.png">'), '', '<img> must not survive')
+assert.equal(rich('<form action="/x"><input name="a"></form>'), '', '<form>/<input> must not survive')
+// KEEP_CONTENT is on, so a table is unwrapped to its text rather than kept.
+assert.equal(rich('<table><tr><td>cell</td></tr></table>'), 'cell', '<table> must not survive')
 
-// 4. Legitimately-allowed rich tags and styles are preserved (not narrowed):
-//    the editor relies on these formatting tags and inline styles.
-for (const tag of ['a', 'blockquote', 'h2', 'h3', 'font', 'span', 'strong', 'u', 'ul', 'li']) {
+// ─── legitimately-allowed rich markup survives ───────────────────────────────
+
+assert.equal(rich('<strong>b</strong><em>i</em><u>u</u>'), '<strong>b</strong><em>i</em><u>u</u>')
+assert.equal(
+  rich('<pre><code class="language-js">const a = 1</code></pre>'),
+  '<pre><code class="language-js">const a = 1</code></pre>',
+)
+for (const tag of ['a', 'blockquote', 'h2', 'h3', 'font', 'span', 'strong', 'u', 'ul', 'li', 'pre', 'code']) {
   assert.ok(richText.allowedTags.includes(tag), `rich tag <${tag}> must stay allowed`)
 }
+
+// Allowed inline style properties survive; everything else is dropped.
+assert.equal(
+  rich('<span style="color:red;font-weight:bold">t</span>'),
+  '<span style="color: red; font-weight: bold">t</span>',
+)
+assert.equal(
+  rich('<span style="position:fixed;top:0;color:red">t</span>'),
+  '<span style="color: red">t</span>',
+  'disallowed style properties are stripped, allowed ones kept',
+)
+assert.equal(rich('<span style="position:fixed">t</span>'), '<span>t</span>', 'an all-disallowed style attribute is removed')
 for (const style of ['color', 'background-color', 'font-family', 'font-size', 'font-weight', 'text-align', 'text-decoration']) {
   assert.ok(richText.allowedStyles.has(style), `rich style ${style} must stay allowed`)
 }
@@ -49,40 +77,27 @@ assert.equal(
   'text-align: center; font-weight: bold; text-decoration: underline',
 )
 
-// --- code blocks: <pre>/<code> are allowed and the `class` attribute is
-// constrained to a single `language-*` hint on code/pre only. The class
-// decision is exercised directly via sanitizeClassAttribute (the DOM-free
-// single source of truth used by the browser post-process pass) so it is
-// testable without a headless DOM. ---
+// ─── anchors: javascript: loses its href, https keeps it + rel/target ────────
 
-// 5. <pre>/<code> are now in BOTH allow-lists (post body + rich editor).
-for (const tag of ['pre', 'code']) {
-  assert.ok(SANITIZE_PROFILES.richText.allowedTags.includes(tag), `rich tag <${tag}> must be allowed`)
-}
-// `class` is allowed at the attribute level (its values are then constrained).
-assert.ok(SANITIZE_PROFILES.richText.allowedAttributes.includes('class'), 'class attribute must be allow-listed')
+assert.equal(rich('<a href="javascript:alert(1)">x</a>'), '<a>x</a>')
+assert.equal(
+  rich('<a href="https://coms.kw.ac.kr/notice">link</a>'),
+  '<a href="https://coms.kw.ac.kr/notice" target="_blank" rel="noopener noreferrer">link</a>',
+)
+// target/rel are always (re)written by the sanitizer, never taken from the input.
+assert.equal(
+  rich('<a href="https://coms.kw.ac.kr/notice" target="_self" rel="opener">link</a>'),
+  '<a href="https://coms.kw.ac.kr/notice" target="_blank" rel="noopener noreferrer">link</a>',
+)
 
-// 6. A `language-js` hint survives on <code>/<pre> with the class value intact.
+// ─── class attribute: a single language-* hint, on code/pre only ─────────────
+
+assert.ok(richText.allowedAttributes.includes('class'), 'class attribute must be allow-listed')
 assert.equal(sanitizeClassAttribute('code', 'language-js'), 'language-js')
 assert.equal(sanitizeClassAttribute('pre', 'language-py3'), 'language-py3')
 assert.equal(sanitizeClassAttribute('CODE', 'language-TS'), 'language-TS', 'tag/class matching is case-insensitive')
-
-// 7. A <code class="language-js" onclick=alert(1)> keeps the class but the
-//    event handler is never allow-listed, so onclick is dropped. (The class
-//    survives; onclick is rejected by the attribute allow-list.)
-assert.ok(!SANITIZE_PROFILES.richText.allowedAttributes.includes('onclick'))
-assert.equal(sanitizeClassAttribute('code', 'language-js'), 'language-js')
-
-// 8. A <div class="evil"> has its class stripped entirely (class only rides on code/pre).
 assert.equal(sanitizeClassAttribute('div', 'evil'), '')
 assert.equal(sanitizeClassAttribute('span', 'language-js'), '', 'language-* is only honored on code/pre')
-// Non-language classes on code/pre are also stripped (no arbitrary class survives).
 assert.equal(sanitizeClassAttribute('code', 'hljs theme-dark'), '')
 assert.equal(sanitizeClassAttribute('pre', 'language-js evil'), '', 'multi-class with a non-language token is rejected')
-
-// 9. A <script> inside a code block is still neutralized — never emitted as live
-//    markup. Server-side (no DOM) the whole body is HTML-escaped; the rich
-//    profile additionally drops <script> from the allow-list in the browser.
-const codeWithScript = sanitizeHtml('<pre><code><script>alert(1)</script></code></pre>', { profile: 'richText' })
-assert.ok(!codeWithScript.includes('<script>'), 'script inside a code block must not survive as live markup')
-assert.ok(!richText.allowedTags.includes('script'))
+assert.equal(rich('<div class="evil">d</div>'), '<div>d</div>', 'class is stripped off non-code tags in the real pipeline')
