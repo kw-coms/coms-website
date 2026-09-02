@@ -36,6 +36,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class CommunitySharePreviewControllerTest {
 
+    // 업로드 검증이 실제 PNG 바이트를 요구한다.
+    private static final byte[] PREVIEW_PNG = onePixelPng();
+
+    private static byte[] onePixelPng() {
+        try {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            javax.imageio.ImageIO.write(
+                    new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_RGB),
+                    "png", out);
+            return out.toByteArray();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -78,7 +93,7 @@ class CommunitySharePreviewControllerTest {
     void exposesOpenGraphHtmlForCommunityPostWithoutLogin() throws Exception {
         Member author = member("2025123456", "작성자", Member.Role.USER);
         memberRepository.save(author);
-        MockMultipartFile image = new MockMultipartFile("image", "preview.png", "image/png", "png".getBytes());
+        MockMultipartFile image = new MockMultipartFile("image", "preview.png", "image/png", PREVIEW_PNG);
         var post = communityService.create(
                 author.getStudentId(),
                 new CommunityPostRequest("사진 있는 글", "<b>사진이 있는 글입니다.</b>", "GENERAL", false),
@@ -103,7 +118,7 @@ class CommunitySharePreviewControllerTest {
     void exposesCommunityShareImageWithoutLogin() throws Exception {
         Member author = member("2025123456", "작성자", Member.Role.USER);
         memberRepository.save(author);
-        MockMultipartFile image = new MockMultipartFile("image", "preview.png", "image/png", "png".getBytes());
+        MockMultipartFile image = new MockMultipartFile("image", "preview.png", "image/png", PREVIEW_PNG);
         var post = communityService.create(
                 author.getStudentId(),
                 new CommunityPostRequest("사진 있는 글", "내용", "GENERAL", false),
@@ -114,14 +129,14 @@ class CommunitySharePreviewControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition", containsString("inline")))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.IMAGE_PNG))
-                .andExpect(content().bytes("png".getBytes()));
+                .andExpect(content().bytes(PREVIEW_PNG));
     }
 
     @Test
     void exposesCommunityShareImageHeadersWithoutLogin() throws Exception {
         Member author = member("2025123456", "작성자", Member.Role.USER);
         memberRepository.save(author);
-        MockMultipartFile image = new MockMultipartFile("image", "preview.png", "image/png", "png".getBytes());
+        MockMultipartFile image = new MockMultipartFile("image", "preview.png", "image/png", PREVIEW_PNG);
         var post = communityService.create(
                 author.getStudentId(),
                 new CommunityPostRequest("사진 있는 글", "내용", "GENERAL", false),
@@ -153,7 +168,7 @@ class CommunitySharePreviewControllerTest {
     void exposesOnlySafeShareDataWithoutLogin() throws Exception {
         Member author = member("2025123456", "작성자", Member.Role.USER);
         memberRepository.save(author);
-        MockMultipartFile image = new MockMultipartFile("image", "preview.png", "image/png", "png".getBytes());
+        MockMultipartFile image = new MockMultipartFile("image", "preview.png", "image/png", PREVIEW_PNG);
         var post = communityService.create(
                 author.getStudentId(),
                 new CommunityPostRequest("공유용 제목", "공개 미리보기 설명", "GENERAL", false),
