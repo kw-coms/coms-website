@@ -75,7 +75,8 @@ public class LinkPreviewService {
         return preview(rawUrl);
     }
 
-    public LinkPreviewResponse preview(String rawUrl) {
+    /** Rate limiter deliberately not applied here — go through {@link #preview(String, String)}. */
+    private LinkPreviewResponse preview(String rawUrl) {
         URI uri = parseAndValidate(rawUrl);
         String host = uri.getHost();
         String fallbackTitle = host == null ? "" : host;
