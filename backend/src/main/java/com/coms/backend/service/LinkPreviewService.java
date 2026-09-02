@@ -58,8 +58,22 @@ public class LinkPreviewService {
     private static final int MAX_TITLE_LENGTH = 160;
     private static final int MAX_DESCRIPTION_LENGTH = 280;
     private static final int MAX_SITE_NAME_LENGTH = 80;
+    private static final java.util.Set<Integer> ALLOWED_PORTS = java.util.Set.of(80, 443);
+    private static final int MAX_PREVIEWS_PER_WINDOW = 20;
+    private static final Duration PREVIEW_WINDOW = Duration.ofMinutes(1);
+
+    // Sliding-window limiter keyed on the requesting member. Each preview is an outbound fetch
+    // the caller chooses the target of, so an unthrottled endpoint lets one account use the
+    // server as a request proxy / scanner. Same shape as the AuthService signup windows.
+    private final java.util.Map<String, java.util.Deque<java.time.LocalDateTime>> previewsByMember =
+            new java.util.concurrent.ConcurrentHashMap<>();
     private static final String USER_AGENT =
             "Mozilla/5.0 (compatible; ComsLinkPreview/1.0; +https://coms.kw.ac.kr)";
+
+    public LinkPreviewResponse preview(String rawUrl, String memberStudentId) {
+        enforcePreviewRateLimit(memberStudentId);
+        return preview(rawUrl);
+    }
 
     public LinkPreviewResponse preview(String rawUrl) {
         URI uri = parseAndValidate(rawUrl);
@@ -118,6 +132,30 @@ public class LinkPreviewService {
         return out.toByteArray();
     }
 
+    private void enforcePreviewRateLimit(String memberStudentId) {
+        String key = memberStudentId == null || memberStudentId.isBlank() ? "unknown" : memberStudentId;
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime cutoff = now.minus(PREVIEW_WINDOW);
+        java.util.Deque<java.time.LocalDateTime> attempts =
+                previewsByMember.computeIfAbsent(key, ignored -> new java.util.ArrayDeque<>());
+        synchronized (attempts) {
+            while (!attempts.isEmpty() && attempts.peekFirst().isBefore(cutoff)) {
+                attempts.removeFirst();
+            }
+            if (attempts.size() >= MAX_PREVIEWS_PER_WINDOW) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "링크 미리보기 요청이 많습니다. 잠시 후 다시 시도해주세요.");
+            }
+            attempts.addLast(now);
+        }
+        previewsByMember.entrySet().removeIf(entry -> {
+            java.util.Deque<java.time.LocalDateTime> q = entry.getValue();
+            synchronized (q) {
+                return q.isEmpty() || q.peekLast().isBefore(cutoff);
+            }
+        });
+    }
+
     private URI parseAndValidate(String rawUrl) {
         String trimmed = rawUrl == null ? "" : rawUrl.trim();
         if (trimmed.isBlank() || trimmed.length() > MAX_URL_LENGTH) {
@@ -133,6 +171,14 @@ public class LinkPreviewService {
                 || uri.getHost() == null || uri.getHost().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "링크 미리보기는 https 주소만 지원합니다.");
+        }
+        // An explicit port turns the preview into a port scanner for whatever the server can
+        // reach: the response shape (fallback vs. parsed card, and how fast it comes back)
+        // leaks whether something is listening. Only the standard web ports are allowed.
+        int port = uri.getPort();
+        if (port != -1 && !ALLOWED_PORTS.contains(port)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "링크 미리보기는 기본 웹 포트(80, 443)만 지원합니다.");
         }
         return uri;
     }
@@ -379,6 +425,9 @@ public class LinkPreviewService {
         if (a == 169 && second == 254) return true;          // 169.254.0.0/16 link-local + metadata
         if (a == 172 && second >= 16 && second <= 31) return true; // 172.16.0.0/12
         if (a == 192 && second == 168) return true;          // 192.168.0.0/16
+        if (a == 100 && second >= 64 && second <= 127) return true; // 100.64.0.0/10 CGNAT
+        if (a == 192 && second == 0 && (b[2] & 0xFF) == 0) return true; // 192.0.0.0/24 IETF protocol assignments
+        if (a == 198 && (second == 18 || second == 19)) return true;    // 198.18.0.0/15 benchmarking
         return false;
     }
 
