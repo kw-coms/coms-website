@@ -68,8 +68,10 @@ public class AuthController {
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(authService.signup(request));
+    public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request,
+                                               HttpServletRequest servletRequest) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(authService.signup(request, resolveClientIp(servletRequest)));
     }
 
     @PostMapping("/login")
