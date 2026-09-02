@@ -14,6 +14,8 @@ public interface LoginFailureRepository extends JpaRepository<LoginFailure, Long
 
     long countByIpAndAttemptedAtAfter(String ip, LocalDateTime since);
 
+    void deleteByStudentId(String studentId);
+
     @Modifying
     @Query("DELETE FROM LoginFailure f WHERE f.attemptedAt < :before")
     void deleteOlderThan(@Param("before") LocalDateTime before);

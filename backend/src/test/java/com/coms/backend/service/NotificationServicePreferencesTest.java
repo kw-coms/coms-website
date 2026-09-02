@@ -21,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -57,6 +58,9 @@ class NotificationServicePreferencesTest {
 
     @Autowired
     private MemberRepository memberRepository;
+
+    @Autowired
+    private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
 
     private Member author;
     private Member commenter;
@@ -190,6 +194,26 @@ class NotificationServicePreferencesTest {
                 new NotificationPreferencesRequest(true, true, true, true, true, true, true));
         notificationService.notifyPostComment(post, comment);
         verify(pushNotificationSender, timeout(3000).times(1)).sendToMember(anyString(), eq("새 댓글"), anyString(), any());
+    }
+
+    @Test
+    void pushIsNotSentWhenTheSurroundingTransactionRollsBack() {
+        CommunityPost post = new CommunityPost();
+        post.setAuthorStudentId(author.getStudentId());
+        CommunityComment comment = new CommunityComment(
+                null, commenter.getStudentId(), commenter.getName(), "댓글 내용", null, 0);
+
+        // 알림 행과 푸시는 같은 트랜잭션의 결과여야 한다. 롤백되면 존재하지 않는 알림에 대한
+        // 푸시가 나가서는 안 된다 — 예전에는 커밋 전에 큐에 넣어 그대로 발송됐다.
+        assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(status -> {
+            notificationService.notifyPostComment(post, comment);
+            throw new IllegalStateException("boom");
+        })).isInstanceOf(IllegalStateException.class);
+
+        drainPushExecutor();
+        verify(pushNotificationSender, never()).sendToMember(anyString(), anyString(), anyString(), any());
+        assertThat(notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc(
+                author.getStudentId())).isEmpty();
     }
 
     /**

@@ -141,4 +141,48 @@ class LinkPreviewServiceTest {
         assertThatThrownBy(() -> svc.resolveAndGuard("this-host-does-not-exist.invalid"))
                 .hasMessageContaining("링크 호스트를 확인할 수 없습니다.");
     }
+
+    @Test
+    void blocksCarrierGradeNatProtocolAndBenchmarkingRanges() throws Exception {
+        // 100.64.0.0/10 — CGNAT, routable inside many hosting networks.
+        assertThat(LinkPreviewService.isBlockedAddress(ip("100.64.0.1"))).isTrue();
+        assertThat(LinkPreviewService.isBlockedAddress(ip("100.127.255.255"))).isTrue();
+        // 192.0.0.0/24 — IETF protocol assignments (incl. NAT64 discovery).
+        assertThat(LinkPreviewService.isBlockedAddress(ip("192.0.0.1"))).isTrue();
+        // 198.18.0.0/15 — benchmarking.
+        assertThat(LinkPreviewService.isBlockedAddress(ip("198.18.0.1"))).isTrue();
+        assertThat(LinkPreviewService.isBlockedAddress(ip("198.19.255.255"))).isTrue();
+
+        // Neighbouring public addresses must stay reachable.
+        assertThat(LinkPreviewService.isBlockedAddress(ip("100.63.255.255"))).isFalse();
+        assertThat(LinkPreviewService.isBlockedAddress(ip("100.128.0.1"))).isFalse();
+        assertThat(LinkPreviewService.isBlockedAddress(ip("192.0.1.1"))).isFalse();
+        assertThat(LinkPreviewService.isBlockedAddress(ip("198.20.0.1"))).isFalse();
+    }
+
+    @Test
+    void rejectsNonStandardPorts() {
+        LinkPreviewService svc = new LinkPreviewService();
+        // A preview against an arbitrary port is a port scan with the server as the scanner.
+        assertThatThrownBy(() -> svc.preview("https://example.com:8080/", "2026123456"))
+                .hasMessageContaining("기본 웹 포트");
+        assertThatThrownBy(() -> svc.preview("https://example.com:22/", "2026123456"))
+                .hasMessageContaining("기본 웹 포트");
+    }
+
+    @Test
+    void limitsPreviewsPerMember() {
+        LinkPreviewService svc = new LinkPreviewService();
+        // 포트 검증에서 막히더라도 제한기는 그 앞에서 이미 요청을 셌다.
+        for (int i = 0; i < 20; i++) {
+            assertThatThrownBy(() -> svc.preview("https://example.com:8080/", "2026123456"))
+                    .hasMessageContaining("기본 웹 포트");
+        }
+        assertThatThrownBy(() -> svc.preview("https://example.com:8080/", "2026123456"))
+                .hasMessageContaining("링크 미리보기 요청이 많습니다");
+
+        // 다른 회원은 자기 창을 가진다.
+        assertThatThrownBy(() -> svc.preview("https://example.com:8080/", "2026123457"))
+                .hasMessageContaining("기본 웹 포트");
+    }
 }
