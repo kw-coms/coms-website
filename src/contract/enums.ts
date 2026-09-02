@@ -2,7 +2,7 @@
  * generated from coms-shared-contract — do not edit by hand
  *
  * Source of truth: https://github.com/choijunhuk/coms-shared-contract (enums.js)
- * Vendored commit: 44c6cbcbf4b176ebf49037b6195ff6ad38aebdb2
+ * Vendored commit: 44c6cbcbf4b176ebf49037b6195ff6ad38aebdb2 (synced 2026-09-02)
  *
  * To sync: copy enums.js from the coms-shared-contract repo into this file,
  * keeping this header. We vendor (instead of a `github:` npm dependency)
@@ -62,6 +62,7 @@ export const ActivityKind = /** @type {const} */ ({
 
 // Member.Role
 export const MemberRole = /** @type {const} */ ({
+  ASSOCIATE: "ASSOCIATE",
   USER: "USER",
   OFFICER: "OFFICER",
   VICE_PRESIDENT: "VICE_PRESIDENT",
