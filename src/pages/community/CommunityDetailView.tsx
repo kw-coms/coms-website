@@ -1,6 +1,7 @@
 import RoleTag from '../../components/common/RoleTag'
 import Chip from '../../components/common/Chip'
 import {
+  AlertTriangle,
   ArrowLeft,
   Pencil,
   Pin,
@@ -17,6 +18,7 @@ import { useEffect, useState } from 'react'
 import { listMembers } from '../../services/adminApi'
 import { showToast } from '../../components/common/Toast'
 import { renderPostBlocks } from './PostBlocks'
+import ReportPostDialog from './ReportPostDialog'
 import { isConceptPost, isEdited, postScore } from './communityBoardUtils'
 import { MAX_ANONYMOUS_NAME_LENGTH, categoryLabel } from './postEditorUtils'
 import { Skeleton, SkeletonLine, SkeletonGroup } from '../../components/common/Skeleton'
@@ -138,6 +140,8 @@ export default function CommunityDetailView({
   onPin,
   onToggleBookmark,
   bookmarkPending,
+  canReport,
+  onReport,
 }: {
   currentPost: {
     id: number
@@ -198,8 +202,17 @@ export default function CommunityDetailView({
   onPin: () => void
   onToggleBookmark: (post: { id: number; bookmarked?: boolean }) => void
   bookmarkPending?: boolean
+  canReport?: boolean
+  onReport?: (reason: string, detail: string) => Promise<void>
 }) {
   const currentPostConcept = currentPost ? isConceptPost(currentPost) : false
+  // Tracked by post id, not as booleans: this component stays mounted while the
+  // reader navigates from one post to the next, so a plain flag would leave the
+  // dialog open on — or mark as 신고됨 — a post it was never opened for.
+  const [reportingPostId, setReportingPostId] = useState(null)
+  const [reportedPostId, setReportedPostId] = useState(null)
+  const reporting = Boolean(currentPost && reportingPostId === currentPost.id)
+  const reported = Boolean(currentPost && reportedPostId === currentPost.id)
 
   return (
     <>
@@ -275,6 +288,17 @@ export default function CommunityDetailView({
                 {currentPost.pinned ? '고정 해제' : '고정'}
               </button>
             )}
+            {canReport && onReport && (
+              <button
+                type="button"
+                onClick={() => setReportingPostId(currentPost.id)}
+                disabled={reported}
+                className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold disabled:opacity-50 sm:min-h-0"
+              >
+                <AlertTriangle size={14} />
+                {reported ? '신고됨' : '신고'}
+              </button>
+            )}
             {currentPost.editable && (
               <>
                 <button type="button" onClick={onEdit} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
@@ -288,6 +312,16 @@ export default function CommunityDetailView({
               </>
             )}
           </div>
+
+          {reporting && onReport && (
+            <ReportPostDialog
+              onClose={() => setReportingPostId(null)}
+              onSubmit={async (reason, detail) => {
+                await onReport(reason, detail)
+                setReportedPostId(currentPost.id)
+              }}
+            />
+          )}
 
           <CommentThread
             comments={comments}

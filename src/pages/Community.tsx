@@ -13,6 +13,7 @@ import {
   listMyDeletedCommunityPosts,
   listComments,
   pinCommunityPost,
+  reportCommunityPost,
   voteCommunityPost,
   voteCommunityPoll,
 } from '../services/communityApi'
@@ -54,7 +55,9 @@ export default function Community({ onBack }: { onBack: () => void }) {
   const [deletedLoading, setDeletedLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [deletedError, setDeletedError] = useState('')
-  const [page, setPage] = useState(1)
+  // `rawPage` is what the user last asked for; the page actually rendered is
+  // derived below, clamped to the current filter's page count.
+  const [rawPage, setPage] = useState(1)
   const [activeCategory, setActiveCategory] = useState('ALL')
   const [sortMode, setSortMode] = useState('latest')
   const [searchQuery, setSearchQuery] = useState('')
@@ -114,6 +117,10 @@ export default function Community({ onBack }: { onBack: () => void }) {
     [canSeeAnonymous, effectiveActiveCategory, posts, searchQuery, sortMode],
   )
   const totalPages = Math.max(1, Math.ceil(filteredPosts.length / PAGE_SIZE))
+  // Derived, not corrected in an effect: when a filter/search shrinks the result
+  // set below the current page, clamping during render shows the right page on the
+  // FIRST paint. The old setState-in-effect rendered one empty page first.
+  const page = Math.min(rawPage, totalPages)
   const pageStartIndex = (page - 1) * PAGE_SIZE
   const visiblePosts = useMemo(
     () => filteredPosts.slice(pageStartIndex, pageStartIndex + PAGE_SIZE),
@@ -122,13 +129,6 @@ export default function Community({ onBack }: { onBack: () => void }) {
   const paginationItems = useMemo(() => paginationRange(page, totalPages), [page, totalPages])
   const showingFrom = filteredPosts.length === 0 ? 0 : pageStartIndex + 1
   const showingTo = Math.min(filteredPosts.length, pageStartIndex + visiblePosts.length)
-
-  useEffect(() => {
-    if (page > totalPages) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setPage(totalPages)
-    }
-  }, [page, totalPages])
 
   const bookmarkMutation = useBookmarkMutation({
     onToggled: (postId, bookmarked) => {
@@ -277,6 +277,18 @@ export default function Community({ onBack }: { onBack: () => void }) {
     } finally {
       setAppealingId(null)
     }
+  }
+
+  // 신고는 로그인한 회원만, 자기 글은 제외. 익명 글은 authorStudentId가 서버에서
+  // 마스킹되어(CommunityService: `maskAnonymous ? null : …`) 작성자 판별이 불가능한데,
+  // 익명 게시판이야말로 신고가 필요한 곳이라 coms-member-app과 동일하게 노출한다.
+  const canReportCurrentPost = Boolean(
+    user?.studentId && currentPost && currentPost.authorStudentId !== user.studentId,
+  )
+
+  const handleReport = async (reason, detail) => {
+    await reportCommunityPost(currentPost.id, reason, detail)
+    showToast({ message: '신고가 접수되었습니다. 운영진이 확인합니다.', tone: 'success' })
   }
 
   const handleVote = async (value) => {
@@ -563,6 +575,8 @@ export default function Community({ onBack }: { onBack: () => void }) {
             onPin={handlePin}
             onToggleBookmark={handleToggleBookmark}
             bookmarkPending={bookmarkMutation.isPending}
+            canReport={canReportCurrentPost}
+            onReport={handleReport}
           />
         )}
       </section>
