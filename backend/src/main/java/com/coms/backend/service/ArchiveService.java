@@ -29,7 +29,9 @@ import java.util.stream.Collectors;
 @Transactional
 public class ArchiveService {
 
-    private static final long MAX_ARCHIVE_FILE_BYTES = 500L * 1024 * 1024;
+    // A real cap for this feature (lecture notes, slides, past papers). Matching the
+    // multipart cap made this check meaningless — the container rejected first.
+    private static final long MAX_ARCHIVE_FILE_BYTES = 50L * 1024 * 1024;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "pdf", "txt", "md", "csv",
             "doc", "docx", "ppt", "pptx", "xls", "xlsx", "hwp", "hwpx",
@@ -262,7 +264,7 @@ public class ArchiveService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일이 비어 있거나 파일명이 없습니다.");
         }
         if (file.getSize() > MAX_ARCHIVE_FILE_BYTES) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "자료실 파일은 500MB 이하만 업로드할 수 있습니다.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "자료실 파일은 50MB 이하만 업로드할 수 있습니다.");
         }
         String baseContentType = baseContentType(file.getContentType());
         if (BLOCKED_MIME_TYPES.contains(baseContentType)) {
@@ -271,6 +273,11 @@ public class ArchiveService {
         String extension = StringUtils.getFilenameExtension(filename);
         if (extension == null || !ALLOWED_EXTENSIONS.contains(extension.toLowerCase(Locale.ROOT))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "허용되지 않는 자료실 파일 확장자입니다.");
+        }
+        // The extension is client-supplied, so for the formats with a dependable signature check
+        // that the bytes agree with it — otherwise `payload.exe.zip` gets stored as an archive.
+        if (!UploadSniffer.matchesExtension(extension, UploadSniffer.header(file))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일 내용이 확장자와 일치하지 않습니다.");
         }
     }
 

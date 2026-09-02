@@ -41,6 +41,24 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 })
 @WithMockUser(roles = "ADMIN")
 class CommunityServiceAuditLogTest {
+
+    // 업로드 검증이 매직 바이트를 확인하므로 이미지 픽스처는 실제 PNG 여야 한다.
+    // (PNG 는 저장 시 메타데이터 제거를 위해 디코딩되므로 시그니처만으로는 부족하다.)
+    private static final byte[] COVER_PNG = onePixelPng(0x112233);
+    private static final byte[] INLINE_PNG = onePixelPng(0x445566);
+    private static final byte[] ZIP_BYTES = {0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00};
+
+    private static byte[] onePixelPng(int rgb) {
+        try {
+            var image = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_RGB);
+            image.setRGB(0, 0, rgb);
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            javax.imageio.ImageIO.write(image, "png", out);
+            return out.toByteArray();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
     @Autowired
     private CommunityService communityService;
 
@@ -290,8 +308,8 @@ class CommunityServiceAuditLogTest {
         Member admin = member("2026123456", "관리자", Member.Role.ADMIN);
         memberRepository.save(author);
         memberRepository.save(admin);
-        MockMultipartFile cover = new MockMultipartFile("image", "cover.png", "image/png", "cover".getBytes());
-        MockMultipartFile inline = new MockMultipartFile("images", "inline.png", "image/png", "inline".getBytes());
+        MockMultipartFile cover = new MockMultipartFile("image", "cover.png", "image/png", COVER_PNG);
+        MockMultipartFile inline = new MockMultipartFile("images", "inline.png", "image/png", INLINE_PNG);
         var created = communityService.create(
                 author.getStudentId(),
                 new CommunityPostRequest("사진 보관 대상", "임시 본문", "GENERAL", false),
@@ -323,7 +341,7 @@ class CommunityServiceAuditLogTest {
                     assertThat(image.getOriginalImageId()).isEqualTo(inlineImageId);
                     assertThat(image.getOriginalName()).isEqualTo("inline.png");
                     assertThat(communityDeletionArchiveService.loadImage(snapshot.getId(), image.getId()).getInputStream().readAllBytes())
-                            .isEqualTo("inline".getBytes());
+                            .isEqualTo(INLINE_PNG);
                 });
 
         assertThat(communityDeletionArchiveService.recent(10))
@@ -339,8 +357,8 @@ class CommunityServiceAuditLogTest {
         Member admin = member("2026123456", "관리자", Member.Role.ADMIN);
         memberRepository.save(author);
         memberRepository.save(admin);
-        MockMultipartFile cover = new MockMultipartFile("image", "cover.png", "image/png", "cover".getBytes());
-        MockMultipartFile inline = new MockMultipartFile("images", "inline.png", "image/png", "inline".getBytes());
+        MockMultipartFile cover = new MockMultipartFile("image", "cover.png", "image/png", COVER_PNG);
+        MockMultipartFile inline = new MockMultipartFile("images", "inline.png", "image/png", INLINE_PNG);
         var created = communityService.create(
                 author.getStudentId(),
                 new CommunityPostRequest("복원 대상", "임시 본문", "QUESTION", false),
@@ -422,7 +440,7 @@ class CommunityServiceAuditLogTest {
         Long originalFileId = communityService.addFile(
                 author.getStudentId(),
                 created.id(),
-                new MockMultipartFile("file", "source.zip", "application/zip", "zip".getBytes())
+                new MockMultipartFile("file", "source.zip", "application/zip", ZIP_BYTES)
         );
         String content = """
                 [{"type":"text","content":"영상과 첨부, 댓글까지 복원되어야 합니다."},
@@ -501,8 +519,8 @@ class CommunityServiceAuditLogTest {
         memberRepository.save(author);
         memberRepository.save(commenter);
         memberRepository.save(admin);
-        MockMultipartFile cover = new MockMultipartFile("image", "cover.png", "image/png", "cover".getBytes());
-        MockMultipartFile inline = new MockMultipartFile("images", "inline.png", "image/png", "inline".getBytes());
+        MockMultipartFile cover = new MockMultipartFile("image", "cover.png", "image/png", COVER_PNG);
+        MockMultipartFile inline = new MockMultipartFile("images", "inline.png", "image/png", INLINE_PNG);
         var created = communityService.create(
                 author.getStudentId(),
                 new CommunityPostRequest("상세 보기 대상", "임시 본문", "GENERAL", false),
@@ -571,7 +589,7 @@ class CommunityServiceAuditLogTest {
         Long originalImageId = communityService.addImages(
                 author.getStudentId(),
                 created.id(),
-                java.util.List.of(new MockMultipartFile("images", "inline.png", "image/png", "inline".getBytes()))
+                java.util.List.of(new MockMultipartFile("images", "inline.png", "image/png", INLINE_PNG))
         ).get(0);
         communityService.update(
                 author.getStudentId(),
@@ -591,7 +609,7 @@ class CommunityServiceAuditLogTest {
         communityService.deleteImage(admin.getStudentId(), restoredPostId, restoredImageId);
 
         assertThat(communityDeletionArchiveService.loadImage(snapshotId, archivedImageId).getInputStream().readAllBytes())
-                .isEqualTo("inline".getBytes());
+                .isEqualTo(INLINE_PNG);
     }
 
     @Test

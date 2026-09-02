@@ -45,6 +45,24 @@ import static org.mockito.Mockito.verify;
 })
 @Transactional
 class CommunityServiceTest {
+
+    // 업로드 검증이 매직 바이트를 확인하므로 픽스처도 실제 파일이어야 한다. PNG 는 저장 단계에서
+    // 메타데이터 제거를 위해 실제로 디코딩되므로 시그니처만으로는 부족하다.
+    private static final byte[] PNG_BYTES = onePixelPng(0x000000);
+    private static final byte[] ZIP_BYTES = {0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00};
+
+    /** 색이 다르면 바이트도 달라지므로 "어느 이미지가 선택됐는가"를 내용으로 구분할 수 있다. */
+    private static byte[] onePixelPng(int rgb) {
+        try {
+            var image = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_RGB);
+            image.setRGB(0, 0, rgb);
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            javax.imageio.ImageIO.write(image, "png", out);
+            return out.toByteArray();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
     @Autowired
     private CommunityService communityService;
 
@@ -457,7 +475,7 @@ class CommunityServiceTest {
         memberRepository.save(author);
         memberRepository.save(other);
         var created = communityService.create(author.getStudentId(), new CommunityPostRequest("이미지", "내용", "GENERAL", false), null);
-        MockMultipartFile image = new MockMultipartFile("images", "ok.png", "image/png", "png".getBytes());
+        MockMultipartFile image = new MockMultipartFile("images", "ok.png", "image/png", PNG_BYTES);
 
         assertThatThrownBy(() -> communityService.addImages(other.getStudentId(), created.id(), java.util.List.of(image)))
                 .isInstanceOf(ResponseStatusException.class);
@@ -468,7 +486,7 @@ class CommunityServiceTest {
         Member user = member("2025123456", "회원", Member.Role.USER);
         memberRepository.save(user);
         var created = communityService.create(user.getStudentId(), new CommunityPostRequest("이미지", "내용", "GENERAL", false), null);
-        MockMultipartFile image = new MockMultipartFile("images", "ok.png", "image/png", "png".getBytes());
+        MockMultipartFile image = new MockMultipartFile("images", "ok.png", "image/png", PNG_BYTES);
 
         communityService.addImages(user.getStudentId(), created.id(), java.util.List.of(image));
 
@@ -485,8 +503,9 @@ class CommunityServiceTest {
         Member user = member("2025123456", "회원", Member.Role.USER);
         memberRepository.save(user);
         var created = communityService.create(user.getStudentId(), new CommunityPostRequest("이미지", "내용", "GENERAL", false), null);
-        MockMultipartFile lowerImage = new MockMultipartFile("images", "lower.png", "image/png", "lower".getBytes());
-        MockMultipartFile topImage = new MockMultipartFile("images", "top.png", "image/png", "top".getBytes());
+        byte[] topBytes = onePixelPng(0xFF0000);
+        MockMultipartFile lowerImage = new MockMultipartFile("images", "lower.png", "image/png", onePixelPng(0x0000FF));
+        MockMultipartFile topImage = new MockMultipartFile("images", "top.png", "image/png", topBytes);
         java.util.List<Long> imageIds = communityService.addImages(user.getStudentId(), created.id(), java.util.List.of(lowerImage, topImage));
 
         String content = """
@@ -503,7 +522,7 @@ class CommunityServiceTest {
 
         var shareImage = communityService.loadShareImage(created.id());
 
-        assertThat(shareImage.resource().getInputStream().readAllBytes()).isEqualTo("top".getBytes());
+        assertThat(shareImage.resource().getInputStream().readAllBytes()).isEqualTo(topBytes);
         assertThat(shareImage.originalName()).isEqualTo("top.png");
     }
 
@@ -512,7 +531,7 @@ class CommunityServiceTest {
         Member user = member("2025123456", "회원", Member.Role.USER);
         memberRepository.save(user);
         var created = communityService.create(user.getStudentId(), new CommunityPostRequest("첨부", "내용", "GENERAL", false), null);
-        MockMultipartFile zip = new MockMultipartFile("file", "source.zip", "application/zip", "zip".getBytes());
+        MockMultipartFile zip = new MockMultipartFile("file", "source.zip", "application/zip", ZIP_BYTES);
 
         Long fileId = communityService.addFile(user.getStudentId(), created.id(), zip);
         CommunityPostResponse detail = communityService.get(user.getStudentId(), created.id());
@@ -536,6 +555,41 @@ class CommunityServiceTest {
         assertThatThrownBy(() -> communityService.addFile(user.getStudentId(), created.id(), text))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                         assertThat(ex.getReason()).contains("ZIP"));
+    }
+
+    @Test
+    void rejectsExecutableDisguisedWithAZipExtension() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest("첨부", "내용", "GENERAL", false), null);
+        // payload.exe.zip: .zip 확장자 + 허용 MIME 이지만 내용은 PE 실행 파일(MZ).
+        byte[] executable = {0x4D, 0x5A, (byte) 0x90, 0x00, 0x03, 0x00};
+        MockMultipartFile disguised = new MockMultipartFile("file", "payload.exe.zip", "application/zip", executable);
+
+        assertThatThrownBy(() -> communityService.addFile(user.getStudentId(), created.id(), disguised))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST));
+
+        // 빈 content-type 으로도 우회할 수 없어야 한다.
+        MockMultipartFile blankType = new MockMultipartFile("file", "payload.exe.zip", "", executable);
+        assertThatThrownBy(() -> communityService.addFile(user.getStudentId(), created.id(), blankType))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void rejectsImageWhoseBytesDoNotMatchTheDeclaredType() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        // image/png 선언 + .png 이름이지만 내용은 HTML — inline 으로 서빙되면 저장형 XSS 가 된다.
+        MockMultipartFile fakePng = new MockMultipartFile(
+                "image", "xss.png", "image/png", "<html><script>alert(1)</script>".getBytes());
+
+        assertThatThrownBy(() -> communityService.create(
+                user.getStudentId(),
+                new CommunityPostRequest("사진", "내용", "GENERAL", false),
+                fakePng
+        )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                assertThat(ex.getStatusCode()).isEqualTo(org.springframework.http.HttpStatus.BAD_REQUEST));
     }
 
     @Test
@@ -857,8 +911,8 @@ class CommunityServiceTest {
                 new CommunityPostRequest("이미지 글", "내용", "GENERAL", false), null);
         var postWithFile = communityService.create(user.getStudentId(),
                 new CommunityPostRequest("첨부 글", "내용", "GENERAL", false), null);
-        MockMultipartFile image = new MockMultipartFile("images", "ok.png", "image/png", "png".getBytes());
-        MockMultipartFile zip = new MockMultipartFile("file", "source.zip", "application/zip", "zip".getBytes());
+        MockMultipartFile image = new MockMultipartFile("images", "ok.png", "image/png", PNG_BYTES);
+        MockMultipartFile zip = new MockMultipartFile("file", "source.zip", "application/zip", ZIP_BYTES);
         communityService.addImages(user.getStudentId(), postWithImage.id(), java.util.List.of(image));
         communityService.addFile(user.getStudentId(), postWithFile.id(), zip);
         communityService.toggleBookmark(postWithFile.id(), user.getStudentId());

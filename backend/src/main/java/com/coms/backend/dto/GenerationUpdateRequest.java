@@ -1,9 +1,9 @@
 package com.coms.backend.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-
-public record GenerationUpdateRequest(
-        @NotBlank @Pattern(regexp = "\\d{1,3}", message = "기수는 숫자여야 합니다.") String generation
-) {
+/**
+ * 기수 변경 요청. 값 검증은 {@code AdminService.updateGeneration} 한 곳에서만 한다 —
+ * 예전에는 DTO 의 @Pattern 과 서비스의 정규식이 각각 검사하면서 둘 다 "000" 같은
+ * 0 기수를 통과시켰다.
+ */
+public record GenerationUpdateRequest(String generation) {
 }

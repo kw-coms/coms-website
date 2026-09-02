@@ -14,6 +14,8 @@ public interface RecruitApplicationRepository extends JpaRepository<RecruitAppli
     long countByStatus(RecruitApplication.Status status);
     Optional<RecruitApplication> findFirstByStudentIdAndNameOrderBySubmittedAtDescIdDesc(String studentId, String name);
 
+    void deleteByStudentId(String studentId);
+
     @Query("select r.submittedAt from RecruitApplication r where r.submittedAt >= :since")
     List<LocalDateTime> findSubmittedAtSince(@Param("since") LocalDateTime since);
 }

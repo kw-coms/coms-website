@@ -291,8 +291,9 @@ public class CommunityController {
     }
 
     @GetMapping("/tools/link-preview")
-    public ResponseEntity<LinkPreviewResponse> linkPreview(@RequestParam String url) {
-        return ResponseEntity.ok(linkPreviewService.preview(url));
+    public ResponseEntity<LinkPreviewResponse> linkPreview(Authentication authentication,
+                                                           @RequestParam String url) {
+        return ResponseEntity.ok(linkPreviewService.preview(url, authentication.getName()));
     }
 
     @GetMapping("/{id}/image")
