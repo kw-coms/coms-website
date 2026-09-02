@@ -112,6 +112,32 @@ class AdminServiceTest {
         verify(loginFailureRepository, never()).deleteByStudentId("admin");
     }
 
+    @Test
+    void updateGenerationRejectsOutOfRangeValues() {
+        Member user = member("2026123456", Member.Role.USER);
+        when(memberRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        // 0기는 존재하지 않는다 — "0", "000" 모두 거부해야 한다.
+        for (String invalid : new String[]{"0", "00", "000", "100", "", " ", "abc", null}) {
+            assertThatThrownBy(() -> adminService.updateGeneration(1L, invalid))
+                    .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                            assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+        }
+    }
+
+    @Test
+    void updateGenerationNormalizesLeadingZeros() {
+        Member user = member("2026123456", Member.Role.USER);
+        when(memberRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(memberRepository.save(user)).thenReturn(user);
+
+        adminService.updateGeneration(1L, " 007 ");
+        assertThat(user.getGeneration()).isEqualTo("7");
+
+        adminService.updateGeneration(1L, "99");
+        assertThat(user.getGeneration()).isEqualTo("99");
+    }
+
     private static Member member(String studentId, Member.Role role) {
         Member member = new Member();
         member.setStudentId(studentId);

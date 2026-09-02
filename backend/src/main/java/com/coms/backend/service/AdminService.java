@@ -139,6 +139,22 @@ public class AdminService {
         loginFailureRepository.deleteByStudentId(studentId);
     }
 
+    /**
+     * 기수의 유일한 검증 지점. 1..99 범위만 허용하고(존재하지 않는 0기, "000" 거부),
+     * 앞자리 0 을 떼어 "07" 과 "7" 이 서로 다른 기수처럼 저장되지 않게 정규화한다.
+     */
+    private static String normalizeGeneration(String generation) {
+        String cleaned = generation == null ? "" : generation.trim();
+        if (!cleaned.matches("\\d{1,3}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "기수는 숫자여야 합니다.");
+        }
+        int value = Integer.parseInt(cleaned);
+        if (value < 1 || value > 99) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "기수는 1에서 99 사이여야 합니다.");
+        }
+        return String.valueOf(value);
+    }
+
     private void ensureNotFinalAdmin(Member member, String message) {
         if (member.getRole() == Member.Role.ADMIN && memberRepository.countByRole(Member.Role.ADMIN) <= 1) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, message);
@@ -148,11 +164,7 @@ public class AdminService {
     public MemberResponse updateGeneration(Long id, String generation) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        String cleaned = generation == null ? "" : generation.trim();
-        if (!cleaned.matches("\\d{1,3}")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "기수는 숫자(1~3자리)여야 합니다.");
-        }
-        member.setGeneration(cleaned);
+        member.setGeneration(normalizeGeneration(generation));
         return toResponse(memberRepository.save(member));
     }
 
