@@ -1,7 +1,10 @@
 type Role = string | null | undefined
 
-// Privilege ladder, mirroring the backend's Member.Role + RoleHierarchy:
-// 회장(ADMIN) > 부회장(VICE_PRESIDENT) > 임원(OFFICER) > 일반 회원(USER).
+// Privilege ladder, mirroring the backend's Member.Role + RoleHierarchy — all five
+// values, lowest last:
+// 회장(ADMIN) > 부회장(VICE_PRESIDENT) > 임원(OFFICER) > 일반 회원(USER) > 준회원(ASSOCIATE).
+// ASSOCIATE sits BELOW USER: a 준회원 is a provisional member who has not been
+// promoted into the 명부 yet, so it must never clear a USER-level gate.
 const ROLE_RANK: Record<string, number> = {
   ASSOCIATE: 0,
   USER: 1,
