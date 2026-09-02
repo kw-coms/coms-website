@@ -347,7 +347,19 @@ export default function AdminRoster() {
                     ) : (
                       <>
                         <td className="px-3 py-3 font-mono text-xs text-[var(--theme-body-dark)]">{displayStudentId(member.studentId) || '-'}</td>
-                        <td className="px-3 py-3 font-semibold text-[var(--theme-body-dark)]">{member.name}</td>
+                        <td className="px-3 py-3 font-semibold text-[var(--theme-body-dark)]">
+                          <span className="inline-flex items-center gap-1.5">
+                            {member.name}
+                            {member.initialRole === 'ASSOCIATE' && (
+                              <span
+                                title="리크루팅 합격으로 등록된 행입니다. 가입하면 준회원으로 시작합니다."
+                                className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+                              >
+                                준회원
+                              </span>
+                            )}
+                          </span>
+                        </td>
                         <td className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{member.generation ? `${member.generation}기` : '-'}</td>
                         <td className="px-3 py-3 text-xs text-[var(--theme-body-muted)]">{member.phone || '-'}</td>
                         <td className="px-3 py-3">
