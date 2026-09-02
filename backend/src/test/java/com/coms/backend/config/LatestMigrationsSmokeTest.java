@@ -32,7 +32,25 @@ class LatestMigrationsSmokeTest {
                     new ClassPathResource("db/migration/V80__club_project_author_nullable.sql"));
             ScriptUtils.executeSqlScript(connection,
                     new ClassPathResource("db/migration/V81__site_settings.sql"));
+            // Replayed on top of the hibernate-generated schema: both are written idempotently
+            // (IF NOT EXISTS) and carry DEFAULTs on their NOT NULL columns, so re-running them
+            // over an existing table is a no-op rather than an error.
+            ScriptUtils.executeSqlScript(connection,
+                    new ClassPathResource("db/migration/V86__refresh_sessions.sql"));
+            ScriptUtils.executeSqlScript(connection,
+                    new ClassPathResource("db/migration/V87__eligible_member_initial_role.sql"));
         }
+
+        String initialRoleNullable = jdbcTemplate.queryForObject(
+                """
+                SELECT is_nullable
+                FROM information_schema.columns
+                WHERE table_name = 'ELIGIBLE_MEMBERS' AND column_name = 'INITIAL_ROLE'
+                """,
+                String.class
+        );
+        assertThat(initialRoleNullable).isEqualToIgnoringCase("NO");
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM refresh_sessions", Integer.class)).isZero();
 
         Integer settingsRows = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM site_settings WHERE id = 1",

@@ -51,7 +51,8 @@ class AdminServiceTest {
             mock(MiniAppDocumentRepository.class),
             mock(TeamRandomizerRoomRepository.class),
             recruitApplicationRepository,
-            loginFailureRepository
+            loginFailureRepository,
+            mock(RefreshSessionService.class)
     );
 
     @Test

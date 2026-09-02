@@ -1,6 +1,7 @@
 package com.coms.backend.service;
 
 import com.coms.backend.repository.LoginFailureRepository;
+import com.coms.backend.repository.RefreshSessionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,9 @@ class LoginFailureRetentionJobTest {
     private LoginFailureRepository loginFailureRepository;
 
     @Autowired
+    private RefreshSessionRepository refreshSessionRepository;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
@@ -53,10 +57,35 @@ class LoginFailureRetentionJobTest {
         insert("2026123456", "203.0.113.1", LocalDateTime.now().minusDays(400));
 
         LoginFailureRetentionJob disabled =
-                new LoginFailureRetentionJob(loginFailureRepository, java.time.Clock.systemDefaultZone(), false);
+                new LoginFailureRetentionJob(loginFailureRepository, refreshSessionRepository,
+                        java.time.Clock.systemDefaultZone(), false);
         disabled.purgeOldLoginFailures();
 
         assertThat(loginFailureRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void deletesRefreshSessionsThatExpiredOrWereRevokedOverAWeekAgo() {
+        refreshSessionRepository.deleteAll();
+        LocalDateTime now = LocalDateTime.now();
+        insertSession("expired-long-ago", now.minusDays(30), null);
+        insertSession("revoked-long-ago", now.plusDays(20), now.minusDays(8));
+        insertSession("revoked-yesterday", now.plusDays(20), now.minusDays(1));
+        insertSession("still-live", now.plusDays(20), null);
+
+        job.purgeStaleRefreshSessions();
+
+        assertThat(jdbcTemplate.queryForList("SELECT jti FROM refresh_sessions", String.class))
+                .containsExactlyInAnyOrder("revoked-yesterday", "still-live");
+    }
+
+    private void insertSession(String jti, LocalDateTime expiresAt, LocalDateTime revokedAt) {
+        jdbcTemplate.update(
+                "INSERT INTO refresh_sessions (jti, family, student_id, remember_me, expires_at, revoked_at, created_at) "
+                        + "VALUES (?, ?, ?, FALSE, ?, ?, ?)",
+                jti, jti, "2026123456", Timestamp.valueOf(expiresAt),
+                revokedAt == null ? null : Timestamp.valueOf(revokedAt),
+                Timestamp.valueOf(LocalDateTime.now()));
     }
 
     private void insert(String studentId, String ip, LocalDateTime attemptedAt) {
