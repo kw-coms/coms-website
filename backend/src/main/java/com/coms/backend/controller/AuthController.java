@@ -120,8 +120,16 @@ public class AuthController {
             session = refreshSessionService.rotate(
                     studentId, jwtTokenProvider.getSessionId(refreshToken), family, rememberMe);
         }
+        if (session.outcome() == RefreshSessionService.Outcome.RACE_LOSER) {
+            // A parallel refresh from the SAME client already rotated this token and its Set-Cookie
+            // landed in the same cookie jar. Answer 204 with no cookies so the loser's retry rides
+            // the winner's cookies. A 401 here would make clients without single-flight refresh
+            // (member app <= v0.2.x fires one refresh per concurrent 401) treat a cold boot as an
+            // expired session and log out. Nothing is issued, so a replay from elsewhere gains nothing.
+            return ResponseEntity.noContent().build();
+        }
         if (session.outcome() != RefreshSessionService.Outcome.ROTATED) {
-            // REUSE_DETECTED already revoked the family; RACE_LOSER deliberately did not.
+            // REUSE_DETECTED already revoked the family; REJECTED has no live session at all.
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
