@@ -1,5 +1,5 @@
 export type SponsorSummary = {
-  id: number
+  id: number | null
   name: string
   tierId: number | null
   logoUrl: string | null
@@ -115,7 +115,7 @@ export function sponsorDisplayName(sponsor: { name?: string | null; anonymous?: 
  */
 export function anonymizeSponsor(sponsor: SponsorSummary): SponsorSummary {
   if (!sponsor?.anonymous) return sponsor
-  return { ...sponsor, name: ANONYMOUS_SPONSOR_NAME, logoUrl: null, linkUrl: null, description: null }
+  return { ...sponsor, id: null, name: ANONYMOUS_SPONSOR_NAME, logoUrl: null, linkUrl: null, description: null }
 }
 
 /**

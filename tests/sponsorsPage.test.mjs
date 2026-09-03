@@ -39,8 +39,9 @@ assert.equal(isSponsorExpired(sponsor({ untilDate: '2027-01-01' }), TODAY), fals
 // 파싱할 수 없는 값 때문에 후원자가 사라지면 안 된다.
 assert.equal(isSponsorExpired(sponsor({ untilDate: '언젠가' }), TODAY), false)
 
-// --- 익명화: 이름/로고/링크/소개가 모두 지워진다 ------------------------------------
+// --- 익명화: DB 식별자/이름/로고/링크/소개가 모두 지워진다 ---------------------------
 const anonymous = anonymizeSponsor(sponsor({ anonymous: true }))
+assert.equal(anonymous.id, null)
 assert.equal(anonymous.name, ANONYMOUS_SPONSOR_NAME)
 assert.equal(anonymous.logoUrl, null)
 assert.equal(anonymous.linkUrl, null)

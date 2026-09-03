@@ -177,8 +177,8 @@ function TierSection({ group, layout, showTierLabels }: {
         </div>
       )}
       <ul className={layout === 'list' ? 'flex flex-col gap-3' : 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3'}>
-        {group.sponsors.map((sponsor) => (
-          <li key={sponsor.id}>
+        {group.sponsors.map((sponsor, index) => (
+          <li key={sponsor.anonymous ? `anon-${index}` : sponsor.id}>
             <SponsorCard sponsor={sponsor} tierColor={tierColor} layout={layout} />
           </li>
         ))}

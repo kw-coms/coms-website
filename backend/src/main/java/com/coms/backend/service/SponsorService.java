@@ -419,7 +419,7 @@ public class SponsorService {
             // No name, no logo, no outbound link — an anonymous sponsor is only ever a
             // placeholder card, and the tier/period are the only details that survive.
             return new SponsorResponse(
-                    sponsor.getId(), ANONYMOUS_NAME, sponsor.getTierId(), null, null,
+                    null, ANONYMOUS_NAME, sponsor.getTierId(), null, null,
                     null, sponsor.getSinceDate(), sponsor.getUntilDate(), true);
         }
         return new SponsorResponse(
