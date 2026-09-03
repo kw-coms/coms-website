@@ -442,6 +442,8 @@ export const footerLinkGroups = [
 
 export const navExtraItems = [
   { id: 'notices', label: 'Notices', path: '/notices' },
+  // 후원자 페이지는 로그아웃 상태에서도 열리므로 auth 플래그를 붙이지 않는다.
+  { id: 'sponsors', label: '후원자', path: '/sponsors' },
   { id: 'resources', label: 'Resources', path: '/resources', auth: true },
   { id: 'community', label: 'Community', path: '/community', auth: true },
 ]
