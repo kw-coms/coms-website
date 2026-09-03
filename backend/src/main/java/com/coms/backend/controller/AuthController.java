@@ -15,6 +15,7 @@ import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.dto.UpdateProfileRequest;
 import com.coms.backend.security.JwtTokenProvider;
 import com.coms.backend.service.AuthService;
+import com.coms.backend.service.RefreshSessionService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -40,17 +41,20 @@ public class AuthController {
     private final AuthService authService;
     private final JwtTokenProvider jwtTokenProvider;
     private final com.coms.backend.service.AdminService adminService;
+    private final RefreshSessionService refreshSessionService;
     private final boolean cookieSecure;
     private final String cookieSameSite;
 
     public AuthController(AuthService authService,
                           JwtTokenProvider jwtTokenProvider,
                           com.coms.backend.service.AdminService adminService,
+                          RefreshSessionService refreshSessionService,
                           @Value("${cookie.secure:false}") boolean cookieSecure,
                           @Value("${cookie.same-site:Lax}") String cookieSameSite) {
         this.authService = authService;
         this.jwtTokenProvider = jwtTokenProvider;
         this.adminService = adminService;
+        this.refreshSessionService = refreshSessionService;
         this.cookieSecure = cookieSecure;
         String requested = cookieSameSite == null ? "Lax" : cookieSameSite.trim();
         // SameSite=None requires Secure=true per RFC; if the deployer mis-paired the flags, log and fall back to Lax.
@@ -89,12 +93,7 @@ public class AuthController {
 
     @PostMapping("/refresh")
     public ResponseEntity<Void> refresh(HttpServletRequest servletRequest, HttpServletResponse response) {
-        String refreshToken = null;
-        if (servletRequest.getCookies() != null) {
-            for (Cookie c : servletRequest.getCookies()) {
-                if ("refreshToken".equals(c.getName())) { refreshToken = c.getValue(); break; }
-            }
-        }
+        String refreshToken = readCookie(servletRequest, "refreshToken");
         if (refreshToken == null || !jwtTokenProvider.validateToken(refreshToken) || !jwtTokenProvider.isRefreshToken(refreshToken)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -107,10 +106,36 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        // Rotate: re-issue both a new access token and a new refresh token.
         boolean rememberMe = jwtTokenProvider.isRememberedRefreshToken(refreshToken);
-        String newAccessToken = jwtTokenProvider.generateToken(studentId, currentTokenVersion);
-        String newRefreshToken = jwtTokenProvider.generateRefreshToken(studentId, rememberMe, currentTokenVersion);
+        String family = jwtTokenProvider.getFamily(refreshToken);
+
+        RefreshSessionService.Result session;
+        if (family == null) {
+            // Legacy token issued before refresh sessions existed: it has no row and never will.
+            // Accepting it once (the JWT itself is valid and the token version matches) is what
+            // keeps the deploy from logging every signed-in member out; the replacement token
+            // carries a family, so this branch is unreachable for it from here on.
+            session = refreshSessionService.openSession(studentId, rememberMe);
+        } else {
+            session = refreshSessionService.rotate(
+                    studentId, jwtTokenProvider.getSessionId(refreshToken), family, rememberMe);
+        }
+        if (session.outcome() == RefreshSessionService.Outcome.RACE_LOSER) {
+            // A parallel refresh from the SAME client already rotated this token and its Set-Cookie
+            // landed in the same cookie jar. Answer 204 with no cookies so the loser's retry rides
+            // the winner's cookies. A 401 here would make clients without single-flight refresh
+            // (member app <= v0.2.x fires one refresh per concurrent 401) treat a cold boot as an
+            // expired session and log out. Nothing is issued, so a replay from elsewhere gains nothing.
+            return ResponseEntity.noContent().build();
+        }
+        if (session.outcome() != RefreshSessionService.Outcome.ROTATED) {
+            // REUSE_DETECTED already revoked the family; REJECTED has no live session at all.
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+
+        String newAccessToken = jwtTokenProvider.generateToken(studentId, currentTokenVersion, session.family());
+        String newRefreshToken = jwtTokenProvider.generateRefreshToken(
+                studentId, rememberMe, currentTokenVersion, session.jti(), session.family());
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie(newAccessToken).toString());
         response.addHeader(HttpHeaders.SET_COOKIE, refreshCookie(newRefreshToken, rememberMe).toString());
@@ -120,16 +145,19 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest servletRequest, HttpServletResponse response) {
-        // Revoke all of this user's sessions by bumping their token version.
+        // Per-device logout: revoke only the refresh-session family this access token belongs to,
+        // so the member's other devices stay signed in. The access token itself is not revocable
+        // without bumping the shared token version, so it stays usable until it expires (2h).
         // The access cookie ("token", path "/") is the one delivered to this endpoint.
-        String accessToken = null;
-        if (servletRequest.getCookies() != null) {
-            for (Cookie c : servletRequest.getCookies()) {
-                if ("token".equals(c.getName())) { accessToken = c.getValue(); break; }
-            }
-        }
+        String accessToken = readCookie(servletRequest, "token");
         if (accessToken != null && jwtTokenProvider.validateToken(accessToken) && !jwtTokenProvider.isRefreshToken(accessToken)) {
-            authService.revokeAllSessions(jwtTokenProvider.getStudentId(accessToken));
+            String family = jwtTokenProvider.getFamily(accessToken);
+            if (family != null) {
+                refreshSessionService.revokeFamily(family);
+            } else {
+                // Legacy access token with no family — fall back to the old all-devices behavior.
+                authService.revokeAllSessions(jwtTokenProvider.getStudentId(accessToken));
+            }
         }
 
         response.addHeader(HttpHeaders.SET_COOKIE, ResponseCookie.from("token", "")
@@ -187,6 +215,18 @@ public class AuthController {
     }
 
     private static final java.util.Set<String> TRUSTED_PROXIES = java.util.Set.of("127.0.0.1", "::1", "0:0:0:0:0:0:0:1");
+
+    private static String readCookie(HttpServletRequest request, String name) {
+        if (request.getCookies() == null) {
+            return null;
+        }
+        for (Cookie cookie : request.getCookies()) {
+            if (name.equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+        return null;
+    }
 
     private ResponseCookie accessCookie(String token) {
         return ResponseCookie.from("token", token)

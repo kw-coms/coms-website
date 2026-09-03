@@ -5,6 +5,7 @@ import com.coms.backend.dto.CommunityReputationResponse;
 import com.coms.backend.repository.CommunityCommentRepository;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVoteRepository;
+import com.coms.backend.repository.MemberRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,15 +26,18 @@ class CommunityReputationService {
     private final CommunityCommentRepository commentRepository;
     private final CommunityPostVoteRepository voteRepository;
     private final CommunityAccess access;
+    private final MemberRepository memberRepository;
 
     CommunityReputationService(CommunityPostRepository communityPostRepository,
                                CommunityCommentRepository commentRepository,
                                CommunityPostVoteRepository voteRepository,
-                               CommunityAccess access) {
+                               CommunityAccess access,
+                               MemberRepository memberRepository) {
         this.communityPostRepository = communityPostRepository;
         this.commentRepository = commentRepository;
         this.voteRepository = voteRepository;
         this.access = access;
+        this.memberRepository = memberRepository;
     }
 
     /**
@@ -48,7 +52,7 @@ class CommunityReputationService {
         long posts = communityPostRepository.countByAuthorStudentId(target.getStudentId());
         long comments = commentRepository.countByStudentId(target.getStudentId());
         long upvotes = voteRepository.sumVoteValueByPostAuthor(target.getStudentId());
-        return CommunityReputation.compute(posts, comments, upvotes);
+        return CommunityReputation.compute(posts, comments, upvotes, target.getGeneration());
     }
 
     /**
@@ -66,9 +70,13 @@ class CommunityReputationService {
                 .collect(Collectors.toMap(CommunityCommentRepository.AuthorCount::getStudentId, CommunityCommentRepository.AuthorCount::getCount));
         Map<String, Long> upvoteSums = voteRepository.sumVoteValueByPostAuthors(studentIds).stream()
                 .collect(Collectors.toMap(CommunityPostVoteRepository.AuthorVoteSum::getStudentId, CommunityPostVoteRepository.AuthorVoteSum::getTotal));
+        Map<String, String> generations = memberRepository.findByStudentIdIn(studentIds).stream()
+                .filter(m -> m.getGeneration() != null)
+                .collect(Collectors.toMap(Member::getStudentId, Member::getGeneration));
         return studentIds.stream().collect(Collectors.toMap(Function.identity(), id -> CommunityReputation.compute(
                 postCounts.getOrDefault(id, 0L),
                 commentCounts.getOrDefault(id, 0L),
-                upvoteSums.getOrDefault(id, 0L))));
+                upvoteSums.getOrDefault(id, 0L),
+                generations.get(id))));
     }
 }
