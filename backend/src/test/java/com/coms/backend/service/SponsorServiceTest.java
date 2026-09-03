@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.Resource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -150,8 +151,66 @@ class SponsorServiceTest {
                 .isEqualTo("https://example.com");
     }
 
+    @Test
+    void deletingSponsorDeletesItsUnreferencedLogoImage() {
+        Long imageId = upload("delete-logo.png");
+        Resource storedFile = sponsorService.loadImage(sponsorService.imageMeta(imageId));
+        Long sponsorId = sponsorService.create(sponsor("삭제", null, b -> b.logoImageId(imageId))).id();
+
+        sponsorService.delete(sponsorId);
+
+        assertThatThrownBy(() -> sponsorService.imageMeta(imageId))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(storedFile.exists()).isFalse();
+    }
+
+    @Test
+    void replacingLogoAndBannerDeletesTheirUnreferencedPreviousImages() {
+        Long oldLogo = upload("old-logo.png");
+        Long newLogo = upload("new-logo.png");
+        Long sponsorId = sponsorService.create(sponsor("교체", null, b -> b.logoImageId(oldLogo))).id();
+
+        sponsorService.update(sponsorId, sponsor("교체", null, b -> b.logoImageId(newLogo)));
+
+        assertThatThrownBy(() -> sponsorService.imageMeta(oldLogo))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(sponsorService.imageMeta(newLogo).getId()).isEqualTo(newLogo);
+
+        Long oldBanner = upload("old-banner.png");
+        Long newBanner = upload("new-banner.png");
+        sponsorService.saveSettings(settingsWithBanner(oldBanner));
+
+        sponsorService.saveSettings(settingsWithBanner(newBanner));
+
+        assertThatThrownBy(() -> sponsorService.imageMeta(oldBanner))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(sponsorService.imageMeta(newBanner).getId()).isEqualTo(newBanner);
+    }
+
+    @Test
+    void lifecycleKeepsAnImageUntilEverySponsorAndBannerReferenceIsGone() {
+        Long shared = upload("shared.png");
+        Long first = sponsorService.create(sponsor("첫째", null, b -> b.logoImageId(shared))).id();
+        Long second = sponsorService.create(sponsor("둘째", null, b -> b.logoImageId(shared))).id();
+        sponsorService.saveSettings(settingsWithBanner(shared));
+
+        sponsorService.delete(first);
+        sponsorService.update(second, sponsor("둘째", null, b -> b));
+
+        assertThat(sponsorService.imageMeta(shared).getId()).isEqualTo(shared);
+
+        sponsorService.saveSettings(settings("#112233", "grid"));
+
+        assertThatThrownBy(() -> sponsorService.imageMeta(shared))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
     private Long tier(String name) {
         return sponsorService.createTier(new SponsorTierRequest(name, "#d4a017", null, null)).id();
+    }
+
+    private Long upload(String filename) {
+        return sponsorService.uploadImage(new MockMultipartFile("image", filename, "image/png", PNG_BYTES)).id();
     }
 
     /** The service binds the raw body itself, so the tests feed it the same map shape MVC would. */
@@ -165,6 +224,12 @@ class SponsorServiceTest {
         return body;
     }
 
+    private static Map<String, Object> settingsWithBanner(Long bannerImageId) {
+        Map<String, Object> body = settings("#112233", "grid");
+        body.put("bannerImageId", bannerImageId);
+        return body;
+    }
+
     /**
      * A sponsor request with every optional field empty, then whatever the caller overrides —
      * so each test only spells out the one field it is actually about.
@@ -174,12 +239,14 @@ class SponsorServiceTest {
     }
 
     private static final class Draft {
+        private Long logoImageId;
         private String linkUrl;
         private String amountNote;
         private LocalDate untilDate;
         private Boolean anonymous;
         private Boolean visible;
 
+        Draft logoImageId(Long value) { this.logoImageId = value; return this; }
         Draft linkUrl(String value) { this.linkUrl = value; return this; }
         Draft amountNote(String value) { this.amountNote = value; return this; }
         Draft untilDate(LocalDate value) { this.untilDate = value; return this; }
@@ -187,7 +254,7 @@ class SponsorServiceTest {
         Draft visible(boolean value) { this.visible = value; return this; }
 
         SponsorRequest toRequest(String name, Long tierId) {
-            return new SponsorRequest(name, tierId, null, linkUrl, null, amountNote, null, untilDate, anonymous, visible, null);
+            return new SponsorRequest(name, tierId, logoImageId, linkUrl, null, amountNote, null, untilDate, anonymous, visible, null);
         }
     }
 }

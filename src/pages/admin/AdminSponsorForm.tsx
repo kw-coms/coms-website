@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { ImagePlus, X } from 'lucide-react'
 import { showToast } from '../../components/common/Toast'
-import { sponsorImageSrc, uploadSponsorImage, type SponsorTier } from '../../services/sponsorApi'
+import { deleteSponsorImage, sponsorImageSrc, uploadSponsorImage, type SponsorTier } from '../../services/sponsorApi'
 import type { SponsorFormValue } from './sponsorFormUtils'
 
 const fieldClass = 'mt-1 w-full rounded-lg border border-[var(--app-hairline)] bg-white px-3 py-2 text-sm text-[var(--theme-body-dark)] outline-none'
@@ -31,6 +31,21 @@ export default function AdminSponsorForm({ value, tiers, saving, onChange, onSub
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const removeLogo = async () => {
+    const imageId = value.logoImageId
+    update({ logoImageId: null, logoUrl: null })
+    if (!imageId) return
+    try {
+      await deleteSponsorImage(imageId)
+    } catch (err) {
+      // A persisted sponsor still references its logo until the form is saved; the update
+      // lifecycle deletes it then. Other failures are covered by the 24-hour orphan cleanup.
+      if (err.status !== 409) {
+        showToast({ message: '로고는 저장 후 자동으로 정리됩니다.', tone: 'default' })
+      }
     }
   }
 
@@ -94,7 +109,7 @@ export default function AdminSponsorForm({ value, tiers, saving, onChange, onSub
             {value.logoImageId && (
               <button
                 type="button"
-                onClick={() => update({ logoImageId: null, logoUrl: null })}
+                onClick={removeLogo}
                 className="inline-flex items-center gap-1 rounded-full border border-[var(--app-hairline)] bg-white px-3 py-1.5 text-xs font-bold text-rose-600"
               >
                 <X size={12} aria-hidden="true" />

@@ -33,6 +33,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -170,8 +171,13 @@ public class SponsorService {
 
     public SponsorAdminResponse update(Long id, SponsorRequest request) {
         Sponsor sponsor = requireSponsor(id);
+        Long previousLogoImageId = sponsor.getLogoImageId();
         apply(sponsor, request);
-        return toAdmin(sponsorRepository.save(sponsor));
+        SponsorAdminResponse updated = toAdmin(sponsorRepository.saveAndFlush(sponsor));
+        if (!Objects.equals(previousLogoImageId, sponsor.getLogoImageId())) {
+            deleteImageIfUnreferenced(previousLogoImageId);
+        }
+        return updated;
     }
 
     public SponsorAdminResponse get(Long id) {
@@ -179,7 +185,11 @@ public class SponsorService {
     }
 
     public void delete(Long id) {
-        sponsorRepository.delete(requireSponsor(id));
+        Sponsor sponsor = requireSponsor(id);
+        Long logoImageId = sponsor.getLogoImageId();
+        sponsorRepository.delete(sponsor);
+        sponsorRepository.flush();
+        deleteImageIfUnreferenced(logoImageId);
     }
 
     /** Rewrites {@code sortOrder} to match the given id order; ids not listed keep their place after. */
@@ -287,13 +297,17 @@ public class SponsorService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "알 수 없는 페이지 설정 항목이 있습니다.");
         }
         SponsorPageSettings validated = validate(incoming);
+        Long previousBannerImageId = readSettings().bannerImageId();
         SponsorPageSettingsEntity entity = settingsEntity();
         try {
             entity.setSettings(objectMapper.writeValueAsString(validated));
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "페이지 설정을 저장하지 못했습니다.");
         }
-        settingsRepository.save(entity);
+        settingsRepository.saveAndFlush(entity);
+        if (!Objects.equals(previousBannerImageId, validated.bannerImageId())) {
+            deleteImageIfUnreferenced(previousBannerImageId);
+        }
         return validated;
     }
 
@@ -354,8 +368,27 @@ public class SponsorService {
         if (sponsorRepository.existsByLogoImageId(id) || Objects.equals(bannerImageId, id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "사용 중인 이미지는 삭제할 수 없습니다.");
         }
+        deleteStoredImage(image);
+    }
+
+    private void deleteImageIfUnreferenced(Long id) {
+        if (id == null || sponsorRepository.existsByLogoImageId(id)
+                || Objects.equals(readSettings().bannerImageId(), id)) {
+            return;
+        }
+        imageRepository.findById(id).ifPresent(this::deleteStoredImage);
+    }
+
+    private void deleteStoredImage(SponsorImage image) {
         storageService.delete(storedName(image));
         imageRepository.delete(image);
+    }
+
+    public int deleteOrphanedImagesOlderThan(LocalDateTime cutoff) {
+        Long bannerImageId = readSettings().bannerImageId();
+        List<SponsorImage> orphaned = imageRepository.findOrphanedOlderThan(cutoff, bannerImageId);
+        orphaned.forEach(this::deleteStoredImage);
+        return orphaned.size();
     }
 
     // ---- Internals -----------------------------------------------------------------------
