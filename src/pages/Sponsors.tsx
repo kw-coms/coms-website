@@ -256,9 +256,11 @@ function HowToSection({ howTo }: { howTo: { title: string; bodyHtml: string; con
     <section className="rounded-2xl border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] px-5 py-6 sm:px-7">
       <h2 className="text-lg font-bold text-[var(--app-text)]">{howTo.title}</h2>
       {howTo.bodyHtml && (
-        <p className="mt-3 whitespace-pre-line text-[14px] font-medium leading-7 text-[var(--app-muted)]">
-          {howTo.bodyHtml}
-        </p>
+        <div className="mt-3 text-[14px] font-medium leading-7 text-[var(--app-muted)]">
+          {renderRichBody(howTo.bodyHtml, (plain) => (
+            <p className="whitespace-pre-line">{plain}</p>
+          ))}
+        </div>
       )}
       {howTo.bankNote && (
         <p className="mt-3 rounded-xl border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-3 text-[13px] font-semibold text-[var(--app-text)]">
