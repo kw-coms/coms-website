@@ -10,9 +10,8 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
 /**
- * 후원자 로고 / 페이지 배너 이미지. Rows are immutable once written — the stored key,
- * the sniffed mime and the dimensions never change — which is what lets the public
- * GET serve them with a one-year immutable cache header.
+ * 후원자 로고 / 페이지 배너 이미지. Rows are immutable once written, but whether a row is
+ * publicly referenced can change, so the public GET uses a bounded cache lifetime.
  */
 @Entity
 @Table(name = "sponsor_images")
