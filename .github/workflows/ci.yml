@@ -51,6 +51,19 @@ jobs:
           COMS_PG_TEST_PASSWORD: coms-ci
         run: ./gradlew test --no-daemon
 
+      # The migration test skips itself when COMS_PG_TEST_URL is missing, which would make
+      # a broken service container look like a green build. Fail loudly instead.
+      - name: Verify the Postgres migration test was not skipped
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          report=build/test-results/test/TEST-com.coms.backend.config.PostgresMigrationExecutionTest.xml
+          if ! grep -q 'skipped="0"' "$report"; then
+            echo "::error::PostgresMigrationExecutionTest did not run — check the postgres service and COMS_PG_TEST_URL."
+            cat "$report"
+            exit 1
+          fi
+
   frontend:
     name: Frontend tests, build & smoke
     runs-on: ubuntu-latest
