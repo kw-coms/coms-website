@@ -3,6 +3,15 @@
 // stay consistent in how they report errors.
 let initialized = false
 
+// Only the three functions we actually call are kept, and they are destructured
+// straight off the dynamic import so the bundler can drop the rest of the SDK's
+// re-exports (session replay, the feedback widget, the router integrations).
+// Reaching for a `Sentry.` namespace instead pins the whole package.
+let sentry: {
+  captureException: (error: unknown, hint?: { extra?: Record<string, unknown> }) => void
+  setUser: (user: { id: string } | null) => void
+} | null = null
+
 function pickDsn() {
   if (typeof import.meta === 'undefined' || !import.meta.env) return ''
   return import.meta.env.VITE_SENTRY_DSN || ''
@@ -18,15 +27,14 @@ export async function initObservability({ release }: { release?: string } = {}) 
   const dsn = pickDsn()
   if (!dsn) return
   try {
-    const Sentry = await import('@sentry/react')
-    Sentry.init({
+    const { init, captureException, setUser } = await import('@sentry/react')
+    init({
       dsn,
       environment: pickEnvironment(),
       release,
       tracesSampleRate: 0.1,
-      replaysSessionSampleRate: 0,
-      replaysOnErrorSampleRate: 0,
     })
+    sentry = { captureException, setUser }
     initialized = true
   } catch (error) {
     console.warn('Sentry init skipped', error)
@@ -34,31 +42,29 @@ export async function initObservability({ release }: { release?: string } = {}) 
 }
 
 export async function captureError(error, context = {}) {
-  if (!initialized) return
+  if (!sentry) return
   try {
-    const Sentry = await import('@sentry/react')
-    Sentry.captureException(error, { extra: context })
+    sentry.captureException(error, { extra: context })
   } catch {
     // swallow — observability must never break the app
   }
 }
 
 export async function setUserContext(user) {
-  if (!initialized) return
+  if (!sentry) return
   try {
-    const Sentry = await import('@sentry/react')
     if (!user) {
-      Sentry.setUser(null)
+      sentry.setUser(null)
       return
     }
     // Sentry is a third-party processor: send ONLY the opaque internal id. The
     // member's real name and 학번 are personal data and must never leave the app —
     // an id is enough to correlate an error with a member in our own DB.
     if (!user.id) {
-      Sentry.setUser(null)
+      sentry.setUser(null)
       return
     }
-    Sentry.setUser({ id: String(user.id) })
+    sentry.setUser({ id: String(user.id) })
   } catch {
     // ignore
   }
