@@ -8,6 +8,7 @@ import com.coms.backend.service.ArchiveService;
 import com.coms.backend.service.StorageService;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.InvalidMediaTypeException;
@@ -29,10 +30,17 @@ import com.coms.backend.web.ListPagination;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/files")
 public class ArchiveController {
+    // An archive entry's stored blob is written once at upload and never replaced
+    // (ArchiveService.upload is the only caller of setStoredName), so /{id}/download
+    // and /{id}/inline are immutable for the life of the entry. cachePrivate because
+    // /api/files/** requires a signed-in member.
+    private static final CacheControl IMMUTABLE_BLOB =
+            CacheControl.maxAge(30, TimeUnit.DAYS).cachePrivate().immutable();
 
     private final ArchiveService archiveService;
     private final StorageService storageService;
@@ -85,6 +93,7 @@ public class ArchiveController {
                 .build();
 
         return ResponseEntity.ok()
+                .cacheControl(IMMUTABLE_BLOB)
                 .contentType(mediaType(file.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(resource);
@@ -107,6 +116,7 @@ public class ArchiveController {
                 .build();
 
         return ResponseEntity.ok()
+                .cacheControl(IMMUTABLE_BLOB)
                 .contentType(mediaType)
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(resource);

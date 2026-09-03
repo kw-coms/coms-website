@@ -49,6 +49,16 @@ import java.util.concurrent.TimeUnit;
 public class CommunityController {
     private static final Set<String> TRUSTED_PROXIES = Set.of("127.0.0.1", "::1", "0:0:0:0:0:0:0:1");
     private static final String SHARE_DESCRIPTION = "여기를 눌러 내용을 확인하세요.\ncoms.kw.ac.kr";
+    // Extra images, videos and attachments are addressed by their own row id and a
+    // replacement upload always creates a NEW row, so the bytes behind one of these
+    // URLs never change. Spring Security's default CacheControlHeadersWriter stamps
+    // no-store on anything that does not set its own Cache-Control, which made a
+    // 4.7 MB post image a fresh download on every view.
+    // cachePrivate, not public: /api/community/** is members-only and a shared cache
+    // must not hold member content. The post cover at /{id}/image is deliberately
+    // left uncached — attachImage() replaces it in place under the same URL.
+    private static final CacheControl IMMUTABLE_BLOB =
+            CacheControl.maxAge(30, TimeUnit.DAYS).cachePrivate().immutable();
 
     private final CommunityService communityService;
     private final CommunityDeletionArchiveService communityDeletionArchiveService;
@@ -340,6 +350,7 @@ public class CommunityController {
         String mimeType = meta.getMimeType();
         String filename = meta.getOriginalName() == null ? "image" : meta.getOriginalName();
         return ResponseEntity.ok()
+                .cacheControl(IMMUTABLE_BLOB)
                 .contentType(mediaType(mimeType))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
                         .filename(filename, StandardCharsets.UTF_8).build().toString())
@@ -353,6 +364,7 @@ public class CommunityController {
         Resource resource = communityService.loadExtraImage(id, imageId);
         String filename = filenameOrFallback(meta.getOriginalName(), meta.getMimeType(), "image");
         return ResponseEntity.ok()
+                .cacheControl(IMMUTABLE_BLOB)
                 .contentType(mediaType(meta.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                         .filename(filename, StandardCharsets.UTF_8).build().toString())
@@ -382,6 +394,7 @@ public class CommunityController {
         Resource resource = communityService.loadVideo(id, videoId);
         String filename = meta.getOriginalName() == null ? "video" : meta.getOriginalName();
         return ResponseEntity.ok()
+                .cacheControl(IMMUTABLE_BLOB)
                 .contentType(mediaType(meta.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
                         .filename(filename, StandardCharsets.UTF_8).build().toString())
@@ -395,6 +408,7 @@ public class CommunityController {
         Resource resource = communityService.loadVideo(id, videoId);
         String filename = filenameOrFallback(meta.getOriginalName(), meta.getMimeType(), "video");
         return ResponseEntity.ok()
+                .cacheControl(IMMUTABLE_BLOB)
                 .contentType(mediaType(meta.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                         .filename(filename, StandardCharsets.UTF_8).build().toString())
@@ -424,6 +438,7 @@ public class CommunityController {
         Resource resource = communityService.loadFile(id, fileId);
         String filename = filenameOrFallback(meta.getOriginalName(), meta.getMimeType(), "attachment");
         return ResponseEntity.ok()
+                .cacheControl(IMMUTABLE_BLOB)
                 .contentType(mediaType(meta.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                         .filename(filename, StandardCharsets.UTF_8).build().toString())
