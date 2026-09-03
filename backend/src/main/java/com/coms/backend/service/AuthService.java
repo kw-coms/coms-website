@@ -73,6 +73,7 @@ public class AuthService implements UserDetailsService {
     private final FontService fontService;
     private final BannedStudentService bannedStudentService;
     private final AuditLogService auditLogService;
+    private final RefreshSessionService refreshSessionService;
     private final Clock clock;
 
     public AuthService(MemberRepository memberRepository,
@@ -84,6 +85,7 @@ public class AuthService implements UserDetailsService {
                        FontService fontService,
                        BannedStudentService bannedStudentService,
                        AuditLogService auditLogService,
+                       RefreshSessionService refreshSessionService,
                        Clock clock) {
         this.memberRepository = memberRepository;
         this.loginFailureRepository = loginFailureRepository;
@@ -94,6 +96,7 @@ public class AuthService implements UserDetailsService {
         this.fontService = fontService;
         this.bannedStudentService = bannedStudentService;
         this.auditLogService = auditLogService;
+        this.refreshSessionService = refreshSessionService;
         this.clock = clock;
     }
 
@@ -116,6 +119,9 @@ public class AuthService implements UserDetailsService {
 
         Member member = new Member();
         member.setStudentId(studentId);
+        // 명부 행이 등급을 정한다: 리크루팅 합격으로 이관된 행은 준회원(ASSOCIATE),
+        // 관리자가 직접 넣은 행은 기존과 동일하게 회원(USER).
+        member.setRole(eligibleMemberService.resolveSignupRole(studentId));
         member.setName(request.name().trim());
         member.setEmail(request.email().trim());
         member.setEmailVerified(false);
@@ -173,8 +179,13 @@ public class AuthService implements UserDetailsService {
         auditLogService.record(member.getStudentId(), member.getRole() == Member.Role.ADMIN ? "ADMIN_LOGIN_SUCCESS" : "LOGIN_SUCCESS",
                 "AUTH", null, null, clientIp);
 
-        String token = jwtTokenProvider.generateToken(member.getStudentId(), member.getTokenVersion());
-        String refreshToken = jwtTokenProvider.generateRefreshToken(member.getStudentId(), request.rememberMe(), member.getTokenVersion());
+        // Each login opens its own refresh-session family, so logging out on one device (or
+        // detecting a stolen token there) leaves the member's other devices signed in.
+        RefreshSessionService.Result session =
+                refreshSessionService.openSession(member.getStudentId(), request.rememberMe());
+        String token = jwtTokenProvider.generateToken(member.getStudentId(), member.getTokenVersion(), session.family());
+        String refreshToken = jwtTokenProvider.generateRefreshToken(
+                member.getStudentId(), request.rememberMe(), member.getTokenVersion(), session.jti(), session.family());
         return new AuthResponse(token, member.getStudentId(), member.getName(), "로그인 성공", refreshToken);
     }
 
@@ -296,6 +307,7 @@ public class AuthService implements UserDetailsService {
         member.setPassword(passwordEncoder.encode(newPassword));
         member.incrementTokenVersion();
         memberRepository.save(member);
+        refreshSessionService.revokeAllForStudent(member.getStudentId());
     }
 
     public void requestPasswordReset(String studentId, String email) {
@@ -351,6 +363,7 @@ public class AuthService implements UserDetailsService {
         member.resetPasswordResetAttempts();
         clearPasswordResetCode(member);
         memberRepository.save(member);
+        refreshSessionService.revokeAllForStudent(member.getStudentId());
     }
 
     public MemberResponse updateProfile(String studentId, UpdateProfileRequest request) {
@@ -517,12 +530,17 @@ public class AuthService implements UserDetailsService {
         bannedStudentService.ensureNotBanned(studentId);
     }
 
-    /** Revokes all existing sessions for the member by bumping the token version. */
+    /**
+     * Revokes every session of the member on every device by bumping the token version (which
+     * invalidates already-issued access tokens too) and revoking their refresh-session rows.
+     * Per-device logout uses {@link RefreshSessionService#revokeFamily(String)} instead.
+     */
     public void revokeAllSessions(String studentId) {
         memberRepository.findByStudentId(studentId).ifPresent(member -> {
             member.incrementTokenVersion();
             memberRepository.save(member);
         });
+        refreshSessionService.revokeAllForStudent(studentId);
     }
 
     /** Current token version for the member, or 0 if not found. */

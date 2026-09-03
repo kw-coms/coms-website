@@ -46,6 +46,7 @@ public class AdminService {
     private final TeamRandomizerRoomRepository teamRandomizerRoomRepository;
     private final RecruitApplicationRepository recruitApplicationRepository;
     private final LoginFailureRepository loginFailureRepository;
+    private final RefreshSessionService refreshSessionService;
 
     public AdminService(MemberRepository memberRepository, PasswordEncoder passwordEncoder, CommunityService communityService,
                         NoticeVoteRepository noticeVoteRepository, ClubActivityVoteRepository clubActivityVoteRepository,
@@ -55,7 +56,8 @@ public class AdminService {
                         MobilePushTokenRepository mobilePushTokenRepository, MiniAppDocumentRepository miniAppDocumentRepository,
                         TeamRandomizerRoomRepository teamRandomizerRoomRepository,
                         RecruitApplicationRepository recruitApplicationRepository,
-                        LoginFailureRepository loginFailureRepository) {
+                        LoginFailureRepository loginFailureRepository,
+                        RefreshSessionService refreshSessionService) {
         this.memberRepository = memberRepository;
         this.passwordEncoder = passwordEncoder;
         this.communityService = communityService;
@@ -71,6 +73,7 @@ public class AdminService {
         this.teamRandomizerRoomRepository = teamRandomizerRoomRepository;
         this.recruitApplicationRepository = recruitApplicationRepository;
         this.loginFailureRepository = loginFailureRepository;
+        this.refreshSessionService = refreshSessionService;
     }
 
     @Transactional(readOnly = true)
@@ -137,6 +140,7 @@ public class AdminService {
         // 둘 다 감사 기록이 아니라 개인정보이므로 탈퇴 시 함께 지운다.
         recruitApplicationRepository.deleteByStudentId(studentId);
         loginFailureRepository.deleteByStudentId(studentId);
+        refreshSessionService.deleteAllForStudent(studentId);
     }
 
     /**
@@ -174,6 +178,7 @@ public class AdminService {
         member.setPassword(passwordEncoder.encode(newPassword));
         member.incrementTokenVersion();
         memberRepository.save(member);
+        refreshSessionService.revokeAllForStudent(member.getStudentId());
     }
 
     @Transactional(readOnly = true)
