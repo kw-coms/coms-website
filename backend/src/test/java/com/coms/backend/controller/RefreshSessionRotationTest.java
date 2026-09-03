@@ -124,8 +124,12 @@ class RefreshSessionRotationTest {
         assertThat(refresh(shared, winner).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
         String rotated = cookieValue(winner, "refreshToken");
 
-        // Second in-flight request with the same cookie, immediately after: benign race.
-        assertThat(refresh(shared, new MockHttpServletResponse()).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        // Second in-flight request with the same cookie, immediately after: benign race. The loser
+        // gets 204 but NO cookies — its retry must ride the winner's cookies, and a 401 would log
+        // out clients that fire parallel refreshes (member app <= v0.2.x).
+        MockHttpServletResponse loser = new MockHttpServletResponse();
+        assertThat(refresh(shared, loser).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+        assertThat(loser.getHeaders(HttpHeaders.SET_COOKIE)).isEmpty();
 
         // The winner's token must survive — otherwise a double-clicked tab logs the member out.
         assertThat(liveSessionCount(family)).isEqualTo(1);
