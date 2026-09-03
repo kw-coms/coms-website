@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listFonts } from './services/fontApi'
-import { BUILT_IN_FONTS, buildFontFaceCss, fontFamilyValue, injectBuiltinFontStylesheets } from './services/fontPreferences'
+import { BUILT_IN_FONTS, buildFontFaceCss, fontFamilyValue, injectBuiltinFontStylesheet } from './services/fontPreferences'
 import { useAuth } from './contexts/useAuth'
 import PageFallback from './components/home/PageFallback'
 import { ToastHost } from './components/common/Toast'
@@ -98,10 +98,6 @@ function App() {
     return undefined
   }, [activeFonts])
 
-  useEffect(() => {
-    injectBuiltinFontStylesheets()
-  }, [])
-
   const combinedFonts = [...BUILT_IN_FONTS, ...activeFonts]
   const effectiveFontId = user ? (user.selectedBuiltinFontKey ?? user.selectedFontId) : guestFontId
   const selectedFont = combinedFonts.find((font) => String(font.id) === String(effectiveFontId))
@@ -110,8 +106,10 @@ function App() {
     const root = document.documentElement
     // Site default is Pretendard (BUILT_IN_FONTS[0]) — the bare system stack
     // only ever showed on Windows as Malgun Gothic. A user's explicit pick
-    // still overrides; stylesheets are already injected above.
+    // still overrides. Only the applied font's stylesheet is fetched (a custom
+    // uploaded font isn't built-in and gets its @font-face from the effect above).
     const applied = selectedFont ?? BUILT_IN_FONTS[0]
+    injectBuiltinFontStylesheet(applied.id)
     root.style.setProperty('--apple-font-family', fontFamilyValue(applied))
   }, [selectedFont])
 

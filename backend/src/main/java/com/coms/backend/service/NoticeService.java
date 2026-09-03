@@ -55,6 +55,22 @@ public class NoticeService {
     }
 
     /**
+     * One page of notices in the same order as {@link #list(String)}, fetched from the database with a
+     * LIMIT instead of loading every row and slicing in memory. {@code total} is the unpaged row count
+     * so callers can size their pager. Only used when a caller asks for pagination — the unpaged
+     * {@link #list(String)} stays the default so existing clients see no change.
+     */
+    @Transactional(readOnly = true)
+    public PagedNotices listPaged(String studentId, int page, int size) {
+        List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc(
+                org.springframework.data.domain.PageRequest.of(page, size));
+        Map<Long, VoteSummary> stats = voteStats(notices);
+        return new PagedNotices(notices.stream().map(notice -> toResponse(notice, stats, studentId)).toList(), repo.count());
+    }
+
+    public record PagedNotices(List<NoticeResponse> items, long total) {}
+
+    /**
      * Returns at most {@code limit} notices in the same order as {@link #list()}, pushing the cap into
      * the query instead of loading every row and trimming in memory. Used by the mobile home preview.
      */

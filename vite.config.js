@@ -105,7 +105,15 @@ export default defineConfig({
           if (id.includes('@tanstack')) return 'vendor-query'
           if (id.includes('lucide-react')) return 'vendor-icons'
           if (id.includes('react-router')) return 'vendor-router'
-          if (id.includes('/react-dom/') || id.includes('/react/') || id.includes('/scheduler/')) return 'vendor-react'
+          // Anchor to /node_modules/<pkg>/: the unanchored '/react/' also matched
+          // node_modules/@tiptap/react/, which dragged @tiptap/core and three
+          // prosemirror-* packages (~85 KB gz of editor engine) into vendor-react —
+          // a chunk index.html modulepreloads on every page, editor or not.
+          // Deliberately NO manual group for tiptap/prosemirror: naming one makes
+          // rolldown place react's own CJS module in it, which then makes that chunk
+          // eager for the whole app. Left unassigned, the editor lands in the lazy
+          // TiptapTextEditor chunk and is fetched only when someone opens an editor.
+          if (id.includes('/node_modules/react-dom/') || id.includes('/node_modules/react/') || id.includes('/node_modules/scheduler/')) return 'vendor-react'
         },
       },
     },

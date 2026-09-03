@@ -5,7 +5,11 @@ export const BUILT_IN_FONTS = [
     id: 'b:pretendard',
     name: 'Pretendard',
     family: 'Pretendard Variable',
-    stylesheet: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css',
+    // dynamic-subset, not the single-file build: the one-@font-face version has no
+    // unicode-range, so every visitor downloads the whole 2 MB variable woff2 before
+    // first paint. The subset build splits it into unicode-range slices and the
+    // browser fetches only the ones the page's glyphs actually land in.
+    stylesheet: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css',
   },
   {
     id: 'b:noto-sans-kr',
@@ -77,16 +81,20 @@ export function fontFamilyValue(font) {
   return family ? `"${family}", ${DEFAULT_FONT_FAMILY}` : DEFAULT_FONT_FAMILY
 }
 
-export function injectBuiltinFontStylesheets() {
+// Injects the stylesheet for ONE built-in font — the one actually applied.
+// Injecting all six on mount cost every visitor 2 MB of Pretendard plus ~200 KB of
+// Google Fonts CSS for fonts nobody had selected. Already-added links are kept so
+// switching fonts in settings stays instant and never re-adds a <link>.
+export function injectBuiltinFontStylesheet(fontId) {
   if (typeof document === 'undefined') return
-  BUILT_IN_FONTS.forEach((font) => {
-    const linkId = `builtin-font-${font.id}`
-    if (document.getElementById(linkId)) return
-    const link = document.createElement('link')
-    link.id = linkId
-    link.rel = 'stylesheet'
-    link.href = font.stylesheet
-    link.crossOrigin = 'anonymous'
-    document.head.appendChild(link)
-  })
+  const font = BUILT_IN_FONTS.find((item) => String(item.id) === String(fontId))
+  if (!font) return
+  const linkId = `builtin-font-${font.id}`
+  if (document.getElementById(linkId)) return
+  const link = document.createElement('link')
+  link.id = linkId
+  link.rel = 'stylesheet'
+  link.href = font.stylesheet
+  link.crossOrigin = 'anonymous'
+  document.head.appendChild(link)
 }
