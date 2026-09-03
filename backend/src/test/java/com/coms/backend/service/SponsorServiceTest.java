@@ -58,7 +58,8 @@ class SponsorServiceTest {
         assertThat(groups).singleElement().satisfies(group -> {
             assertThat(group.sponsors()).extracting("name").containsExactlyInAnyOrder("익명 후원자", "공개 스폰서");
             assertThat(group.sponsors()).filteredOn("anonymous", true).singleElement().satisfies(sponsor -> {
-                // 익명 후원자는 이름/로고/링크/소개가 모두 지워진 자리 표시자로만 나간다.
+                // 익명 후원자는 DB 식별자/이름/로고/링크/소개가 모두 지워진 자리 표시자로만 나간다.
+                assertThat(sponsor.id()).isNull();
                 assertThat(sponsor.name()).isEqualTo("익명 후원자");
                 assertThat(sponsor.logoUrl()).isNull();
                 assertThat(sponsor.linkUrl()).isNull();
