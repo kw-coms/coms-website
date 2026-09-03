@@ -84,6 +84,12 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// Gradle's 512MB default is no longer enough: the suite holds a dozen cached Spring
+	// contexts (one per distinct @SpringBootTest property set), each with its own Hikari
+	// pool and EntityManagerFactory, and the JVM died with an OutOfMemoryError partway
+	// through rather than reporting a real failure.
+	maxHeapSize = '2g'
+	jvmArgs '-XX:MaxMetaspaceSize=768m'
 	systemProperty 'spring.profiles.active',
 			System.getProperty('spring.profiles.active')
 					?: System.getenv('SPRING_PROFILES_ACTIVE')

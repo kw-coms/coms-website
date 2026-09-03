@@ -10,6 +10,24 @@ jobs:
   backend:
     name: Backend tests
     runs-on: ubuntu-latest
+
+    # The suite itself still runs on H2; this container exists only so
+    # PostgresMigrationExecutionTest can replay every Flyway migration against the
+    # database engine production actually uses.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: coms-ci
+          POSTGRES_DB: coms_migration_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,7 +46,23 @@ jobs:
         working-directory: backend
         env:
           JWT_SECRET: coms-dev-only-secret-key-do-not-use-in-production!!
+          COMS_PG_TEST_URL: jdbc:postgresql://localhost:5432/coms_migration_test
+          COMS_PG_TEST_USER: postgres
+          COMS_PG_TEST_PASSWORD: coms-ci
         run: ./gradlew test --no-daemon
+
+      # The migration test skips itself when COMS_PG_TEST_URL is missing, which would make
+      # a broken service container look like a green build. Fail loudly instead.
+      - name: Verify the Postgres migration test was not skipped
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          report=build/test-results/test/TEST-com.coms.backend.config.PostgresMigrationExecutionTest.xml
+          if ! grep -q 'skipped="0"' "$report"; then
+            echo "::error::PostgresMigrationExecutionTest did not run — check the postgres service and COMS_PG_TEST_URL."
+            cat "$report"
+            exit 1
+          fi
 
   frontend:
     name: Frontend tests, build & smoke

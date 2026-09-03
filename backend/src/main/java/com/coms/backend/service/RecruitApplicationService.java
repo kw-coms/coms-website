@@ -161,11 +161,13 @@ public class RecruitApplicationService {
         // 덮어쓰지 말고 409로 중단한다 — 예외가 트랜잭션을 롤백하므로 상태 변경도 되돌아간다.
         eligibleMemberService.ensureStudentIdNotTakenByOtherName(application.getStudentId(), application.getName());
         String generation = String.valueOf(Year.now(clock).getValue() - FIRST_GENERATION_YEAR);
+        // 리크루팅 합격자는 가입하면 준회원(ASSOCIATE)으로 시작한다. 정회원 승격은 관리자 수기 처리.
         eligibleMemberService.addSingle(
                 application.getStudentId(),
                 application.getName(),
                 generation,
-                application.getPhone()
+                application.getPhone(),
+                com.coms.backend.domain.Member.Role.ASSOCIATE
         );
 
         RecruitPromotionLog log = new RecruitPromotionLog();

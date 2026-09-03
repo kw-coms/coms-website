@@ -341,7 +341,8 @@ class AuthServiceTest {
         when(fontService.isSelectable(null)).thenReturn(true);
         BannedStudentService banned = mock(BannedStudentService.class);
         AuditLogService auditLogService = mock(AuditLogService.class);
-        AuthService service = new AuthService(repo, loginFailures, eligible, passwordEncoder, jwt, sender, fontService, banned, auditLogService, Clock.systemDefaultZone());
+        AuthService service = new AuthService(repo, loginFailures, eligible, passwordEncoder, jwt, sender, fontService, banned, auditLogService,
+                mock(RefreshSessionService.class), Clock.systemDefaultZone());
 
         when(repo.existsByStudentId("2026123462")).thenReturn(false);
         when(repo.existsByEmail("new@example.com")).thenReturn(false);
@@ -506,7 +507,7 @@ class AuthServiceTest {
         AuthService service = new AuthService(repo, mock(LoginFailureRepository.class),
                 mock(EligibleMemberService.class), passwordEncoder, mock(JwtTokenProvider.class),
                 mock(EmailVerificationSender.class), fontService, mock(BannedStudentService.class),
-                mock(AuditLogService.class), Clock.systemDefaultZone());
+                mock(AuditLogService.class), mock(RefreshSessionService.class), Clock.systemDefaultZone());
 
         // Every attempt is rejected as a duplicate email, but the limiter runs first and
         // still counts it — otherwise failed probes would be a free pass.
@@ -543,6 +544,54 @@ class AuthServiceTest {
                 "웹",
                 "CURRENT"
         );
+    }
+
+    @Test
+    @DisplayName("리크루팅 합격으로 이관된 명부 행으로 가입하면 준회원(ASSOCIATE)이 된다")
+    void signupFromAnAcceptedApplicantRosterRowCreatesAnAssociateMember() {
+        eligibleMemberService.addSingle("2026123470", "홍길동", "60", null, Member.Role.ASSOCIATE);
+
+        authService.signup(new SignupRequest(
+                "2026123470",
+                "홍길동",
+                null,
+                null,
+                "associate-signup@example.com",
+                "Password1!",
+                "컴퓨터공학과",
+                null,
+                "01012345678",
+                "열심히 하겠습니다.",
+                "웹",
+                "CURRENT"
+        ), "203.0.113.60");
+
+        assertThat(memberRepository.findByStudentId("2026123470").orElseThrow().getRole())
+                .isEqualTo(Member.Role.ASSOCIATE);
+    }
+
+    @Test
+    @DisplayName("관리자가 직접 등록한 명부 행으로 가입하면 기존대로 회원(USER)이 된다")
+    void signupFromAManuallyAddedRosterRowStillCreatesARegularMember() {
+        eligibleMemberService.addSingle("2026123471", "홍길동", "60", null);
+
+        authService.signup(new SignupRequest(
+                "2026123471",
+                "홍길동",
+                null,
+                null,
+                "manual-roster-signup@example.com",
+                "Password1!",
+                "컴퓨터공학과",
+                null,
+                "01012345678",
+                "열심히 하겠습니다.",
+                "웹",
+                "CURRENT"
+        ), "203.0.113.61");
+
+        assertThat(memberRepository.findByStudentId("2026123471").orElseThrow().getRole())
+                .isEqualTo(Member.Role.USER);
     }
 
     private Member saveMember(String studentId, boolean emailVerified) {

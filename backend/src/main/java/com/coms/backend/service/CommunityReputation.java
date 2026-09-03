@@ -50,8 +50,10 @@ final class CommunityReputation {
      * @param upvotesReceived net upvote value (upvotes minus downvotes) across the member's posts;
      *                        negative contributions are floored at zero so downvote brigades cannot
      *                        push the displayed score below the activity it already earned.
+     * @param generation      the member's server-side 기수, or null when it is unknown
      */
-    static CommunityReputationResponse compute(long postCount, long commentCount, long upvotesReceived) {
+    static CommunityReputationResponse compute(long postCount, long commentCount, long upvotesReceived,
+                                               String generation) {
         long safePosts = Math.max(0, postCount);
         long safeComments = Math.max(0, commentCount);
         long safeUpvotes = Math.max(0, upvotesReceived);
@@ -63,6 +65,7 @@ final class CommunityReputation {
                 score,
                 tier.name(),
                 tier.label(),
+                generation,
                 new CommunityReputationResponse.Breakdown(safePosts, safeComments, safeUpvotes)
         );
     }
