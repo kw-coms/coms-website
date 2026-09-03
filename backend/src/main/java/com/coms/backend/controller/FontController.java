@@ -6,6 +6,7 @@ import com.coms.backend.dto.SiteFontResponse;
 import com.coms.backend.service.FontService;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -17,10 +18,17 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api")
 public class FontController {
+    // A site font's file is stored once at upload and never replaced, and GET
+    // /api/fonts/** is permitAll — logged-out visitors render with it, so a shared
+    // cache may hold it.
+    private static final CacheControl IMMUTABLE_FONT =
+            CacheControl.maxAge(30, TimeUnit.DAYS).cachePublic().immutable();
+
     private final FontService fontService;
 
     public FontController(FontService fontService) {
@@ -40,6 +48,7 @@ public class FontController {
                 .filename(font.getOriginalName(), StandardCharsets.UTF_8)
                 .build();
         return ResponseEntity.ok()
+                .cacheControl(IMMUTABLE_FONT)
                 .contentType(mediaType(font.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(resource);

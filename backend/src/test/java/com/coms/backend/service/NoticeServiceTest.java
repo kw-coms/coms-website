@@ -125,6 +125,30 @@ class NoticeServiceTest {
         assertThat(updated.author()).isEqualTo("동아리 임원진");
     }
 
+    @Test
+    void pagesNoticesInTheSameOrderAsTheUnpagedListAndReportsTheFullTotal() {
+        for (int i = 1; i <= 5; i++) {
+            noticeService.create("2026123000", new NoticeRequest("공지 " + i, "내용", null, false, null));
+        }
+        // Pinned rows sort first in both paths, so the pin has to survive the page boundary.
+        var pinned = noticeService.create("2026123000", new NoticeRequest("고정 공지", "내용", null, true, null));
+
+        var all = noticeService.list(null);
+        assertThat(all).hasSize(6);
+        assertThat(all.get(0).id()).isEqualTo(pinned.id());
+
+        var firstPage = noticeService.listPaged(null, 0, 2);
+        assertThat(firstPage.total()).isEqualTo(6);
+        assertThat(firstPage.items()).extracting("id").containsExactly(all.get(0).id(), all.get(1).id());
+
+        var secondPage = noticeService.listPaged(null, 1, 2);
+        assertThat(secondPage.total()).isEqualTo(6);
+        assertThat(secondPage.items()).extracting("id").containsExactly(all.get(2).id(), all.get(3).id());
+
+        // A page past the end is empty, not an error — the pager relies on total, not a 404.
+        assertThat(noticeService.listPaged(null, 9, 2).items()).isEmpty();
+    }
+
     private Member admin(String studentId, String name) {
         Member member = new Member();
         member.setStudentId(studentId);

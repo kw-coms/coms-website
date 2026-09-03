@@ -6,7 +6,7 @@ import {
   updateProfile,
 } from '../services/authApi'
 import { listFonts } from '../services/fontApi'
-import { BUILT_IN_FONTS, fontFamilyValue } from '../services/fontPreferences'
+import { BUILT_IN_FONTS, fontFamilyValue, injectBuiltinFontStylesheet } from '../services/fontPreferences'
 import { listProfileMiniAppDocuments } from '../services/miniAppsApi'
 import { getNotificationPreferences, updateNotificationPreferences } from '../services/notificationApi'
 import {
@@ -397,6 +397,11 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
   }
   const selectableFonts = [...BUILT_IN_FONTS, ...fonts]
   const selectedFont = selectableFonts.find((font) => String(font.id) === String(profileForm.selectedFontValue))
+  // The picker previews a font the visitor has not applied yet, so its stylesheet
+  // is not loaded site-wide — fetch just the previewed one on demand.
+  useEffect(() => {
+    injectBuiltinFontStylesheet(profileForm.selectedFontValue)
+  }, [profileForm.selectedFontValue])
   const passwordChecks = [
     { label: '8자 이상', ok: newPassword.length >= 8 },
     { label: '영문 포함', ok: /[A-Za-z]/.test(newPassword) },

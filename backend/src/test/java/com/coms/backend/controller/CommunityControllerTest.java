@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -162,6 +163,31 @@ class CommunityControllerTest {
         mockMvc.perform(write(post("/api/community/posts"))
                         .content("{\"title\":\"제목\",\"content\":\"<script>alert(1)</script>\",\"category\":\"GENERAL\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void servesUploadedPostImagesAsImmutableAndPrivatelyCacheable() throws Exception {
+        Long postId = communityService.create(AUTHOR,
+                new CommunityPostRequest("사진 글", "본문", "GENERAL", false), null).id();
+        Long imageId = communityService.addImages(AUTHOR, postId,
+                java.util.List.of(new org.springframework.mock.web.MockMultipartFile(
+                        "images", "shot.png", "image/png", onePixelPng()))).get(0);
+
+        // Without an explicit Cache-Control, Spring Security's default header writer
+        // stamps no-store on this response and the browser re-downloads the blob on
+        // every view. The image row id is stable and its bytes never change, so it is
+        // safe to keep — but only in the member's own browser, never a shared cache.
+        mockMvc.perform(get("/api/community/posts/{id}/images/{imageId}", postId, imageId).cookie(authCookie))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "max-age=2592000, private, immutable"));
+    }
+
+    /** The upload path sniffs the bytes, so a real PNG is required. */
+    private static byte[] onePixelPng() throws java.io.IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(
+                new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", out);
+        return out.toByteArray();
     }
 
     /** Attaches the auth cookie, a trusted Origin (for the same-origin write filter) and JSON content type. */

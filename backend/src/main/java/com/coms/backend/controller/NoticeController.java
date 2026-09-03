@@ -18,7 +18,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.coms.backend.web.ListPagination;
 
 import java.util.List;
 
@@ -32,9 +35,21 @@ public class NoticeController {
         this.noticeService = noticeService;
     }
 
+    /**
+     * Optional, backward-compatible pagination: with neither param the full array is returned
+     * exactly as before (the web 공지사항 page and the member app both rely on that shape). With
+     * page/size the response is still a bare array — one page of it — plus X-Total-Count.
+     */
     @GetMapping
-    public ResponseEntity<List<NoticeResponse>> list(Authentication authentication) {
-        return ResponseEntity.ok(noticeService.list(studentId(authentication)));
+    public ResponseEntity<List<NoticeResponse>> list(Authentication authentication,
+                                                     @RequestParam(required = false) Integer page,
+                                                     @RequestParam(required = false) Integer size) {
+        if (page == null && size == null) {
+            return ResponseEntity.ok(noticeService.list(studentId(authentication)));
+        }
+        ListPagination.Resolved resolved = ListPagination.resolve(page, size);
+        NoticeService.PagedNotices paged = noticeService.listPaged(studentId(authentication), resolved.page(), resolved.size());
+        return ListPagination.paginated(paged.items(), paged.total());
     }
 
     @GetMapping("/{id}")
