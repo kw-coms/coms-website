@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -123,6 +124,24 @@ class SponsorSecurityIntegrationTest {
                         .header("Origin", ORIGIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"accentColor\":\"#112233\",\"layout\":\"list\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void reorderPathsResolveAheadOfTheIdPathVariable() throws Exception {
+        // /reorder 와 /{id} 는 같은 자리를 두고 겨루므로, 리터럴 경로가 먼저 잡히는지
+        // HTTP 수준에서 못박아 둔다 — {id} 로 새면 Long 파싱 실패로 400 이 된다.
+        mockMvc.perform(patch("/api/admin/sponsors/reorder")
+                        .cookie(adminCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[]}"))
+                .andExpect(status().isOk());
+        mockMvc.perform(patch("/api/admin/sponsors/tiers/reorder")
+                        .cookie(adminCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[]}"))
                 .andExpect(status().isOk());
     }
 
