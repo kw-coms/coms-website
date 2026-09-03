@@ -2674,3 +2674,81 @@ test('archive highlights repeat-visit search and category controls', async ({ pa
   await expect(page.getByRole('button', { name: /전체/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /React 세미나 자료/ })).toBeVisible()
 })
+
+test('sponsors page renders tiers, anonymises, and hides the amount note from guests', async ({ page }) => {
+  // routes are LIFO, so these win over the mockOptionalApis defaults registered in beforeEach.
+  await page.route('**/api/sponsors/page', (route) => route.fulfill({
+    status: 200,
+    json: {
+      settings: {
+        heroTitle: '후원해주신 분들',
+        heroSubtitle: '함께 만들어주셔서 고맙습니다.',
+        bannerImageId: null,
+        introHtml: '',
+        accentColor: '#7c3aed',
+        layout: 'grid',
+        showTierLabels: true,
+        thankYouMessage: '앞으로도 잘 부탁드립니다.',
+        howToSection: {
+          title: '후원 안내',
+          bodyHtml: '연락 주시면 안내드립니다.',
+          contactEmail: 'kwcoms69@gmail.com',
+          contactLink: '',
+          bankNote: '광운은행 000-000-000',
+        },
+        showCounts: true,
+      },
+      bannerImageUrl: null,
+      sponsorCount: 2,
+      tierCount: 1,
+    },
+  }))
+  await page.route('**/api/sponsors', (route) => route.fulfill({
+    status: 200,
+    json: [
+      {
+        id: 1,
+        name: '골드',
+        color: '#d4a017',
+        description: '정기 후원',
+        sortOrder: 1,
+        sponsors: [
+          {
+            id: 10,
+            name: '광운 후원사',
+            tierId: 1,
+            logoUrl: null,
+            linkUrl: 'https://example.com',
+            description: '동아리 활동을 후원합니다.',
+            sinceDate: '2026-03-01',
+            untilDate: null,
+            anonymous: false,
+          },
+          {
+            id: 11,
+            name: '익명 후원자',
+            tierId: 1,
+            logoUrl: null,
+            linkUrl: null,
+            description: null,
+            sinceDate: null,
+            untilDate: null,
+            anonymous: true,
+          },
+        ],
+      },
+    ],
+  }))
+
+  await page.goto('/sponsors')
+
+  await expect(page.getByRole('heading', { name: '후원해주신 분들' })).toBeVisible()
+  await expect(page.getByText('광운 후원사')).toBeVisible()
+  await expect(page.getByText('익명 후원자')).toBeVisible()
+  await expect(page.getByRole('link', { name: /바로가기/ })).toHaveAttribute('rel', /noreferrer/)
+  await expect(page.getByText('총 후원자 수')).toBeVisible()
+  await expect(page.getByText('광운은행 000-000-000')).toBeVisible()
+  // 금액 메모는 공개 응답에 없으므로 어떤 형태로도 화면에 나타나지 않는다.
+  await expect(page.locator('body')).not.toContainText('금액 메모')
+  await expect(page.getByText('문제가 발생했습니다.')).toHaveCount(0)
+})
