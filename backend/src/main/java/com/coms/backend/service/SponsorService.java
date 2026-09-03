@@ -337,8 +337,15 @@ public class SponsorService {
     }
 
     @Transactional(readOnly = true)
-    public Resource loadImage(Long id) {
-        return storageService.load(storedName(imageMeta(id)));
+    public SponsorImage publicImageMeta(Long id) {
+        Long bannerImageId = readSettings().bannerImageId();
+        return imageRepository.findPublicById(id, bannerImageId, today())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true)
+    public Resource loadImage(SponsorImage image) {
+        return storageService.load(storedName(image));
     }
 
     public void deleteImage(Long id) {

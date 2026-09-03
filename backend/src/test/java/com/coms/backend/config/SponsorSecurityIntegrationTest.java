@@ -1,8 +1,10 @@
 package com.coms.backend.config;
 
 import com.coms.backend.domain.Member;
+import com.coms.backend.dto.SponsorRequest;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.security.JwtTokenProvider;
+import com.coms.backend.service.SponsorService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,14 +12,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
 /**
  * 후원자 경계: 공개 읽기는 로그아웃 상태에서도 열려 있고, 관리 API 는 회장(ADMIN) 전용이다.
@@ -27,7 +34,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "jwt.secret=test-secret-key-with-at-least-32-chars",
         "cors.allowed-origins=https://coms.kw.ac.kr",
-        "spring.datasource.url=jdbc:h2:mem:sponsor-security-test;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1"
+        "spring.datasource.url=jdbc:h2:mem:sponsor-security-test;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
+        "storage.location=./build/test-uploads/sponsor-security"
 })
 @AutoConfigureMockMvc
 @Transactional
@@ -35,6 +43,12 @@ class SponsorSecurityIntegrationTest {
 
     private static final String ORIGIN = "https://coms.kw.ac.kr";
     private static final String SPONSOR_BODY = "{\"name\":\"후원사\"}";
+    private static final byte[] PNG_BYTES = {
+            (byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, (byte) 0x90, 0x77, 0x53,
+            (byte) 0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x78, (byte) 0x9C, 0x63, (byte) 0xF8,
+            (byte) 0xCF, (byte) 0xC0, 0x00, 0x00, 0x03, 0x01, 0x01, 0x00, (byte) 0xC9, (byte) 0xFE, (byte) 0x92,
+            (byte) 0xEF, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, (byte) 0xAE, 0x42, 0x60, (byte) 0x82};
 
     @Autowired
     private MockMvc mockMvc;
@@ -44,6 +58,9 @@ class SponsorSecurityIntegrationTest {
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
+    private SponsorService sponsorService;
 
     private Cookie userCookie;
     private Cookie vicePresidentCookie;
@@ -64,6 +81,31 @@ class SponsorSecurityIntegrationTest {
     void publicSponsorReadsAreOpenToLoggedOutVisitors() throws Exception {
         mockMvc.perform(get("/api/sponsors")).andExpect(status().isOk());
         mockMvc.perform(get("/api/sponsors/page")).andExpect(status().isOk());
+    }
+
+    @Test
+    void publicImagesOnlyServeTheBannerAndCurrentIdentifiedSponsorLogos() throws Exception {
+        Long hidden = upload("hidden.png");
+        Long anonymous = upload("anonymous.png");
+        Long expired = upload("expired.png");
+        Long current = upload("current.png");
+        Long banner = upload("banner.png");
+
+        sponsorService.create(sponsor("숨김", hidden, false, false, null));
+        sponsorService.create(sponsor("익명", anonymous, true, true, null));
+        sponsorService.create(sponsor("만료", expired, false, true, LocalDate.now().minusDays(1)));
+        sponsorService.create(sponsor("공개", current, false, true, null));
+        sponsorService.saveSettings(Map.of("bannerImageId", banner));
+
+        mockMvc.perform(get("/api/sponsors/images/{id}", hidden)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/sponsors/images/{id}", anonymous)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/sponsors/images/{id}", expired)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/sponsors/images/{id}", current))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "public, max-age=86400"));
+        mockMvc.perform(get("/api/sponsors/images/{id}", banner))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "public, max-age=86400"));
     }
 
     @Test
@@ -147,6 +189,15 @@ class SponsorSecurityIntegrationTest {
 
     private Cookie authCookie(String studentId) {
         return new Cookie("token", jwtTokenProvider.generateToken(studentId, 0));
+    }
+
+    private Long upload(String filename) {
+        return sponsorService.uploadImage(new MockMultipartFile("image", filename, "image/png", PNG_BYTES)).id();
+    }
+
+    private SponsorRequest sponsor(String name, Long logoImageId, boolean anonymous, boolean visible, LocalDate untilDate) {
+        return new SponsorRequest(name, null, logoImageId, null, null, null,
+                null, untilDate, anonymous, visible, null);
     }
 
     private Member member(String studentId, Member.Role role) {

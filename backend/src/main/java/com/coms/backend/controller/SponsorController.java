@@ -5,7 +5,6 @@ import com.coms.backend.dto.SponsorPageResponse;
 import com.coms.backend.dto.SponsorTierResponse;
 import com.coms.backend.service.SponsorService;
 import org.springframework.core.io.Resource;
-import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -16,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.List;
 
 /**
@@ -47,19 +45,18 @@ public class SponsorController {
     }
 
     /**
-     * Image ids are immutable — a row's bytes and mime never change once written — so the
-     * response can be cached for a year. The mime is the sniffed one recorded at upload, never
-     * the client-declared content type.
+     * Only the current banner and publicly visible, identified sponsors' logos are readable.
+     * The mime is the sniffed one recorded at upload, never the client-declared content type.
      */
     @GetMapping("/images/{id}")
     public ResponseEntity<Resource> image(@PathVariable Long id) {
-        SponsorImage meta = sponsorService.imageMeta(id);
-        Resource resource = sponsorService.loadImage(id);
+        SponsorImage meta = sponsorService.publicImageMeta(id);
+        Resource resource = sponsorService.loadImage(meta);
         String filename = meta.getOriginalName() == null || meta.getOriginalName().isBlank()
                 ? "sponsor-image"
                 : meta.getOriginalName();
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable())
+                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=86400")
                 .contentType(MediaType.parseMediaType(meta.getMime()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
                         .filename(filename, StandardCharsets.UTF_8).build().toString())
