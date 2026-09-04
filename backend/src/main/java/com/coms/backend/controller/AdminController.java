@@ -211,7 +211,7 @@ public class AdminController {
         return ResponseEntity.ok(response);
     }
 
-    /** 최근 100건의 합격 이관 이력 (지원서는 이관 시 삭제되므로 이 로그가 원본 기록). */
+    /** 최근 100건의 지원 처리 이력(합격/불합격) — 지원서는 처리 시 삭제되므로 이 로그가 원본 기록. */
     @GetMapping("/recruit-promotions")
     public ResponseEntity<List<com.coms.backend.dto.RecruitPromotionLogResponse>> recruitPromotions() {
         return ResponseEntity.ok(recruitApplicationService.listPromotions());

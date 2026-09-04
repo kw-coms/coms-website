@@ -147,12 +147,14 @@ public class RecruitApplicationService {
         RecruitApplicationAdminResponse response = RecruitApplicationAdminResponse.from(application);
         if (status == RecruitApplication.Status.ACCEPTED) {
             promote(application, adminStudentId);
+        } else if (status == RecruitApplication.Status.REJECTED) {
+            reject(application, adminStudentId);
         }
         return response;
     }
 
     /**
-     * 합격 처리: 지원서를 명부로 이관하고(현재 연도 기수, 전화번호 포함), 이관 이력을
+     * 합격 처리: 지원서를 명부로 이관하고(현재 연도 기수, 전화번호 포함), 처리 이력을
      * 별도 로그로 남긴 뒤 지원서를 삭제한다. 명부 upsert가 실패하면 전체가 롤백되어
      * 지원서가 사라지는 일은 없다.
      */
@@ -179,9 +181,41 @@ public class RecruitApplicationService {
         log.setEmail(application.getEmail());
         log.setGeneration(generation);
         log.setPromotedBy(adminStudentId);
+        log.setDecision(RecruitPromotionLog.Decision.ACCEPTED);
+        log.setAdminNote(truncateAdminNote(application.getAdminNote()));
         promotionLogRepository.save(log);
 
         recruitApplicationRepository.delete(application);
+    }
+
+    /**
+     * 불합격 처리: 지원서를 삭제하되 처리 이력은 남긴다. 합격 이관과 같은 로그 테이블을
+     * 재사용하지만, 명부에 올라간 적이 없으므로 기수는 없고, 연락처(전화번호/이메일)는
+     * 개인정보 최소 보유 원칙에 따라 저장하지 않는다.
+     */
+    private void reject(RecruitApplication application, String adminStudentId) {
+        RecruitPromotionLog log = new RecruitPromotionLog();
+        log.setApplicationId(application.getId());
+        log.setName(application.getName());
+        log.setStudentId(application.getStudentId());
+        log.setDepartment(application.getDepartment());
+        log.setPhone(null);
+        log.setEmail(null);
+        log.setPromotedBy(adminStudentId);
+        log.setDecision(RecruitPromotionLog.Decision.REJECTED);
+        log.setAdminNote(truncateAdminNote(application.getAdminNote()));
+        promotionLogRepository.save(log);
+
+        recruitApplicationRepository.delete(application);
+    }
+
+    // admin_note 컬럼은 500자까지다(지원서 자체의 운영 메모는 최대 1000자 허용) — 로그에
+    // 옮겨 적을 때 DB 예외 없이 조용히 잘라낸다.
+    private static String truncateAdminNote(String adminNote) {
+        if (adminNote == null || adminNote.length() <= 500) {
+            return adminNote;
+        }
+        return adminNote.substring(0, 500);
     }
 
     @Transactional(readOnly = true)

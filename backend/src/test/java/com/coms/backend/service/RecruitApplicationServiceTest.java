@@ -226,6 +226,98 @@ class RecruitApplicationServiceTest {
     }
 
     @Test
+    void rejectedStatusDeletesApplicationAndLogsDecisionWithoutContactDetails() {
+        RecruitApplication application = new RecruitApplication();
+        application.setName("김탈락");
+        application.setStudentId("2026403004");
+        application.setDepartment("컴퓨터공학과");
+        application.setPhone("01099998888");
+        application.setEmail("tallak@example.com");
+        application.setStatus(RecruitApplication.Status.REVIEWING);
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.findById(1L)).thenReturn(Optional.of(application));
+        EligibleMemberService eligible = mock(EligibleMemberService.class);
+        RecruitPromotionLogRepository promotionLogs = mock(RecruitPromotionLogRepository.class);
+        RecruitApplicationService service = new RecruitApplicationService(
+                mock(JavaMailSender.class),
+                repository,
+                mock(NotificationService.class),
+                eligible,
+                promotionLogs,
+                java.time.Clock.systemDefaultZone(),
+                true,
+                "no-reply@coms.kw.ac.kr",
+                "recruit@coms.kw.ac.kr"
+        );
+
+        service.updateStatus(1L, new RecruitApplicationStatusUpdateRequest("REJECTED", "면접 불참"), "2026402040");
+
+        // 명부에는 손대지 않는다 — 불합격은 이관 대상이 아니다.
+        verify(eligible, never()).addSingle(any(), any(), any(), any(), any());
+
+        ArgumentCaptor<com.coms.backend.domain.RecruitPromotionLog> logCaptor =
+                ArgumentCaptor.forClass(com.coms.backend.domain.RecruitPromotionLog.class);
+        verify(promotionLogs).save(logCaptor.capture());
+        com.coms.backend.domain.RecruitPromotionLog saved = logCaptor.getValue();
+        assertThat(saved.getName()).isEqualTo("김탈락");
+        assertThat(saved.getStudentId()).isEqualTo("2026403004");
+        assertThat(saved.getDepartment()).isEqualTo("컴퓨터공학과");
+        assertThat(saved.getDecision()).isEqualTo(com.coms.backend.domain.RecruitPromotionLog.Decision.REJECTED);
+        assertThat(saved.getAdminNote()).isEqualTo("면접 불참");
+        assertThat(saved.getPromotedBy()).isEqualTo("2026402040");
+        // 불합격자의 연락처는 남기지 않는다(개인정보 최소 보유 원칙).
+        assertThat(saved.getPhone()).isNull();
+        assertThat(saved.getEmail()).isNull();
+
+        verify(repository).delete(application);
+    }
+
+    @Test
+    void acceptedStatusLogsDecisionAcceptedAndAdminNote() {
+        RecruitApplication application = new RecruitApplication();
+        application.setName("박경택");
+        application.setStudentId("2026403003");
+        application.setPhone("01023870490");
+        application.setDepartment("소프트웨어학부");
+        application.setStatus(RecruitApplication.Status.REVIEWING);
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.findById(1L)).thenReturn(Optional.of(application));
+        EligibleMemberService eligible = mock(EligibleMemberService.class);
+        RecruitPromotionLogRepository promotionLogs = mock(RecruitPromotionLogRepository.class);
+        RecruitApplicationService service = new RecruitApplicationService(
+                mock(JavaMailSender.class),
+                repository,
+                mock(NotificationService.class),
+                eligible,
+                promotionLogs,
+                java.time.Clock.systemDefaultZone(),
+                true,
+                "no-reply@coms.kw.ac.kr",
+                "recruit@coms.kw.ac.kr"
+        );
+
+        service.updateStatus(1L, new RecruitApplicationStatusUpdateRequest("ACCEPTED", "OT 안내 완료"), "admin");
+
+        ArgumentCaptor<com.coms.backend.domain.RecruitPromotionLog> logCaptor =
+                ArgumentCaptor.forClass(com.coms.backend.domain.RecruitPromotionLog.class);
+        verify(promotionLogs).save(logCaptor.capture());
+        assertThat(logCaptor.getValue().getDecision()).isEqualTo(com.coms.backend.domain.RecruitPromotionLog.Decision.ACCEPTED);
+        assertThat(logCaptor.getValue().getAdminNote()).isEqualTo("OT 안내 완료");
+    }
+
+    @Test
+    void rejectingAlreadyDeletedApplicationReturnsNotFound() {
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.findById(1L)).thenReturn(Optional.empty());
+        RecruitApplicationService service = newService(repository);
+
+        assertThatThrownBy(() -> service.updateStatus(
+                1L, new RecruitApplicationStatusUpdateRequest("REJECTED", null), "admin"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
     void acceptedStatusAbortsWhenStudentIdBelongsToAnotherNameOnTheRoster() {
         RecruitApplication application = new RecruitApplication();
         application.setName("홍길동");
@@ -285,6 +377,34 @@ class RecruitApplicationServiceTest {
         verify(eligible, never()).addSingle(any(), any(), any(), any(), any());
         verify(promotionLogs, never()).save(any());
         verify(repository, never()).delete(any(RecruitApplication.class));
+    }
+
+    @Test
+    void listPromotionsIncludesDecisionAndAdminNote() {
+        com.coms.backend.domain.RecruitPromotionLog rejectedLog = new com.coms.backend.domain.RecruitPromotionLog();
+        rejectedLog.setName("김탈락");
+        rejectedLog.setDecision(com.coms.backend.domain.RecruitPromotionLog.Decision.REJECTED);
+        rejectedLog.setAdminNote("면접 불참");
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        RecruitPromotionLogRepository promotionLogs = mock(RecruitPromotionLogRepository.class);
+        when(promotionLogs.findTop100ByOrderByPromotedAtDescIdDesc()).thenReturn(List.of(rejectedLog));
+        RecruitApplicationService service = new RecruitApplicationService(
+                mock(JavaMailSender.class),
+                repository,
+                mock(NotificationService.class),
+                mock(EligibleMemberService.class),
+                promotionLogs,
+                java.time.Clock.systemDefaultZone(),
+                true,
+                "no-reply@coms.kw.ac.kr",
+                "recruit@coms.kw.ac.kr"
+        );
+
+        var responses = service.listPromotions();
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).decision()).isEqualTo("REJECTED");
+        assertThat(responses.get(0).adminNote()).isEqualTo("면접 불참");
     }
 
     @Test
