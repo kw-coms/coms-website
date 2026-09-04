@@ -71,6 +71,7 @@ class PermissionServiceTest {
     void replacePersistsAllEditableRowsRefreshesCacheAndRecordsAuditDiff() {
         when(repository.findById(new RolePermissionId(Member.Role.USER, Permission.ARCHIVE_MANAGE)))
                 .thenReturn(Optional.of(row(Member.Role.USER, Permission.ARCHIVE_MANAGE, false, "before")));
+        when(repository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
         assertThat(service.has(member(Member.Role.USER), Permission.ARCHIVE_MANAGE)).isFalse();
 
         PermissionMatrixResponse response = service.replace(Map.of(

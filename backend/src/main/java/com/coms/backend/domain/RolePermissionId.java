@@ -1,6 +1,7 @@
 package com.coms.backend.domain;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -15,7 +16,7 @@ public class RolePermissionId implements Serializable {
     @Column(nullable = false, length = 20)
     private Member.Role role;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = Permission.KeyConverter.class)
     @Column(nullable = false, length = 60)
     private Permission permission;
 
