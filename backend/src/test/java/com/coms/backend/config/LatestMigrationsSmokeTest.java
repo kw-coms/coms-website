@@ -41,6 +41,8 @@ class LatestMigrationsSmokeTest {
                     new ClassPathResource("db/migration/V87__eligible_member_initial_role.sql"));
             ScriptUtils.executeSqlScript(connection,
                     new ClassPathResource("db/migration/V88__sponsors.sql"));
+            ScriptUtils.executeSqlScript(connection,
+                    new ClassPathResource("db/migration/V90__role_permissions.sql"));
         }
 
         String initialRoleNullable = jdbcTemplate.queryForObject(
@@ -77,5 +79,25 @@ class LatestMigrationsSmokeTest {
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM sponsor_tiers", Integer.class)).isEqualTo(3);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sponsor_page_settings WHERE id = 1", Integer.class)).isEqualTo(1);
+
+        // V90: role permission rows replay cleanly over Hibernate schema, keep NOT NULL
+        // defaults, and seed the four editable roles x nine permissions exactly once.
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM role_permissions", Integer.class)).isEqualTo(36);
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT column_default
+                FROM information_schema.columns
+                WHERE table_name = 'ROLE_PERMISSIONS' AND column_name = 'ALLOWED'
+                """,
+                String.class
+        )).containsIgnoringCase("false");
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT is_nullable
+                FROM information_schema.columns
+                WHERE table_name = 'ROLE_PERMISSIONS' AND column_name = 'UPDATED_AT'
+                """,
+                String.class
+        )).isEqualToIgnoringCase("NO");
     }
 }
