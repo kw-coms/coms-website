@@ -14,6 +14,8 @@ public record RecruitPromotionLogResponse(
         String email,
         String generation,
         String promotedBy,
+        String decision,
+        String adminNote,
         LocalDateTime promotedAt
 ) {
     public static RecruitPromotionLogResponse from(RecruitPromotionLog log) {
@@ -27,6 +29,8 @@ public record RecruitPromotionLogResponse(
                 log.getEmail(),
                 log.getGeneration(),
                 log.getPromotedBy(),
+                log.getDecision().name(),
+                log.getAdminNote(),
                 log.getPromotedAt()
         );
     }

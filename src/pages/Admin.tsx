@@ -190,8 +190,9 @@ export default function Admin({ onBack }: { onBack: () => void }) {
                 onReload={loadRecruitApplications}
                 onUpdated={(updated) => {
                   const next = updated as RecruitApplication
-                  if (next.status === 'ACCEPTED') {
-                    // 합격 처리 시 서버가 지원서를 명부로 이관 후 삭제한다 — 목록에서도 제거.
+                  if (next.status === 'ACCEPTED' || next.status === 'REJECTED') {
+                    // 합격/불합격 처리 시 서버가 지원서를 삭제한다(합격은 명부 이관 후,
+                    // 불합격은 이력만 남기고) — 어느 쪽이든 목록에서도 제거.
                     setRecruitApplications((prev) => prev.filter((item) => item.id !== next.id))
                     return
                   }
