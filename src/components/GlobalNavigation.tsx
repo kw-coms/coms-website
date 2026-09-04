@@ -5,6 +5,7 @@ import {
   ChevronDown,
   CircuitBoard,
   Grid3x3,
+  HeartHandshake,
   LogOut,
   Menu,
   Megaphone,
@@ -38,6 +39,7 @@ function getActiveNavKey(pathname) {
   if (pathname === '/apps') return 'apps'
   if (pathname.startsWith('/recruit')) return 'recruit'
   if (pathname.startsWith('/notices')) return 'notices'
+  if (pathname.startsWith('/sponsors')) return 'sponsors'
   if (pathname.startsWith('/resources')) return 'resources'
   if (pathname.startsWith('/community')) return 'community'
   return null
@@ -349,6 +351,11 @@ export default function GlobalNavigation() {
                 ))}
               </div>
             )}
+            <button type="button" onClick={() => closeAndGo('/sponsors')} className="apple-mobile-menu-item">
+              <HeartHandshake size={15} className="text-emerald-500" />
+              <span>Sponsors</span>
+              <span className="ml-auto text-xs text-[var(--app-muted)]">후원자</span>
+            </button>
             <button type="button" onClick={() => goProtected('/resources')} disabled={authLoading} className="apple-mobile-menu-item disabled:opacity-50">
               <CircuitBoard size={15} className="text-violet-400" />
               <span>Resources</span>

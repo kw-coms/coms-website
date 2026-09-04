@@ -17,6 +17,7 @@ import AdminRecruitApplications from './admin/AdminRecruitApplications'
 import { recruitPendingCount, recruitStatusLabel } from './admin/recruitStatus'
 import AdminScreenCheck from './admin/AdminScreenCheck'
 import AdminSiteSettings from './admin/AdminSiteSettings'
+import AdminSponsors from './admin/AdminSponsors'
 import {
   adminTabsForRole,
   ROLE_LABELS,
@@ -27,7 +28,7 @@ import {
 
 const ADMIN_TAB_IDS = new Set([
   'overview', 'analytics', 'members', 'recruit', 'roster', 'activities', 'projects', 'files',
-  'site-settings', 'fonts', 'community', 'deleted-posts', 'screen-check', 'ban', 'logs',
+  'site-settings', 'sponsors', 'fonts', 'community', 'deleted-posts', 'screen-check', 'ban', 'logs',
 ])
 
 const ADMIN_TABS = [
@@ -40,6 +41,8 @@ const ADMIN_TABS = [
   { id: 'projects', label: 'Apps 관리' },
   { id: 'files', label: '파일 관리' },
   { id: 'site-settings', label: '사이트 문구' },
+  // 'sponsors' 는 roleAccess 의 임원/부회장 허용 목록에 없다 — 회장 전용 탭.
+  { id: 'sponsors', label: '후원자' },
   { id: 'fonts', label: '폰트 관리' },
   { id: 'community', label: '커뮤니티 관리' },
   { id: 'deleted-posts', label: '삭제 보관함' },
@@ -202,6 +205,7 @@ export default function Admin({ onBack }: { onBack: () => void }) {
             {resolvedActiveTab === 'projects' && <AdminAppCatalog />}
             {isSensitiveAdmin && resolvedActiveTab === 'files' && <AdminFiles />}
             {resolvedActiveTab === 'site-settings' && <AdminSiteSettings />}
+            {isSensitiveAdmin && resolvedActiveTab === 'sponsors' && <AdminSponsors />}
             {isSensitiveAdmin && resolvedActiveTab === 'fonts' && <AdminFonts />}
             {isSensitiveAdmin && resolvedActiveTab === 'community' && <AdminCommunityReports formatDateTime={formatDateTime} />}
             {isSensitiveAdmin && resolvedActiveTab === 'deleted-posts' && <AdminDeletedCommunityPosts />}

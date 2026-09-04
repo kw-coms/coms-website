@@ -39,6 +39,8 @@ class LatestMigrationsSmokeTest {
                     new ClassPathResource("db/migration/V86__refresh_sessions.sql"));
             ScriptUtils.executeSqlScript(connection,
                     new ClassPathResource("db/migration/V87__eligible_member_initial_role.sql"));
+            ScriptUtils.executeSqlScript(connection,
+                    new ClassPathResource("db/migration/V88__sponsors.sql"));
         }
 
         String initialRoleNullable = jdbcTemplate.queryForObject(
@@ -67,5 +69,13 @@ class LatestMigrationsSmokeTest {
 
         assertThat(settingsRows).isEqualTo(1);
         assertThat(authorNullable).isEqualToIgnoringCase("YES");
+
+        // V88: the sponsor tables replay cleanly and seed the three default tiers plus the
+        // single settings row, without duplicating them when re-run.
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM sponsors", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM sponsor_images", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM sponsor_tiers", Integer.class)).isEqualTo(3);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sponsor_page_settings WHERE id = 1", Integer.class)).isEqualTo(1);
     }
 }
