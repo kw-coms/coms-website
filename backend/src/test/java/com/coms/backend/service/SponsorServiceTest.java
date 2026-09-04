@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.Resource;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -160,6 +161,15 @@ class SponsorServiceTest {
         Long sponsorId = sponsorService.create(sponsor("삭제", null, b -> b.logoImageId(imageId))).id();
 
         sponsorService.delete(sponsorId);
+
+        // The physical file delete is deferred to run after commit (see SponsorImageDeleter), so
+        // it only happens for real once this test's transaction actually commits — this class's
+        // usual rollback-based isolation would otherwise never let it fire. Commit before the
+        // 404 assertion below: a propagated exception from a @Transactional call would otherwise
+        // mark this transaction rollback-only and turn the commit into UnexpectedRollbackException.
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+        TestTransaction.start();
 
         assertThatThrownBy(() -> sponsorService.imageMeta(imageId))
                 .isInstanceOf(ResponseStatusException.class);

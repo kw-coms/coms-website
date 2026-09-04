@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -29,8 +28,13 @@ public class SponsorImageRetentionJob {
         this.enabled = enabled;
     }
 
+    /**
+     * Not itself {@code @Transactional} — {@code SponsorService.deleteOrphanedImagesOlderThan}
+     * only reads under its own read-only transaction, and each row it deletes runs in its own
+     * {@code REQUIRES_NEW} transaction (see {@link SponsorImageDeleter}) so one bad row cannot
+     * abort the rest of the batch.
+     */
     @Scheduled(cron = "${coms.retention.sponsor-images-cron:0 50 4 * * *}", zone = "Asia/Seoul")
-    @Transactional
     public void purgeOrphanedSponsorImages() {
         if (!enabled) {
             log.debug("Retention purge disabled (coms.retention.enabled=false) — skipping sponsor images.");
