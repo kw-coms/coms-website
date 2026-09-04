@@ -15,4 +15,9 @@ export const queryKeys = {
     all: ['notices'],
     list: () => [...queryKeys.notices.all, 'list'],
   },
+  sponsors: {
+    all: ['sponsors'],
+    list: () => [...queryKeys.sponsors.all, 'list'],
+    page: () => [...queryKeys.sponsors.all, 'page'],
+  },
 }

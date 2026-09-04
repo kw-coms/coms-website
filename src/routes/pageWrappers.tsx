@@ -14,6 +14,7 @@ const CommunityMemberProfile = lazy(() => import('../pages/community/CommunityMe
 const ChangePassword = lazy(() => import('../pages/ChangePassword'))
 const RecruitApply = lazy(() => import('../pages/RecruitApply'))
 const RecruitNotice = lazy(() => import('../pages/RecruitNotice'))
+const Sponsors = lazy(() => import('../pages/Sponsors'))
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -46,6 +47,14 @@ export function NoticesPage() {
   return (
     <PageShell wide full>
       <Notices />
+    </PageShell>
+  )
+}
+
+export function SponsorsPage() {
+  return (
+    <PageShell wide full>
+      <Sponsors />
     </PageShell>
   )
 }

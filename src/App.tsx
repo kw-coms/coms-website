@@ -31,6 +31,7 @@ import {
   SettingsPage,
   RecruitPage,
   RecruitNoticePage,
+  SponsorsPage,
 } from './routes/pageWrappers'
 import GlobalNavigation from './components/GlobalNavigation'
 import AppearanceControl from './components/AppearanceControl'
@@ -156,6 +157,7 @@ function App() {
         <Route path="/monthly-calendar" element={<RequireAuth><MonthlyCalendarPage /></RequireAuth>} />
         <Route path="/projects" element={<ProjectsDetailPage />} />
         <Route path="/apps" element={<AppsPage />} />
+        <Route path="/sponsors" element={<SponsorsPage />} />
         <Route path="/notices" element={<RequireAuth><NoticesPage /></RequireAuth>} />
         <Route path="/notices/:id" element={<RequireAuth><NoticesPage /></RequireAuth>} />
         <Route path="/resources" element={<RequireAuth><ArchivePage /></RequireAuth>} />
