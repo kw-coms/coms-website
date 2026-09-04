@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { listRecruitPromotions, updateRecruitApplicationStatus } from '../../services/adminApi'
-import { RECRUIT_STATUS_OPTIONS, recruitStatusLabel } from './recruitStatus'
+import { RECRUIT_STATUS_OPTIONS, recruitStatusLabel, recruitDecisionLabel, recruitDecisionChipVariant } from './recruitStatus'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
+import Chip from '../../components/common/Chip'
 
 type RecruitApplicationItem = {
   id: string | number
@@ -30,6 +32,8 @@ type RecruitPromotion = {
   email?: string
   generation?: string
   promotedBy?: string
+  decision?: string
+  adminNote?: string
   promotedAt?: string
 }
 
@@ -72,12 +76,22 @@ export default function AdminRecruitApplications({ applications, loading, error,
 
   const saveApplication = async (application) => {
     const draft = drafts[application.id] || {}
+    const status = draft.status || application.status
+
+    if (status === 'REJECTED') {
+      const confirmed = await confirmDialog({
+        message: '불합격 처리하면 지원서는 삭제되고 처리 이력만 남습니다. 계속할까요?',
+        tone: 'danger',
+      })
+      if (!confirmed) return
+    }
+
     setSavingId(application.id)
     setMessage('')
     setSaveError('')
     try {
       const updated = await updateRecruitApplicationStatus(application.id, {
-        status: draft.status || application.status,
+        status,
         // `?? application.adminNote` — a status-only save has no adminNote key in the
         // draft, and `draft.adminNote || ''` sent an empty string that WIPED the
         // stored 운영 메모. Only an edit the admin actually made may clear it.
@@ -91,12 +105,16 @@ export default function AdminRecruitApplications({ applications, loading, error,
           adminNote: updated.adminNote || '',
         },
       }))
-      if (updated.status === 'ACCEPTED') {
-        setMessage(`${updated.name} 합격 — 명부에 등록하고 지원서를 정리했습니다.`)
+      if (updated.status === 'ACCEPTED' || updated.status === 'REJECTED') {
+        setMessage(
+          updated.status === 'ACCEPTED'
+            ? `${updated.name} 합격 — 명부에 등록하고 지원서를 정리했습니다.`
+            : `${updated.name} 불합격 — 지원서를 삭제하고 처리 이력을 남겼습니다.`,
+        )
         loadPromotions()
-        // The parent drops the row optimistically on ACCEPTED. Re-fetch the list so a
-        // backend transfer that did NOT actually happen reappears instead of silently
-        // vanishing from the admin's view.
+        // The parent drops the row optimistically on ACCEPTED/REJECTED. Re-fetch the
+        // list so a backend deletion that did NOT actually happen reappears instead of
+        // silently vanishing from the admin's view.
         onReload()
       } else {
         setMessage(`${updated.name} 지원서를 저장했습니다.`)
@@ -238,8 +256,8 @@ export default function AdminRecruitApplications({ applications, loading, error,
       <div className="rounded-lg border border-[var(--app-hairline)] bg-black/5 p-4">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-bold text-[var(--theme-body-dark)]">합격 이관 이력 (최근 100건)</h3>
-            <p className="mt-1 text-xs text-[var(--theme-body-muted)]">합격 처리된 지원서는 명부로 이관 후 삭제되며, 이 목록이 원본 기록입니다.</p>
+            <h3 className="text-base font-bold text-[var(--theme-body-dark)]">지원 처리 이력 (최근 100건)</h3>
+            <p className="mt-1 text-xs text-[var(--theme-body-muted)]">합격/불합격 처리된 지원서는 삭제되며, 이 목록이 원본 기록입니다.</p>
           </div>
           <button
             type="button"
@@ -256,25 +274,31 @@ export default function AdminRecruitApplications({ applications, loading, error,
             <table className="w-full min-w-[640px] text-left text-xs">
               <thead className="border-b border-[var(--app-hairline)] text-[var(--theme-body-muted)]">
                 <tr>
-                  <th className="px-2 py-2">이관일</th>
+                  <th className="px-2 py-2">처리일</th>
+                  <th className="px-2 py-2">결과</th>
                   <th className="px-2 py-2">이름</th>
                   <th className="px-2 py-2">학번</th>
                   <th className="px-2 py-2">기수</th>
                   <th className="px-2 py-2">학과</th>
                   <th className="px-2 py-2">전화번호</th>
                   <th className="px-2 py-2">처리자</th>
+                  <th className="px-2 py-2">메모</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/10">
                 {promotions.map((log) => (
                   <tr key={log.id} className="text-[var(--theme-body-dark)]">
                     <td className="px-2 py-2 whitespace-nowrap">{formatDateTime(log.promotedAt)}</td>
+                    <td className="px-2 py-2">
+                      <Chip variant={recruitDecisionChipVariant(log.decision)}>{recruitDecisionLabel(log.decision)}</Chip>
+                    </td>
                     <td className="px-2 py-2 font-semibold">{log.name}</td>
                     <td className="px-2 py-2 font-mono">{log.studentId || '-'}</td>
                     <td className="px-2 py-2">{log.generation ? `${log.generation}기` : '-'}</td>
                     <td className="px-2 py-2">{log.department || '-'}</td>
                     <td className="px-2 py-2">{log.phone || '-'}</td>
                     <td className="px-2 py-2">{log.promotedBy || '-'}</td>
+                    <td className="px-2 py-2 max-w-[220px] truncate" title={log.adminNote || ''}>{log.adminNote || '-'}</td>
                   </tr>
                 ))}
               </tbody>
