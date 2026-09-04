@@ -99,7 +99,9 @@ class SponsorServiceTest {
                 .hasMessageContaining("이미지 파일 내용이 형식과 일치하지 않습니다");
 
         MockMultipartFile real = new MockMultipartFile("image", "logo.png", "image/png", PNG_BYTES);
-        assertThat(sponsorService.uploadImage(real).url()).startsWith("/api/sponsors/images/");
+        // Admin DTOs emit the admin-gated URL, not the public one — the freshly uploaded image
+        // is still an orphan at this point and would 404 through the public endpoint.
+        assertThat(sponsorService.uploadImage(real).url()).startsWith("/api/admin/sponsors/images/");
     }
 
     @Test
