@@ -63,7 +63,9 @@ export default function AdminSponsorPageDesign({ settings, onSaved }: {
     }
   }
 
-  const bannerUrl = form.bannerImageId ? sponsorImageSrc(`/api/sponsors/images/${form.bannerImageId}`) : ''
+  // The admin path has no visibility gate, unlike the public one — a freshly picked banner
+  // (or one not yet the saved settings.bannerImageId) would otherwise 404 here.
+  const bannerUrl = form.bannerImageId ? sponsorImageSrc(`/api/admin/sponsors/images/${form.bannerImageId}`) : ''
 
   return (
     <form onSubmit={submit} className="rounded-lg border border-[var(--app-hairline)] bg-white/60 p-4">

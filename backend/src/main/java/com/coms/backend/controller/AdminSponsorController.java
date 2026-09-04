@@ -1,5 +1,6 @@
 package com.coms.backend.controller;
 
+import com.coms.backend.domain.SponsorImage;
 import com.coms.backend.dto.SponsorAdminResponse;
 import com.coms.backend.dto.SponsorImageResponse;
 import com.coms.backend.dto.SponsorPageSettings;
@@ -10,6 +11,8 @@ import com.coms.backend.dto.SponsorTierResponse;
 import com.coms.backend.service.AuditLogService;
 import com.coms.backend.service.SponsorService;
 import jakarta.validation.Valid;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -153,6 +156,27 @@ public class AdminSponsorController {
     }
 
     // ---- Images --------------------------------------------------------------------------
+
+    /**
+     * Admin counterpart to {@code SponsorController#image} — no visibility gate, so hidden,
+     * anonymous, and expired sponsors' logos (and any freshly uploaded, not-yet-attached image)
+     * still preview correctly in the admin UI. Reuses {@code SponsorService}'s same sniffed-mime
+     * loader; only the cache policy differs since this response can vary per viewer's permissions.
+     */
+    @GetMapping("/images/{id}")
+    public ResponseEntity<Resource> image(@PathVariable Long id) {
+        SponsorImage meta = sponsorService.imageMeta(id);
+        Resource resource = sponsorService.loadImage(meta);
+        String filename = meta.getOriginalName() == null || meta.getOriginalName().isBlank()
+                ? "sponsor-image"
+                : meta.getOriginalName();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CACHE_CONTROL, "private, max-age=3600")
+                .contentType(MediaType.parseMediaType(meta.getMime()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(filename, StandardCharsets.UTF_8).build().toString())
+                .body(resource);
+    }
 
     @PostMapping("/images")
     public ResponseEntity<SponsorImageResponse> uploadImage(@RequestPart("image") MultipartFile image,

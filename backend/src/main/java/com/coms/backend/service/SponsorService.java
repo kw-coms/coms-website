@@ -17,6 +17,8 @@ import com.coms.backend.repository.SponsorPageSettingsRepository;
 import com.coms.backend.repository.SponsorRepository;
 import com.coms.backend.repository.SponsorTierRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -59,6 +61,8 @@ import java.util.stream.Collectors;
 @Transactional
 public class SponsorService {
 
+    private static final Logger log = LoggerFactory.getLogger(SponsorService.class);
+
     static final String ANONYMOUS_NAME = "익명 후원자";
     private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
     private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
@@ -74,6 +78,7 @@ public class SponsorService {
     private final SponsorPageSettingsRepository settingsRepository;
     private final StorageService storageService;
     private final RichContentSanitizer sanitizer;
+    private final SponsorImageDeleter imageDeleter;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Clock clock;
 
@@ -83,6 +88,7 @@ public class SponsorService {
                           SponsorPageSettingsRepository settingsRepository,
                           StorageService storageService,
                           RichContentSanitizer sanitizer,
+                          SponsorImageDeleter imageDeleter,
                           Clock clock) {
         this.sponsorRepository = sponsorRepository;
         this.tierRepository = tierRepository;
@@ -90,6 +96,7 @@ public class SponsorService {
         this.settingsRepository = settingsRepository;
         this.storageService = storageService;
         this.sanitizer = sanitizer;
+        this.imageDeleter = imageDeleter;
         this.clock = clock;
     }
 
@@ -338,7 +345,7 @@ public class SponsorService {
             image.setWidth(dimensions[0] > 0 ? dimensions[0] : null);
             image.setHeight(dimensions[1] > 0 ? dimensions[1] : null);
             SponsorImage saved = imageRepository.save(image);
-            return new SponsorImageResponse(saved.getId(), imageUrl(saved.getId()));
+            return new SponsorImageResponse(saved.getId(), adminImageUrl(saved.getId()));
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 저장에 실패했습니다.");
         }
@@ -368,7 +375,7 @@ public class SponsorService {
         if (sponsorRepository.existsByLogoImageId(id) || Objects.equals(bannerImageId, id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "사용 중인 이미지는 삭제할 수 없습니다.");
         }
-        deleteStoredImage(image);
+        imageDeleter.delete(image);
     }
 
     private void deleteImageIfUnreferenced(Long id) {
@@ -376,19 +383,28 @@ public class SponsorService {
                 || Objects.equals(readSettings().bannerImageId(), id)) {
             return;
         }
-        imageRepository.findById(id).ifPresent(this::deleteStoredImage);
+        imageRepository.findById(id).ifPresent(imageDeleter::delete);
     }
 
-    private void deleteStoredImage(SponsorImage image) {
-        storageService.delete(storedName(image));
-        imageRepository.delete(image);
-    }
-
+    /**
+     * Each orphan is deleted in its own {@code REQUIRES_NEW} transaction via
+     * {@link SponsorImageDeleter#deleteOrphanInOwnTransaction(Long)} so one bad row cannot abort
+     * the rest of the nightly batch; a failure is logged and skipped rather than propagated.
+     */
+    @Transactional(readOnly = true)
     public int deleteOrphanedImagesOlderThan(LocalDateTime cutoff) {
         Long bannerImageId = readSettings().bannerImageId();
         List<SponsorImage> orphaned = imageRepository.findOrphanedOlderThan(cutoff, bannerImageId);
-        orphaned.forEach(this::deleteStoredImage);
-        return orphaned.size();
+        int deleted = 0;
+        for (SponsorImage image : orphaned) {
+            try {
+                imageDeleter.deleteOrphanInOwnTransaction(image.getId());
+                deleted++;
+            } catch (RuntimeException e) {
+                log.warn("Failed to purge orphaned sponsor image {}", image.getId(), e);
+            }
+        }
+        return deleted;
     }
 
     // ---- Internals -----------------------------------------------------------------------
@@ -401,8 +417,19 @@ public class SponsorService {
         return "/api/sponsors/images/" + imageId;
     }
 
-    /** Strips the {@code sponsors-} bookkeeping prefix back off to get the real storage filename. */
-    private String storedName(SponsorImage image) {
+    /**
+     * The admin equivalent of {@link #imageUrl(Long)} — served by {@code AdminSponsorController}
+     * without the public visibility gate, for admin previews of hidden/anonymous/expired sponsors.
+     */
+    static String adminImageUrl(Long imageId) {
+        return "/api/admin/sponsors/images/" + imageId;
+    }
+
+    /**
+     * Strips the {@code sponsors-} bookkeeping prefix back off to get the real storage filename.
+     * Package-private and static so {@link SponsorImageDeleter} can reuse it.
+     */
+    static String storedName(SponsorImage image) {
         String key = image.getStorageKey() == null ? "" : image.getStorageKey();
         return key.startsWith(STORAGE_PREFIX + "-") ? key.substring(STORAGE_PREFIX.length() + 1) : key;
     }
@@ -482,7 +509,7 @@ public class SponsorService {
                 sponsor.getTierId(),
                 tier == null ? null : tier.getName(),
                 sponsor.getLogoImageId(),
-                sponsor.getLogoImageId() == null ? null : imageUrl(sponsor.getLogoImageId()),
+                sponsor.getLogoImageId() == null ? null : adminImageUrl(sponsor.getLogoImageId()),
                 sponsor.getLinkUrl(),
                 sponsor.getDescription(),
                 sponsor.getAmountNote(),

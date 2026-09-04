@@ -109,6 +109,18 @@ class SponsorSecurityIntegrationTest {
     }
 
     @Test
+    void adminImagesServeHiddenSponsorLogosThatThePublicEndpointRefuses() throws Exception {
+        Long hidden = upload("hidden-admin-preview.png");
+        sponsorService.create(sponsor("숨김", hidden, false, false, null));
+
+        mockMvc.perform(get("/api/sponsors/images/{id}", hidden))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/admin/sponsors/images/{id}", hidden).cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "private, max-age=3600"));
+    }
+
+    @Test
     void onlyThePresidentMayManageSponsors() throws Exception {
         mockMvc.perform(post("/api/admin/sponsors")
                         .header("Origin", ORIGIN)
