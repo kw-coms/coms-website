@@ -123,6 +123,10 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.PUT, "/api/apps/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.DELETE, "/api/apps/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.GET, "/api/fonts", "/api/fonts/**").permitAll();
+                // 후원자 공개 페이지 — 로그아웃 상태에서도 읽을 수 있어야 한다. 관리 API 는
+                // /api/admin/sponsors/** 이라 위쪽 ADMIN 경계에 이미 걸린다. 로고/배너 이미지는
+                // authenticated() 로 끝나는 /api/files/** 아래에 두지 않고 여기로 서빙한다.
+                auth.requestMatchers(HttpMethod.GET, "/api/sponsors", "/api/sponsors/**").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/api/community/posts/*/share", "/api/community/posts/*/share-data", "/api/community/posts/*/share-image").permitAll();
                 auth.requestMatchers(HttpMethod.HEAD, "/api/community/posts/*/share", "/api/community/posts/*/share-data", "/api/community/posts/*/share-image").permitAll();
                 auth.requestMatchers("/api/mini-apps/**").authenticated();
