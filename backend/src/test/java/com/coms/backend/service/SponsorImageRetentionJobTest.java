@@ -9,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.io.Resource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
@@ -64,8 +65,16 @@ class SponsorImageRetentionJobTest {
                 old, oldOrphan, sponsorLogo, banner);
         entityManager.clear();
 
+        // The job deletes each orphan in its own REQUIRES_NEW transaction, which runs on a
+        // separate physical connection — it can only see fixture rows that are actually
+        // committed, not merely flushed within this test's still-open transaction. Commit for
+        // real, then reopen a transaction so the class's usual rollback-based cleanup still runs.
+        TestTransaction.flagForCommit();
+        TestTransaction.end();
+
         job.purgeOrphanedSponsorImages();
 
+        TestTransaction.start();
         assertThat(imageRepository.findAll()).extracting("id")
                 .containsExactlyInAnyOrder(youngOrphan, sponsorLogo, banner);
         assertThat(oldOrphanFile.exists()).isFalse();
