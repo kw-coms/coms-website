@@ -7,48 +7,41 @@ CREATE TABLE IF NOT EXISTS role_permissions (
     PRIMARY KEY (role, permission)
 );
 
-INSERT INTO role_permissions (role, permission, allowed)
-SELECT source.role, source.permission, source.allowed
-FROM (VALUES
-    ('ASSOCIATE', 'CLUB_ROOM_VIEW', false),
-    ('ASSOCIATE', 'COMMUNITY_ANONYMOUS_BOARD', false),
-    ('ASSOCIATE', 'COMMUNITY_MODERATE', false),
-    ('ASSOCIATE', 'NOTICE_WRITE', false),
-    ('ASSOCIATE', 'ACTIVITY_WRITE', false),
-    ('ASSOCIATE', 'PROJECT_WRITE', false),
-    ('ASSOCIATE', 'ARCHIVE_MANAGE', false),
-    ('ASSOCIATE', 'SITE_SETTINGS_EDIT', false),
-    ('ASSOCIATE', 'OPERATIONS_PANEL', false),
-    ('USER', 'CLUB_ROOM_VIEW', true),
-    ('USER', 'COMMUNITY_ANONYMOUS_BOARD', true),
-    ('USER', 'COMMUNITY_MODERATE', false),
-    ('USER', 'NOTICE_WRITE', false),
-    ('USER', 'ACTIVITY_WRITE', false),
-    ('USER', 'PROJECT_WRITE', false),
-    ('USER', 'ARCHIVE_MANAGE', false),
-    ('USER', 'SITE_SETTINGS_EDIT', false),
-    ('USER', 'OPERATIONS_PANEL', false),
-    ('OFFICER', 'CLUB_ROOM_VIEW', true),
-    ('OFFICER', 'COMMUNITY_ANONYMOUS_BOARD', true),
-    ('OFFICER', 'COMMUNITY_MODERATE', false),
-    ('OFFICER', 'NOTICE_WRITE', true),
-    ('OFFICER', 'ACTIVITY_WRITE', true),
-    ('OFFICER', 'PROJECT_WRITE', true),
-    ('OFFICER', 'ARCHIVE_MANAGE', false),
-    ('OFFICER', 'SITE_SETTINGS_EDIT', true),
-    ('OFFICER', 'OPERATIONS_PANEL', true),
-    ('VICE_PRESIDENT', 'CLUB_ROOM_VIEW', true),
-    ('VICE_PRESIDENT', 'COMMUNITY_ANONYMOUS_BOARD', true),
-    ('VICE_PRESIDENT', 'COMMUNITY_MODERATE', true),
-    ('VICE_PRESIDENT', 'NOTICE_WRITE', true),
-    ('VICE_PRESIDENT', 'ACTIVITY_WRITE', true),
-    ('VICE_PRESIDENT', 'PROJECT_WRITE', true),
-    ('VICE_PRESIDENT', 'ARCHIVE_MANAGE', true),
-    ('VICE_PRESIDENT', 'SITE_SETTINGS_EDIT', true),
-    ('VICE_PRESIDENT', 'OPERATIONS_PANEL', true)
-) AS source(role, permission, allowed)
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM role_permissions existing
-    WHERE existing.role = source.role AND existing.permission = source.permission
-);
+INSERT INTO role_permissions (role, permission, allowed) VALUES
+    ('ASSOCIATE', 'club_room.view', false),
+    ('ASSOCIATE', 'community.anonymous_board', false),
+    ('ASSOCIATE', 'community.moderate', false),
+    ('ASSOCIATE', 'notice.write', false),
+    ('ASSOCIATE', 'activity.write', false),
+    ('ASSOCIATE', 'project.write', false),
+    ('ASSOCIATE', 'archive.manage', false),
+    ('ASSOCIATE', 'site_settings.edit', false),
+    ('ASSOCIATE', 'operations.panel', false),
+    ('USER', 'club_room.view', true),
+    ('USER', 'community.anonymous_board', true),
+    ('USER', 'community.moderate', false),
+    ('USER', 'notice.write', false),
+    ('USER', 'activity.write', false),
+    ('USER', 'project.write', false),
+    ('USER', 'archive.manage', false),
+    ('USER', 'site_settings.edit', false),
+    ('USER', 'operations.panel', false),
+    ('OFFICER', 'club_room.view', true),
+    ('OFFICER', 'community.anonymous_board', true),
+    ('OFFICER', 'community.moderate', false),
+    ('OFFICER', 'notice.write', true),
+    ('OFFICER', 'activity.write', true),
+    ('OFFICER', 'project.write', true),
+    ('OFFICER', 'archive.manage', false),
+    ('OFFICER', 'site_settings.edit', true),
+    ('OFFICER', 'operations.panel', true),
+    ('VICE_PRESIDENT', 'club_room.view', true),
+    ('VICE_PRESIDENT', 'community.anonymous_board', true),
+    ('VICE_PRESIDENT', 'community.moderate', true),
+    ('VICE_PRESIDENT', 'notice.write', true),
+    ('VICE_PRESIDENT', 'activity.write', true),
+    ('VICE_PRESIDENT', 'project.write', true),
+    ('VICE_PRESIDENT', 'archive.manage', true),
+    ('VICE_PRESIDENT', 'site_settings.edit', true),
+    ('VICE_PRESIDENT', 'operations.panel', true)
+ON CONFLICT (role, permission) DO NOTHING;

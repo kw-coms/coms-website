@@ -1,5 +1,7 @@
 package com.coms.backend.domain;
 
+import jakarta.persistence.AttributeConverter;
+import jakarta.persistence.Converter;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Arrays;
@@ -106,6 +108,19 @@ public enum Permission {
             return Permission.valueOf(token);
         } catch (IllegalArgumentException ignored) {
             return fromKey(token);
+        }
+    }
+
+    @Converter(autoApply = false)
+    public static class KeyConverter implements AttributeConverter<Permission, String> {
+        @Override
+        public String convertToDatabaseColumn(Permission permission) {
+            return permission == null ? null : permission.key();
+        }
+
+        @Override
+        public Permission convertToEntityAttribute(String key) {
+            return key == null ? null : Permission.fromKey(key);
         }
     }
 }

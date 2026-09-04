@@ -136,11 +136,11 @@ public class PermissionService {
         }
 
         Iterable<RolePermission> saved = repository.saveAll(rows);
-        List<RolePermission> savedRows = saved == null ? rows : iterableToList(saved);
+        List<RolePermission> savedRows = iterableToList(saved);
         cache.clear();
         cache.putAll(refreshed);
         auditReplacement(previous, allowed, updatedBy);
-        return matrixFromRows(savedRows.isEmpty() ? rows : savedRows);
+        return matrixFromRows(savedRows);
     }
 
     public static List<Member.Role> editableRoles() {
