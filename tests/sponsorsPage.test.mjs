@@ -94,6 +94,8 @@ assert.equal(sponsorPeriodLabel(null, null), '')
 // --- 로고가 없을 때의 이니셜 --------------------------------------------------------
 assert.equal(sponsorInitial('광운대'), '광')
 assert.equal(sponsorInitial('COM\'s'), 'C')
+assert.equal(sponsorInitial('60기 박채현'), '박')
+assert.equal(sponsorInitial('60기'), '?')
 assert.equal(sponsorInitial(''), '?')
 
 // --- 페이지 설정 기본값 채우기 ------------------------------------------------------
