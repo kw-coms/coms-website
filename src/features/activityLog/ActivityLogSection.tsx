@@ -12,10 +12,12 @@ import ActivityFilterBar from './ActivityFilterBar'
 import ActivityListItem from './ActivityListItem'
 import { useActivityFilters } from './useActivityFilters'
 import { canManageContent } from '../../utils/roleAccess'
+import { usePermissions } from '../../contexts/usePermissions'
 
 function ActivityLogSection({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate()
   const { user, authLoading, records, loading, loadError, prependActivity, mergeActivity, removeActivity } = useClubActivities('활동 기록을 불러오지 못했습니다.')
+  const { permissions } = usePermissions()
   const categories = useClubActivityCategories()
   const [viewedIds] = useState(() => new Set())
   const [submitError, setSubmitError] = useState('')
@@ -50,7 +52,7 @@ function ActivityLogSection({ compact = false }: { compact?: boolean }) {
   } = useActivityFilters(allActivityItems, compact)
   const selectedActivity = allActivityItems.find((item) => item.id === selectedActivityId) || null
   const isLocked = !authLoading && !user
-  const isAdmin = canManageContent(user?.role)
+  const isAdmin = canManageContent(permissions)
 
   // Register a view once per activity per mount when the card is opened.
   const registerActivityView = async (item) => {

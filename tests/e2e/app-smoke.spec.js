@@ -227,6 +227,36 @@ test('admin exposes a pre-deploy screen check panel', async ({ page }) => {
   await expect(page.getByText('/api/fonts')).toBeVisible()
 })
 
+test('admin permissions tab toggles a role capability and saves the matrix', async ({ page }) => {
+  await mockAdminApis(page)
+  let savedAllowed = null
+  // mockAdminApis 뒤에 등록해 LIFO 로 먼저 매칭되게 한다 — PUT 본문을 여기서 확인한다.
+  await page.route('**/api/admin/permissions', async (route) => {
+    if (route.request().method() === 'PUT') {
+      savedAllowed = JSON.parse(route.request().postData() || '{}').allowed
+      await route.fulfill({ status: 200, json: { roles: ['ASSOCIATE', 'USER', 'OFFICER', 'VICE_PRESIDENT'], permissions: [], allowed: savedAllowed } })
+      return
+    }
+    await route.fallback()
+  })
+
+  await page.goto('/admin')
+  await page.getByRole('tab', { name: '권한 관리' }).click()
+
+  const panel = page.getByTestId('admin-permissions')
+  await expect(panel.getByRole('heading', { name: '직급별 권한' })).toBeVisible()
+  // 회장 열은 항상 체크 + 비활성.
+  const presidentBox = panel.getByRole('checkbox', { name: '회장 — 커뮤니티 중재 (항상 허용)' })
+  await expect(presidentBox).toBeChecked()
+  await expect(presidentBox).toBeDisabled()
+
+  // 임원에게 커뮤니티 중재를 열어준다.
+  await panel.getByRole('checkbox', { name: '임원 — 커뮤니티 중재' }).check()
+  await panel.getByRole('button', { name: '저장' }).click()
+
+  await expect.poll(() => savedAllowed?.OFFICER).toContain('community.moderate')
+})
+
 test('admin password reset accepts simple temporary passwords without complexity copy', async ({ page }) => {
   await mockAdminApis(page)
   let promptMessage

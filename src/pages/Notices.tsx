@@ -19,7 +19,8 @@ import { URL_ONLY_RICH_FEATURES } from '../components/richEditor/richBodyFeature
 import { renderRichBody, richBodyToPlainText as noticeContentSearchText } from '../components/richEditor/renderRichBody'
 import { serializeRichBody, richBodyPlainText } from '../components/richEditor/serializeRichBody'
 import { parsePostBlocks } from './community/postEditorUtils'
-import { canManageContent, canManageSensitiveAdmin } from '../utils/roleAccess'
+import { canManageSensitiveAdmin, canWriteNotice } from '../utils/roleAccess'
+import { usePermissions } from '../contexts/usePermissions'
 import Chip from '../components/common/Chip'
 
 function formatDate(iso) {
@@ -175,6 +176,7 @@ export default function Notices() {
   const { id: urlId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { permissions } = usePermissions()
   const { notices, setNotices, refreshNotices, loading, error } = useNotices()
   const [mode, setMode] = useState('list')
   const [selectedNotice, setSelectedNotice] = useState(null)
@@ -183,7 +185,7 @@ export default function Notices() {
 
   useScrollReveal([notices?.length, loading])
 
-  const isAdmin = canManageContent(user?.role)
+  const isAdmin = canWriteNotice(permissions)
 
   const filteredNotices = useMemo(() => {
     const byCategory = activeCategory === 'ALL'
