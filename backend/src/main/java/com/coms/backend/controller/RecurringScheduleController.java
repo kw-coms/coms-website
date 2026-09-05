@@ -50,13 +50,13 @@ public class RecurringScheduleController {
     }
 
     // Content managers maintain recurring club schedules and exceptions.
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @GetMapping("/admin/recurring-schedules")
     public ResponseEntity<List<RecurringScheduleResponse>> list() {
         return ResponseEntity.ok(recurringScheduleService.list());
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @PostMapping("/admin/recurring-schedules")
     public ResponseEntity<RecurringScheduleResponse> create(@Valid @RequestBody RecurringScheduleRequest request,
                                                             Authentication authentication) {
@@ -65,7 +65,7 @@ public class RecurringScheduleController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @PatchMapping("/admin/recurring-schedules/{id}")
     public ResponseEntity<RecurringScheduleResponse> update(@PathVariable Long id,
                                                             @Valid @RequestBody RecurringScheduleRequest request,
@@ -75,7 +75,7 @@ public class RecurringScheduleController {
         return ResponseEntity.ok(response);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @DeleteMapping("/admin/recurring-schedules/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id, Authentication authentication) {
         RecurringSchedule schedule = recurringScheduleService.get(id);
@@ -93,7 +93,7 @@ public class RecurringScheduleController {
         return ResponseEntity.noContent().build();
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @PutMapping("/admin/recurring-schedules/{id}/exceptions/{date}")
     public ResponseEntity<RecurringScheduleExceptionResponse> upsertException(
             @PathVariable Long id,
@@ -110,7 +110,7 @@ public class RecurringScheduleController {
         return ResponseEntity.ok(response);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @DeleteMapping("/admin/recurring-schedules/{id}/exceptions/{date}")
     public ResponseEntity<Void> deleteException(@PathVariable Long id,
                                                 @PathVariable LocalDate date,

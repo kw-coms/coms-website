@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,11 +35,13 @@ public class CommunityReportController {
                 .body(reportService.report(id, authentication.getName(), request));
     }
 
+    @PreAuthorize("@perm.has(authentication,'COMMUNITY_MODERATE')")
     @GetMapping("/api/admin/community/reports")
     public ResponseEntity<List<CommunityPostReportResponse>> listOpen() {
         return ResponseEntity.ok(reportService.listOpen());
     }
 
+    @PreAuthorize("@perm.has(authentication,'COMMUNITY_MODERATE')")
     @PatchMapping("/api/admin/community/reports/{id}")
     public ResponseEntity<CommunityPostReportResponse> resolve(@PathVariable Long id,
                                                                @Valid @RequestBody CommunityReportResolveRequest request,

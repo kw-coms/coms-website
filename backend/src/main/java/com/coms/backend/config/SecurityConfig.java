@@ -83,41 +83,47 @@ public class SecurityConfig {
                 auth.requestMatchers("/api/integrations/**").hasRole("INTEGRATION");
                 auth.requestMatchers(HttpMethod.POST, "/api/recruit/apply", "/api/recruit/status").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/api/site-settings").permitAll();
-                // 동아리방 비밀번호: 회원(USER) 이상 — 준회원(ASSOCIATE)은 제외.
-                auth.requestMatchers("/api/club-room").hasRole("USER");
+                // 동아리방 비밀번호: club_room.view 권한 — 실제 판정은 SiteSettingsController 의
+                // @perm.has 가 한다. URL 규칙은 "로그인했는가"까지만 본다.
+                auth.requestMatchers("/api/club-room").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/maintenance/bootstrap").permitAll();
                 auth.requestMatchers("/api/maintenance/**").hasRole("ADMIN");
+                // 회장이 조정하는 권한(site_settings.edit / activity.write / project.write)로 열리는
+                // 관리 경로 — 로그인 경계만 URL 에 두고, 직급 판정은 컨트롤러의 @perm.has 가 맡는다.
                 auth.requestMatchers("/api/admin/site-settings", "/api/admin/club-room", "/api/admin/club-activity-categories/**",
-                        "/api/admin/club-project-categories/**", "/api/admin/recurring-schedules/**").hasAnyRole("ADMIN", "OFFICER");
-                // 부회장(VICE_PRESIDENT)+ community moderation surface (reports, deleted-post archive).
-                auth.requestMatchers("/api/admin/community/**").hasRole("VICE_PRESIDENT");
+                        "/api/admin/club-project-categories/**", "/api/admin/recurring-schedules/**").authenticated();
+                // community.moderate 권한으로 열리는 중재 화면(신고, 삭제 보관함).
+                auth.requestMatchers("/api/admin/community/**").authenticated();
                 auth.requestMatchers("/api/admin/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.GET, "/api/notices", "/api/notices/**").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/notices/*/vote").authenticated();
-                auth.requestMatchers(HttpMethod.POST, "/api/notices").hasAnyRole("ADMIN", "OFFICER");
-                auth.requestMatchers(HttpMethod.PATCH, "/api/notices/*/pin").hasAnyRole("ADMIN", "OFFICER");
+                // notice.write — 컨트롤러의 @perm.has 가 실제 게이트.
+                auth.requestMatchers(HttpMethod.POST, "/api/notices").authenticated();
+                auth.requestMatchers(HttpMethod.PATCH, "/api/notices/*/pin").authenticated();
                 // 작성자 변경은 회장 전용 (커뮤니티 /posts/*/author 규칙과 동일 정책).
                 auth.requestMatchers(HttpMethod.PATCH, "/api/notices/*/author").hasRole("ADMIN");
-                auth.requestMatchers(HttpMethod.PUT, "/api/notices/**").hasAnyRole("ADMIN", "OFFICER");
-                auth.requestMatchers(HttpMethod.DELETE, "/api/notices/**").hasAnyRole("ADMIN", "OFFICER");
+                auth.requestMatchers(HttpMethod.PUT, "/api/notices/**").authenticated();
+                auth.requestMatchers(HttpMethod.DELETE, "/api/notices/**").authenticated();
+                // activity.write — 컨트롤러의 @perm.has 가 실제 게이트.
                 auth.requestMatchers(HttpMethod.GET, "/api/club-activities", "/api/club-activities/**").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/club-activities/*/vote").authenticated();
-                auth.requestMatchers(HttpMethod.POST, "/api/club-activities").hasAnyRole("ADMIN", "OFFICER");
-                auth.requestMatchers(HttpMethod.POST, "/api/club-activities/**").hasAnyRole("ADMIN", "OFFICER");
-                auth.requestMatchers(HttpMethod.PATCH, "/api/club-activities/**").hasAnyRole("ADMIN", "OFFICER");
-                auth.requestMatchers(HttpMethod.DELETE, "/api/club-activities/**").hasAnyRole("ADMIN", "OFFICER");
+                auth.requestMatchers(HttpMethod.POST, "/api/club-activities").authenticated();
+                auth.requestMatchers(HttpMethod.POST, "/api/club-activities/**").authenticated();
+                auth.requestMatchers(HttpMethod.PATCH, "/api/club-activities/**").authenticated();
+                auth.requestMatchers(HttpMethod.DELETE, "/api/club-activities/**").authenticated();
                 auth.requestMatchers(HttpMethod.GET, "/api/club-events", "/api/club-events/**").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/club-events/*/entries/*/vote").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/club-events/*/rsvp").authenticated();
-                auth.requestMatchers(HttpMethod.POST, "/api/club-events", "/api/club-events/*/entries").hasAnyRole("ADMIN", "OFFICER");
-                auth.requestMatchers(HttpMethod.PATCH, "/api/club-events/**").hasAnyRole("ADMIN", "OFFICER");
-                auth.requestMatchers(HttpMethod.DELETE, "/api/club-events/**").hasAnyRole("ADMIN", "OFFICER");
+                auth.requestMatchers(HttpMethod.POST, "/api/club-events", "/api/club-events/*/entries").authenticated();
+                auth.requestMatchers(HttpMethod.PATCH, "/api/club-events/**").authenticated();
+                auth.requestMatchers(HttpMethod.DELETE, "/api/club-events/**").authenticated();
                 // Club projects showcase is public (the /apps route is public); admin CRUD
                 // lives under /api/admin/** and is guarded above.
                 auth.requestMatchers(HttpMethod.GET, "/api/club-projects", "/api/club-projects/**").permitAll();
-                auth.requestMatchers(HttpMethod.POST, "/api/club-projects", "/api/club-projects/**").hasAnyRole("ADMIN", "OFFICER");
-                auth.requestMatchers(HttpMethod.PATCH, "/api/club-projects/**").hasAnyRole("ADMIN", "OFFICER");
-                auth.requestMatchers(HttpMethod.DELETE, "/api/club-projects/**").hasAnyRole("ADMIN", "OFFICER");
+                // project.write — 컨트롤러의 @perm.has 가 실제 게이트.
+                auth.requestMatchers(HttpMethod.POST, "/api/club-projects", "/api/club-projects/**").authenticated();
+                auth.requestMatchers(HttpMethod.PATCH, "/api/club-projects/**").authenticated();
+                auth.requestMatchers(HttpMethod.DELETE, "/api/club-projects/**").authenticated();
                 auth.requestMatchers(HttpMethod.GET, "/api/apps", "/api/apps/**").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/apps", "/api/apps/**").hasRole("ADMIN");
                 auth.requestMatchers(HttpMethod.PUT, "/api/apps/**").hasRole("ADMIN");
@@ -132,10 +138,13 @@ public class SecurityConfig {
                 auth.requestMatchers("/api/mini-apps/**").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/files").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/files/*/vote").authenticated();
-                auth.requestMatchers(HttpMethod.DELETE, "/api/files/**").hasRole("VICE_PRESIDENT");
-                auth.requestMatchers(HttpMethod.PATCH, "/api/files/**").hasRole("VICE_PRESIDENT");
+                // archive.manage — ArchiveController 의 @perm.has 가 실제 게이트. 명시 matcher 는
+                // 아래 authenticated() catch-all 보다 앞서 있어야 의도가 드러난다.
+                auth.requestMatchers(HttpMethod.DELETE, "/api/files/**").authenticated();
+                auth.requestMatchers(HttpMethod.PATCH, "/api/files/**").authenticated();
                 auth.requestMatchers("/api/files", "/api/files/**").authenticated();
-                auth.requestMatchers(HttpMethod.PATCH, "/api/community/posts/*/pin").hasRole("VICE_PRESIDENT");
+                // community.moderate — CommunityController 의 @perm.has 가 실제 게이트.
+                auth.requestMatchers(HttpMethod.PATCH, "/api/community/posts/*/pin").authenticated();
                 // 작성자 변경은 회장 전용.
                 auth.requestMatchers(HttpMethod.PATCH, "/api/community/posts/*/author").hasRole("ADMIN");
                 auth.requestMatchers("/api/community/**").authenticated();

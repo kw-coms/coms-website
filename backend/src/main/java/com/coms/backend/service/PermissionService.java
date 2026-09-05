@@ -75,10 +75,21 @@ public class PermissionService {
         if (member == null || permission == null) {
             return false;
         }
-        if (member.getRole() == Member.Role.ADMIN) {
+        return allows(member.getRole(), permission);
+    }
+
+    /**
+     * 회장(ADMIN)은 항상 통과. 그 외에는 DB 행(캐시 우선) → 없으면 enum 기본값.
+     */
+    @Transactional(readOnly = true)
+    public boolean allows(Member.Role role, Permission permission) {
+        if (role == null || permission == null) {
+            return false;
+        }
+        if (role == Member.Role.ADMIN) {
             return true;
         }
-        RolePermissionId id = new RolePermissionId(member.getRole(), permission);
+        RolePermissionId id = new RolePermissionId(role, permission);
         Boolean cached = cache.get(id);
         if (cached != null) {
             return cached;
@@ -88,7 +99,23 @@ public class PermissionService {
                     cache.put(id, row.isAllowed());
                     return row.isAllowed();
                 })
-                .orElseGet(() -> permission.defaultRoles().contains(member.getRole()));
+                .orElseGet(() -> permission.defaultRoles().contains(role));
+    }
+
+    /**
+     * 해당 권한을 가진 직급 목록 — 회장은 언제나 포함. 알림 수신자처럼
+     * "권한 보유자 전체"를 역질의해야 하는 곳에서 쓴다.
+     */
+    @Transactional(readOnly = true)
+    public List<Member.Role> rolesWith(Permission permission) {
+        List<Member.Role> roles = new ArrayList<>();
+        for (Member.Role role : EDITABLE_ROLES) {
+            if (allows(role, permission)) {
+                roles.add(role);
+            }
+        }
+        roles.add(Member.Role.ADMIN);
+        return roles;
     }
 
     @Transactional(readOnly = true)
