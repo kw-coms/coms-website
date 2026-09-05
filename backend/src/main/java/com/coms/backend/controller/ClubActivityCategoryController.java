@@ -40,7 +40,7 @@ public class ClubActivityCategoryController {
     }
 
     // Content managers maintain the labels used by the member-only activity log.
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @PostMapping("/admin/club-activity-categories")
     public ResponseEntity<ClubActivityCategoryResponse> create(@Valid @RequestBody ClubActivityCategoryRequest request,
                                                                Authentication authentication) {
@@ -49,7 +49,7 @@ public class ClubActivityCategoryController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @PatchMapping("/admin/club-activity-categories/{id}")
     public ResponseEntity<ClubActivityCategoryResponse> update(@PathVariable Long id,
                                                                @Valid @RequestBody ClubActivityCategoryRequest request,
@@ -59,7 +59,7 @@ public class ClubActivityCategoryController {
         return ResponseEntity.ok(response);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @DeleteMapping("/admin/club-activity-categories/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id, Authentication authentication) {
         ClubActivityCategoryResponse category = categoryService.get(id);

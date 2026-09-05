@@ -5,6 +5,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -54,6 +56,21 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String, String>> handleUploadTooLarge() {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
                 .body(Map.of("message", "업로드 용량이 너무 큽니다. 파일 크기를 줄여 다시 시도해주세요."));
+    }
+
+    /**
+     * 메서드 단위 보안(@PreAuthorize)의 거부는 컨트롤러 안에서 던져지므로 이 advice 를
+     * 먼저 통과한다 — 여기서 잡지 않으면 아래 catch-all 이 500 으로 바꿔 버린다.
+     * URL 규칙에서 걸린 요청과 같은 응답(빈 본문 403/401)을 돌려준다.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, String>> handleAccessDenied() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<Map<String, String>> handleUnauthenticated() {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
 
     @ExceptionHandler(Exception.class)

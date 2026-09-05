@@ -12,6 +12,7 @@ import AdminDeletedCommunityPosts from './admin/AdminDeletedCommunityPosts'
 import AdminFiles from './admin/AdminFiles'
 import AdminFonts from './admin/AdminFonts'
 import AdminMembers from './admin/AdminMembers'
+import AdminPermissions from './admin/AdminPermissions'
 import AdminRoster from './admin/AdminRoster'
 import AdminRecruitApplications from './admin/AdminRecruitApplications'
 import { recruitPendingCount, recruitStatusLabel } from './admin/recruitStatus'
@@ -22,13 +23,19 @@ import {
   adminTabsForRole,
   ROLE_LABELS,
   canAccessOperationsPanel,
+  canEditSiteSettings,
+  canManageArchive,
+  canManageContent,
+  canManageProjects,
   canManageSensitiveAdmin,
+  canModerateCommunity,
   defaultOperationsTab,
 } from '../utils/roleAccess'
+import { usePermissions } from '../contexts/usePermissions'
 
 const ADMIN_TAB_IDS = new Set([
   'overview', 'analytics', 'members', 'recruit', 'roster', 'activities', 'projects', 'files',
-  'site-settings', 'sponsors', 'fonts', 'community', 'deleted-posts', 'screen-check', 'ban', 'logs',
+  'site-settings', 'sponsors', 'fonts', 'community', 'deleted-posts', 'screen-check', 'ban', 'permissions', 'logs',
 ])
 
 const ADMIN_TABS = [
@@ -48,6 +55,8 @@ const ADMIN_TABS = [
   { id: 'deleted-posts', label: '삭제 보관함' },
   { id: 'screen-check', label: '화면 점검' },
   { id: 'ban', label: '차단 관리' },
+  // 'permissions' 는 회장 전용 — 직급별 권한 매트릭스를 조정한다.
+  { id: 'permissions', label: '권한 관리' },
   { id: 'logs', label: '로그' },
 ]
 
@@ -61,16 +70,17 @@ type RecruitApplication = {
 
 export default function Admin({ onBack }: { onBack: () => void }) {
   const { user } = useAuth()
+  const { permissions } = usePermissions()
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState(() => {
     const requested = searchParams.get('tab')
     return requested && ADMIN_TAB_IDS.has(requested) ? requested : 'overview'
   })
   const isSensitiveAdmin = canManageSensitiveAdmin(user?.role)
-  const visibleTabs = adminTabsForRole(user?.role, ADMIN_TABS)
+  const visibleTabs = adminTabsForRole(user?.role, permissions, ADMIN_TABS)
   const resolvedActiveTab = visibleTabs.some((tab) => tab.id === activeTab)
     ? activeTab
-    : defaultOperationsTab(user?.role, searchParams.get('tab'))
+    : defaultOperationsTab(user?.role, permissions, searchParams.get('tab'))
   const activeTabLabel = visibleTabs.find((tab) => tab.id === resolvedActiveTab)?.label || '운영 탭'
   const [recruitApplications, setRecruitApplications] = useState<RecruitApplication[]>([])
   const [recruitLoading, setRecruitLoading] = useState(true)
@@ -109,7 +119,7 @@ export default function Admin({ onBack }: { onBack: () => void }) {
     return () => { mounted = false }
   }, [isSensitiveAdmin])
 
-  if (!canAccessOperationsPanel(user?.role)) {
+  if (!canAccessOperationsPanel(permissions) || (!isSensitiveAdmin && !resolvedActiveTab)) {
     return (
       <div className="space-y-4">
         <button
@@ -202,16 +212,17 @@ export default function Admin({ onBack }: { onBack: () => void }) {
               />
             )}
             {isSensitiveAdmin && resolvedActiveTab === 'roster' && <AdminRoster />}
-            {resolvedActiveTab === 'activities' && <AdminActivities />}
-            {resolvedActiveTab === 'projects' && <AdminAppCatalog />}
-            {isSensitiveAdmin && resolvedActiveTab === 'files' && <AdminFiles />}
-            {resolvedActiveTab === 'site-settings' && <AdminSiteSettings />}
+            {canManageContent(permissions) && resolvedActiveTab === 'activities' && <AdminActivities />}
+            {canManageProjects(permissions) && resolvedActiveTab === 'projects' && <AdminAppCatalog />}
+            {canManageArchive(permissions) && resolvedActiveTab === 'files' && <AdminFiles />}
+            {canEditSiteSettings(permissions) && resolvedActiveTab === 'site-settings' && <AdminSiteSettings />}
             {isSensitiveAdmin && resolvedActiveTab === 'sponsors' && <AdminSponsors />}
             {isSensitiveAdmin && resolvedActiveTab === 'fonts' && <AdminFonts />}
-            {isSensitiveAdmin && resolvedActiveTab === 'community' && <AdminCommunityReports formatDateTime={formatDateTime} />}
-            {isSensitiveAdmin && resolvedActiveTab === 'deleted-posts' && <AdminDeletedCommunityPosts />}
+            {canModerateCommunity(permissions) && resolvedActiveTab === 'community' && <AdminCommunityReports formatDateTime={formatDateTime} />}
+            {canModerateCommunity(permissions) && resolvedActiveTab === 'deleted-posts' && <AdminDeletedCommunityPosts />}
             {isSensitiveAdmin && resolvedActiveTab === 'screen-check' && <AdminScreenCheck />}
             {isSensitiveAdmin && resolvedActiveTab === 'ban' && <AdminBan formatDateTime={formatDateTime} />}
+            {isSensitiveAdmin && resolvedActiveTab === 'permissions' && <AdminPermissions />}
             {isSensitiveAdmin && resolvedActiveTab === 'logs' && <AdminAuditLogs formatDateTime={formatDateTime} />}
           </div>
         </section>

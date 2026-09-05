@@ -22,6 +22,7 @@ import { showToast } from '../components/common/Toast'
 import { PASSWORD_PATTERN, PASSWORD_MESSAGE } from '../utils/passwordPolicy'
 import { getClubRoom } from '../services/siteSettingsApi'
 import { canSeeClubRoom } from '../utils/roleAccess'
+import { usePermissions } from '../contexts/usePermissions'
 const OTHER_INTEREST = '기타'
 const INTEREST_OPTIONS = ['보안', '웹', '앱']
 
@@ -343,6 +344,7 @@ function NotificationPreferencesSection({ cardClass, helperTextClass, primaryBtn
 
 export default function ChangePassword({ onBack }: { onBack: () => void }) {
   const { user, refreshUser, setUser } = useAuth()
+  const { permissions } = usePermissions()
   const [profileDraft, setProfileDraft] = useState<Record<string, string>>({})
   const [verificationCode, setVerificationCode] = useState('')
   const [currentPassword, setCurrentPassword] = useState('')
@@ -702,7 +704,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
             </div>
           </div>
 
-          {canSeeClubRoom(user?.role) && (
+          {canSeeClubRoom(permissions) && (
             <ClubRoomSection cardClass={cardClass} helperTextClass={helperTextClass} />
           )}
 

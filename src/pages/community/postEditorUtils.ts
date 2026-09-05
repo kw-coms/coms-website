@@ -1,5 +1,5 @@
 import { sanitizeHtml } from '../../utils/sanitizeHtml'
-import { canModerateCommunity } from '../../utils/roleAccess'
+import { canModerateCommunity, canUseAnonymousBoard, defaultPermissionsForRole } from '../../utils/roleAccess'
 
 export const MAX_TITLE_LENGTH = 120
 export const MAX_ANONYMOUS_NAME_LENGTH = 20
@@ -156,8 +156,12 @@ function isGraduateStudentId(studentId) {
   return admissionYear <= new Date().getFullYear() - 7
 }
 
-export function canAccessAnonymousBoard(user) {
-  return canModerateCommunity(user?.role) || !isGraduateStudentId(user?.studentId)
+// 백엔드 CommunityAccess.canSeeAnonymous 의 거울: 중재 권한은 졸업 여부와 무관하게
+// 통과하고, 그 밖에는 community.anonymous_board 권한 + 졸업생 제외 규칙.
+export function canAccessAnonymousBoard(user, permissions) {
+  const effective = permissions ?? defaultPermissionsForRole(user?.role)
+  if (canModerateCommunity(effective)) return true
+  return canUseAnonymousBoard(effective) && !isGraduateStudentId(user?.studentId)
 }
 
 function youtubeVideoIdFromUrl(value) {
@@ -358,8 +362,10 @@ export function categoryLabel(value) {
   return CATEGORY_OPTIONS.find((item) => item.value === value)?.label || '일반'
 }
 
-export function categoryOptionsForUser(user) {
-  return canAccessAnonymousBoard(user) ? CATEGORY_OPTIONS : CATEGORY_OPTIONS.filter((item) => item.value !== 'ANONYMOUS')
+export function categoryOptionsForUser(user, permissions) {
+  return canAccessAnonymousBoard(user, permissions)
+    ? CATEGORY_OPTIONS
+    : CATEGORY_OPTIONS.filter((item) => item.value !== 'ANONYMOUS')
 }
 
 export function figureInlineStyle(wPct, align) {

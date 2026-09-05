@@ -22,11 +22,13 @@ import {
 } from '../../shared/homeUi'
 import { CalendarScheduleComposer } from './CalendarScheduleComposer'
 import { canManageContent } from '../../utils/roleAccess'
+import { usePermissions } from '../../contexts/usePermissions'
 
 function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user, authLoading, records, loading, loadError, prependActivity, mergeActivity, removeActivity } = useClubActivities('일정을 불러오지 못했습니다.')
+  const { permissions } = usePermissions()
   const initialCalendarDate = new Date()
   const error = loadError
   const [selectedYear, setSelectedYear] = useState(initialCalendarDate.getFullYear())
@@ -49,7 +51,7 @@ function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
   })
   const hasAnyEvent = Object.values(eventsByDay).some((list) => Array.isArray(list) && list.length > 0)
   const isLocked = !authLoading && !user
-  const isAdmin = canManageContent(user?.role)
+  const isAdmin = canManageContent(permissions)
   const selectedDayEvents = selectedDay ? eventsByDay[selectedDay] || [] : []
   const activeSelectedEventId = selectedDayEvents.some((event) => event.id === selectedEventId) ? selectedEventId : null
   const monthSummary = buildMonthEventSummary({

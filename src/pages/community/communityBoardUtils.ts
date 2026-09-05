@@ -34,11 +34,11 @@ export function deletionIdentity(name, studentId) {
   return studentId ? `${safeName}(${studentId})` : safeName
 }
 
-export function boardFilterOptionsForUser(user) {
+export function boardFilterOptionsForUser(user, permissions) {
   return [
     { value: 'ALL', label: '전체글' },
     { value: 'CONCEPT', label: '개념글' },
-    ...categoryOptionsForUser(user),
+    ...categoryOptionsForUser(user, permissions),
   ]
 }
 

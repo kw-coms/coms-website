@@ -65,6 +65,7 @@ public class NotificationService {
     private final EmailVerificationSender mailSender;
     private final PushNotificationSender pushNotificationSender;
     private final org.springframework.core.task.TaskExecutor pushExecutor;
+    private final PermissionService permissionService;
     private final Set<String> acceptUrlAllowedHosts;
     private final Map<String, Deque<LocalDateTime>> inviteAttemptsBySender = new ConcurrentHashMap<>();
 
@@ -75,7 +76,8 @@ public class NotificationService {
                                EmailVerificationSender mailSender,
                                PushNotificationSender pushNotificationSender,
                                @Value("${notification.external-invite.allowed-hosts:coms.kw.ac.kr}") String allowedHosts,
-                               @org.springframework.beans.factory.annotation.Qualifier("pushExecutor") org.springframework.core.task.TaskExecutor pushExecutor) {
+                               @org.springframework.beans.factory.annotation.Qualifier("pushExecutor") org.springframework.core.task.TaskExecutor pushExecutor,
+                               PermissionService permissionService) {
         this.notificationRepository = notificationRepository;
         this.notificationPreferenceRepository = notificationPreferenceRepository;
         this.memberRepository = memberRepository;
@@ -84,6 +86,7 @@ public class NotificationService {
         this.pushNotificationSender = pushNotificationSender;
         this.acceptUrlAllowedHosts = parseAllowedHosts(allowedHosts);
         this.pushExecutor = pushExecutor;
+        this.permissionService = permissionService;
     }
 
     /**
@@ -505,8 +508,10 @@ public class NotificationService {
             return;
         }
         String message = "커뮤니티 신고 접수: " + (post.getTitle() == null ? "제목 없음" : post.getTitle());
+        // 중재 권한(community.moderate)을 실제로 가진 직급으로 수신자를 뽑는다 —
+        // 회장이 임원에게 중재를 열어주면 임원도 신고 알림을 받아야 한다.
         List<String> moderators = memberRepository.findStudentIdsByRoleIn(
-                List.of(Member.Role.VICE_PRESIDENT, Member.Role.ADMIN));
+                permissionService.rolesWith(com.coms.backend.domain.Permission.COMMUNITY_MODERATE));
         List<Notification> notifications = moderators.stream()
                 .map(studentId -> build(
                         studentId,
