@@ -39,7 +39,7 @@ public class ClubProjectCategoryController {
     }
 
     // Content managers maintain the public project showcase taxonomy.
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'PROJECT_WRITE')")
     @PostMapping("/admin/club-project-categories")
     public ResponseEntity<ClubProjectCategoryResponse> create(@Valid @RequestBody ClubProjectCategoryRequest request,
                                                               Authentication authentication) {
@@ -48,7 +48,7 @@ public class ClubProjectCategoryController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'PROJECT_WRITE')")
     @PatchMapping("/admin/club-project-categories/{id}")
     public ResponseEntity<ClubProjectCategoryResponse> update(@PathVariable Long id,
                                                               @Valid @RequestBody ClubProjectCategoryRequest request,
@@ -58,7 +58,7 @@ public class ClubProjectCategoryController {
         return ResponseEntity.ok(response);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'PROJECT_WRITE')")
     @DeleteMapping("/admin/club-project-categories/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id, Authentication authentication) {
         categoryService.delete(id);

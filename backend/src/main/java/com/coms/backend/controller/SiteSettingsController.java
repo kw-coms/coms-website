@@ -28,15 +28,15 @@ public class SiteSettingsController {
         return ResponseEntity.ok(siteSettingsService.current());
     }
 
-    // 회원(USER) 이상만 — 준회원(ASSOCIATE)은 RoleHierarchy상 USER 미만이라 403.
+    // club_room.view 권한 — 기본값은 회원(USER) 이상이고, 회장이 권한 매트릭스에서 조정한다.
     @GetMapping("/club-room")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("@perm.has(authentication,'CLUB_ROOM_VIEW')")
     public ResponseEntity<ClubRoomResponse> clubRoom() {
         return ResponseEntity.ok(new ClubRoomResponse(siteSettingsService.clubRoomCode()));
     }
 
     @PutMapping("/admin/club-room")
-    @PreAuthorize("hasAnyRole('OFFICER','ADMIN')")
+    @PreAuthorize("@perm.has(authentication,'SITE_SETTINGS_EDIT')")
     public ResponseEntity<ClubRoomResponse> updateClubRoom(@Valid @RequestBody ClubRoomUpdateRequest request,
                                                            Authentication authentication) {
         String saved = siteSettingsService.updateClubRoomCode(request.doorCode());
@@ -53,13 +53,13 @@ public class SiteSettingsController {
     }
 
     @GetMapping("/admin/site-settings")
-    @PreAuthorize("hasAnyRole('OFFICER','ADMIN')")
+    @PreAuthorize("@perm.has(authentication,'SITE_SETTINGS_EDIT')")
     public ResponseEntity<SiteSettingsResponse> adminCurrent() {
         return ResponseEntity.ok(siteSettingsService.current());
     }
 
     @PutMapping("/admin/site-settings")
-    @PreAuthorize("hasAnyRole('OFFICER','ADMIN')")
+    @PreAuthorize("@perm.has(authentication,'SITE_SETTINGS_EDIT')")
     public ResponseEntity<SiteSettingsResponse> publish(@Valid @RequestBody SiteSettingsRequest request,
                                                         Authentication authentication) {
         SiteSettingsResponse response = siteSettingsService.publish(request);

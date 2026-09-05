@@ -16,6 +16,7 @@ import AuthorName from './AuthorName'
 import CommunityPostRow from './CommunityPostRow'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 import { canModerateCommunity } from '../../utils/roleAccess'
+import { usePermissions } from '../../contexts/usePermissions'
 import {
   SORT_OPTIONS,
   clickableCell,
@@ -95,6 +96,7 @@ export default function CommunityListView({
   onToggleBookmark: (post: { id: number; bookmarked?: boolean }) => void
   bookmarkPending?: boolean
 }) {
+  const { permissions } = usePermissions()
   const commentCountSuffix = (post) => {
     const count = Number(post?.commentCount || 0)
     return count > 0 ? `[${count.toLocaleString('ko-KR')}]` : ''
@@ -198,7 +200,7 @@ export default function CommunityListView({
         onOpen={onOpenPost}
         onToggleBookmark={onToggleBookmark}
         bookmarkPending={bookmarkPending}
-        showAdminDelete={canModerateCommunity(user?.role)}
+        showAdminDelete={canModerateCommunity(permissions)}
         onAdminDelete={onAdminDelete}
       />
     )
@@ -366,7 +368,7 @@ export default function CommunityListView({
                       <AuthorName post={post} />
                       <BookmarkButton post={post} onToggle={onToggleBookmark} pending={bookmarkPending} />
                     </span>
-                    {canModerateCommunity(user?.role) && (
+                    {canModerateCommunity(permissions) && (
                       <button
                         type="button"
                         onClick={(event) => onAdminDelete(event, post)}

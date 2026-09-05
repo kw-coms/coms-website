@@ -16,6 +16,7 @@ import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -55,6 +56,7 @@ public class ClubEventController {
         return ResponseEntity.ok(clubEventService.get(id, authentication.getName()));
     }
 
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @PostMapping
     public ResponseEntity<ClubEventResponse> create(@Valid @RequestBody ClubEventRequest request,
                                                     Authentication authentication) {
@@ -64,6 +66,7 @@ public class ClubEventController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @PatchMapping("/{id}")
     public ResponseEntity<ClubEventResponse> update(@PathVariable Long id,
                                                     @Valid @RequestBody ClubEventRequest request,
@@ -74,6 +77,7 @@ public class ClubEventController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @PostMapping(path = "/{id}/entries", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ClubEventResponse.Entry> addEntry(@PathVariable Long id,
                                                             @RequestParam("title") String title,
@@ -135,6 +139,7 @@ public class ClubEventController {
                 .body(resource);
     }
 
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @DeleteMapping("/{id}/entries/{entryId}")
     public ResponseEntity<Void> deleteEntry(@PathVariable Long id,
                                             @PathVariable Long entryId,
@@ -145,6 +150,7 @@ public class ClubEventController {
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteEvent(@PathVariable Long id, Authentication authentication) {
         ClubEventResponse event = clubEventService.get(id, authentication.getName());

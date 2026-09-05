@@ -17,6 +17,7 @@ import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -69,6 +70,7 @@ public class ClubActivityController {
         return ResponseEntity.ok(clubActivityService.vote(authentication.getName(), id, request.value()));
     }
 
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @PostMapping
     public ResponseEntity<ClubActivityResponse> create(
             @RequestParam("kind") String kind,
@@ -88,6 +90,7 @@ public class ClubActivityController {
         return ResponseEntity.ok(response);
     }
 
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @PatchMapping("/{id}")
     public ResponseEntity<ClubActivityResponse> update(
             @PathVariable Long id,
@@ -119,6 +122,7 @@ public class ClubActivityController {
                 .body(resource);
     }
 
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @PostMapping(path = "/{id}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<List<Long>> uploadImages(@PathVariable Long id,
                                                    @RequestParam("images") List<MultipartFile> images) {
@@ -137,12 +141,14 @@ public class ClubActivityController {
                 .body(resource);
     }
 
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @DeleteMapping("/{id}/images/{imageId}")
     public ResponseEntity<Void> deleteImage(@PathVariable Long id, @PathVariable Long imageId) {
         clubActivityService.deleteImage(id, imageId);
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @PostMapping(path = "/{id}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Long> uploadFile(@PathVariable Long id,
                                            @RequestParam("file") MultipartFile file) {
@@ -161,12 +167,14 @@ public class ClubActivityController {
                 .body(resource);
     }
 
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @DeleteMapping("/{id}/files/{fileId}")
     public ResponseEntity<Void> deleteFile(@PathVariable Long id, @PathVariable Long fileId) {
         clubActivityService.deleteFile(id, fileId);
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id, Authentication authentication) {
         ClubActivity activity = clubActivityService.get(id);

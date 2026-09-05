@@ -15,6 +15,7 @@ import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -68,7 +69,8 @@ public class ArchiveController {
                 archiveService.list(authentication == null ? null : authentication.getName()), page, size);
     }
 
-    // 부회장 이상 전용 — SecurityConfig의 PATCH /api/files/** hasRole("VICE_PRESIDENT") 규칙이 게이트.
+    // archive.manage 권한 — 기본값은 부회장(VICE_PRESIDENT)이고, 회장이 권한 매트릭스에서 조정한다.
+    @PreAuthorize("@perm.has(authentication,'ARCHIVE_MANAGE')")
     @PatchMapping("/{id}/author")
     public ResponseEntity<ArchiveFileResponse> updateAuthor(@PathVariable Long id,
                                                             @Valid @RequestBody ArchiveAuthorUpdateRequest request,
@@ -138,6 +140,7 @@ public class ArchiveController {
         }
     }
 
+    @PreAuthorize("@perm.has(authentication,'ARCHIVE_MANAGE')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         archiveService.delete(id);

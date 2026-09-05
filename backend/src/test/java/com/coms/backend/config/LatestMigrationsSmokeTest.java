@@ -1,5 +1,9 @@
 package com.coms.backend.config;
 
+import com.coms.backend.domain.Member;
+import com.coms.backend.domain.Permission;
+import com.coms.backend.domain.RolePermissionId;
+import com.coms.backend.repository.RolePermissionRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -9,6 +13,7 @@ import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.sql.DataSource;
+import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,6 +29,9 @@ class LatestMigrationsSmokeTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private RolePermissionRepository rolePermissionRepository;
 
     @Test
     void latestProjectAndSiteSettingsMigrationsExecuteInPostgresMode() throws Exception {
@@ -41,6 +49,7 @@ class LatestMigrationsSmokeTest {
                     new ClassPathResource("db/migration/V87__eligible_member_initial_role.sql"));
             ScriptUtils.executeSqlScript(connection,
                     new ClassPathResource("db/migration/V88__sponsors.sql"));
+            executeV90WithH2OnConflictAdapter();
         }
 
         String initialRoleNullable = jdbcTemplate.queryForObject(
@@ -77,5 +86,56 @@ class LatestMigrationsSmokeTest {
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM sponsor_tiers", Integer.class)).isEqualTo(3);
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sponsor_page_settings WHERE id = 1", Integer.class)).isEqualTo(1);
+
+        // V90: role permission rows replay cleanly over Hibernate schema, keep NOT NULL
+        // defaults, and seed the four editable roles x nine permissions exactly once.
+        String v90 = new ClassPathResource("db/migration/V90__role_permissions.sql").getContentAsString(StandardCharsets.UTF_8);
+        assertThat(v90).contains("INSERT INTO role_permissions (role, permission, allowed) VALUES");
+        assertThat(v90).contains("ON CONFLICT (role, permission) DO NOTHING");
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM role_permissions", Integer.class)).isEqualTo(36);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM role_permissions WHERE permission = 'notice.write'",
+                Integer.class
+        )).isEqualTo(4);
+        assertThat(rolePermissionRepository.findById(new RolePermissionId(Member.Role.OFFICER, Permission.NOTICE_WRITE)))
+                .isPresent()
+                .get()
+                .extracting(row -> row.getId().getPermission(), row -> row.isAllowed())
+                .containsExactly(Permission.NOTICE_WRITE, true);
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT column_default
+                FROM information_schema.columns
+                WHERE table_name = 'ROLE_PERMISSIONS' AND column_name = 'ALLOWED'
+                """,
+                String.class
+        )).containsIgnoringCase("false");
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT is_nullable
+                FROM information_schema.columns
+                WHERE table_name = 'ROLE_PERMISSIONS' AND column_name = 'UPDATED_AT'
+                """,
+                String.class
+        )).isEqualToIgnoringCase("NO");
+    }
+
+    private void executeV90WithH2OnConflictAdapter() throws java.io.IOException {
+        String sql = new ClassPathResource("db/migration/V90__role_permissions.sql")
+                .getContentAsString(StandardCharsets.UTF_8);
+        jdbcTemplate.execute(sql.substring(0, sql.indexOf("INSERT INTO role_permissions")));
+        String values = sql.substring(sql.indexOf("VALUES") + "VALUES".length(), sql.indexOf("ON CONFLICT")).trim();
+        jdbcTemplate.execute("""
+                INSERT INTO role_permissions (role, permission, allowed)
+                SELECT source.role, source.permission, source.allowed
+                FROM (VALUES
+                """ + values + """
+                ) AS source(role, permission, allowed)
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM role_permissions existing
+                    WHERE existing.role = source.role AND existing.permission = source.permission
+                )
+                """);
     }
 }

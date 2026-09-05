@@ -19,6 +19,7 @@ import {
   parsePostBlocks,
   textContentForSearch,
 } from './postEditorUtils'
+import { usePermissions } from '../../contexts/usePermissions'
 
 export default function PostEditor({ initialPost, onCancel, onSave, user }: {
   initialPost?: { id?: number; title?: string; category?: string; anonymousName?: string; imageUrl?: string; [key: string]: unknown } | null
@@ -27,6 +28,7 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
   user?: { role?: string; [key: string]: unknown } | null
 }) {
   const isEditing = Boolean(initialPost)
+  const { permissions } = usePermissions()
   const [title, setTitle] = useState(initialPost?.title || '')
   const [category, setCategory] = useState(initialPost?.category || 'GENERAL')
   const [anonymousName, setAnonymousName] = useState(initialPost?.anonymousName || '')
@@ -36,7 +38,7 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
   const editorApiRef = useRef(null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const initialBlocks = useMemo(() => isEditing ? parsePostBlocks(initialPost) : [], [])
-  const categoryOptions = useMemo(() => categoryOptionsForUser(user), [user])
+  const categoryOptions = useMemo(() => categoryOptionsForUser(user, permissions), [user, permissions])
   const effectiveCategory = categoryOptions.some((item) => item.value === category) ? category : 'GENERAL'
 
   const submit = async (e) => {

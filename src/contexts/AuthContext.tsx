@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type PropsWithChildren } from 'react'
 import type { ApiError } from '../services/apiClient'
 import { getCurrentUser, logoutUser } from '../services/authApi'
+import { getMyPermissions } from '../services/permissionsApi'
 import { setSessionExpiredHandler } from '../services/apiClient'
 import { setUserContext } from '../services/observability'
 import { queryClient } from '../services/queryClient'
@@ -11,6 +12,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState(null)
+  // 회장이 조정한 직급별 권한. null = 아직 못 받음 → 직급 기본값으로 대체(usePermissions).
+  const [permissions, setPermissions] = useState<string[] | null>(null)
 
   // Keep Sentry's user context in sync with the session (no-op when Sentry is disabled).
   useEffect(() => {
@@ -22,6 +25,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     setSessionExpiredHandler(() => {
       setUser(null)
+      setPermissions(null)
       queryClient.clear()
     })
     return () => setSessionExpiredHandler(null)
@@ -65,6 +69,30 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }, [])
 
+  const studentId = user?.studentId
+  const role = user?.role
+  const [permissionsNonce, setPermissionsNonce] = useState(0)
+
+  // 로그인한 사용자가 바뀌면(또는 권한 매트릭스를 저장한 뒤) 유효 권한을 다시 읽는다.
+  useEffect(() => {
+    // 로그아웃/세션 만료는 각자 permissions 를 비우므로 여기서 다시 지울 필요는 없다.
+    if (!studentId) return undefined
+    let mounted = true
+    getMyPermissions()
+      .then((data) => {
+        if (mounted) setPermissions(Array.isArray(data?.permissions) ? data.permissions : null)
+      })
+      .catch(() => {
+        // 실패해도 로그인 상태를 흔들지 않는다 — 직급 기본값으로 화면을 그린다.
+        if (mounted) setPermissions(null)
+      })
+    return () => { mounted = false }
+  }, [studentId, role, permissionsNonce])
+
+  const refreshPermissions = useCallback(() => {
+    setPermissionsNonce((value) => value + 1)
+  }, [])
+
   const login = useCallback(async (data) => {
     setAuthError(null)
     if (data) {
@@ -84,6 +112,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     } finally {
       setUser(null)
       setAuthError(null)
+      setPermissions(null)
       // Drop every cached query so the next account on a shared device can't see the previous
       // user's community list, bookmarks, or vote state (query keys aren't scoped per user).
       queryClient.clear()
@@ -119,8 +148,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, loading, authError, login, logout, refreshUser, retryAuth, setUser }),
-    [user, loading, authError, login, logout, refreshUser, retryAuth]
+    () => ({
+      user, loading, authError, permissions, refreshPermissions,
+      login, logout, refreshUser, retryAuth, setUser,
+    }),
+    [user, loading, authError, permissions, refreshPermissions, login, logout, refreshUser, retryAuth]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
