@@ -11,6 +11,11 @@ export const queryKeys = {
     byAuthor: (studentId) => [...queryKeys.community.all, 'by-author', String(studentId)],
     reputation: (studentId) => [...queryKeys.community.all, 'reputation', String(studentId)],
   },
+  permissions: {
+    all: ['permissions'],
+    mine: () => [...queryKeys.permissions.all, 'me'],
+    matrix: () => [...queryKeys.permissions.all, 'matrix'],
+  },
   notices: {
     all: ['notices'],
     list: () => [...queryKeys.notices.all, 'list'],

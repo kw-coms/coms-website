@@ -22,6 +22,7 @@ import {
 import { scrollToTopInstant } from '../utils/themeColors'
 import NotificationButton from './NotificationButton'
 import { ROLE_LABELS, canAccessOperationsPanel } from '../utils/roleAccess'
+import { usePermissions } from '../contexts/usePermissions'
 
 const floatingBarBaseClass = 'apple-topbar border-b border-[var(--app-hairline)]'
 
@@ -47,6 +48,7 @@ function getActiveNavKey(pathname) {
 
 export default function GlobalNavigation() {
   const { user, loading: authLoading, logout } = useAuth()
+  const { permissions } = usePermissions()
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -260,7 +262,7 @@ export default function GlobalNavigation() {
           <div className="ml-auto hidden items-center gap-1 md:flex">
             <NotificationButton />
             <button type="button" onClick={() => goPageTop('/settings')} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)]" title="계정 설정">{user.name}</button>
-            {canAccessOperationsPanel(user.role) && (
+            {canAccessOperationsPanel(permissions) && (
               <button type="button" onClick={() => goPageTop('/admin')} className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-2.5 py-1 text-xs font-bold text-[var(--app-accent-text)] transition hover:border-[var(--app-accent-border,rgba(0,113,227,0.4))]">
                 {ROLE_LABELS[user.role] || '임원'}
               </button>
@@ -388,7 +390,7 @@ export default function GlobalNavigation() {
                     <span>{user.name}</span>
                     <span className="ml-auto text-xs text-[var(--app-muted)]">계정 설정</span>
                   </button>
-                  {canAccessOperationsPanel(user.role) && (
+                  {canAccessOperationsPanel(permissions) && (
                     <button type="button" onClick={() => closeAndGo('/admin')} className="apple-mobile-menu-item apple-mobile-menu-item-warning">
                       <span>{(ROLE_LABELS[user.role] || '임원') + ' 패널'}</span>
                     </button>

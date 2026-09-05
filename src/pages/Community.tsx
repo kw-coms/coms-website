@@ -42,9 +42,11 @@ import { MAX_COMMENT_LENGTH, useCommunityComments } from './community/useCommuni
 import { useCommunityPosts } from './community/useCommunityPosts'
 import { useBookmarkMutation } from './community/useBookmarkMutation'
 import { canManageSensitiveAdmin, canModerateCommunity } from '../utils/roleAccess'
+import { usePermissions } from '../contexts/usePermissions'
 
 export default function Community({ onBack }: { onBack: () => void }) {
   const { user } = useAuth()
+  const { permissions } = usePermissions()
   const { id: urlId } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
@@ -67,8 +69,8 @@ export default function Community({ onBack }: { onBack: () => void }) {
   const [appealDrafts, setAppealDrafts] = useState({})
   const [appealingId, setAppealingId] = useState(null)
   useScrollReveal([posts?.length, loading])
-  const boardFilterOptions = useMemo(() => boardFilterOptionsForUser(user), [user])
-  const canSeeAnonymous = canAccessAnonymousBoard(user)
+  const boardFilterOptions = useMemo(() => boardFilterOptionsForUser(user, permissions), [user, permissions])
+  const canSeeAnonymous = canAccessAnonymousBoard(user, permissions)
   const effectiveActiveCategory = boardFilterOptions.some((item) => item.value === activeCategory) ? activeCategory : 'ALL'
   const isAnonymousDetail = currentPost?.category === 'ANONYMOUS'
   const deletedViewRequested = useMemo(() => new URLSearchParams(location.search).get('view') === 'deleted', [location.search])
@@ -222,11 +224,11 @@ export default function Community({ onBack }: { onBack: () => void }) {
 
   const handleDelete = async (post) => {
     if (!(await confirmDialog({ message: '게시글을 삭제하시겠습니까?', tone: 'danger' }))) return
-    const reason = canModerateCommunity(user?.role)
+    const reason = canModerateCommunity(permissions)
       ? await promptDialog({ message: '삭제 사유를 입력하세요. 감사 로그에 기록됩니다.', defaultValue: '' })
       : ''
     if (reason === null) return
-    if (canModerateCommunity(user?.role) && post.authorStudentId !== user.studentId && !reason.trim()) {
+    if (canModerateCommunity(permissions) && post.authorStudentId !== user.studentId && !reason.trim()) {
       showToast({ message: '관리자가 다른 회원의 글을 삭제하려면 삭제 사유가 필요합니다.', tone: 'error' })
       return
     }
@@ -568,7 +570,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
             onBackToList={backToList}
             onEdit={() => setMode('edit')}
             onDelete={handleDelete}
-            isAdmin={canModerateCommunity(user?.role)}
+            isAdmin={canModerateCommunity(permissions)}
             isPresident={canManageSensitiveAdmin(user?.role)}
             onUpdateAuthor={handleAuthorUpdate}
             pinning={pinning}

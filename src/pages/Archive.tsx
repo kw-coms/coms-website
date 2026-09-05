@@ -11,10 +11,12 @@ import { ArchiveListView } from '../components/archive/ArchiveListView'
 import { WriteForm } from '../components/archive/WriteForm'
 import { categoryLabel } from '../components/archive/archiveUtils'
 import { canManageArchive } from '../utils/roleAccess'
+import { usePermissions } from '../contexts/usePermissions'
 import { showToast } from '../components/common/Toast'
 
 export default function Archive({ onBack }: { onBack: () => void }) {
   const { user } = useAuth()
+  const { permissions } = usePermissions()
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -26,7 +28,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
 
   useScrollReveal([files.length, loading])
 
-  const isAdmin = canManageArchive(user?.role)
+  const isAdmin = canManageArchive(permissions)
 
   const loadFiles = ({ showLoading = true } = {}) => {
     if (showLoading) setLoading(true)

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/useAuth'
 import PageShell from '../components/PageShell'
 import { scrollToTopInstant } from '../utils/themeColors'
 import { canAccessOperationsPanel } from '../utils/roleAccess'
+import { usePermissions } from '../contexts/usePermissions'
 
 export function ScrollToTop() {
   const { pathname } = useLocation()
@@ -34,6 +35,7 @@ export function RequireAuth({ children }: PropsWithChildren) {
 
 export function RequireAdmin({ children }: PropsWithChildren) {
   const { user, loading, authError } = useAuth()
+  const { permissions } = usePermissions()
   const location = useLocation()
   if (loading) return (
     <PageShell>
@@ -43,6 +45,6 @@ export function RequireAdmin({ children }: PropsWithChildren) {
     </PageShell>
   )
   if (authError || !user) return <Navigate to="/login" state={{ from: location, authIssue: Boolean(authError) }} replace />
-  if (!canAccessOperationsPanel(user.role)) return <Navigate to="/" replace />
+  if (!canAccessOperationsPanel(permissions)) return <Navigate to="/" replace />
   return children
 }

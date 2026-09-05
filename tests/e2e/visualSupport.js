@@ -181,6 +181,44 @@ export async function mockAdminApis(page) {
       ],
     },
   }))
+
+  // 권한 매트릭스 — 라우트는 LIFO 라 나중에 등록한 구체 경로가 먼저 매칭된다.
+  // 회장(ADMIN) 세션이므로 /api/permissions/me 는 모든 키를 돌려준다.
+  const PERMISSION_DESCRIPTORS = [
+    { key: 'club_room.view', label: '동방 비밀번호 보기', description: '동방 출입 비밀번호를 조회할 수 있습니다.' },
+    { key: 'community.anonymous_board', label: '익명게시판 이용', description: '익명 커뮤니티 게시판을 이용할 수 있습니다.' },
+    { key: 'community.moderate', label: '커뮤니티 중재', description: '글 고정, 신고 처리, 삭제 보관함, 익명 작성자 확인을 수행할 수 있습니다.' },
+    { key: 'notice.write', label: '공지 작성·수정·삭제·고정', description: '공지사항을 작성, 수정, 삭제, 고정할 수 있습니다.' },
+    { key: 'activity.write', label: '활동·일정·이벤트·정기일정·카테고리 관리', description: '활동, 일정, 이벤트, 정기일정, 활동 카테고리를 관리할 수 있습니다.' },
+    { key: 'project.write', label: "COM's 프로젝트 관리", description: "COM's 프로젝트와 프로젝트 카테고리를 관리할 수 있습니다." },
+    { key: 'archive.manage', label: '자료실 삭제·작성자 변경', description: '자료실 파일을 삭제하고 작성자를 변경할 수 있습니다.' },
+    { key: 'site_settings.edit', label: '사이트 문구·동방 비번 편집', description: '사이트 공개 문구와 동방 비밀번호를 편집할 수 있습니다.' },
+    { key: 'operations.panel', label: '운영 패널 접근', description: '운영 패널과 권한이 허용된 운영 탭에 접근할 수 있습니다.' },
+  ]
+  const permissionMatrix = {
+    roles: ['ASSOCIATE', 'USER', 'OFFICER', 'VICE_PRESIDENT'],
+    permissions: PERMISSION_DESCRIPTORS,
+    allowed: {
+      ASSOCIATE: [],
+      USER: ['club_room.view', 'community.anonymous_board'],
+      OFFICER: ['club_room.view', 'community.anonymous_board', 'notice.write', 'activity.write', 'project.write', 'site_settings.edit', 'operations.panel'],
+      VICE_PRESIDENT: PERMISSION_DESCRIPTORS.map((item) => item.key),
+    },
+    updatedAt: '2026-09-01T09:00:00',
+    updatedBy: '2020123456',
+  }
+  await page.route('**/api/admin/permissions', async (route) => {
+    if (route.request().method() === 'PUT') {
+      const body = JSON.parse(route.request().postData() || '{}')
+      route.fulfill({ status: 200, json: { ...permissionMatrix, allowed: body.allowed || permissionMatrix.allowed } })
+      return
+    }
+    route.fulfill({ status: 200, json: permissionMatrix })
+  })
+  await page.route('**/api/permissions/me', (route) => route.fulfill({
+    status: 200,
+    json: { role: 'ADMIN', permissions: PERMISSION_DESCRIPTORS.map((item) => item.key) },
+  }))
 }
 
 // Auto-drive the app's confirm/prompt modal (ConfirmDialog.tsx) in e2e flows:
