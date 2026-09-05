@@ -145,6 +145,13 @@ assert.equal(canAccessOperationsPanel(memberWithArchive), true)
 assert.deepEqual(adminTabsForRole('USER', memberWithArchive, tabs).map((tab) => tab.id), ['files'])
 assert.equal(defaultOperationsTab('USER', memberWithArchive, 'members'), 'files')
 
+// 공지 권한만 가진 회원은 운영 패널엔 들어오지만(canAccessOperationsPanel) 탭은 하나도
+// 없다 — defaultOperationsTab 이 'activities' 로 새면 권한 없는 탭이 열려버린다.
+const memberWithNoticeOnly = [PERMISSIONS.noticeWrite]
+assert.equal(canAccessOperationsPanel(memberWithNoticeOnly), true)
+assert.deepEqual(adminTabsForRole('OFFICER', memberWithNoticeOnly, tabs), [])
+assert.equal(defaultOperationsTab('OFFICER', memberWithNoticeOnly, 'members'), null)
+
 // 임원에게서 모든 운영 권한을 회수하면 운영 패널도 닫힌다.
 assert.equal(canAccessOperationsPanel([]), false)
 assert.deepEqual(adminTabsForRole('OFFICER', [], tabs), [])

@@ -23,7 +23,10 @@ import {
   adminTabsForRole,
   ROLE_LABELS,
   canAccessOperationsPanel,
+  canEditSiteSettings,
   canManageArchive,
+  canManageContent,
+  canManageProjects,
   canManageSensitiveAdmin,
   canModerateCommunity,
   defaultOperationsTab,
@@ -116,7 +119,7 @@ export default function Admin({ onBack }: { onBack: () => void }) {
     return () => { mounted = false }
   }, [isSensitiveAdmin])
 
-  if (!canAccessOperationsPanel(permissions)) {
+  if (!canAccessOperationsPanel(permissions) || (!isSensitiveAdmin && !resolvedActiveTab)) {
     return (
       <div className="space-y-4">
         <button
@@ -209,10 +212,10 @@ export default function Admin({ onBack }: { onBack: () => void }) {
               />
             )}
             {isSensitiveAdmin && resolvedActiveTab === 'roster' && <AdminRoster />}
-            {resolvedActiveTab === 'activities' && <AdminActivities />}
-            {resolvedActiveTab === 'projects' && <AdminAppCatalog />}
+            {canManageContent(permissions) && resolvedActiveTab === 'activities' && <AdminActivities />}
+            {canManageProjects(permissions) && resolvedActiveTab === 'projects' && <AdminAppCatalog />}
             {canManageArchive(permissions) && resolvedActiveTab === 'files' && <AdminFiles />}
-            {resolvedActiveTab === 'site-settings' && <AdminSiteSettings />}
+            {canEditSiteSettings(permissions) && resolvedActiveTab === 'site-settings' && <AdminSiteSettings />}
             {isSensitiveAdmin && resolvedActiveTab === 'sponsors' && <AdminSponsors />}
             {isSensitiveAdmin && resolvedActiveTab === 'fonts' && <AdminFonts />}
             {canModerateCommunity(permissions) && resolvedActiveTab === 'community' && <AdminCommunityReports formatDateTime={formatDateTime} />}

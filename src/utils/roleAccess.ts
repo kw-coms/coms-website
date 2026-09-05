@@ -181,5 +181,7 @@ export function defaultOperationsTab(role: Role, permissions: PermissionSet, req
   const required = requested ? TAB_PERMISSIONS[requested] : undefined
   if (required && has(permissions, required)) return requested as string
   const firstAllowed = Object.keys(TAB_PERMISSIONS).find((id) => has(permissions, TAB_PERMISSIONS[id]))
-  return firstAllowed || 'activities'
+  // No tab permission at all (e.g. a role granted only notice.write, which has no admin
+  // tab of its own) — don't guess a tab; let the caller render its empty/forbidden state.
+  return firstAllowed || null
 }
