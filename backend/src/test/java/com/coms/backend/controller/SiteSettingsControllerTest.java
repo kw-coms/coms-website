@@ -35,13 +35,16 @@ class SiteSettingsControllerTest {
     }
 
     @Test
-    void publishIsMethodGuardedForOfficerOrAdminAndWritesAuditLog() throws NoSuchMethodException {
+    void publishIsPermissionGuardedAndWritesAuditLog() throws NoSuchMethodException {
         Method method = SiteSettingsController.class.getMethod(
                 "publish",
                 SiteSettingsRequest.class,
                 org.springframework.security.core.Authentication.class
         );
-        assertThat(method.getAnnotation(PreAuthorize.class).value()).isEqualTo("hasAnyRole('OFFICER','ADMIN')");
+        // 직급이 아니라 site_settings.edit 권한이 게이트 — 기본값은 임원 이상이고
+        // 회장이 권한 매트릭스에서 조정한다.
+        assertThat(method.getAnnotation(PreAuthorize.class).value())
+                .isEqualTo("@perm.has(authentication,'SITE_SETTINGS_EDIT')");
 
         var request = new SiteSettingsRequest(
                 "2026-2 모집",
