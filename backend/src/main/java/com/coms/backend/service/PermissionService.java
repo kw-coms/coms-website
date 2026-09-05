@@ -11,6 +11,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
@@ -164,10 +166,39 @@ public class PermissionService {
 
         Iterable<RolePermission> saved = repository.saveAll(rows);
         List<RolePermission> savedRows = iterableToList(saved);
-        cache.clear();
-        cache.putAll(refreshed);
+        refreshCacheAfterCommit(refreshed);
         auditReplacement(previous, allowed, updatedBy);
         return matrixFromRows(savedRows);
+    }
+
+    /**
+     * Clears the in-memory permission matrix cache. Callers include
+     * {@link CacheMaintenanceService#clearAll()} so an admin's "clear all caches" action also
+     * forces a fresh DB read for role permission checks.
+     */
+    public void invalidate() {
+        cache.clear();
+    }
+
+    /**
+     * Swaps in the freshly-saved rows only after the surrounding transaction commits — if it were
+     * applied eagerly and the transaction then rolled back, the cache would keep serving a matrix
+     * that was never actually persisted. Outside a transaction (no active synchronization) the swap
+     * happens immediately, matching the old behaviour.
+     */
+    private void refreshCacheAfterCommit(ConcurrentHashMap<RolePermissionId, Boolean> refreshed) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    cache.clear();
+                    cache.putAll(refreshed);
+                }
+            });
+        } else {
+            cache.clear();
+            cache.putAll(refreshed);
+        }
     }
 
     public static List<Member.Role> editableRoles() {
