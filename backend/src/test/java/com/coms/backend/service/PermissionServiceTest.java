@@ -13,8 +13,10 @@ import org.springframework.security.authentication.TestingAuthenticationToken;
 
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -63,14 +65,60 @@ class PermissionServiceTest {
     }
 
     @Test
-    void missingDatabaseRowFallsBackToEnumDefault() {
+    void missingDatabaseRowFailsClosedInsteadOfFallingBackToEnumDefault() {
+        // A missing row used to silently fall back to the enum default (fail open). It now denies
+        // regardless of what the enum default would have allowed — selfHealMissingRows() is what's
+        // supposed to keep rows from going missing in the first place.
         when(repository.findById(new RolePermissionId(Member.Role.OFFICER, Permission.NOTICE_WRITE)))
                 .thenReturn(Optional.empty());
         when(repository.findById(new RolePermissionId(Member.Role.USER, Permission.NOTICE_WRITE)))
                 .thenReturn(Optional.empty());
 
-        assertThat(service.has(member(Member.Role.OFFICER), Permission.NOTICE_WRITE)).isTrue();
+        assertThat(service.has(member(Member.Role.OFFICER), Permission.NOTICE_WRITE)).isFalse();
         assertThat(service.has(member(Member.Role.USER), Permission.NOTICE_WRITE)).isFalse();
+    }
+
+    @Test
+    void selfHealInsertsOnlyTheMissingRowsWithEnumDefaultsAndLogsThem() {
+        // Every pair except USER/NOTICE_WRITE already exists — pretend that one row got dropped.
+        List<RolePermission> existingRows = new ArrayList<>();
+        for (Member.Role role : PermissionService.editableRoles()) {
+            for (Permission permission : Permission.values()) {
+                if (role == Member.Role.USER && permission == Permission.NOTICE_WRITE) {
+                    continue;
+                }
+                existingRows.add(row(role, permission, permission.defaultRoles().contains(role), "seed"));
+            }
+        }
+        when(repository.findAll()).thenReturn(existingRows);
+        when(repository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.selfHealMissingRows();
+
+        verify(repository).saveAll(argThat((Iterable<RolePermission> rows) -> {
+            List<RolePermission> list = new ArrayList<>();
+            rows.forEach(list::add);
+            assertThat(list).hasSize(1);
+            assertThat(list.get(0).getId()).isEqualTo(new RolePermissionId(Member.Role.USER, Permission.NOTICE_WRITE));
+            // NOTICE_WRITE defaults to OFFICER/VICE_PRESIDENT, not USER.
+            assertThat(list.get(0).isAllowed()).isFalse();
+            return true;
+        }));
+    }
+
+    @Test
+    void selfHealDoesNothingWhenEveryRowAlreadyExists() {
+        List<RolePermission> existingRows = new ArrayList<>();
+        for (Member.Role role : PermissionService.editableRoles()) {
+            for (Permission permission : Permission.values()) {
+                existingRows.add(row(role, permission, permission.defaultRoles().contains(role), "seed"));
+            }
+        }
+        when(repository.findAll()).thenReturn(existingRows);
+
+        service.selfHealMissingRows();
+
+        verify(repository, never()).saveAll(any());
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.coms.backend.service;
 
 import com.coms.backend.domain.Member;
 import com.coms.backend.domain.Permission;
+import com.coms.backend.domain.RolePermissionId;
 import com.coms.backend.repository.RolePermissionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,6 +67,22 @@ class PermissionServiceTransactionTest {
         permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_MANAGE), "2026000001");
 
         assertThat(permissionService.allows(Member.Role.USER, Permission.ARCHIVE_MANAGE)).isTrue();
+    }
+
+    @Test
+    void deletingARowDeniesUntilSelfHealReseedsIt() {
+        // ARCHIVE_MANAGE defaults to VICE_PRESIDENT only.
+        permissionService.replace(matrixGranting(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE), "2026000001");
+        assertThat(permissionService.allows(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE)).isTrue();
+
+        rolePermissionRepository.deleteById(new RolePermissionId(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE));
+        permissionService.invalidate();
+
+        assertThat(permissionService.allows(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE)).isFalse();
+
+        permissionService.selfHealMissingRows();
+
+        assertThat(permissionService.allows(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE)).isTrue();
     }
 
     private Map<Member.Role, Set<Permission>> matrixGranting(Member.Role grantedRole, Permission permission) {

@@ -7,6 +7,10 @@ import com.coms.backend.domain.RolePermissionId;
 import com.coms.backend.dto.PermissionMatrixResponse;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.RolePermissionRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,7 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +37,8 @@ import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 @Service("perm")
 public class PermissionService {
+
+    private static final Logger log = LoggerFactory.getLogger(PermissionService.class);
 
     private static final List<Member.Role> EDITABLE_ROLES = List.of(
             Member.Role.ASSOCIATE,
@@ -89,7 +96,9 @@ public class PermissionService {
     }
 
     /**
-     * 회장(ADMIN)은 항상 통과. 그 외에는 DB 행(캐시 우선) → 없으면 enum 기본값.
+     * 회장(ADMIN)은 항상 통과. 그 외에는 DB 행(캐시 우선). 행이 없으면 — 스키마 드리프트든 아직
+     * 시드되지 않았든 — enum 기본값으로 돌아가지 않고 거부한다({@link #selfHealMissingRows()}가
+     * 부팅 시 모든 행을 채워 넣으므로 정상 운영 중에는 이 경로를 타지 않는다).
      */
     @Transactional(readOnly = true)
     public boolean allows(Member.Role role, Permission permission) {
@@ -110,7 +119,7 @@ public class PermissionService {
                     cacheSingle(id, row.isAllowed());
                     return row.isAllowed();
                 })
-                .orElseGet(() -> permission.defaultRoles().contains(role));
+                .orElse(false);
     }
 
     /**
@@ -219,6 +228,45 @@ public class PermissionService {
             });
         } else {
             cacheRef.set(snapshot);
+        }
+    }
+
+    /**
+     * Verifies every editable role has a row for every {@link Permission} and inserts the enum
+     * default for any pair that's missing (e.g. after manual schema drift), logging what it healed.
+     * {@code allows()}/{@code has()} fail closed for a missing row, so without this a deleted row
+     * would silently deny a permission forever instead of just until the next boot — package-visible
+     * (not private) so tests can also invoke it directly after deleting a row mid-run.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    @Transactional
+    public void selfHealMissingRows() {
+        Set<RolePermissionId> existing = new HashSet<>();
+        for (RolePermission row : repository.findAll()) {
+            existing.add(row.getId());
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        List<RolePermission> missingRows = new ArrayList<>();
+        List<String> missingKeys = new ArrayList<>();
+        for (Member.Role role : EDITABLE_ROLES) {
+            for (Permission permission : Permission.values()) {
+                RolePermissionId id = new RolePermissionId(role, permission);
+                if (existing.contains(id)) {
+                    continue;
+                }
+                RolePermission row = new RolePermission(id);
+                row.setAllowed(permission.defaultRoles().contains(role));
+                row.setUpdatedAt(now);
+                missingRows.add(row);
+                missingKeys.add(role.name() + ":" + permission.key());
+            }
+        }
+
+        if (!missingRows.isEmpty()) {
+            repository.saveAll(missingRows);
+            log.warn("Self-healed {} missing role_permissions row(s) with enum defaults: {}",
+                    missingRows.size(), missingKeys);
         }
     }
 
