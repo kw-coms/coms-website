@@ -21,11 +21,12 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
@@ -42,7 +43,14 @@ public class PermissionService {
     private final RolePermissionRepository repository;
     private final MemberRepository memberRepository;
     private final AuditLogService auditLogService;
-    private final ConcurrentHashMap<RolePermissionId, Boolean> cache = new ConcurrentHashMap<>();
+
+    /**
+     * Immutable snapshot, swapped in one {@link AtomicReference#set}. A reader always sees either
+     * the previous complete matrix or the next one — never a partially-cleared map, which is what
+     * a {@code cache.clear(); cache.putAll(refreshed)} two-step would momentarily expose (a revoked
+     * permission would read as a cache miss and fall through to the enum default, i.e. fail open).
+     */
+    private final AtomicReference<Map<RolePermissionId, Boolean>> cacheRef = new AtomicReference<>(Map.of());
 
     public PermissionService(RolePermissionRepository repository,
                              MemberRepository memberRepository,
@@ -92,16 +100,29 @@ public class PermissionService {
             return true;
         }
         RolePermissionId id = new RolePermissionId(role, permission);
-        Boolean cached = cache.get(id);
+        Map<RolePermissionId, Boolean> snapshot = cacheRef.get();
+        Boolean cached = snapshot.get(id);
         if (cached != null) {
             return cached;
         }
         return repository.findById(id)
                 .map(row -> {
-                    cache.put(id, row.isAllowed());
+                    cacheSingle(id, row.isAllowed());
                     return row.isAllowed();
                 })
                 .orElseGet(() -> permission.defaultRoles().contains(role));
+    }
+
+    /**
+     * Copy-on-write insert of a single lazily-resolved entry. Losing a concurrent insert here just
+     * costs the next caller an extra repository lookup — it can never resurrect a stale/removed
+     * permission, since {@link #replace(Map, String)} and {@link #invalidate()} both swap the whole
+     * reference afterward.
+     */
+    private void cacheSingle(RolePermissionId id, boolean allowed) {
+        Map<RolePermissionId, Boolean> next = new HashMap<>(cacheRef.get());
+        next.put(id, allowed);
+        cacheRef.set(Map.copyOf(next));
     }
 
     /**
@@ -149,7 +170,7 @@ public class PermissionService {
         Map<Member.Role, Set<Permission>> previous = currentAllowed(repository.findAll());
         LocalDateTime now = LocalDateTime.now();
         List<RolePermission> rows = new ArrayList<>();
-        ConcurrentHashMap<RolePermissionId, Boolean> refreshed = new ConcurrentHashMap<>();
+        Map<RolePermissionId, Boolean> refreshed = new HashMap<>();
 
         for (Member.Role role : EDITABLE_ROLES) {
             for (Permission permission : Permission.values()) {
@@ -177,27 +198,27 @@ public class PermissionService {
      * forces a fresh DB read for role permission checks.
      */
     public void invalidate() {
-        cache.clear();
+        cacheRef.set(Map.of());
     }
 
     /**
      * Swaps in the freshly-saved rows only after the surrounding transaction commits — if it were
      * applied eagerly and the transaction then rolled back, the cache would keep serving a matrix
      * that was never actually persisted. Outside a transaction (no active synchronization) the swap
-     * happens immediately, matching the old behaviour.
+     * happens immediately, matching the old behaviour. Either way the swap is a single
+     * {@link AtomicReference#set}, so no reader ever observes an empty or partially-refreshed map.
      */
-    private void refreshCacheAfterCommit(ConcurrentHashMap<RolePermissionId, Boolean> refreshed) {
+    private void refreshCacheAfterCommit(Map<RolePermissionId, Boolean> refreshed) {
+        Map<RolePermissionId, Boolean> snapshot = Map.copyOf(refreshed);
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    cache.clear();
-                    cache.putAll(refreshed);
+                    cacheRef.set(snapshot);
                 }
             });
         } else {
-            cache.clear();
-            cache.putAll(refreshed);
+            cacheRef.set(snapshot);
         }
     }
 
