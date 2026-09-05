@@ -60,8 +60,8 @@ public enum Permission {
     ),
     OPERATIONS_PANEL(
             "operations.panel",
-            "운영 패널 접근",
-            "운영 패널과 권한이 허용된 운영 탭에 접근할 수 있습니다.",
+            "운영 패널 메뉴 표시",
+            "운영 패널 메뉴/탭 표시 여부만 제어합니다 — 각 탭의 기능은 개별 권한으로 제어됩니다.",
             Set.of(Member.Role.OFFICER, Member.Role.VICE_PRESIDENT)
     );
 
