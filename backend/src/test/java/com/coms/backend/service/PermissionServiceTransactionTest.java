@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.Member;
 import com.coms.backend.domain.Permission;
 import com.coms.backend.domain.RolePermissionId;
+import com.coms.backend.dto.PermissionMatrixResponse;
 import com.coms.backend.repository.RolePermissionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.EnumMap;
 import java.util.EnumSet;
@@ -54,7 +56,7 @@ class PermissionServiceTransactionTest {
 
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> {
-            permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_MANAGE), "2026000001");
+            permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_MANAGE), "2026000001", null);
             throw new RuntimeException("force rollback after the write");
         })).hasMessage("force rollback after the write");
 
@@ -64,15 +66,43 @@ class PermissionServiceTransactionTest {
 
     @Test
     void committedReplaceUpdatesTheCache() {
-        permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_MANAGE), "2026000001");
+        permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_MANAGE), "2026000001", null);
 
         assertThat(permissionService.allows(Member.Role.USER, Permission.ARCHIVE_MANAGE)).isTrue();
     }
 
     @Test
+    void staleExpectedUpdatedAtIsRejectedWithConflictAndDoesNotChangeTheMatrix() {
+        permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_MANAGE), "2026000001", null);
+
+        // A second admin still holding the pre-save updatedAt (null, since the table was empty when
+        // they loaded the screen) tries to save on top of it.
+        assertThatThrownBy(() -> permissionService.replace(
+                matrixGranting(Member.Role.OFFICER, Permission.ARCHIVE_MANAGE), "2026000002", null))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(409))
+                .hasMessageContaining("다른 관리자가 먼저 저장했습니다");
+
+        assertThat(permissionService.allows(Member.Role.USER, Permission.ARCHIVE_MANAGE)).isTrue();
+        assertThat(permissionService.allows(Member.Role.OFFICER, Permission.ARCHIVE_MANAGE)).isFalse();
+    }
+
+    @Test
+    void freshExpectedUpdatedAtSucceeds() {
+        PermissionMatrixResponse first =
+                permissionService.replace(matrixGranting(Member.Role.USER, Permission.ARCHIVE_MANAGE), "2026000001", null);
+
+        PermissionMatrixResponse second = permissionService.replace(
+                matrixGranting(Member.Role.OFFICER, Permission.ARCHIVE_MANAGE), "2026000002", first.updatedAt());
+
+        assertThat(second.allowed().get("OFFICER")).contains("archive.manage");
+        assertThat(permissionService.allows(Member.Role.OFFICER, Permission.ARCHIVE_MANAGE)).isTrue();
+    }
+
+    @Test
     void deletingARowDeniesUntilSelfHealReseedsIt() {
         // ARCHIVE_MANAGE defaults to VICE_PRESIDENT only.
-        permissionService.replace(matrixGranting(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE), "2026000001");
+        permissionService.replace(matrixGranting(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE), "2026000001", null);
         assertThat(permissionService.allows(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE)).isTrue();
 
         rolePermissionRepository.deleteById(new RolePermissionId(Member.Role.VICE_PRESIDENT, Permission.ARCHIVE_MANAGE));

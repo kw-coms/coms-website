@@ -20,6 +20,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -30,10 +31,12 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.CONFLICT;
 
 @Service("perm")
 public class PermissionService {
@@ -125,8 +128,8 @@ public class PermissionService {
     /**
      * Copy-on-write insert of a single lazily-resolved entry. Losing a concurrent insert here just
      * costs the next caller an extra repository lookup — it can never resurrect a stale/removed
-     * permission, since {@link #replace(Map, String)} and {@link #invalidate()} both swap the whole
-     * reference afterward.
+     * permission, since {@link #replace(Map, String, LocalDateTime)} and {@link #invalidate()} both
+     * swap the whole reference afterward.
      */
     private void cacheSingle(RolePermissionId id, boolean allowed) {
         Map<RolePermissionId, Boolean> next = new HashMap<>(cacheRef.get());
@@ -174,10 +177,22 @@ public class PermissionService {
     }
 
     @Transactional
-    public PermissionMatrixResponse replace(Map<Member.Role, Set<Permission>> allowed, String updatedBy) {
+    public PermissionMatrixResponse replace(Map<Member.Role, Set<Permission>> allowed,
+                                            String updatedBy,
+                                            LocalDateTime expectedUpdatedAt) {
         validateReplacement(allowed);
-        Map<Member.Role, Set<Permission>> previous = currentAllowed(repository.findAll());
-        LocalDateTime now = LocalDateTime.now();
+        // Lock the rows for the duration of the transaction so two concurrent PUTs can't both read
+        // the same "current" matrix and both believe their expectedUpdatedAt still matches.
+        List<RolePermission> lockedRows = repository.findAllForUpdate();
+        LocalDateTime currentMaxUpdatedAt = maxUpdatedAt(lockedRows);
+        if (!Objects.equals(currentMaxUpdatedAt, expectedUpdatedAt)) {
+            throw new ResponseStatusException(CONFLICT, "다른 관리자가 먼저 저장했습니다. 새로 고침 후 다시 시도해주세요.");
+        }
+        Map<Member.Role, Set<Permission>> previous = currentAllowed(lockedRows);
+        // Truncated to microseconds: PostgreSQL/H2 TIMESTAMP columns round-trip at microsecond
+        // precision, so a nanosecond-precision LocalDateTime.now() would never compare equal to the
+        // value a later expectedUpdatedAt reads back from the database.
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MICROS);
         List<RolePermission> rows = new ArrayList<>();
         Map<RolePermissionId, Boolean> refreshed = new HashMap<>();
 
@@ -229,6 +244,14 @@ public class PermissionService {
         } else {
             cacheRef.set(snapshot);
         }
+    }
+
+    private LocalDateTime maxUpdatedAt(List<RolePermission> rows) {
+        return rows.stream()
+                .map(RolePermission::getUpdatedAt)
+                .filter(Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
     }
 
     /**

@@ -127,7 +127,7 @@ class PermissionServiceTest {
         int totalPairs = PermissionService.editableRoles().size() * Permission.values().length;
 
         // Seed a full matrix so the cache starts out complete.
-        service.replace(fullMatrix(false), "seed");
+        service.replace(fullMatrix(false), "seed", null);
 
         Field field = PermissionService.class.getDeclaredField("cacheRef");
         field.setAccessible(true);
@@ -146,7 +146,7 @@ class PermissionServiceTest {
         reader.start();
         try {
             for (int i = 0; i < 200; i++) {
-                service.replace(fullMatrix(i % 2 == 0), "writer");
+                service.replace(fullMatrix(i % 2 == 0), "writer", null);
             }
         } finally {
             running.set(false);
@@ -194,7 +194,7 @@ class PermissionServiceTest {
                 Member.Role.USER, Set.of(Permission.ARCHIVE_MANAGE),
                 Member.Role.OFFICER, Set.of(Permission.NOTICE_WRITE),
                 Member.Role.VICE_PRESIDENT, Set.of(Permission.ARCHIVE_MANAGE)
-        ), "2026000001");
+        ), "2026000001", null);
 
         assertThat(response.allowed().get("USER")).containsExactly("archive.manage");
         assertThat(service.has(member(Member.Role.USER), Permission.ARCHIVE_MANAGE)).isTrue();

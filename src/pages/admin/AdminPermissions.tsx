@@ -76,13 +76,25 @@ export default function AdminPermissions() {
     if (!matrix) return
     setSaving(true)
     try {
-      const saved = await updatePermissionMatrix(draft)
+      const saved = await updatePermissionMatrix(draft, matrix.updatedAt)
       setMatrix(saved)
       setDraft(saved.allowed || {})
       refreshPermissions()
       showToast({ message: '권한이 저장되었습니다.' })
     } catch (err) {
       showToast({ message: err.message || '저장 중 오류가 발생했습니다.', tone: 'error' })
+      // 409: 다른 관리자가 먼저 저장했다 — 화면이 든 매트릭스가 낡았으니 다시 불러와
+      // 새 updatedAt 기준으로 다시 시도할 수 있게 한다.
+      if (err.status === 409) {
+        try {
+          const fresh = await getPermissionMatrix()
+          setMatrix(fresh)
+          setDraft(fresh.allowed || {})
+        } catch {
+          // 재조회 실패는 무시 — 사용자는 이미 토스트로 안내받았고, 저장 버튼을 다시 누르면
+          // useEffect 를 거치지 않아도 되는 이 재조회가 다시 시도된다.
+        }
+      }
     } finally {
       setSaving(false)
     }

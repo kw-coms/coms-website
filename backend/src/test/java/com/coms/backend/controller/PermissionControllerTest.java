@@ -64,35 +64,36 @@ class PermissionControllerTest {
                 "OFFICER", List.of(),
                 "VICE_PRESIDENT", List.of(),
                 "ADMIN", List.of("club_room.view")
-        )));
+        ), null));
         assertBadRequest(new PermissionMatrixUpdateRequest(Map.of(
                 "ASSOCIATE", List.of(),
                 "USER", List.of(),
                 "OFFICER", List.of(),
                 "GUEST", List.of()
-        )));
+        ), null));
         assertBadRequest(new PermissionMatrixUpdateRequest(Map.of(
                 "ASSOCIATE", List.of(),
                 "USER", List.of(),
                 "OFFICER", List.of()
-        )));
+        ), null));
         assertBadRequest(new PermissionMatrixUpdateRequest(Map.of(
                 "ASSOCIATE", List.of(),
                 "USER", List.of("members.manage"),
                 "OFFICER", List.of(),
                 "VICE_PRESIDENT", List.of()
-        )));
-        assertBadRequest(new PermissionMatrixUpdateRequest(null));
+        ), null));
+        assertBadRequest(new PermissionMatrixUpdateRequest(null, null));
     }
 
     @Test
     void replaceAcceptsExactlyFourEditableRolesAndReturnsRefreshedMatrix() {
+        LocalDateTime expectedUpdatedAt = LocalDateTime.of(2026, 9, 1, 9, 0);
         PermissionMatrixUpdateRequest request = new PermissionMatrixUpdateRequest(Map.of(
                 "ASSOCIATE", List.of(),
                 "USER", List.of("club_room.view"),
                 "OFFICER", List.of("notice.write"),
                 "VICE_PRESIDENT", List.of("archive.manage")
-        ));
+        ), expectedUpdatedAt);
         PermissionMatrixResponse refreshed = new PermissionMatrixResponse(
                 List.of("ASSOCIATE", "USER", "OFFICER", "VICE_PRESIDENT"),
                 List.of(),
@@ -105,7 +106,7 @@ class PermissionControllerTest {
                 Member.Role.USER, Set.of(Permission.CLUB_ROOM_VIEW),
                 Member.Role.OFFICER, Set.of(Permission.NOTICE_WRITE),
                 Member.Role.VICE_PRESIDENT, Set.of(Permission.ARCHIVE_MANAGE)
-        )), eq("2026000001"))).thenReturn(refreshed);
+        )), eq("2026000001"), eq(expectedUpdatedAt))).thenReturn(refreshed);
 
         var response = controller.replace(request, new TestingAuthenticationToken("2026000001", "password")).getBody();
 
@@ -115,7 +116,7 @@ class PermissionControllerTest {
                 Member.Role.USER, Set.of(Permission.CLUB_ROOM_VIEW),
                 Member.Role.OFFICER, Set.of(Permission.NOTICE_WRITE),
                 Member.Role.VICE_PRESIDENT, Set.of(Permission.ARCHIVE_MANAGE)
-        )), eq("2026000001"));
+        )), eq("2026000001"), eq(expectedUpdatedAt));
     }
 
     private void assertBadRequest(PermissionMatrixUpdateRequest request) {

@@ -54,7 +54,8 @@ public class PermissionController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<PermissionMatrixResponse> replace(@RequestBody PermissionMatrixUpdateRequest request,
                                                             Authentication authentication) {
-        return ResponseEntity.ok(permissionService.replace(parse(request), authentication.getName()));
+        return ResponseEntity.ok(permissionService.replace(
+                parse(request), authentication.getName(), request.expectedUpdatedAt()));
     }
 
     private Map<Member.Role, Set<Permission>> parse(PermissionMatrixUpdateRequest request) {

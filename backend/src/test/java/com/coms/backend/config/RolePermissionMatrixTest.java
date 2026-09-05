@@ -240,6 +240,45 @@ class RolePermissionMatrixTest {
     }
 
     @Test
+    void staleExpectedUpdatedAtIsRejectedWithConflictAndLeavesTheMatrixUnchanged() throws Exception {
+        String staleUpdatedAt = currentMatrixUpdatedAt();
+        // 다른 관리자가 먼저 저장해서 매트릭스의 updatedAt 이 이미 넘어간 상황을 흉내낸다.
+        putMatrix(defaults());
+        String beforeConflict = mockMvc.perform(get("/api/admin/permissions").cookie(cookies.get(Member.Role.ADMIN)))
+                .andReturn().getResponse().getContentAsString();
+
+        Map<String, Object> staleBody = new LinkedHashMap<>();
+        staleBody.put("allowed", matrixBody(defaults()));
+        staleBody.put("expectedUpdatedAt", staleUpdatedAt);
+
+        mockMvc.perform(put("/api/admin/permissions")
+                        .cookie(cookies.get(Member.Role.ADMIN))
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(staleBody)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("다른 관리자가 먼저 저장했습니다. 새로 고침 후 다시 시도해주세요."));
+
+        String afterConflict = mockMvc.perform(get("/api/admin/permissions").cookie(cookies.get(Member.Role.ADMIN)))
+                .andReturn().getResponse().getContentAsString();
+        assertThat(afterConflict).isEqualTo(beforeConflict);
+    }
+
+    @Test
+    void freshExpectedUpdatedAtSucceeds() throws Exception {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("allowed", matrixBody(defaults()));
+        body.put("expectedUpdatedAt", currentMatrixUpdatedAt());
+
+        mockMvc.perform(put("/api/admin/permissions")
+                        .cookie(cookies.get(Member.Role.ADMIN))
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void onlyPresidentCanReadOrWriteTheMatrix() throws Exception {
         for (Member.Role role : PermissionService.editableRoles()) {
             mockMvc.perform(get("/api/admin/permissions").cookie(cookies.get(role)))
@@ -292,12 +331,27 @@ class RolePermissionMatrixTest {
     }
 
     private void putMatrix(Map<Member.Role, Set<Permission>> allowed) throws Exception {
+        // expectedUpdatedAt is now required for the optimistic-concurrency check in
+        // PermissionService.replace() — read the matrix's current updatedAt right before writing
+        // so this helper keeps working across the many sequential saves each test makes (the H2
+        // instance is shared across test methods, so "current" keeps moving forward).
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("allowed", matrixBody(allowed));
+        body.put("expectedUpdatedAt", currentMatrixUpdatedAt());
         mockMvc.perform(put("/api/admin/permissions")
                         .cookie(cookies.get(Member.Role.ADMIN))
                         .header("Origin", ORIGIN)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of("allowed", matrixBody(allowed)))))
+                        .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isOk());
+    }
+
+    private String currentMatrixUpdatedAt() throws Exception {
+        String json = mockMvc.perform(get("/api/admin/permissions").cookie(cookies.get(Member.Role.ADMIN)))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(json).path("updatedAt").asText(null);
     }
 
     private Member member(String studentId, Member.Role role) {
