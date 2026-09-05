@@ -11,10 +11,15 @@ import com.coms.backend.repository.RolePermissionRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 
+import java.lang.reflect.Field;
 import java.time.LocalDateTime;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -66,6 +71,51 @@ class PermissionServiceTest {
 
         assertThat(service.has(member(Member.Role.OFFICER), Permission.NOTICE_WRITE)).isTrue();
         assertThat(service.has(member(Member.Role.USER), Permission.NOTICE_WRITE)).isFalse();
+    }
+
+    @Test
+    void cacheSwapIsAtomicNoReaderEverObservesAnEmptyOrPartialSnapshot() throws Exception {
+        when(repository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        int totalPairs = PermissionService.editableRoles().size() * Permission.values().length;
+
+        // Seed a full matrix so the cache starts out complete.
+        service.replace(fullMatrix(false), "seed");
+
+        Field field = PermissionService.class.getDeclaredField("cacheRef");
+        field.setAccessible(true);
+        AtomicReference<?> cacheRef = (AtomicReference<?>) field.get(service);
+
+        AtomicBoolean sawEmptyOrPartial = new AtomicBoolean(false);
+        AtomicBoolean running = new AtomicBoolean(true);
+        Thread reader = new Thread(() -> {
+            while (running.get()) {
+                Map<?, ?> snapshot = (Map<?, ?>) cacheRef.get();
+                if (snapshot.size() != totalPairs) {
+                    sawEmptyOrPartial.set(true);
+                }
+            }
+        });
+        reader.start();
+        try {
+            for (int i = 0; i < 200; i++) {
+                service.replace(fullMatrix(i % 2 == 0), "writer");
+            }
+        } finally {
+            running.set(false);
+            reader.join();
+        }
+
+        assertThat(sawEmptyOrPartial.get())
+                .as("a concurrent reader must never see an empty or partially-refreshed cache snapshot")
+                .isFalse();
+    }
+
+    private Map<Member.Role, Set<Permission>> fullMatrix(boolean allowed) {
+        EnumMap<Member.Role, Set<Permission>> matrix = new EnumMap<>(Member.Role.class);
+        for (Member.Role role : PermissionService.editableRoles()) {
+            matrix.put(role, allowed ? EnumSet.allOf(Permission.class) : EnumSet.noneOf(Permission.class));
+        }
+        return matrix;
     }
 
     @Test
