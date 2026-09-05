@@ -131,29 +131,29 @@ export default function AdminPermissions() {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse text-sm">
+        <table className="w-full table-fixed border-collapse text-sm">
           <thead>
             <tr className="border-b border-[var(--app-hairline)] text-left">
-              <th scope="col" className="py-2 pr-3 font-bold text-[var(--theme-body-dark)]">권한</th>
+              <th scope="col" className="py-2 pr-2 font-bold text-[var(--theme-body-dark)]">권한</th>
               {matrix.roles.map((role) => (
-                <th key={role} scope="col" className="px-2 py-2 text-center font-bold text-[var(--theme-body-dark)]">
+                <th key={role} scope="col" className="w-11 px-0.5 py-2 text-center text-[11px] font-bold leading-tight text-[var(--theme-body-dark)] sm:w-14 sm:text-xs">
                   {ROLE_LABELS[role] || role}
                 </th>
               ))}
-              <th scope="col" className="px-2 py-2 text-center font-bold text-[var(--theme-body-muted)]">회장</th>
+              <th scope="col" className="w-11 px-0.5 py-2 text-center text-[11px] font-bold leading-tight text-[var(--theme-body-muted)] sm:w-14 sm:text-xs">회장</th>
             </tr>
           </thead>
           <tbody>
             {matrix.permissions.map((permission) => (
               <tr key={permission.key} className="border-b border-[var(--app-hairline)] align-top">
-                <th scope="row" className="py-3 pr-3 text-left font-semibold text-[var(--theme-body-dark)]">
+                <th scope="row" className="py-3 pr-2 text-left font-semibold break-keep text-[var(--theme-body-dark)]">
                   {permission.label}
                   <span className="mt-0.5 block text-xs font-normal text-[var(--theme-body-muted)]">
                     {permission.description}
                   </span>
                 </th>
                 {matrix.roles.map((role) => (
-                  <td key={role} className="px-2 py-3 text-center">
+                  <td key={role} className="px-0.5 py-3 text-center">
                     <input
                       type="checkbox"
                       className="h-4 w-4 accent-[var(--app-accent)]"
@@ -164,7 +164,7 @@ export default function AdminPermissions() {
                     />
                   </td>
                 ))}
-                <td className="px-2 py-3 text-center">
+                <td className="px-0.5 py-3 text-center">
                   <input
                     type="checkbox"
                     className="h-4 w-4 accent-[var(--app-accent)]"
