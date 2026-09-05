@@ -17,7 +17,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.EnumMap;
 import java.util.EnumSet;
@@ -48,7 +47,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.datasource.url=jdbc:h2:mem:role-permission-matrix-test;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1"
 })
 @AutoConfigureMockMvc
-@Transactional
+// No class-level @Transactional: PermissionService.replace() now swaps its cache via an
+// afterCommit synchronization, which only fires once the request's own transaction actually
+// commits. Spring's test-managed transaction never commits (it rolls back at the end of each
+// test), so wrapping every mockMvc call in one would silently stop putMatrix() from taking
+// effect. Each request already runs its own real, committing transaction; setUp() resets both
+// the DB rows and the singleton cache to a known matrix before every test.
 class RolePermissionMatrixTest {
 
     private static final String ORIGIN = "https://coms.kw.ac.kr";

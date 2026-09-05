@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -65,6 +66,22 @@ class PermissionServiceTest {
 
         assertThat(service.has(member(Member.Role.OFFICER), Permission.NOTICE_WRITE)).isTrue();
         assertThat(service.has(member(Member.Role.USER), Permission.NOTICE_WRITE)).isFalse();
+    }
+
+    @Test
+    void invalidateForcesARepositoryReReadOnTheNextCheck() {
+        RolePermissionId id = new RolePermissionId(Member.Role.USER, Permission.ARCHIVE_MANAGE);
+        when(repository.findById(id))
+                .thenReturn(Optional.of(row(Member.Role.USER, Permission.ARCHIVE_MANAGE, true, "admin")));
+
+        assertThat(service.allows(Member.Role.USER, Permission.ARCHIVE_MANAGE)).isTrue();
+        assertThat(service.allows(Member.Role.USER, Permission.ARCHIVE_MANAGE)).isTrue();
+        verify(repository, times(1)).findById(id);
+
+        service.invalidate();
+
+        assertThat(service.allows(Member.Role.USER, Permission.ARCHIVE_MANAGE)).isTrue();
+        verify(repository, times(2)).findById(id);
     }
 
     @Test
