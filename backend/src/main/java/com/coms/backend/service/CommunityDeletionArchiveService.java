@@ -11,6 +11,7 @@ import com.coms.backend.domain.DeletedCommunityPostComment;
 import com.coms.backend.domain.DeletedCommunityPostImage;
 import com.coms.backend.domain.DeletedCommunityPostMedia;
 import com.coms.backend.domain.Member;
+import com.coms.backend.domain.Permission;
 import com.coms.backend.dto.DeletedCommunityPostAppealRequest;
 import com.coms.backend.dto.DeletedCommunityPostAppealResponse;
 import com.coms.backend.dto.DeletedCommunityPostResponse;
@@ -66,6 +67,7 @@ public class CommunityDeletionArchiveService {
     private final StorageService storageService;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
+    private final PermissionService permissionService;
 
     public CommunityDeletionArchiveService(DeletedCommunityPostRepository repository,
                                            DeletedCommunityPostImageRepository deletedImageRepository,
@@ -80,7 +82,8 @@ public class CommunityDeletionArchiveService {
                                            MemberRepository memberRepository,
                                            StorageService storageService,
                                            AuditLogService auditLogService,
-                                           NotificationService notificationService) {
+                                           NotificationService notificationService,
+                                           PermissionService permissionService) {
         this.repository = repository;
         this.deletedImageRepository = deletedImageRepository;
         this.deletedMediaRepository = deletedMediaRepository;
@@ -95,6 +98,7 @@ public class CommunityDeletionArchiveService {
         this.storageService = storageService;
         this.auditLogService = auditLogService;
         this.notificationService = notificationService;
+        this.permissionService = permissionService;
     }
 
     public DeletedCommunityPost record(CommunityPost post, Member deletedBy, String reason) {
@@ -200,7 +204,7 @@ public class CommunityDeletionArchiveService {
     }
 
     @Transactional(readOnly = true)
-    @PreAuthorize("hasRole('VICE_PRESIDENT')")
+    @PreAuthorize("@perm.has(authentication,'COMMUNITY_MODERATE')")
     public DeletedCommunityPostImage loadImageMeta(Long deletedPostId, Long imageId) {
         return deletedImageRepository.findById(imageId)
                 .filter(image -> image.getDeletedPostId().equals(deletedPostId))
@@ -220,14 +224,14 @@ public class CommunityDeletionArchiveService {
     }
 
     @Transactional(readOnly = true)
-    @PreAuthorize("hasRole('VICE_PRESIDENT')")
+    @PreAuthorize("@perm.has(authentication,'COMMUNITY_MODERATE')")
     public Resource loadImage(Long deletedPostId, Long imageId) {
         DeletedCommunityPostImage image = loadImageMeta(deletedPostId, imageId);
         return storageService.load(image.getStoredName());
     }
 
     @Transactional(readOnly = true)
-    @PreAuthorize("hasRole('VICE_PRESIDENT')")
+    @PreAuthorize("@perm.has(authentication,'COMMUNITY_MODERATE')")
     public DeletedCommunityPostMedia loadMediaMeta(Long deletedPostId, Long mediaId) {
         return deletedMediaRepository.findById(mediaId)
                 .filter(media -> media.getDeletedPostId().equals(deletedPostId))
@@ -247,7 +251,7 @@ public class CommunityDeletionArchiveService {
     }
 
     @Transactional(readOnly = true)
-    @PreAuthorize("hasRole('VICE_PRESIDENT')")
+    @PreAuthorize("@perm.has(authentication,'COMMUNITY_MODERATE')")
     public Resource loadMedia(Long deletedPostId, Long mediaId) {
         DeletedCommunityPostMedia media = loadMediaMeta(deletedPostId, mediaId);
         return storageService.load(media.getStoredName());
@@ -257,7 +261,7 @@ public class CommunityDeletionArchiveService {
     public DeletedCommunityPostRestoreResponse restore(Long deletedPostId, String adminStudentId) {
         Member admin = memberRepository.findByStudentId(adminStudentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        if (!admin.getRole().isAtLeast(Member.Role.VICE_PRESIDENT)) {
+        if (!permissionService.has(admin, Permission.COMMUNITY_MODERATE)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         DeletedCommunityPost snapshot = repository.findById(deletedPostId)

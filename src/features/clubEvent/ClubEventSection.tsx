@@ -19,10 +19,12 @@ import { CLUB_EVENT_RSVP_OPTIONS, toEventDateTime } from './clubEventUtils'
 import { useClubEventEntryForm } from './useClubEventEntryForm'
 import { useClubEvents } from './useClubEvents'
 import { canManageContent } from '../../utils/roleAccess'
+import { usePermissions } from '../../contexts/usePermissions'
 
 function ClubEventSection() {
   const navigate = useNavigate()
   const { user, authLoading, events, loading, loadError, prependEvent, mergeEvent, removeEvent } = useClubEvents('이벤트를 불러오지 못했습니다.')
+  const { permissions } = usePermissions()
   const [mode, setMode] = useState('list')
   const [selectedEventId, setSelectedEventId] = useState(null)
   const [selectedSnapshot, setSelectedSnapshot] = useState(null)
@@ -56,7 +58,7 @@ function ClubEventSection() {
     ? null
     : eventItems.find((item) => item.id === selectedEventId) || selectedSnapshot
   const isLocked = !authLoading && !user
-  const isAdmin = canManageContent(user?.role)
+  const isAdmin = canManageContent(permissions)
   const visibleError = error || loadError
 
   const resetEventForm = () => {

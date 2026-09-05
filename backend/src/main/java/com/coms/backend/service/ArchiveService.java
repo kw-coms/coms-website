@@ -10,6 +10,7 @@ import com.coms.backend.repository.MemberRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -94,11 +95,13 @@ public class ArchiveService {
     }
 
     /**
-     * Moderator-only (부회장 이상, enforced by the PATCH /api/files/** rule in
-     * SecurityConfig): override the displayed 작성자 of an archive entry.
+     * archive.manage-gated (defaults to 부회장 이상; enforced here as a second lock behind
+     * ArchiveController's own @PreAuthorize — the /api/files/** URL rule in SecurityConfig only
+     * requires a logged-in member): override the displayed 작성자 of an archive entry.
      * uploaderName is a free-text display snapshot with no FK, so this is a
      * plain column update; uploadedBy (the owning account) never changes.
      */
+    @PreAuthorize("@perm.has(authentication,'ARCHIVE_MANAGE')")
     public ArchiveFileResponse updateAuthor(Long id, String uploaderName, String editorStudentId) {
         ArchiveFile entity = repo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -176,6 +179,9 @@ public class ArchiveService {
         return toResponse(file, voteStats(List.of(file)), studentId);
     }
 
+    // archive.manage-gated — second lock behind ArchiveController's own @PreAuthorize; the
+    // /api/files/** URL rule in SecurityConfig only requires a logged-in member.
+    @PreAuthorize("@perm.has(authentication,'ARCHIVE_MANAGE')")
     public void delete(Long id) {
         ArchiveFile file = get(id);
         storage.delete(file.getStoredName());

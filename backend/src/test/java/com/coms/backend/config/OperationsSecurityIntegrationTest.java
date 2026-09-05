@@ -29,6 +29,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class OperationsSecurityIntegrationTest {
 
     private static final String ORIGIN = "https://coms.kw.ac.kr";
+    private static final String NOTICE_BODY = """
+            {"title":"공지","content":"내용","pinned":false,"category":"GENERAL"}
+            """;
 
     @Autowired
     private MockMvc mockMvc;
@@ -97,12 +100,44 @@ class OperationsSecurityIntegrationTest {
 
     @Test
     void regularMemberCannotPublishNotice() throws Exception {
+        // 본문은 유효해야 한다 — URL 규칙이 authenticated() 로 내려간 뒤로는 검증이
+        // @perm.has 보다 먼저 돌기 때문에, 빈 본문이면 403 이 아니라 400 이 난다.
         mockMvc.perform(post("/api/notices")
                         .cookie(userCookie)
                         .header("Origin", ORIGIN)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
+                        .content(NOTICE_BODY))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void loweredUrlRulesStillRejectAnonymousRequests() throws Exception {
+        // 권한 매트릭스로 옮긴 경로들의 URL 규칙을 authenticated() 로 낮췄다 —
+        // 로그인하지 않은 요청은 여전히 전부 막혀야 한다.
+        mockMvc.perform(get("/api/club-room"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/notices")
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(NOTICE_BODY))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/admin/site-settings"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/admin/community/deleted-posts"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void sensitiveAdminBoundaryStaysPresidentOnlyForOfficersAndVicePresidents() throws Exception {
+        // 매트릭스로 열 수 없는 경계 — 회원 관리/명부/모집/폰트/감사로그.
+        for (Cookie cookie : new Cookie[]{officerCookie, vicePresidentCookie}) {
+            mockMvc.perform(get("/api/admin/members").cookie(cookie))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(get("/api/admin/audit-logs").cookie(cookie))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(get("/api/admin/permissions").cookie(cookie))
+                    .andExpect(status().isForbidden());
+        }
     }
 
     @Test
