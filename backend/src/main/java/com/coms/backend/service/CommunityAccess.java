@@ -2,6 +2,7 @@ package com.coms.backend.service;
 
 import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.domain.Member;
+import com.coms.backend.domain.Permission;
 import com.coms.backend.repository.MemberRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -22,9 +23,11 @@ class CommunityAccess {
     private static final Pattern TEN_DIGIT_STUDENT_ID = Pattern.compile("\\d{10}");
 
     private final MemberRepository memberRepository;
+    private final PermissionService permissionService;
 
-    CommunityAccess(MemberRepository memberRepository) {
+    CommunityAccess(MemberRepository memberRepository, PermissionService permissionService) {
         this.memberRepository = memberRepository;
+        this.permissionService = permissionService;
     }
 
     Member requireMember(String studentId) {
@@ -42,16 +45,17 @@ class CommunityAccess {
     }
 
     /**
-     * 부회장(VICE_PRESIDENT) 이상 = community moderator: may view/moderate the
+     * community.moderate 권한 보유자 = community moderator: may view/moderate the
      * anonymous board, edit/delete others' posts and comments, and see
-     * unmasked authors. 회장(ADMIN) inherits via Role.isAtLeast.
+     * unmasked authors. 기본값은 부회장(VICE_PRESIDENT)이지만 회장이 권한
+     * 매트릭스에서 조정할 수 있고, 회장(ADMIN)은 언제나 통과한다.
      */
     boolean isModerator(Member member) {
-        return member.getRole().isAtLeast(Member.Role.VICE_PRESIDENT);
+        return permissionService.has(member, Permission.COMMUNITY_MODERATE);
     }
 
     boolean canView(Member member, CommunityPost post) {
-        return !isAnonymous(post) || isModerator(member) || !isGraduate(member);
+        return !isAnonymous(post) || canSeeAnonymous(member);
     }
 
     void requireVisible(Member member, CommunityPost post) {
@@ -61,7 +65,7 @@ class CommunityAccess {
     }
 
     void requireCategoryAllowed(Member member, CommunityPost.Category category) {
-        if (category == CommunityPost.Category.ANONYMOUS && !isModerator(member) && isGraduate(member)) {
+        if (category == CommunityPost.Category.ANONYMOUS && !canSeeAnonymous(member)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid community category.");
         }
     }
@@ -82,7 +86,12 @@ class CommunityAccess {
         return admissionYear <= Year.now().getValue() - GRADUATE_AFTER_YEARS;
     }
 
+    /**
+     * 익명게시판 열람/작성: community.anonymous_board 권한 + 졸업생 제외 규칙.
+     * 중재 권한 보유자는 졸업 여부와 무관하게 통과한다(신고 처리를 위해).
+     */
     boolean canSeeAnonymous(Member member) {
-        return isModerator(member) || !isGraduate(member);
+        return isModerator(member)
+                || (permissionService.has(member, Permission.COMMUNITY_ANONYMOUS_BOARD) && !isGraduate(member));
     }
 }

@@ -33,6 +33,7 @@ import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import com.coms.backend.web.ListPagination;
 import org.springframework.web.multipart.MultipartFile;
@@ -260,6 +261,7 @@ public class CommunityController {
         return ResponseEntity.ok(communityService.updateAuthor(authentication.getName(), id, request.studentId(), request.name()));
     }
 
+    @PreAuthorize("@perm.has(authentication,'COMMUNITY_MODERATE')")
     @PatchMapping("/{id}/pin")
     public ResponseEntity<CommunityPostResponse> pin(Authentication authentication,
                                                      @PathVariable Long id,

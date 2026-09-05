@@ -44,7 +44,7 @@ public class ClubProjectController {
         return ResponseEntity.ok(projectService.list());
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'PROJECT_WRITE')")
     @PostMapping
     public ResponseEntity<ClubProjectResponse> create(
             @RequestParam("category") String category,
@@ -61,7 +61,7 @@ public class ClubProjectController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'PROJECT_WRITE')")
     @PatchMapping("/{id}")
     public ResponseEntity<ClubProjectResponse> update(
             @PathVariable Long id,
@@ -79,7 +79,7 @@ public class ClubProjectController {
         return ResponseEntity.ok(response);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'PROJECT_WRITE')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id, Authentication authentication) {
         com.coms.backend.domain.ClubProject project = projectService.get(id);
@@ -89,7 +89,7 @@ public class ClubProjectController {
         return ResponseEntity.noContent().build();
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'PROJECT_WRITE')")
     @PostMapping(path = "/{id}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Long> uploadFile(@PathVariable Long id,
                                            @RequestParam("file") MultipartFile file,
@@ -115,7 +115,7 @@ public class ClubProjectController {
                 .body(resource);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'PROJECT_WRITE')")
     @DeleteMapping("/{id}/files/{fileId}")
     public ResponseEntity<Void> deleteFile(@PathVariable Long id, @PathVariable Long fileId, Authentication authentication) {
         projectService.deleteFile(id, fileId);

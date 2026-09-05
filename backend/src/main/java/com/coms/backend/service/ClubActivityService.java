@@ -119,7 +119,7 @@ public class ClubActivityService {
         return toResponse(activity, studentId);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     public ClubActivityResponse create(String kind,
                                        String category,
                                        String title,
@@ -130,7 +130,7 @@ public class ClubActivityService {
         return create(kind, category, title, description, eventDate, eventDate, null, null, image, creatorStudentId);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     public ClubActivityResponse create(String kind,
                                        String category,
                                        String title,
@@ -144,7 +144,7 @@ public class ClubActivityService {
         return create(kind, category, title, description, eventDate, endDate, startTime, endTime, null, image, creatorStudentId);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     public ClubActivityResponse create(String kind,
                                        String category,
                                        String title,
@@ -218,7 +218,7 @@ public class ClubActivityService {
         }
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     public ClubActivityResponse update(Long id,
                                        String kind,
                                        String category,
@@ -229,7 +229,7 @@ public class ClubActivityService {
         return update(id, kind, category, title, description, eventDate, null, null, null, editorStudentId);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     public ClubActivityResponse update(Long id,
                                        String kind,
                                        String category,
@@ -243,7 +243,7 @@ public class ClubActivityService {
         return update(id, kind, category, title, description, eventDate, endDate, startTime, endTime, null, editorStudentId);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     public ClubActivityResponse update(Long id,
                                        String kind,
                                        String category,
@@ -297,7 +297,7 @@ public class ClubActivityService {
         return toResponse(saved, editorStudentId);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     public List<Long> addImages(Long id, List<MultipartFile> images) {
         if (images == null || images.isEmpty()) return List.of();
         ClubActivity activity = get(id);
@@ -326,7 +326,7 @@ public class ClubActivityService {
         return createdIds;
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     public void deleteImage(Long id, Long imageId) {
         ClubActivityImage image = imageRepository.findById(imageId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -337,7 +337,7 @@ public class ClubActivityService {
         imageRepository.delete(image);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     public Long addFile(Long id, MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부할 파일을 선택하세요.");
@@ -362,7 +362,7 @@ public class ClubActivityService {
         }
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     public void deleteFile(Long id, Long fileId) {
         ClubActivityFile file = fileRepository.findById(fileId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -409,7 +409,7 @@ public class ClubActivityService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','OFFICER')")
+    @PreAuthorize("@perm.has(authentication,'ACTIVITY_WRITE')")
     public void delete(Long id) {
         ClubActivity activity = get(id);
         for (ClubActivityImage image : imageRepository.findByClubActivityIdOrderByPositionAsc(id)) {

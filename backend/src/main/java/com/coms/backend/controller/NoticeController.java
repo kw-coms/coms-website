@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -68,12 +69,14 @@ public class NoticeController {
         return authentication == null ? null : authentication.getName();
     }
 
+    @PreAuthorize("@perm.has(authentication,'NOTICE_WRITE')")
     @PostMapping
     public ResponseEntity<NoticeResponse> create(Authentication authentication,
                                                  @Valid @RequestBody NoticeRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(noticeService.create(authentication.getName(), request));
     }
 
+    @PreAuthorize("@perm.has(authentication,'NOTICE_WRITE')")
     @PutMapping("/{id}")
     public ResponseEntity<NoticeResponse> update(Authentication authentication,
                                                  @PathVariable Long id,
@@ -81,6 +84,7 @@ public class NoticeController {
         return ResponseEntity.ok(noticeService.update(authentication.getName(), id, request));
     }
 
+    @PreAuthorize("@perm.has(authentication,'NOTICE_WRITE')")
     @PatchMapping("/{id}/pin")
     public ResponseEntity<NoticeResponse> pin(Authentication authentication,
                                               @PathVariable Long id,
@@ -96,6 +100,7 @@ public class NoticeController {
         return ResponseEntity.ok(noticeService.updateAuthor(authentication.getName(), id, request.name()));
     }
 
+    @PreAuthorize("@perm.has(authentication,'NOTICE_WRITE')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(Authentication authentication, @PathVariable Long id) {
         noticeService.delete(authentication.getName(), id);

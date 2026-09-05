@@ -222,19 +222,19 @@ public class AdminController {
         return ResponseEntity.ok(auditLogService.recent(limit));
     }
 
-    @PreAuthorize("hasRole('VICE_PRESIDENT')")
+    @PreAuthorize("@perm.has(authentication,'COMMUNITY_MODERATE')")
     @GetMapping("/community/deleted-posts")
     public ResponseEntity<List<DeletedCommunityPostResponse>> deletedCommunityPosts(@RequestParam(defaultValue = "300") int limit) {
         return ResponseEntity.ok(communityDeletionArchiveService.recent(limit));
     }
 
-    @PreAuthorize("hasRole('VICE_PRESIDENT')")
+    @PreAuthorize("@perm.has(authentication,'COMMUNITY_MODERATE')")
     @GetMapping("/community/deleted-posts/{id}")
     public ResponseEntity<DeletedCommunityPostResponse> deletedCommunityPost(@PathVariable Long id) {
         return ResponseEntity.ok(communityDeletionArchiveService.detail(id));
     }
 
-    @PreAuthorize("hasRole('VICE_PRESIDENT')")
+    @PreAuthorize("@perm.has(authentication,'COMMUNITY_MODERATE')")
     @GetMapping("/community/deleted-posts/{id}/images/{imageId}")
     public ResponseEntity<Resource> deletedCommunityPostImage(@PathVariable Long id, @PathVariable Long imageId) {
         DeletedCommunityPostImage meta = communityDeletionArchiveService.loadImageMeta(id, imageId);
@@ -247,7 +247,7 @@ public class AdminController {
                 .body(resource);
     }
 
-    @PreAuthorize("hasRole('VICE_PRESIDENT')")
+    @PreAuthorize("@perm.has(authentication,'COMMUNITY_MODERATE')")
     @GetMapping("/community/deleted-posts/{id}/media/{mediaId}")
     public ResponseEntity<Resource> deletedCommunityPostMedia(@PathVariable Long id, @PathVariable Long mediaId) {
         DeletedCommunityPostMedia meta = communityDeletionArchiveService.loadMediaMeta(id, mediaId);
@@ -262,7 +262,7 @@ public class AdminController {
                 .body(resource);
     }
 
-    @PreAuthorize("hasRole('VICE_PRESIDENT')")
+    @PreAuthorize("@perm.has(authentication,'COMMUNITY_MODERATE')")
     @PostMapping("/community/deleted-posts/{id}/restore")
     public ResponseEntity<DeletedCommunityPostRestoreResponse> restoreDeletedCommunityPost(Authentication authentication,
                                                                                           @PathVariable Long id) {
