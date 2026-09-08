@@ -10,6 +10,8 @@ import com.coms.backend.dto.UpdateProfileRequest;
 import com.coms.backend.repository.LoginFailureRepository;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.security.JwtTokenProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -35,6 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Transactional
 public class AuthService implements UserDetailsService {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final int EMAIL_VERIFICATION_EXPIRES_MINUTES = 10;
     private static final int EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES = 1;
@@ -194,6 +197,12 @@ public class AuthService implements UserDetailsService {
         long identifierFailures = identifier == null ? 0 : loginFailureRepository.countByStudentIdAndAttemptedAtAfter(identifier, windowStart);
         long ipFailures = normalizeNullable(clientIp) == null ? 0 : loginFailureRepository.countByIpAndAttemptedAtAfter(clientIp, windowStart);
         if (identifierFailures >= MAX_FAILURES_PER_ID || ipFailures >= MAX_FAILURES_PER_IP) {
+            if (identifierFailures >= MAX_FAILURES_PER_ID) {
+                log.warn("Rate limit rejected: limiter=login-lockout-identifier key={}", maskAccountKey(identifier));
+            }
+            if (ipFailures >= MAX_FAILURES_PER_IP) {
+                log.warn("Rate limit rejected: limiter=login-lockout-ip key={}", maskIp(clientIp));
+            }
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "로그인 시도 횟수가 초과되었습니다. " + LOCKOUT_WINDOW_MINUTES + "분 후 다시 시도해주세요.");
         }
@@ -427,16 +436,16 @@ public class AuthService implements UserDetailsService {
     }
 
     private void enforceSignupEmailRateLimit(String clientIp) {
-        enforceIpRateLimit(signupEmailAttemptsByClient, clientIp,
+        enforceIpRateLimit(signupEmailAttemptsByClient, "signup-email", clientIp,
                 MAX_SIGNUP_EMAIL_REQUESTS_PER_WINDOW, SIGNUP_EMAIL_REQUEST_WINDOW);
     }
 
     private void enforceSignupRateLimit(String clientIp) {
-        enforceIpRateLimit(signupAttemptsByClient, clientIp, MAX_SIGNUPS_PER_WINDOW, SIGNUP_WINDOW);
+        enforceIpRateLimit(signupAttemptsByClient, "signup", clientIp, MAX_SIGNUPS_PER_WINDOW, SIGNUP_WINDOW);
     }
 
     /** Sliding-window per-IP limiter shared by the unauthenticated signup paths. */
-    private static void enforceIpRateLimit(Map<String, Deque<LocalDateTime>> attemptsByClient,
+    private static void enforceIpRateLimit(Map<String, Deque<LocalDateTime>> attemptsByClient, String limiterName,
                                            String clientIp, int maxPerWindow, Duration window) {
         String key = clientIp == null || clientIp.isBlank() ? "unknown" : clientIp;
         LocalDateTime now = LocalDateTime.now();
@@ -447,6 +456,7 @@ public class AuthService implements UserDetailsService {
                 attempts.removeFirst();
             }
             if (attempts.size() >= maxPerWindow) {
+                log.warn("Rate limit rejected: limiter={} key={}", limiterName, maskIp(key));
                 throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 시도해주세요.");
             }
             attempts.addLast(now);
@@ -560,6 +570,8 @@ public class AuthService implements UserDetailsService {
         LocalDateTime cooldownBoundary = LocalDateTime.now()
                 .plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES - EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES);
         if (expiresAt.isAfter(cooldownBoundary)) {
+            log.warn("Rate limit rejected: limiter=email-verification-cooldown key={}",
+                    maskAccountKey(member.getStudentId()));
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "이메일 인증코드는 1분 후 다시 요청할 수 있습니다.");
         }
     }
@@ -590,6 +602,27 @@ public class AuthService implements UserDetailsService {
 
     private String newSixDigitCode() {
         return String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+    }
+
+    /** Masks an IPv4 client key for rate-limit logs (e.g. 203.0.x.x); never logs raw IPv6/unknown values. */
+    private static String maskIp(String ip) {
+        if (ip == null || ip.isBlank()) {
+            return "unknown";
+        }
+        String[] octets = ip.split("\\.");
+        if (octets.length == 4) {
+            return octets[0] + "." + octets[1] + ".x.x";
+        }
+        return "masked";
+    }
+
+    /** Masks a studentId/identifier client key for rate-limit logs (e.g. 2026***). */
+    private static String maskAccountKey(String key) {
+        if (key == null || key.isBlank()) {
+            return "unknown";
+        }
+        String trimmed = key.trim();
+        return trimmed.substring(0, Math.min(4, trimmed.length())) + "***";
     }
 
     private String normalizeNullable(String value) {
