@@ -49,9 +49,13 @@ public class AuthService implements UserDetailsService {
     private static final int MAX_FAILURES_PER_IP = 5;
     private static final int LOCKOUT_WINDOW_MINUTES = 15;
     private static final int GRADUATE_AFTER_YEARS = 7;
-    private static final int MAX_SIGNUP_EMAIL_REQUESTS_PER_WINDOW = 5;
+    // Raised from 5 -> 20 per 10 min per IP: campus Wi-Fi and the club room sit behind one NAT
+    // IP, so a handful of members requesting codes together tripped this well before any single
+    // person hit the per-account 1-minute cooldown below. The per-account cooldown is the real
+    // spam guard; this cap only stops one IP from mass-requesting codes for many accounts.
+    private static final int MAX_SIGNUP_EMAIL_REQUESTS_PER_WINDOW = 20;
     private static final Duration SIGNUP_EMAIL_REQUEST_WINDOW = Duration.ofMinutes(10);
-    // 30/h matches the signup-email step above (5 per 10 min). New members often sign up
+    // 30/h matches the signup-email step above (20 per 10 min). New members often sign up
     // together from the club room or campus Wi-Fi behind one NAT IP; this must not trip
     // before the email limiter already does.
     private static final int MAX_SIGNUPS_PER_WINDOW = 30;
