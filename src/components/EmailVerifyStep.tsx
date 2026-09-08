@@ -89,6 +89,9 @@ export function EmailVerifyStep({ studentId, email, onDone }: {
             autoComplete="one-time-code"
             className={`${inputClass} text-center text-2xl tracking-[0.5em]`}
           />
+          <p className="mt-2 text-xs text-[var(--theme-body-muted)]">
+            메일이 오지 않으면 스팸함·프로모션함을 확인해주세요. 1분 후 다시 요청할 수 있습니다.
+          </p>
         </div>
 
         {error && (
