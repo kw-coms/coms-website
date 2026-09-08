@@ -118,7 +118,8 @@ public class EmailVerificationSender {
             helper.setFrom(new InternetAddress(from, SENDER_DISPLAY_NAME, "UTF-8"));
             helper.setReplyTo(from);
             helper.setTo(to);
-            helper.setSubject("[" + SENDER_DISPLAY_NAME + "] " + subjectLabel + " " + code);
+            // The code stays out of the subject: subjects show on lock screens and inbox previews.
+            helper.setSubject("[" + SENDER_DISPLAY_NAME + "] " + subjectLabel);
             helper.setText(plainText, buildHtml(subjectLabel, code));
             mailSender.send(message);
             // Success used to be silent, which made "mail isn't arriving" reports
