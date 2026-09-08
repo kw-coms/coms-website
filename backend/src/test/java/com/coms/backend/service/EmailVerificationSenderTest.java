@@ -61,7 +61,7 @@ class EmailVerificationSenderTest {
         assertThat(mimeMessage.getFrom()[0].toString()).contains("KW COM's").contains("no-reply@coms.kw.ac.kr");
         assertThat(mimeMessage.getReplyTo()).hasSize(1);
         assertThat(mimeMessage.getReplyTo()[0].toString()).contains("no-reply@coms.kw.ac.kr");
-        assertThat(mimeMessage.getSubject()).isEqualTo("[KW COM's] 이메일 인증코드 123456");
+        assertThat(mimeMessage.getSubject()).isEqualTo("[KW COM's] 이메일 인증코드");
 
         // getContentType() only reflects the Content-Type header, which JavaMail only writes on
         // saveChanges() (normally triggered by a real send); the mocked send() here never calls
@@ -99,7 +99,7 @@ class EmailVerificationSenderTest {
 
         sender.sendPasswordResetCode("member@example.com", "654321");
 
-        assertThat(mimeMessage.getSubject()).isEqualTo("[KW COM's] 비밀번호 재설정 인증코드 654321");
+        assertThat(mimeMessage.getSubject()).isEqualTo("[KW COM's] 비밀번호 재설정 인증코드");
     }
 
     @Test
