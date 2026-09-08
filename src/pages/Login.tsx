@@ -293,15 +293,20 @@ export default function Login({ onCancel, onSuccess, goSignup }: {
 
               {resetRequested && (
                 <div className="space-y-4">
-                  <TextInput
-                    id="resetCode"
-                    label="인증코드"
-                    value={resetForm.code}
-                    onChange={updateResetForm('code')}
-                    placeholder="숫자 6자리"
-                    autoComplete="one-time-code"
-                    inputMode="numeric"
-                  />
+                  <div>
+                    <TextInput
+                      id="resetCode"
+                      label="인증코드"
+                      value={resetForm.code}
+                      onChange={updateResetForm('code')}
+                      placeholder="숫자 6자리"
+                      autoComplete="one-time-code"
+                      inputMode="numeric"
+                    />
+                    <p className="mt-2 text-xs text-[var(--theme-body-muted)]">
+                      메일이 오지 않으면 스팸함·프로모션함을 확인해주세요. 1분 후 다시 요청할 수 있습니다.
+                    </p>
+                  </div>
                   <TextInput
                     id="resetNewPassword"
                     label="새 비밀번호"
