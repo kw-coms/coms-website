@@ -1,5 +1,6 @@
 package com.coms.backend.service;
 
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,15 +19,39 @@ public class EmailVerificationSender {
     private final boolean mailEnabled;
     private final boolean logVerificationCodes;
     private final String from;
+    private final String smtpHost;
+    private final int smtpPort;
+    private final String smtpUsername;
 
     public EmailVerificationSender(JavaMailSender mailSender,
                                    @Value("${mail.enabled:false}") boolean mailEnabled,
                                    @Value("${mail.log-verification-codes:false}") boolean logVerificationCodes,
-                                   @Value("${mail.from:no-reply@coms.kw.ac.kr}") String from) {
+                                   @Value("${mail.from:no-reply@coms.kw.ac.kr}") String from,
+                                   @Value("${spring.mail.host:localhost}") String smtpHost,
+                                   @Value("${spring.mail.port:587}") int smtpPort,
+                                   @Value("${spring.mail.username:}") String smtpUsername) {
         this.mailSender = mailSender;
         this.mailEnabled = mailEnabled;
         this.logVerificationCodes = logVerificationCodes;
         this.from = from;
+        this.smtpHost = smtpHost;
+        this.smtpPort = smtpPort;
+        this.smtpUsername = smtpUsername;
+    }
+
+    /**
+     * Logs the effective SMTP wiring once at startup so a misconfigured deploy (wrong host,
+     * blank username, mail left disabled) is visible in the logs instead of only surfacing as
+     * silent "verification email never arrived" reports.
+     */
+    @PostConstruct
+    void logMailConfiguration() {
+        if (mailEnabled) {
+            log.info("Mail enabled via {}:{} as {}", smtpHost, smtpPort, mask(smtpUsername));
+        } else {
+            log.info("Mail disabled (MAIL_ENABLED=false); verification codes will {}.",
+                    logVerificationCodes ? "be logged instead of sent" : "fail with 503 until mail is enabled");
+        }
     }
 
     public void sendVerificationCode(String to, String code) {
