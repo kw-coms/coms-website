@@ -529,6 +529,31 @@ class AuthServiceTest {
                         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
     }
 
+    @Test
+    @DisplayName("signup email verification tolerates a campus NAT: 20 requests per client IP per 10 min")
+    void requestSignupEmailVerificationRateLimitsPerClientIpAtRaisedCap() {
+        MemberRepository repo = mock(MemberRepository.class);
+        when(repo.findByStudentId(anyString())).thenReturn(java.util.Optional.empty());
+        when(repo.findByEmailIgnoreCase(anyString())).thenReturn(java.util.Optional.empty());
+        AuthService service = new AuthService(repo, mock(LoginFailureRepository.class),
+                mock(EligibleMemberService.class), passwordEncoder, mock(JwtTokenProvider.class),
+                mock(EmailVerificationSender.class), mock(FontService.class), mock(BannedStudentService.class),
+                mock(AuditLogService.class), mock(RefreshSessionService.class), Clock.systemDefaultZone());
+
+        // Campus Wi-Fi/club room sit behind one NAT IP; the old 5-per-10-min cap tripped on a
+        // handful of members requesting codes together. 20 must be tolerated before 429 kicks in.
+        for (int i = 0; i < 20; i++) {
+            assertThat(service.requestSignupEmailVerification("0000000000", "198.51.100.20")).isFalse();
+        }
+
+        assertThatThrownBy(() -> service.requestSignupEmailVerification("0000000000", "198.51.100.20"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+
+        // A different IP has its own window.
+        assertThat(service.requestSignupEmailVerification("0000000000", "198.51.100.21")).isFalse();
+    }
+
     private static SignupRequest signupRequest(String email) {
         return new SignupRequest(
                 "2026123999",
