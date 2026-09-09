@@ -100,6 +100,8 @@ export default function Archive({ onBack }: { onBack: () => void }) {
   }
 
   const openFile = (file) => {
+    // 표 행과 셀 양쪽에 클릭 핸들러가 있어 한 번의 클릭이 두 번 도착한다 — 같은 파일이면 무시.
+    if (String(file.id) === urlId) return
     navigate('/resources/' + file.id)
   }
 
