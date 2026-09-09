@@ -22,7 +22,7 @@ function ActivityListItem({ item, onOpen }) {
         <span className="activity-community-row-author">{item.createdByName || 'COM\'s'}</span>
         <span className="activity-community-row-reactions">
           <span>조회 {item.viewCount ?? 0}</span>
-          <span><ThumbsUp size={13} aria-hidden="true" /> 개추 {item.upvotes ?? 0}</span>
+          <span><ThumbsUp size={13} aria-hidden="true" /> 추천 {item.upvotes ?? 0}</span>
         </span>
         <span className="activity-community-row-preview">
           {previewImage ? (

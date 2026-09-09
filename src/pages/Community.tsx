@@ -426,7 +426,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
                 <table className="w-full min-w-[860px] border-collapse text-sm">
                   <thead className="border-b border-[var(--app-hairline)]">
                     <tr>
-                      {['번호', '말머리', '제목', '글쓴이', '작성일', '조회', '개추'].map((col) => (
+                      {['번호', '말머리', '제목', '글쓴이', '작성일', '조회', '추천'].map((col) => (
                         <th key={col} className="px-4 py-3 font-semibold text-[var(--app-muted)]">{col}</th>
                       ))}
                     </tr>

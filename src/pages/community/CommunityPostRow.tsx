@@ -96,7 +96,7 @@ export default function CommunityPostRow({
         </span>
         <span className="shrink-0">{shortDate(post.createdAt)}</span>
         <span className="shrink-0">조회 {post.viewCount}</span>
-        <span className="shrink-0">개추 {postScore(post)}</span>
+        <span className="shrink-0">추천 {postScore(post)}</span>
       </div>
     </div>
   )
