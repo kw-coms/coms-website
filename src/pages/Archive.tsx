@@ -100,9 +100,11 @@ export default function Archive({ onBack }: { onBack: () => void }) {
   }
 
   const openFile = (file) => {
-    // 표 행과 셀 양쪽에 클릭 핸들러가 있어 한 번의 클릭이 두 번 도착한다 — 같은 파일이면 무시.
-    if (String(file.id) === urlId) return
-    navigate('/resources/' + file.id)
+    // 표 행과 셀 양쪽에 클릭 핸들러가 있어 한 번의 클릭이 같은 틱에 두 번 도착한다.
+    // 라우터 상태(urlId)는 아직 이전 값이므로, pushState 직후 즉시 바뀌는 location 으로 판단한다.
+    const target = '/resources/' + file.id
+    if (window.location.pathname === target) return
+    navigate(target)
   }
 
   // 상세 파일은 URL에서 파생된다 — 뒤로가기로 /resources 에 돌아오면 자동으로 목록.
