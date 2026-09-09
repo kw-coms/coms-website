@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { confirmDialog, promptDialog } from '../components/common/ConfirmDialog'
 import { useScrollReveal } from '../hooks/useScrollReveal'
 import { useVisibleCount } from '../hooks/useVisibleCount'
@@ -15,13 +16,15 @@ import { usePermissions } from '../contexts/usePermissions'
 import { showToast } from '../components/common/Toast'
 
 export default function Archive({ onBack }: { onBack: () => void }) {
+  // 자료 상세는 /resources/:id 로 열린다 — 브라우저 뒤로가기가 자료실 목록으로 돌아오도록.
+  const navigate = useNavigate()
+  const { id: urlId } = useParams()
   const { user } = useAuth()
   const { permissions } = usePermissions()
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [detailFile, setDetailFile] = useState(null)
   const [mode, setMode] = useState('list')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('ALL')
@@ -89,10 +92,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
     try {
       await deleteFile(id)
       setFiles((prev) => prev.filter((f) => f.id !== id))
-      if (detailFile?.id === id) {
-        setDetailFile(null)
-        setMode('list')
-      }
+      if (detailFile?.id === id) navigate('/resources', { replace: true })
       setNotice('자료가 삭제되었습니다.')
     } catch (err) {
       setError(err.message || '삭제 중 오류가 발생했습니다.')
@@ -100,9 +100,21 @@ export default function Archive({ onBack }: { onBack: () => void }) {
   }
 
   const openFile = (file) => {
-    setDetailFile(file)
-    setMode('detail')
+    navigate('/resources/' + file.id)
   }
+
+  // 상세 파일은 URL에서 파생된다 — 뒤로가기로 /resources 에 돌아오면 자동으로 목록.
+  const routeFileId = urlId === undefined ? null : Number(urlId)
+  const detailFile = routeFileId === null ? null : files.find((f) => f.id === routeFileId) ?? null
+  const view = detailFile ? 'detail' : mode
+
+  // 없는 id 로 들어온 경우(삭제됨·오타)는 목록으로 돌려보낸다.
+  useEffect(() => {
+    if (loading || routeFileId === null) return
+    if (Number.isNaN(routeFileId) || !files.some((f) => f.id === routeFileId)) {
+      navigate('/resources', { replace: true })
+    }
+  }, [loading, routeFileId, files, navigate])
 
   const [voting, setVoting] = useState(false)
   const handleVote = async () => {
@@ -110,7 +122,6 @@ export default function Archive({ onBack }: { onBack: () => void }) {
     setVoting(true)
     try {
       const updated = await voteArchiveFile(detailFile.id, detailFile.myVote === 1 ? 0 : 1)
-      setDetailFile(updated)
       setFiles((prev) => prev.map((f) => (f.id === updated.id ? { ...f, ...updated } : f)))
     } catch (err) {
       setError(err.message || '추천 중 오류가 발생했습니다.')
@@ -134,7 +145,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
 
   const backToList = () => {
     setMode('list')
-    setDetailFile(null)
+    if (detailFile) navigate('/resources')
   }
 
   const handleAuthorEdit = async (file) => {
@@ -155,7 +166,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="w-full space-y-4 text-[var(--app-text)]">
-      {mode === 'list' && (
+      {view === 'list' && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
@@ -174,16 +185,16 @@ export default function Archive({ onBack }: { onBack: () => void }) {
             <div className="min-w-0" data-reveal>
               <p className="apple-eyebrow">Archive</p>
               <h1 className="mt-2 text-3xl font-bold leading-tight tracking-normal sm:text-4xl">
-                {mode === 'write' ? '자료 등록' : mode === 'detail' ? '자료 상세' : '자료실'}
+                {view === 'write' ? '자료 등록' : view === 'detail' ? '자료 상세' : '자료실'}
               </h1>
-              {mode === 'list' && (
+              {view === 'list' && (
                 <p className="mt-2 text-sm font-bold text-[var(--app-accent-text)]">다시 찾는 자료실</p>
               )}
               <p className="apple-copy mt-3 max-w-2xl">
-                {mode === 'list' ? '세미나, 프로젝트, 학술회지 자료를 카테고리와 검색으로 빠르게 다시 찾습니다.' : ''}
+                {view === 'list' ? '세미나, 프로젝트, 학술회지 자료를 카테고리와 검색으로 빠르게 다시 찾습니다.' : ''}
               </p>
             </div>
-            {mode === 'list' ? (
+            {view === 'list' ? (
               <button
                 type="button"
                 onClick={() => setMode('write')}
@@ -205,13 +216,13 @@ export default function Archive({ onBack }: { onBack: () => void }) {
           </div>
         </div>
 
-        {mode === 'write' && (
+        {view === 'write' && (
           <div className="bg-[var(--app-surface-soft)] p-5 sm:p-7">
             <WriteForm onCancel={backToList} onSave={handleSave} />
           </div>
         )}
 
-        {mode === 'list' && (
+        {view === 'list' && (
           <ArchiveListView
             activeCategory={activeCategory}
             onCategoryChange={setActiveCategory}
@@ -231,7 +242,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
           />
         )}
 
-        {mode === 'detail' && detailFile && (
+        {view === 'detail' && detailFile && (
           <ArchiveDetailView
             onAuthorEdit={handleAuthorEdit}
             detailFile={detailFile}
