@@ -2718,6 +2718,13 @@ test('archive highlights repeat-visit search and category controls', async ({ pa
   await expect(page.getByPlaceholder('세미나, 프로젝트, 작성자 검색')).toBeVisible()
   await expect(page.getByRole('button', { name: /전체/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /React 세미나 자료/ })).toBeVisible()
+  // 자료를 열면 /resources/:id 로 이동하고, 브라우저 뒤로가기는 자료실 목록으로 돌아온다.
+  await page.getByRole('button', { name: /React 세미나 자료/ }).click()
+  await expect(page).toHaveURL(/\/resources\/\d+$/)
+  await expect(page.getByRole('heading', { name: '자료 상세' })).toBeVisible()
+  await page.goBack()
+  await expect(page).toHaveURL(/\/resources$/)
+  await expect(page.getByRole('button', { name: /React 세미나 자료/ })).toBeVisible()
 })
 
 test('sponsors page renders tiers, anonymises, and hides the amount note from guests', async ({ page }) => {
