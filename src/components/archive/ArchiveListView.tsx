@@ -170,7 +170,7 @@ export function ArchiveListView({
                       </span>
                     )}
                     <span className="mt-3 block truncate text-xs font-semibold text-[var(--app-subtle)]">
-                      {file.uploaderName || file.uploadedBy || '-'} · {formatDate(file.uploadedAt)} · 조회 {file.viewCount ?? 0} · 개추 {file.upvotes ?? 0}
+                      {file.uploaderName || file.uploadedBy || '-'} · {formatDate(file.uploadedAt)} · 조회 {file.viewCount ?? 0} · 추천 {file.upvotes ?? 0}
                     </span>
                   </button>
                   <div className="mt-3.5 flex justify-end border-t border-[var(--app-hairline)] pt-3.5">
@@ -231,7 +231,7 @@ export function ArchiveListView({
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">{file.uploaderName || file.uploadedBy || '-'}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
                         <span className="block">{formatDate(file.uploadedAt)}</span>
-                        <span className="mt-0.5 block text-xs text-[var(--app-subtle)]">조회 {file.viewCount ?? 0} · 개추 {file.upvotes ?? 0}</span>
+                        <span className="mt-0.5 block text-xs text-[var(--app-subtle)]">조회 {file.viewCount ?? 0} · 추천 {file.upvotes ?? 0}</span>
                       </td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-right">
                         <div className="flex justify-end gap-2">

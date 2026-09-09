@@ -255,7 +255,7 @@ export default function CommunityDetailView({
               <span>{new Date(currentPost.createdAt).toLocaleString('ko-KR')}</span>
               {isEdited(currentPost) && <span>수정 {new Date(currentPost.updatedAt).toLocaleString('ko-KR')}</span>}
               <span>조회 {currentPost.viewCount}</span>
-              <span>개추 {postScore(currentPost)}</span>
+              <span>추천 {postScore(currentPost)}</span>
             </div>
           </div>
           <div className="min-h-[220px] sm:min-h-[280px]">
@@ -269,7 +269,7 @@ export default function CommunityDetailView({
           <div className="grid grid-cols-2 gap-2 border-y border-[var(--app-hairline)] bg-[#fafafa] px-4 py-4 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-3 sm:py-5">
             <button type="button" onClick={() => onVote(1)} className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:w-auto sm:px-5 ${currentPost.myVote === 1 ? 'border-[var(--app-accent)] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}>
               <ThumbsUp size={16} />
-              개추 {currentPost.upvotes}
+              추천 {currentPost.upvotes}
             </button>
             <button type="button" onClick={() => onVote(-1)} className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border px-3 py-3 text-sm font-black sm:w-auto sm:px-5 ${currentPost.myVote === -1 ? 'border-red-600 bg-red-600 text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-red-600'}`}>
               <ThumbsDown size={16} />

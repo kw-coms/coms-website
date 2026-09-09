@@ -209,7 +209,7 @@ function ActivityDetailModal({
                 className={activity.myVote === 1 ? 'is-active' : ''}
               >
                 <ThumbsUp size={15} aria-hidden="true" />
-                개추 {activity.upvotes ?? 0}
+                추천 {activity.upvotes ?? 0}
               </button>
               {isAdmin && (
                 <div className="activity-detail-admin-actions">
