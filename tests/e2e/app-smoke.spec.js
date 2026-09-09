@@ -2073,10 +2073,10 @@ test('notice detail registers a view and toggles the upvote count', async ({ pag
   await expect(page.getByRole('heading', { name: '조회수 검증 공지' })).toBeVisible()
   await expect(page.getByText('조회 12')).toBeVisible()
 
-  const voteButton = page.getByRole('button', { name: /개추 4/ })
+  const voteButton = page.getByRole('button', { name: /추천 4/ })
   await voteButton.click()
   await expect.poll(() => voteValue).toBe(1)
-  await expect(page.getByRole('button', { name: /개추 5/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /추천 5/ })).toBeVisible()
 })
 
 test('club activity detail registers view, vote, edit, and delete only after opening', async ({ page }) => {
@@ -2213,8 +2213,8 @@ test('club activity detail registers view, vote, edit, and delete only after ope
   await expect(card).toBeVisible()
   await expect(card.locator('img')).toHaveAttribute('src', /\/api\/club-activities\/5\/images\/51/)
   await expect(card.getByText('조회 8')).toBeVisible()
-  await expect(card.getByText('개추 2')).toBeVisible()
-  await expect(card.getByRole('button', { name: /개추/ })).toHaveCount(0)
+  await expect(card.getByText('추천 2')).toBeVisible()
+  await expect(card.getByRole('button', { name: /추천/ })).toHaveCount(0)
 
   await card.hover()
   await expect.poll(() => viewRegistered).toBe(false)
@@ -2225,9 +2225,9 @@ test('club activity detail registers view, vote, edit, and delete only after ope
   await expect(dialog.getByText('조회 9')).toBeVisible()
   await expect(dialog.locator('.activity-detail-gallery img')).toHaveCount(2)
 
-  await dialog.getByRole('button', { name: /개추 2/ }).click()
+  await dialog.getByRole('button', { name: /추천 2/ }).click()
   await expect.poll(() => voteValue).toBe(1)
-  await expect(dialog.getByRole('button', { name: /개추 3/ })).toBeVisible()
+  await expect(dialog.getByRole('button', { name: /추천 3/ })).toBeVisible()
 
   await dialog.getByRole('button', { name: '수정' }).click()
   await dialog.getByLabel('활동 제목').fill('수정된 세미나')

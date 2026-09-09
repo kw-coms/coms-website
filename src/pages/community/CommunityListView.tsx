@@ -318,7 +318,7 @@ export default function CommunityListView({
               <th className="w-36 px-4 py-3 font-semibold">글쓴이</th>
               <th className="w-28 px-4 py-3 font-semibold">작성일</th>
               <th className="w-20 px-4 py-3 font-semibold">조회</th>
-              <th className="w-20 px-4 py-3 font-semibold">개추</th>
+              <th className="w-20 px-4 py-3 font-semibold">추천</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-black/10">

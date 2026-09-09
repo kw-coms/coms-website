@@ -29,7 +29,7 @@ export function ArchiveDetailView({
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--app-subtle)]">
           <span>조회 {detailFile.viewCount ?? 0}</span>
-          <span>개추 {detailFile.upvotes ?? 0}</span>
+          <span>추천 {detailFile.upvotes ?? 0}</span>
         </div>
       </div>
       {detailFile.description && (
@@ -65,7 +65,7 @@ export function ArchiveDetailView({
           className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-4 text-sm font-bold disabled:opacity-50 sm:min-h-10 ${detailFile.myVote === 1 ? 'border-[var(--app-accent)] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
         >
           <ThumbsUp size={15} />
-          개추 {detailFile.upvotes ?? 0}
+          추천 {detailFile.upvotes ?? 0}
         </button>
         {isAdmin && onAuthorEdit && (
           <button

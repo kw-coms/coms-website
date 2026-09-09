@@ -44,7 +44,7 @@ export default function CommunityMemberProfile({ onBack }: { onBack: () => void 
   const statItems = [
     { icon: FileText, label: '작성글', value: breakdown.posts ?? 0 },
     { icon: MessageSquare, label: '댓글', value: breakdown.comments ?? 0 },
-    { icon: ThumbsUp, label: '받은 개추', value: breakdown.upvotes ?? 0 },
+    { icon: ThumbsUp, label: '받은 추천', value: breakdown.upvotes ?? 0 },
   ]
 
   return (

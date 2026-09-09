@@ -222,7 +222,7 @@ export default function Notices() {
     if (isNaN(numId)) { navigate('/notices', { replace: true }); return }
     if (loading) return
     let mounted = true
-    // Fetch the full notice so the view count is registered and engagement (조회/개추) is current.
+    // Fetch the full notice so the view count is registered and engagement (조회/추천) is current.
     getNotice(numId)
       .then((detail) => {
         if (!mounted) return
@@ -623,7 +623,7 @@ export default function Notices() {
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--app-subtle)]">
                 <span>조회 {selectedNotice.viewCount ?? 0}</span>
-                <span>개추 {selectedNotice.upvotes ?? 0}</span>
+                <span>추천 {selectedNotice.upvotes ?? 0}</span>
               </div>
             </div>
             <div className="text-size-container min-h-[200px] break-words auto-text-notice sm:min-h-[360px]">
@@ -640,7 +640,7 @@ export default function Notices() {
                 className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full border px-5 py-3 text-sm font-black disabled:opacity-50 ${selectedNotice.myVote === 1 ? 'border-[var(--app-accent)] bg-[var(--app-accent)] text-white' : 'border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-accent-text)]'}`}
               >
                 <ThumbsUp size={16} />
-                개추 {selectedNotice.upvotes ?? 0}
+                추천 {selectedNotice.upvotes ?? 0}
               </button>
             </div>
             <div className="grid grid-cols-2 gap-2 border-t border-[var(--app-hairline)] px-4 py-4 sm:flex sm:flex-row sm:flex-wrap sm:justify-between sm:gap-2.5 sm:px-5">
