@@ -14,88 +14,21 @@ import CommentThread from './CommentThread'
 import { BoardDetailBar } from './CommunityChrome'
 import BookmarkButton from './BookmarkButton'
 import AuthorName from './AuthorName'
-import { useEffect, useState } from 'react'
-import { listMembers } from '../../services/adminApi'
-import { showToast } from '../../components/common/Toast'
+import { useState } from 'react'
+import AuthorChangeDialog from '../../components/common/AuthorChangeDialog'
 import { renderPostBlocks } from './PostBlocks'
 import ReportPostDialog from './ReportPostDialog'
 import { isConceptPost, isEdited, postScore } from './communityBoardUtils'
 import { MAX_ANONYMOUS_NAME_LENGTH, categoryLabel } from './postEditorUtils'
 import { Skeleton, SkeletonLine, SkeletonGroup } from '../../components/common/Skeleton'
 
-// 회장 전용 작성자 변경: 회원 목록에서 고르거나 이름을 직접 입력.
 function AuthorEditControl({ onUpdateAuthor }: { onUpdateAuthor: (payload: { studentId?: string; name?: string }) => Promise<void> }) {
   const [open, setOpen] = useState(false)
-  const [members, setMembers] = useState<{ studentId?: string; name?: string; role?: string }[]>([])
-  const [pickedId, setPickedId] = useState('')
-  const [customName, setCustomName] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  useEffect(() => {
-    if (!open || members.length > 0) return
-    listMembers()
-      .then((data) => setMembers(Array.isArray(data) ? data : []))
-      .catch(() => setMembers([]))
-  }, [open, members.length])
-
-  const save = async () => {
-    const payload = pickedId ? { studentId: pickedId } : customName.trim() ? { name: customName.trim() } : null
-    if (!payload) {
-      showToast({ message: '회원을 선택하거나 이름을 입력해주세요.', tone: 'error' })
-      return
-    }
-    setSaving(true)
-    try {
-      await onUpdateAuthor(payload)
-      setOpen(false)
-      setPickedId('')
-      setCustomName('')
-    } catch (err) {
-      showToast({ message: err.message || '작성자 변경 중 오류가 발생했습니다.', tone: 'error' })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (!open) {
-    return (
-      <button type="button" onClick={() => setOpen(true)} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
-        작성자 변경
-      </button>
-    )
-  }
-
-  return (
-    <div className="col-span-2 flex w-full flex-wrap items-center gap-2 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-3 sm:col-auto">
-      <select
-        value={pickedId}
-        onChange={(event) => { setPickedId(event.target.value); if (event.target.value) setCustomName('') }}
-        className="min-w-40 rounded border border-[var(--app-hairline)] bg-[var(--app-surface)] px-2 py-1.5 text-sm font-semibold"
-        aria-label="회원 선택"
-      >
-        <option value="">회원 선택...</option>
-        {members.map((member) => (
-          <option key={member.studentId} value={member.studentId}>{member.name} ({member.studentId})</option>
-        ))}
-      </select>
-      <span className="text-xs font-bold text-[var(--app-subtle)]">또는</span>
-      <input
-        value={customName}
-        onChange={(event) => { setCustomName(event.target.value); if (event.target.value) setPickedId('') }}
-        maxLength={60}
-        placeholder="이름 직접 입력"
-        className="w-36 rounded border border-[var(--app-hairline)] bg-[var(--app-surface)] px-2 py-1.5 text-sm font-semibold"
-      />
-      <button type="button" onClick={save} disabled={saving} className="rounded-full bg-[var(--app-accent)] px-3 py-1.5 text-sm font-bold text-white disabled:opacity-50">
-        {saving ? '저장 중...' : '저장'}
-      </button>
-      <button type="button" onClick={() => setOpen(false)} className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-1.5 text-sm font-bold">
-        취소
-      </button>
-    </div>
-  )
+  return <>
+    <button type="button" onClick={() => setOpen(true)} className="apple-action-secondary px-4 py-2">작성자 변경</button>
+    {open && <AuthorChangeDialog allowMemberSelection onClose={() => setOpen(false)} onSave={onUpdateAuthor} />}
+  </>
 }
-
 export default function CommunityDetailView({
   currentPost,
   detailLoading,
@@ -299,12 +232,12 @@ export default function CommunityDetailView({
                 {reported ? '신고됨' : '신고'}
               </button>
             )}
-            {currentPost.editable && (
+            {(currentPost.editable || isAdmin) && (
               <>
-                <button type="button" onClick={onEdit} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
+                {currentPost.editable && <button type="button" onClick={onEdit} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
                   <Pencil size={14} />
                   수정
-                </button>
+                </button>}
                 <button type="button" onClick={() => onDelete(currentPost)} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 sm:min-h-0">
                   <Trash2 size={14} />
                   삭제

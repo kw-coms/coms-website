@@ -46,12 +46,19 @@ class CommunityAccess {
 
     /**
      * community.moderate 권한 보유자 = community moderator: may view/moderate the
-     * anonymous board, edit/delete others' posts and comments, and see
-     * unmasked authors. 기본값은 부회장(VICE_PRESIDENT)이지만 회장이 권한
-     * 매트릭스에서 조정할 수 있고, 회장(ADMIN)은 언제나 통과한다.
+     * anonymous board, pin/delete/review reports, and see unmasked authors.
+     * Content/media edits are narrower and use {@link #canEditPost(CommunityPost, Member)}.
      */
     boolean isModerator(Member member) {
         return permissionService.has(member, Permission.COMMUNITY_MODERATE);
+    }
+
+    boolean isAdmin(Member member) {
+        return member != null && member.getRole() == Member.Role.ADMIN;
+    }
+
+    boolean canEditPost(CommunityPost post, Member member) {
+        return post.getAuthorStudentId().equals(member.getStudentId()) || isAdmin(member);
     }
 
     boolean canView(Member member, CommunityPost post) {
@@ -72,7 +79,7 @@ class CommunityAccess {
 
     void requireOwnerOrAdmin(CommunityPost post, Member member) {
         requireVisible(member, post);
-        if (!post.getAuthorStudentId().equals(member.getStudentId()) && !isModerator(member)) {
+        if (!canEditPost(post, member)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
     }

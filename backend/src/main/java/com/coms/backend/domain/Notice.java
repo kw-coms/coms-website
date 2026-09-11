@@ -29,6 +29,9 @@ public class Notice {
     @Column(nullable = false)
     private String author;
 
+    @Column(name = "author_student_id", length = 64)
+    private String authorStudentId;
+
     @Column(nullable = false)
     private boolean pinned = false;
 
@@ -64,6 +67,8 @@ public class Notice {
     public void setContent(String content) { this.content = content; }
     public String getAuthor() { return author; }
     public void setAuthor(String author) { this.author = author; }
+    public String getAuthorStudentId() { return authorStudentId; }
+    public void setAuthorStudentId(String authorStudentId) { this.authorStudentId = authorStudentId; }
     public boolean isPinned() { return pinned; }
     public void setPinned(boolean pinned) {
         if (pinned && !this.pinned) {
