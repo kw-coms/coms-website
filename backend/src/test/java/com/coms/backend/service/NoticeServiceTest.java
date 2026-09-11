@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest(properties = {
         "jwt.secret=test-secret-key-with-at-least-32-chars",
@@ -39,6 +40,21 @@ class NoticeServiceTest {
 
         assertThat(notice.category()).isEqualTo("GENERAL");
         assertThat(notice.author()).isEqualTo("관리자");
+    }
+
+    @Test
+    void noticeWritePermissionDoesNotAllowEditingAnotherAuthorsContent() {
+        var notice = noticeService.create("2026123000", new NoticeRequest("원본", "원본 내용", null, false, "GENERAL"));
+        for (Member.Role role : java.util.List.of(Member.Role.OFFICER, Member.Role.VICE_PRESIDENT)) {
+            Member editor = user("2026999999", "운영진");
+            editor.setRole(role);
+            memberRepository.save(editor);
+            assertThatThrownBy(() -> noticeService.update(editor.getStudentId(), notice.id(), new NoticeRequest("변경", "변경 내용", null, false, "GENERAL")))
+                    .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                            ex -> assertThat(ex.getStatusCode().value()).isEqualTo(403));
+            memberRepository.delete(editor);
+        }
+        assertThat(noticeRepository.findById(notice.id()).orElseThrow().getTitle()).isEqualTo("원본");
     }
 
     @Test
@@ -118,11 +134,62 @@ class NoticeServiceTest {
     void authorOverrideSurvivesLaterEdits() {
         var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
 
-        var overridden = noticeService.updateAuthor("2026123000", notice.id(), "  동아리 임원진  ");
+        var overridden = noticeService.updateAuthor("2026123000", notice.id(), "  동아리 임원진  ", null);
         assertThat(overridden.author()).isEqualTo("동아리 임원진");
+        assertThat(overridden.authorStudentId()).isEqualTo("2026123000");
 
         var updated = noticeService.update("2026123000", notice.id(), new NoticeRequest("수정", "내용", null, false, "GENERAL"));
         assertThat(updated.author()).isEqualTo("동아리 임원진");
+        assertThat(updated.authorStudentId()).isEqualTo("2026123000");
+    }
+
+    @Test
+    void adminCanReassignNoticeAuthorToMemberWithoutInferringLegacyNames() {
+        memberRepository.save(admin("2026000001", "새작성자"));
+        var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
+
+        var displayOnly = noticeService.updateAuthor("2026123000", notice.id(), "동아리 임원진", null);
+        assertThat(displayOnly.author()).isEqualTo("동아리 임원진");
+        assertThat(displayOnly.authorStudentId()).isEqualTo("2026123000");
+
+        var reassigned = noticeService.updateAuthor("2026123000", notice.id(), null, "2026000001");
+        assertThat(reassigned.author()).isEqualTo("새작성자");
+        assertThat(reassigned.authorStudentId()).isEqualTo("2026000001");
+    }
+
+    @Test
+    void noticeAuthorUpdateRejectsBothModesAndNonAdminReassignment() {
+        memberRepository.save(user("2026000001", "일반회원"));
+        memberRepository.save(user("2026000002", "새작성자"));
+        var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
+
+        assertThatThrownBy(() -> noticeService.updateAuthor("2026123000", notice.id(), "이름", "2026000002"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode().value()).isEqualTo(400));
+        assertThatThrownBy(() -> noticeService.updateAuthor("2026123000", notice.id(), null, null))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode().value()).isEqualTo(400));
+        assertThatThrownBy(() -> noticeService.updateAuthor("2026000001", notice.id(), null, "2026000002"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode().value()).isEqualTo(403));
+    }
+
+    @Test
+    void reassignedOwnerCanEditContentButCannotChangePinnedStateWithoutNoticeWrite() {
+        memberRepository.save(user("2026000001", "선택회원"));
+        var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
+        noticeService.updateAuthor("2026123000", notice.id(), null, "2026000001");
+
+        var updated = noticeService.update(
+                "2026000001",
+                notice.id(),
+                new NoticeRequest("회원 수정", "회원 수정 내용", null, true, "PROMOTION")
+        );
+
+        assertThat(updated.title()).isEqualTo("회원 수정");
+        assertThat(updated.content()).isEqualTo("회원 수정 내용");
+        assertThat(updated.category()).isEqualTo("PROMOTION");
+        assertThat(updated.pinned()).isFalse();
     }
 
     @Test
@@ -157,6 +224,12 @@ class NoticeServiceTest {
         member.setPassword("encoded-password");
         member.setEmailVerified(true);
         member.setRole(Member.Role.ADMIN);
+        return member;
+    }
+
+    private Member user(String studentId, String name) {
+        Member member = admin(studentId, name);
+        member.setRole(Member.Role.USER);
         return member;
     }
 }

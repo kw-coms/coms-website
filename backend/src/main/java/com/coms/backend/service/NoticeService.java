@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.Notice;
 import com.coms.backend.domain.NoticeVote;
 import com.coms.backend.domain.Member;
+import com.coms.backend.domain.Permission;
 import com.coms.backend.dto.NoticeRequest;
 import com.coms.backend.dto.NoticeResponse;
 import com.coms.backend.repository.MemberRepository;
@@ -30,16 +31,18 @@ public class NoticeService {
     private final AuditLogService auditLogService;
     private final NoticeVoteRepository voteRepository;
     private final RichContentSanitizer richContentSanitizer;
+    private final PermissionService permissionService;
 
     public NoticeService(NoticeRepository repo, MemberRepository memberRepository, NotificationService notificationService,
                          AuditLogService auditLogService, NoticeVoteRepository voteRepository,
-                         RichContentSanitizer richContentSanitizer) {
+                         RichContentSanitizer richContentSanitizer, PermissionService permissionService) {
         this.repo = repo;
         this.memberRepository = memberRepository;
         this.notificationService = notificationService;
         this.auditLogService = auditLogService;
         this.voteRepository = voteRepository;
         this.richContentSanitizer = richContentSanitizer;
+        this.permissionService = permissionService;
     }
 
     @Transactional(readOnly = true)
@@ -118,6 +121,7 @@ public class NoticeService {
     public NoticeResponse create(String authorStudentId, NoticeRequest request) {
         Notice notice = new Notice();
         applyRequest(notice, request, authorName(authorStudentId));
+        notice.setAuthorStudentId(authorStudentId);
         Notice saved = repo.save(notice);
         notificationService.notifyNoticeCreated(saved);
         auditLogService.record(authorStudentId, "NOTICE_CREATE", "NOTICE", String.valueOf(saved.getId()), "title=" + saved.getTitle(), null);
@@ -125,22 +129,43 @@ public class NoticeService {
     }
 
     // 회장 전용 — SecurityConfig의 PATCH /api/notices/*/author hasRole("ADMIN") 규칙이 게이트.
-    public NoticeResponse updateAuthor(String editorStudentId, Long id, String author) {
+    public NoticeResponse updateAuthor(String editorStudentId, Long id, String author, String studentId) {
+        Member editor = memberRepository.findByStudentId(editorStudentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        if (editor.getRole() != Member.Role.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
         Notice notice = getEntity(id);
         String cleaned = author == null ? "" : author.trim();
-        if (cleaned.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "작성자 이름을 입력해주세요.");
+        String cleanedStudentId = studentId == null ? "" : studentId.trim();
+        if (cleaned.isEmpty() == cleanedStudentId.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "회원 선택 또는 이름 직접 입력 중 하나만 지정해주세요.");
         }
-        notice.setAuthor(cleaned);
-        auditLogService.record(editorStudentId, "NOTICE_AUTHOR_UPDATE", "NOTICE", String.valueOf(notice.getId()), "author=" + cleaned, null);
+        String detail;
+        if (!cleanedStudentId.isEmpty()) {
+            Member newAuthor = memberRepository.findByStudentId(cleanedStudentId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 학번의 회원을 찾을 수 없습니다."));
+            notice.setAuthor(newAuthor.getName());
+            notice.setAuthorStudentId(newAuthor.getStudentId());
+            detail = "authorStudentId=" + newAuthor.getStudentId();
+        } else {
+            notice.setAuthor(cleaned);
+            detail = "author=(custom)";
+        }
+        auditLogService.record(editorStudentId, "NOTICE_AUTHOR_UPDATE", "NOTICE", String.valueOf(notice.getId()), detail, null);
         return toResponse(notice, voteStats(List.of(notice)), editorStudentId);
+    }
+
+    public NoticeResponse updateAuthor(String editorStudentId, Long id, String author) {
+        return updateAuthor(editorStudentId, id, author, null);
     }
 
     public NoticeResponse update(String authorStudentId, Long id, NoticeRequest request) {
         Notice notice = getEntity(id);
+        boolean canManageNotice = requireEditable(authorStudentId, notice);
         // Keep the displayed author on edits — previously every edit stomped it with the
         // editor's own name, which silently undid 회장 author overrides.
-        applyRequest(notice, request, notice.getAuthor());
+        applyRequest(notice, request, notice.getAuthor(), canManageNotice);
         auditLogService.record(authorStudentId, "NOTICE_UPDATE", "NOTICE", String.valueOf(notice.getId()), "title=" + notice.getTitle(), null);
         return toResponse(notice, voteStats(List.of(notice)), authorStudentId);
     }
@@ -164,11 +189,28 @@ public class NoticeService {
     }
 
     private void applyRequest(Notice notice, NoticeRequest request, String authorName) {
+        applyRequest(notice, request, authorName, true);
+    }
+
+    private void applyRequest(Notice notice, NoticeRequest request, String authorName, boolean applyPinned) {
         notice.setTitle(request.title());
         notice.setContent(richContentSanitizer.sanitizeContent(request.content()));
         notice.setAuthor(authorName);
-        notice.setPinned(request.pinned());
+        if (applyPinned) {
+            notice.setPinned(request.pinned());
+        }
         notice.setCategory(parseCategory(request.category()));
+    }
+
+    private boolean requireEditable(String editorStudentId, Notice notice) {
+        Member editor = memberRepository.findByStudentId(editorStudentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        boolean owner = notice.getAuthorStudentId() != null && notice.getAuthorStudentId().equals(editor.getStudentId());
+        boolean canManageNotice = permissionService.has(editor, Permission.NOTICE_WRITE);
+        if (!owner && editor.getRole() != Member.Role.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        return canManageNotice;
     }
 
     private String authorName(String studentId) {
@@ -207,6 +249,7 @@ public class NoticeService {
                 notice.getTitle(),
                 notice.getContent(),
                 notice.getAuthor(),
+                notice.getAuthorStudentId(),
                 notice.isPinned(),
                 notice.getCategory().name(),
                 notice.getViewCount(),

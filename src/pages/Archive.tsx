@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { confirmDialog, promptDialog } from '../components/common/ConfirmDialog'
+import { confirmDialog } from '../components/common/ConfirmDialog'
+import AuthorChangeDialog from '../components/common/AuthorChangeDialog'
+import { canEditArchive } from '../utils/contentEditing'
 import { useScrollReveal } from '../hooks/useScrollReveal'
 import { useVisibleCount } from '../hooks/useVisibleCount'
 import { ArrowLeft, FileUp } from 'lucide-react'
@@ -26,6 +28,8 @@ export default function Archive({ onBack }: { onBack: () => void }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [mode, setMode] = useState('list')
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [authorFile, setAuthorFile] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('ALL')
 
@@ -110,7 +114,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
   // 상세 파일은 URL에서 파생된다 — 뒤로가기로 /resources 에 돌아오면 자동으로 목록.
   const routeFileId = urlId === undefined ? null : Number(urlId)
   const detailFile = routeFileId === null ? null : files.find((f) => f.id === routeFileId) ?? null
-  const view = detailFile ? 'detail' : mode
+  const view = detailFile ? editingId === detailFile.id ? 'edit' : 'detail' : mode
 
   // 없는 id 로 들어온 경우(삭제됨·오타)는 목록으로 돌려보낸다.
   useEffect(() => {
@@ -136,6 +140,12 @@ export default function Archive({ onBack }: { onBack: () => void }) {
 
   const handleSave = (savedList, failedNames = []) => {
     const saved = Array.isArray(savedList) ? savedList : [savedList]
+    if (editingId !== null) {
+      setFiles(prev => prev.map(file => file.id === editingId ? saved[0] : file))
+      setEditingId(null)
+      showToast({ message: '자료가 수정되었습니다.' })
+      return
+    }
     setFiles((prev) => [...saved, ...prev])
     if (failedNames.length > 0) {
       setNotice('')
@@ -148,28 +158,18 @@ export default function Archive({ onBack }: { onBack: () => void }) {
   }
 
   const backToList = () => {
+    setEditingId(null)
     setMode('list')
     if (detailFile) navigate('/resources')
   }
 
-  const handleAuthorEdit = async (file) => {
-    const name = await promptDialog({ message: '자료실에 표시할 작성자 이름을 입력하세요.', defaultValue: file.uploaderName || '' })
-    if (name === null) return
-    if (!name.trim()) {
-      showToast({ message: '작성자 이름을 입력해주세요.', tone: 'error' })
-      return
-    }
-    try {
-      const updated = await updateArchiveAuthor(file.id, name.trim())
-      setFiles((prev) => prev.map((item) => (item.id === file.id ? { ...item, uploaderName: updated.uploaderName } : item)))
-      showToast({ message: '작성자가 변경되었습니다.' })
-    } catch (err) {
-      showToast({ message: err.message || '작성자 변경 중 오류가 발생했습니다.', tone: 'error' })
-    }
-  }
-
   return (
     <div className="w-full space-y-4 text-[var(--app-text)]">
+      {authorFile && <AuthorChangeDialog name={authorFile.uploaderName} allowMemberSelection={user?.role === 'ADMIN'} onClose={() => setAuthorFile(null)} onSave={async payload => {
+        const updated = await updateArchiveAuthor(authorFile.id, payload.studentId ? { studentId: payload.studentId } : { uploaderName: payload.name })
+        setFiles(prev => prev.map(file => file.id === updated.id ? updated : file))
+        showToast({ message: '작성자가 변경되었습니다.' })
+      }} />}
       {view === 'list' && (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button
@@ -189,7 +189,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
             <div className="min-w-0" data-reveal>
               <p className="apple-eyebrow">Archive</p>
               <h1 className="mt-2 text-3xl font-bold leading-tight tracking-normal sm:text-4xl">
-                {view === 'write' ? '자료 등록' : view === 'detail' ? '자료 상세' : '자료실'}
+                {view === 'write' ? '자료 등록' : view === 'edit' ? '자료 수정' : view === 'detail' ? '자료 상세' : '자료실'}
               </h1>
               {view === 'list' && (
                 <p className="mt-2 text-sm font-bold text-[var(--app-accent-text)]">다시 찾는 자료실</p>
@@ -225,6 +225,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
             <WriteForm onCancel={backToList} onSave={handleSave} />
           </div>
         )}
+        {view === 'edit' && detailFile && canEditArchive(user, detailFile) && <WriteForm key={detailFile.id} initialFile={detailFile} onCancel={() => setEditingId(null)} onSave={handleSave} />}
 
         {view === 'list' && (
           <ArchiveListView
@@ -248,7 +249,8 @@ export default function Archive({ onBack }: { onBack: () => void }) {
 
         {view === 'detail' && detailFile && (
           <ArchiveDetailView
-            onAuthorEdit={handleAuthorEdit}
+            onAuthorEdit={setAuthorFile}
+            onEdit={canEditArchive(user, detailFile) ? () => setEditingId(detailFile.id) : undefined}
             detailFile={detailFile}
             isAdmin={isAdmin}
             voting={voting}

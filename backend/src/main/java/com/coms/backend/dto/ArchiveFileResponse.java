@@ -15,6 +15,7 @@ public record ArchiveFileResponse(
         long viewCount,
         long upvotes,
         int myVote,
-        LocalDateTime uploadedAt
+        LocalDateTime uploadedAt,
+        String contentVersion
 ) {
 }

@@ -301,7 +301,7 @@ public class CommunityService {
         Member member = access.requireMember(studentId);
         CommunityPost post = requirePost(id);
         access.requireVisible(member, post);
-        if (!post.getAuthorStudentId().equals(member.getStudentId()) && !access.isModerator(member)) {
+        if (!access.canEditPost(post, member)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         SanitizedPost sanitized = validateRequest(request);
@@ -968,8 +968,7 @@ public class CommunityService {
                                              Map<Long, List<CommunityPostVideo>> videosByPost,
                                              Map<Long, List<CommunityPostFile>> filesByPost,
                                              Set<Long> bookmarkedPostIds) {
-        boolean editable = post.getAuthorStudentId().equals(currentMember.getStudentId())
-                || access.isModerator(currentMember);
+        boolean editable = access.canEditPost(post, currentMember);
         boolean maskAnonymous = access.isAnonymous(post) && !access.isModerator(currentMember);
         boolean authorAdmin = !maskAnonymous && author != null && author.getRole() == Member.Role.ADMIN;
         // 직급 노출: 익명 마스킹이 아닐 때만, 임원 이상만 의미 있으므로 그 외는 null.
