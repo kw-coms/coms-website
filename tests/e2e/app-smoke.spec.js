@@ -84,6 +84,28 @@ test('archive replacement sends only the explicitly chosen file', async ({ page 
   expect(body).toContain('replacement bytes')
 })
 
+test('archive refuses saving while its rich editor is still loading', async ({ page }) => {
+  await mockAdminApis(page)
+  const file = { id: 915, title: '편집기 지연 자료', description: '보존할 설명', originalName: 'old.txt', uploadedBy: 'other', category: 'GENERAL', uploadedAt: '2026-09-01T00:00:00' }
+  let releaseEditor
+  const gate = new Promise(resolve => { releaseEditor = resolve })
+  let saves = 0
+  await page.route('**/assets/TiptapTextEditor-*.js', async route => { await gate; await route.continue() })
+  await page.route('**/api/files', route => route.fulfill({ json: [file] }))
+  await page.route('**/api/files/915', async route => { saves++; await route.fulfill({ json: file }) })
+  try {
+    await page.goto('/resources/915')
+    await page.getByRole('button', { name: '수정', exact: true }).click()
+    await page.getByPlaceholder('자료 제목').fill('제목만 변경')
+    await page.getByRole('button', { name: '수정 저장' }).click()
+    await expect(page.getByText('편집기를 불러오는 중입니다. 잠시 후 저장해주세요.')).toBeVisible()
+    expect(saves).toBe(0)
+  } finally { releaseEditor() }
+  await expect(page.locator('[contenteditable="true"]').first()).toContainText('보존할 설명')
+  await page.getByRole('button', { name: '수정 저장' }).click()
+  await expect.poll(() => saves).toBe(1)
+})
+
 test('archive non-owner vice president cannot see the content edit action', async ({ page }) => {
   await mockAdminApis(page)
   await page.route('**/api/auth/me', route => route.fulfill({ json: { studentId: 'vp', name: '부회장', role: 'VICE_PRESIDENT', emailVerified: true } }))
@@ -114,6 +136,8 @@ test('notice author can edit after reassignment but cannot pin or delete', async
   await expect(page.getByRole('button', { name: '삭제', exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: '수정', exact: true }).click()
   await page.getByPlaceholder('제목', { exact: true }).fill('수정된 공지 제목')
+  // The editor is a lazy chunk; the title input becoming visible does not imply its API is ready.
+  await expect(page.locator('[contenteditable="true"]').first()).toContainText('기존 본문')
   await page.getByRole('button', { name: /수정|저장/ }).last().click()
   await expect.poll(() => edited?.title).toBe('수정된 공지 제목')
   expect(edited.pinned).toBe(true)
