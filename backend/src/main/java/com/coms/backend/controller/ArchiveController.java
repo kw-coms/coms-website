@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -31,17 +32,13 @@ import com.coms.backend.web.ListPagination;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/files")
 public class ArchiveController {
-    // An archive entry's stored blob is written once at upload and never replaced
-    // (ArchiveService.upload is the only caller of setStoredName), so /{id}/download
-    // and /{id}/inline are immutable for the life of the entry. cachePrivate because
-    // /api/files/** requires a signed-in member.
-    private static final CacheControl IMMUTABLE_BLOB =
-            CacheControl.maxAge(30, TimeUnit.DAYS).cachePrivate().immutable();
+    // Archive blobs can now be replaced while keeping the same entry id, so the bare URLs must not
+    // be cached as immutable. Clients that want stable cache busting append ?v=contentVersion.
+    private static final CacheControl REVALIDATE_BLOB = CacheControl.noStore().cachePrivate();
 
     private final ArchiveService archiveService;
     private final StorageService storageService;
@@ -75,7 +72,17 @@ public class ArchiveController {
     public ResponseEntity<ArchiveFileResponse> updateAuthor(@PathVariable Long id,
                                                             @Valid @RequestBody ArchiveAuthorUpdateRequest request,
                                                             Authentication authentication) {
-        return ResponseEntity.ok(archiveService.updateAuthor(id, request.uploaderName(), authentication.getName()));
+        return ResponseEntity.ok(archiveService.updateAuthor(id, request.uploaderName(), request.studentId(), authentication.getName()));
+    }
+
+    @PutMapping(path = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ArchiveFileResponse> update(Authentication authentication,
+                                                      @PathVariable Long id,
+                                                      @RequestParam("title") String title,
+                                                      @RequestParam(value = "description", required = false) String description,
+                                                      @RequestParam(value = "category", defaultValue = "GENERAL") String category,
+                                                      @RequestParam(value = "file", required = false) MultipartFile file) throws IOException {
+        return ResponseEntity.ok(archiveService.update(authentication.getName(), id, title, description, category, file));
     }
 
     @PostMapping("/{id}/vote")
@@ -95,7 +102,7 @@ public class ArchiveController {
                 .build();
 
         return ResponseEntity.ok()
-                .cacheControl(IMMUTABLE_BLOB)
+                .cacheControl(REVALIDATE_BLOB)
                 .contentType(mediaType(file.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(resource);
@@ -118,7 +125,7 @@ public class ArchiveController {
                 .build();
 
         return ResponseEntity.ok()
-                .cacheControl(IMMUTABLE_BLOB)
+                .cacheControl(REVALIDATE_BLOB)
                 .contentType(mediaType)
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(resource);

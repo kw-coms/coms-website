@@ -238,6 +238,34 @@ class CommunityServiceTest {
     }
 
     @Test
+    void vicePresidentModeratorCannotEditAnotherMembersPostContentOrMedia() {
+        Member author = member("2025123456", "원작성자", Member.Role.USER);
+        Member vicePresident = member("2026129998", "부회장", Member.Role.VICE_PRESIDENT);
+        memberRepository.save(author);
+        memberRepository.save(vicePresident);
+        var created = communityService.create(
+                author.getStudentId(),
+                new CommunityPostRequest("원제목", "내용", "GENERAL", false),
+                null
+        );
+
+        assertThatThrownBy(() -> communityService.update(
+                vicePresident.getStudentId(),
+                created.id(),
+                new CommunityPostRequest("부회장 수정", "부회장 내용", "GENERAL", false),
+                null
+        )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+
+        assertThatThrownBy(() -> communityService.addImages(
+                vicePresident.getStudentId(),
+                created.id(),
+                java.util.List.of(new MockMultipartFile("images", "bypass.png", "image/png", PNG_BYTES))
+        )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+    }
+
+    @Test
     void editingAnonymousPostKeepsOriginalAnonymousIdentity() {
         Member author = member("2025123456", "작성자", Member.Role.USER);
         Member viewer = member("2026123456", "회원", Member.Role.USER);

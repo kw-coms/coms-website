@@ -7,6 +7,7 @@ public record NoticeResponse(
         String title,
         String content,
         String author,
+        String authorStudentId,
         boolean pinned,
         String category,
         long viewCount,

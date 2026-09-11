@@ -76,7 +76,6 @@ public class NoticeController {
         return ResponseEntity.status(HttpStatus.CREATED).body(noticeService.create(authentication.getName(), request));
     }
 
-    @PreAuthorize("@perm.has(authentication,'NOTICE_WRITE')")
     @PutMapping("/{id}")
     public ResponseEntity<NoticeResponse> update(Authentication authentication,
                                                  @PathVariable Long id,
@@ -97,7 +96,7 @@ public class NoticeController {
     public ResponseEntity<NoticeResponse> updateAuthor(Authentication authentication,
                                                        @PathVariable Long id,
                                                        @Valid @RequestBody NoticeAuthorUpdateRequest request) {
-        return ResponseEntity.ok(noticeService.updateAuthor(authentication.getName(), id, request.name()));
+        return ResponseEntity.ok(noticeService.updateAuthor(authentication.getName(), id, request.name(), request.studentId()));
     }
 
     @PreAuthorize("@perm.has(authentication,'NOTICE_WRITE')")

@@ -32,8 +32,8 @@ class SecurityConfigSourceTest {
 
         assertThat(source).contains("auth.requestMatchers(HttpMethod.GET, \"/api/notices\", \"/api/notices/**\").authenticated()");
         assertThat(source).doesNotContain("auth.requestMatchers(HttpMethod.GET, \"/api/notices\", \"/api/notices/**\").permitAll()");
-        // 공지 변경은 이제 notice.write 권한 게이트 — URL 규칙은 로그인 경계까지만 낮추고
-        // 실제 판정은 NoticeController 의 @perm.has 가 한다. 익명 요청은 여전히 못 들어온다.
+        // 공지 내용 수정은 회장 또는 명시 작성자(owner) 서비스 게이트 — URL 규칙은
+        // 로그인 경계까지만 낮춘다. 익명 요청은 여전히 못 들어온다.
         assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/notices\").authenticated()");
         assertThat(source).contains("auth.requestMatchers(HttpMethod.PATCH, \"/api/notices/*/pin\").authenticated()");
         assertThat(source).contains("auth.requestMatchers(HttpMethod.PUT, \"/api/notices/**\").authenticated()");
@@ -41,7 +41,7 @@ class SecurityConfigSourceTest {
         assertThat(source).doesNotContain("\"/api/notices\").permitAll()");
         String noticeController = controller("NoticeController.java");
         assertThat(noticeController.split("@PreAuthorize\\(\"@perm.has\\(authentication,'NOTICE_WRITE'\\)\"\\)", -1))
-                .hasSize(5); // create, update, pin, delete
+                .hasSize(4); // create, pin, delete; update is service-level owner-or-president
         assertThat(source).contains("auth.requestMatchers(HttpMethod.POST, \"/api/files\").authenticated()");
         // Archive moderation is archive.manage — the explicit DELETE/PATCH matchers must
         // still exist (ahead of the /api/files/** catch-all) so the intent is readable,
