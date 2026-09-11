@@ -10,6 +10,7 @@ export function ArchiveDetailView({
   voting,
   onVote,
   onDelete,
+  onEdit,
 }: {
   detailFile: any
   isAdmin: boolean
@@ -17,6 +18,7 @@ export function ArchiveDetailView({
   voting: boolean
   onVote: () => void
   onDelete: (id: number) => void
+  onEdit?: () => void
 }) {
   return (
     <div className="m-5 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] p-5 text-[var(--app-muted)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:m-7 sm:p-7">
@@ -52,7 +54,7 @@ export function ArchiveDetailView({
       </dl>
       <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         <a
-          href={downloadUrl(detailFile.id)}
+          href={downloadUrl(detailFile.id, detailFile.contentVersion)}
           className="apple-action-primary inline-flex min-h-12 items-center justify-center gap-2 px-4 text-sm max-md:col-span-2 sm:min-h-10"
         >
           <Download size={15} />
@@ -67,6 +69,7 @@ export function ArchiveDetailView({
           <ThumbsUp size={15} />
           추천 {detailFile.upvotes ?? 0}
         </button>
+        {onEdit && <button type="button" onClick={onEdit} className="apple-action-secondary min-h-12 px-4 text-sm">수정</button>}
         {isAdmin && onAuthorEdit && (
           <button
             type="button"

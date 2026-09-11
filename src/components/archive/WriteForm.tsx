@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { FileUp, X } from 'lucide-react'
-import { createPosts } from '../../services/archiveApi'
+import { createPosts, updateArchiveFile } from '../../services/archiveApi'
+import { parsePostBlocks } from '../../pages/community/postEditorUtils'
 import { fetchLinkPreview, searchYoutubeVideos } from '../../services/communityApi'
 import RichBodyEditor from '../richEditor/RichBodyEditor'
 import { URL_ONLY_RICH_FEATURES } from '../richEditor/richBodyFeatures'
@@ -8,20 +9,22 @@ import { serializeRichBody } from '../richEditor/serializeRichBody'
 import { CategorySegment } from './CategorySegment'
 import { WRITABLE_ARCHIVE_CATEGORIES, formatSize } from './archiveUtils'
 
-export function WriteForm({ onCancel, onSave }: {
+export function WriteForm({ onCancel, onSave, initialFile }: {
+  initialFile?: { id: number; title?: string; originalName?: string; description?: string; category?: string }
   onCancel: () => void
   onSave: (savedList: unknown[], failedNames: string[]) => void
 }) {
-  const [form, setForm] = useState({ title: '', category: 'GENERAL' })
+  const [form, setForm] = useState({ title: initialFile?.title || initialFile?.originalName || '', category: initialFile?.category || 'GENERAL' })
   const [files, setFiles] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const fileInputRef = useRef(null)
   const editorApiRef = useRef(null)
+  const initialBlocks = useMemo(() => initialFile ? parsePostBlocks({ content: initialFile.description }) : [], [initialFile])
 
   const addFiles = (event) => {
     const picked = Array.from(event.target.files || [])
-    if (picked.length) setFiles((prev) => [...prev, ...picked])
+    if (picked.length) setFiles((prev) => initialFile ? picked.slice(0, 1) : [...prev, ...picked])
     // Reset so re-selecting the same file fires onChange again.
     event.target.value = ''
   }
@@ -33,12 +36,17 @@ export function WriteForm({ onCancel, onSave }: {
   const submit = async (event) => {
     event.preventDefault()
     if (!form.title.trim()) { setError('제목을 입력해주세요.'); return }
-    if (files.length === 0) { setError('파일을 선택해주세요.'); return }
+    if (!initialFile && files.length === 0) { setError('파일을 선택해주세요.'); return }
     setSaving(true)
     setError('')
     try {
       const blocks = editorApiRef.current?.getBlocks() || []
       const description = serializeRichBody(blocks)
+      if (initialFile) {
+        const saved = await updateArchiveFile(initialFile.id, { title: form.title.trim(), description, category: form.category, file: files[0] })
+        onSave([saved], [])
+        return
+      }
       const results = await createPosts(files, {
         title: form.title.trim(),
         description,
@@ -84,7 +92,7 @@ export function WriteForm({ onCancel, onSave }: {
       <div className="block">
         <span className="mb-2 block text-xs font-bold text-[var(--app-subtle)]">설명 (선택)</span>
         <RichBodyEditor
-          initialBlocks={[]}
+          initialBlocks={initialBlocks}
           apiRef={editorApiRef}
           features={URL_ONLY_RICH_FEATURES}
           onError={setError}
@@ -101,13 +109,13 @@ export function WriteForm({ onCancel, onSave }: {
             <input
               ref={fileInputRef}
               type="file"
-              multiple
+              multiple={!initialFile}
               className="hidden"
               onChange={addFiles}
             />
           </label>
           <span className="min-w-0 flex-1 truncate font-medium">
-            {files.length === 0 ? '선택된 파일 없음' : `${files.length}개 파일 선택됨`}
+            {files.length === 0 ? initialFile ? `기존 파일 유지: ${initialFile.originalName}` : '선택된 파일 없음' : `${files.length}개 파일 선택됨`}
           </span>
         </div>
         {files.length > 1 && (
@@ -142,15 +150,16 @@ export function WriteForm({ onCancel, onSave }: {
       <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
         <button
           type="submit"
-          disabled={saving || files.length === 0}
+          disabled={saving || (!initialFile && files.length === 0)}
           className="apple-action-primary inline-flex min-h-12 items-center justify-center gap-2 px-5 text-sm disabled:opacity-50 sm:min-h-10"
         >
           <FileUp size={15} />
-          {saving ? '업로드 중...' : '등록'}
+          {saving ? '저장 중...' : initialFile ? '수정 저장' : '등록'}
         </button>
         <button
           type="button"
           onClick={onCancel}
+          disabled={saving}
           className="apple-action-secondary inline-flex min-h-12 items-center justify-center gap-1.5 px-4 text-sm sm:min-h-10"
         >
           <X size={14} />

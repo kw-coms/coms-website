@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { listFiles, createPost, deleteFile, updateArchiveAuthor } from '../../services/archiveApi'
 import { showToast } from '../../components/common/Toast'
-import { confirmDialog, promptDialog } from '../../components/common/ConfirmDialog'
+import { confirmDialog } from '../../components/common/ConfirmDialog'
+import AuthorChangeDialog from '../../components/common/AuthorChangeDialog'
+import { WriteForm } from '../../components/archive/WriteForm'
+import { canEditArchive } from '../../utils/contentEditing'
+import { useAuth } from '../../contexts/useAuth'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
 export default function AdminFiles() {
+  const { user } = useAuth()
+  const [editingFile, setEditingFile] = useState<any>(null)
+  const [authorFile, setAuthorFile] = useState<any>(null)
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -41,25 +48,6 @@ export default function AdminFiles() {
     }
   }
 
-  const handleAuthorEdit = async (file) => {
-    const name = await promptDialog({
-      message: '자료실에 표시할 작성자 이름을 입력하세요.',
-      defaultValue: file.uploaderName || '',
-    })
-    if (name === null) return
-    if (!name.trim()) {
-      showToast({ message: '작성자 이름을 입력해주세요.', tone: 'error' })
-      return
-    }
-    try {
-      const updated = await updateArchiveAuthor(file.id, name.trim())
-      setFiles((prev) => prev.map((item) => (item.id === file.id ? { ...item, uploaderName: updated.uploaderName } : item)))
-      showToast({ message: '작성자가 변경되었습니다.' })
-    } catch (err) {
-      showToast({ message: err.message || '작성자 변경 중 오류가 발생했습니다.', tone: 'error' })
-    }
-  }
-
   const handleDelete = async (id) => {
     if (!(await confirmDialog({ message: '파일을 삭제하시겠습니까?', tone: 'danger' }))) return
     try {
@@ -72,6 +60,11 @@ export default function AdminFiles() {
 
   return (
     <div className="space-y-4">
+      {authorFile && <AuthorChangeDialog name={authorFile.uploaderName} allowMemberSelection={user?.role === 'ADMIN'} onClose={() => setAuthorFile(null)} onSave={async payload => {
+        const updated = await updateArchiveAuthor(authorFile.id, payload.studentId ? { studentId: payload.studentId } : { uploaderName: payload.name })
+        setFiles(prev => prev.map(file => file.id === updated.id ? updated : file))
+      }} />}
+      {editingFile && <WriteForm key={editingFile.id} initialFile={editingFile} onCancel={() => setEditingFile(null)} onSave={() => { setEditingFile(null); loadFiles(); showToast({ message: '자료가 수정되었습니다.' }) }} />}
       <div>
         <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
         <button
@@ -113,9 +106,10 @@ export default function AdminFiles() {
                   작성자 {file.uploaderName || file.uploadedBy || '-'} · {formatFileSize(file.fileSize)}
                 </p>
               </div>
+              {canEditArchive(user, file) && <button type="button" onClick={() => setEditingFile(file)} className="text-xs font-semibold text-blue-500">수정</button>}
               <button
                 type="button"
-                onClick={() => handleAuthorEdit(file)}
+                onClick={() => setAuthorFile(file)}
                 className="text-xs font-semibold text-blue-500 transition hover:underline"
               >
                 작성자 변경

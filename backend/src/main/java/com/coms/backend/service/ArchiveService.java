@@ -7,12 +7,16 @@ import com.coms.backend.dto.ArchiveFileResponse;
 import com.coms.backend.repository.ArchiveFileRepository;
 import com.coms.backend.repository.ArchiveFileVoteRepository;
 import com.coms.backend.repository.MemberRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -29,10 +33,12 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class ArchiveService {
+    private static final Logger log = LoggerFactory.getLogger(ArchiveService.class);
 
     // A real cap for this feature (lecture notes, slides, past papers). Matching the
     // multipart cap made this check meaningless — the container rejected first.
     private static final long MAX_ARCHIVE_FILE_BYTES = 50L * 1024 * 1024;
+    private static final int MAX_TITLE_LENGTH = 200;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "pdf", "txt", "md", "csv",
             "doc", "docx", "ppt", "pptx", "xls", "xlsx", "hwp", "hwpx",
@@ -55,14 +61,17 @@ public class ArchiveService {
     private final MemberRepository memberRepository;
     private final ArchiveFileVoteRepository voteRepository;
     private final RichContentSanitizer richContentSanitizer;
+    private final AuditLogService auditLogService;
 
     public ArchiveService(ArchiveFileRepository repo, StorageService storage, MemberRepository memberRepository,
-                          ArchiveFileVoteRepository voteRepository, RichContentSanitizer richContentSanitizer) {
+                          ArchiveFileVoteRepository voteRepository, RichContentSanitizer richContentSanitizer,
+                          AuditLogService auditLogService) {
         this.repo = repo;
         this.storage = storage;
         this.memberRepository = memberRepository;
         this.voteRepository = voteRepository;
         this.richContentSanitizer = richContentSanitizer;
+        this.auditLogService = auditLogService;
     }
 
     public ArchiveFileResponse upload(String title, String description, MultipartFile file, String uploaderStudentId) throws IOException {
@@ -94,27 +103,84 @@ public class ArchiveService {
         }
     }
 
+    public ArchiveFileResponse update(String editorStudentId, Long id, String title, String description,
+                                      String category, MultipartFile replacement) throws IOException {
+        Member editor = memberRepository.findByStudentId(editorStudentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        ArchiveFile entity = repo.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!Objects.equals(entity.getUploadedBy(), editor.getStudentId()) && editor.getRole() != Member.Role.ADMIN) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        ArchiveFile.Category parsedCategory = parseCategory(category);
+        String normalizedTitle = normalizeTitle(title);
+        String oldStoredName = entity.getStoredName();
+        String newStoredName = null;
+        if (replacement != null && replacement.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "교체할 파일이 비어 있습니다.");
+        }
+        if (replacement != null) {
+            validateUpload(replacement);
+            newStoredName = storage.store(replacement);
+            deleteAfterRollback(newStoredName);
+            entity.setOriginalName(cleanOriginalFilename(replacement));
+            entity.setStoredName(newStoredName);
+            entity.setMimeType(replacement.getContentType() == null ? "application/octet-stream" : replacement.getContentType());
+            entity.setFileSize(replacement.getSize());
+        }
+        entity.setTitle(normalizedTitle != null ? normalizedTitle : entity.getOriginalName());
+        entity.setDescription(sanitizeDescription(description));
+        entity.setCategory(parsedCategory);
+        ArchiveFile saved = repo.save(entity);
+        if (newStoredName != null && !Objects.equals(oldStoredName, newStoredName)) {
+            deleteAfterCommit(oldStoredName);
+        }
+        auditLogService.record(editor.getStudentId(), "ARCHIVE_FILE_UPDATE", "ARCHIVE_FILE",
+                String.valueOf(saved.getId()), archiveAuditDetail(saved, newStoredName != null), null);
+        return toResponse(saved, voteStats(List.of(saved)), editorStudentId);
+    }
+
     /**
-     * archive.manage-gated (defaults to 부회장 이상; enforced here as a second lock behind
-     * ArchiveController's own @PreAuthorize — the /api/files/** URL rule in SecurityConfig only
-     * requires a logged-in member): override the displayed 작성자 of an archive entry.
-     * uploaderName is a free-text display snapshot with no FK, so this is a
-     * plain column update; uploadedBy (the owning account) never changes.
+     * Display-name mode remains the archive.manage-compatible path enforced by the controller.
+     * Supplying studentId is ownership reassignment and is always ADMIN-only in the service.
      */
     @PreAuthorize("@perm.has(authentication,'ARCHIVE_MANAGE')")
-    public ArchiveFileResponse updateAuthor(Long id, String uploaderName, String editorStudentId) {
+    public ArchiveFileResponse updateAuthor(Long id, String uploaderName, String studentId, String editorStudentId) {
         ArchiveFile entity = repo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        String cleaned = uploaderName == null ? null : uploaderName.trim();
-        if (cleaned == null || cleaned.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "작성자 이름을 입력해주세요.");
+        String cleaned = uploaderName == null ? "" : uploaderName.trim();
+        String cleanedStudentId = studentId == null ? "" : studentId.trim();
+        if (cleaned.isEmpty() == cleanedStudentId.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "회원 선택 또는 이름 직접 입력 중 하나만 지정해주세요.");
         }
-        if (cleaned.length() > 60) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "작성자 이름은 60자 이하여야 합니다.");
+        String detail;
+        if (!cleanedStudentId.isEmpty()) {
+            Member editor = memberRepository.findByStudentId(editorStudentId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+            if (editor.getRole() != Member.Role.ADMIN) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+            }
+            Member newOwner = memberRepository.findByStudentId(cleanedStudentId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 학번의 회원을 찾을 수 없습니다."));
+            entity.setUploadedBy(newOwner.getStudentId());
+            entity.setUploaderName(newOwner.getName());
+            detail = "uploadedBy=" + newOwner.getStudentId();
+        } else {
+            if (cleaned.length() > 60) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "작성자 이름은 60자 이하여야 합니다.");
+            }
+            entity.setUploaderName(cleaned);
+            detail = "uploaderName=(custom)";
         }
-        entity.setUploaderName(cleaned);
         ArchiveFile saved = repo.save(entity);
+        auditLogService.record(editorStudentId, "ARCHIVE_FILE_AUTHOR_UPDATE", "ARCHIVE_FILE",
+                String.valueOf(saved.getId()), detail, null);
         return toResponse(saved, voteStats(List.of(saved)), editorStudentId);
+    }
+
+    @PreAuthorize("@perm.has(authentication,'ARCHIVE_MANAGE')")
+    public ArchiveFileResponse updateAuthor(Long id, String uploaderName, String editorStudentId) {
+        return updateAuthor(id, uploaderName, null, editorStudentId);
     }
 
     @Transactional(readOnly = true)
@@ -215,8 +281,76 @@ public class ArchiveService {
                 file.getViewCount(),
                 votes.upvotes(),
                 votes.myVote(studentId),
-                file.getUploadedAt()
+                file.getUploadedAt(),
+                contentVersion(file.getStoredName())
         );
+    }
+
+    private String contentVersion(String storedName) {
+        if (storedName == null || storedName.isBlank()) {
+            return null;
+        }
+        String filename = StringUtils.getFilename(storedName);
+        if (filename == null || filename.isBlank()) {
+            return storedName;
+        }
+        int separator = filename.indexOf('_');
+        return separator > 0 ? filename.substring(0, separator) : filename;
+    }
+
+    private String archiveAuditDetail(ArchiveFile file, boolean replacedFile) {
+        return "title=" + auditValue(file.getTitle())
+                + ", category=" + auditValue(file.getCategory().name())
+                + ", replacedFile=" + replacedFile;
+    }
+
+    private String normalizeTitle(String title) {
+        if (title == null || title.isBlank()) {
+            return null;
+        }
+        String cleaned = title.trim();
+        if (cleaned.length() > MAX_TITLE_LENGTH) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "제목은 200자 이하여야 합니다.");
+        }
+        return cleaned;
+    }
+
+    private String auditValue(String value) {
+        return value == null ? "" : value.replace("\n", " ").replace("\r", " ");
+    }
+
+    private void deleteAfterCommit(String storedName) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    deleteBestEffort(storedName);
+                }
+            });
+        } else {
+            storage.delete(storedName);
+        }
+    }
+
+    private void deleteAfterRollback(String storedName) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    if (status != STATUS_COMMITTED) {
+                        deleteBestEffort(storedName);
+                    }
+                }
+            });
+        }
+    }
+
+    private void deleteBestEffort(String storedName) {
+        try {
+            storage.delete(storedName);
+        } catch (RuntimeException e) {
+            log.warn("Failed to delete archive blob {}", storedName, e);
+        }
     }
 
     private record VoteSummary(long upvotes, Map<String, Integer> byStudent) {
