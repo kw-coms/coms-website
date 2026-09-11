@@ -20,6 +20,119 @@ const fontFamilies = [
   'Nanum Myeongjo',
 ]
 
+test('archive edit preserves its file and offers explicit author reassignment', async ({ page }) => {
+  await mockAdminApis(page)
+  let file = { id: 910, title: '기존 자료', description: '기존 설명', originalName: 'original.pdf', uploadedBy: 'owner', uploaderName: '원작성자', category: 'GENERAL', fileSize: 42, viewCount: 7, upvotes: 2, uploadedAt: '2026-09-01T00:00:00', contentVersion: 'original' }
+  const edits = []
+  const authors = []
+  await page.route('**/api/files', route => route.fulfill({ json: [file] }))
+  await page.route('**/api/files/910', async route => {
+    expect(route.request().method()).toBe('PUT')
+    const body = route.request().postData()
+    edits.push(body)
+    file = { ...file, title: multipartField(body, 'title'), description: multipartField(body, 'description') }
+    await route.fulfill({ json: file })
+  })
+  await page.route('**/api/admin/members', route => route.fulfill({ json: [{ studentId: '2026123456', name: '박채현' }] }))
+  await page.route('**/api/files/910/author', async route => {
+    const body = route.request().postDataJSON()
+    authors.push(body)
+    file = { ...file, uploaderName: body.uploaderName || '박채현', uploadedBy: body.studentId || file.uploadedBy }
+    await route.fulfill({ json: file })
+  })
+  await page.goto('/resources/910')
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  await expect(page.getByText('기존 파일 유지: original.pdf')).toBeVisible()
+  await page.getByPlaceholder('자료 제목').fill('수정된 자료')
+  await page.getByRole('button', { name: '수정 저장' }).click()
+  await expect(page.getByRole('heading', { name: '수정된 자료', exact: true })).toBeVisible()
+  expect(edits).toHaveLength(1)
+  expect(edits[0]).not.toContain('filename=')
+  await expect(page.getByText(/원작성자 ·/)).toBeVisible()
+  await expect(page.getByRole('link', { name: '다운로드' })).toHaveAttribute('href', '/api/files/910/download?v=original')
+  await page.getByRole('button', { name: '작성자 변경', exact: true }).click()
+  let dialog = page.getByRole('dialog', { name: '작성자 변경' })
+  await dialog.getByLabel('표시 이름').fill('표시 전용 이름')
+  await dialog.getByRole('button', { name: '표시 이름 변경' }).click()
+  await expect(dialog).not.toBeVisible()
+  expect(authors[0]).toEqual({ uploaderName: '표시 전용 이름' })
+  await page.getByRole('button', { name: '작성자 변경', exact: true }).click()
+  dialog = page.getByRole('dialog', { name: '작성자 변경' })
+  await dialog.getByRole('radio', { name: '회원 선택' }).check()
+  await dialog.getByLabel('회원 검색').fill('박채현')
+  await dialog.getByRole('combobox', { name: '회원 선택' }).selectOption('2026123456')
+  await dialog.getByRole('button', { name: '소유권 변경 확인' }).click()
+  await expect(dialog).not.toBeVisible()
+  expect(authors[1]).toEqual({ studentId: '2026123456' })
+})
+
+test('archive replacement sends only the explicitly chosen file', async ({ page }) => {
+  await mockAdminApis(page)
+  const file = { id: 911, title: '교체 대상', description: '', originalName: 'old.txt', uploadedBy: 'other', category: 'GENERAL', uploadedAt: '2026-09-01T00:00:00' }
+  let body = ''
+  await page.route('**/api/files', route => route.fulfill({ json: [file] }))
+  await page.route('**/api/files/911', async route => {
+    body = route.request().postData()
+    await route.fulfill({ json: { ...file, originalName: 'replacement.txt', contentVersion: 'new-blob' } })
+  })
+  await page.goto('/resources/911')
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  await page.locator('input[type=file]').setInputFiles({ name: 'replacement.txt', mimeType: 'text/plain', buffer: Buffer.from('replacement bytes') })
+  await page.getByRole('button', { name: '수정 저장' }).click()
+  await expect(page.getByRole('link', { name: '다운로드' })).toHaveAttribute('href', '/api/files/911/download?v=new-blob')
+  expect(body).toContain('filename="replacement.txt"')
+  expect(body).toContain('replacement bytes')
+})
+
+test('archive non-owner vice president cannot see the content edit action', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/auth/me', route => route.fulfill({ json: { studentId: 'vp', name: '부회장', role: 'VICE_PRESIDENT', emailVerified: true } }))
+  await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'VICE_PRESIDENT', permissions: ['archive.manage'] } }))
+  await page.route('**/api/files', route => route.fulfill({ json: [{ id: 912, title: '타인 자료', uploadedBy: 'owner', originalName: 'old.txt', uploadedAt: '2026-09-01T00:00:00' }] }))
+  await page.goto('/resources/912')
+  await expect(page.getByRole('heading', { name: '타인 자료' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '수정', exact: true })).toHaveCount(0)
+})
+
+test('notice author can edit after reassignment but cannot pin or delete', async ({ page }) => {
+  await mockAdminApis(page)
+  const notice = { id: 913, title: '이관된 공지', content: '기존 본문', category: 'GENERAL', author: '회원', authorStudentId: 'owner', pinned: true, createdAt: '2026-09-01T00:00:00' }
+  let edited = null
+  await page.route('**/api/auth/me', route => route.fulfill({ json: { studentId: 'owner', name: '회원', role: 'USER', emailVerified: true } }))
+  await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
+  await page.route('**/api/notices', route => route.fulfill({ json: [notice] }))
+  await page.route('**/api/notices/913', async route => {
+    if (route.request().method() === 'PUT') {
+      edited = route.request().postDataJSON()
+      return route.fulfill({ json: { ...notice, ...edited } })
+    }
+    return route.fulfill({ json: notice })
+  })
+  await page.goto('/notices/913')
+  await expect(page.getByRole('button', { name: '수정', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '고정 해제', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '삭제', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  await page.getByPlaceholder('제목', { exact: true }).fill('수정된 공지 제목')
+  await page.getByRole('button', { name: /수정|저장/ }).last().click()
+  await expect.poll(() => edited?.title).toBe('수정된 공지 제목')
+  expect(edited.pinned).toBe(true)
+})
+
+test('notice write permission does not expose another authors edit action', async ({ page }) => {
+  await mockAdminApis(page)
+  const notice = { id: 914, title: '다른 회원의 공지', content: '본문', category: 'GENERAL', author: '다른 회원', authorStudentId: 'owner', pinned: false, createdAt: '2026-09-01T00:00:00' }
+  await page.route('**/api/auth/me', route => route.fulfill({ json: { studentId: 'vp', name: '부회장', role: 'VICE_PRESIDENT', emailVerified: true } }))
+  await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'VICE_PRESIDENT', permissions: ['notice.write'] } }))
+  await page.route('**/api/notices', route => route.fulfill({ json: [notice] }))
+  await page.route('**/api/notices/914', route => route.fulfill({ json: notice }))
+  await page.goto('/notices/914')
+  await expect(page.getByRole('heading', { name: '다른 회원의 공지', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '수정', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '고정', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: '삭제', exact: true })).toBeVisible()
+})
+
 function multipartField(body, name) {
   const match = new RegExp(`name="${name}"\\r\\n\\r\\n([^\\r]+)`).exec(body || '')
   return match?.[1] || ''

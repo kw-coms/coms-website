@@ -1,5 +1,7 @@
 package com.coms.backend.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.coms.backend.domain.Member;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.security.JwtTokenProvider;
@@ -10,19 +12,24 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
         "jwt.secret=test-secret-key-with-at-least-32-chars",
         "cors.allowed-origins=https://coms.kw.ac.kr",
-        "spring.datasource.url=jdbc:h2:mem:operations-security-test;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1"
+        "spring.datasource.url=jdbc:h2:mem:operations-security-test;MODE=PostgreSQL;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
+        "storage.location=./build/test-uploads/operations-security"
 })
 @AutoConfigureMockMvc
 @Transactional
@@ -42,10 +49,13 @@ class OperationsSecurityIntegrationTest {
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     private Cookie officerCookie;
     private Cookie userCookie;
     private Cookie vicePresidentCookie;
     private Cookie associateCookie;
+    private Cookie adminCookie;
 
     @BeforeEach
     void setUp() {
@@ -54,10 +64,12 @@ class OperationsSecurityIntegrationTest {
         memberRepository.save(member("2026000002", Member.Role.USER));
         memberRepository.save(member("2026000003", Member.Role.VICE_PRESIDENT));
         memberRepository.save(member("2026000004", Member.Role.ASSOCIATE));
+        memberRepository.save(member("2026000005", Member.Role.ADMIN));
         officerCookie = authCookie("2026000001");
         userCookie = authCookie("2026000002");
         vicePresidentCookie = authCookie("2026000003");
         associateCookie = authCookie("2026000004");
+        adminCookie = authCookie("2026000005");
     }
 
     @Test
@@ -201,6 +213,92 @@ class OperationsSecurityIntegrationTest {
     }
 
     @Test
+    void archiveUpdateHttpAllowsOwnerAndPresidentButNotVicePresidentNonOwner() throws Exception {
+        JsonNode uploaded = uploadArchive(userCookie, "원제목", "old.pdf", "%PDF-1.4 old");
+        long id = uploaded.get("id").asLong();
+        String initialVersion = uploaded.get("contentVersion").asText();
+
+        JsonNode ownerUpdated = objectMapper.readTree(mockMvc.perform(multipart("/api/files/{id}", id)
+                        .file(new MockMultipartFile("file", "new.pdf", "application/pdf", "%PDF-1.4 new".getBytes()))
+                        .param("title", "회원 수정")
+                        .param("description", "회원 설명")
+                        .param("category", "ACADEMIC_JOURNAL")
+                        .cookie(userCookie)
+                        .header("Origin", ORIGIN)
+                        .with(request -> {
+                            request.setMethod("PUT");
+                            return request;
+                        }))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value((int) id))
+                .andExpect(jsonPath("$.uploadedBy").value("2026000002"))
+                .andExpect(jsonPath("$.title").value("회원 수정"))
+                .andExpect(jsonPath("$.category").value("ACADEMIC_JOURNAL"))
+                .andReturn().getResponse().getContentAsString());
+        assertThat(ownerUpdated.get("contentVersion").asText()).isNotEqualTo(initialVersion);
+
+        mockMvc.perform(get("/api/files/{id}/download", id).cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(result -> assertThat(result.getResponse().getContentAsByteArray())
+                        .isEqualTo("%PDF-1.4 new".getBytes()));
+
+        mockMvc.perform(multipart("/api/files/{id}", id)
+                        .param("title", "부회장 수정")
+                        .param("category", "GENERAL")
+                        .cookie(vicePresidentCookie)
+                        .header("Origin", ORIGIN)
+                        .with(request -> {
+                            request.setMethod("PUT");
+                            return request;
+                        }))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(multipart("/api/files/{id}", id)
+                        .param("title", "회장 수정")
+                        .param("category", "GENERAL")
+                        .cookie(adminCookie)
+                        .header("Origin", ORIGIN)
+                        .with(request -> {
+                            request.setMethod("PUT");
+                            return request;
+                        }))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("회장 수정"))
+                .andExpect(jsonPath("$.uploadedBy").value("2026000002"));
+    }
+
+    @Test
+    void archiveAuthorHttpKeepsDisplayModeArchiveManageAndMakesReassignmentPresidentOnly() throws Exception {
+        JsonNode uploaded = uploadArchive(userCookie, "작성자 테스트", "author.pdf", "%PDF-1.4 author");
+        long id = uploaded.get("id").asLong();
+
+        mockMvc.perform(patch("/api/files/{id}/author", id)
+                        .cookie(vicePresidentCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"uploaderName\":\"표시 작성자\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.uploadedBy").value("2026000002"))
+                .andExpect(jsonPath("$.uploaderName").value("표시 작성자"));
+
+        mockMvc.perform(patch("/api/files/{id}/author", id)
+                        .cookie(vicePresidentCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"studentId\":\"2026000001\"}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(patch("/api/files/{id}/author", id)
+                        .cookie(adminCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"studentId\":\"2026000001\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.uploadedBy").value("2026000001"))
+                .andExpect(jsonPath("$.uploaderName").value("OFFICER"));
+    }
+
+    @Test
     void noticeAuthorEditIsPresidentOnly() throws Exception {
         // 작성자 변경 is 회장 전용 — 부회장도 거부.
         mockMvc.perform(patch("/api/notices/1/author")
@@ -210,10 +308,9 @@ class OperationsSecurityIntegrationTest {
                         .content("{\"name\":\"홍길동\"}"))
                 .andExpect(status().isForbidden());
 
-        memberRepository.save(member("2026000005", Member.Role.ADMIN));
         // ADMIN passes the gate; 404 because notice 1 doesn't exist here.
         mockMvc.perform(patch("/api/notices/1/author")
-                        .cookie(authCookie("2026000005"))
+                        .cookie(adminCookie)
                         .header("Origin", ORIGIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"홍길동\"}"))
@@ -233,6 +330,19 @@ class OperationsSecurityIntegrationTest {
 
     private Cookie authCookie(String studentId) {
         return new Cookie("token", jwtTokenProvider.generateToken(studentId, 0));
+    }
+
+    private JsonNode uploadArchive(Cookie cookie, String title, String filename, String bytes) throws Exception {
+        String body = mockMvc.perform(multipart("/api/files")
+                        .file(new MockMultipartFile("file", filename, "application/pdf", bytes.getBytes()))
+                        .param("title", title)
+                        .param("description", "설명")
+                        .param("category", "GENERAL")
+                        .cookie(cookie)
+                        .header("Origin", ORIGIN))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(body);
     }
 
     private Member member(String studentId, Member.Role role) {

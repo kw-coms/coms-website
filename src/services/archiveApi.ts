@@ -39,7 +39,7 @@ export async function createPost({ title, description, category, file }: {
 export function updateArchiveAuthor(id, uploaderName) {
   return request(`/api/files/${id}/author`, {
     method: 'PATCH',
-    body: JSON.stringify({ uploaderName }),
+    body: JSON.stringify(typeof uploaderName === 'string' ? { uploaderName } : uploaderName),
   })
 }
 
@@ -59,8 +59,17 @@ export async function createPosts(files, meta) {
   return results
 }
 
-export function downloadUrl(id) {
-  return apiUrl(`/api/files/${id}/download`)
+export function downloadUrl(id, contentVersion?: string) {
+  return apiUrl(`/api/files/${id}/download${contentVersion ? `?v=${encodeURIComponent(contentVersion)}` : ''}`)
+}
+
+export function updateArchiveFile(id, { title, description, category, file }: { title: string; description: string; category: string; file?: File }) {
+  const body = new FormData()
+  body.append('title', title)
+  body.append('description', description)
+  body.append('category', category)
+  if (file) body.append('file', file)
+  return request(`/api/files/${id}`, { method: 'PUT', body })
 }
 
 export async function deleteFile(id) {

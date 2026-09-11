@@ -4,7 +4,8 @@ import { linkify } from '../utils/linkify'
 import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Pin, PinOff, Search, Sparkles, ThumbsUp, Trash2, UsersRound } from 'lucide-react'
 import { getNotice, createNotice, updateNotice, deleteNotice, voteNotice, pinNotice, updateNoticeAuthor } from '../services/noticeApi'
 import { showToast } from '../components/common/Toast'
-import { confirmDialog, promptDialog } from '../components/common/ConfirmDialog'
+import { confirmDialog } from '../components/common/ConfirmDialog'
+import AuthorChangeDialog from '../components/common/AuthorChangeDialog'
 import { Skeleton, SkeletonLine, SkeletonGroup } from '../components/common/Skeleton'
 import ErrorState from '../components/common/ErrorState'
 import { fetchLinkPreview, searchYoutubeVideos } from '../services/communityApi'
@@ -122,7 +123,7 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
     setSaving(true)
     setError('')
     try {
-      const body = { ...formData, content, pinned: false }
+      const body = { ...formData, content, pinned: Boolean(initialNotice?.pinned) }
       const saved = initialNotice
         ? await updateNotice(initialNotice.id, body)
         : await createNotice(body)
@@ -287,23 +288,13 @@ export default function Notices() {
     }
   }
 
-  // 회장 전용 작성자 변경 (자료실과 동일한 prompt 방식).
-  const handleAuthorEdit = async () => {
+  const [editingAuthor, setEditingAuthor] = useState(false)
+  const handleAuthorEdit = async (payload) => {
     if (!selectedNotice) return
-    const name = await promptDialog({ message: '공지에 표시할 작성자 이름을 입력하세요.', defaultValue: selectedNotice.author || '' })
-    if (name === null) return
-    if (!name.trim()) {
-      showToast({ message: '작성자 이름을 입력해주세요.', tone: 'error' })
-      return
-    }
-    try {
-      const updated = await updateNoticeAuthor(selectedNotice.id, name.trim())
-      setSelectedNotice(updated)
-      setNotices((prev) => prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
-      showToast({ message: '작성자가 변경되었습니다.', tone: 'success' })
-    } catch (err) {
-      showToast({ message: err.message || '작성자 변경 중 오류가 발생했습니다.', tone: 'error' })
-    }
+    const updated = await updateNoticeAuthor(selectedNotice.id, payload)
+    setSelectedNotice(updated)
+    setNotices((prev) => prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)))
+    showToast({ message: '작성자가 변경되었습니다.', tone: 'success' })
   }
 
   const [voting, setVoting] = useState(false)
@@ -648,24 +639,26 @@ export default function Notices() {
                 목록
               </button>
               {canManageSensitiveAdmin(user?.role) && (
-                <button type="button" onClick={handleAuthorEdit} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
+                <button type="button" onClick={() => setEditingAuthor(true)} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
                   작성자 변경
                 </button>
               )}
-              {isAdmin && (
+              {editingAuthor && canManageSensitiveAdmin(user?.role) && <AuthorChangeDialog name={selectedNotice.author} allowMemberSelection onClose={() => setEditingAuthor(false)} onSave={handleAuthorEdit} />}
+              {(isAdmin || (!!user?.studentId && selectedNotice.authorStudentId === user.studentId)) && (
                 <>
+                  {isAdmin &&
                   <button type="button" onClick={handlePinSelected} disabled={pinning} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold disabled:opacity-50 max-md:col-span-2 sm:min-h-0">
                     {selectedNotice.pinned ? <PinOff size={14} /> : <Pin size={14} />}
                     {selectedNotice.pinned ? '고정 해제' : '고정'}
-                  </button>
-                  <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
+                  </button>}
+                  {(user?.role === 'ADMIN' || (!!user?.studentId && selectedNotice.authorStudentId === user.studentId)) && <button type="button" onClick={() => setMode('edit')} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 py-2 text-sm font-bold sm:min-h-0">
                     <Pencil size={14} />
                     수정
-                  </button>
-                  <button type="button" onClick={deleteSelected} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 sm:min-h-0">
+                  </button>}
+                  {isAdmin && <button type="button" onClick={deleteSelected} className="inline-flex min-h-12 items-center justify-center gap-1 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 sm:min-h-0">
                     <Trash2 size={14} />
                     삭제
-                  </button>
+                  </button>}
                 </>
               )}
             </div>

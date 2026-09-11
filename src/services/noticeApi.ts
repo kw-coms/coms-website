@@ -19,7 +19,7 @@ export async function updateNotice(id, body) {
 export async function updateNoticeAuthor(id, name) {
   return request(`/api/notices/${id}/author`, {
     method: 'PATCH',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(typeof name === 'string' ? { name } : name),
   })
 }
 
