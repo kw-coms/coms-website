@@ -37,6 +37,7 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
     event.preventDefault()
     if (!form.title.trim()) { setError('제목을 입력해주세요.'); return }
     if (!initialFile && files.length === 0) { setError('파일을 선택해주세요.'); return }
+    if (!editorApiRef.current) { setError('편집기를 불러오는 중입니다. 잠시 후 저장해주세요.'); return }
     setSaving(true)
     setError('')
     try {
