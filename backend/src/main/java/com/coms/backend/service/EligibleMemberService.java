@@ -102,6 +102,7 @@ public class EligibleMemberService {
         return prepareGraduateSignup(request, normalizedName);
     }
 
+    @Transactional
     public EligibleMember claimPreparedSignup(long eligibleMemberId, String studentId) {
         String normalizedStudentId = normalize(studentId);
         EligibleMember member = eligibleMemberRepository.findByIdForUpdate(eligibleMemberId)
