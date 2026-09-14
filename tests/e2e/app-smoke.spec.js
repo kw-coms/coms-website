@@ -341,13 +341,130 @@ test('signup follows the recruit application form structure', async ({ page }) =
   await expect(page.getByText('지원하기와 같은 흐름으로 가입 정보를 작성합니다.')).toBeVisible()
   await expect(page.getByRole('heading', { name: '가입 정보 양식' })).toBeVisible()
   await expect(page.getByText('Process')).toBeVisible()
-  await expect(page.getByText('1. 가입 정보 작성')).toBeVisible()
-  await expect(page.getByText('2. 명부 확인 및 계정 생성')).toBeVisible()
-  await expect(page.getByText('3. 이메일 인증 후 로그인')).toBeVisible()
+  await expect(page.getByText('가입 정보 확인 → 이메일 인증 → 계정 생성')).toBeVisible()
+  await expect(page.getByText('1. 가입 정보 확인')).toBeVisible()
+  await expect(page.getByText('2. 이메일 인증')).toBeVisible()
+  await expect(page.getByText('3. 계정 생성 후 로그인')).toBeVisible()
 
   for (const interest of ['웹', '앱', '보안', '알고리즘', '아두이노', '디자인', '기타']) {
     await expect(page.getByRole('button', { name: interest })).toBeVisible()
   }
+})
+
+test('signup does not offer login until code confirmation creates the account', async ({ page }) => {
+  await mockOptionalApis(page)
+  await page.route('**/api/auth/signup', async (route) => {
+    expect(route.request().postDataJSON()).toMatchObject({
+      signupType: 'CURRENT',
+      studentId: '2026123456',
+      email: 'new-member@example.com',
+      name: '홍길동',
+    })
+    await route.fulfill({
+      status: 200,
+      json: { studentId: '2026123456', name: '홍길동', role: 'ASSOCIATE', emailVerified: false },
+    })
+  })
+  await page.route('**/api/auth/email-verification/confirm-signup', async (route) => {
+    expect(route.request().postDataJSON()).toEqual({ studentId: '2026123456', code: '123456' })
+    await route.fulfill({
+      status: 200,
+      json: { studentId: '2026123456', name: '홍길동', role: 'ASSOCIATE', emailVerified: true },
+    })
+  })
+  await page.route('**/api/auth/email-verification/request-signup', (route) => route.fulfill({
+    status: 200,
+    json: { message: '입력 정보와 일치하는 계정이 있다면 인증코드를 이메일로 보냈습니다.' },
+  }))
+
+  await page.goto('/signup')
+
+  await expect(page.getByText('가입 정보 확인 → 이메일 인증 → 계정 생성')).toBeVisible()
+  await page.getByLabel('학번').fill('2026123456')
+  await page.getByLabel('기수').fill('60')
+  await page.getByLabel('이름').fill('홍길동')
+  await page.getByLabel('이메일').fill('new-member@example.com')
+  await page.getByLabel('학과').fill('소프트웨어학부')
+  await page.getByLabel('전화번호').fill('01012345678')
+  await page.getByLabel('비밀번호', { exact: true }).fill('Strong!234')
+  await page.getByLabel('비밀번호 확인').fill('Strong!234')
+  await page.getByRole('button', { name: '웹' }).click()
+  await page.getByLabel('포부').fill('열심히 활동하겠습니다.')
+  await page.getByRole('button', { name: '회원가입' }).click()
+
+  await expect(page.getByText('이메일로 인증코드를 발송했습니다.')).toBeVisible()
+  await expect(page.getByRole('button', { name: '로그인하러 가기' })).toHaveCount(0)
+  await page.locator('input[autocomplete="one-time-code"]').fill('123456')
+  await page.getByRole('button', { name: '인증 완료' }).click()
+
+  await expect(page.getByText('인증이 완료되어 계정이 생성되었습니다.')).toBeVisible()
+  await expect(page.getByRole('button', { name: '로그인하러 가기' })).toBeVisible()
+})
+
+test('president adds a verified member from member management', async ({ page }) => {
+  await mockAdminApis(page)
+  let members = [
+    {
+      id: 2,
+      name: '기존회원',
+      studentId: '2025123456',
+      email: 'old@example.com',
+      emailVerified: true,
+      role: 'USER',
+      generation: 59,
+    },
+  ]
+  let postedMember = null
+
+  await page.route('**/api/admin/members', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, json: members })
+      return
+    }
+    if (route.request().method() === 'POST') {
+      postedMember = route.request().postDataJSON()
+      members = [
+        ...members,
+        {
+          id: 3,
+          ...postedMember,
+          emailVerified: true,
+        },
+      ]
+      await route.fulfill({ status: 200, json: members.at(-1) })
+      return
+    }
+    await route.fallback()
+  })
+
+  await page.goto('/admin?tab=members')
+  await page.getByRole('button', { name: '회원 추가' }).click()
+
+  await expect(page.getByText('이메일 인증 완료 상태로 생성됩니다.')).toBeVisible()
+  await page.getByLabel('학번').fill('2026123456')
+  await page.getByLabel('이름').fill('신규회원')
+  await page.getByLabel('이메일').fill('new-member@example.com')
+  await page.getByLabel('임시 비밀번호').fill('temp1')
+  await page.getByLabel('기수').fill('60')
+  await page.getByLabel('역할', { exact: true }).selectOption('OFFICER')
+  await page.getByLabel('학과').fill('컴퓨터정보공학부')
+  await page.getByLabel('전화번호').fill('01099998888')
+  await page.getByRole('button', { name: '저장' }).click()
+
+  await expect.poll(() => postedMember).toEqual({
+    studentId: '2026123456',
+    name: '신규회원',
+    email: 'new-member@example.com',
+    password: 'temp1',
+    generation: '60',
+    role: 'OFFICER',
+    department: '컴퓨터정보공학부',
+    phone: '01099998888',
+  })
+  expect(postedMember).not.toHaveProperty('passwordConfirm')
+  expect(postedMember).not.toHaveProperty('emailVerified')
+  await expect(page.getByText('신규회원')).toBeVisible()
+  await expect(page.getByText('new-member@example.com · 이메일 인증')).toBeVisible()
 })
 
 test('admin exposes a pre-deploy screen check panel', async ({ page }) => {
