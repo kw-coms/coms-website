@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const adminSource = readFileSync('src/pages/Admin.tsx', 'utf8')
+const adminMembersSource = readFileSync('src/pages/admin/AdminMembers.tsx', 'utf8')
 const deletedPostModalSource = readFileSync('src/pages/admin/DeletedPostDetailModal.tsx', 'utf8')
 
 assert.match(adminSource, /role="tablist"\s+aria-label="관리자 패널 섹션"/)
@@ -12,5 +13,7 @@ assert.match(deletedPostModalSource, /aria-modal="true"[\s\S]*?aria-labelledby="
 assert.match(deletedPostModalSource, /const closeButtonRef = useRef\(null\)/)
 assert.match(deletedPostModalSource, /previousActiveElement\?\.focus\?\.\(\)/)
 assert.match(deletedPostModalSource, /ref=\{closeButtonRef\}/)
+
+assert.match(adminMembersSource, /\{createError && <p[^>]*(role="alert"|aria-live="assertive"|aria-live="polite")/)
 
 console.log('admin accessibility contract passed')

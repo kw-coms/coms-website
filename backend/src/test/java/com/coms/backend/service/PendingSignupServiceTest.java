@@ -263,6 +263,44 @@ class PendingSignupServiceTest {
     }
 
     @Test
+    @DisplayName("start deletes an expired conflicting pending email so another student can reuse it")
+    void startDeletesExpiredConflictingPendingEmailBeforeDuplicateValidation() {
+        saveEligible("2026123473", "김철수", "60", "01012345679", Member.Role.USER);
+        service.start(currentStudentRequest("2026123473", "reuse@example.com", "김철수", "01012345679"), "198.51.100.23");
+        PendingSignup expired = pendingRepository.findByStudentId("2026123473").orElseThrow();
+        expired.setExpiresAt(LocalDateTime.now().minusMinutes(1));
+        pendingRepository.saveAndFlush(expired);
+
+        saveEligible("2026123474", "이영희", "60", "01012345670", Member.Role.USER);
+        AuthResponse started = service.start(currentStudentRequest("2026123474", "REUSE@example.com", "이영희", "01012345670"), "198.51.100.24");
+
+        assertThat(started.studentId()).isEqualTo("2026123474");
+        assertThat(pendingRepository.findByStudentId("2026123473")).isEmpty();
+        assertThat(pendingRepository.findByStudentId("2026123474")).isPresent();
+        assertThat(pendingRepository.findAll().stream()
+                .filter(pending -> "reuse@example.com".equalsIgnoreCase(pending.getEmail()))
+                .count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("concurrent starts for the same pending email leave only one pending row")
+    void concurrentStartWithSameEmailRemainsDatabaseSafe() throws Exception {
+        saveEligible("2026123475", "김철수", "60", "01012345679", Member.Role.USER);
+        saveEligible("2026123476", "이영희", "60", "01012345670", Member.Role.USER);
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Callable<Boolean> firstStart = () -> startReturningSuccess("2026123475", "same-race@example.com", "김철수", "01012345679");
+            Callable<Boolean> secondStart = () -> startReturningSuccess("2026123476", "SAME-RACE@example.com", "이영희", "01012345670");
+            List<Future<Boolean>> results = executor.invokeAll(List.of(firstStart, secondStart));
+
+            assertThat(results.stream().filter(this::completedSuccessfully).count()).isEqualTo(1);
+        }
+        assertThat(pendingRepository.findAll().stream()
+                .filter(pending -> "same-race@example.com".equalsIgnoreCase(pending.getEmail()))
+                .count()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("SMTP failure deletes the exact pending signup created for that send")
     void smtpFailureCleansUpPendingSignup() {
         saveEligible("2026123466", "홍길동", "60", "01012345678", Member.Role.USER);
@@ -299,6 +337,15 @@ class PendingSignupServiceTest {
         try {
             return future.get();
         } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    private boolean startReturningSuccess(String studentId, String email, String name, String phone) {
+        try {
+            service.start(currentStudentRequest(studentId, email, name, phone), "198.51.100.25");
+            return true;
+        } catch (RuntimeException ex) {
             return false;
         }
     }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useAdminMembers } from './useAdminMembers'
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog, promptDialog } from '../../components/common/ConfirmDialog'
@@ -36,6 +36,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
   const [createForm, setCreateForm] = useState(initialCreateForm)
   const [createError, setCreateError] = useState('')
   const [creating, setCreating] = useState(false)
+  const createSubmitInFlightRef = useRef(false)
 
   const handleCreateChange = (event) => {
     const { name, value } = event.target
@@ -54,6 +55,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
 
   const handleCreateSubmit = async (event) => {
     event.preventDefault()
+    if (createSubmitInFlightRef.current) return
     setCreateError('')
     const validationMessage = validateCreateForm()
     if (validationMessage) {
@@ -61,6 +63,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
       return
     }
 
+    createSubmitInFlightRef.current = true
     setCreating(true)
     try {
       await addMember({
@@ -81,6 +84,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
       setCreateError(err.message || '회원 추가 중 오류가 발생했습니다.')
       showToast({ message: err.message || '회원 추가 중 오류가 발생했습니다.', tone: 'error' })
     } finally {
+      createSubmitInFlightRef.current = false
       setCreating(false)
     }
   }
@@ -204,7 +208,7 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
             </div>
           </div>
 
-          {createError && <p className="rounded bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{createError}</p>}
+          {createError && <p role="alert" className="rounded bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{createError}</p>}
         </form>
       )}
     </section>
