@@ -3,6 +3,7 @@ package com.coms.backend.config;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.coms.backend.domain.Member;
+import com.coms.backend.repository.AuditLogRepository;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.security.JwtTokenProvider;
 import jakarta.servlet.http.Cookie;
@@ -45,6 +46,9 @@ class OperationsSecurityIntegrationTest {
 
     @Autowired
     private MemberRepository memberRepository;
+
+    @Autowired
+    private AuditLogRepository auditLogRepository;
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
@@ -168,6 +172,55 @@ class OperationsSecurityIntegrationTest {
 
         mockMvc.perform(get("/api/admin/members").cookie(officerCookie))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void directMemberCreationIsPresidentOnly() throws Exception {
+        mockMvc.perform(post("/api/admin/members")
+                        .cookie(vicePresidentCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "studentId":"2026123456",
+                                  "name":"홍길동",
+                                  "email":"hong@example.com",
+                                  "password":"temporary-secret",
+                                  "generation":"60",
+                                  "role":"USER"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void presidentCreatesDirectMemberWithoutLoggingSecrets() throws Exception {
+        mockMvc.perform(post("/api/admin/members")
+                        .cookie(adminCookie)
+                        .header("Origin", ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "studentId":"2026123456",
+                                  "name":"홍길동",
+                                  "email":"hong@example.com",
+                                  "password":"1234",
+                                  "generation":"60",
+                                  "role":"USER",
+                                  "department":"컴퓨터정보공학부",
+                                  "phone":"01012345678"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.studentId").value("2026123456"))
+                .andExpect(jsonPath("$.emailVerified").value(true))
+                .andExpect(jsonPath("$.role").value("USER"));
+
+        String detail = auditLogRepository.findAllByOrderByCreatedAtDesc(org.springframework.data.domain.PageRequest.of(0, 1))
+                .getFirst()
+                .getDetail();
+        assertThat(detail).contains("targetStudentId=2026123456", "role=USER");
+        assertThat(detail).doesNotContain("hong@example.com", "01012345678", "temporary-secret");
     }
 
     @Test

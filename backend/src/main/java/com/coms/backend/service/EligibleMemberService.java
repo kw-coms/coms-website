@@ -186,6 +186,23 @@ public class EligibleMemberService {
         });
     }
 
+    public void ensureDirectMemberRosterRow(String studentId, String name, String generation, String phone, Member.Role createdRole) {
+        String normalizedStudentId = normalize(studentId);
+        String normalizedName = normalize(name);
+        eligibleMemberRepository.findByStudentId(normalizedStudentId).ifPresentOrElse(existing -> {
+            if (existing.getName() != null && !existing.getName().equals(normalizedName)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 다른 이름으로 명부에 등록된 학번입니다.");
+            }
+        }, () -> {
+            EligibleMember member = new EligibleMember();
+            applyExactStudentIdentity(member, normalizedStudentId, normalizedName, generation);
+            String normalizedPhone = normalizePhone(phone);
+            member.setPhone(normalizedPhone.isBlank() ? null : normalizedPhone);
+            member.setInitialRole(createdRole == Member.Role.ASSOCIATE ? Member.Role.ASSOCIATE : Member.Role.USER);
+            eligibleMemberRepository.save(member);
+        });
+    }
+
     public void addGraduateSingle(String name, String twoDigitYearStr, String generationStr) {
         addGraduateSingle(name, twoDigitYearStr, generationStr, null);
     }

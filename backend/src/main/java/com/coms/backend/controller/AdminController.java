@@ -4,6 +4,7 @@ import com.coms.backend.domain.DeletedCommunityPostImage;
 import com.coms.backend.domain.DeletedCommunityPostMedia;
 import com.coms.backend.dto.AddEligibleMemberRequest;
 import com.coms.backend.dto.AdminAnalyticsResponse;
+import com.coms.backend.dto.AdminMemberCreateRequest;
 import com.coms.backend.dto.AuditLogResponse;
 import com.coms.backend.dto.BanStudentRequest;
 import com.coms.backend.dto.BannedStudentResponse;
@@ -82,6 +83,15 @@ public class AdminController {
     public ResponseEntity<List<MemberResponse>> members(@RequestParam(required = false) Integer page,
                                                         @RequestParam(required = false) Integer size) {
         return ListPagination.paginate(adminService.listMembers(), page, size);
+    }
+
+    @PostMapping("/members")
+    public ResponseEntity<MemberResponse> createMember(Authentication authentication,
+                                                       @Valid @RequestBody AdminMemberCreateRequest request) {
+        MemberResponse response = adminService.createMember(request);
+        auditLogService.record(authentication.getName(), "ADMIN_MEMBER_CREATE", "MEMBER", String.valueOf(response.id()),
+                "targetStudentId=" + response.studentId() + ", role=" + response.role(), null);
+        return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/members/{id}/role")
