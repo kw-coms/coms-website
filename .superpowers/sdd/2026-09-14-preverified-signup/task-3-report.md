@@ -28,3 +28,19 @@ Passed: `OperationsSecurityIntegrationTest` 14 tests, `AdminServiceTest` 12 test
 
 - Scope stayed backend-only; no lifecycle, frontend, OpenAPI, production, or pending-signup flow files were changed.
 - The admin direct-create path accepts `1234` as a temporary password and verifies it through `PasswordEncoder.matches`.
+
+## Fix round 1 — RED
+
+`cd backend && ./gradlew test --tests '*AdminServiceTest' --tests '*OperationsSecurityIntegrationTest'`
+
+Failed: `AdminServiceTest > createMemberRoleAllowlistIsExplicit()` and `AdminServiceTest > createMemberRejectsGraduateYearTenDigitStudentIdWithoutMutation()` failed. The implementation had no explicit direct-create role allowlist and accepted graduate-year 10-digit student ids.
+
+## Fix round 1 — GREEN
+
+`cd backend && ./gradlew test --tests '*AdminServiceTest' --tests '*OperationsSecurityIntegrationTest'`
+
+Passed: `AdminServiceTest` 14 tests and `OperationsSecurityIntegrationTest` 14 tests, 0 failures, 0 errors.
+
+`cd backend && ./gradlew test`
+
+Passed: 70 suites, 493 tests, 0 failures, 0 errors, 1 skipped.

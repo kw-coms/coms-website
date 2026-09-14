@@ -25,8 +25,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 @Service
 @Transactional
@@ -34,6 +36,12 @@ public class AdminService {
 
     private static final java.util.regex.Pattern EMAIL_PATTERN =
             java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final Set<Member.Role> CREATABLE_ROLES = EnumSet.of(
+            Member.Role.ASSOCIATE,
+            Member.Role.USER,
+            Member.Role.OFFICER,
+            Member.Role.VICE_PRESIDENT
+    );
 
     private final MemberRepository memberRepository;
     private final EligibleMemberService eligibleMemberService;
@@ -101,6 +109,7 @@ public class AdminService {
         if (!studentId.matches("\\d{10}")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
         }
+        eligibleMemberService.requireCurrentStudentIdForDirectMemberCreation(studentId);
         if (!name.matches("[가-힣]{2,10}")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름은 한글 2~10자여야 합니다.");
         }
@@ -217,8 +226,8 @@ public class AdminService {
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid role.");
         }
-        if (parsed == Member.Role.ADMIN) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "관리자 역할은 직접 생성할 수 없습니다.");
+        if (!CREATABLE_ROLES.contains(parsed)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "직접 생성할 수 없는 역할입니다.");
         }
         return parsed;
     }
