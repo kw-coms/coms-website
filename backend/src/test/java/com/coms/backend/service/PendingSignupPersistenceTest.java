@@ -9,9 +9,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -53,6 +56,21 @@ class PendingSignupPersistenceTest {
         assertThat(passwordEncoder.matches(rawPassword, saved.getPasswordHash())).isTrue();
         assertThat(passwordEncoder.matches(rawCode, saved.getVerificationCodeHash())).isTrue();
         assertThat(saved.getExpiresAt()).isEqualTo(saved.getCreatedAt().plusHours(24));
+    }
+
+    @Test
+    void ordinaryPendingSignupFindersStayUnlockedAndForUpdateUsesExplicitQueries() throws Exception {
+        Method ordinaryIdFinder = PendingSignupRepository.class.getMethod("findById", Object.class);
+        Method ordinaryStudentFinder = PendingSignupRepository.class.getMethod("findByStudentId", String.class);
+        Method lockedIdFinder = PendingSignupRepository.class.getMethod("findByIdForUpdate", java.util.UUID.class);
+        Method lockedStudentFinder = PendingSignupRepository.class.getMethod("findByStudentIdForUpdate", String.class);
+
+        assertThat(ordinaryIdFinder.getAnnotation(Lock.class)).isNull();
+        assertThat(ordinaryStudentFinder.getAnnotation(Lock.class)).isNull();
+        assertThat(lockedIdFinder.getAnnotation(Lock.class)).isNotNull();
+        assertThat(lockedIdFinder.getAnnotation(Query.class)).isNotNull();
+        assertThat(lockedStudentFinder.getAnnotation(Lock.class)).isNotNull();
+        assertThat(lockedStudentFinder.getAnnotation(Query.class)).isNotNull();
     }
 
     private PendingSignup samplePending(String passwordHash, String verificationCodeHash) {
