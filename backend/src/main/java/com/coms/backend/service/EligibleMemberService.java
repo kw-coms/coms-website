@@ -186,6 +186,17 @@ public class EligibleMemberService {
         });
     }
 
+    public void requireCurrentStudentIdForDirectMemberCreation(String studentId) {
+        String normalizedStudentId = normalize(studentId);
+        if (!STUDENT_ID_PATTERN.matcher(normalizedStudentId).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
+        }
+        int admissionYear = Integer.parseInt(normalizedStudentId.substring(0, 4));
+        if (isGraduate(admissionYear)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "관리자 직접 추가는 재학생 학번만 가능합니다.");
+        }
+    }
+
     public void ensureDirectMemberRosterRow(String studentId, String name, String generation, String phone, Member.Role createdRole) {
         String normalizedStudentId = normalize(studentId);
         String normalizedName = normalize(name);

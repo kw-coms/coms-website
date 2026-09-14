@@ -27,6 +27,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Set;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -189,6 +192,23 @@ class AdminServiceTest {
     }
 
     @Test
+    void createMemberRoleAllowlistIsExplicit() throws Exception {
+        assertThat(Set.of(Member.Role.values()))
+                .containsExactlyInAnyOrder(
+                        Member.Role.ASSOCIATE,
+                        Member.Role.USER,
+                        Member.Role.OFFICER,
+                        Member.Role.VICE_PRESIDENT,
+                        Member.Role.ADMIN);
+        assertThat(Files.readString(Path.of("src/main/java/com/coms/backend/service/AdminService.java")))
+                .contains("EnumSet.of(")
+                .contains("Member.Role.ASSOCIATE")
+                .contains("Member.Role.USER")
+                .contains("Member.Role.OFFICER")
+                .contains("Member.Role.VICE_PRESIDENT");
+    }
+
+    @Test
     void createMemberRejectsDuplicateStudentId() {
         when(memberRepository.existsByStudentId("2026123456")).thenReturn(true);
 
@@ -234,18 +254,18 @@ class AdminServiceTest {
     @Test
     void presidentCreatesVerifiedMemberAndMatchingRosterRowWithTemporaryPassword() {
         MemberResponse created = realAdminService.createMember(new AdminMemberCreateRequest(
-                "2026123456", "홍길동", "hong@example.com", "1234", "60", "USER", "컴퓨터정보공학부", null));
+                "2020123456", "홍길동", "hong@example.com", "1234", "60", "USER", "컴퓨터정보공학부", null));
 
         assertThat(created.emailVerified()).isTrue();
-        assertThat(created.studentId()).isEqualTo("2026123456");
+        assertThat(created.studentId()).isEqualTo("2020123456");
         assertThat(created.email()).isEqualTo("hong@example.com");
         assertThat(created.generation()).isEqualTo("60");
         assertThat(created.department()).isEqualTo("컴퓨터정보공학부");
-        assertThat(realEligibleMemberRepository.findByStudentId("2026123456"))
+        assertThat(realEligibleMemberRepository.findByStudentId("2020123456"))
                 .get()
                 .extracting(EligibleMember::getName, EligibleMember::getGeneration, EligibleMember::getInitialRole)
                 .containsExactly("홍길동", "60", Member.Role.USER);
-        assertThat(realMemberRepository.findByStudentId("2026123456"))
+        assertThat(realMemberRepository.findByStudentId("2020123456"))
                 .get()
                 .satisfies(member -> {
                     assertThat(member.isEmailVerified()).isTrue();
@@ -253,6 +273,17 @@ class AdminServiceTest {
                     assertThat(member.getPassword()).isNotEqualTo("1234");
                     assertThat(member.getRole()).isEqualTo(Member.Role.USER);
                 });
+    }
+
+    @Test
+    void createMemberRejectsGraduateYearTenDigitStudentIdWithoutMutation() {
+        assertThatThrownBy(() -> realAdminService.createMember(new AdminMemberCreateRequest(
+                "2019123456", "홍길동", "hong@example.com", "1234", "60", "USER", null, null)))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+
+        assertThat(realEligibleMemberRepository.findByStudentId("2019123456")).isEmpty();
+        assertThat(realMemberRepository.findByStudentId("2019123456")).isEmpty();
     }
 
     @Test
