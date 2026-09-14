@@ -4,6 +4,24 @@ export async function listMembers() {
   return request('/api/admin/members')
 }
 
+export async function createMember(payload) {
+  const body: Record<string, string> = {
+    studentId: payload.studentId,
+    name: payload.name,
+    email: payload.email,
+    password: payload.password,
+    generation: payload.generation,
+    role: payload.role,
+  }
+  if (payload.department) body.department = payload.department
+  if (payload.phone) body.phone = payload.phone
+
+  return request('/api/admin/members', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
 export async function getAdminAnalytics() {
   return request('/api/admin/analytics')
 }
