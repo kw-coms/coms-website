@@ -32,15 +32,18 @@ public class LoginFailureRetentionJob {
 
     private final LoginFailureRepository loginFailureRepository;
     private final RefreshSessionRepository refreshSessionRepository;
+    private final PendingSignupService pendingSignupService;
     private final Clock clock;
     private final boolean enabled;
 
     public LoginFailureRetentionJob(LoginFailureRepository loginFailureRepository,
                                     RefreshSessionRepository refreshSessionRepository,
+                                    PendingSignupService pendingSignupService,
                                     Clock clock,
                                     @Value("${coms.retention.enabled:true}") boolean enabled) {
         this.loginFailureRepository = loginFailureRepository;
         this.refreshSessionRepository = refreshSessionRepository;
+        this.pendingSignupService = pendingSignupService;
         this.clock = clock;
         this.enabled = enabled;
     }
@@ -69,5 +72,16 @@ public class LoginFailureRetentionJob {
         LocalDateTime cutoff = LocalDateTime.now(clock).minusDays(REFRESH_SESSION_RETENTION_DAYS);
         int deleted = refreshSessionRepository.deleteStaleBefore(cutoff);
         log.info("Purged {} refresh_sessions rows expired or revoked before {}", deleted, cutoff);
+    }
+
+    /** Drops pending signup rows after their 24-hour temporary retention window. */
+    @Scheduled(cron = "${coms.retention.pending-signups-cron:0 50 4 * * *}", zone = "Asia/Seoul")
+    public void purgeExpiredPendingSignups() {
+        if (!enabled) {
+            log.debug("Retention purge disabled (coms.retention.enabled=false) — skipping.");
+            return;
+        }
+        int deleted = pendingSignupService.deleteExpired(LocalDateTime.now(clock).atZone(clock.getZone()).toInstant());
+        log.info("Purged {} pending_signups rows past their expiry", deleted);
     }
 }
