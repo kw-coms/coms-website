@@ -58,6 +58,7 @@ class LoginFailureRetentionJobTest {
 
         LoginFailureRetentionJob disabled =
                 new LoginFailureRetentionJob(loginFailureRepository, refreshSessionRepository,
+                        org.mockito.Mockito.mock(PendingSignupService.class),
                         java.time.Clock.systemDefaultZone(), false);
         disabled.purgeOldLoginFailures();
 
