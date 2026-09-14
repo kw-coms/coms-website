@@ -18,11 +18,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
@@ -31,6 +32,7 @@ import java.util.concurrent.Future;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
@@ -66,6 +68,9 @@ class PendingSignupServiceTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
 
     @MockitoBean
     private EmailVerificationSender emailVerificationSender;
@@ -183,6 +188,35 @@ class PendingSignupServiceTest {
                 .isInstanceOf(ResponseStatusException.class);
         assertThat(service.confirm("2026123460", newCode)).isTrue();
         assertThat(memberRepository.findByStudentId("2026123460")).isPresent();
+    }
+
+    @Test
+    @DisplayName("resend sends SMTP after commit and failed cleanup cannot remove a newer pending version")
+    void resendSendsAfterCommitAndFailureCleanupCannotTouchNewerVersion() {
+        saveEligible("2026123472", "홍길동", "60", "01012345678", Member.Role.USER);
+        service.start(currentStudentRequest("2026123472", "resend-failure@example.com"), "198.51.100.22");
+        PendingSignup pending = pendingRepository.findByStudentId("2026123472").orElseThrow();
+        pending.setCodeExpiresAt(LocalDateTime.now().plusMinutes(8));
+        pendingRepository.save(pending);
+        reset(emailVerificationSender);
+
+        doAnswer(invocation -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            transactionTemplate.executeWithoutResult(status -> {
+                PendingSignup newer = pendingRepository.findByStudentIdForUpdate("2026123472").orElseThrow();
+                newer.setVerificationCodeHash(passwordEncoder.encode("999999"));
+                newer.setCodeExpiresAt(LocalDateTime.now().plusMinutes(9));
+                pendingRepository.saveAndFlush(newer);
+            });
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "이메일 발송에 실패했습니다.");
+        }).when(emailVerificationSender).sendVerificationCode(anyString(), anyString());
+
+        assertThatThrownBy(() -> service.resend("2026123472", "198.51.100.22"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
+
+        PendingSignup preserved = pendingRepository.findByStudentId("2026123472").orElseThrow();
+        assertThat(passwordEncoder.matches("999999", preserved.getVerificationCodeHash())).isTrue();
     }
 
     @Test
