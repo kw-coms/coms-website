@@ -23,7 +23,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.Year;
-import java.time.ZoneId;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -119,32 +118,43 @@ public class PendingSignupService {
         return new AuthResponse(null, pendingSend.studentId(), pendingSend.name(), "회원가입 신청이 완료되었습니다.");
     }
 
-    @Transactional
     public boolean resend(String studentId, String clientIp) {
         enforceIpRateLimit(signupEmailAttemptsByClient, "signup-email", clientIp,
                 MAX_SIGNUP_EMAIL_REQUESTS_PER_WINDOW, SIGNUP_EMAIL_REQUEST_WINDOW);
 
-        PendingSignup pending = pendingSignupRepository.findByStudentIdForUpdate(normalizeRequired(studentId))
-                .orElse(null);
-        if (pending == null) {
-            return false;
-        }
-        if (pending.getExpiresAt().isBefore(now())) {
-            pendingSignupRepository.delete(pending);
+        PendingSend pendingSend = transactionTemplate.execute(status -> {
+            PendingSignup pending = pendingSignupRepository.findByStudentIdForUpdate(normalizeRequired(studentId))
+                    .orElse(null);
+            if (pending == null) {
+                return null;
+            }
+            if (pending.getExpiresAt().isBefore(now())) {
+                pendingSignupRepository.delete(pending);
+                return null;
+            }
+            try {
+                enforceResendCooldown(pending);
+            } catch (ResponseStatusException ignored) {
+                return null;
+            }
+            ensureNotBannedWithoutMarkingConfirmRollbackOnly(pending.getStudentId());
+            String code = newSixDigitCode();
+            pending.setVerificationCodeHash(passwordEncoder.encode(code));
+            pending.setCodeExpiresAt(now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
+            pending.setVerificationAttempts(0);
+            PendingSignup saved = pendingSignupRepository.saveAndFlush(pending);
+            return new PendingSend(saved.getId(), saved.getVerificationCodeHash(), saved.getEmail(), code,
+                    saved.getStudentId(), saved.getName());
+        });
+        if (pendingSend == null) {
             return false;
         }
         try {
-            enforceResendCooldown(pending);
-        } catch (ResponseStatusException ignored) {
-            return false;
+            emailVerificationSender.sendVerificationCode(pendingSend.email(), pendingSend.code());
+        } catch (RuntimeException ex) {
+            cleanup.clearCodeIfVersionMatches(pendingSend.id(), pendingSend.verificationCodeHash());
+            throw ex;
         }
-        ensureNotBannedWithoutMarkingConfirmRollbackOnly(pending.getStudentId());
-        String code = newSixDigitCode();
-        pending.setVerificationCodeHash(passwordEncoder.encode(code));
-        pending.setCodeExpiresAt(now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
-        pending.setVerificationAttempts(0);
-        pendingSignupRepository.save(pending);
-        emailVerificationSender.sendVerificationCode(pending.getEmail(), code);
         return false;
     }
 
@@ -194,7 +204,7 @@ public class PendingSignupService {
 
     @Transactional
     public int deleteExpired(Instant cutoff) {
-        LocalDateTime localCutoff = LocalDateTime.ofInstant(cutoff, ZoneId.systemDefault());
+        LocalDateTime localCutoff = LocalDateTime.ofInstant(cutoff, clock.getZone());
         return entityManager.createQuery("delete from PendingSignup pending where pending.expiresAt < :cutoff")
                 .setParameter("cutoff", localCutoff)
                 .executeUpdate();
@@ -388,6 +398,19 @@ class PendingSignupCleanup {
     public void deleteIfVersionMatches(UUID id, String verificationCodeHash) {
         entityManager.createQuery("""
                         delete from PendingSignup pending
+                        where pending.id = :id and pending.verificationCodeHash = :verificationCodeHash
+                        """)
+                .setParameter("id", id)
+                .setParameter("verificationCodeHash", verificationCodeHash)
+                .executeUpdate();
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void clearCodeIfVersionMatches(UUID id, String verificationCodeHash) {
+        entityManager.createQuery("""
+                        update PendingSignup pending
+                        set pending.codeExpiresAt = pending.createdAt,
+                            pending.verificationAttempts = 0
                         where pending.id = :id and pending.verificationCodeHash = :verificationCodeHash
                         """)
                 .setParameter("id", id)

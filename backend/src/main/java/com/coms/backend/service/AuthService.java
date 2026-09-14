@@ -53,7 +53,6 @@ public class AuthService implements UserDetailsService {
     private final AuditLogService auditLogService;
     private final RefreshSessionService refreshSessionService;
     private final PendingSignupService pendingSignupService;
-    private final Clock clock;
 
     public AuthService(MemberRepository memberRepository,
                        LoginFailureRepository loginFailureRepository,
@@ -77,7 +76,6 @@ public class AuthService implements UserDetailsService {
         this.auditLogService = auditLogService;
         this.refreshSessionService = refreshSessionService;
         this.pendingSignupService = pendingSignupService;
-        this.clock = clock;
     }
 
     public AuthResponse signup(SignupRequest request, String clientIp) {
