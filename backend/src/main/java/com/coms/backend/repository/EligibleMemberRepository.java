@@ -15,5 +15,12 @@ public interface EligibleMemberRepository extends JpaRepository<EligibleMember, 
     Optional<EligibleMember> findByVerificationKey(String verificationKey);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<EligibleMember> findById(long id);
+
+    default Optional<EligibleMember> findByIdForUpdate(long id) {
+        return findById(id);
+    }
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<EligibleMember> findAllByNameAndAdmissionYear(String name, Integer admissionYear);
 }
