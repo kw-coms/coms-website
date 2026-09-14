@@ -415,6 +415,7 @@ test('president adds a verified member from member management', async ({ page })
     },
   ]
   let postedMember = null
+  let postCount = 0
 
   await page.route('**/api/admin/members', async (route) => {
     if (route.request().method() === 'GET') {
@@ -422,6 +423,7 @@ test('president adds a verified member from member management', async ({ page })
       return
     }
     if (route.request().method() === 'POST') {
+      postCount += 1
       postedMember = route.request().postDataJSON()
       members = [
         ...members,
@@ -431,6 +433,7 @@ test('president adds a verified member from member management', async ({ page })
           emailVerified: true,
         },
       ]
+      await new Promise((resolve) => setTimeout(resolve, 100))
       await route.fulfill({ status: 200, json: members.at(-1) })
       return
     }
@@ -449,7 +452,10 @@ test('president adds a verified member from member management', async ({ page })
   await page.getByLabel('역할', { exact: true }).selectOption('OFFICER')
   await page.getByLabel('학과').fill('컴퓨터정보공학부')
   await page.getByLabel('전화번호').fill('01099998888')
-  await page.getByRole('button', { name: '저장' }).click()
+  await page.locator('#add-member-form').evaluate((form) => {
+    form.requestSubmit()
+    form.requestSubmit()
+  })
 
   await expect.poll(() => postedMember).toEqual({
     studentId: '2026123456',
@@ -461,6 +467,7 @@ test('president adds a verified member from member management', async ({ page })
     department: '컴퓨터정보공학부',
     phone: '01099998888',
   })
+  expect(postCount).toBe(1)
   expect(postedMember).not.toHaveProperty('passwordConfirm')
   expect(postedMember).not.toHaveProperty('emailVerified')
   await expect(page.getByText('신규회원')).toBeVisible()

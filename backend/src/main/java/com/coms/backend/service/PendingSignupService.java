@@ -55,6 +55,7 @@ public class PendingSignupService {
 
     private final Map<String, java.util.Deque<LocalDateTime>> signupAttemptsByClient = new ConcurrentHashMap<>();
     private final Map<String, java.util.Deque<LocalDateTime>> signupEmailAttemptsByClient = new ConcurrentHashMap<>();
+    private final Map<String, Object> pendingEmailLocks = new ConcurrentHashMap<>();
 
     public PendingSignupService(PendingSignupRepository pendingSignupRepository,
                                 MemberRepository memberRepository,
@@ -94,15 +95,20 @@ public class PendingSignupService {
             bannedStudentService.ensureNotBanned(prepared.studentId());
             requireMemberStudentIdAvailable(prepared.studentId());
             String normalizedEmail = normalizeRequired(request.email());
-            requireEmailAvailableForStart(normalizedEmail, prepared.studentId());
+            Object emailLock = pendingEmailLocks.computeIfAbsent(
+                    normalizedEmail.toLowerCase(Locale.ROOT), ignored -> new Object());
+            synchronized (emailLock) {
+                deleteExpiredPendingEmailConflicts(normalizedEmail, prepared.studentId());
+                requireEmailAvailableForStart(normalizedEmail, prepared.studentId());
 
-            PendingSignup pending = pendingSignupRepository.findByStudentIdForUpdate(prepared.studentId())
-                    .orElseGet(PendingSignup::new);
-            String code = newSixDigitCode();
-            applyPending(pending, request, prepared, normalizedEmail, code, signupType);
-            PendingSignup saved = pendingSignupRepository.saveAndFlush(pending);
-            return new PendingSend(saved.getId(), saved.getVerificationCodeHash(), saved.getEmail(), code,
-                    saved.getStudentId(), saved.getName());
+                PendingSignup pending = pendingSignupRepository.findByStudentIdForUpdate(prepared.studentId())
+                        .orElseGet(PendingSignup::new);
+                String code = newSixDigitCode();
+                applyPending(pending, request, prepared, normalizedEmail, code, signupType);
+                PendingSignup saved = pendingSignupRepository.saveAndFlush(pending);
+                return new PendingSend(saved.getId(), saved.getVerificationCodeHash(), saved.getEmail(), code,
+                        saved.getStudentId(), saved.getName());
+            }
         });
 
         if (pendingSend == null) {
@@ -247,6 +253,19 @@ public class PendingSignupService {
         if (otherPending > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다.");
         }
+    }
+
+    private void deleteExpiredPendingEmailConflicts(String email, String studentId) {
+        entityManager.createQuery("""
+                        delete from PendingSignup pending
+                        where lower(pending.email) = lower(:email)
+                          and pending.studentId <> :studentId
+                          and pending.expiresAt < :now
+                        """)
+                .setParameter("email", email)
+                .setParameter("studentId", studentId)
+                .setParameter("now", now())
+                .executeUpdate();
     }
 
     private void validateCurrentProfile(SignupRequest request, String signupType) {
