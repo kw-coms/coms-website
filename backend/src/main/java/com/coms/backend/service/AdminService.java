@@ -1,6 +1,7 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.Member;
+import com.coms.backend.dto.AdminMemberCreateRequest;
 import com.coms.backend.dto.LoginAuditResponse;
 import com.coms.backend.dto.MemberResponse;
 import com.coms.backend.dto.RoleUpdateRequest;
@@ -24,14 +25,26 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 @Service
 @Transactional
 public class AdminService {
 
+    private static final java.util.regex.Pattern EMAIL_PATTERN =
+            java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final Set<Member.Role> CREATABLE_ROLES = EnumSet.of(
+            Member.Role.ASSOCIATE,
+            Member.Role.USER,
+            Member.Role.OFFICER,
+            Member.Role.VICE_PRESIDENT
+    );
+
     private final MemberRepository memberRepository;
+    private final EligibleMemberService eligibleMemberService;
     private final PasswordEncoder passwordEncoder;
     private final CommunityService communityService;
     private final NoticeVoteRepository noticeVoteRepository;
@@ -48,7 +61,8 @@ public class AdminService {
     private final LoginFailureRepository loginFailureRepository;
     private final RefreshSessionService refreshSessionService;
 
-    public AdminService(MemberRepository memberRepository, PasswordEncoder passwordEncoder, CommunityService communityService,
+    public AdminService(MemberRepository memberRepository, EligibleMemberService eligibleMemberService,
+                        PasswordEncoder passwordEncoder, CommunityService communityService,
                         NoticeVoteRepository noticeVoteRepository, ClubActivityVoteRepository clubActivityVoteRepository,
                         ClubEventVoteRepository clubEventVoteRepository, ClubEventRsvpRepository clubEventRsvpRepository,
                         ArchiveFileVoteRepository archiveFileVoteRepository, NotificationRepository notificationRepository,
@@ -59,6 +73,7 @@ public class AdminService {
                         LoginFailureRepository loginFailureRepository,
                         RefreshSessionService refreshSessionService) {
         this.memberRepository = memberRepository;
+        this.eligibleMemberService = eligibleMemberService;
         this.passwordEncoder = passwordEncoder;
         this.communityService = communityService;
         this.noticeVoteRepository = noticeVoteRepository;
@@ -79,6 +94,51 @@ public class AdminService {
     @Transactional(readOnly = true)
     public List<MemberResponse> listMembers() {
         return memberRepository.findAll().stream().map(this::toResponse).toList();
+    }
+
+    public MemberResponse createMember(AdminMemberCreateRequest request) {
+        String studentId = normalizeText(request.studentId());
+        String name = normalizeText(request.name());
+        String email = normalizeText(request.email()).toLowerCase(Locale.ROOT);
+        String password = normalizeText(request.password());
+        String generation = normalizeGeneration(request.generation());
+        Member.Role role = parseCreatableRole(request.role());
+        String department = blankToNull(request.department());
+        String phone = blankToNull(request.phone());
+
+        if (!studentId.matches("\\d{10}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
+        }
+        eligibleMemberService.requireCurrentStudentIdForDirectMemberCreation(studentId);
+        if (!name.matches("[가-힣]{2,10}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름은 한글 2~10자여야 합니다.");
+        }
+        if (!EMAIL_PATTERN.matcher(email).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이메일 형식을 확인해주세요.");
+        }
+        if (memberRepository.findByEmailIgnoreCase(email).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다.");
+        }
+        if (password.isBlank() || password.length() > 200) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "임시 비밀번호를 입력해주세요.");
+        }
+        if (memberRepository.existsByStudentId(studentId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 가입된 학번입니다.");
+        }
+
+        eligibleMemberService.ensureDirectMemberRosterRow(studentId, name, generation, phone, role);
+
+        Member member = new Member();
+        member.setStudentId(studentId);
+        member.setName(name);
+        member.setEmail(email);
+        member.setPassword(passwordEncoder.encode(password));
+        member.setEmailVerified(true);
+        member.setDepartment(department);
+        member.setGeneration(generation);
+        member.setPhone(phone);
+        member.setRole(role);
+        return toResponse(memberRepository.save(member));
     }
 
     public MemberResponse updateRole(Long id, RoleUpdateRequest request) {
@@ -157,6 +217,28 @@ public class AdminService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "기수는 1에서 99 사이여야 합니다.");
         }
         return String.valueOf(value);
+    }
+
+    private static Member.Role parseCreatableRole(String role) {
+        Member.Role parsed;
+        try {
+            parsed = Member.Role.valueOf(normalizeText(role).toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid role.");
+        }
+        if (!CREATABLE_ROLES.contains(parsed)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "직접 생성할 수 없는 역할입니다.");
+        }
+        return parsed;
+    }
+
+    private static String normalizeText(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private static String blankToNull(String value) {
+        String normalized = normalizeText(value);
+        return normalized.isBlank() ? null : normalized;
     }
 
     private void ensureNotFinalAdmin(Member member, String message) {

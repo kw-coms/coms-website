@@ -4,6 +4,7 @@ import com.coms.backend.domain.EligibleMember;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.EligibleMemberResponse;
 import com.coms.backend.dto.EligibleMemberImportResponse;
+import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.repository.EligibleMemberRepository;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -87,6 +88,84 @@ public class EligibleMemberService {
                 .orElse(Member.Role.USER);
     }
 
+    @Transactional(readOnly = true)
+    public PreparedSignup prepareSignup(SignupRequest request) {
+        String normalizedName = normalize(request.name());
+        if (!NAME_PATTERN.matcher(normalizedName).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름은 한글 2~10자여야 합니다.");
+        }
+
+        String normalizedStudentId = normalize(request.studentId());
+        if (!normalizedStudentId.isBlank()) {
+            return prepareStudentSignup(request, normalizedStudentId, normalizedName);
+        }
+        return prepareGraduateSignup(request, normalizedName);
+    }
+
+    @Transactional
+    public EligibleMember claimPreparedSignup(long eligibleMemberId, String studentId) {
+        String normalizedStudentId = normalize(studentId);
+        EligibleMember member = eligibleMemberRepository.findByIdForUpdate(eligibleMemberId)
+                .orElseThrow(() -> invalidRoster());
+        String currentStudentId = normalize(member.getStudentId());
+        if (currentStudentId.isBlank()) {
+            member.setStudentId(normalizedStudentId);
+            return eligibleMemberRepository.save(member);
+        }
+        if (!currentStudentId.equals(normalizedStudentId)) {
+            throw invalidRoster();
+        }
+        return member;
+    }
+
+    private PreparedSignup prepareStudentSignup(SignupRequest request, String normalizedStudentId, String normalizedName) {
+        if (!STUDENT_ID_PATTERN.matcher(normalizedStudentId).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
+        }
+        if (bannedStudentRepository.existsByStudentId(normalizedStudentId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "가입이 제한된 학번입니다.");
+        }
+        EligibleMember member = eligibleMemberRepository.findByStudentId(normalizedStudentId)
+                .orElseThrow(() -> invalidRoster());
+        if (!member.getName().equals(normalizedName)) {
+            throw invalidRoster();
+        }
+        requirePhoneMatchWhenRosterHasPhone(member, request.phone());
+        return preparedSignup(member, normalizedStudentId);
+    }
+
+    private PreparedSignup prepareGraduateSignup(SignupRequest request, String normalizedName) {
+        int admissionYear = admissionYearFromGraduateVerification(
+                request.graduateVerificationType(),
+                request.graduateVerificationValue()
+        );
+        if (!isGraduate(admissionYear)) {
+            throw invalidRoster();
+        }
+
+        List<EligibleMember> matches = eligibleMemberRepository.findAllByNameAndAdmissionYear(normalizedName, admissionYear);
+        if (matches.size() != 1) {
+            throw invalidRoster();
+        }
+
+        EligibleMember member = matches.getFirst();
+        requirePhoneMatchWhenRosterHasPhone(member, request.phone());
+        String accountId = normalize(member.getStudentId());
+        if (accountId.isBlank()) {
+            accountId = generateGraduateAccountId(member);
+        }
+        return preparedSignup(member, accountId);
+    }
+
+    private PreparedSignup preparedSignup(EligibleMember member, String studentId) {
+        return new PreparedSignup(
+                member.getId(),
+                studentId,
+                member.getGeneration(),
+                allowedInitialRole(member.getInitialRole())
+        );
+    }
+
     private static Member.Role allowedInitialRole(Member.Role role) {
         return role == Member.Role.ASSOCIATE ? Member.Role.ASSOCIATE : Member.Role.USER;
     }
@@ -104,6 +183,34 @@ public class EligibleMemberService {
             if (existing.getName() != null && !existing.getName().equals(normalizedName)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 다른 이름으로 명부에 등록된 학번입니다.");
             }
+        });
+    }
+
+    public void requireCurrentStudentIdForDirectMemberCreation(String studentId) {
+        String normalizedStudentId = normalize(studentId);
+        if (!STUDENT_ID_PATTERN.matcher(normalizedStudentId).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
+        }
+        int admissionYear = Integer.parseInt(normalizedStudentId.substring(0, 4));
+        if (isGraduate(admissionYear)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "관리자 직접 추가는 재학생 학번만 가능합니다.");
+        }
+    }
+
+    public void ensureDirectMemberRosterRow(String studentId, String name, String generation, String phone, Member.Role createdRole) {
+        String normalizedStudentId = normalize(studentId);
+        String normalizedName = normalize(name);
+        eligibleMemberRepository.findByStudentId(normalizedStudentId).ifPresentOrElse(existing -> {
+            if (existing.getName() != null && !existing.getName().equals(normalizedName)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 다른 이름으로 명부에 등록된 학번입니다.");
+            }
+        }, () -> {
+            EligibleMember member = new EligibleMember();
+            applyExactStudentIdentity(member, normalizedStudentId, normalizedName, generation);
+            String normalizedPhone = normalizePhone(phone);
+            member.setPhone(normalizedPhone.isBlank() ? null : normalizedPhone);
+            member.setInitialRole(createdRole == Member.Role.ASSOCIATE ? Member.Role.ASSOCIATE : Member.Role.USER);
+            eligibleMemberRepository.save(member);
         });
     }
 
@@ -707,4 +814,11 @@ public class EligibleMemberService {
             );
         }
     }
+
+    public record PreparedSignup(
+            long eligibleMemberId,
+            String studentId,
+            String generation,
+            Member.Role initialRole
+    ) {}
 }

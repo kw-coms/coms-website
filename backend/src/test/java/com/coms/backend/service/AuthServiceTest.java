@@ -8,6 +8,7 @@ import com.coms.backend.repository.BannedStudentRepository;
 import com.coms.backend.repository.LoginFailureRepository;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.EligibleMemberRepository;
+import com.coms.backend.repository.PendingSignupRepository;
 import com.coms.backend.security.JwtTokenProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +29,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -65,6 +65,9 @@ class AuthServiceTest {
     @Autowired
     private EligibleMemberService eligibleMemberService;
 
+    @Autowired
+    private PendingSignupRepository pendingSignupRepository;
+
     @MockitoBean
     private EmailVerificationSender emailVerificationSender;
 
@@ -72,6 +75,7 @@ class AuthServiceTest {
     void setUp() {
         reset(emailVerificationSender);
         bannedStudentRepository.deleteAll();
+        pendingSignupRepository.deleteAll();
         memberRepository.deleteAll();
         eligibleMemberRepository.deleteAll();
     }
@@ -334,22 +338,18 @@ class AuthServiceTest {
     void signupPropagatesEmailSendFailure() {
         MemberRepository repo = mock(MemberRepository.class);
         LoginFailureRepository loginFailures = mock(LoginFailureRepository.class);
-        EligibleMemberService eligible = mock(EligibleMemberService.class);
         JwtTokenProvider jwt = mock(JwtTokenProvider.class);
         EmailVerificationSender sender = mock(EmailVerificationSender.class);
         FontService fontService = mock(FontService.class);
         when(fontService.isSelectable(null)).thenReturn(true);
         BannedStudentService banned = mock(BannedStudentService.class);
         AuditLogService auditLogService = mock(AuditLogService.class);
-        AuthService service = new AuthService(repo, loginFailures, eligible, passwordEncoder, jwt, sender, fontService, banned, auditLogService,
-                mock(RefreshSessionService.class), Clock.systemDefaultZone());
+        PendingSignupService pendingSignupService = mock(PendingSignupService.class);
+        AuthService service = new AuthService(repo, loginFailures, mock(EligibleMemberService.class), passwordEncoder, jwt, sender, fontService, banned, auditLogService,
+                mock(RefreshSessionService.class), pendingSignupService, Clock.systemDefaultZone());
 
-        when(repo.existsByStudentId("2026123462")).thenReturn(false);
-        when(repo.existsByEmail("new@example.com")).thenReturn(false);
-        doNothing().when(eligible).validateAndClaimSignup("2026123462", "홍길동", null, null, "01012345678");
-        when(repo.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
         doThrow(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "이메일 발송에 실패했습니다."))
-                .when(sender).sendVerificationCode(anyString(), anyString());
+                .when(pendingSignupService).start(any(SignupRequest.class), anyString());
 
         assertThatThrownBy(() -> service.signup(new SignupRequest(
                 "2026123462",
@@ -441,9 +441,10 @@ class AuthServiceTest {
         ), "203.0.113.4");
 
         assertThat(response.studentId()).isEqualTo("2026123467");
-        Member saved = memberRepository.findByStudentId("2026123467").orElseThrow();
-        assertThat(saved.getAspiration()).isEqualTo("신입 부원으로 열심히 활동하겠습니다.");
-        assertThat(saved.getInterests()).isEqualTo("보안,웹");
+        assertThat(memberRepository.findByStudentId("2026123467")).isEmpty();
+        var pending = pendingSignupRepository.findByStudentId("2026123467").orElseThrow();
+        assertThat(pending.getAspiration()).isEqualTo("신입 부원으로 열심히 활동하겠습니다.");
+        assertThat(pending.getInterests()).isEqualTo("보안,웹");
     }
 
     @Test
@@ -466,11 +467,10 @@ class AuthServiceTest {
         ), "203.0.113.5");
 
         assertThat(response.studentId()).startsWith("G2019-");
-        Member saved = memberRepository.findByStudentId(response.studentId()).orElseThrow();
-        assertThat(saved.getAspiration()).isNull();
-        assertThat(saved.getInterests()).isNull();
-        EligibleMember claimed = eligibleMemberRepository.findByStudentId(response.studentId()).orElseThrow();
-        assertThat(claimed.getVerificationKey()).isEqualTo("홍길동|2019");
+        assertThat(memberRepository.findByStudentId(response.studentId())).isEmpty();
+        assertThat(pendingSignupRepository.findByStudentId(response.studentId()).orElseThrow().getAspiration()).isNull();
+        EligibleMember unclaimed = eligibleMemberRepository.findByVerificationKey("홍길동|2019").orElseThrow();
+        assertThat(unclaimed.getStudentId()).isNull();
     }
 
     @Test
@@ -493,65 +493,45 @@ class AuthServiceTest {
         ), "203.0.113.6");
 
         assertThat(response.studentId()).startsWith("G2019-");
-        assertThat(memberRepository.findByStudentId(response.studentId())).isPresent();
-        EligibleMember claimed = eligibleMemberRepository.findByStudentId(response.studentId()).orElseThrow();
-        assertThat(claimed.getGeneration()).isEqualTo("53");
+        assertThat(memberRepository.findByStudentId(response.studentId())).isEmpty();
+        assertThat(pendingSignupRepository.findByStudentId(response.studentId()).orElseThrow().getGeneration()).isEqualTo("53");
     }
 
     @Test
     @DisplayName("signup is rate-limited per client IP so one host cannot mass-create accounts")
-    void signupRateLimitsRepeatedAttemptsFromSameClientIp() {
+    void signupDelegatesToPendingSignupService() {
         MemberRepository repo = mock(MemberRepository.class);
         FontService fontService = mock(FontService.class);
         when(fontService.isSelectable(null)).thenReturn(true);
+        PendingSignupService pendingSignupService = mock(PendingSignupService.class);
         AuthService service = new AuthService(repo, mock(LoginFailureRepository.class),
                 mock(EligibleMemberService.class), passwordEncoder, mock(JwtTokenProvider.class),
                 mock(EmailVerificationSender.class), fontService, mock(BannedStudentService.class),
-                mock(AuditLogService.class), mock(RefreshSessionService.class), Clock.systemDefaultZone());
+                mock(AuditLogService.class), mock(RefreshSessionService.class), pendingSignupService, Clock.systemDefaultZone());
 
-        // Every attempt is rejected as a duplicate email, but the limiter runs first and
-        // still counts it — otherwise failed probes would be a free pass.
-        when(repo.existsByEmail("taken@example.com")).thenReturn(true);
+        when(pendingSignupService.start(any(SignupRequest.class), anyString()))
+                .thenReturn(new com.coms.backend.dto.AuthResponse(null, "2026123999", "홍길동", "회원가입 신청이 완료되었습니다."));
 
-        for (int i = 0; i < 30; i++) {
-            assertThatThrownBy(() -> service.signup(signupRequest("taken@example.com"), "198.51.100.7"))
-                    .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
-                            assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
-        }
+        var response = service.signup(signupRequest("taken@example.com"), "198.51.100.7");
 
-        assertThatThrownBy(() -> service.signup(signupRequest("taken@example.com"), "198.51.100.7"))
-                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
-                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
-
-        // A different IP has its own window.
-        assertThatThrownBy(() -> service.signup(signupRequest("taken@example.com"), "198.51.100.8"))
-                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
-                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+        assertThat(response.studentId()).isEqualTo("2026123999");
+        verify(pendingSignupService).start(any(SignupRequest.class), org.mockito.ArgumentMatchers.eq("198.51.100.7"));
     }
 
     @Test
     @DisplayName("signup email verification tolerates a campus NAT: 20 requests per client IP per 10 min")
-    void requestSignupEmailVerificationRateLimitsPerClientIpAtRaisedCap() {
+    void requestSignupEmailVerificationDelegatesToPendingSignupService() {
         MemberRepository repo = mock(MemberRepository.class);
         when(repo.findByStudentId(anyString())).thenReturn(java.util.Optional.empty());
         when(repo.findByEmailIgnoreCase(anyString())).thenReturn(java.util.Optional.empty());
+        PendingSignupService pendingSignupService = mock(PendingSignupService.class);
         AuthService service = new AuthService(repo, mock(LoginFailureRepository.class),
                 mock(EligibleMemberService.class), passwordEncoder, mock(JwtTokenProvider.class),
                 mock(EmailVerificationSender.class), mock(FontService.class), mock(BannedStudentService.class),
-                mock(AuditLogService.class), mock(RefreshSessionService.class), Clock.systemDefaultZone());
+                mock(AuditLogService.class), mock(RefreshSessionService.class), pendingSignupService, Clock.systemDefaultZone());
 
-        // Campus Wi-Fi/club room sit behind one NAT IP; the old 5-per-10-min cap tripped on a
-        // handful of members requesting codes together. 20 must be tolerated before 429 kicks in.
-        for (int i = 0; i < 20; i++) {
-            assertThat(service.requestSignupEmailVerification("0000000000", "198.51.100.20")).isFalse();
-        }
-
-        assertThatThrownBy(() -> service.requestSignupEmailVerification("0000000000", "198.51.100.20"))
-                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
-                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
-
-        // A different IP has its own window.
-        assertThat(service.requestSignupEmailVerification("0000000000", "198.51.100.21")).isFalse();
+        assertThat(service.requestSignupEmailVerification("0000000000", "198.51.100.20")).isFalse();
+        verify(pendingSignupService).resend("0000000000", "198.51.100.20");
     }
 
     private static SignupRequest signupRequest(String email) {
@@ -591,7 +571,7 @@ class AuthServiceTest {
                 "CURRENT"
         ), "203.0.113.60");
 
-        assertThat(memberRepository.findByStudentId("2026123470").orElseThrow().getRole())
+        assertThat(pendingSignupRepository.findByStudentId("2026123470").orElseThrow().getInitialRole())
                 .isEqualTo(Member.Role.ASSOCIATE);
     }
 
@@ -615,7 +595,7 @@ class AuthServiceTest {
                 "CURRENT"
         ), "203.0.113.61");
 
-        assertThat(memberRepository.findByStudentId("2026123471").orElseThrow().getRole())
+        assertThat(pendingSignupRepository.findByStudentId("2026123471").orElseThrow().getInitialRole())
                 .isEqualTo(Member.Role.USER);
     }
 

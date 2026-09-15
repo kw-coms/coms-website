@@ -24,14 +24,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.Year;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Transactional
@@ -48,32 +42,9 @@ public class AuthService implements UserDetailsService {
     private static final int MAX_FAILURES_PER_ID = 5;
     private static final int MAX_FAILURES_PER_IP = 5;
     private static final int LOCKOUT_WINDOW_MINUTES = 15;
-    private static final int GRADUATE_AFTER_YEARS = 7;
-    // Raised from 5 -> 20 per 10 min per IP: campus Wi-Fi and the club room sit behind one NAT
-    // IP, so a handful of members requesting codes together tripped this well before any single
-    // person hit the per-account 1-minute cooldown below. The per-account cooldown is the real
-    // spam guard; this cap only stops one IP from mass-requesting codes for many accounts.
-    private static final int MAX_SIGNUP_EMAIL_REQUESTS_PER_WINDOW = 20;
-    private static final Duration SIGNUP_EMAIL_REQUEST_WINDOW = Duration.ofMinutes(10);
-    // 30/h matches the signup-email step above (20 per 10 min). New members often sign up
-    // together from the club room or campus Wi-Fi behind one NAT IP; this must not trip
-    // before the email limiter already does.
-    private static final int MAX_SIGNUPS_PER_WINDOW = 30;
-    private static final Duration SIGNUP_WINDOW = Duration.ofHours(1);
-
-    // Sliding-window limiter for the unauthenticated request-signup path, keyed on client IP.
-    private final Map<String, Deque<LocalDateTime>> signupEmailAttemptsByClient = new ConcurrentHashMap<>();
-    // Same limiter for the unauthenticated signup path itself: without it a single IP can
-    // create unlimited accounts (and trigger one verification mail each).
-    private final Map<String, Deque<LocalDateTime>> signupAttemptsByClient = new ConcurrentHashMap<>();
-
-    private enum SignupType {
-        CURRENT, GRADUATE
-    }
 
     private final MemberRepository memberRepository;
     private final LoginFailureRepository loginFailureRepository;
-    private final EligibleMemberService eligibleMemberService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final EmailVerificationSender emailVerificationSender;
@@ -81,7 +52,7 @@ public class AuthService implements UserDetailsService {
     private final BannedStudentService bannedStudentService;
     private final AuditLogService auditLogService;
     private final RefreshSessionService refreshSessionService;
-    private final Clock clock;
+    private final PendingSignupService pendingSignupService;
 
     public AuthService(MemberRepository memberRepository,
                        LoginFailureRepository loginFailureRepository,
@@ -93,10 +64,10 @@ public class AuthService implements UserDetailsService {
                        BannedStudentService bannedStudentService,
                        AuditLogService auditLogService,
                        RefreshSessionService refreshSessionService,
+                       PendingSignupService pendingSignupService,
                        Clock clock) {
         this.memberRepository = memberRepository;
         this.loginFailureRepository = loginFailureRepository;
-        this.eligibleMemberService = eligibleMemberService;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
         this.emailVerificationSender = emailVerificationSender;
@@ -104,50 +75,11 @@ public class AuthService implements UserDetailsService {
         this.bannedStudentService = bannedStudentService;
         this.auditLogService = auditLogService;
         this.refreshSessionService = refreshSessionService;
-        this.clock = clock;
+        this.pendingSignupService = pendingSignupService;
     }
 
     public AuthResponse signup(SignupRequest request, String clientIp) {
-        // permitAll endpoint: without a per-IP cap one client can mass-create accounts and
-        // fire one verification mail per attempt. Same sliding-window shape as the
-        // request-signup-email path, with its own (longer) window.
-        enforceSignupRateLimit(clientIp);
-        if (memberRepository.existsByEmail(request.email())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다.");
-        }
-        SignupType signupType = resolveSignupType(request);
-        validateSignupType(request, signupType);
-        validateCurrentProfile(request, signupType);
-        String studentId = claimSignupStudentId(request, signupType);
-        bannedStudentService.ensureNotBanned(studentId);
-        if (memberRepository.existsByStudentId(studentId)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 가입된 계정입니다.");
-        }
-
-        Member member = new Member();
-        member.setStudentId(studentId);
-        // 명부 행이 등급을 정한다: 리크루팅 합격으로 이관된 행은 준회원(ASSOCIATE),
-        // 관리자가 직접 넣은 행은 기존과 동일하게 회원(USER).
-        member.setRole(eligibleMemberService.resolveSignupRole(studentId));
-        member.setName(request.name().trim());
-        member.setEmail(request.email().trim());
-        member.setEmailVerified(false);
-        member.setPassword(passwordEncoder.encode(request.password()));
-        member.setDepartment(request.department() == null ? null : request.department().trim());
-        member.setGeneration(resolveSignupGeneration(request, studentId));
-        member.setPhone(request.phone() == null ? null : request.phone().trim());
-        member.setAspiration(signupType == SignupType.CURRENT ? normalizeNullable(request.aspiration()) : null);
-        member.setInterests(signupType == SignupType.CURRENT ? normalizeNullable(request.interests()) : null);
-        memberRepository.save(member);
-
-        String code = newSixDigitCode();
-        member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
-        member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
-        member.resetEmailVerificationAttempts();
-        memberRepository.save(member);
-        emailVerificationSender.sendVerificationCode(member.getEmail(), code);
-
-        return new AuthResponse(null, member.getStudentId(), member.getName(), "회원가입 신청이 완료되었습니다.");
+        return pendingSignupService.start(request, clientIp);
     }
 
     public AuthResponse login(LoginRequest request, String clientIp) {
@@ -214,51 +146,6 @@ public class AuthService implements UserDetailsService {
 
     private void recordLoginFailure(String identifier, String clientIp) {
         loginFailureRepository.save(new LoginFailure(identifier, clientIp));
-    }
-
-    private String claimSignupStudentId(SignupRequest request, SignupType signupType) {
-        if (signupType == SignupType.GRADUATE && normalizeNullable(request.studentId()) == null) {
-            return eligibleMemberService.validateAndClaimGraduateSignup(
-                    request.name(),
-                    request.graduateVerificationType(),
-                    request.graduateVerificationValue(),
-                    request.phone()
-            );
-        }
-
-        String studentId = normalizeNullable(request.studentId());
-        if (studentId == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번을 입력해주세요.");
-        }
-        eligibleMemberService.validateAndClaimSignup(
-                studentId,
-                request.name(),
-                request.graduateVerificationType(),
-                request.graduateVerificationValue(),
-                request.phone()
-        );
-        return studentId;
-    }
-
-    /**
-     * 기수 is what the applicant entered (source of truth — 편입생 학번 연도 ≠ 기수).
-     * Falls back to the studentId-derived value only for clients that predate the
-     * 기수 signup field (stale PWA bundles); the form itself requires it.
-     */
-    private String resolveSignupGeneration(SignupRequest request, String studentId) {
-        String entered = normalizeNullable(request.generation());
-        if (entered != null) {
-            return entered;
-        }
-        if (studentId != null && studentId.matches("\\d{10}")) {
-            int generation = Integer.parseInt(studentId.substring(0, 4)) - 1966;
-            return generation > 0 ? String.valueOf(generation) : null;
-        }
-        if (studentId != null && studentId.matches("G\\d{4}-\\d+")) {
-            int generation = Integer.parseInt(studentId.substring(1, 5)) - 1966;
-            return generation > 0 ? String.valueOf(generation) : null;
-        }
-        return null;
     }
 
     private java.util.Optional<Member> findMemberByIdentifier(String identifier) {
@@ -416,65 +303,11 @@ public class AuthService implements UserDetailsService {
     }
 
     public boolean requestSignupEmailVerification(String studentId, String clientIp) {
-        // permitAll endpoint: an unmasked 404-vs-200 and a real email on hit made this an
-        // unauthenticated member-enumeration and mail-bomb oracle. Rate-limit by IP and always
-        // return the same response — never reveal whether the identifier resolves to an account.
-        enforceSignupEmailRateLimit(clientIp);
-        findMemberByIdentifier(studentId).ifPresent(member -> {
-            if (bannedStudentService.isBanned(member.getStudentId()) || member.isEmailVerified()) {
-                return;
-            }
-            try {
-                enforceEmailVerificationResendCooldown(member);
-            } catch (ResponseStatusException cooldownActive) {
-                return; // per-account cooldown running; stay silent so it isn't a timing oracle
-            }
-            String code = newSixDigitCode();
-            member.setEmailVerificationCodeHash(passwordEncoder.encode(code));
-            member.setEmailVerificationExpiresAt(LocalDateTime.now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
-            member.resetEmailVerificationAttempts();
-            memberRepository.save(member);
-            emailVerificationSender.sendVerificationCode(member.getEmail(), code);
-        });
-        return false;
-    }
-
-    private void enforceSignupEmailRateLimit(String clientIp) {
-        enforceIpRateLimit(signupEmailAttemptsByClient, "signup-email", clientIp,
-                MAX_SIGNUP_EMAIL_REQUESTS_PER_WINDOW, SIGNUP_EMAIL_REQUEST_WINDOW);
-    }
-
-    private void enforceSignupRateLimit(String clientIp) {
-        enforceIpRateLimit(signupAttemptsByClient, "signup", clientIp, MAX_SIGNUPS_PER_WINDOW, SIGNUP_WINDOW);
-    }
-
-    /** Sliding-window per-IP limiter shared by the unauthenticated signup paths. */
-    private static void enforceIpRateLimit(Map<String, Deque<LocalDateTime>> attemptsByClient, String limiterName,
-                                           String clientIp, int maxPerWindow, Duration window) {
-        String key = clientIp == null || clientIp.isBlank() ? "unknown" : clientIp;
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime cutoff = now.minus(window);
-        Deque<LocalDateTime> attempts = attemptsByClient.computeIfAbsent(key, ignored -> new ArrayDeque<>());
-        synchronized (attempts) {
-            while (!attempts.isEmpty() && attempts.peekFirst().isBefore(cutoff)) {
-                attempts.removeFirst();
-            }
-            if (attempts.size() >= maxPerWindow) {
-                log.warn("Rate limit rejected: limiter={} key={}", limiterName, maskIp(key));
-                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 시도해주세요.");
-            }
-            attempts.addLast(now);
-        }
-        attemptsByClient.entrySet().removeIf(entry -> {
-            Deque<LocalDateTime> q = entry.getValue();
-            synchronized (q) {
-                return q.isEmpty() || q.peekLast().isBefore(cutoff);
-            }
-        });
+        return pendingSignupService.resend(studentId, clientIp);
     }
 
     public boolean confirmSignupEmailVerification(String studentId, String code) {
-        return confirmEmailVerification(studentId, code);
+        return pendingSignupService.confirm(studentId, code);
     }
 
     public boolean requestEmailVerification(String studentId) {
@@ -635,54 +468,6 @@ public class AuthService implements UserDetailsService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private SignupType resolveSignupType(SignupRequest request) {
-        String raw = normalizeNullable(request.signupType());
-        if (raw == null) {
-            return hasGraduateVerification(request) ? SignupType.GRADUATE : SignupType.CURRENT;
-        }
-        return switch (raw.toUpperCase(Locale.ROOT)) {
-            case "CURRENT", "STUDENT" -> SignupType.CURRENT;
-            case "GRADUATE", "ALUMNI" -> SignupType.GRADUATE;
-            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "가입 구분이 올바르지 않습니다.");
-        };
-    }
-
-    private boolean hasGraduateVerification(SignupRequest request) {
-        return normalizeNullable(request.graduateVerificationType()) != null
-                || normalizeNullable(request.graduateVerificationValue()) != null;
-    }
-
-    private void validateSignupType(SignupRequest request, SignupType signupType) {
-        String studentId = request.studentId() == null ? "" : request.studentId().trim();
-        if (!studentId.matches("\\d{10}")) {
-            return;
-        }
-        boolean graduateStudentId = isGraduateStudentId(studentId);
-        if (signupType == SignupType.GRADUATE && !graduateStudentId) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "졸업생 가입은 졸업생 학번으로만 신청할 수 있습니다.");
-        }
-        if (signupType == SignupType.CURRENT && graduateStudentId) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "졸업생은 졸업생 회원가입을 선택해주세요.");
-        }
-    }
-
-    private boolean isGraduateStudentId(String studentId) {
-        int admissionYear = Integer.parseInt(studentId.substring(0, 4));
-        return admissionYear <= Year.now(clock).getValue() - GRADUATE_AFTER_YEARS;
-    }
-
-    private void validateCurrentProfile(SignupRequest request, SignupType signupType) {
-        if (signupType != SignupType.CURRENT) {
-            return;
-        }
-        if (normalizeNullable(request.interests()) == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "재학생은 관심 분야를 입력해주세요.");
-        }
-        if (normalizeNullable(request.aspiration()) == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "재학생은 포부를 입력해주세요.");
-        }
     }
 
     @Override

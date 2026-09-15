@@ -43,6 +43,7 @@ class AuthServiceLoginThrottleTest {
             bannedStudentService,
             auditLogService,
             mock(RefreshSessionService.class),
+            mock(PendingSignupService.class),
             Clock.systemUTC()
     );
 
