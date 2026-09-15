@@ -10,24 +10,36 @@ import com.coms.backend.repository.BannedStudentRepository;
 import com.coms.backend.repository.EligibleMemberRepository;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.PendingSignupRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -55,6 +67,9 @@ class PendingSignupServiceTest {
     private PendingSignupRepository pendingRepository;
 
     @Autowired
+    private EligibleMemberService eligibleMemberService;
+
+    @Autowired
     private EligibleMemberRepository eligibleMemberRepository;
 
     @Autowired
@@ -70,7 +85,25 @@ class PendingSignupServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @Autowired
+    private AuditLogService auditLogService;
+
+    @Autowired
+    private PendingSignupCleanup cleanup;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    @Autowired
     private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private Clock clock;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @MockitoBean
     private EmailVerificationSender emailVerificationSender;
@@ -283,21 +316,74 @@ class PendingSignupServiceTest {
     }
 
     @Test
-    @DisplayName("concurrent starts for the same pending email leave only one pending row")
+    @DisplayName("concurrent starts for the same pending email return one success and one conflict")
     void concurrentStartWithSameEmailRemainsDatabaseSafe() throws Exception {
         saveEligible("2026123475", "김철수", "60", "01012345679", Member.Role.USER);
         saveEligible("2026123476", "이영희", "60", "01012345670", Member.Role.USER);
+        CountDownLatch commitBarrier = new CountDownLatch(2);
+        PendingSignupService delayedCommitService = newService(commitDelayedPasswordEncoder(commitBarrier));
 
         try (var executor = Executors.newFixedThreadPool(2)) {
-            Callable<Boolean> firstStart = () -> startReturningSuccess("2026123475", "same-race@example.com", "김철수", "01012345679");
-            Callable<Boolean> secondStart = () -> startReturningSuccess("2026123476", "SAME-RACE@example.com", "이영희", "01012345670");
-            List<Future<Boolean>> results = executor.invokeAll(List.of(firstStart, secondStart));
+            Callable<StartOutcome> firstStart = () -> startReturningOutcome(
+                    delayedCommitService, "2026123475", "same-race@example.com", "김철수", "01012345679");
+            Callable<StartOutcome> secondStart = () -> startReturningOutcome(
+                    delayedCommitService, "2026123476", "SAME-RACE@example.com", "이영희", "01012345670");
+            List<Future<StartOutcome>> results = executor.invokeAll(List.of(firstStart, secondStart));
 
-            assertThat(results.stream().filter(this::completedSuccessfully).count()).isEqualTo(1);
+            assertThat(results.stream().map(this::completedStart).toList())
+                    .containsExactlyInAnyOrder(StartOutcome.SUCCESS, StartOutcome.CONFLICT);
         }
         assertThat(pendingRepository.findAll().stream()
                 .filter(pending -> "same-race@example.com".equalsIgnoreCase(pending.getEmail()))
                 .count()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("database email unique collisions return conflict across service instances")
+    void startTranslatesDatabaseEmailUniqueCollisionToConflict() throws Exception {
+        createCaseInsensitivePendingEmailIndex();
+        try {
+            saveEligible("2026123477", "김철수", "60", "01012345679", Member.Role.USER);
+            saveEligible("2026123478", "이영희", "60", "01012345670", Member.Role.USER);
+            CountDownLatch duplicateCheckBarrier = new CountDownLatch(2);
+            PasswordEncoder coordinatedEncoder = duplicateCheckBarrierPasswordEncoder(duplicateCheckBarrier);
+            PendingSignupService firstService = newService(coordinatedEncoder);
+            PendingSignupService secondService = newService(coordinatedEncoder);
+
+            try (var executor = Executors.newFixedThreadPool(2)) {
+                Callable<StartOutcome> firstStart = () -> startReturningOutcome(
+                        firstService, "2026123477", "db-race@example.com", "김철수", "01012345679");
+                Callable<StartOutcome> secondStart = () -> startReturningOutcome(
+                        secondService, "2026123478", "DB-RACE@example.com", "이영희", "01012345670");
+                List<Future<StartOutcome>> results = executor.invokeAll(List.of(firstStart, secondStart));
+
+                assertThat(results.stream().map(this::completedStart).toList())
+                        .containsExactlyInAnyOrder(StartOutcome.SUCCESS, StartOutcome.CONFLICT);
+            }
+            assertThat(pendingRepository.findAll().stream()
+                    .filter(pending -> "db-race@example.com".equalsIgnoreCase(pending.getEmail()))
+                    .count()).isEqualTo(1);
+        } finally {
+            dropCaseInsensitivePendingEmailIndex();
+        }
+    }
+
+    @Test
+    @DisplayName("unrelated pending signup integrity failures are not translated to email conflicts")
+    void startDoesNotMaskUnrelatedIntegrityFailures() {
+        jdbcTemplate.execute("CREATE UNIQUE INDEX uq_pending_signups_phone_test ON pending_signups(phone)");
+        try {
+            saveEligible("2026123479", "김철수", "60", "01012345679", Member.Role.USER);
+            service.start(currentStudentRequest(
+                    "2026123479", "phone-one@example.com", "김철수", "01012345679"), "198.51.100.26");
+            saveEligible("2026123480", "이영희", "60", "01012345679", Member.Role.USER);
+
+            assertThatThrownBy(() -> service.start(currentStudentRequest(
+                    "2026123480", "phone-two@example.com", "이영희", "01012345679"), "198.51.100.27"))
+                    .isInstanceOf(DataIntegrityViolationException.class);
+        } finally {
+            jdbcTemplate.execute("DROP INDEX IF EXISTS uq_pending_signups_phone_test");
+        }
     }
 
     @Test
@@ -341,12 +427,145 @@ class PendingSignupServiceTest {
         }
     }
 
-    private boolean startReturningSuccess(String studentId, String email, String name, String phone) {
+    private StartOutcome completedStart(Future<StartOutcome> future) {
         try {
-            service.start(currentStudentRequest(studentId, email, name, phone), "198.51.100.25");
-            return true;
-        } catch (RuntimeException ex) {
-            return false;
+            return future.get();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while waiting for concurrent signup start", ex);
+        } catch (ExecutionException ex) {
+            throw new AssertionError("Unexpected concurrent signup start failure", ex.getCause());
+        }
+    }
+
+    private StartOutcome startReturningOutcome(PendingSignupService targetService,
+                                               String studentId,
+                                               String email,
+                                               String name,
+                                               String phone) {
+        try {
+            targetService.start(currentStudentRequest(studentId, email, name, phone), "198.51.100.25");
+            return StartOutcome.SUCCESS;
+        } catch (ResponseStatusException ex) {
+            if (ex.getStatusCode().equals(HttpStatus.CONFLICT)) {
+                return StartOutcome.CONFLICT;
+            }
+            throw ex;
+        }
+    }
+
+    private PendingSignupService newService(PasswordEncoder encoder) {
+        return new PendingSignupService(
+                pendingRepository,
+                memberRepository,
+                eligibleMemberService,
+                encoder,
+                emailVerificationSender,
+                bannedStudentService,
+                bannedStudentRepository,
+                auditLogService,
+                cleanup,
+                transactionManager,
+                entityManager,
+                clock
+        );
+    }
+
+    private PasswordEncoder commitDelayedPasswordEncoder(CountDownLatch commitBarrier) {
+        return new PasswordEncoder() {
+            @Override
+            public String encode(CharSequence rawPassword) {
+                String encoded = passwordEncoder.encode(rawPassword);
+                if (TransactionSynchronizationManager.isActualTransactionActive()
+                        && TransactionSynchronizationManager.getSynchronizations().stream()
+                        .noneMatch(CommitBarrierSynchronization.class::isInstance)) {
+                    TransactionSynchronizationManager.registerSynchronization(
+                            new CommitBarrierSynchronization(commitBarrier));
+                }
+                return encoded;
+            }
+
+            @Override
+            public boolean matches(CharSequence rawPassword, String encodedPassword) {
+                return passwordEncoder.matches(rawPassword, encodedPassword);
+            }
+
+            @Override
+            public boolean upgradeEncoding(String encodedPassword) {
+                return passwordEncoder.upgradeEncoding(encodedPassword);
+            }
+        };
+    }
+
+    private PasswordEncoder duplicateCheckBarrierPasswordEncoder(CountDownLatch duplicateCheckBarrier) {
+        Set<Long> coordinatedThreads = ConcurrentHashMap.newKeySet();
+        return new PasswordEncoder() {
+            @Override
+            public String encode(CharSequence rawPassword) {
+                if (TransactionSynchronizationManager.isActualTransactionActive()
+                        && coordinatedThreads.add(Thread.currentThread().threadId())) {
+                    duplicateCheckBarrier.countDown();
+                    try {
+                        if (!duplicateCheckBarrier.await(5, TimeUnit.SECONDS)) {
+                            throw new IllegalStateException("Timed out coordinating concurrent duplicate checks");
+                        }
+                    } catch (InterruptedException ex) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("Interrupted while coordinating duplicate checks", ex);
+                    }
+                }
+                return passwordEncoder.encode(rawPassword);
+            }
+
+            @Override
+            public boolean matches(CharSequence rawPassword, String encodedPassword) {
+                return passwordEncoder.matches(rawPassword, encodedPassword);
+            }
+
+            @Override
+            public boolean upgradeEncoding(String encodedPassword) {
+                return passwordEncoder.upgradeEncoding(encodedPassword);
+            }
+        };
+    }
+
+    private void createCaseInsensitivePendingEmailIndex() {
+        jdbcTemplate.execute("""
+                ALTER TABLE pending_signups
+                ADD COLUMN email_ci VARCHAR(255) GENERATED ALWAYS AS (lower(email))
+                """);
+        jdbcTemplate.execute("""
+                CREATE UNIQUE INDEX uq_pending_signups_email_ci
+                ON pending_signups(email_ci)
+                """);
+    }
+
+    private void dropCaseInsensitivePendingEmailIndex() {
+        jdbcTemplate.execute("DROP INDEX IF EXISTS uq_pending_signups_email_ci");
+        jdbcTemplate.execute("ALTER TABLE pending_signups DROP COLUMN IF EXISTS email_ci");
+    }
+
+    private enum StartOutcome {
+        SUCCESS,
+        CONFLICT
+    }
+
+    private static final class CommitBarrierSynchronization implements TransactionSynchronization {
+        private final CountDownLatch commitBarrier;
+
+        private CommitBarrierSynchronization(CountDownLatch commitBarrier) {
+            this.commitBarrier = commitBarrier;
+        }
+
+        @Override
+        public void beforeCommit(boolean readOnly) {
+            commitBarrier.countDown();
+            try {
+                commitBarrier.await(1, TimeUnit.SECONDS);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted while coordinating transaction commits", ex);
+            }
         }
     }
 

@@ -9,6 +9,8 @@ import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.PendingSignupRepository;
 import com.coms.backend.repository.BannedStudentRepository;
 import jakarta.persistence.EntityManager;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -39,6 +41,8 @@ public class PendingSignupService {
     private static final java.time.Duration SIGNUP_WINDOW = java.time.Duration.ofHours(1);
     private static final int MAX_SIGNUP_EMAIL_REQUESTS_PER_WINDOW = 20;
     private static final java.time.Duration SIGNUP_EMAIL_REQUEST_WINDOW = java.time.Duration.ofMinutes(10);
+    private static final int PENDING_EMAIL_LOCK_STRIPES = 64;
+    private static final String PENDING_EMAIL_UNIQUE_CONSTRAINT = "uq_pending_signups_email_ci";
 
     private final PendingSignupRepository pendingSignupRepository;
     private final MemberRepository memberRepository;
@@ -55,7 +59,7 @@ public class PendingSignupService {
 
     private final Map<String, java.util.Deque<LocalDateTime>> signupAttemptsByClient = new ConcurrentHashMap<>();
     private final Map<String, java.util.Deque<LocalDateTime>> signupEmailAttemptsByClient = new ConcurrentHashMap<>();
-    private final Map<String, Object> pendingEmailLocks = new ConcurrentHashMap<>();
+    private final Object[] pendingEmailLocks = createPendingEmailLocks();
 
     public PendingSignupService(PendingSignupRepository pendingSignupRepository,
                                 MemberRepository memberRepository,
@@ -86,30 +90,36 @@ public class PendingSignupService {
 
     public AuthResponse start(SignupRequest request, String clientIp) {
         enforceIpRateLimit(signupAttemptsByClient, "signup", clientIp, MAX_SIGNUPS_PER_WINDOW, SIGNUP_WINDOW);
+        String normalizedEmail = normalizeRequired(request.email());
 
-        PendingSend pendingSend = transactionTemplate.execute(status -> {
-            String signupType = resolveSignupType(request);
-            validateSignupType(request, signupType);
-            EligibleMemberService.PreparedSignup prepared = eligibleMemberService.prepareSignup(request);
-            validateCurrentProfile(request, signupType);
-            bannedStudentService.ensureNotBanned(prepared.studentId());
-            requireMemberStudentIdAvailable(prepared.studentId());
-            String normalizedEmail = normalizeRequired(request.email());
-            Object emailLock = pendingEmailLocks.computeIfAbsent(
-                    normalizedEmail.toLowerCase(Locale.ROOT), ignored -> new Object());
-            synchronized (emailLock) {
-                deleteExpiredPendingEmailConflicts(normalizedEmail, prepared.studentId());
-                requireEmailAvailableForStart(normalizedEmail, prepared.studentId());
+        PendingSend pendingSend;
+        synchronized (pendingEmailLock(normalizedEmail)) {
+            try {
+                pendingSend = transactionTemplate.execute(status -> {
+                    String signupType = resolveSignupType(request);
+                    validateSignupType(request, signupType);
+                    EligibleMemberService.PreparedSignup prepared = eligibleMemberService.prepareSignup(request);
+                    validateCurrentProfile(request, signupType);
+                    bannedStudentService.ensureNotBanned(prepared.studentId());
+                    requireMemberStudentIdAvailable(prepared.studentId());
+                    deleteExpiredPendingEmailConflicts(normalizedEmail, prepared.studentId());
+                    requireEmailAvailableForStart(normalizedEmail, prepared.studentId());
 
-                PendingSignup pending = pendingSignupRepository.findByStudentIdForUpdate(prepared.studentId())
-                        .orElseGet(PendingSignup::new);
-                String code = newSixDigitCode();
-                applyPending(pending, request, prepared, normalizedEmail, code, signupType);
-                PendingSignup saved = pendingSignupRepository.saveAndFlush(pending);
-                return new PendingSend(saved.getId(), saved.getVerificationCodeHash(), saved.getEmail(), code,
-                        saved.getStudentId(), saved.getName());
+                    PendingSignup pending = pendingSignupRepository.findByStudentIdForUpdate(prepared.studentId())
+                            .orElseGet(PendingSignup::new);
+                    String code = newSixDigitCode();
+                    applyPending(pending, request, prepared, normalizedEmail, code, signupType);
+                    PendingSignup saved = pendingSignupRepository.saveAndFlush(pending);
+                    return new PendingSend(saved.getId(), saved.getVerificationCodeHash(), saved.getEmail(), code,
+                            saved.getStudentId(), saved.getName());
+                });
+            } catch (DataIntegrityViolationException ex) {
+                if (isPendingEmailUniqueViolation(ex)) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 사용 중인 이메일입니다.", ex);
+                }
+                throw ex;
             }
-        });
+        }
 
         if (pendingSend == null) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "회원가입 신청을 처리할 수 없습니다.");
@@ -266,6 +276,43 @@ public class PendingSignupService {
                 .setParameter("studentId", studentId)
                 .setParameter("now", now())
                 .executeUpdate();
+    }
+
+    private Object pendingEmailLock(String normalizedEmail) {
+        String key = normalizedEmail.toLowerCase(Locale.ROOT);
+        return pendingEmailLocks[Math.floorMod(key.hashCode(), pendingEmailLocks.length)];
+    }
+
+    private boolean isPendingEmailUniqueViolation(DataIntegrityViolationException exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException constraintViolation
+                    && matchesConstraintName(constraintViolation.getConstraintName(), PENDING_EMAIL_UNIQUE_CONSTRAINT)) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
+    }
+
+    private boolean matchesConstraintName(String actualName, String expectedName) {
+        if (actualName == null) {
+            return false;
+        }
+        for (String part : actualName.split("[^A-Za-z0-9_]+")) {
+            if (part.equalsIgnoreCase(expectedName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Object[] createPendingEmailLocks() {
+        Object[] locks = new Object[PENDING_EMAIL_LOCK_STRIPES];
+        for (int index = 0; index < locks.length; index++) {
+            locks[index] = new Object();
+        }
+        return locks;
     }
 
     private void validateCurrentProfile(SignupRequest request, String signupType) {
