@@ -37,5 +37,6 @@ uploads/
 !*sample*.xlsx
 .omc/
 .omx/
+.superpowers/
 .playwright-mcp/
 .tools/
