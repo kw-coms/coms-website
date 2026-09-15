@@ -277,12 +277,12 @@ export default function Signup({ onBack }: { onBack: () => void }) {
   }
 
   const stepDesc = step === 'verify'
-    ? '가입하신 이메일로 발송된 인증코드를 입력해주세요.'
+    ? '이메일 인증을 완료하면 계정이 생성됩니다.'
     : step === 'done'
-      ? '이메일 인증이 완료되었습니다. 로그인하시면 됩니다.'
+      ? '인증이 완료되어 계정이 생성되었습니다.'
       : isGraduateSignup
-        ? '졸업생 명부 인증 정보와 일치해야 계정을 만들 수 있습니다.'
-        : "COM's 명부 확인 후 관심 분야와 포부를 함께 등록합니다."
+        ? '졸업생 명부 인증 정보를 확인한 뒤 이메일 인증으로 계정을 생성합니다.'
+        : "COM's 명부 정보를 확인한 뒤 이메일 인증으로 계정을 생성합니다."
 
   return (
     <div className="w-full min-w-0 space-y-4 text-[var(--app-text)]">
@@ -301,7 +301,7 @@ export default function Signup({ onBack }: { onBack: () => void }) {
           <p className="apple-eyebrow">Signup</p>
           <h1 className="apple-display mt-3 text-4xl sm:text-6xl">COM&apos;s 회원가입</h1>
           <p className="apple-copy mt-5 max-w-3xl text-base sm:text-lg">
-            지원하기와 같은 흐름으로 가입 정보를 작성합니다. 재학생은 명부 확인과 관심 분야를 함께 등록하고, 졸업생은 명부 인증 정보로 계정을 만듭니다.
+            지원하기와 같은 흐름으로 가입 정보를 작성합니다. 재학생은 명부 확인과 관심 분야를 함께 등록하고, 졸업생은 명부 인증 정보를 확인한 뒤 이메일 인증으로 계정을 생성합니다.
           </p>
         </div>
 
@@ -464,7 +464,7 @@ export default function Signup({ onBack }: { onBack: () => void }) {
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-3xl text-[var(--app-accent-text)]">
                 <CheckCircle2 size={30} />
               </div>
-              <p className="text-base font-semibold text-[var(--app-accent-text)]">이메일 인증이 완료되었습니다!</p>
+              <p className="text-base font-semibold text-[var(--app-accent-text)]">인증이 완료되어 계정이 생성되었습니다.</p>
               <button
                 type="button"
                 onClick={onBack}
@@ -481,9 +481,10 @@ export default function Signup({ onBack }: { onBack: () => void }) {
               <div>
                 <p className="text-sm font-semibold text-[var(--app-accent-text)]">Process</p>
                 <div className="mt-4 space-y-3 text-sm leading-6 text-[var(--app-muted)]">
-                  <p>1. 가입 정보 작성</p>
-                  <p>2. 명부 확인 및 계정 생성</p>
-                  <p>3. 이메일 인증 후 로그인</p>
+                  <p>가입 정보 확인 → 이메일 인증 → 계정 생성</p>
+                  <p>1. 가입 정보 확인</p>
+                  <p>2. 이메일 인증</p>
+                  <p>3. 계정 생성 후 로그인</p>
                 </div>
               </div>
 
@@ -499,7 +500,7 @@ export default function Signup({ onBack }: { onBack: () => void }) {
             </div>
 
             <p className="text-xs leading-5 text-[var(--app-subtle)]">
-              가입 후 이메일 인증을 완료해야 로그인할 수 있습니다. 지원서와 달리 회원가입은 계정 생성과 인증 절차가 함께 진행됩니다.
+              이메일 인증 전에는 계정이 생성되지 않아 로그인할 수 없습니다. 인증코드를 확인하면 계정이 생성되고 로그인할 수 있습니다.
             </p>
           </aside>
         </div>

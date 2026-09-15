@@ -1,6 +1,9 @@
 package com.coms.backend.service;
 
+import com.coms.backend.domain.Member;
 import com.coms.backend.repository.EligibleMemberRepository;
+import com.coms.backend.dto.SignupRequest;
+import com.coms.backend.service.EligibleMemberService.PreparedSignup;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -173,6 +176,36 @@ class EligibleMemberServiceTest {
         assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2019999999", "홍길동", "GENERATION", "53", null))
                 .isInstanceOf(ResponseStatusException.class);
         assertThat(eligibleMemberService.importRoster(file).skipped()).isEqualTo(1);
+    }
+
+    @Test
+    void graduatePreparationDoesNotClaimRosterUntilConfirmation() {
+        eligibleMemberService.addGraduateSingle("홍길동", "19", null, "010-1234-5678");
+
+        PreparedSignup prepared = eligibleMemberService.prepareSignup(new SignupRequest(
+                null,
+                " 홍길동 ",
+                "YEAR",
+                "19",
+                "hong@example.com",
+                "Password!123",
+                "컴퓨터공학부",
+                null,
+                "01012345678",
+                "열심히 하겠습니다",
+                "backend",
+                "graduate"
+        ));
+
+        assertThat(prepared.studentId()).startsWith("G2019-");
+        assertThat(prepared.generation()).isEqualTo("53");
+        assertThat(prepared.initialRole()).isEqualTo(Member.Role.USER);
+        assertThat(eligibleMemberRepository.findById(prepared.eligibleMemberId()).orElseThrow().getStudentId()).isBlank();
+
+        eligibleMemberService.claimPreparedSignup(prepared.eligibleMemberId(), prepared.studentId());
+
+        assertThat(eligibleMemberRepository.findById(prepared.eligibleMemberId()).orElseThrow().getStudentId())
+                .isEqualTo(prepared.studentId());
     }
 
     @Test

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  createMember,
   deleteMember,
   listMembers,
   resetMemberPassword,
@@ -9,6 +10,17 @@ import {
 import { queryKeys } from '../../services/queryKeys'
 
 const adminMembersQueryKey = queryKeys.admin.members()
+
+type CreateMemberPayload = {
+  studentId: string
+  name: string
+  email: string
+  password: string
+  generation: string
+  role: string
+  department: string
+  phone: string
+}
 
 export function useAdminMembers() {
   const queryClient = useQueryClient()
@@ -26,6 +38,13 @@ export function useAdminMembers() {
       queryClient.setQueryData(adminMembersQueryKey, (prev) => (
         (Array.isArray(prev) ? prev : []).map((member) => (member.id === updated.id ? updated : member))
       ))
+      queryClient.invalidateQueries({ queryKey: adminMembersQueryKey })
+    },
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (payload: CreateMemberPayload) => createMember(payload),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminMembersQueryKey })
     },
   })
@@ -59,6 +78,7 @@ export function useAdminMembers() {
     loading: membersQuery.isPending,
     error: membersQuery.error ? (membersQuery.error.message || '회원 목록을 불러오지 못했습니다.') : '',
     refetch: membersQuery.refetch,
+    addMember: createMutation.mutateAsync,
     updateRole: roleMutation.mutateAsync,
     updateGeneration: generationMutation.mutateAsync,
     removeMember: deleteMutation.mutateAsync,

@@ -2,10 +2,13 @@ package com.coms.backend.controller;
 
 import com.coms.backend.dto.AuthResponse;
 import com.coms.backend.dto.LoginRequest;
+import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.security.JwtTokenProvider;
 import com.coms.backend.service.AuthService;
+import com.coms.backend.service.PendingSignupService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -17,10 +20,25 @@ import static org.mockito.Mockito.when;
 
 class AuthControllerCookieTest {
     private final AuthService authService = mock(AuthService.class);
+    private final PendingSignupService pendingSignupService = mock(PendingSignupService.class);
     private final JwtTokenProvider jwtTokenProvider = mock(JwtTokenProvider.class);
     private final com.coms.backend.service.RefreshSessionService refreshSessionService =
             mock(com.coms.backend.service.RefreshSessionService.class);
-    private final AuthController controller = new AuthController(authService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, true, "Lax");
+    private final AuthController controller = new AuthController(authService, pendingSignupService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, true, "Lax");
+
+    @Test
+    void signupStartsPendingLifecycleWithoutIssuingCookies() {
+        SignupRequest request = new SignupRequest(
+                "2026123456", "홍길동", null, null, "new@example.com", "Password1!",
+                "컴퓨터공학과", "60", "01012345678", "열심히 하겠습니다.", "웹", "CURRENT");
+        when(pendingSignupService.start(org.mockito.ArgumentMatchers.eq(request), org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(new AuthResponse(null, "2026123456", "홍길동", "회원가입 신청이 완료되었습니다."));
+
+        var response = controller.signup(request, new MockHttpServletRequest());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(response.getBody()).isEqualTo(new AuthResponse(null, "2026123456", "홍길동", "회원가입 신청이 완료되었습니다."));
+    }
 
     @Test
     void regularLoginUsesSessionCookies() {
@@ -50,7 +68,7 @@ class AuthControllerCookieTest {
 
     @Test
     void sameSiteNoneIsHonoredWhenSecure() {
-        AuthController noneController = new AuthController(authService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, true, "None");
+        AuthController noneController = new AuthController(authService, pendingSignupService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, true, "None");
         when(authService.login(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(new AuthResponse("access", "2026123456", "홍길동", "ok", "refresh"));
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -63,7 +81,7 @@ class AuthControllerCookieTest {
 
     @Test
     void sameSiteNoneWithoutSecureDegradesToLax() {
-        AuthController unsafeNone = new AuthController(authService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, false, "None");
+        AuthController unsafeNone = new AuthController(authService, pendingSignupService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, false, "None");
         when(authService.login(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(new AuthResponse("access", "2026123456", "홍길동", "ok", "refresh"));
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -76,7 +94,7 @@ class AuthControllerCookieTest {
 
     @Test
     void unknownSameSiteFallsBackToLax() {
-        AuthController bogus = new AuthController(authService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, true, "Weird");
+        AuthController bogus = new AuthController(authService, pendingSignupService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, true, "Weird");
         when(authService.login(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(new AuthResponse("access", "2026123456", "홍길동", "ok", "refresh"));
         MockHttpServletResponse response = new MockHttpServletResponse();

@@ -15,6 +15,7 @@ import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.dto.UpdateProfileRequest;
 import com.coms.backend.security.JwtTokenProvider;
 import com.coms.backend.service.AuthService;
+import com.coms.backend.service.PendingSignupService;
 import com.coms.backend.service.RefreshSessionService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,6 +40,7 @@ public class AuthController {
     private static final java.util.Set<String> VALID_SAME_SITE = java.util.Set.of("Lax", "Strict", "None");
 
     private final AuthService authService;
+    private final PendingSignupService pendingSignupService;
     private final JwtTokenProvider jwtTokenProvider;
     private final com.coms.backend.service.AdminService adminService;
     private final RefreshSessionService refreshSessionService;
@@ -46,12 +48,14 @@ public class AuthController {
     private final String cookieSameSite;
 
     public AuthController(AuthService authService,
+                          PendingSignupService pendingSignupService,
                           JwtTokenProvider jwtTokenProvider,
                           com.coms.backend.service.AdminService adminService,
                           RefreshSessionService refreshSessionService,
                           @Value("${cookie.secure:false}") boolean cookieSecure,
                           @Value("${cookie.same-site:Lax}") String cookieSameSite) {
         this.authService = authService;
+        this.pendingSignupService = pendingSignupService;
         this.jwtTokenProvider = jwtTokenProvider;
         this.adminService = adminService;
         this.refreshSessionService = refreshSessionService;
@@ -74,8 +78,8 @@ public class AuthController {
     @PostMapping("/signup")
     public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request,
                                                HttpServletRequest servletRequest) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(authService.signup(request, resolveClientIp(servletRequest)));
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(pendingSignupService.start(request, resolveClientIp(servletRequest)));
     }
 
     @PostMapping("/login")
@@ -276,14 +280,14 @@ public class AuthController {
             HttpServletRequest servletRequest) {
         // Constant response regardless of whether the identifier resolves — the service masks
         // enumeration and rate-limits by IP internally.
-        authService.requestSignupEmailVerification(request.studentId(), resolveClientIp(servletRequest));
+        pendingSignupService.resend(request.studentId(), resolveClientIp(servletRequest));
         return ResponseEntity.ok(new EmailVerificationStatusResponse("인증코드를 이메일로 보냈습니다.", false));
     }
 
     @PostMapping("/email-verification/confirm-signup")
     public ResponseEntity<EmailVerificationStatusResponse> confirmSignupEmail(
             @Valid @RequestBody ConfirmSignupEmailRequest request) {
-        boolean verified = authService.confirmSignupEmailVerification(request.studentId(), request.code());
+        boolean verified = pendingSignupService.confirm(request.studentId(), request.code());
         return ResponseEntity.ok(new EmailVerificationStatusResponse("이메일 인증이 완료되었습니다.", verified));
     }
 
