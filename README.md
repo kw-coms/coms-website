@@ -86,7 +86,7 @@ $env:JWT_SECRET = [Convert]::ToBase64String([Security.Cryptography.RandomNumberG
 
 개발 프로필은 H2 파일 DB를 사용합니다. 서버는 기본적으로 `http://localhost:8080`에서 실행됩니다. 개발용 관리자 계정이 필요하면 실행 전에 `COMS_DEV_ADMIN_PASSWORD`에 12자 이상의 임의 비밀번호를 설정하세요. 소스에 고정 비밀번호는 없습니다.
 
-로컬 JDK가 `.tools\jdk-21.0.11+10`에 준비되어 있다면 루트에서 다음 스크립트를 사용할 수 있습니다.
+JDK 21을 `JAVA_HOME`으로 지정했거나 스크립트가 인식하는 로컬 경로에 설치했다면 루트에서 다음 스크립트를 사용할 수 있습니다.
 
 ```powershell
 .\scripts\start-backend.ps1
@@ -147,8 +147,8 @@ docker compose --env-file .env up -d --build
 | --- | --- | --- |
 | 인증 | `/api/auth/**` | 일부 공개, 일부 회원 |
 | 모집 지원 | `POST /api/recruit/apply` | 공개 |
-| 공지사항 조회 | `GET /api/notices/**` | 공개 |
-| 공지사항 관리 | `POST`, `PUT`, `DELETE /api/notices/**` | 관리자 |
+| 공지사항 조회 | `GET /api/notices/**` | 회원 |
+| 공지사항 관리 | `POST`, `PUT`, `DELETE /api/notices/**` | 작성 권한 보유 회원 또는 작성자(동작별 상이) |
 | 자료실 | `/api/files/**` | 회원 |
 | 커뮤니티 | `/api/community/posts/**` | 회원 |
 | 커뮤니티 링크 미리보기 | `GET /api/community/posts/{id}/share`, `GET /api/community/posts/{id}/share-data`, `GET /api/community/posts/{id}/share-image` | 공개 |
@@ -181,7 +181,7 @@ docker compose --env-file .env up -d --build
 
 ## 배포
 
-`main` 브랜치에 push하거나 GitHub Actions에서 수동 실행하면 `.github/workflows/deploy.yml`이 서버에 접속해 Docker Compose로 서비스를 배포합니다.
+`main` 브랜치에 push한 뒤 CI가 성공하거나 GitHub Actions에서 검증된 커밋을 수동 지정하면 `.github/workflows/deploy.yml`이 서버에 접속해 Docker Compose로 서비스를 배포합니다.
 
 필요한 GitHub Secrets:
 
@@ -189,6 +189,7 @@ docker compose --env-file .env up -d --build
 - `DEPLOY_USER`
 - `DEPLOY_PORT`
 - `DEPLOY_SSH_KEY`
+- `DEPLOY_SSH_KNOWN_HOSTS`
 - `DEPLOY_PATH`
 - `PUBLIC_BASE_URL`
 
@@ -202,5 +203,6 @@ docker compose --env-file .env up -d --build
 - 운영에서는 `MAIL_LOG_VERIFICATION_CODES=false`를 유지합니다.
 - 메일 기능을 사용할 때만 서버의 `.env`에 `RECRUIT_MAIL_TO`를 설정합니다.
 - PostgreSQL 스키마는 Flyway migration으로 관리합니다.
+- 기존 운영 DB에 공개 자격 증명·학번을 제거한 migration 파일을 처음 배포할 때는 DB를 백업한 뒤 Flyway 11.14.1로 `repair`와 `validate`를 수행해야 합니다. 기존 데이터는 삭제되지 않습니다.
 - 운영 reverse proxy는 `/api`와 `/actuator` 요청을 백엔드로 전달해야 합니다.
 - DB volume과 업로드 파일 volume은 정기적으로 백업합니다.
