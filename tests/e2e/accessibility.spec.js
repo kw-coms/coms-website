@@ -12,6 +12,19 @@ const BLOCKING_IMPACTS = ['serious', 'critical']
 // prefers-reduced-motion, so run the scans in that mode for determinism.
 test.use({ reducedMotion: 'reduce' })
 
+test.describe('first-visit intro', () => {
+  test.use({ reducedMotion: 'no-preference' })
+
+  test('visible skip control is available to assistive technology', async ({ page }) => {
+    await mockAdminApis(page)
+    await page.goto('/')
+    const skip = page.getByRole('button', { name: /skip/i })
+    await expect(skip).toBeVisible()
+    await skip.click()
+    await expect(skip).toBeHidden()
+  })
+})
+
 const samplePost = {
   id: 77,
   title: '접근성 점검 게시글',

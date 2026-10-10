@@ -23,8 +23,8 @@ import { expect, test } from '@playwright/test'
 // blocked until the emailed 6-digit code is confirmed; there is no SMTP server
 // here. Two facts make full real-backend coverage possible without email:
 //
-//  1. The dev profile auto-seeds an ADMIN (studentId "admin" / "REDACTED_SECRET" via
-//     DevDataInitializer). ADMINs bypass the email-verification login gate, so
+//  1. The runner supplies a random dev admin password to DevDataInitializer.
+//     ADMINs bypass the email-verification login gate, so
 //     this account logs in immediately — test 1 drives a complete real login.
 //  2. The runner boots with MAIL_LOG_VERIFICATION_CODES=true, which makes the
 //     verification-code "sender" log instead of throwing, so /signup returns
@@ -34,12 +34,11 @@ import { expect, test } from '@playwright/test'
 //     than completing it).
 
 const ORIGIN = 'http://localhost:3000'
-const BOOTSTRAP_SECRET =
-  process.env.BOOTSTRAP_SECRET || 'REDACTED_SECRET'
+const BOOTSTRAP_SECRET = process.env.BOOTSTRAP_SECRET
 
 // Auto-seeded dev admin (see backend DevDataInitializer). Login-able without
 // email verification because ADMINs bypass the gate.
-const ADMIN = { identifier: 'admin', password: 'REDACTED_SECRET' }
+const ADMIN = { identifier: 'admin', password: process.env.COMS_E2E_ADMIN_PASSWORD }
 
 test.describe('real backend auth', () => {
   test('dev admin logs in through the UI and reaches a gated page', async ({ page }) => {
@@ -52,6 +51,7 @@ test.describe('real backend auth', () => {
 
     // After a successful login the SPA leaves /login (onSuccess navigation).
     await expect(page).not.toHaveURL(/\/login$/, { timeout: 15_000 })
+    await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible()
 
     // The httpOnly access-token cookie must be set by the real backend.
     const cookies = await page.context().cookies()
@@ -67,6 +67,11 @@ test.describe('real backend auth', () => {
     const me = await meRes.json()
     expect(me.studentId).toBe('admin')
     expect(me.role).toBe('ADMIN')
+    const browserMeStatus = await page.evaluate(async () => {
+      const response = await fetch('/api/auth/me', { credentials: 'include' })
+      return response.status
+    })
+    expect(browserMeStatus, 'browser fetch must retain the session cookie').toBe(200)
 
     // A gated page renders for the authenticated session (the RequireAuth guard
     // would redirect to /login otherwise).
