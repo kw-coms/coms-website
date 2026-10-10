@@ -143,3 +143,25 @@ test('admin panel has no serious or critical accessibility violations', async ({
   await expect(page.getByRole('tablist', { name: '관리자 패널 섹션' })).toBeVisible()
   await assertNoSeriousViolations(page)
 })
+
+const publicRoutes = ['/about', '/activities', '/projects', '/apps', '/sponsors', '/recruit', '/recruit-notice', '/login', '/signup']
+
+for (const viewport of [{ width: 1280, height: 900 }, { width: 320, height: 720 }]) {
+  test.describe(`public routes at ${viewport.width}px`, () => {
+    test.use({ viewport })
+
+    for (const route of publicRoutes) {
+      test(`${route} has no serious accessibility violation or horizontal overflow`, async ({ page }) => {
+        await mockOptionalApis(page)
+        await page.goto(route)
+        await expect(page.locator('#main-content')).toBeVisible()
+        await expect.poll(() => page.locator('#main-content').innerText()).not.toBe('')
+        // Detail pages fade in after navigation; scan at full opacity to avoid transient contrast readings.
+        await page.waitForTimeout(500)
+        await assertNoSeriousViolations(page)
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+        expect(overflow, `${route} overflows at ${viewport.width}px`).toBeLessThanOrEqual(1)
+      })
+    }
+  })
+}

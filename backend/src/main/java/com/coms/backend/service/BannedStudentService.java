@@ -35,6 +35,8 @@ public class BannedStudentService {
         bannedStudentRepository.save(new BannedStudent(studentId, expiresAt));
     }
 
+    // This check may run inside a caller that must still commit independent abuse counters.
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public void ensureNotBanned(String studentId) {
         if (isBanned(studentId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "차단된 계정입니다.");
