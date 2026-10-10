@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Upload } from 'lucide-react'
-import { apiUrl } from '../../services/apiClient'
+import { projectFileHref } from '../../utils/appProjectUrls'
 import {
   deleteClubProjectFile,
   listClubProjects,
@@ -232,7 +232,7 @@ export default function AdminAppCatalogRow({ item, categories, onDelete, onUpdat
             <ul className="mt-2 flex flex-col gap-1">
               {(item.files || []).map((file) => (
                 <li key={file.id} className="flex items-center gap-2 text-xs">
-                  <a href={apiUrl(file.url)} className="font-semibold text-[var(--app-accent-text)] hover:underline">{file.originalName || '배포파일'}</a>
+                  <a href={projectFileHref(file.url)} className="font-semibold text-[var(--app-accent-text)] hover:underline">{file.originalName || '배포파일'}</a>
                   <button
                     type="button"
                     onClick={() => removeFile(file.id)}

@@ -3,6 +3,9 @@ name: OpenAPI Drift Check
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   openapi-drift:
     name: Verify committed openapi.json is up to date

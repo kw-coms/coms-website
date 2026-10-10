@@ -168,7 +168,7 @@ function youtubeVideoIdFromUrl(value) {
   try {
     const url = new URL(String(value || '').trim())
     if (url.hostname === 'youtu.be') return url.pathname.slice(1)
-    if (url.hostname.endsWith('youtube.com')) {
+    if (url.hostname === 'youtube.com' || url.hostname.endsWith('.youtube.com')) {
       if (url.pathname.startsWith('/watch')) return url.searchParams.get('v')
       if (url.pathname.startsWith('/shorts/')) return url.pathname.split('/')[2]
       if (url.pathname.startsWith('/embed/')) return url.pathname.split('/')[2]

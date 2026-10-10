@@ -1,6 +1,6 @@
 import { ArrowUpRight, Download, FileText } from 'lucide-react'
-import { apiUrl } from '../../services/apiClient'
 import { buildProjectStatusBadges } from '../../utils/appProjectStatus'
+import { projectFileHref, safeProjectLinkUrl } from '../../utils/appProjectUrls'
 
 const STATUS_TONE_CLASS = {
   ready: 'bg-[#e8f3ff] text-[var(--app-accent-text)]',
@@ -8,11 +8,6 @@ const STATUS_TONE_CLASS = {
   external: 'bg-[#fff4de] text-[#b76e00]',
   download: 'bg-[#f0ecff] text-[#6e3fd8]',
   draft: 'bg-[#f5f5f7] text-[#6e6e73]',
-}
-
-function fileHref(file) {
-  if (!file?.url || file.url === '#') return '#'
-  return apiUrl(file.url)
 }
 
 function formatFileSize(bytes) {
@@ -52,13 +47,14 @@ export default function AppProjectCard({
   testId?: string
 }) {
   const files = Array.isArray(project?.files) ? project.files : []
-  const hasLink = Boolean(project?.linkUrl)
+  const linkHref = safeProjectLinkUrl(project?.linkUrl)
+  const hasLink = Boolean(linkHref)
   // Keep the whole card clickable only when there's nothing interactive nested
   // inside it (no embed button, no download files) — anchors can't wrap buttons.
   const wholeCardLink = hasLink && interactive && files.length === 0
   const CardTag = wholeCardLink ? 'a' : 'div'
   const cardProps = wholeCardLink
-    ? { href: project.linkUrl, target: '_blank', rel: 'noreferrer' }
+    ? { href: linkHref, target: '_blank', rel: 'noreferrer' }
     : {}
   const badges = showStatusBadges ? buildProjectStatusBadges(project) : []
 
@@ -101,7 +97,7 @@ export default function AppProjectCard({
             </span>
           ) : (
             <a
-              href={project.linkUrl}
+              href={linkHref || undefined}
               target="_blank"
               rel="noreferrer"
               aria-label={`${project?.title || '앱'} 열기`}
@@ -118,7 +114,7 @@ export default function AppProjectCard({
         <div className="mt-4 grid gap-2" aria-label="배포 파일">
           {files.map((file) => {
             const size = formatFileSize(file.fileSize)
-            const href = fileHref(file)
+            const href = projectFileHref(file.url)
             return (
               <a
                 key={file.id || file.originalName || file.url}
