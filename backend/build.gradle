@@ -18,7 +18,14 @@ dependencyCheck {
 	formats = ['HTML', 'JSON']
 	outputDirectory = layout.buildDirectory.dir('reports/dependency-check')
 	nvd {
-		apiKey = System.getenv('NVD_API_KEY')
+		def key = System.getenv('NVD_API_KEY')
+		if (key?.trim()) {
+			apiKey = key.trim()
+		} else {
+			// The project-maintained feed avoids anonymous API rate limits and a
+			// 13.0.0 bug that treats a missing API key as an invalid empty key.
+			datafeedUrl = 'https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/nvdcve-{0}.json.gz'
+		}
 	}
 }
 
