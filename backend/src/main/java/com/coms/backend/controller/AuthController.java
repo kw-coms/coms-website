@@ -14,6 +14,7 @@ import com.coms.backend.dto.RequestSignupEmailRequest;
 import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.dto.UpdateProfileRequest;
 import com.coms.backend.security.JwtTokenProvider;
+import com.coms.backend.security.ClientIpResolver;
 import com.coms.backend.service.AuthService;
 import com.coms.backend.service.PendingSignupService;
 import com.coms.backend.service.RefreshSessionService;
@@ -44,6 +45,7 @@ public class AuthController {
     private final JwtTokenProvider jwtTokenProvider;
     private final com.coms.backend.service.AdminService adminService;
     private final RefreshSessionService refreshSessionService;
+    private final ClientIpResolver clientIpResolver;
     private final boolean cookieSecure;
     private final String cookieSameSite;
 
@@ -52,6 +54,7 @@ public class AuthController {
                           JwtTokenProvider jwtTokenProvider,
                           com.coms.backend.service.AdminService adminService,
                           RefreshSessionService refreshSessionService,
+                          ClientIpResolver clientIpResolver,
                           @Value("${cookie.secure:false}") boolean cookieSecure,
                           @Value("${cookie.same-site:Lax}") String cookieSameSite) {
         this.authService = authService;
@@ -59,6 +62,7 @@ public class AuthController {
         this.jwtTokenProvider = jwtTokenProvider;
         this.adminService = adminService;
         this.refreshSessionService = refreshSessionService;
+        this.clientIpResolver = clientIpResolver;
         this.cookieSecure = cookieSecure;
         String requested = cookieSameSite == null ? "Lax" : cookieSameSite.trim();
         // SameSite=None requires Secure=true per RFC; if the deployer mis-paired the flags, log and fall back to Lax.
@@ -79,14 +83,14 @@ public class AuthController {
     public ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request,
                                                HttpServletRequest servletRequest) {
         return ResponseEntity.status(HttpStatus.ACCEPTED)
-                .body(pendingSignupService.start(request, resolveClientIp(servletRequest)));
+                .body(pendingSignupService.start(request, clientIpResolver.resolve(servletRequest)));
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
                                               HttpServletRequest servletRequest,
                                               HttpServletResponse response) {
-        String clientIp = resolveClientIp(servletRequest);
+        String clientIp = clientIpResolver.resolve(servletRequest);
         AuthResponse auth = authService.login(request, clientIp);
 
         response.addHeader(HttpHeaders.SET_COOKIE, accessCookie(auth.token()).toString());
@@ -218,8 +222,6 @@ public class AuthController {
         return ResponseEntity.ok(authService.updateProfile(authentication.getName(), request));
     }
 
-    private static final java.util.Set<String> TRUSTED_PROXIES = java.util.Set.of("127.0.0.1", "::1", "0:0:0:0:0:0:0:1");
-
     private static String readCookie(HttpServletRequest request, String name) {
         if (request.getCookies() == null) {
             return null;
@@ -248,39 +250,13 @@ public class AuthController {
         return cookie.build();
     }
 
-    private static String resolveClientIp(HttpServletRequest request) {
-        String remoteAddr = request.getRemoteAddr();
-        if (TRUSTED_PROXIES.contains(remoteAddr)) {
-            String forwarded = request.getHeader("X-Forwarded-For");
-            if (forwarded != null && !forwarded.isBlank()) {
-                String candidate = forwarded.split(",")[0].trim();
-                if (isValidIp(candidate)) return candidate;
-            }
-            String realIp = request.getHeader("X-Real-IP");
-            if (realIp != null && !realIp.isBlank() && isValidIp(realIp.trim())) {
-                return realIp.trim();
-            }
-        }
-        return remoteAddr;
-    }
-
-    private static boolean isValidIp(String ip) {
-        if (ip == null || ip.length() > 45) return false;
-        try {
-            java.net.InetAddress.getByName(ip);
-            return !ip.contains(" ");
-        } catch (java.net.UnknownHostException e) {
-            return false;
-        }
-    }
-
     @PostMapping("/email-verification/request-signup")
     public ResponseEntity<EmailVerificationStatusResponse> requestSignupEmail(
             @Valid @RequestBody RequestSignupEmailRequest request,
             HttpServletRequest servletRequest) {
         // Constant response regardless of whether the identifier resolves — the service masks
         // enumeration and rate-limits by IP internally.
-        pendingSignupService.resend(request.studentId(), resolveClientIp(servletRequest));
+        pendingSignupService.resend(request.studentId(), clientIpResolver.resolve(servletRequest));
         return ResponseEntity.ok(new EmailVerificationStatusResponse("인증코드를 이메일로 보냈습니다.", false));
     }
 

@@ -170,6 +170,7 @@ docker compose --env-file .env up -d --build
 | `COOKIE_SECURE` | HTTPS 쿠키 보안 옵션 |
 | `COOKIE_SAME_SITE` | 쿠키 SameSite 정책 (`Lax` 기본값; 모바일 앱 연동 시 `None` 필요) |
 | `CORS_ALLOWED_ORIGINS` | 허용할 origin 목록 |
+| `AUTH_TRUSTED_PROXY_IPS` | 백엔드가 `X-Real-IP`를 신뢰할 바로 앞 리버스 프록시의 숫자 IP 목록. 운영 Docker 네트워크의 게이트웨이 IP를 지정해야 로그인·지원 조회 횟수 제한이 방문자별로 적용됩니다. |
 | `MAIL_ENABLED` | 메일 발송 사용 여부 |
 | `MAIL_LOG_VERIFICATION_CODES` | 인증 코드 로그 출력 여부 |
 | `MAIL_FROM`, `RECRUIT_MAIL_TO` | 발신/수신 메일 주소 |
