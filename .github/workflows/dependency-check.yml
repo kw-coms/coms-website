@@ -15,6 +15,9 @@ on:
     # Weekly, Monday 09:00 UTC.
     - cron: "0 9 * * 1"
 
+permissions:
+  contents: read
+
 jobs:
   dependency-check:
     name: OWASP Dependency-Check (backend)

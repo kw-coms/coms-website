@@ -117,6 +117,8 @@ assert.equal(linkWithMeta.siteName, 'Example Blog')
 
 // youtube / direct image / direct video URLs are unchanged (backward compat)
 assert.equal(externalBlockFromUrl('https://www.youtube.com/watch?v=abcdef123').kind, 'youtube')
+assert.equal(externalBlockFromUrl('https://notyoutube.com/watch?v=abcdef123').kind, 'link')
+assert.equal(externalBlockFromUrl('https://youtube.com.evil.example/watch?v=abcdef123').kind, 'link')
 assert.equal(externalBlockFromUrl('https://cdn.example.com/a.png').kind, 'image')
 assert.equal(externalBlockFromUrl('https://cdn.example.com/a.mp4').kind, 'video')
 
