@@ -23,10 +23,9 @@ jobs:
 
       - name: Boot backend (H2 in-memory) and capture /v3/api-docs
         working-directory: backend
-        env:
-          JWT_SECRET: coms-dev-only-secret-key-do-not-use-in-production!!
         run: |
           set -euo pipefail
+          export JWT_SECRET="$(openssl rand -base64 48)"
 
           # Boot the app on H2 in-memory so no external Postgres is needed.
           ./gradlew bootRun \
