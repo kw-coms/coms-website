@@ -18,12 +18,17 @@ concurrency:
   group: deploy-${{ github.workflow }}
   cancel-in-progress: false
 
+permissions: {}
+
 jobs:
   # Manual deploys must not bypass CI: resolve deploy_ref to a commit SHA and require a
   # successful CI workflow run for that exact SHA before anything reaches the server.
   verify-manual-ref:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
     outputs:
       sha: ${{ steps.verify.outputs.sha }}
     steps:
@@ -47,6 +52,7 @@ jobs:
 
   deploy:
     needs: [verify-manual-ref]
+    permissions: {}
     if: >-
       ${{
         always() &&
