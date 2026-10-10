@@ -188,9 +188,9 @@ class RecruitApplicationServiceTest {
     @Test
     void acceptedStatusPromotesToRosterLogsAndDeletesApplication() {
         RecruitApplication application = new RecruitApplication();
-        application.setName("박경택");
-        application.setStudentId("2026403003");
-        application.setPhone("01023870490");
+        application.setName("가상지원자");
+        application.setStudentId("2026990101");
+        application.setPhone("01000000000");
         application.setDepartment("소프트웨어학부");
         application.setStatus(RecruitApplication.Status.REVIEWING);
         RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
@@ -210,18 +210,18 @@ class RecruitApplicationServiceTest {
                 "recruit@coms.kw.ac.kr"
         );
 
-        service.updateStatus(1L, new RecruitApplicationStatusUpdateRequest("ACCEPTED", null), "2099000005");
+        service.updateStatus(1L, new RecruitApplicationStatusUpdateRequest("ACCEPTED", null), "2026990901");
 
         // 2026 - 1966 = 60기 as the joining cohort, regardless of the studentId year.
         // 합격 이관 행은 준회원(ASSOCIATE)으로 표시되어, 이 학번으로 가입하면 준회원 계정이 만들어진다.
-        verify(eligible).addSingle("2026403003", "박경택", "60", "01023870490",
+        verify(eligible).addSingle("2026990101", "가상지원자", "60", "01000000000",
                 com.coms.backend.domain.Member.Role.ASSOCIATE);
         ArgumentCaptor<com.coms.backend.domain.RecruitPromotionLog> logCaptor =
                 ArgumentCaptor.forClass(com.coms.backend.domain.RecruitPromotionLog.class);
         verify(promotionLogs).save(logCaptor.capture());
-        assertThat(logCaptor.getValue().getName()).isEqualTo("박경택");
+        assertThat(logCaptor.getValue().getName()).isEqualTo("가상지원자");
         assertThat(logCaptor.getValue().getGeneration()).isEqualTo("60");
-        assertThat(logCaptor.getValue().getPromotedBy()).isEqualTo("2099000005");
+        assertThat(logCaptor.getValue().getPromotedBy()).isEqualTo("2026990901");
         verify(repository).delete(application);
     }
 
@@ -229,7 +229,7 @@ class RecruitApplicationServiceTest {
     void rejectedStatusDeletesApplicationAndLogsDecisionWithoutContactDetails() {
         RecruitApplication application = new RecruitApplication();
         application.setName("김탈락");
-        application.setStudentId("2026403004");
+        application.setStudentId("2026990102");
         application.setDepartment("컴퓨터공학과");
         application.setPhone("01099998888");
         application.setEmail("tallak@example.com");
@@ -250,7 +250,7 @@ class RecruitApplicationServiceTest {
                 "recruit@coms.kw.ac.kr"
         );
 
-        service.updateStatus(1L, new RecruitApplicationStatusUpdateRequest("REJECTED", "면접 불참"), "2099000005");
+        service.updateStatus(1L, new RecruitApplicationStatusUpdateRequest("REJECTED", "면접 불참"), "2026990901");
 
         // 명부에는 손대지 않는다 — 불합격은 이관 대상이 아니다.
         verify(eligible, never()).addSingle(any(), any(), any(), any(), any());
@@ -260,11 +260,11 @@ class RecruitApplicationServiceTest {
         verify(promotionLogs).save(logCaptor.capture());
         com.coms.backend.domain.RecruitPromotionLog saved = logCaptor.getValue();
         assertThat(saved.getName()).isEqualTo("김탈락");
-        assertThat(saved.getStudentId()).isEqualTo("2026403004");
+        assertThat(saved.getStudentId()).isEqualTo("2026990102");
         assertThat(saved.getDepartment()).isEqualTo("컴퓨터공학과");
         assertThat(saved.getDecision()).isEqualTo(com.coms.backend.domain.RecruitPromotionLog.Decision.REJECTED);
         assertThat(saved.getAdminNote()).isEqualTo("면접 불참");
-        assertThat(saved.getPromotedBy()).isEqualTo("2099000005");
+        assertThat(saved.getPromotedBy()).isEqualTo("2026990901");
         // 불합격자의 연락처는 남기지 않는다(개인정보 최소 보유 원칙).
         assertThat(saved.getPhone()).isNull();
         assertThat(saved.getEmail()).isNull();
@@ -275,9 +275,9 @@ class RecruitApplicationServiceTest {
     @Test
     void acceptedStatusLogsDecisionAcceptedAndAdminNote() {
         RecruitApplication application = new RecruitApplication();
-        application.setName("박경택");
-        application.setStudentId("2026403003");
-        application.setPhone("01023870490");
+        application.setName("가상지원자");
+        application.setStudentId("2026990101");
+        application.setPhone("01000000000");
         application.setDepartment("소프트웨어학부");
         application.setStatus(RecruitApplication.Status.REVIEWING);
         RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
@@ -321,14 +321,14 @@ class RecruitApplicationServiceTest {
     void acceptedStatusAbortsWhenStudentIdBelongsToAnotherNameOnTheRoster() {
         RecruitApplication application = new RecruitApplication();
         application.setName("홍길동");
-        application.setStudentId("2026403003");
+        application.setStudentId("2026990101");
         application.setStatus(RecruitApplication.Status.REVIEWING);
         RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
         when(repository.findById(1L)).thenReturn(Optional.of(application));
         EligibleMemberService eligible = mock(EligibleMemberService.class);
         RecruitPromotionLogRepository promotionLogs = mock(RecruitPromotionLogRepository.class);
         doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "이미 다른 이름으로 명부에 등록된 학번입니다."))
-                .when(eligible).ensureStudentIdNotTakenByOtherName("2026403003", "홍길동");
+                .when(eligible).ensureStudentIdNotTakenByOtherName("2026990101", "홍길동");
         RecruitApplicationService service = new RecruitApplicationService(
                 mock(JavaMailSender.class),
                 repository,

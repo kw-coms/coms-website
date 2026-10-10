@@ -45,6 +45,10 @@ class PostgresMigrationExecutionTest {
         assertThat(result.migrationsExecuted).isGreaterThan(0);
 
         JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        // A fresh installation must not publish or provision a fixed administrator
+        // or a real member's roster record from source-controlled migrations.
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM members", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM eligible_members", Integer.class)).isZero();
         assertThat(columnExists(jdbc, "refresh_sessions", "family")).isTrue();
         assertThat(columnExists(jdbc, "eligible_members", "initial_role")).isTrue();
         // Hibernate validates the schema on boot, so the entity defaults and the migration

@@ -6,7 +6,7 @@ import { scrollToTopInstant } from '../utils/themeColors'
 export default function NotFoundPage() {
   const navigate = useNavigate()
   return (
-    <div className="apple-detail-page theme-home relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[var(--app-surface-soft)] px-6 text-center text-[var(--app-text)]">
+    <main className="apple-detail-page theme-home relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[var(--app-surface-soft)] px-6 text-center text-[var(--app-text)]">
       <div className="home-hero-surface absolute inset-0" />
       <div className="relative z-10 flex flex-col items-center">
         <img src={getLogoAsset('COMs_logo_vec')} alt="" className="coms-cinema-intrologo mb-8 w-20 sm:w-24" aria-hidden="true" />
@@ -20,6 +20,6 @@ export default function NotFoundPage() {
           <button type="button" onClick={() => navigate(-1)} className={ghostActionBtnClass}>이전으로</button>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

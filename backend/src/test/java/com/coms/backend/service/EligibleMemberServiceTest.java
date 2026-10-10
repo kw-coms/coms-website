@@ -277,9 +277,9 @@ class EligibleMemberServiceTest {
 
     @Test
     void rosterGuardRejectsStudentIdAlreadyHeldByAnotherName() {
-        eligibleMemberService.addSingle("2026403003", "박경택", "60", "01023870490");
+        eligibleMemberService.addSingle("2026990101", "가상지원자", "60", "01000000000");
 
-        assertThatThrownBy(() -> eligibleMemberService.ensureStudentIdNotTakenByOtherName("2026403003", "홍길동"))
+        assertThatThrownBy(() -> eligibleMemberService.ensureStudentIdNotTakenByOtherName("2026990101", "홍길동"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
                     assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
                     assertThat(ex.getReason()).isEqualTo("이미 다른 이름으로 명부에 등록된 학번입니다.");
@@ -288,11 +288,11 @@ class EligibleMemberServiceTest {
 
     @Test
     void rosterGuardAllowsSameNameOrUnknownStudentId() {
-        eligibleMemberService.addSingle("2026403003", "박경택", "60", "01023870490");
+        eligibleMemberService.addSingle("2026990101", "가상지원자", "60", "01000000000");
 
         // 재이관(같은 사람) 과 신규 학번은 통과해야 한다.
-        eligibleMemberService.ensureStudentIdNotTakenByOtherName("2026403003", " 박경택 ");
-        eligibleMemberService.ensureStudentIdNotTakenByOtherName("2026403004", "홍길동");
+        eligibleMemberService.ensureStudentIdNotTakenByOtherName("2026990101", " 가상지원자 ");
+        eligibleMemberService.ensureStudentIdNotTakenByOtherName("2026990102", "홍길동");
     }
 
     private MockMultipartFile workbookFile(String[] header, String[] values) throws Exception {

@@ -10,9 +10,10 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "e2e": "PWA_DISABLE=1 npm run build && playwright test",
-    "e2e:update": "PWA_DISABLE=1 npm run build && playwright test --update-snapshots",
-    "smoke": "PWA_DISABLE=1 npm run build && playwright test --project=smoke",
+    "e2e": "cross-env PWA_DISABLE=1 npm run build && playwright test",
+    "e2e:update": "cross-env PWA_DISABLE=1 npm run build && playwright test --update-snapshots",
+    "smoke": "cross-env PWA_DISABLE=1 npm run build && playwright test --project=smoke",
+    "smoke:production": "node scripts/prod-smoke.mjs",
     "test:e2e:backend": "node scripts/e2e-backend.mjs"
   },
   "dependencies": {
@@ -41,6 +42,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "cross-env": "^10.1.0",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
