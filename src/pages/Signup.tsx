@@ -45,6 +45,7 @@ function TextField({
   autoComplete,
   inputMode,
   maxLength,
+  hint,
 }: {
   id: string
   label: string
@@ -55,6 +56,7 @@ function TextField({
   autoComplete?: string
   inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
   maxLength?: number
+  hint?: string
 }) {
   return (
     <div className="min-w-0">
@@ -70,7 +72,9 @@ function TextField({
         autoComplete={autoComplete}
         inputMode={inputMode}
         maxLength={maxLength}
+        aria-describedby={hint ? `${id}-hint` : undefined}
       />
+      {hint && <p id={`${id}-hint`} className="mt-2 text-sm leading-6 text-[var(--app-muted)]">{hint}</p>}
     </div>
   )
 }
@@ -270,7 +274,10 @@ export default function Signup({ onBack }: { onBack: () => void }) {
       setSignedUpEmail(email)
       setStep('verify')
     } catch (err) {
-      setError(err.message || '회원가입 중 오류가 발생했습니다.')
+      const mailSendFailed = err.status === 503 && err.serverMessage?.includes('이메일 발송')
+      setError(mailSendFailed
+        ? '인증 메일 발송에 실패해 계정이 생성되지 않았습니다. 잠시 후 다시 시도하거나 관리자에게 문의해주세요.'
+        : err.message || '회원가입 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }
@@ -400,7 +407,7 @@ export default function Signup({ onBack }: { onBack: () => void }) {
 
               <div className={fieldGridClass}>
                 <TextField id="department" label="학과" value={form.department} onChange={handleChange} placeholder="학과를 입력하세요" />
-                <TextField id="phone" label="전화번호" value={form.phone} onChange={handleChange} placeholder="01012345678 (하이픈 없이)" inputMode="tel" autoComplete="tel" />
+                <TextField id="phone" label="전화번호" value={form.phone} onChange={handleChange} placeholder="01012345678 (하이픈 없이)" inputMode="tel" autoComplete="tel" hint="명부에 전화번호가 등록돼 있다면 같은 번호를 입력해야 가입할 수 있습니다. 하이픈 유무는 관계없습니다." />
               </div>
 
               <div className={fieldGridClass}>
@@ -494,7 +501,7 @@ export default function Signup({ onBack }: { onBack: () => void }) {
                   가입 안내
                 </div>
                 <p className="mt-2 text-sm leading-6 text-[var(--app-muted)]">
-                  재학생은 명부의 학번과 이름이 일치해야 합니다. 졸업생은 입학연도 끝 두 자리 또는 기수로 인증합니다.
+                  재학생은 명부의 학번과 이름이 일치해야 합니다. 졸업생은 입학연도 끝 두 자리 또는 기수로 인증합니다. 명부에 전화번호가 있다면 같은 번호도 필요합니다.
                 </p>
               </div>
             </div>

@@ -353,6 +353,7 @@ test('signup follows the recruit application form structure', async ({ page }) =
 
 test('signup does not offer login until code confirmation creates the account', async ({ page }) => {
   await mockOptionalApis(page)
+  let signupAttempts = 0
   await page.route('**/api/auth/signup', async (route) => {
     expect(route.request().postDataJSON()).toMatchObject({
       signupType: 'CURRENT',
@@ -360,6 +361,11 @@ test('signup does not offer login until code confirmation creates the account', 
       email: 'new-member@example.com',
       name: '홍길동',
     })
+    signupAttempts += 1
+    if (signupAttempts === 1) {
+      await route.fulfill({ status: 503, json: { message: '이메일 발송에 실패했습니다.' } })
+      return
+    }
     await route.fulfill({
       status: 200,
       json: { studentId: '2026123456', name: '홍길동', role: 'ASSOCIATE', emailVerified: false },
@@ -390,6 +396,10 @@ test('signup does not offer login until code confirmation creates the account', 
   await page.getByLabel('비밀번호 확인').fill('Strong!234')
   await page.getByRole('button', { name: '웹' }).click()
   await page.getByLabel('포부').fill('열심히 활동하겠습니다.')
+  await page.getByRole('button', { name: '회원가입' }).click()
+
+  await expect(page.getByText('인증 메일 발송에 실패해 계정이 생성되지 않았습니다. 잠시 후 다시 시도하거나 관리자에게 문의해주세요.')).toBeVisible()
+  await expect(page.getByLabel('이메일')).toHaveValue('new-member@example.com')
   await page.getByRole('button', { name: '회원가입' }).click()
 
   await expect(page.getByText('이메일로 인증코드를 발송했습니다.')).toBeVisible()
