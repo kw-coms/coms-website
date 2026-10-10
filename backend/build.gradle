@@ -18,7 +18,10 @@ dependencyCheck {
 	formats = ['HTML', 'JSON']
 	outputDirectory = layout.buildDirectory.dir('reports/dependency-check')
 	nvd {
-		apiKey = System.getenv('NVD_API_KEY')
+		def key = System.getenv('NVD_API_KEY')
+		if (key?.trim()) {
+			apiKey = key.trim()
+		}
 	}
 }
 
