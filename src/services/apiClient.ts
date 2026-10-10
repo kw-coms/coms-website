@@ -142,17 +142,18 @@ export async function throwApiError(response, fallbackMessage = '') {
 }
 
 function isOptionalDevApiPath(path) {
-  return import.meta.env?.DEV && !API_BASE_URL && (path === '/api/auth/me' || path === '/api/fonts' || path === '/api/site-settings')
+  return import.meta.env?.DEV && !API_BASE_URL && (path === '/api/fonts' || path === '/api/site-settings')
 }
 
-function optionalDevApiUnavailable() {
+function optionalDevApiUnavailable(path) {
   if (typeof window === 'undefined') return false
-  return window.sessionStorage.getItem(OPTIONAL_DEV_API_SKIP_KEY) === '1'
+  return window.sessionStorage.getItem(`${OPTIONAL_DEV_API_SKIP_KEY}:${path}`) === '1'
 }
 
-function rememberOptionalDevApiUnavailable(error) {
+function rememberOptionalDevApiUnavailable(path, error) {
   if (typeof window === 'undefined') return
-  window.sessionStorage.setItem(OPTIONAL_DEV_API_SKIP_KEY, '1')
+  // A font failure must not suppress the independent settings request.
+  window.sessionStorage.setItem(`${OPTIONAL_DEV_API_SKIP_KEY}:${path}`, '1')
   if (!optionalDevNoticeShown) {
     optionalDevNoticeShown = true
     console.info('Local backend is unavailable; continuing with guest fallbacks for optional startup API calls.', error?.message || '')
@@ -165,7 +166,7 @@ function isDevBackendUnavailableError(error) {
 
 export async function requestOptional(path, options: RequestInit = {}, fallback = null) {
   if (!isOptionalDevApiPath(path)) return request(path, options)
-  if (optionalDevApiUnavailable()) return fallback
+  if (optionalDevApiUnavailable(path)) return fallback
 
   const key = `${path}:${options.method || 'GET'}`
   if (!optionalDevApiInFlight.has(key)) {
@@ -174,7 +175,7 @@ export async function requestOptional(path, options: RequestInit = {}, fallback 
       request(path, options)
         .catch((error) => {
           if (isDevBackendUnavailableError(error)) {
-            rememberOptionalDevApiUnavailable(error)
+            rememberOptionalDevApiUnavailable(path, error)
             return fallback
           }
           throw error
