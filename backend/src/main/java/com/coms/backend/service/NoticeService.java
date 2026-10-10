@@ -52,7 +52,7 @@ public class NoticeService {
 
     @Transactional(readOnly = true)
     public List<NoticeResponse> list(String studentId) {
-        List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc();
+        List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc();
         Map<Long, VoteSummary> stats = voteStats(notices);
         return notices.stream().map(notice -> toResponse(notice, stats, studentId)).toList();
     }
@@ -65,7 +65,7 @@ public class NoticeService {
      */
     @Transactional(readOnly = true)
     public PagedNotices listPaged(String studentId, int page, int size) {
-        List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc(
+        List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(
                 org.springframework.data.domain.PageRequest.of(page, size));
         Map<Long, VoteSummary> stats = voteStats(notices);
         return new PagedNotices(notices.stream().map(notice -> toResponse(notice, stats, studentId)).toList(), repo.count());
@@ -79,7 +79,7 @@ public class NoticeService {
      */
     @Transactional(readOnly = true)
     public List<NoticeResponse> listLimited(int limit) {
-        List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDesc(
+        List<Notice> notices = repo.findAllByOrderByPinnedDescPinnedAtDescCreatedAtDescIdDesc(
                 org.springframework.data.domain.PageRequest.of(0, limit));
         Map<Long, VoteSummary> stats = voteStats(notices);
         return notices.stream().map(notice -> toResponse(notice, stats, null)).toList();
