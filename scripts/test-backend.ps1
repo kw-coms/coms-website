@@ -1,11 +1,16 @@
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
-$jdkPath = Join-Path $repoRoot ".tools\jdk-21.0.11+10"
+$jdkCandidates = @(
+    $env:JAVA_HOME,
+    (Join-Path $repoRoot ".tools\jdk-21.0.11+10"),
+    (Join-Path $env:LOCALAPPDATA "coms-tools\jdk21\jdk-21.0.12.1+1")
+)
+$jdkPath = $jdkCandidates | Where-Object { $_ -and (Test-Path (Join-Path $_ "bin\java.exe")) } | Select-Object -First 1
 $backendPath = Join-Path $repoRoot "backend"
 
-if (-not (Test-Path $jdkPath)) {
-    throw "Local JDK not found at $jdkPath. Install or extract JDK 21 there before running backend tests."
+if (-not $jdkPath) {
+    throw "JDK 21 not found. Set JAVA_HOME or install JDK 21 in .tools."
 }
 
 $env:JAVA_HOME = (Resolve-Path $jdkPath).Path

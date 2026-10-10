@@ -45,11 +45,10 @@ jobs:
       - name: Run backend tests
         working-directory: backend
         env:
-          JWT_SECRET: coms-dev-only-secret-key-do-not-use-in-production!!
           COMS_PG_TEST_URL: jdbc:postgresql://localhost:5432/coms_migration_test
           COMS_PG_TEST_USER: postgres
           COMS_PG_TEST_PASSWORD: coms-ci
-        run: ./gradlew test --no-daemon
+        run: JWT_SECRET="$(openssl rand -base64 48)" ./gradlew test --no-daemon
 
       # The migration test skips itself when COMS_PG_TEST_URL is missing, which would make
       # a broken service container look like a green build. Fail loudly instead.
