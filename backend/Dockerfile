@@ -7,11 +7,17 @@ COPY gradle ./gradle
 
 RUN chmod +x ./gradlew
 
-RUN ./gradlew --version --no-daemon
+RUN --mount=type=cache,id=coms-backend-gradle,target=/root/.gradle,sharing=locked \
+    for attempt in 1 2 3; do \
+      if ./gradlew --version --no-daemon; then exit 0; fi; \
+      sleep $((attempt * 5)); \
+    done; \
+    exit 1
 
 COPY src ./src
 
-RUN ./gradlew clean test --tests com.coms.backend.MigrationVersionTest bootJar --no-daemon
+RUN --mount=type=cache,id=coms-backend-gradle,target=/root/.gradle,sharing=locked \
+    ./gradlew clean test --tests com.coms.backend.MigrationVersionTest bootJar --no-daemon
 
 
 FROM eclipse-temurin:21-jre-alpine
