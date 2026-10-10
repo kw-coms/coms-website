@@ -162,7 +162,10 @@ if (result.failure || result.routes.some((route) => route.http !== 200 || route.
   || result.mobileRoutes.some((route) => route.finalPath !== route.path || route.overflowPx > 1)
   || result.api.some((api) => api.status !== 200)
   || result.adminTabs.some((tab) => !tab.rendered)
-  || !result.logout.protectedRedirect || result.login.meStatus !== 200 || !result.login.expectedIdentity || !result.login.httpOnlyCookie
+  || result.browserErrors.length > 0 || result.apiErrors.length > 0
+  || result.guest.meStatus !== 403 || !result.guest.protectedRedirect
+  || result.login.role !== 'ADMIN' || result.login.meStatus !== 200 || !result.login.expectedIdentity || !result.login.httpOnlyCookie
+  || result.logout.meStatus !== 403 || !result.logout.protectedRedirect
   || result.security.crossOriginRefreshStatus !== 403 || result.security.crossOriginAllowed) {
   process.exitCode = 1
 }
