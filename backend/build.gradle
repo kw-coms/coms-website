@@ -1,6 +1,6 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.0.6'
+	id 'org.springframework.boot' version '4.0.8'
 	id 'io.spring.dependency-management' version '1.1.7'
 	id 'org.owasp.dependencycheck' version '13.0.0'
 }
@@ -8,11 +8,16 @@ plugins {
 group = 'com.coms'
 version = '0.0.1-SNAPSHOT'
 
+// Patch releases newer than Spring Boot 4.0.8's BOM; keep each library family aligned.
+ext['tomcat.version'] = '11.0.26'
+ext['netty.version'] = '4.2.18.Final'
+ext['httpclient5.version'] = '5.6.4'
+ext['httpcore5.version'] = '5.4.4'
+
 // OWASP Dependency-Check — scans declared dependencies for known CVEs.
 // Run on demand / on a schedule via `./gradlew dependencyCheckAnalyze`; it is
-// intentionally NOT wired into the normal build, since the NVD database download
-// is slow and rate-limited. Set the NVD_API_KEY env var (free key from
-// https://nvd.nist.gov/developers/request-an-api-key) to avoid rate limits.
+// intentionally NOT wired into the normal build. CI uses the project-maintained
+// NVD feed without an API key; an NVD_API_KEY opts in to the direct NVD API.
 dependencyCheck {
 	failBuildOnCVSS = 7.0
 	formats = ['HTML', 'JSON']
