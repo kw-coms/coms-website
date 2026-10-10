@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-comsdb}
       POSTGRES_USER: ${DB_USER:-coms}
@@ -8,7 +9,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-coms}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-coms} -d ${DB_NAME:-comsdb}"]
       interval: 10s
       timeout: 5s
       retries: 5
