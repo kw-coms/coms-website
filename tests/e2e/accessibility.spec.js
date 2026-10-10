@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
-import { mockAdminApis } from './visualSupport.js'
+import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
 
 // Only serious/critical findings fail the suite; axe also reports minor/moderate
 // issues that we surface in the attachment but do not gate on yet.
@@ -68,6 +68,7 @@ test('home page has no serious or critical accessibility violations', async ({ p
   await mockAdminApis(page)
   await page.goto('/')
   await expect(page.locator('body')).toContainText("KW COM's")
+  await expect(page.getByRole('heading', { level: 1, name: "COM's" })).toBeVisible()
   // The lower home sections lazy-mount as they scroll into view; axe scanning
   // while a section is mid-mount reads its not-yet-revealed (transparent) text
   // as bogus color-contrast violations. Walk the page to mount everything and
@@ -81,6 +82,43 @@ test('home page has no serious or critical accessibility violations', async ({ p
   })
   await page.waitForTimeout(700)
   await assertNoSeriousViolations(page)
+})
+
+test('desktop activity disclosure uses navigation semantics and closes with Escape', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.goto('/')
+  const toggle = page.getByRole('button', { name: 'Activity', exact: true })
+  await toggle.click()
+  const navigation = page.getByRole('navigation', { name: '활동 메뉴' })
+  await expect(navigation).toBeVisible()
+  await assertNoSeriousViolations(page)
+  await page.keyboard.press('Escape')
+  await expect(navigation).toBeHidden()
+  await expect(toggle).toBeFocused()
+})
+
+test.describe('mobile navigation', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  test('open menu is accessible and Escape restores focus', async ({ page }) => {
+    await mockOptionalApis(page)
+    await page.goto('/')
+    const toggle = page.getByRole('button', { name: '메뉴 열기' })
+    await toggle.click()
+    const navigation = page.getByRole('navigation', { name: '모바일 메뉴' })
+    await expect(navigation).toBeVisible()
+    await assertNoSeriousViolations(page)
+    await page.keyboard.press('Escape')
+    await expect(navigation).toBeHidden()
+    await expect(page.getByRole('button', { name: '메뉴 열기' })).toBeFocused()
+  })
+
+  test('login form has no serious or critical accessibility violations', async ({ page }) => {
+    await mockOptionalApis(page)
+    await page.goto('/login')
+    await expect(page.getByRole('heading', { name: '로그인' })).toBeVisible()
+    await assertNoSeriousViolations(page)
+  })
 })
 
 test('community list has no serious or critical accessibility violations', async ({ page }) => {
