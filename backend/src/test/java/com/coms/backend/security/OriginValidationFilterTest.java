@@ -23,6 +23,22 @@ class OriginValidationFilterTest {
     }
 
     @Test
+    void rejectsUnsafeMethodWithoutOriginOrReferer() throws Exception {
+        assertThat(filter("POST", null, null).getStatus()).isEqualTo(403);
+    }
+
+    @Test
+    void rejectsLookalikeOriginAndReferer() throws Exception {
+        assertThat(filter("POST", "https://coms.kw.ac.kr.evil.example", null).getStatus()).isEqualTo(403);
+        assertThat(filter("DELETE", null, "https://coms.kw.ac.kr.evil.example/post").getStatus()).isEqualTo(403);
+    }
+
+    @Test
+    void rejectsUntrustedOriginEvenWithTrustedReferer() throws Exception {
+        assertThat(filter("POST", "https://evil.example", "https://coms.kw.ac.kr/post").getStatus()).isEqualTo(403);
+    }
+
+    @Test
     void allowsUnsafeMethodWithAllowedOrigin() throws Exception {
         MockHttpServletResponse response = filter("POST", "https://coms.kw.ac.kr", null);
 

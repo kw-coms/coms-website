@@ -73,6 +73,9 @@ public class SecurityConfig {
                                            com.coms.backend.repository.MemberRepository memberRepository) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            // The API authenticates with stateless cookies. OriginValidationFilter rejects every
+            // state-changing browser request without an exact allowed Origin/Referer; integration
+            // requests use a separate HMAC filter. Spring's session CSRF token is not used here.
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> {
