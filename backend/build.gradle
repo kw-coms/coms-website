@@ -22,6 +22,7 @@ dependencyCheck {
 	failBuildOnCVSS = 7.0
 	formats = ['HTML', 'JSON']
 	outputDirectory = layout.buildDirectory.dir('reports/dependency-check')
+	suppressionFile = file('dependency-check-suppressions.xml').absolutePath
 	nvd {
 		def key = System.getenv('NVD_API_KEY')
 		if (key?.trim()) {
@@ -75,8 +76,8 @@ dependencies {
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	implementation 'org.springframework.boot:spring-boot-flyway'
 
-	// OpenAPI / Swagger UI — springdoc 2.x targets Boot 3; Boot 4 compatibility unconfirmed
-	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
+	// OpenAPI / Swagger UI — springdoc 3.x supports Spring Boot 4 and includes patched UI assets.
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
 
 	// Firebase Admin SDK — used by PushNotificationSender to send FCM push.
 	// Fully gated behind push.enabled + a valid credentials file; a no-op otherwise.
