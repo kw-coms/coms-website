@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 
 // Real-backend auth e2e.
 //
@@ -17,24 +18,10 @@ import { expect, test } from '@playwright/test'
 // `localhost`, not `127.0.0.1`. So this lane runs on http://localhost:3000 and
 // every direct API POST below carries an explicit Origin header.
 //
-// Email-verification handling
-// ---------------------------
-// A normal /signup leaves the member with emailVerified=false and login is
-// blocked until the emailed 6-digit code is confirmed; there is no SMTP server
-// here. Two facts make full real-backend coverage possible without email:
-//
-//  1. The runner supplies a random dev admin password to DevDataInitializer.
-//     ADMINs bypass the email-verification login gate, so
-//     this account logs in immediately — test 1 drives a complete real login.
-//  2. The runner boots with MAIL_LOG_VERIFICATION_CODES=true, which makes the
-//     verification-code "sender" log instead of throwing, so /signup returns
-//     success and the UI advances to the verify step — test 2 exercises the
-//     real signup + login-gating path end-to-end (the actual code is logged,
-//     not emailed, so we assert through the "verification required" step rather
-//     than completing it).
+// The runner provides a local SMTP sink. The signup test receives a real mail,
+// confirms its code, then logs in as the newly created member.
 
 const ORIGIN = 'http://localhost:3000'
-const BOOTSTRAP_SECRET = process.env.BOOTSTRAP_SECRET
 
 // Auto-seeded dev admin (see backend DevDataInitializer). Login-able without
 // email verification because ADMINs bypass the gate.
@@ -90,12 +77,13 @@ test.describe('real backend auth', () => {
     expect(transientMeCount).toBeGreaterThanOrEqual(2)
   })
 
-  test('fresh UI signup against the real backend reaches the email-verification step', async ({ page, request }) => {
-    // Seed an eligible-roster entry so signup passes roster validation. The
-    // add-eligible endpoint needs an authenticated ADMIN AND the bootstrap
-    // secret header, so log in as the dev admin first to obtain the cookie.
+  test('fresh UI signup checks the roster phone, sends mail, verifies and logs in', async ({ page, request }) => {
+    // Seed an eligible-roster entry through the real admin API. The test uses
+    // a separate API context so the signup page remains signed out.
     const studentId = `2026${String(Date.now()).slice(-6).padStart(6, '0')}`
     const name = '김철수'
+    const email = `e2e-${Date.now()}@example.com`
+    const phone = '01012345678'
 
     const loginRes = await request.post('/api/auth/login', {
       headers: { Origin: ORIGIN },
@@ -103,23 +91,33 @@ test.describe('real backend auth', () => {
     })
     expect(loginRes.status()).toBe(200)
 
-    const seedRes = await request.post('/api/maintenance/add-eligible', {
-      headers: { Origin: ORIGIN, 'X-Bootstrap-Secret': BOOTSTRAP_SECRET },
-      data: { studentId, name },
+    const seedRes = await request.post('/api/admin/eligible-members', {
+      headers: { Origin: ORIGIN },
+      data: { studentId, name, generation: '60', phone },
     })
-    expect(seedRes.status(), `add-eligible failed: ${await seedRes.text().catch(() => '')}`).toBe(200)
+    expect(seedRes.status(), `add-eligible failed: ${await seedRes.text().catch(() => '')}`).toBe(204)
 
     await page.goto('/signup')
 
     await page.locator('#studentId').fill(studentId)
     await page.locator('#generation').fill('60')
     await page.locator('#name').fill(name)
-    await page.locator('#email').fill(`e2e-${Date.now()}@example.com`)
+    await page.locator('#email').fill(email)
     await page.locator('#password').fill('Member1234!@')
     await page.locator('#passwordConfirm').fill('Member1234!@')
     await page.locator('#aspiration').fill('동아리 활동에 적극 참여하고 싶습니다.')
     // Current-student signup requires at least one interest selected.
     await page.getByRole('button', { name: '웹', exact: true }).click()
+    await expect(page.getByText('명부에 전화번호가 등록돼 있다면 같은 번호를 입력해야 가입할 수 있습니다.')).toBeVisible()
+
+    const rejectedSignup = page.waitForResponse(
+      (res) => res.url().includes('/api/auth/signup') && res.request().method() === 'POST',
+    )
+    await page.locator('#main-content button[type="submit"]').click()
+    expect((await rejectedSignup).status()).toBe(403)
+    await expect(page.getByText('명부에 등록된 학번 또는 졸업생 인증 정보, 이름, 전화번호를 확인해주세요.')).toBeVisible()
+
+    await page.locator('#phone').fill(phone)
 
     const signupResponse = page.waitForResponse(
       (res) => res.url().includes('/api/auth/signup') && res.request().method() === 'POST',
@@ -127,12 +125,32 @@ test.describe('real backend auth', () => {
     // The signup form's submit button ("회원가입" / "가입 처리 중...").
     await page.locator('#main-content button[type="submit"]').click()
 
-    // The real backend must accept the signup (2xx) and the SPA must advance to
-    // the email-verification step (the signup verify step shows
-    // "이메일로 인증코드를 발송했습니다." and an "인증 완료" button).
+    // The real backend must accept the signup and send the code over SMTP.
     const res = await signupResponse
     expect(res.status(), `signup failed: ${await res.text().catch(() => '')}`).toBeLessThan(400)
     await expect(page.getByText('이메일로 인증코드를 발송했습니다.')).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('button', { name: '인증 완료' })).toBeVisible()
+
+    let receivedMail
+    await expect.poll(() => {
+      try {
+        receivedMail = JSON.parse(readFileSync(process.env.COMS_E2E_MAILBOX_PATH, 'utf8'))
+        return receivedMail.to
+      } catch { return null }
+    }, { timeout: 10_000 }).toBe(email)
+    expect(receivedMail.code).toMatch(/^\d{6}$/)
+
+    await page.locator('input[autocomplete="one-time-code"]').fill(receivedMail.code)
+    await page.getByRole('button', { name: '인증 완료' }).click()
+    await expect(page.getByText('인증이 완료되어 계정이 생성되었습니다.')).toBeVisible()
+
+    await page.getByRole('button', { name: '로그인하러 가기' }).click()
+    await page.locator('#identifier').fill(studentId)
+    await page.locator('#password').fill('Member1234!@')
+    await page.locator('#main-content button[type="submit"]').click()
+    await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible({ timeout: 15_000 })
+    const me = await page.request.get('/api/auth/me')
+    expect(me.status()).toBe(200)
+    expect((await me.json()).studentId).toBe(studentId)
   })
 })

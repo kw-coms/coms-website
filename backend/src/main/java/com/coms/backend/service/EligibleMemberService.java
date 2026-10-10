@@ -794,7 +794,7 @@ public class EligibleMemberService {
     }
 
     private ResponseStatusException invalidRoster() {
-        return new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번 또는 졸업생 인증 정보와 이름을 확인해주세요.");
+        return new ResponseStatusException(HttpStatus.FORBIDDEN, "명부에 등록된 학번 또는 졸업생 인증 정보, 이름, 전화번호를 확인해주세요.");
     }
 
     public record DeletedEligibleMemberSnapshot(
