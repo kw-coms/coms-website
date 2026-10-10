@@ -21,6 +21,7 @@ import com.coms.backend.domain.DeletedCommunityPostMedia;
 import com.coms.backend.service.CommunityDeletionArchiveService;
 import com.coms.backend.service.CommunityService;
 import com.coms.backend.service.LinkPreviewService;
+import com.coms.backend.security.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,13 +43,11 @@ import org.springframework.web.util.HtmlUtils;
 import java.nio.charset.StandardCharsets;
 
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/api/community/posts")
 public class CommunityController {
-    private static final Set<String> TRUSTED_PROXIES = Set.of("127.0.0.1", "::1", "0:0:0:0:0:0:0:1");
     private static final String SHARE_DESCRIPTION = "여기를 눌러 내용을 확인하세요.\ncoms.kw.ac.kr";
     // Extra images, videos and attachments are addressed by their own row id and a
     // replacement upload always creates a NEW row, so the bytes behind one of these
@@ -64,15 +63,18 @@ public class CommunityController {
     private final CommunityService communityService;
     private final CommunityDeletionArchiveService communityDeletionArchiveService;
     private final LinkPreviewService linkPreviewService;
+    private final ClientIpResolver clientIpResolver;
     private final String publicBaseUrl;
 
     public CommunityController(CommunityService communityService,
                                CommunityDeletionArchiveService communityDeletionArchiveService,
                                LinkPreviewService linkPreviewService,
+                               ClientIpResolver clientIpResolver,
                                @Value("${app.public-base-url:}") String publicBaseUrl) {
         this.communityService = communityService;
         this.communityDeletionArchiveService = communityDeletionArchiveService;
         this.linkPreviewService = linkPreviewService;
+        this.clientIpResolver = clientIpResolver;
         this.publicBaseUrl = publicBaseUrl == null ? "" : publicBaseUrl.trim();
     }
 
@@ -206,7 +208,7 @@ public class CommunityController {
                                                        @Valid @RequestBody CommunityPostRequest request,
                                                        HttpServletRequest servletRequest) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(communityService.create(authentication.getName(), request, null, resolveClientIp(servletRequest)));
+                .body(communityService.create(authentication.getName(), request, null, clientIpResolver.resolve(servletRequest)));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -222,7 +224,7 @@ public class CommunityController {
                         authentication.getName(),
                         new CommunityPostRequest(title, content, category, false, anonymousName),
                         image,
-                        resolveClientIp(servletRequest)
+                        clientIpResolver.resolve(servletRequest)
                 ));
     }
 
@@ -231,7 +233,7 @@ public class CommunityController {
                                                         @PathVariable Long id,
                                                         @Valid @RequestBody CommunityPostRequest request,
                                                         HttpServletRequest servletRequest) {
-        return ResponseEntity.ok(communityService.update(authentication.getName(), id, request, null, resolveClientIp(servletRequest)));
+        return ResponseEntity.ok(communityService.update(authentication.getName(), id, request, null, clientIpResolver.resolve(servletRequest)));
     }
 
     @PatchMapping(path = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -249,7 +251,7 @@ public class CommunityController {
                 id,
                 new CommunityPostRequest(title, content, category, removeImage, anonymousName),
                 image,
-                resolveClientIp(servletRequest)
+                clientIpResolver.resolve(servletRequest)
         ));
     }
 
@@ -469,7 +471,7 @@ public class CommunityController {
                                                                @Valid @RequestBody CommunityCommentRequest request,
                                                                HttpServletRequest servletRequest) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(communityService.addComment(id, authentication.getName(), request, resolveClientIp(servletRequest)));
+                .body(communityService.addComment(id, authentication.getName(), request, clientIpResolver.resolve(servletRequest)));
     }
 
     @PatchMapping("/{id}/comments/{commentId}")
@@ -610,29 +612,4 @@ public class CommunityController {
         };
     }
 
-    private static String resolveClientIp(HttpServletRequest request) {
-        String remoteAddr = request.getRemoteAddr();
-        if (TRUSTED_PROXIES.contains(remoteAddr)) {
-            String forwarded = request.getHeader("X-Forwarded-For");
-            if (forwarded != null && !forwarded.isBlank()) {
-                String candidate = forwarded.split(",")[0].trim();
-                if (isValidIp(candidate)) return candidate;
-            }
-            String realIp = request.getHeader("X-Real-IP");
-            if (realIp != null && !realIp.isBlank() && isValidIp(realIp.trim())) {
-                return realIp.trim();
-            }
-        }
-        return remoteAddr;
-    }
-
-    private static boolean isValidIp(String ip) {
-        if (ip == null || ip.length() > 45) return false;
-        try {
-            java.net.InetAddress.getByName(ip);
-            return !ip.contains(" ");
-        } catch (java.net.UnknownHostException e) {
-            return false;
-        }
-    }
 }

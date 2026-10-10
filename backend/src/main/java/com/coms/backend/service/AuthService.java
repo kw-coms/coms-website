@@ -82,6 +82,8 @@ public class AuthService implements UserDetailsService {
         return pendingSignupService.start(request, clientIp);
     }
 
+    // A rejected login still needs to commit its failure row for the lockout window.
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public AuthResponse login(LoginRequest request, String clientIp) {
         String normalizedIdentifier = normalizeLoginIdentifier(request.identifier());
         checkLoginLockout(normalizedIdentifier, clientIp);
@@ -231,6 +233,8 @@ public class AuthService implements UserDetailsService {
                 });
     }
 
+    // Invalid-code attempts and expiry cleanup must survive the 400 response.
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public void confirmPasswordReset(String studentId, String email, String code, String newPassword) {
         String normalizedEmail = normalizeNullable(email);
         if (normalizedEmail == null) {
@@ -328,6 +332,8 @@ public class AuthService implements UserDetailsService {
         return false;
     }
 
+    // Invalid-code attempts and expiry cleanup must survive the 400 response.
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public boolean confirmEmailVerification(String studentId, String code) {
         Member member = findMemberByIdentifier(studentId)
                 .flatMap(found -> memberRepository.findWithLockById(found.getId()))

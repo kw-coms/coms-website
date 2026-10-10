@@ -4,6 +4,7 @@ import com.coms.backend.dto.AuthResponse;
 import com.coms.backend.dto.LoginRequest;
 import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.security.JwtTokenProvider;
+import com.coms.backend.security.ClientIpResolver;
 import com.coms.backend.service.AuthService;
 import com.coms.backend.service.PendingSignupService;
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,8 @@ class AuthControllerCookieTest {
     private final JwtTokenProvider jwtTokenProvider = mock(JwtTokenProvider.class);
     private final com.coms.backend.service.RefreshSessionService refreshSessionService =
             mock(com.coms.backend.service.RefreshSessionService.class);
-    private final AuthController controller = new AuthController(authService, pendingSignupService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, true, "Lax");
+    private final ClientIpResolver clientIpResolver = new ClientIpResolver("127.0.0.1");
+    private final AuthController controller = new AuthController(authService, pendingSignupService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, clientIpResolver, true, "Lax");
 
     @Test
     void signupStartsPendingLifecycleWithoutIssuingCookies() {
@@ -68,7 +70,7 @@ class AuthControllerCookieTest {
 
     @Test
     void sameSiteNoneIsHonoredWhenSecure() {
-        AuthController noneController = new AuthController(authService, pendingSignupService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, true, "None");
+        AuthController noneController = new AuthController(authService, pendingSignupService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, clientIpResolver, true, "None");
         when(authService.login(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(new AuthResponse("access", "2026123456", "홍길동", "ok", "refresh"));
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -81,7 +83,7 @@ class AuthControllerCookieTest {
 
     @Test
     void sameSiteNoneWithoutSecureDegradesToLax() {
-        AuthController unsafeNone = new AuthController(authService, pendingSignupService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, false, "None");
+        AuthController unsafeNone = new AuthController(authService, pendingSignupService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, clientIpResolver, false, "None");
         when(authService.login(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(new AuthResponse("access", "2026123456", "홍길동", "ok", "refresh"));
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -94,7 +96,7 @@ class AuthControllerCookieTest {
 
     @Test
     void unknownSameSiteFallsBackToLax() {
-        AuthController bogus = new AuthController(authService, pendingSignupService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, true, "Weird");
+        AuthController bogus = new AuthController(authService, pendingSignupService, jwtTokenProvider, mock(com.coms.backend.service.AdminService.class), refreshSessionService, clientIpResolver, true, "Weird");
         when(authService.login(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(new AuthResponse("access", "2026123456", "홍길동", "ok", "refresh"));
         MockHttpServletResponse response = new MockHttpServletResponse();
