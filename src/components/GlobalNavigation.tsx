@@ -57,6 +57,8 @@ export default function GlobalNavigation() {
   const [scrolled, setScrolled] = useState(false)
   const [showTop, setShowTop] = useState(false)
   const activityWrapperRef = useRef(null)
+  const activityToggleRef = useRef<HTMLButtonElement | null>(null)
+  const mobileMenuToggleRef = useRef<HTMLButtonElement | null>(null)
   const activeKey = getActiveNavKey(location.pathname)
   const mobileTabs = tabs.slice(0, 3)
   const showMobileTabs = mobileTabs.some((tab) => tab.id === activeKey)
@@ -98,6 +100,7 @@ export default function GlobalNavigation() {
     const onKey = (event) => {
       if (event.key === 'Escape') {
         setActivityOpen(false)
+        activityToggleRef.current?.focus()
       }
     }
     document.addEventListener('mousedown', onDocClick)
@@ -107,6 +110,18 @@ export default function GlobalNavigation() {
       document.removeEventListener('keydown', onKey)
     }
   }, [activityOpen])
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return undefined
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setMobileMenuOpen(false)
+      setMobileActivityOpen(false)
+      mobileMenuToggleRef.current?.focus()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [mobileMenuOpen])
 
   useEffect(() => {
     if (!location.hash) return undefined
@@ -204,18 +219,20 @@ export default function GlobalNavigation() {
           )}
           <div ref={activityWrapperRef} className="relative">
             <button
+              ref={activityToggleRef}
               type="button"
               onClick={() => setActivityOpen((open) => !open)}
               className={`${navClass('activity', activityNavActive)} inline-flex items-center gap-1`}
-              aria-haspopup="menu"
               aria-expanded={activityOpen}
+              aria-controls="activity-nav-panel"
             >
               Activity
               <ChevronDown size={12} className={`transition ${activityOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
             </button>
             {activityOpen && (
-              <div
-                role="menu"
+              <nav
+                id="activity-nav-panel"
+                aria-label="활동 메뉴"
                 className="absolute left-1/2 top-full z-[90] mt-4 w-64 -translate-x-1/2 overflow-hidden rounded-2xl border border-[var(--app-hairline)] bg-[var(--app-surface)] shadow-[0_18px_45px_rgba(0,0,0,0.12)]"
               >
                 <ul className="flex flex-col py-1">
@@ -237,7 +254,7 @@ export default function GlobalNavigation() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </nav>
             )}
           </div>
           {memberNavItems.map((item) => (
@@ -284,22 +301,22 @@ export default function GlobalNavigation() {
         )}
 
         <button
+          ref={mobileMenuToggleRef}
           type="button"
           onClick={() => setMobileMenuOpen((open) => !open)}
           className="apple-global-nav-menu md:hidden"
           aria-label={mobileMenuOpen ? '메뉴 닫기' : '메뉴 열기'}
           aria-expanded={mobileMenuOpen}
           aria-controls="mobile-menu"
-          aria-haspopup="menu"
         >
           {mobileMenuOpen ? <X size={21} strokeWidth={2.1} /> : <Menu size={22} strokeWidth={2.25} />}
         </button>
       </div>
 
       {mobileMenuOpen && (
-        <div
+        <nav
           id="mobile-menu"
-          role="menu"
+          aria-label="모바일 메뉴"
           className="apple-mobile-menu-panel mx-auto md:hidden"
         >
           <div className="flex flex-col divide-y divide-[var(--app-hairline)]">
@@ -404,7 +421,7 @@ export default function GlobalNavigation() {
               </div>
             )}
           </div>
-        </div>
+        </nav>
       )}
 
       {showMobileTabs && (
