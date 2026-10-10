@@ -3,12 +3,12 @@ name: Dependency Check
 # OWASP Dependency-Check — scans backend Gradle dependencies for known CVEs.
 #
 # This workflow is intentionally NOT triggered on push/PR: the NVD database
-# download is slow and rate-limited, and a finding (or a transient rate-limit)
+# download is slow, and a finding (or a transient feed failure)
 # should never block day-to-day development. It runs on a weekly schedule and
 # can be kicked off manually from the Actions tab.
 #
-# NOTE: set the `NVD_API_KEY` repository secret to avoid NVD rate limits.
-# Request a free key at https://nvd.nist.gov/developers/request-an-api-key
+# Uses the Dependency-Check-maintained NVD feed by default. An NVD_API_KEY
+# repository secret opts in to the direct NVD API.
 on:
   workflow_dispatch:
   schedule:
