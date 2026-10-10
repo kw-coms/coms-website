@@ -471,9 +471,8 @@ export default function ComsIntro() {
     <div
       onClick={() => setFadingOut(true)}
       style={{ position: 'fixed', inset: 0, zIndex: 9999, opacity: fadingOut ? 0 : 1, transition: 'opacity ' + FADE + 'ms ease', background: 'var(--app-surface-soft)', cursor: 'pointer' }}
-      aria-hidden="true"
     >
-      <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+      <canvas ref={canvasRef} aria-hidden="true" style={{ display: 'block', width: '100%', height: '100%' }} />
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setFadingOut(true) }}

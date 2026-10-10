@@ -58,7 +58,7 @@ function CompanionServicesSection() {
       <div className="mx-auto max-w-7xl">
         <div className="max-w-2xl">
           <p className="apple-eyebrow">Service launcher</p>
-          <h2 className="apple-display mt-3 text-4xl sm:text-5xl">COM&apos;s Apps</h2>
+          <h1 className="apple-display mt-3 text-4xl sm:text-5xl">COM&apos;s Apps</h1>
           <p className="apple-copy mt-4 text-lg">
             동아리 부원들이 직접 만든 웹사이트·앱·게임 프로젝트를 한곳에 모았습니다. 카테고리별로 살펴보고, 링크로 바로 열거나 배포 파일을 내려받아 사용해 보세요.
           </p>

@@ -19,7 +19,9 @@ class NginxFrontendConfigTest {
         assertThat(source).contains("location ~ ^/community/([0-9]+)$");
         assertThat(source).contains("try_files $uri $uri/ $community_entry_uri");
         assertThat(source).contains("/api/community/posts/$community_post_id/share");
-        assertThat(source).contains("proxy_pass http://coms-backend:8080");
+        assertThat(source).contains("resolver 127.0.0.11 valid=10s ipv6=off;");
+        assertThat(source).contains("set $coms_backend coms-backend:8080;");
+        assertThat(source).contains("proxy_pass http://$coms_backend;");
     }
 
     @Test
