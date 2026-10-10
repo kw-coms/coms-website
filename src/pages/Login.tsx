@@ -269,7 +269,7 @@ export default function Login({ onCancel, onSuccess, goSignup }: {
           <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left" data-reveal style={{ '--reveal-delay': '80ms' } as React.CSSProperties}>
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="h-10 w-10 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
             <div className="min-w-0">
-              <h2 className="text-lg font-bold leading-snug sm:text-xl">{stepTitle}</h2>
+              <h1 className="text-lg font-bold leading-snug sm:text-xl">{stepTitle}</h1>
               <p className="break-keep text-sm leading-5 text-[var(--theme-body-muted)]/85">{stepDescription}</p>
             </div>
           </div>

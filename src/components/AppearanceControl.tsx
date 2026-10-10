@@ -28,7 +28,7 @@ export default function AppearanceControl({
   const fontSelectValue = selectedFontId ? String(selectedFontId) : ''
 
   return (
-    <section className="appearance-control apple-footer-surface border-t border-[var(--app-hairline)] bg-[var(--app-surface-soft)] px-5 py-8 text-[var(--app-muted)]">
+    <footer className="appearance-control apple-footer-surface border-t border-[var(--app-hairline)] bg-[var(--app-surface-soft)] px-5 py-8 text-[var(--app-muted)]">
       <div className="mx-auto w-full max-w-5xl">
         <div className="apple-footer-note border-b border-[var(--app-hairline)] pb-5 text-xs leading-5">
           <p>KW COM&apos;s는 광운대학교 학생들이 함께 공부하고 프로젝트를 만드는 중앙 컴퓨터 학술동아리입니다.</p>
@@ -158,6 +158,6 @@ export default function AppearanceControl({
           </div>
         </div>
       </div>
-    </section>
+    </footer>
   )
 }
