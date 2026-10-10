@@ -74,10 +74,20 @@ test.describe('real backend auth', () => {
     expect(browserMeStatus, 'browser fetch must retain the session cookie').toBe(200)
 
     // A gated page renders for the authenticated session (the RequireAuth guard
-    // would redirect to /login otherwise).
+    // would redirect to /login otherwise). Simulate a brief backend outage on
+    // the first /me request after navigation: AuthProvider should retry it.
+    let transientMeCount = 0
+    await page.route('**/api/auth/me', async (route) => {
+      if (transientMeCount++ === 0) {
+        await route.fulfill({ status: 503, contentType: 'application/json', body: '{"message":"temporary outage"}' })
+      } else {
+        await route.continue()
+      }
+    })
     await page.goto('/community')
     await expect(page).toHaveURL(/\/community$/, { timeout: 15_000 })
     await expect(page).not.toHaveURL(/\/login$/)
+    expect(transientMeCount).toBeGreaterThanOrEqual(2)
   })
 
   test('fresh UI signup against the real backend reaches the email-verification step', async ({ page, request }) => {

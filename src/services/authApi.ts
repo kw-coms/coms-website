@@ -1,4 +1,4 @@
-import { request, requestOptional } from './apiClient'
+import { request } from './apiClient'
 
 export async function signupUser(payload) {
   return request('/api/auth/signup', {
@@ -19,7 +19,8 @@ export async function logoutUser() {
 }
 
 export async function getCurrentUser() {
-  return requestOptional('/api/auth/me', {}, null)
+  // Let transient failures reach AuthProvider so it retries session recovery.
+  return request('/api/auth/me')
 }
 
 export async function changePassword(currentPassword, newPassword) {
