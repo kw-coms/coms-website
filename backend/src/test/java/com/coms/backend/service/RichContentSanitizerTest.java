@@ -82,6 +82,12 @@ class RichContentSanitizerTest {
     }
 
     @Test
+    void rejectsEventHandlerInLegacyPlainText() {
+        assertThatThrownBy(() -> sanitizer.sanitizeContent("<b onclick=alert(1)>text</b>"))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
     void passesBlankContentThrough() {
         assertThat(sanitizer.sanitizeContent("")).isEmpty();
         assertThat(sanitizer.sanitizeContent(null)).isNull();

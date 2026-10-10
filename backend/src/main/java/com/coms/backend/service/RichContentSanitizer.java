@@ -33,6 +33,7 @@ public class RichContentSanitizer {
     private static final Pattern SAFE_COLOR = Pattern.compile("(?i)^(#[0-9a-f]{3,8}|rgba?\\([0-9.,%\\s]+\\))$");
     private static final Pattern HTTPS_URL = Pattern.compile("^https://[^\\s<>\"']+$", Pattern.CASE_INSENSITIVE);
     private static final Pattern YOUTUBE_EMBED_URL = Pattern.compile("^https://www\\.youtube(-nocookie)?\\.com/embed/[A-Za-z0-9_-]{6,20}([?&][^\\s<>\"']*)?$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern EVENT_HANDLER_ATTRIBUTE = Pattern.compile("\\son[a-z]+\\s*=");
 
     /**
      * Sanitizes a stored content string. When the value is a JSON array of blocks it
@@ -197,7 +198,7 @@ public class RichContentSanitizer {
                     || lower.contains("vbscript:")
                     || lower.contains("data:text/html")
                     || lower.contains("expression(")
-                    || lower.matches(".*\\son[a-z]+\\s*=.*");
+                    || EVENT_HANDLER_ATTRIBUTE.matcher(lower).find();
             if (!unsafe) {
                 for (String tag : FORBIDDEN_TAG_PREFIXES) {
                     if (lower.contains("<" + tag) || lower.contains("</" + tag)) {
