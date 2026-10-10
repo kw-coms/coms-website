@@ -13,12 +13,11 @@
 
 import { spawn, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
-import { tmpdir } from 'node:os'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(__dirname, '..')
@@ -28,8 +27,9 @@ const JWT_SECRET = randomBytes(48).toString('base64url')
 const BOOTSTRAP_SECRET = randomBytes(48).toString('base64url')
 const ADMIN_PASSWORD = randomBytes(24).toString('base64url')
 const HEALTH_URL = 'http://127.0.0.1:8080/v3/api-docs'
-const mailboxDir = mkdtempSync(join(tmpdir(), 'coms-e2e-mail-'))
-const mailboxPath = join(mailboxDir, 'latest.json')
+// A fixed path inside Playwright's ignored test output avoids accepting a file
+// path from an environment variable in the test process.
+const mailboxPath = resolve(repoRoot, 'test-results', 'coms-e2e-mailbox.json')
 
 let backend = null
 let backendError = null
@@ -68,6 +68,7 @@ async function startSmtpSink() {
             readingData = false
             try {
               const code = readVerificationCode(dataLines.join('\r\n'))
+              mkdirSync(dirname(mailboxPath), { recursive: true })
               writeFileSync(mailboxPath, JSON.stringify({ to: recipient, code }))
               socket.write('250 2.0.0 queued\r\n')
             } catch (error) {
@@ -192,7 +193,7 @@ async function runPlaywright() {
       cwd: repoRoot,
       stdio: 'inherit',
       env: { ...process.env, E2E_BACKEND: '1', BOOTSTRAP_SECRET,
-        COMS_E2E_ADMIN_PASSWORD: ADMIN_PASSWORD, COMS_E2E_MAILBOX_PATH: mailboxPath },
+        COMS_E2E_ADMIN_PASSWORD: ADMIN_PASSWORD },
     },
   )
   return await new Promise((resolveExit) => {
@@ -217,7 +218,7 @@ try {
   console.log('[e2e-backend] Tearing down backend...')
   killBackend()
   smtpServer?.close()
-  rmSync(mailboxDir, { recursive: true, force: true })
+  rmSync(mailboxPath, { force: true })
 }
 
 process.exit(exitCode)

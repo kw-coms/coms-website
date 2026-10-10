@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
 // Real-backend auth e2e.
 //
@@ -22,6 +23,7 @@ import { readFileSync } from 'node:fs'
 // confirms its code, then logs in as the newly created member.
 
 const ORIGIN = 'http://localhost:3000'
+const MAILBOX_PATH = fileURLToPath(new URL('../../test-results/coms-e2e-mailbox.json', import.meta.url))
 
 // Auto-seeded dev admin (see backend DevDataInitializer). Login-able without
 // email verification because ADMINs bypass the gate.
@@ -134,7 +136,7 @@ test.describe('real backend auth', () => {
     let receivedMail
     await expect.poll(() => {
       try {
-        receivedMail = JSON.parse(readFileSync(process.env.COMS_E2E_MAILBOX_PATH, 'utf8'))
+        receivedMail = JSON.parse(readFileSync(MAILBOX_PATH, 'utf8'))
         return receivedMail.to
       } catch { return null }
     }, { timeout: 10_000 }).toBe(email)
