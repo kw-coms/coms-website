@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.4.xsd">
+    <!-- These advisories describe OpenTelemetry-Go behavior. The matched Maven artifacts are Java libraries. -->
+    <suppress>
+        <notes>CVE-2026-29181 affects OpenTelemetry-Go baggage header parsing, not these Java artifacts.</notes>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry(\.contrib)?/opentelemetry-(api-incubator|extension-incubator|gcp-resources)@.*$</packageUrl>
+        <cve>CVE-2026-29181</cve>
+    </suppress>
+    <suppress>
+        <notes>CVE-2026-39883 affects OpenTelemetry-Go command execution on BSD and Solaris, not these Java artifacts.</notes>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry(\.contrib)?/opentelemetry-(api-incubator|extension-incubator|gcp-resources)@.*$</packageUrl>
+        <cve>CVE-2026-39883</cve>
+    </suppress>
+    <suppress>
+        <notes>CVE-2026-24051 affects OpenTelemetry-Go command execution on macOS, not these Java artifacts.</notes>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry(\.contrib)?/opentelemetry-(api-incubator|extension-incubator|gcp-resources)@.*$</packageUrl>
+        <cve>CVE-2026-24051</cve>
+    </suppress>
+</suppressions>
