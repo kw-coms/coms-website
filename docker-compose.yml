@@ -59,6 +59,16 @@ services:
       JAVA_TOOL_OPTIONS: "-Duser.timezone=Asia/Seoul"
     ports:
       - "127.0.0.1:8080:8080"
+    healthcheck:
+      # The JRE image is alpine: BusyBox wget, no curl. /actuator/health answers 503 when the
+      # database is unreachable, which wget reports as a failure. 127.0.0.1, not localhost, for
+      # the reason given on the frontend healthcheck below.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # Flyway and the schema check run before the port opens.
+      start_period: 120s
     volumes:
       - ./backend-data:/app/data
       - backend-uploads:/app/uploads
@@ -75,8 +85,17 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
+        # Every VITE_* variable the frontend reads is listed here: .env itself is kept out of
+        # the image build context (.dockerignore), so these arguments are the only way in.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
         VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
         VITE_SENTRY_ENV: ${VITE_SENTRY_ENV:-production}
+        # Web push (Firebase web app config + VAPID key). Any blank value hides the feature.
+        VITE_FIREBASE_API_KEY: ${VITE_FIREBASE_API_KEY:-}
+        VITE_FIREBASE_PROJECT_ID: ${VITE_FIREBASE_PROJECT_ID:-}
+        VITE_FIREBASE_APP_ID: ${VITE_FIREBASE_APP_ID:-}
+        VITE_FIREBASE_MESSAGING_SENDER_ID: ${VITE_FIREBASE_MESSAGING_SENDER_ID:-}
+        VITE_FIREBASE_VAPID_KEY: ${VITE_FIREBASE_VAPID_KEY:-}
         # Sentry source map upload (optional). Empty token = no upload, normal build.
         SENTRY_AUTH_TOKEN: ${SENTRY_AUTH_TOKEN:-}
         SENTRY_ORG: ${SENTRY_ORG:-}
