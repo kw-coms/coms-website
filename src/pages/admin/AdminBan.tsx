@@ -24,10 +24,16 @@ export default function AdminBan({ formatDateTime }: { formatDateTime: (value: s
   const [duration, setDuration] = useState(BAN_DURATIONS[0].value)
   const [error, setError] = useState('')
 
+  // A list that failed to load is not an empty list. Swallowed, the failure read as
+  // "차단된 학번이 없습니다".
+  const reportLoadFailure = (err) => {
+    showToast({ message: err?.message || '차단 목록을 불러오지 못했습니다.', tone: 'error' })
+  }
+
   const load = () => {
     listBannedStudents()
       .then(setBanned)
-      .catch(() => {})
+      .catch(reportLoadFailure)
       .finally(() => setLoading(false))
   }
 
@@ -35,7 +41,7 @@ export default function AdminBan({ formatDateTime }: { formatDateTime: (value: s
     let mounted = true
     listBannedStudents()
       .then(d => { if (mounted) setBanned(d) })
-      .catch(() => {})
+      .catch((err) => { if (mounted) reportLoadFailure(err) })
       .finally(() => { if (mounted) setLoading(false) })
     return () => { mounted = false }
   }, [])

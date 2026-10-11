@@ -2,6 +2,10 @@ import { useMemo, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import {
   createCommunityPost,
+  deleteCommunityPost,
+  deletePostFile,
+  deletePostImage,
+  deletePostVideo,
   fetchLinkPreview,
   searchYoutubeVideos,
   updateCommunityPost,
@@ -12,11 +16,17 @@ import {
 import RichBodyEditor from '../../components/richEditor/RichBodyEditor'
 import { FULL_RICH_FEATURES } from '../../components/richEditor/richBodyFeatures'
 import {
+  EMPTY_POST_STAND_IN,
   MAX_ANONYMOUS_NAME_LENGTH,
   MAX_TITLE_LENGTH,
+  categoryOptionsForPost,
   categoryOptionsForUser,
+  creationStandIn,
+  needsUpload,
   optimizeImageFile,
   parsePostBlocks,
+  removedSavedMedia,
+  serializePostBlocks,
   textContentForSearch,
 } from './postEditorUtils'
 import { usePermissions } from '../../contexts/usePermissions'
@@ -36,10 +46,37 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
   const [savingStep, setSavingStep] = useState('')
   const [error, setError] = useState('')
   const editorApiRef = useRef(null)
+  // A new post that exists on the server but is not complete yet: its media upload failed
+  // part-way. Kept so the next attempt finishes this post instead of creating another one.
+  const [pendingPost, setPendingPost] = useState<{ id: number; category: string } | null>(null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const initialBlocks = useMemo(() => isEditing ? parsePostBlocks(initialPost) : [], [])
-  const categoryOptions = useMemo(() => categoryOptionsForUser(user, permissions), [user, permissions])
-  const effectiveCategory = categoryOptions.some((item) => item.value === category) ? category : 'GENERAL'
+  const postedCategory = isEditing ? (initialPost?.category || 'GENERAL') : pendingPost?.category
+  const categoryOptions = useMemo(
+    () => categoryOptionsForPost(categoryOptionsForUser(user, permissions), postedCategory),
+    [user, permissions, postedCategory],
+  )
+  const effectiveCategory = categoryOptions.some((item) => item.value === category)
+    ? category
+    : (categoryOptions[0]?.value || 'GENERAL')
+
+  const cancel = async () => {
+    // Nothing was meant to be published: take back the half-made post rather than leave it on
+    // the board with a stand-in body.
+    if (pendingPost && !saving) {
+      setSaving(true)
+      setSavingStep('작성 취소 중...')
+      try {
+        await deleteCommunityPost(pendingPost.id)
+      } catch {
+        // Left for the author to remove from the board; cancelling must still work.
+      } finally {
+        setSaving(false)
+        setSavingStep('')
+      }
+    }
+    onCancel()
+  }
 
   const submit = async (e) => {
     e.preventDefault()
@@ -51,21 +88,38 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
     setSaving(true)
     setError('')
     try {
-      let postId
-      if (isEditing) {
-        postId = initialPost.id
-      } else {
+      const fields = { title: title.trim(), category: effectiveCategory, anonymousName: anonymousName.trim() }
+      let postId = isEditing ? initialPost.id : pendingPost?.id
+      if (!postId && !blocks.some(needsUpload)) {
+        // Nothing to upload, so the post is created whole in one request: no stand-in body, no
+        // follow-up save for the server to mistake for an edit.
         setSavingStep('글 등록 중...')
-        const placeholder = textContentForSearch(blocks.find(b => b.type === 'text' && textContentForSearch(b.content).trim())?.content || '').trim() || '...'
-        const created = await createCommunityPost({ title: title.trim(), content: placeholder, category: effectiveCategory, anonymousName: anonymousName.trim() })
+        onSave(await createCommunityPost({ ...fields, content: serializePostBlocks(blocks) }))
+        return
+      }
+      if (!postId) {
+        // Uploads need the post's id, so the post is created with a stand-in body (its first
+        // paragraph) and completed below.
+        setSavingStep('글 등록 중...')
+        const standIn = creationStandIn(blocks)
+        let created
+        try {
+          created = await createCommunityPost({ ...fields, content: standIn })
+        } catch (err) {
+          // A plain-text body is screened more strictly than the same words inside a block. If
+          // the stand-in is what was refused, the neutral one still lets the post through.
+          if (standIn === EMPTY_POST_STAND_IN || err?.status !== 400) throw err
+          created = await createCommunityPost({ ...fields, content: EMPTY_POST_STAND_IN })
+        }
         postId = created.id
+        setPendingPost({ id: created.id, category: effectiveCategory })
       }
 
       const uploadedBlocks = []
       for (const block of blocks) {
         if (block.type === 'text') {
           uploadedBlocks.push(block)
-        } else if (block.status !== 'saved' && block.file) {
+        } else if (needsUpload(block)) {
           setSavingStep(`업로드 중: ${block.name}`)
           if (block.type === 'image') {
             setSavingStep(`이미지 최적화 중: ${block.name}`)
@@ -90,21 +144,18 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
         }
       }
 
-      const contentJson = JSON.stringify(
-        uploadedBlocks.map(b => {
-          if (b.type === 'text') return { type: 'text', content: b.content }
-          if (b.type === 'image' && b.mediaId) return { type: 'image', mediaId: b.mediaId, name: b.name, width: b.width || 75, align: b.align || 'center' }
-          if (b.type === 'video' && b.mediaId) return { type: 'video', mediaId: b.mediaId, name: b.name, width: b.width || 75, align: b.align || 'center' }
-          if (b.type === 'file' && b.fileId) return { type: 'file', fileId: b.fileId, name: b.name }
-          if (b.type === 'externalEmbed') return { type: 'externalEmbed', provider: b.provider, kind: b.kind, url: b.url, embedUrl: b.embedUrl, title: b.title, thumbnailUrl: b.thumbnailUrl, width: b.width || 75, align: b.align || 'center' }
-          if (b.type === 'poll') return { type: 'poll', pollId: b.pollId, question: b.question, options: b.options || [], closesAt: b.closesAt, closedAt: b.closedAt }
-          return null
-        }).filter(Boolean)
-      )
-
       const removeLegacyImage = Boolean(initialPost?.imageUrl && !uploadedBlocks.some(b => b.legacy))
       setSavingStep('저장 중...')
-      const saved = await updateCommunityPost(postId, { title: title.trim(), content: contentJson, category: effectiveCategory, removeImage: removeLegacyImage, anonymousName: anonymousName.trim() })
+      const saved = await updateCommunityPost(postId, { ...fields, content: serializePostBlocks(uploadedBlocks), removeImage: removeLegacyImage })
+      setPendingPost(null)
+      if (isEditing) {
+        // The saved body no longer refers to these uploads; free them (and their share of the
+        // per-post limit). Best effort: the post itself is already saved correctly.
+        const deleteById = { image: deletePostImage, video: deletePostVideo, file: deletePostFile }
+        await Promise.allSettled(
+          removedSavedMedia(initialBlocks, uploadedBlocks).map((media) => deleteById[media.type](postId, media.id)),
+        )
+      }
       onSave(saved)
     } catch (err) {
       setError(err.message || '저장 중 오류가 발생했습니다.')
@@ -155,7 +206,12 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
         />
       </div>
 
-      {error && <p className="community-compose-error order-5 text-sm font-semibold text-red-500 lg:col-start-2">{error}</p>}
+      {error && <p role="alert" className="community-compose-error order-5 text-sm font-semibold text-red-500 lg:col-start-2">{error}</p>}
+      {pendingPost && !saving && (
+        <p className="order-5 text-xs font-semibold text-[var(--app-muted)] lg:col-start-2">
+          첨부 업로드가 끝나지 않았습니다. &lsquo;글 등록&rsquo;을 다시 누르면 이어서 올리고, 취소하면 등록을 되돌립니다.
+        </p>
+      )}
 
       <div className="community-compose-actions order-6 flex flex-col gap-2 sm:flex-row lg:col-start-2 lg:flex-col">
         <button type="submit" disabled={saving || !title.trim()}
@@ -163,8 +219,8 @@ export default function PostEditor({ initialPost, onCancel, onSave, user }: {
         >
           {saving ? (savingStep || '저장 중...') : isEditing ? '수정 완료' : '글 등록'}
         </button>
-        <button type="button" onClick={onCancel}
-          className="apple-action-secondary inline-flex min-h-11 items-center justify-center gap-1 px-4 py-2.5 text-sm sm:min-h-0"
+        <button type="button" onClick={cancel} disabled={saving}
+          className="apple-action-secondary inline-flex min-h-11 items-center justify-center gap-1 px-4 py-2.5 text-sm disabled:opacity-50 sm:min-h-0"
         >
           <X size={14} />취소
         </button>

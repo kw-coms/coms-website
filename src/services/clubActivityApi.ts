@@ -1,4 +1,4 @@
-import { apiUrl, request, requestNoContent, throwApiError } from './apiClient'
+import { request, requestNoContent } from './apiClient'
 
 export async function listClubActivities() {
   return request('/api/club-activities')
@@ -28,14 +28,10 @@ export async function createClubActivity({ kind, category, title, description, e
   if (description) formData.append('description', description)
   if (image) formData.append('image', image)
 
-  const response = await fetch(apiUrl('/api/club-activities'), {
+  return request('/api/club-activities', {
     method: 'POST',
-    credentials: 'include',
     body: formData,
   })
-  if (!response.ok) await throwApiError(response, '활동 기록 등록 중 오류가 발생했습니다.')
-  const data = await response.json().catch(() => null)
-  return data
 }
 
 export async function updateClubActivity(id, { kind, category, title, description, eventDate, endDate, startTime, endTime, colorHex }: {

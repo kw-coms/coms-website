@@ -8,7 +8,7 @@ import { defaultPermissionsForRole, type PermissionKey } from '../utils/roleAcce
  * 잠깐 비어 보이지 않게 하되, 실제 판정은 언제나 백엔드가 다시 한다.
  */
 export function usePermissions() {
-  const { user, permissions } = useAuth()
+  const { user, permissions, permissionsSettled } = useAuth()
   const role = user?.role
 
   const effective = useMemo(
@@ -20,8 +20,11 @@ export function usePermissions() {
     () => ({
       permissions: effective,
       loaded: Boolean(permissions),
+      // The request has come back, with or without an answer. After a failure `loaded` stays
+      // false (the role defaults are in use) but there is nothing left to wait for.
+      settled: Boolean(permissions) || Boolean(permissionsSettled),
       can: (key: PermissionKey) => effective.has(key),
     }),
-    [effective, permissions]
+    [effective, permissions, permissionsSettled]
   )
 }

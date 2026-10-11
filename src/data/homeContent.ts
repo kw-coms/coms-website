@@ -9,9 +9,10 @@ import { ActivityCategory } from '../contract/enums'
 import { enumLabels } from '../contract/labels'
 
 export const tabs = [
-  { id: 'about', label: 'About', hint: '정체성', icon: Binary, accent: 'text-cyan-200' },
-  { id: 'activities', label: 'Activities', hint: '세미나·스터디', icon: Sparkles, accent: 'text-rose-200' },
-  { id: 'projects', label: 'Projects', hint: '실전 제작', icon: CircuitBoard, accent: 'text-violet-200' },
+  // Menu-row icon tints: the 200-level shades these used were nearly invisible on the light surface.
+  { id: 'about', label: 'About', hint: '정체성', icon: Binary, accent: 'text-cyan-500' },
+  { id: 'activities', label: 'Activities', hint: '세미나·스터디', icon: Sparkles, accent: 'text-rose-500' },
+  { id: 'projects', label: 'Projects', hint: '실전 제작', icon: CircuitBoard, accent: 'text-violet-500' },
   { id: 'recruit', label: 'Recruit', hint: '지원 안내', icon: Rocket, accent: 'text-sky-500' },
 ]
 

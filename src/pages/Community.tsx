@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useScrollReveal } from '../hooks/useScrollReveal'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -36,6 +37,8 @@ import {
 import {
   PAGE_SIZE,
   boardFilterOptionsForUser,
+  boardViewFromSearch,
+  boardViewToSearch,
   paginationRange,
 } from './community/communityBoardUtils'
 import { MAX_COMMENT_LENGTH, useCommunityComments } from './community/useCommunityComments'
@@ -57,12 +60,16 @@ export default function Community({ onBack }: { onBack: () => void }) {
   const [deletedLoading, setDeletedLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [deletedError, setDeletedError] = useState('')
+  // The board view starts from the list URL and is written back to it (below). This page
+  // remounts whenever the path changes, so with the view in component state alone, opening a
+  // post and coming back always landed on page 1 of the unfiltered board.
+  const [initialBoardView] = useState(() => boardViewFromSearch(location.search))
   // `rawPage` is what the user last asked for; the page actually rendered is
   // derived below, clamped to the current filter's page count.
-  const [rawPage, setPage] = useState(1)
-  const [activeCategory, setActiveCategory] = useState('ALL')
-  const [sortMode, setSortMode] = useState('latest')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [rawPage, setPage] = useState(initialBoardView.page)
+  const [activeCategory, setActiveCategory] = useState(initialBoardView.category)
+  const [sortMode, setSortMode] = useState(initialBoardView.sort)
+  const [searchQuery, setSearchQuery] = useState(initialBoardView.query)
   const [pollVoting, setPollVoting] = useState('')
   const [pollClosing, setPollClosing] = useState('')
   const [appealOpenId, setAppealOpenId] = useState(null)
@@ -73,6 +80,7 @@ export default function Community({ onBack }: { onBack: () => void }) {
   const canSeeAnonymous = canAccessAnonymousBoard(user, permissions)
   const effectiveActiveCategory = boardFilterOptions.some((item) => item.value === activeCategory) ? activeCategory : 'ALL'
   const isAnonymousDetail = currentPost?.category === 'ANONYMOUS'
+  useDocumentTitle(urlId && currentPost ? currentPost.title : null)
   const deletedViewRequested = useMemo(() => new URLSearchParams(location.search).get('view') === 'deleted', [location.search])
   const {
     comments,
@@ -204,15 +212,26 @@ export default function Community({ onBack }: { onBack: () => void }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlId, deletedViewRequested])
 
+  // Kept in the address bar with `replace`, not pushed: paging and typing a search must not
+  // each add a step to the Back button. Local state stays the source for the inputs — router
+  // updates are transitions, and a text field driven by one drops characters while typing.
+  useEffect(() => {
+    if (urlId || deletedViewRequested) return
+    const search = boardViewToSearch({ page: rawPage, category: activeCategory, sort: sortMode, query: searchQuery }, location.search)
+    if (search !== location.search) navigate({ pathname: location.pathname, search }, { replace: true, state: location.state })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawPage, activeCategory, sortMode, searchQuery, urlId, deletedViewRequested])
+
   const openPost = (post) => {
-    navigate('/community/' + post.id)
+    // Remembered so "목록" on the post returns to this page of the board, not to its first.
+    navigate('/community/' + post.id, { state: { boardSearch: location.search } })
   }
 
   const backToList = () => {
     setMode('list')
     setCurrentPost(null)
     resetCommentNavigation()
-    if (urlId) navigate('/community')
+    if (urlId) navigate('/community' + (typeof location.state?.boardSearch === 'string' ? location.state.boardSearch : ''))
     else if (deletedViewRequested) navigate('/community', { replace: true })
   }
 

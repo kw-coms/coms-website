@@ -9,7 +9,7 @@ import {
 import { useAuth } from '../contexts/useAuth'
 import { getLogoAsset } from '../utils/logoAssets'
 import { EmailVerifyStep } from '../components/EmailVerifyStep'
-import { PASSWORD_PATTERN, PASSWORD_MESSAGE } from '../utils/passwordPolicy'
+import { PASSWORD_PATTERN, PASSWORD_MESSAGE, PASSWORD_TOO_LONG_MESSAGE, isPasswordTooLong } from '../utils/passwordPolicy'
 import { useScrollReveal } from '../hooks/useScrollReveal'
 
 const panelClass =
@@ -78,7 +78,7 @@ export default function Login({ onCancel, onSuccess, goSignup }: {
   onSuccess: () => void
   goSignup: () => void
 }) {
-  const { login } = useAuth()
+  const { user, login } = useAuth()
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
@@ -97,6 +97,12 @@ export default function Login({ onCancel, onSuccess, goSignup }: {
 
   const isVerifyStep = step === 'verify'
   const isResetStep = step === 'reset'
+
+  // A member who is already signed in has nothing to fill in here (a bookmarked /login). They
+  // are told so and offered the way on, rather than redirected: the admin 화면 점검 tab opens
+  // this page on purpose to check the form while signed in. Not shown mid-login — `login()`
+  // sets the user before the submit handler has left the page.
+  const alreadySignedIn = Boolean(user) && !loading && step === 'login'
 
   const stepTitle = isVerifyStep ? '이메일 인증' : isResetStep ? '비밀번호 찾기' : 'KW COM\'s 로그인'
   const stepDescription = isVerifyStep
@@ -212,6 +218,10 @@ export default function Login({ onCancel, onSuccess, goSignup }: {
       setResetError(PASSWORD_MESSAGE)
       return
     }
+    if (isPasswordTooLong(newPassword)) {
+      setResetError(PASSWORD_TOO_LONG_MESSAGE)
+      return
+    }
     if (newPassword !== resetForm.newPasswordConfirm) {
       setResetError('새 비밀번호 확인이 일치하지 않습니다.')
       return
@@ -276,7 +286,7 @@ export default function Login({ onCancel, onSuccess, goSignup }: {
 
           {isVerifyStep ? (
             <div className="space-y-4" data-reveal style={{ '--reveal-delay': '160ms' } as React.CSSProperties}>
-              {verifyError && <div className="text-sm text-red-500">{verifyError}</div>}
+              {verifyError && <div role="alert" className="text-sm text-red-500">{verifyError}</div>}
               <EmailVerifyStep studentId={verifyStudentId} onDone={handleVerified} />
             </div>
           ) : isResetStep ? (
@@ -328,8 +338,8 @@ export default function Login({ onCancel, onSuccess, goSignup }: {
                 </div>
               )}
 
-              {resetMessage && <div className="text-sm text-[var(--app-accent-text)]">{resetMessage}</div>}
-              {resetError && <div className="text-sm text-red-500">{resetError}</div>}
+              {resetMessage && <div role="status" className="text-sm text-[var(--app-accent-text)]">{resetMessage}</div>}
+              {resetError && <div role="alert" className="text-sm text-red-500">{resetError}</div>}
 
               <ActionButton icon={resetRequested ? KeyRound : Mail} loading={resetLoading}>
                 {resetLoading ? '처리 중...' : resetRequested ? '비밀번호 재설정' : '인증코드 받기'}
@@ -349,6 +359,14 @@ export default function Login({ onCancel, onSuccess, goSignup }: {
             </form>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4" data-reveal style={{ '--reveal-delay': '160ms' } as React.CSSProperties}>
+              {alreadySignedIn && (
+                <p role="status" className="rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] px-3 py-2.5 text-sm text-[var(--app-text)]">
+                  이미 {user.name ? `${user.name}님으로 ` : ''}로그인되어 있습니다.{' '}
+                  <button type="button" onClick={onSuccess} className="font-semibold text-[var(--app-accent-text)] underline underline-offset-2">
+                    계속하기
+                  </button>
+                </p>
+              )}
               <TextInput
                 id="identifier"
                 label="학번 또는 이메일"
@@ -378,8 +396,8 @@ export default function Login({ onCancel, onSuccess, goSignup }: {
                 자동 로그인
               </label>
 
-              {notice && <div className="text-sm text-[var(--app-accent-text)]">{notice}</div>}
-              {error && <div className="text-sm text-red-500">{error}</div>}
+              {notice && <div role="status" className="text-sm text-[var(--app-accent-text)]">{notice}</div>}
+              {error && <div role="alert" className="text-sm text-red-500">{error}</div>}
 
               <ActionButton icon={LogIn} loading={loading}>
                 {loading ? '로그인 중...' : '로그인'}

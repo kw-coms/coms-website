@@ -752,7 +752,10 @@ html.home-snap-scroll .home-snap-section {
 	top: 0;
 	left: 0;
 	z-index: 10000;
-	transform: translateY(-120%);
+	/* Park it a full margin above the viewport and keep the shadow for the focused
+	   state only: at -120% the bottom edge sat exactly on the viewport top, so the
+	   16px shadow blur leaked into the top-left corner of every page. */
+	transform: translateY(calc(-100% - 1.5rem));
 	padding: 0.6rem 1rem;
 	margin: 0.5rem;
 	border-radius: 0.5rem;
@@ -762,12 +765,12 @@ html.home-snap-scroll .home-snap-section {
 	font-size: 0.85rem;
 	font-weight: 700;
 	text-decoration: none;
-	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 	transition: transform 160ms ease;
 }
 .coms-skip-link:focus,
 .coms-skip-link:focus-visible {
 	transform: translateY(0);
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 	outline: 2px solid var(--app-accent);
 	outline-offset: 2px;
 }

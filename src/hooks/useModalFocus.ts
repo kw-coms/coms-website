@@ -29,6 +29,14 @@ function focusableElements(container) {
  */
 export function useModalFocus(active, onClose, { initialFocusRef }: any = {}) {
   const containerRef = useRef(null)
+  // Callers usually pass an inline arrow, which is a new function on every render. Keeping it
+  // in the effect's dependencies re-ran the whole effect on each keystroke inside the dialog:
+  // the cleanup handed focus back to the opener and the setup then focused the first control,
+  // so typing into any field of the dialog lost focus after one character.
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  })
 
   useEffect(() => {
     if (!active || typeof document === 'undefined') return undefined
@@ -43,7 +51,7 @@ export function useModalFocus(active, onClose, { initialFocusRef }: any = {}) {
     const onKeyDown = (event) => {
       if (event.key === 'Escape') {
         event.stopPropagation()
-        onClose?.()
+        onCloseRef.current?.()
         return
       }
       if (event.key !== 'Tab') return
@@ -69,7 +77,7 @@ export function useModalFocus(active, onClose, { initialFocusRef }: any = {}) {
       document.removeEventListener('keydown', onKeyDown, true)
       previousActiveElement?.focus?.()
     }
-  }, [active, onClose, initialFocusRef])
+  }, [active, initialFocusRef])
 
   return containerRef
 }

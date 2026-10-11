@@ -17,10 +17,15 @@ export default function AdminFiles() {
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef(null)
 
+  // A list that failed to load is not an empty list. Swallowed, the failure read as "no files".
+  const reportLoadFailure = (err) => {
+    showToast({ message: err?.message || '자료 목록을 불러오지 못했습니다.', tone: 'error' })
+  }
+
   const loadFiles = () => {
     listFiles()
       .then(setFiles)
-      .catch(() => {})
+      .catch(reportLoadFailure)
       .finally(() => setLoading(false))
   }
 
@@ -28,7 +33,7 @@ export default function AdminFiles() {
     let mounted = true
     listFiles()
       .then(d => { if (mounted) setFiles(d) })
-      .catch(() => {})
+      .catch((err) => { if (mounted) reportLoadFailure(err) })
       .finally(() => { if (mounted) setLoading(false) })
     return () => { mounted = false }
   }, [])

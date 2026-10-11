@@ -1,5 +1,5 @@
 import { Download } from 'lucide-react'
-import { linkify } from '../../utils/linkify'
+import { linkify, linkifyHtml } from '../../utils/linkify'
 import { apiUrl } from '../../services/apiClient'
 import { PostBlocksContent } from './PostBlocksContent'
 import {
@@ -7,6 +7,7 @@ import {
   hasFormattedText,
   mediaWidthPercent,
   parsePostBlocks,
+  plainBlockText,
   pollOptionImageUrl,
   pollOptionLabel,
   safeExternalSrc,
@@ -69,13 +70,13 @@ export function renderPostBlocks(post, options: {
               <div
                 key={i}
                 className="community-post-text text-size-container whitespace-pre-wrap break-words auto-text-post"
-                dangerouslySetInnerHTML={{ __html: sanitizeEditorHtml(block.content) }}
+                dangerouslySetInnerHTML={{ __html: linkifyHtml(sanitizeEditorHtml(block.content)) }}
               />
             )
           }
           return (
             <div key={i} className="community-post-text text-size-container whitespace-pre-wrap break-words auto-text-post">
-              {linkify(block.content)}
+              {linkify(plainBlockText(block.content))}
             </div>
           )
         }

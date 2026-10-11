@@ -8,11 +8,13 @@ import { BoardComposeBar } from './CommunityChrome'
 import CommunityPostRow from './CommunityPostRow'
 import { useBookmarkMutation } from './useBookmarkMutation'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
+import { useScrollReveal } from '../../hooks/useScrollReveal'
 
 export default function CommunityMemberProfile({ onBack }: { onBack: () => void }) {
   const { studentId } = useParams()
   const navigate = useNavigate()
   const bookmarkMutation = useBookmarkMutation()
+  useScrollReveal()
 
   const reputationQuery = useQuery({
     queryKey: queryKeys.community.reputation(studentId),

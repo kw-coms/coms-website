@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { confirmDialog } from '../components/common/ConfirmDialog'
 import AuthorChangeDialog from '../components/common/AuthorChangeDialog'
 import { canEditArchive } from '../utils/contentEditing'
 import { useScrollReveal } from '../hooks/useScrollReveal'
 import { useVisibleCount } from '../hooks/useVisibleCount'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { ArrowLeft, FileUp } from 'lucide-react'
 import { deleteFile, listFiles, voteArchiveFile, updateArchiveAuthor } from '../services/archiveApi'
 import { useAuth } from '../contexts/useAuth'
@@ -12,7 +13,7 @@ import { richBodyToPlainText } from '../components/richEditor/renderRichBody'
 import { ArchiveDetailView } from '../components/archive/ArchiveDetailView'
 import { ArchiveListView } from '../components/archive/ArchiveListView'
 import { WriteForm } from '../components/archive/WriteForm'
-import { categoryLabel } from '../components/archive/archiveUtils'
+import { ARCHIVE_CATEGORIES, categoryLabel } from '../components/archive/archiveUtils'
 import { canManageArchive } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
 import { showToast } from '../components/common/Toast'
@@ -30,8 +31,29 @@ export default function Archive({ onBack }: { onBack: () => void }) {
   const [mode, setMode] = useState('list')
   const [editingId, setEditingId] = useState<number | null>(null)
   const [authorFile, setAuthorFile] = useState<any>(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [activeCategory, setActiveCategory] = useState('ALL')
+  // Same query-string mirror as the notices list (replace, no extra history entries): App
+  // remounts this page between /resources and /resources/:id, so without it Back from a file
+  // landed on an unfiltered list. State stays the source of truth for the search box.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '')
+  const [activeCategory, setActiveCategory] = useState(() => {
+    const category = searchParams.get('category')
+    return ARCHIVE_CATEGORIES.some((item) => item.value === category) ? category : 'ALL'
+  })
+  const updateListFilter = (category, query) => {
+    setActiveCategory(category)
+    setSearchQuery(query)
+    const params = new URLSearchParams()
+    if (category !== 'ALL') params.set('category', category)
+    if (query) params.set('q', query)
+    try {
+      setSearchParams(params, { replace: true })
+    } catch {
+      // Safari throws once replaceState is called 100+ times in a few seconds (a held key).
+      // The filter above is already applied; only the URL misses this keystroke.
+    }
+  }
 
   useScrollReveal([files.length, loading])
 
@@ -108,13 +130,15 @@ export default function Archive({ onBack }: { onBack: () => void }) {
     // 라우터 상태(urlId)는 아직 이전 값이므로, pushState 직후 즉시 바뀌는 location 으로 판단한다.
     const target = '/resources/' + file.id
     if (window.location.pathname === target) return
-    navigate(target)
+    // Remembered so "목록" on the file returns to the filtered list it was opened from.
+    navigate(target, { state: { listSearch: location.search } })
   }
 
   // 상세 파일은 URL에서 파생된다 — 뒤로가기로 /resources 에 돌아오면 자동으로 목록.
   const routeFileId = urlId === undefined ? null : Number(urlId)
   const detailFile = routeFileId === null ? null : files.find((f) => f.id === routeFileId) ?? null
   const view = detailFile ? editingId === detailFile.id ? 'edit' : 'detail' : mode
+  useDocumentTitle(detailFile ? detailFile.title || detailFile.originalName : null)
 
   // 없는 id 로 들어온 경우(삭제됨·오타)는 목록으로 돌려보낸다.
   useEffect(() => {
@@ -160,7 +184,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
   const backToList = () => {
     setEditingId(null)
     setMode('list')
-    if (detailFile) navigate('/resources')
+    if (detailFile) navigate('/resources' + (typeof location.state?.listSearch === 'string' ? location.state.listSearch : ''))
   }
 
   return (
@@ -230,10 +254,10 @@ export default function Archive({ onBack }: { onBack: () => void }) {
         {view === 'list' && (
           <ArchiveListView
             activeCategory={activeCategory}
-            onCategoryChange={setActiveCategory}
+            onCategoryChange={(category) => updateListFilter(category, searchQuery)}
             categoryCounts={categoryCounts}
             searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
+            onSearchChange={(query) => updateListFilter(activeCategory, query)}
             filteredFiles={filteredFiles}
             notice={notice}
             error={error}

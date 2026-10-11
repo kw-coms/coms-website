@@ -8,7 +8,14 @@ import {
   deleteRecurringScheduleException,
   upsertRecurringScheduleException,
 } from '../../services/clubActivityApi'
-import { buildCalendarDayEvents, buildMonthEventSummary, visibleDayEvents } from '../../utils/monthlyCalendar'
+import {
+  CALENDAR_MAX_YEAR,
+  CALENDAR_MIN_YEAR,
+  buildCalendarDayEvents,
+  buildMonthEventSummary,
+  parseCalendarYear,
+  visibleDayEvents,
+} from '../../utils/monthlyCalendar'
 import { buildIcsCalendar } from '../../utils/icsExport'
 import { showToast } from '../../components/common/Toast'
 import { calendarWeekdays, calendarMonthOptions } from '../../data/homeContent'
@@ -32,6 +39,8 @@ function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
   const initialCalendarDate = new Date()
   const error = loadError
   const [selectedYear, setSelectedYear] = useState(initialCalendarDate.getFullYear())
+  // What is typed in the year box while it is not a usable year yet; null shows selectedYear.
+  const [yearDraft, setYearDraft] = useState<string | null>(null)
   const [selectedMonth, setSelectedMonth] = useState(initialCalendarDate.getMonth())
   const [selectedDay, setSelectedDay] = useState(null)
   const [selectedEventId, setSelectedEventId] = useState(null)
@@ -52,6 +61,9 @@ function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
   const hasAnyEvent = Object.values(eventsByDay).some((list) => Array.isArray(list) && list.length > 0)
   const isLocked = !authLoading && !user
   const isAdmin = canManageContent(permissions)
+  // On its own page (/monthly-calendar) this is the only page-level heading, so it is the
+  // <h1>; embedded in the home page (compact), which has its own <h1>, it stays an <h2>.
+  const Heading = compact ? 'h2' : 'h1'
   const selectedDayEvents = selectedDay ? eventsByDay[selectedDay] || [] : []
   const activeSelectedEventId = selectedDayEvents.some((event) => event.id === selectedEventId) ? selectedEventId : null
   const monthSummary = buildMonthEventSummary({
@@ -62,11 +74,15 @@ function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
   })
 
   const updateSelectedYear = (value) => {
-    const nextYear = Number(value)
-    if (!Number.isFinite(nextYear)) return
+    const nextYear = parseCalendarYear(value)
+    // Unfinished text ("", "20", "1999") stays in the box as typed and the calendar waits for
+    // a usable year. Clamping every keystroke into 2000–2100 rewrote the box mid-typing
+    // ("2" became 2000, the next digit 2100), so a year could not be typed at all.
+    setYearDraft(nextYear === null ? value : null)
+    if (nextYear === null) return
     setSelectedDay(null)
     setSelectedEventId(null)
-    setSelectedYear(Math.min(2100, Math.max(2000, nextYear)))
+    setSelectedYear(nextYear)
   }
 
   const selectCalendarDay = (day) => {
@@ -239,7 +255,7 @@ function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="apple-eyebrow">Monthly calendar</p>
-            <h2 className="apple-display mt-3 text-4xl sm:text-5xl">동아리 일정 캘린더</h2>
+            <Heading className="apple-display mt-3 text-4xl sm:text-5xl">동아리 일정 캘린더</Heading>
             <p className="apple-copy mt-4 max-w-2xl text-lg">
               공지사항 목록만으로 놓치기 쉬운 정기 회의, 세미나, 스터디, 발표, 모집 마감, MT/행사를 월별 흐름으로 확인합니다.
             </p>
@@ -254,11 +270,12 @@ function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
             <span>년도</span>
             <input
               type="number"
-              min="2000"
-              max="2100"
+              min={CALENDAR_MIN_YEAR}
+              max={CALENDAR_MAX_YEAR}
               step="1"
-              value={selectedYear}
+              value={yearDraft ?? selectedYear}
               onChange={(event) => updateSelectedYear(event.target.value)}
+              onBlur={() => setYearDraft(null)}
               aria-label="년도 선택"
             />
           </label>

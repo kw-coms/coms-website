@@ -97,7 +97,11 @@ export default function CommunityDeletedRecordsView({
                   <span className={restored ? 'rounded bg-emerald-100 px-2 py-1 text-emerald-700' : 'rounded bg-red-50 px-2 py-1 text-red-700'}>
                     {restored ? '복원됨' : '삭제됨'}
                   </span>
-                  {appealed && <span className="rounded bg-[#fff4cc] px-2 py-1 text-[#8a6400]">복원 요청 접수됨</span>}
+                  {appealed && (
+                    <span className="rounded bg-[#fff4cc] px-2 py-1 text-[#8a6400]">
+                      {record.latestAppealStatus === 'OPEN' ? '복원 요청 접수됨' : '복원 요청 처리됨'}
+                    </span>
+                  )}
                 </div>
                 <h2 className="break-words text-lg font-black text-[var(--app-text)]">{record.title}</h2>
                 <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[var(--theme-body-muted)]">

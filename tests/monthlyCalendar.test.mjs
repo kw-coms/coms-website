@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
+  CALENDAR_MAX_YEAR,
+  CALENDAR_MIN_YEAR,
   buildMonthEventSummary,
   buildCalendarDayEvents,
+  parseCalendarYear,
   visibleDayEvents,
 } from '../src/utils/monthlyCalendar.ts'
 
@@ -140,5 +144,49 @@ const crowded = visibleDayEvents([
 
 assert.equal(crowded.overflowCount, 2)
 assert.deepEqual(crowded.visible.map((item) => item.id), [1, 2, 3])
+
+// Year box: the calendar follows only a whole year inside the offered range. Everything a
+// member passes through while typing ("", "2", "20", "202") must come back as null, so the
+// box can keep the text instead of being clamped into range on every keystroke.
+assert.equal(parseCalendarYear('2026'), 2026)
+assert.equal(parseCalendarYear(2026), 2026, 'a number (the current year) is accepted as well')
+assert.equal(parseCalendarYear(' 2027 '), 2027)
+assert.equal(parseCalendarYear(String(CALENDAR_MIN_YEAR)), CALENDAR_MIN_YEAR)
+assert.equal(parseCalendarYear(String(CALENDAR_MAX_YEAR)), CALENDAR_MAX_YEAR)
+for (const unfinished of ['', '2', '20', '202']) {
+  assert.equal(parseCalendarYear(unfinished), null, `"${unfinished}" is still being typed`)
+}
+for (const rejected of [
+  String(CALENDAR_MIN_YEAR - 1),
+  String(CALENDAR_MAX_YEAR + 1),
+  '20260',
+  '2026.5',
+  '-2026',
+  '2e3',
+  'abcd',
+  null,
+  undefined,
+]) {
+  assert.equal(parseCalendarYear(rejected), null, `${JSON.stringify(rejected)} must not reach the calendar`)
+}
+// The schedule API (RecurringScheduleService) answers 400 outside 1900–2200.
+assert.ok(CALENDAR_MIN_YEAR >= 1900 && CALENDAR_MAX_YEAR <= 2200, 'offered years must stay inside what the API accepts')
+
+const calendarSection = readFileSync(new URL('../src/features/clubCalendar/ClubCalendarSection.tsx', import.meta.url), 'utf8')
+assert.match(
+  calendarSection,
+  /value=\{yearDraft \?\? selectedYear\}/,
+  'year box should show unfinished typing instead of the last committed year',
+)
+assert.match(
+  calendarSection,
+  /const nextYear = parseCalendarYear\(value\)[\s\S]*?if \(nextYear === null\) return[\s\S]*?setSelectedYear\(nextYear\)/,
+  'only a parsed, in-range year may move the calendar (and its API request)',
+)
+assert.match(
+  calendarSection,
+  /const Heading = compact \? 'h2' : 'h1'[\s\S]*?<Heading [^>]*>동아리 일정 캘린더<\/Heading>/,
+  '/monthly-calendar needs an <h1>; the compact block on the home page stays an <h2>',
+)
 
 console.log('monthly calendar contract passed')

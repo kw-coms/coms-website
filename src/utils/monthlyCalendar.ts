@@ -18,6 +18,21 @@ export function formatTimeLabel(startTime, endTime) {
   return endTime ? `${startTime}~${endTime}` : startTime
 }
 
+// Years the calendar's year box offers. The schedule API answers 400 outside 1900–2200, so
+// this range has to stay inside that one.
+export const CALENDAR_MIN_YEAR = 2000
+export const CALENDAR_MAX_YEAR = 2100
+
+// Year-box text -> the year to show, or null while it is not a usable year yet ("", "20",
+// "1999", "2026.5"). The box keeps such text as typed and the calendar (with its API
+// request) waits for a whole year in range.
+export function parseCalendarYear(value) {
+  const text = String(value ?? '').trim()
+  if (!/^\d+$/.test(text)) return null
+  const year = Number(text)
+  return year >= CALENDAR_MIN_YEAR && year <= CALENDAR_MAX_YEAR ? year : null
+}
+
 function monthBounds(calendarMonth) {
   const monthStart = new Date(calendarMonth.year, calendarMonth.month, 1)
   const monthEnd = new Date(calendarMonth.year, calendarMonth.month, calendarMonth.days.length)

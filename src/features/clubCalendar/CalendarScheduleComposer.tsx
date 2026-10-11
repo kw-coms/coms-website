@@ -208,8 +208,11 @@ export function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editing
     setCsvImporting(true)
     setCsvNotice('')
     setCsvError('')
+    // Counted outside the try: when a request fails part-way, the rows before it are already
+    // saved, and the message has to say which ones — importing the same file again would
+    // otherwise duplicate them.
+    let importedCount = 0
     try {
-      let importedCount = 0
       for (const row of parsed.rows) {
         if (row.type === 'date') {
           const created = await createClubActivity({
@@ -242,7 +245,17 @@ export function CalendarScheduleComposer({ onDateCreated, onDateUpdated, editing
       refreshCalendar()
       setCsvNotice(`CSV에서 일정 ${importedCount}개를 가져왔습니다.`)
     } catch (err) {
-      setCsvError(err.message || 'CSV 일정을 가져오지 못했습니다.')
+      const reason = err.message || 'CSV 일정을 가져오지 못했습니다.'
+      if (importedCount === 0) {
+        setCsvError(reason)
+      } else {
+        refreshCalendar()
+        const failedTitle = parsed.rows[importedCount]?.title
+        setCsvError(
+          `앞의 ${importedCount}개는 저장됐고, ${importedCount + 1}번째 일정${failedTitle ? `('${failedTitle}')` : ''}에서 멈췄습니다: ${reason} `
+          + '다시 가져오기 전에 이미 저장된 행을 CSV에서 지워주세요.',
+        )
+      }
     } finally {
       setCsvImporting(false)
     }
