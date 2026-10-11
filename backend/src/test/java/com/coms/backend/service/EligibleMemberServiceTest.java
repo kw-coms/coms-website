@@ -1,6 +1,8 @@
 package com.coms.backend.service;
 
+import com.coms.backend.domain.BannedStudent;
 import com.coms.backend.domain.Member;
+import com.coms.backend.repository.BannedStudentRepository;
 import com.coms.backend.repository.EligibleMemberRepository;
 import com.coms.backend.dto.SignupRequest;
 import com.coms.backend.service.EligibleMemberService.PreparedSignup;
@@ -22,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.ByteArrayOutputStream;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -41,6 +45,9 @@ class EligibleMemberServiceTest {
 
     @Autowired
     private EligibleMemberRepository eligibleMemberRepository;
+
+    @Autowired
+    private BannedStudentRepository bannedStudentRepository;
 
     @BeforeEach
     void setUp() {
@@ -293,6 +300,75 @@ class EligibleMemberServiceTest {
         // 재이관(같은 사람) 과 신규 학번은 통과해야 한다.
         eligibleMemberService.ensureStudentIdNotTakenByOtherName("2026990101", " 가상지원자 ");
         eligibleMemberService.ensureStudentIdNotTakenByOtherName("2026990102", "홍길동");
+    }
+
+    @Test
+    void importsCsvSavedByExcelWithUtf8Bom() {
+        // Excel's "CSV UTF-8" always starts with a BOM; it used to stay glued to the first header,
+        // so a file whose first column is 이름 was rejected as having no name column.
+        byte[] bytes = "﻿이름,학번,전화번호\n홍길동,2024123456,010-1234-5678\n".getBytes(StandardCharsets.UTF_8);
+
+        var response = eligibleMemberService.importRoster(csvFile(bytes));
+
+        assertThat(response.imported()).isEqualTo(1);
+        assertThat(eligibleMemberService.listRoster())
+                .singleElement()
+                .satisfies(member -> {
+                    assertThat(member.name()).isEqualTo("홍길동");
+                    assertThat(member.studentId()).isEqualTo("2024123456");
+                });
+    }
+
+    @Test
+    void importsCsvSavedByExcelInKoreanWindowsEncoding() {
+        // "CSV (쉼표로 분리)" on Korean Windows is CP949, not UTF-8.
+        byte[] bytes = "이름,학번\n김철수,2024123457\n".getBytes(Charset.forName("MS949"));
+
+        var response = eligibleMemberService.importRoster(csvFile(bytes));
+
+        assertThat(response.imported()).isEqualTo(1);
+        assertThat(eligibleMemberService.listRoster())
+                .singleElement()
+                .satisfies(member -> assertThat(member.name()).isEqualTo("김철수"));
+    }
+
+    @Test
+    void rejectsUploadThatIsNotSpreadsheetAsBadRequest() {
+        MockMultipartFile notSpreadsheet = new MockMultipartFile(
+                "file",
+                "members.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "this is not a workbook".getBytes(StandardCharsets.UTF_8)
+        );
+
+        assertThatThrownBy(() -> eligibleMemberService.importRoster(notSpreadsheet))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode().value()).isEqualTo(HttpStatus.BAD_REQUEST.value()));
+    }
+
+    @Test
+    void signupLookupDoesNotRevealBanToCallerWhoCannotMatchRoster() {
+        bannedStudentRepository.save(new BannedStudent("2024777777", null));
+
+        // Not on the roster, wrong everything: the answer must be the same generic roster error an
+        // unbanned unknown 학번 gets, not a statement about the ban.
+        assertThatThrownBy(() -> eligibleMemberService.prepareSignup(signupRequest("2024777777", "홍길동", null)))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
+                    assertThat(ex.getStatusCode().value()).isEqualTo(HttpStatus.FORBIDDEN.value());
+                    assertThat(ex.getReason()).doesNotContain("제한").doesNotContain("차단");
+                });
+        assertThatThrownBy(() -> eligibleMemberService.prepareSignup(signupRequest("2024888888", "홍길동", null)))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode().value()).isEqualTo(HttpStatus.FORBIDDEN.value()));
+    }
+
+    private SignupRequest signupRequest(String studentId, String name, String phone) {
+        return new SignupRequest(studentId, name, null, null, "roster-test@example.com", "Password1!",
+                null, null, phone, null, null, null);
+    }
+
+    private MockMultipartFile csvFile(byte[] bytes) {
+        return new MockMultipartFile("file", "members.csv", "text/csv", bytes);
     }
 
     private MockMultipartFile workbookFile(String[] header, String[] values) throws Exception {

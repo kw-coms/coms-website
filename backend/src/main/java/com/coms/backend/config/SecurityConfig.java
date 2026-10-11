@@ -1,5 +1,6 @@
 package com.coms.backend.config;
 
+import com.coms.backend.security.BoundedBCryptPasswordEncoder;
 import com.coms.backend.security.IntegrationHmacFilter;
 import com.coms.backend.security.JwtAuthenticationFilter;
 import com.coms.backend.security.JwtTokenProvider;
@@ -15,7 +16,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -45,7 +45,8 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        // BCrypt with the 72-byte input limit reported as a 400 instead of an unhandled exception.
+        return new BoundedBCryptPasswordEncoder();
     }
 
     /**

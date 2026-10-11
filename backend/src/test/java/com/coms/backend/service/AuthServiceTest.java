@@ -33,6 +33,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -216,7 +217,7 @@ class AuthServiceTest {
     void requestPasswordResetStoresHashedCodeAndSendsEmail() {
         Member member = saveMember("2026123472", true);
 
-        authService.requestPasswordReset(null, member.getEmail());
+        authService.requestPasswordReset(null, member.getEmail(), "198.51.100.7");
 
         Member saved = memberRepository.findByStudentId("2026123472").orElseThrow();
         assertThat(saved.getPasswordResetCodeHash()).isNotBlank();
@@ -226,7 +227,7 @@ class AuthServiceTest {
 
     @Test
     void requestPasswordResetDoesNotRevealUnknownAccount() {
-        authService.requestPasswordReset("2026123473", "missing@example.com");
+        authService.requestPasswordReset("2026123473", "missing@example.com", "198.51.100.7");
 
         verify(emailVerificationSender, never()).sendPasswordResetCode(anyString(), anyString());
     }
@@ -238,7 +239,7 @@ class AuthServiceTest {
         member.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(10));
         memberRepository.save(member);
 
-        authService.confirmPasswordReset(null, member.getEmail(), "123456", "NewPassword1!");
+        authService.confirmPasswordReset(null, member.getEmail(), "123456", "NewPassword1!", "198.51.100.7");
 
         Member saved = memberRepository.findByStudentId("2026123474").orElseThrow();
         assertThat(passwordEncoder.matches("NewPassword1!", saved.getPassword())).isTrue();
@@ -597,6 +598,75 @@ class AuthServiceTest {
 
         assertThat(pendingSignupRepository.findByStudentId("2026123471").orElseThrow().getInitialRole())
                 .isEqualTo(Member.Role.USER);
+    }
+
+    @Test
+    void passwordResetStopsIssuingCodesOncePerAccountHourlyCapIsReached() {
+        Member member = saveMember("2026123490", true);
+
+        for (int request = 0; request < 5; request++) {
+            authService.requestPasswordReset(null, member.getEmail(), "198.51.100.30");
+            endPasswordResetCooldown("2026123490");
+        }
+        verify(emailVerificationSender, times(5)).sendPasswordResetCode(eq(member.getEmail()), anyString());
+
+        // The sixth request in the hour is dropped silently: same answer, no mail, no new code.
+        String codeBefore = memberRepository.findByStudentId("2026123490").orElseThrow().getPasswordResetCodeHash();
+        authService.requestPasswordReset(null, member.getEmail(), "198.51.100.30");
+        verify(emailVerificationSender, times(5)).sendPasswordResetCode(eq(member.getEmail()), anyString());
+        assertThat(memberRepository.findByStudentId("2026123490").orElseThrow().getPasswordResetCodeHash())
+                .isEqualTo(codeBefore);
+    }
+
+    @Test
+    void passwordResetRequestsAreRateLimitedPerClientAddress() {
+        for (int request = 0; request < 20; request++) {
+            authService.requestPasswordReset(null, "nobody" + request + "@example.com", "198.51.100.31");
+        }
+
+        assertThatThrownBy(() -> authService.requestPasswordReset(null, "nobody@example.com", "198.51.100.31"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+        // A different address is not affected.
+        authService.requestPasswordReset(null, "nobody@example.com", "198.51.100.32");
+    }
+
+    @Test
+    void changePasswordLocksAfterRepeatedWrongCurrentPassword() {
+        saveMember("2026123491", true);
+
+        for (int attempt = 0; attempt < 10; attempt++) {
+            assertThatThrownBy(() -> authService.changePassword("2026123491", "WrongPassword1!", "NewPassword1!"))
+                    .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                            assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED));
+        }
+
+        // Locked: not even the right password is evaluated until the window passes.
+        assertThatThrownBy(() -> authService.changePassword("2026123491", "Password1!", "NewPassword1!"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+        assertThat(passwordEncoder.matches("Password1!",
+                memberRepository.findByStudentId("2026123491").orElseThrow().getPassword())).isTrue();
+    }
+
+    @Test
+    void passwordLongerThanBcryptLimitIsBadRequestNotServerError() {
+        saveMember("2026123492", true);
+        String seventyFourBytes = "Aa1!" + "x".repeat(70);
+
+        assertThatThrownBy(() -> authService.changePassword("2026123492", "Password1!", seventyFourBytes))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+
+        // Exactly at the limit still works.
+        authService.changePassword("2026123492", "Password1!", "Aa1!" + "x".repeat(68));
+    }
+
+    /** Moves the stored expiry out of the one-minute resend cooldown without waiting. */
+    private void endPasswordResetCooldown(String studentId) {
+        Member member = memberRepository.findByStudentId(studentId).orElseThrow();
+        member.setPasswordResetExpiresAt(LocalDateTime.now().plusMinutes(5));
+        memberRepository.save(member);
     }
 
     private Member saveMember(String studentId, boolean emailVerified) {

@@ -76,7 +76,13 @@ public final class ListPagination {
         if (resolvedPage < 0 || resolvedSize < 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page must be >= 0 and size must be >= 1.");
         }
-        return new Resolved(resolvedPage, Math.min(resolvedSize, MAX_SIZE));
+        int boundedSize = Math.min(resolvedSize, MAX_SIZE);
+        // PageRequest computes page * size as the row offset and throws once it passes
+        // Integer.MAX_VALUE, which reached the client as HTTP 500.
+        if ((long) resolvedPage * boundedSize > Integer.MAX_VALUE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page is out of range.");
+        }
+        return new Resolved(resolvedPage, boundedSize);
     }
 
     /**

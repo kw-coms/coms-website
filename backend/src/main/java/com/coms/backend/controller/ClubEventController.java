@@ -12,7 +12,6 @@ import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -28,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import com.coms.backend.web.ListPagination;
+import com.coms.backend.web.SafeMediaTypes;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -120,7 +120,7 @@ public class ClubEventController {
         ClubEventEntry meta = clubEventService.loadEntryMeta(id, entryId);
         Resource resource = clubEventService.loadEntryResource(id, entryId);
         return ResponseEntity.ok()
-                .contentType(mediaType(meta.getMimeType()))
+                .contentType(SafeMediaTypes.forDownload(meta.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                         .filename(meta.getOriginalName(), StandardCharsets.UTF_8).build().toString())
                 .body(resource);
@@ -133,7 +133,7 @@ public class ClubEventController {
         ClubEventEntryFile meta = clubEventService.loadEntryFileMeta(id, entryId, fileId);
         Resource resource = clubEventService.loadEntryFileResource(id, entryId, fileId);
         return ResponseEntity.ok()
-                .contentType(mediaType(meta.getMimeType()))
+                .contentType(SafeMediaTypes.forDownload(meta.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                         .filename(meta.getOriginalName(), StandardCharsets.UTF_8).build().toString())
                 .body(resource);
@@ -236,16 +236,5 @@ public class ClubEventController {
             detail.append('\n');
         }
         detail.append(key).append('=').append(value);
-    }
-
-    private MediaType mediaType(String mimeType) {
-        if (mimeType == null || mimeType.isBlank()) {
-            return MediaType.APPLICATION_OCTET_STREAM;
-        }
-        try {
-            return MediaType.parseMediaType(mimeType);
-        } catch (InvalidMediaTypeException e) {
-            return MediaType.APPLICATION_OCTET_STREAM;
-        }
     }
 }

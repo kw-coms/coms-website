@@ -91,10 +91,11 @@ public class NoticeService {
     }
 
     public NoticeResponse getAndIncrementView(Long id, String studentId) {
+        if (repo.incrementViewCount(id) == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         Notice notice = getEntity(id);
-        notice.incrementViewCount();
-        Notice saved = repo.save(notice);
-        return toResponse(saved, voteStats(List.of(saved)), studentId);
+        return toResponse(notice, voteStats(List.of(notice)), studentId);
     }
 
     public NoticeResponse vote(String studentId, Long id, int value) {

@@ -10,6 +10,7 @@ import com.coms.backend.dto.UpdateProfileRequest;
 import com.coms.backend.repository.LoginFailureRepository;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.security.JwtTokenProvider;
+import com.coms.backend.security.SlidingWindowRateLimiter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -24,8 +25,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.OptionalInt;
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -42,6 +46,17 @@ public class AuthService implements UserDetailsService {
     private static final int MAX_FAILURES_PER_ID = 5;
     private static final int MAX_FAILURES_PER_IP = 5;
     private static final int LOCKOUT_WINDOW_MINUTES = 15;
+    // Password-reset abuse limits. The per-IP numbers follow the signup-mail limit (a campus NAT
+    // puts many members behind one address); the per-account cap is what actually bounds mail
+    // bombing and code guessing: five codes an hour at five guesses each.
+    private static final int MAX_PASSWORD_RESET_REQUESTS_PER_IP = 20;
+    private static final Duration PASSWORD_RESET_REQUEST_IP_WINDOW = Duration.ofMinutes(10);
+    private static final int MAX_PASSWORD_RESET_CODES_PER_ACCOUNT = 5;
+    private static final Duration PASSWORD_RESET_ACCOUNT_WINDOW = Duration.ofHours(1);
+    private static final int MAX_PASSWORD_RESET_CONFIRMS_PER_IP = 30;
+    private static final Duration PASSWORD_RESET_CONFIRM_IP_WINDOW = Duration.ofMinutes(10);
+    private static final int MAX_CURRENT_PASSWORD_FAILURES = 10;
+    private static final Duration CURRENT_PASSWORD_FAILURE_WINDOW = Duration.ofMinutes(15);
 
     private final MemberRepository memberRepository;
     private final LoginFailureRepository loginFailureRepository;
@@ -53,6 +68,12 @@ public class AuthService implements UserDetailsService {
     private final AuditLogService auditLogService;
     private final RefreshSessionService refreshSessionService;
     private final PendingSignupService pendingSignupService;
+    private final SlidingWindowRateLimiter passwordResetRequestsByIp;
+    private final SlidingWindowRateLimiter passwordResetCodesByAccount;
+    private final SlidingWindowRateLimiter passwordResetConfirmsByIp;
+    private final SlidingWindowRateLimiter currentPasswordFailuresByAccount;
+    /** A real BCrypt hash nobody knows the password to; see {@link #login}. */
+    private final String timingEqualizerHash;
 
     public AuthService(MemberRepository memberRepository,
                        LoginFailureRepository loginFailureRepository,
@@ -76,6 +97,15 @@ public class AuthService implements UserDetailsService {
         this.auditLogService = auditLogService;
         this.refreshSessionService = refreshSessionService;
         this.pendingSignupService = pendingSignupService;
+        this.passwordResetRequestsByIp = new SlidingWindowRateLimiter(
+                MAX_PASSWORD_RESET_REQUESTS_PER_IP, PASSWORD_RESET_REQUEST_IP_WINDOW, clock);
+        this.passwordResetCodesByAccount = new SlidingWindowRateLimiter(
+                MAX_PASSWORD_RESET_CODES_PER_ACCOUNT, PASSWORD_RESET_ACCOUNT_WINDOW, clock);
+        this.passwordResetConfirmsByIp = new SlidingWindowRateLimiter(
+                MAX_PASSWORD_RESET_CONFIRMS_PER_IP, PASSWORD_RESET_CONFIRM_IP_WINDOW, clock);
+        this.currentPasswordFailuresByAccount = new SlidingWindowRateLimiter(
+                MAX_CURRENT_PASSWORD_FAILURES, CURRENT_PASSWORD_FAILURE_WINDOW, clock);
+        this.timingEqualizerHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
     public AuthResponse signup(SignupRequest request, String clientIp) {
@@ -90,6 +120,10 @@ public class AuthService implements UserDetailsService {
 
         Member member = findMemberByIdentifier(normalizedIdentifier)
                 .orElseGet(() -> {
+                    // Spend the same BCrypt work as a real check. Without it an unknown identifier
+                    // answered roughly a hundred milliseconds sooner than a known one, which told
+                    // anyone timing the endpoint which 학번 and e-mail addresses have accounts.
+                    passwordEncoder.matches(request.password(), timingEqualizerHash);
                     recordLoginFailure(normalizedIdentifier, clientIp);
                     auditLogService.record(null, "LOGIN_FAILURE", "AUTH", null, "identifier=" + maskIdentifier(normalizedIdentifier), clientIp);
                     throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
@@ -203,16 +237,31 @@ public class AuthService implements UserDetailsService {
         bannedStudentService.ensureNotBanned(studentId);
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        // The login lockout does not cover this endpoint, so a hijacked session could otherwise
+        // guess the current password at BCrypt speed with no ceiling.
+        if (currentPasswordFailuresByAccount.isExhausted(member.getStudentId())) {
+            log.warn("Rate limit rejected: limiter=current-password key={}", maskAccountKey(member.getStudentId()));
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "현재 비밀번호를 여러 번 잘못 입력했습니다. "
+                            + CURRENT_PASSWORD_FAILURE_WINDOW.toMinutes() + "분 후 다시 시도해주세요.");
+        }
         if (!passwordEncoder.matches(currentPassword, member.getPassword())) {
+            currentPasswordFailuresByAccount.record(member.getStudentId());
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "현재 비밀번호가 올바르지 않습니다.");
         }
+        currentPasswordFailuresByAccount.reset(member.getStudentId());
         member.setPassword(passwordEncoder.encode(newPassword));
         member.incrementTokenVersion();
         memberRepository.save(member);
         refreshSessionService.revokeAllForStudent(member.getStudentId());
     }
 
-    public void requestPasswordReset(String studentId, String email) {
+    public void requestPasswordReset(String studentId, String email, String clientIp) {
+        // Checked before anything account-specific so the 429 says nothing about the account.
+        if (!passwordResetRequestsByIp.tryAcquire(clientIp)) {
+            log.warn("Rate limit rejected: limiter=password-reset-request-ip key={}", maskIp(clientIp));
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 시도해주세요.");
+        }
         String normalizedEmail = normalizeNullable(email);
         if (normalizedEmail == null) {
             return;
@@ -222,6 +271,14 @@ public class AuthService implements UserDetailsService {
                 .filter(member -> !bannedStudentService.isBanned(member.getStudentId()))
                 .ifPresent(member -> {
                     if (isPasswordResetResendOnCooldown(member)) {
+                        return;
+                    }
+                    // Silent, like the cooldown above: the caller always gets the same answer. The
+                    // one-minute cooldown alone still let anyone mail a member 1,440 times a day
+                    // and take five guesses at a fresh code every minute, indefinitely.
+                    if (!passwordResetCodesByAccount.tryAcquire(member.getStudentId())) {
+                        log.warn("Rate limit rejected: limiter=password-reset-account key={}",
+                                maskAccountKey(member.getStudentId()));
                         return;
                     }
                     String code = newSixDigitCode();
@@ -235,7 +292,11 @@ public class AuthService implements UserDetailsService {
 
     // Invalid-code attempts and expiry cleanup must survive the 400 response.
     @Transactional(noRollbackFor = ResponseStatusException.class)
-    public void confirmPasswordReset(String studentId, String email, String code, String newPassword) {
+    public void confirmPasswordReset(String studentId, String email, String code, String newPassword, String clientIp) {
+        if (!passwordResetConfirmsByIp.tryAcquire(clientIp)) {
+            log.warn("Rate limit rejected: limiter=password-reset-confirm-ip key={}", maskIp(clientIp));
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "잠시 후 다시 시도해주세요.");
+        }
         String normalizedEmail = normalizeNullable(email);
         if (normalizedEmail == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "인증 정보가 올바르지 않습니다.");
@@ -396,12 +457,16 @@ public class AuthService implements UserDetailsService {
         refreshSessionService.revokeAllForStudent(studentId);
     }
 
-    /** Current token version for the member, or 0 if not found. */
+    /**
+     * Current token version of the member, or empty when no such member exists. Callers must
+     * treat empty as "reject": a deleted account defaulting to version 0 matched every token the
+     * account had been issued before its first password change.
+     */
     @Transactional(readOnly = true)
-    public int getCurrentTokenVersion(String studentId) {
+    public OptionalInt findTokenVersion(String studentId) {
         return memberRepository.findByStudentId(studentId)
-                .map(Member::getTokenVersion)
-                .orElse(0);
+                .map(member -> OptionalInt.of(member.getTokenVersion()))
+                .orElseGet(OptionalInt::empty);
     }
 
     private void enforceEmailVerificationResendCooldown(Member member) {

@@ -6,6 +6,7 @@ import com.coms.backend.dto.ArchiveFileResponse;
 import com.coms.backend.dto.EngagementVoteRequest;
 import com.coms.backend.service.ArchiveService;
 import com.coms.backend.service.StorageService;
+import com.coms.backend.web.SafeMediaTypes;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
@@ -103,7 +104,7 @@ public class ArchiveController {
 
         return ResponseEntity.ok()
                 .cacheControl(REVALIDATE_BLOB)
-                .contentType(mediaType(file.getMimeType()))
+                .contentType(SafeMediaTypes.forDownload(file.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(resource);
     }

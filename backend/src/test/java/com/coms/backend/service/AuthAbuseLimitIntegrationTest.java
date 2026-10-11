@@ -97,7 +97,7 @@ class AuthAbuseLimitIntegrationTest {
         memberRepository.save(member);
 
         for (int attempt = 1; attempt <= 5; attempt++) {
-            assertThatThrownBy(() -> authService.confirmPasswordReset(STUDENT_ID, member.getEmail(), "000000", "NewPassword1!"))
+            assertThatThrownBy(() -> authService.confirmPasswordReset(STUDENT_ID, member.getEmail(), "000000", "NewPassword1!", "198.51.100.7"))
                     .isInstanceOf(ResponseStatusException.class);
             assertThat(memberRepository.findByStudentId(STUDENT_ID).orElseThrow().getPasswordResetAttempts()).isEqualTo(attempt);
         }

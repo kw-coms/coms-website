@@ -40,7 +40,8 @@ public class ClubActivityService {
 
     private static final long MAX_IMAGE_BYTES = 20L * 1024 * 1024;
     private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
-    private static final int MAX_TITLE_LENGTH = 150;
+    // club_activities.title is VARCHAR(120); a longer limit here only moved the failure to the INSERT.
+    private static final int MAX_TITLE_LENGTH = 120;
     private static final int MAX_DESCRIPTION_LENGTH = 2_000;
     private static final int MAX_IMAGES_PER_ACTIVITY = 12;
     private static final int MAX_FILES_PER_ACTIVITY = 10;
@@ -93,10 +94,10 @@ public class ClubActivityService {
     }
 
     public ClubActivityResponse getAndIncrementView(Long id, String studentId) {
-        ClubActivity activity = get(id);
-        activity.incrementViewCount();
-        ClubActivity saved = repository.save(activity);
-        return toResponse(saved, studentId);
+        if (repository.incrementViewCount(id) == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return toResponse(get(id), studentId);
     }
 
     public ClubActivityResponse vote(String studentId, Long id, int value) {
@@ -333,6 +334,17 @@ public class ClubActivityService {
         if (!image.getClubActivityId().equals(id)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
+        // The first image is also recorded on the activity row itself (the legacy single-image
+        // columns). Left pointing at a file that no longer exists, responses kept advertising
+        // /api/club-activities/{id}/image, which then answered 404.
+        repository.findById(id)
+                .filter(activity -> image.getStoredName().equals(activity.getImageStoredName()))
+                .ifPresent(activity -> {
+                    activity.setImageStoredName(null);
+                    activity.setImageOriginalName(null);
+                    activity.setImageMimeType(null);
+                    activity.setImageSize(null);
+                });
         storageService.delete(image.getStoredName());
         imageRepository.delete(image);
     }

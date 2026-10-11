@@ -35,6 +35,10 @@ import java.util.stream.Collectors;
 @Transactional
 public class RecurringScheduleService {
 
+    // The calendar UI offers 2000–2100; anything far outside is a malformed request.
+    private static final int MIN_CALENDAR_YEAR = 1900;
+    private static final int MAX_CALENDAR_YEAR = 2200;
+
     private final RecurringScheduleRepository repository;
     private final RecurringScheduleExceptionRepository exceptionRepository;
     private final MemberRepository memberRepository;
@@ -133,6 +137,10 @@ public class RecurringScheduleService {
     public List<ScheduleOccurrenceResponse> occurrencesForMonth(int year, int month) {
         if (month < 1 || month > 12) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "월은 1~12 사이여야 합니다.");
+        }
+        // YearMonth.of throws DateTimeException outside ±999,999,999, which surfaced as HTTP 500.
+        if (year < MIN_CALENDAR_YEAR || year > MAX_CALENDAR_YEAR) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "연도를 확인해주세요.");
         }
         YearMonth yearMonth = YearMonth.of(year, month);
         LocalDate monthStart = yearMonth.atDay(1);

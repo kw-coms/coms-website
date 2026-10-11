@@ -419,6 +419,14 @@ public class CommunityController {
                 .body(resource);
     }
 
+    @DeleteMapping("/{id}/files/{fileId}")
+    public ResponseEntity<Void> deletePostFile(Authentication authentication,
+                                           @PathVariable Long id,
+                                           @PathVariable Long fileId) {
+        communityService.deleteFile(authentication.getName(), id, fileId);
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/{id}/videos/{videoId}")
     public ResponseEntity<Void> deleteVideo(Authentication authentication,
                                             @PathVariable Long id,

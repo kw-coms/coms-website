@@ -48,6 +48,20 @@ class AuthServiceLoginThrottleTest {
     );
 
     @Test
+    void unknownIdentifierStillSpendsPasswordHashWork() {
+        // Otherwise an unknown identifier answers measurably faster than a known one with a wrong
+        // password, and the login endpoint doubles as an account-existence oracle.
+        when(memberRepository.findByStudentId("2026999999")).thenReturn(java.util.Optional.empty());
+        when(memberRepository.findByEmailIgnoreCase("2026999999")).thenReturn(java.util.Optional.empty());
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("2026999999", "Password1!", false), "203.0.113.10"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED));
+
+        verify(passwordEncoder).matches(eq("Password1!"), any());
+    }
+
+    @Test
     void targetedLockoutUsesNormalizedEmailIdentifierBeforePasswordCheck() {
         when(loginFailureRepository.countByStudentIdAndAttemptedAtAfter(eq("member@example.com"), any(LocalDateTime.class)))
                 .thenReturn(5L);

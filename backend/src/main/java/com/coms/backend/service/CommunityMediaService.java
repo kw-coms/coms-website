@@ -218,6 +218,17 @@ class CommunityMediaService {
         }
     }
 
+    public void deleteFile(String studentId, Long postId, Long fileId) {
+        Member member = access.requireMember(studentId);
+        CommunityPost post = requirePost(postId);
+        access.requireOwnerOrAdmin(post, member);
+        CommunityPostFile file = fileRepository.findById(fileId)
+                .filter(candidate -> candidate.getPostId().equals(postId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        deleteStoredFile(file.getStoredName(), Set.of());
+        fileRepository.delete(file);
+    }
+
     public CommunityPostFile loadFileMeta(Long postId, Long fileId) {
         return fileRepository.findById(fileId)
                 .filter(file -> file.getPostId().equals(postId))
@@ -322,9 +333,30 @@ class CommunityMediaService {
         return firstShareImage(post).isPresent() || post.getImageStoredName() != null;
     }
 
+    /**
+     * The image that represents the post on the public share endpoints. For block content that is
+     * the first image the body actually shows. Falling back to "any uploaded image" is kept only
+     * for legacy bodies that never referenced their attachments: with block content it served a
+     * photo the author had already removed from the post to anyone holding the share link.
+     */
     Optional<CommunityPostImage> firstShareImage(CommunityPost post) {
         List<CommunityPostImage> images = imageRepository.findByPostIdOrderByPositionAsc(post.getId());
-        return firstContentImage(post.getContent(), images).or(images.stream()::findFirst);
+        Optional<CommunityPostImage> shown = firstContentImage(post.getContent(), images);
+        if (shown.isPresent() || isBlockContent(post.getContent())) {
+            return shown;
+        }
+        return images.stream().findFirst();
+    }
+
+    private static boolean isBlockContent(String content) {
+        if (content == null || content.isBlank()) {
+            return false;
+        }
+        try {
+            return JSON.readTree(content).isArray();
+        } catch (Exception notJson) {
+            return false;
+        }
     }
 
     private Optional<CommunityPostImage> firstContentImage(String content, List<CommunityPostImage> images) {

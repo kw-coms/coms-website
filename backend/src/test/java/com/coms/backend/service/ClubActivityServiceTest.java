@@ -36,6 +36,9 @@ class ClubActivityServiceTest {
     private ClubActivityRepository clubActivityRepository;
 
     @Autowired
+    private RecurringScheduleService recurringScheduleService;
+
+    @Autowired
     private MemberRepository memberRepository;
 
     @BeforeEach
@@ -298,6 +301,73 @@ class ClubActivityServiceTest {
                 LocalDate.of(2026, 6, 18), null, "2026123456");
         assertThatThrownBy(() -> clubActivityCategoryService.delete(inUse.id()))
                 .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void deletingTheCoverImageLeavesNoPointerToTheRemovedFile() throws Exception {
+        MockMultipartFile cover = new MockMultipartFile("image", "cover.jpg", "image/jpeg", "jpg-bytes".getBytes());
+        var activity = clubActivityService.create("ACTIVITY", "SEMINAR", "표지 삭제", null,
+                LocalDate.of(2026, 6, 18), cover, "2026123456");
+        assertThat(activity.imageInfos()).hasSize(1);
+
+        clubActivityService.deleteImage(activity.id(), activity.imageInfos().get(0).id());
+
+        // The cover is recorded twice (image table + the activity row itself). With only the
+        // table row removed, the response kept advertising an image URL that answered 404.
+        var after = clubActivityService.getAndIncrementView(activity.id(), "2026123456");
+        assertThat(after.imageInfos()).isEmpty();
+        assertThat(after.imageUrl()).isNull();
+        assertThat(clubActivityRepository.findById(activity.id()).orElseThrow().getImageStoredName()).isNull();
+    }
+
+    @Test
+    void deletingAnotherImageKeepsTheCover() throws Exception {
+        MockMultipartFile cover = new MockMultipartFile("image", "cover.jpg", "image/jpeg", "jpg-bytes".getBytes());
+        var activity = clubActivityService.create("ACTIVITY", "SEMINAR", "표지 유지", null,
+                LocalDate.of(2026, 6, 18), cover, "2026123456");
+        var extraIds = clubActivityService.addImages(activity.id(), java.util.List.of(
+                new MockMultipartFile("images", "b.png", "image/png", "b".getBytes())));
+
+        clubActivityService.deleteImage(activity.id(), extraIds.get(0));
+
+        assertThat(clubActivityRepository.findById(activity.id()).orElseThrow().getImageStoredName()).isNotNull();
+        assertThat(clubActivityService.getAndIncrementView(activity.id(), "2026123456").imageInfos()).hasSize(1);
+    }
+
+    @Test
+    void viewingAMissingActivityIsNotFound() {
+        assertThatThrownBy(() -> clubActivityService.getAndIncrementView(987_654_321L, "2026123456"))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode().value()).isEqualTo(404));
+    }
+
+    @Test
+    void titleLongerThanTheColumnIsRejectedAsBadInput() throws Exception {
+        // club_activities.title is VARCHAR(120).
+        assertThat(clubActivityService.create("ACTIVITY", "SEMINAR", "가".repeat(120), null,
+                LocalDate.of(2026, 6, 18), null, "2026123456").title()).hasSize(120);
+
+        assertThatThrownBy(() -> clubActivityService.create("ACTIVITY", "SEMINAR", "가".repeat(121), null,
+                LocalDate.of(2026, 6, 18), null, "2026123456"))
+                .isInstanceOfSatisfying(ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode().value()).isEqualTo(400));
+    }
+
+    @Test
+    void categoryUsedOnlyByARecurringScheduleCannotBeDeleted() {
+        var category = clubActivityCategoryService.create(
+                new com.coms.backend.dto.ClubActivityCategoryRequest(null, "정기 모임", null));
+        recurringScheduleService.create(new com.coms.backend.dto.RecurringScheduleRequest(
+                "주간 스터디", null, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 12, 15),
+                java.util.List.of("MONDAY"), "18:00", "20:00", "동아리방", category.key()), "2026123456");
+
+        // No activity record uses it, but the schedule does: deleting it would leave a schedule
+        // whose every later save fails the category check.
+        assertThatThrownBy(() -> clubActivityCategoryService.delete(category.id()))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
+                    assertThat(ex.getStatusCode().value()).isEqualTo(409);
+                    assertThat(ex.getReason()).contains("정기 일정");
+                });
     }
 
     private void saveMember(String studentId, String name) {

@@ -68,6 +68,7 @@ public class CommunityDeletionArchiveService {
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
     private final PermissionService permissionService;
+    private final AnonymousIdentityService anonymousIdentity;
 
     public CommunityDeletionArchiveService(DeletedCommunityPostRepository repository,
                                            DeletedCommunityPostImageRepository deletedImageRepository,
@@ -83,7 +84,8 @@ public class CommunityDeletionArchiveService {
                                            StorageService storageService,
                                            AuditLogService auditLogService,
                                            NotificationService notificationService,
-                                           PermissionService permissionService) {
+                                           PermissionService permissionService,
+                                           AnonymousIdentityService anonymousIdentity) {
         this.repository = repository;
         this.deletedImageRepository = deletedImageRepository;
         this.deletedMediaRepository = deletedMediaRepository;
@@ -99,6 +101,7 @@ public class CommunityDeletionArchiveService {
         this.auditLogService = auditLogService;
         this.notificationService = notificationService;
         this.permissionService = permissionService;
+        this.anonymousIdentity = anonymousIdentity;
     }
 
     public DeletedCommunityPost record(CommunityPost post, Member deletedBy, String reason) {
@@ -131,7 +134,7 @@ public class CommunityDeletionArchiveService {
     @Transactional(readOnly = true)
     public List<DeletedCommunityPostResponse> recent(int limit) {
         return toResponses(repository.findAllByOrderByDeletedAtDesc(PageRequest.of(0, boundedLimit(limit))),
-                "/api/admin/community/deleted-posts");
+                "/api/admin/community/deleted-posts", false);
     }
 
     @Transactional(readOnly = true)
@@ -139,13 +142,13 @@ public class CommunityDeletionArchiveService {
         DeletedCommunityPost snapshot = repository.findById(deletedPostId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         return toResponse(snapshot, "/api/admin/community/deleted-posts",
-                latestAppeals(List.of(snapshot.getId())).get(snapshot.getId()));
+                latestAppeals(List.of(snapshot.getId())).get(snapshot.getId()), false);
     }
 
     @Transactional(readOnly = true)
     public List<DeletedCommunityPostResponse> mine(String studentId) {
         return toResponses(repository.findByAuthorStudentIdOrderByDeletedAtDesc(studentId),
-                "/api/community/posts/deleted");
+                "/api/community/posts/deleted", true);
     }
 
     @Transactional
@@ -343,6 +346,18 @@ public class CommunityDeletionArchiveService {
         snapshot.setRestoredByName(admin.getName());
         snapshot.setRestoredAt(LocalDateTime.now());
         repository.save(snapshot);
+        // Restoring the post is the answer to whoever asked for it. Nothing ever closed an appeal,
+        // so each one stayed "open" for good — shown as a pending request on a post that was
+        // already back on the board.
+        List<DeletedCommunityPostAppeal> openAppeals = deletedAppealRepository.findByDeletedPostIdAndStatus(
+                snapshot.getId(), DeletedCommunityPostAppeal.Status.OPEN);
+        for (DeletedCommunityPostAppeal appeal : openAppeals) {
+            appeal.setStatus(DeletedCommunityPostAppeal.Status.RESOLVED);
+            appeal.setResolvedAt(snapshot.getRestoredAt());
+            appeal.setResolvedByStudentId(admin.getStudentId());
+            appeal.setResolutionNote("게시글 복원");
+        }
+        deletedAppealRepository.saveAll(openAppeals);
         auditLogService.record(admin.getStudentId(), "COMMUNITY_POST_RESTORE", "COMMUNITY_POST", String.valueOf(savedPost.getId()),
                 String.join("\n",
                         "deletedSnapshotId=" + snapshot.getId(),
@@ -435,7 +450,15 @@ public class CommunityDeletionArchiveService {
         }
     }
 
-    private List<DeletedCommunityPostResponse> toResponses(List<DeletedCommunityPost> snapshots, String mediaBasePath) {
+    /**
+     * @param authorView the post author's own "내 삭제 기록" rather than the moderators' archive.
+     *                   The author sees what the live post showed them and nothing more: comment
+     *                   authors' 학번 are never included, and on an anonymous post the comments
+     *                   keep their anonymous display names. Returning the stored real identities
+     *                   here let anyone unmask every commenter by deleting their own anonymous post.
+     */
+    private List<DeletedCommunityPostResponse> toResponses(List<DeletedCommunityPost> snapshots, String mediaBasePath,
+                                                           boolean authorView) {
         List<Long> snapshotIds = snapshots.stream().map(DeletedCommunityPost::getId).toList();
         Map<Long, DeletedCommunityPostAppeal> latestAppeals = latestAppeals(snapshotIds);
         Map<Long, List<DeletedCommunityPostImage>> imagesBySnapshot = deletedImageRepository
@@ -451,14 +474,16 @@ public class CommunityDeletionArchiveService {
                 .map(snapshot -> toResponse(snapshot, mediaBasePath, latestAppeals.get(snapshot.getId()),
                         imagesBySnapshot.getOrDefault(snapshot.getId(), List.of()),
                         mediaBySnapshot.getOrDefault(snapshot.getId(), List.of()),
-                        commentsBySnapshot.getOrDefault(snapshot.getId(), List.of())))
+                        commentsBySnapshot.getOrDefault(snapshot.getId(), List.of()),
+                        authorView))
                 .toList();
     }
 
     private DeletedCommunityPostResponse toResponse(DeletedCommunityPost snapshot,
                                                     String mediaBasePath,
-                                                    DeletedCommunityPostAppeal latestAppeal) {
-        return toResponse(snapshot, mediaBasePath, latestAppeal, null, null, null);
+                                                    DeletedCommunityPostAppeal latestAppeal,
+                                                    boolean authorView) {
+        return toResponse(snapshot, mediaBasePath, latestAppeal, null, null, null, authorView);
     }
 
     /**
@@ -472,7 +497,10 @@ public class CommunityDeletionArchiveService {
                                                     DeletedCommunityPostAppeal latestAppeal,
                                                     List<DeletedCommunityPostImage> images,
                                                     List<DeletedCommunityPostMedia> media,
-                                                    List<DeletedCommunityPostComment> comments) {
+                                                    List<DeletedCommunityPostComment> comments,
+                                                    boolean authorView) {
+        boolean maskCommentAuthors = authorView
+                && CommunityPost.Category.ANONYMOUS.name().equals(snapshot.getCategory());
         List<DeletedCommunityPostImage> resolvedImages = images != null
                 ? images
                 : deletedImageRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId());
@@ -516,8 +544,10 @@ public class CommunityDeletionArchiveService {
                 .map(comment -> new DeletedCommunityPostResponse.CommentInfo(
                         comment.getOriginalCommentId(),
                         comment.getOriginalParentCommentId(),
-                        comment.getStudentId(),
-                        comment.getAuthorName(),
+                        authorView ? null : comment.getStudentId(),
+                        maskCommentAuthors
+                                ? anonymousIdentity.anonymousDisplayName(comment.getAnonymousName(), comment.getIpAddress())
+                                : comment.getAuthorName(),
                         comment.getAnonymousName(),
                         comment.getDepth(),
                         comment.getContent(),

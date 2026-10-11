@@ -97,19 +97,27 @@ public class RecruitApplicationService {
             return;
         }
 
+        // Application is already saved and admins are notified in-app; a mail that cannot be
+        // delivered must not fail the submission. The two mails are independent: with no staff
+        // recipient configured (RECRUIT_MAIL_TO blank) the staff send used to throw, and the
+        // applicant's confirmation — queued right behind it in the same try — was never sent.
+        if (to != null && !to.isBlank()) {
+            try {
+                SimpleMailMessage message = new SimpleMailMessage();
+                message.setFrom(from);
+                message.setTo(to.trim());
+                message.setReplyTo(oneLine(request.email()));
+                message.setSubject("[COM's 지원] " + oneLine(request.name()));
+                message.setText(buildBody(request));
+                mailSender.send(message);
+            } catch (RuntimeException e) {
+                log.warn("Recruit application saved but staff notification email failed", e);
+            }
+        }
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(from);
-            message.setTo(to);
-            message.setReplyTo(oneLine(request.email()));
-            message.setSubject("[COM's 지원] " + oneLine(request.name()));
-            message.setText(buildBody(request));
-            mailSender.send(message);
             mailSender.send(buildApplicantConfirmationMessage(request));
         } catch (RuntimeException e) {
-            // Application is already saved and admins are notified in-app; don't fail the
-            // submission just because the notification email could not be delivered.
-            log.warn("Recruit application saved but notification email failed for studentId={}", request.studentId(), e);
+            log.warn("Recruit application saved but applicant confirmation email failed", e);
         }
     }
 
@@ -118,12 +126,26 @@ public class RecruitApplicationService {
         enforceRateLimit(statusLookupAttemptsByClient, clientIp, MAX_STATUS_LOOKUPS_PER_WINDOW, STATUS_LOOKUP_WINDOW,
                 "지원 현황 조회 요청이 많습니다. 잠시 후 다시 시도해주세요.");
 
+        String studentId = trim(request.studentId());
+        String name = trim(request.name());
         // Generic 404 on no match: never reveal whether the studentId or the name was the
         // mismatch, so the endpoint cannot be used as an enumeration oracle.
         return recruitApplicationRepository
-                .findFirstByStudentIdAndNameOrderBySubmittedAtDescIdDesc(trim(request.studentId()), trim(request.name()))
+                .findFirstByStudentIdAndNameOrderBySubmittedAtDescIdDesc(studentId, name)
                 .map(application -> RecruitApplicationStatusResponse.from(application, statusLabel(application.getStatus())))
+                // 합격/불합격 처리는 지원서를 지우고 처리 이력만 남긴다. 그 이력을 보지 않으면 결과가
+                // 나온 지원자는 "지원 내역을 찾을 수 없습니다"만 보게 된다 — 정작 가장 궁금한 순간에.
+                .or(() -> promotionLogRepository
+                        .findFirstByStudentIdAndNameOrderByPromotedAtDescIdDesc(studentId, name)
+                        .map(RecruitApplicationService::decidedStatus))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "일치하는 지원 내역을 찾을 수 없습니다."));
+    }
+
+    private static RecruitApplicationStatusResponse decidedStatus(RecruitPromotionLog decision) {
+        RecruitApplication.Status status = decision.getDecision() == RecruitPromotionLog.Decision.REJECTED
+                ? RecruitApplication.Status.REJECTED
+                : RecruitApplication.Status.ACCEPTED;
+        return RecruitApplicationStatusResponse.decided(status, statusLabel(status));
     }
 
     private static String statusLabel(RecruitApplication.Status status) {
@@ -322,17 +344,19 @@ public class RecruitApplicationService {
         message.setTo(oneLine(request.email()));
         message.setSubject("[COM's] 지원서가 접수되었습니다");
         message.setText(String.join("\n",
-                "안녕하세요, " + trim(request.name()) + "님.",
+                // 이 메일은 제출자가 적어 넣은 주소로 간다. 요약에 싣는 값은 한 줄로 눌러, 줄바꿈을
+                // 넣어 본문을 다른 안내문처럼 꾸미는 데 쓰이지 않게 한다.
+                "안녕하세요, " + oneLine(request.name()) + "님.",
                 "",
                 "COM's 지원서가 정상적으로 접수되었습니다.",
                 "내부 확인 후 입력하신 연락처 또는 이메일로 개별 연락드리겠습니다.",
                 "",
                 "[접수 내용 요약]",
-                "이름: " + trim(request.name()),
-                "학번: " + trim(request.studentId()),
-                "학과: " + trim(request.department()),
-                "학년: " + optional(request.grade(), "선택 안 함"),
-                "관심 분야: " + interestsText(request.interests()),
+                "이름: " + oneLine(request.name()),
+                "학번: " + oneLine(request.studentId()),
+                "학과: " + oneLine(request.department()),
+                "학년: " + oneLine(optional(request.grade(), "선택 안 함")),
+                "관심 분야: " + oneLine(interestsText(request.interests())),
                 "",
                 "지원해주셔서 감사합니다.",
                 "COM's"

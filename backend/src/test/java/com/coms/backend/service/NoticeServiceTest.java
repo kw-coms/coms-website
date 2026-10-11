@@ -90,6 +90,31 @@ class NoticeServiceTest {
     }
 
     @Test
+    void viewingANoticeDoesNotCountAsEditingIt() {
+        var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, true, null));
+        var stored = noticeRepository.findById(notice.id()).orElseThrow();
+        var updatedAtBeforeViews = stored.getUpdatedAt();
+
+        noticeService.getAndIncrementView(notice.id(), "2026123000");
+        var viewed = noticeService.getAndIncrementView(notice.id(), "2026123000");
+
+        // The counter moves, nothing else does: reading is not an edit, so the row's other
+        // columns (and the "수정됨" timestamp) must be exactly what the author last saved.
+        var afterViews = noticeRepository.findById(notice.id()).orElseThrow();
+        assertThat(afterViews.getViewCount()).isEqualTo(2);
+        assertThat(afterViews.getUpdatedAt()).isEqualTo(updatedAtBeforeViews);
+        assertThat(viewed.title()).isEqualTo("공지");
+        assertThat(viewed.pinned()).isTrue();
+    }
+
+    @Test
+    void viewingAMissingNoticeIsNotFound() {
+        assertThatThrownBy(() -> noticeService.getAndIncrementView(987_654_321L, "2026123000"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode().value()).isEqualTo(404));
+    }
+
+    @Test
     void upvoteTogglesAndTracksMyVote() {
         var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
 

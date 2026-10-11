@@ -378,9 +378,19 @@ class CommunityServiceAuditLogTest {
         communityService.delete(admin.getStudentId(), created.id(), "복원 테스트");
         Long snapshotId = deletedCommunityPostRepository.findAll().get(0).getId();
 
+        communityDeletionArchiveService.requestRestore(snapshotId, author.getStudentId(),
+                new DeletedCommunityPostAppealRequest("복원을 요청합니다."));
+
         var restored = communityDeletionArchiveService.restore(snapshotId, admin.getStudentId());
 
         assertThat(restored.restoredPostId()).isNotNull();
+        // The restore answers the request: it must not stay listed as pending.
+        assertThat(deletedCommunityPostAppealRepository.findAll()).singleElement().satisfies(appeal -> {
+            assertThat(appeal.getStatus()).isEqualTo(com.coms.backend.domain.DeletedCommunityPostAppeal.Status.RESOLVED);
+            assertThat(appeal.getResolvedAt()).isNotNull();
+            assertThat(appeal.getResolvedByStudentId()).isEqualTo(admin.getStudentId());
+            assertThat(appeal.getResolutionNote()).isEqualTo("게시글 복원");
+        });
         var restoredPost = communityPostRepository.findById(restored.restoredPostId()).orElseThrow();
         assertThat(restoredPost.getTitle()).isEqualTo("복원 대상");
         assertThat(restoredPost.getAuthorStudentId()).isEqualTo(author.getStudentId());

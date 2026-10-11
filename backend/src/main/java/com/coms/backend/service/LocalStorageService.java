@@ -14,6 +14,7 @@ import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -31,6 +32,8 @@ public class LocalStorageService implements StorageService {
 
     /** Reject images whose decoded pixel count would exceed this, to bound heap use (decompression bomb). */
     private static final long MAX_PIXELS = 50L * 1024 * 1024; // 50 megapixels
+    /** The EXIF block sits in the first segments of a JPEG; a segment is at most 64 KB. */
+    private static final int JPEG_HEAD_BYTES = 256 * 1024;
 
     private final Path root;
 
@@ -122,6 +125,12 @@ public class LocalStorageService implements StorageService {
         if (image == null) {
             return null;
         }
+        if ("jpg".equals(format)) {
+            // The metadata dropped below includes the tag that says which way is up. Cameras
+            // store portrait shots as landscape pixels plus that tag, so without baking the
+            // rotation in first, every such photo came out lying on its side.
+            image = upright(image, jpegOrientation(head(file)));
+        }
         BufferedImage target = image;
         if ("jpg".equals(format) && image.getColorModel().hasAlpha()) {
             // JPEG has no alpha channel; flatten onto white to avoid a corrupt write.
@@ -138,6 +147,114 @@ public class LocalStorageService implements StorageService {
             return null;
         }
         return out.toByteArray();
+    }
+
+    private static byte[] head(MultipartFile file) throws IOException {
+        try (InputStream in = file.getInputStream()) {
+            return in.readNBytes(JPEG_HEAD_BYTES);
+        }
+    }
+
+    /**
+     * The EXIF orientation (1–8) recorded in a JPEG, or 1 ("as stored") when there is none or the
+     * data cannot be read. Package-private for unit testing.
+     */
+    static int jpegOrientation(byte[] jpeg) {
+        if (jpeg.length < 4 || (jpeg[0] & 0xFF) != 0xFF || (jpeg[1] & 0xFF) != 0xD8) {
+            return 1;
+        }
+        int pos = 2;
+        while (pos + 4 <= jpeg.length) {
+            if ((jpeg[pos] & 0xFF) != 0xFF) {
+                return 1;
+            }
+            int marker = jpeg[pos + 1] & 0xFF;
+            if (marker == 0xFF) {   // fill byte before a marker
+                pos++;
+                continue;
+            }
+            if (marker == 0xDA || marker == 0xD9) {   // image data starts: no EXIF past this point
+                return 1;
+            }
+            int length = ((jpeg[pos + 2] & 0xFF) << 8) | (jpeg[pos + 3] & 0xFF);
+            if (length < 2) {
+                return 1;
+            }
+            int payload = pos + 4;
+            if (marker == 0xE1 && payload + 6 <= jpeg.length
+                    && jpeg[payload] == 'E' && jpeg[payload + 1] == 'x' && jpeg[payload + 2] == 'i'
+                    && jpeg[payload + 3] == 'f' && jpeg[payload + 4] == 0 && jpeg[payload + 5] == 0) {
+                return tiffOrientation(jpeg, payload + 6, Math.min(jpeg.length, pos + 2 + length));
+            }
+            pos += 2 + length;
+        }
+        return 1;
+    }
+
+    private static int tiffOrientation(byte[] data, int tiff, int end) {
+        if (tiff + 8 > end) {
+            return 1;
+        }
+        boolean littleEndian = data[tiff] == 'I' && data[tiff + 1] == 'I';
+        if (!littleEndian && !(data[tiff] == 'M' && data[tiff + 1] == 'M')) {
+            return 1;
+        }
+        long directory = tiff + unsigned(data, tiff + 4, 4, littleEndian);
+        if (directory + 2 > end) {
+            return 1;
+        }
+        long entries = unsigned(data, (int) directory, 2, littleEndian);
+        for (long i = 0; i < entries; i++) {
+            long entry = directory + 2 + i * 12;
+            if (entry + 12 > end) {
+                return 1;
+            }
+            if (unsigned(data, (int) entry, 2, littleEndian) == 0x0112) {
+                long value = unsigned(data, (int) entry + 8, 2, littleEndian);
+                return value >= 1 && value <= 8 ? (int) value : 1;
+            }
+        }
+        return 1;
+    }
+
+    private static long unsigned(byte[] data, int offset, int bytes, boolean littleEndian) {
+        long value = 0;
+        for (int i = 0; i < bytes; i++) {
+            int index = littleEndian ? offset + bytes - 1 - i : offset + i;
+            value = (value << 8) | (data[index] & 0xFF);
+        }
+        return value;
+    }
+
+    /** Redraws the pixels the way the EXIF orientation says they are meant to be seen. */
+    static BufferedImage upright(BufferedImage image, int orientation) {
+        if (orientation <= 1 || orientation > 8) {
+            return image;
+        }
+        int width = image.getWidth();
+        int height = image.getHeight();
+        AffineTransform transform = new AffineTransform();
+        switch (orientation) {
+            case 2 -> { transform.scale(-1, 1); transform.translate(-width, 0); }
+            case 3 -> { transform.translate(width, height); transform.rotate(Math.PI); }
+            case 4 -> { transform.scale(1, -1); transform.translate(0, -height); }
+            case 5 -> { transform.rotate(-Math.PI / 2); transform.scale(-1, 1); }
+            case 6 -> { transform.translate(height, 0); transform.rotate(Math.PI / 2); }
+            case 7 -> { transform.scale(-1, 1); transform.translate(-height, 0); transform.translate(0, width); transform.rotate(3 * Math.PI / 2); }
+            default -> { transform.translate(0, width); transform.rotate(3 * Math.PI / 2); }   // 8
+        }
+        boolean quarterTurn = orientation >= 5;
+        BufferedImage turned = new BufferedImage(
+                quarterTurn ? height : width,
+                quarterTurn ? width : height,
+                image.getColorModel().hasAlpha() ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = turned.createGraphics();
+        try {
+            g.drawImage(image, transform, null);
+        } finally {
+            g.dispose();
+        }
+        return turned;
     }
 
     private String reencodeFormat(String contentType) {

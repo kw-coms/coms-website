@@ -372,6 +372,84 @@ class CommunityServiceTest {
     }
 
     @Test
+    void initialUploadFinalizationToleratesHowTheBrowserReadsTheFirstParagraph() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+
+        // A line break: the browser's text for "첫 줄<br>둘째 줄" has no newline in it.
+        var multiLine = communityService.create(user.getStudentId(), new CommunityPostRequest("줄바꿈", "첫 줄둘째 줄", "GENERAL", false), null);
+        var multiLineDone = communityService.update(
+                user.getStudentId(),
+                multiLine.id(),
+                new CommunityPostRequest("줄바꿈", "[{\"type\":\"text\",\"content\":\"첫 줄<br>둘째 줄\"},{\"type\":\"image\",\"mediaId\":1,\"name\":\"image.webp\",\"width\":75,\"align\":\"left\"}]", "GENERAL", false),
+                null
+        );
+        assertThat(multiLineDone.edited()).isFalse();
+
+        // No markup at all: the stand-in is the paragraph still entity-escaped.
+        var escaped = communityService.create(user.getStudentId(), new CommunityPostRequest("특수문자", "Q&amp;A 시간: a &lt; b", "GENERAL", false), null);
+        var escapedDone = communityService.update(
+                user.getStudentId(),
+                escaped.id(),
+                new CommunityPostRequest("특수문자", "[{\"type\":\"text\",\"content\":\"Q&amp;A 시간: a &lt; b\"},{\"type\":\"image\",\"mediaId\":1,\"name\":\"image.webp\",\"width\":75,\"align\":\"left\"}]", "GENERAL", false),
+                null
+        );
+        assertThat(escapedDone.edited()).isFalse();
+
+        // Tolerating whitespace is not tolerating a rewrite.
+        var rewritten = communityService.create(user.getStudentId(), new CommunityPostRequest("다른 글", "첫 줄둘째 줄", "GENERAL", false), null);
+        var rewrittenDone = communityService.update(
+                user.getStudentId(),
+                rewritten.id(),
+                new CommunityPostRequest("다른 글", "[{\"type\":\"text\",\"content\":\"첫 줄<br>셋째 줄\"}]", "GENERAL", false),
+                null
+        );
+        assertThat(rewrittenDone.edited()).isTrue();
+    }
+
+    @Test
+    void listRowsCarryAPlainTextPreviewNotTruncatedMarkup() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+        communityService.create(user.getStudentId(), new CommunityPostRequest(
+                "블록 글",
+                "[{\"type\":\"text\",\"content\":\"<strong>굵은</strong> 첫 문단 Q&amp;A<br>둘째 줄\"},"
+                        + "{\"type\":\"poll\",\"pollId\":\"poll-abc-123456\",\"question\":\"점심 메뉴?\",\"options\":[{\"label\":\"A\"},{\"label\":\"B\"}]},"
+                        + "{\"type\":\"text\",\"content\":\"" + "가".repeat(400) + "\"}]",
+                "GENERAL", false), null);
+        communityService.create(user.getStudentId(), new CommunityPostRequest("평문 글", "예전 방식의 평문 본문", "GENERAL", false), null);
+
+        var rows = communityService.list(user.getStudentId());
+
+        assertThat(rows).filteredOn(row -> row.title().equals("블록 글")).singleElement().satisfies(row -> {
+            // The words of the post, searchable as written…
+            assertThat(row.content()).startsWith("굵은 첫 문단 Q&A 둘째 줄 점심 메뉴? 가가");
+            // …with none of the stored format leaking in, and still only a preview.
+            assertThat(row.content()).doesNotContain("\"type\"", "{", "<strong>", "&amp;", "pollId");
+            assertThat(row.content()).hasSize(160);
+        });
+        assertThat(rows).filteredOn(row -> row.title().equals("평문 글")).singleElement()
+                .satisfies(row -> assertThat(row.content()).isEqualTo("예전 방식의 평문 본문"));
+    }
+
+    @Test
+    void postCreatedWholeInOneRequestIsNotMarkedEdited() {
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+
+        // The editor now sends the complete block body when there is nothing to upload.
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest(
+                "한 번에 등록",
+                "[{\"type\":\"text\",\"content\":\"Q&amp;A: a &lt; b<br>둘째 줄\"},{\"type\":\"poll\",\"pollId\":\"poll-abc-123456\",\"question\":\"점심?\",\"options\":[{\"label\":\"A\"},{\"label\":\"B\"}]}]",
+                "GENERAL", false), null);
+
+        assertThat(created.edited()).isFalse();
+        assertThat(created.content()).contains("Q&amp;A: a &lt; b<br>둘째 줄");
+        assertThat(created.pollResults()).singleElement()
+                .satisfies(poll -> assertThat(poll.pollId()).isEqualTo("poll-abc-123456"));
+    }
+
+    @Test
     void sanitizesForgedFormattedTextBlocksOnCreateAndUpdate() {
         Member user = member("2025123456", "회원", Member.Role.USER);
         memberRepository.save(user);
@@ -436,9 +514,45 @@ class CommunityServiceTest {
         assertThatThrownBy(() -> communityService.addComment(
                 created.id(),
                 user.getStudentId(),
-                new com.coms.backend.dto.CommunityCommentRequest("javascript:alert(1)", null)
+                new com.coms.backend.dto.CommunityCommentRequest("<img src=x onerror=alert(1)>", null)
         )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                 assertThat(ex.getReason()).contains("보안"));
+        assertThatThrownBy(() -> communityService.addComment(
+                created.id(),
+                user.getStudentId(),
+                new com.coms.backend.dto.CommunityCommentRequest("<a href=\"javascript:alert(1)\">클릭</a>", null)
+        )).isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                assertThat(ex.getReason()).contains("보안"));
+    }
+
+    @Test
+    void acceptsProgrammingTalkThatOnlyLooksLikeMarkup() {
+        // The board of a computer club: titles, bodies and comments are full of text that the
+        // old substring filter mistook for an attack and refused with "보안상 허용되지 않는 내용".
+        Member user = member("2025123456", "회원", Member.Role.USER);
+        memberRepository.save(user);
+
+        var created = communityService.create(user.getStudentId(), new CommunityPostRequest(
+                "JavaScript: 이벤트 핸들러 정리",
+                "[{\"type\":\"text\",\"content\":\"#include &lt;math.h&gt;<br>const onSubmit = () =&gt; {}<br>"
+                        + "&lt;script&gt;alert(1)&lt;/script&gt; 는 이렇게 이스케이프됩니다.<br>Regular Expression(정규식)\"}]",
+                "GENERAL", false), null);
+
+        assertThat(created.title()).isEqualTo("JavaScript: 이벤트 핸들러 정리");
+        assertThat(created.content())
+                .contains("#include &lt;math.h&gt;")
+                .contains("&lt;script&gt;alert(1)&lt;/script&gt;")
+                .doesNotContain("<script");
+
+        for (String comment : new String[]{
+                "javascript: 스킴은 왜 위험한가요?",
+                "const onClick = () => {} 이렇게 쓰면 됩니다",
+                "#include <math.h> 를 빼먹으셨어요",
+                "Map<Object,String> 대신 vector<int> 쓰세요",
+        }) {
+            assertThat(communityService.addComment(created.id(), user.getStudentId(),
+                    new com.coms.backend.dto.CommunityCommentRequest(comment, null)).content()).isEqualTo(comment);
+        }
     }
 
     @Test

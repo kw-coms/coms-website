@@ -61,6 +61,7 @@ import java.util.stream.Collectors;
 @Transactional
 public class CommunityService {
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final java.util.regex.Pattern WHITESPACE = java.util.regex.Pattern.compile("[\\s\\u00A0]+");
     private static final int MAX_TITLE_LENGTH = 120;
     private static final int MAX_CONTENT_LENGTH = 50000;
     private static final int MAX_DELETE_REASON_LENGTH = 300;
@@ -306,13 +307,22 @@ public class CommunityService {
         }
         SanitizedPost sanitized = validateRequest(request);
         access.requireCategoryAllowed(member, sanitized.category());
-        boolean titleChanged = !sanitized.title().equals(post.getTitle());
-        boolean isInitialFinalization = isInitialFinalization(post, sanitized.content());
         boolean wasAnonymous = access.isAnonymous(post);
+        if (wasAnonymous != (sanitized.category() == CommunityPost.Category.ANONYMOUS)) {
+            // Whether comment authors are masked follows the post's current category. Moving an
+            // anonymous post to another board therefore unmasked everyone who had commented on it
+            // believing they were anonymous (and the reverse hid named comments after the fact).
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "익명 게시판 글은 다른 분류로 옮길 수 없고, 다른 분류의 글을 익명으로 바꿀 수도 없습니다.");
+        }
+        String content = preservePollState(post, sanitized.content());
+        boolean titleChanged = !sanitized.title().equals(post.getTitle());
+        boolean isInitialFinalization = isInitialFinalization(post, content);
         post.setTitle(sanitized.title());
-        post.setContent(sanitized.content());
+        post.setContent(content);
         post.setCategory(sanitized.category());
-        preserveAnonymousPostFields(post, wasAnonymous, sanitized.category(), request.anonymousName(), clientIp);
+        // The anonymous identity (display name + IP tag) is frozen at creation and the category
+        // cannot cross the anonymous boundary, so an edit never touches those fields.
         if (Boolean.TRUE.equals(request.removeImage())) {
             mediaService.clearImage(post);
         }
@@ -625,6 +635,10 @@ public class CommunityService {
         return mediaService.addFile(studentId, postId, file);
     }
 
+    public void deleteFile(String studentId, Long postId, Long fileId) {
+        mediaService.deleteFile(studentId, postId, fileId);
+    }
+
     public void deleteVideo(String studentId, Long postId, Long videoId) {
         mediaService.deleteVideo(studentId, postId, videoId);
     }
@@ -684,9 +698,11 @@ public class CommunityService {
 
     private SanitizedPost validateRequest(CommunityPostRequest request) {
         String title = textService.normalizeBounded(request.title(), "제목", MAX_TITLE_LENGTH);
+        // sanitizeContent is the whole answer for the body: block content comes back rewritten
+        // through the allow-list and legacy plain content has already been through the plain-text
+        // gate. Running that gate again over the sanitized JSON only produced false alarms.
         String content = textService.sanitizeContent(textService.normalizeBounded(request.content(), "내용", MAX_CONTENT_LENGTH));
         textService.rejectUnsafeText(title);
-        textService.rejectUnsafeText(content);
         return new SanitizedPost(title, content, parseCategory(request.category()));
     }
 
@@ -700,26 +716,6 @@ public class CommunityService {
         if ((post.getIpAddress() == null || post.getIpAddress().isBlank()) && clientIp != null && !clientIp.isBlank()) {
             post.setIpAddress(clientIp.trim());
         }
-    }
-
-    /**
-     * Preserves the anonymous identity (display name + IP tag) of an existing post across edits.
-     * The identity is frozen at creation: editing — even by an admin or a non-author — must never
-     * reassign authorship. If the post stays anonymous, the original anonymousName/ipAddress are kept
-     * verbatim; only a genuine category transition re-derives the fields.
-     */
-    private void preserveAnonymousPostFields(CommunityPost post, boolean wasAnonymous, CommunityPost.Category category,
-                                             String anonymousName, String clientIp) {
-        if (category != CommunityPost.Category.ANONYMOUS) {
-            post.setAnonymousName(null);
-            post.setIpAddress(null);
-            return;
-        }
-        if (wasAnonymous) {
-            // Already anonymous: keep the stored identity untouched regardless of who is editing.
-            return;
-        }
-        applyAnonymousPostFields(post, category, anonymousName, clientIp);
     }
 
     private void enforcePostRateLimit(String studentId) {
@@ -744,13 +740,24 @@ public class CommunityService {
             if (!root.isArray()) return false;
             for (JsonNode block : root) {
                 if ("text".equals(block.path("type").asText())) {
-                    return currentContent.equals(textService.stripHtml(block.path("content").asText("")).trim());
+                    String firstText = textService.stripHtml(block.path("content").asText(""));
+                    // The stand-in is the first paragraph as the browser read it back. That differs
+                    // from stripHtml() in whitespace (a <br> is a newline here, nothing there) and,
+                    // for a paragraph without markup, in still being entity-escaped. Compared
+                    // exactly, a new post with a line break in its first paragraph, or with an
+                    // "&" in it, was published already marked as edited.
+                    return sameTextIgnoringWhitespace(currentContent, firstText)
+                            || sameTextIgnoringWhitespace(textService.stripHtml(currentContent), firstText);
                 }
             }
             return false;
         } catch (Exception ignored) {
             return false;
         }
+    }
+
+    private static boolean sameTextIgnoringWhitespace(String left, String right) {
+        return WHITESPACE.matcher(left).replaceAll("").equals(WHITESPACE.matcher(right).replaceAll(""));
     }
 
     private CommunityPost.Category parseCategory(String value) {
@@ -822,6 +829,73 @@ public class CommunityService {
             return polls;
         } catch (Exception ignored) {
             return List.of();
+        }
+    }
+
+    /**
+     * Poll state lives inside the post's content JSON, and an edit replaces that content wholesale
+     * with whatever the client sent. Carry forward what an edit must not be able to change:
+     * <ul>
+     *   <li>a closed poll stays closed, and a deadline the edit omits is kept — a client that did
+     *       not round-trip these fields reopened every poll for good on any typo fix;</li>
+     *   <li>once a poll has votes its question and options are frozen, because tallies are stored
+     *       by option position and relabelling them afterwards would rewrite what people voted for.</li>
+     * </ul>
+     */
+    private String preservePollState(CommunityPost post, String nextContent) {
+        Map<String, JsonNode> storedPolls = pollBlocksById(post.getContent());
+        if (storedPolls.isEmpty()) {
+            return nextContent;
+        }
+        try {
+            JsonNode root = JSON.readTree(nextContent);
+            if (!root.isArray()) {
+                return nextContent;
+            }
+            boolean changed = false;
+            ArrayNode next = JSON.createArrayNode();
+            for (JsonNode block : root) {
+                JsonNode stored = block.isObject() && "poll".equals(block.path("type").asText())
+                        ? storedPolls.get(block.path("pollId").asText(""))
+                        : null;
+                if (stored == null) {
+                    next.add(block);
+                    continue;
+                }
+                ObjectNode copy = ((ObjectNode) block).deepCopy();
+                if (stored.hasNonNull("closedAt")) {
+                    copy.set("closedAt", stored.get("closedAt"));
+                }
+                if (!copy.hasNonNull("closesAt") && stored.hasNonNull("closesAt")) {
+                    copy.set("closesAt", stored.get("closesAt"));
+                }
+                if (pollVoteRepository.existsByPostIdAndPollId(post.getId(), stored.path("pollId").asText(""))) {
+                    copy.set("question", stored.get("question"));
+                    copy.set("options", stored.get("options"));
+                }
+                changed = changed || !copy.equals(block);
+                next.add(copy);
+            }
+            return changed ? JSON.writeValueAsString(next) : nextContent;
+        } catch (Exception ignored) {
+            return nextContent;
+        }
+    }
+
+    private Map<String, JsonNode> pollBlocksById(String content) {
+        try {
+            JsonNode root = JSON.readTree(content);
+            if (!root.isArray()) return Map.of();
+            Map<String, JsonNode> polls = new java.util.HashMap<>();
+            for (JsonNode block : root) {
+                String pollId = block.path("pollId").asText("");
+                if ("poll".equals(block.path("type").asText()) && !pollId.isBlank()) {
+                    polls.put(pollId, block);
+                }
+            }
+            return polls;
+        } catch (Exception ignored) {
+            return Map.of();
         }
     }
 
@@ -1055,8 +1129,14 @@ public class CommunityService {
         );
     }
 
+    /**
+     * What a list row carries instead of the body: the first characters of the post as text.
+     * It used to be the first characters of the stored value, which for a block post is a
+     * truncated JSON document — nothing a client can parse, so the board's search ended up matching
+     * on its syntax ("type", "content", "mediaId" found every post) rather than on what was written.
+     */
     private String preview(String content) {
-        return textService.preview(content);
+        return textService.shareDescription(content);
     }
 
     private CommunityPost requirePost(Long id) {

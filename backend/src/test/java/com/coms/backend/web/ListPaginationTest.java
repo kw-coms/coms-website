@@ -62,4 +62,21 @@ class ListPaginationTest {
                 .extracting(e -> ((ResponseStatusException) e).getStatusCode())
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
+
+    @Test
+    void resolveRejectsPagesWhoseRowOffsetWouldOverflow() {
+        // PageRequest turns page * size into the row offset; past Integer.MAX_VALUE it throws,
+        // which used to surface as HTTP 500 for ?page=2147483647.
+        assertThatThrownBy(() -> ListPagination.resolve(Integer.MAX_VALUE, 20))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        // The size is clamped to 200 before the offset is computed.
+        assertThatThrownBy(() -> ListPagination.resolve(Integer.MAX_VALUE / 200 + 1, 10_000))
+                .isInstanceOf(ResponseStatusException.class);
+
+        assertThat(ListPagination.resolve(Integer.MAX_VALUE / 200, 10_000))
+                .isEqualTo(new ListPagination.Resolved(Integer.MAX_VALUE / 200, 200));
+        assertThat(ListPagination.resolve(null, null)).isEqualTo(new ListPagination.Resolved(0, 20));
+    }
 }
