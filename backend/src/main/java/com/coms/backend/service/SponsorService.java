@@ -688,6 +688,10 @@ public class SponsorService {
 
     private static String csvCell(String value) {
         String safe = value == null ? "" : value.replace("\"", "\"\"").replace("\n", " ").replace("\r", " ");
+        // A cell that starts like a formula is evaluated when the file is opened in a spreadsheet.
+        if (!safe.isEmpty() && "=+-@\t".indexOf(safe.charAt(0)) >= 0) {
+            safe = "'" + safe;
+        }
         return '"' + safe + '"';
     }
 

@@ -53,6 +53,9 @@ function ActivityLogSection({ compact = false }: { compact?: boolean }) {
   const selectedActivity = allActivityItems.find((item) => item.id === selectedActivityId) || null
   const isLocked = !authLoading && !user
   const isAdmin = canManageContent(permissions)
+  // On its own page (/activity-log) this is the only page-level heading, so it is the <h1>;
+  // embedded as a compact block inside another page it stays an <h2>.
+  const Heading = compact ? 'h2' : 'h1'
 
   // Register a view once per activity per mount when the card is opened.
   const registerActivityView = async (item) => {
@@ -85,7 +88,7 @@ function ActivityLogSection({ compact = false }: { compact?: boolean }) {
           <div className="grid gap-8 lg:grid-cols-[0.62fr_1fr] lg:items-end">
             <div>
               <p className="apple-eyebrow">Activity log</p>
-              <h2 className="apple-display mt-3 text-4xl sm:text-5xl">실제로 이어지는 활동 기록</h2>
+              <Heading className="apple-display mt-3 text-4xl sm:text-5xl">실제로 이어지는 활동 기록</Heading>
               <p className="apple-copy mt-4 max-w-2xl text-lg">
                 신입생이 가장 먼저 궁금해하는 것은 지금도 활동이 이어지는지입니다. 검증된 활동 사진과 기록이 등록되면 날짜, 활동명, 후기 흐름으로 보여줍니다.
               </p>

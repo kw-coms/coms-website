@@ -1,4 +1,4 @@
-import { apiUrl, request, requestNoContent, throwApiError } from './apiClient'
+import { apiUrl, request, requestNoContent } from './apiClient'
 
 export async function voteArchiveFile(id, value) {
   return request(`/api/files/${id}/vote`, {
@@ -22,14 +22,10 @@ export async function createPost({ title, description, category, file }: {
   if (description) formData.append('description', description)
   formData.append('category', category || 'GENERAL')
   formData.append('file', file)
-  const response = await fetch(apiUrl('/api/files'), {
+  return request('/api/files', {
     method: 'POST',
-    credentials: 'include',
     body: formData,
   })
-  if (!response.ok) await throwApiError(response, '업로드 중 오류가 발생했습니다.')
-  const data = await response.json().catch(() => null)
-  return data
 }
 
 // Batch-create one resource entry per selected file by reusing the single-create

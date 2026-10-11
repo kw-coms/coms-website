@@ -86,7 +86,11 @@ public class ArchiveService {
             Member member = memberRepository.findByStudentId(uploaderStudentId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
             ArchiveFile entity = new ArchiveFile();
-            entity.setTitle(title != null && !title.isBlank() ? title.trim() : cleanOriginalFilename(file));
+            // archive_files.title is VARCHAR(200): validate a typed title, fit a filename fallback.
+            String typedTitle = normalizeTitle(title);
+            String fallbackTitle = cleanOriginalFilename(file);
+            entity.setTitle(typedTitle != null ? typedTitle
+                    : fallbackTitle.length() > MAX_TITLE_LENGTH ? fallbackTitle.substring(0, MAX_TITLE_LENGTH) : fallbackTitle);
             entity.setDescription(sanitizeDescription(description));
             entity.setCategory(parsedCategory);
             entity.setOriginalName(cleanOriginalFilename(file));

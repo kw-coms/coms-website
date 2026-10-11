@@ -9,4 +9,5 @@ import java.util.List;
 public interface DeletedCommunityPostAppealRepository extends JpaRepository<DeletedCommunityPostAppeal, Long> {
     boolean existsByDeletedPostIdAndRequesterStudentIdAndStatus(Long deletedPostId, String requesterStudentId, DeletedCommunityPostAppeal.Status status);
     List<DeletedCommunityPostAppeal> findByDeletedPostIdInOrderByCreatedAtDesc(Collection<Long> deletedPostIds);
+    List<DeletedCommunityPostAppeal> findByDeletedPostIdAndStatus(Long deletedPostId, DeletedCommunityPostAppeal.Status status);
 }

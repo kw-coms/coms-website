@@ -7,12 +7,31 @@ RUN npm ci
 
 COPY . .
 
-# Sentry DSN must be baked at build time (Vite inlines import.meta.env.VITE_* into the
-# static bundle; runtime container env cannot inject it). Blank = Sentry stays disabled.
+# Every VITE_* value must be baked at build time (Vite inlines import.meta.env.VITE_* into the
+# static bundle; runtime container env cannot inject it), and each one is passed in as a build
+# argument. They used to reach the build because `COPY . .` brought the server's .env along —
+# together with the database password, JWT secret and SMTP password in that same file. .env is
+# now excluded by .dockerignore, so a variable that is not declared here is simply absent from
+# the bundle; tests/frontendBuildEnv.test.mjs fails when one is missing.
+#
+# Blank Sentry DSN = Sentry stays disabled. Blank API base = same-origin /api. Any blank
+# Firebase value = web push hides itself.
+ARG VITE_API_BASE_URL=
 ARG VITE_SENTRY_DSN=
 ARG VITE_SENTRY_ENV=production
+ARG VITE_FIREBASE_API_KEY=
+ARG VITE_FIREBASE_PROJECT_ID=
+ARG VITE_FIREBASE_APP_ID=
+ARG VITE_FIREBASE_MESSAGING_SENDER_ID=
+ARG VITE_FIREBASE_VAPID_KEY=
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_SENTRY_DSN=$VITE_SENTRY_DSN
 ENV VITE_SENTRY_ENV=$VITE_SENTRY_ENV
+ENV VITE_FIREBASE_API_KEY=$VITE_FIREBASE_API_KEY
+ENV VITE_FIREBASE_PROJECT_ID=$VITE_FIREBASE_PROJECT_ID
+ENV VITE_FIREBASE_APP_ID=$VITE_FIREBASE_APP_ID
+ENV VITE_FIREBASE_MESSAGING_SENDER_ID=$VITE_FIREBASE_MESSAGING_SENDER_ID
+ENV VITE_FIREBASE_VAPID_KEY=$VITE_FIREBASE_VAPID_KEY
 
 # Sentry source map upload (optional). Only uploads when SENTRY_AUTH_TOKEN is
 # non-empty; otherwise the @sentry/vite-plugin is skipped and the build is a

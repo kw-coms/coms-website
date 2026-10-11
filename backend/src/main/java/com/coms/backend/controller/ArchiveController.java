@@ -6,6 +6,7 @@ import com.coms.backend.dto.ArchiveFileResponse;
 import com.coms.backend.dto.EngagementVoteRequest;
 import com.coms.backend.service.ArchiveService;
 import com.coms.backend.service.StorageService;
+import com.coms.backend.web.SafeMediaTypes;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
@@ -103,7 +104,7 @@ public class ArchiveController {
 
         return ResponseEntity.ok()
                 .cacheControl(REVALIDATE_BLOB)
-                .contentType(mediaType(file.getMimeType()))
+                .contentType(SafeMediaTypes.forDownload(file.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(resource);
     }
@@ -112,12 +113,16 @@ public class ArchiveController {
     public ResponseEntity<Resource> inline(@PathVariable Long id) {
         ArchiveFile file = archiveService.get(id);
         Resource resource = storageService.load(file.getStoredName());
-        MediaType mediaType = mediaType(file.getMimeType());
+        MediaType declared = mediaType(file.getMimeType());
         // Only render images and PDFs inline. Anything else (HTML, SVG, scripts, ...) is forced to
         // download as an attachment so the browser never renders it, neutralizing stored XSS even if
         // a dangerous content-type slipped past upload validation. SVG (image/svg+xml) is excluded
         // from the inline allowlist because it can carry script.
-        boolean inlineSafe = isInlineSafe(mediaType);
+        boolean inlineSafe = isInlineSafe(declared);
+        // What is not rendered inline is not announced as its declared type either: an attachment
+        // header does not stop a page from loading the URL as a script or stylesheet, and a
+        // script type here would satisfy both nosniff and script-src 'self'.
+        MediaType mediaType = inlineSafe ? declared : SafeMediaTypes.forDownload(file.getMimeType());
         ContentDisposition disposition = (inlineSafe
                 ? ContentDisposition.inline()
                 : ContentDisposition.attachment())

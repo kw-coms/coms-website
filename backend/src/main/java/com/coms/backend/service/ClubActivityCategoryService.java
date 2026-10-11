@@ -5,6 +5,7 @@ import com.coms.backend.dto.ClubActivityCategoryRequest;
 import com.coms.backend.dto.ClubActivityCategoryResponse;
 import com.coms.backend.repository.ClubActivityCategoryRepository;
 import com.coms.backend.repository.ClubActivityRepository;
+import com.coms.backend.repository.RecurringScheduleRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,11 +23,14 @@ public class ClubActivityCategoryService {
 
     private final ClubActivityCategoryRepository categoryRepository;
     private final ClubActivityRepository activityRepository;
+    private final RecurringScheduleRepository recurringScheduleRepository;
 
     public ClubActivityCategoryService(ClubActivityCategoryRepository categoryRepository,
-                                       ClubActivityRepository activityRepository) {
+                                       ClubActivityRepository activityRepository,
+                                       RecurringScheduleRepository recurringScheduleRepository) {
         this.categoryRepository = categoryRepository;
         this.activityRepository = activityRepository;
+        this.recurringScheduleRepository = recurringScheduleRepository;
     }
 
     @Transactional(readOnly = true)
@@ -82,6 +86,13 @@ public class ClubActivityCategoryService {
         if (inUse > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "이 분류를 사용하는 활동 기록이 " + inUse + "건 있어 삭제할 수 없습니다. 먼저 다른 분류로 변경하세요.");
+        }
+        // Recurring schedules use the same keys. Deleting a category only they referenced left
+        // those schedules impossible to edit: every save failed the category check.
+        long schedulesInUse = recurringScheduleRepository.countByCategory(category.getKey());
+        if (schedulesInUse > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "이 분류를 사용하는 정기 일정이 " + schedulesInUse + "건 있어 삭제할 수 없습니다. 먼저 다른 분류로 변경하세요.");
         }
         categoryRepository.delete(category);
     }

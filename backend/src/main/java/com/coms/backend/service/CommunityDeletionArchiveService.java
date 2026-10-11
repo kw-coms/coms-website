@@ -2,9 +2,12 @@ package com.coms.backend.service;
 
 import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.domain.CommunityComment;
+import com.coms.backend.domain.CommunityPollVote;
+import com.coms.backend.domain.CommunityPostBookmark;
 import com.coms.backend.domain.CommunityPostFile;
 import com.coms.backend.domain.CommunityPostImage;
 import com.coms.backend.domain.CommunityPostVideo;
+import com.coms.backend.domain.CommunityPostVote;
 import com.coms.backend.domain.DeletedCommunityPostAppeal;
 import com.coms.backend.domain.DeletedCommunityPost;
 import com.coms.backend.domain.DeletedCommunityPostComment;
@@ -17,10 +20,13 @@ import com.coms.backend.dto.DeletedCommunityPostAppealResponse;
 import com.coms.backend.dto.DeletedCommunityPostResponse;
 import com.coms.backend.dto.DeletedCommunityPostRestoreResponse;
 import com.coms.backend.repository.CommunityCommentRepository;
+import com.coms.backend.repository.CommunityPollVoteRepository;
+import com.coms.backend.repository.CommunityPostBookmarkRepository;
 import com.coms.backend.repository.CommunityPostFileRepository;
 import com.coms.backend.repository.CommunityPostImageRepository;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVideoRepository;
+import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.DeletedCommunityPostCommentRepository;
 import com.coms.backend.repository.DeletedCommunityPostAppealRepository;
 import com.coms.backend.repository.DeletedCommunityPostImageRepository;
@@ -41,6 +47,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -63,11 +70,15 @@ public class CommunityDeletionArchiveService {
     private final CommunityPostVideoRepository videoRepository;
     private final CommunityPostFileRepository fileRepository;
     private final CommunityCommentRepository commentRepository;
+    private final CommunityPostVoteRepository voteRepository;
+    private final CommunityPostBookmarkRepository bookmarkRepository;
+    private final CommunityPollVoteRepository pollVoteRepository;
     private final MemberRepository memberRepository;
     private final StorageService storageService;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
     private final PermissionService permissionService;
+    private final AnonymousIdentityService anonymousIdentity;
 
     public CommunityDeletionArchiveService(DeletedCommunityPostRepository repository,
                                            DeletedCommunityPostImageRepository deletedImageRepository,
@@ -79,11 +90,15 @@ public class CommunityDeletionArchiveService {
                                            CommunityPostVideoRepository videoRepository,
                                            CommunityPostFileRepository fileRepository,
                                            CommunityCommentRepository commentRepository,
+                                           CommunityPostVoteRepository voteRepository,
+                                           CommunityPostBookmarkRepository bookmarkRepository,
+                                           CommunityPollVoteRepository pollVoteRepository,
                                            MemberRepository memberRepository,
                                            StorageService storageService,
                                            AuditLogService auditLogService,
                                            NotificationService notificationService,
-                                           PermissionService permissionService) {
+                                           PermissionService permissionService,
+                                           AnonymousIdentityService anonymousIdentity) {
         this.repository = repository;
         this.deletedImageRepository = deletedImageRepository;
         this.deletedMediaRepository = deletedMediaRepository;
@@ -94,11 +109,15 @@ public class CommunityDeletionArchiveService {
         this.videoRepository = videoRepository;
         this.fileRepository = fileRepository;
         this.commentRepository = commentRepository;
+        this.voteRepository = voteRepository;
+        this.bookmarkRepository = bookmarkRepository;
+        this.pollVoteRepository = pollVoteRepository;
         this.memberRepository = memberRepository;
         this.storageService = storageService;
         this.auditLogService = auditLogService;
         this.notificationService = notificationService;
         this.permissionService = permissionService;
+        this.anonymousIdentity = anonymousIdentity;
     }
 
     public DeletedCommunityPost record(CommunityPost post, Member deletedBy, String reason) {
@@ -116,6 +135,13 @@ public class CommunityDeletionArchiveService {
         snapshot.setDeletedByName(deletedBy.getName());
         snapshot.setDeletedByRole(deletedBy.getRole().name());
         snapshot.setDeletionReason(reason);
+        // Taken now because the caller deletes the votes, bookmarks and poll answers next.
+        snapshot.setRestoreState(CommunityRestoreState.capture(
+                post,
+                voteRepository.findByPostIdIn(List.of(post.getId())),
+                bookmarkRepository.findByPostId(post.getId()),
+                pollVoteRepository.findByPostIdIn(List.of(post.getId()))
+        ).toJson());
         DeletedCommunityPost saved = repository.save(snapshot);
         recordImages(saved, post);
         recordMedia(saved, post);
@@ -131,7 +157,7 @@ public class CommunityDeletionArchiveService {
     @Transactional(readOnly = true)
     public List<DeletedCommunityPostResponse> recent(int limit) {
         return toResponses(repository.findAllByOrderByDeletedAtDesc(PageRequest.of(0, boundedLimit(limit))),
-                "/api/admin/community/deleted-posts");
+                "/api/admin/community/deleted-posts", false);
     }
 
     @Transactional(readOnly = true)
@@ -139,13 +165,13 @@ public class CommunityDeletionArchiveService {
         DeletedCommunityPost snapshot = repository.findById(deletedPostId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         return toResponse(snapshot, "/api/admin/community/deleted-posts",
-                latestAppeals(List.of(snapshot.getId())).get(snapshot.getId()));
+                latestAppeals(List.of(snapshot.getId())).get(snapshot.getId()), false);
     }
 
     @Transactional(readOnly = true)
     public List<DeletedCommunityPostResponse> mine(String studentId) {
         return toResponses(repository.findByAuthorStudentIdOrderByDeletedAtDesc(studentId),
-                "/api/community/posts/deleted");
+                "/api/community/posts/deleted", true);
     }
 
     @Transactional
@@ -264,11 +290,12 @@ public class CommunityDeletionArchiveService {
         if (!permissionService.has(admin, Permission.COMMUNITY_MODERATE)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        DeletedCommunityPost snapshot = repository.findById(deletedPostId)
+        DeletedCommunityPost snapshot = repository.findByIdForUpdate(deletedPostId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (snapshot.getRestoredAt() != null || snapshot.getRestoredPostId() != null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 복원된 게시글입니다.");
         }
+        CommunityRestoreState state = CommunityRestoreState.parse(snapshot.getRestoreState());
 
         List<DeletedCommunityPostImage> archivedImages = deletedImageRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId());
         List<DeletedCommunityPostMedia> archivedMedia = deletedMediaRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId());
@@ -283,6 +310,16 @@ public class CommunityDeletionArchiveService {
         restored.setCreatedAt(snapshot.getOriginalCreatedAt());
         restored.setUpdatedAt(snapshot.getOriginalUpdatedAt());
         restored.setEdited(!snapshot.getOriginalCreatedAt().equals(snapshot.getOriginalUpdatedAt()));
+        if (state != null) {
+            // Without these an anonymous post came back under a different nickname and tag, so
+            // its author no longer matched their own earlier comments in the thread.
+            restored.setAnonymousName(state.anonymousName());
+            restored.setIpAddress(state.ipAddress());
+            restored.setAuthorNameOverridden(state.authorNameOverridden());
+            if (state.pinned()) {
+                restored.restorePinned(state.pinnedAt() == null ? LocalDateTime.now() : state.pinnedAt());
+            }
+        }
         archivedImages.stream()
                 .filter(image -> DeletedCommunityPostImage.KIND_COVER.equals(image.getKind()))
                 .findFirst()
@@ -337,12 +374,27 @@ public class CommunityDeletionArchiveService {
             savedPost = communityPostRepository.save(savedPost);
         }
         restoreComments(savedPost.getId(), archivedComments);
+        if (state != null) {
+            restoreInteractions(savedPost, state);
+        }
 
         snapshot.setRestoredPostId(savedPost.getId());
         snapshot.setRestoredByStudentId(admin.getStudentId());
         snapshot.setRestoredByName(admin.getName());
         snapshot.setRestoredAt(LocalDateTime.now());
         repository.save(snapshot);
+        // Restoring the post is the answer to whoever asked for it. Nothing ever closed an appeal,
+        // so each one stayed "open" for good — shown as a pending request on a post that was
+        // already back on the board.
+        List<DeletedCommunityPostAppeal> openAppeals = deletedAppealRepository.findByDeletedPostIdAndStatus(
+                snapshot.getId(), DeletedCommunityPostAppeal.Status.OPEN);
+        for (DeletedCommunityPostAppeal appeal : openAppeals) {
+            appeal.setStatus(DeletedCommunityPostAppeal.Status.RESOLVED);
+            appeal.setResolvedAt(snapshot.getRestoredAt());
+            appeal.setResolvedByStudentId(admin.getStudentId());
+            appeal.setResolutionNote("게시글 복원");
+        }
+        deletedAppealRepository.saveAll(openAppeals);
         auditLogService.record(admin.getStudentId(), "COMMUNITY_POST_RESTORE", "COMMUNITY_POST", String.valueOf(savedPost.getId()),
                 String.join("\n",
                         "deletedSnapshotId=" + snapshot.getId(),
@@ -435,7 +487,15 @@ public class CommunityDeletionArchiveService {
         }
     }
 
-    private List<DeletedCommunityPostResponse> toResponses(List<DeletedCommunityPost> snapshots, String mediaBasePath) {
+    /**
+     * @param authorView the post author's own "내 삭제 기록" rather than the moderators' archive.
+     *                   The author sees what the live post showed them and nothing more: comment
+     *                   authors' 학번 are never included, and on an anonymous post the comments
+     *                   keep their anonymous display names. Returning the stored real identities
+     *                   here let anyone unmask every commenter by deleting their own anonymous post.
+     */
+    private List<DeletedCommunityPostResponse> toResponses(List<DeletedCommunityPost> snapshots, String mediaBasePath,
+                                                           boolean authorView) {
         List<Long> snapshotIds = snapshots.stream().map(DeletedCommunityPost::getId).toList();
         Map<Long, DeletedCommunityPostAppeal> latestAppeals = latestAppeals(snapshotIds);
         Map<Long, List<DeletedCommunityPostImage>> imagesBySnapshot = deletedImageRepository
@@ -451,14 +511,16 @@ public class CommunityDeletionArchiveService {
                 .map(snapshot -> toResponse(snapshot, mediaBasePath, latestAppeals.get(snapshot.getId()),
                         imagesBySnapshot.getOrDefault(snapshot.getId(), List.of()),
                         mediaBySnapshot.getOrDefault(snapshot.getId(), List.of()),
-                        commentsBySnapshot.getOrDefault(snapshot.getId(), List.of())))
+                        commentsBySnapshot.getOrDefault(snapshot.getId(), List.of()),
+                        authorView))
                 .toList();
     }
 
     private DeletedCommunityPostResponse toResponse(DeletedCommunityPost snapshot,
                                                     String mediaBasePath,
-                                                    DeletedCommunityPostAppeal latestAppeal) {
-        return toResponse(snapshot, mediaBasePath, latestAppeal, null, null, null);
+                                                    DeletedCommunityPostAppeal latestAppeal,
+                                                    boolean authorView) {
+        return toResponse(snapshot, mediaBasePath, latestAppeal, null, null, null, authorView);
     }
 
     /**
@@ -472,7 +534,10 @@ public class CommunityDeletionArchiveService {
                                                     DeletedCommunityPostAppeal latestAppeal,
                                                     List<DeletedCommunityPostImage> images,
                                                     List<DeletedCommunityPostMedia> media,
-                                                    List<DeletedCommunityPostComment> comments) {
+                                                    List<DeletedCommunityPostComment> comments,
+                                                    boolean authorView) {
+        boolean maskCommentAuthors = authorView
+                && CommunityPost.Category.ANONYMOUS.name().equals(snapshot.getCategory());
         List<DeletedCommunityPostImage> resolvedImages = images != null
                 ? images
                 : deletedImageRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId());
@@ -516,8 +581,10 @@ public class CommunityDeletionArchiveService {
                 .map(comment -> new DeletedCommunityPostResponse.CommentInfo(
                         comment.getOriginalCommentId(),
                         comment.getOriginalParentCommentId(),
-                        comment.getStudentId(),
-                        comment.getAuthorName(),
+                        authorView ? null : comment.getStudentId(),
+                        maskCommentAuthors
+                                ? anonymousIdentity.anonymousDisplayName(comment.getAnonymousName(), comment.getIpAddress())
+                                : comment.getAuthorName(),
                         comment.getAnonymousName(),
                         comment.getDepth(),
                         comment.getContent(),
@@ -638,6 +705,111 @@ public class CommunityDeletionArchiveService {
             CommunityComment saved = commentRepository.save(restored);
             restoredCommentIds.put(archived.getOriginalCommentId(), saved.getId());
         }
+    }
+
+    /**
+     * Puts back the votes, bookmarks and poll answers the post had when it was deleted. A member
+     * who has left since is skipped, and so is anything recorded before the current holder of a
+     * 학번 joined: the 학번 belonged to someone else then, and a new member must not inherit it
+     * (the same rule member removal follows for live data).
+     */
+    private void restoreInteractions(CommunityPost post, CommunityRestoreState state) {
+        Set<String> studentIds = new LinkedHashSet<>();
+        state.votes().forEach(vote -> studentIds.add(vote.studentId()));
+        state.bookmarks().forEach(bookmark -> studentIds.add(bookmark.studentId()));
+        state.pollVotes().forEach(vote -> studentIds.add(vote.studentId()));
+        if (studentIds.isEmpty()) {
+            return;
+        }
+        Map<String, LocalDateTime> joinedAt = new HashMap<>();
+        for (Member member : memberRepository.findByStudentIdIn(studentIds)) {
+            joinedAt.put(member.getStudentId(), member.getCreatedAt());
+        }
+
+        Set<String> voters = new HashSet<>();
+        for (CommunityRestoreState.Vote archived : state.votes()) {
+            if (Math.abs(archived.value()) != 1
+                    || !sameMemberAsThen(joinedAt, archived.studentId(), archived.createdAt())
+                    || !voters.add(archived.studentId())) {
+                continue;
+            }
+            CommunityPostVote vote = new CommunityPostVote();
+            vote.setPost(post);
+            vote.setStudentId(archived.studentId());
+            vote.setValue(archived.value());
+            if (archived.createdAt() != null) {
+                vote.setCreatedAt(archived.createdAt());
+            }
+            if (archived.updatedAt() != null) {
+                vote.setUpdatedAt(archived.updatedAt());
+            }
+            voteRepository.save(vote);
+        }
+
+        Set<String> bookmarkers = new HashSet<>();
+        for (CommunityRestoreState.Bookmark archived : state.bookmarks()) {
+            if (!sameMemberAsThen(joinedAt, archived.studentId(), archived.createdAt())
+                    || !bookmarkers.add(archived.studentId())) {
+                continue;
+            }
+            CommunityPostBookmark bookmark = new CommunityPostBookmark();
+            bookmark.setPost(post);
+            bookmark.setStudentId(archived.studentId());
+            if (archived.createdAt() != null) {
+                bookmark.setCreatedAt(archived.createdAt());
+            }
+            bookmarkRepository.save(bookmark);
+        }
+
+        Map<String, Integer> optionCounts = pollOptionCounts(post.getContent());
+        Set<String> pollAnswers = new HashSet<>();
+        for (CommunityRestoreState.PollVote archived : state.pollVotes()) {
+            Integer options = optionCounts.get(archived.pollId());
+            if (options == null || archived.optionIndex() < 0 || archived.optionIndex() >= options
+                    || !sameMemberAsThen(joinedAt, archived.studentId(), archived.createdAt())
+                    || !pollAnswers.add(archived.pollId() + '\n' + archived.studentId())) {
+                continue;
+            }
+            CommunityPollVote vote = new CommunityPollVote();
+            vote.setPostId(post.getId());
+            vote.setPollId(archived.pollId());
+            vote.setStudentId(archived.studentId());
+            vote.setOptionIndex(archived.optionIndex());
+            if (archived.createdAt() != null) {
+                vote.setCreatedAt(archived.createdAt());
+            }
+            if (archived.updatedAt() != null) {
+                vote.setUpdatedAt(archived.updatedAt());
+            }
+            pollVoteRepository.save(vote);
+        }
+    }
+
+    private static boolean sameMemberAsThen(Map<String, LocalDateTime> joinedAt, String studentId, LocalDateTime recordedAt) {
+        LocalDateTime joined = joinedAt.get(studentId);
+        if (joined == null) {
+            return false;
+        }
+        return recordedAt == null || !recordedAt.isBefore(joined);
+    }
+
+    /** pollId -> number of options, for every poll block in a post body. */
+    private Map<String, Integer> pollOptionCounts(String content) {
+        Map<String, Integer> counts = new HashMap<>();
+        try {
+            JsonNode root = JSON.readTree(content);
+            if (root.isArray()) {
+                for (JsonNode block : root) {
+                    String pollId = block.path("pollId").asText("");
+                    if ("poll".equals(block.path("type").asText()) && !pollId.isBlank() && block.path("options").isArray()) {
+                        counts.put(pollId, block.path("options").size());
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // A body that is not a block array has no polls.
+        }
+        return counts;
     }
 
     private String rewriteMediaIds(String content,

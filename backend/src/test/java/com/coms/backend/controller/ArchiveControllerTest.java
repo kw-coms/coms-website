@@ -32,6 +32,28 @@ class ArchiveControllerTest {
         assertThat(inline.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).contains("inline");
     }
 
+    @Test
+    void aTypeThatIsNotRenderedInlineIsNotAnnouncedEither() {
+        // "attachment" does not stop a page from loading the URL as a script or a stylesheet, and
+        // a script type would pass both nosniff and script-src 'self'.
+        for (String declared : new String[] {"text/javascript", "text/css", "text/html", "image/svg+xml"}) {
+            ArchiveFile file = file("upload.bin", "stored-upload.bin", declared);
+            when(archiveService.get(2L)).thenReturn(file);
+            when(storageService.load("stored-upload.bin")).thenReturn(new ByteArrayResource("x".getBytes()));
+
+            var inline = controller.inline(2L);
+
+            assertThat(inline.getHeaders().getContentType()).as(declared)
+                    .isEqualTo(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM);
+            assertThat(inline.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).as(declared).contains("attachment");
+        }
+
+        ArchiveFile image = file("photo.png", "stored-photo.png", "image/png");
+        when(archiveService.get(3L)).thenReturn(image);
+        when(storageService.load("stored-photo.png")).thenReturn(new ByteArrayResource("x".getBytes()));
+        assertThat(controller.inline(3L).getHeaders().getContentType()).isEqualTo(org.springframework.http.MediaType.IMAGE_PNG);
+    }
+
     private ArchiveFile file(String originalName, String storedName, String mimeType) {
         ArchiveFile file = new ArchiveFile();
         file.setOriginalName(originalName);

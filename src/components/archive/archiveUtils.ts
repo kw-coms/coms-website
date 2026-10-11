@@ -22,6 +22,10 @@ export function formatDate(value) {
 }
 
 export function openRowWithKeyboard(event, open) {
+  // Keys bubble up from anything focusable inside the row. Only a key pressed on the row
+  // itself opens it; otherwise Enter on the row's download link was swallowed by
+  // preventDefault and opened the detail page instead of downloading.
+  if (event.target !== event.currentTarget) return
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
     open()

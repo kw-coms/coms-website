@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -22,6 +23,15 @@ import java.util.regex.Pattern;
  * the logic here guarantees that a crafted {@code externalEmbed} payload (e.g. an
  * arbitrary-origin iframe disguised as a YouTube embed) is rejected no matter which
  * feature stored it, instead of only community posts being protected.
+ *
+ * <p>Two different jobs live here and are kept apart on purpose:
+ * <ul>
+ *   <li>{@link #sanitizeContent} rewrites rich text through an allow-list, so its output is safe
+ *       by construction — everything that is not an allowed tag with allowed attributes comes
+ *       out escaped;</li>
+ *   <li>{@link #rejectUnsafeText} is a gate for values that are stored and shown as plain text
+ *       (titles, comments, labels). It only objects to active markup, never to prose.</li>
+ * </ul>
  */
 @Component
 public class RichContentSanitizer {
@@ -29,11 +39,29 @@ public class RichContentSanitizer {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Pattern HTML_TAG = Pattern.compile("<(/?)([A-Za-z][A-Za-z0-9]*)([^>]*)>");
     private static final Pattern STYLE_DECLARATION = Pattern.compile("(?i)(color|background-color)\\s*:\\s*([^;\"']+)");
+    // The editor writes the value with its quotes entity-encoded inside the style attribute.
+    private static final Pattern FONT_FAMILY_DECLARATION =
+            Pattern.compile("(?i)font-family\\s*:\\s*((?:&quot;|&#39;|&#x27;|[^;\"&<>])+)");
+    private static final Pattern SAFE_FONT_FAMILY = Pattern.compile("^[\\p{L}\\p{N} _\\-,']{1,120}$");
     private static final Pattern FONT_COLOR = Pattern.compile("(?i)\\bcolor\\s*=\\s*([\"']?)(#[0-9a-fA-F]{3,8}|rgba?\\([0-9.,%\\s]+\\))\\1");
     private static final Pattern SAFE_COLOR = Pattern.compile("(?i)^(#[0-9a-f]{3,8}|rgba?\\([0-9.,%\\s]+\\))$");
     private static final Pattern HTTPS_URL = Pattern.compile("^https://[^\\s<>\"']+$", Pattern.CASE_INSENSITIVE);
     private static final Pattern YOUTUBE_EMBED_URL = Pattern.compile("^https://www\\.youtube(-nocookie)?\\.com/embed/[A-Za-z0-9_-]{6,20}([?&][^\\s<>\"']*)?$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern EVENT_HANDLER_ATTRIBUTE = Pattern.compile("\\son[a-z]+\\s*=");
+    private static final Pattern HREF_ATTRIBUTE =
+            Pattern.compile("(?i)\\bhref\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s\"'>]+))");
+    private static final Pattern SAFE_LINK_TARGET =
+            Pattern.compile("^(?:https?://|mailto:)[^\\s<>\"'`\\\\]{1,2000}$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern CODE_LANGUAGE_CLASS =
+            Pattern.compile("(?i)\\bclass\\s*=[\\s\"']*(language-[a-z0-9]{1,30})\\s*[\"']?(?=\\s|$)");
+    // A raw tag opening as an HTML tokenizer sees it: the name runs to whitespace, '/' or '>'.
+    // One character class before the name, not "\s*/?\s*": two neighbouring quantifiers that can
+    // share the same characters make a failed match quadratic in a long run of them, and these
+    // patterns run on text of up to 50,000 characters that a member chose.
+    private static final Pattern RAW_TAG = Pattern.compile("<[\\s/]*([A-Za-z][^\\s/<>]*)");
+    private static final Pattern EVENT_HANDLER_ATTRIBUTE = Pattern.compile("(?:^|[\\s/\"'])on[a-z]+\\s*=");
+    private static final Set<String> MEDIA_WIDTH_NAMES = Set.of("small", "medium", "large", "full");
+    private static final Pattern ENTITY = Pattern.compile(
+            "&(#[xX][0-9a-fA-F]{1,6}|#[0-9]{1,7}|(?i:lt|gt|quot|apos|amp|colon|sol|lpar|rpar|tab|newline|nbsp));?");
 
     /**
      * Sanitizes a stored content string. When the value is a JSON array of blocks it
@@ -55,13 +83,27 @@ public class RichContentSanitizer {
                 if (!block.isObject()) continue;
                 ObjectNode copy = ((ObjectNode) block).deepCopy();
                 String type = copy.path("type").asText();
+                Set<String> sanitizedFields;
                 if ("text".equals(type)) {
                     copy.put("content", sanitizeRichText(copy.path("content").asText("")));
+                    sanitizedFields = Set.of("type", "content");
                 } else if ("externalEmbed".equals(type)) {
                     sanitizeExternalEmbed(copy);
+                    sanitizedFields = Set.of("type", "provider", "kind", "url", "embedUrl", "title",
+                            "thumbnailUrl", "description", "siteName", "image", "width", "align");
                 } else if ("poll".equals(type)) {
                     sanitizePollBlock(copy);
+                    sanitizedFields = Set.of("type", "pollId", "question", "options", "closesAt", "closedAt");
+                } else if ("image".equals(type) || "video".equals(type) || "file".equals(type)) {
+                    sanitizeAttachmentBlock(copy);
+                    sanitizedFields = Set.of("type", "name", "width", "align");
+                } else {
+                    sanitizedFields = Set.of();
                 }
+                // Whatever this sanitizer does not understand — an unknown block type, an extra
+                // field from another client — is still held to the plain-text gate, so nothing
+                // enters storage unchecked.
+                rejectUnsafeValues(copy, sanitizedFields);
                 sanitized.add(copy);
             }
             return JSON.writeValueAsString(sanitized);
@@ -93,9 +135,17 @@ public class RichContentSanitizer {
             return;
         } else if (!HTTPS_URL.matcher(url).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "외부 콘텐츠 주소가 올바르지 않습니다.");
+        } else {
+            // Only the YouTube kind renders an iframe; a stray embedUrl on an image/video card
+            // has no business being stored.
+            copy.remove("embedUrl");
         }
-        copy.put("title", normalizeOptional(copy.path("title").asText(""), 160));
-        copy.put("thumbnailUrl", normalizeOptional(copy.path("thumbnailUrl").asText(""), 500));
+        copy.put("title", inertMetadata(copy.path("title").asText(""), 160));
+        String thumbnailUrl = normalizeOptional(copy.path("thumbnailUrl").asText(""), 500);
+        copy.put("thumbnailUrl", HTTPS_URL.matcher(thumbnailUrl).matches() ? thumbnailUrl : "");
+        copy.remove("description");
+        copy.remove("siteName");
+        copy.remove("image");
         copy.put("width", Math.max(25, Math.min(100, copy.path("width").asInt(75))));
         copy.put("align", normalizeAlign(copy.path("align").asText("left")));
     }
@@ -112,9 +162,9 @@ public class RichContentSanitizer {
         }
         copy.remove("embedUrl");
         copy.remove("thumbnailUrl");
-        copy.put("title", normalizeOptional(copy.path("title").asText(""), 160));
-        copy.put("description", normalizeOptional(copy.path("description").asText(""), 280));
-        copy.put("siteName", normalizeOptional(copy.path("siteName").asText(""), 80));
+        copy.put("title", inertMetadata(copy.path("title").asText(""), 160));
+        copy.put("description", inertMetadata(copy.path("description").asText(""), 280));
+        copy.put("siteName", inertMetadata(copy.path("siteName").asText(""), 80));
         String image = copy.path("image").asText("");
         if (!image.isBlank() && HTTPS_URL.matcher(image).matches()) {
             copy.put("image", normalizeOptional(image, 500));
@@ -154,6 +204,8 @@ public class RichContentSanitizer {
         if (options.size() < 2) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "투표 선택지는 2개 이상 필요합니다.");
         }
+        copy.put("pollId", pollId);
+        copy.put("question", question);
         copy.set("options", options);
         normalizePollDate(copy, "closesAt");
         normalizePollDate(copy, "closedAt");
@@ -172,6 +224,53 @@ public class RichContentSanitizer {
         }
     }
 
+    /** Uploaded image / video / file blocks: only the caption-like fields are free text. */
+    private void sanitizeAttachmentBlock(ObjectNode copy) {
+        if (copy.hasNonNull("name")) {
+            copy.put("name", inertMetadata(copy.path("name").asText(""), 255));
+        }
+        if (copy.has("width")) {
+            JsonNode width = copy.get("width");
+            if (width.isNumber()) {
+                copy.put("width", Math.max(25, Math.min(100, width.asInt(75))));
+            } else if (!MEDIA_WIDTH_NAMES.contains(width.asText(""))) {
+                copy.remove("width");
+            }
+        }
+        if (copy.has("align")) {
+            copy.put("align", normalizeAlign(copy.path("align").asText("center")));
+        }
+    }
+
+    private void rejectUnsafeValues(JsonNode node, Set<String> alreadySanitizedFields) {
+        if (node.isTextual()) {
+            rejectUnsafeText(node.asText());
+        } else if (node.isArray()) {
+            for (JsonNode child : node) {
+                rejectUnsafeValues(child, Set.of());
+            }
+        } else if (node.isObject()) {
+            for (Iterator<String> names = node.fieldNames(); names.hasNext(); ) {
+                String name = names.next();
+                if (!alreadySanitizedFields.contains(name)) {
+                    rejectUnsafeValues(node.get(name), Set.of());
+                }
+            }
+        }
+    }
+
+    /**
+     * For text the member did not type: the title and description fetched for a link card, a
+     * video's title, the name of an uploaded file. Refusing it punishes the member for someone
+     * else's wording — a page really called "&lt;script&gt;: The Script element" made the whole
+     * post unsaveable once link previews started returning real titles. Its angle brackets are
+     * replaced with look-alikes instead, after which nothing in it can be read as a tag.
+     */
+    String inertMetadata(String value, int maxLength) {
+        String inert = (value == null ? "" : value).replace('<', '\u2039').replace('>', '\u203A');
+        return normalizeOptional(inert, maxLength);
+    }
+
     String normalizeOptional(String value, int maxLength) {
         String normalized = value == null ? "" : value.trim();
         if (normalized.length() > maxLength) {
@@ -185,13 +284,95 @@ public class RichContentSanitizer {
         return Set.of("left", "center", "right").contains(align) ? align : "left";
     }
 
-    private static final Set<String> FORBIDDEN_TAG_PREFIXES = Set.of(
+    private static final Set<String> FORBIDDEN_TAGS = Set.of(
             "script", "iframe", "svg", "object", "embed", "style", "img", "math",
             "link", "meta", "form", "base", "video", "audio", "source");
 
+    /**
+     * Gate for values that are stored and displayed as plain text. The web client always renders
+     * them as text, so this exists for the day some client injects one as HTML: it refuses
+     * <em>active markup</em> — a script/iframe/img-style element, or any raw tag carrying an event
+     * handler or a script URL.
+     *
+     * <p>It deliberately says nothing about prose. The previous version matched substrings anywhere
+     * (and again after decoding entities), which on a programming club's board rejected ordinary
+     * writing: a title like "JavaScript: 기초", {@code const onSubmit = ...}, "Regular
+     * Expression(정규식)", and — once decoded — the escaped {@code #include <math.h>} inside a post
+     * body. Without a raw {@code <} nothing here can become an element or an attribute, and a tag
+     * the tokenizer would not read as one of the dangerous elements (e.g. {@code <math.h>},
+     * {@code Map<Object,String>}) is just text.
+     */
     void rejectUnsafeText(String value) {
-        // Check both the raw value and an entity-decoded pass so encodings like
-        // &#x3C;script&#x3E; or java&#115;cript: cannot slip through.
+        if (value == null || value.indexOf('<') < 0) {
+            return;
+        }
+        Matcher tag = RAW_TAG.matcher(value);
+        // How far attributes have been read. A tag opening inside a stretch that was already read
+        // as another tag's attributes is checked for its name only: reading its own stretch again
+        // would make a text of nothing but unclosed tags quadratic, and a browser does not start
+        // a tag there anyway.
+        int attributesReadTo = 0;
+        while (tag.find()) {
+            String name = tag.group(1).toLowerCase(Locale.ROOT);
+            if (FORBIDDEN_TAGS.contains(name)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 내용이 포함되어 있습니다.");
+            }
+            if (tag.end() < attributesReadTo) {
+                continue;
+            }
+            attributesReadTo = tagEnd(value, tag.end());
+            // Entities are undone first so java&#115;cript: is seen for what it is. Handlers are
+            // looked for in the text as written, because whitespace is what separates attributes;
+            // script URLs in a copy with whitespace removed, because browsers ignore tabs and
+            // newlines inside a URL ("java&Tab;script:").
+            String attributes = decodeEntities(value.substring(tag.end(), attributesReadTo))
+                    .toLowerCase(Locale.ROOT);
+            String compact = attributes.replaceAll("[\\s\\u0000]", "");
+            boolean unsafe = EVENT_HANDLER_ATTRIBUTE.matcher(attributes).find()
+                    || compact.contains("javascript:")
+                    || compact.contains("vbscript:")
+                    || compact.contains("data:text/html")
+                    || compact.contains("expression(");
+            if (unsafe) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 내용이 포함되어 있습니다.");
+            }
+        }
+    }
+
+    /**
+     * Where a tag whose name ends at {@code from} ends: at the first {@code >} that is not inside
+     * a quoted attribute value, which is where a browser ends it. Stopping at the first {@code >}
+     * of any kind let {@code <a title=">" onmouseover=...>} through with its handler unread. A
+     * tag that never closes runs to the end of the text.
+     */
+    private static int tagEnd(String value, int from) {
+        char quote = 0;
+        for (int i = from; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (quote != 0) {
+                if (c == quote) {
+                    quote = 0;
+                }
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == '>') {
+                return i;
+            }
+        }
+        return value.length();
+    }
+
+    /**
+     * The gate as it was before {@link #rejectUnsafeText} learned to tell markup from prose: any
+     * of these substrings anywhere, as written or once entities are decoded. Still used for
+     * anonymous nicknames. They are at most twenty characters, so nothing of value is lost, and
+     * they are checked every time they are displayed — a nickname this gate refuses would make
+     * every list containing it fail on a build that reads with the old rule (a rollback).
+     */
+    void rejectUnsafeTextStrict(String value) {
+        if (value == null) {
+            return;
+        }
         for (String candidate : new String[] {value, decodeEntities(value)}) {
             String lower = candidate.toLowerCase(Locale.ROOT);
             boolean unsafe = lower.contains("javascript:")
@@ -200,7 +381,7 @@ public class RichContentSanitizer {
                     || lower.contains("expression(")
                     || EVENT_HANDLER_ATTRIBUTE.matcher(lower).find();
             if (!unsafe) {
-                for (String tag : FORBIDDEN_TAG_PREFIXES) {
+                for (String tag : FORBIDDEN_TAGS) {
                     if (lower.contains("<" + tag) || lower.contains("</" + tag)) {
                         unsafe = true;
                         break;
@@ -214,24 +395,30 @@ public class RichContentSanitizer {
     }
 
     private String decodeEntities(String value) {
-        Matcher matcher = Pattern.compile("&(#x?[0-9a-fA-F]+|lt|gt|quot|amp|colon|sol);?").matcher(value);
+        Matcher matcher = ENTITY.matcher(value);
         StringBuilder out = new StringBuilder();
         while (matcher.find()) {
             String entity = matcher.group(1);
             String replacement;
             try {
                 if (entity.startsWith("#x") || entity.startsWith("#X")) {
-                    replacement = String.valueOf((char) Integer.parseInt(entity.substring(2), 16));
+                    replacement = codePoint(Integer.parseInt(entity.substring(2), 16), matcher.group());
                 } else if (entity.startsWith("#")) {
-                    replacement = String.valueOf((char) Integer.parseInt(entity.substring(1)));
+                    replacement = codePoint(Integer.parseInt(entity.substring(1)), matcher.group());
                 } else {
-                    replacement = switch (entity) {
+                    replacement = switch (entity.toLowerCase(Locale.ROOT)) {
                         case "lt" -> "<";
                         case "gt" -> ">";
                         case "quot" -> "\"";
+                        case "apos" -> "'";
                         case "amp" -> "&";
                         case "colon" -> ":";
                         case "sol" -> "/";
+                        case "lpar" -> "(";
+                        case "rpar" -> ")";
+                        case "tab" -> "\t";
+                        case "newline" -> "\n";
+                        case "nbsp" -> " ";
                         default -> matcher.group();
                     };
                 }
@@ -244,8 +431,17 @@ public class RichContentSanitizer {
         return out.toString();
     }
 
+    private static String codePoint(int value, String fallback) {
+        return Character.isValidCodePoint(value) ? new String(Character.toChars(value)) : fallback;
+    }
+
     private String sanitizeRichText(String html) {
         Matcher matcher = HTML_TAG.matcher(html == null ? "" : html);
+        if (html != null) {
+            // A tag needs its '>'. Past the last one there is none to find, and looking anyway
+            // costs a scan to the end of the text for every '<' there.
+            matcher.region(0, html.lastIndexOf('>') + 1);
+        }
         StringBuilder out = new StringBuilder();
         int last = 0;
         while (matcher.find()) {
@@ -262,20 +458,59 @@ public class RichContentSanitizer {
                 .trim();
     }
 
+    /**
+     * The allow-list. It has to cover what the editor emits — bold/italic/underline, coloured and
+     * font-family spans, inline code, fenced code blocks with a language hint, and links — because
+     * anything missing here is silently stripped on save: code blocks and links used to lose their
+     * markup (and a link its destination) the moment a post was stored.
+     */
     private String sanitizeTag(String closing, String tag, String attrs) {
+        boolean isClosing = !closing.isBlank();
         if ("br".equals(tag)) return "<br>";
-        if (Set.of("b", "strong", "i", "em", "u").contains(tag)) {
-            return closing.isBlank() ? "<" + tag + ">" : "</" + tag + ">";
+        if (Set.of("b", "strong", "i", "em", "u", "pre").contains(tag)) {
+            return isClosing ? "</" + tag + ">" : "<" + tag + ">";
+        }
+        if ("code".equals(tag)) {
+            if (isClosing) return "</code>";
+            Matcher language = CODE_LANGUAGE_CLASS.matcher(attrs);
+            return language.find()
+                    ? "<code class=\"" + language.group(1).toLowerCase(Locale.ROOT) + "\">"
+                    : "<code>";
+        }
+        if ("a".equals(tag)) {
+            if (isClosing) return "</a>";
+            String href = safeHref(attrs);
+            // target/rel are ours, never the caller's: every user link opens in a new tab and
+            // cannot reach back into the page that opened it.
+            return href == null
+                    ? "<a>"
+                    : "<a href=\"" + href + "\" target=\"_blank\" rel=\"noopener noreferrer nofollow\">";
         }
         if ("span".equals(tag) || "font".equals(tag)) {
-            if (!closing.isBlank()) return "</span>";
-            String style = sanitizeInlineColorStyle(attrs);
+            if (isClosing) return "</span>";
+            String style = sanitizeInlineStyle(attrs);
             return style.isBlank() ? "<span>" : "<span style=\"" + style + "\">";
         }
         return "";
     }
 
-    private String sanitizeInlineColorStyle(String attrs) {
+    /** The href as it may be written back into an attribute, or null when it is not a plain link. */
+    private String safeHref(String attrs) {
+        Matcher matcher = HREF_ATTRIBUTE.matcher(attrs);
+        if (!matcher.find()) {
+            return null;
+        }
+        String raw = matcher.group(1) != null ? matcher.group(1)
+                : matcher.group(2) != null ? matcher.group(2)
+                : matcher.group(3);
+        String decoded = decodeEntities(raw).trim();
+        if (!SAFE_LINK_TARGET.matcher(decoded).matches()) {
+            return null;
+        }
+        return decoded.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    private String sanitizeInlineStyle(String attrs) {
         StringBuilder style = new StringBuilder();
         Matcher styleMatcher = STYLE_DECLARATION.matcher(attrs);
         while (styleMatcher.find()) {
@@ -284,6 +519,10 @@ public class RichContentSanitizer {
         Matcher fontMatcher = FONT_COLOR.matcher(attrs);
         if (fontMatcher.find()) {
             appendSafeStyle(style, "color", fontMatcher.group(2).trim());
+        }
+        Matcher fontFamilyMatcher = FONT_FAMILY_DECLARATION.matcher(attrs);
+        if (fontFamilyMatcher.find()) {
+            appendSafeFontFamily(style, fontFamilyMatcher.group(1));
         }
         return style.toString();
     }
@@ -294,6 +533,24 @@ public class RichContentSanitizer {
         if (style.indexOf(key + ":") >= 0) return;
         if (!style.isEmpty()) style.append(';');
         style.append(key).append(':').append(cleanValue);
+    }
+
+    /**
+     * Font names only: letters, digits, spaces, commas, hyphens and single quotes. That leaves no
+     * way to write a url(), an expression, a second declaration or to close the attribute.
+     */
+    private void appendSafeFontFamily(StringBuilder style, String rawValue) {
+        String value = rawValue
+                .replace("&quot;", "'")
+                .replace("&#39;", "'")
+                .replace("&#x27;", "'")
+                .replaceAll("\\s+", " ")
+                .trim();
+        if (!SAFE_FONT_FAMILY.matcher(value).matches()) return;
+        if (value.chars().filter(ch -> ch == '\'').count() % 2 != 0) return;
+        if (style.indexOf("font-family:") >= 0) return;
+        if (!style.isEmpty()) style.append(';');
+        style.append("font-family:").append(value);
     }
 
     // Only escape ampersands that do not already start an entity: the frontend

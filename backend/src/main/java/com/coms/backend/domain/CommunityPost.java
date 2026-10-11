@@ -56,6 +56,13 @@ public class CommunityPost {
     @Column(name = "pinned_at")
     private LocalDateTime pinnedAt;
 
+    // Set when 회장 replaces only the displayed author name. Responses then show the stored
+    // authorName as written instead of the linked member's current name.
+    // The default is spelled out so that ddl-auto=update (the dev profile) can add the column
+    // to a table that already has rows; it matches what V94 creates in production.
+    @Column(name = "author_name_overridden", nullable = false, columnDefinition = "BOOLEAN NOT NULL DEFAULT FALSE")
+    private boolean authorNameOverridden = false;
+
     public void markEdited() {
         edited = true;
         updatedAt = LocalDateTime.now();
@@ -105,4 +112,11 @@ public class CommunityPost {
         this.pinned = pinned;
     }
     public LocalDateTime getPinnedAt() { return pinnedAt; }
+    /** Puts a pin back exactly as it was archived; setPinned would stamp the current time. */
+    public void restorePinned(LocalDateTime pinnedAt) {
+        this.pinned = true;
+        this.pinnedAt = pinnedAt;
+    }
+    public boolean isAuthorNameOverridden() { return authorNameOverridden; }
+    public void setAuthorNameOverridden(boolean authorNameOverridden) { this.authorNameOverridden = authorNameOverridden; }
 }

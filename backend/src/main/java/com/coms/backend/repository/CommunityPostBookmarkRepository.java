@@ -16,6 +16,8 @@ public interface CommunityPostBookmarkRepository extends JpaRepository<Community
     @Query("select b.post from CommunityPostBookmark b where b.studentId = :studentId order by b.createdAt desc")
     List<CommunityPost> findBookmarkedPostsByStudentId(@Param("studentId") String studentId);
     List<CommunityPostBookmark> findByPostIdInAndStudentId(Collection<Long> postIds, String studentId);
+    List<CommunityPostBookmark> findByPostId(Long postId);
+
     long countByPostId(Long postId);
     void deleteByPostId(Long postId);
     void deleteByStudentId(String studentId);

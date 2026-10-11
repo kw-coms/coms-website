@@ -40,18 +40,30 @@ function ActivityComposer({
         eventDate: activityForm.eventDate,
       })
       prependActivity(created)
-      if (activityImages.length > 0) {
-        await uploadClubActivityImages(created.id, activityImages)
-      }
-      if (activityFiles.length > 0) {
-        for (const file of activityFiles) {
-          await uploadClubActivityFile(created.id, file)
-        }
-      }
+      // The post exists from here on, so the form is cleared whatever happens to the attachments.
+      // A failed upload used to read as a failed post: the form stayed filled, and submitting it
+      // again created the same post a second time.
+      let attachmentError = ''
       if (activityImages.length > 0 || activityFiles.length > 0) {
-        await queryClient.invalidateQueries({ queryKey: CLUB_ACTIVITIES_QUERY_KEY })
+        try {
+          if (activityImages.length > 0) {
+            await uploadClubActivityImages(created.id, activityImages)
+          }
+          for (const file of activityFiles) {
+            await uploadClubActivityFile(created.id, file)
+          }
+        } catch (err) {
+          attachmentError = err.message || '첨부를 올리지 못했습니다.'
+        }
+        await queryClient.invalidateQueries({ queryKey: CLUB_ACTIVITIES_QUERY_KEY }).catch(() => {})
       }
-      setActivityNotice('활동 글을 등록했습니다.')
+      if (attachmentError) {
+        // A notice, not the section's error: that one replaces the whole list with
+        // "불러오지 못했습니다", and the post that was just created is in that list.
+        setActivityNotice(`활동 글은 등록됐지만 사진·파일 첨부를 마치지 못했습니다. (${attachmentError}) 등록된 글을 수정해 다시 첨부해주세요.`)
+      } else {
+        setActivityNotice('활동 글을 등록했습니다.')
+      }
       setActivityForm((prev) => ({ ...prev, title: '', eventDate: '', description: '' }))
       setActivityImages([])
       setActivityFiles([])

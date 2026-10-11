@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { request } from '../src/services/apiClient.ts'
+import { request, setSessionExpiredHandler } from '../src/services/apiClient.ts'
 
 // Minimal Response stand-in — apiClient only reads ok/status/json()/text().
 function response(status, body = {}) {
@@ -90,3 +90,52 @@ const refreshCalls = (calls) => calls.filter((call) => call.url.endsWith('/api/a
   assert.equal(refreshCalls(calls).length, 0, '/api/auth/password must never trigger a refresh')
   assert.equal(calls.length, 1, 'and must not be retried either')
 }
+
+// ─── 4. An expired session on a protected endpoint ends the session ──────────
+//        The backend answers a missing/expired token with 403 (no custom entry
+//        point), so the signal that the session is really over is the refresh
+//        itself being refused with 401 — not the status of the original request.
+
+{
+  let expired = 0
+  setSessionExpiredHandler(() => { expired += 1 })
+
+  const calls = stubFetch(async (url) => (
+    url.endsWith('/api/auth/refresh') ? response(401, {}) : response(403, { error: 'Forbidden' })
+  ))
+  await assert.rejects(() => request('/api/community/posts'), (error) => error.status === 403)
+  assert.equal(expired, 1, 'a 403 followed by a refused refresh must report the session as expired')
+  assert.equal(
+    calls.filter((call) => call.url.includes('/api/community/posts')).length,
+    1,
+    'nothing to retry without a fresh token',
+  )
+
+  // A real permission denial: the session is fine (refresh succeeds) and the retry is still 403.
+  expired = 0
+  stubFetch(async (url) => (
+    url.endsWith('/api/auth/refresh') ? response(200, {}) : response(403, { error: 'Forbidden' })
+  ))
+  await assert.rejects(() => request('/api/admin/members'), (error) => error.status === 403)
+  assert.equal(expired, 0, 'a permission denial on a live session must not log the member out')
+
+  // The refresh endpoint being unreachable or failing says nothing about the session.
+  expired = 0
+  stubFetch(async (url) => {
+    if (url.endsWith('/api/auth/refresh')) throw new TypeError('Failed to fetch')
+    return response(403, { error: 'Forbidden' })
+  })
+  await assert.rejects(() => request('/api/notices'), (error) => error.status === 403)
+  assert.equal(expired, 0, 'a network failure during refresh must not end the session')
+
+  expired = 0
+  stubFetch(async (url) => (
+    url.endsWith('/api/auth/refresh') ? response(503, {}) : response(403, { error: 'Forbidden' })
+  ))
+  await assert.rejects(() => request('/api/notices'), (error) => error.status === 403)
+  assert.equal(expired, 0, 'a 5xx from the refresh endpoint must not end the session')
+
+  setSessionExpiredHandler(null)
+}
+
+console.log('api client refresh contract passed')

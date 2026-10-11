@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Download, RefreshCw, RotateCcw } from 'lucide-react'
 import { clearAdminCache, listAuditLogs } from '../../services/adminApi'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
+import { auditLogsToCsv } from './auditLogCsv'
 
 const AUDIT_LOG_LIMITS = [300, 1000, 2000]
 
@@ -104,10 +105,7 @@ export default function AdminAuditLogs({ formatDateTime }: { formatDateTime: (va
 
   const exportVisibleLogs = () => {
     if (visibleLogs.length === 0) return
-    const headers = ['createdAt', 'actorName', 'actorStudentId', 'action', 'targetType', 'targetId', 'ipAddress', 'detail']
-    const rows = visibleLogs.map((log) => headers.map((key) => csvCell(log[key] || '')).join(','))
-    const csv = [headers.join(','), ...rows].join('\n')
-    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+    const blob = new Blob([auditLogsToCsv(visibleLogs)], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
@@ -270,9 +268,4 @@ function auditLogSearchText(log) {
     .filter(Boolean)
     .join(' ')
     .toLowerCase()
-}
-
-function csvCell(value) {
-  const text = String(value ?? '')
-  return `"${text.replaceAll('"', '""')}"`
 }

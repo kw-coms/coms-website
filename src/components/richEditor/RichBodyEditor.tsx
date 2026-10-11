@@ -145,6 +145,12 @@ export default function RichBodyEditor({
     setPollOptionInputs((prev) => (prev.length <= 2 ? prev : prev.filter((_, itemIndex) => itemIndex !== index)))
   }
 
+  // These inputs sit inside the post's <form>. Unhandled, Enter is an implicit submit: it
+  // published the post while its poll was still being typed.
+  const keepEnterInPollForm = (e) => {
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing) e.preventDefault()
+  }
+
   const tipText = features.imageUpload || features.videoUpload || features.fileUpload
     ? '본문 칸에 드래그하거나 Ctrl+V로 바로 삽입 · 필요한 도구만 열어서 사용'
     : '외부 이미지/영상/YouTube 링크를 URL로 삽입하거나 영상을 검색해서 추가하세요.'
@@ -338,6 +344,7 @@ export default function RichBodyEditor({
             type="text"
             value={pollQuestion}
             onChange={(e) => setPollQuestion(e.target.value)}
+            onKeyDown={keepEnterInPollForm}
             placeholder="투표 제목 입력"
             className="mb-2 min-h-11 w-full rounded-lg border border-[var(--app-accent-border)]/15 bg-[var(--app-surface)] px-3 text-sm font-semibold outline-none focus:border-[var(--app-accent-border)]"
           />
@@ -374,13 +381,16 @@ export default function RichBodyEditor({
                   type="text"
                   value={option.label}
                   onChange={(e) => updatePollOption(index, 'label', e.target.value)}
+                  onKeyDown={keepEnterInPollForm}
                   placeholder={`보기 ${index + 1}`}
                   className="min-h-10 flex-1 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-sm outline-none focus:border-[var(--app-accent-border)]"
                 />
                 <input
-                  type="url"
+                  type="text"
+                  inputMode="url"
                   value={option.imageUrl}
                   onChange={(e) => updatePollOption(index, 'imageUrl', e.target.value)}
+                  onKeyDown={keepEnterInPollForm}
                   placeholder="보기 이미지 URL(선택)"
                   className="min-h-10 flex-1 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-sm outline-none focus:border-[var(--app-accent-border)]"
                 />

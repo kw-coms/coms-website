@@ -71,6 +71,24 @@ class SponsorServiceTest {
     }
 
     @Test
+    void exportedLedgerCannotSmuggleSpreadsheetFormulas() {
+        Long tierId = tier("=HYPERLINK(\"https://example.test\",\"등급\")");
+        sponsorService.create(sponsor("=cmd|' /C calc'!A0", tierId, b -> b.amountNote("+82-10-0000-0000")));
+        sponsorService.create(sponsor("정상 \"따옴표\" 후원사", tierId, b -> b.amountNote("500,000원")));
+
+        String csv = sponsorService.exportCsv();
+
+        // A cell that starts with = + - @ is run as a formula by spreadsheet apps; the leading
+        // apostrophe makes them show it as the text it is.
+        assertThat(csv).contains("\"'=cmd|' /C calc'!A0\"");
+        assertThat(csv).contains("\"'+82-10-0000-0000\"");
+        assertThat(csv).contains("\"'=HYPERLINK(\"\"https://example.test\"\",\"\"등급\"\")\"");
+        // Ordinary values are untouched apart from standard quote doubling.
+        assertThat(csv).contains("\"정상 \"\"따옴표\"\" 후원사\"").contains("\"500,000원\"");
+        assertThat(csv.lines()).noneMatch(line -> line.startsWith("\"=") || line.contains(",\"=") || line.contains(",\"+"));
+    }
+
+    @Test
     void expiredAndHiddenSponsorsLeaveThePublicListButStayInTheAdminList() {
         Long tierId = tier("실버");
         sponsorService.create(sponsor("현재 후원", tierId, b -> b));

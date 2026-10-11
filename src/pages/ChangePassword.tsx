@@ -19,12 +19,14 @@ import {
 import { useAuth } from '../contexts/useAuth'
 import { getLogoAsset } from '../utils/logoAssets'
 import { showToast } from '../components/common/Toast'
-import { PASSWORD_PATTERN, PASSWORD_MESSAGE } from '../utils/passwordPolicy'
+import { PASSWORD_PATTERN, PASSWORD_MESSAGE, PASSWORD_TOO_LONG_MESSAGE, isPasswordTooLong } from '../utils/passwordPolicy'
 import { getClubRoom } from '../services/siteSettingsApi'
 import { canSeeClubRoom } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
 const OTHER_INTEREST = '기타'
-const INTEREST_OPTIONS = ['보안', '웹', '앱']
+// Same list as the signup form. This one had fallen behind it, so an interest picked at signup
+// (알고리즘, 아두이노, 디자인) came back here as free-text 기타.
+const INTEREST_OPTIONS = ['웹', '앱', '보안', '알고리즘', '아두이노', '디자인']
 
 function choiceButtonClass(active) {
   return `min-h-11 rounded-lg px-4 py-2 text-sm font-semibold transition ${
@@ -56,6 +58,14 @@ function parseInterests(value) {
 
   if (custom.length > 0) selected.push(OTHER_INTEREST)
   return { selected, other: custom.join(' / ') }
+}
+
+// The shape the signup form stores ("웹,앱,기타:게임"), which the member admin screen parses.
+function serializeInterests(selected, other) {
+  return selected
+    .map((interest) => (interest === OTHER_INTEREST ? other.trim() && `${OTHER_INTEREST}:${other.trim()}` : interest))
+    .filter(Boolean)
+    .join(',')
 }
 
 function InterestsSelector({ selected, onChange, otherText, onOtherChange, inputClass, frameClass }: {
@@ -343,7 +353,7 @@ function NotificationPreferencesSection({ cardClass, helperTextClass, primaryBtn
 }
 
 export default function ChangePassword({ onBack }: { onBack: () => void }) {
-  const { user, refreshUser, setUser } = useAuth()
+  const { user, refreshUser, setUser, clearSession } = useAuth()
   const { permissions } = usePermissions()
   const [profileDraft, setProfileDraft] = useState<Record<string, string>>({})
   const [verificationCode, setVerificationCode] = useState('')
@@ -352,10 +362,13 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [profileMessage, setProfileMessage] = useState('')
   const [emailMessage, setEmailMessage] = useState('')
-  const [passwordMessage, setPasswordMessage] = useState('')
   const [interestDraft, setInterestDraft] = useState(null)
   const [otherInterestDraft, setOtherInterestDraft] = useState(null)
-  const [error, setError] = useState('')
+  // One error per card, shown beside the button that caused it: the page is several screens
+  // long, and a single banner at the top was off-screen for the e-mail and password forms.
+  const [profileError, setProfileError] = useState('')
+  const [emailError, setEmailError] = useState('')
+  const [passwordError, setPasswordError] = useState('')
   const [loadingAction, setLoadingAction] = useState('')
   const [fonts, setFonts] = useState([])
   const [miniAppDocuments, setMiniAppDocuments] = useState({ worldcup: [], tier: [] })
@@ -439,10 +452,11 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
   ]
 
   const resetMessages = () => {
-    setError('')
+    setProfileError('')
+    setEmailError('')
+    setPasswordError('')
     setProfileMessage('')
     setEmailMessage('')
-    setPasswordMessage('')
   }
 
   const handleProfileSubmit = async (e) => {
@@ -450,15 +464,15 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
     resetMessages()
     setLoadingAction('profile')
 
-    const interestList = selectedInterests
-      .map((interest) => (interest === OTHER_INTEREST ? `${OTHER_INTEREST}: ${otherInterest.trim()}` : interest))
-      .filter((interest) => interest.trim() && interest !== `${OTHER_INTEREST}:`)
+    // Interests the member did not touch go back exactly as stored. Rebuilding them from the
+    // chips rewrote the saved value on every unrelated save (a font change, a phone number).
+    const interestsEdited = interestDraft !== null || otherInterestDraft !== null
 
     try {
       const updated = await updateProfile({
         phone: profileForm.phone.trim() || null,
         aspiration: profileForm.aspiration.trim() || null,
-        interests: interestList.length > 0 ? interestList.join(', ') : null,
+        interests: (interestsEdited ? serializeInterests(selectedInterests, otherInterest) : user?.interests) || null,
         selectedFontId: profileForm.selectedFontValue && !String(profileForm.selectedFontValue).startsWith('b:')
           ? Number(profileForm.selectedFontValue)
           : null,
@@ -473,7 +487,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
       setProfileMessage('회원 정보가 저장되었습니다.')
       showToast({ message: '회원 정보가 저장되었습니다.', tone: 'success' })
     } catch (err) {
-      setError(err.message || '회원 정보 저장 중 오류가 발생했습니다.')
+      setProfileError(err.message || '회원 정보 저장 중 오류가 발생했습니다.')
     } finally {
       setLoadingAction('')
     }
@@ -488,7 +502,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
       setEmailMessage(result.message || '인증코드를 이메일로 보냈습니다.')
       await refreshUser()
     } catch (err) {
-      setError(err.message || '이메일 인증코드 요청 중 오류가 발생했습니다.')
+      setEmailError(err.message || '이메일 인증코드 요청 중 오류가 발생했습니다.')
     } finally {
       setLoadingAction('')
     }
@@ -499,7 +513,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
     resetMessages()
 
     if (!/^\d{6}$/.test(verificationCode.trim())) {
-      setError('인증코드는 숫자 6자리로 입력해주세요.')
+      setEmailError('인증코드는 숫자 6자리로 입력해주세요.')
       return
     }
 
@@ -510,7 +524,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
       setVerificationCode('')
       await refreshUser()
     } catch (err) {
-      setError(err.message || '이메일 인증 중 오류가 발생했습니다.')
+      setEmailError(err.message || '이메일 인증 중 오류가 발생했습니다.')
     } finally {
       setLoadingAction('')
     }
@@ -521,23 +535,29 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
     resetMessages()
 
     if (!PASSWORD_PATTERN.test(newPassword)) {
-      setError(PASSWORD_MESSAGE)
+      setPasswordError(PASSWORD_MESSAGE)
+      return
+    }
+    if (isPasswordTooLong(newPassword)) {
+      setPasswordError(PASSWORD_TOO_LONG_MESSAGE)
       return
     }
     if (newPassword !== confirmPassword) {
-      setError('새 비밀번호가 일치하지 않습니다.')
+      setPasswordError('새 비밀번호가 일치하지 않습니다.')
       return
     }
 
     setLoadingAction('password')
     try {
       await changePassword(currentPassword, newPassword)
-      setPasswordMessage('비밀번호가 변경되었습니다.')
-      setCurrentPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
+      // A password change bumps the token version and revokes every refresh session
+      // (AuthService.changePassword), this device's included, so the session is already over.
+      // Say so and hand over to the login screen rather than leave a signed-in page whose next
+      // request fails with "로그인이 만료되었습니다".
+      showToast({ message: '비밀번호가 변경되었습니다. 새 비밀번호로 다시 로그인해주세요.', tone: 'success' })
+      clearSession()
     } catch (err) {
-      setError(err.message || '비밀번호 변경 중 오류가 발생했습니다.')
+      setPasswordError(err.message || '비밀번호 변경 중 오류가 발생했습니다.')
     } finally {
       setLoadingAction('')
     }
@@ -560,12 +580,10 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
           <div className="mb-5 flex flex-col items-center gap-3 text-center sm:mb-6 sm:flex-row sm:items-center sm:gap-4 sm:text-left">
             <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="h-10 w-10 flex-shrink-0 object-contain sm:h-12 sm:w-12" />
             <div className="min-w-0">
-              <h2 className="text-lg font-bold leading-snug sm:text-xl">계정 설정</h2>
+              <h1 className="text-lg font-bold leading-snug sm:text-xl">계정 설정</h1>
               <p className="text-sm leading-5 text-[var(--theme-body-muted)]/85">회원 정보, 이메일 인증, 비밀번호를 관리합니다.</p>
             </div>
           </div>
-
-          {error && <div className="mb-4 text-sm text-red-500">{error}</div>}
 
           <form onSubmit={handleProfileSubmit} className={`${cardClass} space-y-4`}>
             <div>
@@ -654,6 +672,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
             </div>
 
             {profileMessage && <div className="text-sm text-[var(--app-accent-text)]">{profileMessage}</div>}
+            {profileError && <div role="alert" className="text-sm text-red-500">{profileError}</div>}
 
             <button type="submit" className={primaryBtnClass} disabled={loadingAction === 'profile'}>
               {loadingAction === 'profile' ? '저장 중...' : '회원 정보 저장'}
@@ -748,12 +767,14 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
             )}
 
             {emailMessage && <div className="mt-3 text-sm text-[var(--app-accent-text)]">{emailMessage}</div>}
+            {emailError && <div role="alert" className="mt-3 text-sm text-red-500">{emailError}</div>}
           </div>
 
           <form onSubmit={handlePasswordSubmit} className={`${cardClass} mt-4 space-y-4`}>
             <div>
               <h3 className="font-semibold">비밀번호 변경</h3>
               <p className={helperTextClass}>현재 비밀번호와 새 비밀번호 입력 영역을 분리했습니다.</p>
+              <p className={helperTextClass}>변경하면 이 기기를 포함한 모든 기기에서 로그아웃되며, 새 비밀번호로 다시 로그인해야 합니다.</p>
             </div>
             <div className={fieldCardClass}>
               <label className="mb-2 block text-sm text-[var(--theme-body-muted)]/90">현재 비밀번호</label>
@@ -814,7 +835,7 @@ export default function ChangePassword({ onBack }: { onBack: () => void }) {
               </div>
             </div>
 
-            {passwordMessage && <div className="text-sm text-[var(--app-accent-text)]">{passwordMessage}</div>}
+            {passwordError && <div role="alert" className="text-sm text-red-500">{passwordError}</div>}
 
             <button type="submit" className={btnClass} disabled={loadingAction === 'password'}>
               {loadingAction === 'password' ? '변경 중...' : '비밀번호 변경'}

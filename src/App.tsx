@@ -19,6 +19,7 @@ import {
   normalizeHex,
 } from './utils/themeColors'
 import { ScrollToTop, RequireAuth, RequireAdmin } from './routes/guards'
+import { useRouteDocumentTitle } from './hooks/useDocumentTitle'
 import {
   LoginPage,
   SignupPage,
@@ -59,6 +60,7 @@ function App() {
   const [themeMode, setThemeMode] = useState(getStoredThemeMode)
   const [accentColor, setAccentColor] = useState(getStoredAccentColor)
   const [guestFontId, setGuestFontId] = useState(getStoredFontId)
+  const routeAnnouncement = useRouteDocumentTitle()
 
   const fontsQuery = useQuery({
     queryKey: FONTS_QUERY_KEY,
@@ -187,6 +189,8 @@ function App() {
         fontSelectionLocked={Boolean(user)}
         onOpenAccountSettings={openAccountSettings}
       />
+      {/* Client-side navigations are silent to screen readers; announce the new page title. */}
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{routeAnnouncement}</div>
       <ToastHost />
       <ConfirmHost />
     </Suspense>

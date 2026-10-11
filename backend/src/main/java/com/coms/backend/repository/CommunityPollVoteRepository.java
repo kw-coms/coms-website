@@ -10,6 +10,9 @@ import java.util.Optional;
 public interface CommunityPollVoteRepository extends JpaRepository<CommunityPollVote, Long> {
     List<CommunityPollVote> findByPostIdIn(Collection<Long> postIds);
     Optional<CommunityPollVote> findByPostIdAndPollIdAndStudentId(Long postId, String pollId, String studentId);
+    boolean existsByPostIdAndPollId(Long postId, String pollId);
     void deleteByPostId(Long postId);
+
+    void deleteByPostIdAndPollId(Long postId, String pollId);
     void deleteByStudentId(String studentId);
 }

@@ -31,6 +31,10 @@ public class ClubProjectService {
     // Distributables (apk/zip and similar). Generous limit so app/game builds fit.
     private static final long MAX_FILE_BYTES = 200L * 1024 * 1024;
     private static final int MAX_FILES_PER_PROJECT = 10;
+    // Column widths of club_projects (V54).
+    private static final int MAX_TITLE_LENGTH = 120;
+    private static final int MAX_EYEBROW_LENGTH = 60;
+    private static final int MAX_MADE_BY_LENGTH = 100;
     private static final Set<String> ALLOWED_DISTRIBUTABLE_EXTENSIONS = Set.of("zip", "apk", "pdf");
 
     private final ClubProjectRepository repository;
@@ -79,16 +83,16 @@ public class ClubProjectService {
             if (title.isBlank()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "프로젝트 제목을 입력하세요.");
             }
-            project.setTitle(title.trim());
+            project.setTitle(bounded(title, MAX_TITLE_LENGTH, "프로젝트 제목"));
         }
         if (description != null) {
             project.setDescription(description.isBlank() ? null : description.trim());
         }
         if (eyebrow != null) {
-            project.setEyebrow(eyebrow.isBlank() ? null : eyebrow.trim());
+            project.setEyebrow(eyebrow.isBlank() ? null : bounded(eyebrow, MAX_EYEBROW_LENGTH, "분류 문구"));
         }
         if (madeBy != null) {
-            project.setMadeBy(madeBy.isBlank() ? null : madeBy.trim());
+            project.setMadeBy(madeBy.isBlank() ? null : bounded(madeBy, MAX_MADE_BY_LENGTH, "제작자"));
         }
         if (linkUrl != null) {
             project.setLinkUrl(cleanProjectUrl(linkUrl, true));
@@ -175,12 +179,20 @@ public class ClubProjectService {
         if (title == null || title.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "프로젝트 제목을 입력하세요.");
         }
-        project.setTitle(title.trim());
+        project.setTitle(bounded(title, MAX_TITLE_LENGTH, "프로젝트 제목"));
         project.setDescription(description != null && !description.isBlank() ? description.trim() : null);
-        project.setEyebrow(eyebrow != null && !eyebrow.isBlank() ? eyebrow.trim() : null);
-        project.setMadeBy(madeBy != null && !madeBy.isBlank() ? madeBy.trim() : null);
+        project.setEyebrow(eyebrow != null && !eyebrow.isBlank() ? bounded(eyebrow, MAX_EYEBROW_LENGTH, "분류 문구") : null);
+        project.setMadeBy(madeBy != null && !madeBy.isBlank() ? bounded(madeBy, MAX_MADE_BY_LENGTH, "제작자") : null);
         project.setLinkUrl(cleanProjectUrl(linkUrl, true));
         project.setDisplayUrl(cleanProjectUrl(displayUrl, false));
+    }
+
+    private static String bounded(String value, int maxLength, String label) {
+        String trimmed = value.trim();
+        if (trimmed.length() > maxLength) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + "은(는) " + maxLength + "자 이하로 입력하세요.");
+        }
+        return trimmed;
     }
 
     private String resolveCategory(String value) {

@@ -35,6 +35,8 @@ export default function AdminFonts() {
   const submit = async (event) => {
     event.preventDefault()
     if (!name.trim() || !file) return
+    // React nulls event.currentTarget once this handler yields at the first await.
+    const form = event.currentTarget
     setSaving(true)
     setError('')
     try {
@@ -42,7 +44,7 @@ export default function AdminFonts() {
       setFonts((prev) => [uploaded, ...prev])
       setName('')
       setFile(null)
-      event.currentTarget.reset()
+      form.reset()
     } catch (err) {
       setError(err.message || '폰트 업로드에 실패했습니다.')
     } finally {

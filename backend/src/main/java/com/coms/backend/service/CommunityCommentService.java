@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,11 @@ import java.util.stream.Collectors;
 @Transactional
 class CommunityCommentService {
     private static final int MAX_COMMENT_LENGTH = 1000;
+    // Posts are limited to five a minute; comments had no limit at all, and every comment also
+    // writes a notification, a push and an audit row for somebody else.
+    private static final int MAX_COMMENTS_PER_MINUTE = 12;
+    // Reply trees are walked recursively on delete; a bound keeps that walk shallow.
+    private static final int MAX_REPLY_DEPTH = 30;
 
     private final CommunityCommentRepository commentRepository;
     private final CommunityPostRepository communityPostRepository;
@@ -68,6 +74,7 @@ class CommunityCommentService {
         CommunityPost post = requirePost(postId);
         access.requireVisible(member, post);
         boolean isAdmin = access.isModerator(member);
+        boolean canEdit = access.isAdmin(member);
         boolean maskAnonymous = access.isAnonymous(post) && !isAdmin;
         List<CommunityComment> comments = commentRepository.findByPostIdOrderByCreatedAtAsc(postId);
         Map<String, CommunityReputationResponse> reputations = maskAnonymous ? Map.of()
@@ -82,7 +89,8 @@ class CommunityCommentService {
                             reputation == null ? null : reputation.tier(),
                             reputation == null ? null : reputation.tierLabel(),
                             c.getContent(), c.getCreatedAt(), c.getUpdatedAt(), c.isEdited(),
-                            isAdmin || c.getStudentId().equals(studentId));
+                            isAdmin || c.getStudentId().equals(studentId),
+                            canEdit || c.getStudentId().equals(studentId));
                 })
                 .toList();
     }
@@ -106,6 +114,16 @@ class CommunityCommentService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reply parent does not belong to this post.");
             }
             depth = parent.getDepth() + 1;
+            if (depth > MAX_REPLY_DEPTH) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "답글을 더 이어서 달 수 없습니다. 새 댓글로 작성해주세요.");
+            }
+        }
+        // Counted in the database, the same way CommunityService limits posts.
+        long recentComments = commentRepository.countByStudentIdAndCreatedAtAfter(
+                member.getStudentId(), LocalDateTime.now().minusMinutes(1));
+        if (recentComments >= MAX_COMMENTS_PER_MINUTE) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "댓글은 1분에 최대 " + MAX_COMMENTS_PER_MINUTE + "개까지 작성할 수 있습니다.");
         }
         CommunityComment comment = new CommunityComment(postId, studentId, member.getName(), content, request.parentCommentId(), depth);
         applyAnonymousCommentFields(post, comment, request.anonymousName(), clientIp);
@@ -127,7 +145,10 @@ class CommunityCommentService {
         Member member = access.requireAuthenticatedMember(studentId);
         CommunityPost post = requirePost(postId);
         access.requireVisible(member, post);
-        if (!comment.getStudentId().equals(studentId) && !access.isModerator(member)) {
+        // Same rule as posts (CommunityAccess.canEditPost): moderators may delete a comment, but
+        // rewriting what another member said — still shown under that member's name — is for the
+        // author and 회장 only.
+        if (!comment.getStudentId().equals(studentId) && !access.isAdmin(member)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
         String content = textService.normalizeBounded(request.content(), "댓글", MAX_COMMENT_LENGTH);
@@ -170,7 +191,8 @@ class CommunityCommentService {
                 commentAuthorName(post, currentMember, comment),
                 reputation == null ? null : reputation.tier(),
                 reputation == null ? null : reputation.tierLabel(),
-                comment.getContent(), comment.getCreatedAt(), comment.getUpdatedAt(), comment.isEdited(), deletable);
+                comment.getContent(), comment.getCreatedAt(), comment.getUpdatedAt(), comment.isEdited(), deletable,
+                comment.getStudentId().equals(currentMember.getStudentId()) || access.isAdmin(currentMember));
     }
 
     private String commentAuthorName(CommunityPost post, Member currentMember, CommunityComment comment) {

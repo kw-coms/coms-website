@@ -150,6 +150,20 @@ class RefreshSessionRotationTest {
     }
 
     @Test
+    void refreshTokenOfDeletedAccountIsRejected() {
+        // A legacy token (no session row to revoke) for an account that has since been removed.
+        // The member lookup used to fall back to token version 0, which this token also carries,
+        // so the refresh went through and issued a fresh session for a member that does not exist.
+        String legacy = legacyRefreshToken(STUDENT_ID, 0);
+        memberRepository.findByStudentId(STUDENT_ID).ifPresent(memberRepository::delete);
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        assertThat(refresh(legacy, response).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(response.getHeaders(HttpHeaders.SET_COOKIE)).isEmpty();
+        assertThat(refreshSessionRepository.count()).isZero();
+    }
+
+    @Test
     void logoutEndsOnlyTheDeviceThatCalledIt() {
         AuthResponse deviceA = login();
         AuthResponse deviceB = login();

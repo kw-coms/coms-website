@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { CheckCircle2, Mail, Send, UserRound } from 'lucide-react'
 import { signupUser } from '../services/authApi'
 import { EmailVerifyStep } from '../components/EmailVerifyStep'
-import { PASSWORD_PATTERN } from '../utils/passwordPolicy'
+import { PASSWORD_PATTERN, PASSWORD_TOO_LONG_MESSAGE, isPasswordTooLong } from '../utils/passwordPolicy'
 import { useScrollReveal } from '../hooks/useScrollReveal'
 
 const CURRENT_SIGNUP = 'current'
@@ -231,6 +231,7 @@ export default function Signup({ onBack }: { onBack: () => void }) {
     if (!form.password) return '비밀번호를 입력해주세요.'
     if (/\s/.test(form.password)) return '비밀번호에 공백을 사용할 수 없습니다.'
     if (!PASSWORD_PATTERN.test(form.password)) return '비밀번호는 8자 이상, 영문·숫자·특수문자(!@#$ 등)를 모두 포함해야 합니다.'
+    if (isPasswordTooLong(form.password)) return PASSWORD_TOO_LONG_MESSAGE
     if (form.password !== form.passwordConfirm) return '비밀번호 확인이 일치하지 않습니다.'
 
     if (isCurrentSignup && selectedInterests.length === 0) return '재학생 관심 분야를 하나 이상 선택해주세요.'
@@ -445,7 +446,7 @@ export default function Signup({ onBack }: { onBack: () => void }) {
                 </div>
               )}
 
-              {error && <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
+              {error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
 
               <button
                 type="submit"
@@ -459,11 +460,27 @@ export default function Signup({ onBack }: { onBack: () => void }) {
           )}
 
           {step === 'verify' && (
-            <EmailVerifyStep
-              studentId={signedUpStudentId}
-              email={signedUpEmail}
-              onDone={() => setStep('done')}
-            />
+            <div className="space-y-5">
+              <EmailVerifyStep
+                studentId={signedUpStudentId}
+                email={signedUpEmail}
+                onDone={() => setStep('done')}
+              />
+              {/* The form keeps its values, and submitting it again replaces the pending signup and
+                  mails a fresh code. That is the only way to correct a mistyped address, and the
+                  only recovery once the server has dropped the pending signup (five wrong codes,
+                  or an expired one): from then on "코드 재전송" answers OK and sends nothing. */}
+              <p className="text-center text-sm text-[var(--theme-body-muted)]">
+                이메일 주소를 잘못 입력했거나 인증코드가 계속 맞지 않나요?{' '}
+                <button
+                  type="button"
+                  onClick={() => setStep('form')}
+                  className="font-semibold text-[var(--app-accent-text)]"
+                >
+                  가입 정보 수정 후 다시 제출
+                </button>
+              </p>
+            </div>
           )}
 
           {step === 'done' && (

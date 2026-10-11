@@ -71,6 +71,8 @@ export default function AdminActivities() {
   const submit = async (event) => {
     event.preventDefault()
     if (!form.title.trim() || !form.eventDate) return
+    // React nulls event.currentTarget once this handler yields at the first await.
+    const formEl = event.currentTarget
     setSaving(true)
     setError('')
     setNotice('')
@@ -83,23 +85,34 @@ export default function AdminActivities() {
         eventDate: form.eventDate,
         image: form.image,
       })
-      if (form.kind === 'ACTIVITY' && form.images.length > 0) {
-        await uploadClubActivityImages(created.id, form.images)
-      }
-      if (form.kind === 'ACTIVITY' && form.files.length > 0) {
-        for (const file of form.files) {
-          await uploadClubActivityFile(created.id, file)
-        }
-      }
-      // Re-fetch the list so the new media counts are reflected.
+      // The record exists from here on, so it is listed and the form cleared whatever happens
+      // to the attachments. A failed upload used to read as a failed registration: the record
+      // was not listed, the form stayed filled, and submitting it again created a duplicate.
+      setItems((prev) => [created, ...prev])
+      let attachmentError = ''
       if (form.images.length > 0 || form.files.length > 0) {
-        const refreshed = await listClubActivities()
-        setItems(Array.isArray(refreshed) ? refreshed : [])
-      } else {
-        setItems((prev) => [created, ...prev])
+        try {
+          if (form.kind === 'ACTIVITY' && form.images.length > 0) {
+            await uploadClubActivityImages(created.id, form.images)
+          }
+          if (form.kind === 'ACTIVITY' && form.files.length > 0) {
+            for (const file of form.files) {
+              await uploadClubActivityFile(created.id, file)
+            }
+          }
+        } catch (err) {
+          attachmentError = err.message || '첨부를 올리지 못했습니다.'
+        }
+        // Re-fetch the list so the new media counts are reflected.
+        const refreshed = await listClubActivities().catch(() => null)
+        if (Array.isArray(refreshed)) setItems(refreshed)
       }
-      setNotice('활동 기록을 등록했습니다.')
-      event.currentTarget.reset()
+      if (attachmentError) {
+        setError(`활동 기록은 등록됐지만 사진·파일 첨부를 마치지 못했습니다. (${attachmentError}) 아래 목록에서 '수정'을 눌러 다시 첨부해주세요.`)
+      } else {
+        setNotice('활동 기록을 등록했습니다.')
+      }
+      formEl.reset()
       if (imageInputRef.current) imageInputRef.current.value = ''
       if (filesInputRef.current) filesInputRef.current.value = ''
       setForm((prev) => ({ ...prev, title: '', description: '', eventDate: '', image: null, images: [], files: [] }))

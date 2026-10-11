@@ -21,4 +21,12 @@ public record RecruitApplicationStatusResponse(
                 application.getSubmittedAt()
         );
     }
+
+    /**
+     * A decided application. Its row no longer exists (the decision log is the record), so there
+     * is no submission time to report.
+     */
+    public static RecruitApplicationStatusResponse decided(RecruitApplication.Status status, String statusLabel) {
+        return new RecruitApplicationStatusResponse(status.name(), statusLabel, null);
+    }
 }

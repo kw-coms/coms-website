@@ -5,6 +5,10 @@ import { showToast } from '../../components/common/Toast'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 
+// Account id issued to a graduate at signup: G{입학연도}-{명부 id}. Same shape roleAccess's
+// displayStudentId() recognises.
+const GRADUATE_ACCOUNT_ID = /^G\d{4}-\d+$/
+
 export default function AdminRoster() {
   const fileInputRef = useRef(null)
   const [uploading, setUploading] = useState(false)
@@ -100,7 +104,11 @@ export default function AdminRoster() {
 
   const startEdit = (member) => {
     setEditingId(member.id)
-    setEditForm({ studentId: member.studentId || '', name: member.name, phone: member.phone || '', generation: member.generation == null ? '' : String(member.generation) })
+    // A graduate's synthetic account id is an internal key, not a 학번: sent back as studentId,
+    // the server re-derives the row from it and drops the admission year. Leave the field empty
+    // for those rows (an empty 학번 is saved as "keep the current id").
+    const studentId = GRADUATE_ACCOUNT_ID.test(member.studentId || '') ? '' : (member.studentId || '')
+    setEditForm({ studentId, name: member.name, phone: member.phone || '', generation: member.generation == null ? '' : String(member.generation) })
   }
 
   const handleEditSave = async (id) => {
@@ -118,7 +126,8 @@ export default function AdminRoster() {
   }
 
   const handleDelete = async (member) => {
-    if (!(await confirmDialog({ message: `${member.name} (${member.studentId}) 항목을 명부에서 삭제하시겠습니까?`, tone: 'danger' }))) return
+    // Rows without a 학번 (졸업생, 학번 미입력) used to read "이름 (null)".
+    if (!(await confirmDialog({ message: `${member.name} (${displayStudentId(member.studentId) || '학번 없음'}) 항목을 명부에서 삭제하시겠습니까?`, tone: 'danger' }))) return
     try {
       await deleteEligibleMember(member.id)
       setRoster((prev) => prev.filter((m) => m.id !== member.id))
@@ -318,14 +327,13 @@ export default function AdminRoster() {
                     {editingId === member.id ? (
                       <td colSpan={5} className="px-3 py-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          {editForm.studentId ? (
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-[10px] text-[var(--theme-body-muted)]">학번</span>
-                              <input value={editForm.studentId} onChange={(e) => setEditForm((p) => ({ ...p, studentId: e.target.value }))} maxLength={10} className={`${inputCls} w-36`} />
-                            </div>
-                          ) : (
-                            <span className="text-xs italic text-[var(--theme-body-muted)]">졸업생 (학번 없음)</span>
-                          )}
+                          {/* Always rendered. Showing it only while the draft had a value hid it for
+                              학번 미입력 rows (which are completed right here) and unmounted it the
+                              moment an existing 학번 was cleared to retype it. */}
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] text-[var(--theme-body-muted)]">학번</span>
+                            <input value={editForm.studentId} onChange={(e) => setEditForm((p) => ({ ...p, studentId: e.target.value }))} maxLength={10} placeholder="학번 없음" className={`${inputCls} w-36`} />
+                          </div>
                           <div className="flex flex-col gap-0.5">
                             <span className="text-[10px] text-[var(--theme-body-muted)]">이름</span>
                             <input value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} maxLength={20} className={`${inputCls} w-28`} />

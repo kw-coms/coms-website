@@ -105,16 +105,17 @@ function prefersReducedMotion() {
 
 export default function ComsIntro() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  // Skip the intro outright under reduced-motion: start `gone` so the overlay
-  // never renders and the mount effect bails before any canvas work. This is
-  // gated ONLY on the media query, never on the once-per-load flag, so a normal
-  // load still plays.
-  const [gone, setGone] = useState(() => prefersReducedMotion() || introPlayed)
+  // Decided once, at mount. The effect keys off this instead of re-reading the
+  // module flag: under React StrictMode the effect runs setup → cleanup → setup,
+  // and the first pass already flips `introPlayed`, so re-checking it made the
+  // second pass bail and left a blank overlay that never dismissed itself.
+  // Reduced motion skips the intro outright (no overlay, no canvas work).
+  const [shouldPlay] = useState(() => !(prefersReducedMotion() || introPlayed))
+  const [gone, setGone] = useState(!shouldPlay)
   const [fadingOut, setFadingOut] = useState(false)
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (prefersReducedMotion() || introPlayed) return
+    if (typeof window === 'undefined' || !shouldPlay) return
     introPlayed = true
     try {
       sessionStorage.setItem(INTRO_SESSION_KEY, '1')
@@ -123,9 +124,12 @@ export default function ComsIntro() {
     }
 
     const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    const ctx = canvas?.getContext('2d') ?? null
+    if (!canvas || !ctx) {
+      // Nothing can be drawn: dismiss instead of leaving a blank overlay on the home page.
+      const dismiss = window.setTimeout(() => setFadingOut(true), 0)
+      return () => window.clearTimeout(dismiss)
+    }
 
     const koreaGrid = buildKoreaGrid(224)
     const kN = koreaGrid.length
@@ -441,6 +445,13 @@ export default function ComsIntro() {
     }
     raf = requestAnimationFrame(frame)
 
+    // Safety net: the first frame normally lands within a tick. If none has arrived
+    // while the page is actually visible, fade out rather than keep covering the home
+    // page. (A background tab is left alone — the intro plays once it becomes visible.)
+    const watchdog = window.setTimeout(() => {
+      if (!start && document.visibilityState === 'visible') finish()
+    }, 2000)
+
     const onResize = () => resize()
     window.addEventListener('resize', onResize)
     const skip = () => finish()
@@ -450,13 +461,14 @@ export default function ComsIntro() {
 
     return () => {
       cancelAnimationFrame(raf)
+      window.clearTimeout(watchdog)
       window.removeEventListener('resize', onResize)
       window.removeEventListener('keydown', skip)
       window.removeEventListener('wheel', skip)
       window.removeEventListener('touchstart', skip)
       document.body.style.overflow = prevOverflow
     }
-  }, [])
+  }, [shouldPlay])
 
   useEffect(() => {
     if (!fadingOut) return

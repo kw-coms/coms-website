@@ -108,11 +108,13 @@ public class AuthController {
         String studentId = jwtTokenProvider.getStudentId(refreshToken);
         authService.ensureAccountNotBanned(studentId);
 
-        // Reject revoked refresh tokens (stale token version).
-        int currentTokenVersion = authService.getCurrentTokenVersion(studentId);
-        if (jwtTokenProvider.getTokenVersion(refreshToken) != currentTokenVersion) {
+        // Reject refresh tokens of accounts that no longer exist, and revoked ones (stale token version).
+        java.util.OptionalInt memberTokenVersion = authService.findTokenVersion(studentId);
+        if (memberTokenVersion.isEmpty()
+                || jwtTokenProvider.getTokenVersion(refreshToken) != memberTokenVersion.getAsInt()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
+        int currentTokenVersion = memberTokenVersion.getAsInt();
 
         boolean rememberMe = jwtTokenProvider.isRememberedRefreshToken(refreshToken);
         String family = jwtTokenProvider.getFamily(refreshToken);
@@ -204,15 +206,18 @@ public class AuthController {
 
     @PostMapping("/password-reset/request")
     public ResponseEntity<PasswordResetStatusResponse> requestPasswordReset(
-            @Valid @RequestBody RequestPasswordResetRequest request) {
-        authService.requestPasswordReset(request.studentId(), request.email());
+            @Valid @RequestBody RequestPasswordResetRequest request,
+            HttpServletRequest servletRequest) {
+        authService.requestPasswordReset(request.studentId(), request.email(), clientIpResolver.resolve(servletRequest));
         return ResponseEntity.ok(new PasswordResetStatusResponse("입력 정보와 일치하는 계정이 있다면 인증코드를 이메일로 보냈습니다."));
     }
 
     @PostMapping("/password-reset/confirm")
     public ResponseEntity<PasswordResetStatusResponse> confirmPasswordReset(
-            @Valid @RequestBody ConfirmPasswordResetRequest request) {
-        authService.confirmPasswordReset(request.studentId(), request.email(), request.code(), request.newPassword());
+            @Valid @RequestBody ConfirmPasswordResetRequest request,
+            HttpServletRequest servletRequest) {
+        authService.confirmPasswordReset(request.studentId(), request.email(), request.code(), request.newPassword(),
+                clientIpResolver.resolve(servletRequest));
         return ResponseEntity.ok(new PasswordResetStatusResponse("비밀번호가 재설정되었습니다."));
     }
 

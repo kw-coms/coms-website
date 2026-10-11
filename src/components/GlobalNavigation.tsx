@@ -59,6 +59,16 @@ export default function GlobalNavigation() {
   const activityWrapperRef = useRef(null)
   const activityToggleRef = useRef<HTMLButtonElement | null>(null)
   const mobileMenuToggleRef = useRef<HTMLButtonElement | null>(null)
+  // Every navigation closes the mobile menu, not only its own links: the brand link, a
+  // notification row and the browser's Back button change the route without closeAndGo.
+  // location.key (not pathname) so /admin -> /admin?tab=… from a notification counts too.
+  // Reset while rendering, as useVisibleCount does, instead of in a setState effect.
+  const [menuLocationKey, setMenuLocationKey] = useState(location.key)
+  if (location.key !== menuLocationKey) {
+    setMenuLocationKey(location.key)
+    setMobileMenuOpen(false)
+    setMobileActivityOpen(false)
+  }
   const activeKey = getActiveNavKey(location.pathname)
   const mobileTabs = tabs.slice(0, 3)
   const showMobileTabs = mobileTabs.some((tab) => tab.id === activeKey)
@@ -125,7 +135,15 @@ export default function GlobalNavigation() {
 
   useEffect(() => {
     if (!location.hash) return undefined
-    const sectionId = decodeURIComponent(location.hash.slice(1))
+    // A hand-typed hash such as "#100%" is not valid percent-encoding: decodeURIComponent
+    // throws, and an error thrown from this effect (outside the route error boundary) takes
+    // the whole app down. Fall back to the raw hash.
+    let sectionId = location.hash.slice(1)
+    try {
+      sectionId = decodeURIComponent(sectionId)
+    } catch {
+      // Not decodable; look the id up as written.
+    }
     const frame = window.requestAnimationFrame(() => {
       document.getElementById(sectionId)?.scrollIntoView({ block: 'start' })
     })
@@ -159,9 +177,11 @@ export default function GlobalNavigation() {
   }
 
   const handleLogout = async () => {
-    await logout()
+    // logout() resolves false when the server could not be reached: the member is still signed
+    // in (and has been told so), so they stay where they are.
+    const loggedOut = await logout()
     setMobileMenuOpen(false)
-    goPageTop('/')
+    if (loggedOut !== false) goPageTop('/')
   }
 
   const navClass = (key, active = activeKey === key) => (
@@ -184,18 +204,22 @@ export default function GlobalNavigation() {
       <ChevronDown size={20} className="rotate-180" />
     </button>
     <header className={`apple-global-nav fixed inset-x-0 top-0 z-[80] ${scrolled ? 'is-scrolled' : ''}`}>
-      <div className={`${floatingBarBaseClass} relative mx-auto flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-8`}>
+      {/* From lg up the bar is a 1fr / auto / 1fr grid: the nav stays optically centred while
+          there is room and is pushed aside — never painted over — when the account cluster
+          needs more width. Below lg the hamburger menu takes over; the centred nav used to
+          show from 768px, where it overlapped the brand and the account buttons. */}
+      <div className={`${floatingBarBaseClass} relative mx-auto flex items-center justify-between gap-4 px-4 sm:px-6 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:px-8`}>
         <button
           type="button"
           onClick={() => goPageTop('/')}
-          className="apple-global-nav-brand flex min-w-0 items-center gap-3 text-left"
+          className="apple-global-nav-brand flex min-w-0 items-center gap-3 text-left lg:justify-self-start"
           aria-label="홈으로 이동"
         >
           <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's Logo" className="h-6 w-6 shrink-0 object-contain" />
           <span className="whitespace-nowrap text-sm font-bold text-[var(--app-text)]">KW COM&apos;s</span>
         </button>
 
-        <nav className="pointer-events-auto absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-3 lg:gap-5 md:flex">
+        <nav className="hidden items-center gap-3 lg:flex xl:gap-5">
           {primaryNavItems.map((item) => (
             <button
               key={item.id}
@@ -276,17 +300,25 @@ export default function GlobalNavigation() {
         </nav>
 
         {user ? (
-          <div className="ml-auto hidden items-center gap-1 md:flex">
+          <div className="hidden items-center gap-1 lg:flex lg:justify-self-end">
             <NotificationButton />
-            <button type="button" onClick={() => goPageTop('/settings')} className="rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)]" title="계정 설정">{user.name}</button>
+            <button
+              type="button"
+              onClick={() => goPageTop('/settings')}
+              className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] text-[11px] font-bold text-[var(--app-text)] transition hover:bg-black/5 xl:size-auto xl:max-w-[9rem] xl:border-transparent xl:bg-transparent xl:px-2.5 xl:py-1 xl:text-xs xl:font-semibold xl:text-[var(--app-muted)] xl:hover:text-[var(--app-text)]"
+              title="계정 설정"
+            >
+              <span className="xl:hidden" aria-hidden="true">{user.name?.[0] ?? '?'}</span>
+              <span className="sr-only xl:not-sr-only xl:truncate">{user.name}</span>
+            </button>
             {canAccessOperationsPanel(permissions) && (
               <button type="button" onClick={() => goPageTop('/admin')} className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-2.5 py-1 text-xs font-bold text-[var(--app-accent-text)] transition hover:border-[var(--app-accent-border,rgba(0,113,227,0.4))]">
                 {ROLE_LABELS[user.role] || '임원'}
               </button>
             )}
-            <button type="button" onClick={handleLogout} className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)]">
-              <LogOut size={14} />
-              Logout
+            <button type="button" onClick={handleLogout} title="로그아웃" className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-black/5 hover:text-[var(--app-text)] xl:px-2.5">
+              <LogOut size={14} aria-hidden="true" />
+              <span className="sr-only xl:not-sr-only">Logout</span>
             </button>
           </div>
         ) : (
@@ -294,7 +326,7 @@ export default function GlobalNavigation() {
             type="button"
             onClick={() => goPageTop('/login')}
             disabled={authLoading}
-            className="ml-auto hidden shrink-0 whitespace-nowrap rounded-full bg-[var(--app-accent)] px-4 py-1 text-xs font-semibold text-white transition hover:bg-[var(--app-accent-hover)] disabled:cursor-wait disabled:opacity-70 md:inline-flex"
+            className="hidden shrink-0 whitespace-nowrap rounded-full bg-[var(--app-accent)] px-4 py-1 text-xs font-semibold text-white transition hover:bg-[var(--app-accent-hover)] disabled:cursor-wait disabled:opacity-70 lg:inline-flex lg:justify-self-end"
           >
             로그인
           </button>
@@ -304,7 +336,7 @@ export default function GlobalNavigation() {
           ref={mobileMenuToggleRef}
           type="button"
           onClick={() => setMobileMenuOpen((open) => !open)}
-          className="apple-global-nav-menu md:hidden"
+          className="apple-global-nav-menu lg:hidden"
           aria-label={mobileMenuOpen ? '메뉴 닫기' : '메뉴 열기'}
           aria-expanded={mobileMenuOpen}
           aria-controls="mobile-menu"
@@ -317,7 +349,7 @@ export default function GlobalNavigation() {
         <nav
           id="mobile-menu"
           aria-label="모바일 메뉴"
-          className="apple-mobile-menu-panel mx-auto md:hidden"
+          className="apple-mobile-menu-panel mx-auto lg:hidden"
         >
           <div className="flex flex-col divide-y divide-[var(--app-hairline)]">
             {primaryNavItems.map((item) => (

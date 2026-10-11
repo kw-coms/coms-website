@@ -177,7 +177,12 @@
 	.apple-mobile-tabs {
 		display: none !important;
 	}
+}
 
+/* The hamburger stays until lg (1024px): the full desktop nav does not fit next to the
+   brand and the account buttons on tablet widths. Keep in step with the lg: classes in
+   GlobalNavigation.tsx. */
+@media (min-width: 1024px) {
 	.apple-global-nav-menu {
 		display: none !important;
 	}

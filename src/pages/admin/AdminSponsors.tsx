@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, Download, Pencil, Plus, Trash2 } from 'lucide-r
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
+import ErrorState from '../../components/common/ErrorState'
 import Chip from '../../components/common/Chip'
 import {
   createSponsor,
@@ -52,6 +53,25 @@ export default function AdminSponsors() {
       .finally(() => { if (mounted) setLoading(false) })
     return () => { mounted = false }
   }, [])
+
+  const reload = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [sponsorRows, tierRows, pageSettings] = await Promise.all([
+        listAdminSponsors(),
+        listAdminSponsorTiers(),
+        getAdminSponsorPageSettings(),
+      ])
+      setSponsors(sponsorRows)
+      setTiers(tierRows)
+      setSettings(pageSettings)
+    } catch (err) {
+      setError(err.message || '후원자 정보를 불러오지 못했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const openForm = (row: SponsorAdminRow | null) => {
     setEditing(row)
@@ -138,6 +158,10 @@ export default function AdminSponsors() {
     )
   }
 
+  // Sponsors, tiers and page settings arrive together. Rendering the panels after a failed
+  // load showed the default page design, and 설정 저장 then overwrote the stored one.
+  if (error) return <ErrorState message={error} onRetry={reload} />
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -158,8 +182,6 @@ export default function AdminSponsors() {
           </button>
         </div>
       </div>
-
-      {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
 
       {form && (
         <AdminSponsorForm

@@ -198,7 +198,8 @@ public class AdminSponsorController {
     /** 회장 전용 장부 내보내기 — 금액 메모가 포함되므로 공개 경로에는 존재하지 않는다. */
     @GetMapping("/export.csv")
     public ResponseEntity<byte[]> exportCsv(Authentication authentication) {
-        byte[] body = sponsorService.exportCsv().getBytes(StandardCharsets.UTF_8);
+        // The BOM is what makes Excel on Korean Windows read the file as UTF-8 instead of CP949.
+        byte[] body = ("\uFEFF" + sponsorService.exportCsv()).getBytes(StandardCharsets.UTF_8);
         audit(authentication, "ADMIN_SPONSOR_EXPORT", "SPONSOR", null, "format=csv");
         return ResponseEntity.ok()
                 .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))

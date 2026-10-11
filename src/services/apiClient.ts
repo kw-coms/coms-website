@@ -29,7 +29,13 @@ function notifySessionExpired() {
 // Single-flight the refresh: when several requests get 401 at once, they must
 // share ONE /api/auth/refresh call. Otherwise each fires its own refresh, which
 // (with refresh-token rotation) is wasteful and can interleave Set-Cookie writes.
-let refreshInFlight: Promise<boolean> | null = null
+//
+//  - 'refreshed'   new cookies were issued (or a parallel refresh already did): retry.
+//  - 'rejected'    the server refused to renew the session (401): it is gone for good.
+//  - 'unavailable' network failure / 5xx / anything else: unknown, so the session
+//                  state must not be touched on this evidence alone.
+type RefreshOutcome = 'refreshed' | 'rejected' | 'unavailable'
+let refreshInFlight: Promise<RefreshOutcome> | null = null
 // Bumped once per SUCCESSFUL refresh. A request that was already in flight when
 // someone else rotated the token gets a 401 from the token it was sent with, not
 // from the current one — refreshing again would rotate a perfectly good session
@@ -37,15 +43,18 @@ let refreshInFlight: Promise<boolean> | null = null
 // captured before the request against the current one tells the two cases apart:
 // if it moved, just retry; the cookie is already fresh.
 let refreshGeneration = 0
-async function tryRefreshToken() {
+async function tryRefreshToken(): Promise<RefreshOutcome> {
   if (refreshInFlight) return refreshInFlight
-  refreshInFlight = (async () => {
+  refreshInFlight = (async (): Promise<RefreshOutcome> => {
     try {
       const res = await fetch(apiUrl('/api/auth/refresh'), { method: 'POST', credentials: 'include' })
-      if (res.ok) refreshGeneration += 1
-      return res.ok
+      if (res.ok) {
+        refreshGeneration += 1
+        return 'refreshed'
+      }
+      return res.status === 401 ? 'rejected' : 'unavailable'
     } catch {
-      return false
+      return 'unavailable'
     } finally {
       refreshInFlight = null
     }
@@ -59,8 +68,14 @@ async function recoverFromAuthFailure(path, response, generationBeforeRequest, f
   const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
   if (!canRefresh || (response.status !== 401 && response.status !== 403)) return response
   if (refreshGeneration > generationBeforeRequest) return fetchOnce()
-  if (await tryRefreshToken()) return fetchOnce()
-  if (response.status === 401) notifySessionExpired()
+  const outcome = await tryRefreshToken()
+  if (outcome === 'refreshed') return fetchOnce()
+  // The backend has no custom authentication entry point, so an expired or missing token on a
+  // protected endpoint comes back as 403 — the same status as a real permission denial — and
+  // the original status alone cannot say "your session ended". A refresh the server refuses
+  // can: without this, an expired session left the logged-in shell on screen with every panel
+  // stuck on a retry that could never succeed.
+  if (outcome === 'rejected' || response.status === 401) notifySessionExpired()
   return response
 }
 
@@ -76,6 +91,16 @@ async function readErrorBody(response) {
 
 function serverMessageFromBody(data) {
   return data?.message || data?.detail || data?.error || ''
+}
+
+// On a 4xx, `message` is what the backend wrote for the member (ResponseStatusException reasons
+// via ApiExceptionHandler): wrong password, account lockout, duplicate e-mail, rate limits,
+// "관리자 삭제 사유를 입력해주세요." Those are always Korean, so Hangul is the test — an English
+// `message` ("Invalid vote value.") is internal, `error`/`detail` are framework defaults
+// ("Forbidden"), and nothing a 5xx says is meant for the screen.
+function userFacingServerMessage(status, data) {
+  const message = typeof data?.message === 'string' ? data.message : ''
+  return status >= 400 && status < 500 && /[가-힣]/.test(message) ? message : ''
 }
 
 function errorMessageForStatus(status, fallbackMessage = '') {
@@ -111,12 +136,9 @@ export interface ApiError extends Error {
 }
 
 export function createApiError(status, data = null, text = '', fallbackMessage = '') {
-  // On 401/403, `message` carries the backend's intentional user-facing text (wrong password,
-  // unverified email — ResponseStatusException reasons via ApiExceptionHandler). Other statuses
-  // keep the b955a1a policy of hiding server text; `error`/`detail` are framework defaults
-  // ("Forbidden") and are never shown.
-  const authMessage = (status === 401 || status === 403) ? data?.message : ''
-  const error = new Error(errorMessageForStatus(status, fallbackMessage || authMessage || '')) as ApiError
+  // `fallbackMessage` only stands in for the generic per-status copy; it does not outrank a
+  // message the server wrote for the member.
+  const error = new Error(userFacingServerMessage(status, data) || errorMessageForStatus(status, fallbackMessage)) as ApiError
   error.status = status
   error.serverMessage = serverMessageFromBody(data)
   error.responseData = data
@@ -124,8 +146,30 @@ export function createApiError(status, data = null, text = '', fallbackMessage =
   return error
 }
 
+const NETWORK_ERROR_MESSAGE = '서버에 연결하지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도해주세요.'
+
+// fetch() rejects only when no response arrived at all (offline, DNS, CORS, an aborted request),
+// and the browser's own wording for that — "Failed to fetch", "Load failed" — reached the screen
+// through every `err.message`. No `status` on purpose: callers read a status-less error as
+// transient (AuthProvider retries /me on it and never takes it for a logged-out answer).
+function createNetworkError(cause) {
+  const error = new Error(NETWORK_ERROR_MESSAGE, { cause }) as Error & { isNetworkError: boolean }
+  error.isNetworkError = true
+  return error
+}
+
+async function fetchOrNetworkError(url, init: RequestInit) {
+  try {
+    return await fetch(url, init)
+  } catch (cause) {
+    throw createNetworkError(cause)
+  }
+}
+
 function logInternalApiError(error) {
   if (!import.meta.env?.DEV) return
+  // Nothing is hidden when the server's message is the one on screen.
+  if (error?.serverMessage === error?.message) return
   if (!error?.serverMessage && !error?.responseText) return
   console.warn('API error details hidden from user message', {
     status: error.status,
@@ -161,7 +205,7 @@ function rememberOptionalDevApiUnavailable(path, error) {
 }
 
 function isDevBackendUnavailableError(error) {
-  return error?.status >= 500 || /Failed to fetch|NetworkError|Load failed/i.test(error?.message || '')
+  return error?.status >= 500 || error?.isNetworkError === true
 }
 
 export async function requestOptional(path, options: RequestInit = {}, fallback = null) {
@@ -197,7 +241,7 @@ export async function request(path, options: RequestInit = {}) {
   // `credentials` AFTER the spread: a caller passing its own `options.credentials`
   // (or a spread RequestInit carrying an explicit `credentials: 'same-origin'`)
   // silently dropped the session cookie when it came first.
-  const fetchOnce = () => fetch(apiUrl(path), { ...options, headers, credentials: 'include' })
+  const fetchOnce = () => fetchOrNetworkError(apiUrl(path), { ...options, headers, credentials: 'include' })
 
   const generationBeforeRequest = refreshGeneration
   let response = await fetchOnce()
@@ -215,7 +259,7 @@ export async function requestNoContent(path, options: RequestInit = {}) {
   const headers = (options.body && !isFormData)
     ? { 'Content-Type': 'application/json', ...options.headers }
     : options.headers
-  const fetchOnce = () => fetch(apiUrl(path), { ...options, headers, credentials: 'include' })
+  const fetchOnce = () => fetchOrNetworkError(apiUrl(path), { ...options, headers, credentials: 'include' })
 
   const generationBeforeRequest = refreshGeneration
   let response = await fetchOnce()
@@ -227,7 +271,7 @@ export async function requestNoContent(path, options: RequestInit = {}) {
 }
 
 export async function requestBlob(path, options: RequestInit = {}) {
-  const fetchOnce = () => fetch(apiUrl(path), { ...options, credentials: 'include' })
+  const fetchOnce = () => fetchOrNetworkError(apiUrl(path), { ...options, credentials: 'include' })
 
   const generationBeforeRequest = refreshGeneration
   let response = await fetchOnce()

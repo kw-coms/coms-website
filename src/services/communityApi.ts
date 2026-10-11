@@ -201,6 +201,12 @@ export async function deletePostVideo(postId, videoId) {
   })
 }
 
+export async function deletePostFile(postId, fileId) {
+  return requestNoContent(`/api/community/posts/${postId}/files/${fileId}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function listComments(postId) {
   return request(`/api/community/posts/${postId}/comments`)
 }

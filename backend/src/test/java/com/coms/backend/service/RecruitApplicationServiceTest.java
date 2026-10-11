@@ -485,6 +485,176 @@ class RecruitApplicationServiceTest {
                         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
     }
 
+    @Test
+    void lookupStatusReportsTheDecisionAfterTheApplicationRowIsGone() {
+        // 합격/불합격 처리는 지원서를 지우고 처리 이력만 남긴다. 결과가 나온 지원자가 조회했을 때
+        // "지원 내역을 찾을 수 없습니다"가 아니라 그 결과를 봐야 한다.
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.findFirstByStudentIdAndNameOrderBySubmittedAtDescIdDesc(any(), any()))
+                .thenReturn(Optional.empty());
+        RecruitPromotionLogRepository promotionLogs = mock(RecruitPromotionLogRepository.class);
+        when(promotionLogs.findFirstByStudentIdAndNameOrderByPromotedAtDescIdDesc("2026990102", "김탈락"))
+                .thenReturn(Optional.of(decision("김탈락", "2026990102",
+                        com.coms.backend.domain.RecruitPromotionLog.Decision.REJECTED)));
+        when(promotionLogs.findFirstByStudentIdAndNameOrderByPromotedAtDescIdDesc("2026990101", "가상지원자"))
+                .thenReturn(Optional.of(decision("가상지원자", "2026990101",
+                        com.coms.backend.domain.RecruitPromotionLog.Decision.ACCEPTED)));
+        RecruitApplicationService service = newService(mock(JavaMailSender.class), repository, promotionLogs, "recruit@coms.kw.ac.kr");
+
+        RecruitApplicationStatusResponse rejected = service.lookupStatus(
+                new RecruitApplicationStatusLookupRequest(" 김탈락 ", "2026990102"), "203.0.113.20");
+        RecruitApplicationStatusResponse accepted = service.lookupStatus(
+                new RecruitApplicationStatusLookupRequest("가상지원자", "2026990101"), "203.0.113.20");
+
+        assertThat(rejected.status()).isEqualTo("REJECTED");
+        assertThat(rejected.statusLabel()).isEqualTo("불합격");
+        // 지원서가 없으므로 접수 시각은 알 수 없다. 관리자 메모는 응답 형식에 아예 없다.
+        assertThat(rejected.submittedAt()).isNull();
+        assertThat(accepted.status()).isEqualTo("ACCEPTED");
+        assertThat(accepted.statusLabel()).isEqualTo("합격");
+    }
+
+    @Test
+    void lookupStatusStopsAnsweringFromTheDecisionLogAfterNinetyDays() {
+        // The log is kept for good as a record. The public lookup must not turn it into a way
+        // to ask about every applicant of every past season with a name and a 학번.
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.findFirstByStudentIdAndNameOrderBySubmittedAtDescIdDesc(any(), any()))
+                .thenReturn(Optional.empty());
+        RecruitPromotionLogRepository promotionLogs = mock(RecruitPromotionLogRepository.class);
+        var lastSeason = decision("김지난", "2025990103", com.coms.backend.domain.RecruitPromotionLog.Decision.REJECTED);
+        lastSeason.setPromotedAt(java.time.LocalDateTime.now().minusDays(91));
+        var recent = decision("김최근", "2026990104", com.coms.backend.domain.RecruitPromotionLog.Decision.ACCEPTED);
+        recent.setPromotedAt(java.time.LocalDateTime.now().minusDays(89));
+        when(promotionLogs.findFirstByStudentIdAndNameOrderByPromotedAtDescIdDesc("2025990103", "김지난"))
+                .thenReturn(Optional.of(lastSeason));
+        when(promotionLogs.findFirstByStudentIdAndNameOrderByPromotedAtDescIdDesc("2026990104", "김최근"))
+                .thenReturn(Optional.of(recent));
+        RecruitApplicationService service = newService(mock(JavaMailSender.class), repository, promotionLogs, "recruit@coms.kw.ac.kr");
+
+        assertThatThrownBy(() -> service.lookupStatus(
+                new RecruitApplicationStatusLookupRequest("김지난", "2025990103"), "203.0.113.21"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        assertThat(service.lookupStatus(
+                new RecruitApplicationStatusLookupRequest("김최근", "2026990104"), "203.0.113.21").status())
+                .isEqualTo("ACCEPTED");
+    }
+
+    @Test
+    void lookupStatusPrefersAPendingApplicationOverAnOlderDecision() {
+        // 지난 모집에서 불합격했다가 다시 지원한 경우: 지금 진행 중인 지원서가 답이다.
+        RecruitApplication reapplied = new RecruitApplication();
+        reapplied.setStudentId("2026990102");
+        reapplied.setName("김탈락");
+        reapplied.setStatus(RecruitApplication.Status.RECEIVED);
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.findFirstByStudentIdAndNameOrderBySubmittedAtDescIdDesc("2026990102", "김탈락"))
+                .thenReturn(Optional.of(reapplied));
+        RecruitPromotionLogRepository promotionLogs = mock(RecruitPromotionLogRepository.class);
+        when(promotionLogs.findFirstByStudentIdAndNameOrderByPromotedAtDescIdDesc(any(), any()))
+                .thenReturn(Optional.of(decision("김탈락", "2026990102",
+                        com.coms.backend.domain.RecruitPromotionLog.Decision.REJECTED)));
+        RecruitApplicationService service = newService(mock(JavaMailSender.class), repository, promotionLogs, "recruit@coms.kw.ac.kr");
+
+        RecruitApplicationStatusResponse response = service.lookupStatus(
+                new RecruitApplicationStatusLookupRequest("김탈락", "2026990102"), "203.0.113.21");
+
+        assertThat(response.status()).isEqualTo("RECEIVED");
+        verify(promotionLogs, never()).findFirstByStudentIdAndNameOrderByPromotedAtDescIdDesc(any(), any());
+    }
+
+    @Test
+    void applicantIsStillConfirmedWhenNoStaffRecipientIsConfigured() {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.save(any(RecruitApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        RecruitApplicationService service = newService(mailSender, repository, mock(RecruitPromotionLogRepository.class), "  ");
+
+        service.sendApplication(sampleRequest(), "127.0.0.1");
+
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender, times(1)).send(captor.capture());
+        assertThat(captor.getValue().getTo()).containsExactly("applicant@example.com");
+        assertThat(captor.getValue().getSubject()).isEqualTo("[COM's] 지원서가 접수되었습니다");
+    }
+
+    @Test
+    void applicantIsStillConfirmedWhenTheStaffMailFails() {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        doThrow(new org.springframework.mail.MailSendException("staff mailbox rejected"))
+                .doNothing()
+                .when(mailSender).send(any(SimpleMailMessage.class));
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.save(any(RecruitApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        RecruitApplicationService service = newService(mailSender, repository, mock(RecruitPromotionLogRepository.class), "recruit@coms.kw.ac.kr");
+
+        service.sendApplication(sampleRequest(), "127.0.0.1");
+
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender, times(2)).send(captor.capture());
+        assertThat(captor.getAllValues().get(1).getTo()).containsExactly("applicant@example.com");
+    }
+
+    @Test
+    void confirmationMailKeepsEachSubmittedValueOnItsOwnLine() {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.save(any(RecruitApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        RecruitApplicationService service = newService(mailSender, repository, mock(RecruitPromotionLogRepository.class), "recruit@coms.kw.ac.kr");
+        // The confirmation goes to whatever address was typed into the public form, so the
+        // values it echoes must not be able to add lines that read like a notice from the club.
+        RecruitApplicationRequest crafted = new RecruitApplicationRequest(
+                "홍길동",
+                "2026123456",
+                "컴퓨터공학과\n\n[COM's 안내]\n회비를 아래 계좌로 보내주세요",
+                "1학년",
+                "01012345678",
+                "applicant@example.com",
+                List.of("웹\n[긴급] 확인 필요"),
+                "함께 만들고 싶습니다.",
+                "",
+                "프로젝트와 스터디를 해보고 싶습니다."
+        );
+
+        service.sendApplication(crafted, "127.0.0.1");
+
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender, times(2)).send(captor.capture());
+        String confirmation = captor.getAllValues().get(1).getText();
+        assertThat(confirmation.lines())
+                .contains("학과: 컴퓨터공학과 [COM's 안내] 회비를 아래 계좌로 보내주세요")
+                .contains("관심 분야: 웹 [긴급] 확인 필요")
+                .noneMatch(line -> line.startsWith("[COM's 안내]") || line.startsWith("[긴급]"));
+    }
+
+    private static com.coms.backend.domain.RecruitPromotionLog decision(
+            String name, String studentId, com.coms.backend.domain.RecruitPromotionLog.Decision decision) {
+        com.coms.backend.domain.RecruitPromotionLog log = new com.coms.backend.domain.RecruitPromotionLog();
+        log.setName(name);
+        log.setStudentId(studentId);
+        log.setDecision(decision);
+        log.setAdminNote("내부 메모");
+        return log;
+    }
+
+    private static RecruitApplicationService newService(JavaMailSender mailSender,
+                                                        RecruitApplicationRepository repository,
+                                                        RecruitPromotionLogRepository promotionLogs,
+                                                        String staffRecipient) {
+        return new RecruitApplicationService(
+                mailSender,
+                repository,
+                mock(NotificationService.class),
+                mock(EligibleMemberService.class),
+                promotionLogs,
+                java.time.Clock.systemDefaultZone(),
+                true,
+                "no-reply@coms.kw.ac.kr",
+                staffRecipient
+        );
+    }
+
     private static RecruitApplicationService newService(RecruitApplicationRepository repository) {
         return new RecruitApplicationService(
                 mock(JavaMailSender.class),

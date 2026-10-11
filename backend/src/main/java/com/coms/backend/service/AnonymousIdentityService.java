@@ -56,7 +56,7 @@ class AnonymousIdentityService {
         if (normalized.length() > MAX_ANONYMOUS_NAME_LENGTH) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "익명 이름은 " + MAX_ANONYMOUS_NAME_LENGTH + "자 이하로 입력해주세요.");
         }
-        textService.rejectUnsafeText(normalized);
+        textService.rejectUnsafeTextStrict(normalized);
         return normalized;
     }
 

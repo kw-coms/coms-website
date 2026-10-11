@@ -22,6 +22,17 @@ public interface CommunityPostVoteRepository extends JpaRepository<CommunityPost
     @Query("select v.post.authorStudentId as studentId, coalesce(sum(v.value), 0) as total from CommunityPostVote v where v.post.authorStudentId in :studentIds group by v.post.authorStudentId")
     List<AuthorVoteSum> sumVoteValueByPostAuthors(@Param("studentIds") Collection<String> studentIds);
 
+    @Query("select coalesce(sum(v.value), 0) from CommunityPostVote v "
+            + "where v.post.authorStudentId = :studentId and v.post.category <> :excluded")
+    long sumVoteValueByPostAuthorExcludingCategory(@Param("studentId") String studentId,
+                                                   @Param("excluded") CommunityPost.Category excluded);
+
+    @Query("select v.post.authorStudentId as studentId, coalesce(sum(v.value), 0) as total from CommunityPostVote v "
+            + "where v.post.authorStudentId in :studentIds and v.post.category <> :excluded "
+            + "group by v.post.authorStudentId")
+    List<AuthorVoteSum> sumVoteValueByPostAuthorsExcludingCategory(@Param("studentIds") Collection<String> studentIds,
+                                                                   @Param("excluded") CommunityPost.Category excluded);
+
     interface AuthorVoteSum {
         String getStudentId();
         long getTotal();

@@ -26,6 +26,7 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
     List<CommunityPost> findByAuthorStudentIdOrderByCreatedAtDesc(String authorStudentId);
     long countByAuthorStudentIdAndCreatedAtAfter(String authorStudentId, LocalDateTime createdAt);
     long countByAuthorStudentId(String authorStudentId);
+    long countByAuthorStudentIdAndCategoryNot(String authorStudentId, CommunityPost.Category category);
 
     // Real DB-side pagination for the community post list (see CommunityService#listPaged). The
     // visibility rule for anonymous posts collapses to "category != ANONYMOUS" once we know the
@@ -62,6 +63,11 @@ public interface CommunityPostRepository extends JpaRepository<CommunityPost, Lo
 
     @Query("select p.authorStudentId as studentId, count(p) as count from CommunityPost p where p.authorStudentId in :studentIds group by p.authorStudentId")
     List<AuthorCount> countByAuthorStudentIds(@Param("studentIds") Collection<String> studentIds);
+
+    @Query("select p.authorStudentId as studentId, count(p) as count from CommunityPost p "
+            + "where p.authorStudentId in :studentIds and p.category <> :excluded group by p.authorStudentId")
+    List<AuthorCount> countByAuthorStudentIdsExcludingCategory(@Param("studentIds") Collection<String> studentIds,
+                                                               @Param("excluded") CommunityPost.Category excluded);
 
     interface AuthorCount {
         String getStudentId();

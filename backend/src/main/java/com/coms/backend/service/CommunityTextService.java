@@ -43,6 +43,11 @@ class CommunityTextService {
         richContentSanitizer.rejectUnsafeText(value);
     }
 
+    /** The stricter gate kept for anonymous nicknames (see RichContentSanitizer). */
+    void rejectUnsafeTextStrict(String value) {
+        richContentSanitizer.rejectUnsafeTextStrict(value);
+    }
+
     String sanitizeContent(String content) {
         return richContentSanitizer.sanitizeContent(content);
     }
@@ -69,9 +74,18 @@ class CommunityTextService {
                 return stripHtml(content);
             }
             StringBuilder out = new StringBuilder();
+            int images = 0;
+            int videos = 0;
+            int files = 0;
             for (JsonNode block : root) {
                 if (!block.isObject()) continue;
                 String type = block.path("type").asText();
+                switch (type) {
+                    case "image" -> images++;
+                    case "video" -> videos++;
+                    case "file" -> files++;
+                    default -> { }
+                }
                 String text = switch (type) {
                     case "text" -> stripHtml(block.path("content").asText(""));
                     case "poll" -> block.path("question").asText("");
@@ -83,7 +97,16 @@ class CommunityTextService {
                     out.append(text.trim());
                 }
             }
-            return out.isEmpty() ? stripHtml(content) : out.toString();
+            if (!out.isEmpty()) {
+                return out.toString();
+            }
+            // A post made only of attachments has no sentence to show. Falling back to the stored
+            // body printed its JSON ("[{"type":"image","mediaId":…") as the list preview.
+            java.util.List<String> parts = new java.util.ArrayList<>();
+            if (images > 0) parts.add("사진 " + images + "장");
+            if (videos > 0) parts.add("영상 " + videos + "개");
+            if (files > 0) parts.add("첨부파일 " + files + "개");
+            return String.join(" · ", parts);
         } catch (Exception ignored) {
             return stripHtml(content);
         }
@@ -96,9 +119,12 @@ class CommunityTextService {
                 .replace("&nbsp;", " ")
                 .replace("&lt;", "<")
                 .replace("&gt;", ">")
-                .replace("&amp;", "&")
                 .replace("&quot;", "\"")
-                .replace("&#39;", "'");
+                .replace("&#39;", "'")
+                // Last: undone earlier, an escaped ampersand joined what followed it into a new
+                // entity, and text that reads &quot; on the page was turned into a quote mark.
+                // (postEditorUtils.serverPlainText mirrors this function; keep them in step.)
+                .replace("&amp;", "&");
     }
 
     // ---- Audit-log text formatting -----------------------------------------------------------

@@ -9,6 +9,7 @@ import {
 } from '../../services/siteSettingsApi'
 import { showToast } from '../../components/common/Toast'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
+import ErrorState from '../../components/common/ErrorState'
 
 function linksToText(settings: SiteSettings) {
   return settings.contactLinks.map((link) => `${link.label} | ${link.href}`).join('\n')
@@ -26,19 +27,51 @@ function textToLinks(value: string) {
 
 function ClubRoomAdminCard() {
   const [doorCode, setDoorCode] = useState('')
+  // True only after a successful GET. A failed load used to unlock the form with an empty
+  // field, and 저장 then wiped the stored code.
   const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  // Reading the code and changing it are separate permissions. A role that may change it but
+  // not read it gets a 403 here; that is an answer, not a failed load, so the field stays
+  // usable — it just starts empty and will not save empty.
+  const [viewDenied, setViewDenied] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  const applyLoadFailure = (err) => {
+    if (err?.status === 403) {
+      setViewDenied(true)
+      setLoaded(true)
+      return
+    }
+    setLoadError(err.message || '동아리방 비밀번호를 불러오지 못했습니다.')
+  }
 
   useEffect(() => {
     let mounted = true
     getClubRoom()
       .then((data) => { if (mounted) { setDoorCode(data?.doorCode || ''); setLoaded(true) } })
-      .catch(() => { if (mounted) setLoaded(true) })
+      .catch((err) => { if (mounted) applyLoadFailure(err) })
     return () => { mounted = false }
   }, [])
 
+  const retryLoad = async () => {
+    setLoadError('')
+    try {
+      const data = await getClubRoom()
+      setDoorCode(data?.doorCode || '')
+      setLoaded(true)
+    } catch (err) {
+      applyLoadFailure(err)
+    }
+  }
+
   const save = async (event) => {
     event.preventDefault()
+    if (!loaded) return
+    if (viewDenied && !doorCode.trim()) {
+      showToast({ message: '새 비밀번호를 입력해주세요. 현재 값을 볼 수 없는 상태에서는 빈 값으로 저장할 수 없습니다.', tone: 'error' })
+      return
+    }
     setSaving(true)
     try {
       const saved = await updateClubRoom(doorCode.trim())
@@ -62,7 +95,7 @@ function ClubRoomAdminCard() {
           value={doorCode}
           onChange={(event) => setDoorCode(event.target.value)}
           maxLength={60}
-          placeholder={loaded ? '예: 1234' : '불러오는 중...'}
+          placeholder={loaded ? '예: 1234' : (loadError ? '불러오지 못함' : '불러오는 중...')}
           disabled={!loaded || saving}
           className="w-48 rounded-lg border border-[var(--app-hairline)] bg-white px-3 py-2 font-mono text-sm font-bold tracking-widest text-[var(--theme-body-dark)]"
         />
@@ -74,6 +107,26 @@ function ClubRoomAdminCard() {
           {saving ? '저장 중...' : '저장'}
         </button>
       </div>
+      {viewDenied && (
+        <p className="mt-3 text-xs leading-5 text-[var(--theme-body-muted)]">
+          현재 비밀번호를 볼 권한이 없어 값이 표시되지 않습니다. 새 값을 입력해 저장하면 기존 비밀번호가 바뀝니다.
+        </p>
+      )}
+      {loadError && (
+        <div role="alert" className="mt-3">
+          <p className="text-sm font-semibold text-red-600">{loadError}</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--theme-body-muted)]">
+            현재 비밀번호를 불러오지 못한 상태에서 저장하면 기존 비밀번호가 지워질 수 있어 저장을 막았습니다.
+          </p>
+          <button
+            type="button"
+            onClick={retryLoad}
+            className="mt-2 rounded-full border border-[var(--app-hairline)] px-3 py-1.5 text-xs font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/60"
+          >
+            다시 불러오기
+          </button>
+        </div>
+      )}
     </form>
   )
 }
@@ -83,6 +136,7 @@ export default function AdminSiteSettings() {
   const [form, setForm] = useState<SiteSettings>(defaultSiteSettings)
   const [contactText, setContactText] = useState(linksToText(defaultSiteSettings))
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -95,10 +149,25 @@ export default function AdminSiteSettings() {
         setForm(settings)
         setContactText(linksToText(settings))
       })
-      .catch((err) => { if (mounted) setError(err.message || '사이트 설정을 불러오지 못했습니다.') })
+      .catch((err) => { if (mounted) setLoadError(err.message || '사이트 설정을 불러오지 못했습니다.') })
       .finally(() => { if (mounted) setLoading(false) })
     return () => { mounted = false }
   }, [])
+
+  const retryLoad = async () => {
+    setLoading(true)
+    setLoadError('')
+    try {
+      const settings = await getAdminSiteSettings()
+      setCurrent(settings)
+      setForm(settings)
+      setContactText(linksToText(settings))
+    } catch (err) {
+      setLoadError(err.message || '사이트 설정을 불러오지 못했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const update = (field: keyof SiteSettings, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -129,6 +198,22 @@ export default function AdminSiteSettings() {
           <Skeleton className="h-48 w-full" />
         </div>
       </SkeletonGroup>
+    )
+  }
+
+  // The form starts from the built-in defaults, so after a failed load 게시하기 would publish
+  // those over the stored copy. Offer a retry instead of the form until a load has succeeded.
+  if (!current) {
+    return (
+      <div className="space-y-5">
+        <ClubRoomAdminCard />
+        <ErrorState
+          title="사이트 문구를 불러오지 못했습니다."
+          message={`${loadError} 현재 게시된 문구를 불러온 뒤에만 편집하고 게시할 수 있습니다.`}
+          onRetry={retryLoad}
+          retryLabel="다시 불러오기"
+        />
+      </div>
     )
   }
 

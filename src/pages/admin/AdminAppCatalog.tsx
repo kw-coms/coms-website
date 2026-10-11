@@ -90,16 +90,27 @@ export default function AdminAppCatalog() {
         linkUrl: form.linkUrl.trim(),
         displayUrl: form.displayUrl.trim(),
       })
+      // The item exists from here on, so it is listed and the form cleared whatever happens to
+      // the files. A failed upload used to read as a failed registration: the item was not
+      // listed, the form stayed filled, and submitting it again created a duplicate.
+      setItems((prev) => [...prev, created])
+      let fileError = ''
       if (form.files.length > 0) {
-        for (const file of form.files) {
-          await uploadClubProjectFile(created.id, file)
+        try {
+          for (const file of form.files) {
+            await uploadClubProjectFile(created.id, file)
+          }
+        } catch (err) {
+          fileError = err.message || '배포 파일을 올리지 못했습니다.'
         }
-        const refreshed = await listClubProjects()
-        setItems(Array.isArray(refreshed) ? refreshed : [])
-      } else {
-        setItems((prev) => [...prev, created])
+        const refreshed = await listClubProjects().catch(() => null)
+        if (Array.isArray(refreshed)) setItems(refreshed)
       }
-      setNotice('Apps 항목을 등록했습니다.')
+      if (fileError) {
+        setError(`Apps 항목은 등록됐지만 배포 파일 업로드를 마치지 못했습니다. (${fileError}) 아래 목록에서 '수정'을 눌러 파일을 다시 추가해주세요.`)
+      } else {
+        setNotice('Apps 항목을 등록했습니다.')
+      }
       if (fileInputRef.current) fileInputRef.current.value = ''
       setForm((prev) => ({ ...prev, title: '', eyebrow: '', description: '', linkUrl: '', displayUrl: '', files: [] }))
     } catch (err) {

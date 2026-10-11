@@ -1,5 +1,6 @@
 package com.coms.backend.service;
 
+import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.CommunityReputationResponse;
 import com.coms.backend.repository.CommunityCommentRepository;
@@ -22,6 +23,13 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 class CommunityReputationService {
+    /**
+     * Reputation is built from public activity only. Counting the anonymous board made the
+     * (exact, member-visible) numbers tick whenever a member posted or commented there, so
+     * comparing them before and after a new anonymous post identified its author.
+     */
+    private static final CommunityPost.Category ANONYMOUS = CommunityPost.Category.ANONYMOUS;
+
     private final CommunityPostRepository communityPostRepository;
     private final CommunityCommentRepository commentRepository;
     private final CommunityPostVoteRepository voteRepository;
@@ -49,9 +57,9 @@ class CommunityReputationService {
     public CommunityReputationResponse reputation(String viewerStudentId, String targetStudentId) {
         access.requireMember(viewerStudentId);
         Member target = access.requireMember(targetStudentId);
-        long posts = communityPostRepository.countByAuthorStudentId(target.getStudentId());
-        long comments = commentRepository.countByStudentId(target.getStudentId());
-        long upvotes = voteRepository.sumVoteValueByPostAuthor(target.getStudentId());
+        long posts = communityPostRepository.countByAuthorStudentIdAndCategoryNot(target.getStudentId(), ANONYMOUS);
+        long comments = commentRepository.countByStudentIdExcludingPostCategory(target.getStudentId(), ANONYMOUS);
+        long upvotes = voteRepository.sumVoteValueByPostAuthorExcludingCategory(target.getStudentId(), ANONYMOUS);
         return CommunityReputation.compute(posts, comments, upvotes, target.getGeneration());
     }
 
@@ -64,11 +72,11 @@ class CommunityReputationService {
         if (studentIds.isEmpty()) {
             return Map.of();
         }
-        Map<String, Long> postCounts = communityPostRepository.countByAuthorStudentIds(studentIds).stream()
+        Map<String, Long> postCounts = communityPostRepository.countByAuthorStudentIdsExcludingCategory(studentIds, ANONYMOUS).stream()
                 .collect(Collectors.toMap(CommunityPostRepository.AuthorCount::getStudentId, CommunityPostRepository.AuthorCount::getCount));
-        Map<String, Long> commentCounts = commentRepository.countByStudentIds(studentIds).stream()
+        Map<String, Long> commentCounts = commentRepository.countByStudentIdsExcludingPostCategory(studentIds, ANONYMOUS).stream()
                 .collect(Collectors.toMap(CommunityCommentRepository.AuthorCount::getStudentId, CommunityCommentRepository.AuthorCount::getCount));
-        Map<String, Long> upvoteSums = voteRepository.sumVoteValueByPostAuthors(studentIds).stream()
+        Map<String, Long> upvoteSums = voteRepository.sumVoteValueByPostAuthorsExcludingCategory(studentIds, ANONYMOUS).stream()
                 .collect(Collectors.toMap(CommunityPostVoteRepository.AuthorVoteSum::getStudentId, CommunityPostVoteRepository.AuthorVoteSum::getTotal));
         Map<String, String> generations = memberRepository.findByStudentIdIn(studentIds).stream()
                 .filter(m -> m.getGeneration() != null)

@@ -18,9 +18,17 @@ type ActivityItem = {
   title?: string
   description?: string
   eventDate?: string
+  endDate?: string
   kind?: string
   imageInfos?: MediaInfo[]
   fileInfos?: MediaInfo[]
+}
+
+// The end date only when the entry spans more than one day (a period schedule made in the
+// calendar). One-day entries get '' so the edit form's 종료일 stays blank and moving the date
+// never trips "end before start".
+function multiDayEndDate(item: ActivityItem) {
+  return item.endDate && item.endDate !== item.eventDate ? item.endDate : ''
 }
 
 export default function AdminActivityRow({ item, categories, onDelete, onUpdated }: {
@@ -37,6 +45,7 @@ export default function AdminActivityRow({ item, categories, onDelete, onUpdated
     title: item.title,
     description: item.description || '',
     eventDate: item.eventDate || '',
+    endDate: multiDayEndDate(item),
   })
   const imageInputRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -47,6 +56,7 @@ export default function AdminActivityRow({ item, categories, onDelete, onUpdated
       title: item.title,
       description: item.description || '',
       eventDate: item.eventDate || '',
+      endDate: multiDayEndDate(item),
     })
     setRowError('')
     setEditing(true)
@@ -54,6 +64,10 @@ export default function AdminActivityRow({ item, categories, onDelete, onUpdated
 
   const saveEdit = async () => {
     if (!draft.title.trim() || !draft.eventDate) return
+    if (draft.endDate && draft.endDate < draft.eventDate) {
+      setRowError('종료일은 활동 날짜와 같거나 이후여야 합니다.')
+      return
+    }
     setBusy(true)
     setRowError('')
     try {
@@ -62,6 +76,9 @@ export default function AdminActivityRow({ item, categories, onDelete, onUpdated
         title: draft.title.trim(),
         description: draft.description,
         eventDate: draft.eventDate,
+        // Always sent: the server resets endDate to eventDate when a PATCH carries only
+        // eventDate, which collapsed a multi-day schedule to one day on any edit here.
+        endDate: draft.endDate || draft.eventDate,
       })
       onUpdated(updated)
       setEditing(false)
@@ -146,6 +163,7 @@ export default function AdminActivityRow({ item, categories, onDelete, onUpdated
           <p className="font-semibold text-[var(--theme-body-dark)]">{item.title}</p>
           <p className="text-xs text-[var(--theme-body-muted)]">
             {item.kind === 'SCHEDULE' ? '일정' : '활동'} · {categoryName} · {item.eventDate}
+            {multiDayEndDate(item) && ` ~ ${item.endDate}`}
             {(item.imageInfos?.length ?? 0) > 0 && ` · 사진 ${item.imageInfos.length}장`}
             {(item.fileInfos?.length ?? 0) > 0 && ` · 첨부 ${item.fileInfos.length}개`}
           </p>
@@ -185,6 +203,16 @@ export default function AdminActivityRow({ item, categories, onDelete, onUpdated
               type="date"
               value={draft.eventDate}
               onChange={(event) => setDraft((prev) => ({ ...prev, eventDate: event.target.value }))}
+              className={ADMIN_INPUT_CLASS}
+            />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-[var(--theme-body-muted)]">
+            종료일 (선택)
+            <input
+              type="date"
+              value={draft.endDate}
+              min={draft.eventDate || undefined}
+              onChange={(event) => setDraft((prev) => ({ ...prev, endDate: event.target.value }))}
               className={ADMIN_INPUT_CLASS}
             />
           </label>

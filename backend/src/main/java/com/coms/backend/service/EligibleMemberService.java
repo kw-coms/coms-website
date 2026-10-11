@@ -18,7 +18,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.StringReader;
+import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Year;
@@ -122,9 +127,10 @@ public class EligibleMemberService {
         if (!STUDENT_ID_PATTERN.matcher(normalizedStudentId).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
         }
-        if (bannedStudentRepository.existsByStudentId(normalizedStudentId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "가입이 제한된 학번입니다.");
-        }
+        // No ban check here. It used to run before the roster match, so anyone could ask whether
+        // an arbitrary 학번 is banned without knowing anything else about that student, and it
+        // ignored the ban's expiry. PendingSignupService checks the ban (expiry included) right
+        // after this method returns — i.e. only for a caller who matched name and phone.
         EligibleMember member = eligibleMemberRepository.findByStudentId(normalizedStudentId)
                 .orElseThrow(() -> invalidRoster());
         if (!member.getName().equals(normalizedName)) {
@@ -450,7 +456,7 @@ public class EligibleMemberService {
         int imported = 0;
         int skipped = 0;
 
-        try (InputStreamReader reader = new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8);
+        try (StringReader reader = new StringReader(decodeCsv(file.getBytes()));
              CSVParser parser = CSVFormat.DEFAULT.builder()
                      .setHeader()
                      .setSkipHeaderRecord(true)
@@ -506,11 +512,33 @@ public class EligibleMemberService {
                 imported++;
             }
 
-        } catch (IOException e) {
+        } catch (IOException | IllegalArgumentException | UncheckedIOException e) {
+            // commons-csv reports a malformed header row or an unterminated quote this way.
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CSV 파일을 읽지 못했습니다.");
         }
 
         return new EligibleMemberImportResponse(imported, skipped, "명부를 가져왔습니다.");
+    }
+
+    /**
+     * Roster CSVs arrive in three encodings: plain UTF-8 (Google Sheets / Forms), UTF-8 with a BOM
+     * (Excel "CSV UTF-8") and CP949 (Excel's default "CSV (쉼표로 분리)" on Korean Windows). Reading
+     * all of them as UTF-8 left the BOM glued to the first header — so a file whose first column is
+     * "이름" was rejected as having no name column — and turned every CP949 file into mojibake.
+     */
+    static String decodeCsv(byte[] bytes) {
+        String text;
+        try {
+            text = StandardCharsets.UTF_8.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes))
+                    .toString();
+        } catch (CharacterCodingException notUtf8) {
+            Charset korean = Charset.isSupported("MS949") ? Charset.forName("MS949") : StandardCharsets.UTF_8;
+            text = new String(bytes, korean);
+        }
+        return text.startsWith("﻿") ? text.substring(1) : text;
     }
 
     private Map<String, String> buildCsvColumnMap(List<String> headerNames) {
@@ -543,7 +571,7 @@ public class EligibleMemberService {
         int skipped = 0;
 
         try (InputStream inputStream = file.getInputStream();
-             Workbook workbook = WorkbookFactory.create(inputStream)) {
+             Workbook workbook = openWorkbook(inputStream)) {
 
             FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
             Sheet sheet = workbook.getSheetAt(0);
@@ -605,6 +633,19 @@ public class EligibleMemberService {
         }
 
         return new EligibleMemberImportResponse(imported, skipped, "명부를 가져왔습니다.");
+    }
+
+    /**
+     * POI signals "this is not a spreadsheet" (a renamed text file, a password-protected or empty
+     * workbook) with unchecked exceptions, which surfaced as HTTP 500 instead of a usable message.
+     */
+    private static Workbook openWorkbook(InputStream inputStream) throws IOException {
+        try {
+            return WorkbookFactory.create(inputStream);
+        } catch (RuntimeException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "명부 파일을 읽지 못했습니다. 암호가 없는 .xlsx 또는 .csv 파일인지 확인해주세요.");
+        }
     }
 
     private Map<String, Integer> buildXlsxHeaderMap(Row row, FormulaEvaluator evaluator) {

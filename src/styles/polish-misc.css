@@ -256,6 +256,18 @@
 	}
 }
 
+/* Links inside formatted post text come from sanitized HTML, so no utility class reaches them;
+   without this they inherit the body colour and read as plain text. */
+.community-post-text a[href] {
+	color: var(--app-accent-text);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	word-break: break-all;
+}
+.community-post-text a[href]:hover {
+	opacity: 0.8;
+}
+
 /* community code blocks */
 /* Styles formatted code inside rendered community post bodies. Uses the shared
    surface/hairline tokens so block code reads correctly in both light and dark

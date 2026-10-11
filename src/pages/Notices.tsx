@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { linkify } from '../utils/linkify'
 import { ArrowLeft, BriefcaseBusiness, Megaphone, Pencil, Pin, PinOff, Search, Sparkles, ThumbsUp, Trash2, UsersRound } from 'lucide-react'
 import { getNotice, createNotice, updateNotice, deleteNotice, voteNotice, pinNotice, updateNoticeAuthor } from '../services/noticeApi'
@@ -15,6 +15,7 @@ import { enumLabels } from '../contract/labels'
 import { useNotices } from './useNotices'
 import { useScrollReveal } from '../hooks/useScrollReveal'
 import { useVisibleCount } from '../hooks/useVisibleCount'
+import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import RichBodyEditor from '../components/richEditor/RichBodyEditor'
 import { URL_ONLY_RICH_FEATURES } from '../components/richEditor/richBodyFeatures'
 import { renderRichBody, richBodyToPlainText as noticeContentSearchText } from '../components/richEditor/renderRichBody'
@@ -30,15 +31,12 @@ function formatDate(iso) {
 }
 
 function openRowWithKeyboard(event, open) {
+  // Keys bubble up from anything focusable inside the row. Only a key pressed on the row
+  // itself opens it, so Enter/Space on a nested button or link keeps its own meaning.
+  if (event.target !== event.currentTarget) return
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
     open()
-  }
-}
-
-function clickableCell(open) {
-  return {
-    onClick: open,
   }
 }
 
@@ -181,8 +179,31 @@ export default function Notices() {
   const { notices, setNotices, refreshNotices, loading, error } = useNotices()
   const [mode, setMode] = useState('list')
   const [selectedNotice, setSelectedNotice] = useState(null)
-  const [activeCategory, setActiveCategory] = useState('ALL')
-  const [searchQuery, setSearchQuery] = useState('')
+  // The list filter is mirrored into the query string (replace, so no extra history entries).
+  // App keys the routed page by pathname, which remounts this component between /notices and
+  // /notices/:id; without the mirror, Back from a notice landed on an unfiltered list. State
+  // stays the source of truth: router updates are transitions, too late for a controlled
+  // input during Korean IME composition.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const [activeCategory, setActiveCategory] = useState(() => {
+    const category = searchParams.get('category')
+    return NOTICE_FILTERS.some((filter) => filter.value === category) ? category : 'ALL'
+  })
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '')
+  const updateListFilter = (category, query) => {
+    setActiveCategory(category)
+    setSearchQuery(query)
+    const params = new URLSearchParams()
+    if (category !== 'ALL') params.set('category', category)
+    if (query) params.set('q', query)
+    try {
+      setSearchParams(params, { replace: true })
+    } catch {
+      // Safari throws once replaceState is called 100+ times in a few seconds (a held key).
+      // The filter above is already applied; only the URL misses this keystroke.
+    }
+  }
 
   useScrollReveal([notices?.length, loading])
 
@@ -238,13 +259,16 @@ export default function Notices() {
   const openNotice = (notice) => {
     setMode('list')
     setSelectedNotice(notice)
-    navigate('/notices/' + notice.id)
+    // Remembered so "목록" on the notice returns to the filtered list it was opened from.
+    navigate('/notices/' + notice.id, { state: { listSearch: location.search } })
   }
 
   const backToList = () => {
     setMode('list')
     setSelectedNotice(null)
-    navigate('/notices')
+    // Leaving write mode, the URL already is the list with its filter query; pushing a bare
+    // /notices there dropped the query and left a duplicate history entry.
+    if (urlId) navigate('/notices' + (typeof location.state?.listSearch === 'string' ? location.state.listSearch : ''))
   }
 
   const mergeNotice = (notice) => {
@@ -314,6 +338,7 @@ export default function Notices() {
 
   const visibleMode = !urlId && mode === 'edit' ? 'list' : mode
   const isDetail = !!urlId && !!selectedNotice && visibleMode === 'list'
+  useDocumentTitle(isDetail ? selectedNotice.title : null)
   const headerTitle = visibleMode === 'write' ? '공지 작성' : visibleMode === 'edit' ? '공지 수정' : '공지사항'
   // The list/table wants the full content width; the single-notice reading view
   // and the write/edit forms stay narrower for readability.
@@ -381,7 +406,7 @@ export default function Notices() {
                   <button
                     key={value}
                     type="button"
-                    onClick={() => setActiveCategory(value)}
+                    onClick={() => updateListFilter(value, searchQuery)}
                     className={`apple-chip inline-flex min-h-11 min-w-0 items-center justify-center gap-2 px-3 py-2 sm:min-h-0 sm:px-4 ${
                       activeCategory === value
                         ? 'apple-chip-active'
@@ -399,7 +424,7 @@ export default function Notices() {
                   <input
                     type="text"
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => updateListFilter(activeCategory, e.target.value)}
                     placeholder="제목, 작성자 검색"
                     className="h-11 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-8 pr-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:h-auto sm:w-64"
                   />
@@ -425,7 +450,7 @@ export default function Notices() {
                 </div>
 
                 {/* 데스크탑 스켈레톤 테이블 */}
-                <div className="m-4 hidden overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] sm:m-6 md:block">
+                <div className="m-4 hidden overflow-x-auto rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] sm:m-6 md:block">
                   <table className="apple-table w-full min-w-[760px] border-collapse text-sm">
                     <thead className="border-b border-[var(--app-hairline)]">
                       <tr>
@@ -500,7 +525,9 @@ export default function Notices() {
                 </div>
 
                 {/* 데스크탑 테이블 */}
-                <div className="m-4 hidden overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] sm:m-6 md:block">
+                {/* overflow-x-auto, not hidden: the table keeps a 760px minimum, which is wider
+                    than this box on portrait tablets (768–859px) and cut off the date column. */}
+                <div className="m-4 hidden overflow-x-auto rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] sm:m-6 md:block">
                   <table className="apple-table w-full min-w-[760px] border-collapse text-sm">
                     <thead className="border-b border-[var(--app-hairline)]">
                       <tr>
@@ -515,6 +542,8 @@ export default function Notices() {
                       {visibleNotices.map((notice, index) => {
                         const open = () => openNotice(notice)
                         const meta = noticeCategoryMeta(notice.category || 'GENERAL')
+                        // The row's onClick covers every cell. Each <td> used to carry the same
+                        // handler, so one click navigated twice and Back needed two presses.
                         return (
                           <tr
                             key={notice.id}
@@ -524,18 +553,18 @@ export default function Notices() {
                             onKeyDown={(event) => openRowWithKeyboard(event, open)}
                             className="cursor-pointer text-[var(--app-muted)] transition hover:bg-[var(--app-surface-soft)] focus:bg-[var(--app-surface-soft)] focus:outline-none"
                           >
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs text-[var(--app-subtle)]">{notice.id}</td>
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs font-bold">
+                            <td className="cursor-pointer px-4 py-3.5 text-center text-xs text-[var(--app-subtle)]">{notice.id}</td>
+                            <td className="cursor-pointer px-4 py-3.5 text-center text-xs font-bold">
                               <span className={`inline-flex rounded-full px-2.5 py-1 ${meta.badgeClass}`}>{meta.shortLabel}</span>
                             </td>
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5">
+                            <td className="cursor-pointer px-4 py-3.5">
                               <span className="flex max-w-[440px] items-center gap-1.5 text-left font-semibold text-[var(--app-text)]">
                                 {notice.pinned && <Chip variant="pinned">고정</Chip>}
                                 <span className="min-w-0 truncate">{notice.title}</span>
                               </span>
                             </td>
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs">{notice.author}</td>
-                            <td {...clickableCell(open)} className="cursor-pointer px-4 py-3.5 text-center text-xs text-[var(--app-subtle)]">{formatDate(notice.createdAt)}</td>
+                            <td className="cursor-pointer px-4 py-3.5 text-center text-xs">{notice.author}</td>
+                            <td className="cursor-pointer px-4 py-3.5 text-center text-xs text-[var(--app-subtle)]">{formatDate(notice.createdAt)}</td>
                           </tr>
                         )
                       })}

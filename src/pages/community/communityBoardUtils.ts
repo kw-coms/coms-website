@@ -9,6 +9,46 @@ export const SORT_OPTIONS = [
   { value: 'views', label: '조회순' },
 ]
 
+const BOARD_VIEW_DEFAULTS = { page: 1, category: 'ALL', sort: 'latest', query: '' }
+const MAX_BOARD_QUERY_LENGTH = 100
+
+/**
+ * The board's page / filter / sort / search as carried in the list URL
+ * (`/community?page=3&cat=QUESTION&sort=views&q=...`). Anything missing or malformed falls back
+ * to the default, so a hand-edited or stale link still opens the board.
+ */
+export function boardViewFromSearch(search) {
+  const params = new URLSearchParams(search || '')
+  const page = Number(params.get('page'))
+  const sort = params.get('sort')
+  return {
+    page: Number.isInteger(page) && page >= 1 ? page : BOARD_VIEW_DEFAULTS.page,
+    category: params.get('cat') || BOARD_VIEW_DEFAULTS.category,
+    sort: SORT_OPTIONS.some((option) => option.value === sort) ? sort : BOARD_VIEW_DEFAULTS.sort,
+    query: (params.get('q') || '').slice(0, MAX_BOARD_QUERY_LENGTH),
+  }
+}
+
+/**
+ * Writes a board view into `search`, leaving every other parameter alone and omitting values
+ * that are the default — the plain board keeps the plain URL.
+ */
+export function boardViewToSearch(view, search = '') {
+  const params = new URLSearchParams(search || '')
+  const entries = [
+    ['page', view.page, BOARD_VIEW_DEFAULTS.page],
+    ['cat', view.category, BOARD_VIEW_DEFAULTS.category],
+    ['sort', view.sort, BOARD_VIEW_DEFAULTS.sort],
+    ['q', String(view.query || '').trim().slice(0, MAX_BOARD_QUERY_LENGTH), BOARD_VIEW_DEFAULTS.query],
+  ]
+  for (const [key, value, fallback] of entries) {
+    if (value === fallback || value === undefined || value === null || value === '') params.delete(key)
+    else params.set(key, String(value))
+  }
+  const text = params.toString()
+  return text ? `?${text}` : ''
+}
+
 export function deletedRecordText(value) {
   const raw = String(value || '')
   try {
@@ -88,6 +128,10 @@ export function shortDate(iso) {
 }
 
 export function openRowWithKeyboard(event, open) {
+  // Keys bubble up from the controls inside a row (스크랩, the moderator's 삭제). Only a key
+  // pressed on the row itself opens the post; otherwise Enter on one of those buttons was
+  // swallowed by preventDefault and opened the post instead of pressing the button.
+  if (event.target !== event.currentTarget) return
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
     open()

@@ -1,5 +1,6 @@
 import { Download } from 'lucide-react'
 import { apiUrl } from '../../services/apiClient'
+import { plainBlockText } from '../community/postEditorUtils'
 import {
   deletedHasFormattedText,
   deletedMediaWidth,
@@ -96,7 +97,7 @@ export default function DeletedPostEvidence({ post }: { post: DeletedPost }) {
             {deletedHasFormattedText(block.content) ? (
               <span dangerouslySetInnerHTML={{ __html: sanitizeDeletedHtml(block.content) }} />
             ) : (
-              block.content || '-'
+              plainBlockText(block.content) || '-'
             )}
           </div>
         )

@@ -9,14 +9,24 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same pull request replaces the run before it. Pushes to main are never
+# cancelled: the deploy workflow waits for this workflow to finish on each of them.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Runners are pinned to ubuntu-24.04 in every workflow: the ubuntu-latest label starts moving
+# to Ubuntu 26 on 2026-10-19, and the image should change when we choose to, not mid-release.
 jobs:
   backend:
     name: Backend tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
 
-    # The suite itself still runs on H2; this container exists only so
-    # PostgresMigrationExecutionTest can replay every Flyway migration against the
-    # database engine production actually uses.
+    # The suite itself still runs on H2; this container exists so the Postgres tests can
+    # replay every Flyway migration against the database engine production actually uses
+    # (PostgresMigrationExecutionTest) and boot the application on that schema with the prod
+    # profile and ddl-auto=validate (PostgresProductionSchemaTest).
     services:
       postgres:
         image: postgres:16
@@ -53,22 +63,25 @@ jobs:
           COMS_PG_TEST_PASSWORD: coms-ci
         run: JWT_SECRET="$(openssl rand -base64 48)" ./gradlew test --no-daemon
 
-      # The migration test skips itself when COMS_PG_TEST_URL is missing, which would make
+      # The Postgres tests skip themselves when COMS_PG_TEST_URL is missing, which would make
       # a broken service container look like a green build. Fail loudly instead.
-      - name: Verify the Postgres migration test was not skipped
+      - name: Verify the Postgres tests were not skipped
         working-directory: backend
         run: |
           set -euo pipefail
-          report=build/test-results/test/TEST-com.coms.backend.config.PostgresMigrationExecutionTest.xml
-          if ! grep -q 'skipped="0"' "$report"; then
-            echo "::error::PostgresMigrationExecutionTest did not run — check the postgres service and COMS_PG_TEST_URL."
-            cat "$report"
-            exit 1
-          fi
+          for test in PostgresMigrationExecutionTest PostgresProductionSchemaTest; do
+            report="build/test-results/test/TEST-com.coms.backend.config.${test}.xml"
+            if [ ! -f "$report" ] || ! grep -q 'skipped="0"' "$report"; then
+              echo "::error::${test} did not run — check the postgres service and COMS_PG_TEST_URL."
+              [ -f "$report" ] && cat "$report"
+              exit 1
+            fi
+          done
 
   frontend:
     name: Frontend tests, build & smoke
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -102,9 +115,68 @@ jobs:
       - name: Accessibility e2e
         run: npx playwright test --project=accessibility
 
+  # The deploy builds both images on the server and starts them with this same compose file,
+  # and nothing before it ever built them. Do it here first, on a throwaway database, so a
+  # Dockerfile, entrypoint, nginx or prod-profile start-up problem fails the pull request
+  # instead of the deploy.
+  stack:
+    name: Production images build & boot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Write a throwaway .env
+        run: |
+          umask 077
+          {
+            echo "DB_PASSWORD=$(openssl rand -hex 16)"
+            echo "JWT_SECRET=$(openssl rand -hex 48)"
+          } > .env
+
+      - name: Build and start the stack the way the deploy does
+        run: docker compose --env-file .env -f docker-compose.yml up -d --build --remove-orphans
+
+      - name: Wait for the backend, then check the site through nginx
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/actuator/health | grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"'; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              echo "::error::The backend image did not come up on PostgreSQL with the prod profile."
+              exit 1
+            fi
+            sleep 3
+          done
+          curl -fsS -o /dev/null -w 'backend /api/server/time: %{http_code}\n' http://127.0.0.1:8080/api/server/time
+          curl -fsS -o /dev/null -w 'site /: %{http_code}\n' http://127.0.0.1:3000/
+          curl -fsS http://127.0.0.1:3000/actuator/health | grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"'
+
+      - name: Check that the image applied every migration
+        run: |
+          set -euo pipefail
+          expected="$(ls backend/src/main/resources/db/migration | sed -nE 's/^V([0-9]+)__.*\.sql$/\1/p' | sort -n | tail -n 1)"
+          applied="$(docker compose --env-file .env -f docker-compose.yml exec -T db sh -c \
+            'psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select max(version::int) from flyway_schema_history where success"')"
+          echo "newest migration file: V$expected, newest applied: V$applied"
+          [ "$expected" = "$applied" ]
+
+      # This database was created a minute ago and holds nothing, so its output can be shown.
+      # The deploy workflow must not do the same with the production containers.
+      - name: Show container state and output on failure
+        if: failure()
+        run: |
+          docker compose --env-file .env -f docker-compose.yml ps || true
+          docker logs --tail=300 coms-backend || true
+          docker logs --tail=100 coms-frontend || true
+
   backend-e2e:
     name: Real-backend auth e2e
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v5

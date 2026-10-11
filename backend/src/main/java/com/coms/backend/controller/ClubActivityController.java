@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import com.coms.backend.web.ListPagination;
+import com.coms.backend.web.SafeMediaTypes;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -161,7 +162,7 @@ public class ClubActivityController {
         Resource resource = clubActivityService.loadFileResource(id, fileId);
         String filename = meta.getOriginalName() == null || meta.getOriginalName().isBlank() ? "attachment" : meta.getOriginalName();
         return ResponseEntity.ok()
-                .contentType(mediaType(meta.getMimeType()))
+                .contentType(SafeMediaTypes.forDownload(meta.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                         .filename(filename, StandardCharsets.UTF_8).build().toString())
                 .body(resource);

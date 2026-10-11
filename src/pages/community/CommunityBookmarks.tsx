@@ -7,10 +7,12 @@ import { BoardComposeBar } from './CommunityChrome'
 import CommunityPostRow from './CommunityPostRow'
 import { useBookmarkMutation } from './useBookmarkMutation'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
+import { useScrollReveal } from '../../hooks/useScrollReveal'
 
 export default function CommunityBookmarks({ onBack }: { onBack: () => void }) {
   const navigate = useNavigate()
   const bookmarkMutation = useBookmarkMutation()
+  useScrollReveal()
 
   const { data, isPending, error } = useQuery({
     queryKey: queryKeys.community.bookmarks(),

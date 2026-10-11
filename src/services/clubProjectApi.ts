@@ -1,4 +1,4 @@
-import { apiUrl, request, requestNoContent, throwApiError } from './apiClient'
+import { request, requestNoContent } from './apiClient'
 
 // ─── Public read ─────────────────────────────────────────────────────────────
 
@@ -26,14 +26,10 @@ function projectFormData({ category, title, description, eyebrow, madeBy, linkUr
 }
 
 export async function createClubProject(fields) {
-  const response = await fetch(apiUrl('/api/club-projects'), {
+  return request('/api/club-projects', {
     method: 'POST',
-    credentials: 'include',
     body: projectFormData(fields),
   })
-  if (!response.ok) await throwApiError(response, '프로젝트 등록 중 오류가 발생했습니다.')
-  const data = await response.json().catch(() => null)
-  return data
 }
 
 export async function updateClubProject(id, fields) {

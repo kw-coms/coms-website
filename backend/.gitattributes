@@ -1,3 +1,6 @@
 /gradlew text eol=lf
+# Runs inside the Linux image as the container entrypoint: a CRLF checkout (Windows,
+# core.autocrlf=true) would build an image that cannot start ("/bin/sh^M: not found").
+*.sh text eol=lf
 *.bat text eol=crlf
 *.jar binary

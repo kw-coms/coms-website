@@ -13,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Unit tests for SSRF guards and IP-pinning helpers in {@link LinkPreviewService}.
  *
  * No Spring context or network I/O is performed — InetAddress literals are resolved by the
- * JVM loopback resolver from the string form, and buildPinnedUri is a pure URI rewrite.
+ * JVM loopback resolver from the string form, and the request/response helpers work on bytes.
  */
 class LinkPreviewServiceTest {
 
@@ -76,50 +76,108 @@ class LinkPreviewServiceTest {
 
     // ── buildPinnedUri (IP-pinning, DNS-rebinding fix) ───────────────────────
 
-    /**
-     * Plain path: IPv4 address replaces the hostname in the URI; scheme/path/query preserved.
-     * This verifies the TOCTOU fix — the URI used for the actual TCP connect is the literal IP,
-     * not a hostname that could be re-resolved by the JVM or the HTTP client.
-     */
+    // ── the request written to the pinned socket ─────────────────────────────
+
     @Test
-    void pinnedUriReplacesHostWithIpv4Literal() throws Exception {
-        URI original = URI.create("https://example.com/path?q=1");
-        InetAddress addr = ip("93.184.216.34");
+    void requestNamesTheOriginalHostAndAsksForAnUncompressedSingleResponse() {
+        String request = new String(LinkPreviewService.requestFor(URI.create("https://example.com/path/page?q=1&r=2#frag")),
+                java.nio.charset.StandardCharsets.US_ASCII);
 
-        URI pinned = LinkPreviewService.buildPinnedUri(original, addr);
-
-        assertThat(pinned.getScheme()).isEqualTo("https");
-        assertThat(pinned.getHost()).isEqualTo("93.184.216.34");
-        assertThat(pinned.getPath()).isEqualTo("/path");
-        assertThat(pinned.getQuery()).isEqualTo("q=1");
-        // No port was set in original, so pinned URI should also have no explicit port.
-        assertThat(pinned.getPort()).isEqualTo(-1);
-        // The literal must not be a resolvable hostname — it IS the IP.
-        assertThat(pinned.toString()).startsWith("https://93.184.216.34/");
+        assertThat(request).startsWith("GET /path/page?q=1&r=2 HTTP/1.1\r\n");
+        // The socket goes to an IP address; this header is what routes the request to the site.
+        assertThat(request).contains("\r\nHost: example.com\r\n");
+        assertThat(request).contains("\r\nAccept-Encoding: identity\r\n");
+        assertThat(request).contains("\r\nConnection: close\r\n");
+        assertThat(request).endsWith("\r\n\r\n");
+        assertThat(request).doesNotContain("#frag");
     }
 
     @Test
-    void pinnedUriPreservesExplicitPort() throws Exception {
-        URI original = URI.create("https://example.com:8443/secure");
-        InetAddress addr = ip("93.184.216.34");
+    void requestTargetIsAlwaysAsciiAndNeverEmpty() {
+        assertThat(new String(LinkPreviewService.requestFor(URI.create("https://example.com")),
+                java.nio.charset.StandardCharsets.US_ASCII)).startsWith("GET / HTTP/1.1\r\n");
+        assertThat(new String(LinkPreviewService.requestFor(URI.create("https://example.com:443/a")),
+                java.nio.charset.StandardCharsets.US_ASCII)).contains("\r\nHost: example.com:443\r\n");
+        // java.net.URI accepts a raw Korean path; on the wire it must be percent-encoded UTF-8.
+        assertThat(new String(LinkPreviewService.requestFor(URI.create("https://ko.wikipedia.org/wiki/광운대학교")),
+                java.nio.charset.StandardCharsets.US_ASCII))
+                .startsWith("GET /wiki/%EA%B4%91%EC%9A%B4%EB%8C%80%ED%95%99%EA%B5%90 HTTP/1.1\r\n");
+    }
 
-        URI pinned = LinkPreviewService.buildPinnedUri(original, addr);
+    // ── reading the response ─────────────────────────────────────────────────
 
-        assertThat(pinned.getPort()).isEqualTo(8443);
-        assertThat(pinned.toString()).startsWith("https://93.184.216.34:8443/");
+    private static LinkPreviewService.FetchedPage read(String response, int maxBodyBytes) throws Exception {
+        return LinkPreviewService.readResponse(
+                new java.io.ByteArrayInputStream(response.getBytes(java.nio.charset.StandardCharsets.ISO_8859_1)), maxBodyBytes);
     }
 
     @Test
-    void pinnedUriEnclosesIpv6InBrackets() throws Exception {
-        URI original = URI.create("https://example.com/ipv6path");
-        // Use a public IPv6 address (example.com's AAAA record used in IANA assignments).
-        InetAddress addr = ip("2606:2800:220:1:248:1893:25c8:1946");
+    void readsABodyDelimitedByContentLength() throws Exception {
+        var page = read("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: 5\r\n\r\nhelloEXTRA", 1024);
 
-        URI pinned = LinkPreviewService.buildPinnedUri(original, addr);
+        assertThat(page.status()).isEqualTo(200);
+        assertThat(page.isHtml()).isTrue();
+        assertThat(page.charset()).isEqualTo("utf-8");
+        assertThat(page.location()).isNull();
+        assertThat(new String(page.body())).isEqualTo("hello");
+    }
 
-        // RFC 3986 §3.2.2 requires IPv6 literals in brackets.
-        assertThat(pinned.toString()).contains("[2606:2800:220:1:248:1893:25c8:1946]");
-        assertThat(pinned.getPath()).isEqualTo("/ipv6path");
+    @Test
+    void readsAChunkedBodyAndABodyThatRunsToTheEndOfTheStream() throws Exception {
+        var chunked = read("HTTP/1.1 200 OK\r\ncontent-type: TEXT/HTML\r\nTransfer-Encoding: chunked\r\n\r\n"
+                + "5\r\nhello\r\n6;ext=1\r\n world\r\n0\r\n\r\n", 1024);
+        assertThat(new String(chunked.body())).isEqualTo("hello world");
+        assertThat(chunked.isHtml()).isTrue();
+        assertThat(chunked.charset()).isNull();
+
+        var untilClose = read("HTTP/1.0 200 OK\nContent-Type: text/html\n\n<title>x</title>", 1024);
+        assertThat(new String(untilClose.body())).isEqualTo("<title>x</title>");
+    }
+
+    @Test
+    void neverCollectsMoreThanTheBodyCap() throws Exception {
+        assertThat(read("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 999999\r\n\r\n" + "a".repeat(5000), 100).body())
+                .hasSize(100);
+        assertThat(read("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + "a".repeat(5000), 100).body())
+                .hasSize(100);
+        assertThat(read("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nTransfer-Encoding: chunked\r\n\r\n"
+                + "40\r\n" + "a".repeat(64) + "\r\n40\r\n" + "b".repeat(64) + "\r\n0\r\n\r\n", 100).body())
+                .hasSize(100);
+    }
+
+    @Test
+    void reportsRedirectsWithoutReadingTheirBody() throws Exception {
+        var redirect = read("HTTP/1.1 301 Moved Permanently\r\nLocation: https://www.example.com/\r\nContent-Length: 3\r\n\r\nabc", 1024);
+        assertThat(redirect.status()).isEqualTo(301);
+        assertThat(redirect.location()).isEqualTo("https://www.example.com/");
+        assertThat(redirect.body()).isEmpty();
+
+        // A 3xx with nowhere to go, and any other status, is simply "no page".
+        assertThat(read("HTTP/1.1 302 Found\r\n\r\n", 1024).location()).isNull();
+        var notFound = read("HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\nContent-Length: 3\r\n\r\nabc", 1024);
+        assertThat(notFound.status()).isEqualTo(404);
+        assertThat(notFound.body()).isEmpty();
+    }
+
+    @Test
+    void rejectsWhatIsNotAnHttpResponse() {
+        assertThatThrownBy(() -> read("SSH-2.0-OpenSSH_9.6\r\n", 1024)).isInstanceOf(java.io.IOException.class);
+        assertThatThrownBy(() -> read("HTTP/1.1 abc OK\r\n\r\n", 1024)).isInstanceOf(java.io.IOException.class);
+        assertThatThrownBy(() -> read("HTTP/1.1 200 OK\r\nContent-Type: text/html", 1024))
+                .isInstanceOf(java.io.IOException.class);
+        assertThatThrownBy(() -> read("HTTP/1.1 200 OK\r\nX-Long: " + "a".repeat(20_000) + "\r\n\r\n", 1024))
+                .isInstanceOf(java.io.IOException.class);
+        assertThatThrownBy(() -> read("HTTP/1.1 200 OK\r\n" + "X-H: 1\r\n".repeat(500) + "\r\n", 1024))
+                .isInstanceOf(java.io.IOException.class);
+        assertThatThrownBy(() -> read("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\n", 1024))
+                .isInstanceOf(java.io.IOException.class);
+    }
+
+    @Test
+    void ignoresACharsetTheJvmDoesNotKnow() throws Exception {
+        assertThat(read("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=\"EUC-KR\"\r\n\r\n", 10).charset()).isEqualTo("EUC-KR");
+        assertThat(read("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=no-such-charset\r\n\r\n", 10).charset()).isNull();
+        assertThat(read("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n", 10).isHtml()).isFalse();
     }
 
     // ── resolveAndGuard: blocked host is rejected ────────────────────────────
@@ -184,5 +242,47 @@ class LinkPreviewServiceTest {
         // 다른 회원은 자기 창을 가진다.
         assertThatThrownBy(() -> svc.preview("https://example.com:8080/", "2026123457"))
                 .hasMessageContaining("기본 웹 포트");
+    }
+
+    // ---- the time limit is a wall-clock limit ---------------------------------------------------
+
+    /**
+     * A server that keeps the connection alive by sending one byte at a time. The socket read
+     * timeout restarts with every byte and the TLS layer waits for a whole record, so nothing but
+     * closing the socket ends this; before the hard stop the request thread stayed here for as
+     * long as the server liked.
+     */
+    @Test
+    void aTricklingServerCannotHoldTheFetchPastItsDeadline() throws Exception {
+        try (java.net.ServerSocket server = new java.net.ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            Thread trickle = new Thread(() -> {
+                try (java.net.Socket client = server.accept()) {
+                    java.io.OutputStream out = client.getOutputStream();
+                    // The start of a TLS handshake record announcing 16 KB that never arrives in full.
+                    out.write(new byte[] {0x16, 0x03, 0x03, 0x40, 0x00});
+                    out.flush();
+                    while (true) {
+                        Thread.sleep(150);
+                        out.write(0);
+                        out.flush();
+                    }
+                } catch (Exception closed) {
+                    // The client went away, which is what the test waits for.
+                }
+            });
+            trickle.setDaemon(true);
+            trickle.start();
+
+            LinkPreviewService service = new LinkPreviewService();
+            java.net.URI uri = java.net.URI.create("https://preview.example:" + server.getLocalPort() + "/");
+            long start = System.nanoTime();
+            long deadline = start + java.time.Duration.ofMillis(700).toNanos();
+
+            org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(8), () ->
+                    assertThatThrownBy(() -> service.fetch(uri, InetAddress.getLoopbackAddress(), deadline))
+                            .isInstanceOf(java.io.IOException.class));
+
+            assertThat(java.time.Duration.ofNanos(System.nanoTime() - start)).isLessThan(java.time.Duration.ofSeconds(4));
+        }
     }
 }

@@ -1,5 +1,9 @@
 .git
 .github
+# The server's .env holds the database password, JWT secret and SMTP password. The frontend
+# build receives the VITE_* values it needs as build arguments (docker-compose.yml).
+.env
+.env.*
 .omx
 backend
 backend-data

@@ -48,6 +48,7 @@ import java.util.stream.Collectors;
 public class NotificationService {
     private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
     private static final int ACTOR_LABEL_MAX = 100;
+    private static final int MAX_MESSAGE_LENGTH = 300;
     private static final int MAX_EXTERNAL_INVITES_PER_MINUTE = 10;
     private static final int MAX_EXTERNAL_INVITES_PER_DAY = 200;
     // Per-sender sliding window mirroring RecruitApplicationService.enforceRateLimit: bounds how
@@ -192,10 +193,17 @@ public class NotificationService {
     }
 
     public void notifyPostComment(CommunityPost post, CommunityComment comment) {
-        String message = comment.getAuthorName() + "님이 내 글에 댓글을 남겼습니다.";
+        // On the anonymous board the notification must not say who commented. It used to carry
+        // the commenter's real name in the text and their 학번 as the actor, so writing an
+        // anonymous post was enough to learn the identity of everyone who replied to it.
+        boolean anonymous = post.getCategory() == CommunityPost.Category.ANONYMOUS;
+        String message = anonymous
+                ? "내 익명 글에 새 댓글이 달렸습니다."
+                : comment.getAuthorName() + "님이 내 글에 댓글을 남겼습니다.";
         createIfDifferent(
                 post.getAuthorStudentId(),
                 comment.getStudentId(),
+                anonymous,
                 Notification.Type.COMMENT_ON_POST,
                 post.getId(),
                 comment.getId(),
@@ -212,10 +220,14 @@ public class NotificationService {
     }
 
     public void notifyCommentReply(CommunityPost post, CommunityComment parent, CommunityComment reply) {
-        String message = reply.getAuthorName() + "님이 내 댓글에 답글을 남겼습니다.";
+        boolean anonymous = post.getCategory() == CommunityPost.Category.ANONYMOUS;
+        String message = anonymous
+                ? "익명 게시판의 내 댓글에 새 답글이 달렸습니다."
+                : reply.getAuthorName() + "님이 내 댓글에 답글을 남겼습니다.";
         createIfDifferent(
                 parent.getStudentId(),
                 reply.getStudentId(),
+                anonymous,
                 Notification.Type.REPLY_ON_COMMENT,
                 post.getId(),
                 reply.getId(),
@@ -502,11 +514,23 @@ public class NotificationService {
      * 이상 so the queue doesn't rely on someone happening to open the admin
      * panel. Carries the postId so tapping lands on the reported post.
      */
-    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void notifyCommunityReport(CommunityPost post) {
         if (post == null || post.getId() == null) {
             return;
         }
+        // Runs in the reporter's transaction. It used to open its own (REQUIRES_NEW), which needs
+        // a second pooled connection while the caller still holds the first: ten members
+        // reporting at the same moment took all ten and every database call on the site waited
+        // out the acquisition timeout. The alert is best-effort, so nothing it throws leaves
+        // this method — an exception crossing the transactional proxy would doom the report too.
+        try {
+            alertModeratorsOfReport(post);
+        } catch (RuntimeException e) {
+            log.warn("Community report moderator alert failed for post {} (report kept)", post.getId(), e);
+        }
+    }
+
+    private void alertModeratorsOfReport(CommunityPost post) {
         String message = "커뮤니티 신고 접수: " + (post.getTitle() == null ? "제목 없음" : post.getTitle());
         // 중재 권한(community.moderate)을 실제로 가진 직급으로 수신자를 뽑는다 —
         // 회장이 임원에게 중재를 열어주면 임원도 신고 알림을 받아야 한다.
@@ -592,13 +616,30 @@ public class NotificationService {
                                    Long commentId,
                                    Long noticeId,
                                    String message) {
+        createIfDifferent(recipientStudentId, actorStudentId, false, type, postId, commentId, noticeId, message);
+    }
+
+    /**
+     * @param hideActor the actor decides whether a notification is due (nobody is notified of
+     *                  their own action) but is not stored with it — for activity whose author
+     *                  must stay unknown to the recipient.
+     */
+    private void createIfDifferent(String recipientStudentId,
+                                   String actorStudentId,
+                                   boolean hideActor,
+                                   Notification.Type type,
+                                   Long postId,
+                                   Long commentId,
+                                   Long noticeId,
+                                   String message) {
         if (recipientStudentId == null || recipientStudentId.equals(actorStudentId)) {
             return;
         }
         if (!isCategoryEnabled(recipientStudentId, type)) {
             return;
         }
-        notificationRepository.save(build(recipientStudentId, actorStudentId, type, postId, commentId, noticeId, message));
+        notificationRepository.save(build(recipientStudentId, hideActor ? null : actorStudentId,
+                type, postId, commentId, noticeId, message));
     }
 
     private Notification build(String recipientStudentId,
@@ -615,8 +656,20 @@ public class NotificationService {
         notification.setPostId(postId);
         notification.setCommentId(commentId);
         notification.setNoticeId(noticeId);
-        notification.setMessage(message);
+        notification.setMessage(fitMessage(message));
         return notification;
+    }
+
+    /**
+     * notifications.message is VARCHAR(300). A notification is a side effect of some other action
+     * and must never be what makes that action fail: a moderator deleting a post with a long title
+     * and reason used to overflow the column, which rolled the deletion itself back with HTTP 500.
+     */
+    static String fitMessage(String message) {
+        if (message == null || message.length() <= MAX_MESSAGE_LENGTH) {
+            return message;
+        }
+        return message.substring(0, MAX_MESSAGE_LENGTH - 1) + "…";
     }
 
     private NotificationResponse toResponse(Notification notification) {

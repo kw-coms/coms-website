@@ -83,6 +83,11 @@ export default function FigureToolbar({ editorRef, figId, meta, onResize, onAlig
 
   if (!rect) return null
   const hCls = 'fixed z-50 block h-3 w-3 -translate-x-1/2 -translate-y-1/2 border-2 border-blue-500 bg-[var(--app-surface)]'
+  // The site header is fixed and stacked above the editor's overlays. Clamped only to the
+  // viewport edge, the toolbar of an image whose top had scrolled up (any image taller than the
+  // space left on screen) slid underneath the header, where it could be neither seen nor clicked.
+  const headerBottom = document.querySelector('.apple-global-nav')?.getBoundingClientRect().bottom ?? 0
+  const toolbarTop = Math.max(headerBottom + 4, rect.top - 36)
 
   return createPortal(
     <>
@@ -90,7 +95,7 @@ export default function FigureToolbar({ editorRef, figId, meta, onResize, onAlig
         style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }} />
       <div ref={toolbarRef}
         className="fixed z-50 flex items-center gap-1 whitespace-nowrap rounded border border-[var(--app-hairline)] bg-white/95 px-2 py-1 shadow backdrop-blur-sm"
-        style={{ left: rect.left + rect.width / 2, top: Math.max(4, rect.top - 36), transform: 'translateX(-50%)' }}
+        style={{ left: rect.left + rect.width / 2, top: toolbarTop, transform: 'translateX(-50%)' }}
       >
         <MediaAlignControls value={meta?.align || 'center'} onChange={onAlign} />
         <span className="mx-0.5 h-3 w-px bg-black/15" />

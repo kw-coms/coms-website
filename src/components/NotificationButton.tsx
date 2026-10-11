@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -33,6 +33,8 @@ export default function NotificationButton({ alignLeft = false, variant = 'icon'
   const [dropdownStyle, setDropdownStyle] = useState({})
   const btnRef = useRef(null)
   const dropdownRef = useRef(null)
+  // Two instances can be mounted at once (header bell + mobile menu row), so no fixed id.
+  const popoverId = useId()
   const effectiveOpen = open && Boolean(user)
 
   const notificationsQuery = useQuery({
@@ -68,6 +70,8 @@ export default function NotificationButton({ alignLeft = false, variant = 'icon'
     const safeAcceptUrl = typeof item.acceptUrl === 'string' && /^https?:\/\//i.test(item.acceptUrl)
     if (safeAcceptUrl) {
       window.open(item.acceptUrl, '_blank', 'noopener,noreferrer')
+      // This page stays where it is, so focus goes back to the bell (the other branches navigate).
+      btnRef.current?.focus()
     } else if (item.type === 'COMMUNITY_POST_DELETED') {
       navigate('/community?view=deleted')
     } else if (item.type === 'COMMUNITY_REPORT') {
@@ -115,6 +119,33 @@ export default function NotificationButton({ alignLeft = false, variant = 'icon'
     }
   }, [effectiveOpen, positionDropdown])
 
+  // While open: a press outside closes the popover (it is portaled to <body>, so "outside"
+  // means neither the popover nor the bell, whose own click already toggles) and so does
+  // Escape, which hands focus back to the bell. Escape is taken in the capture phase and
+  // stopped so the mobile menu this row sits in stays open until the next Escape.
+  useEffect(() => {
+    if (!effectiveOpen) return undefined
+    // The popover is the last element in <body>; Tab from the bell would never reach it.
+    dropdownRef.current?.focus({ preventScroll: true })
+    const onDocMouseDown = (event: MouseEvent) => {
+      const target = event.target as Node
+      if (btnRef.current?.contains(target) || dropdownRef.current?.contains(target)) return
+      setOpen(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.stopPropagation()
+      setOpen(false)
+      btnRef.current?.focus()
+    }
+    document.addEventListener('mousedown', onDocMouseDown)
+    document.addEventListener('keydown', onKey, true)
+    return () => {
+      document.removeEventListener('mousedown', onDocMouseDown)
+      document.removeEventListener('keydown', onKey, true)
+    }
+  }, [effectiveOpen])
+
   const toggle = () => {
     setOpen((v) => !v)
     if (user) notificationsQuery.refetch()
@@ -132,7 +163,10 @@ export default function NotificationButton({ alignLeft = false, variant = 'icon'
         className={mobileMenu
           ? 'apple-mobile-menu-item apple-mobile-menu-notification'
           : 'relative inline-flex size-9 items-center justify-center rounded-full text-[var(--theme-body-dark)] transition hover:bg-black/5'}
-        aria-label="notifications"
+        aria-label={unreadCount > 0 ? `알림, 읽지 않음 ${unreadCount > 99 ? '99+' : unreadCount}개` : '알림'}
+        aria-haspopup="dialog"
+        aria-expanded={effectiveOpen}
+        aria-controls={popoverId}
       >
         {mobileMenu ? (
           <>
@@ -160,6 +194,10 @@ export default function NotificationButton({ alignLeft = false, variant = 'icon'
       {effectiveOpen && createPortal(
         <div
           ref={dropdownRef}
+          id={popoverId}
+          role="dialog"
+          aria-label="알림"
+          tabIndex={-1}
           className="theme-popover fixed z-[9999] w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--theme-body-dark)] shadow-2xl"
           style={dropdownStyle}
         >

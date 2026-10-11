@@ -137,8 +137,29 @@ export function hasFormattedText(value) {
   return FORMATTED_TEXT_RE.test(String(value || ''))
 }
 
+// The only escapes an HTML fragment needs in its text, and so the only ones the editor writes.
+const EDITOR_ENTITY_RE = /&(amp|lt|gt|quot|nbsp|#39|#x27);/g
+const EDITOR_ENTITY_TEXT = { amp: '&', lt: '<', gt: '>', quot: '"', nbsp: '\u00A0', '#39': "'", '#x27': "'" }
+// Characters an HTML fragment cannot carry unescaped: a raw `<`, `>`, a newline, or an `&`
+// that does not start one of the entities above.
+const VERBATIM_TEXT_RE = /[<>\n]|&(?!(?:amp|lt|gt|quot|nbsp|#39|#x27);)/
+
+/**
+ * What a reader should see for a text block that carries no markup.
+ *
+ * The editor stores every paragraph as an HTML fragment, so an unformatted paragraph still has
+ * "Q&A" written as `Q&amp;A` and "a < b" as `a &lt; b`. Rendered as plain text that reads
+ * "Q&amp;A". Text saved before the block editor, or by another client, is verbatim instead and
+ * must be left alone; it gives itself away by containing a character from VERBATIM_TEXT_RE.
+ */
+export function plainBlockText(value) {
+  const raw = String(value || '')
+  if (VERBATIM_TEXT_RE.test(raw)) return raw
+  return raw.replace(EDITOR_ENTITY_RE, (_match, name) => EDITOR_ENTITY_TEXT[name])
+}
+
 export function textContentForSearch(value) {
-  if (!hasFormattedText(value) || typeof document === 'undefined') return String(value || '')
+  if (!hasFormattedText(value) || typeof document === 'undefined') return plainBlockText(value)
   const template = document.createElement('template')
   template.innerHTML = sanitizeEditorHtml(value)
   return template.content.textContent || ''
@@ -341,7 +362,17 @@ export function parsePostBlocks(post) {
           return { ...block, width: block.width || 75, align: block.align || 'center', id: localId() }
         }
         if (block.type === 'poll') {
-          return { type: 'poll', pollId: block.pollId, question: block.question || '', options: Array.isArray(block.options) ? block.options : [], id: localId() }
+          // closesAt/closedAt live in the content. Dropping them here meant that opening a post
+          // in the editor and saving it sent the poll back without its deadline or its closure.
+          return {
+            type: 'poll',
+            pollId: block.pollId,
+            question: block.question || '',
+            options: Array.isArray(block.options) ? block.options : [],
+            ...(block.closesAt ? { closesAt: block.closesAt } : {}),
+            ...(block.closedAt ? { closedAt: block.closedAt } : {}),
+            id: localId(),
+          }
         }
         return { type: 'text', content: block.content || '', id: localId() }
       }))
@@ -351,6 +382,103 @@ export function parsePostBlocks(post) {
   }
   return withLegacyImage([{ type: 'text', content: post.content || '', id: localId() }])
 }
+
+/**
+ * The JSON the community API stores as a post body. Media blocks that have not been uploaded
+ * yet (no id) are left out.
+ */
+export function serializePostBlocks(blocks) {
+  return JSON.stringify(
+    (Array.isArray(blocks) ? blocks : []).map((b) => {
+      if (b.type === 'text') return { type: 'text', content: b.content }
+      if (b.type === 'image' && b.mediaId) return { type: 'image', mediaId: b.mediaId, name: b.name, width: b.width || 75, align: b.align || 'center' }
+      if (b.type === 'video' && b.mediaId) return { type: 'video', mediaId: b.mediaId, name: b.name, width: b.width || 75, align: b.align || 'center' }
+      if (b.type === 'file' && b.fileId) return { type: 'file', fileId: b.fileId, name: b.name }
+      if (b.type === 'externalEmbed') {
+        if (b.kind === 'link') {
+          // A link card is its preview: without description/image/siteName it came back from a
+          // save as a bare title.
+          return {
+            type: 'externalEmbed',
+            provider: b.provider,
+            kind: 'link',
+            url: b.url,
+            title: b.title,
+            description: b.description || '',
+            image: b.image || '',
+            siteName: b.siteName || '',
+            width: b.width || 75,
+            align: b.align || 'center',
+          }
+        }
+        return { type: 'externalEmbed', provider: b.provider, kind: b.kind, url: b.url, embedUrl: b.embedUrl, title: b.title, thumbnailUrl: b.thumbnailUrl, width: b.width || 75, align: b.align || 'center' }
+      }
+      if (b.type === 'poll') return { type: 'poll', pollId: b.pollId, question: b.question, options: b.options || [], closesAt: b.closesAt, closedAt: b.closedAt }
+      return null
+    }).filter(Boolean),
+  )
+}
+
+export const EMPTY_POST_STAND_IN = '...'
+
+/**
+ * The text the server takes from a text block when it checks whether the follow-up save of a
+ * new post merely completes it (CommunityTextService.stripHtml). Keep the two in step: a
+ * stand-in that does not match is what used to publish new posts already marked "수정".
+ */
+function serverPlainText(html) {
+  let text = String(html || '').replace(/<br\s*\/?>/gi, '\n')
+  // Until nothing is left to remove, so that taking one tag out cannot leave another behind.
+  let before
+  do {
+    before = text
+    text = text.replace(/<[^>]+>/g, '')
+  } while (text !== before)
+  return text
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    // Last, as on the server: undone earlier, "&amp;quot;" would go on to become a quote mark.
+    .replace(/&amp;/g, '&')
+}
+
+/**
+ * The body a new post is created with while its media is still uploading (uploads need the
+ * post's id): the first text block as plain text, so the post already reads sensibly if an
+ * upload fails. Falls back to "..." when there is no leading text, or when the text contains
+ * angle brackets — sent as a plain body those would be read as markup and refused.
+ */
+export function creationStandIn(blocks) {
+  const firstText = (Array.isArray(blocks) ? blocks : []).find((block) => block?.type === 'text')
+  const text = serverPlainText(firstText?.content).trim()
+  return text && !/[<>]/.test(text) ? text : EMPTY_POST_STAND_IN
+}
+
+/** True when a block still has a local file that must be uploaded before the post can be saved. */
+export function needsUpload(block) {
+  return block?.type !== 'text' && block?.status !== 'saved' && Boolean(block?.file)
+}
+
+/**
+ * Uploaded media an edit took out of the post, as `[{ type, id }]`.
+ *
+ * Removing a block only removes the reference; the upload stays on the server, still counted
+ * against the per-post limit, until it is deleted by id.
+ */
+export function removedSavedMedia(before, after) {
+  const idOf = (block) => (block?.type === 'file' ? block.fileId : block?.mediaId)
+  const keyOf = (block) => `${block.type}:${idOf(block)}`
+  const isSavedMedia = (block) => ['image', 'video', 'file'].includes(block?.type) && idOf(block) != null
+  const kept = new Set((Array.isArray(after) ? after : []).filter(isSavedMedia).map(keyOf))
+  const removed = new Map()
+  for (const block of Array.isArray(before) ? before : []) {
+    if (isSavedMedia(block) && !kept.has(keyOf(block))) removed.set(keyOf(block), { type: block.type, id: idOf(block) })
+  }
+  return [...removed.values()]
+}
+
 const CATEGORY_OPTIONS = [
   { value: 'GENERAL', label: '일반' },
   { value: 'QUESTION', label: '질문' },
@@ -366,6 +494,22 @@ export function categoryOptionsForUser(user, permissions) {
   return canAccessAnonymousBoard(user, permissions)
     ? CATEGORY_OPTIONS
     : CATEGORY_OPTIONS.filter((item) => item.value !== 'ANONYMOUS')
+}
+
+/**
+ * The categories an existing post may be moved to. A post cannot cross the anonymous boundary in
+ * either direction (the server refuses: its comments were written under the other rule), so the
+ * editor only offers the side the post is already on.
+ */
+export function categoryOptionsForPost(options, postedCategory) {
+  if (!postedCategory) return options
+  const anonymous = postedCategory === 'ANONYMOUS'
+  const sameSide = options.filter((item) => (item.value === 'ANONYMOUS') === anonymous)
+  if (sameSide.some((item) => item.value === postedCategory)) return sameSide
+  // The editor may not be offered this category for new posts (a moderator fixing someone's
+  // anonymous post). It still has to be selectable, or saving would try to move the post.
+  const posted = CATEGORY_OPTIONS.find((item) => item.value === postedCategory)
+  return posted ? [posted, ...sameSide] : sameSide
 }
 
 export function figureInlineStyle(wPct, align) {

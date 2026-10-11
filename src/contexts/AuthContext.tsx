@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type PropsWithChildren } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react'
 import type { ApiError } from '../services/apiClient'
 import { getCurrentUser, logoutUser } from '../services/authApi'
 import { getMyPermissions } from '../services/permissionsApi'
 import { setSessionExpiredHandler } from '../services/apiClient'
 import { setUserContext } from '../services/observability'
 import { queryClient } from '../services/queryClient'
+import { showToast } from '../components/common/Toast'
 import { buildAuthLoadError, isLoggedOutAuthError } from './authErrors'
 import { AuthContext } from './useAuth'
 
@@ -20,13 +21,27 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setUserContext(user)
   }, [user])
 
-  // A 401 that survives a token refresh means the session is truly gone: clear it so route
-  // guards redirect to /login instead of leaving a logged-in shell whose every panel errors.
+  // Read by the session-expired handler below, which is registered once and must see the
+  // current session rather than the one captured when it was created.
+  const userRef = useRef(null)
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
+
+  // A request the server will no longer authenticate, together with a refresh it refuses,
+  // means the session is truly gone: clear it so route guards redirect to /login instead of
+  // leaving a logged-in shell whose every panel errors.
   useEffect(() => {
     setSessionExpiredHandler(() => {
+      // Logged-out visitors reach this on every page load (/me is refused, and so is the
+      // refresh). There is no session to end, and clearing the query cache here would cancel
+      // the public queries that are still loading.
+      if (!userRef.current) return
+      userRef.current = null
       setUser(null)
       setPermissions(null)
       queryClient.clear()
+      showToast({ message: '로그인이 만료되었습니다. 다시 로그인해주세요.' })
     })
     return () => setSessionExpiredHandler(null)
   }, [])
@@ -72,6 +87,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const studentId = user?.studentId
   const role = user?.role
   const [permissionsNonce, setPermissionsNonce] = useState(0)
+  // Which permissions request has come back, successfully or not. `permissions === null` alone
+  // cannot tell "still on its way" from "failed", and a route guard has to: it waits for the
+  // first and must not wait for the second.
+  const permissionsRequest = studentId ? `${studentId}|${role}|${permissionsNonce}` : ''
+  const [settledPermissionsRequest, setSettledPermissionsRequest] = useState('')
+  const permissionsSettled = Boolean(permissionsRequest) && settledPermissionsRequest === permissionsRequest
 
   // 로그인한 사용자가 바뀌면(또는 권한 매트릭스를 저장한 뒤) 유효 권한을 다시 읽는다.
   useEffect(() => {
@@ -86,7 +107,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
         // 실패해도 로그인 상태를 흔들지 않는다 — 직급 기본값으로 화면을 그린다.
         if (mounted) setPermissions(null)
       })
+      .finally(() => {
+        if (mounted) setSettledPermissionsRequest(permissionsRequest)
+      })
     return () => { mounted = false }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- permissionsRequest is derived from these three
   }, [studentId, role, permissionsNonce])
 
   const refreshPermissions = useCallback(() => {
@@ -106,18 +131,33 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }, [])
 
+  // Forget the session on this device without asking the server. Called on its own when the
+  // server has already ended it — a password change revokes every token the member holds.
+  const clearSession = useCallback(() => {
+    // The session-expired handler reads this ref; clearing it now keeps a request that fails
+    // before the next render from announcing an expiry on top of the caller's own message.
+    userRef.current = null
+    setUser(null)
+    setAuthError(null)
+    setPermissions(null)
+    // Drop every cached query so the next account on a shared device can't see the previous
+    // user's community list, bookmarks, or vote state (query keys aren't scoped per user).
+    queryClient.clear()
+  }, [])
+
   const logout = useCallback(async () => {
     try {
       await logoutUser()
-    } finally {
-      setUser(null)
-      setAuthError(null)
-      setPermissions(null)
-      // Drop every cached query so the next account on a shared device can't see the previous
-      // user's community list, bookmarks, or vote state (query keys aren't scoped per user).
-      queryClient.clear()
+    } catch {
+      // The auth cookies are HttpOnly, so only the server can end the session. If the request
+      // did not go through, the member is still signed in and a reload would bring the account
+      // straight back: keep the session on screen and say so rather than show a logged-out shell.
+      showToast({ message: '로그아웃하지 못했습니다. 아직 로그인된 상태이니 잠시 후 다시 시도해주세요.', tone: 'error' })
+      return false
     }
-  }, [])
+    clearSession()
+    return true
+  }, [clearSession])
 
   const refreshUser = useCallback(async () => {
     setAuthError(null)
@@ -149,10 +189,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const value = useMemo(
     () => ({
-      user, loading, authError, permissions, refreshPermissions,
-      login, logout, refreshUser, retryAuth, setUser,
+      user, loading, authError, permissions, permissionsSettled, refreshPermissions,
+      login, logout, clearSession, refreshUser, retryAuth, setUser,
     }),
-    [user, loading, authError, permissions, refreshPermissions, login, logout, refreshUser, retryAuth]
+    [user, loading, authError, permissions, permissionsSettled, refreshPermissions, login, logout, clearSession, refreshUser, retryAuth]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

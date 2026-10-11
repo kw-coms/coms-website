@@ -202,7 +202,10 @@ export function sanitizeHtml(value, options: SanitizeHtmlOptions = {}) {
     ALLOW_DATA_ATTR: false,
     FORBID_TAGS: ['embed', 'iframe', 'math', 'object', 'script', 'style', 'svg', 'template'],
     KEEP_CONTENT: true,
-    SAFE_FOR_TEMPLATES: true,
+    // No SAFE_FOR_TEMPLATES: it blanks `${...}`, `{{...}}` and `<%...%>` out of the text, which
+    // on a programming club's board deletes the code people post (a template literal, a Vue or
+    // Jinja snippet). It exists for pages that feed the result to a client-side template engine;
+    // this output only ever goes to innerHTML, where those characters are inert.
   })
   const template = document.createElement('template')
   template.innerHTML = clean
