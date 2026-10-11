@@ -8,6 +8,10 @@ import { AuthProvider } from './contexts/AuthContext'
 import { queryClient } from './services/queryClient'
 import { captureError, initObservability } from './services/observability'
 import { setupPwaAutoUpdate } from './pwaAutoUpdate'
+import { getStoredThemeMode } from './utils/themeColors'
+
+// index.html ships dark; a visitor who chose light gets it before the first render.
+document.documentElement.dataset.themeMode = getStoredThemeMode()
 
 const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0'
 

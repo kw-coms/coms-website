@@ -78,6 +78,7 @@ function App() {
     const accent = normalizeHex(accentColor)
 
     root.dataset.themeMode = mode
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', mode === 'dark' ? '#0f1115' : '#ffffff')
     root.style.setProperty('--app-accent', accent)
     root.style.setProperty('--app-accent-hover', mixHex(accent, mode === 'dark' ? '#ffffff' : '#000000', mode === 'dark' ? 0.14 : 0.08))
     root.style.setProperty('--app-accent-soft', mixHex(accent, mode === 'dark' ? '#17191f' : '#ffffff', mode === 'dark' ? 0.8 : 0.88))
