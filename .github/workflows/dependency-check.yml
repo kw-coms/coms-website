@@ -21,7 +21,8 @@ permissions:
 jobs:
   dependency-check:
     name: OWASP Dependency-Check (backend)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v5
