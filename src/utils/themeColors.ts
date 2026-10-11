@@ -1,5 +1,7 @@
 export const DEFAULT_ACCENT = '#0071e3'
-export const THEME_MODE_KEY = 'kwcoms-theme-mode'
+// v2: the default look is dark. The first key stored whatever the OS preferred on the first
+// visit, so it cannot tell a deliberate choice from that default; it is no longer read.
+export const THEME_MODE_KEY = 'kwcoms-theme-mode:v2'
 export const ACCENT_COLOR_KEY = 'kwcoms-accent-color'
 export const FONT_SELECTION_KEY = 'kwcoms-font-id'
 
@@ -48,10 +50,12 @@ export function mixHex(base, overlay, overlayRatio) {
 }
 
 export function getStoredThemeMode() {
-  if (typeof window === 'undefined') return 'light'
-  const stored = window.localStorage.getItem(THEME_MODE_KEY)
-  if (stored === 'light' || stored === 'dark') return stored
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  if (typeof window === 'undefined') return 'dark'
+  try {
+    return window.localStorage.getItem(THEME_MODE_KEY) === 'light' ? 'light' : 'dark'
+  } catch {
+    return 'dark'
+  }
 }
 
 export function getStoredAccentColor() {

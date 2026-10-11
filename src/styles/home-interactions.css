@@ -338,6 +338,45 @@
 		drop-shadow(0 2px 5px rgba(0, 0, 0, 0.12));
 }
 
+/* Boot intro handoff. While the intro (ComsIntro) covers the page the wordmark is held
+   back; when the intro lets go it is typed in, one step per character. Neither class
+   exists when the intro does not play (repeat visits, reduced motion). */
+html.coms-booting .coms-cinema-title,
+html.coms-booting .coms-cinema-word {
+	clip-path: inset(-30% 100% -30% -10%);
+}
+html.coms-booted .coms-cinema-title,
+html.coms-booted .coms-cinema-word {
+	animation: coms-type-in 620ms steps(5, end) both;
+}
+/* The hero's own logo stays dark until the intro's lit logo has landed on it. */
+html.coms-booting .coms-cinema-intrologo,
+html.coms-booting .coms-logo-3d {
+	opacity: 0;
+}
+html.coms-booted .coms-cinema-intrologo {
+	animation: coms-logo-land 280ms ease 300ms both, home-logo-float 7s ease-in-out infinite;
+}
+html.coms-booted .coms-logo-3d {
+	animation: coms-logo-land 280ms ease 300ms both;
+}
+@keyframes coms-logo-land {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+@keyframes coms-type-in {
+	from {
+		clip-path: inset(-30% 100% -30% -10%);
+	}
+	to {
+		clip-path: inset(-30% -10% -30% -10%);
+	}
+}
+
 /* The hero body crossfades + rises in as the wordmark finishes shrinking. */
 .coms-cinema-content {
 	opacity: var(--content-p, 0);
