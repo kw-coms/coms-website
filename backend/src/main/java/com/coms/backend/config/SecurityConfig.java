@@ -5,6 +5,7 @@ import com.coms.backend.security.IntegrationHmacFilter;
 import com.coms.backend.security.JwtAuthenticationFilter;
 import com.coms.backend.security.JwtTokenProvider;
 import com.coms.backend.security.OriginValidationFilter;
+import com.coms.backend.security.RequestBodyLimitFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +23,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import java.util.Arrays;
 import java.util.List;
@@ -71,7 +73,8 @@ public class SecurityConfig {
                                            UserDetailsService userDetailsService,
                                            OriginValidationFilter originValidationFilter,
                                            IntegrationHmacFilter integrationHmacFilter,
-                                           com.coms.backend.repository.MemberRepository memberRepository) throws Exception {
+                                           com.coms.backend.repository.MemberRepository memberRepository,
+                                           @Value("${app.max-request-body-bytes:8388608}") long maxRequestBodyBytes) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             // The API authenticates with stateless cookies. OriginValidationFilter rejects every
@@ -184,6 +187,9 @@ public class SecurityConfig {
                     "frame-ancestors 'none';"
                 ))
             )
+            // Ahead of everything that reads a body or looks at credentials, so an anonymous
+            // caller is refused too; after CORS, so a browser can still read the 413.
+            .addFilterAfter(new RequestBodyLimitFilter(maxRequestBodyBytes), CorsFilter.class)
             .addFilterBefore(originValidationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(integrationHmacFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(

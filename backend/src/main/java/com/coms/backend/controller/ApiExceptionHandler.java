@@ -1,6 +1,8 @@
 package com.coms.backend.controller;
 
+import com.coms.backend.security.RequestBodyLimitFilter;
 import io.sentry.Sentry;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import org.apache.catalina.connector.ClientAbortException;
 import org.slf4j.Logger;
@@ -74,8 +76,20 @@ public class ApiExceptionHandler {
             HandlerMethodValidationException.class,
             ConstraintViolationException.class
     })
-    public ResponseEntity<Map<String, String>> handleBadRequest() {
+    public ResponseEntity<Map<String, String>> handleBadRequest(HttpServletRequest request) {
+        if (RequestBodyLimitFilter.exceeded(request)) {
+            return bodyTooLarge();
+        }
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "입력값을 확인한 뒤 다시 시도해주세요."));
+    }
+
+    /**
+     * A body sent without a declared length is cut off while it is being read, so the failure
+     * arrives here as an unreadable message. It is the same refusal RequestBodyLimitFilter gives
+     * when the length is declared, and gets the same answer.
+     */
+    private static ResponseEntity<Map<String, String>> bodyTooLarge() {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(Map.of("message", RequestBodyLimitFilter.MESSAGE));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
@@ -107,7 +121,7 @@ public class ApiExceptionHandler {
      * the database refuses (a NOT NULL or CHECK violation) is a bug and stays a 500.
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<Map<String, String>> handleDataIntegrity(DataIntegrityViolationException ex) {
+    public ResponseEntity<Map<String, String>> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
         String sqlState = sqlStateOf(ex);
         if (sqlState != null && sqlState.startsWith("22")) {
             log.warn("Rejected a value the database could not store (sqlState={})", sqlState, ex);
@@ -119,7 +133,7 @@ public class ApiExceptionHandler {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("message", "이미 처리되었거나 다른 요청과 충돌했습니다. 새로고침 후 다시 시도해주세요."));
         }
-        return handleUnexpected(ex);
+        return handleUnexpected(ex, request);
     }
 
     /**
@@ -152,7 +166,10 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, String>> handleUnexpected(Exception ex) {
+    public ResponseEntity<Map<String, String>> handleUnexpected(Exception ex, HttpServletRequest request) {
+        if (RequestBodyLimitFilter.exceeded(request)) {
+            return bodyTooLarge();
+        }
         log.error("Unhandled exception", ex);
         // Request failures never reached Sentry: SentryConfig only initialises the SDK, and this
         // handler swallows the exception before any uncaught-exception hook could see it.

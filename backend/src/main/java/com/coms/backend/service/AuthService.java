@@ -276,7 +276,7 @@ public class AuthService implements UserDetailsService {
                     // Silent, like the cooldown above: the caller always gets the same answer. The
                     // one-minute cooldown alone still let anyone mail a member 1,440 times a day
                     // and take five guesses at a fresh code every minute, indefinitely.
-                    if (!passwordResetCodesByAccount.tryAcquire(member.getStudentId())) {
+                    if (passwordResetCodesByAccount.isExhausted(member.getStudentId())) {
                         log.warn("Rate limit rejected: limiter=password-reset-account key={}",
                                 maskAccountKey(member.getStudentId()));
                         return;
@@ -287,6 +287,11 @@ public class AuthService implements UserDetailsService {
                     member.resetPasswordResetAttempts();
                     memberRepository.save(member);
                     emailVerificationSender.sendPasswordResetCode(member.getEmail(), code);
+                    // Counted only once the mail is on its way. A send that fails rolls this
+                    // transaction back and tells the caller to retry; when the attempt was counted
+                    // first, a few retries during a mail outage used up the hour and every later
+                    // request was answered "sent" without sending anything.
+                    passwordResetCodesByAccount.record(member.getStudentId());
                 });
     }
 
@@ -335,20 +340,30 @@ public class AuthService implements UserDetailsService {
         bannedStudentService.ensureNotBanned(studentId);
         Member member = memberRepository.findByStudentId(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        member.setPhone(normalizeNullable(request.phone()));
-        member.setAspiration(normalizeNullable(request.aspiration()));
-        member.setInterests(normalizeNullable(request.interests()));
-        if (request.selectedFontId() != null && request.selectedBuiltinFontKey() != null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose only one font preference.");
+        // Only what the client sent is changed (see UpdateProfileRequest): a screen that saves
+        // just the font must not erase the phone number, and the other way round.
+        if (request.hasPhone()) {
+            member.setPhone(normalizeNullable(request.getPhone()));
         }
-        if (!fontService.isSelectable(request.selectedFontId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selected font is not available.");
+        if (request.hasAspiration()) {
+            member.setAspiration(normalizeNullable(request.getAspiration()));
         }
-        if (!fontService.isSelectableBuiltIn(request.selectedBuiltinFontKey())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Built-in font is not available.");
+        if (request.hasInterests()) {
+            member.setInterests(normalizeNullable(request.getInterests()));
         }
-        member.setSelectedFontId(request.selectedFontId());
-        member.setSelectedBuiltinFontKey(request.selectedBuiltinFontKey());
+        if (request.hasFontChoice()) {
+            if (request.getSelectedFontId() != null && request.getSelectedBuiltinFontKey() != null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose only one font preference.");
+            }
+            if (!fontService.isSelectable(request.getSelectedFontId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selected font is not available.");
+            }
+            if (!fontService.isSelectableBuiltIn(request.getSelectedBuiltinFontKey())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Built-in font is not available.");
+            }
+            member.setSelectedFontId(request.getSelectedFontId());
+            member.setSelectedBuiltinFontKey(request.getSelectedBuiltinFontKey());
+        }
         memberRepository.save(member);
         return new MemberResponse(
                 member.getId(),

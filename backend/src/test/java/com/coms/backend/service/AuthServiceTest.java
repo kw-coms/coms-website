@@ -87,7 +87,7 @@ class AuthServiceTest {
 
         var response = authService.updateProfile(
                 "2026123456",
-                new UpdateProfileRequest(" 01012345678 ", " 프로젝트를 만들고 싶습니다. ", " 웹, AI ", null, null)
+                UpdateProfileRequest.of(" 01012345678 ", " 프로젝트를 만들고 싶습니다. ", " 웹, AI ", null, null)
         );
 
         assertThat(response.phone()).isEqualTo("01012345678");
@@ -106,7 +106,7 @@ class AuthServiceTest {
 
         var response = authService.updateProfile(
                 "2026123464",
-                new UpdateProfileRequest(null, null, null, null, "b:pretendard")
+                UpdateProfileRequest.of(null, null, null, null, "b:pretendard")
         );
 
         assertThat(response.selectedFontId()).isNull();
@@ -123,7 +123,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.updateProfile(
                 "2026123465",
-                new UpdateProfileRequest(null, null, null, null, "b:unknown")
+                UpdateProfileRequest.of(null, null, null, null, "b:unknown")
         )).isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
             assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
             assertThat(ex.getReason()).contains("Built-in font");
@@ -136,7 +136,7 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.updateProfile(
                 "2026123466",
-                new UpdateProfileRequest(null, null, null, 1L, "b:pretendard")
+                UpdateProfileRequest.of(null, null, null, 1L, "b:pretendard")
         )).isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
             assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
             assertThat(ex.getReason()).contains("one font preference");
@@ -616,6 +616,27 @@ class AuthServiceTest {
         verify(emailVerificationSender, times(5)).sendPasswordResetCode(eq(member.getEmail()), anyString());
         assertThat(memberRepository.findByStudentId("2026123490").orElseThrow().getPasswordResetCodeHash())
                 .isEqualTo(codeBefore);
+    }
+
+    @Test
+    void aResetMailThatFailsDoesNotUseUpTheAccountsHourlyAllowance() {
+        Member member = saveMember("2026123491", true);
+        org.mockito.Mockito.doThrow(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "메일 서버 오류"))
+                .when(emailVerificationSender).sendPasswordResetCode(eq(member.getEmail()), anyString());
+        // A mail outage: the member is told to retry, and does, more often than the hourly cap.
+        for (int request = 0; request < 6; request++) {
+            assertThatThrownBy(() -> authService.requestPasswordReset(null, member.getEmail(), "198.51.100.40"))
+                    .isInstanceOf(ResponseStatusException.class);
+        }
+        assertThat(memberRepository.findByStudentId("2026123491").orElseThrow().getPasswordResetCodeHash()).isNull();
+
+        // Mail is back. The request used to be answered "sent" for the rest of the hour while
+        // sending nothing, because every failed attempt had been counted.
+        org.mockito.Mockito.doNothing().when(emailVerificationSender).sendPasswordResetCode(eq(member.getEmail()), anyString());
+        authService.requestPasswordReset(null, member.getEmail(), "198.51.100.40");
+
+        verify(emailVerificationSender, times(7)).sendPasswordResetCode(eq(member.getEmail()), anyString());
+        assertThat(memberRepository.findByStudentId("2026123491").orElseThrow().getPasswordResetCodeHash()).isNotNull();
     }
 
     @Test

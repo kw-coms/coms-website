@@ -113,12 +113,16 @@ public class ArchiveController {
     public ResponseEntity<Resource> inline(@PathVariable Long id) {
         ArchiveFile file = archiveService.get(id);
         Resource resource = storageService.load(file.getStoredName());
-        MediaType mediaType = mediaType(file.getMimeType());
+        MediaType declared = mediaType(file.getMimeType());
         // Only render images and PDFs inline. Anything else (HTML, SVG, scripts, ...) is forced to
         // download as an attachment so the browser never renders it, neutralizing stored XSS even if
         // a dangerous content-type slipped past upload validation. SVG (image/svg+xml) is excluded
         // from the inline allowlist because it can carry script.
-        boolean inlineSafe = isInlineSafe(mediaType);
+        boolean inlineSafe = isInlineSafe(declared);
+        // What is not rendered inline is not announced as its declared type either: an attachment
+        // header does not stop a page from loading the URL as a script or stylesheet, and a
+        // script type here would satisfy both nosniff and script-src 'self'.
+        MediaType mediaType = inlineSafe ? declared : SafeMediaTypes.forDownload(file.getMimeType());
         ContentDisposition disposition = (inlineSafe
                 ? ContentDisposition.inline()
                 : ContentDisposition.attachment())

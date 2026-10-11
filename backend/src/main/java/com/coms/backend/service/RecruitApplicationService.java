@@ -40,6 +40,10 @@ public class RecruitApplicationService {
     // from brute-forcing studentId/name pairs to learn who applied.
     private static final int MAX_STATUS_LOOKUPS_PER_WINDOW = 10;
     private static final Duration STATUS_LOOKUP_WINDOW = Duration.ofMinutes(10);
+    // How long a decision can be looked up with a name and 학번. The decision log itself is kept
+    // for good as a record; without a limit the public lookup would answer for every applicant
+    // of every past season, to anyone who knows those two things about them.
+    private static final int DECISION_LOOKUP_DAYS = 90;
 
     private static final Map<RecruitApplication.Status, String> STATUS_LABELS = Map.of(
             RecruitApplication.Status.RECEIVED, "지원 완료",
@@ -137,6 +141,8 @@ public class RecruitApplicationService {
                 // 나온 지원자는 "지원 내역을 찾을 수 없습니다"만 보게 된다 — 정작 가장 궁금한 순간에.
                 .or(() -> promotionLogRepository
                         .findFirstByStudentIdAndNameOrderByPromotedAtDescIdDesc(studentId, name)
+                        .filter(decision -> decision.getPromotedAt() != null
+                                && decision.getPromotedAt().isAfter(LocalDateTime.now(clock).minusDays(DECISION_LOOKUP_DAYS)))
                         .map(RecruitApplicationService::decidedStatus))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "일치하는 지원 내역을 찾을 수 없습니다."));
     }

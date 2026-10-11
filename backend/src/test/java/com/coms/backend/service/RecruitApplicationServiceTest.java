@@ -515,6 +515,33 @@ class RecruitApplicationServiceTest {
     }
 
     @Test
+    void lookupStatusStopsAnsweringFromTheDecisionLogAfterNinetyDays() {
+        // The log is kept for good as a record. The public lookup must not turn it into a way
+        // to ask about every applicant of every past season with a name and a 학번.
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.findFirstByStudentIdAndNameOrderBySubmittedAtDescIdDesc(any(), any()))
+                .thenReturn(Optional.empty());
+        RecruitPromotionLogRepository promotionLogs = mock(RecruitPromotionLogRepository.class);
+        var lastSeason = decision("김지난", "2025990103", com.coms.backend.domain.RecruitPromotionLog.Decision.REJECTED);
+        lastSeason.setPromotedAt(java.time.LocalDateTime.now().minusDays(91));
+        var recent = decision("김최근", "2026990104", com.coms.backend.domain.RecruitPromotionLog.Decision.ACCEPTED);
+        recent.setPromotedAt(java.time.LocalDateTime.now().minusDays(89));
+        when(promotionLogs.findFirstByStudentIdAndNameOrderByPromotedAtDescIdDesc("2025990103", "김지난"))
+                .thenReturn(Optional.of(lastSeason));
+        when(promotionLogs.findFirstByStudentIdAndNameOrderByPromotedAtDescIdDesc("2026990104", "김최근"))
+                .thenReturn(Optional.of(recent));
+        RecruitApplicationService service = newService(mock(JavaMailSender.class), repository, promotionLogs, "recruit@coms.kw.ac.kr");
+
+        assertThatThrownBy(() -> service.lookupStatus(
+                new RecruitApplicationStatusLookupRequest("김지난", "2025990103"), "203.0.113.21"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        assertThat(service.lookupStatus(
+                new RecruitApplicationStatusLookupRequest("김최근", "2026990104"), "203.0.113.21").status())
+                .isEqualTo("ACCEPTED");
+    }
+
+    @Test
     void lookupStatusPrefersAPendingApplicationOverAnOlderDecision() {
         // 지난 모집에서 불합격했다가 다시 지원한 경우: 지금 진행 중인 지원서가 답이다.
         RecruitApplication reapplied = new RecruitApplication();
