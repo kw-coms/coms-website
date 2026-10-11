@@ -119,9 +119,12 @@ class CommunityTextService {
                 .replace("&nbsp;", " ")
                 .replace("&lt;", "<")
                 .replace("&gt;", ">")
-                .replace("&amp;", "&")
                 .replace("&quot;", "\"")
-                .replace("&#39;", "'");
+                .replace("&#39;", "'")
+                // Last: undone earlier, an escaped ampersand joined what followed it into a new
+                // entity, and text that reads &quot; on the page was turned into a quote mark.
+                // (postEditorUtils.serverPlainText mirrors this function; keep them in step.)
+                .replace("&amp;", "&");
     }
 
     // ---- Audit-log text formatting -----------------------------------------------------------

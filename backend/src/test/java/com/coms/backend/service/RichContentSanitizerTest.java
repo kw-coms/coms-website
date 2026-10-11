@@ -363,6 +363,51 @@ class RichContentSanitizerTest {
         sanitizer.rejectUnsafeTextStrict(null);
     }
 
+    // ---- Cost on hostile input ----------------------------------------------------------------
+
+    /**
+     * A body may be 50,000 characters, and every pattern here runs on text a member chose. A
+     * pattern with two adjacent quantifiers that can share the same characters takes time
+     * quadratic in a long run of them — seconds of CPU for one request.
+     */
+    @Test
+    void hostileInputIsHandledInLinearTime() {
+        int n = 50_000;
+        String[] plainTexts = {
+                "<" + " ".repeat(n),
+                "<" + "/ ".repeat(n / 2),
+                "< ".repeat(n / 2),
+                "<a " + "x".repeat(n),
+                "<a title=\"" + "x".repeat(n),
+                "<b " + "onx ".repeat(n / 4),
+        };
+        String[] richTexts = {
+                "<" + "a".repeat(n),
+                "<a" + "1".repeat(n) + " ",
+                "<code class=" + " ".repeat(n) + ">x</code>",
+                "<code class=\"" + " ".repeat(n) + "language-\">x</code>",
+                "<span style=\"font-family:" + " ".repeat(n) + "\">x</span>",
+                "<span style=\"color:" + " ".repeat(n) + "\">x</span>",
+                "<a href=" + " ".repeat(n) + ">x</a>",
+                "<font color=" + " ".repeat(n) + ">x</font>",
+                "&".repeat(n),
+                "&#".repeat(n / 2),
+        };
+        org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(5), () -> {
+            for (String text : plainTexts) {
+                try {
+                    sanitizer.rejectUnsafeText(text);
+                    sanitizer.rejectUnsafeTextStrict(text.substring(0, Math.min(text.length(), 2_000)));
+                } catch (ResponseStatusException refused) {
+                    // Refusing is fine; taking seconds to decide is not.
+                }
+            }
+            for (String html : richTexts) {
+                textBlock(html);
+            }
+        });
+    }
+
     private String textBlock(String html) throws Exception {
         String content = mapper.writeValueAsString(
                 mapper.createArrayNode().add(mapper.createObjectNode().put("type", "text").put("content", html)));

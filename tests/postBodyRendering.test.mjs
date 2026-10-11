@@ -160,6 +160,11 @@ assert.equal(creationStandIn([{ type: 'image', file: {} }]), '...')
 assert.equal(creationStandIn([{ type: 'text', content: '   ' }, { type: 'text', content: '둘째 블록' }]), '...')
 assert.equal(creationStandIn([{ type: 'text', content: 'if (a &lt; b) return' }]), '...')
 assert.equal(creationStandIn(null), '...')
+// Text that reads "&quot;" on the page is stored as "&amp;quot;". Each entity is undone once:
+// undoing the ampersand first used to turn it into a quotation mark.
+assert.equal(creationStandIn([{ type: 'text', content: 'HTML 에서는 &amp;quot; 와 &amp;#39; 를 씁니다 &quot;이렇게&quot;' }]), 'HTML 에서는 &quot; 와 &#39; 를 씁니다 "이렇게"')
+// Tags are taken out until none is left.
+assert.equal(creationStandIn([{ type: 'text', content: '<span style="color:#ff0000"><b>겹친</b> 서식</span> 문장' }]), '겹친 서식 문장')
 
 // ─── removedSavedMedia ───────────────────────────────────────────────────────
 

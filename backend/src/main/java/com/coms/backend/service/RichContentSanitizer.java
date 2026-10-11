@@ -52,9 +52,12 @@ public class RichContentSanitizer {
     private static final Pattern SAFE_LINK_TARGET =
             Pattern.compile("^(?:https?://|mailto:)[^\\s<>\"'`\\\\]{1,2000}$", Pattern.CASE_INSENSITIVE);
     private static final Pattern CODE_LANGUAGE_CLASS =
-            Pattern.compile("(?i)\\bclass\\s*=\\s*[\"']?\\s*(language-[a-z0-9]{1,30})\\s*[\"']?(?=\\s|$)");
+            Pattern.compile("(?i)\\bclass\\s*=[\\s\"']*(language-[a-z0-9]{1,30})\\s*[\"']?(?=\\s|$)");
     // A raw tag opening as an HTML tokenizer sees it: the name runs to whitespace, '/' or '>'.
-    private static final Pattern RAW_TAG = Pattern.compile("<\\s*/?\\s*([A-Za-z][^\\s/<>]*)");
+    // One character class before the name, not "\s*/?\s*": two neighbouring quantifiers that can
+    // share the same characters make a failed match quadratic in a long run of them, and these
+    // patterns run on text of up to 50,000 characters that a member chose.
+    private static final Pattern RAW_TAG = Pattern.compile("<[\\s/]*([A-Za-z][^\\s/<>]*)");
     private static final Pattern EVENT_HANDLER_ATTRIBUTE = Pattern.compile("(?:^|[\\s/\"'])on[a-z]+\\s*=");
     private static final Set<String> MEDIA_WIDTH_NAMES = Set.of("small", "medium", "large", "full");
     private static final Pattern ENTITY = Pattern.compile(
@@ -304,17 +307,28 @@ public class RichContentSanitizer {
             return;
         }
         Matcher tag = RAW_TAG.matcher(value);
+        // How far attributes have been read. A tag opening inside a stretch that was already read
+        // as another tag's attributes is checked for its name only: reading its own stretch again
+        // would make a text of nothing but unclosed tags quadratic, and a browser does not start
+        // a tag there anyway.
+        int attributesReadTo = 0;
         while (tag.find()) {
             String name = tag.group(1).toLowerCase(Locale.ROOT);
+            if (FORBIDDEN_TAGS.contains(name)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 내용이 포함되어 있습니다.");
+            }
+            if (tag.end() < attributesReadTo) {
+                continue;
+            }
+            attributesReadTo = tagEnd(value, tag.end());
             // Entities are undone first so java&#115;cript: is seen for what it is. Handlers are
             // looked for in the text as written, because whitespace is what separates attributes;
             // script URLs in a copy with whitespace removed, because browsers ignore tabs and
             // newlines inside a URL ("java&Tab;script:").
-            String attributes = decodeEntities(value.substring(tag.end(), tagEnd(value, tag.end())))
+            String attributes = decodeEntities(value.substring(tag.end(), attributesReadTo))
                     .toLowerCase(Locale.ROOT);
             String compact = attributes.replaceAll("[\\s\\u0000]", "");
-            boolean unsafe = FORBIDDEN_TAGS.contains(name)
-                    || EVENT_HANDLER_ATTRIBUTE.matcher(attributes).find()
+            boolean unsafe = EVENT_HANDLER_ATTRIBUTE.matcher(attributes).find()
                     || compact.contains("javascript:")
                     || compact.contains("vbscript:")
                     || compact.contains("data:text/html")
@@ -423,6 +437,11 @@ public class RichContentSanitizer {
 
     private String sanitizeRichText(String html) {
         Matcher matcher = HTML_TAG.matcher(html == null ? "" : html);
+        if (html != null) {
+            // A tag needs its '>'. Past the last one there is none to find, and looking anyway
+            // costs a scan to the end of the text for every '<' there.
+            matcher.region(0, html.lastIndexOf('>') + 1);
+        }
         StringBuilder out = new StringBuilder();
         int last = 0;
         while (matcher.find()) {

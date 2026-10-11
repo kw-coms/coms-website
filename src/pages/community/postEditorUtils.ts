@@ -427,15 +427,21 @@ export const EMPTY_POST_STAND_IN = '...'
  * stand-in that does not match is what used to publish new posts already marked "수정".
  */
 function serverPlainText(html) {
-  return String(html || '')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
+  let text = String(html || '').replace(/<br\s*\/?>/gi, '\n')
+  // Until nothing is left to remove, so that taking one tag out cannot leave another behind.
+  let before
+  do {
+    before = text
+    text = text.replace(/<[^>]+>/g, '')
+  } while (text !== before)
+  return text
     .replace(/&nbsp;/g, ' ')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    // Last, as on the server: undone earlier, "&amp;quot;" would go on to become a quote mark.
+    .replace(/&amp;/g, '&')
 }
 
 /**

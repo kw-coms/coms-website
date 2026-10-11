@@ -47,6 +47,15 @@ class CommunityTextServiceTest {
     }
 
     @Test
+    void eachEntityIsUndoneOnce() {
+        // What reads "&quot;" on the page is stored as "&amp;quot;". Undoing the ampersand first
+        // let it join what followed into a new entity, and the preview showed a quotation mark.
+        String content = "[{\"type\":\"text\",\"content\":\"HTML 은 &amp;quot; 와 &amp;lt;b&amp;gt; 를 씁니다 &quot;이렇게&quot; Q&amp;A\"}]";
+
+        assertThat(text.shareDescription(content)).isEqualTo("HTML 은 &quot; 와 &lt;b&gt; 를 씁니다 \"이렇게\" Q&A");
+    }
+
+    @Test
     void aLongBodyIsCutAtTheListPreviewLength() {
         String content = "[{\"type\":\"text\",\"content\":\"" + "가".repeat(400) + "\"}]";
 

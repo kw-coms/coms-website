@@ -1,7 +1,7 @@
 // setupDom first: the settings page mounts into a real (jsdom) document.
 import './setupDom.mjs'
 import assert from 'node:assert/strict'
-import { register } from 'node:module'
+import * as nodeModule from 'node:module'
 import { act, createElement, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 
@@ -17,15 +17,29 @@ globalThis.setTimeout = (...args) => {
   return timer
 }
 
-// logoAssets reads import.meta.glob, which only exists under Vite.
-register(`data:text/javascript,${encodeURIComponent(`
-  export async function resolve(specifier, context, nextResolve) {
-    if (specifier.endsWith('/utils/logoAssets')) {
-      return { url: 'data:text/javascript,export const getLogoAsset = () => "/coms-logo.png"', shortCircuit: true }
+// logoAssets reads import.meta.glob, which only exists under Vite: give the page a stand-in.
+const LOGO_ASSETS_STUB = 'data:text/javascript,export const getLogoAsset = () => "/coms-logo.png"'
+if (typeof nodeModule.registerHooks === 'function') {
+  // In-thread hooks are asked first. The TypeScript loader registers its own this way on newer
+  // Node versions and resolves the import itself, so a hook added with register() is never
+  // consulted there — the real module loaded and the test died on import.meta.glob.
+  nodeModule.registerHooks({
+    resolve(specifier, context, nextResolve) {
+      return /\/utils\/logoAssets(\.ts)?$/.test(specifier)
+        ? { url: LOGO_ASSETS_STUB, shortCircuit: true }
+        : nextResolve(specifier, context)
+    },
+  })
+} else {
+  nodeModule.register(`data:text/javascript,${encodeURIComponent(`
+    export async function resolve(specifier, context, nextResolve) {
+      if (/\\/utils\\/logoAssets(\\.ts)?$/.test(specifier)) {
+        return { url: ${JSON.stringify(LOGO_ASSETS_STUB)}, shortCircuit: true }
+      }
+      return nextResolve(specifier, context)
     }
-    return nextResolve(specifier, context)
-  }
-`)}`)
+  `)}`)
+}
 const { default: ChangePassword } = await import('../src/pages/ChangePassword.tsx')
 
 const MEMBER = {
