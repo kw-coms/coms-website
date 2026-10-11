@@ -4,8 +4,8 @@ import { mixHex, normalizeHex } from '../../utils/themeColors'
 /**
  * Boot intro: the screen switches on, the cube logo lights up cell by cell while a hairline
  * fills and the club's four activities are named, then the logo glides onto the home hero's
- * own logo as the screen clears and the hero wordmark is typed in. Short (~2.3s), skippable,
- * plays once per page load.
+ * own logo, becomes the solid logo there, and only then the screen clears and the hero
+ * wordmark rises in. Short (~2.7s), skippable, plays once per page load.
  *
  * Under reduced motion it still plays, in a calm form: the screen does not flash open, the
  * cells come up by brightness alone with no sweep line or sparkle, and nothing travels at
@@ -55,8 +55,10 @@ const FACES = [FACE_TOP, FACE_LEFT, FACE_RIGHT]
 const POWER = 380 // the screen switches on
 const SCAN_START = 280 // the logo starts lighting, top row first
 const SCAN_TIME = 1150
-const HANDOFF = 1900 // the overlay starts dissolving into the hero
-const FADE = 420
+const HANDOFF = 1900 // the logo leaves for its place in the hero
+const TRAVEL = 360 // ... and gets there while the screen is still dark
+const FADE = 420 // then the screen clears around it
+const END = TRAVEL + FADE
 const STATUS: Array<[number, string]> = [
   [0, 'seminar'],
   [0.25, 'study'],
@@ -196,11 +198,16 @@ export default function ComsIntro() {
     let stage: Box | null = null
     let bootedTimer = 0
 
+    let cleared = false
     const beginHandoff = () => {
       handing = true
+    }
+    // The page takes over: the hero's own logo and wordmark come in under the fading screen.
+    const beginClear = () => {
+      cleared = true
       root.classList.remove(BOOTING_CLASS)
       root.classList.add(BOOTED_CLASS)
-      bootedTimer = window.setTimeout(() => root.classList.remove(BOOTED_CLASS), 1100)
+      bootedTimer = window.setTimeout(() => root.classList.remove(BOOTED_CLASS), 1300)
       setFadingOut(true)
     }
     skipRef.current = () => {
@@ -217,17 +224,25 @@ export default function ComsIntro() {
         buildCells(stage.h)
       }
       if (!handing && t >= handoffAt) beginHandoff()
-      const hand = handing ? easeInOut(clamp01((t - handoffAt) / FADE)) : 0
+      // Two beats: the logo travels to its place, then the screen clears around it. The calm
+      // form has no travel, so it goes straight to clearing.
+      const travelTime = calm ? 0 : TRAVEL
+      const since = handing ? t - handoffAt : -1
+      const travel = since < 0 ? 0 : travelTime ? easeInOut(clamp01(since / travelTime)) : 1
+      const clear = since < 0 ? 0 : clamp01((since - travelTime) / FADE)
+      if (handing && !cleared && since >= travelTime) beginClear()
       const to = calm ? stage : heroLogoBox() ?? stage
       const box: Box = {
-        x: stage.x + (to.x - stage.x) * hand,
-        y: stage.y + (to.y - stage.y) * hand,
-        w: stage.w + (to.w - stage.w) * hand,
-        h: stage.h + (to.h - stage.h) * hand,
+        x: stage.x + (to.x - stage.x) * travel,
+        y: stage.y + (to.y - stage.y) * travel,
+        w: stage.w + (to.w - stage.w) * travel,
+        h: stage.h + (to.h - stage.h) * travel,
       }
-      // The screen clears first; the logo stays lit until it has landed on the hero's own.
-      const veil = 1 - hand
-      const lit = calm ? veil : 1 - clamp01((hand - 0.7) / 0.3)
+      const veil = 1 - easeInOut(clear)
+      // On the way the cells close up and take the logo's own colour, so what lands is the
+      // solid logo it is about to be replaced by; it gives way early in the clearing.
+      const solid = calm ? 0 : travel
+      const lit = calm ? veil : 1 - clamp01(clear / 0.45)
 
       // The screen: black until the picture opens from a centre line.
       ctx.clearRect(0, 0, W, H)
@@ -255,7 +270,7 @@ export default function ComsIntro() {
       const reveal = clamp01((t - SCAN_START) / SCAN_TIME)
       const idle = stepX * 0.34
       ctx.fillStyle = cInk
-      ctx.globalAlpha = 0.07 * open * veil
+      ctx.globalAlpha = 0.07 * open * (1 - solid) * veil
       for (let gy = -3; gy < rows + 3; gy += 1) {
         for (let gx = -3; gx < cols + 3; gx += 1) {
           ctx.fillRect(box.x + (gx + 0.5) * stepX - idle / 2, box.y + (gy + 0.5) * stepY - idle / 2, idle, idle)
@@ -270,7 +285,13 @@ export default function ComsIntro() {
         const rise = calm ? clamp01((t - cell.at) / 260) : 1
         ctx.globalAlpha = (calm ? 0.94 : 0.86 + 0.14 * Math.sin((cell.gx + cell.gy) * 0.22 - t * 0.0013)) * lit * rise
         ctx.fillStyle = cell.face === 1 ? cInk : cell.face === 2 ? cSide : cAccent
-        ctx.fillRect(x - dot / 2, y - dot / 2, dot, dot)
+        const size = dot + (Math.max(stepX, stepY) * 1.06 - dot) * solid
+        ctx.fillRect(x - size / 2, y - size / 2, size, size)
+        if (solid > 0.01 && cell.face !== 1) {
+          ctx.globalAlpha = solid * lit
+          ctx.fillStyle = cInk
+          ctx.fillRect(x - size / 2, y - size / 2, size, size)
+        }
         const flash = 1 - (t - cell.at) / 320
         if (!calm && flash > 0.02) {
           ctx.globalAlpha = flash * lit
@@ -313,7 +334,7 @@ export default function ComsIntro() {
       }
       ctx.globalAlpha = 1
 
-      if (!handing || t < handoffAt + FADE + 60) raf = requestAnimationFrame(frame)
+      if (!handing || t < handoffAt + END + 60) raf = requestAnimationFrame(frame)
     }
     raf = requestAnimationFrame(frame)
 
@@ -321,7 +342,10 @@ export default function ComsIntro() {
     // while the page is actually visible, fade out rather than keep covering the home
     // page. (A background tab is left alone — the intro plays once it becomes visible.)
     const watchdog = window.setTimeout(() => {
-      if (!start && document.visibilityState === 'visible') beginHandoff()
+      if (!start && document.visibilityState === 'visible') {
+        beginHandoff()
+        beginClear()
+      }
     }, 2000)
 
     const onResize = () => resize()
