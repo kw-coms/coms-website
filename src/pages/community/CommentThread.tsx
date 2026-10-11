@@ -10,6 +10,7 @@ type Comment = {
   updatedAt?: string
   edited?: boolean
   deletable?: boolean
+  editable?: boolean
   parentCommentId?: string | number | null
   children?: Comment[]
 }
@@ -261,7 +262,7 @@ function CommentNode({
               >
                 댓글 달기
               </button>
-              {comment.deletable && (
+              {(comment.editable ?? comment.deletable) && (
                 <button
                   type="button"
                   onClick={() => onStartEditComment(comment)}

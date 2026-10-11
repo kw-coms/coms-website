@@ -34,8 +34,10 @@ export default function CommunityMemberProfile({ onBack }: { onBack: () => void 
   const reputation = reputationQuery.data
   const posts = postsQuery.data ?? []
   const breakdown = reputation?.breakdown ?? {}
-  // The author's display name comes from their posts when available.
-  const memberName = posts[0]?.authorDisplayName || posts[0]?.authorName || reputation?.name || displayStudentId(studentId)
+  // The member's display name comes from their posts when available. A post whose author name
+  // 회장 typed in carries that name instead of the member's, so it is not a source for it.
+  const namedPost = posts.find((post) => !post.authorNameOverridden)
+  const memberName = namedPost?.authorDisplayName || namedPost?.authorName || reputation?.name || displayStudentId(studentId)
 
   const openPost = (post) => navigate(`/community/${post.id}`)
   const handleToggleBookmark = (post) => {

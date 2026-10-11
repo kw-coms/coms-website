@@ -218,7 +218,13 @@ export default function Community({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (urlId || deletedViewRequested) return
     const search = boardViewToSearch({ page: rawPage, category: activeCategory, sort: sortMode, query: searchQuery }, location.search)
-    if (search !== location.search) navigate({ pathname: location.pathname, search }, { replace: true, state: location.state })
+    if (search === location.search) return
+    try {
+      navigate({ pathname: location.pathname, search }, { replace: true, state: location.state })
+    } catch {
+      // Safari throws once replaceState is called 100+ times in a few seconds (a held key in the
+      // search box). The view itself is already updated; only the URL misses this keystroke.
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawPage, activeCategory, sortMode, searchQuery, urlId, deletedViewRequested])
 
