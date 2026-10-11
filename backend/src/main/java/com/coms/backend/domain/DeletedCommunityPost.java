@@ -69,6 +69,12 @@ public class DeletedCommunityPost {
     @Column(name = "restored_at")
     private LocalDateTime restoredAt;
 
+    // What a restore needs beyond the visible snapshot (see CommunityRestoreState), as JSON.
+    // It names other members by 학번 and is never put into a response. Null on snapshots taken
+    // before this column existed.
+    @Column(name = "restore_state", columnDefinition = "TEXT")
+    private String restoreState;
+
     public Long getId() { return id; }
     public Long getOriginalPostId() { return originalPostId; }
     public void setOriginalPostId(Long originalPostId) { this.originalPostId = originalPostId; }
@@ -106,4 +112,6 @@ public class DeletedCommunityPost {
     public void setRestoredByName(String restoredByName) { this.restoredByName = restoredByName; }
     public LocalDateTime getRestoredAt() { return restoredAt; }
     public void setRestoredAt(LocalDateTime restoredAt) { this.restoredAt = restoredAt; }
+    public String getRestoreState() { return restoreState; }
+    public void setRestoreState(String restoreState) { this.restoreState = restoreState; }
 }

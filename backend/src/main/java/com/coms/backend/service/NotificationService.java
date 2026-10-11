@@ -514,11 +514,23 @@ public class NotificationService {
      * 이상 so the queue doesn't rely on someone happening to open the admin
      * panel. Carries the postId so tapping lands on the reported post.
      */
-    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void notifyCommunityReport(CommunityPost post) {
         if (post == null || post.getId() == null) {
             return;
         }
+        // Runs in the reporter's transaction. It used to open its own (REQUIRES_NEW), which needs
+        // a second pooled connection while the caller still holds the first: ten members
+        // reporting at the same moment took all ten and every database call on the site waited
+        // out the acquisition timeout. The alert is best-effort, so nothing it throws leaves
+        // this method — an exception crossing the transactional proxy would doom the report too.
+        try {
+            alertModeratorsOfReport(post);
+        } catch (RuntimeException e) {
+            log.warn("Community report moderator alert failed for post {} (report kept)", post.getId(), e);
+        }
+    }
+
+    private void alertModeratorsOfReport(CommunityPost post) {
         String message = "커뮤니티 신고 접수: " + (post.getTitle() == null ? "제목 없음" : post.getTitle());
         // 중재 권한(community.moderate)을 실제로 가진 직급으로 수신자를 뽑는다 —
         // 회장이 임원에게 중재를 열어주면 임원도 신고 알림을 받아야 한다.

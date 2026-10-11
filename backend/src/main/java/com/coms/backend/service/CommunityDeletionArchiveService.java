@@ -2,9 +2,12 @@ package com.coms.backend.service;
 
 import com.coms.backend.domain.CommunityPost;
 import com.coms.backend.domain.CommunityComment;
+import com.coms.backend.domain.CommunityPollVote;
+import com.coms.backend.domain.CommunityPostBookmark;
 import com.coms.backend.domain.CommunityPostFile;
 import com.coms.backend.domain.CommunityPostImage;
 import com.coms.backend.domain.CommunityPostVideo;
+import com.coms.backend.domain.CommunityPostVote;
 import com.coms.backend.domain.DeletedCommunityPostAppeal;
 import com.coms.backend.domain.DeletedCommunityPost;
 import com.coms.backend.domain.DeletedCommunityPostComment;
@@ -17,10 +20,13 @@ import com.coms.backend.dto.DeletedCommunityPostAppealResponse;
 import com.coms.backend.dto.DeletedCommunityPostResponse;
 import com.coms.backend.dto.DeletedCommunityPostRestoreResponse;
 import com.coms.backend.repository.CommunityCommentRepository;
+import com.coms.backend.repository.CommunityPollVoteRepository;
+import com.coms.backend.repository.CommunityPostBookmarkRepository;
 import com.coms.backend.repository.CommunityPostFileRepository;
 import com.coms.backend.repository.CommunityPostImageRepository;
 import com.coms.backend.repository.CommunityPostRepository;
 import com.coms.backend.repository.CommunityPostVideoRepository;
+import com.coms.backend.repository.CommunityPostVoteRepository;
 import com.coms.backend.repository.DeletedCommunityPostCommentRepository;
 import com.coms.backend.repository.DeletedCommunityPostAppealRepository;
 import com.coms.backend.repository.DeletedCommunityPostImageRepository;
@@ -41,6 +47,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -63,6 +70,9 @@ public class CommunityDeletionArchiveService {
     private final CommunityPostVideoRepository videoRepository;
     private final CommunityPostFileRepository fileRepository;
     private final CommunityCommentRepository commentRepository;
+    private final CommunityPostVoteRepository voteRepository;
+    private final CommunityPostBookmarkRepository bookmarkRepository;
+    private final CommunityPollVoteRepository pollVoteRepository;
     private final MemberRepository memberRepository;
     private final StorageService storageService;
     private final AuditLogService auditLogService;
@@ -80,6 +90,9 @@ public class CommunityDeletionArchiveService {
                                            CommunityPostVideoRepository videoRepository,
                                            CommunityPostFileRepository fileRepository,
                                            CommunityCommentRepository commentRepository,
+                                           CommunityPostVoteRepository voteRepository,
+                                           CommunityPostBookmarkRepository bookmarkRepository,
+                                           CommunityPollVoteRepository pollVoteRepository,
                                            MemberRepository memberRepository,
                                            StorageService storageService,
                                            AuditLogService auditLogService,
@@ -96,6 +109,9 @@ public class CommunityDeletionArchiveService {
         this.videoRepository = videoRepository;
         this.fileRepository = fileRepository;
         this.commentRepository = commentRepository;
+        this.voteRepository = voteRepository;
+        this.bookmarkRepository = bookmarkRepository;
+        this.pollVoteRepository = pollVoteRepository;
         this.memberRepository = memberRepository;
         this.storageService = storageService;
         this.auditLogService = auditLogService;
@@ -119,6 +135,13 @@ public class CommunityDeletionArchiveService {
         snapshot.setDeletedByName(deletedBy.getName());
         snapshot.setDeletedByRole(deletedBy.getRole().name());
         snapshot.setDeletionReason(reason);
+        // Taken now because the caller deletes the votes, bookmarks and poll answers next.
+        snapshot.setRestoreState(CommunityRestoreState.capture(
+                post,
+                voteRepository.findByPostIdIn(List.of(post.getId())),
+                bookmarkRepository.findByPostId(post.getId()),
+                pollVoteRepository.findByPostIdIn(List.of(post.getId()))
+        ).toJson());
         DeletedCommunityPost saved = repository.save(snapshot);
         recordImages(saved, post);
         recordMedia(saved, post);
@@ -267,11 +290,12 @@ public class CommunityDeletionArchiveService {
         if (!permissionService.has(admin, Permission.COMMUNITY_MODERATE)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        DeletedCommunityPost snapshot = repository.findById(deletedPostId)
+        DeletedCommunityPost snapshot = repository.findByIdForUpdate(deletedPostId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (snapshot.getRestoredAt() != null || snapshot.getRestoredPostId() != null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 복원된 게시글입니다.");
         }
+        CommunityRestoreState state = CommunityRestoreState.parse(snapshot.getRestoreState());
 
         List<DeletedCommunityPostImage> archivedImages = deletedImageRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId());
         List<DeletedCommunityPostMedia> archivedMedia = deletedMediaRepository.findByDeletedPostIdOrderByPositionAsc(snapshot.getId());
@@ -286,6 +310,16 @@ public class CommunityDeletionArchiveService {
         restored.setCreatedAt(snapshot.getOriginalCreatedAt());
         restored.setUpdatedAt(snapshot.getOriginalUpdatedAt());
         restored.setEdited(!snapshot.getOriginalCreatedAt().equals(snapshot.getOriginalUpdatedAt()));
+        if (state != null) {
+            // Without these an anonymous post came back under a different nickname and tag, so
+            // its author no longer matched their own earlier comments in the thread.
+            restored.setAnonymousName(state.anonymousName());
+            restored.setIpAddress(state.ipAddress());
+            restored.setAuthorNameOverridden(state.authorNameOverridden());
+            if (state.pinned()) {
+                restored.restorePinned(state.pinnedAt() == null ? LocalDateTime.now() : state.pinnedAt());
+            }
+        }
         archivedImages.stream()
                 .filter(image -> DeletedCommunityPostImage.KIND_COVER.equals(image.getKind()))
                 .findFirst()
@@ -340,6 +374,9 @@ public class CommunityDeletionArchiveService {
             savedPost = communityPostRepository.save(savedPost);
         }
         restoreComments(savedPost.getId(), archivedComments);
+        if (state != null) {
+            restoreInteractions(savedPost, state);
+        }
 
         snapshot.setRestoredPostId(savedPost.getId());
         snapshot.setRestoredByStudentId(admin.getStudentId());
@@ -668,6 +705,111 @@ public class CommunityDeletionArchiveService {
             CommunityComment saved = commentRepository.save(restored);
             restoredCommentIds.put(archived.getOriginalCommentId(), saved.getId());
         }
+    }
+
+    /**
+     * Puts back the votes, bookmarks and poll answers the post had when it was deleted. A member
+     * who has left since is skipped, and so is anything recorded before the current holder of a
+     * 학번 joined: the 학번 belonged to someone else then, and a new member must not inherit it
+     * (the same rule member removal follows for live data).
+     */
+    private void restoreInteractions(CommunityPost post, CommunityRestoreState state) {
+        Set<String> studentIds = new LinkedHashSet<>();
+        state.votes().forEach(vote -> studentIds.add(vote.studentId()));
+        state.bookmarks().forEach(bookmark -> studentIds.add(bookmark.studentId()));
+        state.pollVotes().forEach(vote -> studentIds.add(vote.studentId()));
+        if (studentIds.isEmpty()) {
+            return;
+        }
+        Map<String, LocalDateTime> joinedAt = new HashMap<>();
+        for (Member member : memberRepository.findByStudentIdIn(studentIds)) {
+            joinedAt.put(member.getStudentId(), member.getCreatedAt());
+        }
+
+        Set<String> voters = new HashSet<>();
+        for (CommunityRestoreState.Vote archived : state.votes()) {
+            if (Math.abs(archived.value()) != 1
+                    || !sameMemberAsThen(joinedAt, archived.studentId(), archived.createdAt())
+                    || !voters.add(archived.studentId())) {
+                continue;
+            }
+            CommunityPostVote vote = new CommunityPostVote();
+            vote.setPost(post);
+            vote.setStudentId(archived.studentId());
+            vote.setValue(archived.value());
+            if (archived.createdAt() != null) {
+                vote.setCreatedAt(archived.createdAt());
+            }
+            if (archived.updatedAt() != null) {
+                vote.setUpdatedAt(archived.updatedAt());
+            }
+            voteRepository.save(vote);
+        }
+
+        Set<String> bookmarkers = new HashSet<>();
+        for (CommunityRestoreState.Bookmark archived : state.bookmarks()) {
+            if (!sameMemberAsThen(joinedAt, archived.studentId(), archived.createdAt())
+                    || !bookmarkers.add(archived.studentId())) {
+                continue;
+            }
+            CommunityPostBookmark bookmark = new CommunityPostBookmark();
+            bookmark.setPost(post);
+            bookmark.setStudentId(archived.studentId());
+            if (archived.createdAt() != null) {
+                bookmark.setCreatedAt(archived.createdAt());
+            }
+            bookmarkRepository.save(bookmark);
+        }
+
+        Map<String, Integer> optionCounts = pollOptionCounts(post.getContent());
+        Set<String> pollAnswers = new HashSet<>();
+        for (CommunityRestoreState.PollVote archived : state.pollVotes()) {
+            Integer options = optionCounts.get(archived.pollId());
+            if (options == null || archived.optionIndex() < 0 || archived.optionIndex() >= options
+                    || !sameMemberAsThen(joinedAt, archived.studentId(), archived.createdAt())
+                    || !pollAnswers.add(archived.pollId() + '\n' + archived.studentId())) {
+                continue;
+            }
+            CommunityPollVote vote = new CommunityPollVote();
+            vote.setPostId(post.getId());
+            vote.setPollId(archived.pollId());
+            vote.setStudentId(archived.studentId());
+            vote.setOptionIndex(archived.optionIndex());
+            if (archived.createdAt() != null) {
+                vote.setCreatedAt(archived.createdAt());
+            }
+            if (archived.updatedAt() != null) {
+                vote.setUpdatedAt(archived.updatedAt());
+            }
+            pollVoteRepository.save(vote);
+        }
+    }
+
+    private static boolean sameMemberAsThen(Map<String, LocalDateTime> joinedAt, String studentId, LocalDateTime recordedAt) {
+        LocalDateTime joined = joinedAt.get(studentId);
+        if (joined == null) {
+            return false;
+        }
+        return recordedAt == null || !recordedAt.isBefore(joined);
+    }
+
+    /** pollId -> number of options, for every poll block in a post body. */
+    private Map<String, Integer> pollOptionCounts(String content) {
+        Map<String, Integer> counts = new HashMap<>();
+        try {
+            JsonNode root = JSON.readTree(content);
+            if (root.isArray()) {
+                for (JsonNode block : root) {
+                    String pollId = block.path("pollId").asText("");
+                    if ("poll".equals(block.path("type").asText()) && !pollId.isBlank() && block.path("options").isArray()) {
+                        counts.put(pollId, block.path("options").size());
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // A body that is not a block array has no polls.
+        }
+        return counts;
     }
 
     private String rewriteMediaIds(String content,

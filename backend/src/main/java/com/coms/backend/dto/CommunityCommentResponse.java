@@ -14,5 +14,11 @@ public record CommunityCommentResponse(
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         boolean edited,
-        boolean deletable
+        boolean deletable,
+        /**
+         * Narrower than {@code deletable}: moderators may remove a comment, but only its author
+         * and 회장 may rewrite it. Clients that showed 수정 on {@code deletable} sent moderators
+         * into a 403.
+         */
+        boolean editable
 ) {}

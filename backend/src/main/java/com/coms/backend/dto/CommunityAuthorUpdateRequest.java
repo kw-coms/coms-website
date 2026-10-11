@@ -9,6 +9,8 @@ import jakarta.validation.constraints.Size;
  */
 public record CommunityAuthorUpdateRequest(
         @Size(max = 20) String studentId,
-        @Size(max = 60) String name
+        // 100 is what the deletion snapshot keeps (deleted_community_posts.author_name) and
+        // what the member app's field allows; 60 answered a name the app accepted with a 400.
+        @Size(max = 100) String name
 ) {
 }

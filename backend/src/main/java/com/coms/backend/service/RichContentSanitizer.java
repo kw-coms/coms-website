@@ -54,7 +54,7 @@ public class RichContentSanitizer {
     private static final Pattern CODE_LANGUAGE_CLASS =
             Pattern.compile("(?i)\\bclass\\s*=\\s*[\"']?\\s*(language-[a-z0-9]{1,30})\\s*[\"']?(?=\\s|$)");
     // A raw tag opening as an HTML tokenizer sees it: the name runs to whitespace, '/' or '>'.
-    private static final Pattern RAW_TAG = Pattern.compile("<\\s*/?\\s*([A-Za-z][^\\s/<>]*)([^<>]*)");
+    private static final Pattern RAW_TAG = Pattern.compile("<\\s*/?\\s*([A-Za-z][^\\s/<>]*)");
     private static final Pattern EVENT_HANDLER_ATTRIBUTE = Pattern.compile("(?:^|[\\s/\"'])on[a-z]+\\s*=");
     private static final Set<String> MEDIA_WIDTH_NAMES = Set.of("small", "medium", "large", "full");
     private static final Pattern ENTITY = Pattern.compile(
@@ -137,7 +137,7 @@ public class RichContentSanitizer {
             // has no business being stored.
             copy.remove("embedUrl");
         }
-        copy.put("title", normalizeOptional(copy.path("title").asText(""), 160));
+        copy.put("title", inertMetadata(copy.path("title").asText(""), 160));
         String thumbnailUrl = normalizeOptional(copy.path("thumbnailUrl").asText(""), 500);
         copy.put("thumbnailUrl", HTTPS_URL.matcher(thumbnailUrl).matches() ? thumbnailUrl : "");
         copy.remove("description");
@@ -159,9 +159,9 @@ public class RichContentSanitizer {
         }
         copy.remove("embedUrl");
         copy.remove("thumbnailUrl");
-        copy.put("title", normalizeOptional(copy.path("title").asText(""), 160));
-        copy.put("description", normalizeOptional(copy.path("description").asText(""), 280));
-        copy.put("siteName", normalizeOptional(copy.path("siteName").asText(""), 80));
+        copy.put("title", inertMetadata(copy.path("title").asText(""), 160));
+        copy.put("description", inertMetadata(copy.path("description").asText(""), 280));
+        copy.put("siteName", inertMetadata(copy.path("siteName").asText(""), 80));
         String image = copy.path("image").asText("");
         if (!image.isBlank() && HTTPS_URL.matcher(image).matches()) {
             copy.put("image", normalizeOptional(image, 500));
@@ -224,7 +224,7 @@ public class RichContentSanitizer {
     /** Uploaded image / video / file blocks: only the caption-like fields are free text. */
     private void sanitizeAttachmentBlock(ObjectNode copy) {
         if (copy.hasNonNull("name")) {
-            copy.put("name", normalizeOptional(copy.path("name").asText(""), 255));
+            copy.put("name", inertMetadata(copy.path("name").asText(""), 255));
         }
         if (copy.has("width")) {
             JsonNode width = copy.get("width");
@@ -254,6 +254,18 @@ public class RichContentSanitizer {
                 }
             }
         }
+    }
+
+    /**
+     * For text the member did not type: the title and description fetched for a link card, a
+     * video's title, the name of an uploaded file. Refusing it punishes the member for someone
+     * else's wording — a page really called "&lt;script&gt;: The Script element" made the whole
+     * post unsaveable once link previews started returning real titles. Its angle brackets are
+     * replaced with look-alikes instead, after which nothing in it can be read as a tag.
+     */
+    String inertMetadata(String value, int maxLength) {
+        String inert = (value == null ? "" : value).replace('<', '\u2039').replace('>', '\u203A');
+        return normalizeOptional(inert, maxLength);
     }
 
     String normalizeOptional(String value, int maxLength) {
@@ -298,7 +310,8 @@ public class RichContentSanitizer {
             // looked for in the text as written, because whitespace is what separates attributes;
             // script URLs in a copy with whitespace removed, because browsers ignore tabs and
             // newlines inside a URL ("java&Tab;script:").
-            String attributes = decodeEntities(tag.group(2)).toLowerCase(Locale.ROOT);
+            String attributes = decodeEntities(value.substring(tag.end(), tagEnd(value, tag.end())))
+                    .toLowerCase(Locale.ROOT);
             String compact = attributes.replaceAll("[\\s\\u0000]", "");
             boolean unsafe = FORBIDDEN_TAGS.contains(name)
                     || EVENT_HANDLER_ATTRIBUTE.matcher(attributes).find()
@@ -306,6 +319,61 @@ public class RichContentSanitizer {
                     || compact.contains("vbscript:")
                     || compact.contains("data:text/html")
                     || compact.contains("expression(");
+            if (unsafe) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 내용이 포함되어 있습니다.");
+            }
+        }
+    }
+
+    /**
+     * Where a tag whose name ends at {@code from} ends: at the first {@code >} that is not inside
+     * a quoted attribute value, which is where a browser ends it. Stopping at the first {@code >}
+     * of any kind let {@code <a title=">" onmouseover=...>} through with its handler unread. A
+     * tag that never closes runs to the end of the text.
+     */
+    private static int tagEnd(String value, int from) {
+        char quote = 0;
+        for (int i = from; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (quote != 0) {
+                if (c == quote) {
+                    quote = 0;
+                }
+            } else if (c == '"' || c == '\'') {
+                quote = c;
+            } else if (c == '>') {
+                return i;
+            }
+        }
+        return value.length();
+    }
+
+    /**
+     * The gate as it was before {@link #rejectUnsafeText} learned to tell markup from prose: any
+     * of these substrings anywhere, as written or once entities are decoded. Still used for
+     * anonymous nicknames. They are at most twenty characters, so nothing of value is lost, and
+     * they are checked every time they are displayed — a nickname this gate refuses would make
+     * every list containing it fail on a build that reads with the old rule (a rollback).
+     */
+    void rejectUnsafeTextStrict(String value) {
+        if (value == null) {
+            return;
+        }
+        for (String candidate : new String[] {value, decodeEntities(value)}) {
+            String lower = candidate.toLowerCase(Locale.ROOT);
+            boolean unsafe = lower.contains("javascript:")
+                    || lower.contains("vbscript:")
+                    || lower.contains("data:text/html")
+                    || lower.contains("expression(")
+                    || EVENT_HANDLER_ATTRIBUTE.matcher(lower).find();
+            if (!unsafe) {
+                for (String tag : FORBIDDEN_TAGS) {
+                    if (lower.contains("<" + tag) || lower.contains("</" + tag)) {
+                        unsafe = true;
+                        break;
+                    }
+                }
+            }
             if (unsafe) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "보안상 허용되지 않는 내용이 포함되어 있습니다.");
             }

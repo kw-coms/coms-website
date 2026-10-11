@@ -27,6 +27,11 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Locale;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -74,6 +79,18 @@ public class LinkPreviewService {
     private static final int MAX_HEADER_LINE_BYTES = 8 * 1024;
     private static final int MAX_HEADER_LINES = 100;
     private static final Pattern CHARSET = Pattern.compile("charset\\s*=\\s*\"?([\\w.:-]+)", Pattern.CASE_INSENSITIVE);
+    // Each preview occupies a request thread while it fetches. Beyond this many at once the
+    // caller gets the plain card straight away, so previews can never take the API's threads.
+    private static final int MAX_CONCURRENT_FETCHES = 8;
+    private static final Semaphore FETCH_SLOTS = new Semaphore(MAX_CONCURRENT_FETCHES);
+    // Closes a fetch's socket when its time is up. A read timeout cannot do this on its own: it
+    // restarts with every byte, and the TLS layer keeps reading until a whole record has arrived,
+    // so a server sending one byte every few seconds held the thread for hours.
+    private static final ScheduledExecutorService WATCHDOG = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "link-preview-watchdog");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     // Sliding-window limiter keyed on the requesting member. Each preview is an outbound fetch
     // the caller chooses the target of, so an unthrottled endpoint lets one account use the
@@ -92,6 +109,9 @@ public class LinkPreviewService {
     private LinkPreviewResponse preview(String rawUrl) {
         URI uri = parseAndValidate(rawUrl);
         String fallbackTitle = uri.getHost() == null ? "" : uri.getHost();
+        if (!FETCH_SLOTS.tryAcquire()) {
+            return fallback(rawUrl, fallbackTitle);
+        }
         // One budget for the whole preview, redirects included.
         long deadline = System.nanoTime() + REQUEST_TIMEOUT.toNanos();
         try {
@@ -121,6 +141,8 @@ public class LinkPreviewService {
             throw e;
         } catch (Exception e) {
             return fallback(rawUrl, fallbackTitle);
+        } finally {
+            FETCH_SLOTS.release();
         }
     }
 
@@ -146,10 +168,16 @@ public class LinkPreviewService {
         }
     }
 
-    private FetchedPage fetch(URI uri, InetAddress address, long deadline) throws IOException {
+    /** Package-private for testing against a local socket. */
+    FetchedPage fetch(URI uri, InetAddress address, long deadline) throws IOException {
         String host = uri.getHost();
         int port = uri.getPort() == -1 ? 443 : uri.getPort();
-        try (Socket plain = new Socket()) {
+        Socket plain = new Socket();
+        // The hard stop: whatever the socket is blocked in — the handshake, a read in the middle
+        // of a TLS record — closing it from here ends it.
+        ScheduledFuture<?> hardStop = WATCHDOG.schedule(() -> closeQuietly(plain),
+                remainingMillis(deadline), TimeUnit.MILLISECONDS);
+        try (plain) {
             plain.connect(new InetSocketAddress(address, port),
                     Math.min((int) CONNECT_TIMEOUT.toMillis(), remainingMillis(deadline)));
             // TLS over the socket that is already connected to the validated address. The host
@@ -168,6 +196,16 @@ public class LinkPreviewService {
                 out.flush();
                 return readResponse(new BufferedInputStream(new DeadlineInputStream(tls, deadline)), MAX_BODY_BYTES);
             }
+        } finally {
+            hardStop.cancel(false);
+        }
+    }
+
+    private static void closeQuietly(Socket socket) {
+        try {
+            socket.close();
+        } catch (IOException ignored) {
+            // Already closed, which is all that was wanted.
         }
     }
 
@@ -548,7 +586,9 @@ public class LinkPreviewService {
 
     private String truncate(String value, int maxLength) {
         if (value == null) return "";
-        String normalized = value.replaceAll("\\s+", " ").trim();
+        // Angle brackets become look-alikes, as RichContentSanitizer.inertMetadata does when the
+        // card is saved: the preview then shows exactly what will be stored.
+        String normalized = value.replace('<', '\u2039').replace('>', '\u203A').replaceAll("\\s+", " ").trim();
         return normalized.length() <= maxLength ? normalized : normalized.substring(0, maxLength);
     }
 }

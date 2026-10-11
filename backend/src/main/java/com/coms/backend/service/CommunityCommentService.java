@@ -74,6 +74,7 @@ class CommunityCommentService {
         CommunityPost post = requirePost(postId);
         access.requireVisible(member, post);
         boolean isAdmin = access.isModerator(member);
+        boolean canEdit = access.isAdmin(member);
         boolean maskAnonymous = access.isAnonymous(post) && !isAdmin;
         List<CommunityComment> comments = commentRepository.findByPostIdOrderByCreatedAtAsc(postId);
         Map<String, CommunityReputationResponse> reputations = maskAnonymous ? Map.of()
@@ -88,7 +89,8 @@ class CommunityCommentService {
                             reputation == null ? null : reputation.tier(),
                             reputation == null ? null : reputation.tierLabel(),
                             c.getContent(), c.getCreatedAt(), c.getUpdatedAt(), c.isEdited(),
-                            isAdmin || c.getStudentId().equals(studentId));
+                            isAdmin || c.getStudentId().equals(studentId),
+                            canEdit || c.getStudentId().equals(studentId));
                 })
                 .toList();
     }
@@ -189,7 +191,8 @@ class CommunityCommentService {
                 commentAuthorName(post, currentMember, comment),
                 reputation == null ? null : reputation.tier(),
                 reputation == null ? null : reputation.tierLabel(),
-                comment.getContent(), comment.getCreatedAt(), comment.getUpdatedAt(), comment.isEdited(), deletable);
+                comment.getContent(), comment.getCreatedAt(), comment.getUpdatedAt(), comment.isEdited(), deletable,
+                comment.getStudentId().equals(currentMember.getStudentId()) || access.isAdmin(currentMember));
     }
 
     private String commentAuthorName(CommunityPost post, Member currentMember, CommunityComment comment) {

@@ -399,6 +399,65 @@ class CommunityPrivacyAndIntegrityTest {
     }
 
     @Test
+    void commentsTellEachViewerWhetherTheyMayEditOrOnlyDelete() {
+        var post = communityService.create(AUTHOR, new CommunityPostRequest("글", "내용", "GENERAL", false), null);
+        communityService.addComment(post.id(), COMMENTER, new CommunityCommentRequest("원문", null));
+
+        var own = communityService.listComments(post.id(), COMMENTER).get(0);
+        var moderator = communityService.listComments(post.id(), MODERATOR).get(0);
+        var president = communityService.listComments(post.id(), ADMIN).get(0);
+        var bystander = communityService.listComments(post.id(), OTHER).get(0);
+
+        assertThat(own.deletable()).isTrue();
+        assertThat(own.editable()).isTrue();
+        // The 수정 button used to follow `deletable`, which sent moderators into a 403.
+        assertThat(moderator.deletable()).isTrue();
+        assertThat(moderator.editable()).isFalse();
+        assertThat(president.deletable()).isTrue();
+        assertThat(president.editable()).isTrue();
+        assertThat(bystander.deletable()).isFalse();
+        assertThat(bystander.editable()).isFalse();
+    }
+
+    @Test
+    void removingAPollFromAPostDiscardsItsAnswers() {
+        String text = "{\"type\":\"text\",\"content\":\"본문\"}";
+        String poll = "{\"type\":\"poll\",\"pollId\":\"poll-gone01\",\"question\":\"회식 메뉴\",\"options\":[\"치킨\",\"피자\"]}";
+        var post = communityService.create(AUTHOR,
+                new CommunityPostRequest("투표", "[" + text + "," + poll + "]", "GENERAL", false), null);
+        communityService.votePoll(COMMENTER, post.id(), new CommunityPollVoteRequest("poll-gone01", 0));
+
+        communityService.update(AUTHOR, post.id(), new CommunityPostRequest("투표", "[" + text + "]", "GENERAL", false), null);
+
+        assertThat(pollVoteRepository.findByPostIdIn(java.util.List.of(post.id()))).isEmpty();
+
+        // The same id with other options, one edit later: without the cleanup the old answer was
+        // counted for "피자" and the member could not vote on the new question.
+        String swapped = "{\"type\":\"poll\",\"pollId\":\"poll-gone01\",\"question\":\"싫어하는 메뉴\",\"options\":[\"피자\",\"치킨\"]}";
+        var readded = communityService.update(AUTHOR, post.id(),
+                new CommunityPostRequest("투표", "[" + text + "," + swapped + "]", "GENERAL", false), null);
+        assertThat(pollResult(readded, "poll-gone01").optionCounts()).containsExactly(0L, 0L);
+        var voted = communityService.votePoll(COMMENTER, post.id(), new CommunityPollVoteRequest("poll-gone01", 1));
+        assertThat(pollResult(voted, "poll-gone01").optionCounts()).containsExactly(0L, 1L);
+    }
+
+    @Test
+    void anonymousNicknamesKeepTheStrictGate() {
+        // Nicknames are checked again every time they are shown, so one the previous build would
+        // refuse must not get in: after a rollback it would break every list containing it.
+        for (String nickname : new String[] {"javascript:x", "a onclick=b", "<imgur>"}) {
+            assertThatThrownBy(() -> communityService.create(AUTHOR,
+                    new CommunityPostRequest("익명글", "내용", "ANONYMOUS", false, nickname), null, "118.235.10.20"))
+                    .as(nickname)
+                    .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                            assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+        }
+        assertThat(communityService.create(AUTHOR,
+                new CommunityPostRequest("익명글", "내용", "ANONYMOUS", false, "C++ 좋아"), null, "118.235.10.20")
+                .anonymousName()).isEqualTo("C++ 좋아");
+    }
+
+    @Test
     void moderatorDeletionWithLongestAllowedReasonSucceeds() {
         var post = communityService.create(AUTHOR,
                 new CommunityPostRequest("가".repeat(120), "내용", "GENERAL", false), null);

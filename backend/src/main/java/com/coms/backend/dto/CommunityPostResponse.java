@@ -10,6 +10,11 @@ public record CommunityPostResponse(
         String authorStudentId,
         String authorName,
         String authorDisplayName,
+        /**
+         * True when 회장 typed this post's author name in. The name is then not the linked
+         * member's, so it must not be used as that member's name (their profile heading, say).
+         */
+        boolean authorNameOverridden,
         String anonymousName,
         boolean authorAdmin,
         String authorRole,

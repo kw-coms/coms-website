@@ -251,9 +251,6 @@ class RichContentSanitizerTest {
         assertThatThrownBy(() -> sanitizer.sanitizeContent(
                 "[{\"type\":\"text\",\"content\":\"본문\",\"note\":\"<script>alert(1)</script>\"}]"))
                 .isInstanceOf(ResponseStatusException.class);
-        assertThatThrownBy(() -> sanitizer.sanitizeContent(
-                "[{\"type\":\"image\",\"mediaId\":3,\"name\":\"<svg onload=alert(1)>.png\"}]"))
-                .isInstanceOf(ResponseStatusException.class);
     }
 
     @Test
@@ -278,6 +275,92 @@ class RichContentSanitizerTest {
                         + "\"options\":[\"예\",\"아니오\"]}]")).get(0);
 
         assertThat(poll.get("question").asText()).hasSize(160);
+    }
+
+    // ---- Text the member did not type --------------------------------------------------------
+
+    @Test
+    void aLinkCardKeepsAPageTitleThatLooksLikeMarkup() throws Exception {
+        // What a link preview returns for MDN's page about the script element. Refusing it made the
+        // whole post unsaveable once previews started carrying real titles.
+        String content = mapper.writeValueAsString(mapper.createArrayNode().add(mapper.createObjectNode()
+                .put("type", "externalEmbed").put("provider", "external").put("kind", "link")
+                .put("url", "https://developer.mozilla.org/docs/Web/HTML/Element/script")
+                .put("title", "<script>: The Script element - HTML | MDN")
+                .put("description", "The <script> element embeds code, e.g. <img src=x onerror=alert(1)>.")
+                .put("siteName", "MDN <Web> Docs")));
+
+        JsonNode block = mapper.readTree(sanitizer.sanitizeContent(content)).get(0);
+
+        assertThat(block.get("title").asText()).isEqualTo("\u2039script\u203A: The Script element - HTML | MDN");
+        assertThat(block.get("description").asText()).contains("\u2039img src=x onerror=alert(1)\u203A");
+        assertThat(block.get("siteName").asText()).isEqualTo("MDN \u2039Web\u203A Docs");
+        assertThat(block.toString()).doesNotContain("<").doesNotContain(">");
+    }
+
+    @Test
+    void aVideoCardAndAnUploadNameAreMadeInertToo() throws Exception {
+        String content = mapper.writeValueAsString(mapper.createArrayNode()
+                .add(mapper.createObjectNode()
+                        .put("type", "externalEmbed").put("provider", "youtube").put("kind", "youtube")
+                        .put("url", "https://www.youtube.com/watch?v=abcdef123")
+                        .put("embedUrl", "https://www.youtube.com/embed/abcdef123")
+                        .put("title", "HTML <img> 태그 10분 정리"))
+                .add(mapper.createObjectNode()
+                        .put("type", "file").put("fileId", 7).put("name", "<form> 예제 모음.zip")));
+
+        JsonNode blocks = mapper.readTree(sanitizer.sanitizeContent(content));
+
+        assertThat(blocks.get(0).get("title").asText()).isEqualTo("HTML \u2039img\u203A 태그 10분 정리");
+        assertThat(blocks.get(1).get("name").asText()).isEqualTo("\u2039form\u203A 예제 모음.zip");
+        assertThat(blocks.get(1).get("fileId").asInt()).isEqualTo(7);
+        // Even a name written to look like an attack is only text once its brackets are gone.
+        assertThat(mapper.readTree(sanitizer.sanitizeContent(
+                "[{\"type\":\"image\",\"mediaId\":3,\"name\":\"<svg onload=alert(1)>.png\"}]")).get(0).get("name").asText())
+                .isEqualTo("\u2039svg onload=alert(1)\u203A.png");
+    }
+
+    @Test
+    void whatTheMemberTypesIsStillRefusedRatherThanRewritten() {
+        // A poll question is the member's own text: active markup in it is refused, as before.
+        assertThatThrownBy(() -> sanitizer.sanitizeContent(
+                "[{\"type\":\"poll\",\"pollId\":\"poll-abc123\",\"question\":\"<script>alert(1)</script>\","
+                        + "\"options\":[\"예\",\"아니오\"]}]"))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void aQuotedAngleBracketDoesNotHideTheRestOfATag() {
+        // A browser ends a tag at the first '>' outside a quoted value; the gate used to stop at
+        // the first '>' of any kind and never saw the handler behind it.
+        for (String text : new String[] {
+                "<a title=\">\" onmouseover=alert(1)>x</a>",
+                "<a title='>' href=\"javascript:alert(1)\">x</a>",
+                "<b data-x=\"a>b\" onclick = go()>",
+        }) {
+            assertThatThrownBy(() -> sanitizer.rejectUnsafeText(text)).as(text)
+                    .isInstanceOf(ResponseStatusException.class);
+        }
+        // Ordinary writing with brackets and quotes is still just text.
+        for (String text : new String[] {
+                "#include <math.h> 하고 \"math\" 를 씁니다",
+                "Map<Object,String> m = new HashMap<>(); // \"빈 맵\"",
+                "a < b 이고 b > c 이면 \"a < c\" 입니다",
+                "const onSubmit = () => save()",
+        }) {
+            sanitizer.rejectUnsafeText(text);
+        }
+    }
+
+    @Test
+    void theStrictGateKeepsThePreviousRule() {
+        for (String text : new String[] {"javascript:x", "a onclick=b", "<imgur>", "&#x3C;script&#x3E;"}) {
+            assertThatThrownBy(() -> sanitizer.rejectUnsafeTextStrict(text)).as(text)
+                    .isInstanceOf(ResponseStatusException.class);
+        }
+        sanitizer.rejectUnsafeTextStrict("C++ 좋아");
+        sanitizer.rejectUnsafeTextStrict("익명 <3");
+        sanitizer.rejectUnsafeTextStrict(null);
     }
 
     private String textBlock(String html) throws Exception {

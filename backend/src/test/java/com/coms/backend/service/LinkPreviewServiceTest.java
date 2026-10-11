@@ -243,4 +243,46 @@ class LinkPreviewServiceTest {
         assertThatThrownBy(() -> svc.preview("https://example.com:8080/", "2026123457"))
                 .hasMessageContaining("기본 웹 포트");
     }
+
+    // ---- the time limit is a wall-clock limit ---------------------------------------------------
+
+    /**
+     * A server that keeps the connection alive by sending one byte at a time. The socket read
+     * timeout restarts with every byte and the TLS layer waits for a whole record, so nothing but
+     * closing the socket ends this; before the hard stop the request thread stayed here for as
+     * long as the server liked.
+     */
+    @Test
+    void aTricklingServerCannotHoldTheFetchPastItsDeadline() throws Exception {
+        try (java.net.ServerSocket server = new java.net.ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+            Thread trickle = new Thread(() -> {
+                try (java.net.Socket client = server.accept()) {
+                    java.io.OutputStream out = client.getOutputStream();
+                    // The start of a TLS handshake record announcing 16 KB that never arrives in full.
+                    out.write(new byte[] {0x16, 0x03, 0x03, 0x40, 0x00});
+                    out.flush();
+                    while (true) {
+                        Thread.sleep(150);
+                        out.write(0);
+                        out.flush();
+                    }
+                } catch (Exception closed) {
+                    // The client went away, which is what the test waits for.
+                }
+            });
+            trickle.setDaemon(true);
+            trickle.start();
+
+            LinkPreviewService service = new LinkPreviewService();
+            java.net.URI uri = java.net.URI.create("https://preview.example:" + server.getLocalPort() + "/");
+            long start = System.nanoTime();
+            long deadline = start + java.time.Duration.ofMillis(700).toNanos();
+
+            org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(8), () ->
+                    assertThatThrownBy(() -> service.fetch(uri, InetAddress.getLoopbackAddress(), deadline))
+                            .isInstanceOf(java.io.IOException.class));
+
+            assertThat(java.time.Duration.ofNanos(System.nanoTime() - start)).isLessThan(java.time.Duration.ofSeconds(4));
+        }
+    }
 }

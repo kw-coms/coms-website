@@ -316,6 +316,7 @@ public class CommunityService {
                     "익명 게시판 글은 다른 분류로 옮길 수 없고, 다른 분류의 글을 익명으로 바꿀 수도 없습니다.");
         }
         String content = preservePollState(post, sanitized.content());
+        discardAnswersOfRemovedPolls(post, content);
         boolean titleChanged = !sanitized.title().equals(post.getTitle());
         boolean isInitialFinalization = isInitialFinalization(post, content);
         post.setTitle(sanitized.title());
@@ -373,9 +374,13 @@ public class CommunityService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "해당 학번의 회원을 찾을 수 없습니다."));
             post.setAuthorStudentId(newAuthor.getStudentId());
             post.setAuthorName(newAuthor.getName());
+            post.setAuthorNameOverridden(false);
             detail = "authorStudentId=" + newAuthor.getStudentId();
         } else {
+            // Responses derive the name from the linked member, so storing the custom name alone
+            // changed nothing anyone could see. The flag tells them to show the stored name.
             post.setAuthorName(cleanedName);
+            post.setAuthorNameOverridden(true);
             detail = "authorName=(custom)";
         }
         CommunityPost saved = communityPostRepository.save(post);
@@ -842,6 +847,21 @@ public class CommunityService {
      *       by option position and relabelling them afterwards would rewrite what people voted for.</li>
      * </ul>
      */
+    /**
+     * A poll taken out of a post takes its answers with it. They used to stay behind, so adding a
+     * poll with the same id in a later edit — with other options — handed the old answers to the
+     * new labels: the rule that a poll cannot change once it has votes was two edits away from
+     * meaningless.
+     */
+    private void discardAnswersOfRemovedPolls(CommunityPost post, String nextContent) {
+        Set<String> kept = pollBlocksById(nextContent).keySet();
+        for (String pollId : pollBlocksById(post.getContent()).keySet()) {
+            if (!kept.contains(pollId)) {
+                pollVoteRepository.deleteByPostIdAndPollId(post.getId(), pollId);
+            }
+        }
+    }
+
     private String preservePollState(CommunityPost post, String nextContent) {
         Map<String, JsonNode> storedPolls = pollBlocksById(post.getContent());
         if (storedPolls.isEmpty()) {
@@ -1044,18 +1064,24 @@ public class CommunityService {
                                              Set<Long> bookmarkedPostIds) {
         boolean editable = access.canEditPost(post, currentMember);
         boolean maskAnonymous = access.isAnonymous(post) && !access.isModerator(currentMember);
-        boolean authorAdmin = !maskAnonymous && author != null && author.getRole() == Member.Role.ADMIN;
+        // A name 회장 typed in is shown as written, and without the linked account's role, tier
+        // or 기수: it usually names someone other than the account the post is attached to.
+        boolean nameOverridden = !maskAnonymous && post.isAuthorNameOverridden();
+        boolean showAccount = !maskAnonymous && !nameOverridden;
+        boolean authorAdmin = showAccount && author != null && author.getRole() == Member.Role.ADMIN;
         // 직급 노출: 익명 마스킹이 아닐 때만, 임원 이상만 의미 있으므로 그 외는 null.
-        String authorRole = maskAnonymous || author == null || !author.getRole().isAtLeast(Member.Role.OFFICER)
+        String authorRole = !showAccount || author == null || !author.getRole().isAtLeast(Member.Role.OFFICER)
                 ? null : author.getRole().name();
-        CommunityReputationResponse authorReputation = maskAnonymous ? null
+        CommunityReputationResponse authorReputation = !showAccount ? null
                 : reputations.get(post.getAuthorStudentId());
         String authorTier = authorReputation == null ? null : authorReputation.tier();
         String authorTierLabel = authorReputation == null ? null : authorReputation.tierLabel();
         String anonymousDisplay = anonymousIdentity.anonymousDisplayName(post.getAnonymousName(), post.getIpAddress());
-        String authorName = maskAnonymous ? anonymousDisplay : (author != null ? author.getName() : post.getAuthorName());
+        String authorName = maskAnonymous ? anonymousDisplay
+                : (!nameOverridden && author != null ? author.getName() : post.getAuthorName());
         String authorStudentId = maskAnonymous ? null : post.getAuthorStudentId();
         String authorDisplayName = maskAnonymous ? anonymousDisplay
+                : nameOverridden ? authorName
                 : CommunityDisplayNames.displayName(author == null ? null : author.getGeneration(), post.getAuthorStudentId(), authorName);
         VoteSummary votes = voteStats.getOrDefault(post.getId(), VoteSummary.EMPTY);
         long commentCount = commentCounts.getOrDefault(post.getId(), 0L);
@@ -1101,6 +1127,7 @@ public class CommunityService {
                 authorStudentId,
                 authorName,
                 authorDisplayName,
+                nameOverridden,
                 access.isAnonymous(post) ? post.getAnonymousName() : null,
                 authorAdmin,
                 authorRole,

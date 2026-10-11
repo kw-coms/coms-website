@@ -46,5 +46,7 @@ public class CommunityPollVote {
     public int getOptionIndex() { return optionIndex; }
     public void setOptionIndex(int optionIndex) { this.optionIndex = optionIndex; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

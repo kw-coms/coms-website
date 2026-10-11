@@ -86,8 +86,9 @@ public class CommunityPostReportService {
         report.setCreatedAt(LocalDateTime.now());
         CommunityPostReport saved = reportRepository.save(report);
         try {
-            // Moderator alert is best-effort: a failure here must never roll
-            // back the member's report (both services share the transaction).
+            // Moderator alert is best-effort: a failure here must never roll back the member's
+            // report. Both services share this transaction (and its one connection), and the
+            // alert swallows its own failures for that reason.
             notificationService.notifyCommunityReport(post);
         } catch (RuntimeException e) {
             log.warn("Community report moderator alert failed (report {} kept)", saved.getId(), e);

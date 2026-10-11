@@ -1,5 +1,12 @@
 package com.coms.backend.service;
 
+import com.coms.backend.domain.Member;
+import com.coms.backend.domain.Notification;
+import com.coms.backend.dto.CommunityPostReportRequest;
+import com.coms.backend.dto.CommunityPostRequest;
+import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.NotificationRepository;
+
 import com.coms.backend.domain.AuditLog;
 import com.coms.backend.repository.AuditLogRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +43,18 @@ class AuditLogConnectionUsageTest {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
+
+    @Autowired
+    private MemberRepository memberRepository;
+
+    @Autowired
+    private CommunityService communityService;
+
+    @Autowired
+    private CommunityPostReportService reportService;
+
+    @Autowired
+    private NotificationRepository notificationRepository;
 
     @BeforeEach
     void setUp() {
@@ -88,6 +107,34 @@ class AuditLogConnectionUsageTest {
         assertThat(saved.getTargetId()).hasSize(120);
         assertThat(saved.getIpAddress()).hasSize(80);
         assertThat(saved.getDetail()).hasSize(1000);
+    }
+
+    @Test
+    void reportingAPostAlertsModeratorsWithoutASecondConnection() {
+        // The moderator alert opened its own transaction while the report's was still open: the
+        // same two-connections-per-request pattern, reachable by any member.
+        memberRepository.deleteAll();
+        memberRepository.save(member("2025770001", "작성자", Member.Role.USER));
+        memberRepository.save(member("2026770002", "신고자", Member.Role.USER));
+        memberRepository.save(member("2024770009", "회장", Member.Role.ADMIN));
+        Long postId = communityService.create("2025770001",
+                new CommunityPostRequest("신고 대상", "본문", "GENERAL", false), null).id();
+
+        reportService.report(postId, "2026770002", new CommunityPostReportRequest("SPAM", null));
+
+        assertThat(notificationRepository.findTop30ByRecipientStudentIdOrderByCreatedAtDesc("2024770009"))
+                .extracting(Notification::getType)
+                .contains(Notification.Type.COMMUNITY_REPORT);
+    }
+
+    private static Member member(String studentId, String name, Member.Role role) {
+        Member member = new Member();
+        member.setStudentId(studentId);
+        member.setName(name);
+        member.setEmail(studentId + "@example.com");
+        member.setPassword("encoded-password");
+        member.setRole(role);
+        return member;
     }
 
     @Test
