@@ -14,9 +14,10 @@ jobs:
     name: Backend tests
     runs-on: ubuntu-latest
 
-    # The suite itself still runs on H2; this container exists only so
-    # PostgresMigrationExecutionTest can replay every Flyway migration against the
-    # database engine production actually uses.
+    # The suite itself still runs on H2; this container exists so the Postgres tests can
+    # replay every Flyway migration against the database engine production actually uses
+    # (PostgresMigrationExecutionTest) and boot the application on that schema with the prod
+    # profile and ddl-auto=validate (PostgresProductionSchemaTest).
     services:
       postgres:
         image: postgres:16
@@ -53,18 +54,20 @@ jobs:
           COMS_PG_TEST_PASSWORD: coms-ci
         run: JWT_SECRET="$(openssl rand -base64 48)" ./gradlew test --no-daemon
 
-      # The migration test skips itself when COMS_PG_TEST_URL is missing, which would make
+      # The Postgres tests skip themselves when COMS_PG_TEST_URL is missing, which would make
       # a broken service container look like a green build. Fail loudly instead.
-      - name: Verify the Postgres migration test was not skipped
+      - name: Verify the Postgres tests were not skipped
         working-directory: backend
         run: |
           set -euo pipefail
-          report=build/test-results/test/TEST-com.coms.backend.config.PostgresMigrationExecutionTest.xml
-          if ! grep -q 'skipped="0"' "$report"; then
-            echo "::error::PostgresMigrationExecutionTest did not run — check the postgres service and COMS_PG_TEST_URL."
-            cat "$report"
-            exit 1
-          fi
+          for test in PostgresMigrationExecutionTest PostgresProductionSchemaTest; do
+            report="build/test-results/test/TEST-com.coms.backend.config.${test}.xml"
+            if [ ! -f "$report" ] || ! grep -q 'skipped="0"' "$report"; then
+              echo "::error::${test} did not run — check the postgres service and COMS_PG_TEST_URL."
+              [ -f "$report" ] && cat "$report"
+              exit 1
+            fi
+          done
 
   frontend:
     name: Frontend tests, build & smoke
