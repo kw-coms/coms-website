@@ -6,6 +6,10 @@ import { mixHex, normalizeHex } from '../../utils/themeColors'
  * fills and the club's four activities are named, then the logo glides onto the home hero's
  * own logo as the screen clears and the hero wordmark is typed in. Short (~2.3s), skippable,
  * plays once per page load.
+ *
+ * Under reduced motion it still plays, in a calm form: the screen does not flash open, the
+ * cells come up by brightness alone with no sweep line or sparkle, and nothing travels at
+ * the end, the logo simply fades as the page appears.
  */
 
 // Module-level so an SPA route change back to "/" doesn't replay it, but a full
@@ -22,8 +26,7 @@ function introAlreadyPlayed() {
 
 let introPlayed = introAlreadyPlayed()
 
-// True when the user prefers reduced motion — the intro (canvas animation) is
-// skipped entirely in that case so no motion plays and no canvas work runs.
+// True when the user prefers reduced motion: the intro then plays in its calm form.
 function prefersReducedMotion() {
   return (
     typeof window !== 'undefined' &&
@@ -76,8 +79,8 @@ export default function ComsIntro() {
   // module flag: under React StrictMode the effect runs setup → cleanup → setup,
   // and the first pass already flips `introPlayed`, so re-checking it made the
   // second pass bail and left a blank overlay that never dismissed itself.
-  // Reduced motion skips the intro outright (no overlay, no canvas work).
-  const [shouldPlay] = useState(() => !(prefersReducedMotion() || introPlayed))
+  const [shouldPlay] = useState(() => !introPlayed)
+  const [calm] = useState(prefersReducedMotion)
   const [gone, setGone] = useState(!shouldPlay)
   const [fadingOut, setFadingOut] = useState(false)
   const skipRef = useRef<() => void>(() => {})
@@ -215,7 +218,7 @@ export default function ComsIntro() {
       }
       if (!handing && t >= handoffAt) beginHandoff()
       const hand = handing ? easeInOut(clamp01((t - handoffAt) / FADE)) : 0
-      const to = heroLogoBox() ?? stage
+      const to = calm ? stage : heroLogoBox() ?? stage
       const box: Box = {
         x: stage.x + (to.x - stage.x) * hand,
         y: stage.y + (to.y - stage.y) * hand,
@@ -224,11 +227,11 @@ export default function ComsIntro() {
       }
       // The screen clears first; the logo stays lit until it has landed on the hero's own.
       const veil = 1 - hand
-      const lit = 1 - clamp01((hand - 0.7) / 0.3)
+      const lit = calm ? veil : 1 - clamp01((hand - 0.7) / 0.3)
 
       // The screen: black until the picture opens from a centre line.
       ctx.clearRect(0, 0, W, H)
-      const open = easeOut(clamp01(t / POWER))
+      const open = calm ? 1 : easeOut(clamp01(t / POWER))
       if (open < 1) {
         ctx.globalAlpha = veil
         ctx.fillStyle = '#000'
@@ -238,7 +241,7 @@ export default function ComsIntro() {
       ctx.globalAlpha = veil
       ctx.fillStyle = cBg
       ctx.fillRect(0, H / 2 - band / 2, W, band)
-      if (t < POWER) {
+      if (!calm && t < POWER) {
         ctx.globalAlpha = 1 - open
         ctx.fillStyle = cInk
         ctx.fillRect(0, H / 2 - 1, W, 2)
@@ -264,17 +267,18 @@ export default function ComsIntro() {
         if (cell.at < 0) cell.at = t
         const x = box.x + (cell.gx + 0.5) * stepX
         const y = box.y + (cell.gy + 0.5) * stepY
-        ctx.globalAlpha = (0.86 + 0.14 * Math.sin((cell.gx + cell.gy) * 0.22 - t * 0.0013)) * lit
+        const rise = calm ? clamp01((t - cell.at) / 260) : 1
+        ctx.globalAlpha = (calm ? 0.94 : 0.86 + 0.14 * Math.sin((cell.gx + cell.gy) * 0.22 - t * 0.0013)) * lit * rise
         ctx.fillStyle = cell.face === 1 ? cInk : cell.face === 2 ? cSide : cAccent
         ctx.fillRect(x - dot / 2, y - dot / 2, dot, dot)
         const flash = 1 - (t - cell.at) / 320
-        if (flash > 0.02) {
+        if (!calm && flash > 0.02) {
           ctx.globalAlpha = flash * lit
           ctx.fillStyle = cInk
           ctx.fillRect(x - dot * 0.75, y - dot * 0.75, dot * 1.5, dot * 1.5)
         }
       }
-      if (reveal > 0 && reveal < 1) {
+      if (!calm && reveal > 0 && reveal < 1) {
         ctx.globalAlpha = 0.55
         ctx.fillStyle = cAccent
         ctx.fillRect(box.x - stepX * 3, box.y + reveal * box.h, box.w + stepX * 6, 1.5)
@@ -338,7 +342,7 @@ export default function ComsIntro() {
       root.classList.remove(BOOTING_CLASS, BOOTED_CLASS)
       document.body.style.overflow = prevOverflow
     }
-  }, [shouldPlay])
+  }, [shouldPlay, calm])
 
   useEffect(() => {
     if (!fadingOut) return
@@ -352,9 +356,10 @@ export default function ComsIntro() {
   return (
     <div
       onClick={() => skipRef.current()}
-      // Black until the handoff so the page never shows before the first frame; from then on
-      // the canvas alone decides how much of the page is visible.
-      style={{ position: 'fixed', inset: 0, zIndex: 9999, cursor: 'pointer', background: fadingOut ? 'transparent' : '#000', pointerEvents: fadingOut ? 'none' : 'auto' }}
+      // Covered until the handoff so the page never shows before the first frame (black for the
+      // switch-on, the page colour in the calm form, which has no switch-on); from then on the
+      // canvas alone decides how much of the page is visible.
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, cursor: 'pointer', background: fadingOut ? 'transparent' : calm ? 'var(--app-bg)' : '#000', pointerEvents: fadingOut ? 'none' : 'auto' }}
     >
       <canvas ref={canvasRef} aria-hidden="true" style={{ display: 'block', width: '100%', height: '100%' }} />
       <button

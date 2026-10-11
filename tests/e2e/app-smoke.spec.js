@@ -195,6 +195,32 @@ test.describe('public route smoke', () => {
   }
 })
 
+// The boot intro covers the home page for about two seconds. A visitor whose system asks for
+// reduced motion gets it too, in its calm form, and in both cases it must let go of the page.
+test.describe('home boot intro', () => {
+  for (const reducedMotion of ['no-preference', 'reduce']) {
+    test.describe(`with reduced motion set to ${reducedMotion}`, () => {
+      test.use({ reducedMotion })
+
+      test('plays once and hands the page over', async ({ page }) => {
+        await mockOptionalApis(page)
+        await page.goto('/')
+
+        const skip = page.getByRole('button', { name: 'skip ›' })
+        await expect(skip).toBeVisible()
+        await expect(skip).toBeHidden({ timeout: 8000 })
+        await expect(page.locator('html')).not.toHaveClass(/coms-boot/)
+        await expect(page.locator('h1')).toContainText("COM's")
+
+        // Once per tab: coming back to the home page does not replay it.
+        await page.reload()
+        await expect(page.locator('h1')).toContainText("COM's")
+        await expect(skip).toHaveCount(0)
+      })
+    })
+  }
+})
+
 test('activities title remains readable across selectable fonts and viewport widths', async ({ page }) => {
   for (const viewport of [
     { width: 1280, height: 900 },
