@@ -3193,6 +3193,201 @@ test('sponsors page renders tiers, anonymises, and hides the amount note from gu
   await expect(page.getByText('문제가 발생했습니다.')).toHaveCount(0)
 })
 
+// Gatherings ("모임 신청"): a member opens one, others put their names down, everyone sees who
+// is coming, and whoever opened it manages it. The people are made up.
+test.describe('gatherings', () => {
+  const asMember = async (page) => {
+    await mockAdminApis(page)
+    await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
+    await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
+  }
+  const sheet = (over = {}) => ({ id: 7, title: '알고리즘 스터디', description: '매주 화요일 저녁, 세미나실', creatorName: '김철수', mine: false, canManage: false, capacity: 3, noteLabel: '하고 싶은 주제', closesAt: null, open: true, full: false, participantCount: 1, joined: false, createdAt: '2026-10-12T10:00:00', ...over })
+  const person = (id, name, over = {}) => ({ id, name, mine: false, note: null, signedUpAt: '2026-10-12T19:05:00', ...over })
+
+  test('the list shows what is open, full and closed, and a new one is opened from it', async ({ page }) => {
+    await asMember(page)
+    let list = [
+      sheet({ id: 3, title: '가을 MT', capacity: null, noteLabel: null, participantCount: 14, joined: true, closesAt: '2026-11-01T18:00:00' }),
+      sheet({ id: 2, title: '웹 스터디', capacity: 4, participantCount: 4, full: true }),
+      sheet({ id: 1, title: '개강 회식', capacity: null, participantCount: 21, open: false }),
+    ]
+    let created = null
+    await page.route('**/api/gatherings', async route => {
+      if (route.request().method() !== 'POST') return route.fulfill({ json: list })
+      created = route.request().postDataJSON()
+      const made = sheet({ id: 7, title: created.title, description: created.description, creatorName: '홍길동', mine: true, canManage: true, capacity: created.capacity, noteLabel: created.noteLabel, participantCount: 0 })
+      list = [made, ...list]
+      await route.fulfill({ status: 201, json: { gathering: made, participants: [] } })
+    })
+
+    await page.goto('/gatherings')
+    await expect(page.getByRole('heading', { level: 1, name: '모임 신청' })).toBeVisible()
+    const cards = page.getByRole('list', { name: '모임 목록' }).getByRole('listitem')
+    await expect(cards).toHaveCount(3)
+    await expect(cards.nth(0)).toContainText('가을 MT')
+    await expect(cards.nth(0)).toContainText('받는 중')
+    await expect(cards.nth(0)).toContainText('신청함')
+    await expect(cards.nth(0)).toContainText('14명')
+    await expect(cards.nth(0)).toContainText('11월 1일 18:00까지')
+    await expect(cards.nth(1)).toContainText('정원 마감')
+    await expect(cards.nth(1)).toContainText('4 / 4명')
+    await expect(cards.nth(2)).toContainText('마감')
+    await expect(cards.nth(2)).not.toContainText('신청함')
+
+    await page.getByRole('button', { name: '새 모임 열기' }).click()
+    const form = page.getByRole('form', { name: '새 모임 열기' })
+    await form.getByRole('button', { name: '모임 열기' }).click()
+    await expect(form.getByRole('alert')).toHaveText('제목을 입력해 주세요.')
+    await form.getByLabel('제목').fill('알고리즘 스터디')
+    await form.getByLabel(/^설명/).fill('매주 화요일 저녁, 세미나실')
+    await form.getByLabel(/^정원/).fill('0')
+    await form.getByRole('button', { name: '모임 열기' }).click()
+    await expect(form.getByRole('alert')).toHaveText('정원은 1명에서 500명 사이로 적거나 비워 두세요.')
+    await form.getByLabel(/^정원/).fill('8')
+    await form.getByLabel(/^신청할 때 물어볼 것/).fill('하고 싶은 주제')
+    await form.getByRole('button', { name: '모임 열기' }).click()
+    await expect.poll(() => created).toEqual({ title: '알고리즘 스터디', description: '매주 화요일 저녁, 세미나실', capacity: 8, noteLabel: '하고 싶은 주제', closesAt: null })
+    // Straight to the new gathering, which nobody has signed up to yet.
+    await expect(page).toHaveURL(/\/gatherings\/7$/)
+    await expect(page.getByRole('heading', { level: 1, name: '알고리즘 스터디' })).toBeVisible()
+    await expect(page.getByText('아직 신청한 사람이 없습니다.')).toBeVisible()
+  })
+
+  test('a member signs up with an answer, changes it and cancels', async ({ page }) => {
+    await asMember(page)
+    let detail = { gathering: sheet(), participants: [person(1, '이영희')] }
+    const sent = []
+    await page.route('**/api/gatherings/7', route => route.fulfill({ json: detail }))
+    await page.route('**/api/gatherings/7/signups', async route => {
+      const { note } = route.request().postDataJSON()
+      sent.push(note)
+      detail = { gathering: sheet({ joined: true, participantCount: 2 }), participants: [person(1, '이영희'), person(2, '홍길동', { mine: true, note })] }
+      await route.fulfill({ json: detail })
+    })
+    let left = false
+    await page.route('**/api/gatherings/7/signups/me', async route => {
+      left = true
+      detail = { gathering: sheet(), participants: [person(1, '이영희')] }
+      await route.fulfill({ json: detail })
+    })
+
+    await page.goto('/gatherings/7')
+    await expect(page.getByRole('heading', { level: 1, name: '알고리즘 스터디' })).toBeVisible()
+    await expect(page.getByText('김철수 님이 열었습니다')).toBeVisible()
+    await expect(page.getByText('1 / 3명')).toBeVisible()
+    // Someone who did not open it is not offered its management.
+    await expect(page.getByRole('button', { name: /지금 마감|모임 지우기|명단 내보내기|빼기/ })).toHaveCount(0)
+
+    const join = page.getByRole('form', { name: '신청하기' })
+    await join.getByLabel('하고 싶은 주제').fill('그래프')
+    await join.getByRole('button', { name: '신청하기' }).click()
+    await expect(page.getByText('신청했습니다', { exact: true }).first()).toBeVisible()
+    const people = page.getByRole('list', { name: '신청한 사람' }).getByRole('listitem')
+    await expect(people).toHaveCount(2)
+    await expect(people.nth(1)).toContainText('홍길동')
+    await expect(people.nth(1)).toContainText('그래프')
+    await expect(page.getByText('2 / 3명')).toBeVisible()
+
+    // The answer can be changed while the gathering is open.
+    const mine = page.getByRole('form', { name: '내 신청' })
+    const fix = mine.getByRole('button', { name: '답 고치기' })
+    await expect(fix).toBeDisabled()
+    await mine.getByLabel('하고 싶은 주제').fill('DP')
+    await fix.click()
+    await expect(people.nth(1)).toContainText('DP')
+    expect(sent).toEqual(['그래프', 'DP'])
+
+    // Cancelling asks first, in words that cannot be read the wrong way round.
+    await mine.getByRole('button', { name: '신청 취소' }).click()
+    const confirm = page.getByRole('dialog', { name: '신청을 취소할까요?' })
+    await confirm.getByRole('button', { name: '그대로 두기' }).click()
+    expect(left).toBe(false)
+    await mine.getByRole('button', { name: '신청 취소' }).click()
+    await confirm.getByRole('button', { name: '신청 취소' }).click()
+    await expect.poll(() => left).toBe(true)
+    await expect(people).toHaveCount(1)
+    await expect(page.getByRole('form', { name: '신청하기' })).toBeVisible()
+  })
+
+  test('a full or closed gathering takes nobody', async ({ page }) => {
+    await asMember(page)
+    await page.route('**/api/gatherings/7', route => route.fulfill({ json: { gathering: sheet({ full: true, participantCount: 3 }), participants: [person(1, '이영희'), person(2, '박민수'), person(3, '최가람')] } }))
+    await page.route('**/api/gatherings/8', route => route.fulfill({ json: { gathering: sheet({ id: 8, open: false, joined: true, closesAt: '2026-10-10T18:00:00' }), participants: [person(4, '홍길동', { mine: true, note: '그래프' })] } }))
+
+    await page.goto('/gatherings/7')
+    await expect(page.getByText('정원이 찼습니다. 자리가 나면 신청할 수 있습니다.')).toBeVisible()
+    await expect(page.getByRole('button', { name: '신청하기' })).toHaveCount(0)
+
+    await page.goto('/gatherings/8')
+    await expect(page.getByText('신청한 채로 마감되었습니다.')).toBeVisible()
+    await expect(page.getByText('10월 10일 18:00 마감')).toBeVisible()
+    await expect(page.getByRole('button', { name: /신청하기|신청 취소|답 고치기/ })).toHaveCount(0)
+  })
+
+  test('whoever opened a gathering reads the answers, exports the list, takes a name off, closes and deletes it', async ({ page }) => {
+    await asMember(page)
+    const mineSheet = (over = {}) => sheet({ creatorName: '홍길동', mine: true, canManage: true, participantCount: 2, ...over })
+    let detail = { gathering: mineSheet(), participants: [person(1, '이영희', { note: '그래프' }), person(2, '박민수', { note: 'DP', signedUpAt: '2026-10-13T08:00:00' })] }
+    const calls = []
+    await page.route('**/api/gatherings', route => route.fulfill({ json: [] }))
+    await page.route('**/api/gatherings/7', async route => {
+      if (route.request().method() === 'DELETE') {
+        calls.push('delete')
+        return route.fulfill({ status: 204 })
+      }
+      await route.fulfill({ json: detail })
+    })
+    await page.route('**/api/gatherings/7/signups/2', async route => {
+      calls.push('remove 2')
+      detail = { gathering: mineSheet({ participantCount: 1 }), participants: [detail.participants[0]] }
+      await route.fulfill({ json: detail })
+    })
+    await page.route('**/api/gatherings/7/close', async route => {
+      calls.push('close')
+      detail = { gathering: mineSheet({ participantCount: 1, open: false }), participants: detail.participants }
+      await route.fulfill({ json: detail })
+    })
+
+    await page.goto('/gatherings/7')
+    const people = page.getByRole('list', { name: '신청한 사람' }).getByRole('listitem')
+    await expect(people).toHaveText([/이영희.*그래프/, /박민수.*DP/])
+
+    const downloading = page.waitForEvent('download')
+    await page.getByRole('button', { name: '명단 내보내기' }).click()
+    const download = await downloading
+    expect(download.suggestedFilename()).toMatch(/^coms-gathering-7-\d{4}-\d{2}-\d{2}\.csv$/)
+    const chunks = []
+    for await (const chunk of await download.createReadStream()) chunks.push(chunk)
+    const text = Buffer.concat(chunks).toString('utf8')
+    expect(text.charCodeAt(0)).toBe(0xfeff)
+    expect(text.slice(1).split('\r\n')).toEqual([
+      '"순서","이름","하고 싶은 주제","신청 시각"',
+      '"1","이영희","그래프","10월 12일 19:05"',
+      '"2","박민수","DP","10월 13일 08:00"',
+      '',
+    ])
+
+    await page.getByRole('button', { name: '박민수 님을 명단에서 빼기' }).click()
+    await page.getByRole('dialog', { name: '박민수 님을 명단에서 뺄까요?' }).getByRole('button', { name: '확인' }).click()
+    await expect(people).toHaveCount(1)
+
+    await page.getByRole('button', { name: '지금 마감' }).click()
+    await page.getByRole('dialog', { name: /지금 마감할까요/ }).getByRole('button', { name: '확인' }).click()
+    await expect(page.getByText('마감되었습니다.')).toBeVisible()
+    await expect(page.getByRole('button', { name: '지금 마감' })).toHaveCount(0)
+
+    await page.getByRole('button', { name: '모임 지우기' }).click()
+    await page.getByRole('dialog', { name: /"알고리즘 스터디" 모임과 1명의 신청을 지울까요/ }).getByRole('button', { name: '확인' }).click()
+    await expect(page).toHaveURL(/\/gatherings$/)
+    expect(calls).toEqual(['remove 2', 'close', 'delete'])
+  })
+
+  test('a guest is sent to the login screen', async ({ page }) => {
+    await page.goto('/gatherings/7')
+    await expect(page).toHaveURL(/\/login$/)
+  })
+})
+
 // Attendance ("출석 체크"): a member checks in with the code on the screen; whoever runs the
 // check opens it, shows the code, sees who came and closes it. The people are made up.
 test('a member checks in to attendance with the code', async ({ page }) => {
