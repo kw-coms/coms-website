@@ -730,6 +730,16 @@ html.home-snap-scroll .home-snap-section {
 #main-content:focus {
 	outline: none;
 }
+
+/* The page sits above what follows it in the document (the footer). A dialog or menu a page
+   opens is confined to the page's own stacking context, so without this the footer's
+   positioned controls painted over it, and took its clicks, wherever the two overlapped on
+   screen (a short page with a centred dialog, for one). The navigation bar and the toast and
+   confirm hosts carry higher z-indexes of their own and stay on top. */
+#main-content {
+	position: relative;
+	z-index: 1;
+}
 @media (prefers-reduced-motion: reduce) {
 	.coms-skip-link {
 		transition: none;

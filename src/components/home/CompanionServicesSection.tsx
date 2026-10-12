@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { LayoutGrid } from 'lucide-react'
 import { listClubProjects, listClubProjectCategories } from '../../services/clubProjectApi'
 import AppProjectCard from '../apps/AppProjectCard'
 
@@ -54,9 +55,10 @@ function CompanionServicesSection() {
   const groups = groupByCategory(projects, categories)
 
   return (
-    <section className="bg-white px-5 py-12 sm:py-16">
+    <section className="coms-sec coms-sec-top">
       <div className="mx-auto max-w-7xl">
         <div className="max-w-2xl">
+          <span className="coms-icon coms-board-icon" aria-hidden="true"><LayoutGrid size={22} strokeWidth={2} /></span>
           <p className="apple-eyebrow">Service launcher</p>
           <h1 className="apple-display mt-3 text-4xl sm:text-5xl">COM&apos;s Apps</h1>
           <p className="apple-copy mt-4 text-lg">
