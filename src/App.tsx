@@ -33,6 +33,7 @@ import {
   RecruitPage,
   RecruitNoticePage,
   SponsorsPage,
+  DrawPage,
   MeetingPollsPage,
 } from './routes/pageWrappers'
 import GlobalNavigation from './components/GlobalNavigation'
@@ -167,6 +168,7 @@ function App() {
         <Route path="/meet/:id" element={<RequireAuth><MeetingPollsPage /></RequireAuth>} />
         <Route path="/projects" element={<ProjectsDetailPage />} />
         <Route path="/apps" element={<AppsPage />} />
+        <Route path="/draw" element={<DrawPage />} />
         <Route path="/sponsors" element={<SponsorsPage />} />
         <Route path="/notices" element={<RequireAuth><NoticesPage /></RequireAuth>} />
         <Route path="/notices/:id" element={<RequireAuth><NoticesPage /></RequireAuth>} />
