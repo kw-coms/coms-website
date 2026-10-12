@@ -197,12 +197,14 @@ test.describe('public route smoke', () => {
 
 // The boot intro covers the home page for about two seconds. A visitor whose system asks for
 // reduced motion gets it too, in its calm form, and in both cases it must let go of the page.
+// What it lets go of is the finished home screen: the wordmark and the actions are there
+// without any scrolling (the hero used to open on a giant logo that had to be scrolled away).
 test.describe('home boot intro', () => {
   for (const reducedMotion of ['no-preference', 'reduce']) {
     test.describe(`with reduced motion set to ${reducedMotion}`, () => {
       test.use({ reducedMotion })
 
-      test('plays once and hands the page over', async ({ page }) => {
+      test('plays once and hands over the finished home screen', async ({ page }) => {
         await mockOptionalApis(page)
         await page.goto('/')
 
@@ -211,6 +213,15 @@ test.describe('home boot intro', () => {
         await expect(skip).toBeHidden({ timeout: 8000 })
         await expect(page.locator('html')).not.toHaveClass(/coms-boot/)
         await expect(page.locator('h1')).toContainText("COM's")
+        await expect(page.locator('h1')).toBeInViewport()
+        await expect(page.getByRole('button', { name: '더 알아보기', exact: true })).toBeInViewport()
+        await expect(page.locator('.coms-cinema-content')).toHaveCSS('opacity', '1')
+        expect(await page.evaluate(() => window.scrollY)).toBe(0)
+        // The page under the intro takes clicks again.
+        await page.getByRole('button', { name: '지원하기', exact: true }).click()
+        await expect(page).toHaveURL(/\/recruit$/)
+        await page.goBack()
+        await expect(page.getByRole('button', { name: '더 알아보기', exact: true })).toBeVisible()
 
         // Once per tab: coming back to the home page does not replay it.
         await page.reload()

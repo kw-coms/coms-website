@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { mixHex, normalizeHex } from '../../utils/themeColors'
+import { SCREEN_ON_EVENT, type ScreenOnDetail } from '../../utils/screenOn'
 
 /**
- * Boot intro: the screen switches on, the cube logo lights up cell by cell while a hairline
- * fills and the club's four activities are named, then the logo glides onto the home hero's
- * own logo, becomes the solid logo there, and only then the screen clears and the hero
- * wordmark rises in. Short (~2.7s), skippable, plays once per page load.
+ * Boot intro: the machine starts in the dark. The cube logo lights up cell by cell while a
+ * hairline fills and the club's four activities are named; at 100% the logo folds into a
+ * line, the line runs out to the edges of the screen, and the picture opens from it onto the
+ * home page, which is already complete underneath. Short (~2.4s), skippable, once per tab.
  *
- * Under reduced motion it still plays, in a calm form: the screen does not flash open, the
- * cells come up by brightness alone with no sweep line or sparkle, and nothing travels at
- * the end, the logo simply fades as the page appears.
+ * Under reduced motion it still plays, in a calm form: the cells come up by brightness alone
+ * with no sweep line or sparkle, and at the end the loading screen simply gives way to the
+ * page, with nothing folding or opening.
  */
 
 // Module-level so an SPA route change back to "/" doesn't replay it, but a full
@@ -36,7 +37,9 @@ function prefersReducedMotion() {
 }
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+const easeIn = (t: number) => t * t * t
 const easeOut = (t: number) => 1 - Math.pow(1 - t, 3)
+const easeOutQuart = (t: number) => 1 - Math.pow(1 - t, 4)
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2)
 
 // The three faces of the cube logo (COMs_logo_vec.svg), kept apart so each face can take its
@@ -52,13 +55,15 @@ const FACE_RIGHT =
 const FACES = [FACE_TOP, FACE_LEFT, FACE_RIGHT]
 
 // timeline (ms)
-const POWER = 380 // the screen switches on
-const SCAN_START = 280 // the logo starts lighting, top row first
+const SCAN_START = 200 // the logo starts lighting, top row first
 const SCAN_TIME = 1150
-const HANDOFF = 1900 // the logo leaves for its place in the hero
-const TRAVEL = 360 // ... and gets there while the screen is still dark
-const FADE = 420 // then the screen clears around it
-const END = TRAVEL + FADE
+const LOADED = SCAN_START + SCAN_TIME + 200 // the hairline reaches 100%
+const HANDOFF = LOADED + 170 // one "ready" beat, then the screen comes on
+const FOLD = 210 // the logo folds into a line
+const RUN = 150 // the line runs out to the screen edges
+const OPEN_AT = FOLD + RUN * 0.55 // ... and the picture starts opening from it
+const OPEN = 460
+const CALM_FADE = 180 // the calm form has none of that: the loading screen gives way at once
 const STATUS: Array<[number, string]> = [
   [0, 'seminar'],
   [0.25, 'study'],
@@ -67,15 +72,14 @@ const STATUS: Array<[number, string]> = [
   [1, 'ready'],
 ]
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
-// The hero logo the intro lands on: the giant one on desktop, the card logo on phones.
-const TARGETS = ['.coms-cinema-intrologo', '.coms-logo-3d']
-const BOOTING_CLASS = 'coms-booting'
+// On <html> for a moment after the screen comes on: the hero's entrance hangs off it.
 const BOOTED_CLASS = 'coms-booted'
 
 type Box = { x: number; y: number; w: number; h: number }
 type Cell = { gx: number; gy: number; face: number; order: number; at: number }
 
 export default function ComsIntro() {
+  const overlayRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   // Decided once, at mount. The effect keys off this instead of re-reading the
   // module flag: under React StrictMode the effect runs setup → cleanup → setup,
@@ -84,7 +88,9 @@ export default function ComsIntro() {
   const [shouldPlay] = useState(() => !introPlayed)
   const [calm] = useState(prefersReducedMotion)
   const [gone, setGone] = useState(!shouldPlay)
-  const [fadingOut, setFadingOut] = useState(false)
+  // leaving: the loading is over and the skip control goes; released: the page is uncovered.
+  const [leaving, setLeaving] = useState(false)
+  const [released, setReleased] = useState(false)
   const skipRef = useRef<() => void>(() => {})
 
   useEffect(() => {
@@ -100,30 +106,32 @@ export default function ComsIntro() {
     const ctx = canvas?.getContext('2d') ?? null
     if (!canvas || !ctx || typeof Path2D === 'undefined') {
       // Nothing can be drawn: dismiss instead of leaving a blank overlay on the home page.
-      const dismiss = window.setTimeout(() => setFadingOut(true), 0)
+      const dismiss = window.setTimeout(() => setReleased(true), 0)
       return () => window.clearTimeout(dismiss)
     }
 
     const root = document.documentElement
-    root.classList.add(BOOTING_CLASS)
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
 
-    // Live site theme tokens so the boot screen matches the home page in BOTH light and
-    // dark. Re-read while running: this child effect runs before the parent App effect that
-    // sets [data-theme-mode], so at mount the final tokens are not applied yet.
-    let cBg = '#0f1115'
+    // The machine is off, so the boot screen is black whatever the site theme: pale cells, the
+    // site's accent. The calm form has no switch-on to justify a black screen, so it stays on
+    // the page's own colours. Re-read while running: this child effect runs before the parent
+    // App effect that sets [data-theme-mode] and the accent, so at mount they are not final.
+    let cBg = '#000000'
     let cInk = '#f5f5f7'
     let cAccent = '#2997ff'
-    let cMuted = '#aeaeb4'
+    let cMuted = '#8e8e93'
     let cSide = '#bcd5ff'
     const readTheme = () => {
       const cs = getComputedStyle(root)
       const token = (name: string, fallback: string) => cs.getPropertyValue(name).trim() || fallback
-      cBg = token('--app-bg', cBg)
-      cInk = token('--app-text', cInk)
       cAccent = normalizeHex(token('--app-accent', cAccent))
-      cMuted = token('--app-muted', cMuted)
+      if (calm) {
+        cBg = token('--app-bg', '#0f1115')
+        cInk = token('--app-text', cInk)
+        cMuted = token('--app-muted', cMuted)
+      }
       cSide = mixHex(normalizeHex(cInk), cAccent, 0.4)
     }
 
@@ -141,17 +149,7 @@ export default function ComsIntro() {
     }
     resize()
 
-    // Where the hero's logo is right now (it floats a few px, so this is asked every frame).
-    const heroLogoBox = (): Box | null => {
-      for (const selector of TARGETS) {
-        const el = document.querySelector<HTMLElement>(selector)
-        if (!el) continue
-        const r = el.getBoundingClientRect()
-        if (r.width > 12 && r.height > 12 && r.bottom > 0 && r.top < H) return { x: r.left, y: r.top, w: r.width, h: r.height }
-      }
-      return null
-    }
-    // The logo boots in the middle of the screen and travels to the hero logo at the handoff.
+    // The logo boots in the middle of the screen, a little above centre.
     const stageBox = (): Box => {
       const h = Math.max(170, Math.min(300, Math.min(W, H) * 0.34))
       const w = (h * VIEW_W) / VIEW_H
@@ -195,20 +193,20 @@ export default function ComsIntro() {
     let frames = 0
     let handoffAt = HANDOFF
     let handing = false
+    let uncovered = false
     let stage: Box | null = null
     let bootedTimer = 0
 
-    let cleared = false
-    const beginHandoff = () => {
-      handing = true
-    }
-    // The page takes over: the hero's own logo and wordmark come in under the fading screen.
-    const beginClear = () => {
-      cleared = true
-      root.classList.remove(BOOTING_CLASS)
+    // The page takes over: from here the canvas alone decides how much of it shows, and the
+    // hero underneath is told the screen is on.
+    const release = (lineY: number) => {
+      if (uncovered) return
+      uncovered = true
+      if (overlayRef.current) overlayRef.current.style.background = 'transparent'
       root.classList.add(BOOTED_CLASS)
-      bootedTimer = window.setTimeout(() => root.classList.remove(BOOTED_CLASS), 1300)
-      setFadingOut(true)
+      bootedTimer = window.setTimeout(() => root.classList.remove(BOOTED_CLASS), 1400)
+      window.dispatchEvent(new CustomEvent<ScreenOnDetail>(SCREEN_ON_EVENT, { detail: { y: lineY } }))
+      setReleased(true)
     }
     skipRef.current = () => {
       handoffAt = Math.min(handoffAt, start ? performance.now() - start : 0)
@@ -223,45 +221,40 @@ export default function ComsIntro() {
         stage = stageBox()
         buildCells(stage.h)
       }
-      if (!handing && t >= handoffAt) beginHandoff()
-      // Two beats: the logo travels to its place, then the screen clears around it. The calm
-      // form has no travel, so it goes straight to clearing.
-      const travelTime = calm ? 0 : TRAVEL
+      const box = stage
+      const cx = W / 2
+      const cy = box.y + box.h / 2
+      if (!handing && t >= handoffAt) {
+        handing = true
+        setLeaving(true)
+      }
       const since = handing ? t - handoffAt : -1
-      const travel = since < 0 ? 0 : travelTime ? easeInOut(clamp01(since / travelTime)) : 1
-      const clear = since < 0 ? 0 : clamp01((since - travelTime) / FADE)
-      if (handing && !cleared && since >= travelTime) beginClear()
-      const to = calm ? stage : heroLogoBox() ?? stage
-      const box: Box = {
-        x: stage.x + (to.x - stage.x) * travel,
-        y: stage.y + (to.y - stage.y) * travel,
-        w: stage.w + (to.w - stage.w) * travel,
-        h: stage.h + (to.h - stage.h) * travel,
-      }
-      const veil = 1 - easeInOut(clear)
-      // On the way the cells close up and take the logo's own colour, so what lands is the
-      // solid logo it is about to be replaced by; it gives way early in the clearing.
-      const solid = calm ? 0 : travel
-      const lit = calm ? veil : 1 - clamp01(clear / 0.45)
+      // Three beats close the full form: fold, run, open. The calm form only fades.
+      const moving = !calm && since >= 0
+      const fold = moving ? easeIn(clamp01(since / FOLD)) : 0
+      const run = moving ? easeOut(clamp01((since - FOLD * 0.6) / RUN)) : 0
+      const open = moving ? easeOutQuart(clamp01((since - OPEN_AT) / OPEN)) : 0
+      const veil = calm && since >= 0 ? 1 - easeInOut(clamp01(since / CALM_FADE)) : 1
+      if (handing && !uncovered && (calm || since >= OPEN_AT)) release(cy)
 
-      // The screen: black until the picture opens from a centre line.
+      // The dark machine: everything but the opening picture.
       ctx.clearRect(0, 0, W, H)
-      const open = calm ? 1 : easeOut(clamp01(t / POWER))
-      if (open < 1) {
-        ctx.globalAlpha = veil
-        ctx.fillStyle = '#000'
-        ctx.fillRect(0, 0, W, H)
-      }
-      const band = H * open
+      const top = cy * (1 - open)
+      const bottom = cy + (H - cy) * open
       ctx.globalAlpha = veil
       ctx.fillStyle = cBg
-      ctx.fillRect(0, H / 2 - band / 2, W, band)
-      if (!calm && t < POWER) {
-        ctx.globalAlpha = 1 - open
-        ctx.fillStyle = cInk
-        ctx.fillRect(0, H / 2 - 1, W, 2)
+      ctx.fillRect(0, 0, W, top)
+      ctx.fillRect(0, bottom, W, H - bottom)
+      if (open > 0) {
+        // The picture comes up overbright for a moment, between two edges still glowing.
+        const dim = 1 - open
+        ctx.fillStyle = '#fff'
+        ctx.globalAlpha = 0.16 * dim * dim
+        ctx.fillRect(0, top, W, bottom - top)
+        ctx.globalAlpha = Math.pow(dim, 1.5)
+        ctx.fillRect(0, top - 1, W, 2)
+        ctx.fillRect(0, bottom - 1, W, 2)
       }
-      ctx.globalAlpha = 1
 
       // The logo matrix.
       const stepX = box.w / cols
@@ -269,57 +262,84 @@ export default function ComsIntro() {
       const dot = Math.min(stepX, stepY) * 0.68
       const reveal = clamp01((t - SCAN_START) / SCAN_TIME)
       const idle = stepX * 0.34
+      const squash = 1 - fold
+      const stretch = 1 + fold * 0.16
+      // Loaded: the whole logo flares once before it goes.
+      const ready = calm ? 0 : clamp01(1 - Math.abs(t - (LOADED + 80)) / 120)
+      const lit = veil * (1 - run)
       ctx.fillStyle = cInk
-      ctx.globalAlpha = 0.07 * open * (1 - solid) * veil
-      for (let gy = -3; gy < rows + 3; gy += 1) {
-        for (let gx = -3; gx < cols + 3; gx += 1) {
-          ctx.fillRect(box.x + (gx + 0.5) * stepX - idle / 2, box.y + (gy + 0.5) * stepY - idle / 2, idle, idle)
+      ctx.globalAlpha = 0.07 * squash * veil
+      if (ctx.globalAlpha > 0.004) {
+        for (let gy = -3; gy < rows + 3; gy += 1) {
+          for (let gx = -3; gx < cols + 3; gx += 1) {
+            ctx.fillRect(box.x + (gx + 0.5) * stepX - idle / 2, box.y + (gy + 0.5) * stepY - idle / 2, idle, idle)
+          }
         }
       }
-      for (let i = 0; i < cells.length; i++) {
-        const cell = cells[i]
-        if (cell.order > reveal * 1.06) continue
-        if (cell.at < 0) cell.at = t
-        const x = box.x + (cell.gx + 0.5) * stepX
-        const y = box.y + (cell.gy + 0.5) * stepY
-        const rise = calm ? clamp01((t - cell.at) / 260) : 1
-        ctx.globalAlpha = (calm ? 0.94 : 0.86 + 0.14 * Math.sin((cell.gx + cell.gy) * 0.22 - t * 0.0013)) * lit * rise
-        ctx.fillStyle = cell.face === 1 ? cInk : cell.face === 2 ? cSide : cAccent
-        const size = dot + (Math.max(stepX, stepY) * 1.06 - dot) * solid
-        ctx.fillRect(x - size / 2, y - size / 2, size, size)
-        if (solid > 0.01 && cell.face !== 1) {
-          ctx.globalAlpha = solid * lit
-          ctx.fillStyle = cInk
-          ctx.fillRect(x - size / 2, y - size / 2, size, size)
-        }
-        const flash = 1 - (t - cell.at) / 320
-        if (!calm && flash > 0.02) {
-          ctx.globalAlpha = flash * lit
-          ctx.fillStyle = cInk
-          ctx.fillRect(x - dot * 0.75, y - dot * 0.75, dot * 1.5, dot * 1.5)
+      if (lit > 0.004) {
+        for (let i = 0; i < cells.length; i++) {
+          const cell = cells[i]
+          if (cell.order > reveal * 1.06) continue
+          if (cell.at < 0) cell.at = t
+          const x = cx + (box.x + (cell.gx + 0.5) * stepX - cx) * stretch
+          const y = cy + (box.y + (cell.gy + 0.5) * stepY - cy) * squash
+          const w = dot * (1 + ready * 0.18)
+          const h = Math.max(1.2, w * squash)
+          const rise = calm ? clamp01((t - cell.at) / 260) : 1
+          ctx.globalAlpha = (calm ? 0.94 : 0.86 + 0.14 * Math.sin((cell.gx + cell.gy) * 0.22 - t * 0.0013)) * lit * rise
+          ctx.fillStyle = cell.face === 1 ? cInk : cell.face === 2 ? cSide : cAccent
+          ctx.fillRect(x - w / 2, y - h / 2, w, h)
+          // Flaring and folding both take the cell to white.
+          const white = Math.max(ready * 0.7, fold)
+          if (white > 0.01 && cell.face !== 1) {
+            ctx.globalAlpha = white * lit
+            ctx.fillStyle = cInk
+            ctx.fillRect(x - w / 2, y - h / 2, w, h)
+          }
+          const flash = 1 - (t - cell.at) / 320
+          if (!calm && flash > 0.02) {
+            ctx.globalAlpha = flash * lit
+            ctx.fillStyle = cInk
+            ctx.fillRect(x - dot * 0.75, y - (dot * 0.75) * squash, dot * 1.5, dot * 1.5 * squash)
+          }
         }
       }
-      if (!calm && reveal > 0 && reveal < 1) {
+      if (!calm && reveal > 0 && reveal < 1 && !handing) {
         ctx.globalAlpha = 0.55
         ctx.fillStyle = cAccent
         ctx.fillRect(box.x - stepX * 3, box.y + reveal * box.h, box.w + stepX * 6, 1.5)
       }
+      // The line the logo folds into, running out to the screen edges. Once the picture starts
+      // to open it has become the picture's two edges.
+      const line = clamp01((fold - 0.5) / 0.5) * (1 - clamp01(open * 9))
+      if (line > 0.01) {
+        const half = box.w * 0.6 + (W / 2 + 2 - box.w * 0.6) * run
+        ctx.globalAlpha = line
+        ctx.shadowColor = cAccent
+        ctx.shadowBlur = 22
+        ctx.fillStyle = '#fff'
+        ctx.fillRect(cx - half, cy - 1, half * 2, 2)
+        ctx.shadowBlur = 0
+      }
 
       // Status: a hairline that fills while the four activities are named.
-      const progress = clamp01((t - SCAN_START) / (SCAN_TIME + 200))
-      const show = clamp01((t - 260) / 240) * (1 - clamp01((t - handoffAt) / 180))
+      const progress = clamp01((t - SCAN_START) / (LOADED - SCAN_START))
+      const show = clamp01((t - 220) / 240) * (1 - clamp01(since / 150)) * veil
       if (show > 0.01) {
-        const width = Math.min(220, W * 0.5)
-        const lineY = stage.y + stage.h + Math.max(34, stage.h * 0.2)
+        const width = Math.min(240, W * 0.56)
+        const lineY = box.y + box.h + Math.max(40, box.h * 0.22)
         const left = W / 2 - width / 2
         let label = STATUS[0][1]
         for (const [at, text] of STATUS) if (progress >= at) label = text
         ctx.globalAlpha = show
         ctx.font = '500 12px ' + MONO
-        ctx.textAlign = 'center'
         ctx.textBaseline = 'alphabetic'
+        ctx.textAlign = 'left'
         ctx.fillStyle = cMuted
-        ctx.fillText(label, W / 2, lineY - 12)
+        ctx.fillText(label, left, lineY - 12)
+        ctx.textAlign = 'right'
+        ctx.fillStyle = cInk
+        ctx.fillText(String(Math.round(progress * 100)).padStart(3, '0') + '%', left + width, lineY - 12)
         ctx.globalAlpha = show * 0.22
         ctx.fillStyle = cInk
         ctx.fillRect(left, lineY, width, 2)
@@ -334,17 +354,20 @@ export default function ComsIntro() {
       }
       ctx.globalAlpha = 1
 
-      if (!handing || t < handoffAt + END + 60) raf = requestAnimationFrame(frame)
+      const length = calm ? CALM_FADE : OPEN_AT + OPEN
+      if (!handing || since < length) raf = requestAnimationFrame(frame)
+      else ctx.clearRect(0, 0, W, H)
     }
     raf = requestAnimationFrame(frame)
 
     // Safety net: the first frame normally lands within a tick. If none has arrived
-    // while the page is actually visible, fade out rather than keep covering the home
+    // while the page is actually visible, let go rather than keep covering the home
     // page. (A background tab is left alone — the intro plays once it becomes visible.)
     const watchdog = window.setTimeout(() => {
       if (!start && document.visibilityState === 'visible') {
-        beginHandoff()
-        beginClear()
+        cancelAnimationFrame(raf)
+        ctx.clearRect(0, 0, W, H)
+        release(H / 2)
       }
     }, 2000)
 
@@ -363,33 +386,39 @@ export default function ComsIntro() {
       window.removeEventListener('keydown', skip)
       window.removeEventListener('wheel', skip)
       window.removeEventListener('touchstart', skip)
-      root.classList.remove(BOOTING_CLASS, BOOTED_CLASS)
+      root.classList.remove(BOOTED_CLASS)
       document.body.style.overflow = prevOverflow
     }
   }, [shouldPlay, calm])
 
   useEffect(() => {
-    if (!fadingOut) return
+    if (!released) return
     document.body.style.overflow = ''
-    const id = window.setTimeout(() => setGone(true), FADE)
+    const id = window.setTimeout(() => setGone(true), (calm ? CALM_FADE : OPEN) + 120)
     return () => window.clearTimeout(id)
-  }, [fadingOut])
+  }, [released, calm])
 
   if (gone) return null
 
+  // The skip control sits on a black screen in the full form and on the page colour in the calm one.
+  const skipColors = calm
+    ? { border: '1px solid var(--app-hairline)', background: 'var(--app-surface)', color: 'var(--app-muted)' }
+    : { border: '1px solid rgba(255, 255, 255, 0.18)', background: 'rgba(255, 255, 255, 0.06)', color: '#aeaeb4' }
+
   return (
     <div
+      ref={overlayRef}
       onClick={() => skipRef.current()}
-      // Covered until the handoff so the page never shows before the first frame (black for the
-      // switch-on, the page colour in the calm form, which has no switch-on); from then on the
-      // canvas alone decides how much of the page is visible.
-      style={{ position: 'fixed', inset: 0, zIndex: 9999, cursor: 'pointer', background: fadingOut ? 'transparent' : calm ? 'var(--app-bg)' : '#000', pointerEvents: fadingOut ? 'none' : 'auto' }}
+      // Covered until the page is released so it never shows before the first frame (black
+      // for the full form, the page colour for the calm one); from then on the canvas alone
+      // decides how much of the page is visible, and the page takes the pointer.
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, cursor: 'pointer', background: released ? 'transparent' : calm ? 'var(--app-bg)' : '#000', pointerEvents: released ? 'none' : 'auto' }}
     >
       <canvas ref={canvasRef} aria-hidden="true" style={{ display: 'block', width: '100%', height: '100%' }} />
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); skipRef.current() }}
-        style={{ position: 'absolute', right: 18, bottom: 16, padding: '6px 14px', borderRadius: 999, border: '1px solid var(--app-hairline)', background: 'var(--app-surface)', color: 'var(--app-muted)', font: '500 12px ' + MONO, cursor: 'pointer', opacity: fadingOut ? 0 : 1, transition: 'opacity 160ms ease' }}
+        style={{ position: 'absolute', right: 18, bottom: 16, padding: '6px 14px', borderRadius: 999, ...skipColors, font: '500 12px ' + MONO, cursor: 'pointer', opacity: leaving ? 0 : 1, transition: 'opacity 160ms ease' }}
       >
         skip ›
       </button>
