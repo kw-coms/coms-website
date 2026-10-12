@@ -205,48 +205,36 @@ export const visualDetails = {
     title: 'Club OS',
     subtitle: 'Study · Build · Share',
     rows: ['학습 로드맵', '프로젝트 트랙', '커뮤니티 로그'],
-    accent: 'var(--app-accent)',
   },
   activities: {
     title: 'Learning Stack',
     subtitle: 'Seminar · Study · Review',
     rows: ['기초 세미나', '분야별 스터디', '코드 리뷰'],
-    accent: 'var(--app-accent)',
   },
   projects: {
     title: 'Project Lab',
     subtitle: 'Prototype · Launch · Iterate',
     rows: ['서비스 기획', '프론트엔드 구현', '배포와 개선'],
-    accent: 'var(--app-accent)',
   },
   recruit: {
     title: 'Join Flow',
     subtitle: 'Apply · Meet · Start',
     rows: ['지원서 제출', '개별 안내', '오리엔테이션'],
-    accent: 'var(--app-accent)',
   },
 }
 
 export const sectionMeta = {
   about: {
     eyebrow: 'About COM\'s',
-    background: '#ffffff',
-    visual: 'linear-gradient(135deg, #e8f8ff, #f5f5f7 55%, #ffffff)',
   },
   activities: {
     eyebrow: 'Activities',
-    background: '#f5f5f7',
-    visual: 'linear-gradient(135deg, #fff1f4, #eef5ff)',
   },
   projects: {
     eyebrow: 'Projects',
-    background: '#ffffff',
-    visual: 'linear-gradient(135deg, #edf2ff, #f7f0ff)',
   },
   recruit: {
     eyebrow: 'Recruit',
-    background: '#f5f5f7',
-    visual: 'linear-gradient(135deg, #e8f3ff, #f5f5f7 60%, #ffffff)',
   },
 }
 

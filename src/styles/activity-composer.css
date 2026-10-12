@@ -29,13 +29,6 @@
 		linear-gradient(90deg, transparent 0, color-mix(in srgb, var(--app-surface) 52%, transparent) 50%, transparent 100%);
 }
 
-.home-device {
-	background: linear-gradient(135deg, var(--app-accent-soft), var(--app-surface-soft) 58%, var(--app-surface)) !important;
-	box-shadow:
-		0 34px 85px rgba(0, 0, 0, 0.12),
-		inset 0 1px 0 rgba(255, 255, 255, 0.72);
-}
-
 .apple-hero-metrics {
 	border-top: 1px solid var(--app-hairline);
 	border-bottom: 1px solid var(--app-hairline);
@@ -44,10 +37,6 @@
 
 .apple-hero-metrics > div + div {
 	border-left: 1px solid var(--app-hairline);
-}
-
-.apple-showcase-strip {
-	background: var(--app-bg) !important;
 }
 
 .activity-proof-section,

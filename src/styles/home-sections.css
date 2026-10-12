@@ -1,0 +1,1298 @@
+/* ===== Home sections: composition and artwork ============================= */
+/* Everything under the hero. Each section has its own layout and its own piece of artwork
+   (pages/home/HomeVisuals.tsx) instead of one template repeated four times. One accent
+   throughout. Every animated piece rests in its finished state, so with animations off
+   (reduced motion) it is a still picture, not a half-drawn one. */
+
+/* ---- Section frame ------------------------------------------------------ */
+/* A quiet dot grid and one wash of the accent, placed differently per section
+   through --gx / --gy. */
+.coms-sec {
+	--gx: 80%;
+	--gy: 32%;
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
+	padding: clamp(4rem, 7.5vw, 6.5rem) 1.25rem;
+	background: var(--app-bg);
+	color: var(--app-text);
+}
+
+.coms-sec::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	background-image: radial-gradient(circle, color-mix(in srgb, var(--app-text) 20%, transparent) 1px, transparent 1.4px);
+	background-size: 23px 23px;
+	-webkit-mask-image: radial-gradient(ellipse 58% 70% at var(--gx) var(--gy), #000 0%, transparent 72%);
+	mask-image: radial-gradient(ellipse 58% 70% at var(--gx) var(--gy), #000 0%, transparent 72%);
+	opacity: 0.6;
+}
+
+.coms-sec::after {
+	content: '';
+	position: absolute;
+	left: var(--gx);
+	top: var(--gy);
+	z-index: -1;
+	width: 64rem;
+	height: 64rem;
+	transform: translate(-50%, -50%);
+	pointer-events: none;
+	background: radial-gradient(circle, color-mix(in srgb, var(--app-accent) 15%, transparent), transparent 60%);
+}
+
+.coms-sec-left {
+	--gx: 20%;
+	--gy: 46%;
+}
+
+.coms-sec-top {
+	--gx: 50%;
+	--gy: 4%;
+}
+
+.coms-sec-low {
+	--gx: 50%;
+	--gy: 78%;
+}
+
+.coms-sec-tight {
+	padding-block: clamp(3rem, 6vw, 5rem);
+}
+
+.coms-sec-inner {
+	width: 100%;
+	max-width: 76rem;
+	margin-inline: auto;
+}
+
+/* Two columns from 1024px up: copy and artwork. `coms-split-flip` puts the artwork first. */
+.coms-split {
+	display: grid;
+	align-items: center;
+	gap: clamp(2.5rem, 5vw, 5rem);
+}
+
+@media (min-width: 1024px) {
+	.coms-split {
+		grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+	}
+	.coms-split-flip > :first-child {
+		order: 2;
+	}
+}
+
+/* ---- Type ---------------------------------------------------------------- */
+.coms-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.7rem;
+	color: var(--app-accent-text);
+	font: 600 0.75rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+}
+
+.coms-label b {
+	color: var(--app-muted);
+	font-weight: 600;
+}
+
+.coms-label i {
+	display: block;
+	width: 2.25rem;
+	height: 1px;
+	background: currentColor;
+	opacity: 0.55;
+}
+
+.coms-title {
+	margin-top: 1.1rem;
+	color: var(--app-text);
+	font-size: clamp(2.1rem, 4.3vw, 3.75rem);
+	font-weight: 700;
+	line-height: 1.12;
+	letter-spacing: -0.02em;
+	word-break: keep-all;
+	text-wrap: balance;
+}
+
+:root[data-theme-mode='dark'] .coms-title {
+	background: linear-gradient(180deg, #ffffff 45%, #cdd6e6 100%);
+	-webkit-background-clip: text;
+	background-clip: text;
+	color: transparent;
+	-webkit-text-fill-color: transparent;
+}
+
+.coms-lede {
+	margin-top: 1.25rem;
+	max-width: 35rem;
+	color: var(--app-muted);
+	font-size: clamp(1rem, 1.3vw, 1.18rem);
+	font-weight: 500;
+	line-height: 1.72;
+	word-break: keep-all;
+}
+
+.coms-center {
+	text-align: center;
+}
+
+.coms-center .coms-lede {
+	margin-inline: auto;
+}
+
+.coms-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	margin-top: 1.9rem;
+}
+
+.coms-center .coms-actions {
+	justify-content: center;
+}
+
+/* ---- Small pieces -------------------------------------------------------- */
+.coms-stats {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.75rem;
+	margin-top: 2.25rem;
+}
+
+.coms-stat {
+	border-radius: 14px;
+	border: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 66%, transparent);
+	padding: 1rem;
+}
+
+.coms-stat::before {
+	content: '';
+	display: block;
+	width: 1.5rem;
+	height: 2px;
+	margin-bottom: 0.85rem;
+	border-radius: 2px;
+	background: var(--app-accent);
+	box-shadow: 0 0 10px color-mix(in srgb, var(--app-accent) 70%, transparent);
+}
+
+.coms-stat strong {
+	display: block;
+	color: var(--app-text);
+	font-size: 1.15rem;
+	font-weight: 700;
+}
+
+.coms-stat span {
+	display: block;
+	margin-top: 0.3rem;
+	color: var(--app-muted);
+	font-size: 0.78rem;
+	font-weight: 600;
+	line-height: 1.45;
+	word-break: keep-all;
+}
+
+.coms-stats-column {
+	grid-template-columns: minmax(0, 1fr);
+	margin-top: 0;
+}
+
+.coms-stats-column .coms-stat {
+	display: grid;
+	grid-template-columns: 4.5rem minmax(0, 1fr);
+	align-items: center;
+	gap: 1rem;
+	padding: 1.15rem 1.25rem;
+}
+
+.coms-stats-column .coms-stat::before {
+	display: none;
+}
+
+.coms-stats-column .coms-stat strong {
+	color: var(--app-accent-text);
+	font: 700 1.05rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.coms-stats-column .coms-stat span {
+	margin-top: 0;
+	color: var(--app-text);
+	font-size: 0.95rem;
+}
+
+/* A card that lights up under the pointer (--spot-x / --spot-y come from useSpotlight). */
+.coms-card {
+	position: relative;
+	display: flex;
+	height: 100%;
+	flex-direction: column;
+	overflow: hidden;
+	border-radius: 18px;
+	border: 1px solid var(--app-hairline);
+	background:
+		radial-gradient(26rem circle at var(--spot-x, -60rem) var(--spot-y, -60rem), color-mix(in srgb, var(--app-accent) 17%, transparent), transparent 62%),
+		color-mix(in srgb, var(--app-surface) 78%, transparent);
+	padding: 1.5rem;
+	color: var(--app-text);
+	text-align: left;
+	transition:
+		transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+		border-color 200ms ease,
+		box-shadow 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.coms-card:hover {
+	transform: translateY(-4px);
+	border-color: color-mix(in srgb, var(--app-accent) 55%, var(--app-hairline));
+	box-shadow: 0 24px 60px rgba(0, 0, 0, 0.26);
+}
+
+.coms-card:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 3px;
+}
+
+.coms-card-eyebrow {
+	color: var(--app-accent-text);
+	font: 600 0.72rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+}
+
+.coms-card-title {
+	margin-top: 0.75rem;
+	color: var(--app-text);
+	font-size: 1.5rem;
+	font-weight: 700;
+	line-height: 1.25;
+	word-break: keep-all;
+}
+
+.coms-card-body {
+	margin-top: 0.7rem;
+	color: var(--app-muted);
+	font-size: 0.92rem;
+	font-weight: 500;
+	line-height: 1.7;
+	word-break: keep-all;
+}
+
+.coms-card-go {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	margin-top: auto;
+	padding-top: 1.25rem;
+	color: var(--app-accent-text);
+	font-size: 0.88rem;
+	font-weight: 700;
+}
+
+.coms-card-go svg {
+	transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.coms-card:hover .coms-card-go svg {
+	transform: translateX(4px);
+}
+
+.coms-card-num {
+	position: absolute;
+	right: 1.15rem;
+	top: 0.95rem;
+	color: transparent;
+	font: 700 2.5rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	-webkit-text-stroke: 1px color-mix(in srgb, var(--app-text) 22%, transparent);
+	pointer-events: none;
+}
+
+.coms-icon {
+	display: grid;
+	width: 2.9rem;
+	height: 2.9rem;
+	flex-shrink: 0;
+	place-items: center;
+	border-radius: 0.95rem;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 42%, transparent);
+	background: color-mix(in srgb, var(--app-accent) 16%, transparent);
+	color: var(--app-accent-text);
+	box-shadow: 0 0 22px color-mix(in srgb, var(--app-accent) 22%, transparent);
+}
+
+.coms-card .coms-icon + .coms-card-title {
+	margin-top: 1.15rem;
+}
+
+.coms-rowhead {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: 1.25rem;
+}
+
+.coms-rowhead .coms-title {
+	font-size: clamp(1.9rem, 3.4vw, 2.9rem);
+}
+
+.coms-rowhead .coms-lede {
+	margin-top: 0.85rem;
+}
+
+/* ---- Projects: artwork beside its three tracks, the projects under both -- */
+.coms-bento {
+	display: grid;
+	gap: 1rem;
+	margin-top: clamp(2.25rem, 4vw, 3.5rem);
+}
+
+@media (min-width: 1024px) {
+	.coms-bento {
+		grid-template-columns: repeat(12, minmax(0, 1fr));
+	}
+	.coms-bento-wide {
+		grid-column: span 7;
+	}
+	.coms-bento-side {
+		grid-column: span 5;
+	}
+	.coms-bento-third {
+		grid-column: span 4;
+	}
+}
+
+.coms-bento-side {
+	display: grid;
+	align-content: stretch;
+	gap: 1rem;
+}
+
+/* ---- Recruit: one lit panel ---------------------------------------------- */
+.coms-cta {
+	position: relative;
+	isolation: isolate;
+	overflow: hidden;
+	border-radius: 32px;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 36%, var(--app-hairline));
+	background:
+		radial-gradient(110% 130% at 0% 0%, color-mix(in srgb, var(--app-accent) 26%, transparent), transparent 56%),
+		radial-gradient(90% 120% at 100% 100%, color-mix(in srgb, var(--app-accent) 15%, transparent), transparent 60%),
+		color-mix(in srgb, var(--app-surface) 90%, transparent);
+	padding: clamp(1.75rem, 5vw, 4rem);
+	box-shadow: 0 40px 120px color-mix(in srgb, var(--app-accent) 14%, transparent);
+}
+
+.coms-cta::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	pointer-events: none;
+	background-image: radial-gradient(circle, color-mix(in srgb, var(--app-text) 22%, transparent) 1px, transparent 1.4px);
+	background-size: 23px 23px;
+	-webkit-mask-image: linear-gradient(115deg, #000 0%, transparent 62%);
+	mask-image: linear-gradient(115deg, #000 0%, transparent 62%);
+	opacity: 0.5;
+}
+
+/* ---- Story pages: steps down one line, and a checked list ------------------- */
+.coms-timeline {
+	position: relative;
+	display: grid;
+	gap: 1rem;
+	max-width: 54rem;
+	margin: clamp(2.25rem, 4vw, 3.5rem) auto 0;
+	padding: 0;
+	list-style: none;
+}
+
+.coms-timeline::before {
+	content: '';
+	position: absolute;
+	left: 1.6rem;
+	top: 1.5rem;
+	bottom: 1.5rem;
+	width: 2px;
+	margin-left: -1px;
+	background: linear-gradient(180deg, var(--app-accent), color-mix(in srgb, var(--app-accent) 12%, transparent));
+}
+
+.coms-timeline li {
+	position: relative;
+	display: grid;
+	grid-template-columns: 3.2rem minmax(0, 1fr);
+	align-items: center;
+	gap: 1.1rem;
+}
+
+.coms-timeline-num {
+	position: relative;
+	display: grid;
+	width: 3.2rem;
+	height: 3.2rem;
+	place-items: center;
+	border-radius: 50%;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 55%, var(--app-hairline));
+	background: var(--app-surface-elevated);
+	color: var(--app-accent-text);
+	font: 700 0.95rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	box-shadow: 0 0 24px color-mix(in srgb, var(--app-accent) 30%, transparent);
+}
+
+.coms-timeline-card {
+	border-radius: 18px;
+	border: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 78%, transparent);
+	padding: 1.35rem 1.5rem;
+}
+
+.coms-timeline-card .coms-card-title {
+	margin-top: 0;
+	font-size: 1.3rem;
+}
+
+.coms-checklist {
+	display: grid;
+	gap: 0.7rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.coms-checklist li {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr);
+	align-items: center;
+	gap: 0.9rem;
+	border-radius: 14px;
+	border: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface-elevated) 88%, transparent);
+	padding: 1rem 1.1rem;
+	color: var(--app-text);
+	font-size: 1.02rem;
+	font-weight: 600;
+	line-height: 1.5;
+	word-break: keep-all;
+}
+
+.coms-checklist-mark {
+	display: grid;
+	width: 1.9rem;
+	height: 1.9rem;
+	place-items: center;
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--app-accent) 18%, transparent);
+	border: 1px solid color-mix(in srgb, var(--app-accent) 50%, transparent);
+	color: var(--app-accent-text);
+}
+
+/* ---- Artwork frame --------------------------------------------------------- */
+.coms-visual {
+	position: relative;
+	width: 100%;
+	max-width: 31rem;
+	margin-inline: auto;
+	overflow: hidden;
+	border-radius: 26px;
+	border: 1px solid var(--app-hairline);
+	background: linear-gradient(165deg, color-mix(in srgb, var(--app-surface-elevated) 90%, transparent), color-mix(in srgb, var(--app-bg) 96%, transparent));
+	box-shadow:
+		0 40px 110px rgba(0, 0, 0, 0.34),
+		0 0 0 1px color-mix(in srgb, var(--app-accent) 10%, transparent),
+		inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.coms-visual::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background-image: radial-gradient(circle, color-mix(in srgb, var(--app-text) 18%, transparent) 1px, transparent 1.4px);
+	background-size: 20px 20px;
+	-webkit-mask-image: linear-gradient(180deg, transparent 10%, #000 55%, transparent 100%);
+	mask-image: linear-gradient(180deg, transparent 10%, #000 55%, transparent 100%);
+	opacity: 0.5;
+}
+
+.coms-visual::after {
+	content: '';
+	position: absolute;
+	left: 50%;
+	top: 40%;
+	width: 26rem;
+	height: 26rem;
+	transform: translate(-50%, -50%);
+	pointer-events: none;
+	background: radial-gradient(circle, color-mix(in srgb, var(--app-accent) 24%, transparent), transparent 62%);
+}
+
+/* The projects board fills its cell of the bento instead of sitting in it as a card. */
+.coms-visual-lab {
+	display: flex;
+	max-width: none;
+	height: 100%;
+	flex-direction: column;
+}
+
+.coms-visual-lab .coms-visual-body {
+	flex: 1;
+	gap: 1.75rem;
+	padding: 2rem clamp(1.25rem, 3vw, 2.5rem);
+}
+
+.coms-visual-bar {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	border-bottom: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 55%, transparent);
+	padding: 0.9rem 1.1rem;
+}
+
+.coms-visual-dots {
+	display: inline-flex;
+	gap: 0.35rem;
+}
+
+.coms-visual-dots i {
+	width: 0.55rem;
+	height: 0.55rem;
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--app-text) 26%, transparent);
+}
+
+.coms-visual-dots i:last-child {
+	background: var(--app-accent);
+	box-shadow: 0 0 8px var(--app-accent);
+}
+
+.coms-visual-name {
+	color: var(--app-text);
+	font-size: 0.9rem;
+	font-weight: 700;
+}
+
+.coms-visual-sub {
+	margin-left: auto;
+	color: var(--app-muted);
+	font: 500 0.7rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	letter-spacing: 0.04em;
+	white-space: nowrap;
+}
+
+.coms-visual-body {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	min-height: 21rem;
+	flex-direction: column;
+	justify-content: center;
+	gap: 1.4rem;
+	padding: 1.5rem 1.4rem 1.6rem;
+}
+
+/* ---- About: Club OS -------------------------------------------------------- */
+.coms-os-core {
+	position: relative;
+	display: grid;
+	height: 9.75rem;
+	place-items: center;
+}
+
+.coms-os-ring {
+	position: absolute;
+	width: 8.5rem;
+	height: 8.5rem;
+	border-radius: 50%;
+	border: 1px dashed color-mix(in srgb, var(--app-accent) 55%, transparent);
+	animation: coms-spin 18s linear infinite;
+}
+
+.coms-os-ring::after {
+	content: '';
+	position: absolute;
+	left: 50%;
+	top: -4px;
+	width: 8px;
+	height: 8px;
+	margin-left: -4px;
+	border-radius: 50%;
+	background: var(--app-accent);
+	box-shadow: 0 0 12px var(--app-accent);
+}
+
+.coms-os-ring-2 {
+	width: 11.75rem;
+	height: 11.75rem;
+	border-style: solid;
+	border-color: color-mix(in srgb, var(--app-text) 12%, transparent);
+	animation-duration: 30s;
+	animation-direction: reverse;
+}
+
+.coms-os-ring-2::after {
+	width: 6px;
+	height: 6px;
+	margin-left: -3px;
+	top: -3px;
+	background: color-mix(in srgb, var(--app-text) 60%, transparent);
+	box-shadow: none;
+}
+
+.coms-os-tile {
+	position: relative;
+	display: grid;
+	width: 5.5rem;
+	height: 5.5rem;
+	place-items: center;
+	border-radius: 1.4rem;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 42%, var(--app-hairline));
+	background: color-mix(in srgb, var(--app-surface-elevated) 92%, transparent);
+	box-shadow:
+		0 0 44px color-mix(in srgb, var(--app-accent) 36%, transparent),
+		inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.coms-os-logo {
+	width: 62%;
+}
+
+:root[data-theme-mode='dark'] .coms-os-logo {
+	filter: invert(1) brightness(1.08);
+}
+
+.coms-os-rows {
+	display: grid;
+	gap: 0.55rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.coms-os-rows li {
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) 5.5rem auto;
+	align-items: center;
+	gap: 0.75rem;
+	border-radius: 12px;
+	border: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 60%, transparent);
+	padding: 0.7rem 0.85rem;
+	color: var(--app-text);
+	font-size: 0.86rem;
+	font-weight: 600;
+}
+
+.coms-os-led {
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 50%;
+	background: var(--app-accent);
+	box-shadow: 0 0 8px var(--app-accent);
+	animation: coms-blink 2.4s ease-in-out infinite;
+	animation-delay: calc(var(--i) * 0.5s);
+}
+
+.coms-os-meter {
+	height: 0.35rem;
+	overflow: hidden;
+	border-radius: 99px;
+	background: color-mix(in srgb, var(--app-text) 12%, transparent);
+}
+
+.coms-os-meter i {
+	display: block;
+	width: calc(58% + var(--i) * 14%);
+	height: 100%;
+	border-radius: inherit;
+	background: linear-gradient(90deg, color-mix(in srgb, var(--app-accent) 50%, transparent), var(--app-accent));
+	transform-origin: 0 50%;
+	animation: coms-meter calc(3.2s + var(--i) * 0.9s) ease-in-out infinite alternate;
+}
+
+.coms-os-pid {
+	color: var(--app-muted);
+	font: 500 0.7rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ---- Activities: Learning Stack -------------------------------------------- */
+.coms-stack {
+	position: relative;
+	height: 17rem;
+}
+
+.coms-stack-layer {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: calc(4.7rem + (var(--n) - 1 - var(--i)) * 3.5rem);
+	height: 0;
+	animation: coms-float 5.5s ease-in-out infinite;
+	animation-delay: calc(var(--i) * -0.9s);
+}
+
+.coms-stack-plate {
+	position: absolute;
+	left: 12%;
+	top: 0;
+	width: 46%;
+	aspect-ratio: 1;
+	margin-top: -23%;
+	transform: rotateX(62deg) rotateZ(45deg);
+	border-radius: 14%;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 40%, var(--app-hairline));
+	background:
+		radial-gradient(circle, color-mix(in srgb, var(--app-text) 22%, transparent) 1px, transparent 1.5px) 0 0 / 14px 14px,
+		linear-gradient(135deg, color-mix(in srgb, var(--app-accent) 16%, var(--app-surface-elevated)), color-mix(in srgb, var(--app-surface) 86%, transparent));
+	box-shadow: 0 0 22px color-mix(in srgb, var(--app-accent) 16%, transparent);
+}
+
+.coms-stack-layer:nth-child(2) .coms-stack-plate {
+	border-color: color-mix(in srgb, var(--app-accent) 62%, var(--app-hairline));
+	background:
+		radial-gradient(circle, color-mix(in srgb, var(--app-text) 26%, transparent) 1px, transparent 1.5px) 0 0 / 14px 14px,
+		linear-gradient(135deg, color-mix(in srgb, var(--app-accent) 34%, var(--app-surface-elevated)), color-mix(in srgb, var(--app-accent) 10%, var(--app-surface)));
+	box-shadow: 0 0 30px color-mix(in srgb, var(--app-accent) 26%, transparent);
+}
+
+.coms-stack-layer:nth-child(3) .coms-stack-plate {
+	border-color: color-mix(in srgb, var(--app-accent) 85%, #ffffff);
+	background:
+		radial-gradient(circle, rgba(255, 255, 255, 0.5) 1px, transparent 1.5px) 0 0 / 14px 14px,
+		linear-gradient(135deg, color-mix(in srgb, var(--app-accent) 78%, #ffffff), color-mix(in srgb, var(--app-accent) 46%, var(--app-surface)));
+	box-shadow: 0 0 44px color-mix(in srgb, var(--app-accent) 50%, transparent);
+}
+
+.coms-stack-tag {
+	position: absolute;
+	right: 0;
+	top: -1rem;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	border-radius: 10px;
+	border: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 74%, transparent);
+	padding: 0.5rem 0.75rem;
+	color: var(--app-text);
+	font-size: 0.82rem;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.coms-stack-tag b {
+	color: var(--app-accent-text);
+	font: 600 0.7rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.coms-stack-tag::before {
+	content: '';
+	position: absolute;
+	right: 100%;
+	top: 50%;
+	width: 3rem;
+	height: 1px;
+	background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--app-accent) 70%, transparent));
+}
+
+/* ---- Projects: Project Lab -------------------------------------------------- */
+.coms-lab-line {
+	position: relative;
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.5rem;
+}
+
+.coms-lab-stage {
+	position: relative;
+	z-index: 1;
+	display: grid;
+	justify-items: center;
+	gap: 0.75rem;
+	text-align: center;
+}
+
+.coms-lab-node {
+	display: grid;
+	width: 3.5rem;
+	height: 3.5rem;
+	place-items: center;
+	border-radius: 1.05rem;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 46%, var(--app-hairline));
+	background: color-mix(in srgb, var(--app-surface-elevated) 94%, transparent);
+	color: var(--app-accent-text);
+	animation: coms-node 4.8s ease-in-out infinite;
+	animation-delay: calc(var(--i) * 1.6s);
+}
+
+.coms-lab-name {
+	color: var(--app-text);
+	font-size: 0.82rem;
+	font-weight: 600;
+	word-break: keep-all;
+}
+
+.coms-lab-track {
+	position: absolute;
+	left: 16.66%;
+	right: 16.66%;
+	top: 1.75rem;
+	height: 2px;
+	overflow: hidden;
+	border-radius: 2px;
+	background: color-mix(in srgb, var(--app-text) 14%, transparent);
+}
+
+.coms-lab-track i {
+	position: absolute;
+	left: 100%;
+	top: 0;
+	width: 30%;
+	height: 100%;
+	background: linear-gradient(90deg, transparent, var(--app-accent), transparent);
+	animation: coms-run 4.8s linear infinite;
+}
+
+.coms-lab-grid {
+	display: grid;
+	grid-template-columns: repeat(12, minmax(0, 1fr));
+	gap: 0.36rem;
+}
+
+.coms-lab-grid i {
+	aspect-ratio: 1;
+	border-radius: 4px;
+	background: var(--app-accent);
+	opacity: calc(0.12 + var(--a) * 0.78);
+	animation: coms-lit 5.5s ease-in-out infinite;
+	animation-delay: calc(var(--i) * -0.19s);
+}
+
+/* ---- Recruit: Join Flow ------------------------------------------------------ */
+.coms-flow {
+	position: relative;
+	display: grid;
+	gap: 1rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.coms-flow li {
+	position: relative;
+	z-index: 1;
+	display: grid;
+	grid-template-columns: auto minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 0.9rem;
+	border-radius: 14px;
+	border: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface-elevated) 88%, transparent);
+	padding: 0.95rem 1rem;
+}
+
+.coms-flow-mark {
+	display: grid;
+	width: 2rem;
+	height: 2rem;
+	place-items: center;
+	border-radius: 50%;
+	background: var(--app-accent);
+	color: #ffffff;
+	box-shadow: 0 0 18px color-mix(in srgb, var(--app-accent) 60%, transparent);
+	animation: coms-step 6s ease-in-out infinite;
+	animation-delay: calc(var(--i) * 1.2s);
+}
+
+.coms-flow-name {
+	color: var(--app-text);
+	font-size: 0.95rem;
+	font-weight: 700;
+}
+
+.coms-flow-step {
+	color: var(--app-muted);
+	font: 600 0.68rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	letter-spacing: 0.08em;
+}
+
+.coms-flow-track {
+	position: absolute;
+	left: calc(2rem - 1px);
+	top: 1.5rem;
+	bottom: 1.5rem;
+	width: 2px;
+	background: color-mix(in srgb, var(--app-text) 12%, transparent);
+}
+
+.coms-flow-track i {
+	display: block;
+	width: 100%;
+	height: 100%;
+	background: linear-gradient(180deg, var(--app-accent), color-mix(in srgb, var(--app-accent) 35%, transparent));
+	transform-origin: 50% 0;
+	animation: coms-fill 6s ease-in-out infinite;
+}
+
+/* ---- Showcase cards: small artwork on top ------------------------------------ */
+.coms-mini {
+	position: relative;
+	display: flex;
+	height: 7.5rem;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	margin-bottom: 1.35rem;
+	border-radius: 12px;
+	border: 1px solid var(--app-hairline);
+	background:
+		radial-gradient(circle, color-mix(in srgb, var(--app-text) 16%, transparent) 1px, transparent 1.4px) 0 0 / 16px 16px,
+		radial-gradient(70% 120% at 50% 0%, color-mix(in srgb, var(--app-accent) 20%, transparent), transparent 70%),
+		color-mix(in srgb, var(--app-bg) 60%, transparent);
+}
+
+.coms-mini-flow {
+	justify-content: space-between;
+	padding: 0 13%;
+}
+
+.coms-mini-stop {
+	position: relative;
+	z-index: 1;
+	display: grid;
+	justify-items: center;
+	gap: 0.4rem;
+}
+
+.coms-mini-chip {
+	display: grid;
+	width: 2.6rem;
+	height: 2.6rem;
+	place-items: center;
+	border-radius: 0.8rem;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 46%, var(--app-hairline));
+	background: var(--app-surface-elevated);
+	color: var(--app-accent-text);
+	animation: coms-node 4.5s ease-in-out infinite;
+	animation-delay: calc(var(--i) * 1.5s);
+}
+
+.coms-mini-stop small {
+	color: var(--app-muted);
+	font-size: 0.68rem;
+	font-weight: 700;
+}
+
+.coms-mini-rail {
+	position: absolute;
+	left: calc(13% + 1.3rem);
+	right: calc(13% + 1.3rem);
+	top: calc(50% - 0.62rem);
+	height: 2px;
+	background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--app-text) 24%, transparent) 0 6px, transparent 6px 12px);
+}
+
+.coms-mini-rail i {
+	position: absolute;
+	left: calc(100% - 8px);
+	top: -3px;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--app-accent);
+	box-shadow: 0 0 12px var(--app-accent);
+	opacity: 0;
+	animation: coms-rail 4.5s linear infinite;
+}
+
+.coms-mini-build {
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 0 1.1rem;
+}
+
+.coms-mini-editor {
+	display: grid;
+	flex: 1;
+	gap: 0.42rem;
+	border-radius: 10px;
+	border: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-bg) 72%, transparent);
+	padding: 0.7rem 0.8rem;
+}
+
+.coms-mini-editor-bar {
+	display: flex;
+	gap: 0.25rem;
+	margin-bottom: 0.15rem;
+}
+
+.coms-mini-editor-bar i {
+	width: 0.4rem;
+	height: 0.4rem;
+	border-radius: 50%;
+	background: color-mix(in srgb, var(--app-text) 24%, transparent);
+}
+
+.coms-mini-code {
+	display: block;
+	width: var(--w);
+	height: 0.36rem;
+	border-radius: 99px;
+	background: color-mix(in srgb, var(--app-text) 26%, transparent);
+	transform-origin: 0 50%;
+	animation: coms-type 5s steps(14, end) infinite;
+	animation-delay: calc(var(--i) * 0.45s);
+}
+
+.coms-mini-code:nth-child(3) {
+	background: color-mix(in srgb, var(--app-accent) 80%, transparent);
+}
+
+.coms-mini-pass {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	border-radius: 99px;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 52%, transparent);
+	background: color-mix(in srgb, var(--app-accent) 18%, transparent);
+	padding: 0.42rem 0.65rem;
+	color: var(--app-accent-text);
+	font: 700 0.7rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	animation: coms-pass 5s ease-in-out infinite;
+}
+
+.coms-mini-face {
+	display: grid;
+	width: 2.75rem;
+	height: 2.75rem;
+	place-items: center;
+	margin-left: -0.55rem;
+	border-radius: 50%;
+	border: 2px solid var(--app-surface);
+	background: color-mix(in srgb, var(--app-accent) 26%, var(--app-surface-elevated));
+	color: var(--app-text);
+}
+
+.coms-mini-face:first-child {
+	margin-left: 0;
+}
+
+.coms-mini-face:nth-child(2) {
+	background: color-mix(in srgb, var(--app-accent) 40%, var(--app-surface-elevated));
+}
+
+.coms-mini-face:nth-child(3) {
+	background: color-mix(in srgb, var(--app-accent) 56%, var(--app-surface-elevated));
+}
+
+.coms-mini-face:nth-child(4) {
+	background: color-mix(in srgb, var(--app-accent) 74%, var(--app-surface-elevated));
+	color: #ffffff;
+}
+
+.coms-mini-face-new {
+	margin-left: 0.6rem;
+	border: 2px dashed color-mix(in srgb, var(--app-accent) 72%, transparent);
+	background: transparent;
+	color: var(--app-accent-text);
+	animation: coms-invite 2.8s ease-in-out infinite;
+}
+
+/* ---- Motion ---------------------------------------------------------------- */
+@keyframes coms-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes coms-blink {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.35;
+	}
+}
+
+@keyframes coms-meter {
+	from {
+		transform: scaleX(0.45);
+	}
+	to {
+		transform: scaleX(1);
+	}
+}
+
+@keyframes coms-float {
+	0%,
+	100% {
+		translate: 0 0;
+	}
+	50% {
+		translate: 0 -8px;
+	}
+}
+
+/* A node flashes as the light on its line reaches it. */
+@keyframes coms-node {
+	0%,
+	26%,
+	100% {
+		box-shadow: 0 0 0 0 transparent;
+	}
+	8% {
+		box-shadow:
+			0 0 0 6px color-mix(in srgb, var(--app-accent) 22%, transparent),
+			0 0 28px color-mix(in srgb, var(--app-accent) 55%, transparent);
+	}
+}
+
+@keyframes coms-run {
+	0% {
+		left: -30%;
+	}
+	66%,
+	100% {
+		left: 100%;
+	}
+}
+
+@keyframes coms-rail {
+	0% {
+		left: 0;
+		opacity: 1;
+	}
+	66% {
+		left: calc(100% - 8px);
+		opacity: 1;
+	}
+	67%,
+	100% {
+		left: calc(100% - 8px);
+		opacity: 0;
+	}
+}
+
+/* Opacity, not brightness: brightening the accent would push it toward another hue. */
+@keyframes coms-lit {
+	0%,
+	100% {
+		opacity: calc(0.12 + var(--a) * 0.78);
+	}
+	50% {
+		opacity: calc(0.4 + var(--a) * 0.6);
+	}
+}
+
+@keyframes coms-step {
+	0% {
+		background: color-mix(in srgb, var(--app-text) 16%, transparent);
+		color: transparent;
+		box-shadow: none;
+		transform: scale(0.88);
+	}
+	12%,
+	100% {
+		background: var(--app-accent);
+		color: #ffffff;
+		box-shadow: 0 0 18px color-mix(in srgb, var(--app-accent) 60%, transparent);
+		transform: scale(1);
+	}
+}
+
+@keyframes coms-fill {
+	0% {
+		transform: scaleY(0);
+	}
+	45%,
+	100% {
+		transform: scaleY(1);
+	}
+}
+
+@keyframes coms-type {
+	0% {
+		transform: scaleX(0);
+	}
+	22%,
+	100% {
+		transform: scaleX(1);
+	}
+}
+
+@keyframes coms-pass {
+	0%,
+	40% {
+		opacity: 0.25;
+		transform: scale(0.94);
+	}
+	52%,
+	100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@keyframes coms-invite {
+	0%,
+	100% {
+		transform: scale(1);
+		box-shadow: 0 0 0 0 color-mix(in srgb, var(--app-accent) 45%, transparent);
+	}
+	50% {
+		transform: scale(1.08);
+		box-shadow: 0 0 0 9px transparent;
+	}
+}
+
+@media (max-width: 639px) {
+	.coms-stats {
+		gap: 0.5rem;
+	}
+	.coms-stat {
+		padding: 0.8rem 0.7rem;
+	}
+	.coms-stat strong {
+		font-size: 1rem;
+	}
+	.coms-visual-sub {
+		display: none;
+	}
+	.coms-visual-body {
+		min-height: 19rem;
+		padding-inline: 1rem;
+	}
+	.coms-os-rows li {
+		grid-template-columns: auto minmax(0, 1fr) 3.5rem auto;
+	}
+	.coms-stack-plate {
+		left: 4%;
+	}
+	.coms-stack-tag::before {
+		width: 1.5rem;
+	}
+	.coms-flow-step {
+		display: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.coms-card,
+	.coms-card:hover {
+		transform: none;
+		transition: none;
+	}
+}

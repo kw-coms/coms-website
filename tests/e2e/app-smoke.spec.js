@@ -232,6 +232,28 @@ test.describe('home boot intro', () => {
   }
 })
 
+// The home sections under the hero: every card is a real control that goes where it says.
+test('home section cards lead where they say', async ({ page }) => {
+  await page.addInitScript(() => {
+    try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ }
+  })
+  await page.goto('/')
+
+  const hub = page.locator('section').filter({ has: page.getByRole('heading', { name: '활동 허브' }) })
+  for (const name of [/공지사항/, /커뮤니티/, /자료실/]) {
+    await expect(hub.getByRole('button', { name })).toBeVisible()
+  }
+  for (const heading of ['광운대에서 컴퓨터를 가장 자연스럽게 시작하는 곳.', '기초부터 실전까지, 매주 이어지는 학습 루틴.', '아이디어를 실제 서비스와 제작물로.', '함께 배울 다음 멤버를 기다립니다.']) {
+    await expect(page.getByRole('heading', { name: heading })).toBeAttached()
+  }
+
+  // A showcase card scrolls to its section; the recruit panel's action opens the form.
+  await page.getByRole('button', { name: /학습 흐름을 한눈에/ }).click()
+  await expect(page.locator('#activities')).toBeInViewport()
+  await page.locator('#recruit').getByRole('button', { name: '지원서 작성하기' }).click()
+  await expect(page).toHaveURL(/\/recruit$/)
+})
+
 test('activities title remains readable across selectable fonts and viewport widths', async ({ page }) => {
   for (const viewport of [
     { width: 1280, height: 900 },

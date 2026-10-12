@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate, useLocation, type NavigateOptions, type To } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, Megaphone } from 'lucide-react'
+import { ArrowRight, ChevronDown, Code2, Cpu, FolderOpen, Globe, Megaphone, MessagesSquare } from 'lucide-react'
 import { listNotices } from '../../services/noticeApi'
 import { getPublicSiteSettings } from '../../services/siteSettingsApi'
 import {
@@ -20,11 +20,17 @@ import { getLogoAsset } from '../../utils/logoAssets'
 import { ghostActionBtnClass, solidActionBtnClass } from '../../shared/homeUi'
 import ClubCalendarSection from '../../features/clubCalendar/ClubCalendarSection'
 import HeroField from './HeroField'
+import { BuildMini, ClubOsVisual, FlowMini, JoinFlowVisual, JoinMini, LearningStackVisual, ProjectLabVisual } from './HomeVisuals'
 import { scrollToTopInstant } from '../../utils/themeColors'
 import { useAuth } from '../../contexts/useAuth'
 
 const LATEST_NOTICE_QUERY_KEY = ['app-shell', 'latest-notice']
 const SITE_SETTINGS_QUERY_KEY = ['site-settings', 'public']
+
+// Artwork and icons, in the order of the lists they sit beside in homeContent.
+const SHOWCASE_ART = [FlowMini, BuildMini, JoinMini]
+const HUB_ICONS = [Megaphone, MessagesSquare, FolderOpen]
+const PROJECT_ICONS = [Globe, Cpu, Code2]
 
 export default function HomeView() {
   const { user } = useAuth()
@@ -127,134 +133,62 @@ export default function HomeView() {
   const goRecruitPage = () => goPageTop('/recruit')
   const locationPath = () => `${location.pathname}${location.search}${location.hash}`
 
-  const renderSectionContent = (id) => {
+  // The words of a section: label, title, lede and its two actions. `index` is the section's
+  // place in the page, shown before the label.
+  const renderSectionCopy = (id, index) => {
     const story = sectionStories[id]
-    if (story) {
-      const metrics = sectionMetrics[id]
-      const detailItems = id === 'activities'
-        ? activityDetails.slice(0, 2)
-        : id === 'projects'
-          ? projectDetails.slice(0, 3)
-          : []
 
-      const primaryAction = () => {
-        if (id === 'about') goPageTop('/about')
-        if (id === 'activities') goPageTop('/activities')
-        if (id === 'projects') goPageTop('/projects')
-        if (id === 'recruit') goRecruitPage()
-      }
-
-      const secondaryAction = () => {
-        if (id === 'about') openPanel('activities')
-        if (id === 'activities') goPageTop('/projects')
-        if (id === 'recruit') goPageTop('/recruit-notice', { state: { from: `${locationPath()}#recruit` } })
-      }
-
-      return (
-        <div className="mx-auto w-full max-w-5xl">
-          <div className="mx-auto max-w-4xl text-center">
-            <p data-reveal className="apple-eyebrow">{sectionMeta[id].eyebrow}</p>
-            <h2 data-reveal style={{ '--reveal-delay': '80ms' } as React.CSSProperties} className="apple-display mt-4 text-5xl sm:text-6xl lg:text-7xl">{story.title}</h2>
-            <p data-reveal style={{ '--reveal-delay': '160ms' } as React.CSSProperties} className="apple-copy mx-auto mt-6 max-w-3xl text-xl sm:text-2xl">{story.body}</p>
-            <div data-reveal style={{ '--reveal-delay': '240ms' } as React.CSSProperties} className="mt-8 flex flex-wrap justify-center gap-3">
-              <button type="button" onClick={primaryAction} className={solidActionBtnClass}>
-                {story.primary}
-              </button>
-              {id === 'projects' ? (
-                <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className={ghostActionBtnClass}>{story.secondary}</a>
-              ) : (
-                <button type="button" onClick={secondaryAction} className={ghostActionBtnClass}>{story.secondary}</button>
-              )}
-            </div>
-          </div>
-
-          <div className="mx-auto mt-10 grid max-w-3xl gap-3 sm:grid-cols-3">
-            {metrics.map((item, index) => (
-              <div key={item.value} data-reveal style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties} className="apple-soft-panel px-4 py-5 text-center">
-                <p className="text-lg font-semibold text-[var(--app-text)]">{item.value}</p>
-                <p className="mt-1 text-xs font-semibold leading-5 text-[var(--app-muted)]">{item.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {id === 'about' && (
-            <div className="mt-10 grid gap-3 lg:grid-cols-3">
-              {showcaseItems.map((item, index) => (
-                <button
-                  key={item.title}
-                  type="button"
-                  onClick={() => openPanel(item.target)}
-                  data-reveal
-                  style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties}
-                  className="apple-product-panel group min-h-48 px-6 py-6 text-left transition hover:-translate-y-0.5"
-                >
-                  <p className="apple-eyebrow">{item.eyebrow}</p>
-                  <h3 className="mt-3 text-2xl font-semibold leading-tight text-[var(--app-text)]">{item.title}</h3>
-                  <p className="mt-3 text-sm font-medium leading-6 text-[var(--app-muted)]">{item.body}</p>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {detailItems.length > 0 && (
-            <div className={`mt-10 grid gap-3 ${id === 'projects' ? 'lg:grid-cols-3' : 'sm:grid-cols-2'}`}>
-              {detailItems.map((item, index) => (
-                <article key={item.title} data-reveal style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties} className="apple-product-panel px-6 py-6 text-left transition hover:-translate-y-0.5">
-                  <div className="mb-5 inline-flex size-9 items-center justify-center rounded-full bg-[var(--app-surface-soft)] text-xs font-bold text-[var(--app-accent-text)]">
-                    {String(index + 1).padStart(2, '0')}
-                  </div>
-                  <h3 className="text-xl font-semibold text-[var(--app-text)]">{item.title}</h3>
-                  <p className="mt-3 text-sm font-medium leading-7 text-[var(--app-muted)]">{item.description}</p>
-                </article>
-              ))}
-            </div>
-          )}
-
-        </div>
-      )
+    const primaryAction = () => {
+      if (id === 'about') goPageTop('/about')
+      if (id === 'activities') goPageTop('/activities')
+      if (id === 'projects') goPageTop('/projects')
+      if (id === 'recruit') goRecruitPage()
     }
-    return null
-  }
 
-  const renderSectionPanel = (id) => {
-    const meta = sectionMeta[id]
-    const visual = visualDetails[id]
+    const secondaryAction = () => {
+      if (id === 'about') openPanel('activities')
+      if (id === 'activities') goPageTop('/projects')
+      if (id === 'recruit') goPageTop('/recruit-notice', { state: { from: `${locationPath()}#recruit` } })
+    }
+
     return (
-      <div data-panel="true" className={`w-full overflow-hidden ${id === 'about' || id === 'projects' ? 'apple-section-band' : 'apple-section-band-muted'}`} style={{ background: meta.background }}>
-        <div className="apple-section-grid mx-auto grid min-h-[calc(100svh-44px)] max-w-7xl items-center gap-10 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[minmax(0,1.05fr)_minmax(20rem,0.75fr)] lg:px-10">
-          <div className="flex items-center">
-            {renderSectionContent(id)}
-          </div>
-          <div data-reveal data-reveal-dir="right" style={{ '--reveal-delay': '120ms' } as React.CSSProperties} className="flex items-center justify-center">
-            <div className="home-device apple-device-card relative aspect-square min-h-[30rem] w-full max-w-md overflow-hidden rounded-lg ring-1 ring-black/5" style={{ background: meta.visual }}>
-              <div className="absolute inset-0 bg-linear-to-b from-white/30 via-transparent to-black/5" />
-              <div className="absolute inset-x-6 top-6 rounded-lg bg-white/78 px-5 py-4 shadow-[0_18px_45px_rgba(0,0,0,0.08)] backdrop-blur-xl">
-                <div className="mb-4 flex items-center gap-1.5">
-                  <span className="size-2.5 rounded-full bg-[#ff5f57]" />
-                  <span className="size-2.5 rounded-full bg-[#ffbd2e]" />
-                  <span className="size-2.5 rounded-full bg-[var(--app-accent)]" />
-                </div>
-                <p className="text-2xl font-semibold text-[var(--app-text)]">{visual.title}</p>
-                <p className="mt-1 text-sm font-semibold text-[var(--app-muted)]">{visual.subtitle}</p>
-              </div>
-              <div className="absolute left-1/2 top-1/2 flex size-32 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2rem] bg-white/72 shadow-[0_24px_70px_rgba(0,0,0,0.12)] backdrop-blur-md sm:size-40">
-                <img src={getLogoAsset('COMs_logo_vec')} alt="KW COM's" className="home-logo-float w-[68%] object-contain" />
-              </div>
-              <div className="absolute bottom-6 left-6 right-6 space-y-2">
-                {visual.rows.map((row, index) => (
-                  <div key={row} className="flex items-center gap-3 rounded-lg bg-white/76 px-4 py-3 text-sm font-semibold text-[var(--app-text)] shadow-[0_8px_24px_rgba(0,0,0,0.06)] backdrop-blur-xl">
-                    <span className="size-2.5 rounded-full" style={{ backgroundColor: visual.accent }} />
-                    <span>{row}</span>
-                    <span className="ml-auto text-xs text-[var(--app-subtle)]">{String(index + 1).padStart(2, '0')}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+      <>
+        <p data-reveal className="coms-label"><b>{index}</b><i />{sectionMeta[id].eyebrow}</p>
+        <h2 data-reveal style={{ '--reveal-delay': '80ms' } as React.CSSProperties} className="coms-title">{story.title}</h2>
+        <p data-reveal style={{ '--reveal-delay': '160ms' } as React.CSSProperties} className="coms-lede">{story.body}</p>
+        <div data-reveal style={{ '--reveal-delay': '240ms' } as React.CSSProperties} className="coms-actions">
+          <button type="button" onClick={primaryAction} className={solidActionBtnClass}>{story.primary}</button>
+          {id === 'projects' ? (
+            <a href="https://github.com/kw-coms" target="_blank" rel="noreferrer" className={ghostActionBtnClass}>{story.secondary}</a>
+          ) : (
+            <button type="button" onClick={secondaryAction} className={ghostActionBtnClass}>{story.secondary}</button>
+          )}
         </div>
-      </div>
+      </>
     )
   }
+
+  const renderSectionStats = (id, column = false) => (
+    <div className={`coms-stats ${column ? 'coms-stats-column' : ''}`}>
+      {sectionMetrics[id].map((item, index) => (
+        <div key={item.value} data-reveal style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties} className="coms-stat">
+          <strong>{item.value}</strong>
+          <span>{item.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+
+  const renderDetailCard = (item, index, Icon = null) => (
+    <div key={item.title} data-reveal style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties} className="h-full">
+      <article className="coms-card">
+        <span className="coms-card-num">{String(index + 1).padStart(2, '0')}</span>
+        {Icon && <span className="coms-icon"><Icon size={22} strokeWidth={2} /></span>}
+        <h3 className="coms-card-title">{item.title}</h3>
+        <p className="coms-card-body">{item.description}</p>
+      </article>
+    </div>
+  )
 
   return (
     <div className="theme-home relative min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] selection:bg-[var(--app-accent-soft)] selection:text-[var(--app-text)]">
@@ -333,26 +267,25 @@ export default function HomeView() {
           </div>
         </section>
 
-        <section className="apple-showcase-strip bg-[var(--app-surface)] px-5 py-4 sm:py-6">
-          <div className="coms-hscroll mx-auto max-w-7xl">
-            {showcaseItems.map((item, index) => (
-              <button
-                key={item.title}
-                type="button"
-                onClick={() => openPanel(item.target)}
-                data-reveal
-                style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties}
-                className="coms-hslide apple-product-panel apple-showcase-card group flex min-h-[12rem] flex-col px-6 py-6 text-left text-[var(--app-text)] transition hover:-translate-y-0.5"
-              >
-                <p className="text-sm font-semibold text-[var(--app-accent-text)]">{item.eyebrow}</p>
-                <h3 className="mt-3 text-3xl font-semibold leading-tight tracking-normal text-[var(--app-text)]">{item.title}</h3>
-                <p className="mt-4 max-w-sm leading-7 text-[var(--app-muted)]">{item.body}</p>
-                <span className="apple-action-primary mt-8 inline-flex w-fit items-center gap-1 px-4 py-2 text-sm">
-                  더 보기
-                  <ChevronDown size={14} className="-rotate-90 transition-transform duration-300 group-hover:translate-x-1" />
-                </span>
-              </button>
-            ))}
+        {/* Three ways in, each with a small piece of artwork */}
+        <section className="coms-sec coms-sec-top coms-sec-tight">
+          <div className="coms-sec-inner">
+            <div className="coms-hscroll">
+              {showcaseItems.map((item, index) => {
+                const Art = SHOWCASE_ART[index % SHOWCASE_ART.length]
+                return (
+                  <div key={item.title} data-reveal style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties} className="coms-hslide">
+                    <button type="button" onClick={() => openPanel(item.target)} className="coms-card w-full">
+                      <Art />
+                      <p className="coms-card-eyebrow">{item.eyebrow}</p>
+                      <h3 className="coms-card-title">{item.title}</h3>
+                      <p className="coms-card-body">{item.body}</p>
+                      <span className="coms-card-go">더 보기 <ArrowRight size={16} /></span>
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </section>
 
@@ -369,53 +302,105 @@ export default function HomeView() {
           </div>
         </section>
 
-        <section className="bg-[var(--app-surface-soft)] px-5 py-12 sm:py-16">
-          <div className="mx-auto max-w-7xl">
-            <div className="flex flex-wrap items-end justify-between gap-4">
+        <section className="coms-sec coms-sec-left coms-sec-tight">
+          <div className="coms-sec-inner">
+            <div className="coms-rowhead">
               <div data-reveal>
-                <p className="apple-eyebrow">Member loop</p>
-                <h2 className="apple-display mt-3 text-4xl sm:text-5xl">활동 허브</h2>
-                <p className="apple-copy mt-3 max-w-2xl text-lg">
+                <p className="coms-label"><b>01</b><i />Member loop</p>
+                <h2 className="coms-title">활동 허브</h2>
+                <p className="coms-lede">
                   공지, 커뮤니티, 자료실을 한 번에 이어서 부원이 다시 들어올 이유를 분명하게 만듭니다.
                 </p>
               </div>
               <button type="button" onClick={() => goPageTop('/notices')} className={ghostActionBtnClass}>최근 공지 보기</button>
             </div>
-            <div className="coms-hscroll mt-8">
-              {activityHubItems.map((item, index) => (
-                <button
-                  key={item.title}
-                  type="button"
-                  onClick={() => goPageTop(item.route)}
-                  data-reveal
-                  style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties}
-                  className="coms-hslide apple-product-panel min-h-44 px-6 py-6 text-left transition hover:-translate-y-0.5"
-                >
-                  <span className="inline-flex size-8 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-sm font-bold text-[var(--app-accent-text)]">
-                    {index + 1}
-                  </span>
-                  <h3 className="mt-5 text-2xl font-semibold text-[var(--app-text)]">{item.title}</h3>
-                  <p className="mt-3 text-sm font-medium leading-6 text-[var(--app-muted)]">{item.body}</p>
-                  <span className="mt-5 inline-flex text-sm font-bold text-[var(--app-accent-text)]">{item.cta}</span>
-                </button>
-              ))}
+            <div className="coms-hscroll mt-9">
+              {activityHubItems.map((item, index) => {
+                const Icon = HUB_ICONS[index % HUB_ICONS.length]
+                return (
+                  <div key={item.title} data-reveal style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties} className="coms-hslide">
+                    <button type="button" onClick={() => goPageTop(item.route)} className="coms-card w-full">
+                      <span className="coms-card-num">{String(index + 1).padStart(2, '0')}</span>
+                      <span className="coms-icon"><Icon size={22} strokeWidth={2} /></span>
+                      <h3 className="coms-card-title">{item.title}</h3>
+                      <p className="coms-card-body">{item.body}</p>
+                      <span className="coms-card-go">{item.cta} <ArrowRight size={16} /></span>
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </section>
 
         <ClubCalendarSection compact />
 
-        <section ref={aboutRef} id="about" className="home-snap-section relative">
-          {renderSectionPanel('about')}
+        {/* About: copy on the left, the club as a small operating system on the right */}
+        <section ref={aboutRef} id="about" className="home-snap-section coms-sec">
+          <div className="coms-sec-inner coms-split">
+            <div>
+              {renderSectionCopy('about', '02')}
+              {renderSectionStats('about')}
+            </div>
+            <div data-reveal data-reveal-dir="right" style={{ '--reveal-delay': '120ms' } as React.CSSProperties}>
+              <ClubOsVisual {...visualDetails.about} />
+            </div>
+          </div>
         </section>
-        <section ref={activitiesRef} id="activities" className="home-snap-section relative">
-          {renderSectionPanel('activities')}
+
+        {/* Activities: mirrored, the stack on the left, with what the routine is made of below */}
+        <section ref={activitiesRef} id="activities" className="home-snap-section coms-sec coms-sec-left">
+          <div className="coms-sec-inner">
+            <div className="coms-split coms-split-flip">
+              <div>
+                {renderSectionCopy('activities', '03')}
+                {renderSectionStats('activities')}
+              </div>
+              <div data-reveal data-reveal-dir="left" style={{ '--reveal-delay': '120ms' } as React.CSSProperties}>
+                <LearningStackVisual {...visualDetails.activities} />
+              </div>
+            </div>
+            <div className="mt-10 grid gap-4 sm:grid-cols-2">
+              {activityDetails.slice(0, 2).map((item, index) => renderDetailCard(item, index))}
+            </div>
+          </div>
         </section>
-        <section ref={projectsRef} id="projects" className="home-snap-section relative">
-          {renderSectionPanel('projects')}
+
+        {/* Projects: a centred heading over one board: the pipeline, its tracks, the projects */}
+        <section ref={projectsRef} id="projects" className="home-snap-section coms-sec coms-sec-top">
+          <div className="coms-sec-inner">
+            <div className="coms-center">
+              {renderSectionCopy('projects', '04')}
+            </div>
+            <div className="coms-bento">
+              <div data-reveal className="coms-bento-wide">
+                <ProjectLabVisual {...visualDetails.projects} />
+              </div>
+              <div className="coms-bento-side">
+                {renderSectionStats('projects', true)}
+              </div>
+              {projectDetails.slice(0, 3).map((item, index) => (
+                <div key={item.title} className="coms-bento-third">
+                  {renderDetailCard(item, index, PROJECT_ICONS[index % PROJECT_ICONS.length])}
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
-        <section ref={recruitRef} id="recruit" className="home-snap-section relative">
-          {renderSectionPanel('recruit')}
+
+        {/* Recruit: the call to join, in one lit panel */}
+        <section ref={recruitRef} id="recruit" className="home-snap-section coms-sec coms-sec-low">
+          <div className="coms-sec-inner">
+            <div className="coms-cta coms-split">
+              <div>
+                {renderSectionCopy('recruit', '05')}
+                {renderSectionStats('recruit')}
+              </div>
+              <div data-reveal data-reveal-dir="right" style={{ '--reveal-delay': '120ms' } as React.CSSProperties}>
+                <JoinFlowVisual {...visualDetails.recruit} />
+              </div>
+            </div>
+          </div>
         </section>
       </main>
     </div>

@@ -158,6 +158,7 @@ export default function AppearanceControl({
           </div>
         </div>
       </div>
+      <div className="coms-footer-mark" aria-hidden="true">COM&apos;s</div>
     </footer>
   )
 }

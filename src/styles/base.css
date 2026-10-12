@@ -212,10 +212,6 @@ select {
 	min-height: calc(88svh - var(--apple-nav-height));
 }
 
-.apple-section-grid {
-	min-height: calc(100svh - var(--apple-nav-height));
-}
-
 @media (min-width: 640px) {
 	.apple-home-hero {
 		min-height: calc(84svh - var(--apple-nav-height));
@@ -281,16 +277,6 @@ select {
 	color: var(--app-muted);
 	font-weight: 500;
 	line-height: 1.55;
-}
-
-.apple-section-band {
-	background: var(--app-surface);
-	color: var(--app-text);
-}
-
-.apple-section-band-muted {
-	background: var(--app-surface-soft);
-	color: var(--app-text);
 }
 
 .apple-product-panel {

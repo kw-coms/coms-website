@@ -1,0 +1,84 @@
+/* ===== Site-wide decoration ================================================ */
+/* Small things every page shares. Kept to the one accent and to decoration only: nothing
+   here changes layout or what a control does. */
+
+/* ---- Cards that light up under the pointer -------------------------------- */
+/* useSpotlight keeps --spot-x / --spot-y on the card under the pointer; until then the
+   highlight sits far outside the card. (.coms-card paints its own, in home-sections.css.) */
+.apple-product-panel {
+	background-image: radial-gradient(
+		24rem circle at var(--spot-x, -60rem) var(--spot-y, -60rem),
+		color-mix(in srgb, var(--app-accent) 14%, transparent),
+		transparent 62%
+	);
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.apple-product-panel:hover {
+		border-color: color-mix(in srgb, var(--app-accent) 50%, var(--app-hairline));
+	}
+}
+
+/* ---- Eyebrow labels ---------------------------------------------------------- */
+/* The small label above a heading, everywhere: set like the section labels on the home page,
+   in monospace capitals behind a short rule. The rule is an inline box in front of the text,
+   so the label itself keeps its display type and its place in the layout. */
+.apple-eyebrow {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+}
+
+.apple-eyebrow::before {
+	content: '';
+	display: inline-block;
+	width: 1.75rem;
+	height: 1px;
+	margin-right: 0.6rem;
+	vertical-align: middle;
+	background: currentColor;
+	opacity: 0.55;
+}
+
+/* ---- Board pages (notices, community, archive, recruit, sign-up) ------------ */
+/* The shell these pages share gets the backdrop the rest of the site is drawn on: a wash of
+   the accent from the top right over the dot grid, gone before the content starts. Background
+   layers only, so nothing about the shell's layout or stacking changes. */
+.apple-board-shell {
+	background-image:
+		radial-gradient(52rem 20rem at 88% -5rem, color-mix(in srgb, var(--app-accent) 15%, transparent), transparent 72%),
+		linear-gradient(180deg, transparent, var(--app-surface) 15rem),
+		radial-gradient(circle, color-mix(in srgb, var(--app-text) 14%, transparent) 1px, transparent 1.4px);
+	background-size: auto, auto, 23px 23px;
+	background-repeat: no-repeat, no-repeat, repeat;
+}
+
+/* ---- Footer ---------------------------------------------------------------- */
+/* The wordmark, very large and only outlined, sinking into the foot of every page, over the
+   same dot grid the home screen is drawn on.
+   The footer must stay an ordinary block: no position, mask, opacity or transform on it or on
+   the wordmark. It comes after the page in the document, so anything that put it on its own
+   layer would paint it over the page's dialogs (and take their clicks) wherever they overlap. */
+.apple-footer-surface {
+	overflow: hidden;
+	background-image:
+		linear-gradient(180deg, var(--app-surface-soft) 30%, transparent 100%),
+		radial-gradient(circle, color-mix(in srgb, var(--app-text) 14%, transparent) 1px, transparent 1.4px);
+	background-size: auto, 23px 23px;
+}
+
+.coms-footer-mark {
+	margin: 1.75rem auto -0.42em;
+	color: transparent;
+	font-size: clamp(4.5rem, 21vw, 17rem);
+	font-weight: 800;
+	line-height: 0.8;
+	letter-spacing: -0.04em;
+	text-align: center;
+	white-space: nowrap;
+	-webkit-text-stroke: 1px color-mix(in srgb, var(--app-text) 24%, transparent);
+	pointer-events: none;
+	user-select: none;
+}
