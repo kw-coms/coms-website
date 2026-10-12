@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, Check, type LucideIcon } from 'lucide-react'
 import {
   aboutDetailCards,
   aboutDetailFlow,
@@ -16,6 +16,9 @@ import CompanionServicesSection from '../../components/home/CompanionServicesSec
 import ActivityLogSection from '../../features/activityLog/ActivityLogSection'
 import ClubEventSection from '../../features/clubEvent/ClubEventSection'
 import ClubCalendarSection from '../../features/clubCalendar/ClubCalendarSection'
+import { useScrollReveal } from '../../hooks/useScrollReveal'
+import HeroField from './HeroField'
+import { ClubOsVisual, LearningStackVisual, ProjectLabVisual } from './HomeVisuals'
 
 const DETAIL_TITLE_MIN_FIT = 0.74
 
@@ -25,9 +28,7 @@ export function AboutPage() {
       eyebrow="About COM's"
       title="함께 배우고, 바로 만듭니다."
       body="COM's는 광운대학교 학생들이 컴퓨터와 소프트웨어를 함께 공부하고, 실제 프로젝트로 연결하는 중앙 컴퓨터 학술동아리입니다."
-      visualTitle="Club OS"
-      visualSubtitle="Study · Build · Share"
-      visualRows={['학습 로드맵', '프로젝트 트랙', '커뮤니티 로그']}
+      visual={<ClubOsVisual title="Club OS" subtitle="Study · Build · Share" rows={['학습 로드맵', '프로젝트 트랙', '커뮤니티 로그']} />}
       cards={aboutDetailCards}
       flow={aboutDetailFlow}
       outputsEyebrow="Culture"
@@ -45,9 +46,7 @@ export function DetailStoryPage({
   eyebrow,
   title,
   body,
-  visualTitle,
-  visualSubtitle,
-  visualRows,
+  visual,
   cards,
   flow,
   outputsEyebrow = 'Archive',
@@ -58,9 +57,7 @@ export function DetailStoryPage({
   eyebrow?: React.ReactNode
   title?: React.ReactNode
   body?: React.ReactNode
-  visualTitle?: React.ReactNode
-  visualSubtitle?: React.ReactNode
-  visualRows: string[]
+  visual: React.ReactNode
   cards: { title: string; eyebrow: string; body: string; icon: LucideIcon }[]
   flow: string[][]
   outputsEyebrow?: string
@@ -70,6 +67,7 @@ export function DetailStoryPage({
 }) {
   const navigate = useNavigate()
   const titleRef = useRef<HTMLHeadingElement>(null)
+  useScrollReveal()
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return undefined
@@ -129,6 +127,7 @@ export function DetailStoryPage({
       <main className="apple-detail-main relative overflow-hidden">
         <section className="apple-detail-hero relative grid min-h-[calc(88svh-44px)] items-center gap-12 overflow-hidden bg-[var(--app-surface-soft)] px-5 py-16 lg:grid-cols-[1fr_0.88fr] lg:px-12">
           <div className="home-hero-surface absolute inset-0" />
+          <HeroField />
           <div className="relative z-10 mx-auto max-w-3xl text-center lg:text-left">
             <button type="button" onClick={() => navigate('/')} className="apple-detail-home-button mx-auto mb-8 lg:mx-0">
               <ArrowLeft size={15} />
@@ -140,82 +139,71 @@ export function DetailStoryPage({
           </div>
 
           <div className="relative z-10 mx-auto w-full max-w-xl">
-            <div className="apple-detail-visual rounded-lg bg-white/82 p-5 shadow-[0_32px_90px_rgba(0,0,0,0.12)] ring-1 ring-black/5 backdrop-blur-2xl">
-              <div className="mb-7 flex items-center gap-2">
-                <span className="size-3 rounded-full bg-[#ff5f57]" />
-                <span className="size-3 rounded-full bg-[#ffbd2e]" />
-                <span className="size-3 rounded-full bg-[var(--app-accent)]" />
-              </div>
-              <div className="rounded-lg bg-[var(--app-surface-soft)] px-6 py-7">
-                <p className="text-3xl font-semibold text-[var(--app-text)]">{visualTitle}</p>
-                <p className="mt-2 text-base font-semibold text-[var(--app-muted)]">{visualSubtitle}</p>
-              </div>
-              <div className="mt-4 grid gap-3">
-                {visualRows.map((row, index) => (
-                  <div key={row} className="flex items-center gap-3 rounded-lg bg-[var(--app-surface)] px-4 py-3 text-sm font-semibold text-[var(--app-text)] shadow-[0_8px_24px_rgba(0,0,0,0.05)]">
-                    <span className="size-2.5 rounded-full bg-[var(--app-accent)]" />
-                    <span>{row}</span>
-                    <span className="ml-auto text-xs text-[var(--app-subtle)]">{String(index + 1).padStart(2, '0')}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {visual}
           </div>
         </section>
 
-        <section className="bg-[var(--app-surface)] px-5 py-16 sm:py-20">
-          <div className="mx-auto max-w-7xl">
-            <div className="mx-auto max-w-3xl text-center">
-              <p className="apple-eyebrow">Inside</p>
-              <h2 className="apple-display mt-4 text-5xl sm:text-6xl">무엇을 하고, 어떻게 이어가는지.</h2>
+        {/* What the track is made of: three cards */}
+        <section className="coms-sec coms-sec-top">
+          <div className="coms-sec-inner">
+            <div className="coms-center">
+              <p data-reveal className="coms-label"><b>01</b><i />Inside</p>
+              <h2 data-reveal style={{ '--reveal-delay': '80ms' } as React.CSSProperties} className="coms-title">무엇을 하고, 어떻게 이어가는지.</h2>
             </div>
             <div className="mt-12 grid gap-4 lg:grid-cols-3">
-              {cards.map(({ title: cardTitle, eyebrow: cardEyebrow, body: cardBody, icon: Icon }) => (
-                <article key={cardTitle} className="apple-product-panel apple-detail-card min-h-[19rem] px-7 py-7">
-                  <div className="mb-8 inline-flex size-11 items-center justify-center rounded-full bg-[var(--app-surface-soft)] text-[var(--app-accent-text)]">
-                    <Icon size={20} />
-                  </div>
-                  <p className="apple-eyebrow">{cardEyebrow}</p>
-                  <h3 className="mt-3 text-3xl font-semibold text-[var(--app-text)]">{cardTitle}</h3>
-                  <p className="mt-4 text-[15px] font-medium leading-7 text-[var(--app-muted)]">{cardBody}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-[var(--app-surface-soft)] px-5 py-16 sm:py-20">
-          <div className="mx-auto max-w-6xl">
-            <p className="apple-eyebrow text-center">Flow</p>
-            <h2 className="apple-display mx-auto mt-4 max-w-4xl text-center text-5xl sm:text-6xl">작게 시작해서 오래 남기는 방식.</h2>
-            <div className="mt-12 grid gap-3">
-              {flow.map(([number, flowTitle, flowBody]) => (
-                <article key={number} className="apple-flow-row grid gap-4 rounded-lg bg-[var(--app-surface)] px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:grid-cols-[5rem_1fr] sm:items-center">
-                  <span className="text-3xl font-semibold text-[var(--app-accent-text)]">{number}</span>
-                  <div>
-                    <h3 className="text-2xl font-semibold text-[var(--app-text)]">{flowTitle}</h3>
-                    <p className="mt-2 text-[15px] font-medium leading-7 text-[var(--app-muted)]">{flowBody}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-[var(--app-surface)] px-5 py-16 sm:py-20">
-          <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.82fr_1fr] lg:items-center">
-            <div>
-              <p className="apple-eyebrow">{outputsEyebrow}</p>
-              <h2 className="apple-display mt-4 text-5xl sm:text-6xl">{outputsTitle}</h2>
-              <p className="apple-copy mt-5 text-xl">{outputsBody}</p>
-            </div>
-            <div className="grid gap-3">
-              {outputs.map((item, index) => (
-                <div key={item} className="apple-output-row flex items-center gap-4 rounded-lg bg-[var(--app-surface-soft)] px-5 py-5">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--app-surface)] text-sm font-semibold text-[var(--app-accent-text)]">{index + 1}</span>
-                  <p className="text-lg font-semibold leading-7 text-[var(--app-text)]">{item}</p>
+              {cards.map(({ title: cardTitle, eyebrow: cardEyebrow, body: cardBody, icon: Icon }, index) => (
+                <div key={cardTitle} data-reveal style={{ '--reveal-delay': `${index * 90}ms` } as React.CSSProperties} className="h-full">
+                  <article className="coms-card">
+                    <span className="coms-card-num">{String(index + 1).padStart(2, '0')}</span>
+                    <span className="coms-icon"><Icon size={22} strokeWidth={2} /></span>
+                    <p className="coms-card-eyebrow mt-6">{cardEyebrow}</p>
+                    <h3 className="coms-card-title">{cardTitle}</h3>
+                    <p className="coms-card-body">{cardBody}</p>
+                  </article>
                 </div>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* How it runs: the steps down one line */}
+        <section className="coms-sec coms-sec-left">
+          <div className="coms-sec-inner">
+            <div className="coms-center">
+              <p data-reveal className="coms-label"><b>02</b><i />Flow</p>
+              <h2 data-reveal style={{ '--reveal-delay': '80ms' } as React.CSSProperties} className="coms-title">작게 시작해서 오래 남기는 방식.</h2>
+            </div>
+            <ol className="coms-timeline">
+              {flow.map(([number, flowTitle, flowBody], index) => (
+                <li key={number} data-reveal style={{ '--reveal-delay': `${index * 80}ms` } as React.CSSProperties}>
+                  <span className="coms-timeline-num">{number}</span>
+                  <div className="coms-timeline-card">
+                    <h3 className="coms-card-title">{flowTitle}</h3>
+                    <p className="coms-card-body">{flowBody}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* What it leaves behind: one lit panel */}
+        <section className="coms-sec coms-sec-low">
+          <div className="coms-sec-inner">
+            <div className="coms-cta coms-split">
+              <div>
+                <p data-reveal className="coms-label"><b>03</b><i />{outputsEyebrow}</p>
+                <h2 data-reveal style={{ '--reveal-delay': '80ms' } as React.CSSProperties} className="coms-title">{outputsTitle}</h2>
+                <p data-reveal style={{ '--reveal-delay': '160ms' } as React.CSSProperties} className="coms-lede">{outputsBody}</p>
+              </div>
+              <ul className="coms-checklist">
+                {outputs.map((item, index) => (
+                  <li key={item} data-reveal style={{ '--reveal-delay': `${index * 70}ms` } as React.CSSProperties}>
+                    <span className="coms-checklist-mark"><Check size={15} strokeWidth={3} /></span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </section>
@@ -235,9 +223,7 @@ export function ActivitiesDetailPage() {
         </>
       )}
       body="COM's의 활동은 정기 세미나, 분야별 스터디, 코드 리뷰, 작은 제작 과제가 이어지는 흐름입니다. 처음 시작하는 사람도 따라올 수 있고, 이미 경험이 있는 사람도 더 깊게 확장할 수 있습니다."
-      visualTitle="Learning Stack"
-      visualSubtitle="Seminar · Study · Review"
-      visualRows={['정기 세미나', '분야별 스터디', '코드 리뷰']}
+      visual={<LearningStackVisual title="Learning Stack" subtitle="Seminar · Study · Review" rows={['정기 세미나', '분야별 스터디', '코드 리뷰']} />}
       cards={activitiesDetailCards}
       flow={activitiesDetailFlow}
       outputsTitle="활동이 남기는 기록."
@@ -274,9 +260,7 @@ export function ProjectsDetailPage() {
       eyebrow="Projects"
       title="아이디어를 실제 서비스와 제작물로."
       body="COM's의 프로젝트는 동아리 안에서 쓰이는 서비스, 교육용 실습, 웹 개발 결과물처럼 실제로 동작하는 결과물을 만드는 데 집중합니다. 기획부터 구현, 배포와 개선까지 팀으로 경험합니다."
-      visualTitle="Project Lab"
-      visualSubtitle="Prototype · Launch · Iterate"
-      visualRows={['서비스 기획', '팀 구현', '배포와 개선']}
+      visual={<ProjectLabVisual title="Project Lab" subtitle="Prototype · Launch · Iterate" rows={['서비스 기획', '팀 구현', '배포와 개선']} />}
       cards={projectsDetailCards}
       flow={projectsDetailFlow}
       outputsTitle="프로젝트가 남기는 결과물."

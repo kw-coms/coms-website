@@ -38,6 +38,7 @@ import GlobalNavigation from './components/GlobalNavigation'
 import AppearanceControl from './components/AppearanceControl'
 import NotFoundPage from './components/NotFoundPage'
 import HomeView from './pages/home/HomeView'
+import { useSpotlight } from './hooks/useSpotlight'
 // Detail pages pull in the heavy activity-log / club-event / calendar sections.
 // They are not the landing route, so lazy-load them out of the main bundle
 // (App already wraps <Routes> in <Suspense fallback={<PageFallback />}>).
@@ -61,6 +62,7 @@ function App() {
   const [accentColor, setAccentColor] = useState(getStoredAccentColor)
   const [guestFontId, setGuestFontId] = useState(getStoredFontId)
   const routeAnnouncement = useRouteDocumentTitle()
+  useSpotlight()
 
   const fontsQuery = useQuery({
     queryKey: FONTS_QUERY_KEY,

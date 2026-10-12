@@ -1,0 +1,48 @@
+/* ===== Site-wide decoration ================================================ */
+/* Small things every page shares. Kept to the one accent and to decoration only: nothing
+   here changes layout or what a control does. */
+
+/* ---- Cards that light up under the pointer -------------------------------- */
+/* useSpotlight keeps --spot-x / --spot-y on the card under the pointer; until then the
+   highlight sits far outside the card. (.coms-card paints its own, in home-sections.css.) */
+.apple-product-panel {
+	background-image: radial-gradient(
+		24rem circle at var(--spot-x, -60rem) var(--spot-y, -60rem),
+		color-mix(in srgb, var(--app-accent) 14%, transparent),
+		transparent 62%
+	);
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.apple-product-panel:hover {
+		border-color: color-mix(in srgb, var(--app-accent) 50%, var(--app-hairline));
+	}
+}
+
+/* ---- Footer ---------------------------------------------------------------- */
+/* The wordmark, very large and only outlined, sinking into the foot of every page, over the
+   same dot grid the home screen is drawn on.
+   The footer must stay an ordinary block: no position, mask, opacity or transform on it or on
+   the wordmark. It comes after the page in the document, so anything that put it on its own
+   layer would paint it over the page's dialogs (and take their clicks) wherever they overlap. */
+.apple-footer-surface {
+	overflow: hidden;
+	background-image:
+		linear-gradient(180deg, var(--app-surface-soft) 30%, transparent 100%),
+		radial-gradient(circle, color-mix(in srgb, var(--app-text) 14%, transparent) 1px, transparent 1.4px);
+	background-size: auto, 23px 23px;
+}
+
+.coms-footer-mark {
+	margin: 1.75rem auto -0.42em;
+	color: transparent;
+	font-size: clamp(4.5rem, 21vw, 17rem);
+	font-weight: 800;
+	line-height: 0.8;
+	letter-spacing: -0.04em;
+	text-align: center;
+	white-space: nowrap;
+	-webkit-text-stroke: 1px color-mix(in srgb, var(--app-text) 24%, transparent);
+	pointer-events: none;
+	user-select: none;
+}
