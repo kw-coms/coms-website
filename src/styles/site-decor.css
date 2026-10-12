@@ -139,6 +139,81 @@
 	box-shadow: 0 14px 34px color-mix(in srgb, var(--app-accent) 16%, transparent);
 }
 
+/* ---- Activity sections: log, events, calendar -------------------------------- */
+/* On their own pages and, for the calendar, on the home page: the accent from the top over
+   the dot grid. Background layers on the sections themselves. */
+.activity-proof-section,
+.club-event-section,
+.club-calendar-section {
+	background-image:
+		radial-gradient(62rem 24rem at 50% -8rem, color-mix(in srgb, var(--app-accent) 15%, transparent), transparent 70%),
+		radial-gradient(circle, color-mix(in srgb, var(--app-text) 11%, transparent) 1px, transparent 1.4px);
+	background-size: auto, 23px 23px;
+	background-repeat: no-repeat, repeat;
+}
+
+/* The events head is a board head in everything but name. */
+.club-event-hero {
+	background:
+		radial-gradient(
+			circle at calc(100% - 8rem) 50%,
+			transparent 0 4.5rem,
+			color-mix(in srgb, var(--app-accent) 34%, transparent) 4.5rem calc(4.5rem + 1px),
+			transparent calc(4.5rem + 1px) 7.5rem,
+			color-mix(in srgb, var(--app-accent) 20%, transparent) 7.5rem calc(7.5rem + 1px),
+			transparent calc(7.5rem + 1px) 10.5rem,
+			color-mix(in srgb, var(--app-accent) 11%, transparent) 10.5rem calc(10.5rem + 1px),
+			transparent calc(10.5rem + 1px)
+		),
+		radial-gradient(34rem 15rem at calc(100% - 8rem) 50%, color-mix(in srgb, var(--app-accent) 20%, transparent), transparent 70%),
+		linear-gradient(90deg, var(--app-surface) 30%, transparent 78%),
+		radial-gradient(circle, color-mix(in srgb, var(--app-text) 15%, transparent) 1px, transparent 1.4px) 0 0 / 23px 23px,
+		linear-gradient(180deg, var(--app-surface), var(--app-surface-soft));
+}
+
+@media (max-width: 767px) {
+	.club-event-hero {
+		background:
+			radial-gradient(24rem 12rem at 100% 0%, color-mix(in srgb, var(--app-accent) 18%, transparent), transparent 70%),
+			linear-gradient(180deg, var(--app-surface), var(--app-surface-soft));
+	}
+}
+
+/* Calendar: weekday names like the other column headings, a day that answers the pointer,
+   and today standing out with a glow. */
+.club-calendar-weekdays span {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 0.72rem;
+	font-weight: 600;
+	letter-spacing: 0.08em;
+}
+
+.club-calendar-shell {
+	box-shadow:
+		0 24px 70px rgba(0, 0, 0, 0.16),
+		0 0 0 1px color-mix(in srgb, var(--app-accent) 10%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+	.club-calendar-day:not(.club-calendar-day-empty):not(.club-calendar-day-selected):hover {
+		background: color-mix(in srgb, var(--app-accent) 8%, var(--app-surface));
+	}
+}
+
+.club-calendar-day-active .club-calendar-day-number {
+	box-shadow: 0 0 16px color-mix(in srgb, var(--app-accent) 60%, transparent);
+}
+
+/* ---- Forms ---------------------------------------------------------------------- */
+/* Text fields on the routed pages take the accent as a soft ring when focused. Outline is
+   left as the browser or the field's own classes set it. */
+.apple-route input:not([type='checkbox']):not([type='radio']):not([type='color']):not([type='file']):focus,
+.apple-route textarea:focus,
+.apple-route select:focus {
+	border-color: color-mix(in srgb, var(--app-accent) 65%, var(--app-hairline));
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 20%, transparent);
+}
+
 /* ---- Footer ---------------------------------------------------------------- */
 /* The wordmark, very large and only outlined, sinking into the foot of every page, over the
    same dot grid the home screen is drawn on.

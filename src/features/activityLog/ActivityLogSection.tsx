@@ -87,6 +87,7 @@ function ActivityLogSection({ compact = false }: { compact?: boolean }) {
         <div className="mx-auto max-w-7xl">
           <div className="grid gap-8 lg:grid-cols-[0.62fr_1fr] lg:items-end">
             <div>
+              <span className="coms-icon coms-board-icon" aria-hidden="true"><Sparkles size={22} strokeWidth={2} /></span>
               <p className="apple-eyebrow">Activity log</p>
               <Heading className="apple-display mt-3 text-4xl sm:text-5xl">실제로 이어지는 활동 기록</Heading>
               <p className="apple-copy mt-4 max-w-2xl text-lg">
