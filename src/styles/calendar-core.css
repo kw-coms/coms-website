@@ -115,7 +115,10 @@
 	padding: 0.25rem;
 }
 
-.calendar-admin-mode-tabs button {
+/* Scoped under the composer so the composer's generic button rule further down (a solid
+   pill) cannot win on source order: it used to fill the tab that is NOT selected, leaving both
+   tabs looking switched on. */
+.calendar-admin-composer .calendar-admin-mode-tabs button {
 	display: flex;
 	width: 100%;
 	min-height: 2.7rem;
@@ -134,7 +137,7 @@
 	box-shadow: none;
 }
 
-.calendar-admin-mode-tabs button.is-active {
+.calendar-admin-composer .calendar-admin-mode-tabs button.is-active {
 	background:
 		linear-gradient(135deg, var(--app-text), color-mix(in srgb, var(--app-accent) 42%, var(--app-text)));
 	color: var(--app-bg);

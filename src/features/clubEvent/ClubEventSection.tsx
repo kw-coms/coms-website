@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Sparkles } from 'lucide-react'
+import { ArrowLeft, Sparkles, Trophy } from 'lucide-react'
 import {
   createClubEvent,
   deleteClubEvent,
@@ -216,6 +216,7 @@ function ClubEventSection() {
               <div className="club-event-hero px-4 py-7 sm:px-8 sm:py-10">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                   <div className="min-w-0">
+                    <span className="coms-icon coms-board-icon" aria-hidden="true"><Trophy size={22} strokeWidth={2} /></span>
                     <p className="apple-eyebrow">Event</p>
                     <h1 className="apple-display mt-3 break-words text-4xl sm:text-6xl">이벤트</h1>
                     <p className="apple-copy mt-4 max-w-2xl text-base sm:text-lg">회지, 작품, 활동 결과물을 모아 투표하고 랭킹으로 확인합니다. 등록된 실제 이벤트만 보여줍니다.</p>

@@ -254,6 +254,7 @@ function ClubCalendarSection({ compact = false }: { compact?: boolean }) {
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
+            <span className="coms-icon coms-board-icon" aria-hidden="true"><CalendarDays size={22} strokeWidth={2} /></span>
             <p className="apple-eyebrow">Monthly calendar</p>
             <Heading className="apple-display mt-3 text-4xl sm:text-5xl">동아리 일정 캘린더</Heading>
             <p className="apple-copy mt-4 max-w-2xl text-lg">

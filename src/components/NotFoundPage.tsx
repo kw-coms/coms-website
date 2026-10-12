@@ -2,12 +2,14 @@ import { useNavigate } from 'react-router-dom'
 import { getLogoAsset } from '../utils/logoAssets'
 import { ghostActionBtnClass, solidActionBtnClass } from '../shared/homeUi'
 import { scrollToTopInstant } from '../utils/themeColors'
+import HeroField from '../pages/home/HeroField'
 
 export default function NotFoundPage() {
   const navigate = useNavigate()
   return (
     <main className="apple-detail-page theme-home relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[var(--app-surface-soft)] px-6 text-center text-[var(--app-text)]">
       <div className="home-hero-surface absolute inset-0" />
+      <HeroField />
       <div className="relative z-10 flex flex-col items-center">
         <img src={getLogoAsset('COMs_logo_vec')} alt="" className="coms-cinema-intrologo mb-8 w-20 sm:w-24" aria-hidden="true" />
         <p className="apple-display coms-3d-title coms-cinema-title text-7xl sm:text-8xl">404</p>
