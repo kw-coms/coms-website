@@ -292,20 +292,103 @@ test('admin member list and roster can be searched and ordered', async ({ page }
   await expect(page.getByText('조건에 맞는 회원이 없습니다.')).toBeVisible()
 
   await page.goto('/admin?tab=roster')
+  // Matched from the start of the cell: a name may be followed by a chip (가입함, 준회원).
   const rosterNames = page.locator('tbody tr td:nth-child(2)')
-  await expect(rosterNames).toHaveText(['홍길동', '졸업선배', '김철수'])
+  await expect(rosterNames).toHaveText([/^홍길동/, /^졸업선배/, /^김철수/])
   const generationHeading = page.getByRole('columnheader', { name: '기수' })
   await generationHeading.getByRole('button').click()
   await expect(generationHeading).toHaveAttribute('aria-sort', 'ascending')
-  await expect(rosterNames).toHaveText(['졸업선배', '김철수', '홍길동'])
+  await expect(rosterNames).toHaveText([/^졸업선배/, /^김철수/, /^홍길동/])
   await generationHeading.getByRole('button').click()
   await expect(generationHeading).toHaveAttribute('aria-sort', 'descending')
-  await expect(rosterNames).toHaveText(['홍길동', '김철수', '졸업선배'])
+  await expect(rosterNames).toHaveText([/^홍길동/, /^김철수/, /^졸업선배/])
   await generationHeading.getByRole('button').click()
   await expect(generationHeading).toHaveAttribute('aria-sort', 'none')
-  await expect(rosterNames).toHaveText(['홍길동', '졸업선배', '김철수'])
+  await expect(rosterNames).toHaveText([/^홍길동/, /^졸업선배/, /^김철수/])
   await page.getByLabel('명부 검색').fill('졸업')
-  await expect(rosterNames).toHaveText(['졸업선배'])
+  await expect(rosterNames).toHaveText([/^졸업선배/])
+})
+
+// The roster shows which rows already have an account, and the member list can be saved as a
+// spreadsheet file after a confirmation. The people here are made up.
+test('admin roster marks who has signed up and the member list exports as CSV', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/admin/members', route => route.fulfill({ json: [
+    { id: 1, studentId: '2020123456', name: '관리자', email: 'admin@example.com', emailVerified: true, department: '컴퓨터정보공학부', generation: '58', phone: '01000000001', role: 'ADMIN' },
+    { id: 2, studentId: '2023000002', name: '홍길동', email: 'hong@example.com', emailVerified: true, department: '소프트웨어학부', generation: '61', phone: '01000000002', role: 'USER' },
+    { id: 3, studentId: 'G2019-12', name: '졸업선배', email: 'old@example.com', emailVerified: true, department: '', generation: '41', phone: '', role: 'USER' },
+  ] }))
+  await page.route('**/api/admin/eligible-members', route => route.fulfill({ json: [
+    { id: 11, studentId: '2023000002', name: '홍길동', generation: '61', phone: '01000000002' },
+    { id: 12, studentId: '', name: '졸업선배', generation: '41', phone: '01000000013' },
+    { id: 13, studentId: '2022000003', name: '김철수', generation: '60', phone: '' },
+  ] }))
+
+  await page.goto('/admin?tab=roster')
+  const rows = page.locator('tbody tr')
+  await expect(rows).toHaveCount(3)
+  // A member by 학번, a graduate by the roster id inside the account id, and one with no account.
+  await expect(rows.nth(0)).toContainText('가입함')
+  await expect(rows.nth(1)).toContainText('가입함')
+  await expect(rows.nth(2)).not.toContainText('가입함')
+  await page.getByLabel('가입 여부로 거르기').selectOption('NOT_JOINED')
+  await expect(page.locator('tbody tr td:nth-child(2)')).toHaveText(['김철수'])
+  await page.getByLabel('가입 여부로 거르기').selectOption('JOINED')
+  await expect(rows).toHaveCount(2)
+
+  await page.goto('/admin?tab=members')
+  const tools = page.getByRole('search', { name: '회원 목록 찾기' })
+  await tools.getByLabel('회원 검색').fill('example.com')
+  await tools.getByLabel('정렬 기준').selectOption('name')
+  const exportButton = tools.getByRole('button', { name: 'CSV 내보내기' })
+
+  // Declining the confirmation downloads nothing.
+  await exportButton.click()
+  const dialog = page.getByRole('alertdialog').or(page.getByRole('dialog'))
+  await expect(dialog).toContainText('회원 3명')
+  await dialog.getByRole('button', { name: '취소' }).click()
+  await expect(dialog).toBeHidden()
+
+  const downloadPromise = page.waitForEvent('download')
+  await exportButton.click()
+  await dialog.getByRole('button', { name: '확인' }).click()
+  const download = await downloadPromise
+  expect(download.suggestedFilename()).toMatch(/^coms-members-\d{4}-\d{2}-\d{2}\.csv$/)
+  const stream = await download.createReadStream()
+  const chunks = []
+  for await (const chunk of stream) chunks.push(chunk)
+  const text = Buffer.concat(chunks).toString('utf8')
+  const lines = text.replace(/^\uFEFF/, '').split('\r\n')
+  expect(lines[0]).toBe('"이름","학번","기수","역할","이메일","이메일 인증","학과","전화번호"')
+  // In the order on screen (by name), phone numbers kept as text.
+  expect(lines.slice(1).map((line) => line.split(',')[0])).toEqual(['"관리자"', '"졸업선배"', '"홍길동"'])
+  expect(lines[3]).toContain('"010-0000-0002"')
+  expect(lines[2]).toContain('"2019 (졸업생)"')
+})
+
+test('notices can be ordered by date, views and upvotes', async ({ page }) => {
+  await mockAdminApis(page)
+  const notice = (id, title, createdAt, viewCount, upvotes, pinned = false) => ({ id, title, content: '본문', category: 'GENERAL', author: '운영진', authorStudentId: 'a', pinned, createdAt, viewCount, upvotes, myVote: 0 })
+  await page.route('**/api/notices', route => route.fulfill({ json: [
+    notice(3, '고정 공지', '2026-09-02T00:00:00', 5, 1, true),
+    notice(1, '오래된 공지', '2026-09-01T00:00:00', 40, 0),
+    notice(2, '새 공지', '2026-09-03T00:00:00', 10, 7),
+  ] }))
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.goto('/notices')
+  const titles = page.locator('table.apple-table tbody tr td:nth-child(3)')
+  await expect(titles).toHaveText([/고정 공지/, /오래된 공지/, /새 공지/])
+  const sort = page.getByLabel('공지 정렬')
+  await sort.selectOption('newest')
+  await expect(titles).toHaveText([/새 공지/, /고정 공지/, /오래된 공지/])
+  await sort.selectOption('oldest')
+  await expect(titles).toHaveText([/오래된 공지/, /고정 공지/, /새 공지/])
+  await sort.selectOption('views')
+  await expect(titles).toHaveText([/오래된 공지/, /새 공지/, /고정 공지/])
+  await sort.selectOption('upvotes')
+  await expect(titles).toHaveText([/새 공지/, /고정 공지/, /오래된 공지/])
+  await sort.selectOption('default')
+  await expect(titles).toHaveText([/고정 공지/, /오래된 공지/, /새 공지/])
 })
 
 test('activities title remains readable across selectable fonts and viewport widths', async ({ page }) => {
