@@ -674,8 +674,8 @@ html {
 	overflow-y: auto;
 }
 /* clip (not hidden) keeps horizontal overflow contained WITHOUT turning
-   body/#root into scroll containers — otherwise position: sticky (the home
-   cinematic hero) sticks to them instead of the page and never engages. */
+   body/#root into scroll containers — otherwise a position: sticky element
+   sticks to them instead of the page and never engages. */
 body,
 #root {
 	overflow-x: clip;
