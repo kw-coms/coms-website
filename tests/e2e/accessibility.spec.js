@@ -144,6 +144,46 @@ test('admin panel has no serious or critical accessibility violations', async ({
   await assertNoSeriousViolations(page)
 })
 
+// Attendance with everything on the page: a check open (the code, the countdown) and the summary
+// table. The people are made up.
+for (const viewport of [{ width: 1280, height: 900 }, { width: 320, height: 720 }]) {
+  test.describe(`attendance at ${viewport.width}px`, () => {
+    test.use({ viewport })
+
+    test('has no serious accessibility violation or horizontal overflow', async ({ page }) => {
+      await mockAdminApis(page)
+      await page.route('**/api/attendance/sessions', (route) => route.fulfill({
+        status: 200,
+        json: [
+          { id: 3, title: '웹 세미나 3주차', openedByName: '관리자', openedAt: '2026-10-12T19:00:00', closesAt: '2026-10-12T19:30:00', open: true, remainingSeconds: 900, attendeeCount: 12, attended: false, code: '4821' },
+          { id: 2, title: '알고리즘 스터디', openedByName: '관리자', openedAt: '2026-10-05T19:00:00', closesAt: '2026-10-05T19:30:00', open: false, remainingSeconds: 0, attendeeCount: 9, attended: true, code: null },
+        ],
+      }))
+      await page.route('**/api/attendance/summary', (route) => route.fulfill({
+        status: 200,
+        json: {
+          sessions: [
+            { id: 3, title: '웹 세미나 3주차', openedAt: '2026-10-12T19:00:00', attendeeCount: 12 },
+            { id: 2, title: '알고리즘 스터디', openedAt: '2026-10-05T19:00:00', attendeeCount: 9 },
+          ],
+          members: [
+            { name: '홍길동', count: 2, sessionIds: [2, 3] },
+            { name: '김철수', count: 1, sessionIds: [3] },
+          ],
+        },
+      }))
+      await page.goto('/attendance')
+      await expect(page.getByLabel('출석 코드 4 8 2 1')).toBeVisible()
+      await page.getByRole('button', { name: '현황 보기' }).click()
+      await expect(page.getByRole('region', { name: '출석 현황' }).getByRole('row')).toHaveCount(3)
+      await page.waitForTimeout(500)
+      await assertNoSeriousViolations(page)
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      expect(overflow, `/attendance overflows at ${viewport.width}px`).toBeLessThanOrEqual(1)
+    })
+  })
+}
+
 const publicRoutes = ['/about', '/activities', '/projects', '/apps', '/sponsors', '/recruit', '/recruit-notice', '/login', '/signup']
 
 for (const viewport of [{ width: 1280, height: 900 }, { width: 320, height: 720 }]) {

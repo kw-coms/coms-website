@@ -3,6 +3,7 @@ import {
   CalendarClock,
   CalendarDays,
   CircuitBoard,
+  ClipboardCheck,
   Rocket,
   Sparkles,
 } from 'lucide-react'
@@ -461,6 +462,14 @@ export const activitySectionNavItems = [
     hint: '일정 조율',
     path: '/meet',
     icon: CalendarClock,
+    accent: 'text-sky-500',
+  },
+  {
+    id: 'attendance',
+    label: 'Attendance',
+    hint: '출석 체크',
+    path: '/attendance',
+    icon: ClipboardCheck,
     accent: 'text-sky-500',
   },
   {
