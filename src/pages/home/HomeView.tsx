@@ -11,6 +11,7 @@ import {
   experiencePills,
   showcaseItems,
   activityHubItems,
+  activitySectionNavItems,
   sectionMetrics,
   visualDetails,
   sectionMeta,
@@ -329,6 +330,26 @@ export default function HomeView() {
                   </div>
                 )
               })}
+            </div>
+            {/* What the Activity menu holds, one tap away. The list is the menu's own, so a
+                tool added to the menu shows up here too. */}
+            <div className="coms-tools" data-reveal>
+              <p className="coms-label"><i />Tools</p>
+              <ul className="coms-tools-grid" aria-label="활동 도구 바로가기">
+                {activitySectionNavItems.map((item) => (
+                  <li key={item.id}>
+                    <button type="button" onClick={() => goPageTop(item.path)} className="coms-tool">
+                      <span className="coms-tool-icon" aria-hidden="true"><item.icon size={17} /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="coms-tool-title">{item.hint}</span>
+                        {/* The menu's English name, for the eye only: read aloud, the Korean one is enough. */}
+                        <span className="coms-tool-sub" aria-hidden="true">{item.label}</span>
+                      </span>
+                      <ArrowRight size={15} aria-hidden="true" className="coms-tool-go" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </section>
