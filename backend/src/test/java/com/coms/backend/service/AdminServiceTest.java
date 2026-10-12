@@ -73,7 +73,8 @@ class AdminServiceTest {
             mock(TeamRandomizerRoomRepository.class),
             recruitApplicationRepository,
             loginFailureRepository,
-            mock(RefreshSessionService.class)
+            mock(RefreshSessionService.class),
+            mock(MeetingPollService.class)
     );
 
     @Autowired
