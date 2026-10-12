@@ -14,6 +14,17 @@ import { NoticeCategory } from '../contract/enums'
 import { enumLabels } from '../contract/labels'
 import { useNotices } from './useNotices'
 import { useScrollReveal } from '../hooks/useScrollReveal'
+import { ListSelect } from '../components/common/ListTools'
+import { compareDate, compareNumber, sortedBy } from '../utils/listTools'
+
+// "기본 순서" is the order the server sends (pinned notices first).
+const NOTICE_SORT_OPTIONS = [
+  { value: 'default', label: '기본 순서' },
+  { value: 'newest', label: '최신순' },
+  { value: 'oldest', label: '오래된순' },
+  { value: 'views', label: '조회순' },
+  { value: 'upvotes', label: '추천순' },
+]
 import { useVisibleCount } from '../hooks/useVisibleCount'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import RichBodyEditor from '../components/richEditor/RichBodyEditor'
@@ -222,12 +233,20 @@ export default function Notices() {
       noticeCategoryMeta(notice.category || 'GENERAL').label.toLowerCase().includes(q)
     )
   }, [activeCategory, notices, searchQuery])
+  const [sortKey, setSortKey] = useState('default')
+  const sortedNotices = useMemo(() => {
+    if (sortKey === 'newest') return sortedBy(filteredNotices, (a, b) => compareDate(a.createdAt, b.createdAt, 'desc'))
+    if (sortKey === 'oldest') return sortedBy(filteredNotices, (a, b) => compareDate(a.createdAt, b.createdAt, 'asc'))
+    if (sortKey === 'views') return sortedBy(filteredNotices, (a, b) => compareNumber(a.viewCount, b.viewCount, 'desc'))
+    if (sortKey === 'upvotes') return sortedBy(filteredNotices, (a, b) => compareNumber(a.upvotes, b.upvotes, 'desc'))
+    return filteredNotices
+  }, [filteredNotices, sortKey])
   const { visible, canLoadMore, loadMore, total } = useVisibleCount(
     filteredNotices.length,
     20,
-    `${activeCategory}|${searchQuery}`,
+    `${activeCategory}|${searchQuery}|${sortKey}`,
   )
-  const visibleNotices = filteredNotices.slice(0, visible)
+  const visibleNotices = sortedNotices.slice(0, visible)
   const featuredNotices = useMemo(
     () => NOTICE_CATEGORY_OPTIONS
       .map((category) => ({
@@ -430,6 +449,7 @@ export default function Notices() {
                     className="h-11 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-8 pr-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:h-auto sm:w-64"
                   />
                 </div>
+                <ListSelect value={sortKey} onChange={setSortKey} options={NOTICE_SORT_OPTIONS} label="공지 정렬" />
                 <span className="shrink-0 text-xs font-semibold text-[var(--app-subtle)]">{filteredNotices.length}개</span>
               </div>
             </div>

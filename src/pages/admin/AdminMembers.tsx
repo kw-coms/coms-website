@@ -6,6 +6,8 @@ import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 import ErrorState from '../../components/common/ErrorState'
 import { ASSIGNABLE_ROLES, ROLE_LABELS, displayStudentId } from '../../utils/roleAccess'
 import RoleTag from '../../components/common/RoleTag'
+import { Download } from 'lucide-react'
+import { downloadMembersCsv } from './memberCsv'
 import { ListCount, ListSearch, ListSelect, SortDirectionButton } from '../../components/common/ListTools'
 import { compareNumber, compareRank, compareText, matchesQuery, sortedBy, type SortDirection } from '../../utils/listTools'
 
@@ -168,6 +170,18 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
     }
   }
 
+  // The list as it is on screen (narrowed and ordered) as a spreadsheet file. It is personal
+  // data leaving the site, so the president confirms first.
+  const handleExport = async () => {
+    if (visibleMembers.length === 0) return
+    const ok = await confirmDialog({
+      message: `화면에 보이는 회원 ${visibleMembers.length}명의 이름, 학번, 이메일, 전화번호를 CSV 파일로 내려받습니다.\n개인정보이니 필요한 곳에만 쓰고, 쓴 뒤에는 지워 주세요.`,
+    })
+    if (!ok) return
+    downloadMembersCsv(visibleMembers)
+    showToast({ message: `회원 ${visibleMembers.length}명을 CSV로 내려받았습니다.`, tone: 'success' })
+  }
+
   const createMemberPanel = (
     <section className="shape-cut-sm border border-[var(--app-hairline)] bg-black/5 p-4" aria-labelledby="add-member-heading">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -281,6 +295,15 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
           <ListSelect value={sortKey} onChange={setSortKey} options={MEMBER_SORT_OPTIONS} label="정렬 기준" />
           <SortDirectionButton direction={direction} onChange={setDirection} disabled={sortKey === 'default'} />
           <ListCount shown={visibleMembers.length} total={members.length} />
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={visibleMembers.length === 0}
+            className="apple-action-secondary inline-flex min-h-10 items-center gap-1.5 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download size={13} aria-hidden="true" />
+            CSV 내보내기
+          </button>
         </div>
       )}
       {members.length > 0 && visibleMembers.length === 0 && (

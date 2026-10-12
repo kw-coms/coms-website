@@ -4,10 +4,17 @@ import { importEligibleMembers, addEligibleMember, listEligibleMembers, updateEl
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
-import { ListCount, ListSearch, SortableTh } from '../../components/common/ListTools'
+import { ListCount, ListSearch, ListSelect, SortableTh } from '../../components/common/ListTools'
+import { useAdminMembers } from './useAdminMembers'
 import { compareNumber, compareText, matchesQuery, nextColumnSort, sortedBy, type SortDirection } from '../../utils/listTools'
 
 type RosterSortKey = 'studentId' | 'name' | 'generation'
+
+const SIGNUP_FILTER_OPTIONS = [
+  { value: 'ALL', label: '전체' },
+  { value: 'JOINED', label: '가입함' },
+  { value: 'NOT_JOINED', label: '미가입' },
+]
 
 // Account id issued to a graduate at signup: G{입학연도}-{명부 id}. Same shape roleAccess's
 // displayStudentId() recognises.
@@ -30,19 +37,44 @@ export default function AdminRoster() {
   const [editSaving, setEditSaving] = useState(false)
   const [rosterQuery, setRosterQuery] = useState('')
   const [rosterSort, setRosterSort] = useState<{ key: RosterSortKey; direction: SortDirection } | null>(null)
+  const [signupFilter, setSignupFilter] = useState('ALL')
+
+  // Which roster rows already have an account. A member's id is the row's 학번; a graduate's
+  // is G{입학연도}-{명부 id}. Unknown until the member list has loaded (and if it cannot be
+  // loaded, the column simply stays empty).
+  const { members: signedUpMembers, loading: membersLoading, error: membersError } = useAdminMembers()
+  const signupKnown = !membersLoading && !membersError
+  const { accountIds, graduateRosterIds } = useMemo(() => {
+    const ids = new Set<string>()
+    const rosterIds = new Set<string>()
+    for (const member of signedUpMembers) {
+      const id = String(member.studentId || '')
+      if (!id) continue
+      ids.add(id)
+      const graduate = /^G\d{4}-(\d+)$/.exec(id)
+      if (graduate) rosterIds.add(graduate[1])
+    }
+    return { accountIds: ids, graduateRosterIds: rosterIds }
+  }, [signedUpMembers])
+  const hasAccount = (member: { id: number | string; studentId?: string | null }) => (
+    (Boolean(member.studentId) && accountIds.has(String(member.studentId))) || graduateRosterIds.has(String(member.id))
+  )
 
   // What the table shows: narrowed by the search, then ordered by the column whose heading was
   // pressed. The row being edited stays in view even if it no longer matches the search.
   const visibleRoster = useMemo(() => {
-    const narrowed = roster.filter((member) => (
-      member.id === editingId
-      || matchesQuery(rosterQuery, [member.name, member.studentId, member.phone, member.generation && `${member.generation}기`])
-    ))
+    const narrowed = roster.filter((member) => {
+      if (member.id === editingId) return true
+      if (signupKnown && signupFilter !== 'ALL' && hasAccount(member) !== (signupFilter === 'JOINED')) return false
+      return matchesQuery(rosterQuery, [member.name, member.studentId, member.phone, member.generation && `${member.generation}기`])
+    })
     if (!rosterSort) return narrowed
     const { key, direction } = rosterSort
     if (key === 'generation') return sortedBy(narrowed, (a, b) => compareNumber(a.generation, b.generation, direction))
     return sortedBy(narrowed, (a, b) => compareText(a[key], b[key], direction))
-  }, [roster, rosterQuery, rosterSort, editingId])
+    // hasAccount reads the two sets, which are in the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roster, rosterQuery, rosterSort, editingId, signupFilter, signupKnown, accountIds, graduateRosterIds])
   const sortRosterBy = (key: RosterSortKey) => setRosterSort((current) => nextColumnSort(current, key))
 
   const loadRoster = async () => {
@@ -325,6 +357,7 @@ export default function AdminRoster() {
         {!loadingRoster && !rosterError && roster.length > 0 && (
           <div className="mt-4 flex flex-wrap items-center gap-2" role="search" aria-label="명부 찾기">
             <ListSearch value={rosterQuery} onChange={setRosterQuery} placeholder="이름, 학번, 기수, 전화번호" label="명부 검색" />
+            {signupKnown && <ListSelect value={signupFilter} onChange={setSignupFilter} options={SIGNUP_FILTER_OPTIONS} label="가입 여부로 거르기" />}
             <ListCount shown={visibleRoster.length} total={roster.length} />
           </div>
         )}
@@ -389,6 +422,14 @@ export default function AdminRoster() {
                         <td className="px-3 py-3 font-semibold text-[var(--theme-body-dark)]">
                           <span className="inline-flex items-center gap-1.5">
                             {member.name}
+                            {signupKnown && hasAccount(member) && (
+                              <span
+                                title="이 명부 행으로 가입한 계정이 있습니다."
+                                className="rounded-full bg-[var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--app-accent-text)]"
+                              >
+                                가입함
+                              </span>
+                            )}
                             {member.initialRole === 'ASSOCIATE' && (
                               <span
                                 title="리크루팅 합격으로 등록된 행입니다. 가입하면 준회원으로 시작합니다."

@@ -1,8 +1,19 @@
 import { Download, RefreshCw, Search } from 'lucide-react'
+import { ListSelect } from '../common/ListTools'
 import { downloadUrl } from '../../services/archiveApi'
 import { richBodyToPlainText } from '../richEditor/renderRichBody'
 import { CategorySegment } from './CategorySegment'
 import { ARCHIVE_CATEGORIES, categoryLabel, clickableCell, formatDate, formatSize, openRowWithKeyboard } from './archiveUtils'
+
+const ARCHIVE_SORT_OPTIONS = [
+  { value: 'default', label: '기본 순서' },
+  { value: 'newest', label: '최신순' },
+  { value: 'oldest', label: '오래된순' },
+  { value: 'name', label: '이름순' },
+  { value: 'size', label: '큰 파일순' },
+  { value: 'views', label: '조회순' },
+  { value: 'upvotes', label: '추천순' },
+]
 
 export function ArchiveListView({
   activeCategory,
@@ -11,6 +22,8 @@ export function ArchiveListView({
   searchQuery,
   onSearchChange,
   filteredFiles,
+  sortKey,
+  onSortChange,
   notice,
   error,
   onReload,
@@ -27,6 +40,8 @@ export function ArchiveListView({
   searchQuery: string
   onSearchChange: (value: string) => void
   filteredFiles: unknown[]
+  sortKey: string
+  onSortChange: (value: string) => void
   notice: string
   error: string
   onReload: () => void
@@ -57,6 +72,7 @@ export function ArchiveListView({
               className="h-11 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 pl-8 pr-3 text-sm text-[var(--app-text)] placeholder:text-[var(--app-subtle)] outline-none transition focus:ring-2 focus:ring-[var(--app-accent)]/24 sm:h-10 sm:w-64"
             />
           </div>
+          <ListSelect value={sortKey} onChange={onSortChange} options={ARCHIVE_SORT_OPTIONS} label="자료 정렬" />
           <div className="text-xs font-bold text-[var(--app-subtle)]">{filteredFiles.length}개</div>
         </div>
       </div>

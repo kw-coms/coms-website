@@ -7,6 +7,7 @@ import { useScrollReveal } from '../hooks/useScrollReveal'
 import { useVisibleCount } from '../hooks/useVisibleCount'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import { ArrowLeft, FileUp, FolderOpen } from 'lucide-react'
+import { compareDate, compareNumber, compareText, sortedBy } from '../utils/listTools'
 import { deleteFile, listFiles, voteArchiveFile, updateArchiveAuthor } from '../services/archiveApi'
 import { useAuth } from '../contexts/useAuth'
 import { richBodyToPlainText } from '../components/richEditor/renderRichBody'
@@ -91,12 +92,24 @@ export default function Archive({ onBack }: { onBack: () => void }) {
     )
   }, [activeCategory, files, searchQuery])
 
+  // "default" is the order the server sends.
+  const [sortKey, setSortKey] = useState('default')
+  const sortedFiles = useMemo(() => {
+    if (sortKey === 'newest') return sortedBy(filteredFiles, (a, b) => compareDate(a.uploadedAt, b.uploadedAt, 'desc'))
+    if (sortKey === 'oldest') return sortedBy(filteredFiles, (a, b) => compareDate(a.uploadedAt, b.uploadedAt, 'asc'))
+    if (sortKey === 'name') return sortedBy(filteredFiles, (a, b) => compareText(a.title || a.originalName, b.title || b.originalName))
+    if (sortKey === 'size') return sortedBy(filteredFiles, (a, b) => compareNumber(a.fileSize, b.fileSize, 'desc'))
+    if (sortKey === 'views') return sortedBy(filteredFiles, (a, b) => compareNumber(a.viewCount, b.viewCount, 'desc'))
+    if (sortKey === 'upvotes') return sortedBy(filteredFiles, (a, b) => compareNumber(a.upvotes, b.upvotes, 'desc'))
+    return filteredFiles
+  }, [filteredFiles, sortKey])
+
   const { visible, canLoadMore, loadMore, total } = useVisibleCount(
     filteredFiles.length,
     20,
-    `${activeCategory}|${searchQuery}`,
+    `${activeCategory}|${searchQuery}|${sortKey}`,
   )
-  const visibleFiles = filteredFiles.slice(0, visible)
+  const visibleFiles = sortedFiles.slice(0, visible)
 
   const categoryCounts = useMemo(() => {
     const counts = {
@@ -260,6 +273,8 @@ export default function Archive({ onBack }: { onBack: () => void }) {
             searchQuery={searchQuery}
             onSearchChange={(query) => updateListFilter(activeCategory, query)}
             filteredFiles={filteredFiles}
+            sortKey={sortKey}
+            onSortChange={setSortKey}
             notice={notice}
             error={error}
             onReload={() => loadFiles()}
