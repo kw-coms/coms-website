@@ -3,6 +3,7 @@
 /* Split from the former 7,000-line monolith; order preserves the original cascade. */
 @import "./styles/tokens.css";
 @import "./styles/base.css";
+@import "./styles/quick-search.css";
 @import "./styles/activity-composer.css";
 @import "./styles/activity-admin.css";
 @import "./styles/calendar-core.css";

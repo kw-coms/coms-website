@@ -36,6 +36,7 @@ import {
   MeetingPollsPage,
 } from './routes/pageWrappers'
 import GlobalNavigation from './components/GlobalNavigation'
+import QuickSearch from './components/QuickSearch'
 import AppearanceControl from './components/AppearanceControl'
 import NotFoundPage from './components/NotFoundPage'
 import HomeView from './pages/home/HomeView'
@@ -147,6 +148,7 @@ function App() {
   }
 
   return (
+    <>
     <Suspense fallback={<PageFallback />}>
       <a href="#main-content" className="coms-skip-link">본문으로 건너뛰기</a>
       {location.pathname === '/' && <ComsIntro />}
@@ -200,6 +202,9 @@ function App() {
       <ToastHost />
       <ConfirmHost />
     </Suspense>
+    {/* Outside the page's Suspense: its shortcut answers while a page is still loading. */}
+    <QuickSearch />
+    </>
   )
 }
 

@@ -137,6 +137,25 @@ test('community post detail has no serious or critical accessibility violations'
   await assertNoSeriousViolations(page)
 })
 
+// The quick-jump dialog with results from more than one kind of place. The titles are made up.
+for (const theme of ['dark', 'light']) {
+  test(`quick jump dialog has no serious or critical accessibility violations (${theme} theme)`, async ({ page }) => {
+    // The site keeps its own theme choice (dark unless one is stored).
+    await page.addInitScript((mode) => { window.localStorage.setItem('kwcoms-theme-mode:v2', mode) }, theme)
+    await mockAdminApis(page)
+    await page.route('**/api/notices', (route) => route.fulfill({ status: 200, json: [{ id: 31, title: '2학기 웹 세미나 일정 안내', content: '', createdAt: '2026-10-08T10:00:00' }] }))
+    await page.route('**/api/community/posts{,?*}', (route) => route.fulfill({ status: 200, json: [{ ...samplePost, title: '알고리즘 세미나 후기' }] }))
+    await page.route('**/api/files', (route) => route.fulfill({ status: 200, json: [] }))
+    await page.route('**/api/meeting-polls', (route) => route.fulfill({ status: 200, json: [] }))
+    await page.goto('/about')
+    await page.getByRole('button', { name: '빠른 이동 열기' }).click()
+    const dialog = page.getByRole('dialog', { name: '빠른 이동' })
+    await dialog.getByRole('combobox', { name: '어디로 갈까요?' }).fill('세미나')
+    await expect(dialog.getByRole('option')).toHaveCount(3)
+    await assertNoSeriousViolations(page)
+  })
+}
+
 test('admin panel has no serious or critical accessibility violations', async ({ page }) => {
   await mockAdminApis(page)
   await page.goto('/admin')

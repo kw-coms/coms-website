@@ -9,6 +9,7 @@ import {
   LogOut,
   Menu,
   Megaphone,
+  Search,
   Sparkles,
   X,
 } from 'lucide-react'
@@ -21,6 +22,7 @@ import {
 } from '../data/homeContent'
 import { scrollToTopInstant } from '../utils/themeColors'
 import NotificationButton from './NotificationButton'
+import { openQuickSearch } from '../utils/quickSearch'
 import { ROLE_LABELS, canAccessOperationsPanel } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
 
@@ -220,7 +222,9 @@ export default function GlobalNavigation() {
           <span className="whitespace-nowrap text-sm font-bold text-[var(--app-text)]">KW COM&apos;s</span>
         </button>
 
-        <nav className="hidden items-center gap-3 lg:flex xl:gap-5">
+        {/* gap-2 below xl: with the quick-jump button in the account cluster, the wider gap no
+            longer fitted at 1024px and the brand was painted over. */}
+        <nav className="hidden items-center gap-2 lg:flex xl:gap-5">
           {primaryNavItems.map((item) => (
             <button
               key={item.id}
@@ -302,6 +306,9 @@ export default function GlobalNavigation() {
 
         {user ? (
           <div className="hidden items-center gap-1 lg:flex lg:justify-self-end">
+            <button type="button" onClick={openQuickSearch} className="coms-quick-open" aria-label="빠른 이동 열기" aria-keyshortcuts="Control+K Meta+K" title="빠른 이동 (Ctrl+K)">
+              <Search size={15} aria-hidden="true" />
+            </button>
             <NotificationButton />
             <button
               type="button"
@@ -323,27 +330,37 @@ export default function GlobalNavigation() {
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => goPageTop('/login')}
-            disabled={authLoading}
-            className="hidden shrink-0 whitespace-nowrap rounded-full bg-[var(--app-accent)] px-4 py-1 text-xs font-semibold text-white transition hover:bg-[var(--app-accent-hover)] disabled:cursor-wait disabled:opacity-70 lg:inline-flex lg:justify-self-end"
-          >
-            로그인
-          </button>
+          <div className="hidden items-center gap-2 lg:flex lg:justify-self-end">
+            <button type="button" onClick={openQuickSearch} className="coms-quick-open" aria-label="빠른 이동 열기" aria-keyshortcuts="Control+K Meta+K" title="빠른 이동 (Ctrl+K)">
+              <Search size={15} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => goPageTop('/login')}
+              disabled={authLoading}
+              className="inline-flex shrink-0 whitespace-nowrap rounded-full bg-[var(--app-accent)] px-4 py-1 text-xs font-semibold text-white transition hover:bg-[var(--app-accent-hover)] disabled:cursor-wait disabled:opacity-70"
+            >
+              로그인
+            </button>
+          </div>
         )}
 
-        <button
-          ref={mobileMenuToggleRef}
-          type="button"
-          onClick={() => setMobileMenuOpen((open) => !open)}
-          className="apple-global-nav-menu lg:hidden"
-          aria-label={mobileMenuOpen ? '메뉴 닫기' : '메뉴 열기'}
-          aria-expanded={mobileMenuOpen}
-          aria-controls="mobile-menu"
-        >
-          {mobileMenuOpen ? <X size={21} strokeWidth={2.1} /> : <Menu size={22} strokeWidth={2.25} />}
-        </button>
+        <div className="flex items-center lg:hidden">
+          <button type="button" onClick={openQuickSearch} className="coms-quick-open size-11" aria-label="빠른 이동 열기">
+            <Search size={19} aria-hidden="true" />
+          </button>
+          <button
+            ref={mobileMenuToggleRef}
+            type="button"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+            className="apple-global-nav-menu lg:hidden"
+            aria-label={mobileMenuOpen ? '메뉴 닫기' : '메뉴 열기'}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-menu"
+          >
+            {mobileMenuOpen ? <X size={21} strokeWidth={2.1} /> : <Menu size={22} strokeWidth={2.25} />}
+          </button>
+        </div>
       </div>
 
       {mobileMenuOpen && (
