@@ -3389,3 +3389,41 @@ test('guest visiting the meeting polls is redirected to login', async ({ page })
   await page.goto('/meet')
   await expect(page).toHaveURL(/\/login$/)
 })
+
+test('a best time of a meeting poll can be put on the club calendar by whoever may write to it', async ({ page }) => {
+  await mockAdminApis(page)
+  const poll = { id: 7, title: '웹 스터디 첫 모임', description: '', creatorName: '홍길동', mine: false, canDelete: false, dates: ['2026-10-14'], startMinute: 600, endMinute: 720, slotMinutes: 30, participantCount: 2, answered: false }
+  const participants = [{ name: '홍길동', mine: false, slots: '1100' }, { name: '김철수', mine: false, slots: '1110' }]
+  await page.route('**/api/meeting-polls/7', route => route.fulfill({ json: { poll, participants } }))
+  let registered = null
+  await page.route('**/api/club-activities', async route => {
+    if (route.request().method() !== 'POST') return route.fulfill({ json: [] })
+    registered = route.request().postData()
+    await route.fulfill({ status: 201, json: { id: 99, kind: 'SCHEDULE', title: poll.title, eventDate: '2026-10-14' } })
+  })
+  await autoDriveModals(page)
+
+  await page.goto('/meet/7')
+  // The stretch both can make comes first.
+  await page.getByRole('button', { name: '10월 14일 (수) 10:00 캘린더에 등록' }).click()
+  await expect.poll(() => registered).not.toBeNull()
+  expect(multipartField(registered, 'kind')).toBe('SCHEDULE')
+  expect(multipartField(registered, 'title')).toBe('웹 스터디 첫 모임')
+  expect(multipartField(registered, 'eventDate')).toBe('2026-10-14')
+  expect(multipartField(registered, 'startTime')).toBe('10:00')
+  expect(multipartField(registered, 'endTime')).toBe('11:00')
+  await expect(page.getByText('캘린더에 등록했습니다.')).toBeVisible()
+})
+
+test('a member without calendar rights is not offered the calendar button', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
+  await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
+  const poll = { id: 7, title: '웹 스터디 첫 모임', description: '', creatorName: '김철수', mine: false, canDelete: false, dates: ['2026-10-14'], startMinute: 600, endMinute: 720, slotMinutes: 30, participantCount: 1, answered: false }
+  await page.route('**/api/meeting-polls/7', route => route.fulfill({ json: { poll, participants: [{ name: '김철수', mine: false, slots: '1110' }] } }))
+
+  await page.goto('/meet/7')
+  await expect(page.getByRole('heading', { level: 1, name: '웹 스터디 첫 모임' })).toBeVisible()
+  await expect(page.locator('ol li').first()).toContainText('10:00 ~ 11:30')
+  await expect(page.getByRole('button', { name: /캘린더에 등록/ })).toHaveCount(0)
+})

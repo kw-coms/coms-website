@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, CalendarClock, Check, ChevronLeft, ChevronRight, Plus, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, CalendarClock, CalendarPlus, Check, ChevronLeft, ChevronRight, Plus, Trash2, Users } from 'lucide-react'
 import {
   clearMeetingPollAvailability,
   createMeetingPoll,
@@ -31,8 +31,13 @@ import {
   totalSlots,
   type MeetingPollDetail,
   type MeetingPollParticipant,
+  type BestRange,
   type MeetingPollSummary,
 } from '../utils/meetingPoll'
+import { createClubActivity } from '../services/clubActivityApi'
+import { CLUB_ACTIVITIES_QUERY_KEY } from '../shared/homeUi'
+import { usePermissions } from '../contexts/usePermissions'
+import { canManageContent } from '../utils/roleAccess'
 import { useAuth } from '../contexts/useAuth'
 import { showToast } from '../components/common/Toast'
 import { confirmDialog } from '../components/common/ConfirmDialog'
@@ -343,6 +348,34 @@ function PollView({ id }: { id: string }) {
     return showMine ? [...others, { name: user?.name || '나', mine: true, slots: mySlots }] : others
   }, [detail, hasAnswer, mySlots, user?.name])
 
+  // Whoever may write to the club calendar can put one of the suggested times on it.
+  const { permissions } = usePermissions()
+  const canRegister = canManageContent(permissions)
+  const registerMutation = useMutation({
+    mutationFn: (range: BestRange) => createClubActivity({
+      kind: 'SCHEDULE',
+      category: 'GENERAL',
+      title: poll?.title || '모임',
+      description: poll?.description || undefined,
+      eventDate: range.date,
+      endDate: range.date,
+      startTime: formatMinute(range.startMinute),
+      // The calendar has no 24:00; a stretch that runs to midnight ends at 23:59.
+      endTime: range.endMinute >= 24 * 60 ? '23:59' : formatMinute(range.endMinute),
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: CLUB_ACTIVITIES_QUERY_KEY })
+      showToast({ message: '캘린더에 등록했습니다. 일정 캘린더에서 확인할 수 있습니다.', tone: 'success' })
+    },
+    onError: (err: Error) => showToast({ message: err.message || '캘린더에 등록하지 못했습니다.', tone: 'error' }),
+  })
+  const handleRegister = async (range: BestRange) => {
+    if (!poll || registerMutation.isPending) return
+    const when = `${formatPollDate(range.date)} ${formatMinute(range.startMinute)} ~ ${formatMinute(range.endMinute)}`
+    if (!(await confirmDialog({ message: `"${poll.title}"을(를) ${when} 일정으로 동아리 캘린더에 등록할까요?` }))) return
+    registerMutation.mutate(range)
+  }
+
   const handleDelete = async () => {
     if (!poll) return
     if (!(await confirmDialog({ message: `"${poll.title}" 일정 조율을 지울까요? 모든 응답이 함께 지워집니다.`, tone: 'danger' }))) return
@@ -426,7 +459,7 @@ function PollView({ id }: { id: string }) {
             </div>
 
             <div className="grid gap-6 border-t border-[var(--app-hairline)] p-4 sm:p-6 lg:grid-cols-2">
-              <BestTimes poll={poll} participants={participants} />
+              <BestTimes poll={poll} participants={participants} onRegister={canRegister ? handleRegister : undefined} busy={registerMutation.isPending} />
               <div>
                 <h2 className="text-base font-bold text-[var(--app-text)]">응답한 사람 <span className="text-[var(--app-muted)]">{participants.length}명</span></h2>
                 {participants.length === 0 ? (
@@ -652,7 +685,12 @@ function SlotInfo({ poll, participants, index }: { poll: MeetingPollSummary; par
   )
 }
 
-function BestTimes({ poll, participants }: { poll: MeetingPollSummary; participants: MeetingPollParticipant[] }) {
+function BestTimes({ poll, participants, onRegister, busy = false }: {
+  poll: MeetingPollSummary
+  participants: MeetingPollParticipant[]
+  onRegister?: (range: BestRange) => void
+  busy?: boolean
+}) {
   const ranges = useMemo(() => bestRanges(poll, participants, 5), [poll, participants])
   return (
     <div>
@@ -669,6 +707,18 @@ function BestTimes({ poll, participants }: { poll: MeetingPollSummary; participa
               <span className="ml-auto text-xs font-bold text-[var(--app-accent-text)]">
                 {range.count === participants.length ? `${range.count}명 모두 가능` : `${participants.length}명 중 ${range.count}명`}
               </span>
+              {onRegister && (
+                <button
+                  type="button"
+                  onClick={() => onRegister(range)}
+                  disabled={busy}
+                  aria-label={`${formatPollDate(range.date)} ${formatMinute(range.startMinute)} 캘린더에 등록`}
+                  className="apple-action-secondary inline-flex min-h-8 items-center gap-1 px-2.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <CalendarPlus size={12} aria-hidden="true" />
+                  캘린더에 등록
+                </button>
+              )}
             </li>
           ))}
         </ol>
