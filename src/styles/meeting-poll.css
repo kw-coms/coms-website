@@ -1,0 +1,200 @@
+/* ===== Meeting polls ("일정 조율") ========================================== */
+/* The grid of dates x half hours, in two forms: the member's own answer (painted) and the
+   group's (shaded by how many are free). One accent. */
+
+/* Wide polls scroll sideways inside this box; the page itself never does. */
+.coms-meet-scroll {
+	margin-top: 0.85rem;
+	max-width: 100%;
+	overflow-x: auto;
+	border-radius: 14px;
+	border: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 70%, transparent);
+	padding: 0.6rem;
+}
+
+.coms-meet-grid {
+	/* Fills the box when there are few dates; with many, the columns keep their minimum
+	   width and the box scrolls. */
+	width: 100%;
+	border-collapse: separate;
+	border-spacing: 2px 0;
+	user-select: none;
+	-webkit-user-select: none;
+}
+
+.coms-meet-grid thead th {
+	position: sticky;
+	top: 0;
+	padding: 0 0 0.35rem;
+	color: var(--app-text);
+	text-align: center;
+	font-weight: 700;
+}
+
+.coms-meet-grid tbody th {
+	/* The time column takes only what its labels need. */
+	width: 1%;
+	padding: 0 0.45rem 0 0.1rem;
+	vertical-align: top;
+	text-align: right;
+	white-space: nowrap;
+}
+
+.coms-meet-grid td {
+	padding: 0;
+}
+
+.coms-meet-head {
+	display: block;
+	width: 100%;
+	min-width: 2.9rem;
+	border-radius: 8px;
+	padding: 0.2rem 0.15rem;
+	color: var(--app-text);
+	line-height: 1.25;
+}
+
+button.coms-meet-head:hover,
+button.coms-meet-time:hover {
+	background: color-mix(in srgb, var(--app-accent) 16%, transparent);
+	color: var(--app-accent-text);
+}
+
+.coms-meet-time {
+	display: block;
+	min-width: 2.75rem;
+	height: 1.35rem;
+	border-radius: 6px;
+	padding: 0 0.25rem;
+	color: var(--app-muted);
+	font: 600 0.68rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	text-align: right;
+	/* Sits on the line it names rather than in the middle of the half hour. */
+	transform: translateY(-0.4rem);
+}
+
+.coms-meet-cell {
+	display: block;
+	width: 100%;
+	min-width: 2.9rem;
+	height: 1.35rem;
+	border: 0;
+	border-top: 1px dotted color-mix(in srgb, var(--app-text) 12%, transparent);
+	background: color-mix(in srgb, var(--app-text) 6%, transparent);
+	padding: 0;
+	cursor: pointer;
+}
+
+.coms-meet-grid tr.is-hour .coms-meet-cell {
+	border-top: 1px solid color-mix(in srgb, var(--app-text) 26%, transparent);
+}
+
+.coms-meet-grid tbody tr:first-child .coms-meet-cell {
+	border-top-left-radius: 6px;
+	border-top-right-radius: 6px;
+}
+
+.coms-meet-grid tbody tr:last-child .coms-meet-cell {
+	border-bottom-left-radius: 6px;
+	border-bottom-right-radius: 6px;
+}
+
+.coms-meet-cell:focus-visible {
+	position: relative;
+	outline: 2px solid var(--app-text);
+	outline-offset: -2px;
+}
+
+/* The member's own answer: on or off. */
+.coms-meet-cell-edit:hover {
+	background: color-mix(in srgb, var(--app-accent) 28%, transparent);
+}
+
+.coms-meet-cell-edit.is-on {
+	background: var(--app-accent);
+	box-shadow: 0 0 12px color-mix(in srgb, var(--app-accent) 45%, transparent);
+}
+
+.coms-meet-cell-edit.is-on:hover {
+	background: color-mix(in srgb, var(--app-accent) 78%, var(--app-text));
+}
+
+/* The group: --level is the share of members who are free, 0 to 1. */
+.coms-meet-cell-group {
+	background: color-mix(in srgb, var(--app-accent) calc(var(--level, 0) * 100%), color-mix(in srgb, var(--app-text) 6%, transparent));
+}
+
+.coms-meet-cell-group.is-all {
+	box-shadow: 0 0 12px color-mix(in srgb, var(--app-accent) 55%, transparent);
+}
+
+.coms-meet-cell-group.is-focus {
+	position: relative;
+	outline: 2px solid var(--app-text);
+	outline-offset: -2px;
+}
+
+.coms-meet-info {
+	margin-top: 0.75rem;
+	min-height: 4.4rem;
+	border-radius: 12px;
+	border: 1px solid var(--app-hairline);
+	background: color-mix(in srgb, var(--app-surface) 70%, transparent);
+	padding: 0.75rem 0.9rem;
+	color: var(--app-muted);
+	font-size: 0.8rem;
+	line-height: 1.5;
+	word-break: keep-all;
+}
+
+/* The month view a new poll's dates are picked from. */
+.coms-meet-month {
+	min-width: 0;
+	margin: 0;
+	border: 1px solid var(--app-hairline);
+	border-radius: 14px;
+	background: color-mix(in srgb, var(--app-surface) 70%, transparent);
+	padding: 0.9rem;
+}
+
+.coms-meet-month-nav {
+	display: grid;
+	width: 2rem;
+	height: 2rem;
+	place-items: center;
+	border-radius: 50%;
+	border: 1px solid var(--app-hairline);
+	color: var(--app-text);
+}
+
+.coms-meet-month-nav:hover {
+	background: color-mix(in srgb, var(--app-accent) 16%, transparent);
+}
+
+.coms-meet-day {
+	aspect-ratio: 1;
+	border-radius: 9px;
+	color: var(--app-text);
+	font-size: 0.82rem;
+	font-weight: 600;
+}
+
+.coms-meet-day:hover:not(:disabled):not(.is-selected) {
+	background: color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+.coms-meet-day.is-today {
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--app-accent) 60%, transparent);
+}
+
+.coms-meet-day.is-selected {
+	background: var(--app-accent);
+	color: #ffffff;
+	box-shadow: 0 0 14px color-mix(in srgb, var(--app-accent) 45%, transparent);
+}
+
+.coms-meet-day:disabled {
+	cursor: not-allowed;
+	opacity: 0.3;
+}

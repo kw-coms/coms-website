@@ -1,5 +1,6 @@
 import {
   Binary,
+  CalendarClock,
   CalendarDays,
   CircuitBoard,
   Rocket,
@@ -452,6 +453,14 @@ export const activitySectionNavItems = [
     hint: '월별 일정',
     path: '/monthly-calendar',
     icon: CalendarDays,
+    accent: 'text-sky-500',
+  },
+  {
+    id: 'meet',
+    label: 'Meet',
+    hint: '일정 조율',
+    path: '/meet',
+    icon: CalendarClock,
     accent: 'text-sky-500',
   },
   {
