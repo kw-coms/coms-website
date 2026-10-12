@@ -1769,6 +1769,10 @@ test.describe('draw page', () => {
     await expect(page.getByText('이름을 두 명 이상 넣어 주세요.')).toBeVisible()
     await names.fill(people.join('\n'))
     await expect(page.getByText('7명을 2조로 나눕니다.')).toBeVisible()
+    // Splitting by roles and rules is the club's TeamMate app; this page says so and links to it.
+    const teamMate = page.getByRole('link', { name: 'TeamMate' })
+    await expect(teamMate).toHaveAttribute('href', 'https://coms.kw.ac.kr/team-randomizer/')
+    await expect(teamMate).toHaveAttribute('target', '_blank')
     const stepper = page.getByRole('group', { name: '조 개수' })
     await expect(stepper.getByRole('button', { name: '조 개수 줄이기' })).toBeDisabled()
     await stepper.getByRole('button', { name: '조 개수 늘리기' }).click()
@@ -1789,6 +1793,7 @@ test.describe('draw page', () => {
     expect(copied[0].split('\n').map(line => line.slice(0, 4))).toEqual(['1조: ', '2조: ', '3조: '])
 
     await page.getByRole('button', { name: '순서 정하기' }).click()
+    await expect(teamMate).toHaveCount(0)
     await page.getByRole('button', { name: '순서 섞기' }).click()
     const order = page.getByRole('list', { name: '정해진 순서' }).getByRole('listitem')
     await expect(order).toHaveCount(7)

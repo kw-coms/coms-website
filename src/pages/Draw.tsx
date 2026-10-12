@@ -13,10 +13,14 @@ import {
   teamsToText,
 } from '../utils/draw'
 import { showToast } from '../components/common/Toast'
+import { companionServices } from '../data/homeContent'
 
 /**
  * Draw ("뽑기"): type names, then split them into teams, put them in an order or pick some.
  * Everything happens in the page: the names are not sent or stored anywhere.
+ *
+ * Teams here are a plain even split. TeamMate, one of the club's own apps, splits by roles and
+ * rules and keeps rooms; the page points to it instead of growing into it.
  */
 
 type Mode = 'teams' | 'order' | 'pick'
@@ -32,6 +36,7 @@ const MODES: { key: Mode; label: string; action: string; icon: LucideIcon }[] = 
   { key: 'pick', label: '뽑기', action: '뽑기 시작', icon: Sparkles },
 ]
 const SAMPLE = ['홍길동', '김철수', '이영희', '박민수', '최가람', '정하늘', '강바다', '윤이슬']
+const TEAM_MATE = companionServices.find((service) => service.eyebrow === 'Team randomizer')
 /** How long the names tumble before the result settles. */
 const ROLL_MS = 900
 
@@ -190,6 +195,14 @@ export default function Draw() {
                     ? `${names.length}명을 ${teams}조로 나눕니다.`
                     : ''}
             </p>
+
+            {mode === 'teams' && TEAM_MATE && (
+              <p className="text-xs text-[var(--app-muted)]">
+                역할이나 조건을 맞춰 나누려면{' '}
+                <a href={TEAM_MATE.href} target="_blank" rel="noopener noreferrer" className="font-semibold text-[var(--app-accent-text)] underline underline-offset-2">{TEAM_MATE.title}</a>
+                를 쓰세요. 여기서는 인원만 고르게 나눕니다.
+              </p>
+            )}
 
             <div className="coms-draw-result" aria-live="polite" aria-busy={rolling}>
               {!result && <p className="coms-draw-empty">결과가 여기에 나옵니다.</p>}
