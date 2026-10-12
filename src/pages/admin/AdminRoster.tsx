@@ -1,9 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { displayStudentId } from '../../utils/roleAccess'
 import { importEligibleMembers, addEligibleMember, listEligibleMembers, updateEligibleMember, deleteEligibleMember } from '../../services/adminApi'
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
+import { ListCount, ListSearch, SortableTh } from '../../components/common/ListTools'
+import { compareNumber, compareText, matchesQuery, nextColumnSort, sortedBy, type SortDirection } from '../../utils/listTools'
+
+type RosterSortKey = 'studentId' | 'name' | 'generation'
 
 // Account id issued to a graduate at signup: G{입학연도}-{명부 id}. Same shape roleAccess's
 // displayStudentId() recognises.
@@ -24,6 +28,22 @@ export default function AdminRoster() {
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState({ studentId: '', name: '', phone: '', generation: '' })
   const [editSaving, setEditSaving] = useState(false)
+  const [rosterQuery, setRosterQuery] = useState('')
+  const [rosterSort, setRosterSort] = useState<{ key: RosterSortKey; direction: SortDirection } | null>(null)
+
+  // What the table shows: narrowed by the search, then ordered by the column whose heading was
+  // pressed. The row being edited stays in view even if it no longer matches the search.
+  const visibleRoster = useMemo(() => {
+    const narrowed = roster.filter((member) => (
+      member.id === editingId
+      || matchesQuery(rosterQuery, [member.name, member.studentId, member.phone, member.generation && `${member.generation}기`])
+    ))
+    if (!rosterSort) return narrowed
+    const { key, direction } = rosterSort
+    if (key === 'generation') return sortedBy(narrowed, (a, b) => compareNumber(a.generation, b.generation, direction))
+    return sortedBy(narrowed, (a, b) => compareText(a[key], b[key], direction))
+  }, [roster, rosterQuery, rosterSort, editingId])
+  const sortRosterBy = (key: RosterSortKey) => setRosterSort((current) => nextColumnSort(current, key))
 
   const loadRoster = async () => {
     setRosterError('')
@@ -303,7 +323,13 @@ export default function AdminRoster() {
           <p className="mt-4 text-sm text-[var(--theme-body-muted)]">등록된 명부가 없습니다.</p>
         )}
         {!loadingRoster && !rosterError && roster.length > 0 && (
-          <div className="mt-4 max-h-96 overflow-auto rounded-lg border border-[var(--app-hairline)]">
+          <div className="mt-4 flex flex-wrap items-center gap-2" role="search" aria-label="명부 찾기">
+            <ListSearch value={rosterQuery} onChange={setRosterQuery} placeholder="이름, 학번, 기수, 전화번호" label="명부 검색" />
+            <ListCount shown={visibleRoster.length} total={roster.length} />
+          </div>
+        )}
+        {!loadingRoster && !rosterError && roster.length > 0 && (
+          <div className="mt-3 max-h-96 overflow-auto rounded-lg border border-[var(--app-hairline)]">
             <table className="w-max min-w-full table-fixed divide-y divide-black/10 text-left text-sm">
               <colgroup>
                 <col style={{ width: '136px' }} />
@@ -314,15 +340,20 @@ export default function AdminRoster() {
               </colgroup>
               <thead className="sticky top-0 bg-[var(--app-surface)] text-xs font-semibold text-[var(--theme-body-muted)]">
                 <tr>
-                  <th className="px-3 py-3 whitespace-nowrap">학번</th>
-                  <th className="px-3 py-3 whitespace-nowrap">이름</th>
-                  <th className="px-3 py-3 whitespace-nowrap">기수</th>
+                  <SortableTh label="학번" className="px-3 py-3" active={rosterSort?.key === 'studentId'} direction={rosterSort?.direction ?? 'asc'} onSort={() => sortRosterBy('studentId')} />
+                  <SortableTh label="이름" className="px-3 py-3" active={rosterSort?.key === 'name'} direction={rosterSort?.direction ?? 'asc'} onSort={() => sortRosterBy('name')} />
+                  <SortableTh label="기수" className="px-3 py-3" active={rosterSort?.key === 'generation'} direction={rosterSort?.direction ?? 'asc'} onSort={() => sortRosterBy('generation')} />
                   <th className="px-3 py-3 whitespace-nowrap">전화번호</th>
                   <th className="px-3 py-3"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/10 bg-white/50">
-                {roster.map((member) => (
+                {visibleRoster.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-6 text-center text-sm text-[var(--theme-body-muted)]">조건에 맞는 명부가 없습니다.</td>
+                  </tr>
+                )}
+                {visibleRoster.map((member) => (
                   <tr key={member.id}>
                     {editingId === member.id ? (
                       <td colSpan={5} className="px-3 py-3">

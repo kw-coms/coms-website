@@ -254,6 +254,60 @@ test('home section cards lead where they say', async ({ page }) => {
   await expect(page).toHaveURL(/\/recruit$/)
 })
 
+// The admin lists can be searched, narrowed and ordered without another request. The people
+// here are made up.
+test('admin member list and roster can be searched and ordered', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/admin/members', route => route.fulfill({ json: [
+    { id: 1, studentId: '2020123456', name: '관리자', email: 'admin@example.com', emailVerified: true, department: '컴퓨터정보공학부', generation: '58', phone: '01000000001', role: 'ADMIN' },
+    { id: 2, studentId: '2023000002', name: '홍길동', email: 'hong@example.com', emailVerified: true, department: '소프트웨어학부', generation: '61', phone: '01000000002', role: 'USER' },
+    { id: 3, studentId: '2022000003', name: '김철수', email: 'kim@example.com', emailVerified: false, department: '전자공학과', generation: '60', phone: '01000000003', role: 'OFFICER' },
+    { id: 4, studentId: '2023000006', name: '최가람', email: 'choi@example.com', emailVerified: true, department: '소프트웨어학부', generation: '', phone: '01000000006', role: 'USER' },
+  ] }))
+  await page.route('**/api/admin/eligible-members', route => route.fulfill({ json: [
+    { id: 11, studentId: '2023000002', name: '홍길동', generation: '61', phone: '01000000002' },
+    { id: 12, studentId: '', name: '졸업선배', generation: '41', phone: '01000000013' },
+    { id: 13, studentId: '2022000003', name: '김철수', generation: '60', phone: '' },
+  ] }))
+
+  await page.goto('/admin?tab=members')
+  const memberNames = page.locator('span.font-semibold.text-\\[var\\(--theme-body-dark\\)\\]')
+  await expect(memberNames).toHaveText(['관리자', '홍길동', '김철수', '최가람'])
+  const tools = page.getByRole('search', { name: '회원 목록 찾기' })
+  await expect(tools.getByRole('status')).toHaveText('4명')
+
+  // Ordered by 기수, newest first; the member without one stays last either way.
+  await tools.getByLabel('정렬 기준').selectOption('generation')
+  await expect(memberNames).toHaveText(['관리자', '김철수', '홍길동', '최가람'])
+  await tools.getByRole('button', { name: /오름차순 정렬 중/ }).click()
+  await expect(memberNames).toHaveText(['홍길동', '김철수', '관리자', '최가람'])
+
+  // Narrowed by role and by a search that ignores hyphens.
+  await tools.getByLabel('역할로 거르기').selectOption('USER')
+  await expect(memberNames).toHaveText(['홍길동', '최가람'])
+  await tools.getByLabel('회원 검색').fill('010-0000-0006')
+  await expect(memberNames).toHaveText(['최가람'])
+  await expect(tools.getByRole('status')).toHaveText('4명 중 1명')
+  await tools.getByLabel('회원 검색').fill('없는사람')
+  await expect(page.getByText('조건에 맞는 회원이 없습니다.')).toBeVisible()
+
+  await page.goto('/admin?tab=roster')
+  const rosterNames = page.locator('tbody tr td:nth-child(2)')
+  await expect(rosterNames).toHaveText(['홍길동', '졸업선배', '김철수'])
+  const generationHeading = page.getByRole('columnheader', { name: '기수' })
+  await generationHeading.getByRole('button').click()
+  await expect(generationHeading).toHaveAttribute('aria-sort', 'ascending')
+  await expect(rosterNames).toHaveText(['졸업선배', '김철수', '홍길동'])
+  await generationHeading.getByRole('button').click()
+  await expect(generationHeading).toHaveAttribute('aria-sort', 'descending')
+  await expect(rosterNames).toHaveText(['홍길동', '김철수', '졸업선배'])
+  await generationHeading.getByRole('button').click()
+  await expect(generationHeading).toHaveAttribute('aria-sort', 'none')
+  await expect(rosterNames).toHaveText(['홍길동', '졸업선배', '김철수'])
+  await page.getByLabel('명부 검색').fill('졸업')
+  await expect(rosterNames).toHaveText(['졸업선배'])
+})
+
 test('activities title remains readable across selectable fonts and viewport widths', async ({ page }) => {
   for (const viewport of [
     { width: 1280, height: 900 },
@@ -698,7 +752,8 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
 
   await expect(page.getByText('명부 확인 · 편집')).toBeVisible()
   await page.getByPlaceholder('학번 (10자리)').fill('2026123456')
-  await page.getByPlaceholder('이름').fill('신규회원')
+  // exact: the roster search box below also mentions 이름 in its placeholder.
+  await page.getByPlaceholder('이름', { exact: true }).fill('신규회원')
   await page.getByRole('button', { name: '추가' }).click()
 
   await expect.poll(() => addPayload).toEqual({

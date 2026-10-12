@@ -1,6 +1,21 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { listRecruitPromotions, updateRecruitApplicationStatus } from '../../services/adminApi'
-import { RECRUIT_STATUS_OPTIONS, recruitStatusLabel, recruitDecisionLabel, recruitDecisionChipVariant } from './recruitStatus'
+import { RECRUIT_PENDING_STATUSES, RECRUIT_STATUS_OPTIONS, recruitStatusLabel, recruitDecisionLabel, recruitDecisionChipVariant } from './recruitStatus'
+import { ListCount, ListSearch, ListSelect, SortDirectionButton } from '../../components/common/ListTools'
+import { compareDate, compareRank, compareText, matchesQuery, sortedBy, type SortDirection } from '../../utils/listTools'
+
+const STATUS_FILTER_OPTIONS = [
+  { value: 'ALL', label: '전체 상태' },
+  { value: 'PENDING', label: '처리 대기' },
+  ...RECRUIT_STATUS_OPTIONS,
+]
+const APPLICATION_SORT_OPTIONS = [
+  { value: 'default', label: '기본 순서' },
+  { value: 'submittedAt', label: '접수일순' },
+  { value: 'name', label: '이름순' },
+  { value: 'status', label: '상태순' },
+]
+const STATUS_ORDER = RECRUIT_STATUS_OPTIONS.map((option) => option.value)
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import Chip from '../../components/common/Chip'
@@ -47,6 +62,29 @@ export default function AdminRecruitApplications({ applications, loading, error,
 }) {
   const [drafts, setDrafts] = useState({})
   const [savingId, setSavingId] = useState(null)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [sortKey, setSortKey] = useState('default')
+  const [direction, setDirection] = useState<SortDirection>('asc')
+
+  // What the list shows: narrowed by the search and the status, then ordered. "기본 순서" is
+  // the order the server sent.
+  const visibleApplications = useMemo(() => {
+    const narrowed = applications.filter((application) => {
+      const status = application.status || 'RECEIVED'
+      const statusOk = statusFilter === 'ALL' || (statusFilter === 'PENDING' ? RECRUIT_PENDING_STATUSES.has(status) : status === statusFilter)
+      return statusOk && matchesQuery(query, [application.name, application.studentId, application.department, application.phone, application.email])
+    })
+    if (sortKey === 'submittedAt') return sortedBy(narrowed, (a, b) => compareDate(a.submittedAt, b.submittedAt, direction))
+    if (sortKey === 'name') return sortedBy(narrowed, (a, b) => compareText(a.name, b.name, direction))
+    if (sortKey === 'status') return sortedBy(narrowed, (a, b) => compareRank(a.status || 'RECEIVED', b.status || 'RECEIVED', STATUS_ORDER, direction))
+    return narrowed
+  }, [applications, query, statusFilter, sortKey, direction])
+  // Newest first is what one wants from a date; the other orders start ascending.
+  const chooseSort = (key: string) => {
+    setSortKey(key)
+    setDirection(key === 'submittedAt' ? 'desc' : 'asc')
+  }
   const [message, setMessage] = useState('')
   const [saveError, setSaveError] = useState('')
   const [promotions, setPromotions] = useState<RecruitPromotion[]>([])
@@ -173,8 +211,21 @@ export default function AdminRecruitApplications({ applications, loading, error,
       )}
 
       {!loading && !error && applications.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2" role="search" aria-label="지원서 찾기">
+          <ListSearch value={query} onChange={setQuery} placeholder="이름, 학번, 학과, 연락처" label="지원서 검색" />
+          <ListSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_FILTER_OPTIONS} label="상태로 거르기" />
+          <ListSelect value={sortKey} onChange={chooseSort} options={APPLICATION_SORT_OPTIONS} label="정렬 기준" />
+          <SortDirectionButton direction={direction} onChange={setDirection} disabled={sortKey === 'default'} />
+          <ListCount shown={visibleApplications.length} total={applications.length} unit="건" />
+        </div>
+      )}
+      {!loading && !error && applications.length > 0 && visibleApplications.length === 0 && (
+        <p className="text-sm text-[var(--theme-body-muted)]">조건에 맞는 지원서가 없습니다.</p>
+      )}
+
+      {!loading && !error && visibleApplications.length > 0 && (
         <div className="space-y-3">
-          {applications.map((application) => {
+          {visibleApplications.map((application) => {
             const draft = drafts[application.id] || {
               status: application.status || 'RECEIVED',
               adminNote: application.adminNote || '',

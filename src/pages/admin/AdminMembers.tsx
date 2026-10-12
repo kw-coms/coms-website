@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useAdminMembers } from './useAdminMembers'
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog, promptDialog } from '../../components/common/ConfirmDialog'
@@ -6,8 +6,22 @@ import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 import ErrorState from '../../components/common/ErrorState'
 import { ASSIGNABLE_ROLES, ROLE_LABELS, displayStudentId } from '../../utils/roleAccess'
 import RoleTag from '../../components/common/RoleTag'
+import { ListCount, ListSearch, ListSelect, SortDirectionButton } from '../../components/common/ListTools'
+import { compareNumber, compareRank, compareText, matchesQuery, sortedBy, type SortDirection } from '../../utils/listTools'
 
 const CREATE_MEMBER_ROLES = ['ASSOCIATE', 'USER', 'OFFICER', 'VICE_PRESIDENT']
+const ROLE_FILTER_OPTIONS = [
+  { value: 'ALL', label: '전체 역할' },
+  ...ASSIGNABLE_ROLES.map((role) => ({ value: role as string, label: ROLE_LABELS[role] })),
+]
+const MEMBER_SORT_OPTIONS = [
+  { value: 'default', label: '기본 순서' },
+  { value: 'name', label: '이름순' },
+  { value: 'studentId', label: '학번순' },
+  { value: 'generation', label: '기수순' },
+  { value: 'role', label: '역할순' },
+]
+
 const initialCreateForm = {
   studentId: '',
   name: '',
@@ -37,6 +51,24 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
   const [createError, setCreateError] = useState('')
   const [creating, setCreating] = useState(false)
   const createSubmitInFlightRef = useRef(false)
+  const [query, setQuery] = useState('')
+  const [roleFilter, setRoleFilter] = useState('ALL')
+  const [sortKey, setSortKey] = useState('default')
+  const [direction, setDirection] = useState<SortDirection>('asc')
+
+  // What the list shows: narrowed by the search and the role, then ordered. "기본 순서" is the
+  // order the server sent.
+  const visibleMembers = useMemo(() => {
+    const narrowed = members.filter((member) => (
+      (roleFilter === 'ALL' || (member.role || 'USER') === roleFilter)
+      && matchesQuery(query, [member.name, member.studentId, member.email, member.department, member.phone, member.generation && `${member.generation}기`])
+    ))
+    if (sortKey === 'name') return sortedBy(narrowed, (a, b) => compareText(a.name, b.name, direction))
+    if (sortKey === 'studentId') return sortedBy(narrowed, (a, b) => compareText(a.studentId, b.studentId, direction))
+    if (sortKey === 'generation') return sortedBy(narrowed, (a, b) => compareNumber(a.generation, b.generation, direction))
+    if (sortKey === 'role') return sortedBy(narrowed, (a, b) => compareRank(a.role || 'USER', b.role || 'USER', ASSIGNABLE_ROLES, direction))
+    return narrowed
+  }, [members, query, roleFilter, sortKey, direction])
 
   const handleCreateChange = (event) => {
     const { name, value } = event.target
@@ -242,7 +274,19 @@ export default function AdminMembers({ currentUser }: { currentUser: { studentId
     <div className="space-y-3">
       {createMemberPanel}
       {members.length === 0 && <p className="text-sm text-[var(--theme-body-muted)]">회원이 없습니다.</p>}
-      {members.map((member) => {
+      {members.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2" role="search" aria-label="회원 목록 찾기">
+          <ListSearch value={query} onChange={setQuery} placeholder="이름, 학번, 이메일, 학과, 전화번호" label="회원 검색" />
+          <ListSelect value={roleFilter} onChange={setRoleFilter} options={ROLE_FILTER_OPTIONS} label="역할로 거르기" />
+          <ListSelect value={sortKey} onChange={setSortKey} options={MEMBER_SORT_OPTIONS} label="정렬 기준" />
+          <SortDirectionButton direction={direction} onChange={setDirection} disabled={sortKey === 'default'} />
+          <ListCount shown={visibleMembers.length} total={members.length} />
+        </div>
+      )}
+      {members.length > 0 && visibleMembers.length === 0 && (
+        <p className="text-sm text-[var(--theme-body-muted)]">조건에 맞는 회원이 없습니다.</p>
+      )}
+      {visibleMembers.map((member) => {
         const isSelf = member.studentId === currentUser.studentId
         const isExpanded = expanded === member.id
         const interests = parseInterests(member.interests)
