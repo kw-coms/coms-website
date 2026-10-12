@@ -1738,6 +1738,134 @@ test('admin tracks recruit applications from overview to status update', async (
   await expect(page.locator('article').filter({ hasText: '김지원' }).locator('span').filter({ hasText: '검토중' })).toBeVisible()
 })
 
+// Quick jump ("빠른 이동"): one box, opened with Ctrl+K, "/" or the header button, that goes to
+// any page and, for a member, to a notice, a post, an archive entry or a meeting poll by its
+// title. The titles are made up.
+test('quick jump opens with Ctrl+K, finds pages and member content, and goes there', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/notices', route => route.fulfill({
+    json: [
+      { id: 31, title: '2학기 웹 세미나 일정 안내', content: '', createdAt: '2026-10-08T10:00:00' },
+      { id: 30, title: '개강 총회 공지', content: '', createdAt: '2026-09-01T10:00:00' },
+    ],
+  }))
+  await page.route('**/api/notices/31', route => route.fulfill({ json: { id: 31, title: '2학기 웹 세미나 일정 안내', content: '<p>일정</p>', createdAt: '2026-10-08T10:00:00' } }))
+  await page.route('**/api/community/posts{,?*}', route => route.fulfill({ json: [{ id: 77, title: '알고리즘 세미나 후기', category: 'GENERAL', createdAt: '2026-10-10T21:00:00' }] }))
+  await page.route('**/api/files', route => route.fulfill({ json: [{ id: 12, title: '웹 세미나 1주차 발표 자료', originalName: 'web-seminar-1.pdf', createdAt: '2026-09-15T20:00:00' }] }))
+  await page.route('**/api/meeting-polls', route => route.fulfill({
+    json: [{ id: 5, title: '세미나 뒤풀이 날짜', creatorName: '관리자', mine: true, canDelete: true, dates: ['2026-10-16'], startMinute: 1080, endMinute: 1320, slotMinutes: 30, participantCount: 6, answered: true }],
+  }))
+
+  await page.goto('/about')
+  const dialog = page.getByRole('dialog', { name: '빠른 이동' })
+  await expect(dialog).toHaveCount(0)
+  // The header is on screen: the app has mounted and is listening for the shortcut.
+  await expect(page.getByRole('button', { name: '빠른 이동 열기' })).toBeVisible()
+  await page.keyboard.press('Control+k')
+  const box = dialog.getByRole('combobox', { name: '어디로 갈까요?' })
+  const options = dialog.getByRole('option')
+  await expect(box).toBeFocused()
+  // With nothing typed it is a menu of the pages, the first one highlighted.
+  await expect(options.first()).toContainText('홈')
+  await expect(options.first()).toHaveAttribute('aria-selected', 'true')
+  await expect(dialog.getByRole('option', { name: /운영 패널/ })).toHaveCount(1)
+  await expect(dialog.getByRole('option', { name: /로그인/ })).toHaveCount(0)
+
+  // Titles from every kind of place, each under its own heading.
+  await box.fill('세미나')
+  await expect(dialog.getByRole('group', { name: '페이지' }).getByRole('option')).toHaveText([/활동/])
+  await expect(dialog.getByRole('group', { name: '공지사항' }).getByRole('option')).toHaveText([/2학기 웹 세미나 일정 안내/])
+  await expect(dialog.getByRole('group', { name: '커뮤니티' }).getByRole('option')).toHaveText([/알고리즘 세미나 후기/])
+  await expect(dialog.getByRole('group', { name: '자료실' }).getByRole('option')).toHaveText([/웹 세미나 1주차 발표 자료/])
+  await expect(dialog.getByRole('group', { name: '일정 조율' }).getByRole('option')).toHaveText([/세미나 뒤풀이 날짜/])
+  await expect(options).toHaveCount(5)
+
+  // The arrow keys walk the one list across the headings and wrap round; Enter goes.
+  await expect(options.first()).toHaveAttribute('aria-selected', 'true')
+  await box.press('ArrowUp')
+  await expect(options.last()).toHaveAttribute('aria-selected', 'true')
+  await expect(box).toHaveAttribute('aria-activedescendant', 'quick-option-4')
+  await box.press('ArrowDown')
+  await box.press('ArrowDown')
+  await expect(options.nth(1)).toHaveAttribute('aria-selected', 'true')
+  await box.press('Enter')
+  await expect(page).toHaveURL(/\/notices\/31$/)
+  await expect(dialog).toHaveCount(0)
+
+  // Initial consonants are enough.
+  await page.keyboard.press('Control+k')
+  await box.fill('ㅊㅎ ㄱㅈ')
+  await expect(options).toHaveText([/개강 총회 공지/])
+  await box.fill('없는말없는말')
+  await expect(dialog.getByText('"없는말없는말"에 맞는 곳이 없습니다.')).toBeVisible()
+  // Ctrl+K again closes it.
+  await page.keyboard.press('Control+k')
+  await expect(dialog).toHaveCount(0)
+})
+
+test('quick jump opens from the header and lists only pages for a guest', async ({ page }) => {
+  await mockOptionalApis(page)
+  const asked = []
+  page.on('request', request => { if (/\/api\/(community|files|meeting-polls)/.test(request.url())) asked.push(request.url()) })
+
+  await page.goto('/about')
+  const opener = page.getByRole('button', { name: '빠른 이동 열기' })
+  await opener.click()
+  const dialog = page.getByRole('dialog', { name: '빠른 이동' })
+  const box = dialog.getByRole('combobox', { name: '어디로 갈까요?' })
+  await expect(box).toBeFocused()
+  await expect(dialog.getByRole('status')).toHaveText('로그인하면 공지와 글도 찾을 수 있습니다.')
+  await expect(dialog.getByRole('option', { name: /로그인/ })).toHaveCount(1)
+  await expect(dialog.getByRole('option', { name: /운영 패널|계정 설정/ })).toHaveCount(0)
+
+  // Escape closes it and hands focus back to where it was.
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+  await expect(opener).toBeFocused()
+
+  // "/" opens it while nothing is being typed; inside the box it is just a character.
+  await page.keyboard.press('/')
+  await expect(box).toBeFocused()
+  await box.press('/')
+  await expect(box).toHaveValue('/')
+
+  // A page is found by what the menu calls it, too.
+  await box.fill('about')
+  await expect(dialog.getByRole('option')).toHaveText([/동아리 소개/])
+  await box.fill('프로')
+  await box.press('Enter')
+  await expect(page).toHaveURL(/\/projects$/)
+  await expect(dialog).toHaveCount(0)
+  // A guest's box asks nothing about member content.
+  expect(asked).toEqual([])
+})
+
+test('quick jump leaves "/" alone while something is being typed', async ({ page }) => {
+  await mockOptionalApis(page)
+  await page.goto('/login')
+  const field = page.getByRole('textbox').first()
+  await field.click()
+  await page.keyboard.type('a/b')
+  await expect(field).toHaveValue('a/b')
+  await expect(page.getByRole('dialog', { name: '빠른 이동' })).toHaveCount(0)
+})
+
+test('quick jump is offered beside the menu button on a phone', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  await mockOptionalApis(page)
+  await page.goto('/about')
+  await page.getByRole('button', { name: '빠른 이동 열기' }).click()
+  const dialog = page.getByRole('dialog', { name: '빠른 이동' })
+  await dialog.getByRole('combobox', { name: '어디로 갈까요?' }).fill('ㅎㄷ')
+  await expect(dialog.getByRole('option')).toHaveText([/활동/, /활동 기록/])
+  // A tap goes there. The page is for members, so a guest lands on the login screen.
+  await dialog.getByRole('option', { name: /활동 기록/ }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await expect(dialog).toHaveCount(0)
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+  expect(overflow).toBeLessThanOrEqual(1)
+})
+
 test('top navigation groups activity log and monthly calendar under Activity', async ({ page }) => {
   await mockAdminApis(page)
   await page.goto('/')
