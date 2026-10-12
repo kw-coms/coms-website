@@ -233,6 +233,32 @@ test.describe('home boot intro', () => {
 })
 
 // The home sections under the hero: every card is a real control that goes where it says.
+// The tools row on the home lists what the Activity menu holds and takes a member there.
+test('home tools row lists the Activity menu and opens a tool', async ({ page }) => {
+  await page.addInitScript(() => {
+    try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ }
+  })
+  await mockAdminApis(page)
+  await page.route('**/api/meeting-polls', route => route.fulfill({ json: [] }))
+  await page.goto('/')
+
+  const tools = page.getByRole('list', { name: '활동 도구 바로가기' })
+  await tools.scrollIntoViewIfNeeded()
+  const tiles = tools.getByRole('button')
+  // The same entries, in the same order, as the menu in the header.
+  await page.getByRole('button', { name: 'Activity' }).click()
+  const menu = await page.getByRole('navigation', { name: '활동 메뉴' }).getByRole('button').evaluateAll(items => items.map(item => item.querySelector('span span:last-child').textContent))
+  await page.keyboard.press('Escape')
+  expect(menu.length).toBeGreaterThanOrEqual(4)
+  await expect(tiles).toHaveCount(menu.length)
+  const titles = await tiles.evaluateAll(items => items.map(item => item.querySelector('.coms-tool-title').textContent))
+  expect(titles).toEqual(menu)
+
+  await tools.getByRole('button', { name: /일정 조율/ }).click()
+  await expect(page).toHaveURL(/\/meet$/)
+  await expect(page.getByRole('heading', { level: 1, name: '일정 조율' })).toBeVisible()
+})
+
 test('home section cards lead where they say', async ({ page }) => {
   await page.addInitScript(() => {
     try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ }
