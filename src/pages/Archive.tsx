@@ -6,7 +6,7 @@ import { canEditArchive } from '../utils/contentEditing'
 import { useScrollReveal } from '../hooks/useScrollReveal'
 import { useVisibleCount } from '../hooks/useVisibleCount'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
-import { ArrowLeft, FileUp } from 'lucide-react'
+import { ArrowLeft, FileUp, FolderOpen } from 'lucide-react'
 import { deleteFile, listFiles, voteArchiveFile, updateArchiveAuthor } from '../services/archiveApi'
 import { useAuth } from '../contexts/useAuth'
 import { richBodyToPlainText } from '../components/richEditor/renderRichBody'
@@ -211,6 +211,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
         <div className="apple-board-hero px-5 py-6 sm:px-8 sm:py-8">
           <div className="flex flex-wrap items-end justify-between gap-5">
             <div className="min-w-0" data-reveal>
+              <span className="coms-icon coms-board-icon" aria-hidden="true"><FolderOpen size={22} strokeWidth={2} /></span>
               <p className="apple-eyebrow">Archive</p>
               <h1 className="mt-2 text-3xl font-bold leading-tight tracking-normal sm:text-4xl">
                 {view === 'write' ? '자료 등록' : view === 'edit' ? '자료 수정' : view === 'detail' ? '자료 상세' : '자료실'}

@@ -358,6 +358,7 @@ export default function Notices() {
         <div className="apple-board-hero px-5 py-6 sm:px-7 sm:py-7" data-reveal>
           <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
             <div className="min-w-0">
+              <span className="coms-icon coms-board-icon" aria-hidden="true"><Megaphone size={22} strokeWidth={2} /></span>
               <p className="apple-eyebrow">Notices</p>
               <h1 className="apple-display mt-2 text-4xl sm:text-5xl">{headerTitle}</h1>
               <p className="apple-copy mt-3 max-w-xl text-base sm:text-lg">공지, 홍보, 소모임, 취업공고를 한 화면에서 빠르게 확인하고 검색합니다.</p>
