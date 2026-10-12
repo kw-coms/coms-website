@@ -3553,6 +3553,221 @@ test('sponsors page renders tiers, anonymises, and hides the amount note from gu
   await expect(page.getByText('문제가 발생했습니다.')).toHaveCount(0)
 })
 
+// Attendance ("출석 체크"): a member checks in with the code on the screen; whoever runs the
+// check opens it, shows the code, sees who came and closes it. The people are made up.
+test('a member checks in to attendance with the code', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
+  await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
+  let sessions = [{ id: 3, title: '웹 세미나 3주차', openedByName: '운영진', openedAt: '2026-10-12T19:00:00', closesAt: '2026-10-12T19:30:00', open: true, remainingSeconds: 1500, attendeeCount: 4, attended: false, code: null }]
+  const tries = []
+  await page.route('**/api/attendance/sessions', route => route.fulfill({ json: sessions }))
+  await page.route('**/api/attendance/check-in', async route => {
+    const { code } = route.request().postDataJSON()
+    tries.push(code)
+    if (code !== '4821') return route.fulfill({ status: 404, json: { message: '코드가 맞지 않거나 출석이 마감되었습니다.' } })
+    sessions = [{ ...sessions[0], attended: true, attendeeCount: 5 }]
+    await route.fulfill({ json: { sessionId: 3, title: '웹 세미나 3주차', checkedAt: '2026-10-12T19:05:00', alreadyChecked: false } })
+  })
+
+  await page.goto('/attendance')
+  await expect(page.getByRole('heading', { level: 1, name: '출석 체크' })).toBeVisible()
+  await expect(page.getByText('아직 출석한 기록이 없습니다.')).toBeVisible()
+  // A member is not offered the tools for running a check.
+  await expect(page.getByRole('heading', { name: '출석 진행' })).toHaveCount(0)
+  // What can be checked in to right now is named, without its code.
+  const openNow = page.getByRole('list', { name: '지금 받고 있는 출석' }).getByRole('listitem')
+  await expect(openNow).toHaveCount(1)
+  await expect(openNow).toContainText('웹 세미나 3주차')
+  await expect(openNow).toContainText('받는 중')
+
+  const form = page.getByRole('form', { name: '출석하기' })
+  const code = form.getByLabel('출석 코드')
+  const submit = form.getByRole('button', { name: '출석하기' })
+  await expect(submit).toBeDisabled()
+  // The box keeps digits only, four at most.
+  await code.fill('코드 12 34 5')
+  await expect(code).toHaveValue('1234')
+  await submit.click()
+  await expect(form.getByRole('status')).toHaveText('코드가 맞지 않거나 출석이 마감되었습니다.')
+
+  await code.fill('4821')
+  await submit.click()
+  await expect(form.getByRole('status')).toHaveText('"웹 세미나 3주차" 출석이 기록되었습니다.')
+  await expect(code).toHaveValue('')
+  expect(tries).toEqual(['1234', '4821'])
+  await expect(openNow).toContainText('출석 완료')
+  await expect(page.getByRole('heading', { name: /내 출석 1회/ })).toBeVisible()
+  await expect(page.getByRole('list', { name: '내 출석 기록' }).getByRole('listitem')).toHaveText([/웹 세미나 3주차/])
+})
+
+test('a member is told when no attendance is being taken', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.route('**/api/auth/me', route => route.fulfill({ json: { id: 5, studentId: '2023000002', name: '홍길동', role: 'USER', emailVerified: true } }))
+  await page.route('**/api/permissions/me', route => route.fulfill({ json: { role: 'USER', permissions: [] } }))
+  await page.route('**/api/attendance/sessions', route => route.fulfill({ json: [] }))
+  await page.goto('/attendance')
+  await expect(page.getByText('지금 받고 있는 출석이 없습니다.')).toBeVisible()
+  await expect(page.getByRole('list', { name: '지금 받고 있는 출석' })).toHaveCount(0)
+})
+
+test('whoever runs attendance opens a check, shows the code, sees who came and closes it', async ({ page }) => {
+  await mockAdminApis(page)
+  let sessions = [{ id: 2, title: '지난 세미나', openedByName: '관리자', openedAt: '2026-10-05T19:00:00', closesAt: '2026-10-05T19:30:00', open: false, remainingSeconds: 0, attendeeCount: 7, attended: true, code: null }]
+  let opened = null
+  let closedId = null
+  const local = (date) => new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 19)
+  await page.route('**/api/attendance/sessions', async route => {
+    if (route.request().method() !== 'POST') return route.fulfill({ json: sessions })
+    opened = route.request().postDataJSON()
+    // The viewer's clock plays no part: closesAt is long past, the seconds left are what count.
+    const session = { id: 3, title: opened.title, openedByName: '관리자', openedAt: local(new Date()), closesAt: '2020-01-01T00:00:00', open: true, remainingSeconds: opened.minutes * 60, attendeeCount: 0, attended: false, code: '4821' }
+    sessions = [session, ...sessions]
+    await route.fulfill({ status: 201, json: session })
+  })
+  await page.route('**/api/attendance/sessions/3', route => route.fulfill({ json: { session: sessions[0], attendees: [{ name: '홍길동', checkedAt: local(new Date()) }, { name: '김철수', checkedAt: local(new Date()) }] } }))
+  await page.route('**/api/attendance/sessions/3/close', async route => {
+    closedId = 3
+    sessions = sessions.map((session) => (session.id === 3 ? { ...session, open: false, remainingSeconds: 0, code: null, attendeeCount: 2 } : session))
+    await route.fulfill({ json: sessions[0] })
+  })
+
+  await page.goto('/attendance')
+  await expect(page.getByRole('heading', { name: '출석 진행' })).toBeVisible()
+  const form = page.getByRole('form', { name: '출석 열기' })
+  await form.getByRole('button', { name: '출석 열기' }).click()
+  await expect(page.getByRole('alert')).toHaveText('출석 이름을 입력해 주세요.')
+  await form.getByLabel('출석 이름').fill('웹 세미나 3주차')
+  await form.getByLabel('받는 시간').selectOption('20')
+  await form.getByRole('button', { name: '출석 열기' }).click()
+  await expect.poll(() => opened).toEqual({ title: '웹 세미나 3주차', minutes: 20 })
+
+  // The code, large, with the time left counting down from what the server said.
+  await expect(page.getByLabel('출석 코드 4 8 2 1')).toHaveText('4821')
+  await expect(page.getByText(/남은 시간 (19:5\d|20:00)/)).toBeVisible()
+
+  await page.getByRole('button', { name: '명단 보기' }).click()
+  const roster = page.getByRole('region', { name: '출석한 사람' })
+  await expect(roster).toContainText('웹 세미나 3주차 · 2명')
+  await expect(roster.getByRole('listitem')).toHaveText(['홍길동', '김철수'])
+
+  await page.getByRole('button', { name: '지금 마감' }).click()
+  await expect.poll(() => closedId).toBe(3)
+  await expect(page.getByLabel('출석 코드 4 8 2 1')).toHaveCount(0)
+  const past = page.getByRole('list', { name: '지난 출석' }).getByRole('listitem')
+  await expect(past).toHaveCount(2)
+  await expect(past.first()).toContainText('웹 세미나 3주차')
+  await expect(past.first()).toContainText('2명')
+})
+
+test('an open attendance check can fill the screen for a projector', async ({ page }) => {
+  // The Fullscreen API is replaced by a stand-in that records the element: whether a headless
+  // browser grants real fullscreen differs, and the card's own behaviour is what is pinned here.
+  await page.addInitScript(() => {
+    let current = null
+    const changed = () => document.dispatchEvent(new Event('fullscreenchange'))
+    Object.defineProperty(Document.prototype, 'fullscreenEnabled', { configurable: true, get: () => true })
+    Object.defineProperty(Document.prototype, 'fullscreenElement', { configurable: true, get: () => current })
+    Element.prototype.requestFullscreen = function requestFullscreen() { current = this; changed(); return Promise.resolve() }
+    Document.prototype.exitFullscreen = function exitFullscreen() { current = null; changed(); return Promise.resolve() }
+  })
+  await mockAdminApis(page)
+  await page.route('**/api/attendance/sessions', route => route.fulfill({
+    json: [{ id: 3, title: '웹 세미나 3주차', openedByName: '관리자', openedAt: '2026-10-12T19:00:00', closesAt: '2026-10-12T19:30:00', open: true, remainingSeconds: 900, attendeeCount: 12, attended: false, code: '4821' }],
+  }))
+
+  await page.goto('/attendance')
+  const card = page.getByRole('listitem').filter({ has: page.getByLabel('출석 코드 4 8 2 1') })
+  await expect(card).toContainText('12명')
+  await card.getByRole('button', { name: '크게 보기' }).click()
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement?.className ?? '')).toContain('coms-attend-live')
+  // The list of who came opens below the card, so it is not offered while the card fills the screen.
+  await expect(card.getByRole('button', { name: '명단 보기' })).toHaveCount(0)
+  await expect(card.getByRole('button', { name: '지금 마감' })).toBeVisible()
+  await card.getByRole('button', { name: '작게 보기' }).click()
+  await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true)
+  await expect(card.getByRole('button', { name: '명단 보기' })).toBeVisible()
+})
+
+test('whoever runs attendance sees how often each member came and exports it', async ({ page }) => {
+  await mockAdminApis(page)
+  const past = (id, title, openedAt, attendeeCount) => ({ id, title, openedByName: '관리자', openedAt, closesAt: openedAt, open: false, remainingSeconds: 0, attendeeCount, attended: false, code: null })
+  await page.route('**/api/attendance/sessions', route => route.fulfill({
+    json: [past(3, '웹 세미나 3주차', '2026-10-12T19:00:00', 2), past(2, '알고리즘 스터디', '2026-10-05T19:00:00', 2), past(1, '개강 총회', '2026-09-02T18:00:00', 2)],
+  }))
+  let summaryRequests = 0
+  await page.route('**/api/attendance/summary', route => {
+    summaryRequests += 1
+    return route.fulfill({
+      json: {
+        sessions: [
+          { id: 3, title: '웹 세미나 3주차', openedAt: '2026-10-12T19:00:00', attendeeCount: 2 },
+          { id: 2, title: '알고리즘 스터디', openedAt: '2026-10-05T19:00:00', attendeeCount: 2 },
+          { id: 1, title: '개강 총회', openedAt: '2026-09-02T18:00:00', attendeeCount: 2 },
+        ],
+        members: [
+          { name: '홍길동', count: 3, sessionIds: [1, 2, 3] },
+          { name: '김철수', count: 2, sessionIds: [1, 3] },
+          { name: '이영희', count: 1, sessionIds: [2] },
+        ],
+      },
+    })
+  })
+
+  await page.goto('/attendance')
+  await expect(page.getByRole('heading', { name: '출석 현황' })).toBeVisible()
+  // The summary is asked for when it is opened, not with the page.
+  expect(summaryRequests).toBe(0)
+  await page.getByRole('button', { name: '현황 보기' }).click()
+  const summary = page.getByRole('region', { name: '출석 현황' })
+  const rows = summary.getByRole('row')
+  await expect(rows).toHaveCount(4)
+  await expect(rows.nth(1)).toContainText('홍길동')
+  await expect(rows.nth(1)).toContainText('3회')
+  await expect(rows.nth(1).getByRole('img', { name: '최근 3회 중 3회 출석' })).toBeVisible()
+  await expect(rows.nth(3)).toContainText('이영희')
+  await expect(rows.nth(3).getByRole('img', { name: '최근 3회 중 1회 출석' })).toBeVisible()
+
+  // Ordered by a column, and narrowed by name.
+  await summary.getByRole('button', { name: '이름' }).click()
+  await expect(rows.nth(1)).toContainText('김철수')
+  await expect(rows.nth(3)).toContainText('홍길동')
+  const search = summary.getByRole('searchbox', { name: '출석 현황에서 이름으로 찾기' })
+  await search.fill('없는사람')
+  await expect(summary.getByText('찾는 이름이 없습니다.')).toBeVisible()
+  await expect(summary.getByRole('button', { name: 'CSV 내보내기' })).toBeDisabled()
+  await search.fill('영희')
+  await expect(rows).toHaveCount(2)
+  await expect(summary.getByRole('status')).toHaveText('3명 중 1명')
+  await search.fill('')
+  await expect(rows).toHaveCount(4)
+
+  // The file holds what the table shows, in its order: checks oldest to newest, left to right.
+  const downloading = page.waitForEvent('download')
+  await summary.getByRole('button', { name: 'CSV 내보내기' }).click()
+  const download = await downloading
+  expect(download.suggestedFilename()).toMatch(/^coms-attendance-\d{4}-\d{2}-\d{2}\.csv$/)
+  const chunks = []
+  for await (const chunk of await download.createReadStream()) chunks.push(chunk)
+  const text = Buffer.concat(chunks).toString('utf8')
+  expect(text.charCodeAt(0)).toBe(0xfeff)
+  expect(text.slice(1).split('\r\n')).toEqual([
+    '"이름","출석 횟수","9/2 개강 총회","10/5 알고리즘 스터디","10/12 웹 세미나 3주차"',
+    '"김철수","2","O","","O"',
+    '"이영희","1","","O",""',
+    '"홍길동","3","O","O","O"',
+    '',
+  ])
+
+  await page.getByRole('button', { name: '현황 닫기' }).click()
+  await expect(summary).toHaveCount(0)
+})
+
+test('guest visiting attendance is redirected to login', async ({ page }) => {
+  await page.goto('/attendance')
+  await expect(page).toHaveURL(/\/login$/)
+})
+
 // Meeting polls ("일정 조율"): open one from the list, paint free time with the mouse, the
 // keyboard and a day heading, save it, and read the overlap back. The people are made up.
 test('a member paints free time on a meeting poll and saves it', async ({ page }) => {

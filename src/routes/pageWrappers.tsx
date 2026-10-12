@@ -17,6 +17,7 @@ const RecruitNotice = lazy(() => import('../pages/RecruitNotice'))
 const Sponsors = lazy(() => import('../pages/Sponsors'))
 const Draw = lazy(() => import('../pages/Draw'))
 const MeetingPolls = lazy(() => import('../pages/MeetingPolls'))
+const Attendance = lazy(() => import('../pages/Attendance'))
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -57,6 +58,14 @@ export function SponsorsPage() {
   return (
     <PageShell wide full>
       <Sponsors />
+    </PageShell>
+  )
+}
+
+export function AttendancePage() {
+  return (
+    <PageShell wide full>
+      <Attendance />
     </PageShell>
   )
 }

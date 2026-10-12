@@ -61,6 +61,7 @@ public class AdminService {
     private final LoginFailureRepository loginFailureRepository;
     private final RefreshSessionService refreshSessionService;
     private final MeetingPollService meetingPollService;
+    private final AttendanceService attendanceService;
 
     public AdminService(MemberRepository memberRepository, EligibleMemberService eligibleMemberService,
                         PasswordEncoder passwordEncoder, CommunityService communityService,
@@ -73,7 +74,8 @@ public class AdminService {
                         RecruitApplicationRepository recruitApplicationRepository,
                         LoginFailureRepository loginFailureRepository,
                         RefreshSessionService refreshSessionService,
-                        MeetingPollService meetingPollService) {
+                        MeetingPollService meetingPollService,
+                        AttendanceService attendanceService) {
         this.memberRepository = memberRepository;
         this.eligibleMemberService = eligibleMemberService;
         this.passwordEncoder = passwordEncoder;
@@ -92,6 +94,7 @@ public class AdminService {
         this.loginFailureRepository = loginFailureRepository;
         this.refreshSessionService = refreshSessionService;
         this.meetingPollService = meetingPollService;
+        this.attendanceService = attendanceService;
     }
 
     @Transactional(readOnly = true)
@@ -201,6 +204,8 @@ public class AdminService {
         teamRandomizerRoomRepository.deleteByOwnerStudentId(studentId);
         // 일정 조율: 이 회원이 낸 가능 시간과, 이 회원이 연 조율(안의 응답 포함)을 함께 지운다.
         meetingPollService.deleteDataForMember(studentId);
+        // 출석: 이 회원의 출석 기록을 지우고, 이 회원이 연 출석은 연 사람 표시만 지운다.
+        attendanceService.deleteDataForMember(studentId);
         // 지원서에는 이름/연락처/이메일이 그대로 남고, 로그인 실패 기록에는 학번과 IP 가 남는다.
         // 둘 다 감사 기록이 아니라 개인정보이므로 탈퇴 시 함께 지운다.
         recruitApplicationRepository.deleteByStudentId(studentId);

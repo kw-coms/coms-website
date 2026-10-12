@@ -1,0 +1,192 @@
+/* ===== Attendance ("출석 체크") ============================================== */
+/* The code box members type into, and the code as whoever runs the check shows it to the
+   room. One accent. */
+
+.coms-attend-panel {
+	border-radius: 16px;
+	border: 1px solid var(--app-hairline);
+	background:
+		radial-gradient(22rem 12rem at 100% 0%, color-mix(in srgb, var(--app-accent) 14%, transparent), transparent 70%),
+		color-mix(in srgb, var(--app-surface) 78%, transparent);
+	padding: 1.25rem;
+}
+
+.coms-attend-input {
+	display: block;
+	width: 100%;
+	margin: 1rem 0 0.75rem;
+	border-radius: 14px;
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	padding: 0.85rem 0.5rem 0.85rem 1.1rem;
+	color: var(--app-text);
+	font: 700 2.4rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	letter-spacing: 0.6em;
+	text-align: center;
+	outline: none;
+}
+
+.coms-attend-input::placeholder {
+	color: color-mix(in srgb, var(--app-text) 22%, transparent);
+}
+
+/* A dot before each check that can be checked in to right now. */
+.coms-attend-pulse {
+	width: 8px;
+	height: 8px;
+	flex: none;
+	border-radius: 9999px;
+	background: var(--app-accent);
+	box-shadow: 0 0 0 0 color-mix(in srgb, var(--app-accent) 60%, transparent);
+	animation: coms-attend-pulse 1.8s ease-out infinite;
+}
+
+.coms-attend-pulse.is-done {
+	animation: none;
+	box-shadow: none;
+	opacity: 0.55;
+}
+
+@keyframes coms-attend-pulse {
+	70% { box-shadow: 0 0 0 7px transparent; }
+	100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* An open check as it is put up on the screen. */
+.coms-attend-live {
+	border-radius: 18px;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 45%, var(--app-hairline));
+	background:
+		radial-gradient(24rem 14rem at 50% 0%, color-mix(in srgb, var(--app-accent) 20%, transparent), transparent 72%),
+		color-mix(in srgb, var(--app-surface) 84%, transparent);
+	padding: 1.25rem;
+	text-align: center;
+	box-shadow: 0 24px 60px color-mix(in srgb, var(--app-accent) 14%, transparent);
+}
+
+.coms-attend-live-title {
+	color: var(--app-text);
+	font-size: 0.875rem;
+	font-weight: 700;
+}
+
+.coms-attend-live-meta {
+	color: var(--app-muted);
+	font-size: 0.75rem;
+	font-weight: 600;
+}
+
+.coms-attend-code {
+	margin: 0.6rem 0;
+	color: var(--app-text);
+	font: 800 clamp(3.5rem, 12vw, 5.5rem) / 1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	letter-spacing: 0.18em;
+	/* The tracking after the last digit would push the number off centre. */
+	margin-right: -0.18em;
+	text-shadow: 0 0 34px color-mix(in srgb, var(--app-accent) 55%, transparent);
+}
+
+/* The head count pops when someone checks in (the element is re-made when the number changes). */
+.coms-attend-count {
+	display: inline-block;
+	color: var(--app-text);
+	animation: coms-attend-pop 420ms cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+@keyframes coms-attend-pop {
+	from { transform: scale(1.5); color: var(--app-accent-text); }
+}
+
+/* "크게 보기": the card fills the screen, for a projector. The page behind a fullscreen element
+   is not drawn, so the ground is opaque here. */
+.coms-attend-live:fullscreen {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 2vh;
+	border: 0;
+	border-radius: 0;
+	background:
+		radial-gradient(90vw 70vh at 50% 30%, color-mix(in srgb, var(--app-accent) 26%, transparent), transparent 70%),
+		var(--app-bg);
+	padding: 4vh 4vw;
+	box-shadow: none;
+}
+
+.coms-attend-live:fullscreen .coms-attend-live-title {
+	font-size: clamp(1.5rem, 4.5vw, 3.5rem);
+}
+
+.coms-attend-live:fullscreen .coms-attend-code {
+	margin-block: 0;
+	font-size: min(27vw, 46vh);
+	text-shadow: 0 0 9vw color-mix(in srgb, var(--app-accent) 60%, transparent);
+}
+
+.coms-attend-live:fullscreen .coms-attend-live-meta {
+	font-size: clamp(1rem, 2.6vw, 2rem);
+}
+
+.coms-attend-live:fullscreen .coms-attend-live-meta svg {
+	width: 0.9em;
+	height: 0.9em;
+}
+
+/* Summary: how often a member came, against whoever came most. */
+.coms-attend-bar {
+	display: block;
+	min-width: 2.5rem;
+	max-width: 22rem;
+	flex: 1;
+	height: 8px;
+	overflow: hidden;
+	border-radius: 9999px;
+	background: color-mix(in srgb, var(--app-text) 10%, transparent);
+}
+
+.coms-attend-bar > span {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: linear-gradient(90deg, color-mix(in srgb, var(--app-accent) 70%, transparent), var(--app-accent));
+}
+
+/* Summary: one dot per recent check, lit where the member came. */
+.coms-attend-dots {
+	display: inline-flex;
+	gap: 3px;
+	vertical-align: middle;
+}
+
+.coms-attend-dots > i {
+	width: 9px;
+	height: 9px;
+	flex: none;
+	border-radius: 3px;
+	background: color-mix(in srgb, var(--app-text) 12%, transparent);
+}
+
+.coms-attend-dots > i.is-on {
+	background: var(--app-accent);
+	box-shadow: 0 0 8px color-mix(in srgb, var(--app-accent) 55%, transparent);
+}
+
+@media (max-width: 480px) {
+	.coms-attend-dots {
+		gap: 2px;
+	}
+
+	.coms-attend-dots > i {
+		width: 7px;
+		height: 7px;
+		border-radius: 2px;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.coms-attend-pulse,
+	.coms-attend-count {
+		animation: none;
+	}
+}
