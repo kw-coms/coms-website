@@ -98,7 +98,7 @@ export function CommunityMemberProfilePage() {
 export function AdminPage() {
   const navigate = useNavigate()
   return (
-    <PageShell>
+    <PageShell wide full>
       <Admin onBack={() => navigate('/')} />
     </PageShell>
   )

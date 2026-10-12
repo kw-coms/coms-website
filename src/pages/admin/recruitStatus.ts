@@ -6,7 +6,7 @@ export const RECRUIT_STATUS_OPTIONS = [
   { value: 'REJECTED', label: '불합격' },
 ]
 
-const RECRUIT_PENDING_STATUSES = new Set(['RECEIVED', 'REVIEWING', 'HOLD'])
+export const RECRUIT_PENDING_STATUSES = new Set(['RECEIVED', 'REVIEWING', 'HOLD'])
 
 export function recruitStatusLabel(status) {
   return RECRUIT_STATUS_OPTIONS.find((option) => option.value === status)?.label || status || '알 수 없음'
