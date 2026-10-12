@@ -8,6 +8,8 @@ const STATUS_TONE_CLASS = {
   external: 'bg-[#fff4de] text-[#b76e00]',
   download: 'bg-[#f0ecff] text-[#6e3fd8]',
   draft: 'bg-[#f5f5f7] text-[#6e6e73]',
+  // Theme tokens, not fixed colours: the other tones are remapped for the dark theme by hue.
+  down: 'border border-[var(--app-hairline-strong)] bg-transparent text-[var(--app-text)]',
 }
 
 function formatFileSize(bytes) {
@@ -36,12 +38,15 @@ type AppProject = {
 export default function AppProjectCard({
   project,
   showStatusBadges = false,
+  linkState = null,
   interactive = true,
   className = '',
   testId,
 }: {
   project: AppProject
   showStatusBadges?: boolean
+  /** What the server's last look at the link found; see linkStateOf. */
+  linkState?: 'UP' | 'DOWN' | 'UNKNOWN' | null
   interactive?: boolean
   className?: string
   testId?: string
@@ -56,7 +61,10 @@ export default function AppProjectCard({
   const cardProps = wholeCardLink
     ? { href: linkHref, target: '_blank', rel: 'noreferrer' }
     : {}
-  const badges = showStatusBadges ? buildProjectStatusBadges(project) : []
+  const badges = showStatusBadges ? buildProjectStatusBadges(project, linkState) : []
+  // Said on the card itself wherever the badges are not shown: the link still opens (the look
+  // can be minutes old), but a visitor should not find out from an error page.
+  const notAnswering = hasLink && linkState === 'DOWN' && !showStatusBadges
 
   return (
     <CardTag
@@ -89,6 +97,12 @@ export default function AppProjectCard({
       )}
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
+        {notAnswering && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-hairline-strong)] px-2.5 py-1 text-xs font-bold text-[var(--app-text)]">
+            <span className="size-1.5 rounded-full bg-[var(--app-danger)]" aria-hidden="true" />
+            지금 응답 없음
+          </span>
+        )}
         {hasLink && (
           wholeCardLink ? (
             <span className="inline-flex items-center gap-2 text-sm font-bold text-[var(--app-accent-text)]">

@@ -285,4 +285,87 @@ class LinkPreviewServiceTest {
             assertThat(java.time.Duration.ofNanos(System.nanoTime() - start)).isLessThan(java.time.Duration.ofSeconds(4));
         }
     }
+
+    // ── finalStatus: the status after redirects, under the preview's rules ───────
+
+    /** A service whose fetches return canned pages and whose hosts all resolve to one public address. */
+    private static LinkPreviewService canned(java.util.List<URI> asked, LinkPreviewService.FetchedPage... pages) {
+        java.util.ArrayDeque<LinkPreviewService.FetchedPage> queue = new java.util.ArrayDeque<>(java.util.List.of(pages));
+        return new LinkPreviewService() {
+            @Override
+            InetAddress resolveAndGuard(String host) {
+                try {
+                    return InetAddress.getByName("93.184.216.34");
+                } catch (UnknownHostException impossible) {
+                    throw new IllegalStateException(impossible);
+                }
+            }
+
+            @Override
+            FetchedPage fetch(URI uri, InetAddress address, long deadline) {
+                asked.add(uri);
+                return queue.size() > 1 ? queue.poll() : queue.peek();
+            }
+        };
+    }
+
+    private static LinkPreviewService.FetchedPage answered(int status) {
+        return new LinkPreviewService.FetchedPage(status, "text/html", null, new byte[0]);
+    }
+
+    private static LinkPreviewService.FetchedPage redirected(String location) {
+        return new LinkPreviewService.FetchedPage(301, "", location, new byte[0]);
+    }
+
+    @Test
+    void finalStatusIsWhatTheAddressAnswersAfterItsRedirects() throws Exception {
+        java.util.List<URI> asked = new java.util.ArrayList<>();
+        assertThat(canned(asked, answered(200)).finalStatus("https://app.example/")).isEqualTo(200);
+        assertThat(asked).containsExactly(URI.create("https://app.example/"));
+
+        // A redirect is followed, relative ones against where it came from, and the last answer counts.
+        asked.clear();
+        LinkPreviewService moved = canned(asked, redirected("https://www.app.example/start"), redirected("/home"), answered(502));
+        assertThat(moved.finalStatus("https://app.example/")).isEqualTo(502);
+        assertThat(asked).containsExactly(
+                URI.create("https://app.example/"),
+                URI.create("https://www.app.example/start"),
+                URI.create("https://www.app.example/home"));
+    }
+
+    @Test
+    void finalStatusStopsFollowingAfterAFewRedirects() throws Exception {
+        java.util.List<URI> asked = new java.util.ArrayList<>();
+        LinkPreviewService looping = canned(asked, redirected("https://app.example/again"));
+        assertThat(looping.finalStatus("https://app.example/")).isEqualTo(301);
+        // The first request and three redirects, no more.
+        assertThat(asked).hasSize(4);
+    }
+
+    @Test
+    void finalStatusRefusesWhatAPreviewWouldRefuse() {
+        java.util.List<URI> asked = new java.util.ArrayList<>();
+        LinkPreviewService service = canned(asked, redirected("http://app.example/plain"), answered(200));
+        assertThatThrownBy(() -> service.finalStatus("http://app.example/"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThatThrownBy(() -> service.finalStatus("https://app.example:8443/"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(asked).isEmpty();
+        // A redirect down to plain http is refused too, after the one request that revealed it.
+        assertThatThrownBy(() -> service.finalStatus("https://app.example/"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(asked).containsExactly(URI.create("https://app.example/"));
+        // And the real guard still refuses a private address.
+        assertThatThrownBy(() -> new LinkPreviewService().finalStatus("https://localhost/"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
+
+    @Test
+    void requireResolvableOnlyAsksWhetherTheNameExists() throws Exception {
+        LinkPreviewService service = new LinkPreviewService();
+        // A private address resolves: judging it is the fetch's job, not this method's.
+        service.requireResolvable("127.0.0.1");
+        assertThatThrownBy(() -> service.requireResolvable("no-such-host.invalid"))
+                .isInstanceOf(UnknownHostException.class);
+    }
 }
