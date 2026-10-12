@@ -57,6 +57,8 @@ import static org.assertj.core.api.Assertions.assertThat;
         "cors.allowed-origins=https://coms.kw.ac.kr",
         "spring.jpa.hibernate.ddl-auto=validate",
         "spring.flyway.enabled=true",
+        // The prod profile turns the catalogue link check on; a test makes no outside requests.
+        "coms.project-links.enabled=false",
         "storage.location=./build/test-uploads/postgres-production-schema"
 })
 @WithMockUser(roles = "ADMIN")

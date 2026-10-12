@@ -146,6 +146,47 @@ public class LinkPreviewService {
         }
     }
 
+    /**
+     * The status the address finally answers with, following redirects under the same rules as
+     * a preview: https only, standard ports, public addresses, checked again on every hop. It is
+     * for the scheduled look at the app catalogue's own links ({@link ClubProjectLinkStatusService}),
+     * where no member chose the address at request time, so no per-member limit applies.
+     *
+     * @throws ResponseStatusException when the address, or a redirect it gives, is one this
+     *         server does not fetch
+     * @throws IOException when nothing answers in time, or every fetch slot is taken
+     */
+    int finalStatus(String rawUrl) throws IOException {
+        URI current = parseAndValidate(rawUrl);
+        if (!FETCH_SLOTS.tryAcquire()) {
+            throw new IOException("every fetch slot is taken");
+        }
+        // One budget for the whole check, redirects included.
+        long deadline = System.nanoTime() + REQUEST_TIMEOUT.toNanos();
+        try {
+            InetAddress address = resolveAndGuard(current.getHost());
+            for (int redirects = 0; ; redirects++) {
+                FetchedPage page = fetch(current, address, deadline);
+                if (page.location() == null || redirects == MAX_REDIRECTS) {
+                    return page.status();
+                }
+                current = parseAndValidate(current.resolve(page.location()).toString());
+                address = resolveAndGuard(current.getHost());
+            }
+        } finally {
+            FETCH_SLOTS.release();
+        }
+    }
+
+    /**
+     * Throws when the host name no longer resolves at all. It does not judge the address: the
+     * fetch does that. For telling "this app is gone" from "this address is not one we fetch",
+     * which {@link #resolveAndGuard(String)} reports alike.
+     */
+    void requireResolvable(String host) throws UnknownHostException {
+        InetAddress.getAllByName(host);
+    }
+
     /** What one request brought back. {@code location} is set only for a redirect. */
     record FetchedPage(int status, String contentType, String location, byte[] body) {
 

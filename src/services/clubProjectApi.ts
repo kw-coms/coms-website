@@ -10,6 +10,13 @@ export async function listClubProjectCategories() {
   return request('/api/club-projects/categories')
 }
 
+// Whether each entry's link answered when the server last looked (every ten minutes). Empty
+// right after a server start, and on a server that does not run the check.
+export async function listClubProjectLinkStatuses() {
+  const data = await request('/api/club-projects/link-status')
+  return Array.isArray(data) ? data : []
+}
+
 // ─── Admin project CRUD ──────────────────────────────────────────────────────
 
 function projectFormData({ category, title, description, eyebrow, madeBy, linkUrl, displayUrl, position }) {

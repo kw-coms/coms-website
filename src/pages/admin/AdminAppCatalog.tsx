@@ -6,9 +6,11 @@ import {
   deleteClubProject,
   listClubProjectCategories,
   listClubProjects,
+  listClubProjectLinkStatuses,
   uploadClubProjectFile,
 } from '../../services/clubProjectApi'
 import AppProjectCard from '../../components/apps/AppProjectCard'
+import { linkStateOf } from '../../utils/appProjectStatus'
 import AdminAppCatalogRow from './AdminAppCatalogRow'
 import AdminAppCategories from './AdminAppCategories'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
@@ -28,6 +30,8 @@ export default function AdminAppCatalog() {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  // Whether each link answered the server's last look; the list works without it.
+  const [linkStatuses, setLinkStatuses] = useState([])
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [form, setForm] = useState({
@@ -71,6 +75,9 @@ export default function AdminAppCatalog() {
       })
       .catch((err) => { if (mounted) setError(err.message || 'Apps 항목을 불러오지 못했습니다.') })
       .finally(() => { if (mounted) setLoading(false) })
+    listClubProjectLinkStatuses()
+      .then((statuses) => { if (mounted) setLinkStatuses(statuses) })
+      .catch(() => {})
     return () => { mounted = false }
   }, [])
 
@@ -337,6 +344,7 @@ export default function AdminAppCatalog() {
               key={item.id}
               item={item}
               categories={categories}
+              linkState={linkStateOf(item, linkStatuses)}
               onDelete={handleDelete}
               onUpdated={handleUpdated}
             />

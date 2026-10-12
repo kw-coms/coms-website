@@ -24,9 +24,11 @@ type ProjectItem = {
   files?: MediaInfo[]
 }
 
-export default function AdminAppCatalogRow({ item, categories, onDelete, onUpdated }: {
+export default function AdminAppCatalogRow({ item, categories, linkState = null, onDelete, onUpdated }: {
   item: ProjectItem
   categories: { key?: string; name: string }[]
+  /** What the server's last look at this entry's link found. */
+  linkState?: 'UP' | 'DOWN' | 'UNKNOWN' | null
   onDelete: (item: ProjectItem) => void
   onUpdated: (updated: unknown) => void
 }) {
@@ -153,6 +155,7 @@ export default function AdminAppCatalogRow({ item, categories, onDelete, onUpdat
         <AppProjectCard
           project={{ ...item, categoryName }}
           showStatusBadges
+          linkState={linkState}
           interactive={false}
           className="min-h-0"
         />
