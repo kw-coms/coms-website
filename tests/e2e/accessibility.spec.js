@@ -163,6 +163,38 @@ test('admin panel has no serious or critical accessibility violations', async ({
   await assertNoSeriousViolations(page)
 })
 
+// A gathering as whoever opened it sees it: the sign-up form, the bar, the list with answers and
+// the management buttons. The people are made up.
+for (const viewport of [{ width: 1280, height: 900 }, { width: 320, height: 720 }]) {
+  test.describe(`gathering at ${viewport.width}px`, () => {
+    test.use({ viewport })
+
+    test('has no serious accessibility violation or horizontal overflow', async ({ page }) => {
+      await mockAdminApis(page)
+      const gathering = { id: 7, title: '알고리즘 스터디', description: '매주 화요일 저녁, 세미나실', creatorName: '관리자', mine: true, canManage: true, capacity: 8, noteLabel: '하고 싶은 주제', closesAt: '2026-12-01T18:00:00', open: true, full: false, participantCount: 2, joined: true, createdAt: '2026-10-12T10:00:00' }
+      await page.route('**/api/gatherings', (route) => route.fulfill({ status: 200, json: [gathering, { ...gathering, id: 6, title: '개강 회식', capacity: null, open: false, joined: false }] }))
+      await page.route('**/api/gatherings/7', (route) => route.fulfill({
+        status: 200,
+        json: {
+          gathering,
+          participants: [
+            { id: 1, name: '관리자', mine: true, note: '그래프', signedUpAt: '2026-10-12T19:05:00' },
+            { id: 2, name: '이영희', mine: false, note: 'DP', signedUpAt: '2026-10-12T19:06:00' },
+          ],
+        },
+      }))
+      for (const [path, ready] of [['/gatherings', page.getByRole('list', { name: '모임 목록' })], ['/gatherings/7', page.getByRole('list', { name: '신청한 사람' })]]) {
+        await page.goto(path)
+        await expect(ready).toBeVisible()
+        await page.waitForTimeout(500)
+        await assertNoSeriousViolations(page)
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+        expect(overflow, `${path} overflows at ${viewport.width}px`).toBeLessThanOrEqual(1)
+      }
+    })
+  })
+}
+
 // Attendance with everything on the page: a check open (the code, the countdown) and the summary
 // table. The people are made up.
 for (const viewport of [{ width: 1280, height: 900 }, { width: 320, height: 720 }]) {

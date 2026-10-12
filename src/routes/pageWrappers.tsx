@@ -7,6 +7,7 @@ const Archive = lazy(() => import('../pages/Archive'))
 const Login = lazy(() => import('../pages/Login'))
 const Signup = lazy(() => import('../pages/Signup'))
 const Notices = lazy(() => import('../pages/Notices'))
+const Gatherings = lazy(() => import('../pages/Gatherings'))
 const Admin = lazy(() => import('../pages/Admin'))
 const Community = lazy(() => import('../pages/Community'))
 const CommunityBookmarks = lazy(() => import('../pages/community/CommunityBookmarks'))
@@ -50,6 +51,14 @@ export function NoticesPage() {
   return (
     <PageShell wide full>
       <Notices />
+    </PageShell>
+  )
+}
+
+export function GatheringsPage() {
+  return (
+    <PageShell wide full>
+      <Gatherings />
     </PageShell>
   )
 }

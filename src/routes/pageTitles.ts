@@ -17,6 +17,7 @@ const ROUTE_LABELS: Array<[pattern: RegExp, label: string]> = [
   [/^\/monthly-calendar$/, '일정 캘린더'],
   [/^\/meet(\/[^/]+)?$/, '일정 조율'],
   [/^\/attendance$/, '출석 체크'],
+  [/^\/gatherings(\/[^/]+)?$/, '모임 신청'],
   [/^\/projects$/, '프로젝트'],
   [/^\/apps$/, 'Apps'],
   [/^\/draw$/, '뽑기'],

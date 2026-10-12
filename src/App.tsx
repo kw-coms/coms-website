@@ -24,6 +24,7 @@ import {
   LoginPage,
   SignupPage,
   NoticesPage,
+  GatheringsPage,
   ArchivePage,
   CommunityPage,
   CommunityBookmarksPage,
@@ -168,6 +169,8 @@ function App() {
         <Route path="/attendance" element={<RequireAuth><AttendancePage /></RequireAuth>} />
         <Route path="/meet" element={<RequireAuth><MeetingPollsPage /></RequireAuth>} />
         <Route path="/meet/:id" element={<RequireAuth><MeetingPollsPage /></RequireAuth>} />
+        <Route path="/gatherings" element={<RequireAuth><GatheringsPage /></RequireAuth>} />
+        <Route path="/gatherings/:id" element={<RequireAuth><GatheringsPage /></RequireAuth>} />
         <Route path="/projects" element={<ProjectsDetailPage />} />
         <Route path="/apps" element={<AppsPage />} />
         <Route path="/draw" element={<DrawPage />} />

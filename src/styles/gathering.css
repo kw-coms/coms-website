@@ -1,0 +1,127 @@
+/* ===== Gatherings ("모임 신청") ================================================= */
+/* A list of things members sign up for, and one of them with who is coming. One accent;
+   "full" and "closed" step back to neutral tones instead of taking a second colour. */
+
+.coms-gather-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	border-radius: 9999px;
+	border: 1px solid transparent;
+	padding: 0.15rem 0.55rem;
+	font-size: 0.69rem;
+	font-weight: 700;
+	line-height: 1.4;
+}
+
+.coms-gather-chip.is-open,
+.coms-gather-chip.is-joined {
+	background: var(--app-accent-soft);
+	color: var(--app-accent-text);
+}
+
+.coms-gather-chip.is-full {
+	border-color: var(--app-hairline-strong);
+	color: var(--app-text);
+}
+
+.coms-gather-chip.is-closed {
+	border-color: var(--app-hairline);
+	color: var(--app-muted);
+}
+
+.coms-gather-places {
+	display: inline-flex;
+	max-width: 100%;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.6rem;
+	vertical-align: middle;
+}
+
+.coms-gather-meter {
+	display: block;
+	width: clamp(6rem, 40vw, 11rem);
+	height: 8px;
+	overflow: hidden;
+	border-radius: 9999px;
+	background: color-mix(in srgb, var(--app-text) 10%, transparent);
+}
+
+.coms-gather-meter > span {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: linear-gradient(90deg, color-mix(in srgb, var(--app-accent) 70%, transparent), var(--app-accent));
+	transition: width 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Every place taken: the bar goes quiet. */
+.coms-gather-meter > span.is-full {
+	background: color-mix(in srgb, var(--app-text) 55%, transparent);
+}
+
+.coms-gather-panel {
+	align-self: start;
+	border-radius: 16px;
+	border: 1px solid var(--app-hairline);
+	background:
+		radial-gradient(22rem 12rem at 100% 0%, color-mix(in srgb, var(--app-accent) 14%, transparent), transparent 70%),
+		color-mix(in srgb, var(--app-surface) 78%, transparent);
+	padding: 1.25rem;
+}
+
+.coms-gather-list {
+	display: grid;
+	gap: 0.45rem;
+	margin-top: 0.75rem;
+}
+
+.coms-gather-list > li {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	gap: 0.7rem;
+	border-radius: 12px;
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	padding: 0.55rem 0.8rem;
+	font-size: 0.9rem;
+	animation: coms-gather-in 360ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+.coms-gather-list > li.is-mine {
+	border-color: var(--app-accent-border);
+	background: color-mix(in srgb, var(--app-accent) 8%, var(--app-surface));
+}
+
+.coms-gather-order {
+	display: grid;
+	min-width: 1.7rem;
+	height: 1.7rem;
+	flex: none;
+	place-items: center;
+	border-radius: 9999px;
+	background: var(--app-surface-soft);
+	color: var(--app-muted);
+	font: 800 0.72rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.coms-gather-list > li.is-mine .coms-gather-order {
+	background: var(--app-accent);
+	color: #fff;
+}
+
+@keyframes coms-gather-in {
+	from { opacity: 0; transform: translateY(6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.coms-gather-list > li {
+		animation: none;
+	}
+
+	.coms-gather-meter > span {
+		transition: none;
+	}
+}

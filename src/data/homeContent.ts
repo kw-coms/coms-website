@@ -1,6 +1,7 @@
 import {
   Binary,
   CalendarClock,
+  UserPlus,
   CalendarDays,
   CircuitBoard,
   ClipboardCheck,
@@ -455,6 +456,14 @@ export const activitySectionNavItems = [
     hint: '월별 일정',
     path: '/monthly-calendar',
     icon: CalendarDays,
+    accent: 'text-sky-500',
+  },
+  {
+    id: 'gatherings',
+    label: 'Gather',
+    hint: '모임 신청',
+    path: '/gatherings',
+    icon: UserPlus,
     accent: 'text-sky-500',
   },
   {
