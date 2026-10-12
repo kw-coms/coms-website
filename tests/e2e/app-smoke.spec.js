@@ -254,6 +254,120 @@ test('home section cards lead where they say', async ({ page }) => {
   await expect(page).toHaveURL(/\/recruit$/)
 })
 
+// Meeting polls ("일정 조율"): open one from the list, paint free time with the mouse, the
+// keyboard and a day heading, save it, and read the overlap back. The people are made up.
+test('a member paints free time on a meeting poll and saves it', async ({ page }) => {
+  await mockAdminApis(page)
+  // Two days, 10:00 to 12:00: four half hours a day, eight slots in all.
+  const poll = { id: 7, title: '웹 스터디 첫 모임', description: '동아리방에서 모입니다.', creatorName: '홍길동', mine: false, canDelete: false, dates: ['2026-10-14', '2026-10-15'], startMinute: 600, endMinute: 720, slotMinutes: 30, createdAt: '2026-10-12T10:00:00', participantCount: 1, answered: false }
+  let participants = [{ name: '홍길동', mine: false, slots: '11000011' }]
+  const saved = []
+  const detail = () => ({ poll: { ...poll, participantCount: participants.length, answered: participants.some((p) => p.mine) }, participants })
+  await page.route('**/api/meeting-polls', route => route.fulfill({ json: [detail().poll] }))
+  await page.route('**/api/meeting-polls/7', route => route.fulfill({ json: detail() }))
+  await page.route('**/api/meeting-polls/7/availability', async route => {
+    expect(route.request().method()).toBe('PUT')
+    const { slots } = route.request().postDataJSON()
+    saved.push(slots)
+    participants = [participants[0], { name: '관리자', mine: true, slots }]
+    await route.fulfill({ json: detail() })
+  })
+
+  await page.goto('/meet')
+  await expect(page.getByRole('heading', { level: 1, name: '일정 조율' })).toBeVisible()
+  await page.getByRole('button', { name: /웹 스터디 첫 모임/ }).click()
+  await expect(page).toHaveURL(/\/meet\/7$/)
+  await expect(page.getByRole('heading', { level: 1, name: '웹 스터디 첫 모임' })).toBeVisible()
+
+  const mine = page.getByRole('table', { name: '내 가능 시간' })
+  const everyone = page.getByRole('table', { name: '모두의 가능 시간' })
+  const myCell = (day, slot) => mine.locator(`[data-cell="${day}-${slot}"]`)
+
+  // One click of the mouse paints one cell, once.
+  await myCell(0, 0).click()
+  await expect(myCell(0, 0)).toHaveAttribute('aria-pressed', 'true')
+  // The keyboard toggles a cell and the arrow keys move between cells.
+  await myCell(0, 1).focus()
+  await page.keyboard.press('Enter')
+  await expect(myCell(0, 1)).toHaveAttribute('aria-pressed', 'true')
+  await page.keyboard.press('ArrowDown')
+  await expect(myCell(0, 2)).toBeFocused()
+  await page.keyboard.press('ArrowRight')
+  await expect(myCell(1, 2)).toBeFocused()
+  // A day's heading fills the whole day.
+  await page.getByRole('button', { name: '10월 15일 (목) 전체 바꾸기' }).click()
+  await expect(mine.locator('[aria-pressed="true"]')).toHaveCount(6)
+  await expect(page.getByText('저장하지 않은 변경이 있습니다.')).toBeVisible()
+
+  // The overlap follows what is being painted, before it is saved.
+  await expect(everyone.locator('[data-cell="0-0"]')).toHaveAccessibleName(/2명 중 2명 가능/)
+  await expect(everyone.locator('[data-cell="0-2"]')).toHaveAccessibleName(/2명 중 0명 가능/)
+
+  await page.getByRole('button', { name: '내 시간 저장' }).click()
+  await expect.poll(() => saved).toEqual(['11001111'])
+  await expect(page.getByRole('button', { name: '저장됨' })).toBeDisabled()
+  await expect(page.getByText('저장하지 않은 변경이 있습니다.')).toBeHidden()
+
+  // Who can make a slot, and the stretches the most people can make.
+  await everyone.locator('[data-cell="1-3"]').click()
+  await expect(page.locator('.coms-meet-info')).toContainText('2명 중 2명 가능')
+  await expect(page.locator('.coms-meet-info')).toContainText('홍길동, 관리자')
+  const best = page.locator('ol li')
+  await expect(best.first()).toContainText('10월 14일 (수)')
+  await expect(best.first()).toContainText('10:00 ~ 11:00')
+  await expect(best.first()).toContainText('2명 모두 가능')
+  await expect(best.nth(1)).toContainText('10월 15일 (목)')
+  await expect(best.nth(1)).toContainText('11:00 ~ 12:00')
+})
+
+test('a new meeting poll is sent with its dates and time window', async ({ page }) => {
+  await mockAdminApis(page)
+  let created = null
+  await page.route('**/api/meeting-polls', async route => {
+    if (route.request().method() !== 'POST') return route.fulfill({ json: [] })
+    created = route.request().postDataJSON()
+    await route.fulfill({ status: 201, json: { poll: { id: 9, title: created.title, description: '', creatorName: '관리자', mine: true, canDelete: true, dates: created.dates, startMinute: created.startMinute, endMinute: created.endMinute, slotMinutes: 30, participantCount: 0, answered: false }, participants: [] } })
+  })
+  await page.route('**/api/meeting-polls/9', route => route.fulfill({ json: { poll: { id: 9, title: created.title, description: '', creatorName: '관리자', mine: true, canDelete: true, dates: created.dates, startMinute: created.startMinute, endMinute: created.endMinute, slotMinutes: 30, participantCount: 0, answered: false }, participants: [] } }))
+
+  await page.goto('/meet')
+  await expect(page.getByText('아직 열린 일정 조율이 없습니다.')).toBeVisible()
+  await page.getByRole('button', { name: '새 일정 조율' }).click()
+  const form = page.getByRole('form', { name: '새 일정 조율' })
+
+  // Nothing is sent until the form is complete.
+  await form.getByRole('button', { name: '만들기' }).click()
+  await expect(form.getByRole('alert')).toHaveText('제목을 입력해 주세요.')
+  await form.getByLabel('제목').fill('알고리즘 스터디')
+  await form.getByRole('button', { name: '만들기' }).click()
+  await expect(form.getByRole('alert')).toHaveText('날짜를 하나 이상 골라 주세요.')
+  expect(created).toBeNull()
+
+  // Next month, so the days are selectable whatever today is.
+  await form.getByRole('button', { name: '다음 달' }).click()
+  const days = form.locator('.coms-meet-day:not(:disabled)')
+  await days.nth(2).click()
+  await days.nth(0).click()
+  await expect(form.locator('.coms-meet-day[aria-pressed="true"]')).toHaveCount(2)
+  await form.getByLabel('하루 중 시작').selectOption('840')
+  await form.getByLabel('하루 중 끝').selectOption('1080')
+  await form.getByRole('button', { name: '만들기' }).click()
+
+  await expect(page).toHaveURL(/\/meet\/9$/)
+  expect(created.title).toBe('알고리즘 스터디')
+  expect(created.startMinute).toBe(840)
+  expect(created.endMinute).toBe(1080)
+  expect(created.dates).toHaveLength(2)
+  // Sent in date order although they were picked the other way round.
+  expect([...created.dates].sort()).toEqual(created.dates)
+  await expect(page.getByRole('table', { name: '내 가능 시간' }).locator('[data-cell]')).toHaveCount(16)
+})
+
+test('guest visiting the meeting polls is redirected to login', async ({ page }) => {
+  await page.goto('/meet')
+  await expect(page).toHaveURL(/\/login$/)
+})
+
 test('activities title remains readable across selectable fonts and viewport widths', async ({ page }) => {
   for (const viewport of [
     { width: 1280, height: 900 },

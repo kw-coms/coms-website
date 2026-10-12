@@ -36,6 +36,7 @@ function getActiveNavKey(pathname) {
   if (pathname === '/activity-log') return 'activity-log'
   if (pathname === '/activity-events') return 'activity-events'
   if (pathname === '/monthly-calendar') return 'monthly-calendar'
+  if (pathname === '/meet' || pathname.startsWith('/meet/')) return 'meet'
   if (pathname === '/projects') return 'projects'
   if (pathname === '/apps') return 'apps'
   if (pathname.startsWith('/recruit')) return 'recruit'
