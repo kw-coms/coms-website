@@ -165,3 +165,22 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 320, height: 720 
     }
   })
 }
+
+// The draw page with a result on it, at both widths. The people are made up.
+for (const viewport of [{ width: 1280, height: 900 }, { width: 320, height: 720 }]) {
+  test.describe(`draw page at ${viewport.width}px`, () => {
+    test.use({ viewport })
+
+    test('has no serious accessibility violation or horizontal overflow', async ({ page }) => {
+      await mockOptionalApis(page)
+      await page.goto('/draw')
+      await page.getByRole('textbox', { name: /^이름/ }).fill('홍길동\n김철수\n이영희\n박민수\n최가람')
+      await page.getByRole('button', { name: '섞어서 나누기' }).click()
+      await expect(page.getByRole('list', { name: '조 편성 결과' }).locator('> li')).toHaveCount(2)
+      await page.waitForTimeout(500)
+      await assertNoSeriousViolations(page)
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+      expect(overflow, `/draw overflows at ${viewport.width}px`).toBeLessThanOrEqual(1)
+    })
+  })
+}

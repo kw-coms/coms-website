@@ -1743,6 +1743,124 @@ test('community list stays dense but readable on mobile', async ({ page }) => {
   expect(firstCardBox.width).toBeLessThanOrEqual(360)
 })
 
+// Draw ("뽑기"): names typed into the page are split into teams, put in an order or picked
+// from. The outcome is random, so these check what has to hold whatever it is. The people are
+// made up.
+test.describe('draw page', () => {
+  const people = ['홍길동', '김철수', '이영희', '박민수', '최가람', '정하늘', '강바다']
+
+  test('splits names into even teams, puts them in an order and copies the result', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    // What the page hands to the clipboard, kept where the test can read it.
+    await page.addInitScript(() => {
+      window.__copied = []
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: (text) => { window.__copied.push(text); return Promise.resolve() } } })
+    })
+    await mockOptionalApis(page)
+    await page.goto('/draw')
+    await expect(page.getByRole('heading', { level: 1, name: '뽑기' })).toBeVisible()
+    // It is in the Activity menu, and a guest may use it.
+    await page.getByRole('button', { name: 'Activity' }).click()
+    await expect(page.getByRole('navigation', { name: '활동 메뉴' }).getByRole('button', { name: /Draw/ })).toBeVisible()
+    await page.keyboard.press('Escape')
+
+    const names = page.getByRole('textbox', { name: /^이름/ })
+    await expect(page.getByRole('button', { name: '섞어서 나누기' })).toBeDisabled()
+    await expect(page.getByText('이름을 두 명 이상 넣어 주세요.')).toBeVisible()
+    await names.fill(people.join('\n'))
+    await expect(page.getByText('7명을 2조로 나눕니다.')).toBeVisible()
+    const stepper = page.getByRole('group', { name: '조 개수' })
+    await expect(stepper.getByRole('button', { name: '조 개수 줄이기' })).toBeDisabled()
+    await stepper.getByRole('button', { name: '조 개수 늘리기' }).click()
+    await expect(stepper.getByRole('status')).toHaveText('3조')
+
+    await page.getByRole('button', { name: '섞어서 나누기' }).click()
+    const teams = page.getByRole('list', { name: '조 편성 결과' }).locator('> li')
+    await expect(teams).toHaveCount(3)
+    // Everyone is in exactly one team, and the teams differ by one at most.
+    const members = await teams.evaluateAll(items => items.map(item => [...item.querySelectorAll('.coms-draw-chip')].map(chip => chip.textContent)))
+    expect(members.map(team => team.length).sort()).toEqual([2, 2, 3])
+    expect(members.flat().sort()).toEqual([...people].sort())
+
+    await page.getByRole('button', { name: '결과 복사' }).click()
+    await expect(page.getByText('결과를 복사했습니다.')).toBeVisible()
+    const copied = await page.evaluate(() => window.__copied)
+    expect(copied).toHaveLength(1)
+    expect(copied[0].split('\n').map(line => line.slice(0, 4))).toEqual(['1조: ', '2조: ', '3조: '])
+
+    await page.getByRole('button', { name: '순서 정하기' }).click()
+    await page.getByRole('button', { name: '순서 섞기' }).click()
+    const order = page.getByRole('list', { name: '정해진 순서' }).getByRole('listitem')
+    await expect(order).toHaveCount(7)
+    const ordered = await order.evaluateAll(items => items.map(item => item.lastElementChild.textContent))
+    expect([...ordered].sort()).toEqual([...people].sort())
+  })
+
+  test('picks without repeating until everyone has been picked', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await mockOptionalApis(page)
+    await page.goto('/draw')
+    const three = people.slice(0, 3)
+    await page.getByRole('textbox', { name: /^이름/ }).fill(three.join(', '))
+    await page.getByRole('button', { name: '뽑기', exact: true }).click()
+    const start = page.getByRole('button', { name: '뽑기 시작' })
+    const picked = page.getByRole('list', { name: '뽑힌 사람' }).getByRole('listitem')
+    const seen = []
+    for (let round = 0; round < 3; round += 1) {
+      await expect(page.getByText(`남은 사람 ${3 - round}명`)).toBeVisible()
+      await start.click()
+      await expect(page.getByText(round === 2 ? '모두 뽑혔습니다.' : `남은 사람 ${2 - round}명`)).toBeVisible()
+      await expect(picked).toHaveCount(1)
+      seen.push(await picked.first().textContent())
+    }
+    expect([...seen].sort()).toEqual([...three].sort())
+
+    // Everyone has had a turn: the button starts over.
+    await page.getByRole('button', { name: '처음부터 다시' }).click()
+    await expect(page.getByText('남은 사람 3명')).toBeVisible()
+    // Two at once.
+    await page.getByRole('group', { name: '뽑을 인원' }).getByRole('button', { name: '뽑을 인원 늘리기' }).click()
+    await start.click()
+    await expect(picked).toHaveCount(2)
+    await expect(page.getByText('남은 사람 1명')).toBeVisible()
+    // Without "뽑힌 사람은 빼고" anyone can come up again, so nobody runs out.
+    await page.getByRole('checkbox', { name: '뽑힌 사람은 빼고' }).uncheck()
+    await start.click()
+    await expect(picked).toHaveCount(2)
+    await expect(page.getByText(/남은 사람/)).toHaveCount(0)
+  })
+
+  test('points out a name written twice, and fills and clears the list', async ({ page }) => {
+    await mockOptionalApis(page)
+    await page.goto('/draw')
+    const names = page.getByRole('textbox', { name: /^이름/ })
+    await names.fill('김민수\n김민수\n이영희')
+    await expect(page.getByText('같은 이름이 여러 번 있습니다: 김민수')).toBeVisible()
+    await expect(page.getByText('이름 3명')).toBeVisible()
+    await page.getByRole('button', { name: '예시 넣기' }).click()
+    await expect(names).toHaveValue(/홍길동/)
+    await expect(page.getByText(/같은 이름이 여러 번/)).toHaveCount(0)
+    await page.getByRole('button', { name: '지우기' }).click()
+    await expect(names).toHaveValue('')
+    await expect(page.getByText('결과가 여기에 나옵니다.')).toBeVisible()
+  })
+
+  test('tumbles the names before the result settles', async ({ page }) => {
+    await mockOptionalApis(page)
+    await page.goto('/draw')
+    await page.getByRole('textbox', { name: /^이름/ }).fill(people.join('\n'))
+    const run = page.getByRole('button', { name: '섞어서 나누기' })
+    await run.click()
+    const result = page.locator('.coms-draw-result')
+    await expect(result).toHaveAttribute('aria-busy', 'true')
+    await expect(page.getByRole('button', { name: '섞는 중...' })).toBeDisabled()
+    await expect(result).toHaveAttribute('aria-busy', 'false')
+    await expect(run).toBeEnabled()
+    const settled = await page.locator('.coms-draw-chip').allTextContents()
+    expect([...settled].sort()).toEqual([...people].sort())
+  })
+})
+
 test('activities page does not embed the activity log or monthly calendar', async ({ page }) => {
   await page.goto('/activities')
 

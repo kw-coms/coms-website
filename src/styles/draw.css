@@ -1,0 +1,227 @@
+/* ===== Draw ("뽑기") ========================================================= */
+/* Names in, then teams, an order or a pick out. While the names tumble the result carries
+   .is-rolling; when that goes the pieces settle with a small pop. One accent. */
+
+.coms-draw-names {
+	display: block;
+	width: 100%;
+	margin-top: 0.6rem;
+	resize: vertical;
+	border-radius: 14px;
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	padding: 0.85rem 1rem;
+	color: var(--app-text);
+	font-size: 0.95rem;
+	line-height: 1.7;
+	outline: none;
+}
+
+.coms-draw-names:focus-visible {
+	border-color: var(--app-accent-border);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 22%, transparent);
+}
+
+.coms-draw-names::placeholder {
+	color: var(--app-subtle);
+}
+
+/* The three ways to draw, as one segmented control. */
+.coms-draw-modes {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 4px;
+	border-radius: 14px;
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface-soft);
+	padding: 4px;
+}
+
+.coms-draw-mode {
+	display: inline-flex;
+	min-height: 2.6rem;
+	align-items: center;
+	justify-content: center;
+	gap: 0.4rem;
+	border-radius: 10px;
+	color: var(--app-muted);
+	font-size: 0.85rem;
+	font-weight: 700;
+	transition: background-color 160ms ease, color 160ms ease;
+}
+
+.coms-draw-mode:hover {
+	color: var(--app-text);
+}
+
+.coms-draw-mode.is-on {
+	background: var(--app-accent);
+	color: #fff;
+	box-shadow: 0 8px 22px color-mix(in srgb, var(--app-accent) 32%, transparent);
+}
+
+.coms-draw-stepper {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.coms-draw-stepper button {
+	display: grid;
+	width: 2.25rem;
+	height: 2.25rem;
+	place-items: center;
+	border-radius: 9999px;
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	color: var(--app-text);
+	transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.coms-draw-stepper button:hover:not(:disabled) {
+	border-color: var(--app-accent-border);
+	background: var(--app-accent-soft);
+}
+
+.coms-draw-stepper button:disabled {
+	cursor: not-allowed;
+	opacity: 0.4;
+}
+
+.coms-draw-stepper output {
+	min-width: 3.2rem;
+	color: var(--app-text);
+	font-size: 1.05rem;
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+	text-align: center;
+}
+
+.coms-draw-result {
+	min-height: 13rem;
+	margin-top: 0.75rem;
+	border-radius: 18px;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 30%, var(--app-hairline));
+	background:
+		radial-gradient(26rem 12rem at 50% 0%, color-mix(in srgb, var(--app-accent) 14%, transparent), transparent 72%),
+		color-mix(in srgb, var(--app-surface) 84%, transparent);
+	padding: 1rem;
+}
+
+.coms-draw-empty {
+	display: grid;
+	min-height: 11rem;
+	place-items: center;
+	color: var(--app-muted);
+	font-size: 0.9rem;
+}
+
+.coms-draw-teams {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+	gap: 0.6rem;
+}
+
+.coms-draw-team {
+	border-radius: 14px;
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	padding: 0.75rem 0.85rem 0.85rem;
+}
+
+.coms-draw-team-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.5rem;
+	color: var(--app-accent-text);
+	font: 800 0.95rem/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.coms-draw-chip {
+	border-radius: 9999px;
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface-soft);
+	padding: 0.2rem 0.65rem;
+	color: var(--app-text);
+	font-size: 0.82rem;
+	font-weight: 600;
+}
+
+.coms-draw-order {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+	gap: 0.45rem;
+}
+
+.coms-draw-order > li {
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	gap: 0.6rem;
+	border-radius: 12px;
+	border: 1px solid var(--app-hairline);
+	background: var(--app-surface);
+	padding: 0.5rem 0.75rem;
+	color: var(--app-text);
+	font-size: 0.92rem;
+	font-weight: 700;
+}
+
+.coms-draw-number {
+	display: grid;
+	min-width: 1.7rem;
+	height: 1.7rem;
+	flex: none;
+	place-items: center;
+	border-radius: 9999px;
+	background: var(--app-accent);
+	color: #fff;
+	font: 800 0.75rem/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.coms-draw-picked {
+	display: flex;
+	min-height: 11rem;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: center;
+	gap: 0.75rem 1.5rem;
+}
+
+.coms-draw-picked > li {
+	position: relative;
+	color: var(--app-text);
+	font-size: clamp(2rem, 7vw, 3.4rem);
+	font-weight: 900;
+	line-height: 1.15;
+	text-shadow: 0 0 30px color-mix(in srgb, var(--app-accent) 55%, transparent);
+}
+
+/* Tumbling: the names change too fast to read, and look it. */
+.is-rolling .coms-draw-chip,
+.is-rolling.coms-draw-order > li,
+.is-rolling.coms-draw-picked > li {
+	filter: blur(1.5px);
+	opacity: 0.7;
+}
+
+/* Settling: each piece pops in, one after the other. */
+.coms-draw-teams:not(.is-rolling) .coms-draw-team,
+.coms-draw-order:not(.is-rolling) > li,
+.coms-draw-picked:not(.is-rolling) > li {
+	animation: coms-draw-pop 420ms cubic-bezier(0.2, 0.9, 0.3, 1.35) both;
+	animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+@keyframes coms-draw-pop {
+	from { opacity: 0; transform: translateY(8px) scale(0.92); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.coms-draw-teams:not(.is-rolling) .coms-draw-team,
+	.coms-draw-order:not(.is-rolling) > li,
+	.coms-draw-picked:not(.is-rolling) > li {
+		animation: none;
+	}
+}

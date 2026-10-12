@@ -15,6 +15,7 @@ const ChangePassword = lazy(() => import('../pages/ChangePassword'))
 const RecruitApply = lazy(() => import('../pages/RecruitApply'))
 const RecruitNotice = lazy(() => import('../pages/RecruitNotice'))
 const Sponsors = lazy(() => import('../pages/Sponsors'))
+const Draw = lazy(() => import('../pages/Draw'))
 const MeetingPolls = lazy(() => import('../pages/MeetingPolls'))
 
 export function LoginPage() {
@@ -143,6 +144,14 @@ export function RecruitNoticePage() {
   return (
     <PageShell wide full transition={false}>
       <RecruitNotice onBack={() => navigate(from, { replace: true })} onApply={goApply} />
+    </PageShell>
+  )
+}
+
+export function DrawPage() {
+  return (
+    <PageShell wide full>
+      <Draw />
     </PageShell>
   )
 }

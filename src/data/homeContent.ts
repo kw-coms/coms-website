@@ -5,6 +5,7 @@ import {
   CircuitBoard,
   Rocket,
   Sparkles,
+  Dices,
 } from 'lucide-react'
 import { ActivityCategory } from '../contract/enums'
 import { enumLabels } from '../contract/labels'
@@ -469,6 +470,14 @@ export const activitySectionNavItems = [
     hint: '회지·인기투표',
     path: '/activity-events',
     icon: Rocket,
+    accent: 'text-violet-500',
+  },
+  {
+    id: 'draw',
+    label: 'Draw',
+    hint: '조 편성·뽑기',
+    path: '/draw',
+    icon: Dices,
     accent: 'text-violet-500',
   },
 ]
