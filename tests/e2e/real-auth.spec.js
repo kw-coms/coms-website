@@ -102,7 +102,6 @@ test.describe('real backend auth', () => {
     await page.goto('/signup')
 
     await page.locator('#studentId').fill(studentId)
-    await page.locator('#generation').fill('60')
     await page.locator('#name').fill(name)
     await page.locator('#email').fill(email)
     await page.locator('#password').fill('Member1234!@')
@@ -153,6 +152,9 @@ test.describe('real backend auth', () => {
     await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible({ timeout: 15_000 })
     const me = await page.request.get('/api/auth/me')
     expect(me.status()).toBe(200)
-    expect((await me.json()).studentId).toBe(studentId)
+    const profile = await me.json()
+    expect(profile.studentId).toBe(studentId)
+    // 가입 화면이 기수를 보내지 않아도 위에서 명부에 심은 60기가 계정에 들어가야 한다.
+    expect(profile.generation).toBe('60')
   })
 })

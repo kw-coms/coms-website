@@ -167,7 +167,7 @@ public class EligibleMemberService {
         return new PreparedSignup(
                 member.getId(),
                 studentId,
-                generationOrCurrent(member.getGeneration()),
+                signupGeneration(member),
                 allowedInitialRole(member.getInitialRole())
         );
     }
@@ -180,8 +180,21 @@ public class EligibleMemberService {
         return String.valueOf(Year.now(clock).getValue() - FIRST_GENERATION_YEAR);
     }
 
-    private String generationOrCurrent(String generation) {
-        return generation == null || generation.isBlank() ? currentGeneration() : generation;
+    /**
+     * 가입할 때 계정에 박히는 기수. 명부에 적힌 기수가 정답이고, 그게 없거나
+     * members.generation(VARCHAR(10))에 안 들어갈 모양이면 입학연도로 되짚는다.
+     * 둘 다 없을 때만 가입 연도를 쓴다 — 졸업생이나 복학생에게 올해 기수를 붙이면 안 된다.
+     */
+    private String signupGeneration(EligibleMember member) {
+        String stored = normalizeGeneration(member.getGeneration());
+        if (GENERATION_PATTERN.matcher(stored).matches()) {
+            return stored;
+        }
+        Integer admissionYear = member.getAdmissionYear();
+        if (admissionYear != null && admissionYear >= FIRST_GENERATION_YEAR) {
+            return String.valueOf(admissionYear - FIRST_GENERATION_YEAR);
+        }
+        return currentGeneration();
     }
 
     private static Member.Role allowedInitialRole(Member.Role role) {

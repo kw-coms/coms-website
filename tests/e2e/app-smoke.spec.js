@@ -609,7 +609,13 @@ test('signup does not offer login until code confirmation creates the account', 
 
   await expect(page.getByText('가입 정보 확인 → 이메일 인증 → 계정 생성')).toBeVisible()
   await page.getByLabel('학번').fill('2026123456')
-  await page.getByLabel('기수').fill('60')
+  // 기수는 더 이상 묻지 않는다 — 명부 값을 쓰고, 없으면 서버가 가입 연도로 부여한다.
+  // 화면은 서울 기준으로 센다(roleAccess.currentGeneration). 러너 시간대로 재계산하면
+  // 1월 1일 전후로 어긋난다.
+  const seoulYear = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric' }).format(new Date()))
+  const thisYearGeneration = seoulYear - 1966
+  await expect(page.getByText(`올해 들어오는 분은 ${thisYearGeneration}기`)).toBeVisible()
+  await expect(page.getByLabel('기수')).toHaveCount(0)
   await page.getByLabel('이름').fill('홍길동')
   await page.getByLabel('이메일').fill('new-member@example.com')
   await page.getByLabel('학과').fill('소프트웨어학부')
