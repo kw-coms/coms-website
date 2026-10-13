@@ -525,7 +525,7 @@ public class EligibleMemberService {
 
                 Optional<EligibleMember> existing = findExisting(studentId, verificationKey);
                 if (existing.isPresent()) {
-                    if (fillMissingPhone(existing.get(), phone)) {
+                    if (fillMissingPhone(existing.get(), name, phone)) {
                         phoneFilled++;
                     }
                     skipped++;
@@ -641,16 +641,17 @@ public class EligibleMemberService {
                 String phone = header.containsKey("phone")
                         ? normalizePhone(readCell(row, header.get("phone"), evaluator))
                         : null;
-                String note = normalize(readCell(row, header.get("note"), evaluator));
 
                 Optional<EligibleMember> existing = findExisting(studentId, verificationKey);
                 if (existing.isPresent()) {
-                    if (fillMissingPhone(existing.get(), phone)) {
+                    if (fillMissingPhone(existing.get(), name, phone)) {
                         phoneFilled++;
                     }
                     skipped++;
                     continue;
                 }
+
+                String note = normalize(readCell(row, header.get("note"), evaluator));
 
                 EligibleMember member = new EligibleMember();
                 member.setStudentId(studentId.isBlank() ? null : studentId);
@@ -720,19 +721,38 @@ public class EligibleMemberService {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /** 명부에 적어도 될 만한 전화번호인가. 01012345678 / 0212345678 같은 국내 번호만 받는다. */
+    private static final Pattern FILLABLE_PHONE = Pattern.compile("0\\d{9,10}");
+
     /**
-     * 이미 있는 명부 행의 빈 전화번호만 파일 값으로 채운다. 값이 이미 있으면 건드리지 않는다 —
-     * 가져오기는 기존 행을 덮어쓰지 않는다는 성질을 지키기 위해서다. addGraduateSingle 이
-     * 중복 등록에서 하는 것과 같은 규칙.
+     * 이미 있는 명부 행의 빈 전화번호만 파일 값으로 채운다. 아래 넷 중 하나라도 걸리면 건드리지 않는다.
+     *
+     * <ol>
+     *   <li>파일의 이름이 명부 행의 이름과 다르면 — 학번으로 찾은 행은 이름을 대조하지 않으므로,
+     *       구글 폼에 오타난 학번 하나가 남의 행에 엉뚱한 번호를 박을 수 있다. 그러면
+     *       {@link #requirePhoneMatchWhenRosterHasPhone} 가 그 번호를 요구해 본인이 가입하지
+     *       못하고 일반 403 만 받는다. ensureDirectMemberRosterRow 도 같은 이유로 이름을 본다.</li>
+     *   <li>번호 모양이 이상하면 — 학번이 전화번호 칸에 들어왔거나 두 번호가 한 칸에 붙은 경우.
+     *       한번 박히면 가입 때 그대로 요구된다.</li>
+     *   <li>이미 번호가 있으면 — 가져오기는 기존 값을 덮어쓰지 않는다. 빈 칸 판정은 가입 게이트와
+     *       같은 normalizePhone 기준이어야 "-" 같은 값이 양쪽에서 다르게 보이지 않는다.</li>
+     *   <li>같은 이름+번호 행이 이미 있으면 — V6 의 uk_eligible_members_name_phone 때문에
+     *       저장이 23505 로 터지고, 가져오기 전체가 롤백되며 어느 행 때문인지도 안 나온다.</li>
+     * </ol>
      *
      * @return 실제로 채웠으면 true
      */
-    private boolean fillMissingPhone(EligibleMember member, String phone) {
-        if (phone == null || phone.isBlank()) {
+    private boolean fillMissingPhone(EligibleMember member, String name, String phone) {
+        if (phone == null || !FILLABLE_PHONE.matcher(phone).matches()) {
             return false;
         }
-        String current = normalize(member.getPhone());
-        if (!current.isBlank()) {
+        if (!normalize(name).equals(normalize(member.getName()))) {
+            return false;
+        }
+        if (!normalizePhone(member.getPhone()).isBlank()) {
+            return false;
+        }
+        if (eligibleMemberRepository.findByNameAndPhone(member.getName(), phone).isPresent()) {
             return false;
         }
         member.setPhone(phone);

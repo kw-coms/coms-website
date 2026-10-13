@@ -446,6 +446,45 @@ class EligibleMemberServiceTest {
                 .isEqualTo("01033334444");
     }
 
+    @Test
+    void importDoesNotFillAPhoneWhenTheNameDoesNotMatchTheRosterRow() throws Exception {
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름"},
+                new String[]{"2024123456", "홍길동"}));
+
+        // 같은 학번, 다른 이름 — 구글 폼에 오타난 학번이 남의 행에 떨어지는 경우.
+        var response = eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "김철수", "010-1234-5678"}));
+
+        // 채우면 그 번호를 모르는 홍길동이 가입할 때 403 만 받는다.
+        assertThat(response.phoneFilled()).isZero();
+        assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone()).isNull();
+    }
+
+    @Test
+    void importDoesNotFillAPhoneThatIsNotAPhoneNumber() throws Exception {
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름"},
+                new String[]{"2024123456", "홍길동"}));
+
+        // 전화번호 칸에 학번이 들어온 경우. 한번 박히면 가입 때 그대로 요구된다.
+        var response = eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "홍길동", "2024123456"}));
+
+        assertThat(response.phoneFilled()).isZero();
+        assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone()).isNull();
+    }
+
+    @Test
+    void importLeavesAnEmptyPhoneCellAlone() throws Exception {
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름"},
+                new String[]{"2024123456", "홍길동"}));
+
+        var response = eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "홍길동", ""}));
+
+        assertThat(response.phoneFilled()).isZero();
+        assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone()).isNull();
+    }
+
     private SignupRequest signupRequest(String studentId, String name, String phone) {
         return new SignupRequest(studentId, name, null, null, "roster-test@example.com", "Password1!",
                 null, null, phone, null, null, null);
