@@ -510,6 +510,7 @@ export default function AdminRoster() {
         {result && (
           <p className="mt-3 shape-cut-sm bg-[var(--app-accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-accent-text)]">
             {result.message} 가져온 행: {result.imported}, 건너뜀: {result.skipped}
+            {result.phoneFilled > 0 && `, 전화번호 채움: ${result.phoneFilled}`}
           </p>
         )}
         {error && (

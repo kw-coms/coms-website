@@ -481,6 +481,7 @@ public class EligibleMemberService {
     private EligibleMemberImportResponse importFromCsv(MultipartFile file) {
         int imported = 0;
         int skipped = 0;
+        int phoneFilled = 0;
 
         try (StringReader reader = new StringReader(decodeCsv(file.getBytes()));
              CSVParser parser = CSVFormat.DEFAULT.builder()
@@ -518,14 +519,18 @@ public class EligibleMemberService {
                 }
                 String verificationKey = studentId.isBlank() ? verificationKey(name, admissionYear) : null;
 
-                if (findExisting(studentId, verificationKey).isPresent()) {
-                    skipped++;
-                    continue;
-                }
-
                 String phone = colMap.containsKey("phone")
                         ? normalizePhone(safeGet(record, colMap.get("phone")))
                         : null;
+
+                Optional<EligibleMember> existing = findExisting(studentId, verificationKey);
+                if (existing.isPresent()) {
+                    if (fillMissingPhone(existing.get(), phone)) {
+                        phoneFilled++;
+                    }
+                    skipped++;
+                    continue;
+                }
 
                 EligibleMember member = new EligibleMember();
                 member.setStudentId(studentId.isBlank() ? null : studentId);
@@ -543,7 +548,7 @@ public class EligibleMemberService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CSV 파일을 읽지 못했습니다.");
         }
 
-        return new EligibleMemberImportResponse(imported, skipped, "명부를 가져왔습니다.");
+        return new EligibleMemberImportResponse(imported, skipped, phoneFilled, "명부를 가져왔습니다.");
     }
 
     /**
@@ -595,6 +600,7 @@ public class EligibleMemberService {
     private EligibleMemberImportResponse importFromXlsx(MultipartFile file) {
         int imported = 0;
         int skipped = 0;
+        int phoneFilled = 0;
 
         try (InputStream inputStream = file.getInputStream();
              Workbook workbook = openWorkbook(inputStream)) {
@@ -632,15 +638,19 @@ public class EligibleMemberService {
                 }
                 String verificationKey = studentId.isBlank() ? verificationKey(name, admissionYear) : null;
 
-                if (findExisting(studentId, verificationKey).isPresent()) {
-                    skipped++;
-                    continue;
-                }
-
                 String phone = header.containsKey("phone")
                         ? normalizePhone(readCell(row, header.get("phone"), evaluator))
                         : null;
                 String note = normalize(readCell(row, header.get("note"), evaluator));
+
+                Optional<EligibleMember> existing = findExisting(studentId, verificationKey);
+                if (existing.isPresent()) {
+                    if (fillMissingPhone(existing.get(), phone)) {
+                        phoneFilled++;
+                    }
+                    skipped++;
+                    continue;
+                }
 
                 EligibleMember member = new EligibleMember();
                 member.setStudentId(studentId.isBlank() ? null : studentId);
@@ -658,7 +668,7 @@ public class EligibleMemberService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부 파일을 읽지 못했습니다.");
         }
 
-        return new EligibleMemberImportResponse(imported, skipped, "명부를 가져왔습니다.");
+        return new EligibleMemberImportResponse(imported, skipped, phoneFilled, "명부를 가져왔습니다.");
     }
 
     /**
@@ -709,6 +719,26 @@ public class EligibleMemberService {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * 이미 있는 명부 행의 빈 전화번호만 파일 값으로 채운다. 값이 이미 있으면 건드리지 않는다 —
+     * 가져오기는 기존 행을 덮어쓰지 않는다는 성질을 지키기 위해서다. addGraduateSingle 이
+     * 중복 등록에서 하는 것과 같은 규칙.
+     *
+     * @return 실제로 채웠으면 true
+     */
+    private boolean fillMissingPhone(EligibleMember member, String phone) {
+        if (phone == null || phone.isBlank()) {
+            return false;
+        }
+        String current = normalize(member.getPhone());
+        if (!current.isBlank()) {
+            return false;
+        }
+        member.setPhone(phone);
+        eligibleMemberRepository.save(member);
+        return true;
+    }
 
     private Optional<EligibleMember> findExisting(String studentId, String verificationKey) {
         if (studentId != null && !studentId.isBlank()) {

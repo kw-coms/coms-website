@@ -400,6 +400,52 @@ class EligibleMemberServiceTest {
                 .isEqualTo("57");
     }
 
+    @Test
+    void importFillsAnEmptyPhoneOnAnExistingRow() throws Exception {
+        // 전화번호 없이 먼저 들어온 행.
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름"},
+                new String[]{"2024123456", "홍길동"}));
+        assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone()).isNull();
+
+        var response = eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "홍길동", "010-1234-5678"}));
+
+        // 새 행은 아니므로 skipped 에 들어가지만, 비어 있던 전화번호는 채운다.
+        assertThat(response.imported()).isZero();
+        assertThat(response.skipped()).isEqualTo(1);
+        assertThat(response.phoneFilled()).isEqualTo(1);
+        assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone())
+                .isEqualTo("01012345678");
+    }
+
+    @Test
+    void importNeverOverwritesAPhoneThatIsAlreadyThere() throws Exception {
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "홍길동", "010-1111-1111"}));
+
+        var response = eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "홍길동", "010-2222-2222"}));
+
+        // 가져오기는 기존 행을 덮어쓰지 않는다. 다른 번호가 올라와도 원래 값이 남는다.
+        assertThat(response.phoneFilled()).isZero();
+        assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone())
+                .isEqualTo("01011111111");
+    }
+
+    @Test
+    void csvImportFillsAnEmptyPhoneOnAGraduateRowMatchedByNameAndGeneration() {
+        // 졸업생 행은 학번이 없고 이름+입학연도로만 찾힌다.
+        eligibleMemberService.addGraduateSingle("홍길동", null, "53");
+        assertThat(eligibleMemberRepository.findAllByNameAndAdmissionYear("홍길동", 2019).getFirst().getPhone()).isNull();
+
+        var response = eligibleMemberService.importRoster(csvFile(
+                "이름,기수,전화번호\n홍길동,53,010-3333-4444\n".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+        assertThat(response.phoneFilled()).isEqualTo(1);
+        assertThat(eligibleMemberRepository.findAllByNameAndAdmissionYear("홍길동", 2019).getFirst().getPhone())
+                .isEqualTo("01033334444");
+    }
+
     private SignupRequest signupRequest(String studentId, String name, String phone) {
         return new SignupRequest(studentId, name, null, null, "roster-test@example.com", "Password1!",
                 null, null, phone, null, null, null);
