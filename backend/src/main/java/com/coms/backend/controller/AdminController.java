@@ -165,7 +165,8 @@ public class AdminController {
                                                                               @RequestParam("file") MultipartFile file) {
         EligibleMemberImportResponse response = eligibleMemberService.importRoster(file);
         auditLogService.record(authentication.getName(), "ADMIN_ELIGIBLE_MEMBER_IMPORT", "ELIGIBLE_MEMBER",
-                null, "imported=" + response.imported() + ", skipped=" + response.skipped(), null);
+                null, "imported=" + response.imported() + ", skipped=" + response.skipped()
+                        + ", phoneFilled=" + response.phoneFilled(), null);
         return ResponseEntity.ok(response);
     }
 
