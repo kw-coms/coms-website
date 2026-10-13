@@ -752,7 +752,7 @@ public class EligibleMemberService {
         if (!normalizePhone(member.getPhone()).isBlank()) {
             return false;
         }
-        if (eligibleMemberRepository.findByNameAndPhone(member.getName(), phone).isPresent()) {
+        if (eligibleMemberRepository.existsByNameAndPhone(member.getName(), phone)) {
             return false;
         }
         member.setPhone(phone);

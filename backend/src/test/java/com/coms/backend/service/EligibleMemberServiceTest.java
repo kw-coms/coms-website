@@ -485,6 +485,25 @@ class EligibleMemberServiceTest {
         assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone()).isNull();
     }
 
+    @Test
+    void importDoesNotGiveTwoRowsWithTheSameNameTheSamePhone() throws Exception {
+        // 동명이인 둘. 한 명은 이미 그 번호를 들고 있다.
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "홍길동", "010-1234-5678"}));
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름"},
+                new String[]{"2025123456", "홍길동"}));
+
+        // 같은 번호를 빈 쪽에 채우면 uk_eligible_members_name_phone(V6) 위반으로
+        // 가져오기 전체가 롤백되고 어느 행 때문인지도 안 나온다.
+        var response = eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2025123456", "홍길동", "010-1234-5678"}));
+
+        assertThat(response.phoneFilled()).isZero();
+        assertThat(eligibleMemberRepository.findByStudentId("2025123456").orElseThrow().getPhone()).isNull();
+        assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone())
+                .isEqualTo("01012345678");
+    }
+
     private SignupRequest signupRequest(String studentId, String name, String phone) {
         return new SignupRequest(studentId, name, null, null, "roster-test@example.com", "Password1!",
                 null, null, phone, null, null, null);
