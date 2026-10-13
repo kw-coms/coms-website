@@ -27,10 +27,12 @@ const GRADUATE_AFTER_YEARS = 7
 const FIRST_GENERATION_YEAR = 1966
 
 /**
- * 명부 행의 입학연도. 백엔드가 모든 쓰기 경로에서 admission_year 를 채우므로 그 값이 정답이고,
- * 나머지는 V29 백필이 쓴 것과 같은 순서의 보조 수단이다. 졸업생으로 등록된 행은 학번이 아예
- * 없다(가입할 때 비로소 G{입학연도}-{명부번호} 가 발급된다) — 그래서 학번 모양만으로는 졸업
- * 여부를 알 수 없다.
+ * 명부 행의 입학연도. 졸업생으로 등록된 행은 학번이 아예 없으므로(가입할 때 비로소
+ * G{입학연도}-{명부번호} 가 발급된다) 학번 모양만으로는 졸업 여부를 알 수 없다.
+ *
+ * admission_year 를 채우지 않는 쓰기 경로가 있으므로 아래 폴백은 지우면 안 된다 —
+ * MaintenanceController 부트스트랩은 학번과 이름만 쓰고, applyExactStudentIdentity 는
+ * 학번이 10자리가 아니면 null 을 넣는다. 폴백 순서는 V29 백필이 쓴 것과 같다.
  */
 export function rosterAdmissionYear(row: RosterRow): number | null {
   if (typeof row.admissionYear === 'number' && Number.isFinite(row.admissionYear)) return row.admissionYear
