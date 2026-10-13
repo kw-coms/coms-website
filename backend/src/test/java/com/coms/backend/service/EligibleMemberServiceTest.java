@@ -68,6 +68,7 @@ class EligibleMemberServiceTest {
                     assertThat(member.studentId()).isEqualTo("2024123456");
                     assertThat(member.name()).isEqualTo("홍길동");
                     assertThat(member.generation()).isEqualTo("58");
+                    assertThat(member.admissionYear()).isEqualTo(2024);
                 });
         eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, "010-1234-5678");
         assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024000000", "홍길동", null, null, null))
@@ -225,6 +226,8 @@ class EligibleMemberServiceTest {
             assertThat(m.name()).isEqualTo("김철수");
             assertThat(m.generation()).isEqualTo("53");
             assertThat(m.studentId()).isNull();
+            // 학번이 없는 졸업생 행의 졸업 판정은 이 값에만 기댄다.
+            assertThat(m.admissionYear()).isEqualTo(2019);
         });
     }
 

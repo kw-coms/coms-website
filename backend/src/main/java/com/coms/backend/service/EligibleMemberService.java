@@ -323,6 +323,7 @@ public class EligibleMemberService {
                         member.getStudentId(),
                         member.getName(),
                         member.getGeneration(),
+                        member.getAdmissionYear(),
                         member.getPhone(),
                         member.getInitialRole().name()
                 ))
