@@ -4,6 +4,7 @@ import { signupUser } from '../services/authApi'
 import { EmailVerifyStep } from '../components/EmailVerifyStep'
 import { PASSWORD_PATTERN, PASSWORD_TOO_LONG_MESSAGE, isPasswordTooLong } from '../utils/passwordPolicy'
 import { useScrollReveal } from '../hooks/useScrollReveal'
+import { currentGeneration } from '../utils/roleAccess'
 
 const CURRENT_SIGNUP = 'current'
 const GRADUATE_SIGNUP = 'graduate'
@@ -148,7 +149,6 @@ function InterestsSelector({ selected, onChange, otherText, onOtherChange }: {
 
 const initialForm = {
   studentId: '',
-  generation: '',
   name: '',
   graduateVerificationType: 'YEAR',
   graduateVerificationValue: '',
@@ -183,6 +183,8 @@ export default function Signup({ onBack }: { onBack: () => void }) {
 
   const admissionYear = admissionYearFromStudentId(form.studentId)
   const graduateCutoffYear = new Date().getFullYear() - 7
+  // 재학생 기수는 사람이 적지 않는다 — 명부에 등록된 기수를 쓰고, 없으면 서버가 가입 연도로 부여한다.
+  const thisYearGeneration = currentGeneration()
   const isGraduateSignup = signupType === GRADUATE_SIGNUP
   const isCurrentSignup = signupType === CURRENT_SIGNUP
   const isGraduateStudentId = admissionYear !== null && admissionYear <= graduateCutoffYear
@@ -211,8 +213,6 @@ export default function Signup({ onBack }: { onBack: () => void }) {
 
     if (isCurrentSignup && !studentId) return '학번을 입력해주세요.'
     if (isCurrentSignup && !STUDENT_ID_PATTERN.test(studentId)) return '학번은 숫자 10자리여야 합니다.'
-    if (isCurrentSignup && !form.generation.trim()) return '기수를 입력해주세요.'
-    if (isCurrentSignup && !/^\d{1,3}$/.test(form.generation.trim())) return '기수는 숫자로 입력해주세요. (예: 60)'
     if (!name) return '이름을 입력해주세요.'
     if (!NAME_PATTERN.test(name)) return '이름은 한글 2~10자여야 합니다.'
     if (isCurrentSignup && isGraduateStudentId) return '졸업생은 졸업생 회원가입을 선택해주세요.'
@@ -260,7 +260,7 @@ export default function Signup({ onBack }: { onBack: () => void }) {
         studentId: isGraduateSignup ? null : studentId,
         generation: isGraduateSignup
           ? (form.graduateVerificationType === 'GENERATION' ? normalizeGraduateValue(form.graduateVerificationValue) || null : null)
-          : form.generation.trim(),
+          : null,
         name: form.name.trim(),
         graduateVerificationType: isGraduateSignup ? form.graduateVerificationType : null,
         graduateVerificationValue: isGraduateSignup ? form.graduateVerificationValue.trim() : null,
@@ -343,15 +343,10 @@ export default function Signup({ onBack }: { onBack: () => void }) {
                   />
                 )}
                 {isCurrentSignup && (
-                  <TextField
-                    id="generation"
-                    label="기수"
-                    value={form.generation}
-                    onChange={handleChange}
-                    placeholder="예: 60"
-                    inputMode="numeric"
-                    maxLength={3}
-                  />
+                  <p className="shape-cut-sm bg-[var(--app-accent-soft)] px-4 py-3 text-xs leading-5 text-[var(--app-accent-text)]">
+                    기수는 입력하지 않아도 됩니다. 올해 들어오는 분은 <strong>{thisYearGeneration}기</strong>이고,
+                    해가 바뀌면 {thisYearGeneration + 1}기가 됩니다. 이미 명부에 기수가 등록되어 있으면 그 기수를 그대로 씁니다.
+                  </p>
                 )}
                 <TextField
                   id="name"

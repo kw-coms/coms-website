@@ -1,6 +1,7 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.BannedStudent;
+import com.coms.backend.domain.EligibleMember;
 import com.coms.backend.domain.Member;
 import com.coms.backend.repository.BannedStudentRepository;
 import com.coms.backend.repository.EligibleMemberRepository;
@@ -363,6 +364,40 @@ class EligibleMemberServiceTest {
         assertThatThrownBy(() -> eligibleMemberService.prepareSignup(signupRequest("2024888888", "홍길동", null)))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                         assertThat(ex.getStatusCode().value()).isEqualTo(HttpStatus.FORBIDDEN.value()));
+    }
+
+    @Test
+    void currentGenerationIsPinnedToTheSignupYear() {
+        // 시계가 2026-06-06 에 고정돼 있다. 프런트 currentGeneration() 과 같은 숫자여야 한다.
+        assertThat(eligibleMemberService.currentGeneration()).isEqualTo("60");
+    }
+
+    @Test
+    void blankRosterGenerationFallsBackToAdmissionYear() {
+        EligibleMember member = new EligibleMember();
+        member.setStudentId("2023203099");
+        member.setName("홍길동");
+        member.setGeneration(null);
+        member.setAdmissionYear(2023);
+        eligibleMemberRepository.save(member);
+
+        // 2023 입학이면 57기다. 올해(60기)를 붙이면 안 된다.
+        assertThat(eligibleMemberService.prepareSignup(signupRequest("2023203099", "홍길동", null)).generation())
+                .isEqualTo("57");
+    }
+
+    @Test
+    void overlongRosterGenerationFallsBack() {
+        EligibleMember member = new EligibleMember();
+        member.setStudentId("2023203098");
+        member.setName("홍길동");
+        member.setGeneration("1".repeat(50));
+        member.setAdmissionYear(2023);
+        eligibleMemberRepository.save(member);
+
+        // members.generation 은 VARCHAR(10) 이다. 그대로 흘려보내면 저장에서 터진다.
+        assertThat(eligibleMemberService.prepareSignup(signupRequest("2023203098", "홍길동", null)).generation())
+                .isEqualTo("57");
     }
 
     private SignupRequest signupRequest(String studentId, String name, String phone) {

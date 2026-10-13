@@ -167,9 +167,34 @@ public class EligibleMemberService {
         return new PreparedSignup(
                 member.getId(),
                 studentId,
-                member.getGeneration(),
+                signupGeneration(member),
                 allowedInitialRole(member.getInitialRole())
         );
+    }
+
+    /**
+     * 올해 들어오는 사람의 기수. 2026년이면 60기, 2027년이면 61기.
+     * 가입 화면은 더 이상 기수를 묻지 않으므로, 명부에 기수가 없는 행은 여기서 받는다.
+     */
+    public String currentGeneration() {
+        return String.valueOf(Year.now(clock).getValue() - FIRST_GENERATION_YEAR);
+    }
+
+    /**
+     * 가입할 때 계정에 박히는 기수. 명부에 적힌 기수가 정답이고, 그게 없거나
+     * members.generation(VARCHAR(10))에 안 들어갈 모양이면 입학연도로 되짚는다.
+     * 둘 다 없을 때만 가입 연도를 쓴다 — 졸업생이나 복학생에게 올해 기수를 붙이면 안 된다.
+     */
+    private String signupGeneration(EligibleMember member) {
+        String stored = normalizeGeneration(member.getGeneration());
+        if (GENERATION_PATTERN.matcher(stored).matches()) {
+            return stored;
+        }
+        Integer admissionYear = member.getAdmissionYear();
+        if (admissionYear != null && admissionYear >= FIRST_GENERATION_YEAR) {
+            return String.valueOf(admissionYear - FIRST_GENERATION_YEAR);
+        }
+        return currentGeneration();
     }
 
     private static Member.Role allowedInitialRole(Member.Role role) {
