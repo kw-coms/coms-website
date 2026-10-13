@@ -10,42 +10,67 @@ type RosterRow = {
   studentId?: string | null
   name?: string | null
   generation?: string | number | null
+  admissionYear?: number | null
   phone?: string | null
   initialRole?: string | null
   /** Whether an account has signed up against this row; undefined when the member list failed to load. */
   joined?: boolean
 }
 
-const HEADER = ['이름', '학번', '기수', '구분', '전화번호', '가입 여부', '가입 시 등급']
+const HEADER = ['이름', '학번', '입학연도', '기수', '구분', '전화번호', '가입 여부', '가입 시 등급']
 
 // Byte-order mark, spelled as a code point so no invisible character sits in this file.
 const BOM = String.fromCharCode(0xfeff)
 
+// EligibleMemberService.GRADUATE_AFTER_YEARS / FIRST_GENERATION_YEAR 과 같은 값.
+const GRADUATE_AFTER_YEARS = 7
+const FIRST_GENERATION_YEAR = 1966
+
 /**
- * 졸업생 행은 실제 학번 대신 합성 ID(G{입학연도}-{명부번호})를 들고 있다 — 그 모양이
- * 졸업생이라는 뜻이고, 화면과 같은 규칙(displayStudentId)으로 입학연도만 보여준다.
+ * 명부 행의 입학연도. 백엔드가 모든 쓰기 경로에서 admission_year 를 채우므로 그 값이 정답이고,
+ * 나머지는 V29 백필이 쓴 것과 같은 순서의 보조 수단이다. 졸업생으로 등록된 행은 학번이 아예
+ * 없다(가입할 때 비로소 G{입학연도}-{명부번호} 가 발급된다) — 그래서 학번 모양만으로는 졸업
+ * 여부를 알 수 없다.
  */
-export function isGraduateRow(studentId: unknown): boolean {
-  return /^G\d{4}-\d+$/.test(String(studentId ?? ''))
+export function rosterAdmissionYear(row: RosterRow): number | null {
+  if (typeof row.admissionYear === 'number' && Number.isFinite(row.admissionYear)) return row.admissionYear
+  const studentId = String(row.studentId ?? '')
+  const graduate = studentId.match(/^G(\d{4})-\d+$/)
+  if (graduate) return Number(graduate[1])
+  if (/^\d{10}$/.test(studentId)) return Number(studentId.slice(0, 4))
+  const generation = String(row.generation ?? '').replace(/[^0-9]/g, '')
+  if (generation) return Number(generation) + FIRST_GENERATION_YEAR
+  return null
+}
+
+/** EligibleMemberService.isGraduate 의 거울. 알 수 없으면 추측하지 않고 null 을 돌려준다. */
+export function isGraduateRow(row: RosterRow, now = new Date()): boolean | null {
+  const admissionYear = rosterAdmissionYear(row)
+  if (admissionYear === null) return null
+  return admissionYear <= now.getFullYear() - GRADUATE_AFTER_YEARS
 }
 
 /** UTF-8 with a BOM (so Excel reads the Korean text), one roster row per line, in the order given. */
-export function rosterToCsv(roster: RosterRow[]): string {
-  const rows = roster.map((member) => [
-    member.name,
-    displayStudentId(member.studentId),
-    member.generation ? `${member.generation}기` : '',
-    isGraduateRow(member.studentId) ? '졸업생' : '재학생',
-    formatPhoneForSheet(member.phone),
-    member.joined === undefined ? '' : member.joined ? '가입' : '미가입',
-    member.initialRole === 'ASSOCIATE' ? '준회원' : '회원',
-  ].map(csvCell).join(','))
+export function rosterToCsv(roster: RosterRow[], now = new Date()): string {
+  const rows = roster.map((member) => {
+    const graduate = isGraduateRow(member, now)
+    return [
+      member.name,
+      displayStudentId(member.studentId),
+      rosterAdmissionYear(member) ?? '',
+      member.generation ? `${member.generation}기` : '',
+      graduate === null ? '' : graduate ? '졸업생' : '재학생',
+      formatPhoneForSheet(member.phone),
+      member.joined === undefined ? '' : member.joined ? '가입' : '미가입',
+      member.initialRole === 'ASSOCIATE' ? '준회원' : '회원',
+    ].map(csvCell).join(',')
+  })
   return `${BOM}${[HEADER.map(csvCell).join(','), ...rows].join('\r\n')}`
 }
 
 /** Hands the file to the browser's own download. */
 export function downloadRosterCsv(roster: RosterRow[], now = new Date()) {
-  const blob = new Blob([rosterToCsv(roster)], { type: 'text/csv;charset=utf-8' })
+  const blob = new Blob([rosterToCsv(roster, now)], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
