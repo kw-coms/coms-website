@@ -167,9 +167,21 @@ public class EligibleMemberService {
         return new PreparedSignup(
                 member.getId(),
                 studentId,
-                member.getGeneration(),
+                generationOrCurrent(member.getGeneration()),
                 allowedInitialRole(member.getInitialRole())
         );
+    }
+
+    /**
+     * 올해 들어오는 사람의 기수. 2026년이면 60기, 2027년이면 61기.
+     * 가입 화면은 더 이상 기수를 묻지 않으므로, 명부에 기수가 없는 행은 여기서 받는다.
+     */
+    public String currentGeneration() {
+        return String.valueOf(Year.now(clock).getValue() - FIRST_GENERATION_YEAR);
+    }
+
+    private String generationOrCurrent(String generation) {
+        return generation == null || generation.isBlank() ? currentGeneration() : generation;
     }
 
     private static Member.Role allowedInitialRole(Member.Role role) {

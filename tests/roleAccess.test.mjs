@@ -17,6 +17,7 @@ import {
   canWriteNotice,
   defaultOperationsTab,
   defaultPermissionsForRole,
+  currentGeneration,
 } from '../src/utils/roleAccess.ts'
 
 const tabs = [
@@ -160,3 +161,11 @@ assert.equal(canManageContent(new Set(of('OFFICER'))), true)
 assert.equal(canManageContent(null), false)
 
 console.log('role access policy passed')
+
+// 기수는 가입하는 해를 따른다: 2026년 = 60기, 2027년 = 61기 (1기는 1966년).
+// 백엔드 EligibleMemberService.currentGeneration() 과 같은 식이어야 한다.
+assert.equal(currentGeneration(new Date('2026-10-14T00:00:00Z')), 60)
+assert.equal(currentGeneration(new Date('2027-01-01T00:00:00Z')), 61)
+assert.equal(currentGeneration(new Date('1966-05-01T00:00:00Z')), 0)
+
+console.log('generation numbering passed')

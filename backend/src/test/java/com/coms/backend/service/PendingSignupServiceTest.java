@@ -29,6 +29,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
+import java.time.Year;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -575,6 +576,37 @@ class PendingSignupServiceTest {
         return captor.getAllValues().getLast();
     }
 
+    @Test
+    @DisplayName("signup takes the roster's generation and ignores the one in the request")
+    void signupUsesRosterGenerationNotRequestGeneration() {
+        // 명부에는 60기로 올라가 있는데 가입 요청은 학번 연도에서 뽑은 58기를 들고 온다.
+        saveEligible("2024707153", "홍길동", "60", "01012345678", Member.Role.USER);
+
+        AuthResponse started = service.start(
+                currentStudentRequest("2024707153", "gen@example.com", "홍길동", "01012345678", "58"),
+                "198.51.100.30");
+        assertThat(service.confirm(started.studentId(), sentCode())).isTrue();
+
+        assertThat(memberRepository.findByStudentId("2024707153").orElseThrow().getGeneration())
+                .isEqualTo("60");
+    }
+
+    @Test
+    @DisplayName("a roster row without a generation gets the signup year's generation")
+    void signupFallsBackToCurrentGenerationWhenRosterHasNone() {
+        saveEligible("2026123470", "홍길동", null, "01012345678", Member.Role.USER);
+
+        AuthResponse started = service.start(
+                currentStudentRequest("2026123470", "nogen@example.com", "홍길동", "01012345678", "58"),
+                "198.51.100.31");
+        assertThat(service.confirm(started.studentId(), sentCode())).isTrue();
+
+        String expected = String.valueOf(Year.now(clock).getValue() - 1966);
+        assertThat(eligibleMemberService.currentGeneration()).isEqualTo(expected);
+        assertThat(memberRepository.findByStudentId("2026123470").orElseThrow().getGeneration())
+                .isEqualTo(expected);
+    }
+
     private EligibleMember saveEligible(String studentId, String name, String generation, String phone, Member.Role role) {
         EligibleMember eligible = new EligibleMember();
         eligible.setStudentId(studentId);
@@ -600,6 +632,11 @@ class PendingSignupServiceTest {
     }
 
     private SignupRequest currentStudentRequest(String studentId, String email, String name, String phone) {
+        return currentStudentRequest(studentId, email, name, phone, "60");
+    }
+
+    private SignupRequest currentStudentRequest(String studentId, String email, String name, String phone,
+                                                String generation) {
         return new SignupRequest(
                 studentId,
                 name,
@@ -608,7 +645,7 @@ class PendingSignupServiceTest {
                 email,
                 "Password1!",
                 "컴퓨터공학과",
-                "60",
+                generation,
                 phone,
                 "신입 부원으로 열심히 활동하겠습니다.",
                 "보안,웹",

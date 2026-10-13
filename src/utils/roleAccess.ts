@@ -105,6 +105,14 @@ const OPERATIONS_PERMISSIONS: PermissionKey[] = [
   PERMISSIONS.noticeWrite,
 ]
 
+// 1기가 입학한 해. 백엔드 EligibleMemberService.FIRST_GENERATION_YEAR 와 같은 값이어야 한다.
+export const FIRST_GENERATION_YEAR = 1966
+
+/** 올해 들어오는 사람의 기수. 2026년이면 60기, 2027년이면 61기. */
+export function currentGeneration(now = new Date()) {
+  return now.getFullYear() - FIRST_GENERATION_YEAR
+}
+
 // 졸업생 합성 ID(G{입학연도}-{명부번호})는 내부 키 — 화면에는 입학연도만.
 export function displayStudentId(studentId?: string | null) {
   const raw = String(studentId || '')

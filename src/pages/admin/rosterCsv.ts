@@ -1,6 +1,6 @@
 import { csvCell } from './auditLogCsv'
 import { formatPhoneForSheet } from './memberCsv'
-import { displayStudentId } from '../../utils/roleAccess'
+import { FIRST_GENERATION_YEAR, displayStudentId } from '../../utils/roleAccess'
 
 // The roster as a spreadsheet file, for the president's own records (checking who is still in
 // the club, reconciling the list against a group chat). Built in the browser from the list
@@ -22,9 +22,8 @@ const HEADER = ['이름', '학번', '입학연도', '기수', '구분', '전화�
 // Byte-order mark, spelled as a code point so no invisible character sits in this file.
 const BOM = String.fromCharCode(0xfeff)
 
-// EligibleMemberService.GRADUATE_AFTER_YEARS / FIRST_GENERATION_YEAR 과 같은 값.
+// EligibleMemberService.GRADUATE_AFTER_YEARS 와 같은 값.
 const GRADUATE_AFTER_YEARS = 7
-const FIRST_GENERATION_YEAR = 1966
 
 /**
  * 명부 행의 입학연도. 졸업생으로 등록된 행은 학번이 아예 없으므로(가입할 때 비로소
