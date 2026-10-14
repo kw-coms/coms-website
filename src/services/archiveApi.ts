@@ -28,10 +28,6 @@ export async function createPost({ title, description, category, file }: {
   })
 }
 
-// Batch-create one resource entry per selected file by reusing the single-create
-// endpoint in a loop (no backend change). Each file gets the shared meta; when more
-// than one file is selected the title is suffixed with a 1-based index to stay distinct.
-// Returns per-file results so callers can report partial success/failure.
 export function updateArchiveAuthor(id, uploaderName) {
   return request(`/api/files/${id}/author`, {
     method: 'PATCH',
@@ -39,12 +35,13 @@ export function updateArchiveAuthor(id, uploaderName) {
   })
 }
 
-export async function createPosts(files, meta) {
+// Keep uploading after individual failures. Shared titles are numbered; admin uploads use filenames.
+export async function createPosts(files: File[], meta: { title?: string; description?: string; category?: string } = {}) {
   const multiple = files.length > 1
   const results = []
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index]
-    const title = multiple ? `${meta.title} (${index + 1})` : meta.title
+    const title = multiple && meta.title ? `${meta.title} (${index + 1})` : meta.title || file.name
     try {
       const saved = await createPost({ ...meta, title, file })
       results.push({ ok: true, file, saved })

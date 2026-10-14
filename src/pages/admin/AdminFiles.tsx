@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { listFiles, createPost, deleteFile, updateArchiveAuthor } from '../../services/archiveApi'
+import { listFiles, createPosts, deleteFile, updateArchiveAuthor } from '../../services/archiveApi'
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import AuthorChangeDialog from '../../components/common/AuthorChangeDialog'
@@ -22,13 +22,6 @@ export default function AdminFiles() {
     showToast({ message: err?.message || '자료 목록을 불러오지 못했습니다.', tone: 'error' })
   }
 
-  const loadFiles = () => {
-    listFiles()
-      .then(setFiles)
-      .catch(reportLoadFailure)
-      .finally(() => setLoading(false))
-  }
-
   useEffect(() => {
     let mounted = true
     listFiles()
@@ -39,12 +32,25 @@ export default function AdminFiles() {
   }, [])
 
   const handleUpload = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const selected = Array.from(e.target.files || []) as File[]
+    if (selected.length === 0 || uploading || loading) return
     setUploading(true)
     try {
-      await createPost({ title: file.name, file })
-      loadFiles()
+      const results = await createPosts(selected)
+      const succeeded = results.filter(result => result.ok)
+      const failed = results.filter(result => !result.ok)
+      if (succeeded.length > 0) {
+        setFiles(prev => [...succeeded.map(result => result.saved), ...prev])
+      }
+      if (failed.length > 0) {
+        const failedNames = failed.map(result => result.file.name).join(', ')
+        const message = succeeded.length > 0
+          ? `${succeeded.length}개 파일 업로드 완료. 실패: ${failedNames}`
+          : `업로드 실패: ${failedNames}`
+        showToast({ message: `${message} (${failed[0].error?.message || '업로드 중 오류가 발생했습니다.'})`, tone: 'error' })
+      } else {
+        showToast({ message: `${succeeded.length}개 파일이 업로드되었습니다.` })
+      }
     } catch (err) {
       showToast({ message: err.message || '업로드 중 오류가 발생했습니다.', tone: 'error' })
     } finally {
@@ -69,17 +75,22 @@ export default function AdminFiles() {
         const updated = await updateArchiveAuthor(authorFile.id, payload.studentId ? { studentId: payload.studentId } : { uploaderName: payload.name })
         setFiles(prev => prev.map(file => file.id === updated.id ? updated : file))
       }} />}
-      {editingFile && <WriteForm key={editingFile.id} initialFile={editingFile} onCancel={() => setEditingFile(null)} onSave={() => { setEditingFile(null); loadFiles(); showToast({ message: '자료가 수정되었습니다.' }) }} />}
+      {editingFile && <WriteForm key={editingFile.id} initialFile={editingFile} onCancel={() => setEditingFile(null)} onSave={(savedList) => {
+        setFiles(prev => prev.map(file => file.id === editingFile.id ? savedList[0] : file))
+        setEditingFile(null)
+        showToast({ message: '자료가 수정되었습니다.' })
+      }} />}
       <div>
-        <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
+        <input ref={fileInputRef} type="file" multiple disabled={uploading || loading} aria-label="업로드할 파일 선택" className="hidden" onChange={handleUpload} />
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
+          disabled={uploading || loading}
           className="shape-cut-sm border border-[var(--app-hairline)] bg-white/60 px-4 py-2 text-sm font-semibold text-[var(--theme-body-dark)] transition hover:bg-white/80 disabled:opacity-50"
         >
           {uploading ? '업로드 중...' : '파일 업로드'}
         </button>
+        <p className="mt-2 text-xs text-[var(--theme-body-muted)]">여러 파일을 선택해 한 번에 업로드할 수 있습니다.</p>
       </div>
 
       {loading ? (

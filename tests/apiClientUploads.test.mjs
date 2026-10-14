@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { createPost } from '../src/services/archiveApi.ts'
+import { createPost, createPosts } from '../src/services/archiveApi.ts'
 import { createClubActivity } from '../src/services/clubActivityApi.ts'
 import { createClubProject } from '../src/services/clubProjectApi.ts'
 
@@ -96,6 +96,42 @@ for (const upload of uploads) {
     stubFetch(async () => { throw new TypeError('Failed to fetch') })
     await assert.rejects(upload.send, /서버에 연결하지 못했습니다/, `${upload.name} normalises network failures`)
   }
+}
+
+// Admin batch uploads use each filename as its title and keep going after a rejection.
+{
+  const files = ['slides.pdf', 'rejected.zip', 'notes.txt'].map(name => new File(['contents'], name))
+  let attempts = 0
+  const calls = stubFetch(async () => {
+    attempts += 1
+    return attempts === 2
+      ? response(400, { message: '허용되지 않는 파일 형식입니다.' })
+      : response(200, { id: attempts })
+  })
+  const results = await createPosts(files)
+
+  assert.deepEqual(results.map(result => result.ok), [true, false, true])
+  assert.deepEqual(results.map(result => result.file), files)
+  assert.equal(results[1].error.message, '허용되지 않는 파일 형식입니다.')
+  assert.deepEqual(calls.map(call => call.body.get('title')), ['slides.pdf', 'rejected.zip', 'notes.txt'])
+  assert.deepEqual(calls.map(call => call.body.get('file').name), ['slides.pdf', 'rejected.zip', 'notes.txt'])
+  assert.ok(calls.every(call => call.body.get('category') === 'GENERAL'))
+  assert.deepEqual(results.filter(result => result.ok).map(result => result.saved.id), [1, 3])
+}
+
+// The regular archive form keeps its shared metadata and numbered batch titles.
+{
+  const files = ['first.pdf', 'second.pdf'].map(name => new File(['contents'], name))
+  const calls = stubFetch(async () => response(200, { id: 1 }))
+  const meta = { title: '세미나 자료', description: '발표와 참고 자료', category: 'ACADEMIC_JOURNAL' }
+  await createPosts(files, meta)
+  assert.deepEqual(calls.map(call => call.body.get('title')), ['세미나 자료 (1)', '세미나 자료 (2)'])
+  assert.ok(calls.every(call => call.body.get('description') === meta.description))
+  assert.ok(calls.every(call => call.body.get('category') === meta.category))
+
+  const singleCalls = stubFetch(async () => response(200, { id: 2 }))
+  await createPosts(files.slice(0, 1), meta)
+  assert.equal(singleCalls[0].body.get('title'), '세미나 자료')
 }
 
 console.log('api client upload contract passed')
