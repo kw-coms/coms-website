@@ -25,7 +25,7 @@ public class CompanionController {
     }
 
     @GetMapping("/api/companion/me")
-    public CompanionMember me(Authentication authentication) {
+    public CompanionMember companionMe(Authentication authentication) {
         MemberResponse account = authService.getMe(authentication.getName());
         if ((!account.emailVerified() && !"ADMIN".equals(account.role()))
                 || account.role() == null || !MEMBER_ROLES.contains(account.role())) {
