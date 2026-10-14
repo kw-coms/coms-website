@@ -1,5 +1,7 @@
-import { lazy } from 'react'
+import { lazy, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useAuth } from '../contexts/useAuth'
+import { companionReturnTo } from './companionReturnTo'
 import PageShell from '../components/PageShell'
 import { scrollToTopInstant } from '../utils/themeColors'
 
@@ -23,6 +25,11 @@ const Attendance = lazy(() => import('../pages/Attendance'))
 export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { user, loading } = useAuth()
+  const returnTo = companionReturnTo(location.search, location.hash)
+  useEffect(() => {
+    if (returnTo && !loading && user) window.location.assign(returnTo)
+  }, [returnTo, loading, user])
   const fromLocation = location.state?.from
   const successPath = fromLocation
     ? `${fromLocation.pathname || '/'}${fromLocation.search || ''}${fromLocation.hash || ''}`
@@ -31,8 +38,8 @@ export function LoginPage() {
     <PageShell>
       <Login
         onCancel={() => navigate('/', { replace: true })}
-        onSuccess={() => navigate(successPath, { replace: true })}
-        goSignup={() => navigate('/signup')}
+        onSuccess={() => returnTo ? window.location.assign(returnTo) : navigate(successPath, { replace: true })}
+        goSignup={() => navigate(returnTo ? `/signup?returnTo=%2Fcompanion%2Frespond${location.hash}` : '/signup')}
       />
     </PageShell>
   )
@@ -40,9 +47,11 @@ export function LoginPage() {
 
 export function SignupPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnTo = companionReturnTo(location.search, location.hash)
   return (
     <PageShell wide full>
-      <Signup onBack={() => navigate('/login')} />
+      <Signup onBack={() => navigate(returnTo ? `/login?returnTo=%2Fcompanion%2Frespond${location.hash}` : '/login')} />
     </PageShell>
   )
 }
