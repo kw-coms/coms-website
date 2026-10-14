@@ -1,7 +1,7 @@
 import { Download, ThumbsUp, Trash2 } from 'lucide-react'
-import { downloadUrl } from '../../services/archiveApi'
+import { attachmentDownloadUrl, downloadUrl } from '../../services/archiveApi'
 import { renderRichBody } from '../richEditor/renderRichBody'
-import { categoryLabel, formatDate, formatSize } from './archiveUtils'
+import { archiveAttachments, categoryLabel, formatDate, formatSize } from './archiveUtils'
 
 export function ArchiveDetailView({
   detailFile,
@@ -20,6 +20,7 @@ export function ArchiveDetailView({
   onDelete: (id: number) => void
   onEdit?: () => void
 }) {
+  const attachments = archiveAttachments(detailFile)
   return (
     <div className="m-5 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface)] p-5 text-[var(--app-muted)] shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:m-7 sm:p-7">
       <div className="border-b border-[var(--app-hairline)] pb-5">
@@ -42,7 +43,25 @@ export function ArchiveDetailView({
           )}
         </div>
       )}
-      <dl className="grid gap-4 border-b border-[var(--app-hairline)] py-5 text-sm sm:grid-cols-2">
+      {attachments.length > 1 ? (
+        <section className="border-b border-[var(--app-hairline)] py-5">
+          <h3 className="text-sm font-bold text-[var(--app-text)]">첨부파일 {attachments.length}개</h3>
+          <ul className="mt-3 space-y-2">
+            {attachments.map((attachment, index) => (
+              <li key={attachment.id ?? index} className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--app-hairline)] bg-[var(--app-surface-soft)] p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="break-all text-sm font-bold text-[var(--app-text)]">{attachment.originalName}</p>
+                  <p className="mt-1 text-xs text-[var(--app-subtle)]">{formatSize(attachment.fileSize)}</p>
+                </div>
+                <a href={attachmentDownloadUrl(detailFile.id, attachment.id, attachment.contentVersion)} aria-label={`${attachment.originalName} 다운로드`} className="apple-action-primary inline-flex min-h-11 shrink-0 items-center justify-center gap-2 px-4 text-sm">
+                  <Download size={15} />
+                  다운로드
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : <dl className="grid gap-4 border-b border-[var(--app-hairline)] py-5 text-sm sm:grid-cols-2">
         <div>
           <dt className="font-bold text-[var(--app-subtle)]">파일명</dt>
           <dd className="mt-1 break-all font-bold text-[var(--app-text)]">{detailFile.originalName}</dd>
@@ -51,15 +70,15 @@ export function ArchiveDetailView({
           <dt className="font-bold text-[var(--app-subtle)]">크기</dt>
           <dd className="mt-1 font-bold text-[var(--app-text)]">{formatSize(detailFile.fileSize)}</dd>
         </div>
-      </dl>
+      </dl>}
       <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-        <a
+        {attachments.length === 1 && <a
           href={downloadUrl(detailFile.id, detailFile.contentVersion)}
           className="apple-action-primary inline-flex min-h-12 items-center justify-center gap-2 px-4 text-sm max-md:col-span-2 sm:min-h-10"
         >
           <Download size={15} />
           다운로드
-        </a>
+        </a>}
         <button
           type="button"
           onClick={onVote}

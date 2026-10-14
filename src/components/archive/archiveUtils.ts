@@ -1,6 +1,20 @@
 import { ArchiveCategory } from '../../contract/enums'
 import { enumLabels } from '../../contract/labels'
 
+export function archiveAttachments(file) {
+  return file.attachments?.length ? file.attachments : [{
+    id: null,
+    originalName: file.originalName,
+    mimeType: file.mimeType,
+    fileSize: file.fileSize,
+    contentVersion: file.contentVersion,
+  }]
+}
+
+export function archiveFileSize(file) {
+  return archiveAttachments(file).reduce((total, attachment) => total + attachment.fileSize, 0)
+}
+
 export function formatSize(bytes) {
   if (!Number.isFinite(bytes)) return '-'
   if (bytes < 1024) return `${bytes} B`

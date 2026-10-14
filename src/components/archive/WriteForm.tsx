@@ -1,30 +1,31 @@
 import { useMemo, useRef, useState } from 'react'
 import { FileUp, X } from 'lucide-react'
-import { createPosts, updateArchiveFile } from '../../services/archiveApi'
+import { createPost, updateArchiveFile } from '../../services/archiveApi'
 import { parsePostBlocks } from '../../pages/community/postEditorUtils'
 import { fetchLinkPreview, searchYoutubeVideos } from '../../services/communityApi'
 import RichBodyEditor from '../richEditor/RichBodyEditor'
 import { URL_ONLY_RICH_FEATURES } from '../richEditor/richBodyFeatures'
 import { serializeRichBody } from '../richEditor/serializeRichBody'
 import { CategorySegment } from './CategorySegment'
-import { WRITABLE_ARCHIVE_CATEGORIES, formatSize } from './archiveUtils'
+import { WRITABLE_ARCHIVE_CATEGORIES, archiveAttachments, formatSize } from './archiveUtils'
 
 export function WriteForm({ onCancel, onSave, initialFile }: {
-  initialFile?: { id: number; title?: string; originalName?: string; description?: string; category?: string }
+  initialFile?: { id: number; title?: string; originalName?: string; description?: string; category?: string; attachments?: { id?: number; originalName: string; fileSize: number; contentVersion?: string }[] }
   onCancel: () => void
-  onSave: (savedList: unknown[], failedNames: string[]) => void
+  onSave: (savedList: unknown[]) => void
 }) {
   const [form, setForm] = useState({ title: initialFile?.title || initialFile?.originalName || '', category: initialFile?.category || 'GENERAL' })
-  const [files, setFiles] = useState([])
+  const [files, setFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const fileInputRef = useRef(null)
   const editorApiRef = useRef(null)
   const initialBlocks = useMemo(() => initialFile ? parsePostBlocks({ content: initialFile.description }) : [], [initialFile])
+  const existingAttachments = initialFile ? archiveAttachments(initialFile) : []
 
   const addFiles = (event) => {
-    const picked = Array.from(event.target.files || [])
-    if (picked.length) setFiles((prev) => initialFile ? picked.slice(0, 1) : [...prev, ...picked])
+    const picked = Array.from(event.target.files || []) as File[]
+    if (picked.length) setFiles((prev) => [...prev, ...picked])
     // Reset so re-selecting the same file fires onChange again.
     event.target.value = ''
   }
@@ -43,23 +44,15 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
     try {
       const blocks = editorApiRef.current?.getBlocks() || []
       const description = serializeRichBody(blocks)
-      if (initialFile) {
-        const saved = await updateArchiveFile(initialFile.id, { title: form.title.trim(), description, category: form.category, file: files[0] })
-        onSave([saved], [])
-        return
-      }
-      const results = await createPosts(files, {
+      const metadata = {
         title: form.title.trim(),
         description,
         category: form.category,
-      })
-      const succeeded = results.filter((r) => r.ok)
-      const failed = results.filter((r) => !r.ok)
-      if (succeeded.length === 0) {
-        setError(failed[0]?.error?.message || '업로드 중 오류가 발생했습니다.')
-        return
       }
-      onSave(succeeded.map((r) => r.saved), failed.map((r) => r.file.name))
+      const saved = initialFile
+        ? await updateArchiveFile(initialFile.id, { ...metadata, files: files.length ? files : undefined })
+        : await createPost({ ...metadata, files })
+      onSave([saved])
     } catch (err) {
       setError(err.message || '업로드 중 오류가 발생했습니다.')
     } finally {
@@ -110,19 +103,28 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
             <input
               ref={fileInputRef}
               type="file"
-              multiple={!initialFile}
+              multiple
+              disabled={saving}
               className="hidden"
               onChange={addFiles}
             />
           </label>
           <span className="min-w-0 flex-1 truncate font-medium">
-            {files.length === 0 ? initialFile ? `기존 파일 유지: ${initialFile.originalName}` : '선택된 파일 없음' : `${files.length}개 파일 선택됨`}
+            {files.length === 0 ? initialFile ? existingAttachments.length > 1 ? `${existingAttachments.length}개 기존 파일 유지` : `기존 파일 유지: ${initialFile.originalName}` : '선택된 파일 없음' : `${files.length}개 파일 선택됨`}
           </span>
         </div>
-        {files.length > 1 && (
-          <p className="text-xs font-medium text-[var(--app-subtle)]">
-            파일마다 별도 자료로 등록되며, 제목 뒤에 번호가 붙습니다. (예: {form.title.trim() || '제목'} (1))
-          </p>
+        <p className="text-xs font-medium text-[var(--app-subtle)]">
+          {initialFile && files.length > 0 ? '기존 첨부파일 전체가 선택한 파일로 교체됩니다.' : '선택한 파일은 모두 한 자료에 첨부됩니다.'}
+        </p>
+        {initialFile && files.length === 0 && existingAttachments.length > 1 && (
+          <ul className="space-y-1.5">
+            {existingAttachments.map((attachment, index) => (
+              <li key={attachment.id ?? index} className="flex gap-2 px-3 py-2">
+                <span className="min-w-0 flex-1 break-all">{attachment.originalName}</span>
+                <span className="shrink-0 text-xs">{formatSize(attachment.fileSize)}</span>
+              </li>
+            ))}
+          </ul>
         )}
         {files.length > 0 && (
           <ul className="space-y-1.5">
@@ -135,6 +137,7 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
                 <span className="shrink-0 text-xs font-bold text-[var(--app-subtle)]">{formatSize(selected.size)}</span>
                 <button
                   type="button"
+                  disabled={saving}
                   onClick={() => removeFile(index)}
                   className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--app-hairline)] text-[var(--app-muted)] transition hover:bg-[var(--app-surface-elevated)]"
                   aria-label={`${selected.name} 제거`}

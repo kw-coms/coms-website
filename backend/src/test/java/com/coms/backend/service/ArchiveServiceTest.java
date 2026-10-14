@@ -3,6 +3,7 @@ package com.coms.backend.service;
 import com.coms.backend.domain.Member;
 import com.coms.backend.repository.AuditLogRepository;
 import com.coms.backend.repository.ArchiveFileRepository;
+import com.coms.backend.repository.ArchiveAttachmentRepository;
 import com.coms.backend.repository.ArchiveFileVoteRepository;
 import com.coms.backend.repository.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,11 +23,16 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.List;
+import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.ArgumentMatchers.any;
 
 @SpringBootTest(properties = {
         "jwt.secret=test-secret-key-with-at-least-32-chars",
@@ -41,6 +47,9 @@ class ArchiveServiceTest {
 
     @Autowired
     private ArchiveFileRepository archiveFileRepository;
+
+    @Autowired
+    private ArchiveAttachmentRepository attachmentRepository;
 
     @Autowired
     private ArchiveFileVoteRepository archiveFileVoteRepository;
@@ -62,10 +71,12 @@ class ArchiveServiceTest {
         SecurityContextHolder.clearContext();
         auditLogRepository.deleteAll();
         archiveFileVoteRepository.deleteAll();
+        attachmentRepository.deleteAll();
         archiveFileRepository.deleteAll();
         memberRepository.deleteAll();
         auditLogRepository.flush();
         archiveFileVoteRepository.flush();
+        attachmentRepository.flush();
         archiveFileRepository.flush();
         memberRepository.flush();
         saveMember("2026123456", "홍길동", Member.Role.USER);
@@ -88,6 +99,93 @@ class ArchiveServiceTest {
         assertThat(response.fileSize()).isEqualTo(pdf.getSize());
         assertThat(response.uploaderName()).isEqualTo("홍길동");
         assertThat(response.category()).isEqualTo("GENERAL");
+        assertThat(response.attachments()).hasSize(1);
+    }
+
+    @Test
+    void twoSelectedFilesCreateOnePostWithTwoDownloadableAttachments() throws Exception {
+        var created = archiveService.uploadGroup("중간 족보", null, "GENERAL",
+                List.of(pdf("one.pdf", "%PDF-1.4 one"), pdf("two.pdf", "%PDF-1.4 two")), "2026123456");
+
+        assertThat(archiveFileRepository.count()).isEqualTo(1);
+        assertThat(created.attachments()).extracting("originalName").containsExactly("one.pdf", "two.pdf");
+        assertThat(created.attachments()).allSatisfy(attachment ->
+                assertThat(archiveService.getAttachment(created.id(), attachment.id()).getStoredName()).isNotBlank());
+        assertThat(attachmentRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    void invalidSecondFileDoesNotPersistTheFirst() {
+        assertThatThrownBy(() -> archiveService.uploadGroup("자료", null, "GENERAL",
+                List.of(pdf("one.pdf", "%PDF-1.4"), new MockMultipartFile("files", "bad.html", "text/html", "x".getBytes())),
+                "2026123456")).isInstanceOf(ResponseStatusException.class);
+        assertThat(archiveFileRepository.count()).isZero();
+        assertThat(attachmentRepository.count()).isZero();
+    }
+
+    @Test
+    void secondStorageIOExceptionDeletesFirstBlobBeforeAnyDatabaseWrite() throws Exception {
+        StorageService failingStorage = mock(StorageService.class);
+        ArchiveFileRepository files = mock(ArchiveFileRepository.class);
+        ArchiveAttachmentRepository attachments = mock(ArchiveAttachmentRepository.class);
+        MemberRepository members = mock(MemberRepository.class);
+        when(members.findByStudentId("2026123456"))
+                .thenReturn(memberRepository.findByStudentId("2026123456"));
+        when(failingStorage.store(any(MultipartFile.class)))
+                .thenReturn("first-stored")
+                .thenThrow(new IOException("second write failed"));
+        ArchiveService failingService = new ArchiveService(files, attachments, failingStorage, members,
+                mock(ArchiveFileVoteRepository.class), mock(RichContentSanitizer.class), mock(AuditLogService.class));
+
+        assertThatThrownBy(() -> failingService.uploadGroup("자료", null, "GENERAL",
+                List.of(pdf("first.pdf", "%PDF-1.4 first"), pdf("second.pdf", "%PDF-1.4 second")), "2026123456"))
+                .isInstanceOf(IOException.class).hasMessage("second write failed");
+
+        verify(failingStorage).delete("first-stored");
+        verifyNoInteractions(files, attachments);
+        assertThat(archiveFileRepository.count()).isZero();
+        assertThat(attachmentRepository.count()).isZero();
+    }
+
+    @Test
+    void groupReplacePreservesPostEngagementAndLegacyPrimaryReplacementPreservesExtras() throws Exception {
+        saveMember("2026000001", "투표자", Member.Role.USER);
+        var created = archiveService.uploadGroup("자료", null, "GENERAL",
+                List.of(pdf("first.pdf", "%PDF-1.4 first"), pdf("second.pdf", "%PDF-1.4 second")), "2026123456");
+        archiveService.vote("2026000001", created.id(), 1);
+        archiveService.getAndIncrementView(created.id(), "2026123456");
+
+        var metadataOnly = archiveService.update("2026123456", created.id(), "수정", null, "GENERAL", null);
+        assertThat(metadataOnly.attachments()).extracting("originalName").containsExactly("first.pdf", "second.pdf");
+
+        var legacyReplace = archiveService.update("2026123456", created.id(), "수정", null, "GENERAL",
+                pdf("legacy.pdf", "%PDF-1.4 legacy"));
+        assertThat(legacyReplace.attachments()).extracting("originalName").containsExactly("legacy.pdf", "second.pdf");
+
+        var groupReplace = archiveService.updateGroup("2026123456", created.id(), "새 자료", null, "GENERAL", null,
+                List.of(pdf("new-1.pdf", "%PDF-1.4 new1"), pdf("new-2.pdf", "%PDF-1.4 new2")));
+        assertThat(groupReplace.id()).isEqualTo(created.id());
+        assertThat(groupReplace.viewCount()).isEqualTo(1);
+        assertThat(groupReplace.upvotes()).isEqualTo(1);
+        assertThat(groupReplace.attachments()).extracting("originalName").containsExactly("new-1.pdf", "new-2.pdf");
+        assertThat(archiveFileRepository.count()).isEqualTo(1);
+        assertThat(attachmentRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    void attachmentLookupMustMatchParentAndNonOwnerCannotReplaceGroup() throws Exception {
+        saveMember("2026000001", "다른 회원", Member.Role.USER);
+        var first = archiveService.uploadGroup("첫 글", null, "GENERAL",
+                List.of(pdf("first.pdf", "%PDF-1.4"), pdf("second.pdf", "%PDF-1.4")), "2026123456");
+        var second = archiveService.upload("둘째 글", null, pdf("other.pdf", "%PDF-1.4"), "2026000001");
+
+        assertThatThrownBy(() -> archiveService.getAttachment(second.id(), first.attachments().get(1).id()))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex -> assertThat(ex.getStatusCode().value()).isEqualTo(404));
+        assertThatThrownBy(() -> archiveService.updateGroup("2026000001", first.id(), "침범", null, "GENERAL", null,
+                List.of(pdf("new.pdf", "%PDF-1.4"))))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex -> assertThat(ex.getStatusCode().value()).isEqualTo(403));
+        assertThat(archiveService.list()).filteredOn(file -> file.id().equals(first.id())).singleElement()
+                .extracting(file -> file.attachments().size()).isEqualTo(2);
     }
 
     @Test
@@ -250,6 +348,57 @@ class ArchiveServiceTest {
         assertThat(archiveFileRepository.findById(created.id()).orElseThrow().getStoredName()).isEqualTo(oldStoredName);
         assertThat(oldResource.exists()).isTrue();
         assertThatThrownBy(() -> storageService.load(newStoredName.get())).isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void rolledBackGroupReplacementKeepsOldAttachmentsAndCleansAllNewBlobs() throws Exception {
+        var created = archiveService.uploadGroup("원제목", null, "GENERAL",
+                List.of(pdf("old-1.pdf", "%PDF-1.4 old1"), pdf("old-2.pdf", "%PDF-1.4 old2")), "2026123456");
+        List<String> oldNames = attachmentRepository.findByArchiveFileIdOrderByPositionAsc(created.id()).stream()
+                .map(attachment -> attachment.getStoredName()).toList();
+        AtomicReference<List<String>> newNames = new AtomicReference<>();
+
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> {
+            try {
+                archiveService.updateGroup("2026123456", created.id(), "교체", null, "GENERAL", null,
+                        List.of(pdf("new-1.pdf", "%PDF-1.4 new1"), pdf("new-2.pdf", "%PDF-1.4 new2")));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            newNames.set(attachmentRepository.findByArchiveFileIdOrderByPositionAsc(created.id()).stream()
+                    .map(attachment -> attachment.getStoredName()).toList());
+            throw new RuntimeException("force group rollback");
+        })).hasMessage("force group rollback");
+
+        assertThat(attachmentRepository.findByArchiveFileIdOrderByPositionAsc(created.id()).stream()
+                .map(attachment -> attachment.getStoredName())).containsExactlyElementsOf(oldNames);
+        for (String oldName : oldNames) {
+            assertThat(storageService.load(oldName).exists()).isTrue();
+        }
+        for (String newName : newNames.get()) {
+            assertThatThrownBy(() -> storageService.load(newName)).isInstanceOf(ResponseStatusException.class);
+        }
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void committedDeleteRemovesAllAttachmentBlobs() throws Exception {
+        saveMember("2026000001", "회장", Member.Role.ADMIN);
+        var created = archiveService.uploadGroup("자료", null, "GENERAL",
+                List.of(pdf("one.pdf", "%PDF-1.4 one"), pdf("two.pdf", "%PDF-1.4 two")), "2026123456");
+        List<String> storedNames = attachmentRepository.findByArchiveFileIdOrderByPositionAsc(created.id()).stream()
+                .map(attachment -> attachment.getStoredName()).toList();
+        authenticate("2026000001", "ROLE_ADMIN");
+
+        archiveService.delete(created.id());
+
+        assertThat(archiveFileRepository.findById(created.id())).isEmpty();
+        assertThat(attachmentRepository.findByArchiveFileIdOrderByPositionAsc(created.id())).isEmpty();
+        for (String storedName : storedNames) {
+            assertThatThrownBy(() -> storageService.load(storedName)).isInstanceOf(ResponseStatusException.class);
+        }
     }
 
     @Test

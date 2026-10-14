@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { createPost, createPosts } from '../src/services/archiveApi.ts'
+import { createPost, updateArchiveFile } from '../src/services/archiveApi.ts'
 import { createClubActivity } from '../src/services/clubActivityApi.ts'
 import { createClubProject } from '../src/services/clubProjectApi.ts'
 
@@ -98,40 +98,41 @@ for (const upload of uploads) {
   }
 }
 
-// Admin batch uploads use each filename as its title and keep going after a rejection.
-{
-  const files = ['slides.pdf', 'rejected.zip', 'notes.txt'].map(name => new File(['contents'], name))
-  let attempts = 0
-  const calls = stubFetch(async () => {
-    attempts += 1
-    return attempts === 2
-      ? response(400, { message: '허용되지 않는 파일 형식입니다.' })
-      : response(200, { id: attempts })
-  })
-  const results = await createPosts(files)
-
-  assert.deepEqual(results.map(result => result.ok), [true, false, true])
-  assert.deepEqual(results.map(result => result.file), files)
-  assert.equal(results[1].error.message, '허용되지 않는 파일 형식입니다.')
-  assert.deepEqual(calls.map(call => call.body.get('title')), ['slides.pdf', 'rejected.zip', 'notes.txt'])
-  assert.deepEqual(calls.map(call => call.body.get('file').name), ['slides.pdf', 'rejected.zip', 'notes.txt'])
-  assert.ok(calls.every(call => call.body.get('category') === 'GENERAL'))
-  assert.deepEqual(results.filter(result => result.ok).map(result => result.saved.id), [1, 3])
-}
-
-// The regular archive form keeps its shared metadata and numbered batch titles.
+// A multi-file archive is one multipart request and one post, with an unchanged title.
 {
   const files = ['first.pdf', 'second.pdf'].map(name => new File(['contents'], name))
-  const calls = stubFetch(async () => response(200, { id: 1 }))
-  const meta = { title: '세미나 자료', description: '발표와 참고 자료', category: 'ACADEMIC_JOURNAL' }
-  await createPosts(files, meta)
-  assert.deepEqual(calls.map(call => call.body.get('title')), ['세미나 자료 (1)', '세미나 자료 (2)'])
-  assert.ok(calls.every(call => call.body.get('description') === meta.description))
-  assert.ok(calls.every(call => call.body.get('category') === meta.category))
+  const calls = stubFetch(async () => response(200, { id: 42, title: '2026 대물1 중간 족보' }))
+  const saved = await createPost({ title: '2026 대물1 중간 족보', description: '참고 자료', category: 'GENERAL', files })
+  assert.equal(saved.id, 42)
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].body.get('title'), '2026 대물1 중간 족보')
+  assert.equal(calls[0].body.get('description'), '참고 자료')
+  assert.equal(calls[0].body.get('category'), 'GENERAL')
+  assert.deepEqual(calls[0].body.getAll('files').map(file => file.name), ['first.pdf', 'second.pdf'])
+  assert.equal(calls[0].body.has('file'), false)
+}
 
-  const singleCalls = stubFetch(async () => response(200, { id: 2 }))
-  await createPosts(files.slice(0, 1), meta)
-  assert.equal(singleCalls[0].body.get('title'), '세미나 자료')
+// A rejected group is returned as one error, without creating individual fallback posts.
+{
+  const files = ['first.pdf', 'second.pdf'].map(name => new File(['contents'], name))
+  const calls = stubFetch(async () => response(400, { message: '파일 내용이 확장자와 일치하지 않습니다.' }))
+  await assert.rejects(() => createPost({ title: '세미나 자료', files }), /파일 내용이 확장자/)
+  assert.equal(calls.length, 1)
+}
+
+// Metadata edits preserve attachments; replacing the set sends every selected file.
+{
+  const calls = stubFetch(async () => response(200, { id: 42 }))
+  const meta = { title: '수정된 제목', description: '설명', category: 'ACADEMIC_JOURNAL' }
+  await updateArchiveFile(42, meta)
+  assert.equal(calls[0].body.has('file'), false)
+  assert.equal(calls[0].body.has('files'), false)
+
+  const files = ['replacement.pdf', 'appendix.pdf'].map(name => new File(['contents'], name))
+  await updateArchiveFile(42, { ...meta, files })
+  assert.equal(calls[1].method, 'PUT')
+  assert.deepEqual(calls[1].body.getAll('files').map(file => file.name), ['replacement.pdf', 'appendix.pdf'])
+  assert.equal(calls[1].body.has('file'), false)
 }
 
 console.log('api client upload contract passed')

@@ -1,6 +1,7 @@
 package com.coms.backend.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record ArchiveFileResponse(
         Long id,
@@ -16,6 +17,7 @@ public record ArchiveFileResponse(
         long upvotes,
         int myVote,
         LocalDateTime uploadedAt,
-        String contentVersion
+        String contentVersion,
+        List<ArchiveAttachmentResponse> attachments
 ) {
 }
