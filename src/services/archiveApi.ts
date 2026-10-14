@@ -11,17 +11,19 @@ export async function listFiles() {
   return request('/api/files')
 }
 
-export async function createPost({ title, description, category, file }: {
+export async function createPost({ title, description, category, file, files }: {
   title: string
   description?: string
   category?: string
-  file: File
+  file?: File
+  files?: File[]
 }) {
   const formData = new FormData()
   formData.append('title', title)
   if (description) formData.append('description', description)
   formData.append('category', category || 'GENERAL')
-  formData.append('file', file)
+  if (file) formData.append('file', file)
+  files?.forEach(attachment => formData.append('files', attachment))
   return request('/api/files', {
     method: 'POST',
     body: formData,
@@ -35,33 +37,22 @@ export function updateArchiveAuthor(id, uploaderName) {
   })
 }
 
-// Keep uploading after individual failures. Shared titles are numbered; admin uploads use filenames.
-export async function createPosts(files: File[], meta: { title?: string; description?: string; category?: string } = {}) {
-  const multiple = files.length > 1
-  const results = []
-  for (let index = 0; index < files.length; index += 1) {
-    const file = files[index]
-    const title = multiple && meta.title ? `${meta.title} (${index + 1})` : meta.title || file.name
-    try {
-      const saved = await createPost({ ...meta, title, file })
-      results.push({ ok: true, file, saved })
-    } catch (err) {
-      results.push({ ok: false, file, error: err })
-    }
-  }
-  return results
-}
-
 export function downloadUrl(id, contentVersion?: string) {
   return apiUrl(`/api/files/${id}/download${contentVersion ? `?v=${encodeURIComponent(contentVersion)}` : ''}`)
 }
 
-export function updateArchiveFile(id, { title, description, category, file }: { title: string; description: string; category: string; file?: File }) {
+export function attachmentDownloadUrl(postId, attachmentId, contentVersion?: string) {
+  if (attachmentId == null) return downloadUrl(postId, contentVersion)
+  return apiUrl(`/api/files/${postId}/attachments/${attachmentId}/download${contentVersion ? `?v=${encodeURIComponent(contentVersion)}` : ''}`)
+}
+
+export function updateArchiveFile(id, { title, description, category, file, files }: { title: string; description: string; category: string; file?: File; files?: File[] }) {
   const body = new FormData()
   body.append('title', title)
   body.append('description', description)
   body.append('category', category)
   if (file) body.append('file', file)
+  files?.forEach(attachment => body.append('files', attachment))
   return request(`/api/files/${id}`, { method: 'PUT', body })
 }
 

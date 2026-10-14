@@ -10,11 +10,14 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Image uploads are re-encoded to drop their metadata. These tests pin what must survive that:
@@ -24,6 +27,45 @@ class LocalStorageServiceTest {
 
     @TempDir
     Path uploads;
+
+    @Test
+    void failedRawCopyRemovesItsPartialFileAndKeepsOtherUploads() throws Exception {
+        Files.writeString(uploads.resolve("preserved.txt"), "existing contents");
+        IOException failure = new IOException("upload stream interrupted");
+        MockMultipartFile file = new MockMultipartFile("files", "partial.pdf", "application/pdf", new byte[]{1, 2}) {
+            @Override
+            public InputStream getInputStream() {
+                return new InputStream() {
+                    private boolean copied;
+
+                    @Override
+                    public int read(byte[] bytes, int offset, int length) throws IOException {
+                        if (copied) {
+                            try (var paths = Files.list(uploads)) {
+                                assertThat(paths.count()).isEqualTo(2);
+                            }
+                            throw failure;
+                        }
+                        copied = true;
+                        bytes[offset] = 1;
+                        return 1;
+                    }
+
+                    @Override
+                    public int read() throws IOException {
+                        byte[] bytes = new byte[1];
+                        return read(bytes, 0, 1) == -1 ? -1 : bytes[0];
+                    }
+                };
+            }
+        };
+        LocalStorageService storage = new LocalStorageService(uploads.toString());
+        assertThatThrownBy(() -> storage.store(file)).isSameAs(failure);
+        try (var paths = Files.list(uploads)) {
+            assertThat(paths.map(path -> path.getFileName().toString()).toList()).containsExactly("preserved.txt");
+        }
+        assertThat(Files.readString(uploads.resolve("preserved.txt"))).isEqualTo("existing contents");
+    }
 
     /** 40x20, left half red and right half blue — so every orientation is distinguishable. */
     private static byte[] jpeg(Integer exifOrientation, boolean littleEndian) throws Exception {

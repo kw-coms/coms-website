@@ -164,6 +164,22 @@ function multipartField(body, name) {
   return match?.[1] || ''
 }
 
+function multipartFilenames(body, name = 'files') {
+  return [...(body || '').matchAll(new RegExp(`name="${name}"; filename="([^"]+)"`, 'g'))].map(match => match[1])
+}
+
+function archivePost(id, title, filenames) {
+  return {
+    id,
+    title,
+    originalName: filenames[0],
+    uploadedBy: '2020123456',
+    category: 'GENERAL',
+    fileSize: filenames.length * 7,
+    attachments: filenames.map((originalName, index) => ({ id: id * 10 + index, originalName, mimeType: 'application/pdf', fileSize: 7, contentVersion: `v${index + 1}` })),
+  }
+}
+
 async function assertActivitiesTitleFits(page) {
   await expect
     .poll(async () => {
@@ -985,16 +1001,9 @@ test('admin files tab can upload and delete archive files', async ({ page }) => 
       uploadPayload = {
         title: multipartField(body, 'title'),
         category: multipartField(body, 'category'),
+        filenames: multipartFilenames(body),
       }
-      files = [
-        ...files,
-        {
-          id: 2,
-          originalName: uploadPayload.title,
-          uploadedBy: '관리자',
-          fileSize: 7,
-        },
-      ]
+      files = [...files, archivePost(2, uploadPayload.title, uploadPayload.filenames)]
       return route.fulfill({ status: 200, json: files.at(-1) })
     }
     return route.fallback()
@@ -1020,6 +1029,7 @@ test('admin files tab can upload and delete archive files', async ({ page }) => 
   await expect.poll(() => uploadPayload).toEqual({
     title: '회의록.pdf',
     category: 'GENERAL',
+    filenames: ['회의록.pdf'],
   })
   await expect(page.getByText('회의록.pdf')).toBeVisible()
 
@@ -1029,7 +1039,7 @@ test('admin files tab can upload and delete archive files', async ({ page }) => 
   await expect(page.getByText('회의록.pdf')).toHaveCount(0)
 })
 
-test('admin files tab uploads each selected file with its filename as title', async ({ page }) => {
+test('admin files tab creates one post with all selected attachments', async ({ page }) => {
   await mockAdminApis(page)
   const uploads = []
   let files = []
@@ -1038,8 +1048,9 @@ test('admin files tab uploads each selected file with its filename as title', as
     if (route.request().method() !== 'POST') return route.fallback()
     const body = route.request().postData() || ''
     const title = multipartField(body, 'title')
-    uploads.push({ title, category: multipartField(body, 'category') })
-    const saved = { id: uploads.length, title, originalName: title, uploadedBy: '관리자', fileSize: 7 }
+    const filenames = multipartFilenames(body)
+    uploads.push({ title, category: multipartField(body, 'category'), filenames })
+    const saved = archivePost(2, title, filenames)
     files = [...files, saved]
     return route.fulfill({ status: 201, json: saved })
   })
@@ -1054,26 +1065,25 @@ test('admin files tab uploads each selected file with its filename as title', as
     { name: '자료.zip', mimeType: 'application/zip', buffer: Buffer.from('second') },
   ])
 
-  await expect.poll(() => uploads).toEqual([
-    { title: '회의록.pdf', category: 'GENERAL' },
-    { title: '자료.zip', category: 'GENERAL' },
-  ])
-  await expect(page.getByText('2개 파일이 업로드되었습니다.')).toBeVisible()
-  await expect(page.getByText('회의록.pdf')).toBeVisible()
-  await expect(page.getByText('자료.zip')).toBeVisible()
+  await expect.poll(() => uploads).toEqual([{ title: '회의록.pdf', category: 'GENERAL', filenames: ['회의록.pdf', '자료.zip'] }])
+  await expect(page.getByText('2개 파일이 한 자료에 업로드되었습니다.')).toBeVisible()
+  const row = page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '회의록.pdf' })
+  await expect(row).toHaveCount(1)
+  await expect(row.getByText('회의록.pdf', { exact: true })).toBeVisible()
+  await expect(row).toContainText('첨부파일 2개: 회의록.pdf, 자료.zip')
 })
 
-test('admin files tab continues after a failed file and reports partial upload', async ({ page }) => {
+test('admin files tab retries the same attachment group after one rejected post', async ({ page }) => {
   await mockAdminApis(page)
   const uploads = []
   let files = []
   await page.route('**/api/files', (route) => {
     if (route.request().method() === 'GET') return route.fulfill({ json: files })
     if (route.request().method() !== 'POST') return route.fallback()
-    const title = multipartField(route.request().postData(), 'title')
-    uploads.push(title)
-    if (title === '실패.pdf') return route.fulfill({ status: 500, json: { message: 'failed' } })
-    const saved = { id: 10, title, originalName: title, uploadedBy: '관리자', fileSize: 7 }
+    const body = route.request().postData() || ''
+    uploads.push({ title: multipartField(body, 'title'), filenames: multipartFilenames(body) })
+    if (uploads.length === 1) return route.fulfill({ status: 400, json: { message: '첨부파일을 확인해주세요.' } })
+    const saved = archivePost(3, '재시도.pdf', ['재시도.pdf', '부록.pdf'])
     files = [saved]
     return route.fulfill({ status: 201, json: saved })
   })
@@ -1081,37 +1091,22 @@ test('admin files tab continues after a failed file and reports partial upload',
   await page.goto('/admin')
   await page.getByRole('tab', { name: '파일 관리' }).click()
   const input = page.locator('input[type="file"]')
+  const selection = [
+    { name: '재시도.pdf', mimeType: 'application/pdf', buffer: Buffer.from('pdf') },
+    { name: '부록.pdf', mimeType: 'application/pdf', buffer: Buffer.from('appendix') },
+  ]
   await expect(input).toBeEnabled()
-  await input.setInputFiles([
-    { name: '실패.pdf', mimeType: 'application/pdf', buffer: Buffer.from('first') },
-    { name: '성공.pdf', mimeType: 'application/pdf', buffer: Buffer.from('second') },
-  ])
-
-  await expect.poll(() => uploads).toEqual(['실패.pdf', '성공.pdf'])
-  await expect(page.getByText(/1개 파일 업로드 완료\. 실패: 실패\.pdf/)).toBeVisible()
-  await expect(page.getByText('성공.pdf')).toBeVisible()
-})
-
-test('admin files tab reports all failures and allows the same file to be retried', async ({ page }) => {
-  await mockAdminApis(page)
-  const uploads = []
-  await page.route('**/api/files', (route) => {
-    if (route.request().method() === 'GET') return route.fulfill({ json: [] })
-    if (route.request().method() !== 'POST') return route.fallback()
-    uploads.push(multipartField(route.request().postData(), 'title'))
-    return route.fulfill({ status: 500, json: { message: 'failed' } })
-  })
-
-  await page.goto('/admin')
-  await page.getByRole('tab', { name: '파일 관리' }).click()
-  const input = page.locator('input[type="file"]')
-  const file = { name: '재시도.pdf', mimeType: 'application/pdf', buffer: Buffer.from('pdf') }
-  await expect(input).toBeEnabled()
-  await input.setInputFiles(file)
-  await expect(page.getByText(/업로드 실패: 재시도\.pdf/)).toBeVisible()
+  await input.setInputFiles(selection)
+  await expect(page.getByText('첨부파일을 확인해주세요.')).toBeVisible()
+  await expect(page.getByText('등록된 파일이 없습니다.')).toBeVisible()
   await expect(input).toHaveJSProperty('value', '')
-  await input.setInputFiles(file)
-  await expect.poll(() => uploads).toEqual(['재시도.pdf', '재시도.pdf'])
+  await input.setInputFiles(selection)
+  await expect.poll(() => uploads).toEqual([
+    { title: '재시도.pdf', filenames: ['재시도.pdf', '부록.pdf'] },
+    { title: '재시도.pdf', filenames: ['재시도.pdf', '부록.pdf'] },
+  ])
+  await expect(page.getByText('2개 파일이 한 자료에 업로드되었습니다.')).toBeVisible()
+  await expect(page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '재시도.pdf' })).toHaveCount(1)
 })
 
 test('admin files tab waits for the initial list before accepting an upload', async ({ page }) => {
@@ -1129,7 +1124,7 @@ test('admin files tab waits for the initial list before accepting an upload', as
     }
     if (route.request().method() !== 'POST') return route.fallback()
     uploads.push(multipartField(route.request().postData(), 'title'))
-    return route.fulfill({ status: 201, json: { id: 2, originalName: uploads.at(-1), uploadedBy: '관리자', fileSize: 7 } })
+    return route.fulfill({ status: 201, json: archivePost(2, uploads.at(-1), [uploads.at(-1)]) })
   })
 
   await page.goto('/admin')
@@ -1146,13 +1141,13 @@ test('admin files tab waits for the initial list before accepting an upload', as
   await expect(page.getByText('신규.pdf')).toBeVisible()
 })
 
-test('admin files tab keeps edited and uploaded rows once a concurrent batch finishes', async ({ page }) => {
+test('admin files tab keeps an edited row while an attachment group uploads', async ({ page }) => {
   await mockAdminApis(page)
-  let files = [{ id: 1, title: '기존 자료', originalName: '기존.pdf', uploadedBy: '2020123456', category: 'GENERAL', fileSize: 7 }]
-  let releaseSecond
-  const pendingSecond = new Promise(resolve => { releaseSecond = resolve })
-  let notifySecondStarted
-  const secondStarted = new Promise(resolve => { notifySecondStarted = resolve })
+  let files = [archivePost(1, '기존 자료', ['기존.pdf'])]
+  let releaseUpload
+  const pendingUpload = new Promise(resolve => { releaseUpload = resolve })
+  let notifyUploadStarted
+  const uploadStarted = new Promise(resolve => { notifyUploadStarted = resolve })
   await page.route('**/api/files/1', (route) => {
     if (route.request().method() !== 'PUT') return route.fallback()
     files = files.map(file => file.id === 1 ? { ...file, title: multipartField(route.request().postData(), 'title') } : file)
@@ -1161,12 +1156,12 @@ test('admin files tab keeps edited and uploaded rows once a concurrent batch fin
   await page.route('**/api/files', async (route) => {
     if (route.request().method() === 'GET') return route.fulfill({ json: files })
     if (route.request().method() !== 'POST') return route.fallback()
-    const title = multipartField(route.request().postData(), 'title')
-    if (title === '둘째.pdf') {
-      notifySecondStarted()
-      await pendingSecond
-    }
-    const saved = { id: title === '첫째.pdf' ? 2 : 3, title, originalName: title, uploadedBy: '2020123456', category: 'GENERAL', fileSize: 7 }
+    const body = route.request().postData() || ''
+    const title = multipartField(body, 'title')
+    const filenames = multipartFilenames(body)
+    notifyUploadStarted()
+    await pendingUpload
+    const saved = archivePost(2, title, filenames)
     files = [...files, saved]
     return route.fulfill({ status: 201, json: saved })
   })
@@ -1178,31 +1173,39 @@ test('admin files tab keeps edited and uploaded rows once a concurrent batch fin
     { name: '첫째.pdf', mimeType: 'application/pdf', buffer: Buffer.from('first') },
     { name: '둘째.pdf', mimeType: 'application/pdf', buffer: Buffer.from('second') },
   ])
-  await secondStarted
+  await uploadStarted
   await page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '기존.pdf' }).getByRole('button', { name: '수정' }).click()
   await page.getByPlaceholder('자료 제목').fill('수정된 자료')
   await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
   await page.getByRole('button', { name: '수정 저장' }).click()
   await expect(page.getByRole('button', { name: '수정 저장' })).toHaveCount(0)
 
-  releaseSecond()
-  await expect(page.getByText('2개 파일이 업로드되었습니다.')).toBeVisible()
-  for (const name of ['기존.pdf', '첫째.pdf', '둘째.pdf']) {
-    await expect(page.getByText(name, { exact: true })).toHaveCount(1)
-  }
-  await page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '기존.pdf' }).getByRole('button', { name: '수정' }).click()
+  releaseUpload()
+  await expect(page.getByText('2개 파일이 한 자료에 업로드되었습니다.')).toBeVisible()
+  await expect(page.locator('.space-y-2 > .shape-cut-sm')).toHaveCount(2)
+  const editedRow = page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '수정된 자료' })
+  await expect(editedRow).toHaveCount(1)
+  await expect(editedRow).toContainText('기존.pdf')
+  const newRow = page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '첫째.pdf' })
+  await expect(newRow).toHaveCount(1)
+  await expect(newRow).toContainText('둘째.pdf')
+  await editedRow.getByRole('button', { name: '수정' }).click()
   await expect(page.getByPlaceholder('자료 제목')).toHaveValue('수정된 자료')
 })
 
-test('archive write form removes one selected file and numbers the remaining uploads', async ({ page }) => {
+test('archive write form saves remaining selected files as one post without changing its title', async ({ page }) => {
   await mockAdminApis(page)
   const uploads = []
+  let files = []
   await page.route('**/api/files', (route) => {
-    if (route.request().method() === 'GET') return route.fulfill({ json: [] })
+    if (route.request().method() === 'GET') return route.fulfill({ json: files })
     if (route.request().method() !== 'POST') return route.fallback()
     const body = route.request().postData() || ''
-    uploads.push({ title: multipartField(body, 'title'), filename: /filename="([^"]+)"/.exec(body)?.[1] })
-    return route.fulfill({ status: 201, json: { id: uploads.length, title: uploads.at(-1).title, originalName: uploads.at(-1).filename, category: 'GENERAL' } })
+    const filenames = multipartFilenames(body)
+    uploads.push({ title: multipartField(body, 'title'), filenames })
+    const saved = archivePost(1, '공통 제목', filenames)
+    files = [saved]
+    return route.fulfill({ status: 201, json: saved })
   })
 
   await page.goto('/resources')
@@ -1218,11 +1221,98 @@ test('archive write form removes one selected file and numbers the remaining upl
   await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
   await page.getByRole('button', { name: '등록', exact: true }).click()
 
-  await expect.poll(() => uploads).toEqual([
-    { title: '공통 제목 (1)', filename: '첫째.pdf' },
-    { title: '공통 제목 (2)', filename: '둘째.pdf' },
+  await expect.poll(() => uploads).toEqual([{ title: '공통 제목', filenames: ['첫째.pdf', '둘째.pdf'] }])
+  const row = page.locator('tbody tr').filter({ hasText: '공통 제목' })
+  await expect(row).toHaveCount(1)
+  await expect(row.getByRole('button', { name: '첨부파일 2개' })).toBeVisible()
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.screenshot({ path: '/tmp/coms-archive-grouped-list.png', animations: 'disabled' })
+  await row.getByRole('button', { name: '첨부파일 2개' }).click()
+  await expect(page.getByRole('heading', { name: '자료 상세' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /첫째\.pdf/ })).toHaveAttribute('href', '/api/files/1/attachments/10/download?v=v1')
+  await expect(page.getByRole('link', { name: /둘째\.pdf/ })).toHaveAttribute('href', '/api/files/1/attachments/11/download?v=v2')
+  await page.screenshot({ path: '/tmp/coms-archive-grouped-detail.png', fullPage: true, animations: 'disabled' })
+})
+
+test('archive write form keeps its attachment selection after a rejected post', async ({ page }) => {
+  await mockAdminApis(page)
+  const attempts = []
+  await page.route('**/api/files', (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: [] })
+    if (route.request().method() !== 'POST') return route.fallback()
+    const body = route.request().postData() || ''
+    attempts.push(multipartFilenames(body))
+    if (attempts.length === 1) return route.fulfill({ status: 400, json: { message: '첨부파일을 확인해주세요.' } })
+    return route.fulfill({ status: 201, json: archivePost(4, '재시도 자료', attempts.at(-1)) })
+  })
+
+  await page.goto('/resources')
+  await page.getByRole('button', { name: '자료 올리기' }).click()
+  await page.getByPlaceholder('자료 제목').fill('재시도 자료')
+  await page.locator('input[type="file"]').setInputFiles([
+    { name: '하나.pdf', mimeType: 'application/pdf', buffer: Buffer.from('one') },
+    { name: '둘.pdf', mimeType: 'application/pdf', buffer: Buffer.from('two') },
   ])
-  await expect(page.getByText('2개 자료가 등록되었습니다.')).toBeVisible()
+  await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
+  await page.getByRole('button', { name: '등록', exact: true }).click()
+  await expect(page.getByText('첨부파일을 확인해주세요.')).toBeVisible()
+  await expect(page.getByText('2개 파일 선택됨')).toBeVisible()
+  await page.getByRole('button', { name: '등록', exact: true }).click()
+  await expect.poll(() => attempts).toEqual([['하나.pdf', '둘.pdf'], ['하나.pdf', '둘.pdf']])
+  await expect(page.locator('tbody tr').filter({ hasText: '재시도 자료' })).toHaveCount(1)
+})
+
+test('archive edit replaces all attachments with one multipart request', async ({ page }) => {
+  await mockAdminApis(page)
+  let file = archivePost(10, '기존 자료', ['기존.pdf', '옛부록.pdf'])
+  let replacement = null
+  await page.route('**/api/files', route => route.fulfill({ json: [file] }))
+  await page.route('**/api/files/10', (route) => {
+    if (route.request().method() !== 'PUT') return route.fallback()
+    const body = route.request().postData() || ''
+    replacement = { title: multipartField(body, 'title'), filenames: multipartFilenames(body) }
+    file = archivePost(10, replacement.title, replacement.filenames)
+    return route.fulfill({ json: file })
+  })
+
+  await page.goto('/resources/10')
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  await page.locator('input[type="file"]').setInputFiles([
+    { name: '새본문.pdf', mimeType: 'application/pdf', buffer: Buffer.from('new') },
+    { name: '새부록.pdf', mimeType: 'application/pdf', buffer: Buffer.from('appendix') },
+  ])
+  await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
+  await page.getByRole('button', { name: '수정 저장' }).click()
+
+  await expect.poll(() => replacement).toEqual({ title: '기존 자료', filenames: ['새본문.pdf', '새부록.pdf'] })
+  await expect(page.getByRole('link', { name: /새본문\.pdf/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: /새부록\.pdf/ })).toBeVisible()
+  await expect(page.getByText('옛부록.pdf')).toHaveCount(0)
+})
+
+test('archive metadata edit preserves existing attachments when no files are selected', async ({ page }) => {
+  await mockAdminApis(page)
+  let file = archivePost(11, '기존 자료', ['본문.pdf', '부록.pdf'])
+  let editedFields = null
+  await page.route('**/api/files', route => route.fulfill({ json: [file] }))
+  await page.route('**/api/files/11', (route) => {
+    if (route.request().method() !== 'PUT') return route.fallback()
+    const body = route.request().postData() || ''
+    editedFields = { title: multipartField(body, 'title'), filenames: multipartFilenames(body) }
+    file = { ...file, title: editedFields.title }
+    return route.fulfill({ json: file })
+  })
+
+  await page.goto('/resources/11')
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  await page.getByPlaceholder('자료 제목').fill('고친 제목')
+  await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
+  await page.getByRole('button', { name: '수정 저장' }).click()
+
+  await expect.poll(() => editedFields).toEqual({ title: '고친 제목', filenames: [] })
+  await expect(page.getByRole('heading', { name: '고친 제목' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /본문\.pdf/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: /부록\.pdf/ })).toBeVisible()
 })
 
 test('admin font management explains availability and uses action labels', async ({ page }) => {

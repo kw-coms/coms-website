@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
@@ -59,7 +60,18 @@ public class LocalStorageService implements StorageService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid filename.");
         }
 
-        Files.copy(file.getInputStream(), destination);
+        try (InputStream input = file.getInputStream()) {
+            Files.copy(input, destination);
+        } catch (FileAlreadyExistsException e) {
+            throw e;
+        } catch (IOException | RuntimeException e) {
+            try {
+                Files.deleteIfExists(destination);
+            } catch (IOException cleanupFailure) {
+                e.addSuppressed(cleanupFailure);
+            }
+            throw e;
+        }
         return stored;
     }
 

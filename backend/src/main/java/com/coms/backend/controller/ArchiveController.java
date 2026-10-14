@@ -1,6 +1,7 @@
 package com.coms.backend.controller;
 
 import com.coms.backend.domain.ArchiveFile;
+import com.coms.backend.domain.ArchiveAttachment;
 import com.coms.backend.dto.ArchiveAuthorUpdateRequest;
 import com.coms.backend.dto.ArchiveFileResponse;
 import com.coms.backend.dto.EngagementVoteRequest;
@@ -15,6 +16,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 import com.coms.backend.web.ListPagination;
 
 import java.io.IOException;
@@ -49,13 +52,23 @@ public class ArchiveController {
         this.storageService = storageService;
     }
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ArchiveFileResponse> upload(
             @RequestParam("title") String title,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "category", defaultValue = "GENERAL") String category,
-            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "files", required = false) List<MultipartFile> files,
             Authentication authentication) throws IOException {
+        if (file != null && files != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "file과 files를 함께 보낼 수 없습니다.");
+        }
+        if (files != null) {
+            return ResponseEntity.ok(archiveService.uploadGroup(title, description, category, files, authentication.getName()));
+        }
+        if (file == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일을 선택해주세요.");
+        }
         return ResponseEntity.ok(archiveService.upload(title, description, category, file, authentication.getName()));
     }
 
@@ -82,8 +95,12 @@ public class ArchiveController {
                                                       @RequestParam("title") String title,
                                                       @RequestParam(value = "description", required = false) String description,
                                                       @RequestParam(value = "category", defaultValue = "GENERAL") String category,
-                                                      @RequestParam(value = "file", required = false) MultipartFile file) throws IOException {
-        return ResponseEntity.ok(archiveService.update(authentication.getName(), id, title, description, category, file));
+                                                      @RequestParam(value = "file", required = false) MultipartFile file,
+                                                      @RequestParam(value = "files", required = false) List<MultipartFile> files) throws IOException {
+        if (file != null && files != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "file과 files를 함께 보낼 수 없습니다.");
+        }
+        return ResponseEntity.ok(archiveService.updateGroup(authentication.getName(), id, title, description, category, file, files));
     }
 
     @PostMapping("/{id}/vote")
@@ -105,6 +122,21 @@ public class ArchiveController {
         return ResponseEntity.ok()
                 .cacheControl(REVALIDATE_BLOB)
                 .contentType(SafeMediaTypes.forDownload(file.getMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .body(resource);
+    }
+
+    @GetMapping("/{id}/attachments/{attachmentId}/download")
+    public ResponseEntity<Resource> downloadAttachment(@PathVariable Long id, @PathVariable Long attachmentId) {
+        ArchiveAttachment attachment = archiveService.getAttachment(id, attachmentId);
+        archiveService.incrementView(id);
+        Resource resource = storageService.load(attachment.getStoredName());
+        ContentDisposition disposition = ContentDisposition.attachment()
+                .filename(attachment.getOriginalName(), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .cacheControl(REVALIDATE_BLOB)
+                .contentType(SafeMediaTypes.forDownload(attachment.getMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(resource);
     }

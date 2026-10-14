@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { listFiles, createPosts, deleteFile, updateArchiveAuthor } from '../../services/archiveApi'
+import { listFiles, createPost, deleteFile, updateArchiveAuthor } from '../../services/archiveApi'
 import { showToast } from '../../components/common/Toast'
 import { confirmDialog } from '../../components/common/ConfirmDialog'
 import AuthorChangeDialog from '../../components/common/AuthorChangeDialog'
@@ -7,6 +7,7 @@ import { WriteForm } from '../../components/archive/WriteForm'
 import { canEditArchive } from '../../utils/contentEditing'
 import { useAuth } from '../../contexts/useAuth'
 import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
+import { archiveAttachments, archiveFileSize } from '../../components/archive/archiveUtils'
 
 export default function AdminFiles() {
   const { user } = useAuth()
@@ -36,21 +37,9 @@ export default function AdminFiles() {
     if (selected.length === 0 || uploading || loading) return
     setUploading(true)
     try {
-      const results = await createPosts(selected)
-      const succeeded = results.filter(result => result.ok)
-      const failed = results.filter(result => !result.ok)
-      if (succeeded.length > 0) {
-        setFiles(prev => [...succeeded.map(result => result.saved), ...prev])
-      }
-      if (failed.length > 0) {
-        const failedNames = failed.map(result => result.file.name).join(', ')
-        const message = succeeded.length > 0
-          ? `${succeeded.length}개 파일 업로드 완료. 실패: ${failedNames}`
-          : `업로드 실패: ${failedNames}`
-        showToast({ message: `${message} (${failed[0].error?.message || '업로드 중 오류가 발생했습니다.'})`, tone: 'error' })
-      } else {
-        showToast({ message: `${succeeded.length}개 파일이 업로드되었습니다.` })
-      }
+      const saved = await createPost({ title: selected[0].name, files: selected })
+      setFiles(prev => [saved, ...prev])
+      showToast({ message: `${selected.length}개 파일이 한 자료에 업로드되었습니다.` })
     } catch (err) {
       showToast({ message: err.message || '업로드 중 오류가 발생했습니다.', tone: 'error' })
     } finally {
@@ -90,7 +79,7 @@ export default function AdminFiles() {
         >
           {uploading ? '업로드 중...' : '파일 업로드'}
         </button>
-        <p className="mt-2 text-xs text-[var(--theme-body-muted)]">여러 파일을 선택해 한 번에 업로드할 수 있습니다.</p>
+        <p className="mt-2 text-xs text-[var(--theme-body-muted)]">여러 파일을 선택하면 모두 한 자료에 첨부됩니다.</p>
       </div>
 
       {loading ? (
@@ -117,9 +106,14 @@ export default function AdminFiles() {
               className="shape-cut-sm flex items-center justify-between gap-3 border border-[var(--app-hairline)] bg-black/5 px-4 py-3"
             >
               <div>
-                <p className="font-semibold text-[var(--theme-body-dark)]">{file.originalName}</p>
+                <p className="font-semibold text-[var(--theme-body-dark)]">{file.title || file.originalName}</p>
+                {(archiveAttachments(file).length > 1 || file.title && file.title !== file.originalName) && (
+                  <p className="mt-1 break-all text-xs text-[var(--theme-body-muted)]">
+                    첨부파일 {archiveAttachments(file).length}개: {archiveAttachments(file).map(attachment => attachment.originalName).join(', ')}
+                  </p>
+                )}
                 <p className="text-xs text-[var(--theme-body-muted)]">
-                  작성자 {file.uploaderName || file.uploadedBy || '-'} · {formatFileSize(file.fileSize)}
+                  작성자 {file.uploaderName || file.uploadedBy || '-'} · {formatFileSize(archiveFileSize(file))}
                 </p>
               </div>
               {canEditArchive(user, file) && <button type="button" onClick={() => setEditingFile(file)} className="text-xs font-semibold text-blue-500">수정</button>}
