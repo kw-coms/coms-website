@@ -36,17 +36,18 @@ ENV VITE_FIREBASE_VAPID_KEY=$VITE_FIREBASE_VAPID_KEY
 # Sentry source map upload (optional). Only uploads when SENTRY_AUTH_TOKEN is
 # non-empty; otherwise the @sentry/vite-plugin is skipped and the build is a
 # normal no-upload build. ORG/PROJECT fall back to vite.config.js defaults.
+# These stay build arguments only: RUN sees them as environment variables, but
+# unlike ENV they are not written into the stage's image configuration, so the
+# auth token is not persisted with the build stage.
 ARG SENTRY_AUTH_TOKEN=
 ARG SENTRY_ORG=
 ARG SENTRY_PROJECT=
-ENV SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN
-ENV SENTRY_ORG=$SENTRY_ORG
-ENV SENTRY_PROJECT=$SENTRY_PROJECT
 
 RUN npm run build
 
 
-FROM nginx:1.27-alpine
+# 1.28 is the maintained stable line; the 1.27 mainline no longer gets security fixes.
+FROM nginx:1.28-alpine
 
 COPY nginx.frontend.conf /etc/nginx/conf.d/default.conf
 # Kept outside conf.d/ so nginx's `include conf.d/*.conf` does not load this

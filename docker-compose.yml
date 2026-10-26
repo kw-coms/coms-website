@@ -1,7 +1,15 @@
+# Docker's default json-file logs grow without limit and can fill the server disk.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${DB_NAME:-comsdb}
       POSTGRES_USER: ${DB_USER:-coms}
@@ -14,11 +22,39 @@ services:
       timeout: 5s
       retries: 5
 
+  # Daily pg_dump into a host directory outside the checkout (the deploy's `git clean` never
+  # touches it). The deploy also takes a dump right before every release. Restore steps:
+  # docs/operations/backup-and-rollback.md. Copy this directory off the server regularly —
+  # a backup on the same disk does not survive that disk.
+  db-backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: *default-logging
+    entrypoint: ["/bin/sh", "/usr/local/bin/coms-db-backup.sh"]
+    environment:
+      PGHOST: db
+      PGDATABASE: ${DB_NAME:-comsdb}
+      PGUSER: ${DB_USER:-coms}
+      PGPASSWORD: ${DB_PASSWORD}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      TZ: Asia/Seoul
+    volumes:
+      - ./scripts/db-backup.sh:/usr/local/bin/coms-db-backup.sh:ro
+      - ${COMS_BACKUP_DIR:-../coms-backups}:/backups
+      - backend-uploads:/uploads:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
   coms-backend:
+    # A fixed image name tagged per release lets the deploy roll back to the previous release
+    # (COMS_IMAGE_TAG is set by .github/workflows/deploy.yml; `latest` follows the live one).
+    image: coms-backend:${COMS_IMAGE_TAG:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: coms-backend
+    logging: *default-logging
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
@@ -76,11 +112,13 @@ services:
       # FIREBASE_CREDENTIALS_PATH (+ PUSH_ENABLED=true) in your .env, e.g.:
       #   FIREBASE_CREDENTIALS_PATH=/app/secrets/firebase-service-account.json
       # - ./secrets/firebase-service-account.json:/app/secrets/firebase-service-account.json:ro
+      # (the deploy's `git clean` keeps ./secrets/, and .gitignore keeps it out of git)
     depends_on:
       db:
         condition: service_healthy
 
   coms-frontend:
+    image: coms-frontend:${COMS_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile.frontend
@@ -102,10 +140,11 @@ services:
         SENTRY_PROJECT: ${SENTRY_PROJECT:-}
     container_name: coms-frontend
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "127.0.0.1:3000:80"
     healthcheck:
-      # nginx:1.27-alpine has BusyBox wget but no curl. Use 127.0.0.1, not
+      # nginx:1.28-alpine has BusyBox wget but no curl. Use 127.0.0.1, not
       # localhost: in-container "localhost" resolution is unreliable (observed
       # connection-refused on the prod host — ::1 vs the IPv4-only `listen 80`,
       # plus the host DNS search domain returning NXDOMAIN), which kept this
