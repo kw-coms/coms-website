@@ -1,6 +1,6 @@
 plugins {
 	id 'java'
-	id 'org.springframework.boot' version '4.0.8'
+	id 'org.springframework.boot' version '4.1.2'
 	id 'io.spring.dependency-management' version '1.1.7'
 	id 'org.owasp.dependencycheck' version '13.0.0'
 }
@@ -54,17 +54,17 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
 	implementation 'org.flywaydb:flyway-core'
 	implementation 'org.apache.poi:poi-ooxml:5.4.0'
-	implementation 'org.apache.commons:commons-csv:1.11.0'
+	implementation 'org.apache.commons:commons-csv:1.14.1'
 
 	// jsoup — lenient HTML parser used to extract OpenGraph/meta tags for link-preview
 	// cards. We fetch the remote HTML ourselves (with strict SSRF guards) and only hand
 	// the already-downloaded bytes to jsoup for parsing; jsoup never performs network I/O.
-	implementation 'org.jsoup:jsoup:1.18.1'
+	implementation 'org.jsoup:jsoup:1.23.2'
 
 	// JWT
-	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
-	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
-	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+	implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
+	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
+	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
 
 	// H2 Database (file-based, no external DB needed)
 	runtimeOnly 'com.h2database:h2'
@@ -81,7 +81,7 @@ dependencies {
 
 	// Firebase Admin SDK — used by PushNotificationSender to send FCM push.
 	// Fully gated behind push.enabled + a valid credentials file; a no-op otherwise.
-	implementation 'com.google.firebase:firebase-admin:9.4.1'
+	implementation 'com.google.firebase:firebase-admin:9.11.0'
 
 	// Sentry error reporting — env-gated. Blank SENTRY_DSN = clean no-op (Sentry default).
 	// NOTE: the sentry-spring-boot-starter-jakarta auto-configuration targets Spring Boot 3
