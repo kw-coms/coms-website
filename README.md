@@ -14,6 +14,7 @@ COM's의 한 학기를 통째로 굴리는 동아리 플랫폼이 되었습니�
 <a href="https://coms.kw.ac.kr"><img src="https://img.shields.io/badge/Website-coms.kw.ac.kr-0071e3?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Website" /></a>
 <a href="https://github.com/kw-coms/coms-website/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/kw-coms/coms-website/ci.yml?branch=main&style=for-the-badge&label=CI&logo=githubactions&logoColor=white" alt="CI" /></a>
 <a href="https://coms.kw.ac.kr/recruit"><img src="https://img.shields.io/badge/지원하기-Recruit-34c759?style=for-the-badge&logo=rocket&logoColor=white" alt="Recruit" /></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-8e8e93?style=for-the-badge" alt="MIT License" /></a>
 
 <a href="https://coms.kw.ac.kr">웹사이트</a> ·
 <a href="https://coms.kw.ac.kr/apps">COM's Apps</a> ·
@@ -254,6 +255,13 @@ npm ci && npm run dev          # 프론트엔드 → http://localhost:3000
 - 브랜치·커밋 규칙과 올리기 전 검사: **[기여 안내](CONTRIBUTING.md)**
 - 보안 취약점은 공개 이슈 대신 **[보안 제보 안내](SECURITY.md)**를 따라 주세요.
 - 서버 백업과 복원: **[백업과 되돌리기](docs/operations/backup-and-rollback.md)**
+
+<br/>
+
+## 📄 라이선스
+
+코드는 **[MIT 라이선스](LICENSE)**로 공개되어 있습니다. 저작권 표시만 남기면 누구나 가져다 쓰고, 고치고, 다른 프로젝트에 넣을 수 있습니다.
+단, **COM's 이름과 로고**는 동아리를 나타내는 표시라 이 라이선스에 포함되지 않습니다. 코드를 가져다 쓸 때는 이름과 로고를 바꿔 주세요.
 
 <br/>
 
