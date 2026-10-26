@@ -145,13 +145,16 @@ docker compose --env-file .env up -d --build
 | 공지사항 관리 | `POST`, `PUT`, `DELETE /api/notices/**` | 작성 권한 보유 회원 또는 작성자(동작별 상이) |
 | 자료실 | `/api/files/**` | 회원 |
 | 커뮤니티 | `/api/community/posts/**` | 회원 |
-| 커뮤니티 링크 미리보기 | `GET /api/community/posts/{id}/share`, `GET /api/community/posts/{id}/share-data`, `GET /api/community/posts/{id}/share-image` | 공개 |
+| 커뮤니티 공유 링크 | `GET /api/community/posts/{id}/share-link` | 회원 (글을 읽을 수 있는 회원에게 서명된 링크) |
+| 커뮤니티 링크 미리보기 | `GET /api/community/posts/{id}/share`, `GET /api/community/posts/{id}/share-data`, `GET /api/community/posts/{id}/share-image` | 공개 (`?s=` 서명이 있을 때만 글 미리보기, 없으면 일반 카드·이미지 404) |
 | 알림 | `/api/notifications/**` | 회원 |
 | COM's Apps | `GET /api/club-projects/**` | 공개 |
 | 폰트 조회 | `GET /api/fonts/**` | 공개 |
 | 모바일 앱 | `/api/mobile/v1/**` | 회원 |
 | 관리자 | `/api/admin/**` | 관리자 |
 | 상태 확인 | `/actuator/health`, `/actuator/info` | 공개 |
+
+로그인이 없거나 만료·폐기된 요청은 **401**, 로그인했지만 권한이 없는 요청은 **403**을 받습니다. 웹과 모바일 앱은 401일 때만 토큰을 새로 받습니다.
 
 ## 환경 변수
 
@@ -175,8 +178,22 @@ docker compose --env-file .env up -d --build
 | `SPRING_JPA_HIBERNATE_DDL_AUTO` | JPA DDL 옵션 |
 | `H2_CONSOLE_ENABLED` | H2 console 사용 여부 |
 | `BOOTSTRAP_SECRET` | bootstrap API 보호용 secret |
+| `COMS_BACKUP_DIR` | DB·업로드 백업을 쌓을 서버 폴더. 기본값 `../coms-backups` (저장소 폴더 옆) |
+| `BACKUP_KEEP_DAYS` | 매일 백업 보관 일수. 기본값 14 |
 
 전체 목록과 기본값은 [`.env.example`](../.env.example)에 있습니다.
+
+### 백엔드 설정값 (기본값으로 충분할 때가 많습니다)
+
+아래 값은 `docker-compose.yml`의 `coms-backend.environment`에 넘겨줄 때만 적용됩니다. `.env`에 적기만 해서는 컨테이너에 전달되지 않습니다.
+
+| 설정 | 환경 변수 이름 | 기본값 | 설명 |
+| --- | --- | --- | --- |
+| `storage.min-free-bytes` | `STORAGE_MIN_FREE_BYTES` | 524288000 (500MB) | 업로드 디스크의 여유 공간이 이보다 적으면 업로드를 거절(507) |
+| `coms.retention.audit-ip-days` | `COMS_RETENTION_AUDIT_IP_DAYS` | 180 | 감사 로그의 IP를 지우는 기간 |
+| `coms.retention.recruit-application-ip-days` | `COMS_RETENTION_RECRUIT_APPLICATION_IP_DAYS` | 30 | 지원서 접속 IP를 지우는 기간 |
+| `coms.retention.recruit-application-days` | `COMS_RETENTION_RECRUIT_APPLICATION_DAYS` | 365 | 처리하지 않은 지원서를 지우는 기간 |
+| `coms.retention.recruit-decision-contact-days` | `COMS_RETENTION_RECRUIT_DECISION_CONTACT_DAYS` | 365 | 합격·불합격 기록에서 전화번호·이메일을 지우는 기간 |
 
 ## 배포
 
@@ -206,4 +223,5 @@ docker compose --env-file .env up -d --build
 - PostgreSQL 스키마는 Flyway migration으로 관리합니다.
 - 기존 운영 DB에 공개 자격 증명·학번을 제거한 migration 파일을 처음 배포할 때는 DB를 백업한 뒤 Flyway 11.14.1로 `repair`와 `validate`를 수행해야 합니다. 기존 데이터는 삭제되지 않습니다.
 - 운영 reverse proxy는 `/api`와 `/actuator` 요청을 백엔드로 전달해야 합니다.
-- DB volume과 업로드 파일 volume은 정기적으로 백업합니다.
+- DB와 업로드 파일은 `db-backup` 서비스가 매일, 배포 스크립트가 배포 직전에 백업합니다. 백업 폴더(`COMS_BACKUP_DIR`)는 정기적으로 서버 밖으로 복사하세요. 복원 방법은 [백업과 되돌리기](operations/backup-and-rollback.md)에 있습니다.
+- 배포한 새 버전이 헬스 체크에 실패하면 직전 이미지로 자동으로 되돌아갑니다.
