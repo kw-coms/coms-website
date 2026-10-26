@@ -35,6 +35,9 @@ uploads/
 *.csv
 !*sample*.csv
 !*sample*.xlsx
+# Local AI-assistant settings and memories (machine-specific paths; not project code)
+.codex/
+.serena/
 .omc/
 .omx/
 .superpowers/
