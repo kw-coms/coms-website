@@ -137,41 +137,36 @@ COM's는 광운대학교 학생들이 컴퓨터와 소프트웨어를 함께 공
 ## 🏗️ 어떻게 동작하나요
 
 ```mermaid
-flowchart LR
-    subgraph Client["사용자"]
-        W["🌐 웹 브라우저 · PWA"]
-        A["📱 COMS Member App<br/>Android · iOS"]
-    end
+flowchart TB
+    W["🌐 웹 브라우저 · PWA"]
+    A["📱 COMS Member App"]
+    H["Nginx · HTTPS"]
 
-    subgraph Server["운영 서버 (Docker Compose)"]
-        H["Nginx<br/>HTTPS · 라우팅"]
-        F["Frontend<br/>React 빌드 + Nginx"]
+    subgraph Compose["Docker Compose"]
+        F["Frontend<br/>React 정적 파일"]
         B["Backend<br/>Spring Boot 4"]
         D[("PostgreSQL 16")]
         U[("업로드 파일")]
     end
 
-    W -- HTTPS --> H
-    A -- HTTPS --> H
-    H --> F
+    W --> H
+    A --> H
+    H -- "페이지" --> F
     H -- "/api" --> B
     B --> D
     B --> U
-    B -. 메일 .-> M["✉️ SMTP"]
-    B -. 푸시 .-> P["🔔 FCM · Web Push"]
-    W -. 오류 수집 .-> S["Sentry"]
-    B -. 오류 수집 .-> S
+    B -.-> M["✉️ 메일"]
+    B -.-> P["🔔 푸시 알림"]
+    B -.-> S["📈 Sentry"]
 ```
+
+서버 앞단의 Nginx가 HTTPS를 처리하고, 화면은 프론트엔드 컨테이너로, `/api` 요청은 백엔드로 보냅니다. 백엔드는 메일(SMTP), 푸시 알림(FCM·Web Push)을 보내고, 프론트엔드와 백엔드 오류는 Sentry로 모입니다.
 
 **배포 흐름** — PR을 올리면 CI가 백엔드 테스트, 프론트엔드 타입 검사·린트·단위 테스트, 전체 스택 빌드를 돌립니다. `main`에 머지되어 CI가 통과하면 GitHub Actions가 서버에 접속해 Docker Compose로 새 버전을 띄우고 헬스 체크까지 확인합니다.
 
 ```mermaid
 flowchart LR
-    PR["Pull Request"] --> CI["CI<br/>테스트 · 린트 · 빌드"]
-    CI --> MAIN["main 머지"]
-    MAIN --> DEPLOY["Deploy<br/>SSH → Docker Compose"]
-    DEPLOY --> HEALTH["헬스 체크"]
-    HEALTH --> LIVE["🌐 coms.kw.ac.kr"]
+    PR["PR"] --> CI["CI 통과"] --> MAIN["main 머지"] --> DEPLOY["자동 배포"] --> LIVE["🌐 운영 반영"]
 ```
 
 <br/>
