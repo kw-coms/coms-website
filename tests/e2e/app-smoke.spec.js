@@ -164,6 +164,22 @@ function multipartField(body, name) {
   return match?.[1] || ''
 }
 
+function multipartFilenames(body, name = 'files') {
+  return [...(body || '').matchAll(new RegExp(`name="${name}"; filename="([^"]+)"`, 'g'))].map(match => match[1])
+}
+
+function archivePost(id, title, filenames) {
+  return {
+    id,
+    title,
+    originalName: filenames[0],
+    uploadedBy: '2020123456',
+    category: 'GENERAL',
+    fileSize: filenames.length * 7,
+    attachments: filenames.map((originalName, index) => ({ id: id * 10 + index, originalName, mimeType: 'application/pdf', fileSize: 7, contentVersion: `v${index + 1}` })),
+  }
+}
+
 async function assertActivitiesTitleFits(page) {
   await expect
     .poll(async () => {
@@ -651,7 +667,13 @@ test('signup does not offer login until code confirmation creates the account', 
 
   await expect(page.getByText('가입 정보 확인 → 이메일 인증 → 계정 생성')).toBeVisible()
   await page.getByLabel('학번').fill('2026123456')
-  await page.getByLabel('기수').fill('60')
+  // 기수는 더 이상 묻지 않는다 — 명부 값을 쓰고, 없으면 서버가 가입 연도로 부여한다.
+  // 화면은 서울 기준으로 센다(roleAccess.currentGeneration). 러너 시간대로 재계산하면
+  // 1월 1일 전후로 어긋난다.
+  const seoulYear = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric' }).format(new Date()))
+  const thisYearGeneration = seoulYear - 1966
+  await expect(page.getByText(`올해 들어오는 분은 ${thisYearGeneration}기`)).toBeVisible()
+  await expect(page.getByLabel('기수')).toHaveCount(0)
   await page.getByLabel('이름').fill('홍길동')
   await page.getByLabel('이메일').fill('new-member@example.com')
   await page.getByLabel('학과').fill('소프트웨어학부')
@@ -1021,16 +1043,9 @@ test('admin files tab can upload and delete archive files', async ({ page }) => 
       uploadPayload = {
         title: multipartField(body, 'title'),
         category: multipartField(body, 'category'),
+        filenames: multipartFilenames(body),
       }
-      files = [
-        ...files,
-        {
-          id: 2,
-          originalName: uploadPayload.title,
-          uploadedBy: '관리자',
-          fileSize: 7,
-        },
-      ]
+      files = [...files, archivePost(2, uploadPayload.title, uploadPayload.filenames)]
       return route.fulfill({ status: 200, json: files.at(-1) })
     }
     return route.fallback()
@@ -1056,6 +1071,7 @@ test('admin files tab can upload and delete archive files', async ({ page }) => 
   await expect.poll(() => uploadPayload).toEqual({
     title: '회의록.pdf',
     category: 'GENERAL',
+    filenames: ['회의록.pdf'],
   })
   await expect(page.getByText('회의록.pdf')).toBeVisible()
 
@@ -1063,6 +1079,282 @@ test('admin files tab can upload and delete archive files', async ({ page }) => 
 
   await expect.poll(() => deletedFileId).toBe(2)
   await expect(page.getByText('회의록.pdf')).toHaveCount(0)
+})
+
+test('admin files tab creates one post with all selected attachments', async ({ page }) => {
+  await mockAdminApis(page)
+  const uploads = []
+  let files = []
+  await page.route('**/api/files', (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: files })
+    if (route.request().method() !== 'POST') return route.fallback()
+    const body = route.request().postData() || ''
+    const title = multipartField(body, 'title')
+    const filenames = multipartFilenames(body)
+    uploads.push({ title, category: multipartField(body, 'category'), filenames })
+    const saved = archivePost(2, title, filenames)
+    files = [...files, saved]
+    return route.fulfill({ status: 201, json: saved })
+  })
+
+  await page.goto('/admin')
+  await page.getByRole('tab', { name: '파일 관리' }).click()
+  const input = page.locator('input[type="file"]')
+  await expect(input).toHaveAttribute('multiple', '')
+  await expect(input).toBeEnabled()
+  await input.setInputFiles([
+    { name: '회의록.pdf', mimeType: 'application/pdf', buffer: Buffer.from('first') },
+    { name: '자료.zip', mimeType: 'application/zip', buffer: Buffer.from('second') },
+  ])
+
+  await expect.poll(() => uploads).toEqual([{ title: '회의록.pdf', category: 'GENERAL', filenames: ['회의록.pdf', '자료.zip'] }])
+  await expect(page.getByText('2개 파일이 한 자료에 업로드되었습니다.')).toBeVisible()
+  const row = page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '회의록.pdf' })
+  await expect(row).toHaveCount(1)
+  await expect(row.getByText('회의록.pdf', { exact: true })).toBeVisible()
+  await expect(row).toContainText('첨부파일 2개: 회의록.pdf, 자료.zip')
+})
+
+test('admin files tab retries the same attachment group after one rejected post', async ({ page }) => {
+  await mockAdminApis(page)
+  const uploads = []
+  let files = []
+  await page.route('**/api/files', (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: files })
+    if (route.request().method() !== 'POST') return route.fallback()
+    const body = route.request().postData() || ''
+    uploads.push({ title: multipartField(body, 'title'), filenames: multipartFilenames(body) })
+    if (uploads.length === 1) return route.fulfill({ status: 400, json: { message: '첨부파일을 확인해주세요.' } })
+    const saved = archivePost(3, '재시도.pdf', ['재시도.pdf', '부록.pdf'])
+    files = [saved]
+    return route.fulfill({ status: 201, json: saved })
+  })
+
+  await page.goto('/admin')
+  await page.getByRole('tab', { name: '파일 관리' }).click()
+  const input = page.locator('input[type="file"]')
+  const selection = [
+    { name: '재시도.pdf', mimeType: 'application/pdf', buffer: Buffer.from('pdf') },
+    { name: '부록.pdf', mimeType: 'application/pdf', buffer: Buffer.from('appendix') },
+  ]
+  await expect(input).toBeEnabled()
+  await input.setInputFiles(selection)
+  await expect(page.getByText('첨부파일을 확인해주세요.')).toBeVisible()
+  await expect(page.getByText('등록된 파일이 없습니다.')).toBeVisible()
+  await expect(input).toHaveJSProperty('value', '')
+  await input.setInputFiles(selection)
+  await expect.poll(() => uploads).toEqual([
+    { title: '재시도.pdf', filenames: ['재시도.pdf', '부록.pdf'] },
+    { title: '재시도.pdf', filenames: ['재시도.pdf', '부록.pdf'] },
+  ])
+  await expect(page.getByText('2개 파일이 한 자료에 업로드되었습니다.')).toBeVisible()
+  await expect(page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '재시도.pdf' })).toHaveCount(1)
+})
+
+test('admin files tab waits for the initial list before accepting an upload', async ({ page }) => {
+  await mockAdminApis(page)
+  let releaseList
+  const pendingList = new Promise(resolve => { releaseList = resolve })
+  let listRequested
+  const listStarted = new Promise(resolve => { listRequested = resolve })
+  const uploads = []
+  await page.route('**/api/files', async (route) => {
+    if (route.request().method() === 'GET') {
+      listRequested()
+      await pendingList
+      return route.fulfill({ json: [{ id: 1, originalName: '기존.pdf', uploadedBy: '관리자', fileSize: 7 }] })
+    }
+    if (route.request().method() !== 'POST') return route.fallback()
+    uploads.push(multipartField(route.request().postData(), 'title'))
+    return route.fulfill({ status: 201, json: archivePost(2, uploads.at(-1), [uploads.at(-1)]) })
+  })
+
+  await page.goto('/admin')
+  await page.getByRole('tab', { name: '파일 관리' }).click()
+  await listStarted
+  await expect(page.getByRole('button', { name: '파일 업로드' })).toBeDisabled()
+  await expect(page.locator('input[type="file"]')).toBeDisabled()
+
+  releaseList()
+  await expect(page.getByText('기존.pdf')).toBeVisible()
+  await page.locator('input[type="file"]').setInputFiles({ name: '신규.pdf', mimeType: 'application/pdf', buffer: Buffer.from('new') })
+  await expect.poll(() => uploads).toEqual(['신규.pdf'])
+  await expect(page.getByText('기존.pdf')).toBeVisible()
+  await expect(page.getByText('신규.pdf')).toBeVisible()
+})
+
+test('admin files tab keeps an edited row while an attachment group uploads', async ({ page }) => {
+  await mockAdminApis(page)
+  let files = [archivePost(1, '기존 자료', ['기존.pdf'])]
+  let releaseUpload
+  const pendingUpload = new Promise(resolve => { releaseUpload = resolve })
+  let notifyUploadStarted
+  const uploadStarted = new Promise(resolve => { notifyUploadStarted = resolve })
+  await page.route('**/api/files/1', (route) => {
+    if (route.request().method() !== 'PUT') return route.fallback()
+    files = files.map(file => file.id === 1 ? { ...file, title: multipartField(route.request().postData(), 'title') } : file)
+    return route.fulfill({ json: files[0] })
+  })
+  await page.route('**/api/files', async (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: files })
+    if (route.request().method() !== 'POST') return route.fallback()
+    const body = route.request().postData() || ''
+    const title = multipartField(body, 'title')
+    const filenames = multipartFilenames(body)
+    notifyUploadStarted()
+    await pendingUpload
+    const saved = archivePost(2, title, filenames)
+    files = [...files, saved]
+    return route.fulfill({ status: 201, json: saved })
+  })
+
+  await page.goto('/admin')
+  await page.getByRole('tab', { name: '파일 관리' }).click()
+  await expect(page.getByText('기존.pdf')).toBeVisible()
+  await page.locator('input[type="file"]').setInputFiles([
+    { name: '첫째.pdf', mimeType: 'application/pdf', buffer: Buffer.from('first') },
+    { name: '둘째.pdf', mimeType: 'application/pdf', buffer: Buffer.from('second') },
+  ])
+  await uploadStarted
+  await page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '기존.pdf' }).getByRole('button', { name: '수정' }).click()
+  await page.getByPlaceholder('자료 제목').fill('수정된 자료')
+  await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
+  await page.getByRole('button', { name: '수정 저장' }).click()
+  await expect(page.getByRole('button', { name: '수정 저장' })).toHaveCount(0)
+
+  releaseUpload()
+  await expect(page.getByText('2개 파일이 한 자료에 업로드되었습니다.')).toBeVisible()
+  await expect(page.locator('.space-y-2 > .shape-cut-sm')).toHaveCount(2)
+  const editedRow = page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '수정된 자료' })
+  await expect(editedRow).toHaveCount(1)
+  await expect(editedRow).toContainText('기존.pdf')
+  const newRow = page.locator('.space-y-2 > .shape-cut-sm').filter({ hasText: '첫째.pdf' })
+  await expect(newRow).toHaveCount(1)
+  await expect(newRow).toContainText('둘째.pdf')
+  await editedRow.getByRole('button', { name: '수정' }).click()
+  await expect(page.getByPlaceholder('자료 제목')).toHaveValue('수정된 자료')
+})
+
+test('archive write form saves remaining selected files as one post without changing its title', async ({ page }) => {
+  await mockAdminApis(page)
+  const uploads = []
+  let files = []
+  await page.route('**/api/files', (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: files })
+    if (route.request().method() !== 'POST') return route.fallback()
+    const body = route.request().postData() || ''
+    const filenames = multipartFilenames(body)
+    uploads.push({ title: multipartField(body, 'title'), filenames })
+    const saved = archivePost(1, '공통 제목', filenames)
+    files = [saved]
+    return route.fulfill({ status: 201, json: saved })
+  })
+
+  await page.goto('/resources')
+  await page.getByRole('button', { name: '자료 올리기' }).click()
+  await page.getByPlaceholder('자료 제목').fill('공통 제목')
+  await page.locator('input[type="file"]').setInputFiles([
+    { name: '첫째.pdf', mimeType: 'application/pdf', buffer: Buffer.from('first') },
+    { name: '제외.pdf', mimeType: 'application/pdf', buffer: Buffer.from('remove') },
+    { name: '둘째.pdf', mimeType: 'application/pdf', buffer: Buffer.from('second') },
+  ])
+  await page.getByRole('button', { name: '제외.pdf 제거' }).click()
+  await expect(page.getByText('2개 파일 선택됨')).toBeVisible()
+  await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
+  await page.getByRole('button', { name: '등록', exact: true }).click()
+
+  await expect.poll(() => uploads).toEqual([{ title: '공통 제목', filenames: ['첫째.pdf', '둘째.pdf'] }])
+  const row = page.locator('tbody tr').filter({ hasText: '공통 제목' })
+  await expect(row).toHaveCount(1)
+  await expect(row.getByRole('button', { name: '첨부파일 2개' })).toBeVisible()
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.screenshot({ path: '/tmp/coms-archive-grouped-list.png', animations: 'disabled' })
+  await row.getByRole('button', { name: '첨부파일 2개' }).click()
+  await expect(page.getByRole('heading', { name: '자료 상세' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /첫째\.pdf/ })).toHaveAttribute('href', '/api/files/1/attachments/10/download?v=v1')
+  await expect(page.getByRole('link', { name: /둘째\.pdf/ })).toHaveAttribute('href', '/api/files/1/attachments/11/download?v=v2')
+  await page.screenshot({ path: '/tmp/coms-archive-grouped-detail.png', fullPage: true, animations: 'disabled' })
+})
+
+test('archive write form keeps its attachment selection after a rejected post', async ({ page }) => {
+  await mockAdminApis(page)
+  const attempts = []
+  await page.route('**/api/files', (route) => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: [] })
+    if (route.request().method() !== 'POST') return route.fallback()
+    const body = route.request().postData() || ''
+    attempts.push(multipartFilenames(body))
+    if (attempts.length === 1) return route.fulfill({ status: 400, json: { message: '첨부파일을 확인해주세요.' } })
+    return route.fulfill({ status: 201, json: archivePost(4, '재시도 자료', attempts.at(-1)) })
+  })
+
+  await page.goto('/resources')
+  await page.getByRole('button', { name: '자료 올리기' }).click()
+  await page.getByPlaceholder('자료 제목').fill('재시도 자료')
+  await page.locator('input[type="file"]').setInputFiles([
+    { name: '하나.pdf', mimeType: 'application/pdf', buffer: Buffer.from('one') },
+    { name: '둘.pdf', mimeType: 'application/pdf', buffer: Buffer.from('two') },
+  ])
+  await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
+  await page.getByRole('button', { name: '등록', exact: true }).click()
+  await expect(page.getByText('첨부파일을 확인해주세요.')).toBeVisible()
+  await expect(page.getByText('2개 파일 선택됨')).toBeVisible()
+  await page.getByRole('button', { name: '등록', exact: true }).click()
+  await expect.poll(() => attempts).toEqual([['하나.pdf', '둘.pdf'], ['하나.pdf', '둘.pdf']])
+  await expect(page.locator('tbody tr').filter({ hasText: '재시도 자료' })).toHaveCount(1)
+})
+
+test('archive edit replaces all attachments with one multipart request', async ({ page }) => {
+  await mockAdminApis(page)
+  let file = archivePost(10, '기존 자료', ['기존.pdf', '옛부록.pdf'])
+  let replacement = null
+  await page.route('**/api/files', route => route.fulfill({ json: [file] }))
+  await page.route('**/api/files/10', (route) => {
+    if (route.request().method() !== 'PUT') return route.fallback()
+    const body = route.request().postData() || ''
+    replacement = { title: multipartField(body, 'title'), filenames: multipartFilenames(body) }
+    file = archivePost(10, replacement.title, replacement.filenames)
+    return route.fulfill({ json: file })
+  })
+
+  await page.goto('/resources/10')
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  await page.locator('input[type="file"]').setInputFiles([
+    { name: '새본문.pdf', mimeType: 'application/pdf', buffer: Buffer.from('new') },
+    { name: '새부록.pdf', mimeType: 'application/pdf', buffer: Buffer.from('appendix') },
+  ])
+  await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
+  await page.getByRole('button', { name: '수정 저장' }).click()
+
+  await expect.poll(() => replacement).toEqual({ title: '기존 자료', filenames: ['새본문.pdf', '새부록.pdf'] })
+  await expect(page.getByRole('link', { name: /새본문\.pdf/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: /새부록\.pdf/ })).toBeVisible()
+  await expect(page.getByText('옛부록.pdf')).toHaveCount(0)
+})
+
+test('archive metadata edit preserves existing attachments when no files are selected', async ({ page }) => {
+  await mockAdminApis(page)
+  let file = archivePost(11, '기존 자료', ['본문.pdf', '부록.pdf'])
+  let editedFields = null
+  await page.route('**/api/files', route => route.fulfill({ json: [file] }))
+  await page.route('**/api/files/11', (route) => {
+    if (route.request().method() !== 'PUT') return route.fallback()
+    const body = route.request().postData() || ''
+    editedFields = { title: multipartField(body, 'title'), filenames: multipartFilenames(body) }
+    file = { ...file, title: editedFields.title }
+    return route.fulfill({ json: file })
+  })
+
+  await page.goto('/resources/11')
+  await page.getByRole('button', { name: '수정', exact: true }).click()
+  await page.getByPlaceholder('자료 제목').fill('고친 제목')
+  await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
+  await page.getByRole('button', { name: '수정 저장' }).click()
+
+  await expect.poll(() => editedFields).toEqual({ title: '고친 제목', filenames: [] })
+  await expect(page.getByRole('heading', { name: '고친 제목' })).toBeVisible()
+  await expect(page.getByRole('link', { name: /본문\.pdf/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: /부록\.pdf/ })).toBeVisible()
 })
 
 test('admin font management explains availability and uses action labels', async ({ page }) => {

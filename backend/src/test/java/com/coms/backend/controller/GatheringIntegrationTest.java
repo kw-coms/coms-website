@@ -88,8 +88,8 @@ class GatheringIntegrationTest {
 
     @Test
     void loggedOutVisitorsAreRefused() throws Exception {
-        mockMvc.perform(get("/api/gatherings")).andExpect(status().isForbidden());
-        join(null, 1L, null).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/gatherings")).andExpect(status().isUnauthorized());
+        join(null, 1L, null).andExpect(status().isUnauthorized());
     }
 
     @Test

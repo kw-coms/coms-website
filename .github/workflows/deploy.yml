@@ -128,7 +128,34 @@ jobs:
               for container in "$@"; do
                 ( umask 077; docker logs --tail=500 "$container" > "$log_dir/$stamp-$container.log" 2>&1 ) || true
               done
+              # Saved output is only for the next few deploys' troubleshooting.
+              find "$log_dir" -maxdepth 1 -type f -name '*.log' -mtime +30 -delete 2>/dev/null || true
               echo "Container output was saved on the server in ~/deploy-logs/$stamp-*.log and is not printed here." >&2
+            }
+
+            # Waits for the new release: first the backend on loopback, then the public site
+            # through the host proxy. The prod backend may take up to its 120 s healthcheck
+            # start_period (Flyway + schema validation), so the first loop allows ~3 minutes.
+            site_is_healthy() {
+              for attempt in $(seq 1 60); do
+                if curl -fsS -o /dev/null http://127.0.0.1:8080/actuator/health; then
+                  break
+                fi
+                if [ "$attempt" -eq 60 ]; then
+                  return 1
+                fi
+                sleep 3
+              done
+              for attempt in $(seq 1 20); do
+                if curl -fsI -o /dev/null "$PUBLIC_BASE_URL/" &&
+                   curl -fsS -o /dev/null "$PUBLIC_BASE_URL/api/server/time" &&
+                   health="$(curl -fsS "$PUBLIC_BASE_URL/actuator/health")" &&
+                   grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"' <<< "$health"; then
+                  return 0
+                fi
+                sleep 3
+              done
+              return 1
             }
 
             if ! command -v git >/dev/null 2>&1; then
@@ -163,7 +190,11 @@ jobs:
             fi
 
             # Keep only persistent secrets/data; remove every other untracked or ignored build artifact.
-            git clean -fdx -e .env -e backend-data/ -e backend/uploads/ -e uploads/
+            # secrets/ holds the optional Firebase service-account file mounted by docker-compose.yml.
+            git clean -fdx -e .env -e backend-data/ -e backend/uploads/ -e uploads/ -e secrets/
+
+            NEW_TAG="$(git rev-parse --short=12 HEAD)"
+            export COMS_IMAGE_TAG="$NEW_TAG"
 
             if [ ! -f .env ]; then
               echo "Missing $DEPLOY_PATH/.env on the server. Create it from .env.example before deploying." >&2
@@ -182,34 +213,86 @@ jobs:
               fi
             fi
 
-            (cd backend && ./gradlew clean test --no-daemon)
+            # Backups live outside the checkout (docker-compose.yml mounts the same directory
+            # into the db-backup service). Creating it here, as the deploy user, keeps it
+            # owner-only and readable without sudo.
+            BACKUP_DIR="$(sed -n 's/^COMS_BACKUP_DIR=//p' .env | tail -n 1)"
+            BACKUP_DIR="${BACKUP_DIR%\"}"
+            BACKUP_DIR="${BACKUP_DIR#\"}"
+            BACKUP_DIR="${BACKUP_DIR:-../coms-backups}"
+            case "$BACKUP_DIR" in
+              /*) ;;
+              *) BACKUP_DIR="$DEPLOY_PATH/$BACKUP_DIR" ;;
+            esac
+            mkdir -p "$BACKUP_DIR"
+            chmod 700 "$BACKUP_DIR"
 
-            $COMPOSE --env-file .env -f docker-compose.yml up -d --build --remove-orphans
+            # Dump the database before the new release can run its Flyway migrations, so a bad
+            # migration can always be undone. No deploy goes ahead without this dump.
+            if $COMPOSE --env-file .env -f docker-compose.yml exec -T db true >/dev/null 2>&1; then
+              dump="$BACKUP_DIR/predeploy-$(date +%Y%m%dT%H%M%S)-$NEW_TAG.dump"
+              if ( umask 077; $COMPOSE --env-file .env -f docker-compose.yml exec -T db \
+                     sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' > "$dump.partial" ) &&
+                 [ -s "$dump.partial" ]; then
+                mv "$dump.partial" "$dump"
+                echo "Database backed up before deploy: $(basename "$dump")"
+              else
+                rm -f "$dump.partial"
+                echo "Refusing deploy: the pre-deploy database backup failed." >&2
+                exit 1
+              fi
+              # Keep the ten most recent pre-deploy dumps.
+              ls -1t "$BACKUP_DIR"/predeploy-*.dump 2>/dev/null | tail -n +11 | xargs -r rm -f || true
+            fi
+
+            # Remember the images the site runs right now, so a release that fails its health
+            # check can be replaced by them again.
+            ROLLBACK_READY=0
+            if docker inspect coms-backend >/dev/null 2>&1 && docker inspect coms-frontend >/dev/null 2>&1; then
+              docker tag "$(docker inspect -f '{{.Image}}' coms-backend)" coms-backend:previous
+              docker tag "$(docker inspect -f '{{.Image}}' coms-frontend)" coms-frontend:previous
+              ROLLBACK_READY=1
+            fi
+
+            # CI already ran the full backend and frontend suites on this exact commit (this job
+            # only starts after a green CI run), so the server only builds the images. Building
+            # first keeps the current release serving until the new images exist.
+            $COMPOSE --env-file .env -f docker-compose.yml build
+            $COMPOSE --env-file .env -f docker-compose.yml up -d --remove-orphans
+
+            if ! site_is_healthy; then
+              $COMPOSE --env-file .env -f docker-compose.yml ps
+              save_container_logs coms-backend coms-frontend
+              if [ "$ROLLBACK_READY" = 1 ]; then
+                echo "The new release failed its health check. Rolling back to the previous release." >&2
+                docker tag coms-backend:previous coms-backend:latest
+                docker tag coms-frontend:previous coms-frontend:latest
+                COMS_IMAGE_TAG=previous $COMPOSE --env-file .env -f docker-compose.yml up -d --no-build coms-backend coms-frontend
+                if site_is_healthy; then
+                  echo "Rollback finished: the site is running the previous release again." >&2
+                else
+                  $COMPOSE --env-file .env -f docker-compose.yml ps
+                  save_container_logs coms-backend coms-frontend
+                  echo "Rollback did not bring the site back. Restore by hand: docs/operations/backup-and-rollback.md" >&2
+                fi
+              fi
+              exit 1
+            fi
+
+            # The release is live. `latest` follows it so a manual `docker compose up -d` on the
+            # server keeps running it, and only the live and previous release images are kept.
+            docker tag "coms-backend:$NEW_TAG" coms-backend:latest
+            docker tag "coms-frontend:$NEW_TAG" coms-frontend:latest
+            for repo in coms-backend coms-frontend; do
+              docker image ls "$repo" --format '{{.Tag}}' | while read -r tag; do
+                case "$tag" in
+                  "$NEW_TAG"|previous|latest|"<none>") ;;
+                  *) docker rmi "$repo:$tag" >/dev/null 2>&1 || true ;;
+                esac
+              done
+            done
+            # Images named after the compose project (the names used before this file set its own)
+            # are no longer referenced by anything.
+            docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -E -- '-coms-(backend|frontend):latest$' | xargs -r docker rmi >/dev/null 2>&1 || true
             docker image prune -f
-
-            for attempt in 1 2 3 4 5 6 7 8 9 10; do
-              if curl -fsS http://127.0.0.1:8080/actuator/health; then
-                break
-              fi
-              if [ "$attempt" -eq 10 ]; then
-                $COMPOSE --env-file .env -f docker-compose.yml ps
-                save_container_logs coms-backend
-                exit 1
-              fi
-              sleep 3
-            done
-
-            for attempt in 1 2 3 4 5 6 7 8 9 10; do
-              if curl -fI "$PUBLIC_BASE_URL/" &&
-                 curl -f "$PUBLIC_BASE_URL/api/server/time" &&
-                 curl -fsS "$PUBLIC_BASE_URL/actuator/health" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"'; then
-                break
-              fi
-              if [ "$attempt" -eq 10 ]; then
-                $COMPOSE --env-file .env -f docker-compose.yml ps
-                save_container_logs coms-backend coms-frontend
-                exit 1
-              fi
-              sleep 3
-            done
           REMOTE

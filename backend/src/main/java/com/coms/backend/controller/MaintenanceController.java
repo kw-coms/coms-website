@@ -4,7 +4,11 @@ import com.coms.backend.domain.EligibleMember;
 import com.coms.backend.domain.Member;
 import com.coms.backend.repository.EligibleMemberRepository;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.security.ClientIpResolver;
+import com.coms.backend.service.AuditLogService;
 import com.coms.backend.service.EligibleMemberService;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -26,6 +30,15 @@ public class MaintenanceController {
     private final EligibleMemberRepository eligibleMemberRepository;
     private final PasswordEncoder passwordEncoder;
     private final EligibleMemberService eligibleMemberService;
+    private final AuditLogService auditLogService;
+    private final ClientIpResolver clientIpResolver;
+    private final TransactionTemplate transactionTemplate;
+
+    /**
+     * Serialises bootstrap requests. The "no admin yet" check and the insert run in one transaction
+     * that commits while this lock is held, so two concurrent requests cannot both pass the check.
+     */
+    private static final Object BOOTSTRAP_LOCK = new Object();
 
     @Value("${bootstrap.secret:}")
     private String bootstrapSecret;
@@ -33,11 +46,17 @@ public class MaintenanceController {
     public MaintenanceController(MemberRepository memberRepository,
                                   EligibleMemberRepository eligibleMemberRepository,
                                   PasswordEncoder passwordEncoder,
-                                  EligibleMemberService eligibleMemberService) {
+                                  EligibleMemberService eligibleMemberService,
+                                  AuditLogService auditLogService,
+                                  ClientIpResolver clientIpResolver,
+                                  PlatformTransactionManager transactionManager) {
         this.memberRepository = memberRepository;
         this.eligibleMemberRepository = eligibleMemberRepository;
         this.passwordEncoder = passwordEncoder;
         this.eligibleMemberService = eligibleMemberService;
+        this.auditLogService = auditLogService;
+        this.clientIpResolver = clientIpResolver;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
     record BootstrapRequest(
@@ -70,8 +89,19 @@ public class MaintenanceController {
     @PostMapping("/bootstrap")
     public ResponseEntity<Map<String, String>> bootstrap(
             @RequestHeader(value = "X-Bootstrap-Secret", required = false) String providedSecret,
-            @Valid @RequestBody BootstrapRequest req) {
+            @Valid @RequestBody BootstrapRequest req,
+            jakarta.servlet.http.HttpServletRequest request) {
         verifyBootstrapSecret(providedSecret);
+        String clientIp = clientIpResolver.resolve(request);
+        synchronized (BOOTSTRAP_LOCK) {
+            ResponseEntity<Map<String, String>> response = transactionTemplate.execute(status -> bootstrapAdmin(req));
+            auditLogService.record(req.studentId(), "BOOTSTRAP_ADMIN", "MEMBER", req.studentId(),
+                    response == null || response.getBody() == null ? null : response.getBody().get("message"), clientIp);
+            return response;
+        }
+    }
+
+    private ResponseEntity<Map<String, String>> bootstrapAdmin(BootstrapRequest req) {
         boolean adminExists = memberRepository.existsByRole(Member.Role.ADMIN);
         if (adminExists) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "이미 초기 설정이 완료되어 다시 실행할 수 없습니다.");

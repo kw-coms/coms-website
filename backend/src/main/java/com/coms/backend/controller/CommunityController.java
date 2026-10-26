@@ -22,6 +22,7 @@ import com.coms.backend.service.CommunityDeletionArchiveService;
 import com.coms.backend.service.CommunityService;
 import com.coms.backend.service.LinkPreviewService;
 import com.coms.backend.security.ClientIpResolver;
+import com.coms.backend.security.ShareLinkSigner;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
@@ -49,6 +50,8 @@ import java.util.concurrent.TimeUnit;
 @RequestMapping("/api/community/posts")
 public class CommunityController {
     private static final String SHARE_DESCRIPTION = "여기를 눌러 내용을 확인하세요.\ncoms.kw.ac.kr";
+    private static final String GENERIC_SHARE_TITLE = "COM's 커뮤니티";
+    private static final String GENERIC_SHARE_IMAGE = "/og-image.jpg";
     // Extra images, videos and attachments are addressed by their own row id and a
     // replacement upload always creates a NEW row, so the bytes behind one of these
     // URLs never change. Spring Security's default CacheControlHeadersWriter stamps
@@ -64,17 +67,20 @@ public class CommunityController {
     private final CommunityDeletionArchiveService communityDeletionArchiveService;
     private final LinkPreviewService linkPreviewService;
     private final ClientIpResolver clientIpResolver;
+    private final ShareLinkSigner shareLinkSigner;
     private final String publicBaseUrl;
 
     public CommunityController(CommunityService communityService,
                                CommunityDeletionArchiveService communityDeletionArchiveService,
                                LinkPreviewService linkPreviewService,
                                ClientIpResolver clientIpResolver,
+                               ShareLinkSigner shareLinkSigner,
                                @Value("${app.public-base-url:}") String publicBaseUrl) {
         this.communityService = communityService;
         this.communityDeletionArchiveService = communityDeletionArchiveService;
         this.linkPreviewService = linkPreviewService;
         this.clientIpResolver = clientIpResolver;
+        this.shareLinkSigner = shareLinkSigner;
         this.publicBaseUrl = publicBaseUrl == null ? "" : publicBaseUrl.trim();
     }
 
@@ -159,25 +165,64 @@ public class CommunityController {
         return ResponseEntity.ok(communityService.get(authentication.getName(), id));
     }
 
+    /**
+     * A shareable link for a post the member can read: {@code /community/{id}?s=<signature>}.
+     * Only links carrying the signature get the post's own title and image in chat previews;
+     * see {@link ShareLinkSigner}. Anonymous-board posts never get a preview, so they get no link.
+     */
+    @GetMapping("/{id}/share-link")
+    public ResponseEntity<CommunityShareLink> shareLink(Authentication authentication,
+                                                        @PathVariable Long id,
+                                                        HttpServletRequest request) {
+        communityService.requireShareablePost(authentication.getName(), id);
+        String signature = shareLinkSigner.sign(id);
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(new CommunityShareLink(absoluteUrl(request, "/community/" + id + "?s=" + signature), signature));
+    }
+
+    // The three share endpoints below answer link-preview crawlers, which have no session. With a
+    // valid signature they describe the post; without one they return the same generic card for
+    // every id, so walking ids reveals nothing — not even which posts exist.
+
     @GetMapping(value = "/{id}/share", produces = MediaType.TEXT_HTML_VALUE)
-    public ResponseEntity<String> sharePreview(@PathVariable Long id, HttpServletRequest request) {
-        CommunityService.CommunityPostSharePreview preview = communityService.sharePreview(id);
-        String postUrl = absoluteUrl(request, "/community/" + id);
-        String imageUrl = preview.hasImage()
-                ? absoluteUrl(request, "/api/community/posts/" + id + "/share-image")
-                : null;
+    public ResponseEntity<String> sharePreview(@PathVariable Long id,
+                                               @RequestParam(name = "s", required = false) String signature,
+                                               HttpServletRequest request) {
+        String html;
+        if (shareLinkSigner.verify(id, signature)) {
+            CommunityService.CommunityPostSharePreview preview = communityService.sharePreview(id);
+            String query = "?s=" + signature;
+            String postUrl = absoluteUrl(request, "/community/" + id + query);
+            String imageUrl = preview.hasImage()
+                    ? absoluteUrl(request, "/api/community/posts/" + id + "/share-image" + query)
+                    : null;
+            html = sharePreviewHtml(preview.title(), postUrl, imageUrl, true);
+        } else {
+            html = sharePreviewHtml(GENERIC_SHARE_TITLE, absoluteUrl(request, "/community/" + id),
+                    absoluteUrl(request, GENERIC_SHARE_IMAGE), false);
+        }
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("text/html;charset=UTF-8"))
                 .cacheControl(CacheControl.noStore())
-                .body(sharePreviewHtml(preview, postUrl, imageUrl));
+                .body(html);
     }
 
     @GetMapping("/{id}/share-data")
-    public ResponseEntity<CommunityShareData> shareData(@PathVariable Long id, HttpServletRequest request) {
+    public ResponseEntity<CommunityShareData> shareData(@PathVariable Long id,
+                                                        @RequestParam(name = "s", required = false) String signature,
+                                                        HttpServletRequest request) {
+        if (!shareLinkSigner.verify(id, signature)) {
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.noStore())
+                    .body(new CommunityShareData(id, GENERIC_SHARE_TITLE, SHARE_DESCRIPTION,
+                            absoluteUrl(request, "/community/" + id), null, false));
+        }
         CommunityService.CommunityPostSharePreview preview = communityService.sharePreview(id);
-        String postUrl = absoluteUrl(request, "/community/" + id);
+        String query = "?s=" + signature;
+        String postUrl = absoluteUrl(request, "/community/" + id + query);
         String imageUrl = preview.hasImage()
-                ? absoluteUrl(request, "/api/community/posts/" + id + "/share-image")
+                ? absoluteUrl(request, "/api/community/posts/" + id + "/share-image" + query)
                 : null;
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
@@ -192,11 +237,16 @@ public class CommunityController {
     }
 
     @GetMapping("/{id}/share-image")
-    public ResponseEntity<Resource> shareImage(@PathVariable Long id) {
+    public ResponseEntity<Resource> shareImage(@PathVariable Long id,
+                                               @RequestParam(name = "s", required = false) String signature) {
+        if (!shareLinkSigner.verify(id, signature)) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         CommunityService.CommunityPostShareImage image = communityService.loadShareImage(id);
         String filename = filenameOrFallback(image.originalName(), image.mimeType(), "community-preview");
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic())
+                // Private: the image is members' content even though this signed URL may fetch it.
+                .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePrivate())
                 .contentType(mediaType(image.mimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
                         .filename(filename, StandardCharsets.UTF_8).build().toString())
@@ -300,8 +350,9 @@ public class CommunityController {
     }
 
     @GetMapping("/tools/youtube/search")
-    public ResponseEntity<YouTubeSearchResponse> searchYouTube(@RequestParam String q) {
-        return ResponseEntity.ok(communityService.searchYouTube(q));
+    public ResponseEntity<YouTubeSearchResponse> searchYouTube(Authentication authentication,
+                                                               @RequestParam String q) {
+        return ResponseEntity.ok(communityService.searchYouTube(authentication.getName(), q));
     }
 
     @GetMapping("/tools/link-preview")
@@ -509,10 +560,11 @@ public class CommunityController {
         }
     }
 
-    private String sharePreviewHtml(CommunityService.CommunityPostSharePreview preview,
+    private String sharePreviewHtml(String rawTitle,
                                     String postUrl,
-                                    String imageUrl) {
-        String title = html(preview.title());
+                                    String imageUrl,
+                                    boolean article) {
+        String title = html(rawTitle);
         String description = html(SHARE_DESCRIPTION);
         String escapedPostUrl = html(postUrl);
         StringBuilder html = new StringBuilder();
@@ -522,7 +574,7 @@ public class CommunityController {
         html.append("<meta name=\"robots\" content=\"noindex,nofollow\">");
         html.append("<title>").append(title).append("</title>");
         html.append("<link rel=\"canonical\" href=\"").append(escapedPostUrl).append("\">");
-        html.append("<meta property=\"og:type\" content=\"article\">");
+        html.append("<meta property=\"og:type\" content=\"").append(article ? "article" : "website").append("\">");
         html.append("<meta property=\"og:site_name\" content=\"COM's\">");
         html.append("<meta property=\"og:title\" content=\"").append(title).append("\">");
         html.append("<meta property=\"og:description\" content=\"").append(description).append("\">");
@@ -590,6 +642,8 @@ public class CommunityController {
     }
 
     private record BookmarkToggleResponse(boolean bookmarked) {}
+
+    private record CommunityShareLink(String url, String signature) {}
 
     private record CommunityShareData(Long id,
                                       String title,

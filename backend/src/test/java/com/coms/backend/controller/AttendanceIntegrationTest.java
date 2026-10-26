@@ -87,8 +87,8 @@ class AttendanceIntegrationTest {
 
     @Test
     void loggedOutVisitorsAreRefused() throws Exception {
-        mockMvc.perform(get("/api/attendance/sessions")).andExpect(status().isForbidden());
-        checkIn(null, "1234").andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/attendance/sessions")).andExpect(status().isUnauthorized());
+        checkIn(null, "1234").andExpect(status().isUnauthorized());
     }
 
     @Test

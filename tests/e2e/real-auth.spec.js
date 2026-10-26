@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { Buffer } from 'node:buffer'
 
 // Real-backend auth e2e.
 //
@@ -30,6 +31,65 @@ const MAILBOX_PATH = fileURLToPath(new URL('../../test-results/coms-e2e-mailbox.
 const ADMIN = { identifier: 'admin', password: process.env.COMS_E2E_ADMIN_PASSWORD }
 
 test.describe('real backend auth', () => {
+  test('archive uploads one post with two attachments and downloads the original bytes', async ({ page }) => {
+    const login = await page.request.post('/api/auth/login', {
+      headers: { Origin: ORIGIN },
+      data: { identifier: ADMIN.identifier, password: ADMIN.password, rememberMe: false },
+    })
+    expect(login.status()).toBe(200)
+    const title = `다중 첨부 검증 ${Date.now()}`
+    const files = [
+      { name: 'first.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 first attachment') },
+      { name: 'second.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 second attachment') },
+    ]
+    let postId
+    try {
+      await page.goto('/resources')
+      await page.getByRole('button', { name: '자료 올리기' }).click()
+      await page.getByPlaceholder('자료 제목').fill(title)
+      await page.locator('input[type="file"]').setInputFiles(files)
+      await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
+      const creating = page.waitForResponse(response => new URL(response.url()).pathname === '/api/files' && response.request().method() === 'POST')
+      await page.getByRole('button', { name: '등록', exact: true }).click()
+      const created = await creating
+      expect(created.status()).toBe(200)
+      const saved = await created.json()
+      postId = saved.id
+      expect(saved.title).toBe(title)
+      expect(saved.attachments.map(file => file.originalName)).toEqual(['first.pdf', 'second.pdf'])
+      const listed = await page.request.get('/api/files')
+      expect((await listed.json()).filter(post => post.title === title)).toHaveLength(1)
+      await page.getByRole('button', { name: '첨부파일 2개', exact: true }).click()
+      await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()
+
+      for (const file of files) {
+        const link = page.getByRole('link', { name: `${file.name} 다운로드`, exact: true })
+        const download = await page.request.get(await link.getAttribute('href'))
+        expect(download.status()).toBe(200)
+        expect(await download.body()).toEqual(file.buffer)
+        expect(download.headers()['content-disposition']).toContain('attachment')
+        expect(download.headers()['cache-control']).toContain('no-store')
+      }
+
+      await page.getByRole('button', { name: '수정', exact: true }).click()
+      await expect(page.getByText('2개 기존 파일 유지')).toBeVisible()
+      await page.getByPlaceholder('자료 제목').fill(`${title} 수정`)
+      await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
+      const updating = page.waitForResponse(response => new URL(response.url()).pathname === `/api/files/${postId}` && response.request().method() === 'PUT')
+      await page.getByRole('button', { name: '수정 저장' }).click()
+      const updated = await updating
+      expect(updated.status()).toBe(200)
+      expect((await updated.json()).attachments.map(file => file.id)).toEqual(saved.attachments.map(file => file.id))
+      await expect(page.getByRole('heading', { name: `${title} 수정`, exact: true })).toBeVisible()
+      await expect(page.getByRole('link', { name: 'second.pdf 다운로드', exact: true })).toBeVisible()
+    } finally {
+      if (postId) {
+        const removed = await page.request.delete(`/api/files/${postId}`, { headers: { Origin: ORIGIN } })
+        expect(removed.status()).toBe(204)
+      }
+    }
+  })
+
   test('dev admin logs in through the UI and reaches a gated page', async ({ page }) => {
     await page.goto('/login')
 
@@ -102,7 +162,6 @@ test.describe('real backend auth', () => {
     await page.goto('/signup')
 
     await page.locator('#studentId').fill(studentId)
-    await page.locator('#generation').fill('60')
     await page.locator('#name').fill(name)
     await page.locator('#email').fill(email)
     await page.locator('#password').fill('Member1234!@')
@@ -153,6 +212,9 @@ test.describe('real backend auth', () => {
     await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible({ timeout: 15_000 })
     const me = await page.request.get('/api/auth/me')
     expect(me.status()).toBe(200)
-    expect((await me.json()).studentId).toBe(studentId)
+    const profile = await me.json()
+    expect(profile.studentId).toBe(studentId)
+    // 가입 화면이 기수를 보내지 않아도 위에서 명부에 심은 60기가 계정에 들어가야 한다.
+    expect(profile.generation).toBe('60')
   })
 })

@@ -111,7 +111,7 @@ class OperationsSecurityIntegrationTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/notices"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -129,18 +129,18 @@ class OperationsSecurityIntegrationTest {
     @Test
     void loweredUrlRulesStillRejectAnonymousRequests() throws Exception {
         // 권한 매트릭스로 옮긴 경로들의 URL 규칙을 authenticated() 로 낮췄다 —
-        // 로그인하지 않은 요청은 여전히 전부 막혀야 한다.
+        // 로그인하지 않은 요청은 여전히 전부 막혀야 한다 (세션 없음 = 401).
         mockMvc.perform(get("/api/club-room"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/notices")
                         .header("Origin", ORIGIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(NOTICE_BODY))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/admin/site-settings"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/admin/community/deleted-posts"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

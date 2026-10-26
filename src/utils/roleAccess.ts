@@ -105,6 +105,20 @@ const OPERATIONS_PERMISSIONS: PermissionKey[] = [
   PERMISSIONS.noticeWrite,
 ]
 
+// 1기가 입학한 해. 백엔드 EligibleMemberService.FIRST_GENERATION_YEAR 와 같은 값이어야 한다.
+export const FIRST_GENERATION_YEAR = 1966
+
+/**
+ * 올해 들어오는 사람의 기수. 2026년이면 60기, 2027년이면 61기.
+ *
+ * 기수가 넘어가는 시점은 한국 기준 새해다. 브라우저 시간대를 쓰면 1월 1일 전후 몇 시간 동안
+ * 서버(Clock.systemDefaultZone(), 배포 환경 TZ=Asia/Seoul)와 다른 숫자를 보여주므로 서울 기준으로 센다.
+ */
+export function currentGeneration(now = new Date()) {
+  const seoulYear = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Seoul', year: 'numeric' }).format(now))
+  return seoulYear - FIRST_GENERATION_YEAR
+}
+
 // 졸업생 합성 ID(G{입학연도}-{명부번호})는 내부 키 — 화면에는 입학연도만.
 export function displayStudentId(studentId?: string | null) {
   const raw = String(studentId || '')

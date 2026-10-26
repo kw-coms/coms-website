@@ -1,0 +1,27 @@
+name: 기능 제안
+description: 있으면 좋겠는 기능이나 개선점을 알려 주세요
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 어떤 불편이 있나요
+      description: 지금 어떻게 하고 있고, 무엇이 번거로운지 적어 주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 이렇게 되면 좋겠어요
+    validations:
+      required: true
+  - type: dropdown
+    id: who
+    attributes:
+      label: 누가 쓰나요
+      options:
+        - 처음 오는 방문자
+        - 부원
+        - 운영진
+    validations:
+      required: false

@@ -238,7 +238,10 @@ public class PendingSignupService {
         pending.setCodeExpiresAt(now().plusMinutes(EMAIL_VERIFICATION_EXPIRES_MINUTES));
         pending.setVerificationAttempts(0);
         pending.setDepartment(normalizeNullable(request.department()));
-        pending.setGeneration(normalizeNullable(request.generation()) == null ? prepared.generation() : normalizeNullable(request.generation()));
+        // 기수는 요청값을 받지 않는다. 명부에 등록된 기수가 정답이고, 없으면 가입 연도로 부여된다
+        // (EligibleMemberService.preparedSignup). 예전에는 가입 폼 입력이 명부 값을 덮어써서
+        // 같은 사람의 기수가 명부와 회원 목록에서 어긋났다.
+        pending.setGeneration(prepared.generation());
         pending.setPhone(normalizeNullable(request.phone()));
         pending.setAspiration(signupType.equals("CURRENT") ? normalizeNullable(request.aspiration()) : null);
         pending.setInterests(signupType.equals("CURRENT") ? normalizeNullable(request.interests()) : null);

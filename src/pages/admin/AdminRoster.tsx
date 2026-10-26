@@ -7,6 +7,8 @@ import { Skeleton, SkeletonGroup } from '../../components/common/Skeleton'
 import { ListCount, ListSearch, ListSelect, SortableTh } from '../../components/common/ListTools'
 import { useAdminMembers } from './useAdminMembers'
 import { compareNumber, compareText, matchesQuery, nextColumnSort, sortedBy, type SortDirection } from '../../utils/listTools'
+import { Download } from 'lucide-react'
+import { downloadRosterCsv } from './rosterCsv'
 
 type RosterSortKey = 'studentId' | 'name' | 'generation'
 
@@ -152,6 +154,21 @@ export default function AdminRoster() {
     } finally {
       setAdding(false)
     }
+  }
+
+  // The list as it is on screen (narrowed and ordered) as a spreadsheet file. It is personal
+  // data leaving the site, so the president confirms first.
+  const handleExport = async () => {
+    if (visibleRoster.length === 0) return
+    const ok = await confirmDialog({
+      message: `화면에 보이는 명부 ${visibleRoster.length}명의 이름, 학번, 전화번호를 CSV 파일로 내려받습니다.\n개인정보이니 필요한 곳에만 쓰고, 쓴 뒤에는 지워 주세요.`,
+    })
+    if (!ok) return
+    downloadRosterCsv(visibleRoster.map((member) => ({
+      ...member,
+      joined: signupKnown ? hasAccount(member) : undefined,
+    })))
+    showToast({ message: `명부 ${visibleRoster.length}명을 CSV로 내려받았습니다.`, tone: 'success' })
   }
 
   const startEdit = (member) => {
@@ -359,6 +376,15 @@ export default function AdminRoster() {
             <ListSearch value={rosterQuery} onChange={setRosterQuery} placeholder="이름, 학번, 기수, 전화번호" label="명부 검색" />
             {signupKnown && <ListSelect value={signupFilter} onChange={setSignupFilter} options={SIGNUP_FILTER_OPTIONS} label="가입 여부로 거르기" />}
             <ListCount shown={visibleRoster.length} total={roster.length} />
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={visibleRoster.length === 0}
+              className="apple-action-secondary inline-flex min-h-10 items-center gap-1.5 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download size={13} aria-hidden="true" />
+              CSV 내보내기
+            </button>
           </div>
         )}
         {!loadingRoster && !rosterError && roster.length > 0 && (
@@ -484,6 +510,7 @@ export default function AdminRoster() {
         {result && (
           <p className="mt-3 shape-cut-sm bg-[var(--app-accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-accent-text)]">
             {result.message} 가져온 행: {result.imported}, 건너뜀: {result.skipped}
+            {result.phoneFilled > 0 && `, 전화번호 채움: ${result.phoneFilled}`}
           </p>
         )}
         {error && (

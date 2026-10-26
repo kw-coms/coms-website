@@ -9,6 +9,7 @@ import com.coms.backend.security.RequestBodyLimitFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
@@ -20,6 +21,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -74,6 +76,7 @@ public class SecurityConfig {
                                            OriginValidationFilter originValidationFilter,
                                            IntegrationHmacFilter integrationHmacFilter,
                                            com.coms.backend.repository.MemberRepository memberRepository,
+                                           com.coms.backend.repository.RefreshSessionRepository refreshSessionRepository,
                                            @Value("${app.max-request-body-bytes:8388608}") long maxRequestBodyBytes) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -82,12 +85,18 @@ public class SecurityConfig {
             // requests use a separate HMAC filter. Spring's session CSRF token is not used here.
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // No usable credentials (missing, expired, revoked) -> 401; a signed-in member without
+            // the required role -> 403. The web and mobile clients refresh their session on 401
+            // only, so an expired token must not look like a permission denial.
+            .exceptionHandling(errors -> errors
+                    .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
             .authorizeHttpRequests(auth -> {
                 auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll();
                 auth.requestMatchers("/error", "/api/auth/signup", "/api/auth/login", "/api/auth/logout", "/api/auth/refresh", "/hello", "/api/server/time",
                         "/api/auth/email-verification/request-signup", "/api/auth/email-verification/confirm-signup",
                         "/api/auth/password-reset/request", "/api/auth/password-reset/confirm").permitAll();
                 auth.requestMatchers("/api/integrations/**").hasRole("INTEGRATION");
+                auth.requestMatchers(HttpMethod.GET, "/api/companion/me").authenticated();
                 auth.requestMatchers(HttpMethod.POST, "/api/recruit/apply", "/api/recruit/status").permitAll();
                 auth.requestMatchers(HttpMethod.GET, "/api/site-settings").permitAll();
                 // 동아리방 비밀번호: club_room.view 권한 — 실제 판정은 SiteSettingsController 의
@@ -193,7 +202,7 @@ public class SecurityConfig {
             .addFilterBefore(originValidationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(integrationHmacFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(
-                new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService, memberRepository),
+                new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService, memberRepository, refreshSessionRepository),
                 UsernamePasswordAuthenticationFilter.class
             );
 

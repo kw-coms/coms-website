@@ -1,6 +1,7 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.BannedStudent;
+import com.coms.backend.domain.EligibleMember;
 import com.coms.backend.domain.Member;
 import com.coms.backend.repository.BannedStudentRepository;
 import com.coms.backend.repository.EligibleMemberRepository;
@@ -68,6 +69,7 @@ class EligibleMemberServiceTest {
                     assertThat(member.studentId()).isEqualTo("2024123456");
                     assertThat(member.name()).isEqualTo("홍길동");
                     assertThat(member.generation()).isEqualTo("58");
+                    assertThat(member.admissionYear()).isEqualTo(2024);
                 });
         eligibleMemberService.validateAndClaimSignup("2024123456", "홍길동", null, null, "010-1234-5678");
         assertThatThrownBy(() -> eligibleMemberService.validateAndClaimSignup("2024000000", "홍길동", null, null, null))
@@ -225,6 +227,8 @@ class EligibleMemberServiceTest {
             assertThat(m.name()).isEqualTo("김철수");
             assertThat(m.generation()).isEqualTo("53");
             assertThat(m.studentId()).isNull();
+            // 학번이 없는 졸업생 행의 졸업 판정은 이 값에만 기댄다.
+            assertThat(m.admissionYear()).isEqualTo(2019);
         });
     }
 
@@ -360,6 +364,144 @@ class EligibleMemberServiceTest {
         assertThatThrownBy(() -> eligibleMemberService.prepareSignup(signupRequest("2024888888", "홍길동", null)))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
                         assertThat(ex.getStatusCode().value()).isEqualTo(HttpStatus.FORBIDDEN.value()));
+    }
+
+    @Test
+    void currentGenerationIsPinnedToTheSignupYear() {
+        // 시계가 2026-06-06 에 고정돼 있다. 프런트 currentGeneration() 과 같은 숫자여야 한다.
+        assertThat(eligibleMemberService.currentGeneration()).isEqualTo("60");
+    }
+
+    @Test
+    void blankRosterGenerationFallsBackToAdmissionYear() {
+        EligibleMember member = new EligibleMember();
+        member.setStudentId("2023203099");
+        member.setName("홍길동");
+        member.setGeneration(null);
+        member.setAdmissionYear(2023);
+        eligibleMemberRepository.save(member);
+
+        // 2023 입학이면 57기다. 올해(60기)를 붙이면 안 된다.
+        assertThat(eligibleMemberService.prepareSignup(signupRequest("2023203099", "홍길동", null)).generation())
+                .isEqualTo("57");
+    }
+
+    @Test
+    void overlongRosterGenerationFallsBack() {
+        EligibleMember member = new EligibleMember();
+        member.setStudentId("2023203098");
+        member.setName("홍길동");
+        member.setGeneration("1".repeat(50));
+        member.setAdmissionYear(2023);
+        eligibleMemberRepository.save(member);
+
+        // members.generation 은 VARCHAR(10) 이다. 그대로 흘려보내면 저장에서 터진다.
+        assertThat(eligibleMemberService.prepareSignup(signupRequest("2023203098", "홍길동", null)).generation())
+                .isEqualTo("57");
+    }
+
+    @Test
+    void importFillsAnEmptyPhoneOnAnExistingRow() throws Exception {
+        // 전화번호 없이 먼저 들어온 행.
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름"},
+                new String[]{"2024123456", "홍길동"}));
+        assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone()).isNull();
+
+        var response = eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "홍길동", "010-1234-5678"}));
+
+        // 새 행은 아니므로 skipped 에 들어가지만, 비어 있던 전화번호는 채운다.
+        assertThat(response.imported()).isZero();
+        assertThat(response.skipped()).isEqualTo(1);
+        assertThat(response.phoneFilled()).isEqualTo(1);
+        assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone())
+                .isEqualTo("01012345678");
+    }
+
+    @Test
+    void importNeverOverwritesAPhoneThatIsAlreadyThere() throws Exception {
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "홍길동", "010-1111-1111"}));
+
+        var response = eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "홍길동", "010-2222-2222"}));
+
+        // 가져오기는 기존 행을 덮어쓰지 않는다. 다른 번호가 올라와도 원래 값이 남는다.
+        assertThat(response.phoneFilled()).isZero();
+        assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone())
+                .isEqualTo("01011111111");
+    }
+
+    @Test
+    void csvImportFillsAnEmptyPhoneOnAGraduateRowMatchedByNameAndGeneration() {
+        // 졸업생 행은 학번이 없고 이름+입학연도로만 찾힌다.
+        eligibleMemberService.addGraduateSingle("홍길동", null, "53");
+        assertThat(eligibleMemberRepository.findAllByNameAndAdmissionYear("홍길동", 2019).getFirst().getPhone()).isNull();
+
+        var response = eligibleMemberService.importRoster(csvFile(
+                "이름,기수,전화번호\n홍길동,53,010-3333-4444\n".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+
+        assertThat(response.phoneFilled()).isEqualTo(1);
+        assertThat(eligibleMemberRepository.findAllByNameAndAdmissionYear("홍길동", 2019).getFirst().getPhone())
+                .isEqualTo("01033334444");
+    }
+
+    @Test
+    void importDoesNotFillAPhoneWhenTheNameDoesNotMatchTheRosterRow() throws Exception {
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름"},
+                new String[]{"2024123456", "홍길동"}));
+
+        // 같은 학번, 다른 이름 — 구글 폼에 오타난 학번이 남의 행에 떨어지는 경우.
+        var response = eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "김철수", "010-1234-5678"}));
+
+        // 채우면 그 번호를 모르는 홍길동이 가입할 때 403 만 받는다.
+        assertThat(response.phoneFilled()).isZero();
+        assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone()).isNull();
+    }
+
+    @Test
+    void importDoesNotFillAPhoneThatIsNotAPhoneNumber() throws Exception {
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름"},
+                new String[]{"2024123456", "홍길동"}));
+
+        // 전화번호 칸에 학번이 들어온 경우. 한번 박히면 가입 때 그대로 요구된다.
+        var response = eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "홍길동", "2024123456"}));
+
+        assertThat(response.phoneFilled()).isZero();
+        assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone()).isNull();
+    }
+
+    @Test
+    void importLeavesAnEmptyPhoneCellAlone() throws Exception {
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름"},
+                new String[]{"2024123456", "홍길동"}));
+
+        var response = eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "홍길동", ""}));
+
+        assertThat(response.phoneFilled()).isZero();
+        assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone()).isNull();
+    }
+
+    @Test
+    void importDoesNotGiveTwoRowsWithTheSameNameTheSamePhone() throws Exception {
+        // 동명이인 둘. 한 명은 이미 그 번호를 들고 있다.
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2024123456", "홍길동", "010-1234-5678"}));
+        eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름"},
+                new String[]{"2025123456", "홍길동"}));
+
+        // 같은 번호를 빈 쪽에 채우면 uk_eligible_members_name_phone(V6) 위반으로
+        // 가져오기 전체가 롤백되고 어느 행 때문인지도 안 나온다.
+        var response = eligibleMemberService.importRoster(workbookFile(new String[]{"학번", "이름", "전화번호"},
+                new String[]{"2025123456", "홍길동", "010-1234-5678"}));
+
+        assertThat(response.phoneFilled()).isZero();
+        assertThat(eligibleMemberRepository.findByStudentId("2025123456").orElseThrow().getPhone()).isNull();
+        assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone())
+                .isEqualTo("01012345678");
     }
 
     private SignupRequest signupRequest(String studentId, String name, String phone) {

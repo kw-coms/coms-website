@@ -14,7 +14,7 @@ import { richBodyToPlainText } from '../components/richEditor/renderRichBody'
 import { ArchiveDetailView } from '../components/archive/ArchiveDetailView'
 import { ArchiveListView } from '../components/archive/ArchiveListView'
 import { WriteForm } from '../components/archive/WriteForm'
-import { ARCHIVE_CATEGORIES, categoryLabel } from '../components/archive/archiveUtils'
+import { ARCHIVE_CATEGORIES, archiveFileSize, categoryLabel } from '../components/archive/archiveUtils'
 import { canManageArchive } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
 import { showToast } from '../components/common/Toast'
@@ -98,7 +98,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
     if (sortKey === 'newest') return sortedBy(filteredFiles, (a, b) => compareDate(a.uploadedAt, b.uploadedAt, 'desc'))
     if (sortKey === 'oldest') return sortedBy(filteredFiles, (a, b) => compareDate(a.uploadedAt, b.uploadedAt, 'asc'))
     if (sortKey === 'name') return sortedBy(filteredFiles, (a, b) => compareText(a.title || a.originalName, b.title || b.originalName))
-    if (sortKey === 'size') return sortedBy(filteredFiles, (a, b) => compareNumber(a.fileSize, b.fileSize, 'desc'))
+    if (sortKey === 'size') return sortedBy(filteredFiles, (a, b) => compareNumber(archiveFileSize(a), archiveFileSize(b), 'desc'))
     if (sortKey === 'views') return sortedBy(filteredFiles, (a, b) => compareNumber(a.viewCount, b.viewCount, 'desc'))
     if (sortKey === 'upvotes') return sortedBy(filteredFiles, (a, b) => compareNumber(a.upvotes, b.upvotes, 'desc'))
     return filteredFiles
@@ -175,7 +175,7 @@ export default function Archive({ onBack }: { onBack: () => void }) {
     }
   }
 
-  const handleSave = (savedList, failedNames = []) => {
+  const handleSave = (savedList) => {
     const saved = Array.isArray(savedList) ? savedList : [savedList]
     if (editingId !== null) {
       setFiles(prev => prev.map(file => file.id === editingId ? saved[0] : file))
@@ -184,13 +184,8 @@ export default function Archive({ onBack }: { onBack: () => void }) {
       return
     }
     setFiles((prev) => [...saved, ...prev])
-    if (failedNames.length > 0) {
-      setNotice('')
-      setError(`${saved.length}개 자료가 등록되었습니다. 실패: ${failedNames.join(', ')}`)
-    } else {
-      setError('')
-      setNotice(saved.length > 1 ? `${saved.length}개 자료가 등록되었습니다.` : '자료가 등록되었습니다.')
-    }
+    setError('')
+    setNotice('자료가 등록되었습니다.')
     setMode('list')
   }
 

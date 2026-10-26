@@ -1,0 +1,39 @@
+# Workflow actions are pinned to commit SHAs; this keeps those pins (and the app's
+# dependencies) moving with grouped weekly pull requests instead of one per package.
+#
+# Major versions are skipped for npm and Gradle: they change APIs and need a planned upgrade,
+# and one pull request per major bump was more noise than help for a small team. Security
+# updates are separate from these version updates and still arrive for every version.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: gradle
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      gradle-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

@@ -42,7 +42,7 @@ const expiredSession = createApiError(401, { status: 401, error: 'Unauthorized',
 assert.equal(expiredSession.message, '로그인이 만료되었습니다. 다시 로그인해주세요.')
 
 const forbidden = createApiError(403, { status: 403, error: 'Forbidden', message: '', path: '/api/admin/site-settings' })
-assert.equal(forbidden.message, '접근 권한이 없거나 로그인 상태가 만료되었습니다. 다시 로그인해주세요.')
+assert.equal(forbidden.message, '이 작업을 할 권한이 없습니다.')
 
 // ─── Every 4xx: a Korean `message` is what the backend wrote for the member ───
 //     Lockouts, duplicates and rate limits used to collapse into "입력값을 확인한
@@ -72,7 +72,7 @@ assert.equal(hiddenBadRequest.serverMessage, 'password hash constraint failed')
 assert.equal(createApiError(400, { message: 'Invalid vote value.' }).message, '입력값을 확인한 뒤 다시 시도해주세요.')
 assert.equal(
   createApiError(403, { message: 'Access Denied' }).message,
-  '접근 권한이 없거나 로그인 상태가 만료되었습니다. 다시 로그인해주세요.',
+  '이 작업을 할 권한이 없습니다.',
 )
 // A `message` that is not a string is not something to print either.
 assert.equal(createApiError(400, { message: { reason: '한글' } }).message, '입력값을 확인한 뒤 다시 시도해주세요.')

@@ -14,6 +14,10 @@ public interface EligibleMemberRepository extends JpaRepository<EligibleMember, 
     List<EligibleMember> findAllByOrderByStudentIdAscNameAsc();
     Optional<EligibleMember> findByStudentId(String studentId);
     Optional<EligibleMember> findByNameAndPhone(String name, String phone);
+
+    /** 존재만 본다. 같은 (이름, 전화번호) 행이 둘 이상이어도 터지지 않는다 —
+     *  V6 의 UNIQUE 는 CREATE TABLE IF NOT EXISTS 안에 있어서 Hibernate 가 만든 스키마에는 없다. */
+    boolean existsByNameAndPhone(String name, String phone);
     Optional<EligibleMember> findByVerificationKey(String verificationKey);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -1,9 +1,12 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.ArchiveFile;
+import com.coms.backend.domain.ArchiveAttachment;
 import com.coms.backend.domain.ArchiveFileVote;
 import com.coms.backend.domain.Member;
 import com.coms.backend.dto.ArchiveFileResponse;
+import com.coms.backend.dto.ArchiveAttachmentResponse;
+import com.coms.backend.repository.ArchiveAttachmentRepository;
 import com.coms.backend.repository.ArchiveFileRepository;
 import com.coms.backend.repository.ArchiveFileVoteRepository;
 import com.coms.backend.repository.MemberRepository;
@@ -22,6 +25,8 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -38,6 +43,8 @@ public class ArchiveService {
     // A real cap for this feature (lecture notes, slides, past papers). Matching the
     // multipart cap made this check meaningless — the container rejected first.
     private static final long MAX_ARCHIVE_FILE_BYTES = 50L * 1024 * 1024;
+    private static final long MAX_ARCHIVE_GROUP_BYTES = 200L * 1024 * 1024;
+    private static final int MAX_ARCHIVE_ATTACHMENTS = 20;
     private static final int MAX_TITLE_LENGTH = 200;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "pdf", "txt", "md", "csv",
@@ -57,16 +64,19 @@ public class ArchiveService {
     );
 
     private final ArchiveFileRepository repo;
+    private final ArchiveAttachmentRepository attachmentRepository;
     private final StorageService storage;
     private final MemberRepository memberRepository;
     private final ArchiveFileVoteRepository voteRepository;
     private final RichContentSanitizer richContentSanitizer;
     private final AuditLogService auditLogService;
 
-    public ArchiveService(ArchiveFileRepository repo, StorageService storage, MemberRepository memberRepository,
+    public ArchiveService(ArchiveFileRepository repo, ArchiveAttachmentRepository attachmentRepository,
+                          StorageService storage, MemberRepository memberRepository,
                           ArchiveFileVoteRepository voteRepository, RichContentSanitizer richContentSanitizer,
                           AuditLogService auditLogService) {
         this.repo = repo;
+        this.attachmentRepository = attachmentRepository;
         this.storage = storage;
         this.memberRepository = memberRepository;
         this.voteRepository = voteRepository;
@@ -74,41 +84,64 @@ public class ArchiveService {
         this.auditLogService = auditLogService;
     }
 
+    @Transactional(rollbackFor = IOException.class)
     public ArchiveFileResponse upload(String title, String description, MultipartFile file, String uploaderStudentId) throws IOException {
         return upload(title, description, null, file, uploaderStudentId);
     }
 
+    @Transactional(rollbackFor = IOException.class)
     public ArchiveFileResponse upload(String title, String description, String category, MultipartFile file, String uploaderStudentId) throws IOException {
+        return uploadGroup(title, description, category, List.of(file), uploaderStudentId);
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    public ArchiveFileResponse uploadGroup(String title, String description, String category,
+                                           List<MultipartFile> files, String uploaderStudentId) throws IOException {
         ArchiveFile.Category parsedCategory = parseCategory(category);
-        validateUpload(file);
-        String stored = storage.store(file);
+        String typedTitle = normalizeTitle(title);
+        String cleanedDescription = sanitizeDescription(description);
+        Member member = memberRepository.findByStudentId(uploaderStudentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        validateGroup(files);
+
+        List<String> newStoredNames = new ArrayList<>();
         try {
-            Member member = memberRepository.findByStudentId(uploaderStudentId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+            for (MultipartFile file : files) {
+                String storedName = storage.store(file);
+                newStoredNames.add(storedName);
+                deleteAfterRollback(storedName);
+            }
+            MultipartFile primary = files.get(0);
             ArchiveFile entity = new ArchiveFile();
-            // archive_files.title is VARCHAR(200): validate a typed title, fit a filename fallback.
-            String typedTitle = normalizeTitle(title);
-            String fallbackTitle = cleanOriginalFilename(file);
+            String fallbackTitle = cleanOriginalFilename(primary);
             entity.setTitle(typedTitle != null ? typedTitle
                     : fallbackTitle.length() > MAX_TITLE_LENGTH ? fallbackTitle.substring(0, MAX_TITLE_LENGTH) : fallbackTitle);
-            entity.setDescription(sanitizeDescription(description));
+            entity.setDescription(cleanedDescription);
             entity.setCategory(parsedCategory);
-            entity.setOriginalName(cleanOriginalFilename(file));
-            entity.setStoredName(stored);
-            entity.setMimeType(file.getContentType() == null ? "application/octet-stream" : file.getContentType());
-            entity.setFileSize(file.getSize());
+            setPrimary(entity, primary, newStoredNames.get(0));
             entity.setUploadedBy(uploaderStudentId);
             entity.setUploaderName(member.getName());
             ArchiveFile saved = repo.save(entity);
+            for (int i = 0; i < files.size(); i++) {
+                attachmentRepository.save(newAttachment(saved.getId(), files.get(i), newStoredNames.get(i), i));
+            }
             return toResponse(saved, voteStats(List.of(saved)), uploaderStudentId);
-        } catch (RuntimeException e) {
-            storage.delete(stored);
+        } catch (IOException | RuntimeException e) {
+            newStoredNames.forEach(this::deleteBestEffort);
             throw e;
         }
     }
 
+    @Transactional(rollbackFor = IOException.class)
     public ArchiveFileResponse update(String editorStudentId, Long id, String title, String description,
                                       String category, MultipartFile replacement) throws IOException {
+        return updateGroup(editorStudentId, id, title, description, category, replacement, null);
+    }
+
+    @Transactional(rollbackFor = IOException.class)
+    public ArchiveFileResponse updateGroup(String editorStudentId, Long id, String title, String description,
+                                           String category, MultipartFile replacement,
+                                           List<MultipartFile> replacements) throws IOException {
         Member editor = memberRepository.findByStudentId(editorStudentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         ArchiveFile entity = repo.findByIdForUpdate(id)
@@ -118,30 +151,56 @@ public class ArchiveService {
         }
         ArchiveFile.Category parsedCategory = parseCategory(category);
         String normalizedTitle = normalizeTitle(title);
+        String cleanedDescription = sanitizeDescription(description);
         String oldStoredName = entity.getStoredName();
-        String newStoredName = null;
-        if (replacement != null && replacement.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "교체할 파일이 비어 있습니다.");
+        if (replacement != null && replacements != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "file과 files를 함께 보낼 수 없습니다.");
         }
-        if (replacement != null) {
-            validateUpload(replacement);
-            newStoredName = storage.store(replacement);
-            deleteAfterRollback(newStoredName);
-            entity.setOriginalName(cleanOriginalFilename(replacement));
-            entity.setStoredName(newStoredName);
-            entity.setMimeType(replacement.getContentType() == null ? "application/octet-stream" : replacement.getContentType());
-            entity.setFileSize(replacement.getSize());
+        List<MultipartFile> incoming = replacements != null ? replacements
+                : replacement != null ? List.of(replacement) : List.of();
+        if (replacements != null && replacements.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "교체할 파일을 선택해주세요.");
         }
-        entity.setTitle(normalizedTitle != null ? normalizedTitle : entity.getOriginalName());
-        entity.setDescription(sanitizeDescription(description));
-        entity.setCategory(parsedCategory);
-        ArchiveFile saved = repo.save(entity);
-        if (newStoredName != null && !Objects.equals(oldStoredName, newStoredName)) {
-            deleteAfterCommit(oldStoredName);
+        if (!incoming.isEmpty()) {
+            validateGroup(incoming);
         }
-        auditLogService.record(editor.getStudentId(), "ARCHIVE_FILE_UPDATE", "ARCHIVE_FILE",
-                String.valueOf(saved.getId()), archiveAuditDetail(saved, newStoredName != null), null);
-        return toResponse(saved, voteStats(List.of(saved)), editorStudentId);
+        List<ArchiveAttachment> oldAttachments = attachmentsFor(entity);
+        List<String> newStoredNames = new ArrayList<>();
+        try {
+            for (MultipartFile file : incoming) {
+                String storedName = storage.store(file);
+                newStoredNames.add(storedName);
+                deleteAfterRollback(storedName);
+            }
+            if (!incoming.isEmpty()) {
+                setPrimary(entity, incoming.get(0), newStoredNames.get(0));
+                if (replacements != null) {
+                    attachmentRepository.deleteAll(oldAttachments);
+                    attachmentRepository.flush();
+                    for (int i = 0; i < incoming.size(); i++) {
+                        attachmentRepository.save(newAttachment(entity.getId(), incoming.get(i), newStoredNames.get(i), i));
+                    }
+                    oldAttachments.forEach(old -> deleteAfterCommit(old.getStoredName()));
+                } else {
+                    ArchiveAttachment oldPrimary = oldAttachments.stream().filter(a -> a.getPosition() == 0).findFirst().orElse(null);
+                    if (oldPrimary != null) {
+                        attachmentRepository.delete(oldPrimary);
+                    }
+                    attachmentRepository.save(newAttachment(entity.getId(), incoming.get(0), newStoredNames.get(0), 0));
+                    deleteAfterCommit(oldPrimary == null ? oldStoredName : oldPrimary.getStoredName());
+                }
+            }
+            entity.setTitle(normalizedTitle != null ? normalizedTitle : entity.getOriginalName());
+            entity.setDescription(cleanedDescription);
+            entity.setCategory(parsedCategory);
+            ArchiveFile saved = repo.save(entity);
+            auditLogService.record(editor.getStudentId(), "ARCHIVE_FILE_UPDATE", "ARCHIVE_FILE",
+                    String.valueOf(saved.getId()), archiveAuditDetail(saved, !incoming.isEmpty()), null);
+            return toResponse(saved, voteStats(List.of(saved)), editorStudentId);
+        } catch (IOException | RuntimeException e) {
+            newStoredNames.forEach(this::deleteBestEffort);
+            throw e;
+        }
     }
 
     /**
@@ -196,7 +255,8 @@ public class ArchiveService {
     public List<ArchiveFileResponse> list(String studentId) {
         List<ArchiveFile> files = repo.findAllByOrderByUploadedAtDesc();
         Map<Long, VoteSummary> stats = voteStats(files);
-        return files.stream().map(file -> toResponse(file, stats, studentId)).toList();
+        Map<Long, List<ArchiveAttachment>> attachments = attachmentsFor(files);
+        return files.stream().map(file -> toResponse(file, stats, studentId, attachments.get(file.getId()))).toList();
     }
 
     /**
@@ -208,7 +268,8 @@ public class ArchiveService {
         List<ArchiveFile> files = repo.findAllByOrderByUploadedAtDesc(
                 org.springframework.data.domain.PageRequest.of(0, limit));
         Map<Long, VoteSummary> stats = voteStats(files);
-        return files.stream().map(file -> toResponse(file, stats, studentId)).toList();
+        Map<Long, List<ArchiveAttachment>> attachments = attachmentsFor(files);
+        return files.stream().map(file -> toResponse(file, stats, studentId, attachments.get(file.getId()))).toList();
     }
 
     @Transactional(readOnly = true)
@@ -227,6 +288,12 @@ public class ArchiveService {
     public void incrementView(Long id) {
         // Atomic increment avoids the lost-update race of read-then-save under concurrent views.
         repo.incrementViewCount(id);
+    }
+
+    @Transactional(readOnly = true)
+    public ArchiveAttachment getAttachment(Long archiveFileId, Long attachmentId) {
+        return attachmentRepository.findByIdAndArchiveFileId(attachmentId, archiveFileId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     public ArchiveFileResponse vote(String studentId, Long id, int value) {
@@ -253,9 +320,16 @@ public class ArchiveService {
     // /api/files/** URL rule in SecurityConfig only requires a logged-in member.
     @PreAuthorize("@perm.has(authentication,'ARCHIVE_MANAGE')")
     public void delete(Long id) {
-        ArchiveFile file = get(id);
-        storage.delete(file.getStoredName());
+        ArchiveFile file = repo.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        List<ArchiveAttachment> attachments = attachmentsFor(file);
+        attachmentRepository.deleteAll(attachments);
         repo.delete(file);
+        if (attachments.isEmpty()) {
+            deleteAfterCommit(file.getStoredName());
+        } else {
+            attachments.forEach(attachment -> deleteAfterCommit(attachment.getStoredName()));
+        }
     }
 
     private Map<Long, VoteSummary> voteStats(List<ArchiveFile> files) {
@@ -271,7 +345,18 @@ public class ArchiveService {
     }
 
     private ArchiveFileResponse toResponse(ArchiveFile file, Map<Long, VoteSummary> voteStats, String studentId) {
+        return toResponse(file, voteStats, studentId, attachmentsFor(file));
+    }
+
+    private ArchiveFileResponse toResponse(ArchiveFile file, Map<Long, VoteSummary> voteStats, String studentId,
+                                           List<ArchiveAttachment> attachments) {
         VoteSummary votes = voteStats.getOrDefault(file.getId(), VoteSummary.EMPTY);
+        List<ArchiveAttachmentResponse> attachmentResponses = attachments == null || attachments.isEmpty()
+                ? List.of(new ArchiveAttachmentResponse(null, file.getOriginalName(), file.getMimeType(),
+                file.getFileSize(), contentVersion(file.getStoredName())))
+                : attachments.stream().map(attachment -> new ArchiveAttachmentResponse(
+                attachment.getId(), attachment.getOriginalName(), attachment.getMimeType(),
+                attachment.getFileSize(), contentVersion(attachment.getStoredName()))).toList();
         return new ArchiveFileResponse(
                 file.getId(),
                 file.getTitle() != null ? file.getTitle() : file.getOriginalName(),
@@ -286,8 +371,50 @@ public class ArchiveService {
                 votes.upvotes(),
                 votes.myVote(studentId),
                 file.getUploadedAt(),
-                contentVersion(file.getStoredName())
+                contentVersion(file.getStoredName()),
+                attachmentResponses
         );
+    }
+
+    private List<ArchiveAttachment> attachmentsFor(ArchiveFile file) {
+        return attachmentRepository.findByArchiveFileIdOrderByPositionAsc(file.getId());
+    }
+
+    private Map<Long, List<ArchiveAttachment>> attachmentsFor(List<ArchiveFile> files) {
+        if (files.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, List<ArchiveAttachment>> byFile = new HashMap<>();
+        attachmentRepository.findByArchiveFileIdInOrderByPositionAsc(files.stream().map(ArchiveFile::getId).toList())
+                .forEach(attachment -> byFile.computeIfAbsent(attachment.getArchiveFileId(), id -> new ArrayList<>()).add(attachment));
+        return byFile;
+    }
+
+    private ArchiveAttachment newAttachment(Long fileId, MultipartFile file, String storedName, int position) {
+        return new ArchiveAttachment(fileId, cleanOriginalFilename(file), storedName,
+                file.getContentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : file.getContentType(),
+                file.getSize(), position);
+    }
+
+    private void setPrimary(ArchiveFile entity, MultipartFile file, String storedName) {
+        entity.setOriginalName(cleanOriginalFilename(file));
+        entity.setStoredName(storedName);
+        entity.setMimeType(file.getContentType() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : file.getContentType());
+        entity.setFileSize(file.getSize());
+    }
+
+    private void validateGroup(List<MultipartFile> files) {
+        if (files == null || files.isEmpty() || files.size() > MAX_ARCHIVE_ATTACHMENTS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "자료실 파일은 한 번에 1~20개까지 업로드할 수 있습니다.");
+        }
+        long total = 0;
+        for (MultipartFile file : files) {
+            validateUpload(file);
+            total += file.getSize();
+            if (total > MAX_ARCHIVE_GROUP_BYTES) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "자료실 파일의 총 크기는 200MB 이하여야 합니다.");
+            }
+        }
     }
 
     private String contentVersion(String storedName) {

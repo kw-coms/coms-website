@@ -10,11 +10,14 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Image uploads are re-encoded to drop their metadata. These tests pin what must survive that:
@@ -24,6 +27,45 @@ class LocalStorageServiceTest {
 
     @TempDir
     Path uploads;
+
+    @Test
+    void failedRawCopyRemovesItsPartialFileAndKeepsOtherUploads() throws Exception {
+        Files.writeString(uploads.resolve("preserved.txt"), "existing contents");
+        IOException failure = new IOException("upload stream interrupted");
+        MockMultipartFile file = new MockMultipartFile("files", "partial.pdf", "application/pdf", new byte[]{1, 2}) {
+            @Override
+            public InputStream getInputStream() {
+                return new InputStream() {
+                    private boolean copied;
+
+                    @Override
+                    public int read(byte[] bytes, int offset, int length) throws IOException {
+                        if (copied) {
+                            try (var paths = Files.list(uploads)) {
+                                assertThat(paths.count()).isEqualTo(2);
+                            }
+                            throw failure;
+                        }
+                        copied = true;
+                        bytes[offset] = 1;
+                        return 1;
+                    }
+
+                    @Override
+                    public int read() throws IOException {
+                        byte[] bytes = new byte[1];
+                        return read(bytes, 0, 1) == -1 ? -1 : bytes[0];
+                    }
+                };
+            }
+        };
+        LocalStorageService storage = new LocalStorageService(uploads.toString());
+        assertThatThrownBy(() -> storage.store(file)).isSameAs(failure);
+        try (var paths = Files.list(uploads)) {
+            assertThat(paths.map(path -> path.getFileName().toString()).toList()).containsExactly("preserved.txt");
+        }
+        assertThat(Files.readString(uploads.resolve("preserved.txt"))).isEqualTo("existing contents");
+    }
 
     /** 40x20, left half red and right half blue — so every orientation is distinguishable. */
     private static byte[] jpeg(Integer exifOrientation, boolean littleEndian) throws Exception {
@@ -163,5 +205,64 @@ class LocalStorageServiceTest {
                     .as("first %d bytes", cut).isEqualTo(1);
         }
         assertThat(LocalStorageService.jpegOrientation(java.util.Arrays.copyOf(whole, 34))).isEqualTo(6);
+    }
+
+    @Test
+    void webpMetadataChunksAreDroppedAndTheirFlagsCleared() {
+        byte[] vp8x = new byte[10];
+        vp8x[0] = 0x08 | 0x04 | 0x10; // EXIF + XMP + alpha
+        byte[] webp = webp(
+                chunk("VP8X", vp8x),
+                chunk("VP8L", new byte[]{1, 2, 3, 4, 5}), // odd length: padded
+                chunk("EXIF", "GPS 37.6 127.0".getBytes(StandardCharsets.US_ASCII)),
+                chunk("XMP ", "<x:xmpmeta/>".getBytes(StandardCharsets.US_ASCII)));
+
+        byte[] stripped = LocalStorageService.stripWebpMetadata(webp);
+
+        String text = new String(stripped, StandardCharsets.ISO_8859_1);
+        assertThat(text).startsWith("RIFF").contains("WEBP").contains("VP8X").contains("VP8L")
+                .doesNotContain("EXIF").doesNotContain("XMP ").doesNotContain("GPS");
+        assertThat(stripped[20] & 0xFF).as("VP8X flags").isEqualTo(0x10);
+        long riffSize = (stripped[4] & 0xFFL) | (stripped[5] & 0xFFL) << 8
+                | (stripped[6] & 0xFFL) << 16 | (stripped[7] & 0xFFL) << 24;
+        assertThat(riffSize).isEqualTo(stripped.length - 8L);
+    }
+
+    @Test
+    void webpWithoutMetadataIsReturnedUnchangedAndBrokenFilesAreRejected() {
+        byte[] plain = webp(chunk("VP8L", new byte[]{1, 2, 3, 4}));
+        assertThat(LocalStorageService.stripWebpMetadata(plain)).isSameAs(plain);
+
+        assertThat(LocalStorageService.stripWebpMetadata("not a webp file".getBytes(StandardCharsets.US_ASCII))).isNull();
+        byte[] truncated = java.util.Arrays.copyOf(plain, plain.length - 3);
+        assertThat(LocalStorageService.stripWebpMetadata(truncated)).isNull();
+    }
+
+    private static byte[] webp(byte[]... chunks) {
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        body.writeBytes("WEBP".getBytes(StandardCharsets.US_ASCII));
+        for (byte[] chunk : chunks) {
+            body.writeBytes(chunk);
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.writeBytes("RIFF".getBytes(StandardCharsets.US_ASCII));
+        out.writeBytes(le32(body.size()));
+        out.writeBytes(body.toByteArray());
+        return out.toByteArray();
+    }
+
+    private static byte[] chunk(String fourcc, byte[] data) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.writeBytes(fourcc.getBytes(StandardCharsets.US_ASCII));
+        out.writeBytes(le32(data.length));
+        out.writeBytes(data);
+        if ((data.length & 1) == 1) {
+            out.write(0);
+        }
+        return out.toByteArray();
+    }
+
+    private static byte[] le32(int value) {
+        return new byte[]{(byte) value, (byte) (value >>> 8), (byte) (value >>> 16), (byte) (value >>> 24)};
     }
 }

@@ -62,20 +62,22 @@ async function tryRefreshToken(): Promise<RefreshOutcome> {
   return refreshInFlight
 }
 
-// Shared 401/403 recovery for request / requestNoContent / requestBlob, which all
-// ran an identical copy of this block.
+// Shared 401 recovery for request / requestNoContent / requestBlob, which all ran an identical
+// copy of this block.
+//
+// The backend answers a missing, expired or revoked token with 401 and keeps 403 for a signed-in
+// member who lacks the role. Only a 401 can be fixed by a new token: refreshing on a 403 burned a
+// refresh-token rotation on every permission denial and could never turn it into a 200.
 async function recoverFromAuthFailure(path, response, generationBeforeRequest, fetchOnce) {
   const canRefresh = path === '/api/auth/me' || !path.includes('/api/auth/')
-  if (!canRefresh || (response.status !== 401 && response.status !== 403)) return response
+  if (!canRefresh || response.status !== 401) return response
   if (refreshGeneration > generationBeforeRequest) return fetchOnce()
   const outcome = await tryRefreshToken()
   if (outcome === 'refreshed') return fetchOnce()
-  // The backend has no custom authentication entry point, so an expired or missing token on a
-  // protected endpoint comes back as 403 — the same status as a real permission denial — and
-  // the original status alone cannot say "your session ended". A refresh the server refuses
-  // can: without this, an expired session left the logged-in shell on screen with every panel
-  // stuck on a retry that could never succeed.
-  if (outcome === 'rejected' || response.status === 401) notifySessionExpired()
+  // A refresh the server refuses means the session is gone: without this, an expired session
+  // left the logged-in shell on screen with every panel stuck on a retry that could never
+  // succeed. An unreachable refresh endpoint says nothing about the session, so it is left alone.
+  if (outcome === 'rejected') notifySessionExpired()
   return response
 }
 
@@ -111,7 +113,7 @@ function errorMessageForStatus(status, fallbackMessage = '') {
     return fallbackMessage || '로그인이 만료되었습니다. 다시 로그인해주세요.'
   }
   if (status === 403) {
-    return fallbackMessage || '접근 권한이 없거나 로그인 상태가 만료되었습니다. 다시 로그인해주세요.'
+    return fallbackMessage || '이 작업을 할 권한이 없습니다.'
   }
   if (status === 404) {
     return '요청한 항목을 찾을 수 없습니다.'
@@ -152,17 +154,34 @@ const NETWORK_ERROR_MESSAGE = '서버에 연결하지 못했습니다. 네트워
 // and the browser's own wording for that — "Failed to fetch", "Load failed" — reached the screen
 // through every `err.message`. No `status` on purpose: callers read a status-less error as
 // transient (AuthProvider retries /me on it and never takes it for a logged-out answer).
-function createNetworkError(cause) {
-  const error = new Error(NETWORK_ERROR_MESSAGE, { cause }) as Error & { isNetworkError: boolean }
+function createNetworkError(cause, message = NETWORK_ERROR_MESSAGE) {
+  const error = new Error(message, { cause }) as Error & { isNetworkError: boolean }
   error.isNetworkError = true
   return error
 }
 
+const TIMEOUT_ERROR_MESSAGE = '서버 응답이 너무 늦습니다. 잠시 후 다시 시도해주세요.'
+// Without a limit a request to a hung server never settled: the route guard sat on "로그인 상태를
+// 확인하는 중..." and a submit button stayed disabled forever. Uploads (multipart bodies) get much
+// longer, since a phone on campus Wi-Fi can take minutes to send a video.
+export const REQUEST_TIMEOUT_MS = 30_000
+export const UPLOAD_TIMEOUT_MS = 5 * 60_000
+
+function withTimeout(init: RequestInit): RequestInit {
+  if (typeof AbortSignal === 'undefined' || typeof AbortSignal.timeout !== 'function') return init
+  const isUpload = typeof FormData !== 'undefined' && init.body instanceof FormData
+  const timeout = AbortSignal.timeout(isUpload ? UPLOAD_TIMEOUT_MS : REQUEST_TIMEOUT_MS)
+  if (!init.signal) return { ...init, signal: timeout }
+  // The caller's own signal (e.g. a cancelled query) still wins; combine when the browser can.
+  return typeof AbortSignal.any === 'function' ? { ...init, signal: AbortSignal.any([init.signal, timeout]) } : init
+}
+
 async function fetchOrNetworkError(url, init: RequestInit) {
   try {
-    return await fetch(url, init)
+    return await fetch(url, withTimeout(init))
   } catch (cause) {
-    throw createNetworkError(cause)
+    const timedOut = (cause as { name?: string } | null)?.name === 'TimeoutError'
+    throw createNetworkError(cause, timedOut ? TIMEOUT_ERROR_MESSAGE : NETWORK_ERROR_MESSAGE)
   }
 }
 

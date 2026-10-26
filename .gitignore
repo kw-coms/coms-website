@@ -35,8 +35,13 @@ uploads/
 *.csv
 !*sample*.csv
 !*sample*.xlsx
+# Local AI-assistant settings and memories (machine-specific paths; not project code)
+.codex/
+.serena/
 .omc/
 .omx/
 .superpowers/
 .playwright-mcp/
 .tools/
+# Server-only credential files (e.g. the Firebase service account mounted by docker-compose.yml)
+secrets/

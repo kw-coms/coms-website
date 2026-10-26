@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 
-import { createPost } from '../src/services/archiveApi.ts'
+import { createPost, updateArchiveFile } from '../src/services/archiveApi.ts'
 import { createClubActivity } from '../src/services/clubActivityApi.ts'
 import { createClubProject } from '../src/services/clubProjectApi.ts'
 
@@ -55,7 +55,7 @@ const uploads = [
 
 for (const upload of uploads) {
   // ─── 1. Expired access token: refresh once, then send the same body again ───
-  //        (the backend answers a missing/expired token with 403, see apiClient)
+  //        (the backend answers a missing/expired token with 401, see apiClient)
   {
     let refreshed = false
     const calls = stubFetch(async (url) => {
@@ -63,7 +63,7 @@ for (const upload of uploads) {
         refreshed = true
         return response(204)
       }
-      return refreshed ? response(200, { id: 1 }) : response(403, { error: 'Forbidden' })
+      return refreshed ? response(200, { id: 1 }) : response(401, { error: 'Unauthorized' })
     })
 
     assert.deepEqual(await upload.send(), { id: 1 }, `${upload.name} resolves with the saved record after the refresh`)
@@ -96,6 +96,43 @@ for (const upload of uploads) {
     stubFetch(async () => { throw new TypeError('Failed to fetch') })
     await assert.rejects(upload.send, /서버에 연결하지 못했습니다/, `${upload.name} normalises network failures`)
   }
+}
+
+// A multi-file archive is one multipart request and one post, with an unchanged title.
+{
+  const files = ['first.pdf', 'second.pdf'].map(name => new File(['contents'], name))
+  const calls = stubFetch(async () => response(200, { id: 42, title: '2026 대물1 중간 족보' }))
+  const saved = await createPost({ title: '2026 대물1 중간 족보', description: '참고 자료', category: 'GENERAL', files })
+  assert.equal(saved.id, 42)
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].body.get('title'), '2026 대물1 중간 족보')
+  assert.equal(calls[0].body.get('description'), '참고 자료')
+  assert.equal(calls[0].body.get('category'), 'GENERAL')
+  assert.deepEqual(calls[0].body.getAll('files').map(file => file.name), ['first.pdf', 'second.pdf'])
+  assert.equal(calls[0].body.has('file'), false)
+}
+
+// A rejected group is returned as one error, without creating individual fallback posts.
+{
+  const files = ['first.pdf', 'second.pdf'].map(name => new File(['contents'], name))
+  const calls = stubFetch(async () => response(400, { message: '파일 내용이 확장자와 일치하지 않습니다.' }))
+  await assert.rejects(() => createPost({ title: '세미나 자료', files }), /파일 내용이 확장자/)
+  assert.equal(calls.length, 1)
+}
+
+// Metadata edits preserve attachments; replacing the set sends every selected file.
+{
+  const calls = stubFetch(async () => response(200, { id: 42 }))
+  const meta = { title: '수정된 제목', description: '설명', category: 'ACADEMIC_JOURNAL' }
+  await updateArchiveFile(42, meta)
+  assert.equal(calls[0].body.has('file'), false)
+  assert.equal(calls[0].body.has('files'), false)
+
+  const files = ['replacement.pdf', 'appendix.pdf'].map(name => new File(['contents'], name))
+  await updateArchiveFile(42, { ...meta, files })
+  assert.equal(calls[1].method, 'PUT')
+  assert.deepEqual(calls[1].body.getAll('files').map(file => file.name), ['replacement.pdf', 'appendix.pdf'])
+  assert.equal(calls[1].body.has('file'), false)
 }
 
 console.log('api client upload contract passed')

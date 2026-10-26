@@ -3,7 +3,7 @@ import { ListSelect } from '../common/ListTools'
 import { downloadUrl } from '../../services/archiveApi'
 import { richBodyToPlainText } from '../richEditor/renderRichBody'
 import { CategorySegment } from './CategorySegment'
-import { ARCHIVE_CATEGORIES, categoryLabel, clickableCell, formatDate, formatSize, openRowWithKeyboard } from './archiveUtils'
+import { ARCHIVE_CATEGORIES, archiveAttachments, archiveFileSize, categoryLabel, clickableCell, formatDate, formatSize, openRowWithKeyboard } from './archiveUtils'
 
 const ARCHIVE_SORT_OPTIONS = [
   { value: 'default', label: '기본 순서' },
@@ -128,7 +128,7 @@ export function ArchiveListView({
                     <th className="w-28 px-4 py-3">크기</th>
                     <th className="w-28 px-4 py-3">작성자</th>
                     <th className="w-36 px-4 py-3">날짜</th>
-                    <th className="w-28 px-4 py-3 text-right">동작</th>
+                    <th className="w-36 px-4 py-3 text-right">동작</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--app-hairline)]">
@@ -164,6 +164,7 @@ export function ArchiveListView({
           <div className="grid gap-3 p-4 md:hidden">
             {visibleFiles.map((file) => {
               const open = () => onOpenFile(file)
+              const attachmentCount = archiveAttachments(file).length
               return (
                 <article key={file.id} className="apple-soft-panel p-4">
                   <button
@@ -175,7 +176,7 @@ export function ArchiveListView({
                       <span className="rounded-full bg-[var(--app-accent-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--app-accent-text)]">
                         {categoryLabel(file.category || 'GENERAL')}
                       </span>
-                      <span className="ml-auto shrink-0 text-[11px] font-bold text-[var(--app-subtle)]">{formatSize(file.fileSize)}</span>
+                      <span className="ml-auto shrink-0 text-[11px] font-bold text-[var(--app-subtle)]">{formatSize(archiveFileSize(file))}</span>
                     </span>
                     <span className="mt-3 block line-clamp-2 text-[15px] font-bold leading-6 text-[var(--app-text)]" title={file.title || file.originalName}>
                       {file.title || file.originalName}
@@ -190,13 +191,20 @@ export function ArchiveListView({
                     </span>
                   </button>
                   <div className="mt-3.5 flex justify-end border-t border-[var(--app-hairline)] pt-3.5">
-                    <a
-                      href={downloadUrl(file.id)}
+                    {attachmentCount > 1 ? <button
+                      type="button"
+                      onClick={open}
+                      className="inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 text-sm font-bold text-[var(--app-accent-text)] transition hover:bg-[var(--app-surface-elevated)]"
+                    >
+                      <Download size={15} />
+                      첨부파일 {attachmentCount}개
+                    </button> : <a
+                      href={downloadUrl(file.id, file.contentVersion)}
                       className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 text-sm font-bold text-[var(--app-accent-text)] transition hover:bg-[var(--app-surface-elevated)]"
                     >
                       <Download size={15} />
                       다운로드
-                    </a>
+                    </a>}
                   </div>
                 </article>
               )
@@ -212,12 +220,13 @@ export function ArchiveListView({
                   <th className="w-28 px-4 py-3">크기</th>
                   <th className="w-28 px-4 py-3">작성자</th>
                   <th className="w-36 px-4 py-3">날짜</th>
-                  <th className="w-28 px-4 py-3 text-right">동작</th>
+                  <th className="w-36 px-4 py-3 text-right">동작</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--app-hairline)]">
                 {visibleFiles.map((file) => {
                   const open = () => onOpenFile(file)
+                  const attachmentCount = archiveAttachments(file).length
                   return (
                     <tr
                       key={file.id}
@@ -243,7 +252,7 @@ export function ArchiveListView({
                           </span>
                         )}
                       </td>
-                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">{formatSize(file.fileSize)}</td>
+                      <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">{formatSize(archiveFileSize(file))}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">{file.uploaderName || file.uploadedBy || '-'}</td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4">
                         <span className="block">{formatDate(file.uploadedAt)}</span>
@@ -251,14 +260,21 @@ export function ArchiveListView({
                       </td>
                       <td {...clickableCell(open)} className="cursor-pointer px-4 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <a
-                            href={downloadUrl(file.id)}
+                          {attachmentCount > 1 ? <button
+                            type="button"
+                            onClick={(event) => { event.stopPropagation(); open() }}
+                            className="inline-flex min-h-9 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 font-bold text-[var(--app-accent-text)] transition hover:bg-[var(--app-surface-elevated)]"
+                          >
+                            <Download size={15} />
+                            첨부파일 {attachmentCount}개
+                          </button> : <a
+                            href={downloadUrl(file.id, file.contentVersion)}
                             onClick={(event) => event.stopPropagation()}
                             className="inline-flex min-h-9 items-center justify-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 font-bold text-[var(--app-accent-text)] transition hover:bg-[var(--app-surface-elevated)]"
                           >
                             <Download size={15} />
                             다운로드
-                          </a>
+                          </a>}
                         </div>
                       </td>
                     </tr>
