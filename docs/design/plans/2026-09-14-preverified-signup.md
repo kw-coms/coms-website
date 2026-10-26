@@ -8,7 +8,7 @@
 
 **Tech Stack:** Spring Boot 4, Java 21, Spring Data JPA, PostgreSQL/Flyway, React 19, TypeScript, Playwright.
 
-**Spec:** `docs/superpowers/specs/2026-09-14-preverified-signup-design.md`
+**Spec:** `docs/design/specs/2026-09-14-preverified-signup-design.md`
 
 ## Global Constraints
 

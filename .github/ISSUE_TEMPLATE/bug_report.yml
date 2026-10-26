@@ -1,0 +1,49 @@
+name: 버그 제보
+description: 사이트에서 잘못 동작하는 것을 알려 주세요
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        보안 문제(다른 사람의 정보가 보이는 등)는 여기 말고 [보안 제보 안내](../blob/main/SECURITY.md)를 따라 주세요.
+        스크린샷에 다른 회원의 이름, 학번, 연락처가 보이지 않게 가려 주세요.
+  - type: input
+    id: where
+    attributes:
+      label: 어디에서
+      description: 주소나 화면 이름
+      placeholder: "예: https://coms.kw.ac.kr/community/123, 운영 패널 > 회원 관리"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: 무슨 일이 있었나요
+      description: 어떻게 하면 다시 볼 수 있는지 순서대로 적어 주세요.
+      placeholder: |
+        1. ...을 누른다
+        2. ...을 입력한다
+        3. "..." 오류가 뜬다
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 원래 기대한 동작
+    validations:
+      required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: 사용한 기기
+      options:
+        - PC 브라우저
+        - 휴대폰 브라우저
+        - 홈 화면에 설치한 앱(PWA)
+        - COMS Member App
+    validations:
+      required: false
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 스크린샷
