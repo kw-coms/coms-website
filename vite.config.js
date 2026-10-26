@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -6,6 +7,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 import { visualizer } from 'rollup-plugin-visualizer'
 import { VitePWA } from 'vite-plugin-pwa'
+import { PUBLIC_PAGE_META, renderPublicPageHtml } from './src/routes/publicPageMeta.ts'
 
 const pkg = JSON.parse(readFileSync(fileURLToPath(new URL('./package.json', import.meta.url)), 'utf8'))
 
@@ -38,6 +40,21 @@ const analyzePlugins = process.env.ANALYZE
       }),
     ]
   : []
+
+// One HTML file per public page (dist/recruit.html, ...) carrying that page's title,
+// description and canonical URL, so a shared link previews the page instead of the home page.
+// nginx.frontend.conf serves $uri.html before falling back to index.html; the app is the same.
+const publicPageHtmlPlugin = {
+  name: 'coms-public-page-html',
+  apply: 'build',
+  writeBundle(outputOptions) {
+    const outDir = outputOptions.dir || 'dist'
+    const indexHtml = readFileSync(join(outDir, 'index.html'), 'utf8')
+    for (const page of PUBLIC_PAGE_META) {
+      writeFileSync(join(outDir, `${page.path.slice(1)}.html`), renderPublicPageHtml(indexHtml, page))
+    }
+  },
+}
 
 // Installable PWA + offline app shell. Conservative config:
 //  - autoUpdate so a new deploy activates on the next visit (no stale-stuck SW)
@@ -75,15 +92,36 @@ const pwaPlugin = VitePWA({
       // Without these the SW hijacks their navigations and renders the SPA 404.
       /^\/(foodclub|gameclub|BugSnap|LogDoctor|PRDoctor|worldcup|tier|team-randomizer|companion|phonemote)(\/|$)/,
     ],
-    // Don't precache giant rarely-used author/editor chunks into the install.
+    // The install used to precache every chunk (~2.2 MB), so each first-time visitor —
+    // including logged-out phones on the recruit page — downloaded the rich-text editor,
+    // the admin console, highlight.js and Sentry. Those are only fetched when someone opens
+    // them; the runtime cache below keeps them for offline use after that first visit.
+    globIgnores: [
+      '**/TiptapTextEditor-*.js',
+      '**/RichBodyEditor-*.js',
+      '**/Admin-*.js',
+      '**/common-*.js', // highlight.js (its "common" language bundle)
+      '**/vendor-sentry-*.js',
+    ],
     maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+    runtimeCaching: [
+      {
+        // Hashed build output never changes under the same name, so cache-first is safe.
+        urlPattern: /\/assets\/.+\.js$/,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'coms-lazy-chunks',
+          expiration: { maxEntries: 60, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        },
+      },
+    ],
   },
   devOptions: { enabled: false },
 })
 
 export default defineConfig({
   // sentryVitePlugin must come AFTER react/tailwind so it sees the final build output.
-  plugins: [react(), tailwindcss(), pwaPlugin, ...sentryPlugins, ...analyzePlugins],
+  plugins: [react(), tailwindcss(), pwaPlugin, publicPageHtmlPlugin, ...sentryPlugins, ...analyzePlugins],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version || '0.0.0'),
   },

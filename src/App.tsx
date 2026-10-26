@@ -12,11 +12,13 @@ import {
   ACCENT_COLOR_KEY,
   FONT_SELECTION_KEY,
   THEME_MODE_KEY,
+  forgetStoredValue,
   getStoredAccentColor,
   getStoredFontId,
   getStoredThemeMode,
   mixHex,
   normalizeHex,
+  storeValue,
 } from './utils/themeColors'
 import { ScrollToTop, RequireAuth, RequireAdmin } from './routes/guards'
 import { useRouteDocumentTitle } from './hooks/useDocumentTitle'
@@ -92,8 +94,8 @@ function App() {
     root.style.setProperty('--app-accent-text', mode === 'dark' ? mixHex(accent, '#ffffff', 0.28) : mixHex(accent, '#000000', 0.08))
     root.style.setProperty('--app-accent-border', `color-mix(in srgb, ${accent} 42%, transparent)`)
 
-    window.localStorage.setItem(THEME_MODE_KEY, mode)
-    window.localStorage.setItem(ACCENT_COLOR_KEY, accent)
+    storeValue(THEME_MODE_KEY, mode)
+    storeValue(ACCENT_COLOR_KEY, accent)
   }, [accentColor, themeMode])
 
   useEffect(() => {
@@ -127,21 +129,21 @@ function App() {
   const handleGuestFontChange = (value) => {
     if (!value) {
       setGuestFontId(null)
-      window.localStorage.removeItem(FONT_SELECTION_KEY)
+      forgetStoredValue(FONT_SELECTION_KEY)
       return
     }
     if (String(value).startsWith('b:')) {
       setGuestFontId(value)
-      window.localStorage.setItem(FONT_SELECTION_KEY, value)
+      storeValue(FONT_SELECTION_KEY, value)
       return
     }
     const id = Number(value)
     if (Number.isFinite(id) && id > 0) {
       setGuestFontId(id)
-      window.localStorage.setItem(FONT_SELECTION_KEY, String(id))
+      storeValue(FONT_SELECTION_KEY, String(id))
     } else {
       setGuestFontId(null)
-      window.localStorage.removeItem(FONT_SELECTION_KEY)
+      forgetStoredValue(FONT_SELECTION_KEY)
     }
   }
 

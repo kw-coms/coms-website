@@ -1,5 +1,6 @@
 import { Download, ExternalLink, FileText, Tag, ThumbsUp, Trash2 } from 'lucide-react'
 import { RichTextContent } from '../../shared/RichText'
+import { isSafeUrl } from '../../utils/sanitizeHtml'
 import { clubEventEntryTags, clubEventWorkTypeLabel, formatFileSize } from './clubEventUtils'
 
 export default function ClubEventEntryCard({ entry, votingOpen, isAdmin, votingEntryId, deletingId, onVote, onDelete }) {
@@ -32,7 +33,8 @@ export default function ClubEventEntryCard({ entry, votingOpen, isAdmin, votingE
           </div>
         )}
         {entry.description && <RichTextContent value={entry.description} className="club-event-entry-description" />}
-        {entry.externalUrl && (
+        {/* Same protocol allowlist as every other member-supplied link (no javascript: etc.). */}
+        {entry.externalUrl && isSafeUrl(entry.externalUrl) && (
           <a href={entry.externalUrl} className="club-event-entry-external" target="_blank" rel="noreferrer">
             <ExternalLink size={14} aria-hidden="true" />
             관련 링크
