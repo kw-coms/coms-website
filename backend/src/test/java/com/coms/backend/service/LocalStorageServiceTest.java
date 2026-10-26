@@ -206,4 +206,63 @@ class LocalStorageServiceTest {
         }
         assertThat(LocalStorageService.jpegOrientation(java.util.Arrays.copyOf(whole, 34))).isEqualTo(6);
     }
+
+    @Test
+    void webpMetadataChunksAreDroppedAndTheirFlagsCleared() {
+        byte[] vp8x = new byte[10];
+        vp8x[0] = 0x08 | 0x04 | 0x10; // EXIF + XMP + alpha
+        byte[] webp = webp(
+                chunk("VP8X", vp8x),
+                chunk("VP8L", new byte[]{1, 2, 3, 4, 5}), // odd length: padded
+                chunk("EXIF", "GPS 37.6 127.0".getBytes(StandardCharsets.US_ASCII)),
+                chunk("XMP ", "<x:xmpmeta/>".getBytes(StandardCharsets.US_ASCII)));
+
+        byte[] stripped = LocalStorageService.stripWebpMetadata(webp);
+
+        String text = new String(stripped, StandardCharsets.ISO_8859_1);
+        assertThat(text).startsWith("RIFF").contains("WEBP").contains("VP8X").contains("VP8L")
+                .doesNotContain("EXIF").doesNotContain("XMP ").doesNotContain("GPS");
+        assertThat(stripped[20] & 0xFF).as("VP8X flags").isEqualTo(0x10);
+        long riffSize = (stripped[4] & 0xFFL) | (stripped[5] & 0xFFL) << 8
+                | (stripped[6] & 0xFFL) << 16 | (stripped[7] & 0xFFL) << 24;
+        assertThat(riffSize).isEqualTo(stripped.length - 8L);
+    }
+
+    @Test
+    void webpWithoutMetadataIsReturnedUnchangedAndBrokenFilesAreRejected() {
+        byte[] plain = webp(chunk("VP8L", new byte[]{1, 2, 3, 4}));
+        assertThat(LocalStorageService.stripWebpMetadata(plain)).isSameAs(plain);
+
+        assertThat(LocalStorageService.stripWebpMetadata("not a webp file".getBytes(StandardCharsets.US_ASCII))).isNull();
+        byte[] truncated = java.util.Arrays.copyOf(plain, plain.length - 3);
+        assertThat(LocalStorageService.stripWebpMetadata(truncated)).isNull();
+    }
+
+    private static byte[] webp(byte[]... chunks) {
+        ByteArrayOutputStream body = new ByteArrayOutputStream();
+        body.writeBytes("WEBP".getBytes(StandardCharsets.US_ASCII));
+        for (byte[] chunk : chunks) {
+            body.writeBytes(chunk);
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.writeBytes("RIFF".getBytes(StandardCharsets.US_ASCII));
+        out.writeBytes(le32(body.size()));
+        out.writeBytes(body.toByteArray());
+        return out.toByteArray();
+    }
+
+    private static byte[] chunk(String fourcc, byte[] data) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.writeBytes(fourcc.getBytes(StandardCharsets.US_ASCII));
+        out.writeBytes(le32(data.length));
+        out.writeBytes(data);
+        if ((data.length & 1) == 1) {
+            out.write(0);
+        }
+        return out.toByteArray();
+    }
+
+    private static byte[] le32(int value) {
+        return new byte[]{(byte) value, (byte) (value >>> 8), (byte) (value >>> 16), (byte) (value >>> 24)};
+    }
 }

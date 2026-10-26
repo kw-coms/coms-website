@@ -28,6 +28,11 @@ export async function getCommunityPost(id) {
   return request(`/api/community/posts/${id}`)
 }
 
+/** `{ url, signature }` — a link whose chat preview may show this post's title and image. */
+export async function getCommunityShareLink(id): Promise<{ url: string; signature: string }> {
+  return request(`/api/community/posts/${id}/share-link`)
+}
+
 export async function getMemberReputation(studentId) {
   return request(`/api/community/members/${encodeURIComponent(studentId)}/reputation`)
 }

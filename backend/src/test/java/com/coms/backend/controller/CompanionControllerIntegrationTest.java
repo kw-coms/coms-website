@@ -110,7 +110,7 @@ class CompanionControllerIntegrationTest {
     @Test
     void anonymousRequestCannotReadRosterIdentity() throws Exception {
         mockMvc.perform(get("/api/companion/me")).andExpect(status().isUnauthorized());
-        mockMvc.perform(get("/api/auth/me")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/auth/me")).andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/companion/me").cookie(new Cookie("token", "not-a-jwt")))
                 .andExpect(status().isUnauthorized());
     }

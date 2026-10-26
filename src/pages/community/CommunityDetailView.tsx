@@ -21,6 +21,7 @@ import ReportPostDialog from './ReportPostDialog'
 import { isConceptPost, isEdited, postScore } from './communityBoardUtils'
 import { MAX_ANONYMOUS_NAME_LENGTH, categoryLabel } from './postEditorUtils'
 import { Skeleton, SkeletonLine, SkeletonGroup } from '../../components/common/Skeleton'
+import { useShareSignatureInAddressBar } from './shareLink'
 
 function AuthorEditControl({ onUpdateAuthor }: { onUpdateAuthor: (payload: { studentId?: string; name?: string }) => Promise<void> }) {
   const [open, setOpen] = useState(false)
@@ -139,6 +140,9 @@ export default function CommunityDetailView({
   onReport?: (reason: string, detail: string) => Promise<void>
 }) {
   const currentPostConcept = currentPost ? isConceptPost(currentPost) : false
+  // A copied address-bar URL then shows this post's title and image in chat previews.
+  // Anonymous-board posts never get a preview, so they are left alone.
+  useShareSignatureInAddressBar(detailLoading ? null : currentPost?.id, !isAnonymousDetail)
   // Tracked by post id, not as booleans: this component stays mounted while the
   // reader navigates from one post to the next, so a plain flag would leave the
   // dialog open on — or mark as 신고됨 — a post it was never opened for.

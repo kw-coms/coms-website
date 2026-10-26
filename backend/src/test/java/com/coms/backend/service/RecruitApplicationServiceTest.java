@@ -67,8 +67,29 @@ class RecruitApplicationServiceTest {
         assertThat(confirmation.getSubject()).isEqualTo("[COM's] 지원서가 접수되었습니다");
         assertThat(confirmation.getText())
                 .contains("COM's 지원서가 정상적으로 접수되었습니다.")
-                .contains("학번: 2026123456")
-                .contains("관심 분야: 웹, 기타: AI");
+                // The confirmation goes to an address anyone can type in, from the club's sender:
+                // nothing the applicant wrote may appear in it.
+                .doesNotContain("홍길동")
+                .doesNotContain("2026123456")
+                .doesNotContain("AI");
+    }
+
+    @Test
+    void applicantConfirmationsAreCappedPerRecipient() {
+        JavaMailSender mailSender = mock(JavaMailSender.class);
+        RecruitApplicationRepository repository = mock(RecruitApplicationRepository.class);
+        when(repository.save(any(RecruitApplication.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        RecruitApplicationService service = newService(mailSender, repository, mock(RecruitPromotionLogRepository.class), "");
+
+        for (int i = 0; i < 5; i++) {
+            // Different client addresses so the per-IP submission limit does not interfere.
+            service.sendApplication(sampleRequest(), "10.0.0." + i);
+        }
+
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender, times(3)).send(captor.capture());
+        assertThat(captor.getAllValues()).allSatisfy(message ->
+                assertThat(message.getTo()).containsExactly("applicant@example.com"));
     }
 
     @Test
@@ -621,11 +642,13 @@ class RecruitApplicationServiceTest {
 
         ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
         verify(mailSender, times(2)).send(captor.capture());
+        // Nothing typed into the form reaches the confirmation at all, crafted or not.
         String confirmation = captor.getAllValues().get(1).getText();
-        assertThat(confirmation.lines())
-                .contains("학과: 컴퓨터공학과 [COM's 안내] 회비를 아래 계좌로 보내주세요")
-                .contains("관심 분야: 웹 [긴급] 확인 필요")
-                .noneMatch(line -> line.startsWith("[COM's 안내]") || line.startsWith("[긴급]"));
+        assertThat(confirmation)
+                .doesNotContain("회비")
+                .doesNotContain("[긴급]")
+                .doesNotContain("[COM's 안내]")
+                .doesNotContain("컴퓨터공학과");
     }
 
     private static com.coms.backend.domain.RecruitPromotionLog decision(

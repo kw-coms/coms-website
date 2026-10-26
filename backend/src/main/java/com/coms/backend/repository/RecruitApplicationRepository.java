@@ -2,6 +2,7 @@ package com.coms.backend.repository;
 
 import com.coms.backend.domain.RecruitApplication;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -18,4 +19,14 @@ public interface RecruitApplicationRepository extends JpaRepository<RecruitAppli
 
     @Query("select r.submittedAt from RecruitApplication r where r.submittedAt >= :since")
     List<LocalDateTime> findSubmittedAtSince(@Param("since") LocalDateTime since);
+
+    /** Retention: the submitting address only matters while the per-address limits apply. */
+    @Modifying
+    @Query("UPDATE RecruitApplication r SET r.clientIp = NULL WHERE r.clientIp IS NOT NULL AND r.submittedAt < :before")
+    int clearClientIpsBefore(@Param("before") LocalDateTime before);
+
+    /** Retention: applications nobody decided on within the window are dropped with their contact details. */
+    @Modifying
+    @Query("DELETE FROM RecruitApplication r WHERE r.submittedAt < :before")
+    int deleteSubmittedBefore(@Param("before") LocalDateTime before);
 }

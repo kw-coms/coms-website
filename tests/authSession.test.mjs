@@ -30,7 +30,7 @@ const json = (status, body) => new Response(JSON.stringify(body), {
 })
 
 // The fake backend. `sessionDead` models a session the server has already ended: protected
-// endpoints answer 403 and the refresh is refused, exactly what the real one does after a
+// endpoints answer 401 and the refresh is refused, exactly what the real one does after a
 // password change.
 let sessionDead = false
 let answerLogout = () => new Response(null, { status: 204 })
@@ -40,7 +40,7 @@ globalThis.fetch = async (url, options = {}) => {
   calls.push(`${options.method || 'GET'} ${path}`)
   if (path === '/api/auth/logout') return answerLogout()
   if (path === '/api/auth/refresh') return sessionDead ? json(401, {}) : new Response(null, { status: 204 })
-  if (sessionDead) return json(403, { error: 'Forbidden' })
+  if (sessionDead) return json(401, { error: 'Unauthorized' })
   if (path === '/api/auth/me') return json(200, USER)
   if (path === '/api/permissions/me') return json(200, { role: USER.role, permissions: ['community.read'] })
   return json(200, [])

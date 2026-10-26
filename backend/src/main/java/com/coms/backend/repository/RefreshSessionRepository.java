@@ -13,6 +13,9 @@ public interface RefreshSessionRepository extends JpaRepository<RefreshSession, 
 
     Optional<RefreshSession> findByJti(String jti);
 
+    /** True while the family still has an unrevoked token, i.e. the device has not logged out. */
+    boolean existsByFamilyAndRevokedAtIsNull(String family);
+
     /**
      * Atomic claim of a live token. The {@code revoked_at IS NULL} guard is what makes two parallel
      * refreshes with the same jti safe: exactly one UPDATE reports a changed row, the other gets 0.
