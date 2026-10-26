@@ -73,7 +73,7 @@ const pwaPlugin = VitePWA({
       /\/(share|share-data|share-image)$/,
       // Sibling apps the host nginx serves under sub-paths of this origin.
       // Without these the SW hijacks their navigations and renders the SPA 404.
-      /^\/(foodclub|gameclub|BugSnap|LogDoctor|PRDoctor|worldcup|tier|team-randomizer|companion)(\/|$)/,
+      /^\/(foodclub|gameclub|BugSnap|LogDoctor|PRDoctor|worldcup|tier|team-randomizer|companion|phonemote)(\/|$)/,
     ],
     // Don't precache giant rarely-used author/editor chunks into the install.
     maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
