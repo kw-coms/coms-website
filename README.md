@@ -1,209 +1,257 @@
-# COM's Website
+<div align="center">
 
-광운대학교 중앙 컴퓨터 학술동아리 **COM's**의 공식 웹사이트입니다.
+<a href="https://coms.kw.ac.kr">
+  <img src="public/coms-logo.png" alt="COM's" width="112" />
+</a>
 
-동아리 소개, 모집 안내, 공지사항, 자료실, 커뮤니티, 회원 관리 기능을 제공하며, React 프론트엔드와 Spring Boot 백엔드를 한 저장소에서 함께 관리합니다.
+# KW COM's
 
-![COM's Logo](public/coms-logo.png)
+**배우고, 만들고, 성장하는 광운대학교 중앙 컴퓨터 학술동아리 COM's의 공식 웹사이트**
 
-## 주요 기능
+동아리를 소개하는 홈페이지에서 시작해, 지금은 모집부터 공지·커뮤니티·출석·일정 조율·운영까지<br/>
+COM's의 한 학기를 통째로 굴리는 동아리 플랫폼이 되었습니다.
 
-- 동아리 소개, 활동, 프로젝트, 모집 안내
-- 회원가입, 로그인, 로그아웃, 비밀번호 변경/재설정
-- 가입 가능 명부 기반 회원가입 및 이메일 인증
-- 공지사항 조회, 작성, 수정, 삭제
-- 회원 전용 자료실 파일 업로드/다운로드
-- 회원 전용 커뮤니티 게시글, 이미지, 댓글, 추천/비추천
-- 모집 지원서 제출 및 메일 알림
-- 관리자 회원 관리, 권한 관리, 차단 학생 관리
-- 사이트 폰트 업로드 및 활성화
+<a href="https://coms.kw.ac.kr"><img src="https://img.shields.io/badge/Website-coms.kw.ac.kr-0071e3?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Website" /></a>
+<a href="https://github.com/kw-coms/coms-website/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/kw-coms/coms-website/ci.yml?branch=main&style=for-the-badge&label=CI&logo=githubactions&logoColor=white" alt="CI" /></a>
+<a href="https://coms.kw.ac.kr/recruit"><img src="https://img.shields.io/badge/지원하기-Recruit-34c759?style=for-the-badge&logo=rocket&logoColor=white" alt="Recruit" /></a>
 
-## 기술 스택
+<a href="https://coms.kw.ac.kr">웹사이트</a> ·
+<a href="https://coms.kw.ac.kr/apps">COM's Apps</a> ·
+<a href="https://coms.kw.ac.kr/recruit">지원하기</a> ·
+<a href="https://www.instagram.com/kw_coms">Instagram</a> ·
+<a href="https://www.youtube.com/@kw_coms">YouTube</a>
 
-| 구분 | 기술 |
-| --- | --- |
-| Frontend | React 19, Vite 8, React Router 7, Tailwind CSS 4 |
-| Backend | Java 21, Spring Boot 4, Gradle |
-| Security | Spring Security, JWT, HttpOnly Cookie, BCrypt |
-| Database | H2, PostgreSQL, Flyway |
-| Infra | Docker, Docker Compose, Nginx, GitHub Actions |
+<br/><br/>
 
-## 프로젝트 구조
+<img src="docs/images/home.png" alt="COM's 웹사이트 메인 화면" width="100%" />
 
-```text
-coms-website/
-|-- src/                         # React frontend
-|   |-- assets/                   # 이미지, 로고, 폰트
-|   |-- components/               # 공통 컴포넌트
-|   |-- contexts/                 # 인증 컨텍스트
-|   |-- pages/                    # 화면 단위 컴포넌트
-|   `-- services/                 # API 요청 모듈
-|-- public/                      # 정적 파일
-|-- backend/                     # Spring Boot backend
-|   |-- src/main/java/com/coms/backend/
-|   |   |-- controller/           # REST API
-|   |   |-- service/              # 비즈니스 로직
-|   |   |-- repository/           # JPA Repository
-|   |   |-- domain/               # Entity
-|   |   |-- dto/                  # Request/Response DTO
-|   |   |-- security/             # JWT, 인증 필터
-|   |   `-- config/               # 보안, 시간, Flyway 설정
-|   `-- src/main/resources/
-|       `-- db/migration/         # Flyway migration
-|-- scripts/                     # Windows 보조 스크립트
-|-- docker-compose.yml
-|-- Dockerfile.frontend
-`-- nginx.frontend.conf
+</div>
+
+<br/>
+
+## 📌 한눈에 보기
+
+COM's는 광운대학교 학생들이 컴퓨터와 소프트웨어를 함께 공부하고, 그 배움을 실제 프로젝트로 연결하는 중앙 컴퓨터 학술동아리입니다.
+이 저장소는 그 동아리가 **실제로 매일 쓰는 웹사이트**입니다. 처음 오는 사람에게는 동아리를 소개하고, 부원에게는 활동 도구가 되고, 운영진에게는 관리 콘솔이 됩니다.
+
+<div align="center">
+
+| 🧑‍💻 커밋 | 🔀 머지된 PR | 🖥️ 화면 | 🔌 API | 🗄️ DB 마이그레이션 | 🧩 부원 프로젝트 |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| **785** | **466** | **30+** | **232** | **97** | **16** |
+
+<sub>2026년 5월 첫 커밋부터 지금까지 운영하면서 계속 고쳐 온 기록입니다.</sub>
+
+</div>
+
+<br/>
+
+## ✨ 이런 걸 할 수 있어요
+
+### 👋 처음 오신 분 — 로그인 없이
+
+| | 기능 | 설명 |
+| :---: | --- | --- |
+| 🏠 | **동아리 소개** | 동아리의 정체성, 정기 세미나·스터디·코드 리뷰 활동, 팀 프로젝트를 소개합니다. |
+| 📝 | **온라인 지원** | 로그인 없이 지원서를 제출하고, 학번과 이름으로 지원 진행 상황을 확인합니다. |
+| 🧩 | **COM's Apps** | 부원들이 직접 만든 웹사이트·앱·게임 16개를 한곳에서 열어 볼 수 있습니다. |
+| 💛 | **후원자** | 동아리를 후원해 주신 분들을 등급별로 소개합니다. |
+| 🎲 | **뽑기** | 조 나누기, 발표 순서 정하기, 한 명 뽑기. 입력한 이름은 브라우저 밖으로 나가지 않습니다. |
+
+### 🙋 부원 — 동아리 생활에 필요한 도구
+
+| | 기능 | 설명 |
+| :---: | --- | --- |
+| 📢 | **공지사항** | 중요한 공지는 상단에 고정하고, 공지마다 추천·비추천으로 반응할 수 있습니다. |
+| 💬 | **커뮤니티** | 이미지·파일·링크 임베드·투표·코드 블록을 넣을 수 있는 블록 에디터, 댓글, 스크랩, 신고, 회원 프로필을 지원합니다. |
+| 📂 | **자료실** | 세미나 자료와 강의 파일을 올리고 내려받습니다. 관련 파일은 한 제목 아래 묶어서 관리합니다. |
+| 🗓️ | **일정 캘린더** | 매주 반복되는 정기 모임과 단발 일정을 한 달 단위로 보고, `.ics`로 내 캘린더에 추가합니다. |
+| 📒 | **활동 기록** | 세미나와 스터디에서 한 일을 카테고리별로 남겨, 다음 기수가 참고할 수 있게 합니다. |
+| ⏰ | **일정 조율** | 각자 가능한 시간을 칠하면 모두가 되는 시간이 보입니다. 스터디나 회의 시간을 정할 때 씁니다. |
+| 🙌 | **모임 신청** | 스터디원 모집, MT, 회식처럼 사람을 모을 일이 있을 때 모임을 열고 이름을 올립니다. |
+| ✅ | **출석 체크** | 세미나 화면에 뜬 네 자리 코드를 입력하면 출석이 기록되고, 내 출석 기록이 쌓입니다. |
+| 🏆 | **이벤트** | 회지 글과 작품을 등록하고, 인기투표를 하고, 참석 여부를 남깁니다. |
+| 🔔 | **알림** | 새 공지와 댓글을 사이트 알림과 웹 푸시로 받습니다. 홈 화면에 설치하면 앱처럼 쓸 수 있습니다(PWA). |
+| 🎨 | **나만의 화면** | 다크·라이트 테마와 사이트 글꼴을 원하는 대로 바꿉니다. |
+
+### 🛠️ 운영진 — 운영 패널
+
+동아리 운영에 필요한 일을 17개 탭의 운영 패널에서 처리합니다.
+
+- **회원** — 회원·권한 관리, 차단 관리, 가입 가능 명부(CSV 가져오기·내보내기)
+- **모집** — 지원서 검토와 처리 상태 관리, 처리 대기 지원 알림
+- **콘텐츠** — 활동, COM's Apps, 후원자, 사이트 문구, 글꼴 관리
+- **커뮤니티** — 신고 처리, 삭제된 글 보관함
+- **점검** — 운영 요약과 방문 분석, 감사 로그(CSV 내보내기), 화면 점검
+
+<br/>
+
+## 📸 둘러보기
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/activities.png" alt="활동 소개" /><p align="center"><b>활동 소개</b></p></td>
+    <td width="50%"><img src="docs/images/apps.png" alt="COM's Apps" /><p align="center"><b>COM's Apps</b></p></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/recruit.png" alt="지원하기" /><p align="center"><b>온라인 지원</b></p></td>
+    <td width="50%"><img src="docs/images/draw.png" alt="뽑기" /><p align="center"><b>뽑기 도구</b></p></td>
+  </tr>
+</table>
+
+<details>
+<summary><b>📱 모바일 화면 보기</b></summary>
+<br/>
+<p align="center"><img src="docs/images/mobile-home.png" alt="모바일 메인 화면" width="320" /></p>
+</details>
+
+<br/>
+
+## 🧩 COM's Apps — 부원들이 만든 것들
+
+웹사이트의 [Apps](https://coms.kw.ac.kr/apps) 페이지는 부원들이 만든 프로젝트를 모아 둔 런처입니다. 지금 올라와 있는 프로젝트는 다음과 같습니다.
+
+| 분류 | 프로젝트 | 한 줄 소개 |
+| --- | --- | --- |
+| 🌐 웹 | [COMS 월드컵](https://coms.kw.ac.kr/worldcup/) | 개발 언어·야식·밈·세미나 주제의 최종 우승자를 뽑는 미니게임 |
+| 🌐 웹 | [COMS 티어표](https://coms.kw.ac.kr/tier/) | 언어·프레임워크·활동 주제를 S~D 티어로 나누고 공유 |
+| 🌐 웹 | [Food Club](https://coms.kw.ac.kr/foodclub/) | 밥 약속과 맛집 후보를 모으는 식사 모임 허브 |
+| 🌐 웹 | [TeamMate](https://coms.kw.ac.kr/team-randomizer/) | 역할과 조건에 맞춰 스터디·프로젝트 팀을 나누는 도구 |
+| 🌐 웹 | [Game Club](https://coms.kw.ac.kr/gameclub/) | 동아리 안에서 함께 즐기는 작은 게임과 이벤트 공간 |
+| 🌐 웹 | [KW Mate](http://kwmate.com/) | 광운대 생활에 필요한 연결과 정보를 찾도록 돕는 서비스 |
+| 🌐 웹 | [Daily Coding](https://dailycoding-final.com/) | 매일 코딩 문제와 기록으로 학습 루틴을 만드는 공간 |
+| 🌐 웹 | [KW Algorithm Lab](https://choijunhuk.github.io/kw-algorithm-lab/) | 알고리즘 실행 과정을 단계별로 보고 비교하는 학습 도구 |
+| 🛠️ 개발 도구 | [BugSnap](https://coms.kw.ac.kr/BugSnap/) | 오류 스크린샷에서 텍스트를 뽑아 GitHub Issue 버그 리포트로 정리 |
+| 🛠️ 개발 도구 | [LogDoctor](https://coms.kw.ac.kr/LogDoctor/) | 서버 에러 로그로 원인 후보와 해결 절차를 정리 |
+| 🛠️ 개발 도구 | [PRDoctor](https://coms.kw.ac.kr/PRDoctor) | GitHub PR의 변경 요약, 위험도, 테스트 목록, 리뷰 코멘트 생성 |
+| 📱 앱 | [COMS Member App](https://github.com/choijunhuk/coms-member-app) | 공지·커뮤니티·활동 기록·알림을 보는 회원 전용 모바일 앱 |
+| 📱 앱 | [Rusty Alarm](https://github.com/choijunhuk/rusty-alarm) | Rust로 만든 알람 앱 |
+| 🎮 게임 | [회로의 봄](https://choijunhuk.github.io/campus-romance/) | 캠퍼스 연애 시뮬레이터 비주얼 노벨 |
+| 🎮 게임 | [debug-till-dawn](https://choijunhuk.github.io/debug-till-dawn/) | 프로그래밍 테마의 뱀파이어 서바이버류 로그라이크 |
+| 🎮 게임 | [indie-studio-idle](https://choijunhuk.github.io/indie-studio-idle/) | 인디 게임 스튜디오를 키우는 방치형 웹게임 |
+
+<sub>목록은 운영 패널에서 관리하며, 최신 목록은 웹사이트에서 확인할 수 있습니다.</sub>
+
+<br/>
+
+## 🏗️ 어떻게 동작하나요
+
+```mermaid
+flowchart LR
+    subgraph Client["사용자"]
+        W["🌐 웹 브라우저 · PWA"]
+        A["📱 COMS Member App<br/>Android · iOS"]
+    end
+
+    subgraph Server["운영 서버 (Docker Compose)"]
+        H["Nginx<br/>HTTPS · 라우팅"]
+        F["Frontend<br/>React 빌드 + Nginx"]
+        B["Backend<br/>Spring Boot 4"]
+        D[("PostgreSQL 16")]
+        U[("업로드 파일")]
+    end
+
+    W -- HTTPS --> H
+    A -- HTTPS --> H
+    H --> F
+    H -- "/api" --> B
+    B --> D
+    B --> U
+    B -. 메일 .-> M["✉️ SMTP"]
+    B -. 푸시 .-> P["🔔 FCM · Web Push"]
+    W -. 오류 수집 .-> S["Sentry"]
+    B -. 오류 수집 .-> S
 ```
 
-## 시작하기
+**배포 흐름** — PR을 올리면 CI가 백엔드 테스트, 프론트엔드 타입 검사·린트·단위 테스트, 전체 스택 빌드를 돌립니다. `main`에 머지되어 CI가 통과하면 GitHub Actions가 서버에 접속해 Docker Compose로 새 버전을 띄우고 헬스 체크까지 확인합니다.
 
-### 1. 저장소 클론
+```mermaid
+flowchart LR
+    PR["Pull Request"] --> CI["CI<br/>테스트 · 린트 · 빌드"]
+    CI --> MAIN["main 머지"]
+    MAIN --> DEPLOY["Deploy<br/>SSH → Docker Compose"]
+    DEPLOY --> HEALTH["헬스 체크"]
+    HEALTH --> LIVE["🌐 coms.kw.ac.kr"]
+```
+
+<br/>
+
+## 🧰 기술 스택
+
+| 영역 | 사용 기술 |
+| --- | --- |
+| **Frontend** | ![React](https://img.shields.io/badge/React_19-20232A?style=flat-square&logo=react&logoColor=61DAFB) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white) ![Vite](https://img.shields.io/badge/Vite_8-646CFF?style=flat-square&logo=vite&logoColor=white) ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white) ![React Router](https://img.shields.io/badge/React_Router_7-CA4245?style=flat-square&logo=reactrouter&logoColor=white) ![TanStack Query](https://img.shields.io/badge/TanStack_Query-FF4154?style=flat-square&logo=reactquery&logoColor=white) ![Tiptap](https://img.shields.io/badge/Tiptap-000000?style=flat-square&logo=tiptap&logoColor=white) ![PWA](https://img.shields.io/badge/PWA-5A0FC8?style=flat-square&logo=pwa&logoColor=white) |
+| **Backend** | ![Java](https://img.shields.io/badge/Java_21-007396?style=flat-square&logo=openjdk&logoColor=white) ![Spring Boot](https://img.shields.io/badge/Spring_Boot_4-6DB33F?style=flat-square&logo=springboot&logoColor=white) ![Spring Security](https://img.shields.io/badge/Spring_Security-6DB33F?style=flat-square&logo=springsecurity&logoColor=white) ![JWT](https://img.shields.io/badge/JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white) ![Gradle](https://img.shields.io/badge/Gradle-02303A?style=flat-square&logo=gradle&logoColor=white) |
+| **Database** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL_16-4169E1?style=flat-square&logo=postgresql&logoColor=white) ![Flyway](https://img.shields.io/badge/Flyway-CC0200?style=flat-square&logo=flyway&logoColor=white) ![H2](https://img.shields.io/badge/H2_(dev)-1E5A96?style=flat-square) |
+| **Infra** | ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) ![Nginx](https://img.shields.io/badge/Nginx-009639?style=flat-square&logo=nginx&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white) ![Sentry](https://img.shields.io/badge/Sentry-362D59?style=flat-square&logo=sentry&logoColor=white) ![Firebase](https://img.shields.io/badge/FCM-FFCA28?style=flat-square&logo=firebase&logoColor=black) |
+| **Test** | ![Playwright](https://img.shields.io/badge/Playwright-2EAD33?style=flat-square&logo=playwright&logoColor=white) ![JUnit](https://img.shields.io/badge/JUnit_5-25A162?style=flat-square&logo=junit5&logoColor=white) ![axe](https://img.shields.io/badge/axe--core-663399?style=flat-square) |
+
+<br/>
+
+## 🛡️ 신경 쓴 부분
+
+실제 회원 정보를 다루는 서비스라서, 기능만큼 안전하고 오래 운영할 수 있는 구조에 공을 들였습니다.
+
+- **🔐 인증과 개인정보**
+  - 로그인 토큰은 JavaScript가 읽을 수 없는 HttpOnly 쿠키에 담습니다.
+  - 비밀번호는 BCrypt로 해시해서 저장합니다.
+  - 동아리 명부에 있는 학생만 이메일 인증을 거쳐 가입할 수 있습니다.
+  - 로그인과 지원 조회에는 요청 횟수 제한을 둡니다.
+  - 서버는 JWT 비밀키가 기본값이거나 너무 짧으면 아예 시작하지 않습니다.
+- **🧱 웹 보안**
+  - CSP로 외부 스크립트, `<object>` 삽입, 다른 사이트의 iframe 삽입을 막습니다.
+  - 게시글 HTML은 DOMPurify로 소독한 뒤에 렌더링합니다.
+  - DB와 내부 서비스는 외부에 노출하지 않습니다.
+- **✅ 테스트**
+  - 프론트엔드 단위 테스트 52개 파일과 백엔드 테스트 클래스 90개가 있습니다.
+  - Playwright E2E는 스모크, 실제 백엔드 로그인, 커뮤니티 흐름을 확인합니다.
+  - axe로 접근성을, 스크린샷 비교로 화면 깨짐을 함께 검사합니다.
+- **🔁 CI/CD**
+  - PR마다 테스트를 돌리고, `main`에서 CI가 통과한 커밋만 배포합니다.
+  - OpenAPI 명세와 코드가 어긋나면 CI가 잡아냅니다.
+  - OWASP Dependency-Check, CodeQL, 시크릿 스캔이 정기적으로 돌아갑니다.
+- **📈 운영**
+  - Sentry로 프론트엔드와 백엔드 오류를 수집합니다.
+  - 헬스 체크 엔드포인트가 있습니다.
+  - 운영 사이트를 대상으로 하는 스모크 테스트 스크립트가 있습니다.
+  - 운영 패널에 감사 로그를 남깁니다.
+
+<br/>
+
+## 👥 만든 사람들
+
+COM's 부원들이 함께 만들고 운영합니다.
+
+<a href="https://github.com/kw-coms/coms-website/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=kw-coms/coms-website" alt="Contributors" />
+</a>
+
+<br/>
+
+## 🤝 개발에 참여하기
 
 ```bash
 git clone https://github.com/kw-coms/coms-website.git
 cd coms-website
+npm ci && npm run dev          # 프론트엔드 → http://localhost:3000
+# 백엔드는 backend/ 에서 ./gradlew bootRun (dev 프로필, JDK 21)
 ```
 
-### 2. 환경 변수 설정
+환경 변수, 테스트, Docker 실행, 배포, 운영 메모는 **[개발 가이드](docs/DEVELOPMENT.md)**에 정리되어 있습니다.
 
-```powershell
-Copy-Item .env.example .env
-```
+<br/>
 
-운영 환경에서는 `.env`의 `JWT_SECRET`, `DB_PASSWORD`, `CORS_ALLOWED_ORIGINS`, SMTP 관련 값을 반드시 실제 값으로 변경해야 합니다. `CORS_ALLOWED_ORIGINS`에는 실제로 사용하는 HTTPS 웹 출처와 모바일 앱 출처만 넣으세요.
+## 📬 연락처
 
-새 운영 DB에는 기본 관리자나 실제 회원 명부가 생성되지 않습니다. 첫 관리자는 32자 이상의 무작위 `BOOTSTRAP_SECRET`을 서버의 `.env`에 설정한 뒤 `/api/maintenance/bootstrap`으로 한 번만 등록합니다. 등록 후 이 값을 `.env`에서 제거하고 백엔드를 다시 시작하세요. 기존 운영 DB에는 이 초기 설정이 다시 적용되지 않습니다.
+<div align="center">
 
-### 3. 백엔드 실행
+<a href="https://www.instagram.com/kw_coms"><img src="https://img.shields.io/badge/Instagram-@kw__coms-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram" /></a>
+<a href="https://www.youtube.com/@kw_coms"><img src="https://img.shields.io/badge/YouTube-@kw__coms-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube" /></a>
+<a href="mailto:kwcoms69@gmail.com"><img src="https://img.shields.io/badge/Mail-kwcoms69@gmail.com-EA4335?style=for-the-badge&logo=gmail&logoColor=white" alt="Mail" /></a>
+<a href="https://github.com/kw-coms"><img src="https://img.shields.io/badge/GitHub-kw--coms-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" /></a>
 
-```powershell
-cd backend
-$env:SPRING_PROFILES_ACTIVE = "dev"
-$env:JWT_SECRET = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
-.\gradlew.bat bootRun
-```
+<br/><br/>
 
-개발 프로필은 H2 파일 DB를 사용합니다. 서버는 기본적으로 `http://localhost:8080`에서 실행됩니다. 개발용 관리자 계정이 필요하면 실행 전에 `COMS_DEV_ADMIN_PASSWORD`에 12자 이상의 임의 비밀번호를 설정하세요. 소스에 고정 비밀번호는 없습니다.
+<sub>© KW COM's · 광운대학교 중앙 컴퓨터 학술동아리</sub>
 
-JDK 21을 `JAVA_HOME`으로 지정했거나 스크립트가 인식하는 로컬 경로에 설치했다면 루트에서 다음 스크립트를 사용할 수 있습니다.
-
-```powershell
-.\scripts\start-backend.ps1
-```
-
-### 4. 프론트엔드 실행
-
-새 터미널에서 실행합니다.
-
-```powershell
-npm ci
-npm run dev
-```
-
-프론트엔드는 `http://localhost:3000`에서 실행됩니다. Vite 개발 서버는 `/api` 요청을 `http://localhost:8080`으로 프록시합니다.
-
-## 테스트와 빌드
-
-### Frontend
-
-```powershell
-npm run lint
-npm run build
-```
-
-### Backend
-
-```powershell
-cd backend
-.\gradlew.bat test
-```
-
-또는 루트에서 다음 스크립트를 사용할 수 있습니다.
-
-```powershell
-.\scripts\test-backend.ps1
-```
-
-## Docker 실행
-
-```powershell
-docker compose --env-file .env up -d --build
-```
-
-기본 포트는 다음과 같습니다.
-
-| 서비스 | 주소 |
-| --- | --- |
-| Frontend | `http://127.0.0.1:3000` |
-| Backend | `http://127.0.0.1:8080` |
-| Health Check | `http://127.0.0.1:8080/actuator/health` |
-
-프론트엔드 Docker 빌드는 Vite 빌드 시점의 `.env` 값을 사용합니다. 로컬 Docker에서 프론트엔드가 백엔드에 직접 접근해야 한다면 `VITE_API_BASE_URL=http://localhost:8080/api`처럼 설정한 뒤 다시 빌드하세요. 운영 환경에서는 보통 reverse proxy가 `/api`를 백엔드로 전달하도록 구성합니다.
-
-## 주요 API
-
-| 영역 | 경로 | 권한 |
-| --- | --- | --- |
-| 인증 | `/api/auth/**` | 일부 공개, 일부 회원 |
-| 모집 지원 | `POST /api/recruit/apply` | 공개 |
-| 공지사항 조회 | `GET /api/notices/**` | 회원 |
-| 공지사항 관리 | `POST`, `PUT`, `DELETE /api/notices/**` | 작성 권한 보유 회원 또는 작성자(동작별 상이) |
-| 자료실 | `/api/files/**` | 회원 |
-| 커뮤니티 | `/api/community/posts/**` | 회원 |
-| 커뮤니티 링크 미리보기 | `GET /api/community/posts/{id}/share`, `GET /api/community/posts/{id}/share-data`, `GET /api/community/posts/{id}/share-image` | 공개 |
-| 알림 | `/api/notifications/**` | 회원 |
-| 폰트 조회 | `GET /api/fonts/**` | 공개 |
-| 관리자 | `/api/admin/**` | 관리자 |
-| 상태 확인 | `/actuator/health`, `/actuator/info` | 공개 |
-
-## 환경 변수
-
-| 변수 | 설명 |
-| --- | --- |
-| `VITE_API_BASE_URL` | 프론트엔드 API base URL |
-| `PUBLIC_BASE_URL` | 공유 미리보기용 공개 사이트 URL |
-| `SPRING_PROFILES_ACTIVE` | Spring profile |
-| `JWT_SECRET` | JWT 서명 secret |
-| `DB_HOST`, `DB_PORT`, `DB_NAME` | DB 접속 정보 |
-| `DB_USER`, `DB_PASSWORD` | DB 계정 |
-| `COOKIE_SECURE` | HTTPS 쿠키 보안 옵션 |
-| `COOKIE_SAME_SITE` | 쿠키 SameSite 정책 (`Lax` 기본값; 모바일 앱 연동 시 `None` 필요) |
-| `CORS_ALLOWED_ORIGINS` | 허용할 origin 목록 |
-| `AUTH_TRUSTED_PROXY_IPS` | 백엔드가 `X-Real-IP`를 신뢰할 바로 앞 리버스 프록시의 숫자 IP 목록. 운영 Docker 네트워크의 게이트웨이 IP를 지정해야 로그인·지원 조회 횟수 제한이 방문자별로 적용됩니다. |
-| `MAIL_ENABLED` | 메일 발송 사용 여부 |
-| `MAIL_LOG_VERIFICATION_CODES` | 인증 코드 로그 출력 여부 |
-| `MAIL_FROM`, `RECRUIT_MAIL_TO` | 발신/수신 메일 주소 |
-| `SMTP_HOST`, `SMTP_PORT` | SMTP 서버 |
-| `SMTP_USERNAME`, `SMTP_PASSWORD` | SMTP 계정 |
-| `SPRING_JPA_HIBERNATE_DDL_AUTO` | JPA DDL 옵션 |
-| `H2_CONSOLE_ENABLED` | H2 console 사용 여부 |
-| `BOOTSTRAP_SECRET` | bootstrap API 보호용 secret |
-
-## 배포
-
-`main` 브랜치에 push한 뒤 CI가 성공하거나 GitHub Actions에서 검증된 커밋을 수동 지정하면 `.github/workflows/deploy.yml`이 서버에 접속해 Docker Compose로 서비스를 배포합니다.
-
-필요한 GitHub Secrets:
-
-- `DEPLOY_HOST`
-- `DEPLOY_USER`
-- `DEPLOY_PORT`
-- `DEPLOY_SSH_KEY`
-- `DEPLOY_SSH_KNOWN_HOSTS`
-- `DEPLOY_PATH`
-- `PUBLIC_BASE_URL`
-
-서버에는 `git`, Docker, Docker Compose가 설치되어 있어야 하며, 최초 배포 전 `DEPLOY_PATH/.env` 파일을 준비해야 합니다.
-
-## 운영 메모
-
-- 운영에서는 `JWT_SECRET`과 `DB_PASSWORD`를 기본값으로 두지 않습니다.
-- 운영에서는 `COOKIE_SECURE=true`를 유지합니다.
-- **Capacitor 모바일 앱 연동 시**: `COOKIE_SAME_SITE=None`과 `COOKIE_SECURE=true`를 설정하고, `CORS_ALLOWED_ORIGINS`에 `https://localhost`(Android)와 `capacitor://localhost`(iOS)를 추가해야 합니다. `SameSite=None`은 반드시 HTTPS(Secure=true)와 함께 사용해야 합니다.
-- 운영에서는 `MAIL_LOG_VERIFICATION_CODES=false`를 유지합니다.
-- 메일 기능을 사용할 때만 서버의 `.env`에 `RECRUIT_MAIL_TO`를 설정합니다.
-- PostgreSQL 스키마는 Flyway migration으로 관리합니다.
-- 기존 운영 DB에 공개 자격 증명·학번을 제거한 migration 파일을 처음 배포할 때는 DB를 백업한 뒤 Flyway 11.14.1로 `repair`와 `validate`를 수행해야 합니다. 기존 데이터는 삭제되지 않습니다.
-- 운영 reverse proxy는 `/api`와 `/actuator` 요청을 백엔드로 전달해야 합니다.
-- DB volume과 업로드 파일 volume은 정기적으로 백업합니다.
+</div>
