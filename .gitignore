@@ -40,3 +40,5 @@ uploads/
 .superpowers/
 .playwright-mcp/
 .tools/
+# Server-only credential files (e.g. the Firebase service account mounted by docker-compose.yml)
+secrets/
