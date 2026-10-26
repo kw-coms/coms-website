@@ -1,7 +1,7 @@
 <div align="center">
 
 <a href="https://coms.kw.ac.kr">
-  <img src="public/coms-logo.png" alt="COM's" width="112" />
+  <img src="docs/images/logo.png" alt="COM's" width="112" />
 </a>
 
 # KW COM's
