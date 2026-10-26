@@ -83,13 +83,13 @@ class MeetingPollIntegrationTest {
 
     @Test
     void loggedOutVisitorsAreRefused() throws Exception {
-        mockMvc.perform(get("/api/meeting-polls")).andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/meeting-polls/1")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/meeting-polls")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/meeting-polls/1")).andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/meeting-polls")
                         .header("Origin", ORIGIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(pollBody("모임", 600, 720, today().plusDays(1))))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

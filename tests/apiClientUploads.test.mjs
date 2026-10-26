@@ -55,7 +55,7 @@ const uploads = [
 
 for (const upload of uploads) {
   // ─── 1. Expired access token: refresh once, then send the same body again ───
-  //        (the backend answers a missing/expired token with 403, see apiClient)
+  //        (the backend answers a missing/expired token with 401, see apiClient)
   {
     let refreshed = false
     const calls = stubFetch(async (url) => {
@@ -63,7 +63,7 @@ for (const upload of uploads) {
         refreshed = true
         return response(204)
       }
-      return refreshed ? response(200, { id: 1 }) : response(403, { error: 'Forbidden' })
+      return refreshed ? response(200, { id: 1 }) : response(401, { error: 'Unauthorized' })
     })
 
     assert.deepEqual(await upload.send(), { id: 1 }, `${upload.name} resolves with the saved record after the refresh`)

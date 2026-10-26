@@ -12,12 +12,17 @@ import com.coms.backend.repository.RecruitApplicationRepository;
 import com.coms.backend.repository.RecruitPromotionLogRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.coms.backend.security.SlidingWindowRateLimiter;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
@@ -29,6 +34,7 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 
 @Service
 public class RecruitApplicationService {
@@ -44,6 +50,10 @@ public class RecruitApplicationService {
     // for good as a record; without a limit the public lookup would answer for every applicant
     // of every past season, to anyone who knows those two things about them.
     private static final int DECISION_LOOKUP_DAYS = 90;
+    // A real applicant may resubmit to fix a typo; nobody needs more confirmations than this.
+    private static final int MAX_CONFIRMATIONS_PER_RECIPIENT_PER_DAY = 3;
+    // Far above a recruiting season's daily volume; stops the form being used as a mail cannon.
+    private static final int MAX_CONFIRMATIONS_PER_DAY = 200;
 
     private static final Map<RecruitApplication.Status, String> STATUS_LABELS = Map.of(
             RecruitApplication.Status.RECEIVED, "지원 완료",
@@ -66,13 +76,34 @@ public class RecruitApplicationService {
     private final String to;
     private final Map<String, Deque<LocalDateTime>> submissionAttemptsByClient = new ConcurrentHashMap<>();
     private final Map<String, Deque<LocalDateTime>> statusLookupAttemptsByClient = new ConcurrentHashMap<>();
+    private final Executor mailExecutor;
+    // The confirmation goes to whatever address the (anonymous) applicant typed, from the club's
+    // own sender. Cap how often one address and the whole site can be mailed that way.
+    private final SlidingWindowRateLimiter confirmationsByRecipient;
+    private final SlidingWindowRateLimiter confirmationsForSite;
 
+    /** Sends mail on the calling thread — for unit tests that construct the service directly. */
     public RecruitApplicationService(JavaMailSender mailSender,
                                      RecruitApplicationRepository recruitApplicationRepository,
                                      NotificationService notificationService,
                                      EligibleMemberService eligibleMemberService,
                                      RecruitPromotionLogRepository promotionLogRepository,
                                      Clock clock,
+                                     boolean mailEnabled,
+                                     String from,
+                                     String to) {
+        this(mailSender, recruitApplicationRepository, notificationService, eligibleMemberService,
+                promotionLogRepository, clock, Runnable::run, mailEnabled, from, to);
+    }
+
+    @Autowired
+    public RecruitApplicationService(JavaMailSender mailSender,
+                                     RecruitApplicationRepository recruitApplicationRepository,
+                                     NotificationService notificationService,
+                                     EligibleMemberService eligibleMemberService,
+                                     RecruitPromotionLogRepository promotionLogRepository,
+                                     Clock clock,
+                                     @Qualifier("mailExecutor") Executor mailExecutor,
                                      @Value("${mail.enabled:false}") boolean mailEnabled,
                                      @Value("${mail.from:no-reply@coms.kw.ac.kr}") String from,
                                      @Value("${recruit.mail.to:kwcoms69@gmail.com}") String to) {
@@ -82,9 +113,14 @@ public class RecruitApplicationService {
         this.eligibleMemberService = eligibleMemberService;
         this.promotionLogRepository = promotionLogRepository;
         this.clock = clock;
+        this.mailExecutor = mailExecutor;
         this.mailEnabled = mailEnabled;
         this.from = from;
         this.to = to;
+        this.confirmationsByRecipient = new SlidingWindowRateLimiter(
+                MAX_CONFIRMATIONS_PER_RECIPIENT_PER_DAY, Duration.ofDays(1), clock);
+        this.confirmationsForSite = new SlidingWindowRateLimiter(
+                MAX_CONFIRMATIONS_PER_DAY, Duration.ofDays(1), clock);
     }
 
     @Transactional
@@ -101,28 +137,69 @@ public class RecruitApplicationService {
             return;
         }
 
-        // Application is already saved and admins are notified in-app; a mail that cannot be
-        // delivered must not fail the submission. The two mails are independent: with no staff
-        // recipient configured (RECRUIT_MAIL_TO blank) the staff send used to throw, and the
-        // applicant's confirmation — queued right behind it in the same try — was never sent.
+        SimpleMailMessage staffMessage = null;
         if (to != null && !to.isBlank()) {
+            staffMessage = new SimpleMailMessage();
+            staffMessage.setFrom(from);
+            staffMessage.setTo(to.trim());
+            staffMessage.setReplyTo(oneLine(request.email()));
+            staffMessage.setSubject("[COM's 지원] " + oneLine(request.name()));
+            staffMessage.setText(buildBody(request));
+        }
+        String recipient = oneLine(request.email()).toLowerCase(java.util.Locale.ROOT);
+        SimpleMailMessage confirmation = null;
+        if (confirmationsByRecipient.tryAcquire(recipient) && confirmationsForSite.tryAcquire("site")) {
+            confirmation = buildApplicantConfirmationMessage(request);
+        } else {
+            log.warn("Recruit applicant confirmation skipped: daily mail limit reached");
+        }
+        SimpleMailMessage staff = staffMessage;
+        SimpleMailMessage applicant = confirmation;
+        dispatchAfterCommit(() -> sendMails(staff, applicant));
+    }
+
+    // Application is already saved and admins are notified in-app; a mail that cannot be
+    // delivered must not fail the submission. The two mails are independent: with no staff
+    // recipient configured (RECRUIT_MAIL_TO blank) the staff send used to throw, and the
+    // applicant's confirmation — queued right behind it in the same try — was never sent.
+    private void sendMails(SimpleMailMessage staffMessage, SimpleMailMessage confirmation) {
+        if (staffMessage != null) {
             try {
-                SimpleMailMessage message = new SimpleMailMessage();
-                message.setFrom(from);
-                message.setTo(to.trim());
-                message.setReplyTo(oneLine(request.email()));
-                message.setSubject("[COM's 지원] " + oneLine(request.name()));
-                message.setText(buildBody(request));
-                mailSender.send(message);
+                mailSender.send(staffMessage);
             } catch (RuntimeException e) {
                 log.warn("Recruit application saved but staff notification email failed", e);
             }
         }
-        try {
-            mailSender.send(buildApplicantConfirmationMessage(request));
-        } catch (RuntimeException e) {
-            log.warn("Recruit application saved but applicant confirmation email failed", e);
+        if (confirmation != null) {
+            try {
+                mailSender.send(confirmation);
+            } catch (RuntimeException e) {
+                log.warn("Recruit application saved but applicant confirmation email failed", e);
+            }
         }
+    }
+
+    // Mail goes out only after the application row has committed (a rolled-back submission must
+    // not mail anyone), and off the request thread so a slow SMTP server never holds the request
+    // and its database connection.
+    private void dispatchAfterCommit(Runnable send) {
+        Runnable enqueue = () -> {
+            try {
+                mailExecutor.execute(send);
+            } catch (RuntimeException e) {
+                log.warn("Recruit application saved but its emails could not be queued", e);
+            }
+        };
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    enqueue.run();
+                }
+            });
+            return;
+        }
+        enqueue.run();
     }
 
     @Transactional(readOnly = true)
@@ -350,19 +427,16 @@ public class RecruitApplicationService {
         message.setTo(oneLine(request.email()));
         message.setSubject("[COM's] 지원서가 접수되었습니다");
         message.setText(String.join("\n",
-                // 이 메일은 제출자가 적어 넣은 주소로 간다. 요약에 싣는 값은 한 줄로 눌러, 줄바꿈을
-                // 넣어 본문을 다른 안내문처럼 꾸미는 데 쓰이지 않게 한다.
-                "안녕하세요, " + oneLine(request.name()) + "님.",
+                // 이 메일은 로그인 없이 누구나 적어 넣은 주소로, 동아리 공식 발신 주소에서 나간다.
+                // 그래서 제출자가 입력한 글(이름·학과·관심 분야 등)은 한 글자도 싣지 않는다. 그 칸에
+                // 링크나 안내문을 적어 남에게 공식 메일처럼 보내는 데 쓰일 수 있기 때문이다.
+                "안녕하세요.",
                 "",
                 "COM's 지원서가 정상적으로 접수되었습니다.",
-                "내부 확인 후 입력하신 연락처 또는 이메일로 개별 연락드리겠습니다.",
+                "내부 확인 후 지원서에 적어 주신 연락처로 개별 연락드리겠습니다.",
+                "진행 상황은 COM's 웹사이트 지원하기 페이지의 '지원 현황 확인'에서 학번과 이름으로 볼 수 있습니다.",
                 "",
-                "[접수 내용 요약]",
-                "이름: " + oneLine(request.name()),
-                "학번: " + oneLine(request.studentId()),
-                "학과: " + oneLine(request.department()),
-                "학년: " + oneLine(optional(request.grade(), "선택 안 함")),
-                "관심 분야: " + oneLine(interestsText(request.interests())),
+                "직접 지원하지 않으셨다면 다른 사람이 이 주소를 잘못 적은 것이니 이 메일을 무시해 주세요.",
                 "",
                 "지원해주셔서 감사합니다.",
                 "COM's"

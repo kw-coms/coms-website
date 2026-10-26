@@ -14,6 +14,8 @@ public interface LoginFailureRepository extends JpaRepository<LoginFailure, Long
 
     long countByIpAndAttemptedAtAfter(String ip, LocalDateTime since);
 
+    long countByStudentIdAndIpAndAttemptedAtAfter(String studentId, String ip, LocalDateTime since);
+
     void deleteByStudentId(String studentId);
 
     @Modifying

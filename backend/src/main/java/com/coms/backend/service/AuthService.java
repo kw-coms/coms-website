@@ -43,8 +43,15 @@ public class AuthService implements UserDetailsService {
     private static final int PASSWORD_RESET_RESEND_COOLDOWN_MINUTES = 1;
     private static final int MAX_PASSWORD_RESET_ATTEMPTS = 5;
     private static final int MAX_EMAIL_VERIFICATION_ATTEMPTS = 5;
-    private static final int MAX_FAILURES_PER_ID = 5;
-    private static final int MAX_FAILURES_PER_IP = 5;
+    // Login lockout, all over the same 15-minute window. Campus Wi-Fi puts many members behind one
+    // address, so a lock keyed on the address alone at five failures shut everyone there out after
+    // one person's typos, and a lock keyed on the account alone let anyone lock a member out by
+    // typing five wrong passwords for them. The tight limit is therefore per account *and* address;
+    // the account-only and address-only limits are wide enough for shared networks while still
+    // stopping distributed guessing against one account and spraying many accounts from one place.
+    private static final int MAX_FAILURES_PER_ID_AND_IP = 5;
+    private static final int MAX_FAILURES_PER_ID = 20;
+    private static final int MAX_FAILURES_PER_IP = 30;
     private static final int LOCKOUT_WINDOW_MINUTES = 15;
     // Password-reset abuse limits. The per-IP numbers follow the signup-mail limit (a campus NAT
     // puts many members behind one address); the per-account cap is what actually bounds mail
@@ -166,10 +173,21 @@ public class AuthService implements UserDetailsService {
 
     private void checkLoginLockout(String identifier, String clientIp) {
         LocalDateTime windowStart = LocalDateTime.now().minusMinutes(LOCKOUT_WINDOW_MINUTES);
+        boolean hasIp = normalizeNullable(clientIp) != null;
+        long pairFailures = identifier == null || !hasIp ? 0
+                : loginFailureRepository.countByStudentIdAndIpAndAttemptedAtAfter(identifier, clientIp, windowStart);
         long identifierFailures = identifier == null ? 0 : loginFailureRepository.countByStudentIdAndAttemptedAtAfter(identifier, windowStart);
-        long ipFailures = normalizeNullable(clientIp) == null ? 0 : loginFailureRepository.countByIpAndAttemptedAtAfter(clientIp, windowStart);
-        if (identifierFailures >= MAX_FAILURES_PER_ID || ipFailures >= MAX_FAILURES_PER_IP) {
-            if (identifierFailures >= MAX_FAILURES_PER_ID) {
+        long ipFailures = !hasIp ? 0 : loginFailureRepository.countByIpAndAttemptedAtAfter(clientIp, windowStart);
+        // Without a client address the account-only count is the only signal, so it keeps the
+        // tight limit.
+        boolean accountLocked = hasIp ? identifierFailures >= MAX_FAILURES_PER_ID
+                : identifierFailures >= MAX_FAILURES_PER_ID_AND_IP;
+        if (pairFailures >= MAX_FAILURES_PER_ID_AND_IP || accountLocked || ipFailures >= MAX_FAILURES_PER_IP) {
+            if (pairFailures >= MAX_FAILURES_PER_ID_AND_IP) {
+                log.warn("Rate limit rejected: limiter=login-lockout-identifier-ip key={} ip={}",
+                        maskAccountKey(identifier), maskIp(clientIp));
+            }
+            if (accountLocked) {
                 log.warn("Rate limit rejected: limiter=login-lockout-identifier key={}", maskAccountKey(identifier));
             }
             if (ipFailures >= MAX_FAILURES_PER_IP) {

@@ -290,7 +290,7 @@ class RolePermissionMatrixTest {
                             .content(objectMapper.writeValueAsString(Map.of("allowed", matrixBody(defaults())))))
                     .andExpect(status().isForbidden());
         }
-        mockMvc.perform(get("/api/admin/permissions")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/admin/permissions")).andExpect(status().isUnauthorized());
     }
 
     private int statusFor(Case testCase, Member.Role role) throws Exception {

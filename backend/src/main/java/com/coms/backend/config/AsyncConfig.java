@@ -25,4 +25,19 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    /**
+     * Outgoing mail that a request should not wait for (recruit application mails). SMTP can take
+     * seconds; sending inline held the request thread — and its database connection — meanwhile.
+     */
+    @Bean(name = "mailExecutor")
+    public TaskExecutor mailExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setThreadNamePrefix("mail-");
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(500);
+        executor.initialize();
+        return executor;
+    }
 }

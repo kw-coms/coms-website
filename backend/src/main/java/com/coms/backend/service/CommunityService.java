@@ -533,9 +533,11 @@ public class CommunityService {
 
     // ---- YouTube search (delegated) ------------------------------------------------------------
 
-    @Transactional(readOnly = true)
-    public YouTubeSearchResponse searchYouTube(String query) {
-        return youTubeSearchService.search(query);
+    // No transaction: the search is an outbound HTTP call of up to five seconds and must not hold
+    // a database connection while it waits (the class-level @Transactional would open one).
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    public YouTubeSearchResponse searchYouTube(String studentId, String query) {
+        return youTubeSearchService.search(studentId, query);
     }
 
     // ---- Member data erasure -------------------------------------------------------------------
@@ -613,6 +615,17 @@ public class CommunityService {
         Member member = access.requireMember(studentId);
         CommunityPost post = requirePost(postId);
         access.requireVisible(member, post);
+    }
+
+    /** A post the member can read and whose preview may be shared (never an anonymous-board post). */
+    @Transactional(readOnly = true)
+    public void requireShareablePost(String studentId, Long postId) {
+        Member member = access.requireMember(studentId);
+        CommunityPost post = requirePost(postId);
+        access.requireVisible(member, post);
+        if (access.isAnonymous(post)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
     }
 
     // ---- Reputation (delegated) ----------------------------------------------------------------

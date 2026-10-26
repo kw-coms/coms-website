@@ -167,10 +167,45 @@ public class JwtTokenProvider {
         }
     }
 
+    /** What the request filter needs from a valid access token. */
+    public record AccessClaims(String studentId, int tokenVersion, String family) {}
+
+    /**
+     * Parses an access token once (signature, issuer, audience, expiry) and returns its claims, or
+     * empty for anything that is not a valid access token — including refresh tokens.
+     */
+    public java.util.Optional<AccessClaims> parseAccessToken(String token) {
+        if (token == null || token.isBlank()) {
+            return java.util.Optional.empty();
+        }
+        try {
+            Claims claims = parser().parseSignedClaims(token).getPayload();
+            if ("refresh".equals(claims.get("type"))) {
+                return java.util.Optional.empty();
+            }
+            String studentId = claims.getSubject();
+            if (studentId == null || studentId.isBlank()) {
+                return java.util.Optional.empty();
+            }
+            Object tv = claims.get("tv");
+            Object fam = claims.get("fam");
+            return java.util.Optional.of(new AccessClaims(
+                    studentId,
+                    tv instanceof Number number ? number.intValue() : 0,
+                    fam instanceof String family && !family.isBlank() ? family : null));
+        } catch (JwtException | IllegalArgumentException e) {
+            return java.util.Optional.empty();
+        }
+    }
+
     private JwtParser parser() {
+        // Every token this backend has issued since 2026-06-06 carries the audience, and the
+        // longest-lived token (a remembered refresh token) lasts 30 days, so requiring it no
+        // longer rejects any live session.
         return Jwts.parser()
                 .verifyWith(key)
                 .requireIssuer(ISSUER)
+                .requireAudience(AUDIENCE)
                 .build();
     }
 }

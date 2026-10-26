@@ -36,14 +36,43 @@ public class LocalStorageService implements StorageService {
     /** The EXIF block sits in the first segments of a JPEG; a segment is at most 64 KB. */
     private static final int JPEG_HEAD_BYTES = 256 * 1024;
 
-    private final Path root;
+    /** Uploads stop before the disk does: a full disk also stops the database and the site. */
+    private static final long DEFAULT_MIN_FREE_BYTES = 500L * 1024 * 1024;
 
-    public LocalStorageService(@Value("${storage.location:./uploads}") String location) {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(LocalStorageService.class);
+
+    private final Path root;
+    private final long minFreeBytes;
+
+    public LocalStorageService(String location) {
+        this(location, DEFAULT_MIN_FREE_BYTES);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public LocalStorageService(@Value("${storage.location:./uploads}") String location,
+                               @Value("${storage.min-free-bytes:524288000}") long minFreeBytes) {
         this.root = Paths.get(location).toAbsolutePath().normalize();
+        this.minFreeBytes = Math.max(0, minFreeBytes);
         try {
             Files.createDirectories(root);
         } catch (IOException e) {
             throw new RuntimeException("Could not initialize storage directory", e);
+        }
+    }
+
+    private void ensureRoomFor(long incomingBytes) {
+        long usable;
+        try {
+            usable = Files.getFileStore(root).getUsableSpace();
+        } catch (IOException e) {
+            // Cannot tell: let the write itself fail if the disk really is full.
+            log.warn("Could not read free space for {}", root, e);
+            return;
+        }
+        if (usable - Math.max(0, incomingBytes) < minFreeBytes) {
+            log.error("Upload refused: {} bytes free on the upload disk, {} kept in reserve", usable, minFreeBytes);
+            throw new ResponseStatusException(HttpStatus.INSUFFICIENT_STORAGE,
+                    "서버 저장 공간이 부족해 파일을 올릴 수 없습니다. 운영진에게 알려주세요.");
         }
     }
 
@@ -53,6 +82,7 @@ public class LocalStorageService implements StorageService {
         if (file.isEmpty() || originalName.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File is empty or missing a filename.");
         }
+        ensureRoomFor(file.getSize());
 
         String stored = UUID.randomUUID() + "_" + originalName;
         Path destination = root.resolve(stored).normalize();
@@ -82,11 +112,17 @@ public class LocalStorageService implements StorageService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File is empty or missing a filename.");
         }
 
+        ensureRoomFor(file.getSize());
         byte[] sanitized = stripImageMetadata(file, contentType);
+        if (sanitized == null && "image/webp".equals(contentType)) {
+            // ImageIO cannot re-encode WebP, but its metadata lives in separate EXIF / XMP chunks
+            // that can be dropped without touching the picture.
+            sanitized = stripWebpMetadata(file.getBytes());
+        }
         if (sanitized == null) {
-            // ImageIO has no safe re-encoder for this format (GIF, WebP) so metadata cannot be
-            // stripped here; the raw bytes — including any EXIF/XMP — are stored as-is. Callers
-            // requiring the stripping guarantee must restrict uploads to JPEG/PNG at the API layer.
+            // ImageIO has no safe re-encoder for this format (GIF) so metadata cannot be
+            // stripped here; the raw bytes are stored as-is. Callers requiring the stripping
+            // guarantee must restrict uploads to JPEG/PNG/WebP at the API layer.
             return store(file);
         }
 
@@ -267,6 +303,76 @@ public class LocalStorageService implements StorageService {
             g.dispose();
         }
         return turned;
+    }
+
+    /**
+     * Drops the EXIF and XMP chunks from a WebP file (RIFF container) without touching the image
+     * data, and clears their flags in the VP8X header. Returns the input unchanged when it has no
+     * such chunks, and {@code null} when it is not a well-formed WebP container (the caller then
+     * stores it as-is). Package-private for unit testing.
+     */
+    static byte[] stripWebpMetadata(byte[] data) {
+        if (data == null || data.length < 12 || !fourcc(data, 0, "RIFF") || !fourcc(data, 8, "WEBP")) {
+            return null;
+        }
+        long riffEnd = le32(data, 4) + 8;
+        if (riffEnd > data.length) {
+            return null;
+        }
+        int end = (int) riffEnd;
+        ByteArrayOutputStream out = new ByteArrayOutputStream(data.length);
+        out.write(data, 0, 12);
+        boolean removed = false;
+        int pos = 12;
+        while (pos + 8 <= end) {
+            long size = le32(data, pos + 4);
+            long next = pos + 8 + size + (size & 1);
+            if (pos + 8 + size > end) {
+                return null;
+            }
+            next = Math.min(next, end); // the final chunk may omit its padding byte
+            boolean metadata = fourcc(data, pos, "EXIF") || fourcc(data, pos, "XMP ");
+            if (metadata) {
+                removed = true;
+            } else {
+                out.write(data, pos, (int) (next - pos));
+            }
+            pos = (int) next;
+        }
+        if (pos != end) {
+            return null;
+        }
+        if (!removed) {
+            return data;
+        }
+        byte[] result = out.toByteArray();
+        // VP8X (always the first chunk when present): flags byte right after the chunk header.
+        // Bit 3 says "has EXIF", bit 2 "has XMP"; a decoder may reject a file whose flags promise
+        // chunks that are gone.
+        if (result.length >= 21 && fourcc(result, 12, "VP8X")) {
+            result[20] &= (byte) ~(0x08 | 0x04);
+        }
+        long riffSize = result.length - 8L;
+        result[4] = (byte) riffSize;
+        result[5] = (byte) (riffSize >>> 8);
+        result[6] = (byte) (riffSize >>> 16);
+        result[7] = (byte) (riffSize >>> 24);
+        return result;
+    }
+
+    private static boolean fourcc(byte[] data, int offset, String expected) {
+        if (offset + 4 > data.length) return false;
+        for (int i = 0; i < 4; i++) {
+            if (data[offset + i] != (byte) expected.charAt(i)) return false;
+        }
+        return true;
+    }
+
+    private static long le32(byte[] data, int offset) {
+        return (data[offset] & 0xFFL)
+                | (data[offset + 1] & 0xFFL) << 8
+                | (data[offset + 2] & 0xFFL) << 16
+                | (data[offset + 3] & 0xFFL) << 24;
     }
 
     private String reencodeFormat(String contentType) {

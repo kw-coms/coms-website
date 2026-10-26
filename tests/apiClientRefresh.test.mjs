@@ -92,47 +92,47 @@ const refreshCalls = (calls) => calls.filter((call) => call.url.endsWith('/api/a
 }
 
 // ─── 4. An expired session on a protected endpoint ends the session ──────────
-//        The backend answers a missing/expired token with 403 (no custom entry
-//        point), so the signal that the session is really over is the refresh
-//        itself being refused with 401 — not the status of the original request.
+//        The backend answers a missing/expired/revoked token with 401 and keeps
+//        403 for a member without the role. A 401 whose refresh is refused means
+//        the session is over; a 403 is never a reason to refresh.
 
 {
   let expired = 0
   setSessionExpiredHandler(() => { expired += 1 })
 
   const calls = stubFetch(async (url) => (
-    url.endsWith('/api/auth/refresh') ? response(401, {}) : response(403, { error: 'Forbidden' })
+    url.endsWith('/api/auth/refresh') ? response(401, {}) : response(401, { error: 'Unauthorized' })
   ))
-  await assert.rejects(() => request('/api/community/posts'), (error) => error.status === 403)
-  assert.equal(expired, 1, 'a 403 followed by a refused refresh must report the session as expired')
+  await assert.rejects(() => request('/api/community/posts'), (error) => error.status === 401)
+  assert.equal(expired, 1, 'a 401 followed by a refused refresh must report the session as expired')
   assert.equal(
     calls.filter((call) => call.url.includes('/api/community/posts')).length,
     1,
     'nothing to retry without a fresh token',
   )
 
-  // A real permission denial: the session is fine (refresh succeeds) and the retry is still 403.
+  // A permission denial: no refresh, no retry, and the member stays signed in.
   expired = 0
-  stubFetch(async (url) => (
-    url.endsWith('/api/auth/refresh') ? response(200, {}) : response(403, { error: 'Forbidden' })
-  ))
+  const denied = stubFetch(async () => response(403, { error: 'Forbidden' }))
   await assert.rejects(() => request('/api/admin/members'), (error) => error.status === 403)
+  assert.equal(refreshCalls(denied).length, 0, 'a 403 must not spend a refresh-token rotation')
+  assert.equal(denied.length, 1, 'and must not be retried')
   assert.equal(expired, 0, 'a permission denial on a live session must not log the member out')
 
   // The refresh endpoint being unreachable or failing says nothing about the session.
   expired = 0
   stubFetch(async (url) => {
     if (url.endsWith('/api/auth/refresh')) throw new TypeError('Failed to fetch')
-    return response(403, { error: 'Forbidden' })
+    return response(401, { error: 'Unauthorized' })
   })
-  await assert.rejects(() => request('/api/notices'), (error) => error.status === 403)
+  await assert.rejects(() => request('/api/notices'), (error) => error.status === 401)
   assert.equal(expired, 0, 'a network failure during refresh must not end the session')
 
   expired = 0
   stubFetch(async (url) => (
-    url.endsWith('/api/auth/refresh') ? response(503, {}) : response(403, { error: 'Forbidden' })
+    url.endsWith('/api/auth/refresh') ? response(503, {}) : response(401, { error: 'Unauthorized' })
   ))
-  await assert.rejects(() => request('/api/notices'), (error) => error.status === 403)
+  await assert.rejects(() => request('/api/notices'), (error) => error.status === 401)
   assert.equal(expired, 0, 'a 5xx from the refresh endpoint must not end the session')
 
   setSessionExpiredHandler(null)

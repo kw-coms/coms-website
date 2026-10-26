@@ -76,6 +76,7 @@ public class SecurityConfig {
                                            OriginValidationFilter originValidationFilter,
                                            IntegrationHmacFilter integrationHmacFilter,
                                            com.coms.backend.repository.MemberRepository memberRepository,
+                                           com.coms.backend.repository.RefreshSessionRepository refreshSessionRepository,
                                            @Value("${app.max-request-body-bytes:8388608}") long maxRequestBodyBytes) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -84,12 +85,11 @@ public class SecurityConfig {
             // requests use a separate HMAC filter. Spring's session CSRF token is not used here.
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            // No usable credentials (missing, expired, revoked) -> 401; a signed-in member without
+            // the required role -> 403. The web and mobile clients refresh their session on 401
+            // only, so an expired token must not look like a permission denial.
             .exceptionHandling(errors -> errors
-                    .defaultAuthenticationEntryPointFor(
-                            new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
-                            request -> "GET".equals(request.getMethod()) && "/api/companion/me".equals(request.getRequestURI()))
-                    .defaultAuthenticationEntryPointFor(
-                            new HttpStatusEntryPoint(HttpStatus.FORBIDDEN), request -> true))
+                    .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
             .authorizeHttpRequests(auth -> {
                 auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll();
                 auth.requestMatchers("/error", "/api/auth/signup", "/api/auth/login", "/api/auth/logout", "/api/auth/refresh", "/hello", "/api/server/time",
@@ -202,7 +202,7 @@ public class SecurityConfig {
             .addFilterBefore(originValidationFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(integrationHmacFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(
-                new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService, memberRepository),
+                new JwtAuthenticationFilter(jwtTokenProvider, userDetailsService, memberRepository, refreshSessionRepository),
                 UsernamePasswordAuthenticationFilter.class
             );
 

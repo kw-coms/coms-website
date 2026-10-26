@@ -126,8 +126,8 @@ class SponsorSecurityIntegrationTest {
                         .header("Origin", ORIGIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(SPONSOR_BODY))
-                // 로그아웃 상태는 403 — 이 앱의 필터 체인은 익명 요청에 401 진입점을 쓰지 않는다.
-                .andExpect(status().isForbidden());
+                // 로그아웃 상태는 401 — 세션이 없으면 권한 거부(403)가 아니라 인증 필요다.
+                .andExpect(status().isUnauthorized());
 
         mockMvc.perform(post("/api/admin/sponsors")
                         .cookie(userCookie)

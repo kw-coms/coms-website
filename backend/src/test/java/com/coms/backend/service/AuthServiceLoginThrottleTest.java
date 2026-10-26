@@ -63,7 +63,8 @@ class AuthServiceLoginThrottleTest {
 
     @Test
     void targetedLockoutUsesNormalizedEmailIdentifierBeforePasswordCheck() {
-        when(loginFailureRepository.countByStudentIdAndAttemptedAtAfter(eq("member@example.com"), any(LocalDateTime.class)))
+        when(loginFailureRepository.countByStudentIdAndIpAndAttemptedAtAfter(
+                eq("member@example.com"), eq("203.0.113.10"), any(LocalDateTime.class)))
                 .thenReturn(5L);
 
         assertThatThrownBy(() -> authService.login(new LoginRequest("  MEMBER@Example.com  ", "Password1!", false), "203.0.113.10"))
@@ -75,9 +76,34 @@ class AuthServiceLoginThrottleTest {
     }
 
     @Test
+    void someoneElsesFailuresDoNotLockTheOwnerOutFromAnotherAddress() {
+        // Five wrong passwords typed for this account from elsewhere: the owner, on their own
+        // network, can still sign in.
+        when(loginFailureRepository.countByStudentIdAndAttemptedAtAfter(eq("2026123478"), any(LocalDateTime.class)))
+                .thenReturn(5L);
+        when(memberRepository.findByStudentId("2026123478")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("2026123478", "Password1!", false), "203.0.113.30"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED));
+        verify(memberRepository).findByStudentId("2026123478");
+    }
+
+    @Test
+    void distributedGuessingAgainstOneAccountIsStillLocked() {
+        when(loginFailureRepository.countByStudentIdAndAttemptedAtAfter(eq("2026123479"), any(LocalDateTime.class)))
+                .thenReturn(20L);
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("2026123479", "Password1!", false), "203.0.113.31"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+        verify(memberRepository, never()).findByStudentId(any());
+    }
+
+    @Test
     void passwordSprayingLockoutUsesClientIpBeforeAccountLookup() {
         when(loginFailureRepository.countByIpAndAttemptedAtAfter(eq("198.51.100.20"), any(LocalDateTime.class)))
-                .thenReturn(5L);
+                .thenReturn(30L);
 
         assertThatThrownBy(() -> authService.login(new LoginRequest("2026123477", "Password1!", false), "198.51.100.20"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
@@ -85,6 +111,19 @@ class AuthServiceLoginThrottleTest {
 
         verify(memberRepository, never()).findByStudentId(any());
         verify(passwordEncoder, never()).matches(any(), any());
+    }
+
+    @Test
+    void aSharedCampusAddressIsNotLockedByAFewMembersTypos() {
+        // Five failures from one campus NAT address, spread over other accounts.
+        when(loginFailureRepository.countByIpAndAttemptedAtAfter(eq("198.51.100.21"), any(LocalDateTime.class)))
+                .thenReturn(5L);
+        when(memberRepository.findByStudentId("2026123480")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("2026123480", "Password1!", false), "198.51.100.21"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
+                        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED));
+        verify(memberRepository).findByStudentId("2026123480");
     }
 
     @Test
