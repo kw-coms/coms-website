@@ -5,9 +5,39 @@ export const THEME_MODE_KEY = 'kwcoms-theme-mode:v2'
 export const ACCENT_COLOR_KEY = 'kwcoms-accent-color'
 export const FONT_SELECTION_KEY = 'kwcoms-font-id'
 
+// localStorage throws (not just returns null) when site data is blocked or storage is full.
+// Preferences are conveniences: on any failure fall back to the defaults instead of letting the
+// first render crash the whole app.
+export function readStoredValue(key: string): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+export function storeValue(key: string, value: string) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(key, value)
+  } catch {
+    // Not remembered across visits; the current page still applies it.
+  }
+}
+
+export function forgetStoredValue(key: string) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.removeItem(key)
+  } catch {
+    // Nothing stored that could be removed.
+  }
+}
+
 export function getStoredFontId() {
   if (typeof window === 'undefined') return null
-  const raw = window.localStorage.getItem(FONT_SELECTION_KEY)
+  const raw = readStoredValue(FONT_SELECTION_KEY)
   if (!raw) return null
   if (raw.startsWith('b:')) return raw
   const n = Number(raw)
@@ -60,7 +90,7 @@ export function getStoredThemeMode() {
 
 export function getStoredAccentColor() {
   if (typeof window === 'undefined') return DEFAULT_ACCENT
-  return normalizeHex(window.localStorage.getItem(ACCENT_COLOR_KEY) || DEFAULT_ACCENT)
+  return normalizeHex(readStoredValue(ACCENT_COLOR_KEY) || DEFAULT_ACCENT)
 }
 
 export function scrollToTopInstant() {
