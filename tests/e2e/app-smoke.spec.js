@@ -483,6 +483,48 @@ test('apps page surfaces companion service links away from the home dashboard', 
   }
 })
 
+// The server looks at the catalogue's links every ten minutes; the Apps page marks the ones
+// that did not answer, so a visitor does not find out from an error page.
+test('apps page marks an app whose link did not answer', async ({ page }) => {
+  const project = (id, title, linkUrl) => ({ id, category: 'WEBSITE', categoryName: '웹사이트', title, eyebrow: '', description: `${title} 설명`, madeBy: '', linkUrl, displayUrl: '', position: id, files: [] })
+  await page.route('**/api/club-projects/categories', route => route.fulfill({ json: [{ key: 'WEBSITE', name: '웹사이트', position: 0 }] }))
+  await page.route('**/api/club-projects', route => route.fulfill({
+    json: [project(1, '열리는 앱', 'https://up.example/'), project(2, '죽은 앱', 'https://down.example/'), project(3, '주소를 바꾼 앱', 'https://new.example/'), project(4, '아직 안 본 앱', 'https://unseen.example/')],
+  }))
+  await page.route('**/api/club-projects/link-status', route => route.fulfill({
+    json: [
+      { projectId: 1, linkUrl: 'https://up.example/', state: 'UP', checkedAt: '2026-10-12T17:00:00' },
+      { projectId: 2, linkUrl: 'https://down.example/', state: 'DOWN', checkedAt: '2026-10-12T17:00:00' },
+      // Looked at before the entry's address was changed: says nothing about the new one.
+      { projectId: 3, linkUrl: 'https://old.example/', state: 'DOWN', checkedAt: '2026-10-12T17:00:00' },
+    ],
+  }))
+
+  await page.goto('/apps')
+  await expect(page.getByRole('heading', { name: "COM's Apps" })).toBeVisible()
+  const dead = page.getByRole('link', { name: /죽은 앱/ })
+  await expect(dead).toContainText('지금 응답 없음')
+  // It still opens: the look can be minutes old.
+  await expect(dead).toHaveAttribute('href', 'https://down.example/')
+  await expect(page.getByText('지금 응답 없음')).toHaveCount(1)
+  for (const name of [/열리는 앱/, /주소를 바꾼 앱/, /아직 안 본 앱/]) {
+    await expect(page.getByRole('link', { name })).not.toContainText('응답 없음')
+  }
+})
+
+test('apps page does without the link check when it cannot be read', async ({ page }) => {
+  await page.route('**/api/club-projects/categories', route => route.fulfill({ json: [{ key: 'WEBSITE', name: '웹사이트', position: 0 }] }))
+  await page.route('**/api/club-projects', route => route.fulfill({
+    json: [{ id: 1, category: 'WEBSITE', categoryName: '웹사이트', title: '열리는 앱', eyebrow: '', description: '', madeBy: '', linkUrl: 'https://up.example/', displayUrl: '', position: 1, files: [] }],
+  }))
+  await page.route('**/api/club-projects/link-status', route => route.fulfill({ status: 500, json: { message: 'boom' } }))
+
+  await page.goto('/apps')
+  await expect(page.getByRole('link', { name: /열리는 앱/ })).toHaveAttribute('href', 'https://up.example/')
+  await expect(page.getByText('프로젝트를 불러오지 못했습니다')).toHaveCount(0)
+  await expect(page.getByText('응답 없음')).toHaveCount(0)
+})
+
 test('club event page renders entries and ranking from real API data', async ({ page }) => {
   await mockAdminApis(page)
 

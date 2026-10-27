@@ -1,8 +1,10 @@
 package com.coms.backend.controller;
 
 import com.coms.backend.domain.ClubProjectFile;
+import com.coms.backend.dto.ClubProjectLinkStatusResponse;
 import com.coms.backend.dto.ClubProjectResponse;
 import com.coms.backend.service.AuditLogService;
+import com.coms.backend.service.ClubProjectLinkStatusService;
 import com.coms.backend.service.ClubProjectService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
@@ -31,10 +33,14 @@ import java.util.List;
 public class ClubProjectController {
 
     private final ClubProjectService projectService;
+    private final ClubProjectLinkStatusService linkStatusService;
     private final AuditLogService auditLogService;
 
-    public ClubProjectController(ClubProjectService projectService, AuditLogService auditLogService) {
+    public ClubProjectController(ClubProjectService projectService,
+                                 ClubProjectLinkStatusService linkStatusService,
+                                 AuditLogService auditLogService) {
         this.projectService = projectService;
+        this.linkStatusService = linkStatusService;
         this.auditLogService = auditLogService;
     }
 
@@ -42,6 +48,13 @@ public class ClubProjectController {
     @GetMapping
     public ResponseEntity<List<ClubProjectResponse>> list() {
         return ResponseEntity.ok(projectService.list());
+    }
+
+    // Public like the list itself: whether each entry's link answered when the server last
+    // looked. Empty until the first look after a start, and wherever the check is switched off.
+    @GetMapping("/link-status")
+    public ResponseEntity<List<ClubProjectLinkStatusResponse>> listClubProjectLinkStatuses() {
+        return ResponseEntity.ok(linkStatusService.list());
     }
 
     @PreAuthorize("@perm.has(authentication,'PROJECT_WRITE')")

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { LayoutGrid } from 'lucide-react'
-import { listClubProjects, listClubProjectCategories } from '../../services/clubProjectApi'
+import { listClubProjects, listClubProjectCategories, listClubProjectLinkStatuses } from '../../services/clubProjectApi'
+import { linkStateOf } from '../../utils/appProjectStatus'
 import AppProjectCard from '../apps/AppProjectCard'
 
 function groupByCategory(projects, categories) {
@@ -31,6 +32,7 @@ function CompanionServicesSection() {
   const [projects, setProjects] = useState([])
   const [categories, setCategories] = useState([])
   const [loadState, setLoadState] = useState('loading')
+  const [linkStatuses, setLinkStatuses] = useState([])
 
   useEffect(() => {
     let mounted = true
@@ -49,6 +51,11 @@ function CompanionServicesSection() {
         setCategories([])
         setLoadState('error')
       })
+    // Which links answered the server's last look. The page does not wait for it and does
+    // without it: a failure here only means no app is marked.
+    listClubProjectLinkStatuses()
+      .then((statuses) => { if (mounted) setLinkStatuses(statuses) })
+      .catch(() => {})
     return () => { mounted = false }
   }, [])
 
@@ -80,7 +87,7 @@ function CompanionServicesSection() {
                 </div>
                 <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {group.projects.map((project) => (
-                    <AppProjectCard key={project.id} project={project} />
+                    <AppProjectCard key={project.id} project={project} linkState={linkStateOf(project, linkStatuses)} />
                   ))}
                 </div>
               </div>

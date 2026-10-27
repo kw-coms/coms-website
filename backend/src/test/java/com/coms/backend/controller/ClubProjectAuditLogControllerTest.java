@@ -5,6 +5,7 @@ import com.coms.backend.dto.ClubProjectCategoryResponse;
 import com.coms.backend.dto.ClubProjectResponse;
 import com.coms.backend.service.AuditLogService;
 import com.coms.backend.service.ClubProjectCategoryService;
+import com.coms.backend.service.ClubProjectLinkStatusService;
 import com.coms.backend.service.ClubProjectService;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.TestingAuthenticationToken;
@@ -27,7 +28,7 @@ class ClubProjectAuditLogControllerTest {
     private final ClubProjectService projectService = mock(ClubProjectService.class);
     private final ClubProjectCategoryService categoryService = mock(ClubProjectCategoryService.class);
     private final AuditLogService auditLogService = mock(AuditLogService.class);
-    private final ClubProjectController projectController = new ClubProjectController(projectService, auditLogService);
+    private final ClubProjectController projectController = new ClubProjectController(projectService, mock(ClubProjectLinkStatusService.class), auditLogService);
     private final ClubProjectCategoryController categoryController = new ClubProjectCategoryController(categoryService, auditLogService);
 
     @Test
