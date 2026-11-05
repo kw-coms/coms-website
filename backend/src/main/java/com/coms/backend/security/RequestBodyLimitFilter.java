@@ -21,7 +21,7 @@ import java.util.Set;
 /**
  * Refuses a request body larger than the ceiling before anything parses it.
  *
- * <p>Uploads have their own limits ({@code spring.servlet.multipart.*}, up to 210 MB) and the proxy
+ * <p>Uploads have their own limits ({@code spring.servlet.multipart.*}, up to 320 MB) and the proxy
  * in front accepts bodies that large on every path. Nothing bounded a body that is not a multipart
  * upload, so a JSON endpoint — the anonymous ones included: login, signup, recruit apply — read and
  * parsed whatever it was sent, and a handful of large requests in parallel could exhaust the heap.
