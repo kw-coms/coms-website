@@ -239,13 +239,13 @@ class ArchiveServiceTest {
         ) {
             @Override
             public long getSize() {
-                return 50L * 1024 * 1024 + 1;
+                return 300L * 1024 * 1024 + 1;
             }
         };
 
         assertThatThrownBy(() -> archiveService.upload("큰 파일", null, large, "2026123456"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, ex ->
-                        assertThat(ex.getReason()).contains("50MB"));
+                        assertThat(ex.getReason()).contains("300MB"));
     }
 
     @Test
