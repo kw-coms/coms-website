@@ -59,13 +59,18 @@ public class EligibleMemberService {
 
     /** 관리자 수기 등록/보정 경로. 이 행으로 가입하면 일반 회원(USER)이 된다. */
     public void addSingle(String studentId, String name, String generation, String phone) {
-        addSingle(studentId, name, generation, phone, Member.Role.USER);
+        addSingle(studentId, name, generation, phone, null, Member.Role.USER);
     }
 
     /**
      * @param initialRole 이 행으로 가입할 때 부여할 등급. 리크루팅 합격 이관만 ASSOCIATE(준회원)을 넘긴다.
      */
     public void addSingle(String studentId, String name, String generation, String phone, Member.Role initialRole) {
+        addSingle(studentId, name, generation, phone, null, initialRole);
+    }
+
+    public void addSingle(String studentId, String name, String generation, String phone,
+                          String department, Member.Role initialRole) {
         String normalized = normalize(studentId);
         if (!STUDENT_ID_PATTERN.matcher(normalized).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
@@ -77,6 +82,10 @@ public class EligibleMemberService {
         String normalizedPhone = normalizePhone(phone);
         if (!normalizedPhone.isBlank()) {
             member.setPhone(normalizedPhone);
+        }
+        String normalizedDepartment = normalizeDepartment(department);
+        if (normalizedDepartment != null) {
+            member.setDepartment(normalizedDepartment);
         }
         eligibleMemberRepository.save(member);
     }
@@ -250,6 +259,11 @@ public class EligibleMemberService {
     }
 
     public void addGraduateSingle(String name, String twoDigitYearStr, String generationStr, String phone) {
+        addGraduateSingle(name, twoDigitYearStr, generationStr, phone, null);
+    }
+
+    public void addGraduateSingle(String name, String twoDigitYearStr, String generationStr, String phone,
+                                  String department) {
         String normalizedName = normalize(name);
 
         Integer admissionYear = null;
@@ -276,12 +290,18 @@ public class EligibleMemberService {
         String generation = String.valueOf(admissionYear - FIRST_GENERATION_YEAR);
         String verificationKey = verificationKey(normalizedName, admissionYear);
         String normalizedPhone = normalizePhone(phone);
+        String normalizedDepartment = normalizeDepartment(department);
 
         Optional<EligibleMember> existing = eligibleMemberRepository.findByVerificationKey(verificationKey);
         if (existing.isPresent()) {
-            // 중복 등록은 무시하되 전화번호는 보강한다.
+            // 중복 등록은 무시하되 전달된 연락처와 학부/학과는 보강한다.
             if (!normalizedPhone.isBlank()) {
                 existing.get().setPhone(normalizedPhone);
+            }
+            if (normalizedDepartment != null) {
+                existing.get().setDepartment(normalizedDepartment);
+            }
+            if (!normalizedPhone.isBlank() || normalizedDepartment != null) {
                 eligibleMemberRepository.save(existing.get());
             }
             return;
@@ -294,6 +314,7 @@ public class EligibleMemberService {
         member.setGeneration(generation);
         member.setVerificationKey(verificationKey);
         member.setPhone(normalizedPhone.isBlank() ? null : normalizedPhone);
+        member.setDepartment(normalizedDepartment);
         eligibleMemberRepository.save(member);
     }
 
@@ -304,6 +325,10 @@ public class EligibleMemberService {
      * 편집으로 학번을 채우는 순간부터 가입 가능해진다.
      */
     public void addPendingByGeneration(String name, String generationStr, String phone) {
+        addPendingByGeneration(name, generationStr, phone, null);
+    }
+
+    public void addPendingByGeneration(String name, String generationStr, String phone, String department) {
         String normalizedName = normalize(name);
         if (normalizedName.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름을 입력해주세요.");
@@ -314,7 +339,7 @@ public class EligibleMemberService {
         }
         int admissionYear = Integer.parseInt(digits) + FIRST_GENERATION_YEAR;
         if (isGraduate(admissionYear)) {
-            addGraduateSingle(normalizedName, null, digits, phone);
+            addGraduateSingle(normalizedName, null, digits, phone, department);
             return;
         }
         // 같은 이름+기수 임시 행이 이미 있으면 전화번호만 보강.
@@ -329,6 +354,10 @@ public class EligibleMemberService {
         String normalizedPhone = normalizePhone(phone);
         if (!normalizedPhone.isBlank()) {
             member.setPhone(normalizedPhone);
+        }
+        String normalizedDepartment = normalizeDepartment(department);
+        if (normalizedDepartment != null) {
+            member.setDepartment(normalizedDepartment);
         }
         eligibleMemberRepository.save(member);
     }
@@ -347,6 +376,7 @@ public class EligibleMemberService {
                         member.getId(),
                         member.getStudentId(),
                         member.getName(),
+                        member.getDepartment(),
                         member.getGeneration(),
                         member.getAdmissionYear(),
                         member.getPhone(),
@@ -356,6 +386,11 @@ public class EligibleMemberService {
     }
 
     public void updateEligibleMember(Long id, String studentId, String name, String generation, String phone) {
+        updateEligibleMember(id, studentId, name, generation, phone, null);
+    }
+
+    public void updateEligibleMember(Long id, String studentId, String name, String generation, String phone,
+                                     String department) {
         EligibleMember member = eligibleMemberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "명부에서 해당 항목을 찾을 수 없습니다."));
         String normalizedStudentId = normalize(studentId);
@@ -373,6 +408,7 @@ public class EligibleMemberService {
         }
         String normalizedPhone = normalizePhone(phone);
         member.setPhone(normalizedPhone.isBlank() ? null : normalizedPhone);
+        member.setDepartment(normalizeDepartment(department));
         eligibleMemberRepository.save(member);
     }
 
@@ -482,6 +518,7 @@ public class EligibleMemberService {
         int imported = 0;
         int skipped = 0;
         int phoneFilled = 0;
+        int departmentFilled = 0;
 
         try (StringReader reader = new StringReader(decodeCsv(file.getBytes()));
              CSVParser parser = CSVFormat.DEFAULT.builder()
@@ -522,11 +559,17 @@ public class EligibleMemberService {
                 String phone = colMap.containsKey("phone")
                         ? normalizePhone(safeGet(record, colMap.get("phone")))
                         : null;
+                String department = colMap.containsKey("department")
+                        ? normalizeDepartment(safeGet(record, colMap.get("department")))
+                        : null;
 
                 Optional<EligibleMember> existing = findExisting(studentId, verificationKey);
                 if (existing.isPresent()) {
                     if (fillMissingPhone(existing.get(), name, phone)) {
                         phoneFilled++;
+                    }
+                    if (fillMissingDepartment(existing.get(), name, department)) {
+                        departmentFilled++;
                     }
                     skipped++;
                     continue;
@@ -535,6 +578,7 @@ public class EligibleMemberService {
                 EligibleMember member = new EligibleMember();
                 member.setStudentId(studentId.isBlank() ? null : studentId);
                 member.setName(name);
+                member.setDepartment(department);
                 member.setPhone(phone == null || phone.isBlank() ? null : phone);
                 member.setGeneration(generation);
                 member.setAdmissionYear(admissionYear);
@@ -548,7 +592,7 @@ public class EligibleMemberService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CSV 파일을 읽지 못했습니다.");
         }
 
-        return new EligibleMemberImportResponse(imported, skipped, phoneFilled, "명부를 가져왔습니다.");
+        return new EligibleMemberImportResponse(imported, skipped, phoneFilled, departmentFilled, "명부를 가져왔습니다.");
     }
 
     /**
@@ -582,6 +626,7 @@ public class EligibleMemberService {
             if (flat.contains("기수")) map.putIfAbsent("generation", header);
             if (flat.contains("전화")) map.putIfAbsent("phone", header);
             if (flat.equalsIgnoreCase("phone")) map.putIfAbsent("phone", header);
+            if (isDepartmentHeader(flat)) map.putIfAbsent("department", header);
         }
         return map;
     }
@@ -601,6 +646,7 @@ public class EligibleMemberService {
         int imported = 0;
         int skipped = 0;
         int phoneFilled = 0;
+        int departmentFilled = 0;
 
         try (InputStream inputStream = file.getInputStream();
              Workbook workbook = openWorkbook(inputStream)) {
@@ -641,11 +687,17 @@ public class EligibleMemberService {
                 String phone = header.containsKey("phone")
                         ? normalizePhone(readCell(row, header.get("phone"), evaluator))
                         : null;
+                String department = header.containsKey("department")
+                        ? normalizeDepartment(readCell(row, header.get("department"), evaluator))
+                        : null;
 
                 Optional<EligibleMember> existing = findExisting(studentId, verificationKey);
                 if (existing.isPresent()) {
                     if (fillMissingPhone(existing.get(), name, phone)) {
                         phoneFilled++;
+                    }
+                    if (fillMissingDepartment(existing.get(), name, department)) {
+                        departmentFilled++;
                     }
                     skipped++;
                     continue;
@@ -656,6 +708,7 @@ public class EligibleMemberService {
                 EligibleMember member = new EligibleMember();
                 member.setStudentId(studentId.isBlank() ? null : studentId);
                 member.setName(name);
+                member.setDepartment(department);
                 member.setPhone(phone == null || phone.isBlank() ? null : phone);
                 member.setGeneration(generation);
                 member.setAdmissionYear(admissionYear);
@@ -669,7 +722,7 @@ public class EligibleMemberService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "명부 파일을 읽지 못했습니다.");
         }
 
-        return new EligibleMemberImportResponse(imported, skipped, phoneFilled, "명부를 가져왔습니다.");
+        return new EligibleMemberImportResponse(imported, skipped, phoneFilled, departmentFilled, "명부를 가져왔습니다.");
     }
 
     /**
@@ -694,6 +747,7 @@ public class EligibleMemberService {
             if (label.equals("이름") || label.equalsIgnoreCase("name")) header.putIfAbsent("name", cell.getColumnIndex());
             if (label.equals("전화번호") || label.contains("전화") || label.equalsIgnoreCase("phone")) header.putIfAbsent("phone", cell.getColumnIndex());
             if (label.contains("기수")) header.putIfAbsent("generation", cell.getColumnIndex());
+            if (isDepartmentHeader(label)) header.putIfAbsent("department", cell.getColumnIndex());
             if (label.equals("특이사항") || label.equals("비고")) header.putIfAbsent("note", cell.getColumnIndex());
         }
         return header;
@@ -760,6 +814,18 @@ public class EligibleMemberService {
         return true;
     }
 
+    private boolean fillMissingDepartment(EligibleMember member, String name, String department) {
+        if (department == null || !normalize(name).equals(normalize(member.getName()))) {
+            return false;
+        }
+        if (normalizeDepartment(member.getDepartment()) != null) {
+            return false;
+        }
+        member.setDepartment(department);
+        eligibleMemberRepository.save(member);
+        return true;
+    }
+
     private Optional<EligibleMember> findExisting(String studentId, String verificationKey) {
         if (studentId != null && !studentId.isBlank()) {
             return eligibleMemberRepository.findByStudentId(studentId);
@@ -791,6 +857,21 @@ public class EligibleMemberService {
     private String normalize(String value) {
         String trimmed = value == null ? "" : value.trim();
         return trimmed.length() > MAX_TEXT_LENGTH ? trimmed.substring(0, MAX_TEXT_LENGTH) : trimmed;
+    }
+
+    private String normalizeDepartment(String value) {
+        String normalized = normalize(value);
+        if (normalized.isBlank()) return null;
+        return normalized.length() > 100 ? normalized.substring(0, 100) : normalized;
+    }
+
+    private boolean isDepartmentHeader(String label) {
+        return label.equals("과")
+                || label.contains("학과")
+                || label.contains("학부")
+                || label.contains("전공")
+                || label.equalsIgnoreCase("department")
+                || label.equalsIgnoreCase("major");
     }
 
     /**

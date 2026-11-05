@@ -4,6 +4,7 @@ public record EligibleMemberResponse(
     Long id,
     String studentId,
     String name,
+    String department,
     String generation,
     /**
      * 입학연도. 졸업 여부 판정의 근거다. 명부에 직접 추가·가져오기한 행은 이 값을 들고 있지만,

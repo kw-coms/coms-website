@@ -274,6 +274,7 @@ public class RecruitApplicationService {
                 application.getName(),
                 generation,
                 application.getPhone(),
+                application.getDepartment(),
                 com.coms.backend.domain.Member.Role.ASSOCIATE
         );
 

@@ -16,6 +16,9 @@ public class EligibleMember {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "department", length = 100)
+    private String department;
+
     private String phone;
 
     private String generation;
@@ -54,6 +57,8 @@ public class EligibleMember {
     public void setStudentId(String studentId) { this.studentId = studentId; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+    public String getDepartment() { return department; }
+    public void setDepartment(String department) { this.department = department; }
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
     public String getGeneration() { return generation; }

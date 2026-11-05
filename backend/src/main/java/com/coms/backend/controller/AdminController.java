@@ -125,12 +125,13 @@ public class AdminController {
     @PostMapping("/eligible-members")
     public ResponseEntity<Void> addEligibleMember(Authentication authentication, @Valid @RequestBody AddEligibleMemberRequest request) {
         if (request.studentId() != null && !request.studentId().isBlank()) {
-            eligibleMemberService.addSingle(request.studentId(), request.name(), request.generation(), request.phone());
+            eligibleMemberService.addSingle(request.studentId(), request.name(), request.generation(), request.phone(),
+                    request.department(), com.coms.backend.domain.Member.Role.USER);
         } else if (request.admissionYear() != null && !request.admissionYear().isBlank()) {
-            eligibleMemberService.addGraduateSingle(request.name(), request.admissionYear(), request.generation(), request.phone());
+            eligibleMemberService.addGraduateSingle(request.name(), request.admissionYear(), request.generation(), request.phone(), request.department());
         } else {
             // 학번 미상 재학생: 이름+기수(+전화)만으로 임시 등록. 학번은 나중에 편집으로 채운다.
-            eligibleMemberService.addPendingByGeneration(request.name(), request.generation(), request.phone());
+            eligibleMemberService.addPendingByGeneration(request.name(), request.generation(), request.phone(), request.department());
         }
         auditLogService.record(authentication.getName(), "ADMIN_ELIGIBLE_MEMBER_ADD", "ELIGIBLE_MEMBER",
                 request.studentId(), "name=" + request.name(), null);
@@ -146,7 +147,7 @@ public class AdminController {
     public ResponseEntity<Void> updateEligibleMember(Authentication authentication,
                                                      @PathVariable Long id,
                                                      @Valid @RequestBody UpdateEligibleMemberRequest request) {
-        eligibleMemberService.updateEligibleMember(id, request.studentId(), request.name(), request.generation(), request.phone());
+        eligibleMemberService.updateEligibleMember(id, request.studentId(), request.name(), request.generation(), request.phone(), request.department());
         auditLogService.record(authentication.getName(), "ADMIN_ELIGIBLE_MEMBER_UPDATE", "ELIGIBLE_MEMBER",
                 String.valueOf(id), "studentId=" + request.studentId() + ", name=" + request.name(), null);
         return ResponseEntity.noContent().build();
@@ -166,7 +167,8 @@ public class AdminController {
         EligibleMemberImportResponse response = eligibleMemberService.importRoster(file);
         auditLogService.record(authentication.getName(), "ADMIN_ELIGIBLE_MEMBER_IMPORT", "ELIGIBLE_MEMBER",
                 null, "imported=" + response.imported() + ", skipped=" + response.skipped()
-                        + ", phoneFilled=" + response.phoneFilled(), null);
+                        + ", phoneFilled=" + response.phoneFilled()
+                        + ", departmentFilled=" + response.departmentFilled(), null);
         return ResponseEntity.ok(response);
     }
 
