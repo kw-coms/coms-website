@@ -42,8 +42,8 @@ public class ArchiveService {
 
     // A real cap for this feature (lecture notes, slides, past papers). Matching the
     // multipart cap made this check meaningless — the container rejected first.
-    private static final long MAX_ARCHIVE_FILE_BYTES = 50L * 1024 * 1024;
-    private static final long MAX_ARCHIVE_GROUP_BYTES = 200L * 1024 * 1024;
+    private static final long MAX_ARCHIVE_FILE_BYTES = 300L * 1024 * 1024;
+    private static final long MAX_ARCHIVE_GROUP_BYTES = 300L * 1024 * 1024;
     private static final int MAX_ARCHIVE_ATTACHMENTS = 20;
     private static final int MAX_TITLE_LENGTH = 200;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
@@ -412,7 +412,7 @@ public class ArchiveService {
             validateUpload(file);
             total += file.getSize();
             if (total > MAX_ARCHIVE_GROUP_BYTES) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "자료실 파일의 총 크기는 200MB 이하여야 합니다.");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "자료실 파일의 총 크기는 300MB 이하여야 합니다.");
             }
         }
     }
@@ -535,7 +535,7 @@ public class ArchiveService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일이 비어 있거나 파일명이 없습니다.");
         }
         if (file.getSize() > MAX_ARCHIVE_FILE_BYTES) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "자료실 파일은 50MB 이하만 업로드할 수 있습니다.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "자료실 파일은 300MB 이하만 업로드할 수 있습니다.");
         }
         String baseContentType = baseContentType(file.getContentType());
         if (BLOCKED_MIME_TYPES.contains(baseContentType)) {
