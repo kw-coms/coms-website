@@ -197,6 +197,7 @@ export default function AdminRoster() {
         editForm.name.trim(),
         editForm.phone.trim(),
         editForm.generation.trim(),
+        // Empty string explicitly clears the department; null would keep the stored value.
         editForm.department.trim(),
       )
       setEditingId(null)

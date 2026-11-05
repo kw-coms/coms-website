@@ -938,12 +938,13 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
   await expect(page.getByRole('row').filter({ hasText: '신규회원' })).toBeVisible()
 
   await page.getByRole('row').filter({ hasText: '신규회원' }).getByRole('button', { name: '편집' }).click()
-  // 편집 인라인 폼: 학번 / 이름 / 기수 / 전화번호 순.
-  const editInputs = page.locator('td[colspan="5"]').locator('input')
+  // 편집 인라인 폼: 학번 / 이름 / 학부·학과 / 기수 / 전화번호 순.
+  const editInputs = page.locator('td[colspan="6"]').locator('input')
   await editInputs.nth(1).fill('수정회원')
   await editInputs.nth(0).fill('2026123999')
-  await editInputs.nth(2).fill('60')
-  await editInputs.nth(3).fill('01099998888')
+  await editInputs.nth(2).fill('컴퓨터정보공학부')
+  await editInputs.nth(3).fill('60')
+  await editInputs.nth(4).fill('01099998888')
   await page.getByRole('button', { name: '저장' }).click()
 
   await expect.poll(() => updatePayload).toEqual({
@@ -951,8 +952,10 @@ test('admin roster tab can add edit and delete eligible members', async ({ page 
     name: '수정회원',
     generation: '60',
     phone: '01099998888',
+    department: '컴퓨터정보공학부',
   })
   await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toBeVisible()
+  await expect(page.getByRole('row').filter({ hasText: '수정회원' })).toContainText('컴퓨터정보공학부')
 
   await page.getByRole('row').filter({ hasText: '수정회원' }).getByRole('button', { name: '삭제' }).click()
 

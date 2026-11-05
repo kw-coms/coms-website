@@ -84,7 +84,7 @@ public class EligibleMemberService {
             member.setPhone(normalizedPhone);
         }
         String normalizedDepartment = normalizeDepartment(department);
-        if (normalizedDepartment != null) {
+        if (normalizedDepartment != null && normalizeDepartment(member.getDepartment()) == null) {
             member.setDepartment(normalizedDepartment);
         }
         eligibleMemberRepository.save(member);
@@ -385,10 +385,6 @@ public class EligibleMemberService {
                 .toList();
     }
 
-    public void updateEligibleMember(Long id, String studentId, String name, String generation, String phone) {
-        updateEligibleMember(id, studentId, name, generation, phone, null);
-    }
-
     public void updateEligibleMember(Long id, String studentId, String name, String generation, String phone,
                                      String department) {
         EligibleMember member = eligibleMemberRepository.findById(id)
@@ -408,7 +404,9 @@ public class EligibleMemberService {
         }
         String normalizedPhone = normalizePhone(phone);
         member.setPhone(normalizedPhone.isBlank() ? null : normalizedPhone);
-        member.setDepartment(normalizeDepartment(department));
+        if (department != null) {
+            member.setDepartment(normalizeDepartment(department));
+        }
         eligibleMemberRepository.save(member);
     }
 
@@ -866,6 +864,7 @@ public class EligibleMemberService {
     }
 
     private boolean isDepartmentHeader(String label) {
+        if (label.contains("학번")) return false;
         return label.equals("과")
                 || label.contains("학과")
                 || label.contains("학부")

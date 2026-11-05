@@ -280,7 +280,7 @@ class EligibleMemberServiceTest {
         eligibleMemberService.validateAndClaimSignup("2019123456", "홍길동", "YEAR", "19", null);
         var claimed = eligibleMemberRepository.findByStudentId("2019123456").orElseThrow();
 
-        eligibleMemberService.updateEligibleMember(claimed.getId(), "2018123456", "김철수", null, null);
+        eligibleMemberService.updateEligibleMember(claimed.getId(), "2018123456", "김철수", null, null, null);
 
         assertThat(eligibleMemberRepository.findByVerificationKey("김철수|2018")).isPresent();
         assertThat(eligibleMemberRepository.findByVerificationKey("홍길동|2019")).isEmpty();
@@ -301,6 +301,45 @@ class EligibleMemberServiceTest {
 
         assertThat(eligibleMemberRepository.findByStudentId("2026990101").orElseThrow().getDepartment())
                 .isNull();
+    }
+
+    @Test
+    void adminUpdateKeepsDepartmentWhenNullAndTrimsReplacement() {
+        eligibleMemberService.addSingle(
+                "2026990101", "가상회원", "60", null, "컴퓨터정보공학부", Member.Role.USER);
+        var member = eligibleMemberRepository.findByStudentId("2026990101").orElseThrow();
+
+        eligibleMemberService.updateEligibleMember(
+                member.getId(), "2026990101", "가상회원", "60", null, null);
+
+        assertThat(member.getDepartment()).isEqualTo("컴퓨터정보공학부");
+
+        eligibleMemberService.updateEligibleMember(
+                member.getId(), "2026990101", "가상회원", "60", null, "  소프트웨어학부  ");
+
+        assertThat(member.getDepartment()).isEqualTo("소프트웨어학부");
+    }
+
+    @Test
+    void promotionFillsOnlyBlankRosterDepartments() {
+        eligibleMemberService.addSingle(
+                "2026990101", "가상회원", "60", null, "전자공학과", Member.Role.USER);
+        eligibleMemberService.addSingle("2026990102", "가상빈값", "60", null);
+        eligibleMemberRepository.findByStudentId("2026990102").orElseThrow().setDepartment("   ");
+
+        eligibleMemberService.addSingle(
+                "2026990101", "가상회원", "60", null, "로봇학부", Member.Role.ASSOCIATE);
+        eligibleMemberService.addSingle(
+                "2026990102", "가상빈값", "60", null, "  로봇학부  ", Member.Role.ASSOCIATE);
+        eligibleMemberService.addSingle(
+                "2026990103", "가상신규", "60", null, "  로봇학부  ", Member.Role.ASSOCIATE);
+
+        assertThat(eligibleMemberRepository.findByStudentId("2026990101").orElseThrow().getDepartment())
+                .isEqualTo("전자공학과");
+        assertThat(eligibleMemberRepository.findByStudentId("2026990102").orElseThrow().getDepartment())
+                .isEqualTo("로봇학부");
+        assertThat(eligibleMemberRepository.findByStudentId("2026990103").orElseThrow().getDepartment())
+                .isEqualTo("로봇학부");
     }
 
     @Test
@@ -447,6 +486,24 @@ class EligibleMemberServiceTest {
         assertThat(response.phoneFilled()).isZero();
         assertThat(eligibleMemberRepository.findByStudentId("2024123456").orElseThrow().getPhone())
                 .isEqualTo("01011111111");
+    }
+
+    @Test
+    void importNeverTreatsStudentIdHeadersAsDepartment() throws Exception {
+        for (String header : new String[]{"학부학번", "학과/학번"}) {
+            eligibleMemberRepository.deleteAll();
+            var csv = eligibleMemberService.importRoster(csvFile(
+                    ("이름," + header + ",학과\n가상회원,2026990101,전자공학과\n").getBytes(StandardCharsets.UTF_8)));
+            var xlsx = eligibleMemberService.importRoster(workbookFile(
+                    new String[]{"이름", header, "학과"}, new String[]{"가상신규", "2026990102", "로봇학부"}));
+
+            assertThat(csv.imported()).isEqualTo(1);
+            assertThat(xlsx.imported()).isEqualTo(1);
+            assertThat(eligibleMemberRepository.findByStudentId("2026990101").orElseThrow().getDepartment())
+                    .isEqualTo("전자공학과");
+            assertThat(eligibleMemberRepository.findByStudentId("2026990102").orElseThrow().getDepartment())
+                    .isEqualTo("로봇학부");
+        }
     }
 
     @Test

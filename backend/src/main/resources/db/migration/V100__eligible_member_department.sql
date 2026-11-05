@@ -25,3 +25,23 @@ WHERE e.department IS NULL
       WHERE r.student_id = e.student_id
         AND NULLIF(TRIM(r.department), '') IS NOT NULL
   );
+
+-- Accepted applications are deleted on promotion; use their logs for rows still missing a department.
+UPDATE eligible_members e
+SET department = (
+    SELECT LEFT(TRIM(p.department), 100)
+    FROM recruit_promotion_logs p
+    WHERE p.student_id = e.student_id
+      AND p.decision = 'ACCEPTED'
+      AND NULLIF(TRIM(p.department), '') IS NOT NULL
+    ORDER BY p.promoted_at DESC, p.id DESC
+    LIMIT 1
+)
+WHERE e.department IS NULL
+  AND EXISTS (
+      SELECT 1
+      FROM recruit_promotion_logs p
+      WHERE p.student_id = e.student_id
+        AND p.decision = 'ACCEPTED'
+        AND NULLIF(TRIM(p.department), '') IS NOT NULL
+  );
