@@ -23,7 +23,7 @@ assert.equal(rosterAdmissionYear({ studentId: '', admissionYear: 2021 }), 2021, 
 
 // Made-up people.
 const csv = rosterToCsv([
-  { name: '홍길동', studentId: '2024000002', generation: '58', admissionYear: 2024, phone: '01000000002', initialRole: 'USER', joined: true },
+  { name: '홍길동', studentId: '2024000002', department: '컴퓨터정보공학부', generation: '58', admissionYear: 2024, phone: '01000000002', initialRole: 'USER', joined: true },
   { name: '졸업 "선배"', studentId: null, generation: '53', admissionYear: 2019, phone: '', initialRole: 'USER', joined: false },
   { name: '=HYPERLINK("http://example.com")', studentId: '', generation: 60, admissionYear: null, phone: '-1', initialRole: 'ASSOCIATE' },
   { name: '판정불가', studentId: null, generation: null, admissionYear: null, phone: null, initialRole: 'USER', joined: true },
@@ -32,16 +32,16 @@ const csv = rosterToCsv([
 assert.equal(csv.charCodeAt(0), 0xfeff, 'starts with a byte-order mark so Excel reads the Korean text')
 
 const lines = csv.slice(1).split('\r\n')
-assert.equal(lines[0], '"이름","학번","입학연도","기수","구분","전화번호","가입 여부","가입 시 등급"')
-assert.equal(lines[1], '"홍길동","2024000002","2024","58기","재학생","010-0000-0002","가입","회원"')
+assert.equal(lines[0], '"이름","학번","학부/학과","입학연도","기수","구분","전화번호","가입 여부","가입 시 등급"')
+assert.equal(lines[1], '"홍길동","2024000002","컴퓨터정보공학부","2024","58기","재학생","010-0000-0002","가입","회원"')
 // 학번 없는 졸업생 행: 예전처럼 "재학생" 으로 새지 않는다.
-assert.equal(lines[2], '"졸업 ""선배""","","2019","53기","졸업생","","미가입","회원"')
+assert.equal(lines[2], '"졸업 ""선배""","","","2019","53기","졸업생","","미가입","회원"')
 // 가입 여부를 모르면(회원 목록 로딩 실패) 빈 칸. 수식으로 읽힐 셀은 앞에 '를 붙인다.
-assert.equal(lines[3], `"'=HYPERLINK(""http://example.com"")","","2026","60기","재학생","'-1","","준회원"`)
+assert.equal(lines[3], `"'=HYPERLINK(""http://example.com"")","","","2026","60기","재학생","'-1","","준회원"`)
 
 // 입학연도를 못 구하면 구분을 비워 둔다. 여기를 '재학생' 으로 되돌리면 학번 없는 졸업생이
 // 다시 재학생으로 새어 나가므로, 그 회귀를 이 한 줄이 잡는다.
-assert.equal(lines[4], '"판정불가","","","","","","가입","회원"')
+assert.equal(lines[4], '"판정불가","","","","","","","가입","회원"')
 
 assert.equal(rosterToCsv([], NOW).slice(1).split('\r\n').length, 1, 'an empty roster is a header row only')
 

@@ -9,6 +9,7 @@ import { FIRST_GENERATION_YEAR, displayStudentId } from '../../utils/roleAccess'
 type RosterRow = {
   studentId?: string | null
   name?: string | null
+  department?: string | null
   generation?: string | number | null
   admissionYear?: number | null
   phone?: string | null
@@ -17,7 +18,7 @@ type RosterRow = {
   joined?: boolean
 }
 
-const HEADER = ['이름', '학번', '입학연도', '기수', '구분', '전화번호', '가입 여부', '가입 시 등급']
+const HEADER = ['이름', '학번', '학부/학과', '입학연도', '기수', '구분', '전화번호', '가입 여부', '가입 시 등급']
 
 // Byte-order mark, spelled as a code point so no invisible character sits in this file.
 const BOM = String.fromCharCode(0xfeff)
@@ -58,6 +59,7 @@ export function rosterToCsv(roster: RosterRow[], now = new Date()): string {
     return [
       member.name,
       displayStudentId(member.studentId),
+      member.department ?? '',
       rosterAdmissionYear(member) ?? '',
       member.generation ? `${member.generation}기` : '',
       graduate === null ? '' : graduate ? '졸업생' : '재학생',

@@ -103,10 +103,16 @@ export async function addEligibleMember(payload) {
   })
 }
 
-export async function updateEligibleMember(id, studentId, name, phone, generation) {
+export async function updateEligibleMember(id, studentId, name, phone, generation, department: string) {
   return requestNoContent(`/api/admin/eligible-members/${id}`, {
     method: 'PATCH',
-    body: JSON.stringify({ studentId, name, phone: phone || null, generation: generation || null }),
+    body: JSON.stringify({
+      studentId,
+      name,
+      phone: phone || null,
+      generation: generation || null,
+      department: department ?? '',
+    }),
   })
 }
 

@@ -274,7 +274,9 @@ public class RecruitApplicationService {
                 application.getName(),
                 generation,
                 application.getPhone(),
-                com.coms.backend.domain.Member.Role.ASSOCIATE
+                application.getDepartment(),
+                com.coms.backend.domain.Member.Role.ASSOCIATE,
+                true
         );
 
         RecruitPromotionLog log = new RecruitPromotionLog();
