@@ -20,6 +20,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -236,7 +237,7 @@ class RecruitApplicationServiceTest {
         // 2026 - 1966 = 60기 as the joining cohort, regardless of the studentId year.
         // 합격 이관 행은 준회원(ASSOCIATE)으로 표시되어, 이 학번으로 가입하면 준회원 계정이 만들어진다.
         verify(eligible).addSingle("2026990101", "가상지원자", "60", "01000000000",
-                "소프트웨어학부", com.coms.backend.domain.Member.Role.ASSOCIATE);
+                "소프트웨어학부", com.coms.backend.domain.Member.Role.ASSOCIATE, true);
         ArgumentCaptor<com.coms.backend.domain.RecruitPromotionLog> logCaptor =
                 ArgumentCaptor.forClass(com.coms.backend.domain.RecruitPromotionLog.class);
         verify(promotionLogs).save(logCaptor.capture());
@@ -274,7 +275,7 @@ class RecruitApplicationServiceTest {
         service.updateStatus(1L, new RecruitApplicationStatusUpdateRequest("REJECTED", "면접 불참"), "2026990901");
 
         // 명부에는 손대지 않는다 — 불합격은 이관 대상이 아니다.
-        verify(eligible, never()).addSingle(any(), any(), any(), any(), any(), any());
+        verify(eligible, never()).addSingle(any(), any(), any(), any(), any(), any(), anyBoolean());
 
         ArgumentCaptor<com.coms.backend.domain.RecruitPromotionLog> logCaptor =
                 ArgumentCaptor.forClass(com.coms.backend.domain.RecruitPromotionLog.class);
@@ -368,7 +369,7 @@ class RecruitApplicationServiceTest {
                         assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
 
         // 명부 덮어쓰기·이관 로그·지원서 삭제 모두 일어나지 않아야 한다(트랜잭션 롤백 대상).
-        verify(eligible, never()).addSingle(any(), any(), any(), any(), any(), any());
+        verify(eligible, never()).addSingle(any(), any(), any(), any(), any(), any(), anyBoolean());
         verify(promotionLogs, never()).save(any());
         verify(repository, never()).delete(any(RecruitApplication.class));
     }
@@ -395,7 +396,7 @@ class RecruitApplicationServiceTest {
 
         service.updateStatus(1L, new RecruitApplicationStatusUpdateRequest("REVIEWING", null), "admin");
 
-        verify(eligible, never()).addSingle(any(), any(), any(), any(), any(), any());
+        verify(eligible, never()).addSingle(any(), any(), any(), any(), any(), any(), anyBoolean());
         verify(promotionLogs, never()).save(any());
         verify(repository, never()).delete(any(RecruitApplication.class));
     }

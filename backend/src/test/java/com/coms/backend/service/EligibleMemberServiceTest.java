@@ -321,6 +321,21 @@ class EligibleMemberServiceTest {
     }
 
     @Test
+    void adminAddReplacesExistingDepartment() {
+        eligibleMemberService.addSingle(
+                "2026990101", "가상전", "60", null, "전자공학과", Member.Role.USER);
+
+        // 같은 학번을 관리자가 다른 사람으로 고쳐 넣으면 학부/학과도 새 값이 맞다.
+        eligibleMemberService.addSingle(
+                "2026990101", "가상후", "60", null, "로봇학부", Member.Role.USER);
+        // 학부/학과 칸을 비워 두면 기존 값은 그대로 둔다.
+        eligibleMemberService.addSingle("2026990101", "가상후", "60", null, "   ", Member.Role.USER);
+
+        assertThat(eligibleMemberRepository.findByStudentId("2026990101").orElseThrow().getDepartment())
+                .isEqualTo("로봇학부");
+    }
+
+    @Test
     void promotionFillsOnlyBlankRosterDepartments() {
         eligibleMemberService.addSingle(
                 "2026990101", "가상회원", "60", null, "전자공학과", Member.Role.USER);
@@ -328,11 +343,11 @@ class EligibleMemberServiceTest {
         eligibleMemberRepository.findByStudentId("2026990102").orElseThrow().setDepartment("   ");
 
         eligibleMemberService.addSingle(
-                "2026990101", "가상회원", "60", null, "로봇학부", Member.Role.ASSOCIATE);
+                "2026990101", "가상회원", "60", null, "로봇학부", Member.Role.ASSOCIATE, true);
         eligibleMemberService.addSingle(
-                "2026990102", "가상빈값", "60", null, "  로봇학부  ", Member.Role.ASSOCIATE);
+                "2026990102", "가상빈값", "60", null, "  로봇학부  ", Member.Role.ASSOCIATE, true);
         eligibleMemberService.addSingle(
-                "2026990103", "가상신규", "60", null, "  로봇학부  ", Member.Role.ASSOCIATE);
+                "2026990103", "가상신규", "60", null, "  로봇학부  ", Member.Role.ASSOCIATE, true);
 
         assertThat(eligibleMemberRepository.findByStudentId("2026990101").orElseThrow().getDepartment())
                 .isEqualTo("전자공학과");

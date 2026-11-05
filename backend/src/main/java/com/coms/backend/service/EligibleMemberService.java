@@ -69,8 +69,18 @@ public class EligibleMemberService {
         addSingle(studentId, name, generation, phone, null, initialRole);
     }
 
+    /** 관리자가 직접 넣은 학부/학과는 그 값이 맞는 값이다: 비어 있지 않으면 기존 값을 바꾼다. */
     public void addSingle(String studentId, String name, String generation, String phone,
                           String department, Member.Role initialRole) {
+        addSingle(studentId, name, generation, phone, department, initialRole, false);
+    }
+
+    /**
+     * @param keepExistingDepartment 리크루팅 합격 이관처럼 자동으로 채우는 경로는 true:
+     *                               명부에 이미 적힌 학부/학과를 덮어쓰지 않고 빈 칸만 채운다.
+     */
+    public void addSingle(String studentId, String name, String generation, String phone,
+                          String department, Member.Role initialRole, boolean keepExistingDepartment) {
         String normalized = normalize(studentId);
         if (!STUDENT_ID_PATTERN.matcher(normalized).matches()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "학번은 숫자 10자리여야 합니다.");
@@ -84,7 +94,8 @@ public class EligibleMemberService {
             member.setPhone(normalizedPhone);
         }
         String normalizedDepartment = normalizeDepartment(department);
-        if (normalizedDepartment != null && normalizeDepartment(member.getDepartment()) == null) {
+        if (normalizedDepartment != null
+                && (!keepExistingDepartment || normalizeDepartment(member.getDepartment()) == null)) {
             member.setDepartment(normalizedDepartment);
         }
         eligibleMemberRepository.save(member);
