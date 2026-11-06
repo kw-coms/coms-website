@@ -109,7 +109,18 @@ const gaps = starts.slice(1).map((t, i) => t - starts[i])
 assert.ok(gaps.every((g) => g >= sim.beepInterval(55) && g <= sim.beepInterval(55) + 130), `beep spacing follows map(): ${gaps}`)
 
 // ---- chapter 6: the figures follow the numbers printed in the sketches next to them
-const code = html.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+// plain text of the lesson: walk the markup and keep only what lies outside <...>, then decode the three entities the code blocks use
+const textOf = (markup) => {
+  let out = ''
+  let inTag = false
+  for (const ch of markup) {
+    if (ch === '<') inTag = true
+    else if (ch === '>' && inTag) inTag = false
+    else if (!inTag) out += ch
+  }
+  return out.split('&lt;').join('<').split('&gt;').join('>').split('&amp;').join('&')
+}
+const code = textOf(html)
 const printed = (snippet) => assert.ok(code.includes(snippet), `sketch text changed: ${snippet}`)
 assert.ok(!nets(def('dc-motor'))('bat.plus', 'uno:5V'), 'the motor supply never touches the Arduino 5V pin')
 assert.ok(!nets(def('dc-motor'))('bat.plus', 'uno:GND'))

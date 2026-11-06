@@ -8,7 +8,8 @@
   --line: var(--app-hairline);
   --accent: var(--app-accent);
   --accent-soft: var(--app-accent-soft);
-  --accent-text: #0058b0; /* accent used as TEXT colour: >= 4.5:1 on the light surfaces */
+  /* the site accent (user selectable) used as TEXT colour: darkened so every swatch stays >= 4.5:1 on the light surfaces */
+  --accent-text: color-mix(in srgb, var(--app-accent-text, #0071e3) 60%, #000);
   --html: #b53b0c; /* darker than the brand tints so chips and headings reach 4.5:1 on the light surfaces */
   --css: #2459c4;
   --js: #7a5c00;
@@ -27,7 +28,7 @@
   word-break: keep-all;
 }
 :root[data-theme-mode='dark'] .study-page {
-  --accent-text: #6cb4ff;
+  --accent-text: color-mix(in srgb, var(--app-accent-text, #4da3ff) 70%, #fff); /* lightened for the dark surfaces */
   --html: #ff7a4d;
   --css: #6b9bff;
   --js: #f0c93a;
@@ -445,13 +446,13 @@
   color: #fff;
 }
 .study-page .tabs button[data-lang="html"].on {
-  box-shadow: inset 0 2px 0 var(--html);
+  box-shadow: inset 0 2px 0 #ff7a4d; /* the selected tab sits on the fixed dark bar: always the bright tint */
 }
 .study-page .tabs button[data-lang="css"].on {
-  box-shadow: inset 0 2px 0 var(--css);
+  box-shadow: inset 0 2px 0 #6b9bff;
 }
 .study-page .tabs button[data-lang="js"].on {
-  box-shadow: inset 0 2px 0 var(--js);
+  box-shadow: inset 0 2px 0 #f0c93a;
 }
 .study-page .tools {
   display: flex;
@@ -748,5 +749,8 @@
 /* 한 번에 한 줄씩만 낭독되는 스크린 리더용 영역과, 화면 밖 회로의 자리표시 상자 */
 .study-page .circuit-live { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 .study-page .circuit { position: relative; }
-.study-page .circuit-ph { width: 100%; margin: 54px auto 150px; border-radius: 14px; background: var(--surface-2, rgba(127, 140, 160, .1)); border: 1px solid var(--line); }
+.study-page .circuit-ph { width: 100%; margin: 0 auto var(--ph-x, 240px); border-radius: 14px; background: var(--surface-2, rgba(127, 140, 160, .1)); border: 1px solid var(--line); }
 .study-page .circuit[data-offscreen] .circuit-svg .waves.on circle { animation-play-state: paused; }
+
+.study-page [data-scroll-region]:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+@media (max-width: 520px) { .study-page .circuit-ph { margin-bottom: var(--ph-xm, 400px); } }

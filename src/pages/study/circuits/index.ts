@@ -110,12 +110,16 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
   const setStatus = (s: string) => { if (s !== lastStatus) { lastStatus = s; status.textContent = s } }
   // announce the latest status ~0.5 s after a user action (never from the animation frame loop)
   let announceTimer = 0
-  let lastSaid = ''
+  let lastSaid = lastStatus // the idle instruction is already on screen: do not read it out again on the first click
   const announce = () => {
     window.clearTimeout(announceTimer)
     announceTimer = window.setTimeout(() => { if (lastStatus !== lastSaid) { lastSaid = lastStatus; live.textContent = lastStatus } }, 500)
   }
-  ;(['input', 'click', 'pointerup', 'keyup'] as const).forEach((ev) => fig.addEventListener(ev, announce, { signal }))
+  ;(['input', 'click', 'pointerup'] as const).forEach((ev) => fig.addEventListener(ev, announce, { signal }))
+  // keys: only Enter/Space on things that do not turn them into a click themselves (the drawn push button); Tab, Shift and arrows say nothing
+  fig.addEventListener('keyup', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && !(e.target as Element).closest('button, input, textarea, select, a')) announce()
+  }, { signal })
   cleanups.push(() => window.clearTimeout(announceTimer))
 
   const q = <T extends Element = SVGElement>(sel: string) => svg.querySelector<T>(sel)
@@ -219,15 +223,15 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
 
   if (linked) {
     if (caption) {
-      const hint = h('span', 'circuit-hint', '아래 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.', { id: `${uid}-hint` })
+      const hint = h('span', 'circuit-hint', '위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.', { id: `${uid}-hint` })
       caption.append(hint)
       cleanups.push(() => hint.remove())
     }
     // one tab stop per table (roving tabindex): arrow keys move between the rows
+    if (caption) rows[0]?.closest('table')?.setAttribute('aria-describedby', `${uid}-hint`) // described once, on the table
     const setRowTab = (i: number) => rows.forEach((r, k) => r.setAttribute('tabindex', k === i ? '0' : '-1'))
     rows.forEach((row, i) => {
       row.setAttribute('tabindex', i === 0 ? '0' : '-1')
-      if (caption) row.setAttribute('aria-describedby', `${uid}-hint`)
       row.classList.add('circuit-row')
       row.addEventListener('pointerenter', () => hl(i), { signal })
       row.addEventListener('pointerleave', restoreHl, { signal })
@@ -248,7 +252,7 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
       el.addEventListener('pointerleave', restoreHl, { signal })
     })
     cleanups.push(() => rows.forEach((row) => {
-      row.removeAttribute('tabindex'); row.removeAttribute('aria-describedby')
+      row.removeAttribute('tabindex'); rows[0]?.closest('table')?.removeAttribute('aria-describedby')
       row.classList.remove('circuit-row', 'circuit-row-on', 'circuit-row-current')
     }))
   } else {
@@ -728,6 +732,12 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
   }
 }
 
+/** Height of everything around the drawing (bar, controls, status line, caption hint) per circuit: [wide, narrow (<= 520px)], measured from the mounted figures, so the placeholder reserves the final height. */
+const PLACEHOLDER_EXTRA: Record<string, [number, number]> = {
+  'led-blink': [166, 207], 'button-led': [166, 227], 'pot-led': [199, 287], ultrasonic: [199, 286], servo: [199, 288], buzzer: [166, 210], alarm: [185, 291],
+  'cds-night': [215, 307], 'rgb-led': [241, 504], 'lcd-i2c': [185, 310], dht11: [241, 428], 'dht11-lcd': [227, 430], joystick: [241, 428], 'dc-motor': [210, 348],
+}
+
 /**
  * Registers every circuit figure under `root` and builds each scene only when it nears the viewport (a scene is ~50 KB of
  * SVG, so building all of them at load costs thousands of DOM nodes). Until then a placeholder of the final aspect ratio
@@ -744,20 +754,50 @@ export function mountCircuits(root: HTMLElement): () => void {
         pending.delete(en.target)
       }), { rootMargin: '300px 0px' })
     : null
-  root.querySelectorAll<HTMLElement>('figure.circuit[data-circuit]').forEach((fig) => {
+  const figs = Array.from(root.querySelectorAll<HTMLElement>('figure.circuit[data-circuit]'))
+  // read first, write after: which figures sit wholly above the viewport and how tall they are right now
+  const was = figs.map((f) => { const r = f.getBoundingClientRect(); return { above: r.bottom <= 0, h: r.height } })
+  figs.forEach((fig) => {
     const def = circuitById(fig.getAttribute('data-circuit') || '')
     if (!def) return
-    const mount = () => { ph?.remove(); cleanups.push(mountOne(fig, def)) }
+    const mount = () => {
+      const before = fig.getBoundingClientRect()
+      try {
+        ph?.remove()
+        cleanups.push(mountOne(fig, def))
+      } catch {
+        // a broken scene must not take the others down: put the static figure back and carry on
+        ph?.remove()
+        fig.querySelectorAll(':scope > .circuit-bar, :scope > .circuit-stepper, :scope > .circuit-stage, :scope > .circuit-ctl, :scope > .circuit-status, :scope > .circuit-live').forEach((n) => n.remove())
+        fig.classList.remove('is-live')
+        fig.removeAttribute('data-sim')
+        return
+      }
+      // A figure wholly above the viewport changes height here (placeholder vs real): scroll by the difference so the text being read stays put
+      // (Chrome and Firefox anchor the scroll position themselves, Safari does not).
+      if (before.bottom <= 0) {
+        const delta = fig.getBoundingClientRect().height - before.height
+        if (Math.abs(delta) >= 1) window.scrollBy({ top: delta, left: 0, behavior: 'instant' as ScrollBehavior })
+      }
+    }
     let ph: HTMLElement | null = null
     if (io) {
       ph = h('div', 'circuit-ph', undefined, { 'aria-hidden': 'true' })
       ph.style.aspectRatio = `${def.size[0]} / ${def.size[1]}`
       ph.style.maxWidth = `${Math.round(def.size[0] * 1.12)}px`
+      const extra = PLACEHOLDER_EXTRA[def.id] ?? [190, 350]
+      ph.style.setProperty('--ph-x', `${extra[0]}px`)
+      ph.style.setProperty('--ph-xm', `${extra[1]}px`)
       fig.insertBefore(ph, Array.from(fig.children).find((c) => c.tagName === 'FIGCAPTION') ?? null)
       pending.set(fig, mount)
       io.observe(fig)
     } else mount()
     cleanups.push(() => ph?.remove())
   })
+  // the placeholders were inserted after the browser may already have jumped to a #hash or restored a scroll position:
+  // keep the text on screen where it was
+  let grown = 0
+  figs.forEach((fig, i) => { if (was[i].above) grown += fig.getBoundingClientRect().height - was[i].h })
+  if (Math.abs(grown) >= 1) window.scrollBy({ top: grown, left: 0, behavior: 'instant' as ScrollBehavior })
   return () => { io?.disconnect(); pending.clear(); cleanups.forEach((c) => c()) }
 }

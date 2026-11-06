@@ -4725,6 +4725,80 @@ test.describe('arduino study circuits', () => {
     await expect(fig).toHaveAttribute('data-led', frozen === 'on' ? 'off' : 'on')
   })
 
+  test('text being read stays put while figures above it are built (scroll up, placeholder height mismatch, no browser anchoring)', async ({ page }) => {
+    await page.goto('/study/arduino')
+    await expect(page.locator('.circuit-ph').first()).toBeAttached()
+    // worst case: no native scroll anchoring (Safari) and placeholders that are far from the real height
+    await page.addStyleTag({ content: 'html, body, * { overflow-anchor: none !important; }' })
+    await page.evaluate(() => document.querySelectorAll('.circuit-ph').forEach((el) => { el.style.setProperty('--ph-x', '10px'); el.style.setProperty('--ph-xm', '10px') }))
+    await page.evaluate(() => { document.getElementById('mod-motor').scrollIntoView(); window.scrollBy(0, -150) })
+    await page.waitForTimeout(300)
+    const probe = () => page.evaluate(() => document.getElementById('mod-motor').getBoundingClientRect().top)
+    const start = await probe()
+    for (let i = 1; i <= 8; i += 1) {
+      await page.evaluate(() => window.scrollBy(0, -260))
+      await page.waitForTimeout(250)
+      expect(Math.abs((await probe()) - (start + 260 * i)), `after scroll step ${i}`).toBeLessThanOrEqual(2)
+    }
+    expect(await page.locator('svg.circuit-svg').count()).toBeGreaterThan(0) // figures above really were built during the scroll
+  })
+
+  test('a table-of-contents jump past many placeholders still lands on its heading', async ({ page }) => {
+    await page.goto('/study/arduino')
+    await expect(page.locator('.circuit-ph').first()).toBeAttached()
+    await page.locator('nav.toc a[href="#mod-motor"]').click()
+    const top = () => page.evaluate(() => Math.round(document.getElementById('mod-motor').getBoundingClientRect().top))
+    await expect.poll(top, { timeout: 8000 }).toBeLessThan(160)
+    await page.waitForTimeout(700) // figures near the target are built while it settles
+    const settled = await top()
+    expect(settled).toBeGreaterThan(-2)
+    expect(settled).toBeLessThan(160)
+  })
+
+  test('a resumed sim continues from where it stopped', async ({ page }) => {
+    await page.goto('/study/arduino')
+    const fig = circuit(page, 'led-blink')
+    await fig.scrollIntoViewIfNeeded()
+    await expect(fig).toHaveClass(/is-live/)
+    await fig.getByRole('button', { name: '▶ 시뮬레이션' }).click()
+    await expect(fig).toHaveAttribute('data-led', 'on')
+    await expect(fig).toHaveAttribute('data-led', 'off') // just flipped: about 500 ms of this phase are left
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    await expect(fig).toHaveAttribute('data-offscreen', '')
+    await page.waitForTimeout(1500) // three blink periods pass while it is off screen
+    const wait = page.evaluate(() => new Promise((resolve) => {
+      const el = document.querySelector('figure.circuit[data-circuit="led-blink"]')
+      const t0 = performance.now()
+      const start = el.getAttribute('data-led')
+      const mo = new MutationObserver(() => { if (el.getAttribute('data-led') !== start) { mo.disconnect(); resolve(performance.now() - t0) } })
+      mo.observe(el, { attributes: true, attributeFilter: ['data-led'] })
+    }))
+    await fig.scrollIntoViewIfNeeded()
+    const after = await wait
+    expect(after, 'the next flip is the rest of the interrupted half period').toBeGreaterThan(100)
+    expect(after).toBeLessThan(750)
+  })
+
+  test('leaving the page and coming back leaves no duplicates or leftovers', async ({ page }) => {
+    await page.goto('/study/arduino')
+    for (const id of ['led-blink', 'cds-night']) await circuit(page, id).scrollIntoViewIfNeeded()
+    await expect(circuit(page, 'cds-night')).toHaveClass(/is-live/)
+    await page.getByRole('link', { name: /스터디 목록/ }).click()
+    await expect(page.locator('figure.circuit')).toHaveCount(0)
+    await page.locator('a[href="/study/arduino"]').first().click()
+    await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
+    expect(await page.locator('svg.circuit-svg').count(), 'a fresh page builds nothing until figures are reached').toBe(0)
+    for (const id of ['led-blink', 'cds-night']) await circuit(page, id).scrollIntoViewIfNeeded()
+    await expect(circuit(page, 'cds-night')).toHaveClass(/is-live/)
+    for (const id of ['led-blink', 'cds-night']) await expect(circuit(page, id).locator('svg.circuit-svg')).toHaveCount(1)
+    await expect(page.locator('figure.circuit.is-live')).toHaveCount(await page.locator('svg.circuit-svg').count())
+    // unmounting restores the static page: nothing left behind on the table rows or the figures
+    await page.getByRole('link', { name: /스터디 목록/ }).click()
+    await page.locator('a[href="/study/arduino"]').first().click()
+    await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
+    expect(await page.locator('tr[tabindex], [data-offscreen], .circuit-live, figure.circuit.is-live').count()).toBe(0)
+  })
+
   test('a table has one tab stop and arrow keys move between its rows', async ({ page }) => {
     await page.goto('/study/arduino')
     const fig = circuit(page, 'pot-led')
