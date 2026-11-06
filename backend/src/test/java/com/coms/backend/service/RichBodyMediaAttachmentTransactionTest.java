@@ -250,8 +250,9 @@ class RichBodyMediaAttachmentTransactionTest {
     @Test
     void noticeDeleteRecordsActor() {
         long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
-        long mediaId = uploadedBy(actorId, RichBodyMedia.Scope.NOTICE);
-        long id = notices.create(ACTOR, new NoticeRequest("t", body(mediaId), null, false, "GENERAL")).id();
+        Member author = otherMember();
+        long mediaId = uploadedBy(author.getId(), RichBodyMedia.Scope.NOTICE);
+        long id = notices.create(author.getStudentId(), new NoticeRequest("t", body(mediaId), null, false, "GENERAL")).id();
 
         notices.delete(ACTOR, id);
 
@@ -273,8 +274,9 @@ class RichBodyMediaAttachmentTransactionTest {
     @Test
     void archiveEditOutRecordsActor() throws Exception {
         long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
-        long mediaId = uploadedBy(actorId, RichBodyMedia.Scope.ARCHIVE);
-        long id = archives.upload("t", body(mediaId), pdf(), ACTOR).id();
+        Member author = otherMember();
+        long mediaId = uploadedBy(author.getId(), RichBodyMedia.Scope.ARCHIVE);
+        long id = archives.upload("t", body(mediaId), pdf(), author.getStudentId()).id();
 
         archives.update(ACTOR, id, "t", "[]", "GENERAL", null);
 
@@ -284,8 +286,9 @@ class RichBodyMediaAttachmentTransactionTest {
     @Test
     void archiveDeleteRecordsActor() throws Exception {
         long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
-        long mediaId = uploadedBy(actorId, RichBodyMedia.Scope.ARCHIVE);
-        long id = archives.upload("t", body(mediaId), pdf(), ACTOR).id();
+        Member author = otherMember();
+        long mediaId = uploadedBy(author.getId(), RichBodyMedia.Scope.ARCHIVE);
+        long id = archives.upload("t", body(mediaId), pdf(), author.getStudentId()).id();
         var auth = new org.springframework.security.authentication.TestingAuthenticationToken(
                 ACTOR, "n/a", "ROLE_ADMIN");
         org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
@@ -301,8 +304,9 @@ class RichBodyMediaAttachmentTransactionTest {
     @Test
     void sponsorSettingsSaveRecordsActor() {
         long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
-        long mediaId = uploadedBy(actorId, RichBodyMedia.Scope.SPONSOR);
-        sponsors.saveSettings(Map.of("introHtml", body(mediaId)), ACTOR);
+        Member author = otherMember();
+        long mediaId = uploadedBy(author.getId(), RichBodyMedia.Scope.SPONSOR);
+        sponsors.saveSettings(Map.of("introHtml", body(mediaId)), author.getStudentId());
 
         sponsors.saveSettings(Map.of("introHtml", "[]"), ACTOR);
 

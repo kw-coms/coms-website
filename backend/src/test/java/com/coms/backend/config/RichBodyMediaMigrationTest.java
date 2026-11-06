@@ -110,6 +110,16 @@ class RichBodyMediaMigrationTest {
                 while (columns.next()) count++;
                 assertThat(count).isEqualTo(14);
             }
+            boolean detachedByIndexed = false;
+            try (var indexes = connection.getMetaData().getIndexInfo(null, null, "RICH_BODY_MEDIA", false, false)) {
+                while (indexes.next()) {
+                    if ("IDX_RICH_BODY_MEDIA_DETACHED_BY".equalsIgnoreCase(indexes.getString("INDEX_NAME"))
+                            && "DETACHED_BY_ID".equalsIgnoreCase(indexes.getString("COLUMN_NAME"))) {
+                        detachedByIndexed = true;
+                    }
+                }
+            }
+            assertThat(detachedByIndexed).isTrue();
         }
 
         var registry = new StandardServiceRegistryBuilder()
