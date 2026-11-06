@@ -444,6 +444,8 @@ export const navExtraItems = [
 ]
 
 // Two columns in the Activity menu: what the club did and when, and the tools members use.
+// Keep activitySectionNavItems ordered group by group: the home tools row lists the same flat
+// array and must read in the same order as the menu.
 export const activityNavGroups = [
   { id: 'records', label: '기록·일정' },
   { id: 'tools', label: '참여 도구' },
@@ -467,6 +469,15 @@ export const activitySectionNavItems = [
     path: '/monthly-calendar',
     icon: CalendarDays,
     accent: 'text-sky-500',
+  },
+  {
+    id: 'activity-events',
+    group: 'records',
+    label: 'Events',
+    hint: '회지·인기투표',
+    path: '/activity-events',
+    icon: Rocket,
+    accent: 'text-violet-500',
   },
   {
     id: 'gatherings',
@@ -494,15 +505,6 @@ export const activitySectionNavItems = [
     path: '/attendance',
     icon: ClipboardCheck,
     accent: 'text-sky-500',
-  },
-  {
-    id: 'activity-events',
-    group: 'records',
-    label: 'Events',
-    hint: '회지·인기투표',
-    path: '/activity-events',
-    icon: Rocket,
-    accent: 'text-violet-500',
   },
   {
     id: 'draw',
