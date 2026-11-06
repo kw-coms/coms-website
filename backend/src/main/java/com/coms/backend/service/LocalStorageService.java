@@ -78,22 +78,25 @@ public class LocalStorageService implements StorageService {
 
     @Override
     public String store(MultipartFile file) throws IOException {
-        String extension = StringUtils.getFilenameExtension(cleanOriginalFilename(file));
-        return store(file, extension != null && extension.matches("[A-Za-z0-9]{1,10}") ? extension : "bin");
+        return storeRaw(file, null);
     }
 
     @Override
     public String store(MultipartFile file, String extension) throws IOException {
+        if (extension == null || !extension.matches("[A-Za-z0-9]{1,10}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid file extension.");
+        }
+        return storeRaw(file, extension);
+    }
+
+    private String storeRaw(MultipartFile file, String extension) throws IOException {
         String originalName = cleanOriginalFilename(file);
         if (file.isEmpty() || originalName.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File is empty or missing a filename.");
         }
-        if (extension == null || !extension.matches("[A-Za-z0-9]{1,10}")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid file extension.");
-        }
         ensureRoomFor(file.getSize());
 
-        String stored = UUID.randomUUID() + "." + extension.toLowerCase(java.util.Locale.ROOT);
+        String stored = UUID.randomUUID() + (extension == null ? "_" + originalName : "." + extension.toLowerCase(java.util.Locale.ROOT));
         Path destination = root.resolve(stored).normalize();
         if (!destination.startsWith(root)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid filename.");
@@ -116,6 +119,18 @@ public class LocalStorageService implements StorageService {
 
     @Override
     public String storeImage(MultipartFile file, String contentType) throws IOException {
+        return storeImageInternal(file, contentType, null);
+    }
+
+    @Override
+    public String storeImage(MultipartFile file, String contentType, String extension) throws IOException {
+        if (extension == null || !extension.matches("[A-Za-z0-9]{1,10}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid file extension.");
+        }
+        return storeImageInternal(file, contentType, extension);
+    }
+
+    private String storeImageInternal(MultipartFile file, String contentType, String extension) throws IOException {
         String originalName = cleanOriginalFilename(file);
         if (file.isEmpty() || originalName.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File is empty or missing a filename.");
@@ -132,10 +147,10 @@ public class LocalStorageService implements StorageService {
             // ImageIO has no safe re-encoder for this format (GIF) so metadata cannot be
             // stripped here; the raw bytes are stored as-is. Callers requiring the stripping
             // guarantee must restrict uploads to JPEG/PNG/WebP at the API layer.
-            return store(file, MediaUploadValidator.canonicalExtension(contentType));
+            return extension == null ? store(file) : store(file, extension);
         }
 
-        String stored = UUID.randomUUID() + "." + MediaUploadValidator.canonicalExtension(contentType);
+        String stored = UUID.randomUUID() + (extension == null ? "_" + originalName : "." + extension.toLowerCase(java.util.Locale.ROOT));
         Path destination = root.resolve(stored).normalize();
         if (!destination.startsWith(root)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid filename.");

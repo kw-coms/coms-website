@@ -34,10 +34,28 @@ class LocalStorageServiceTest {
         var file = new MockMultipartFile("image", longName, "image/gif", "GIF89a".getBytes(StandardCharsets.US_ASCII));
         var storage = new LocalStorageService(uploads.toString());
 
-        String stored = storage.storeImage(file, "image/gif");
+        String stored = storage.storeImage(file, "image/gif", "gif");
 
         assertThat(stored).matches("[0-9a-f-]{36}\\.gif");
         assertThat(Files.readAllBytes(uploads.resolve(stored))).isEqualTo(file.getBytes());
+    }
+
+    @Test
+    void sharedStoreKeepsOriginalFilename() throws Exception {
+        var file = new MockMultipartFile("file", "archive.pdf", "application/pdf", new byte[]{1});
+        String stored = new LocalStorageService(uploads.toString()).store(file);
+        assertThat(stored).matches("[0-9a-f-]{36}_archive\\.pdf");
+    }
+
+    @Test
+    void sharedImageStoreAcceptsMissingOrUnlistedContentType() throws Exception {
+        var storage = new LocalStorageService(uploads.toString());
+        for (String type : new String[]{null, "application/octet-stream"}) {
+            var file = new MockMultipartFile("image", "legacy.gif", type, "GIF89a".getBytes(StandardCharsets.US_ASCII));
+            String stored = storage.storeImage(file, type);
+            assertThat(stored).matches("[0-9a-f-]{36}_legacy\\.gif");
+            assertThat(Files.readAllBytes(uploads.resolve(stored))).isEqualTo(file.getBytes());
+        }
     }
 
     @Test

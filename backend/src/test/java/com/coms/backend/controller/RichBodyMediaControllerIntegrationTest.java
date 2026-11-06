@@ -186,9 +186,11 @@ class RichBodyMediaControllerIntegrationTest {
         }
     }
 
-    @Test void sponsorAuthorizationRunsBeforeRequiredMultipartBinding() throws Exception {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"2026000101", "2026000102"})
+    void sponsorAuthorizationRunsBeforeRequiredMultipartBinding(String studentId) throws Exception {
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/rich-media/sponsor/images")
-                        .cookie(member).header("Origin", ORIGIN).contentType("application/json").content("{}"))
+                        .cookie(cookie(studentId)).header("Origin", ORIGIN).contentType("application/json").content("{}"))
                 .andExpect(status().isForbidden());
     }
 

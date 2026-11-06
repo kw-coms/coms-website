@@ -38,6 +38,6 @@ class RichBodyMediaDeleter {
 
     private void deleteBestEffort(String storedName) {
         try { storage.delete(storedName); }
-        catch (RuntimeException e) { log.warn("Could not delete orphan rich media file {}", storedName, e); }
+        catch (RuntimeException e) { log.error("Could not delete orphan rich media file {}", storedName, e); }
     }
 }

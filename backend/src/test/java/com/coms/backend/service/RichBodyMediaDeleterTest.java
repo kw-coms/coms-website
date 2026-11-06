@@ -62,6 +62,30 @@ class RichBodyMediaDeleterTest {
         }
     }
 
+    @Test void failedAfterCommitDeleteLogsStoredNameAtError() {
+        var old = media(6L, cutoff.minusSeconds(1));
+        when(repository.findLockedById(6L)).thenReturn(Optional.of(old));
+        doThrow(new IllegalStateException("disk unavailable")).when(storage).delete("stored-6");
+        var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(RichBodyMediaDeleter.class);
+        var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>();
+        appender.start();
+        logger.addAppender(appender);
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            assertThat(deleter.deleteIfStillOrphan(6L, cutoff)).isTrue();
+            verifyNoInteractions(storage);
+            TransactionSynchronizationManager.getSynchronizations().forEach(sync -> sync.afterCommit());
+            assertThat(appender.list).singleElement().satisfies(event -> {
+                assertThat(event.getLevel()).isEqualTo(ch.qos.logback.classic.Level.ERROR);
+                assertThat(event.getFormattedMessage()).contains("stored-6");
+            });
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
     private RichBodyMedia media(Long id, LocalDateTime createdAt) {
         var row = new RichBodyMedia(RichBodyMedia.Kind.FILE, RichBodyMedia.Scope.ARCHIVE,
                 "stored-" + id, "original.pdf", "application/pdf", 1, 7L);

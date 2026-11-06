@@ -20,6 +20,9 @@ public interface StorageService {
      */
     String storeImage(MultipartFile file, String contentType) throws IOException;
 
+    /** Store a validated rich-body image with a canonical extension. */
+    String storeImage(MultipartFile file, String contentType, String extension) throws IOException;
+
     Resource load(String storedName);
     void delete(String storedName);
 }

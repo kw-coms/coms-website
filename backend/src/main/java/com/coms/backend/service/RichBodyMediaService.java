@@ -9,7 +9,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -34,11 +36,14 @@ public class RichBodyMediaService {
     private final MediaUploadValidator validator;
     private final Clock clock;
     private final RichBodyMediaDeleter deleter;
+    private final TransactionTemplate uploadTransaction;
 
     public RichBodyMediaService(RichBodyMediaRepository repository, MemberRepository members,
-                                StorageService storage, MediaUploadValidator validator, Clock clock, RichBodyMediaDeleter deleter) {
+                                StorageService storage, MediaUploadValidator validator, Clock clock, RichBodyMediaDeleter deleter,
+                                PlatformTransactionManager transactionManager) {
         this.repository = repository; this.members = members; this.storage = storage;
         this.validator = validator; this.clock = clock; this.deleter = deleter;
+        this.uploadTransaction = new TransactionTemplate(transactionManager);
     }
 
     public static RichBodyMedia.Scope parseScope(String raw) {
@@ -48,17 +53,9 @@ public class RichBodyMediaService {
         }
     }
 
-    @Transactional
     public RichBodyMedia upload(RichBodyMedia.Scope scope, RichBodyMedia.Kind kind, MultipartFile file, String studentId) {
         if (file == null || file.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일을 선택해주세요.");
         var member = members.findByStudentId(studentId).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        // Serialize quota checks and inserts for the same uploader, including administrators.
-        members.findWithLockById(member.getId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-        if (repository.countByUploaderIdAndOwnerIdIsNull(member.getId()) >= MAX_PENDING_COUNT
-                || repository.sumPendingBytes(member.getId()) > MAX_PENDING_BYTES - file.getSize()) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
-                    "저장하지 않은 업로드가 너무 많습니다. 글을 저장하거나 잠시 후 다시 시도해 주세요.");
-        }
         String type = switch (kind) {
             case IMAGE -> validator.validateImage(file);
             case VIDEO -> validator.validateVideo(file);
@@ -76,9 +73,20 @@ public class RichBodyMediaService {
             if (original.length() > 255) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일 이름이 너무 깁니다.");
         }
         try {
-            String stored = kind == RichBodyMedia.Kind.IMAGE ? storage.storeImage(file, type) : storage.store(file, extension);
-            try { return repository.saveAndFlush(new RichBodyMedia(kind, scope, stored, original, type, file.getSize(), member.getId())); }
-            catch (RuntimeException e) { storage.delete(stored); throw e; }
+            String stored = kind == RichBodyMedia.Kind.IMAGE ? storage.storeImage(file, type, extension) : storage.store(file, extension);
+            RichBodyMedia media = new RichBodyMedia(kind, scope, stored, original, type, file.getSize(), member.getId());
+            try {
+                // Only quota check + insert hold the member lock shared with login/refresh.
+                return uploadTransaction.execute(status -> {
+                    members.findWithLockById(member.getId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+                    if (repository.countByUploaderIdAndOwnerIdIsNull(member.getId()) >= MAX_PENDING_COUNT
+                            || repository.sumPendingBytes(member.getId()) > MAX_PENDING_BYTES - file.getSize()) {
+                        throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                                "저장하지 않은 업로드가 너무 많습니다. 글을 저장하거나 잠시 후 다시 시도해 주세요.");
+                    }
+                    return repository.saveAndFlush(media);
+                });
+            } catch (RuntimeException e) { storage.delete(stored); throw e; }
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장에 실패했습니다.");
         }
@@ -107,7 +115,7 @@ public class RichBodyMediaService {
         Set<Long> referenced = references.keySet();
         var actor = actorStudentId == null || references.isEmpty() ? null
                 : members.findByStudentId(actorStudentId).orElse(null);
-        for (var reference : references.entrySet()) {
+        for (var reference : references.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList()) {
             RichBodyMedia row = repository.findLockedById(reference.getKey()).orElseThrow(RichBodyMediaService::invalidAttachment);
             if (row.getScope() != scope || row.getKind() != reference.getValue()) throw invalidAttachment();
             if (ownerId.equals(row.getOwnerId())) continue;
