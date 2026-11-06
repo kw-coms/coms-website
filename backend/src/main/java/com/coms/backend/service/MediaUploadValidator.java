@@ -18,13 +18,18 @@ public class MediaUploadValidator {
     public static final int MAX_BODY_VIDEOS = 3;
     public static final int MAX_BODY_FILES = 10;
     public static final int MAX_BODY_MEDIA_BLOCKS = 200;
-    public static final long MAX_PENDING_BYTES = 500 * MB;
-    public static final int MAX_PENDING_COUNT = 30;
+    static final long MAX_IMAGE_BYTES = 5 * MB;
+    static final long MAX_VIDEO_BYTES = 100 * MB;
+    static final long MAX_FILE_BYTES = 50 * MB;
+    private static final int PENDING_BODY_SLOTS = 2;
+    public static final long MAX_PENDING_BYTES = PENDING_BODY_SLOTS * (MAX_BODY_IMAGES * MAX_IMAGE_BYTES
+            + MAX_BODY_VIDEOS * MAX_VIDEO_BYTES + MAX_BODY_FILES * MAX_FILE_BYTES);
+    public static final int MAX_PENDING_COUNT = PENDING_BODY_SLOTS * (MAX_BODY_IMAGES + MAX_BODY_VIDEOS + MAX_BODY_FILES);
     private static final Set<String> IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
     private static final Set<String> VIDEO_TYPES = Set.of("video/mp4", "video/webm", "video/quicktime");
 
     public String validateImage(MultipartFile file) {
-        requireFile(file, 5 * MB, "이미지는 5MB 이하만 업로드할 수 있습니다.");
+        requireFile(file, MAX_IMAGE_BYTES, "이미지는 5MB 이하만 업로드할 수 있습니다.");
         String type = file.getContentType();
         if (type == null || !IMAGE_TYPES.contains(type)) {
             throw badRequest("JPG, PNG, GIF, WebP 이미지만 업로드할 수 있습니다.");
@@ -37,7 +42,7 @@ public class MediaUploadValidator {
     }
 
     public String validateVideo(MultipartFile file) {
-        requireFile(file, 100 * MB, "영상은 100MB 이하만 업로드할 수 있습니다.");
+        requireFile(file, MAX_VIDEO_BYTES, "영상은 100MB 이하만 업로드할 수 있습니다.");
         String type = file.getContentType();
         if (type == null || !VIDEO_TYPES.contains(type)) {
             throw badRequest("MP4, WebM, MOV 영상만 업로드할 수 있습니다.");
@@ -49,7 +54,7 @@ public class MediaUploadValidator {
     }
 
     public String validateFile(MultipartFile file) {
-        requireFile(file, 50 * MB, "첨부파일은 50MB 이하만 업로드할 수 있습니다.");
+        requireFile(file, MAX_FILE_BYTES, "첨부파일은 50MB 이하만 업로드할 수 있습니다.");
         String extension = StringUtils.getFilenameExtension(cleanOriginalFilename(file));
         if (extension == null || !ArchiveService.ALLOWED_EXTENSIONS.contains(extension.toLowerCase(Locale.ROOT))) {
             throw badRequest("허용되지 않는 자료실 파일 확장자입니다.");

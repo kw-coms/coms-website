@@ -11,6 +11,20 @@ class MediaUploadValidatorTest {
     private final MediaUploadValidator validator = new MediaUploadValidator();
 
     @Test
+    void pendingQuotaFitsMaximalBodyWithOneMoreBodyOfHeadroom() {
+        int bodyCount = MediaUploadValidator.MAX_BODY_IMAGES + MediaUploadValidator.MAX_BODY_VIDEOS
+                + MediaUploadValidator.MAX_BODY_FILES;
+        long bodyBytes = MediaUploadValidator.MAX_BODY_IMAGES * MediaUploadValidator.MAX_IMAGE_BYTES
+                + MediaUploadValidator.MAX_BODY_VIDEOS * MediaUploadValidator.MAX_VIDEO_BYTES
+                + MediaUploadValidator.MAX_BODY_FILES * MediaUploadValidator.MAX_FILE_BYTES;
+
+        assertThat(MediaUploadValidator.MAX_PENDING_COUNT).isEqualTo(2 * bodyCount);
+        assertThat(MediaUploadValidator.MAX_PENDING_BYTES).isEqualTo(2 * bodyBytes);
+        assertThat(bodyCount).isEqualTo(33);
+        assertThat(bodyBytes).isEqualTo(900L * 1024 * 1024);
+    }
+
+    @Test
     void validatesImageSignatureAndRejectsDeclaredMismatch() {
         assertThat(validator.validateImage(file("a.gif", "image/gif", "GIF89a"))).isEqualTo("image/gif");
         assertThatThrownBy(() -> validator.validateImage(file("a.png", "image/png", "%PDF")))

@@ -9,8 +9,10 @@ CREATE TABLE rich_body_media (
     uploader_id BIGINT REFERENCES members(id) ON DELETE SET NULL,
     owner_id BIGINT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    attached_at TIMESTAMP
+    attached_at TIMESTAMP,
+    detached_at TIMESTAMP
 );
 CREATE INDEX idx_rich_body_media_orphans ON rich_body_media(owner_id, created_at);
+CREATE INDEX idx_rich_body_media_detached ON rich_body_media(owner_id, detached_at);
 CREATE INDEX idx_rich_body_media_owner ON rich_body_media(scope, owner_id);
 CREATE INDEX idx_rich_body_media_uploader ON rich_body_media(uploader_id);

@@ -10,7 +10,14 @@ import java.util.Optional;
 
 public interface RichBodyMediaRepository extends JpaRepository<RichBodyMedia, Long> {
     List<RichBodyMedia> findByScopeAndOwnerId(RichBodyMedia.Scope scope, Long ownerId);
-    List<RichBodyMedia> findByOwnerIdIsNullAndCreatedAtBefore(LocalDateTime cutoff);
+    @org.springframework.data.jpa.repository.Query("""
+            select m from RichBodyMedia m where m.ownerId is null and (
+                (m.detachedAt is null and m.attachedAt is null and m.createdAt < :pendingCutoff)
+                or m.detachedAt < :detachedCutoff)
+            """)
+    List<RichBodyMedia> findOrphansOlderThan(
+            @org.springframework.data.repository.query.Param("pendingCutoff") LocalDateTime pendingCutoff,
+            @org.springframework.data.repository.query.Param("detachedCutoff") LocalDateTime detachedCutoff);
     long countByUploaderIdAndOwnerIdIsNull(Long uploaderId);
     @org.springframework.data.jpa.repository.Query("select coalesce(sum(m.sizeBytes), 0) from RichBodyMedia m where m.uploaderId = :uploaderId and m.ownerId is null")
     long sumPendingBytes(@org.springframework.data.repository.query.Param("uploaderId") Long uploaderId);

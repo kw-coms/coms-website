@@ -19,11 +19,15 @@ class RichBodyMediaDeleter {
         this.repository = repository; this.storage = storage;
     }
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public boolean deleteIfStillOrphan(Long id, LocalDateTime cutoff) {
+    public boolean deleteIfStillOrphan(Long id, LocalDateTime pendingCutoff, LocalDateTime detachedCutoff) {
         var locked = repository.findLockedById(id);
         if (locked.isEmpty()) return false;
         RichBodyMedia row = locked.get();
-        if (row.getOwnerId() != null || !row.getCreatedAt().isBefore(cutoff)) return false;
+        if (row.getOwnerId() != null) return false;
+        boolean expired = row.getDetachedAt() != null
+                ? row.getDetachedAt().isBefore(detachedCutoff)
+                : row.getAttachedAt() == null && row.getCreatedAt().isBefore(pendingCutoff);
+        if (!expired) return false;
         repository.delete(row);
         String storedName = row.getStoredName();
         if (TransactionSynchronizationManager.isSynchronizationActive()) {

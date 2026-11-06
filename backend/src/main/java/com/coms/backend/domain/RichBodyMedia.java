@@ -31,6 +31,8 @@ public class RichBodyMedia {
     private LocalDateTime createdAt = LocalDateTime.now();
     @Column(name = "attached_at")
     private LocalDateTime attachedAt;
+    @Column(name = "detached_at")
+    private LocalDateTime detachedAt;
 
     protected RichBodyMedia() {}
     public RichBodyMedia(Kind kind, Scope scope, String storedName, String originalName, String contentType, long sizeBytes, Long uploaderId) {
@@ -48,6 +50,11 @@ public class RichBodyMedia {
     public Long getOwnerId() { return ownerId; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getAttachedAt() { return attachedAt; }
-    public void attach(Long ownerId, LocalDateTime now) { this.ownerId = ownerId; this.attachedAt = now; }
-    public void detach() { this.ownerId = null; this.attachedAt = null; }
+    public LocalDateTime getDetachedAt() { return detachedAt; }
+    public void attach(Long ownerId, LocalDateTime now) {
+        this.ownerId = ownerId; this.attachedAt = now; this.detachedAt = null;
+    }
+    public void detach(LocalDateTime now) {
+        this.ownerId = null; this.attachedAt = null; this.detachedAt = now;
+    }
 }

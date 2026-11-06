@@ -63,7 +63,7 @@ public class RichBodyMediaService {
             case FILE -> validator.validateFile(file);
         };
         String original = MediaUploadValidator.cleanOriginalFilename(file).trim();
-        if (original.isBlank() || original.length() > 255 || original.contains("..")) {
+        if (original.isBlank() || original.length() > 255) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바른 파일 이름이 필요합니다.");
         }
         String extension = kind == RichBodyMedia.Kind.FILE
@@ -141,7 +141,7 @@ public class RichBodyMediaService {
         }
         for (RichBodyMedia row : repository.findByScopeAndOwnerId(scope, ownerId).stream()
                 .sorted(Comparator.comparing(RichBodyMedia::getId)).toList()) {
-            if (!referenced.contains(row.getId())) row.detach();
+            if (!referenced.contains(row.getId())) row.detach(LocalDateTime.now(clock));
         }
     }
 
@@ -191,14 +191,15 @@ public class RichBodyMediaService {
 
     @Transactional
     public void detachAttachments(RichBodyMedia.Scope scope, Long ownerId) {
-        for (RichBodyMedia row : repository.findByScopeAndOwnerId(scope, ownerId)) row.detach();
+        for (RichBodyMedia row : repository.findByScopeAndOwnerId(scope, ownerId)) row.detach(LocalDateTime.now(clock));
     }
 
     public int deleteOrphanedOlderThan(LocalDateTime cutoff) {
         int removed = 0;
-        for (RichBodyMedia candidate : repository.findByOwnerIdIsNullAndCreatedAtBefore(cutoff)) {
+        LocalDateTime detachedCutoff = LocalDateTime.now(clock).minusHours(24);
+        for (RichBodyMedia candidate : repository.findOrphansOlderThan(cutoff, detachedCutoff)) {
             try {
-                if (deleter.deleteIfStillOrphan(candidate.getId(), cutoff)) removed++;
+                if (deleter.deleteIfStillOrphan(candidate.getId(), cutoff, detachedCutoff)) removed++;
             } catch (RuntimeException e) {
                 log.warn("Could not purge orphan rich media {}", candidate.getId(), e);
             }

@@ -86,7 +86,7 @@ class RichBodyMediaMigrationTest {
             try (var columns = connection.getMetaData().getColumns(null, null, "RICH_BODY_MEDIA", null)) {
                 int count = 0;
                 while (columns.next()) count++;
-                assertThat(count).isEqualTo(11);
+                assertThat(count).isEqualTo(12);
             }
         }
 

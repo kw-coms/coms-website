@@ -15,8 +15,10 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,6 +39,7 @@ class RichBodyMediaAttachmentTransactionTest {
     @Autowired SponsorService sponsors;
     @Autowired NoticeRepository noticeRows;
     @Autowired RichBodyMediaRepository mediaRows;
+    @Autowired RichBodyMediaService richMedia;
     @Autowired ArchiveFileRepository archiveRows;
     @Autowired SponsorPageSettingsRepository settingsRows;
     @Autowired MemberRepository members;
@@ -84,6 +87,69 @@ class RichBodyMediaAttachmentTransactionTest {
                 new NoticeRequest("변경", INVALID_BODY, null, false, "GENERAL")));
 
         assertThat(noticeRows.count()).isEqualTo(before);
+    }
+
+    @Test
+    void recentlyDetachedOldUploadSurvivesPurge() {
+        var row = oldAttachedMedia();
+        richMedia.syncAttachments(RichBodyMedia.Scope.NOTICE, row.getOwnerId(), "[]", ACTOR);
+
+        richMedia.deleteOrphanedOlderThan(LocalDateTime.now().minusHours(24));
+
+        var stored = mediaRows.findById(row.getId()).orElseThrow();
+        assertThat(stored.getOwnerId()).isNull();
+        assertThat(stored.getDetachedAt()).isAfter(LocalDateTime.now().minusMinutes(1));
+    }
+
+    @Test
+    void detachedForOver24HoursIsPurgedEvenWithLongerPendingThreshold() {
+        var row = oldAttachedMedia();
+        row.detach(LocalDateTime.now().minusHours(25));
+        mediaRows.saveAndFlush(row);
+
+        richMedia.deleteOrphanedOlderThan(LocalDateTime.now().minusHours(48));
+
+        assertThat(mediaRows.findById(row.getId())).isEmpty();
+    }
+
+    @Test
+    void reattachmentPersistsClearedDetachmentTimestampAndSurvivesPurge() {
+        var row = oldAttachedMedia();
+        long ownerId = row.getOwnerId();
+        row.detach(LocalDateTime.now().minusHours(25));
+        mediaRows.saveAndFlush(row);
+        assertThat(mediaRows.findById(row.getId()).orElseThrow().getDetachedAt()).isNotNull();
+
+        richMedia.syncAttachments(RichBodyMedia.Scope.NOTICE, ownerId,
+                "[{\"type\":\"image\",\"mediaId\":" + row.getId() + "}]", ACTOR);
+        richMedia.deleteOrphanedOlderThan(LocalDateTime.now().minusHours(24));
+
+        var stored = mediaRows.findById(row.getId()).orElseThrow();
+        assertThat(stored.getOwnerId()).isEqualTo(ownerId);
+        assertThat(stored.getDetachedAt()).isNull();
+    }
+
+    @Test
+    void onlyExpiredNeverAttachedUploadsArePurged() {
+        long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
+        var old = media(RichBodyMedia.Kind.IMAGE, RichBodyMedia.Scope.NOTICE, actorId);
+        ReflectionTestUtils.setField(old, "createdAt", LocalDateTime.now().minusHours(49));
+        old = mediaRows.saveAndFlush(old);
+        var recent = mediaRows.saveAndFlush(media(RichBodyMedia.Kind.IMAGE, RichBodyMedia.Scope.NOTICE, actorId));
+
+        richMedia.deleteOrphanedOlderThan(LocalDateTime.now().minusHours(48));
+
+        assertThat(mediaRows.findById(old.getId())).isEmpty();
+        assertThat(mediaRows.findById(recent.getId())).isPresent();
+    }
+
+    private RichBodyMedia oldAttachedMedia() {
+        long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
+        var row = media(RichBodyMedia.Kind.IMAGE, RichBodyMedia.Scope.NOTICE, actorId);
+        ReflectionTestUtils.setField(row, "createdAt", LocalDateTime.now().minusDays(30));
+        row = mediaRows.saveAndFlush(row);
+        row.attach(row.getId(), LocalDateTime.now().minusDays(29));
+        return mediaRows.saveAndFlush(row);
     }
 
     @Test

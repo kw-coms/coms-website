@@ -25,9 +25,9 @@ class RichBodyMediaDeleterTest {
         when(repository.findLockedById(2L)).thenReturn(Optional.of(recent));
         when(repository.findLockedById(3L)).thenReturn(Optional.of(attached));
 
-        assertThat(deleter.deleteIfStillOrphan(1L, cutoff)).isTrue();
-        assertThat(deleter.deleteIfStillOrphan(2L, cutoff)).isFalse();
-        assertThat(deleter.deleteIfStillOrphan(3L, cutoff)).isFalse();
+        assertThat(deleter.deleteIfStillOrphan(1L, cutoff, cutoff)).isTrue();
+        assertThat(deleter.deleteIfStillOrphan(2L, cutoff, cutoff)).isFalse();
+        assertThat(deleter.deleteIfStillOrphan(3L, cutoff, cutoff)).isFalse();
         verify(storage).delete("stored-1");
         verify(repository).delete(old);
         verify(storage, never()).delete("stored-2");
@@ -39,7 +39,7 @@ class RichBodyMediaDeleterTest {
         when(repository.findLockedById(4L)).thenReturn(Optional.of(old));
         TransactionSynchronizationManager.initSynchronization();
         try {
-            assertThat(deleter.deleteIfStillOrphan(4L, cutoff)).isTrue();
+            assertThat(deleter.deleteIfStillOrphan(4L, cutoff, cutoff)).isTrue();
             verify(repository).delete(old);
             verify(storage, never()).delete(anyString());
             TransactionSynchronizationManager.getSynchronizations().forEach(sync -> sync.afterCommit());
@@ -49,12 +49,49 @@ class RichBodyMediaDeleterTest {
         }
     }
 
+    @Test void rechecksDetachmentAgeUnderLock() {
+        var recent = media(7L, cutoff.minusDays(30));
+        recent.attach(99L, cutoff.minusDays(29));
+        recent.detach(cutoff.plusHours(23));
+        var expired = media(8L, cutoff.minusDays(30));
+        expired.attach(99L, cutoff.minusDays(29));
+        expired.detach(cutoff.minusSeconds(1));
+        var boundary = media(9L, cutoff.minusDays(30));
+        boundary.attach(99L, cutoff.minusDays(29));
+        boundary.detach(cutoff);
+        when(repository.findLockedById(7L)).thenReturn(Optional.of(recent));
+        when(repository.findLockedById(8L)).thenReturn(Optional.of(expired));
+        when(repository.findLockedById(9L)).thenReturn(Optional.of(boundary));
+
+        assertThat(deleter.deleteIfStillOrphan(7L, cutoff, cutoff)).isFalse();
+        assertThat(deleter.deleteIfStillOrphan(8L, cutoff, cutoff)).isTrue();
+        assertThat(deleter.deleteIfStillOrphan(9L, cutoff, cutoff)).isFalse();
+        verify(repository).delete(expired);
+        verify(repository, never()).delete(recent);
+        verify(repository, never()).delete(boundary);
+        verify(storage).delete("stored-8");
+        verifyNoMoreInteractions(storage);
+    }
+
+    @Test void reattachedCandidateSurvivesLockedRecheck() {
+        var row = media(10L, cutoff.minusDays(30));
+        row.attach(99L, cutoff.minusDays(29));
+        row.detach(cutoff.minusSeconds(1));
+        row.attach(99L, cutoff.plusHours(23));
+        when(repository.findLockedById(10L)).thenReturn(Optional.of(row));
+
+        assertThat(row.getDetachedAt()).isNull();
+        assertThat(deleter.deleteIfStillOrphan(10L, cutoff, cutoff)).isFalse();
+        verify(repository, never()).delete(any());
+        verifyNoInteractions(storage);
+    }
+
     @Test void keepsFileWhenTransactionDoesNotCommit() {
         var old = media(5L, cutoff.minusSeconds(1));
         when(repository.findLockedById(5L)).thenReturn(Optional.of(old));
         TransactionSynchronizationManager.initSynchronization();
         try {
-            assertThat(deleter.deleteIfStillOrphan(5L, cutoff)).isTrue();
+            assertThat(deleter.deleteIfStillOrphan(5L, cutoff, cutoff)).isTrue();
             TransactionSynchronizationManager.getSynchronizations().forEach(sync -> sync.afterCompletion(1));
             verify(storage, never()).delete(anyString());
         } finally {
@@ -72,7 +109,7 @@ class RichBodyMediaDeleterTest {
         logger.addAppender(appender);
         TransactionSynchronizationManager.initSynchronization();
         try {
-            assertThat(deleter.deleteIfStillOrphan(6L, cutoff)).isTrue();
+            assertThat(deleter.deleteIfStillOrphan(6L, cutoff, cutoff)).isTrue();
             verifyNoInteractions(storage);
             TransactionSynchronizationManager.getSynchronizations().forEach(sync -> sync.afterCommit());
             assertThat(appender.list).singleElement().satisfies(event -> {

@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static com.coms.backend.service.MediaUploadValidator.*;
 import static org.mockito.Mockito.*;
 
 class RichBodyMediaServiceTest {
@@ -26,6 +27,7 @@ class RichBodyMediaServiceTest {
             mock(org.springframework.transaction.PlatformTransactionManager.class);
     private final RichBodyMediaService service = new RichBodyMediaService(rows, members, storage, validator,
             Clock.fixed(java.time.Instant.parse("2026-11-06T00:00:00Z"), ZoneOffset.UTC), deleter, transactions);
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 6, 0, 0);
     private static final RichBodyMedia.Scope NOTICE = RichBodyMedia.Scope.NOTICE;
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -85,6 +87,7 @@ class RichBodyMediaServiceTest {
         assertThat(retained.getAttachedAt()).isNotNull();
         assertThat(removed.getOwnerId()).isNull();
         assertThat(removed.getAttachedAt()).isNull();
+        assertThat(removed.getDetachedAt()).isEqualTo(NOW);
     }
 
     @Test void deletingOwnerDetachesAllItsRows() {
@@ -100,18 +103,21 @@ class RichBodyMediaServiceTest {
         assertThat(second.getOwnerId()).isNull();
         assertThat(first.getAttachedAt()).isNull();
         assertThat(second.getAttachedAt()).isNull();
+        assertThat(first.getDetachedAt()).isEqualTo(NOW);
+        assertThat(second.getDetachedAt()).isEqualTo(NOW);
     }
 
     @Test void sweepContinuesAfterOneRowFails() {
         RichBodyMedia first = row(1, RichBodyMedia.Kind.FILE, NOTICE, 100);
         RichBodyMedia second = row(2, RichBodyMedia.Kind.FILE, NOTICE, 100);
-        LocalDateTime cutoff = LocalDateTime.now().minusHours(24);
-        when(rows.findByOwnerIdIsNullAndCreatedAtBefore(cutoff)).thenReturn(List.of(first, second));
-        when(deleter.deleteIfStillOrphan(1L, cutoff)).thenThrow(new IllegalStateException("disk unavailable"));
-        when(deleter.deleteIfStillOrphan(2L, cutoff)).thenReturn(true);
+        LocalDateTime cutoff = NOW.minusHours(48);
+        LocalDateTime detachedCutoff = NOW.minusHours(24);
+        when(rows.findOrphansOlderThan(cutoff, detachedCutoff)).thenReturn(List.of(first, second));
+        when(deleter.deleteIfStillOrphan(1L, cutoff, detachedCutoff)).thenThrow(new IllegalStateException("disk unavailable"));
+        when(deleter.deleteIfStillOrphan(2L, cutoff, detachedCutoff)).thenReturn(true);
 
         assertThat(service.deleteOrphanedOlderThan(cutoff)).isEqualTo(1);
-        verify(deleter).deleteIfStillOrphan(2L, cutoff);
+        verify(deleter).deleteIfStillOrphan(2L, cutoff, detachedCutoff);
     }
 
     @Test void repeatedIdsAreResolvedOnlyOnce() {
@@ -125,6 +131,41 @@ class RichBodyMediaServiceTest {
         verify(rows, times(1)).findLockedById(1L);
         verify(members, times(1)).findByStudentId("actor");
         assertThat(candidate.getOwnerId()).isEqualTo(50L);
+    }
+
+    @Test void reattachingClearsDetachmentTimestamp() {
+        RichBodyMedia candidate = row(1, RichBodyMedia.Kind.IMAGE, NOTICE, 100);
+        candidate.attach(50L, NOW.minusDays(30));
+        candidate.detach(NOW.minusHours(1));
+        Member actor = mock(Member.class);
+        when(actor.getId()).thenReturn(100L);
+        when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
+        when(rows.findLockedById(1L)).thenReturn(Optional.of(candidate));
+
+        service.syncAttachments(NOTICE, 50L, image(1), "actor");
+
+        assertThat(candidate.getOwnerId()).isEqualTo(50L);
+        assertThat(candidate.getAttachedAt()).isEqualTo(NOW);
+        assertThat(candidate.getDetachedAt()).isNull();
+    }
+
+    @Test void acceptsDoubleDotsInCleanedOriginalFilename() throws Exception {
+        Member actor = mock(Member.class);
+        when(actor.getId()).thenReturn(100L);
+        when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
+        when(members.findWithLockById(100L)).thenReturn(Optional.of(actor));
+        var file = new org.springframework.mock.web.MockMultipartFile(
+                "file", "../reports/report..final.pdf", "application/pdf", "%PDF-1.7".getBytes());
+        var realValidatorService = new RichBodyMediaService(rows, members, storage, new MediaUploadValidator(),
+                Clock.systemUTC(), deleter, transactions);
+        when(storage.store(file, "pdf")).thenReturn("uuid.pdf");
+        when(rows.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var uploaded = realValidatorService.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor");
+
+        assertThat(uploaded.getOriginalName()).isEqualTo("report..final.pdf");
+        assertThat(uploaded.getStoredName()).isEqualTo("uuid.pdf");
+        verify(storage).store(file, "pdf");
     }
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -159,8 +200,10 @@ class RichBodyMediaServiceTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource({"USER,30,0", "ADMIN,30,0", "USER,0,524288000", "ADMIN,0,524288000"})
-    void pendingQuotaDeletesStoredFileAfterUnlocking(Member.Role role, long count, long bytes) throws Exception {
+    @org.junit.jupiter.params.provider.CsvSource({"USER,true", "ADMIN,true", "USER,false", "ADMIN,false"})
+    void pendingQuotaDeletesStoredFileAfterUnlocking(Member.Role role, boolean countLimit) throws Exception {
+        long count = countLimit ? MAX_PENDING_COUNT : 0;
+        long bytes = countLimit ? 0 : MAX_PENDING_BYTES;
         Member actor = mock(Member.class);
         when(actor.getId()).thenReturn(100L);
         when(actor.getRole()).thenReturn(role);
@@ -188,8 +231,10 @@ class RichBodyMediaServiceTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource({"30,0", "0,524288000"})
-    void preCheckOverQuotaStoresNothing(long count, long bytes) throws Exception {
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void preCheckOverQuotaStoresNothing(boolean countLimit) throws Exception {
+        long count = countLimit ? MAX_PENDING_COUNT : 0;
+        long bytes = countLimit ? 0 : MAX_PENDING_BYTES;
         var file = prepareUpload();
         when(rows.countByUploaderIdAndOwnerIdIsNull(100L)).thenReturn(count);
         when(rows.sumPendingBytes(100L)).thenReturn(bytes);
@@ -253,13 +298,13 @@ class RichBodyMediaServiceTest {
         return file;
     }
 
-    @Test void exactPendingByteLimitAndThirtiethUploadAreAllowed() throws Exception {
+    @Test void exactPendingByteAndCountLimitsAreAllowed() throws Exception {
         Member actor = mock(Member.class);
         when(actor.getId()).thenReturn(100L);
         when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
         when(members.findWithLockById(100L)).thenReturn(Optional.of(actor));
-        when(rows.countByUploaderIdAndOwnerIdIsNull(100L)).thenReturn(29L);
-        when(rows.sumPendingBytes(100L)).thenReturn(524288000L - 1);
+        when(rows.countByUploaderIdAndOwnerIdIsNull(100L)).thenReturn((long) MAX_PENDING_COUNT - 1);
+        when(rows.sumPendingBytes(100L)).thenReturn(MAX_PENDING_BYTES - 1);
         var file = new org.springframework.mock.web.MockMultipartFile("file", "a.pdf", "application/pdf", new byte[]{1});
         when(validator.validateFile(file)).thenReturn("application/pdf");
         when(storage.store(file, "pdf")).thenReturn("stored.pdf");
@@ -318,7 +363,7 @@ class RichBodyMediaServiceTest {
         Member actor = mock(Member.class);
         when(actor.getId()).thenReturn(100L);
         when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
-        when(rows.countByUploaderIdAndOwnerIdIsNull(100L)).thenReturn(30L);
+        when(rows.countByUploaderIdAndOwnerIdIsNull(100L)).thenReturn((long) MAX_PENDING_COUNT);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.upload(NOTICE, kind, file, "actor"))
                 .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
@@ -354,9 +399,9 @@ class RichBodyMediaServiceTest {
         service.syncAttachments(NOTICE, 50L, "[]", null);
 
         var order = inOrder(first, second, third);
-        order.verify(first).detach();
-        order.verify(second).detach();
-        order.verify(third).detach();
+        order.verify(first).detach(NOW);
+        order.verify(second).detach(NOW);
+        order.verify(third).detach(NOW);
     }
 
     private void assertBadAttachment(String content) {
