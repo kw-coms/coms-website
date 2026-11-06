@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CircleAlert, Copy, Info, RotateCw, Trash2, TriangleAlert } from 'lucide-react';
 import type { PartInstance, PropDef, SimInputDef } from '../../core/types';
 import { PARTS, resistorBands } from '../core';
@@ -23,15 +23,33 @@ function PropField({ part, def }: { part: PartInstance; def: PropDef }) {
         </select>
       </label>
     );
-  const num = Number(value);
+  return <NumberField part={part} def={def} value={Number(value)} />;
+}
+
+/** Number input with a text draft: only values the core accepts (range, integer rules) are committed; the reason is shown inline. */
+function NumberField({ part, def, value }: { part: PartInstance; def: PropDef; value: number }) {
+  const [text, setText] = useState(String(value));
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => { setText((t) => (Number(t) === value ? t : String(value))); }, [value]);
+  useEffect(() => { setErr(null); }, [part.id]);
+  const range = def.min !== undefined || def.max !== undefined ? ` (${def.min ?? '−∞'} ~ ${def.max ?? '∞'})` : '';
+  const change = (raw: string) => {
+    setText(raw);
+    const v = Number(raw);
+    if (raw.trim() === '' || !Number.isFinite(v)) return setErr(`숫자를 입력해 주세요.${range}`);
+    if (v < (def.min ?? -Infinity) || v > (def.max ?? Infinity)) return setErr(`범위를 벗어났어요.${range}`);
+    const e = setProp(part.id, def.key, v);
+    setErr(e ? `이 값은 쓸 수 없어요. ${e}` : null);
+  };
   return (
     <div className="row col">
       <span>{def.label}{def.unit ? ` (${def.unit})` : ''}</span>
       <div className="num">
         <input
-          type="number" value={Number.isFinite(num) ? num : ''} min={def.min} max={def.max} step="any"
-          onChange={(e) => { const v = Number(e.target.value); if (Number.isFinite(v) && v >= (def.min ?? -Infinity) && v <= (def.max ?? Infinity)) setProp(part.id, def.key, v); }}
-          aria-label={def.label}
+          type="number" value={text} min={def.min} max={def.max} step="any"
+          onChange={(e) => change(e.target.value)}
+          onBlur={() => { setText(String(value)); setErr(null); }}
+          aria-label={def.label} aria-invalid={!!err}
         />
         {def.options && (
           <select value="" aria-label={`${def.label} 프리셋`} onChange={(e) => e.target.value && setProp(part.id, def.key, Number(e.target.value))}>
@@ -40,6 +58,7 @@ function PropField({ part, def }: { part: PartInstance; def: PropDef }) {
           </select>
         )}
       </div>
+      {err && <p className="field-err" role="alert">{err}</p>}
     </div>
   );
 }

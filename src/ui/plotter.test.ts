@@ -22,3 +22,11 @@ describe('plotter', () => {
     expect(b.push('\n')).toEqual(['6']);
   });
 });
+
+describe('LineBuffer cap', () => {
+  it('does not keep unbounded text without a newline', () => {
+    const b = new LineBuffer();
+    for (let i = 0; i < 100; i++) b.push('x'.repeat(1000));
+    expect(b.push('\n')[0]!.length).toBeLessThanOrEqual(4096);
+  });
+});

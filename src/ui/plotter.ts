@@ -1,5 +1,6 @@
 // Serial plotter line parsing. Accepts "1 2 3", "1,2,3", tab-separated and "name:1,other:2".
 export const MAX_SERIES = 6;
+const MAX_PENDING = 4096;
 
 export interface PlotSample {
   names: (string | null)[];
@@ -26,7 +27,8 @@ export class LineBuffer {
   private rest = '';
   push(text: string): string[] {
     const parts = (this.rest + text).split(/\r\n|\n|\r/);
-    this.rest = parts.pop() ?? '';
+    // Serial.print without a newline must not grow the buffer (and the next split) without bound
+    this.rest = (parts.pop() ?? '').slice(-MAX_PENDING);
     return parts;
   }
   reset() {

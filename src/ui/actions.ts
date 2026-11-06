@@ -1,9 +1,10 @@
 import { encodeShare, decodeShare, EXAMPLES, validateScene } from './core';
 import { refs } from '../scene3d/sceneRefs';
-import { loadSharedScene, shareHash } from './shareHash';
-import { getState, loadScene, scene, set, THEME_KEY, toast } from './store';
+import { parseShareHash, shareHash } from './shareHash';
+import { BACKUP_KEY, getState, isDirty, loadScene, markClean, scene, set, THEME_KEY, toast } from './store';
 import { stop } from './simHost';
-import { setItem } from './storage';
+import { getItem, setItem } from './storage';
+import type { Scene } from '../core/types';
 
 function download(name: string, href: string) {
   const a = document.createElement('a');
@@ -13,53 +14,95 @@ function download(name: string, href: string) {
   a.click();
   a.remove();
 }
-
-export function exportJson() {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(scene(), null, 2)], { type: 'application/json' }));
-  download(`${scene().title ?? 'circuit-lab'}.json`, url);
+function downloadText(name: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  download(name, url);
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
+
+/** One gate for every action that replaces the whole document (example, import, share link). */
+export const confirmReplace = (what: string) =>
+  !isDirty() || confirm(`저장하지 않은 작업이 사라져요. ${what}`);
+
+/** Stop the simulator and replace the document. */
+function replaceWith(s: Scene) {
+  stop();
+  loadScene(s);
+}
+
+export function exportJson() {
+  downloadText(`${scene().title ?? 'circuit-lab'}.json`, JSON.stringify(scene(), null, 2));
+  markClean();
+}
+
+/** Download the raw copy of an autosave that failed validation at startup. */
+export function downloadBackup() {
+  const raw = getItem(BACKUP_KEY);
+  if (raw) downloadText('circuit-lab-backup.json', raw);
+  else toast('백업 데이터를 찾지 못했어요.');
+}
+export const dismissRestoreNotice = () => set({ restoreNotice: false });
+
+const errMsg = (e: unknown) => (e instanceof Error && e.message && !/^[\x00-\x7f]*$/.test(e.message) ? e.message : '');
 
 export async function importJson(file: File) {
   try {
     if (file.size > 400_000) throw new Error('파일이 너무 커요.');
-    const s = validateScene(JSON.parse(await file.text()));
-    stop();
-    loadScene(s);
+    let json: unknown;
+    try {
+      json = JSON.parse(await file.text());
+    } catch {
+      throw new Error('JSON 형식이 아니에요.');
+    }
+    const s = validateScene(json);
+    if (!confirmReplace('불러올까요?')) return;
+    replaceWith(s);
     toast('불러왔어요.');
   } catch (e) {
-    toast(e instanceof Error && e.message ? `불러오지 못했어요: ${e.message}` : '불러오지 못했어요. 올바른 회로 파일인지 확인해 주세요.');
+    const m = errMsg(e);
+    toast(m ? `불러오지 못했어요: ${m}` : '불러오지 못했어요. 올바른 회로 파일인지 확인해 주세요.');
   }
 }
 
+/** The share link goes to the clipboard only; it is never left in the working URL. */
 export async function copyShareLink() {
   try {
     const token = await encodeShare(scene());
     const url = `${location.origin}${location.pathname}${shareHash(token)}`;
-    history.replaceState(null, '', shareHash(token));
     try {
       await navigator.clipboard.writeText(url);
       toast('공유 링크를 복사했어요.');
     } catch {
-      toast('주소창의 링크를 복사해서 공유하세요.');
+      prompt('이 링크를 복사해서 공유하세요.', url);
     }
   } catch (e) {
-    toast(e instanceof Error ? e.message : '공유 링크를 만들지 못했어요.');
+    toast(errMsg(e) || '공유 링크를 만들지 못했어요.');
   }
 }
 
+/** Consume a #s=… share hash: remove it from the URL first (so a reload never restores a stale snapshot), then import. */
 export async function loadFromLocationHash() {
+  const token = parseShareHash(location.hash);
+  if (!token) return;
+  history.replaceState(null, '', location.pathname + location.search);
   try {
-    const s = await loadSharedScene(location.hash, decodeShare);
-    if (s) loadScene(s);
+    const s = await decodeShare(token);
+    if (!confirmReplace('공유 링크의 회로를 불러올까요?')) return;
+    replaceWith(s);
+    toast('공유 링크의 회로를 불러왔어요.');
   } catch (e) {
-    toast(e instanceof Error ? e.message : '공유 장면을 읽을 수 없어요.');
+    toast(errMsg(e) || '공유 링크를 읽을 수 없어요.');
   }
 }
 
 export function snapshotPng() {
   const { gl, scene: sc, camera } = refs;
   if (!gl || !sc || !camera) return;
+  // editing helpers (selection box, snap rings, bend handles, wire preview) stay out of the picture
+  const hidden: { visible: boolean }[] = [];
+  sc.traverse((o) => {
+    if (o.visible && (o.type === 'Box3Helper' || o.renderOrder >= 6)) { hidden.push(o); o.visible = false; }
+  });
   gl.render(sc, camera);
   gl.domElement.toBlob((b) => {
     if (!b) return toast('이미지를 만들지 못했어요.');
@@ -67,14 +110,15 @@ export function snapshotPng() {
     download('circuit-lab.png', url);
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }, 'image/png');
+  for (const o of hidden) o.visible = true;
+  refs.invalidate();
 }
 
 export function loadExample(id: string) {
   const ex = EXAMPLES.find((e) => e.id === id);
   if (!ex) return;
-  if (getState().hist.past.length > 0 && !confirm('현재 작업은 사라져요. 예제를 불러올까요?')) return;
-  stop();
-  loadScene(ex.scene);
+  if (!confirmReplace('예제를 불러올까요?')) return;
+  replaceWith(ex.scene);
   history.replaceState(null, '', location.pathname + location.search);
   set({ examplesOpen: false });
 }

@@ -22,7 +22,16 @@ export function Tutorial() {
   const close = () => { setItem(TUTORIAL_KEY, '1'); set({ tutorial: false }); };
   const s = STEPS[i]!;
   return (
-    <div className="overlay" role="dialog" aria-modal="true" aria-label="처음 시작하기" onKeyDown={(e) => e.key === 'Escape' && close()}>
+    <div className="overlay" role="dialog" aria-modal="true" aria-label="처음 시작하기" onKeyDown={(e) => {
+      if (e.key === 'Escape') return close();
+      if (e.key !== 'Tab') return;
+      // focus trap: Tab cycles inside the dialog
+      const items = [...e.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled])')];
+      const first = items[0], last = items[items.length - 1];
+      if (!first || !last) return;
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }}>
       <div className="card">
         <p className="muted small">처음 오셨나요? ({i + 1}/3)</p>
         <h2>{s.t}</h2>

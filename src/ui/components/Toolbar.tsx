@@ -32,9 +32,19 @@ export function Toolbar() {
   useEffect(() => {
     if (!more) return;
     const close = (e: PointerEvent) => { if (!(e.target as HTMLElement).closest('.tb-more')) setMore(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setMore(false); };
     window.addEventListener('pointerdown', close);
-    return () => window.removeEventListener('pointerdown', close);
+    window.addEventListener('keydown', esc);
+    return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', esc); };
   }, [more]);
+  useEffect(() => {
+    if (!exOpen) return;
+    const close = (e: PointerEvent) => { if (!(e.target as HTMLElement).closest('.pop')) set({ examplesOpen: false }); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') set({ examplesOpen: false }); };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('keydown', esc);
+    return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', esc); };
+  }, [exOpen]);
 
   const secondary = (
     <>
@@ -108,7 +118,7 @@ export function Toolbar() {
       <div className="tb-secondary">{secondary}</div>
       <div className="tb-more pop">
         <Btn label="더보기" onClick={() => setMore(!more)} active={more}><Ellipsis size={18} /></Btn>
-        {more && <div className="popover more-pop" role="menu" aria-label="더보기 메뉴" onClick={(e) => (e.target as HTMLElement).closest('button') && setMore(false)}>{secondary}</div>}
+        {more && <div className="popover more-pop" role="group" aria-label="더보기 메뉴" onClick={(e) => (e.target as HTMLElement).closest('button') && setMore(false)}>{secondary}</div>}
       </div>
       <input ref={file} type="file" accept="application/json,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void importJson(f); e.target.value = ''; }} />
     </header>

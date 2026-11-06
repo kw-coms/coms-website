@@ -8,7 +8,7 @@ import { lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint';
 import { ChevronDown, ChevronUp, Eraser, Send } from 'lucide-react';
 import { sim } from '../simHost';
 import { clearSerial, onSerialLog, plot, serialLog } from '../serial';
-import { getState, set, setCode, useStore, type SerialTab } from '../store';
+import { getState, MAX_CODE_BYTES, set, setCode, toast, useStore, type SerialTab } from '../store';
 
 const theme = new Compartment();
 const lightTheme = EditorView.theme({ '&': { backgroundColor: 'var(--surface)', color: 'var(--text)', height: '100%' }, '.cm-gutters': { backgroundColor: 'var(--surface-2)', color: 'var(--muted)', border: 'none' } });
@@ -27,6 +27,13 @@ export function CodeEditor() {
         extensions: [
           basicSetup, cpp(), lintGutter(), EditorView.lineWrapping,
           theme.of(getState().theme === 'dark' ? oneDark : lightTheme),
+          EditorState.transactionFilter.of((tr) => {
+            // refuse input past the core's code limit instead of letting the document become unimportable
+            if (!tr.docChanged || tr.newDoc.length * 3 <= MAX_CODE_BYTES) return tr;
+            if (new TextEncoder().encode(tr.newDoc.toString()).length <= MAX_CODE_BYTES) return tr;
+            toast('코드는 64 KB 이하여야 해요.');
+            return [];
+          }),
           EditorView.updateListener.of((u) => { if (u.docChanged) setCode(u.state.doc.toString()); }),
           EditorView.contentAttributes.of({ 'aria-label': '아두이노 코드 편집기' }),
         ],
@@ -47,7 +54,7 @@ export function CodeEditor() {
     if (!v) return;
     const doc = v.state.doc;
     const diags: Diagnostic[] = (errors ?? []).map((e) => {
-      const line = doc.line(Math.min(Math.max(1, e.line), doc.lines));
+      const line = doc.line(Math.min(Math.max(1, Number.isFinite(e.line) ? Math.trunc(e.line) : 1), doc.lines));
       return {
         from: line.from, to: Math.max(line.from, line.to), severity: e.severity,
         message: e.hintKo ? `${e.message}\n힌트: ${e.hintKo}` : e.message,
