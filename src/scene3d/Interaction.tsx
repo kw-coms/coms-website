@@ -289,7 +289,7 @@ export function Interaction() {
           set({ wireStart: null });
           preview.point = null;
         }
-      } else if (click && d.type === 'empty') {
+      } else if (click && d.type === 'empty' && !e.shiftKey) {
         set({ selection: null, multi: [], wireStart: null });
         preview.point = null;
       }

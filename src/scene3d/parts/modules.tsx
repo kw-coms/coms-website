@@ -25,7 +25,7 @@ export function Servo({ part }: PartProps) {
         <mesh position={[0, 18.5, 0]} castShadow><boxGeometry args={[32.5, 2.2, 12.2]} /><meshStandardMaterial color="#2c63d8" roughness={0.5} /></mesh>
         {[-14.5, 14.5].map((x) => <mesh key={x} position={[x, 18.5, 0]} rotation-x={Math.PI / 2}><cylinderGeometry args={[1.1, 1.1, 2.4, 12]} /><meshStandardMaterial color="#111" /></mesh>)}
         <mesh position={[6, 24.8, 0]}><cylinderGeometry args={[2.6, 2.6, 2.4, 20]} /><meshStandardMaterial color="#e6e8ea" /></mesh>
-        <group ref={horn} position={[6, 27, 0]}>
+        <group ref={horn} userData={{ probe: 'horn' }} position={[6, 27, 0]}>
           <mesh position={[-5, 0, 0]} castShadow><boxGeometry args={[16, 1.4, 4]} /><meshStandardMaterial color="#f4f5f6" roughness={0.4} /></mesh>
           <mesh><cylinderGeometry args={[3, 3, 1.4, 20]} /><meshStandardMaterial color="#f4f5f6" /></mesh>
         </group>
@@ -288,7 +288,7 @@ export function DcMotor({ part }: PartProps) {
       {pins.map((p, i) => <Cable key={p.id} a={[p.pos[0], 1.5, 0]} b={[p.pos[0] * 1.6, 6, -5]} color={i ? '#1a1a1a' : '#d32f2f'} r={0.55} />)}
       <mesh position={[-3, 10.5, -14]} rotation-z={Math.PI / 2} castShadow><cylinderGeometry args={[10, 10, 22, 32]} /><meshStandardMaterial color={METAL} metalness={0.85} roughness={0.35} /></mesh>
       <mesh position={[8.4, 10.5, -14]} rotation-z={Math.PI / 2}><cylinderGeometry args={[6, 6, 1.2, 24]} /><meshStandardMaterial color="#6d7378" metalness={0.7} /></mesh>
-      <group ref={shaft} position={[9, 10.5, -14]}>
+      <group ref={shaft} userData={{ probe: 'shaft' }} position={[9, 10.5, -14]}>
         <mesh rotation-z={Math.PI / 2} position={[3, 0, 0]}><cylinderGeometry args={[1, 1, 9, 12]} /><meshStandardMaterial color="#d8dcdf" metalness={0.9} roughness={0.2} /></mesh>
         {/* wheel: rubber tyre, hub and spokes + a white mark so the spin reads */}
         <mesh position={[7, 0, 0]} rotation-z={Math.PI / 2} castShadow><cylinderGeometry args={[10.5, 10.5, 4.2, 36]} /><meshStandardMaterial color="#1f2124" roughness={0.85} /></mesh>

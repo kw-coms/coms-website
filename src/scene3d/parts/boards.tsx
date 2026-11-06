@@ -4,7 +4,10 @@ import { RoundedBox } from '@react-three/drei';
 import type { PinDef } from '../../core/types';
 import { PARTS } from '../../ui/core';
 import { DESK_Y } from '../sceneRefs';
-import { makeTexture, type PartProps } from './common';
+import { useFrame } from '@react-three/fiber';
+import { AdditiveBlending, type MeshStandardMaterial, type Sprite } from 'three';
+import { frameRef } from '../../ui/simHost';
+import { glowTexture, makeTexture, type PartProps } from './common';
 
 const P = 2.54;
 const SILVER = '#c9ced3';
@@ -61,6 +64,25 @@ function strips(pins: PinDef[]) {
     if (cur.length) out.push(cur);
   }
   return out;
+}
+
+/** The amber "L" LED on the UNO follows pin D13 (built-in blink); TX/RX stay dark. */
+function BuiltinLed({ position }: { position: [number, number, number] }) {
+  const mat = useRef<MeshStandardMaterial>(null);
+  const halo = useRef<Sprite>(null);
+  useFrame(() => {
+    const on = (frameRef.current?.pins.D13?.duty ?? 0) > 0.05 && (frameRef.current?.pins.D13?.mode === 'output');
+    if (mat.current) mat.current.emissiveIntensity = on ? 3 : 0.1;
+    if (halo.current) halo.current.visible = on;
+  });
+  return (
+    <>
+      <mesh position={position}><boxGeometry args={[2, 1, 1.2]} /><meshStandardMaterial userData={{ dynamic: true }} ref={mat} color="#ffb300" emissive="#ff9100" emissiveIntensity={0.1} /></mesh>
+      <sprite ref={halo} position={[position[0], position[1] + 1, position[2]]} scale={[12, 12, 1]} visible={false} renderOrder={5}>
+        <spriteMaterial map={glowTexture()} color="#ffb300" transparent depthWrite={false} blending={AdditiveBlending} opacity={0.9} />
+      </sprite>
+    </>
+  );
 }
 
 export function ArduinoUno() {
@@ -134,7 +156,7 @@ export function ArduinoUno() {
       <mesh position={[-20, 1.5, 21]} castShadow><cylinderGeometry args={[2.6, 2.6, 3, 16]} /><meshStandardMaterial color="#d33" /></mesh>
       <mesh position={[-21, 4, 7]} castShadow><cylinderGeometry args={[3.2, 3.2, 8, 16]} /><meshStandardMaterial color={SILVER} metalness={0.7} roughness={0.35} /></mesh>
       <mesh position={[-21, 4, 14]} castShadow><cylinderGeometry args={[3.2, 3.2, 8, 16]} /><meshStandardMaterial color={SILVER} metalness={0.7} roughness={0.35} /></mesh>
-      <mesh position={[-3, 0.6, -17]}><boxGeometry args={[2, 1, 1.2]} /><meshStandardMaterial color="#ffb300" emissive="#ffb300" emissiveIntensity={0.3} /></mesh>
+      <BuiltinLed position={[-3, 0.6, -17]} />
       <mesh position={[8, 0.6, -17]}><boxGeometry args={[2, 1, 1.2]} /><meshStandardMaterial color="#27d35a" emissive="#27d35a" emissiveIntensity={0.6} /></mesh>
       {/* header strips + socket openings */}
       {groups.map((g, i) => {

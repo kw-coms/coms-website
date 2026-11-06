@@ -2,10 +2,12 @@
 import { Vector3 } from 'three';
 import { EXAMPLES, PARTS, pinWorldPos } from './core';
 import { refs } from '../scene3d/sceneRefs';
-import { addPart, getState, loadScene, set, updateParts } from './store';
+import { addPart, getState, loadScene, selectPart, set, updateParts, updateWire } from './store';
 import { frameAll, partsBox, viewAngle } from '../scene3d/cameraFrame';
 import type { PartKind, Scene } from '../core/types';
 import { frameRef, setSimInput, sim } from './simHost';
+import { clearSerial, serialLog } from './serial';
+import { setCode } from './store';
 
 function project(partId: string, pinId: string) {
   const part = getState().hist.present.parts.find((p) => p.id === partId);
@@ -66,4 +68,38 @@ async function closeup(kind: PartKind, az = 25, el = 38, fill = 0.8) {
   await nextFrames(2);
 }
 
-(window as unknown as { __lab: unknown }).__lab = { loadScene, gallery, closeup, viewAngle, frameAll, partsBox, set, EXAMPLES, setSimInput, projectPart, getState, project, litOf, addPart, frame: () => frameRef.current, simState: () => sim.state, camera: () => refs.camera?.position.toArray() };
+/** Visible state of a part's meshes: what the user actually sees (lit glow, emissive, servo horn / motor shaft angle). */
+function probe(partId: string) {
+  const out = { sprite: 0, emissive: 0, horn: null as number | null, shaft: null as number | null };
+  refs.scene?.children.forEach((g) => {
+    if (g.userData.partId !== partId) return;
+    g.traverse((o) => {
+      const m = o as unknown as { isSprite?: boolean; material?: { opacity?: number; emissiveIntensity?: number; userData?: { dynamic?: boolean } } };
+      if (m.isSprite && o.visible) out.sprite = Math.max(out.sprite, m.material?.opacity ?? 0);
+      if (m.material?.userData?.dynamic && o.visible) out.emissive += m.material.emissiveIntensity ?? 0;
+      if (o.userData.probe === 'horn') out.horn = o.rotation.y;
+      if (o.userData.probe === 'shaft') out.shaft = o.rotation.x;
+    });
+  });
+  return out;
+}
+
+function projectWorld(x: number, y: number, z: number) {
+  if (!refs.camera || !refs.gl) return null;
+  const v = new Vector3(x, y, z).project(refs.camera);
+  const r = refs.gl.domElement.getBoundingClientRect();
+  return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+}
+/** Fraction of the canvas (limiting dimension) covered by all parts' bounding box corners. */
+function fillRatio() {
+  const b = partsBox();
+  if (!b || !refs.camera) return 0;
+  let x0 = 9, x1 = -9, y0 = 9, y1 = -9;
+  for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+    const v = new Vector3(x, y, z).project(refs.camera);
+    x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y);
+  }
+  return Math.max((x1 - x0) / 2, (y1 - y0) / 2);
+}
+
+(window as unknown as { __lab: unknown }).__lab = { setCode, serialClear: clearSerial, updateWire, selectPart, projectWorld, fillRatio, serial: () => serialLog.text, probe, loadScene, gallery, closeup, viewAngle, frameAll, partsBox, set, EXAMPLES, setSimInput, projectPart, getState, project, litOf, addPart, frame: () => frameRef.current, simState: () => sim.state, camera: () => refs.camera?.position.toArray() };
