@@ -118,22 +118,28 @@ export const statusTexts: Record<SimKind, () => string[]> = {
   buzzer: () => [null, ...sim.NOTES.flatMap((_n, note) => bools.map((sounding) => ({ note, sounding })))].map(say.buzzer),
 }
 
-/** Display width in monospace columns: Hangul takes two. */
-const cols = (s: string) => [...s].reduce((n, ch) => n + (/[ᄀ-ᇿ㄰-㆏가-힣]/.test(ch) ? 2 : 1), 0)
+/** A number in a status text (sign and decimals included). The status line is monospaced: digits, '-' and '.' are equally wide. */
+const NUMBER = /-?\d+(?:\.\d+)?/g
 /**
- * The texts the status line reserves room for: the idle instruction plus the widest running text of each of the
- * widest message templates (texts that differ only in their numbers share a template). The line is as tall as the
- * tallest of these at the current width and font, whatever it shows.
+ * The texts the status line reserves room for: the idle instruction plus, for EVERY message template (texts that differ
+ * only in their numbers), that template with each number as wide as it ever gets. In a monospaced font that text is at
+ * least as wide as every real one, word for word, with the same break opportunities, so it wraps to at least as many
+ * lines at any width. The line is as tall as the tallest of these, whatever it shows.
  */
-export function reservedTexts(kind: SimKind, templates = 4): string[] {
-  const widest = new Map<string, string>()
+export function reservedTexts(kind: SimKind): string[] {
+  const templates = new Map<string, { parts: string[]; lens: number[] }>() // the text around the numbers -> widest number per slot
   for (const t of statusTexts[kind]()) {
-    const key = t.replace(/[\d.-]+/g, '0')
-    const cur = widest.get(key)
-    if (cur == null || cols(t) > cols(cur)) widest.set(key, t)
+    const parts = t.split(NUMBER)
+    const lens = (t.match(NUMBER) ?? []).map((n) => n.length)
+    const key = JSON.stringify(parts)
+    const cur = templates.get(key)
+    templates.set(key, { parts, lens: cur ? cur.lens.map((n, i) => Math.max(n, lens[i])) : lens })
   }
-  return [IDLE[kind], ...[...widest.values()].sort((a, b) => cols(b) - cols(a)).slice(0, templates)]
+  return [IDLE[kind], ...[...templates.values()].map(({ parts, lens }) => parts.map((p, i) => p + (i < lens.length ? '0'.repeat(lens[i]) : '')).join(''))]
 }
+
+/** Shown in the status line when the circuit code or a scene could not be loaded (it reserves its own room too). */
+export const FAILED = '그림을 불러오지 못했어요. 새로고침해 보세요.'
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const btn = (cls: string, text: string, attrs = '') => `<button type="button" class="cb ${cls}"${attrs} disabled>${esc(text)}</button>`
@@ -144,12 +150,13 @@ export function chromeHtml(def: CircuitDef): string {
   const ranges = (RANGES[def.sim] ?? []).map((s) =>
     `<label class="circuit-range"><span class="circuit-range-label">${esc(s.label)}</span><input type="range" min="${s.min}" max="${s.max}" step="1" value="${s.value}" disabled><output class="circuit-range-out">${s.value}${esc(s.unit)}</output></label>`)
   const modes = (MODES[def.sim] ?? []).map((m) => btn('cb-mode', m, ' aria-pressed="false"'))
+  const modeRow = modes.length ? `<div class="circuit-modes">${modes.join('')}</div>` : ''
   const sizes = reservedTexts(def.sim).map((t) => `<span class="circuit-status-size" aria-hidden="true">${esc(t)}</span>`)
   return [
     `<div class="circuit-bar" role="group" aria-label="회로 그림 조작">${btn('cb-play', '▶ 시뮬레이션', ' aria-pressed="false"')}${btn('cb-view', '평면으로 보기')}${btn('cb-steps', '조립 순서 보기')}${stepper}</div>`,
     `<div class="circuit-stage"><div class="circuit-plane" style="--w: ${def.size[0]}; --h: ${def.size[1]}"></div></div>`,
-    `<div class="circuit-ctl">${ranges.join('')}${modes.join('')}</div>`,
-    `<p class="circuit-status-box">${sizes.join('')}<span class="circuit-status">${esc(IDLE[def.sim])}</span></p>`,
+    `<div class="circuit-ctl">${ranges.join('')}${modeRow}</div>`,
+    `<p class="circuit-status-box">${sizes.join('')}<span class="circuit-status">${esc(IDLE[def.sim])}</span><span class="circuit-failed">${esc(FAILED)}</span></p>`,
     '<div class="circuit-live" role="status" aria-live="polite"></div>',
   ].join('\n')
 }

@@ -4592,6 +4592,11 @@ test.describe('lite rendering mode', () => {
 // /study/arduino draws each wiring table as an interactive circuit (separate chunk, loaded when the page has one).
 test.describe('arduino study circuits', () => {
   const circuit = (page, id) => page.locator(`figure.circuit[data-circuit="${id}"]`)
+  // The real site-wide screen-effects setting (perfMode.ts, in the footer): it sets <html data-perf> while the page is open.
+  const setPerf = async (page, mode) => {
+    await page.getByRole('radiogroup', { name: '화면 효과' }).getByRole('radio', { name: mode === 'lite' ? '가볍게' : '화려하게' }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-perf', mode)
+  }
 
   test('the LED blink simulation toggles the LED like the sketch', async ({ page }) => {
     await page.goto('/study/arduino')
@@ -4672,12 +4677,9 @@ test.describe('arduino study circuits', () => {
   })
 
   test('low-power mode starts flat and drops the SVG filters, live', async ({ page }) => {
-    await page.addInitScript(() => {
-      const set = () => { document.documentElement.dataset.perf = 'lite' }
-      if (document.documentElement) set()
-      else new MutationObserver((_m, o) => { if (document.documentElement) { set(); o.disconnect() } }).observe(document, { childList: true })
-    })
+    await page.addInitScript(() => window.localStorage.setItem('kwcoms-perf-mode:v1', 'lite')) // the stored screen-effects choice
     await page.goto('/study/arduino')
+    await expect(page.locator('html')).toHaveAttribute('data-perf', 'lite')
     const fig = circuit(page, 'led-blink')
     await fig.scrollIntoViewIfNeeded()
     await expect(fig).toHaveClass(/is-live/)
@@ -4686,13 +4688,14 @@ test.describe('arduino study circuits', () => {
     const filtered = () => fig.locator('.circuit-svg [filter]').evaluateAll((els) => els.filter((e) => getComputedStyle(e).filter !== 'none').length)
     expect(await filtered()).toBe(0)
     // back to the full mode: the tilt returns and filters are applied again
-    await page.evaluate(() => { document.documentElement.dataset.perf = 'full' })
+    await setPerf(page, 'full')
     await expect(fig.locator('.circuit-stage')).not.toHaveClass(/is-flat/)
     expect(await filtered()).toBeGreaterThan(0)
     // an explicit 평면/3D choice survives later mode flips
     await fig.getByRole('button', { name: '평면으로 보기' }).click()
     await expect(fig.locator('.circuit-stage')).toHaveClass(/is-flat/)
-    await page.evaluate(() => { document.documentElement.dataset.perf = 'lite'; document.documentElement.dataset.perf = 'full' })
+    await setPerf(page, 'lite')
+    await setPerf(page, 'full')
     await expect(fig.locator('.circuit-stage')).toHaveClass(/is-flat/)
   })
 
@@ -4822,9 +4825,9 @@ test.describe('arduino study circuits', () => {
       const heights = () => page.evaluate(() => [...document.querySelectorAll('figure.circuit')].map((f) => f.getBoundingClientRect().height))
       const first = await heights()
       const same = async (state) => (await heights()).forEach((h, i) => expect(Math.abs(h - first[i]), `figure ${i}: static vs ${state}`).toBeLessThanOrEqual(1))
-      const perfFlip = async () => { // the site-wide low-power switch flips every figure to flat (and back) with no user input
+      const perfFlip = async () => { // the site-wide low-power switch flips every figure to flat (and back) without touching it
         for (const mode of ['lite', 'full']) {
-          await page.evaluate((m) => { document.documentElement.dataset.perf = m }, mode)
+          await setPerf(page, mode)
           await page.waitForTimeout(100)
           await same(`${mode} mode`)
         }
@@ -4889,6 +4892,64 @@ test.describe('arduino study circuits', () => {
       for (const [id, hs] of Object.entries(seen)) expect(Math.max(...hs) - Math.min(...hs), `${id} changed height at some point: ${hs.map(Math.round).join(', ')}`).toBeLessThanOrEqual(1)
     })
   }
+
+  // A site font chosen in the footer (fontPreferences.ts) arrives with font-display: swap, after the figures are shown.
+  // Text width must not decide how many rows the bar, the sliders or the status line take.
+  for (const width of [375, 1280]) {
+    test(`swapping to a wider font after load moves no figure row: ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await page.goto('/study/arduino')
+      await expect(page.locator('figure.circuit.is-live')).toHaveCount(14)
+      // the figure without its caption (the caption is prose and reflows with the font like every paragraph)
+      const rows = () => page.evaluate(() => [...document.querySelectorAll('figure.circuit')].map((f) => f.getBoundingClientRect().height - f.querySelector('figcaption').getBoundingClientRect().height))
+      const label = () => page.evaluate(() => { // the label text's own width (its box is a fixed grid column)
+        const r = document.createRange()
+        r.selectNodeContents(document.querySelector('figure.circuit[data-circuit="pot-led"] .circuit-range-label'))
+        return r.getBoundingClientRect().width
+      })
+      const before = await rows()
+      const narrow = await label()
+      await page.evaluate(() => document.documentElement.style.setProperty('--apple-font-family', "'Courier New', 'Nanum Myeongjo', serif"))
+      // whatever fonts this machine has, make the swapped labels and buttons much wider (Hangul has no Courier glyphs)
+      await page.addStyleTag({ content: '.study-page .circuit :is(.cb, .circuit-range-label) { letter-spacing: .25em; }' })
+      await page.waitForTimeout(300)
+      expect(await label(), 'the swapped font is wider').toBeGreaterThan(narrow)
+      ;(await rows()).forEach((h, i) => expect(Math.abs(h - before[i]), `figure ${i} rows after the font swap`).toBeLessThanOrEqual(1))
+    })
+  }
+
+  test('text-only scaling (minimum font size, large OS text) grows the bar and the status line instead of clipping them', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 800 })
+    await page.goto('/study/arduino')
+    await expect(page.locator('figure.circuit.is-live')).toHaveCount(14)
+    await page.addStyleTag({ content: '.study-page .circuit :is(.cb, .circuit-range, .circuit-status-box) { font-size: 22px !important; }' })
+    for (const fig of await page.locator('figure.circuit[data-circuit]').all()) await fig.locator('.cb-steps').click() // the widest bar
+    const clipped = await page.evaluate(() => [...document.querySelectorAll('figure.circuit')].flatMap((f) =>
+      [f.querySelector('.circuit-bar'), f.querySelector('.circuit-status')].filter((e) => e.scrollHeight > e.clientHeight + 1).map((e) => `${f.dataset.circuit}: ${e.className}`)))
+    expect(clipped).toEqual([])
+  })
+
+  test('when the circuit code cannot be loaded, each figure says so in the room it already has', async ({ page }) => {
+    // the app reloads on a failed chunk (pwaAutoUpdate.ts, for stale deploys); keep this page to see what a lasting failure shows
+    await page.addInitScript(() => window.addEventListener('vite:preloadError', (e) => e.stopImmediatePropagation()))
+    let release
+    const gate = new Promise((resolve) => { release = resolve })
+    await page.route('**/study-content-circuits-*.js', async (route) => { await gate; await route.abort() })
+    await page.goto('/study/arduino')
+    await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
+    const heights = () => page.evaluate(() => [...document.querySelectorAll('figure.circuit')].map((f) => f.getBoundingClientRect().height))
+    const before = await heights()
+    const fig = circuit(page, 'led-blink')
+    await expect(fig.locator('.circuit-failed')).toBeHidden()
+    await expect(fig.getByRole('button', { name: '▶ 시뮬레이션' })).toBeDisabled()
+    release()
+    await expect(page.locator('figure.circuit[data-failed]')).toHaveCount(14)
+    await expect(fig.locator('.circuit-failed')).toBeVisible()
+    await expect(fig.locator('.circuit-failed')).toHaveText('그림을 불러오지 못했어요. 새로고침해 보세요.')
+    await expect(fig.locator('.circuit-status')).toBeHidden()
+    await expect(fig.getByRole('button', { name: '▶ 시뮬레이션' })).toBeDisabled()
+    ;(await heights()).forEach((h, i) => expect(Math.abs(h - before[i]), `figure ${i} with the failure note`).toBeLessThanOrEqual(1))
+  })
 
   test('a table-of-contents jump past many unbuilt scenes still lands on its heading', async ({ page }) => {
     await page.goto('/study/arduino')

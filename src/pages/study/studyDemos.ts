@@ -212,7 +212,8 @@ export function initStudyPage(root: HTMLElement, progressKey: string): () => voi
   if (root.querySelector('figure.circuit[data-circuit]')) {
     import('./circuits').then(
       (m) => { if (!disposed) unmountCircuits = m.mountCircuits(root) },
-      () => { /* chunk failed to load: the static caption and aria-label of each figure remain */ },
+      // chunk failed to load: each static figure keeps its size and says so in its status line
+      () => { if (!disposed) root.querySelectorAll('figure.circuit[data-circuit]').forEach((f) => f.setAttribute('data-failed', '')) },
     )
   }
 

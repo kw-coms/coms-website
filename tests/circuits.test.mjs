@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-import { IDLE, chromeHtml, hintHtml, reservedTexts } from '../src/pages/study/circuits/chrome.ts'
+import { IDLE, chromeHtml, hintHtml, reservedTexts, statusTexts } from '../src/pages/study/circuits/chrome.ts'
 import { CIRCUITS } from '../src/pages/study/circuits/definitions.ts'
 import { nets, pointOf } from '../src/pages/study/circuits/netlist.ts'
 import { buildScene } from '../src/pages/study/circuits/scene.ts'
@@ -27,7 +27,8 @@ for (const m of mounts) {
 }
 
 // ---- every figure carries its whole chrome in the page, so it has its final height before any script runs
-const chromes = [...html.matchAll(/<figure class="circuit" data-circuit="([\w-]+)"[^>]*>\n([\s\S]*?)\n<figcaption>([\s\S]*?)<\/figcaption>/g)]
+const inFigure = '(?:(?!</figure>)[\\s\\S])*?' // never let one match run into the next figure
+const chromes = [...html.matchAll(new RegExp(`<figure class="circuit" data-circuit="([\\w-]+)"[^>]*>\n(${inFigure})\n<figcaption>(${inFigure})</figcaption>`, 'g'))]
 assert.equal(chromes.length, CIRCUITS.length, 'every figure has its static chrome')
 for (const m of chromes) {
   const d = def(m[1])
@@ -46,6 +47,16 @@ for (const d of CIRCUITS) {
   assert.ok(reserved.length >= 2, `${d.id}: a running text is reserved`)
 }
 assert.ok(reservedTexts('alarm').some((t) => t.includes('경보!')) && reservedTexts('alarm').some((t) => t.includes('조용')), 'each alarm zone is reserved')
+// ...for every text a sim can print: a reserved text of the same template whose every number is at least as wide
+const NUMBER = /-?\d+(?:\.\d+)?/g
+const shape = (t) => ({ key: t.replace(NUMBER, '#'), lens: (t.match(NUMBER) ?? []).map((n) => n.length) })
+for (const kind of new Set(CIRCUITS.map((d) => d.sim))) {
+  const reserved = reservedTexts(kind).map(shape)
+  for (const t of statusTexts[kind]()) {
+    const { key, lens } = shape(t)
+    assert.ok(reserved.some((r) => r.key === key && r.lens.every((n, i) => n >= lens[i])), `${kind}: no room reserved for "${t}"`)
+  }
+}
 
 // ---- the drawing builds, and every terminal resolves to a point inside the scene
 for (const d of CIRCUITS) {

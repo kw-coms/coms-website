@@ -10,9 +10,12 @@ import { circuitById } from '../src/pages/study/circuits/definitions.ts'
 
 const file = new URL('../src/pages/study/content/arduino.html', import.meta.url)
 const html = readFileSync(file, 'utf8')
+// one figure at a time: nothing in a match may cross a </figure>
+const inFigure = '(?:(?!</figure>)[\\s\\S])*?'
+const figures = (html.match(/<figure class="circuit" data-circuit="/g) ?? []).length
 let count = 0
 const out = html.replace(
-  /(<figure class="circuit" data-circuit="([\w-]+)"[^>]*>)[\s\S]*?<figcaption>([\s\S]*?)(?: ?<span class="circuit-hint"[^>]*>[^<]*<\/span>)?<\/figcaption>/g,
+  new RegExp(`(<figure class="circuit" data-circuit="([\\w-]+)"[^>]*>)${inFigure}<figcaption>(${inFigure})(?: ?<span class="circuit-hint"[^>]*>[^<]*</span>)?</figcaption>`, 'g'),
   (_m, open, id, caption) => {
     const def = circuitById(id)
     if (!def) throw new Error(`no circuit definition for ${id}`)
@@ -20,5 +23,6 @@ const out = html.replace(
     return `${open}\n${chromeHtml(def)}\n<figcaption>${caption} ${hintHtml(def)}</figcaption>`
   },
 )
+if (count !== figures) throw new Error(`${figures - count} circuit figure(s) have no <figcaption>: every figure needs one`)
 writeFileSync(file, out)
 console.log(`${count} circuit figures written`)

@@ -32,7 +32,8 @@ interface Mounted {
   attach(): void
   /** the box the scene goes into: what the viewport observer watches */
   plane: HTMLElement
-  dispose(): void
+  /** puts the static figure back; `failed` also shows its "could not load" note */
+  dispose(failed?: boolean): void
 }
 
 /**
@@ -50,6 +51,7 @@ function mountOne(fig: HTMLElement, def: CircuitDef): Mounted | null {
     console.error('circuit figure failed to mount', def.id, err)
     ac.abort()
     cleanups.forEach((c) => { try { c() } catch { /* best effort */ } })
+    fig.setAttribute('data-failed', '')
     return null
   }
 }
@@ -62,6 +64,7 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
   let raf = 0
 
   /* ---------- DOM (the static chrome generated from chrome.ts) ---------- */
+  fig.removeAttribute('data-failed')
   const statics = Array.from(fig.childNodes, (n) => n.cloneNode(true)) // put back as it was on dispose / failure
   cleanups.push(() => { fig.replaceChildren(...statics); fig.classList.remove('is-live'); fig.removeAttribute('data-sim'); ['data-led', 'data-sound'].forEach((a) => fig.removeAttribute(a)) })
   const need = <T extends Element = HTMLElement>(sel: string) => {
@@ -682,8 +685,8 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
   function setRunning(on: boolean) {
     if (on) {
       // a scene must exist before it can be simulated (a keyboard user can reach the play button first); if it cannot be
-      // built, nothing changes: the button keeps saying ▶ and the controls stay locked
-      try { attach() } catch (err) { console.error('circuit scene failed to build', def.id, err); return }
+      // built, the figure goes back to its static form with the "could not load" note, as when the build fails on scroll
+      try { attach() } catch (err) { console.error('circuit scene failed to build', def.id, err); dispose(true); return }
     }
     running = on
     btnPlay.textContent = on ? '■ 정지' : '▶ 시뮬레이션'
@@ -713,13 +716,14 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
     sceneHooks.splice(0).forEach((fn) => fn())
     applyStepper() // stepper state and a row highlighted (hover / focus) before the scene existed
   }
-  const dispose = () => {
+  const dispose = (failed = false) => {
     if (disposed) return // a scene that failed to build disposes its figure early; unmount must not run the cleanups twice
     disposed = true
     ac.abort()
     cancelAnimationFrame(raf)
     fig.removeAttribute('data-offscreen')
     cleanups.forEach((c) => c())
+    if (failed) fig.setAttribute('data-failed', '')
   }
   return { attach, plane, dispose }
 }
@@ -734,7 +738,7 @@ export function mountCircuits(root: HTMLElement): () => void {
   const mounted: Mounted[] = []
   const pending = new Map<Element, Mounted>()
   const build = (m: Mounted) => {
-    try { m.attach() } catch (err) { console.error('circuit scene failed to build', err); m.dispose() }
+    try { m.attach() } catch (err) { console.error('circuit scene failed to build', err); m.dispose(true) }
   }
   const io = 'IntersectionObserver' in window
     ? new IntersectionObserver((entries) => entries.forEach((en) => {
