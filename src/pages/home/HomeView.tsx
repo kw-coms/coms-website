@@ -331,10 +331,10 @@ export default function HomeView() {
                 )
               })}
             </div>
-            {/* What the Activity menu holds, one tap away. The list is the menu's own, so a
+            {/* What the Records and Tools menus hold, one tap away. The list is the menu's own, so a
                 tool added to the menu shows up here too. */}
             <div className="coms-tools" data-reveal>
-              <p className="coms-label"><i />Tools</p>
+              <p className="coms-label"><i />Shortcuts</p>
               <ul className="coms-tools-grid" aria-label="활동 도구 바로가기">
                 {activitySectionNavItems.map((item) => (
                   <li key={item.id}>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation, type NavigateOptions, type To } from 'react-router-dom'
 import {
   CalendarDays,
@@ -10,6 +10,7 @@ import {
   Menu,
   Megaphone,
   Search,
+  Wrench,
   Sparkles,
   X,
 } from 'lucide-react'
@@ -63,12 +64,12 @@ export default function GlobalNavigation() {
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [activityOpen, setActivityOpen] = useState(false)
-  const [mobileActivityOpen, setMobileActivityOpen] = useState(false)
+  const [openGroup, setOpenGroup] = useState<string | null>(null)
+  const [mobileOpenGroups, setMobileOpenGroups] = useState<string[]>([])
   const [scrolled, setScrolled] = useState(false)
   const [showTop, setShowTop] = useState(false)
-  const activityWrapperRef = useRef(null)
-  const activityToggleRef = useRef<HTMLButtonElement | null>(null)
+  const groupWrapperRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const groupToggleRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const mobileMenuToggleRef = useRef<HTMLButtonElement | null>(null)
   // Every navigation closes the mobile menu, not only its own links: the brand link, a
   // notification row and the browser's Back button change the route without closeAndGo.
@@ -78,7 +79,7 @@ export default function GlobalNavigation() {
   if (location.key !== menuLocationKey) {
     setMenuLocationKey(location.key)
     setMobileMenuOpen(false)
-    setMobileActivityOpen(false)
+    setMobileOpenGroups([])
   }
   const activeKey = getActiveNavKey(location.pathname)
   const mobileTabs = MOBILE_TAB_IDS.flatMap((id) => tabs.filter((tab) => tab.id === id))
@@ -86,7 +87,6 @@ export default function GlobalNavigation() {
   const primaryNavItems = tabs.map((tab) => ({ ...tab, path: getTabRoute(tab.id) }))
   const noticesNavItem = navExtraItems.find((item) => item.id === 'notices')
   const memberNavItems = navExtraItems.filter((item) => item.id !== 'notices')
-  const activityNavActive = activitySectionNavItems.some((item) => item.id === activeKey)
 
   // Kakao-style header: solidify on scroll, drive the top progress bar, and
   // toggle the back-to-top button.
@@ -114,14 +114,15 @@ export default function GlobalNavigation() {
   }, [])
 
   useEffect(() => {
-    if (!activityOpen) return undefined
+    if (!openGroup) return undefined
     const onDocClick = (event) => {
-      if (activityWrapperRef.current && !activityWrapperRef.current.contains(event.target)) setActivityOpen(false)
+      const wrapper = groupWrapperRefs.current[openGroup]
+      if (wrapper && !wrapper.contains(event.target)) setOpenGroup(null)
     }
     const onKey = (event) => {
       if (event.key === 'Escape') {
-        setActivityOpen(false)
-        activityToggleRef.current?.focus()
+        setOpenGroup(null)
+        groupToggleRefs.current[openGroup]?.focus()
       }
     }
     document.addEventListener('mousedown', onDocClick)
@@ -130,14 +131,14 @@ export default function GlobalNavigation() {
       document.removeEventListener('mousedown', onDocClick)
       document.removeEventListener('keydown', onKey)
     }
-  }, [activityOpen])
+  }, [openGroup])
 
   useEffect(() => {
     if (!mobileMenuOpen) return undefined
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       setMobileMenuOpen(false)
-      setMobileActivityOpen(false)
+      setMobileOpenGroups([])
       mobileMenuToggleRef.current?.focus()
     }
     document.addEventListener('keydown', onKey)
@@ -168,7 +169,7 @@ export default function GlobalNavigation() {
 
   const closeAndGo = (to: To, options?: NavigateOptions) => {
     setMobileMenuOpen(false)
-    setMobileActivityOpen(false)
+    setMobileOpenGroups([])
     goPageTop(to, options)
   }
 
@@ -179,7 +180,7 @@ export default function GlobalNavigation() {
 
   const goNavItem = (item) => {
     const target = `${item.path}${item.hash || ''}`
-    setActivityOpen(false)
+    setOpenGroup(null)
     if (item.auth) {
       goProtected(target)
       return
@@ -196,7 +197,7 @@ export default function GlobalNavigation() {
   }
 
   const navClass = (key, active = activeKey === key) => (
-    `relative px-1 text-xs font-semibold transition ${
+    `relative px-0 text-xs xl:px-1 font-semibold transition ${
       active
         ? 'text-[var(--app-text)]'
         : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'
@@ -230,9 +231,10 @@ export default function GlobalNavigation() {
           <span className="whitespace-nowrap text-sm font-bold text-[var(--app-text)]">KW COM&apos;s</span>
         </button>
 
-        {/* gap-2 below xl: with the quick-jump button in the account cluster, the wider gap no
-            longer fitted at 1024px and the brand was painted over. */}
-        <nav className="hidden items-center gap-2 lg:flex xl:gap-5">
+        {/* Tight below 2xl (gap-1 and no button padding at lg, gap-3 at xl): with the Records and Tools buttons and the
+            quick-jump button in the account cluster, wider gaps no longer fitted at 1024px and
+            1280px and the brand was painted over. */}
+        <nav className="hidden items-center lg:flex lg:gap-1 xl:gap-3 2xl:gap-5">
           {primaryNavItems.map((item) => (
             <button
               key={item.id}
@@ -254,29 +256,33 @@ export default function GlobalNavigation() {
               <span className={`absolute -bottom-4 left-1/2 h-0.5 w-4 -translate-x-1/2 rounded-full bg-[var(--app-accent)] transition ${activeKey === noticesNavItem.id ? 'opacity-100' : 'opacity-0'}`} />
             </button>
           )}
-          <div ref={activityWrapperRef} className="relative">
-            <button
-              ref={activityToggleRef}
-              type="button"
-              onClick={() => setActivityOpen((open) => !open)}
-              className={`${navClass('activity', activityNavActive)} inline-flex items-center gap-1`}
-              aria-expanded={activityOpen}
-              aria-controls="activity-nav-panel"
-            >
-              Activity
-              <ChevronDown size={12} className={`transition ${activityOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
-            </button>
-            {activityOpen && (
-              <nav
-                id="activity-nav-panel"
-                aria-label="활동 메뉴"
-                className="absolute left-1/2 top-full z-[90] mt-4 flex w-[34rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 overflow-hidden rounded-2xl border border-[var(--app-hairline)] bg-[var(--app-surface)] shadow-[0_18px_45px_rgba(0,0,0,0.12)]"
-              >
-                {activityNavGroups.map((group) => (
-                  <div key={group.id} className="min-w-0 flex-1 py-2 first:border-r first:border-[var(--app-hairline)]">
-                    <h3 className="px-4 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wide text-[var(--app-subtle)]">{group.label}</h3>
+          {activityNavGroups.map((group) => {
+            const groupItems = activitySectionNavItems.filter((item) => item.group === group.id)
+            const open = openGroup === group.id
+            const groupActive = groupItems.some((item) => item.id === activeKey)
+            return (
+              <div key={group.id} ref={(node) => { groupWrapperRefs.current[group.id] = node }} className="relative">
+                <button
+                  ref={(node) => { groupToggleRefs.current[group.id] = node }}
+                  type="button"
+                  onClick={() => setOpenGroup(open ? null : group.id)}
+                  className={`${navClass(group.id, groupActive)} inline-flex items-center gap-1`}
+                  data-active={groupActive ? 'true' : undefined}
+                  aria-current={groupActive ? 'true' : undefined}
+                  aria-expanded={open}
+                  aria-controls={`${group.id}-nav-panel`}
+                >
+                  {group.navLabel}
+                  <ChevronDown size={12} className={`transition ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </button>
+                {open && (
+                  <nav
+                    id={`${group.id}-nav-panel`}
+                    aria-label={`${group.label} 메뉴`}
+                    className="absolute left-1/2 top-full z-[90] mt-4 w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 overflow-hidden rounded-2xl border border-[var(--app-hairline)] bg-[var(--app-surface)] py-2 shadow-[0_18px_45px_rgba(0,0,0,0.12)]"
+                  >
                     <ul className="flex flex-col">
-                      {activitySectionNavItems.filter((item) => item.group === group.id).map((item) => (
+                      {groupItems.map((item) => (
                         <li key={item.id}>
                           <button
                             type="button"
@@ -294,11 +300,11 @@ export default function GlobalNavigation() {
                         </li>
                       ))}
                     </ul>
-                  </div>
-                ))}
-              </nav>
-            )}
-          </div>
+                  </nav>
+                )}
+              </div>
+            )
+          })}
           {memberNavItems.map((item) => (
             <button
               key={item.id}
@@ -395,30 +401,28 @@ export default function GlobalNavigation() {
               <span>Notices</span>
               <span className="ml-auto text-xs text-[var(--app-muted)]">공지사항</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setMobileActivityOpen((open) => !open)}
-              aria-expanded={mobileActivityOpen}
-              aria-controls="mobile-activity-panel"
-              className="apple-mobile-menu-item"
-            >
-              <CalendarDays size={15} className="text-sky-500" />
-              <span>Activity</span>
-              <span className="ml-auto inline-flex items-center gap-1 text-xs text-[var(--app-muted)]">
-                기록·일정
-                <ChevronDown
-                  size={14}
-                  className={`transition ${mobileActivityOpen ? 'rotate-180' : ''}`}
-                  aria-hidden="true"
-                />
-              </span>
-            </button>
-            {mobileActivityOpen && (
-              <div id="mobile-activity-panel" className="flex flex-col bg-black/[0.015]">
-                {activityNavGroups.map((group) => (
-                  <div key={group.id} className="border-b border-[var(--app-hairline)] last:border-b-0">
-                    <h3 className="px-4 pb-1 pt-3 text-[11px] font-bold uppercase tracking-wide text-[var(--app-subtle)]">{group.label}</h3>
-                    <ul className="flex flex-col divide-y divide-[var(--app-hairline)]">
+            {activityNavGroups.map((group) => {
+              const open = mobileOpenGroups.includes(group.id)
+              return (
+                <Fragment key={group.id}>
+                  <button
+                    type="button"
+                    onClick={() => setMobileOpenGroups((ids) => (open ? ids.filter((id) => id !== group.id) : [...ids, group.id]))}
+                    aria-expanded={open}
+                    aria-controls={`mobile-${group.id}-panel`}
+                    className="apple-mobile-menu-item"
+                  >
+                    {group.id === 'tools'
+                      ? <Wrench size={15} className="text-amber-500" />
+                      : <CalendarDays size={15} className="text-sky-500" />}
+                    <span>{group.navLabel}</span>
+                    <span className="ml-auto inline-flex items-center gap-1 text-xs text-[var(--app-muted)]">
+                      {group.label}
+                      <ChevronDown size={14} className={`transition ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+                    </span>
+                  </button>
+                  {open && (
+                    <ul id={`mobile-${group.id}-panel`} className="flex flex-col divide-y divide-[var(--app-hairline)] bg-black/[0.015]">
                       {activitySectionNavItems.filter((item) => item.group === group.id).map((item) => (
                         <li key={item.id}>
                           <button
@@ -437,10 +441,10 @@ export default function GlobalNavigation() {
                         </li>
                       ))}
                     </ul>
-                  </div>
-                ))}
-              </div>
-            )}
+                  )}
+                </Fragment>
+              )
+            })}
             <button type="button" onClick={() => closeAndGo('/sponsors')} className="apple-mobile-menu-item">
               <HeartHandshake size={15} className="text-emerald-500" />
               <span>Sponsors</span>

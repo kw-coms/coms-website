@@ -84,18 +84,23 @@ test('home page has no serious or critical accessibility violations', async ({ p
   await assertNoSeriousViolations(page)
 })
 
-test('desktop activity disclosure uses navigation semantics and closes with Escape', async ({ page }) => {
-  await mockAdminApis(page)
-  await page.goto('/')
-  const toggle = page.getByRole('button', { name: 'Activity', exact: true })
-  await toggle.click()
-  const navigation = page.getByRole('navigation', { name: '활동 메뉴' })
-  await expect(navigation).toBeVisible()
-  await assertNoSeriousViolations(page)
-  await page.keyboard.press('Escape')
-  await expect(navigation).toBeHidden()
-  await expect(toggle).toBeFocused()
-})
+for (const [button, menu] of [['Records', '기록·일정 메뉴'], ['Tools', '참여 도구 메뉴']]) {
+  test(`desktop ${button} disclosure uses navigation semantics and closes with Escape`, async ({ page }) => {
+    await mockAdminApis(page)
+    await page.goto('/')
+    const toggle = page.getByRole('button', { name: button, exact: true })
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const navigation = page.getByRole('navigation', { name: menu })
+    await expect(navigation).toBeVisible()
+    await assertNoSeriousViolations(page)
+    await page.keyboard.press('Escape')
+    await expect(navigation).toBeHidden()
+    await expect(toggle).toBeFocused()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  })
+}
 
 test.describe('mobile navigation', () => {
   test.use({ viewport: { width: 390, height: 844 } })
