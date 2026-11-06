@@ -2,12 +2,18 @@ import { createServer } from 'node:http';
 import { isIP } from 'node:net';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import { lstat } from 'node:fs/promises';
 import { validateSketch } from './validation.mjs';
 import { compileSketch, failure } from './compile.mjs';
 import { createRateLimiter, createCompileQueue } from './limits.mjs';
 
 export const MAX_BODY_BYTES = 80 * 1024;
 export const AUTH_MESSAGE = '로그인한 동아리원만 컴파일할 수 있어요.';
+export function rateLimitPerMinute(value = process.env.RATE_LIMIT_PER_MIN) {
+  if (value === undefined || value === '') return 10;
+  if (!/^[1-9]\d*$/.test(String(value)) || !Number.isSafeInteger(Number(value))) throw new Error('RATE_LIMIT_PER_MIN must be a positive integer');
+  return Number(value);
+}
 export function clientIp(request, trustProxy = false) {
   const forwarded = request.headers['x-forwarded-for'];
   if (trustProxy && typeof forwarded === 'string') {
@@ -53,7 +59,7 @@ function readJson(request) {
   });
 }
 export function createCompileServer({
-  runner, tempRoot, queue = createCompileQueue(), limiter = createRateLimiter(),
+  runner, tempRoot, queue = createCompileQueue(), limiter = createRateLimiter({ limit: rateLimitPerMinute() }),
   trustProxy = process.env.TRUST_PROXY === '1', authCheckUrl = process.env.AUTH_CHECK_URL || '',
   fetchImpl = fetch, logger = entry => console.log(JSON.stringify(entry)),
 } = {}) {
@@ -85,7 +91,7 @@ export function createCompileServer({
       }
       if (!limiter.take(clientIp(request, trustProxy))) {
         response.setHeader('Retry-After', '60');
-        return send(429, failure('rate-limited', '1분에 10번까지 컴파일할 수 있어요. 잠시 기다려 주세요.'));
+        return send(429, failure('rate-limited', '1분 동안의 컴파일 요청 한도를 넘었어요. 잠시 기다려 주세요.'));
       }
       const contentType = request.headers['content-type'] || '';
       if (!/^application\/json\s*(?:;\s*charset\s*=\s*utf-8\s*)?$/i.test(contentType) || request.headers['content-encoding']) {
@@ -119,9 +125,24 @@ export function createCompileServer({
   server.maxConnections = 128;
   return server;
 }
+export async function listenCompiler(server, { socketPath = process.env.LISTEN_SOCKET, port = process.env.PORT || 8787 } = {}) {
+  if (socketPath) {
+    // Fail closed: never replace a socket another process may still be serving.
+    try {
+      await lstat(socketPath);
+      throw new Error('LISTEN_SOCKET path already exists');
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    const oldMask = process.umask(0o117); // 0777 & ~0117 = 0660
+    try { await new Promise((resolve, reject) => { server.once('error', reject); server.listen(socketPath, () => { server.off('error', reject); resolve(); }); }); }
+    finally { process.umask(oldMask); }
+  } else {
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(Number(port), '0.0.0.0', () => { server.off('error', reject); resolve(); }); });
+  }
+  return server;
+}
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const server = createCompileServer();
-  server.listen(Number(process.env.PORT || 8787), '0.0.0.0');
+  listenCompiler(server).catch(error => { console.error(error.message); process.exitCode = 1; });
   const shutdown = () => { server.close(); setTimeout(() => process.exit(0), 25_000).unref(); };
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);

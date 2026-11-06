@@ -4,9 +4,11 @@ export const ALLOWED_HEADERS = new Set([
   'stdlib.h', 'avr/pgmspace.h',
 ]);
 export const MAX_SKETCH_BYTES = 64 * 1024;
+const ALLOWED_DIRECTIVES = new Set(['define', 'undef', 'if', 'ifdef', 'ifndef', 'elif', 'else', 'endif', 'error', 'warning']);
 
 // Translation phase 2 (line splicing) precedes phase 3 (comment removal).
-// Keep newlines and quoted literals intact; comment-like text in strings is data.
+// A block comment is whitespace, even across physical lines. Keep line-comment
+// terminators and quoted literals intact; comment-like text in strings is data.
 export function stripComments(source) {
   let result = '', state = 'code';
   for (let i = 0; i < source.length; i++) {
@@ -20,7 +22,7 @@ export function stripComments(source) {
       if (c === '\n') state = 'code';
     } else if (state === 'block') {
       if (c === '*' && next === '/') { result += '  '; i++; state = 'code'; }
-      else result += c === '\n' ? '\n' : ' ';
+      else result += ' ';
     } else if (state === '"' || state === "'") {
       if (c === '\n') throw new Error('multiline literal');
       result += c;
@@ -45,13 +47,20 @@ export function validateSketch(sketch) {
   if (typeof sketch !== 'string') return 'sketch는 문자열이어야 해요.';
   if (Buffer.byteLength(sketch, 'utf8') > MAX_SKETCH_BYTES) return '스케치는 64 KB 이하로 작성해 주세요.';
   // Reject alternate preprocessing spellings before interpreting any comments.
-  if (/\?\?[=/]|%:|\0/.test(sketch)) return '대체 전처리 기호나 NUL 문자는 사용할 수 없어요.';
+  const logical = sketch.replace(/\r\n?/g, '\n').replace(/\\[\t \v\f]*\n/g, '');
+  // Check both forms: splicing can itself assemble a forbidden token. These
+  // spellings are excluded everywhere, including comments and literal contents.
+  for (const text of [sketch, logical]) {
+    if (/\?\?[=/]|%:|\0/.test(text)) return '대체 전처리 기호나 NUL 문자는 사용할 수 없어요.';
+    if (/\\[uU]/.test(text)) return '유니버설 문자 이름(UCN)은 사용할 수 없어요.';
+    if (/__has_\w*/i.test(text)) return '파일 탐색 등 __has_ 계열 기능은 사용할 수 없어요.';
+  }
   let source;
-  try { source = stripComments(sketch.replace(/\r\n?/g, '\n').replace(/\\[\t ]*\n/g, '')); }
+  try { source = stripComments(logical); }
   catch { return '따옴표·주석의 끝을 확인해 주세요. 숫자 구분자와 접두 문자 리터럴은 지원하지 않아요.'; }
   // Conservative teaching subset: forbid raw strings and all inline assembly/pragmas,
   // rather than attempting to interpret assembler string escapes or token pasting.
-  if (/\b(?:u8|u|U|L)?R"|\b(?:__has_include(?:_next)?|_Pragma|__pragma|__asm__|__asm|asm|incbin)\b|##/i.test(source)) {
+  if (/\b(?:u8|u|U|L)?R"|\b(?:_Pragma|__pragma|__asm__|__asm|asm|incbin)\b|##/i.test(source)) {
     return '파일 탐색, 인라인 어셈블리, pragma, 토큰 결합 또는 raw 문자열은 사용할 수 없어요.';
   }
   for (const line of source.split('\n')) {
@@ -62,7 +71,7 @@ export function validateSketch(sketch) {
     if (name === 'include') {
       const match = body.match(/^\s*<([^<>]+)>\s*$/);
       if (!match || !ALLOWED_HEADERS.has(match[1])) return '허용된 라이브러리만 #include <헤더.h> 형식으로 사용할 수 있어요.';
-    } else if (!['define', 'undef', 'if', 'ifdef', 'ifndef', 'elif', 'else', 'endif', 'error', 'warning'].includes(name)) {
+    } else if (!ALLOWED_DIRECTIVES.has(name)) {
       return 'include_next, import, pragma, line 등 지원하지 않는 전처리 지시문은 사용할 수 없어요.';
     }
   }

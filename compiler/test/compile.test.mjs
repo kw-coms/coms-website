@@ -39,3 +39,27 @@ test('returns timeout and removes temporary folder', async () => {
     assert.equal(result.reason, 'timeout'); assert.deepEqual(await readdir(root), []);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test('failed compile response never forwards foreign file diagnostics or source excerpts', async () => {
+  const result = await compileSketch('void setup(){}\nvoid loop(){}', { runner: async (_args, { cwd }) => ({
+    code: 1, stdout: 'error: FILE_CONTENT_SENTINEL', stderr: [
+      '/etc/passwd:1:1: error: FILE_CONTENT_SENTINEL',
+      '/somewhere/sketch.ino:1:1: error: FILE_CONTENT_SENTINEL',
+      `${cwd}/sketch/sketch.ino:3:1: error: FILE_CONTENT_SENTINEL`,
+      `${cwd}/sketch/sketch.ino:1:1: note: FILE_CONTENT_SENTINEL`,
+      '  1 | FILE_CONTENT_SENTINEL',
+    ].join('\n'),
+  }) });
+  assert.equal(result.reason, 'compile');
+  assert.match(result.errors[0].message, /[가-힣]/);
+  assert.doesNotMatch(JSON.stringify(result), /FILE_CONTENT_SENTINEL|passwd/);
+});
+test('failed compile preserves bounded user diagnostics and Korean hints', async () => {
+  const result = await compileSketch('x', { runner: async (_args, { cwd }) => ({
+    code: 1, stdout: '', stderr: `${cwd}/sketch/sketch.ino:1:1: error: expected ';' before '}' token ${'x'.repeat(1000)}`,
+  }) });
+  assert.equal(result.errors.length, 1);
+  assert.equal(result.errors[0].line, 1);
+  assert.ok(result.errors[0].message.length <= 800);
+  assert.match(result.errors[0].hintKo, /세미콜론/);
+});

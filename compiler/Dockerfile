@@ -35,7 +35,8 @@ FROM node:22-bookworm-slim
 # Only runtime shared libraries, certificates, Node and Arduino's own toolchain.
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libstdc++6 \
     && rm -rf /var/lib/apt/lists/* /opt/yarn* /usr/local/lib/node_modules/npm \
-    && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg \
+    && groupadd --gid 10001 compiler && useradd --uid 10001 --gid compiler --no-create-home --shell /usr/sbin/nologin compiler
 ENV NODE_ENV=production PORT=8787 HOME=/tmp \
     ARDUINO_DIRECTORIES_DATA=/opt/arduino/data \
     ARDUINO_DIRECTORIES_USER=/opt/arduino/user \
@@ -46,8 +47,10 @@ COPY --from=toolchain /usr/local/bin/arduino-cli /usr/local/bin/arduino-cli
 COPY --from=toolchain /opt/arduino /opt/arduino
 WORKDIR /app
 COPY --chown=root:root *.mjs package.json ./
-USER node
+USER compiler
+# Fail the image build if the dedicated runtime user can read password hashes.
+RUN test ! -r /etc/shadow
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=4s --start-period=10s --retries=3 \
-    CMD ["node", "--input-type=module", "-e", "const r=await fetch('http://127.0.0.1:8787/lab/api/health',{signal:AbortSignal.timeout(2500)});process.exit(r.status===200?0:1)"]
+    CMD ["node", "--input-type=module", "-e", "const {request}=await import('node:http'); const socket=process.env.LISTEN_SOCKET; const r=request(socket?{socketPath:socket,path:'/lab/api/health',timeout:2500}:{host:'127.0.0.1',port:process.env.PORT||8787,path:'/lab/api/health',timeout:2500},res=>{res.resume();process.exit(res.statusCode===200?0:1)});r.on('error',()=>process.exit(1));r.on('timeout',()=>r.destroy());r.end()"]
 CMD ["node", "server.mjs"]

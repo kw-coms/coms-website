@@ -1,4 +1,4 @@
-import { basename } from 'node:path';
+import { basename, join } from 'node:path';
 
 export const MAX_DIAGNOSTICS = 30;
 const MAX_TEXT = 800;
@@ -28,19 +28,25 @@ export function hintFor(message) {
 }
 export function parseDiagnostics(output, { tempDir = '', sketchLines = Infinity } = {}) {
   const errors = [], warnings = [];
+  const sketchPaths = new Set(['sketch.ino', 'sketch/sketch.ino',
+    ...(tempDir ? [join(tempDir, 'sketch', 'sketch.ino')] : [])]);
   for (const raw of String(output).split(/\r?\n/)) {
     // Arduino preserves user locations via #line in its generated .ino.cpp.
-    const match = raw.match(/(?:^|[\\/])sketch\.ino:(\d+)(?::(\d+))?:\s*(?:fatal )?(error|warning):\s*(.*)$/);
-    const generic = !match && raw.match(/(?:^|\s)(?:fatal )?(error|warning):\s*(.*)$/);
+    // Never accept other files, notes, source excerpts or a matching basename
+    // embedded in arbitrary compiler output. Those can contain file contents.
+    const match = raw.match(/^([^\r\n]+?):(\d+)(?::(\d+))?:\s*(?:fatal )?(error|warning):\s*(.*)$/);
     let diagnostic;
     if (match) {
-      const line = Number(match[1]);
-      diagnostic = { line: line > 0 && line <= sketchLines ? line : 0,
-        ...(match[2] ? { column: Number(match[2]) } : {}), severity: match[3], message: match[4] };
-    } else if (generic) {
-      diagnostic = { line: 0, severity: generic[1], message: generic[2] };
-    } else if (/undefined reference to|sketch too big|text section exceeds|region .*overflowed|will not fit in region/i.test(raw)) {
-      diagnostic = { line: 0, severity: 'error', message: raw };
+      const line = Number(match[2]);
+      if (!sketchPaths.has(match[1]) || !Number.isSafeInteger(line) || line <= 0 || line > sketchLines) continue;
+      diagnostic = { line, ...(match[3] ? { column: Number(match[3]) } : {}), severity: match[4], message: match[5] };
+    } else if (/\bnote:/.test(raw)) {
+      continue;
+    } else if (/^.*:\s*undefined reference to /.test(raw)) {
+      diagnostic = { line: 0, severity: 'error', message: '링크하지 못했어요. 함수 정의와 라이브러리 사용법을 확인해 주세요.' };
+      if (/undefined reference to [`'‘](?:setup|loop)['’]/.test(raw)) diagnostic.hintKo = hintFor('undefined reference to setup');
+    } else if (/^(?:Sketch too big\b|.*:\s*(?:region .*overflowed|.*will not fit in region|text section exceeds))/i.test(raw)) {
+      diagnostic = { line: 0, severity: 'error', message: 'UNO의 플래시 용량을 초과했어요. 큰 배열·문자열이나 사용하지 않는 코드를 줄여 주세요.' };
     }
     if (!diagnostic) continue;
     const hintKo = hintFor(diagnostic.message);

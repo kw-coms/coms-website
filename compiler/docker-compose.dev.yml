@@ -1,0 +1,28 @@
+# Development only: normal bridge and localhost-published port, no production auth.
+services:
+  compiler:
+    build:
+      context: .
+    image: coms-circuit-lab-compiler:local
+    init: true
+    ports:
+      - "127.0.0.1:8787:8787"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=256m,mode=1777
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: 1.0
+    pids_limit: 128
+    stop_grace_period: 25s
+    environment:
+      TRUST_PROXY: "0"
+      AUTH_CHECK_URL: ""
+      RATE_LIMIT_PER_MIN: "120"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

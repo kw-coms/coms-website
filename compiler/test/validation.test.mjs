@@ -38,3 +38,31 @@ test('does not erase path characters inside header-name tokens', () => {
   assert.ok(validateSketch('#include <Servo.h//../secret>'));
   assert.equal(validateSketch('#/**/include/**/<Servo.h> // safe trailing comment'), null);
 });
+
+// Read source literals only; do not import the frontend or execute scene builders.
+const examplesSource = await (await import('node:fs/promises')).readFile(new URL('../../src/core/examples.ts', import.meta.url), 'utf8');
+const examples = [...examplesSource.matchAll(/\bbuild\('([^']+)'\s*,\s*'[^']*'\s*,\s*'[^']*'\s*,\s*`((?:\\[\s\S]|[^`\\])*)`/g)];
+test('extracts all 17 example sketches without editing or executing frontend', () => {
+  assert.equal(examples.length, 17);
+  assert.equal(examples.length, (examplesSource.match(/\bbuild\('/g) || []).length);
+});
+for (const [, id, literal] of examples) test(`allows example ${id}`, () => {
+  assert.doesNotMatch(literal, /\$\{|\\(?![nrt"'\\`])/);
+  const sketch = literal.replace(/\\([nrt"'\\`])/g, (_, c) => ({ n: '\n', r: '\r', t: '\t' }[c] ?? c));
+  assert.equal(validateSketch(sketch.trim() + '\n'), null);
+});
+
+const { rejectedSketches } = await import('./fixtures/rejected-sketches.mjs');
+for (const [name, sketch] of rejectedSketches) test(`rejects bypass: ${name}`, () => {
+  const message = validateSketch(sketch);
+  assert.equal(typeof message, 'string');
+  assert.match(message, /[가-힣]/);
+  assert.doesNotMatch(message, /\/etc\/|passwd|secret|root:/);
+});
+test('allows allowlisted directives after logical-line normalization', () => {
+  assert.equal(validateSketch('#/*\n*/include <Servo.h>\n#define ON 1\n#undef ON\n#if 1\n#elif 0\n#else\n#endif\n#ifdef ON\n#endif\n#ifndef ON\n#endif\n#error user error\n#warning user warning'), null);
+});
+test('continued line comments and literal comment markers preserve directive boundaries', () => {
+  assert.equal(validateSketch('// ignored \\\n#pragma once\nconst char* s="/*"; char c=\'/\';\n#include <Servo.h>'), null);
+  assert.equal(validateSketch('// ignored \\\r\n#pragma once\n#include <Servo.h>'), null);
+});

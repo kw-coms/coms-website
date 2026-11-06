@@ -69,3 +69,34 @@ test('in-memory handler rejects full compile queue', async () => {
   assert.equal(second.status, 429); assert.equal(second.body.reason, 'busy');
   release(); await first;
 });
+
+const { rejectedSketches } = await import('./fixtures/rejected-sketches.mjs');
+for (const [name, sketch] of rejectedSketches) test(`HTTP rejects bypass without compiler output: ${name}`, async () => {
+  let called = false;
+  const server = serverWith({ runner: async () => {
+    called = true;
+    return { code: 1, stderr: '/etc/passwd:1: error: root:FILE_CONTENT_SENTINEL', stdout: '' };
+  } });
+  const result = await invoke(server, { body: JSON.stringify({ sketch }) });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.reason, 'rejected');
+  assert.equal(called, false);
+  assert.match(result.body.errors[0].message, /[가-힣]/);
+  assert.doesNotMatch(JSON.stringify(result.body), /passwd|root:|FILE_CONTENT_SENTINEL|\/etc\//);
+});
+
+test('RATE_LIMIT_PER_MIN configures the handler per client IP', async () => {
+  const previous = process.env.RATE_LIMIT_PER_MIN;
+  process.env.RATE_LIMIT_PER_MIN = '2';
+  try {
+    const server = serverWith({ trustProxy: true });
+    const options = { body: '{broken', headers: { 'x-forwarded-for': '192.0.2.1' } };
+    assert.equal((await invoke(server, options)).status, 400);
+    assert.equal((await invoke(server, options)).status, 400);
+    assert.equal((await invoke(server, options)).status, 429);
+    assert.equal((await invoke(server, { ...options, headers: { 'x-forwarded-for': '192.0.2.2' } })).status, 400);
+  } finally {
+    if (previous === undefined) delete process.env.RATE_LIMIT_PER_MIN;
+    else process.env.RATE_LIMIT_PER_MIN = previous;
+  }
+});
