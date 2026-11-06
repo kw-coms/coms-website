@@ -1,6 +1,7 @@
 // Runtime for the <figure class="circuit" data-circuit="..."> mount points of a study fragment:
 // draws the scene, adds the 3D tilt, the simulation, the assembly stepper and the table <-> drawing links.
 // Loaded on demand from studyDemos.ts (only when a fragment contains such a figure).
+import { DHT_FAIL, DHT_WAIT, IDLE, RANGES, say } from './chrome'
 import { circuitById, type CircuitDef } from './definitions'
 import { JOY_TRAVEL } from './parts'
 import { buildScene } from './scene'
@@ -10,36 +11,6 @@ let counter = 0
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 /** Low-power mode (set site-wide on machines without graphics acceleration): flat view, no SVG filters, no continuous animation. */
 const lite = () => document.documentElement.dataset.perf === 'lite'
-
-function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string | null, text?: string, attrs: Record<string, string> = {}) {
-  const e = document.createElement(tag)
-  if (cls) e.className = cls
-  if (text != null) e.textContent = text
-  Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v))
-  return e
-}
-const button = (cls: string, text: string, label?: string) => {
-  const b = h('button', `cb ${cls}`, text, { type: 'button' })
-  if (label) b.setAttribute('aria-label', label)
-  return b
-}
-
-const IDLE: Record<string, string> = {
-  blink: '▶ 시뮬레이션을 누르면 스케치처럼 D8이 0.5초마다 HIGH/LOW로 바뀌고 LED가 깜빡입니다.',
-  button: '▶ 시뮬레이션을 누른 뒤 그림 속 버튼을 눌러 보세요. (마우스/터치로 누르고 있기, 또는 포커스 후 Space/Enter)',
-  pot: '▶ 시뮬레이션을 누른 뒤 가변저항 손잡이를 돌리거나 슬라이더를 움직여 보세요.',
-  ultrasonic: '▶ 시뮬레이션을 누른 뒤 슬라이더로 물체의 거리를 바꿔 보세요.',
-  servo: '▶ 시뮬레이션을 누른 뒤 슬라이더로 각도를 바꿔 보세요.',
-  buzzer: '▶ 시뮬레이션을 누르면 도레미파솔이 연주되는 동안 소리 파동이 표시됩니다. (실제 소리는 나지 않아요)',
-  alarm: '▶ 시뮬레이션을 누른 뒤 슬라이더로 물체의 거리를 바꿔 보세요. 최종 스케치와 같은 구간·간격으로 동작합니다.',
-  cds: '▶ 시뮬레이션을 누른 뒤 슬라이더로 주변 밝기를 바꿔 보세요. 야간등 스케치처럼 analogRead가 300 아래로 내려가면 LED가 켜집니다.',
-  rgb: '▶ 시뮬레이션을 누른 뒤 R·G·B 슬라이더(analogWrite 값)를 움직이거나, 스케치의 색 순환을 재생해 보세요.',
-  lcd: '▶ 시뮬레이션을 누르면 LCD에 글자가 나타납니다. 가변저항 손잡이나 슬라이더로 둘째 줄의 A0 값을 바꿔 보세요.',
-  dht: '▶ 시뮬레이션을 누른 뒤 슬라이더로 온도·습도를 바꿔 보세요. 스케치처럼 2초마다 한 번 읽어 시리얼에 출력합니다.',
-  'dht-lcd': '▶ 시뮬레이션을 누른 뒤 슬라이더로 온도·습도를 바꿔 보세요. 2초마다 읽어 LCD와 시리얼에 함께 표시합니다.',
-  joystick: '▶ 시뮬레이션을 누른 뒤 그림 속 스틱을 끌거나 슬라이더를 움직여 보세요. 스틱 누르기 버튼은 SW(D7)입니다.',
-  motor: '▶ 시뮬레이션을 누른 뒤 슬라이더로 setMotor 속도(−255~255)를 바꾸거나, 스케치의 loop()를 재생해 보세요.',
-}
 
 const VIEW_RX = 22
 const VIEW_RX_RANGE = 24
@@ -65,8 +36,9 @@ interface Mounted {
 }
 
 /**
- * Renders the whole chrome of one figure (bar, stepper, controls, status line, caption hint, the empty stage box) at once.
- * Only the SVG scene is built later, into a box whose size is fixed by the scene's viewBox, so nothing ever changes height.
+ * Brings the static chrome of one figure to life (bar, stepper, controls, status line, live region and caption hint are
+ * already in the page, generated from chrome.ts, so the figure has its final height before this runs). Only the SVG
+ * scene is built later, into the stage box whose size the page already fixed from the scene's viewBox.
  * If anything throws, everything done so far is undone and null is returned (the static figure stays as it was).
  */
 function mountOne(fig: HTMLElement, def: CircuitDef): Mounted | null {
@@ -89,49 +61,43 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
   const caption = Array.from(fig.children).find((c) => c.tagName === 'FIGCAPTION') ?? null
   let raf = 0
 
-  /* ---------- DOM ---------- */
-  const bar = h('div', 'circuit-bar', undefined, { role: 'group', 'aria-label': '회로 그림 조작' })
-  const btnPlay = button('cb-play', '▶ 시뮬레이션')
-  const btnView = button('cb-view', '평면으로 보기')
-  const btnSteps = button('cb-steps', '조립 순서 보기')
-  btnSteps.setAttribute('aria-pressed', 'false')
-  bar.append(btnPlay, btnView, btnSteps)
-
-  const stepper = h('div', 'circuit-stepper', undefined, { role: 'group', 'aria-label': '조립 순서' })
-  const btnPrev = button('cb-prev', '◀', '이전 단계')
-  const progress = h('span', 'circuit-progress', '', { role: 'status', 'aria-live': 'polite' })
-  const btnNext = button('cb-next', '▶', '다음 단계')
-  const btnAll = button('cb-all', '전체 보기')
-  stepper.append(btnPrev, progress, btnNext, btnAll)
-  stepper.hidden = true
-
-  const stage = h('div', 'circuit-stage', undefined, {
-    tabindex: '0', role: 'group',
-    'aria-label': '회로 그림. 드래그하거나 방향키로 각도를 바꾸고, 더블클릭 또는 Home 키로 처음 각도로 돌립니다.',
-  })
-  const plane = h('div', 'circuit-plane')
-  plane.style.maxWidth = `${Math.round(def.size[0] * 1.12)}px`
-  plane.style.aspectRatio = `${def.size[0]} / ${def.size[1]}` // the scene's viewBox: the box has its final size before the SVG exists
-  stage.append(plane)
+  /* ---------- DOM (the static chrome generated from chrome.ts) ---------- */
+  const statics = Array.from(fig.childNodes, (n) => n.cloneNode(true)) // put back as it was on dispose / failure
+  cleanups.push(() => { fig.replaceChildren(...statics); fig.classList.remove('is-live'); fig.removeAttribute('data-sim'); ['data-led', 'data-sound'].forEach((a) => fig.removeAttribute(a)) })
+  const need = <T extends Element = HTMLElement>(sel: string) => {
+    const el = fig.querySelector<T>(sel)
+    if (!el) throw new Error(`static chrome is missing ${sel} (regenerate it: scripts/gen-circuit-chrome.mjs)`)
+    return el
+  }
+  const btnPlay = need<HTMLButtonElement>('.circuit-bar .cb-play')
+  const btnView = need<HTMLButtonElement>('.circuit-bar .cb-view')
+  const btnSteps = need<HTMLButtonElement>('.circuit-bar .cb-steps')
+  const stepper = need('.circuit-stepper')
+  const btnPrev = need<HTMLButtonElement>('.circuit-stepper .cb-prev')
+  const progress = need('.circuit-progress')
+  const btnNext = need<HTMLButtonElement>('.circuit-stepper .cb-next')
+  const btnAll = need<HTMLButtonElement>('.circuit-stepper .cb-all')
+  const stage = need('.circuit-stage')
+  const plane = need('.circuit-plane')
+  const ctl = need('.circuit-ctl')
+  // the visible status line is plain text (it changes every frame while a sim runs); screen readers get a separate, debounced live region
+  const status = need('.circuit-status')
+  const live = need('.circuit-live')
+  const hint = caption?.querySelector('.circuit-hint') ?? null
+  const rangeEls = Array.from(ctl.querySelectorAll<HTMLLabelElement>('.circuit-range'))
+  const modeEls = Array.from(ctl.querySelectorAll<HTMLButtonElement>('.cb-mode'))
+  const specs = RANGES[def.sim] ?? []
+  if (rangeEls.length !== specs.length) throw new Error(`static chrome has ${rangeEls.length} sliders, ${def.sim} needs ${specs.length}`)
+  ;[btnPlay, btnView, btnSteps, btnPrev, btnNext, btnAll].forEach((b) => { b.disabled = false })
+  stage.tabIndex = 0
+  stage.setAttribute('role', 'group')
+  stage.setAttribute('aria-label', '회로 그림. 드래그하거나 방향키로 각도를 바꾸고, 더블클릭 또는 Home 키로 처음 각도로 돌립니다.')
   // The scene is built later (when the figure nears the viewport); code that needs its elements runs through onScene
   let svg: SVGSVGElement | null = null
   const sceneHooks: Array<() => void> = []
   const onScene = (fn: () => void) => { if (svg) fn(); else sceneHooks.push(fn) }
-
-  const ctl = h('div', 'circuit-ctl')
-  // the visible status line is plain text (it changes every frame while a sim runs); screen readers get a separate, debounced live region
-  const status = h('p', 'circuit-status', IDLE[def.sim])
-  const live = h('div', 'circuit-live', undefined, { role: 'status', 'aria-live': 'polite' })
-  const mounted: HTMLElement[] = [bar, stepper, stage, ctl, status, live]
-  fig.insertBefore(live, caption)
-  fig.insertBefore(status, live)
-  fig.insertBefore(ctl, status)
-  fig.insertBefore(stage, ctl)
-  fig.insertBefore(stepper, stage)
-  fig.insertBefore(bar, stepper)
   fig.classList.add('is-live')
   fig.setAttribute('data-sim', 'off')
-  cleanups.push(() => { mounted.forEach((n) => n.remove()); fig.classList.remove('is-live'); fig.removeAttribute('data-sim'); ;['data-led', 'data-sound'].forEach((a) => fig.removeAttribute(a)) })
 
   let lastStatus = IDLE[def.sim]
   const setStatus = (s: string) => { if (s !== lastStatus) { lastStatus = s; status.textContent = s } }
@@ -246,24 +212,22 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
     ;(s.parts || []).forEach((p) => partEls(p).forEach((n) => n.classList.add('is-hl')))
     rows[i].classList.add('circuit-row-on')
   }
-  const restoreHl = () => hl(stepper$.on ? stepper$.n - 1 : null)
+  // the row under the pointer or with focus wins over the stepper's current step; re-applied once the scene exists
+  let pointed: number | null = null
+  const restoreHl = () => hl(pointed ?? (stepper$.on ? stepper$.n - 1 : null))
+  const point = (i: number | null) => { pointed = i; restoreHl() }
 
   if (linked) {
-    if (caption) {
-      const hint = h('span', 'circuit-hint', '위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.', { id: `${uid}-hint` })
-      caption.append(hint)
-      cleanups.push(() => hint.remove())
-    }
     // one tab stop per table (roving tabindex): arrow keys move between the rows
-    if (caption) rows[0]?.closest('table')?.setAttribute('aria-describedby', `${uid}-hint`) // described once, on the table
+    if (hint?.id) rows[0]?.closest('table')?.setAttribute('aria-describedby', hint.id) // described once, on the table
     const setRowTab = (i: number) => rows.forEach((r, k) => r.setAttribute('tabindex', k === i ? '0' : '-1'))
     rows.forEach((row, i) => {
       row.setAttribute('tabindex', i === 0 ? '0' : '-1')
       row.classList.add('circuit-row')
-      row.addEventListener('pointerenter', () => hl(i), { signal })
-      row.addEventListener('pointerleave', restoreHl, { signal })
-      row.addEventListener('focus', () => { setRowTab(i); hl(i) }, { signal })
-      row.addEventListener('blur', restoreHl, { signal })
+      row.addEventListener('pointerenter', () => point(i), { signal })
+      row.addEventListener('pointerleave', () => point(null), { signal })
+      row.addEventListener('focus', () => { setRowTab(i); point(i) }, { signal })
+      row.addEventListener('blur', () => point(null), { signal })
       row.addEventListener('keydown', (e) => {
         const to = e.key === 'ArrowDown' ? i + 1 : e.key === 'ArrowUp' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? rows.length - 1 : -1
         if (to < 0 || to >= rows.length) return
@@ -282,14 +246,12 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
       row.removeAttribute('tabindex'); rows[0]?.closest('table')?.removeAttribute('aria-describedby')
       row.classList.remove('circuit-row', 'circuit-row-on', 'circuit-row-current')
     }))
-  } else {
-    btnSteps.hidden = true
   }
-
+  // the stepper takes the place of its button inside the bar (whose height is fixed), so showing it moves nothing
   function applyStepper() {
     const { on, n } = stepper$
     stepper.hidden = !on
-    btnSteps.setAttribute('aria-pressed', String(on))
+    btnSteps.hidden = on || !linked
     svg?.querySelectorAll('.cstep-off').forEach((x) => x.classList.remove('cstep-off'))
     rows.forEach((r, i) => r.classList.toggle('circuit-row-current', on && i === n - 1))
     if (on) {
@@ -304,24 +266,26 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
     btnNext.disabled = n >= def.steps.length
     restoreHl()
   }
-  btnSteps.addEventListener('click', () => { stepper$.on = !stepper$.on; stepper$.n = 1; applyStepper() }, { signal })
+  btnSteps.addEventListener('click', () => { stepper$.on = true; stepper$.n = 1; applyStepper(); btnNext.focus() }, { signal })
   btnAll.addEventListener('click', () => { stepper$.on = false; applyStepper(); btnSteps.focus() }, { signal })
   btnPrev.addEventListener('click', () => { stepper$.n = Math.max(1, stepper$.n - 1); applyStepper() }, { signal })
   btnNext.addEventListener('click', () => { stepper$.n = Math.min(def.steps.length, stepper$.n + 1); applyStepper() }, { signal })
   cleanups.push(() => rows.forEach((r) => r.classList.remove('circuit-row-current')))
+  applyStepper()
 
   /* ---------- simulation ---------- */
   let running = false
-  const range = (label: string, min: number, max: number, value: number, unit: string, onInput: (v: number) => void) => {
-    const wrap = h('label', 'circuit-range')
-    const text = h('span', 'circuit-range-label', label)
-    const input = h('input', null, undefined, { type: 'range', min: String(min), max: String(max), step: '1', value: String(value) })
-    const out = h('output', 'circuit-range-out', `${value}${unit}`)
+  /** the i-th slider of the static chrome (label, limits and start value come from chrome.ts RANGES) */
+  const range = (i: number, onInput: (v: number) => void) => {
+    const input = rangeEls[i].querySelector('input')!
+    const out = rangeEls[i].querySelector('output')!
+    const { unit } = specs[i]
     input.addEventListener('input', () => { const v = Number(input.value); out.textContent = `${v}${unit}`; onInput(v) }, { signal })
-    wrap.append(text, input, out)
-    ctl.append(wrap)
     return { input, out, set(v: number) { input.value = String(v); out.textContent = `${v}${unit}` } }
   }
+  const start = (i: number) => specs[i].value
+  /** the i-th toggle button after the sliders (chrome.ts MODES) */
+  const mode = (i: number) => modeEls[i]
   const setLed = (id: string, level: number) => {
     const lit = q(`[data-role="led-lit-${id}"]`)
     const glow = q(`[data-role="led-glow-${id}"]`)
@@ -405,7 +369,7 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
         frame: (t) => {
           const on = sim.blinkOn(t)
           setLed('led', on ? 1 : 0)
-          setStatus(`digitalWrite(8, ${on ? 'HIGH' : 'LOW'}) → D8 = ${on ? '5V' : '0V'}, LED ${on ? '켜짐' : '꺼짐'}  (delay(${sim.BLINK_MS})마다 반복)`)
+          setStatus(say.blink(on))
         },
       }
       break
@@ -415,10 +379,9 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
       const render = () => {
         q('[data-role="btn-cap-btn"]')?.setAttribute('transform', pressed ? 'translate(0 1.8)' : '')
         q('[data-role="btn-hit-btn"]')?.setAttribute('aria-pressed', String(pressed))
-        const read = sim.buttonRead(pressed)
         if (!running) { setLed('led', 0); return }
         setLed('led', pressed ? 1 : 0)
-        setStatus(`D2 = ${read} (${pressed ? '눌림 → GND와 연결' : '안 눌림, 내부 풀업이 HIGH로 당김'}) → digitalWrite(8, ${pressed ? 'HIGH' : 'LOW'}), LED ${pressed ? '켜짐' : '꺼짐'}`)
+        setStatus(say.button(pressed))
       }
       const set = (v: boolean) => { if (pressed !== v) { pressed = v; render() } }
       onScene(() => {
@@ -438,47 +401,47 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
     }
 
     case 'pot': {
-      let raw = 512
+      let raw = start(0)
       const turn = bindKnob('pot', () => raw, (v) => setRaw(v))
-      const slider = range('가변저항 값 (analogRead)', 0, 1023, raw, '', (v) => setRaw(v))
+      const slider = range(0, (v) => setRaw(v))
       const setRaw = (v: number) => {
         raw = v
         slider.set(v)
         turn(v)
         const r = sim.potReadout(v)
         setLed('led', running ? r.duty / 255 : 0)
-        if (running) setStatus(`analogRead(A0) = ${r.raw} (약 ${r.volts.toFixed(2)}V) → map → analogWrite(9, ${r.duty}) : LED 밝기 ${Math.round((r.duty / 255) * 100)}%`)
+        if (running) setStatus(say.pot(v))
       }
       runner = { start: () => setRaw(raw), stop: () => setLed('led', 0) }
       break
     }
 
     case 'lcd': {
-      let raw = 512
+      let raw = start(0)
       const turn = bindKnob('pot', () => raw, (v) => setRaw(v))
-      const slider = range('가변저항 값 (A0)', 0, 1023, raw, '', (v) => setRaw(v))
+      const slider = range(0, (v) => setRaw(v))
       const setRaw = (v: number) => { raw = v; slider.set(v); turn(v); render() }
       const lcd = lcdView('lcd')
       const render = () => {
         if (!running) { lcd.show(false, '', ''); return }
         lcd.show(true, sim.lcdPad(sim.LCD_HELLO), sim.lcdA0Line(raw))
-        setStatus(`lcd.print("${sim.LCD_HELLO}") 첫 줄 / 둘째 줄: "A0 = ${raw}" (analogRead(A0) = ${raw}, 0.2초마다 갱신)`)
+        setStatus(say.lcd(raw))
       }
       runner = { start: render, stop: render }
       break
     }
 
     case 'cds': {
-      let light = 70
+      let light = start(0)
       let on = false
-      range('주변 밝기', 0, 100, light, '%', (v) => { light = v; render() })
+      range(0, (v) => { light = v; render() })
       const render = () => {
         q('[data-role="cds-glow-cds"]')?.setAttribute('opacity', String(((light / 100) * 0.9).toFixed(2)))
         if (!running) { setLed('led', 0); return }
         const raw = sim.cdsRaw(light)
         on = sim.nightLightOn(on, raw)
         setLed('led', on ? 1 : 0)
-        setStatus(`light = ${raw}  LED ${on ? 'ON' : 'OFF'}   (CDS 약 ${sim.cdsKohm(light).toFixed(1)}kΩ, A0 약 ${((raw * 5) / 1023).toFixed(2)}V, 켜는 값 ${sim.DARK_ON} / 끄는 값 ${sim.DARK_OFF})`)
+        setStatus(say.cds(light, on))
       }
       onScene(() => render())
       runner = { start: () => { on = false; render() }, stop: () => { on = false; render() } }
@@ -486,14 +449,12 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
     }
 
     case 'rgb': {
-      const rgb: [number, number, number] = [255, 0, 0]
+      const rgb: [number, number, number] = [start(0), start(1), start(2)]
       let auto: '' | 'mix' | 'wheel' = ''
-      const sliders = ['R (D9)', 'G (D10)', 'B (D11)'].map((l, i) => range(l, 0, 255, rgb[i], '', (v) => { auto = ''; syncModes(); rgb[i] = v; render() }))
-      const modes = (['mix', 'wheel'] as const).map((kind) => {
-        const b = button('cb-mode', kind === 'mix' ? '색 섞기 스케치 재생' : '무지개 스케치 재생')
-        b.setAttribute('aria-pressed', 'false')
+      const sliders = rgb.map((_c, i) => range(i, (v) => { auto = ''; syncModes(); rgb[i] = v; render() }))
+      const modes = (['mix', 'wheel'] as const).map((kind, i) => {
+        const b = mode(i)
         b.addEventListener('click', () => { auto = auto === kind ? '' : kind; syncModes() }, { signal })
-        ctl.append(b)
         return b
       })
       const syncModes = () => modes.forEach((b, i) => b.setAttribute('aria-pressed', String(auto === (['mix', 'wheel'] as const)[i])))
@@ -509,7 +470,7 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
         halo?.setAttribute('fill', col)
         halo?.setAttribute('opacity', String((br * 0.8).toFixed(2)))
         fig.setAttribute('data-led', br > 0 ? 'on' : 'off')
-        if (running) setStatus(`analogWrite(9, ${r}) · analogWrite(10, ${g}) · analogWrite(11, ${b}) → ${sim.colorName(r, g, b) ?? `rgb(${r}, ${g}, ${b})`}`)
+        if (running) setStatus(say.rgb(r, g, b))
       }
       runner = {
         start: render,
@@ -526,24 +487,22 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
 
     case 'dht':
     case 'dht-lcd': {
-      let temp = 24
-      let humi = 45
+      let temp = start(0)
+      let humi = start(1)
       let failing = false
       let readN = 0
       const lcd = def.sim === 'dht-lcd' ? lcdView('lcd') : null
-      range('온도', 0, 50, temp, '°C', (v) => { temp = v })
-      range('습도', 20, 80, humi, '%', (v) => { humi = v })
-      const failBtn = button('cb-mode', '읽기 실패 만들기 (NaN)')
-      failBtn.setAttribute('aria-pressed', 'false')
+      range(0, (v) => { temp = v })
+      range(1, (v) => { humi = v })
+      const failBtn = mode(0)
       failBtn.addEventListener('click', () => { failing = !failing; failBtn.setAttribute('aria-pressed', String(failing)) }, { signal })
-      ctl.append(failBtn)
       const read = () => {
         const ok = !failing
         lcd?.show(true, ...sim.dhtLcdLines(ok ? temp : null, ok ? humi : null))
-        setStatus(!ok ? 'DHT read failed  (isnan 검사에 걸려 return)' : lcd ? `Serial: ${sim.dhtSerialShort(temp, humi)}` : sim.dhtSerial(temp, humi))
+        setStatus(!ok ? DHT_FAIL : lcd ? say.dhtLcd(temp, humi) : say.dht(temp, humi))
       }
       runner = {
-        start: () => { readN = 0; lcd?.show(true, '', ''); setStatus('delay(2000) 중… 첫 측정까지 2초') },
+        start: () => { readN = 0; lcd?.show(true, '', ''); setStatus(DHT_WAIT) },
         stop: () => lcd?.show(false, '', ''),
         frame: (t) => {
           const n = Math.floor(t / sim.DHT_READ_MS)
@@ -555,13 +514,12 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
     }
 
     case 'joystick': {
-      let x = 512
-      let y = 512
+      let x = start(0)
+      let y = start(1)
       let pressed = false
-      const sx = range('X축 (A0)', 0, 1023, x, '', (v) => { x = v; render() })
-      const sy = range('Y축 (A1)', 0, 1023, y, '', (v) => { y = v; render() })
-      const sw = button('cb-mode', '스틱 누르기 (SW)')
-      sw.setAttribute('aria-pressed', 'false')
+      const sx = range(0, (v) => { x = v; render() })
+      const sy = range(1, (v) => { y = v; render() })
+      const sw = mode(0)
       const setSw = (v: boolean) => { if (pressed !== v) { pressed = v; sw.setAttribute('aria-pressed', String(v)); render() } }
       sw.addEventListener('pointerdown', (e) => { e.preventDefault(); sw.setPointerCapture?.(e.pointerId); setSw(true) }, { signal })
       sw.addEventListener('pointerup', () => setSw(false), { signal })
@@ -570,7 +528,6 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
       sw.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setSw(true) } }, { signal })
       sw.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Enter') setSw(false) }, { signal })
       sw.addEventListener('blur', () => setSw(false), { signal })
-      ctl.append(sw)
       const render = () => {
         sx.set(x); sy.set(y)
         q('[data-role="stick-joy"]')?.setAttribute('transform', `translate(${(sim.joyPos(x) * JOY_TRAVEL).toFixed(1)} ${(sim.joyPos(y) * JOY_TRAVEL).toFixed(1)}) scale(${pressed ? 0.94 : 1})`)
@@ -599,7 +556,7 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
     }
 
     case 'motor': {
-      let speed = 0
+      let speed = start(0)
       let follow = false
       let angle = 0
       let lastNow = 0
@@ -609,19 +566,14 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
         const m = /rotate\(0 ([\d.-]+) ([\d.-]+)\)/.exec(q('[data-role="spin-motor"]')?.getAttribute('transform') || '')
         pivot = m ? [Number(m[1]), Number(m[2])] : [0, 0]
       })
-      const slider = range('속도 setMotor(speed)', -255, 255, speed, '', (v) => { follow = false; syncFollow(); speed = v; report() })
-      const followBtn = button('cb-mode', 'loop() 스케치 재생')
-      followBtn.setAttribute('aria-pressed', 'false')
+      const slider = range(0, (v) => { follow = false; syncFollow(); speed = v; report() })
+      const followBtn = mode(0)
       const syncFollow = () => followBtn.setAttribute('aria-pressed', String(follow))
       followBtn.addEventListener('click', () => { follow = !follow; syncFollow() }, { signal })
-      ctl.append(followBtn)
       const turns = () => { const p = sim.motorPins(speed); return Math.max(p.ia, p.ib) >= sim.STALL_PWM }
       const report = () => {
         slider.set(speed)
-        if (!running) return
-        const p = sim.motorPins(speed)
-        const pwm = Math.max(p.ia, p.ib)
-        setStatus(`setMotor(${speed}) → analogWrite(5, ${p.ia}) · analogWrite(6, ${p.ib}) : ${speed === 0 ? '정지' : !turns() ? `PWM ${pwm}는 너무 낮아 웅 소리만 나고 돌지 않음` : `${speed > 0 ? '정방향' : '역방향'}, 속도 ${Math.round((pwm / 255) * 100)}%`}`)
+        if (running) setStatus(say.motor(speed))
       }
       const draw = () => q('[data-role="spin-motor"]')?.setAttribute('transform', `rotate(${(angle % 360).toFixed(1)} ${pivot[0]} ${pivot[1]})`)
       runner = {
@@ -646,14 +598,10 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
 
     case 'ultrasonic':
     case 'alarm': {
-      let cm = def.sim === 'alarm' ? 60 : 40
+      let cm = start(0)
       const alarm = sim.createAlarm()
-      const slider = range('물체까지 거리', 2, 200, cm, 'cm', (v) => { cm = v; moveObject(v); if (def.sim === 'ultrasonic') report() })
-      void slider
-      const report = () => {
-        const us = sim.echoMicros(cm)
-        setStatus(`Echo가 HIGH였던 시간 = ${us}µs → ${us} × 0.034 / 2 = ${sim.cmFromMicros(us).toFixed(1)}cm`)
-      }
+      range(0, (v) => { cm = v; moveObject(v); if (def.sim === 'ultrasonic') report() })
+      const report = () => setStatus(say.ultrasonic(cm))
       onScene(() => moveObject(cm))
       runner = {
         start: () => { if (def.sim === 'ultrasonic') report() },
@@ -663,12 +611,7 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
               const out = alarm(cm, now)
               setLed('led', out.led ? 1 : 0)
               setWaves('bz', out.buzzer)
-              const zone = sim.alarmZone(cm)
-              setStatus(zone === 'quiet'
-                ? `거리 ${cm}cm: ${sim.FAR_CM}cm보다 멀다 → 조용 (부저·LED 꺼짐)`
-                : zone === 'alarm'
-                  ? `거리 ${cm}cm: ${sim.NEAR_CM}cm 이내 → 경보! 부저가 계속 울리고 LED가 켜짐`
-                  : `거리 ${cm}cm: 삑 간격 ${sim.beepInterval(cm)}ms (map(${cm}, ${sim.NEAR_CM}, ${sim.FAR_CM}, ${sim.MIN_INTERVAL}, ${sim.MAX_INTERVAL}))`)
+              setStatus(say.alarm(cm))
             }
           : undefined,
       }
@@ -681,13 +624,13 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
         const m = /rotate\(0 ([\d.-]+) ([\d.-]+)\)/.exec(q('[data-role="horn-sv"]')?.getAttribute('transform') || '')
         pivot = m ? [Number(m[1]), Number(m[2])] : [0, 0]
       })
-      let angle = 90
+      let angle = start(0)
       const turn = (v: number) => {
         angle = v
         q('[data-role="horn-sv"]')?.setAttribute('transform', `rotate(${-v} ${pivot[0]} ${pivot[1]})`)
-        if (running) setStatus(`myServo.write(${v}) → 서보 혼이 ${v}°로 이동`)
+        if (running) setStatus(say.servo(v))
       }
-      range('각도', 0, 180, angle, '°', turn)
+      range(0, turn)
       onScene(() => turn(angle))
       runner = { start: () => turn(angle), stop: () => {} }
       break
@@ -700,11 +643,7 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
         frame: (t) => {
           const n = sim.melodyAt(t)
           setWaves('bz', !!n?.sounding)
-          setStatus(n
-            ? n.sounding
-              ? `tone(8, ${sim.NOTES[n.note]}, ${sim.TONE_MS}) → ${sim.NOTE_NAMES[n.note]} (${sim.NOTES[n.note]}Hz)`
-              : `delay(${sim.NOTE_STEP_MS}) 중: 소리가 끝나고 다음 음을 기다림`
-            : `noTone(8) 후 delay(${sim.REST_MS}): 쉬는 중`)
+          setStatus(say.buzzer(n))
         },
       }
       break
@@ -741,6 +680,11 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
     cleanups.push(() => io.disconnect())
   }
   function setRunning(on: boolean) {
+    if (on) {
+      // a scene must exist before it can be simulated (a keyboard user can reach the play button first); if it cannot be
+      // built, nothing changes: the button keeps saying ▶ and the controls stay locked
+      try { attach() } catch (err) { console.error('circuit scene failed to build', def.id, err); return }
+    }
     running = on
     btnPlay.textContent = on ? '■ 정지' : '▶ 시뮬레이션'
     btnPlay.setAttribute('aria-pressed', String(on))
@@ -751,7 +695,6 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
     pausedAt = 0
     pausedTotal = 0
     if (on) {
-      attach() // a scene must exist before it can be simulated (a keyboard user can reach the play button first)
       t0 = performance.now()
       runner.start()
       syncLoop()
@@ -761,16 +704,18 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
     }
   }
   btnPlay.addEventListener('click', () => setRunning(!running), { signal })
-  btnPlay.setAttribute('aria-pressed', 'false')
 
+  let disposed = false
   const attach = () => {
-    if (svg) return
+    if (svg || disposed) return
     plane.innerHTML = buildScene(def, uid, aria)
     svg = plane.querySelector('svg')
     sceneHooks.splice(0).forEach((fn) => fn())
-    applyStepper()
+    applyStepper() // stepper state and a row highlighted (hover / focus) before the scene existed
   }
   const dispose = () => {
+    if (disposed) return // a scene that failed to build disposes its figure early; unmount must not run the cleanups twice
+    disposed = true
     ac.abort()
     cancelAnimationFrame(raf)
     fig.removeAttribute('data-offscreen')
@@ -780,9 +725,10 @@ function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cle
 }
 
 /**
- * Brings every circuit figure under `root` to life. The chrome of each figure is rendered at once; its SVG scene (~50 KB,
- * a few hundred DOM nodes) is built only when the stage box nears the viewport. The box already has its final size, so
- * building the scene never moves anything. Returns a cleanup that puts the static figures back.
+ * Brings every circuit figure under `root` to life. The chrome of each figure is already in the page and is hydrated at
+ * once; its SVG scene (~50 KB, a few hundred DOM nodes) is built only when the stage box nears the viewport. Every part
+ * of a figure has its final size from the page's own markup and CSS, so neither step moves anything.
+ * Returns a cleanup that puts the static figures back.
  */
 export function mountCircuits(root: HTMLElement): () => void {
   const mounted: Mounted[] = []

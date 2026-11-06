@@ -4762,6 +4762,134 @@ test.describe('arduino study circuits', () => {
     }
   }
 
+  // The circuit code is a separate chunk loaded after the page is shown. Holding it shows the page as a reader sees it
+  // before any circuit script runs: every figure must already have its final height then (Safari has no scroll anchoring).
+  const holdCircuitChunk = async (page) => {
+    let release
+    const gate = new Promise((resolve) => { release = resolve })
+    await page.route('**/study-content-circuits-*.js', async (route) => { await gate; await route.continue() })
+    return release
+  }
+  const noAnchoring = 'html, body, * { overflow-anchor: none !important; }'
+
+  for (const how of ['deep link', 'table-of-contents jump']) {
+    test(`a ${how} keeps its heading in place while the circuits come to life, without scroll anchoring`, async ({ page }) => {
+      const release = await holdCircuitChunk(page)
+      await page.goto(how === 'deep link' ? '/study/arduino#mod-motor' : '/study/arduino')
+      await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
+      await page.addStyleTag({ content: noAnchoring })
+      // Chromium performs the #fragment scroll only once nothing is pending, i.e. after the held chunk; land on it as it would
+      if (how === 'deep link') await page.evaluate(() => document.getElementById(location.hash.slice(1)).scrollIntoView())
+      else await page.locator('nav.toc a[href="#mod-motor"]').click()
+      const top = () => page.evaluate(() => document.getElementById('mod-motor').getBoundingClientRect().top)
+      await expect.poll(top, { timeout: 8000 }).toBeLessThan(160)
+      let last = await top()
+      await expect.poll(async () => { const t = await top(); const still = Math.abs(t - last) < 0.5; last = t; return still }, { intervals: [150] }).toBe(true)
+      expect(await page.locator('figure.circuit.is-live').count(), 'no circuit code has run yet').toBe(0)
+      const above = await page.evaluate(() => [...document.querySelectorAll('figure.circuit')].filter((f) => f.getBoundingClientRect().bottom < 0).length)
+      expect(above, 'the heading is below several figures').toBeGreaterThan(8)
+      release()
+      await expect(page.locator('figure.circuit.is-live')).toHaveCount(14)
+      await page.waitForTimeout(400)
+      expect(Math.abs((await top()) - last), 'the heading did not move').toBeLessThanOrEqual(1)
+      await expect(page.locator('figure.circuit[data-circuit="dc-motor"] svg.circuit-svg')).toHaveCount(1) // the scene next to the heading was built meanwhile
+    })
+  }
+
+  // Each figure's height comes from the page's markup and CSS alone: it is the same before the circuit code runs, after it
+  // runs, with the scene built, while a sim runs, in flat and 3D view, in the stepper, and when the low-power mode flips.
+  for (const view of [
+    { name: '375px', width: 375 }, { name: '768px', width: 768 }, { name: '1024px', width: 1024 }, { name: '1280px', width: 1280 }, { name: '1440px', width: 1440 },
+    { name: '125% text size', width: 1024, fontSize: '125%' },
+  ]) {
+    test(`every figure keeps one height from first paint through every state: ${view.name}`, async ({ page }) => {
+      test.setTimeout(120_000)
+      await page.setViewportSize({ width: view.width, height: 800 })
+      await page.addInitScript((fontSize) => {
+        // every height any figure ever has, from the moment it is in the page
+        const seen = new WeakSet()
+        window.__figureHeights = {}
+        const ro = new ResizeObserver((entries) => entries.forEach((e) => { (window.__figureHeights[e.target.dataset.circuit] ||= []).push(e.target.getBoundingClientRect().height) }))
+        new MutationObserver(() => document.querySelectorAll('figure.circuit').forEach((f) => { if (!seen.has(f)) { seen.add(f); ro.observe(f) } }))
+          .observe(document, { childList: true, subtree: true })
+        if (fontSize) new MutationObserver((_m, o) => { if (document.documentElement) { document.documentElement.style.fontSize = fontSize; o.disconnect() } }).observe(document, { childList: true })
+      }, view.fontSize || '')
+      const release = await holdCircuitChunk(page)
+      await page.goto('/study/arduino')
+      await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
+      await page.waitForTimeout(200)
+      expect(await page.locator('figure.circuit.is-live').count(), 'no circuit code has run yet').toBe(0)
+      const heights = () => page.evaluate(() => [...document.querySelectorAll('figure.circuit')].map((f) => f.getBoundingClientRect().height))
+      const first = await heights()
+      const same = async (state) => (await heights()).forEach((h, i) => expect(Math.abs(h - first[i]), `figure ${i}: static vs ${state}`).toBeLessThanOrEqual(1))
+      const perfFlip = async () => { // the site-wide low-power switch flips every figure to flat (and back) with no user input
+        for (const mode of ['lite', 'full']) {
+          await page.evaluate((m) => { document.documentElement.dataset.perf = m }, mode)
+          await page.waitForTimeout(100)
+          await same(`${mode} mode`)
+        }
+      }
+
+      release()
+      await expect(page.locator('figure.circuit.is-live')).toHaveCount(14)
+      await same('live, no scene')
+      await perfFlip()
+
+      // nothing a figure prints or shows may outgrow the room its static markup reserved
+      const overflow = (fig) => fig.evaluate((f) => [f.querySelector('.circuit-bar'), f.querySelector('.circuit-status')]
+        .filter((e) => e.scrollHeight > e.clientHeight + 1).map((e) => `${e.className}: ${e.textContent}`))
+      const fits = async (fig, what) => expect(await overflow(fig), what).toEqual([])
+      for (const fig of await page.locator('figure.circuit[data-circuit]').all()) {
+        const id = await fig.getAttribute('data-circuit')
+        await fig.scrollIntoViewIfNeeded()
+        await expect(fig.locator('svg.circuit-svg')).toHaveCount(1)
+        await fig.locator('.cb-play').click()
+        await expect(fig).toHaveAttribute('data-sim', 'on')
+        await fits(fig, `${id} running`)
+        for (const slider of await fig.getByRole('slider').all()) {
+          for (const v of [await slider.getAttribute('min'), await slider.getAttribute('max'), await slider.getAttribute('min')]) {
+            await slider.fill(v)
+            await fits(fig, `${id} slider at ${v}`)
+          }
+        }
+        for (const b of await fig.locator('.cb-mode').all()) {
+          await b.click()
+          await page.waitForTimeout(150)
+          await fits(fig, `${id} mode on`)
+          await b.click()
+        }
+        if (id === 'button-led') {
+          await fig.getByRole('button', { name: /택트 스위치/ }).focus()
+          await page.keyboard.down('Space')
+          await fits(fig, `${id} pressed`)
+          await page.keyboard.up('Space')
+        }
+        if (['led-blink', 'buzzer', 'alarm'].includes(id)) {
+          const alarmAt = id === 'alarm' ? fig.getByRole('slider') : null
+          for (let i = 0; i < 12; i += 1) { // three seconds of the running sim (the alarm also walks through its three zones)
+            if (alarmAt && i % 4 === 0) await alarmAt.fill(['5', '50', '150'][i / 4])
+            await page.waitForTimeout(250)
+            await fits(fig, `${id} after ${(i + 1) * 250} ms`)
+          }
+        }
+        await fig.locator('.cb-view').click()
+        await fig.locator('.cb-view').click()
+        await fig.locator('.cb-steps').click()
+        await expect(fig.locator('.circuit-stepper')).toBeVisible()
+        await fits(fig, `${id} stepper`)
+        await fig.locator('.cb-next').click()
+        await fig.locator('.cb-all').click()
+      }
+      await same('scenes built, sims running, views and stepper toggled')
+      await perfFlip()
+      for (const fig of await page.locator('figure.circuit[data-circuit]').all()) if ((await fig.getAttribute('data-sim')) === 'on') await fig.locator('.cb-play').click()
+      await same('sims stopped')
+      const seen = await page.evaluate(() => window.__figureHeights)
+      expect(Object.keys(seen)).toHaveLength(14)
+      for (const [id, hs] of Object.entries(seen)) expect(Math.max(...hs) - Math.min(...hs), `${id} changed height at some point: ${hs.map(Math.round).join(', ')}`).toBeLessThanOrEqual(1)
+    })
+  }
+
   test('a table-of-contents jump past many unbuilt scenes still lands on its heading', async ({ page }) => {
     await page.goto('/study/arduino')
     await expect(page.locator('figure.circuit.is-live')).toHaveCount(14)
@@ -4843,6 +4971,20 @@ test.describe('arduino study circuits', () => {
     await expect(rows.nth(3)).toBeFocused()
     await page.keyboard.press('Home')
     await expect(rows.first()).toBeFocused()
+  })
+
+  test('a row focused before its scene exists lights up its wire once the scene is built', async ({ page }) => {
+    await page.goto('/study/arduino')
+    const fig = circuit(page, 'dc-motor')
+    await expect(fig).toHaveClass(/is-live/)
+    await expect(fig.locator('svg.circuit-svg')).toHaveCount(0)
+    const row = fig.locator('xpath=preceding-sibling::div[contains(@class,"table-wrap")][1]').locator('tr.circuit-row').first()
+    await row.evaluate((r) => r.focus({ preventScroll: true }))
+    await expect(row).toHaveClass(/circuit-row-on/)
+    await fig.locator('.circuit-stage').scrollIntoViewIfNeeded()
+    await expect(fig.locator('svg.circuit-svg')).toHaveCount(1)
+    await expect(row).toBeFocused()
+    await expect(fig.locator('.cw.is-hl')).toHaveCount(1) // the battery (+) wire of the first wiring step
   })
 
   test('results reach screen readers through a debounced live region, not the frame loop', async ({ page }) => {

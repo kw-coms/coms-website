@@ -651,16 +651,22 @@
 .study-card-foot { margin-top: auto; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; font-weight: 700; color: var(--app-accent-text); }
 @media (prefers-reduced-motion: reduce) { .study-card { transition: none; } .study-card:hover { transform: none; } }
 
-/* ---------- 회로 그림 (circuits/): 약간 3D로 기울인 Tinkercad 스타일 SVG + 시뮬레이션 ---------- */
-.study-page .circuit { margin: 22px auto; max-width: 760px; }
+/* ---------- 회로 그림 (circuits/): 약간 3D로 기울인 Tinkercad 스타일 SVG + 시뮬레이션 ----------
+   그림의 틀(버튼 줄, 그림 상자, 슬라이더, 상태 줄, 캡션 안내)은 content/arduino.html에 이미 들어 있고(circuits/chrome.ts로 생성),
+   모든 줄의 높이는 이 CSS와 그 마크업만으로 정해진다: 스크립트가 붙든, 시뮬레이션이 돌든, 평면/3D·저전력 모드가 바뀌든
+   그림 높이는 첫 화면부터 그대로라서 위쪽 그림 때문에 읽던 글이 밀리지 않는다(스크롤 앵커링이 없는 Safari 포함). */
+.study-page .circuit { margin: 22px auto; max-width: 760px; container-type: inline-size; }
 .study-page .circuit figcaption { margin-top: 10px; font-size: 13px; color: var(--muted); text-align: center; }
 .study-page .circuit .circuit-hint { display: block; margin-top: 2px; }
-.study-page .circuit-bar,
-.study-page .circuit-stepper { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin: 0 0 10px; }
-.study-page .circuit-stepper[hidden] { display: none; }
+.study-page .circuit:not(.is-live) .circuit-hint { visibility: hidden; } /* true only once the table is linked to the drawing */
+/* 버튼 줄: 높이 고정(좁은 그림은 두 줄, 넓은 그림은 한 줄). 조립 순서를 켜면 단계 버튼들이 같은 자리에서 '조립 순서 보기'를 대신한다. */
+.study-page .circuit-bar { display: flex; flex-wrap: wrap; align-items: center; align-content: center; justify-content: center; gap: 8px; height: 76px; margin: 0 0 10px; }
+@container (min-width: 560px) { .study-page .circuit-bar { height: 34px; } }
+.study-page .circuit-stepper { display: flex; align-items: center; gap: 8px; }
+.study-page .circuit-stepper[hidden], .study-page .circuit .cb[hidden] { display: none; }
 .study-page .circuit .cb {
   border: 1px solid var(--line); background: var(--surface); color: var(--text);
-  font: 600 13px var(--apple-font-family); padding: 6px 12px; border-radius: 99px; cursor: pointer; min-height: 34px;
+  font: 600 13px var(--apple-font-family); padding: 6px 12px; border-radius: 99px; cursor: pointer; min-height: 34px; white-space: nowrap;
 }
 .study-page .circuit .cb:hover:not(:disabled) { border-color: var(--accent); }
 .study-page .circuit .cb:focus-visible,
@@ -669,7 +675,6 @@
 .study-page .circuit .cb:disabled { opacity: .45; cursor: default; }
 .study-page .circuit .cb-play { background: var(--accent); border-color: var(--accent); color: #fff; }
 .study-page .circuit .cb-play[aria-pressed='true'] { background: var(--surface); color: var(--accent-text); }
-.study-page .circuit .cb-steps[aria-pressed='true'] { background: var(--accent-soft); border-color: var(--accent); }
 .study-page .circuit-progress { min-width: 52px; text-align: center; font: 700 14px var(--study-mono); font-variant-numeric: tabular-nums; }
 
 .study-page .circuit-stage {
@@ -679,11 +684,12 @@
   border: 1px solid var(--line);
   touch-action: pan-y; cursor: grab;
 }
-.study-page .circuit-stage.is-flat { cursor: default; padding-bottom: 14px; }
+.study-page .circuit-stage.is-flat { cursor: default; } /* same padding as 3D: switching views never changes the height */
 .study-page .circuit-stage:active:not(.is-flat) { cursor: grabbing; }
 :root[data-theme-mode='dark'] .study-page .circuit-stage { background: linear-gradient(#232a3b, #151a27); }
 .study-page .circuit-plane {
-  margin: 0 auto; width: 100%; border-radius: 10px;
+  /* the scene's viewBox (--w / --h, written into the page per figure): the box has its final size before the SVG exists */
+  margin: 0 auto; width: 100%; max-width: calc(var(--w) * 1.12px); aspect-ratio: var(--w) / var(--h); min-height: 0; border-radius: 10px;
   background:
     radial-gradient(circle, rgba(70, 90, 130, .22) 1px, transparent 1.4px) 0 0 / 18px 18px,
     linear-gradient(#f9fbfd, #e9eef5);
@@ -715,18 +721,24 @@
 .study-page .circuit-ctl:empty { display: none; }
 .study-page .circuit-range { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; max-width: 100%; }
 .study-page .circuit-range input { width: min(240px, 52vw); accent-color: var(--accent); }
-.study-page .circuit-range-out { min-width: 56px; font: 700 13px var(--study-mono); font-variant-numeric: tabular-nums; }
-.study-page .circuit-status {
-  margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line);
-  font: 13px/1.5 var(--study-mono); text-align: center; word-break: keep-all; min-height: 3.2em;
+.study-page .circuit-range-label { white-space: nowrap; }
+.study-page .circuit-range-out { width: 56px; flex: none; font: 700 13px var(--study-mono); font-variant-numeric: tabular-nums; }
+/* 상태 줄: 숨은 .circuit-status-size들(대기 안내 + 가장 긴 실행 문구들)이 높이를 정하고, 보이는 글(.circuit-status)은
+   그 상자를 채울 뿐 크기에 관여하지 않는다(contain: size). 어떤 문구로 바뀌어도 줄 높이는 그대로다. */
+.study-page .circuit-status-box {
+  display: grid; margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line);
+  font: 13px/1.5 var(--study-mono); text-align: center; word-break: keep-all;
 }
+.study-page .circuit-status-box > * { grid-area: 1 / 1; }
+.study-page .circuit-status-size { visibility: hidden; }
+.study-page .circuit-status { contain: size; overflow: hidden; display: flex; align-items: center; justify-content: center; }
 /* wiring table <-> drawing */
 .study-page tr.circuit-row { cursor: default; }
 .study-page tr.circuit-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .study-page tr.circuit-row-on > td, .study-page tr.circuit-row-on > th { background: rgba(255, 196, 0, .22); }
 .study-page tr.circuit-row-current > td { box-shadow: inset 3px 0 0 var(--accent); }
 @media (max-width: 520px) {
-  .study-page .circuit-stage { padding: 10px 4px 16px; border-radius: 10px; }
+  .study-page .circuit-stage { padding: 10px 4px 16px; border-radius: 10px; } /* flat and 3D alike */
   .study-page .circuit-range { width: 100%; flex-wrap: wrap; justify-content: center; }
   .study-page .circuit-range input { width: 100%; flex: 1 1 100%; }
 }

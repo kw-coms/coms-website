@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
+import { IDLE, chromeHtml, hintHtml, reservedTexts } from '../src/pages/study/circuits/chrome.ts'
 import { CIRCUITS } from '../src/pages/study/circuits/definitions.ts'
 import { nets, pointOf } from '../src/pages/study/circuits/netlist.ts'
 import { buildScene } from '../src/pages/study/circuits/scene.ts'
@@ -24,6 +25,27 @@ for (const m of mounts) {
   const parts = new Set(d.steps.flatMap((s) => s.parts || []))
   d.parts.forEach((p) => assert.ok(parts.has(p.id), `${m[1]}: part ${p.id} is introduced by a step`))
 }
+
+// ---- every figure carries its whole chrome in the page, so it has its final height before any script runs
+const chromes = [...html.matchAll(/<figure class="circuit" data-circuit="([\w-]+)"[^>]*>\n([\s\S]*?)\n<figcaption>([\s\S]*?)<\/figcaption>/g)]
+assert.equal(chromes.length, CIRCUITS.length, 'every figure has its static chrome')
+for (const m of chromes) {
+  const d = def(m[1])
+  const regen = 'out of date: run node --import tsx scripts/gen-circuit-chrome.mjs'
+  assert.equal(m[2], chromeHtml(d), `${m[1]}: static chrome ${regen}`)
+  assert.ok(m[3].endsWith(` ${hintHtml(d)}`), `${m[1]}: caption hint ${regen}`)
+  // the stage box takes the scene's aspect ratio from the page itself: it must be the viewBox the scene is drawn in
+  const [, w, h] = /class="circuit-plane" style="--w: (\d+); --h: (\d+)"/.exec(m[2]) ?? []
+  assert.deepEqual([Number(w), Number(h)], d.size, `${m[1]}: stage aspect ratio = def.size`)
+  assert.ok(buildScene(d, 't', 'x').includes(` viewBox="0 0 ${d.size[0]} ${d.size[1]}" `), `${m[1]}: the scene is drawn in def.size`)
+}
+// the status line reserves room for its idle text and for the widest text of each running message template
+for (const d of CIRCUITS) {
+  const reserved = reservedTexts(d.sim)
+  assert.equal(reserved[0], IDLE[d.sim])
+  assert.ok(reserved.length >= 2, `${d.id}: a running text is reserved`)
+}
+assert.ok(reservedTexts('alarm').some((t) => t.includes('경보!')) && reservedTexts('alarm').some((t) => t.includes('조용')), 'each alarm zone is reserved')
 
 // ---- the drawing builds, and every terminal resolves to a point inside the scene
 for (const d of CIRCUITS) {
