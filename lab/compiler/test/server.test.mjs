@@ -1,0 +1,93 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createCompileServer, checkAuth, clientIp } from '../server.mjs';
+import { createServer } from 'node:net';
+import { createRateLimiter, createCompileQueue } from '../limits.mjs';
+
+
+const canListen = await new Promise(resolve => {
+  const probe = createServer();
+  probe.once('error', error => resolve(error.code !== 'EPERM' ? Promise.reject(error) : false));
+  probe.listen(0, '127.0.0.1', () => probe.close(() => resolve(true)));
+});
+const httpTest = (name, fn) => test(name, { skip: !canListen && 'sandbox denies localhost listen (EPERM)' }, fn);
+
+async function withServer(options, callback) {
+  const server = createCompileServer({ logger: () => {}, ...options });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  try { await callback(`http://127.0.0.1:${server.address().port}`); }
+  finally { await new Promise(resolve => server.close(resolve)); }
+}
+const post = (url, sketch = 'void setup(){} void loop(){}', options = {}) => fetch(`${url}/lab/api/compile`, {
+  method: 'POST', headers: { 'content-type': 'application/json', ...options.headers },
+  body: options.body ?? JSON.stringify({ sketch }),
+});
+httpTest('health endpoint responds with JSON without CORS', async () => {
+  await withServer({}, async url => {
+    const response = await fetch(`${url}/lab/api/health`);
+    assert.deepEqual(await response.json(), { ok: true });
+    assert.equal(response.headers.get('access-control-allow-origin'), null);
+  });
+});
+httpTest('rejects non-JSON media type', async () => {
+  await withServer({}, async url => {
+    const response = await post(url, 'x', { headers: { 'content-type': 'text/plain' } });
+    assert.equal(response.status, 400); assert.equal((await response.json()).reason, 'rejected');
+  });
+});
+httpTest('rejects quoted include before calling runner', async () => {
+  let called = false;
+  await withServer({ runner: async () => { called = true; } }, async url => {
+    const response = await post(url, '#include "secret.h"');
+    assert.equal(response.status, 400); assert.equal(called, false);
+  });
+});
+httpTest('rejects body larger than 80 KiB', async () => {
+  await withServer({}, async url => {
+    const response = await post(url, '', { body: JSON.stringify({ sketch: 'x'.repeat(81000), padding: 'x'.repeat(2000) }) });
+    assert.equal(response.status, 400); assert.equal((await response.json()).reason, 'rejected');
+  });
+});
+httpTest('rejects missing auth and forwards cookie to configured endpoint', async () => {
+  let cookie;
+  await withServer({ authCheckUrl: 'https://example.test/me', fetchImpl: async (_url, options) => {
+    cookie = options.headers.Cookie;
+    return { status: 401, body: { cancel: async () => {} } };
+  } }, async url => {
+    const response = await post(url, undefined, { headers: { cookie: 'token=abc' } });
+    assert.equal(response.status, 401);
+    assert.equal((await response.json()).errors[0].message, '로그인한 동아리원만 컴파일할 수 있어요.');
+    assert.equal(cookie, 'token=abc');
+  });
+});
+test('does not authorize redirects', async () => {
+  assert.equal(await checkAuth('', 'https://example.test/me', { fetchImpl: async (_, options) => {
+    assert.equal(options.redirect, 'manual'); return { status: 302, body: { cancel: async () => {} } };
+  } }), false);
+});
+httpTest('rate limits per real peer when proxy trust disabled', async () => {
+  await withServer({ limiter: createRateLimiter({ limit: 1 }), trustProxy: false }, async url => {
+    assert.equal((await post(url, '#include "bad"', { headers: { 'x-forwarded-for': '1.2.3.4' } })).status, 400);
+    const response = await post(url, '#include "bad"', { headers: { 'x-forwarded-for': '9.8.7.6' } });
+    assert.equal(response.status, 429); assert.equal((await response.json()).reason, 'rate-limited');
+  });
+});
+test('uses right-most forwarded IP only when proxy trust enabled', () => {
+  const request = { headers: { 'x-forwarded-for': '9.9.9.9, 5.6.7.8' }, socket: { remoteAddress: '127.0.0.1' } };
+  assert.equal(clientIp(request, true), '5.6.7.8');
+  assert.equal(clientIp(request, false), '127.0.0.1');
+  assert.equal(clientIp({ headers: { 'x-forwarded-for': '1.1.1.1, junk' }, socket: { remoteAddress: '::ffff:10.0.0.1' } }, true), '10.0.0.1');
+  assert.equal(clientIp({ headers: { 'x-forwarded-for': '2001:db8:1:2::7' }, socket: { remoteAddress: '127.0.0.1' } }, true), clientIp({ headers: {}, socket: { remoteAddress: '2001:db8:1:2::8' } }));
+});
+httpTest('returns busy when bounded compile queue is full', async () => {
+  const queue = createCompileQueue({ concurrency: 1, maxQueued: 0 });
+  let release, started;
+  const running = new Promise(resolve => { release = resolve; });
+  const entered = new Promise(resolve => { started = resolve; });
+  await withServer({ queue, runner: async () => { started(); await running; return { code: 1, stderr: 'sketch.ino:1:1: error: bad', stdout: '' }; } }, async url => {
+    const first = post(url); await entered;
+    const second = await post(url);
+    assert.equal(second.status, 429); assert.equal((await second.json()).reason, 'busy');
+    release(); await first;
+  });
+});
