@@ -187,6 +187,8 @@
 		radial-gradient(36% 36% at 82% 20%, color-mix(in srgb, #6f9dff 38%, transparent), transparent 72%),
 		radial-gradient(34% 34% at 88% 66%, color-mix(in srgb, #a0c4ff 30%, transparent), transparent 72%),
 		radial-gradient(50% 50% at 60% 86%, color-mix(in srgb, var(--app-accent-soft) 92%, transparent), transparent 72%);
+	/* Lite mode (perf-lite.css) drops this filter: blur() over a full-hero layer is what a
+	   CPU-composited page cannot afford. */
 	filter: blur(40px) saturate(118%);
 	animation: coms-aurora 18s ease-in-out infinite alternate;
 	will-change: transform;
@@ -606,7 +608,6 @@ html.home-snap-scroll .home-snap-section {
 	color: var(--app-text);
 	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
 	backdrop-filter: saturate(180%) blur(18px);
-	-webkit-backdrop-filter: saturate(180%) blur(18px);
 	opacity: 0;
 	transform: translateY(12px) scale(0.9);
 	pointer-events: none;

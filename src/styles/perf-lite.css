@@ -1,0 +1,274 @@
+/* Lite rendering mode (:root[data-perf='lite'], set by utils/perfMode.ts).
+
+   Without hardware graphics acceleration the browser paints and composites on the CPU, so the
+   effects below cost whole frames: backdrop blur, big blurred shadows, filters on large areas,
+   endless decorative animation, 3D transforms and surfaces that are repainted every frame.
+   Lite keeps the layout, colours and type and swaps those for flat equivalents. Loaded last so
+   it wins the cascade; !important only where a Tailwind utility or an earlier rule would
+   otherwise stay in force.
+
+   The attribute name and its two values ('lite' | 'full') are a contract with other styles. */
+
+/* ---- Glass: no backdrop-filter (also kills Tailwind backdrop-blur-*) --------------------- */
+:root[data-perf='lite'] *,
+:root[data-perf='lite'] *::before,
+:root[data-perf='lite'] *::after {
+	backdrop-filter: none !important;
+}
+
+/* The translucent tints below were meant to sit over a blurred picture. Without the blur they
+   need to be (nearly) opaque so the text over them stays readable. */
+:root[data-perf='lite'] .coms-quick {
+	background: color-mix(in srgb, var(--app-bg) 82%, transparent);
+}
+:root[data-perf='lite'] .apple-detail-home-button,
+:root[data-perf='lite'] .apple-mobile-tabs,
+:root[data-perf='lite'] .coms-to-top,
+:root[data-perf='lite'] .coms-toast {
+	background: var(--app-surface);
+}
+:root[data-perf='lite'] .apple-mobile-menu-panel,
+:root[data-perf='lite'] .activity-detail-header,
+:root[data-perf='lite'] .apple-product-panel {
+	background: var(--app-surface);
+}
+
+/* ---- Shadows: small and cheap ------------------------------------------------------------ */
+:root[data-perf='lite'] .apple-product-panel,
+:root[data-perf='lite'] .apple-board-shell,
+:root[data-perf='lite'] .club-calendar-shell,
+:root[data-perf='lite'] .calendar-month-summary,
+:root[data-perf='lite'] .calendar-admin-composer,
+:root[data-perf='lite'] .activity-admin-composer,
+:root[data-perf='lite'] .calendar-csv-import,
+:root[data-perf='lite'] .activity-category-manager,
+:root[data-perf='lite'] .activity-community-list,
+:root[data-perf='lite'] .activity-board-card,
+:root[data-perf='lite'] .activity-log-card,
+:root[data-perf='lite'] .club-event-list-card,
+:root[data-perf='lite'] .coms-attend-live,
+:root[data-perf='lite'] .coms-cta,
+:root[data-perf='lite'] .coms-card,
+:root[data-perf='lite'] .coms-card:hover,
+:root[data-perf='lite'] .coms-3d-card,
+:root[data-perf='lite'] .coms-toast,
+:root[data-perf='lite'] .coms-to-top,
+:root[data-perf='lite'] .apple-mobile-menu-panel,
+:root[data-perf='lite'] .coms-confirm-card {
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+:root[data-perf='lite'] .activity-detail-modal {
+	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+}
+/* The home cards lift on hover with a high-specificity rule (base.css); lite keeps them still. */
+:root[data-perf='lite'] .theme-home .apple-product-panel:hover,
+:root[data-perf='lite'] .theme-home [data-reveal].apple-product-panel:hover {
+	transform: none;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+/* Tailwind arbitrary shadows with a big blur (0_18px_.., 0_24px_.., 0_32px_..). */
+:root[data-perf='lite'] [class*='shadow-[0_1'][class*='px_rgba'],
+:root[data-perf='lite'] [class*='shadow-[0_2'][class*='px_'],
+:root[data-perf='lite'] [class*='shadow-[0_3'][class*='px_'],
+:root[data-perf='lite'] [class*='shadow-[0_5px_18px'],
+:root[data-perf='lite'] [class*='shadow-[0_8px_'],
+:root[data-perf='lite'] [class*='shadow-[0_0_2'] {
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+:root[data-perf='lite'] .shadow-lg,
+:root[data-perf='lite'] .shadow-xl,
+:root[data-perf='lite'] .shadow-2xl {
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+/* Accent glows around small marks: a hairline ring instead of a blurred halo. */
+:root[data-perf='lite'] .coms-icon,
+:root[data-perf='lite'] .coms-timeline-num,
+:root[data-perf='lite'] .coms-stack-plate,
+:root[data-perf='lite'] .coms-stack-layer .coms-stack-plate,
+:root[data-perf='lite'] .coms-flow-mark,
+:root[data-perf='lite'] .coms-mini-rail i,
+:root[data-perf='lite'] .coms-stat::before,
+:root[data-perf='lite'] .coms-scroll-progress {
+	box-shadow: none;
+}
+
+/* ---- Filters: no blur / drop-shadow layers ------------------------------------------------ */
+:root[data-perf='lite'] .coms-cinema-pin::before {
+	filter: none;
+	animation: none;
+	will-change: auto;
+}
+:root[data-perf='lite'] .coms-cinema-title,
+:root[data-perf='lite'][data-theme-mode='dark'] .coms-cinema-title {
+	filter: none;
+	animation: none;
+}
+:root[data-perf='lite'] .coms-cinema-intrologo,
+:root[data-perf='lite'] .logo-emboss {
+	filter: none;
+	animation: none;
+}
+:root[data-perf='lite'][data-theme-mode='dark'] .coms-cinema-intrologo,
+:root[data-perf='lite'][data-theme-mode='dark'] .theme-home img[alt*="KW COM"],
+:root[data-perf='lite'][data-theme-mode='dark'] .apple-route img[alt*="KW COM"],
+:root[data-perf='lite'][data-theme-mode='dark'] .apple-global-nav img[alt*="KW COM"] {
+	/* The logo is black artwork: the dark theme still has to invert it. */
+	filter: invert(1) brightness(1.08);
+}
+:root[data-perf='lite'] img[class*='drop-shadow'] {
+	filter: none !important;
+}
+
+/* ---- 3D and parallax: flat --------------------------------------------------------------- */
+:root[data-perf='lite'] .coms-3d-stage {
+	perspective: none;
+}
+:root[data-perf='lite'] .coms-3d-stage-inner,
+:root[data-perf='lite'] .coms-cinema-content,
+:root[data-perf='lite'] .coms-depth-sm,
+:root[data-perf='lite'] .coms-depth-md,
+:root[data-perf='lite'] .coms-depth-lg,
+:root[data-perf='lite'] .coms-logo-3d,
+:root[data-perf='lite'] .coms-3d-card,
+:root[data-perf='lite'] .coms-3d-card:hover,
+:root[data-perf='lite'] .coms-hero-field {
+	transform: none !important;
+	transform-style: flat;
+	will-change: auto;
+}
+:root[data-perf='lite'] .coms-cinema-content {
+	opacity: 1;
+	transition: none;
+}
+
+/* ---- Decorative looping animation: off ------------------------------------------------------ */
+:root[data-perf='lite'] .animate-blob,
+:root[data-perf='lite'] .coms-attend-pulse,
+:root[data-perf='lite'] .coms-logo-3d,
+:root[data-perf='lite'] .coms-live-dot::after,
+:root[data-perf='lite'] .coms-cinema-hint,
+:root[data-perf='lite'] .coms-marquee-track,
+:root[data-perf='lite'] .skeleton::after,
+:root[data-perf='lite'] .coms-os-ring,
+:root[data-perf='lite'] .coms-os-led,
+:root[data-perf='lite'] .coms-os-meter i,
+:root[data-perf='lite'] .coms-stack-layer,
+:root[data-perf='lite'] .coms-lab-node,
+:root[data-perf='lite'] .coms-lab-track i,
+:root[data-perf='lite'] .coms-lab-grid i,
+:root[data-perf='lite'] .coms-flow-mark,
+:root[data-perf='lite'] .coms-flow-track i,
+:root[data-perf='lite'] .coms-mini-chip,
+:root[data-perf='lite'] .coms-mini-rail i,
+:root[data-perf='lite'] .coms-mini-code,
+:root[data-perf='lite'] .coms-mini-pass,
+:root[data-perf='lite'] .coms-mini-face-new {
+	animation: none !important;
+	will-change: auto;
+}
+/* A marquee that no longer moves shows its first copy, wrapped, rather than a cut-off strip. */
+:root[data-perf='lite'] .coms-marquee-track {
+	flex-wrap: wrap;
+	row-gap: 0.5rem;
+	white-space: normal;
+}
+:root[data-perf='lite'] .coms-marquee-track > *:nth-child(n + 9) {
+	display: none;
+}
+:root[data-perf='lite'] .will-change-transform,
+:root[data-perf='lite'] .will-change-auto {
+	will-change: auto;
+}
+
+/* ---- Route/entrance fades: the page is simply there ---------------------------------------- */
+:root[data-perf='lite'] .coms-page-enter,
+:root[data-perf='lite'] .calendar-empty-state {
+	animation: none;
+}
+
+/* ---- Scroll reveals: content is simply there (no per-section fade/slide-in layers) ----------- */
+:root[data-perf='lite'] .reveal-ready [data-reveal],
+:root[data-perf='lite'] .reveal-ready [data-reveal-dir] {
+	opacity: 1;
+	transform: none;
+	transition: none;
+	will-change: auto;
+}
+
+/* ---- Transitions: short, opacity/transform only -------------------------------------------
+   Only elements that already transition are touched (Tailwind's transition utilities); a blanket
+   rule would add transitions to per-frame, script-driven transforms and override intentional
+   `transition: none`. Colour/shadow/size changes simply snap; opacity and transform ease briefly. */
+:root[data-perf='lite'] [class~='transition'],
+:root[data-perf='lite'] [class~='transition-all'],
+:root[data-perf='lite'] [class~='transition-colors'],
+:root[data-perf='lite'] [class~='transition-shadow'],
+:root[data-perf='lite'] [class~='transition-transform'],
+:root[data-perf='lite'] [class~='transition-opacity'] {
+	transition-property: opacity, transform;
+	transition-duration: 120ms;
+}
+:root[data-perf='lite'] .coms-scroll-progress,
+:root[data-perf='lite'] .coms-hero-field {
+	transition: none;
+}
+
+/* ---- One-time "we switched to lite" notice ------------------------------------------------ */
+.coms-perf-notice {
+	position: fixed;
+	left: 50%;
+	bottom: 1rem;
+	z-index: 90;
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	width: max-content;
+	max-width: calc(100vw - 2rem);
+	transform: translateX(-50%);
+	padding: 0.7rem 0.85rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 0.75rem;
+	background: var(--app-surface);
+	color: var(--app-text);
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	line-height: 1.45;
+}
+.coms-perf-notice p {
+	margin: 0;
+}
+.coms-perf-notice-actions {
+	display: flex;
+	flex: none;
+	gap: 0.4rem;
+}
+.coms-perf-notice button {
+	min-height: 2rem;
+	padding: 0 0.75rem;
+	border: 1px solid var(--app-hairline);
+	border-radius: 9999px;
+	background: var(--app-surface-soft);
+	color: var(--app-text);
+	font-size: 0.75rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+.coms-perf-notice button:hover {
+	background: var(--app-surface-elevated);
+}
+.coms-perf-notice button:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 2px;
+}
+@media (max-width: 640px) {
+	.coms-perf-notice {
+		flex-direction: column;
+		align-items: stretch;
+		/* Clear of the back-to-top button (2.75rem at bottom 1.1rem). */
+		bottom: 4.75rem;
+	}
+	.coms-perf-notice-actions {
+		justify-content: flex-end;
+	}
+}

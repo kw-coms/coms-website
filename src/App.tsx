@@ -43,6 +43,7 @@ import {
 import GlobalNavigation from './components/GlobalNavigation'
 import QuickSearch from './components/QuickSearch'
 import AppearanceControl from './components/AppearanceControl'
+import PerfNotice from './components/PerfNotice'
 import NotFoundPage from './components/NotFoundPage'
 import HomeView from './pages/home/HomeView'
 import { useSpotlight } from './hooks/useSpotlight'
@@ -212,6 +213,7 @@ function App() {
       />
       {/* Client-side navigations are silent to screen readers; announce the new page title. */}
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{routeAnnouncement}</div>
+      <PerfNotice />
       <ToastHost />
       <ConfirmHost />
     </Suspense>

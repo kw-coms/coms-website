@@ -23,6 +23,7 @@ import ClubCalendarSection from '../../features/clubCalendar/ClubCalendarSection
 import HeroField from './HeroField'
 import { BuildMini, ClubOsVisual, FlowMini, JoinFlowVisual, JoinMini, LearningStackVisual, ProjectLabVisual } from './HomeVisuals'
 import { scrollToTopInstant } from '../../utils/themeColors'
+import { getPerfState, subscribePerf } from '../../utils/perfMode'
 import { useAuth } from '../../contexts/useAuth'
 
 const LATEST_NOTICE_QUERY_KEY = ['app-shell', 'latest-notice']
@@ -98,16 +99,27 @@ export default function HomeView() {
       if (raf) return
       raf = requestAnimationFrame(() => {
         raf = 0
+        if (getPerfState().mode === 'lite') return
         // 0 with the hero in full view, 1 once the page has scrolled most of it away.
         const out = Math.min(1, Math.max(0, -track.getBoundingClientRect().top / Math.max(1, track.offsetHeight * 0.85)))
         track.style.setProperty('--hero-out', out.toFixed(3))
       })
     }
     onScroll()
+    // Lite skips the hero's scroll/pointer variables; on the way back to full, recompute them
+    // (and clear the pointer tilt) so the hero does not wait for the next scroll to catch up.
+    const offPerf = subscribePerf(() => {
+      if (getPerfState().mode !== 'lite') {
+        heroInnerRef.current?.style.removeProperty('--coms-rx')
+        heroInnerRef.current?.style.removeProperty('--coms-ry')
+        onScroll()
+      }
+    })
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onScroll)
     return () => {
       io.disconnect()
+      offPerf()
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
       document.documentElement.classList.remove('home-snap-scroll')
@@ -206,6 +218,7 @@ export default function HomeView() {
                 ref={heroInnerRef}
                 className="coms-cinema-content relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center"
                 onPointerMove={(e) => {
+                  if (getPerfState().mode === 'lite') return
                   const r = e.currentTarget.getBoundingClientRect()
                   const px = (e.clientX - r.left) / r.width - 0.5
                   const py = (e.clientY - r.top) / r.height - 0.5

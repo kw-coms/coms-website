@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { hexToRgb, mixHex, normalizeHex } from '../../utils/themeColors'
 import { SCREEN_ON_EVENT, type ScreenOnDetail } from '../../utils/screenOn'
+import { getPerfState, subscribePerf } from '../../utils/perfMode'
 
 /**
  * The home hero's backdrop: the screen's own pixel grid, kept alive. Every few seconds a
@@ -38,7 +39,11 @@ export default function HeroField() {
     const ctx = canvas?.getContext('2d') ?? null
     if (!canvas || !ctx || typeof window.matchMedia !== 'function') return
 
-    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    // Lite mode (no hardware graphics acceleration) holds the grid still, like reduced motion,
+    // and also stops answering the pointer. It can switch on while the page is open.
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    let lite = getPerfState().mode === 'lite'
+    let calm = reduced || lite
     const root = document.documentElement
 
     // Colours follow the live theme: pale dots on the dark stage, ink dots on the light one,
@@ -350,7 +355,7 @@ export default function HeroField() {
     kick()
 
     const onPointer = (event: PointerEvent) => {
-      if (event.pointerType === 'touch') return
+      if (event.pointerType === 'touch' || lite) return
       const rect = canvas.getBoundingClientRect()
       tx = event.clientX - rect.left
       ty = event.clientY - rect.top
@@ -366,6 +371,7 @@ export default function HeroField() {
       nearTarget = 0
     }
     const onScreenOn = (event: Event) => {
+      if (lite) return
       const y = (event as CustomEvent<ScreenOnDetail>).detail?.y
       const rect = canvas.getBoundingClientRect()
       surgeY = typeof y === 'number' ? y - rect.top : rect.height / 2
@@ -377,6 +383,16 @@ export default function HeroField() {
       stale = true
       kick()
     }
+
+    const unsubscribePerf = subscribePerf(() => {
+      lite = getPerfState().mode === 'lite'
+      calm = reduced || lite
+      if (lite) {
+        nearTarget = 0
+        surgeAt = -1
+      }
+      kick()
+    })
 
     window.addEventListener('pointermove', onPointer, { passive: true })
     document.documentElement.addEventListener('pointerleave', onPointerGone)
@@ -405,6 +421,7 @@ export default function HeroField() {
       document.documentElement.removeEventListener('pointerleave', onPointerGone)
       window.removeEventListener('blur', onPointerGone)
       window.removeEventListener(SCREEN_ON_EVENT, onScreenOn)
+      unsubscribePerf()
       sizes?.disconnect()
       themes.disconnect()
       views.disconnect()

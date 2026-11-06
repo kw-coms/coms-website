@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { mixHex, normalizeHex } from '../../utils/themeColors'
-import { SCREEN_ON_EVENT, type ScreenOnDetail } from '../../utils/screenOn'
+import { INTRO_SESSION_KEY, SCREEN_ON_EVENT, type ScreenOnDetail } from '../../utils/screenOn'
+import { getPerfState } from '../../utils/perfMode'
 
 /**
  * Boot intro: the machine starts in the dark. The cube logo lights up cell by cell while a
@@ -15,8 +16,6 @@ import { SCREEN_ON_EVENT, type ScreenOnDetail } from '../../utils/screenOn'
 
 // Module-level so an SPA route change back to "/" doesn't replay it, but a full
 // page reload (which re-imports the module) does.
-const INTRO_SESSION_KEY = 'coms.intro.played:v1'
-
 function introAlreadyPlayed() {
   try {
     return sessionStorage.getItem(INTRO_SESSION_KEY) === '1'
@@ -85,7 +84,9 @@ export default function ComsIntro() {
   // module flag: under React StrictMode the effect runs setup → cleanup → setup,
   // and the first pass already flips `introPlayed`, so re-checking it made the
   // second pass bail and left a blank overlay that never dismissed itself.
-  const [shouldPlay] = useState(() => !introPlayed)
+  // Lite mode (no hardware graphics acceleration) skips it: a full-screen canvas animation is
+  // the costliest thing the site draws, and the page underneath is already complete.
+  const [shouldPlay] = useState(() => !introPlayed && getPerfState().mode !== 'lite')
   const [calm] = useState(prefersReducedMotion)
   const [gone, setGone] = useState(!shouldPlay)
   // leaving: the loading is over and the skip control goes; released: the page is uncovered.
