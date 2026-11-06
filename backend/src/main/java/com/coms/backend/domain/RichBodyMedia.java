@@ -28,16 +28,17 @@ public class RichBodyMedia {
     @Column(name = "owner_id")
     private Long ownerId;
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
     @Column(name = "attached_at")
     private LocalDateTime attachedAt;
     @Column(name = "detached_at")
     private LocalDateTime detachedAt;
 
     protected RichBodyMedia() {}
-    public RichBodyMedia(Kind kind, Scope scope, String storedName, String originalName, String contentType, long sizeBytes, Long uploaderId) {
+    public RichBodyMedia(Kind kind, Scope scope, String storedName, String originalName, String contentType, long sizeBytes, Long uploaderId, LocalDateTime createdAt) {
         this.kind = kind; this.scope = scope; this.storedName = storedName; this.originalName = originalName;
         this.contentType = contentType; this.sizeBytes = sizeBytes; this.uploaderId = uploaderId;
+        this.createdAt = createdAt;
     }
     public Long getId() { return id; }
     public Kind getKind() { return kind; }

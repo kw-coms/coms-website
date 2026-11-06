@@ -58,6 +58,23 @@ class RichBodyMediaAttachmentTransactionTest {
         }
     }
 
+    @Test
+    void memberQuotaIgnoresDetachedRowsButSiteCapCountsThem() {
+        long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
+        long count = mediaRows.countPending(actorId);
+        long memberBytes = mediaRows.sumPendingBytes(actorId);
+        long siteBytes = mediaRows.sumAllPendingBytes();
+        mediaRows.saveAndFlush(media(RichBodyMedia.Kind.IMAGE, RichBodyMedia.Scope.NOTICE, actorId));
+        RichBodyMedia detached = media(RichBodyMedia.Kind.IMAGE, RichBodyMedia.Scope.NOTICE, actorId);
+        detached.attach(1L, LocalDateTime.now());
+        detached.detach(LocalDateTime.now());
+        mediaRows.saveAndFlush(detached);
+
+        assertThat(mediaRows.countPending(actorId)).isEqualTo(count + 1);
+        assertThat(mediaRows.sumPendingBytes(actorId)).isEqualTo(memberBytes + 10);
+        assertThat(mediaRows.sumAllPendingBytes()).isEqualTo(siteBytes + 20);
+    }
+
     private enum InvalidReference { MISSING, WRONG_SCOPE, WRONG_KIND, OTHER_UPLOADER, OTHER_OWNER }
 
     @ParameterizedTest
@@ -218,7 +235,7 @@ class RichBodyMediaAttachmentTransactionTest {
 
     private static RichBodyMedia media(RichBodyMedia.Kind kind, RichBodyMedia.Scope scope, long uploaderId) {
         return new RichBodyMedia(kind, scope, "stored-rollback-" + java.util.UUID.randomUUID(),
-                "image.png", "image/png", 10, uploaderId);
+                "image.png", "image/png", 10, uploaderId, java.time.LocalDateTime.now());
     }
 
     @FunctionalInterface

@@ -26,7 +26,7 @@ class RichBodyMediaServiceTest {
     private final org.springframework.transaction.PlatformTransactionManager transactions =
             mock(org.springframework.transaction.PlatformTransactionManager.class);
     private final RichBodyMediaService service = new RichBodyMediaService(rows, members, storage, validator,
-            Clock.fixed(java.time.Instant.parse("2026-11-06T00:00:00Z"), ZoneOffset.UTC), deleter, transactions);
+            Clock.fixed(java.time.Instant.parse("2026-11-06T00:00:00Z"), ZoneOffset.UTC), deleter, transactions, 8L << 30, 60);
     private static final LocalDateTime NOW = LocalDateTime.of(2026, 11, 6, 0, 0);
     private static final RichBodyMedia.Scope NOTICE = RichBodyMedia.Scope.NOTICE;
 
@@ -157,7 +157,7 @@ class RichBodyMediaServiceTest {
         var file = new org.springframework.mock.web.MockMultipartFile(
                 "file", "../reports/report..final.pdf", "application/pdf", "%PDF-1.7".getBytes());
         var realValidatorService = new RichBodyMediaService(rows, members, storage, new MediaUploadValidator(),
-                Clock.systemUTC(), deleter, transactions);
+                Clock.systemUTC(), deleter, transactions, 8L << 30, 60);
         when(storage.store(file, "pdf")).thenReturn("uuid.pdf");
         when(rows.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -209,7 +209,7 @@ class RichBodyMediaServiceTest {
         when(actor.getRole()).thenReturn(role);
         when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
         when(members.findWithLockById(100L)).thenReturn(Optional.of(actor));
-        when(rows.countByUploaderIdAndOwnerIdIsNull(100L)).thenReturn(0L, count);
+        when(rows.countPending(100L)).thenReturn(0L, count);
         when(rows.sumPendingBytes(100L)).thenReturn(0L, bytes);
         var file = new org.springframework.mock.web.MockMultipartFile("file", "a.pdf", "application/pdf", new byte[]{1});
         when(validator.validateFile(file)).thenReturn("application/pdf");
@@ -224,7 +224,7 @@ class RichBodyMediaServiceTest {
         order.verify(storage).store(file, "pdf");
         order.verify(transactions).getTransaction(any());
         order.verify(members).findWithLockById(100L);
-        order.verify(rows).countByUploaderIdAndOwnerIdIsNull(100L);
+        order.verify(rows).countPending(100L);
         order.verify(transactions).rollback(any());
         order.verify(storage).delete("stored.pdf");
         verify(rows, never()).saveAndFlush(any());
@@ -236,7 +236,7 @@ class RichBodyMediaServiceTest {
         long count = countLimit ? MAX_PENDING_COUNT : 0;
         long bytes = countLimit ? 0 : MAX_PENDING_BYTES;
         var file = prepareUpload();
-        when(rows.countByUploaderIdAndOwnerIdIsNull(100L)).thenReturn(count);
+        when(rows.countPending(100L)).thenReturn(count);
         when(rows.sumPendingBytes(100L)).thenReturn(bytes);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor"))
@@ -303,7 +303,7 @@ class RichBodyMediaServiceTest {
         when(actor.getId()).thenReturn(100L);
         when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
         when(members.findWithLockById(100L)).thenReturn(Optional.of(actor));
-        when(rows.countByUploaderIdAndOwnerIdIsNull(100L)).thenReturn((long) MAX_PENDING_COUNT - 1);
+        when(rows.countPending(100L)).thenReturn((long) MAX_PENDING_COUNT - 1);
         when(rows.sumPendingBytes(100L)).thenReturn(MAX_PENDING_BYTES - 1);
         var file = new org.springframework.mock.web.MockMultipartFile("file", "a.pdf", "application/pdf", new byte[]{1});
         when(validator.validateFile(file)).thenReturn("application/pdf");
@@ -314,7 +314,7 @@ class RichBodyMediaServiceTest {
         order.verify(storage).store(file, "pdf");
         order.verify(transactions).getTransaction(any());
         order.verify(members).findWithLockById(100L);
-        order.verify(rows).countByUploaderIdAndOwnerIdIsNull(100L);
+        order.verify(rows).countPending(100L);
         order.verify(rows).sumPendingBytes(100L);
         order.verify(rows).saveAndFlush(any());
         order.verify(transactions).commit(any());
@@ -363,7 +363,7 @@ class RichBodyMediaServiceTest {
         Member actor = mock(Member.class);
         when(actor.getId()).thenReturn(100L);
         when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
-        when(rows.countByUploaderIdAndOwnerIdIsNull(100L)).thenReturn((long) MAX_PENDING_COUNT);
+        when(rows.countPending(100L)).thenReturn((long) MAX_PENDING_COUNT);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.upload(NOTICE, kind, file, "actor"))
                 .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
@@ -404,6 +404,121 @@ class RichBodyMediaServiceTest {
         order.verify(third).detach(NOW);
     }
 
+    private static final String QUOTA_MESSAGE_SITE = "사이트 전체 임시 업로드 용량이 가득 찼습니다. 잠시 후 다시 시도해 주세요.";
+
+    @Test void siteWidePendingCapStopsUploadBeforeAnythingIsStored() throws Exception {
+        var file = prepareUpload();
+        when(rows.sumAllPendingBytes()).thenReturn(8L << 30);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class, error -> {
+                    assertThat(error.getStatusCode().value()).isEqualTo(429);
+                    assertThat(error.getReason()).isEqualTo(QUOTA_MESSAGE_SITE);
+                });
+        verifyNoInteractions(storage, transactions);
+        verify(rows, never()).saveAndFlush(any());
+    }
+
+    @Test void siteWideCapIsRecheckedUnderLockAndDeletesStoredFile() throws Exception {
+        var file = prepareUpload();
+        when(rows.sumAllPendingBytes()).thenReturn(0L, 8L << 30);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode().value()).isEqualTo(429));
+        verify(storage).delete("stored.pdf");
+        verify(rows, never()).saveAndFlush(any());
+    }
+
+    @Test void siteWideCapAllowsUploadThatExactlyFits() throws Exception {
+        var file = prepareUpload();
+        when(rows.sumAllPendingBytes()).thenReturn((8L << 30) - 1);
+        when(rows.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(service.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor").getOriginalName()).isEqualTo("a.pdf");
+    }
+
+    @Test void uploadsAreRateLimitedPerMember() throws Exception {
+        var limited = new RichBodyMediaService(rows, members, storage, validator,
+                Clock.fixed(java.time.Instant.parse("2026-11-06T00:00:00Z"), ZoneOffset.UTC), deleter, transactions, 8L << 30, 2);
+        var file = prepareUpload();
+        when(rows.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        limited.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor");
+        limited.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor");
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> limited.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class, error -> {
+                    assertThat(error.getStatusCode().value()).isEqualTo(429);
+                    assertThat(error.getReason()).isEqualTo("업로드를 너무 자주 하고 있습니다. 잠시 후 다시 시도해 주세요.");
+                });
+        verify(storage, times(2)).store(file, "pdf");
+    }
+
+    @Test void uploadCreatedAtComesFromInjectedClock() throws Exception {
+        var file = prepareUpload();
+        when(rows.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThat(service.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor").getCreatedAt()).isEqualTo(NOW);
+    }
+
+    private RichBodyMedia detachedRow(long uploaderId) {
+        RichBodyMedia candidate = row(1, RichBodyMedia.Kind.IMAGE, NOTICE, uploaderId);
+        candidate.attach(40L, NOW.minusDays(30));
+        candidate.detach(NOW.minusHours(1));
+        when(rows.findLockedById(1L)).thenReturn(Optional.of(candidate));
+        Member actor = mock(Member.class);
+        when(actor.getId()).thenReturn(999L);
+        when(members.findByStudentId("editor")).thenReturn(Optional.of(actor));
+        return candidate;
+    }
+
+    @Test void editorMayReattachDetachedMediaUploadedBySomeoneElse() {
+        RichBodyMedia candidate = detachedRow(100);
+
+        service.syncAttachments(NOTICE, 50L, image(1), "editor", true);
+
+        assertThat(candidate.getOwnerId()).isEqualTo(50L);
+        assertThat(candidate.getDetachedAt()).isNull();
+    }
+
+    @Test void createPathDoesNotLetNonUploaderReattachDetachedMedia() {
+        RichBodyMedia candidate = detachedRow(100);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.syncAttachments(NOTICE, 50L, image(1), "editor"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(candidate.getOwnerId()).isNull();
+    }
+
+    @Test void editorCannotReattachDetachedMediaOfAnotherScope() {
+        RichBodyMedia candidate = detachedRow(100);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                service.syncAttachments(RichBodyMedia.Scope.ARCHIVE, 50L, image(1), "editor", true))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(candidate.getOwnerId()).isNull();
+    }
+
+    @Test void editorCannotTakeMediaCurrentlyAttachedToAnotherOwner() {
+        RichBodyMedia candidate = detachedRow(100);
+        candidate.attach(60L, NOW);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.syncAttachments(NOTICE, 50L, image(1), "editor", true))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(candidate.getOwnerId()).isEqualTo(60L);
+    }
+
+    @Test void editorCannotAttachNeverAttachedPendingMediaOfAnotherUploader() {
+        RichBodyMedia candidate = row(1, RichBodyMedia.Kind.IMAGE, NOTICE, 100);
+        when(rows.findLockedById(1L)).thenReturn(Optional.of(candidate));
+        Member editor = mock(Member.class);
+        when(editor.getId()).thenReturn(999L);
+        when(members.findByStudentId("editor")).thenReturn(Optional.of(editor));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.syncAttachments(NOTICE, 50L, image(1), "editor", true))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(candidate.getOwnerId()).isNull();
+    }
+
     private void assertBadAttachment(String content) {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.syncAttachments(NOTICE, 50L, content, "actor"))
                 .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
@@ -413,7 +528,7 @@ class RichBodyMediaServiceTest {
     private static String image(long id) { return "[{\"type\":\"image\",\"mediaId\":" + id + "}]"; }
 
     private static RichBodyMedia row(long id, RichBodyMedia.Kind kind, RichBodyMedia.Scope scope, long uploaderId) {
-        RichBodyMedia result = new RichBodyMedia(kind, scope, "stored-" + id, "photo.png", "image/png", 10, uploaderId);
+        RichBodyMedia result = new RichBodyMedia(kind, scope, "stored-" + id, "photo.png", "image/png", 10, uploaderId, NOW);
         ReflectionTestUtils.setField(result, "id", id);
         return result;
     }

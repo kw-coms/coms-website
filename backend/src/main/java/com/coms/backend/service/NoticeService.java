@@ -173,7 +173,7 @@ public class NoticeService {
         // editor's own name, which silently undid 회장 author overrides.
         applyRequest(notice, request, notice.getAuthor(), canManageNotice);
         richBodyMediaService.syncAttachments(RichBodyMedia.Scope.NOTICE, notice.getId(), notice.getContent(),
-                canManageNotice ? authorStudentId : null);
+                canManageNotice ? authorStudentId : null, true);
         auditLogService.record(authorStudentId, "NOTICE_UPDATE", "NOTICE", String.valueOf(notice.getId()), "title=" + notice.getTitle(), null);
         return toResponse(notice, voteStats(List.of(notice)), authorStudentId);
     }

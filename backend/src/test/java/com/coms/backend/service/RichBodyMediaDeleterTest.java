@@ -125,7 +125,7 @@ class RichBodyMediaDeleterTest {
 
     private RichBodyMedia media(Long id, LocalDateTime createdAt) {
         var row = new RichBodyMedia(RichBodyMedia.Kind.FILE, RichBodyMedia.Scope.ARCHIVE,
-                "stored-" + id, "original.pdf", "application/pdf", 1, 7L);
+                "stored-" + id, "original.pdf", "application/pdf", 1, 7L, createdAt);
         ReflectionTestUtils.setField(row, "id", id);
         ReflectionTestUtils.setField(row, "createdAt", createdAt);
         return row;

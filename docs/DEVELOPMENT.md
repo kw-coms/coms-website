@@ -190,6 +190,8 @@ docker compose --env-file .env up -d --build
 | 설정 | 환경 변수 이름 | 기본값 | 설명 |
 | --- | --- | --- | --- |
 | `storage.min-free-bytes` | `STORAGE_MIN_FREE_BYTES` | 524288000 (500MB) | 업로드 디스크의 여유 공간이 이보다 적으면 업로드를 거절(507) |
+| `coms.media.pending-total-max-bytes` | `COMS_MEDIA_PENDING_TOTAL_MAX_BYTES` | 8589934592 (8GiB) | 글에 붙지 않은(대기/분리된) 본문 업로드의 사이트 전체 합계 상한. 넘으면 429 |
+| `coms.media.uploads-per-10-minutes` | `COMS_MEDIA_UPLOADS_PER_10_MINUTES` | 60 | 회원당 10분 동안 본문 미디어 업로드 횟수 상한. 넘으면 429 |
 | `coms.retention.audit-ip-days` | `COMS_RETENTION_AUDIT_IP_DAYS` | 180 | 감사 로그의 IP를 지우는 기간 |
 | `coms.retention.recruit-application-ip-days` | `COMS_RETENTION_RECRUIT_APPLICATION_IP_DAYS` | 30 | 지원서 접속 IP를 지우는 기간 |
 | `coms.retention.recruit-application-days` | `COMS_RETENTION_RECRUIT_APPLICATION_DAYS` | 365 | 처리하지 않은 지원서를 지우는 기간 |

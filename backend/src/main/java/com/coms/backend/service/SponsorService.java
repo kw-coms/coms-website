@@ -321,7 +321,7 @@ public class SponsorService {
         }
         settingsRepository.saveAndFlush(entity);
         richBodyMediaService.syncAttachments(RichBodyMedia.Scope.SPONSOR, 1L,
-                combinedRichBody(validated), actorStudentId);
+                combinedRichBody(validated), actorStudentId, true);
         if (!Objects.equals(previousBannerImageId, validated.bannerImageId())) {
             deleteImageIfUnreferenced(previousBannerImageId);
         }
