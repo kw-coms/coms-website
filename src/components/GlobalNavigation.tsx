@@ -10,6 +10,7 @@ import {
   Menu,
   Megaphone,
   Search,
+  Wrench,
   Sparkles,
   X,
 } from 'lucide-react'
@@ -196,7 +197,7 @@ export default function GlobalNavigation() {
   }
 
   const navClass = (key, active = activeKey === key) => (
-    `relative px-[3px] text-xs xl:px-1 font-semibold transition ${
+    `relative px-0 text-xs xl:px-1 font-semibold transition ${
       active
         ? 'text-[var(--app-text)]'
         : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'
@@ -230,10 +231,10 @@ export default function GlobalNavigation() {
           <span className="whitespace-nowrap text-sm font-bold text-[var(--app-text)]">KW COM&apos;s</span>
         </button>
 
-        {/* Tight below 2xl (no gap at lg, gap-3 at xl): with the Records and Tools buttons and the
+        {/* Tight below 2xl (gap-1 and no button padding at lg, gap-3 at xl): with the Records and Tools buttons and the
             quick-jump button in the account cluster, wider gaps no longer fitted at 1024px and
             1280px and the brand was painted over. */}
-        <nav className="hidden items-center lg:flex xl:gap-3 2xl:gap-5">
+        <nav className="hidden items-center lg:flex lg:gap-1 xl:gap-3 2xl:gap-5">
           {primaryNavItems.map((item) => (
             <button
               key={item.id}
@@ -258,13 +259,15 @@ export default function GlobalNavigation() {
           {activityNavGroups.map((group) => {
             const groupItems = activitySectionNavItems.filter((item) => item.group === group.id)
             const open = openGroup === group.id
+            const groupActive = groupItems.some((item) => item.id === activeKey)
             return (
               <div key={group.id} ref={(node) => { groupWrapperRefs.current[group.id] = node }} className="relative">
                 <button
                   ref={(node) => { groupToggleRefs.current[group.id] = node }}
                   type="button"
                   onClick={() => setOpenGroup(open ? null : group.id)}
-                  className={`${navClass(group.id, groupItems.some((item) => item.id === activeKey))} inline-flex items-center gap-1`}
+                  className={`${navClass(group.id, groupActive)} inline-flex items-center gap-1`}
+                  data-active={groupActive ? 'true' : undefined}
                   aria-expanded={open}
                   aria-controls={`${group.id}-nav-panel`}
                 >
@@ -408,7 +411,9 @@ export default function GlobalNavigation() {
                     aria-controls={`mobile-${group.id}-panel`}
                     className="apple-mobile-menu-item"
                   >
-                    <CalendarDays size={15} className="text-sky-500" />
+                    {group.id === 'tools'
+                      ? <Wrench size={15} className="text-amber-500" />
+                      : <CalendarDays size={15} className="text-sky-500" />}
                     <span>{group.navLabel}</span>
                     <span className="ml-auto inline-flex items-center gap-1 text-xs text-[var(--app-muted)]">
                       {group.label}

@@ -2244,6 +2244,10 @@ test('top navigation groups activity log and monthly calendar under Records and 
   await expect(desktopNav.getByRole('button', { name: 'Activity log' })).toHaveCount(0)
   await expect(desktopNav.getByRole('button', { name: 'Monthly calendar' })).toHaveCount(0)
 
+  // No group is active on the home page.
+  await expect(desktopNav.getByRole('button', { name: 'Records', exact: true })).not.toHaveAttribute('data-active', 'true')
+  await expect(desktopNav.getByRole('button', { name: 'Tools', exact: true })).not.toHaveAttribute('data-active', 'true')
+
   await desktopNav.getByRole('button', { name: 'Records', exact: true }).click()
   const activityMenu = page.getByRole('navigation', { name: '기록·일정 메뉴' })
   await expect(activityMenu.getByRole('button', { name: /Activity log/ })).toBeVisible()
@@ -2266,6 +2270,12 @@ test('top navigation groups activity log and monthly calendar under Records and 
   await expect(activityMenu).toBeVisible()
   await activityMenu.getByRole('button', { name: /Activity log/ }).click()
   await expect(page).toHaveURL(/\/activity-log$/)
+  // The toggle of the group that holds the current page is the active one, and only that one.
+  await expect(desktopNav.getByRole('button', { name: 'Records', exact: true })).toHaveAttribute('data-active', 'true')
+  await expect(desktopNav.getByRole('button', { name: 'Tools', exact: true })).not.toHaveAttribute('data-active', 'true')
+  await page.goto('/draw')
+  await expect(desktopNav.getByRole('button', { name: 'Tools', exact: true })).toHaveAttribute('data-active', 'true')
+  await expect(desktopNav.getByRole('button', { name: 'Records', exact: true })).not.toHaveAttribute('data-active', 'true')
   await page.goto('/')
 
   await desktopNav.getByRole('button', { name: 'Records', exact: true }).click()
@@ -2298,6 +2308,12 @@ test('top navigation groups activity log and monthly calendar under Records and 
   await expect(mobileMenu.getByRole('button', { name: /Gather/ })).toBeVisible()
   await expect(mobileMenu.getByRole('button', { name: /Activity log/ })).toBeVisible()
   await expect(mobileMenu.getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
+  // The two collapsibles are independent: closing Records leaves Tools open.
+  await mobileMenu.getByRole('button', { name: /^Records/ }).click()
+  await expect(mobileMenu.getByRole('button', { name: /Activity log/ })).toHaveCount(0)
+  await expect(mobileMenu.getByRole('button', { name: /Gather/ })).toBeVisible()
+  await mobileMenu.getByRole('button', { name: /^Records/ }).click()
+  await expect(mobileMenu.getByRole('button', { name: /Activity log/ })).toBeVisible()
   const mobileSubitemBox = await mobileMenu.getByRole('button', { name: /Activity log/ }).boundingBox()
   expect(mobileSubitemBox.height).toBeGreaterThanOrEqual(44)
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
