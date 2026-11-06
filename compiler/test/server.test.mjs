@@ -72,10 +72,12 @@ httpTest('rate limits per real peer when proxy trust disabled', async () => {
     assert.equal(response.status, 429); assert.equal((await response.json()).reason, 'rate-limited');
   });
 });
-test('uses first valid forwarded IP only when proxy trust enabled', () => {
-  const request = { headers: { 'x-forwarded-for': '1.2.3.4, 5.6.7.8' }, socket: { remoteAddress: '127.0.0.1' } };
-  assert.equal(clientIp(request, true), '1.2.3.4');
+test('uses right-most forwarded IP only when proxy trust enabled', () => {
+  const request = { headers: { 'x-forwarded-for': '9.9.9.9, 5.6.7.8' }, socket: { remoteAddress: '127.0.0.1' } };
+  assert.equal(clientIp(request, true), '5.6.7.8');
   assert.equal(clientIp(request, false), '127.0.0.1');
+  assert.equal(clientIp({ headers: { 'x-forwarded-for': '1.1.1.1, junk' }, socket: { remoteAddress: '::ffff:10.0.0.1' } }, true), '10.0.0.1');
+  assert.equal(clientIp({ headers: { 'x-forwarded-for': '2001:db8:1:2::7' }, socket: { remoteAddress: '127.0.0.1' } }, true), clientIp({ headers: {}, socket: { remoteAddress: '2001:db8:1:2::8' } }));
 });
 httpTest('returns busy when bounded compile queue is full', async () => {
   const queue = createCompileQueue({ concurrency: 1, maxQueued: 0 });

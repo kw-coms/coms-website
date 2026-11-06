@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRateLimiter, createCompileQueue } from '../limits.mjs';
+import { createRateLimiter, createCompileQueue, normalizeIp } from '../limits.mjs';
 
 test('allows ten attempts per IP each minute', () => {
   let now = 0; const limiter = createRateLimiter({ now: () => now });
@@ -10,22 +10,45 @@ test('allows ten attempts per IP each minute', () => {
   now = 60000; assert.equal(limiter.take('a'), true);
   limiter.close();
 });
-test('evicts the oldest client when full and sweeps expired clients on an unref timer', () => {
-  let now = 0, tick, timer;
-  const limiter = createRateLimiter({ limit: 1, maxKeys: 2, windowMs: 100,
+test('full table never evicts live entries; new keys share one overflow bucket; sweep frees space', () => {
+  let now = 0, tick;
+  const limiter = createRateLimiter({ limit: 2, maxKeys: 2, windowMs: 100,
     now: () => now,
-    setIntervalImpl: callback => { tick = callback; timer = { unref() { this.unrefed = true; } }; return timer; },
+    setIntervalImpl: callback => { tick = callback; return { unref() {} }; },
   });
-  assert.equal(timer.unrefed, true);
+  assert.equal(limiter.take('a'), true);
   assert.equal(limiter.take('a'), true);
   assert.equal(limiter.take('b'), true);
-  assert.equal(limiter.take('a'), false); // a is now most recently used
-  assert.equal(limiter.take('c'), true); // b is evicted
-  assert.equal(limiter.take('b'), true); // evicted b is admitted again
+  // table full: c, d, e share one overflow budget of 2
+  assert.equal(limiter.take('c'), true);
+  assert.equal(limiter.take('d'), true);
+  assert.equal(limiter.take('e'), false);
+  assert.equal(limiter.take('c'), false);
+  // existing a keeps its exhausted counter, b its own remaining one
+  assert.equal(limiter.take('a'), false);
+  assert.equal(limiter.take('b'), true);
   assert.deepEqual(limiter.stats(), { clients: 2 });
   now = 100; tick();
   assert.deepEqual(limiter.stats(), { clients: 0 });
+  assert.equal(limiter.take('e'), true);
   assert.equal(limiter.take('a'), true);
+  limiter.close();
+});
+test('normalizeIp maps IPv4-mapped and aggregates IPv6 to /64', () => {
+  assert.equal(normalizeIp('::ffff:1.2.3.4'), '1.2.3.4');
+  assert.equal(normalizeIp('1.2.3.4'), '1.2.3.4');
+  const a = normalizeIp('2001:db8:1:2::1'), b = normalizeIp('2001:0DB8:1:2:ffff:ffff:ffff:ffff');
+  assert.equal(a, b);
+  assert.notEqual(a, normalizeIp('2001:db8:1:3::1'));
+  assert.equal(normalizeIp('::1'), normalizeIp('0:0:0:0::5'));
+  assert.equal(normalizeIp('fe80::1%en0'), normalizeIp('fe80::2'));
+});
+test('same-/64 IPv6 clients share one budget', () => {
+  const limiter = createRateLimiter({ limit: 2, now: () => 0 });
+  assert.equal(limiter.take(normalizeIp('2001:db8:1:2::1')), true);
+  assert.equal(limiter.take(normalizeIp('2001:db8:1:2::2')), true);
+  assert.equal(limiter.take(normalizeIp('2001:db8:1:2:aaaa::3')), false);
+  assert.equal(limiter.take(normalizeIp('2001:db8:1:9::1')), true);
   limiter.close();
 });
 test('requires a positive client capacity', () => {

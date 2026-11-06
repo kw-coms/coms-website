@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { lstat, unlink } from 'node:fs/promises';
 import { validateSketch } from './validation.mjs';
 import { compileSketch, failure } from './compile.mjs';
-import { createRateLimiter, createCompileQueue } from './limits.mjs';
+import { createRateLimiter, createCompileQueue, normalizeIp } from './limits.mjs';
 
 export const MAX_BODY_BYTES = 80 * 1024;
 export const AUTH_MESSAGE = '로그인한 동아리원만 컴파일할 수 있어요.';
@@ -17,10 +17,11 @@ export function rateLimitPerMinute(value = process.env.RATE_LIMIT_PER_MIN) {
 export function clientIp(request, trustProxy = false) {
   const forwarded = request.headers['x-forwarded-for'];
   if (trustProxy && typeof forwarded === 'string') {
-    const first = forwarded.split(',')[0].trim();
-    if (isIP(first)) return first;
+    // nginx overwrites X-Forwarded-For with $remote_addr; the right-most hop is the one our proxy vouches for.
+    const last = forwarded.split(',').pop().trim();
+    if (isIP(last)) return normalizeIp(last);
   }
-  return request.socket.remoteAddress || 'unknown';
+  return normalizeIp(request.socket.remoteAddress || 'unknown');
 }
 export async function checkAuth(cookie, url, { fetchImpl = fetch, timeoutMs = 3000 } = {}) {
   if (!url) return true;
