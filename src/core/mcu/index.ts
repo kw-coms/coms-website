@@ -7,6 +7,7 @@ import type { McuPinState } from '../types';
 import { Lcd1602 } from './lcd';
 import { loadIntelHex as parseIntelHex } from './hex';
 import { DHT11Protocol, WS2812Protocol } from './protocols';
+import { installUnoEeprom, UnoEepromMemoryBackend } from './eeprom';
 
 export const MCU_HZ = 16_000_000;
 const map: Record<string, ['B' | 'C' | 'D', number]> = {};
@@ -26,6 +27,7 @@ export class Mcu {
   adc!: AVRADC;
   usart!: AVRUSART;
   twi!: AVRTWI;
+  readonly eeprom = new UnoEepromMemoryBackend();
   lcd = new Lcd1602();
   onSerial: (text: string) => void;
   onPinChange?: (pin: string, level: 0 | 1) => void;
@@ -49,6 +51,7 @@ export class Mcu {
   }
   reset(program: Uint16Array<ArrayBuffer> = new Uint16Array(16384)): void {
     this.cpu = new CPU(program, 2048);
+    installUnoEeprom(this.cpu, this.eeprom);
     this.ports = { B: new AVRIOPort(this.cpu, portBConfig), C: new AVRIOPort(this.cpu, portCConfig), D: new AVRIOPort(this.cpu, portDConfig) };
     new AVRTimer(this.cpu, timer0Config);
     new AVRTimer(this.cpu, timer1Config);

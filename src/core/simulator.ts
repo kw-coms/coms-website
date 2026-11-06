@@ -20,10 +20,16 @@ export type Event =
 export { LocalSimulator } from './local-simulator';
 
 class WorkerSimulator implements Simulator {
-  private worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
+  private worker!: Worker;
   private frames = new Set<(frame: SimFrame) => void>();
   private serial = new Set<(text: string) => void>();
+  private states = new Set<(state: Simulator['state'], error?: string) => void>();
   private _state: Simulator['state'] = 'idle';
+  private failed = false;
+  private disposed = false;
+  private hex: string | undefined;
+  private speed = 1;
+  private inputs = new Map<string, SimInput>();
   private scene: Scene = { version: 1, parts: [], wires: [], code: '' };
   private lastFrame: SimFrame = {
     timeMs: 0, realtimeRatio: 0, pins: {}, parts: {}, netVolts: {}, warnings: [],
@@ -34,10 +40,22 @@ class WorkerSimulator implements Simulator {
   }
 
   constructor() {
+    this.createWorker();
+  }
+
+  private transition(state: Simulator['state'], error?: string): void {
+    if (this._state === state && !error) return;
+    this._state = state;
+    for (const listener of this.states) listener(state, error);
+  }
+
+  private createWorker(): void {
+    this.worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
     this.worker.onerror = event => {
       event.preventDefault();
       this.fail(event.message || '워커 실행 오류');
     };
+    this.worker.onmessageerror = () => this.fail('워커 메시지를 읽을 수 없습니다.');
     this.worker.onmessage = (event: MessageEvent<Event>) => {
       const message = event.data;
       if (message.type === 'frame') {
@@ -52,17 +70,22 @@ class WorkerSimulator implements Simulator {
   }
 
   private fail(message: string): void {
-    this._state = 'paused';
+    if (this.failed || this.disposed) return;
+    this.failed = true;
+    this.worker.terminate();
+    const error = `시뮬레이션 오류: ${message}`;
+    this.transition('idle', error);
     const frame: SimFrame = {
       ...this.lastFrame,
       warnings: [...this.lastFrame.warnings, {
-        id: 'worker-error', level: 'error', message: `시뮬레이션 오류: ${message}`,
+        id: 'worker-error', level: 'error', message: error,
       }],
     };
     for (const listener of this.frames) listener(frame);
   }
 
   private send(command: Command): void {
+    if (this.failed) return;
     try {
       this.worker.postMessage(command);
     } catch (error) {
@@ -76,26 +99,45 @@ class WorkerSimulator implements Simulator {
     const result = analyze(valid);
     this.send({ method: 'setScene', value: valid });
     this.scene = structuredClone(valid);
+    this.inputs = new Map([...this.inputs].filter(([, value]) => {
+      const part = valid.parts.find(candidate => candidate.id === value.partId);
+      return !!part && !!PARTS[part.kind].inputs?.some(input => input.key === value.key);
+    }));
     return result;
   }
 
   loadHex(hex: string): void {
     loadIntelHex(hex);
     this.send({ method: 'loadHex', value: hex });
+    this.hex = hex;
   }
 
   start(): void {
-    this._state = 'running';
+    if (this.disposed) return;
+    if (this.failed) {
+      this.failed = false;
+      try {
+        this.createWorker();
+        this.send({ method: 'setScene', value: this.scene });
+        if (this.hex) this.send({ method: 'loadHex', value: this.hex });
+        this.send({ method: 'setSpeed', value: this.speed });
+        for (const value of this.inputs.values()) this.send({ method: 'setInput', value });
+      } catch (error) {
+        this.fail(error instanceof Error ? error.message : String(error));
+        return;
+      }
+    }
     this.send({ method: 'start' });
+    if (!this.failed) this.transition('running');
   }
 
   pause(): void {
-    if (this._state === 'running') this._state = 'paused';
+    if (this._state === 'running') this.transition('paused');
     this.send({ method: 'pause' });
   }
 
   stop(): void {
-    this._state = 'idle';
+    this.transition('idle');
     this.send({ method: 'stop' });
   }
 
@@ -105,7 +147,8 @@ class WorkerSimulator implements Simulator {
 
   setSpeed(value: number): void {
     if (!Number.isFinite(value)) throw new Error('속도가 올바르지 않습니다.');
-    this.send({ method: 'setSpeed', value: Math.max(0.25, Math.min(2, value)) });
+    this.speed = Math.max(0.25, Math.min(2, value));
+    this.send({ method: 'setSpeed', value: this.speed });
   }
 
   setInput(value: SimInput): void {
@@ -117,6 +160,7 @@ class WorkerSimulator implements Simulator {
       : typeof value.value !== 'number' || !Number.isFinite(value.value);
     if (invalidType) throw new Error('입력값 형식이 올바르지 않습니다.');
     this.send({ method: 'setInput', value });
+    this.inputs.set(`${value.partId}:${value.key}`, value);
   }
 
   writeSerial(value: string): void {
@@ -133,11 +177,18 @@ class WorkerSimulator implements Simulator {
     return () => { this.serial.delete(listener); };
   }
 
+  onState(listener: (state: Simulator['state'], error?: string) => void): () => void {
+    this.states.add(listener);
+    return () => { this.states.delete(listener); };
+  }
+
   dispose(): void {
     this.worker.terminate();
-    this._state = 'idle';
+    this.disposed = true;
+    this.transition('idle');
     this.frames.clear();
     this.serial.clear();
+    this.states.clear();
   }
 }
 

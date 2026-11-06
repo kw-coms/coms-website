@@ -7,6 +7,7 @@ export class LocalSimulator implements Simulator {
   private engine = new SimulationEngine();
   private frames = new Set<(frame: SimFrame) => void>();
   private serial = new Set<(text: string) => void>();
+  private states = new Set<(state: Simulator['state'], error?: string) => void>();
   private timer: ReturnType<typeof setTimeout> | undefined;
   private inputTimer: ReturnType<typeof setTimeout> | undefined;
   private speed = 1;
@@ -29,6 +30,18 @@ export class LocalSimulator implements Simulator {
     for (const listener of this.frames) listener(frame);
   }
 
+  private transition(state: Simulator['state'], error?: string): void {
+    if (this._state === state && !error) return;
+    this._state = state;
+    for (const listener of this.states) listener(state, error);
+  }
+
+  private fail(error: unknown): void {
+    if (this.timer !== undefined) clearTimeout(this.timer);
+    this.timer = undefined;
+    this.transition('idle', `시뮬레이션 오류: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
   private resetClock(): void {
     this.started = performance.now();
     this.simulatedAtStart = this.engine.mcu.cpu.cycles;
@@ -48,12 +61,18 @@ export class LocalSimulator implements Simulator {
 
   start(): void {
     if (this.disposed || this._state === 'running') return;
-    this._state = 'running';
+    this.transition('running');
     this.resetClock();
     const tick = (): void => {
       if (this._state !== 'running') return;
       const started = performance.now();
-      const frame = this.engine.step(Math.round(MCU_HZ / 60 * this.speed));
+      let frame: SimFrame;
+      try {
+        frame = this.engine.step(Math.round(MCU_HZ / 60 * this.speed));
+      } catch (error) {
+        this.fail(error);
+        return;
+      }
       const elapsedSeconds = (performance.now() - this.started) / 1000;
       frame.realtimeRatio = elapsedSeconds > 0
         ? (this.engine.mcu.cpu.cycles - this.simulatedAtStart) / MCU_HZ / elapsedSeconds
@@ -67,12 +86,12 @@ export class LocalSimulator implements Simulator {
   pause(): void {
     if (this.timer !== undefined) clearTimeout(this.timer);
     this.timer = undefined;
-    if (this._state === 'running') this._state = 'paused';
+    if (this._state === 'running') this.transition('paused');
   }
 
   stop(): void {
     this.pause();
-    this._state = 'idle';
+    this.transition('idle');
     this.engine.reset();
     this.emit();
   }
@@ -94,7 +113,9 @@ export class LocalSimulator implements Simulator {
       if (this.inputTimer !== undefined) clearTimeout(this.inputTimer);
       this.inputTimer = setTimeout(() => {
         this.inputTimer = undefined;
-        if (!this.disposed) this.emit();
+        if (!this.disposed) {
+          try { this.emit(); } catch (error) { this.fail(error); }
+        }
       }, Math.max(18, this.engine.nextSolveDelay + 1));
     }
   }
@@ -113,13 +134,19 @@ export class LocalSimulator implements Simulator {
     return () => { this.serial.delete(listener); };
   }
 
+  onState(listener: (state: Simulator['state'], error?: string) => void): () => void {
+    this.states.add(listener);
+    return () => { this.states.delete(listener); };
+  }
+
   dispose(): void {
     this.pause();
     if (this.inputTimer !== undefined) clearTimeout(this.inputTimer);
     this.inputTimer = undefined;
     this.disposed = true;
-    this._state = 'idle';
+    this.transition('idle');
     this.frames.clear();
     this.serial.clear();
+    this.states.clear();
   }
 }

@@ -17,6 +17,7 @@ export class SimulationEngine {
   mcu = new Mcu(text => this.onSerial(text));
   onSerial: (text: string) => void = () => {};
   inputs: Record<string, Record<string, number | boolean>> = {};
+  private unoId: string | undefined;
   private hex: string | undefined;
   private solution: SolveResult | undefined;
   private opticalCurrents: Record<string, number> = {};
@@ -54,7 +55,7 @@ export class SimulationEngine {
   private powered(id: string, positive: string): boolean {
     const ground = this.analysis.nets.find(net => net.id === this.analysis.pinToNet[`${id}:GND`]);
     const grounded = ground?.pins.some(ref =>
-      ref.pinId.startsWith('GND') && this.scene.parts.some(part => part.id === ref.partId && part.kind === 'arduino-uno'),
+      ref.pinId.startsWith('GND') && ref.partId === this.unoId,
     );
     return this.voltage(id, positive) - this.voltage(id, 'GND') > 3.5 && !!grounded;
   }
@@ -69,7 +70,7 @@ export class SimulationEngine {
       seen.add(netId);
       for (const ref of this.analysis.nets.find(net => net.id === netId)?.pins ?? []) {
         const part = this.scene.parts.find(candidate => candidate.id === ref.partId)!;
-        if (part.kind === 'arduino-uno' && ref.pinId.startsWith('GND')) return true;
+        if (part.id === this.unoId && ref.pinId.startsWith('GND')) return true;
         if (part.id === partId) continue;
         if (part.kind === 'resistor') {
           pending.push(this.analysis.pinToNet[`${part.id}:${ref.pinId === '1' ? '2' : '1'}`]!);
@@ -89,17 +90,22 @@ export class SimulationEngine {
   }
 
   setScene(scene: Scene): Analysis {
-    this.scene = structuredClone(validateScene(scene));
+    const next = structuredClone(validateScene(scene));
+    const unchanged = JSON.stringify(next.parts) === JSON.stringify(this.scene.parts)
+      && JSON.stringify(next.wires) === JSON.stringify(this.scene.wires);
+    this.scene = next;
+    // Editing source must not reset protocol transactions or the running circuit.
+    if (unchanged) return this.analysis;
+    this.unoId = this.scene.parts.find(part => part.kind === 'arduino-uno')?.id;
     this.mcu.clearEcho();
     this.analysis = analyze(this.scene);
     this.linkedInputs.clear();
-    const unoIds = new Set(this.scene.parts.filter(part => part.kind === 'arduino-uno').map(part => part.id));
     for (const net of this.analysis.nets) {
-      const pins = net.pins.filter(ref => unoIds.has(ref.partId) && UNO_PIN_MAP[ref.pinId]).map(ref => ref.pinId);
+      const pins = net.pins.filter(ref => ref.partId === this.unoId && UNO_PIN_MAP[ref.pinId]).map(ref => ref.pinId);
       for (const pin of pins) this.linkedInputs.set(pin, pins.filter(peer => peer !== pin));
     }
     this.inputs = Object.fromEntries(this.scene.parts.map(part => [
-      part.id, Object.fromEntries((PARTS[part.kind].inputs ?? []).map(input => [input.key, input.default])),
+      part.id, Object.fromEntries((PARTS[part.kind].inputs ?? []).map(input => [input.key, this.inputs[part.id]?.[input.key] ?? input.default])),
     ]));
     this.dirty = true;
     this.solution = undefined;
@@ -109,9 +115,27 @@ export class SimulationEngine {
 
   private unoPin(partId: string, pin: string): string | undefined {
     const netId = this.analysis.pinToNet[`${partId}:${pin}`];
-    return this.analysis.nets.find(net => net.id === netId)?.pins.find(ref =>
-      UNO_PIN_MAP[ref.pinId] && this.scene.parts.some(part => part.id === ref.partId && part.kind === 'arduino-uno'),
+    const findPin = (id: string | undefined) => this.analysis.nets.find(net => net.id === id)?.pins.find(ref =>
+      ref.partId === this.unoId && UNO_PIN_MAP[ref.pinId],
     )?.pinId;
+    const direct = findPin(netId);
+    if (direct) return direct;
+    // Signal discovery only: retain separate nets for the electrical solver.
+    // One small series resistor is allowed; supply pull-ups are not data links.
+    const isRail = (id: string | undefined) => this.analysis.nets.find(net => net.id === id)?.pins.some(ref =>
+      ref.partId === this.unoId && ['5V', '3V3', 'IOREF', 'GND.1', 'GND.2', 'GND.3'].includes(ref.pinId),
+    );
+    if (!netId || isRail(netId)) return undefined;
+    for (const part of this.scene.parts) {
+      if (part.kind !== 'resistor' || Number(part.props.ohms ?? 220) > 1000) continue;
+      const a = this.analysis.pinToNet[`${part.id}:1`];
+      const b = this.analysis.pinToNet[`${part.id}:2`];
+      const other = a === netId ? b : b === netId ? a : undefined;
+      if (!other || isRail(other)) continue;
+      const connected = findPin(other);
+      if (connected) return connected;
+    }
+    return undefined;
   }
 
   private configureDevices(): void {
@@ -211,7 +235,7 @@ export class SimulationEngine {
       seen.add(netId);
       for (const ref of this.analysis.nets.find(net => net.id === netId)?.pins ?? []) {
         const part = this.scene.parts.find(candidate => candidate.id === ref.partId)!;
-        if (part.kind === 'arduino-uno' && pins[ref.pinId]?.mode === 'output') found.push(ref.pinId);
+        if (part.id === this.unoId && pins[ref.pinId]?.mode === 'output') found.push(ref.pinId);
         if (part.kind === 'resistor') {
           pending.push(this.analysis.pinToNet[`${part.id}:${ref.pinId === '1' ? '2' : '1'}`]!);
         }
@@ -282,7 +306,7 @@ export class SimulationEngine {
     this.lastSolve = now;
     this.dirty = false;
     this.lastSignature = signature;
-    for (const part of this.scene.parts.filter(part => part.kind === 'arduino-uno')) {
+    for (const part of this.scene.parts.filter(part => part.id === this.unoId)) {
       for (const [id, state] of Object.entries(pins)) {
         if (state.mode === 'output' || this.echoPins.has(id) || this.mcu.dhtBusy(id)) continue;
         this.mcu.setVoltage(id, this.voltage(part.id, id));
@@ -317,7 +341,7 @@ export class SimulationEngine {
         g: ledBrightness(this.opticalCurrents[`${part.id}:G`] ?? 0),
         b: ledBrightness(this.opticalCurrents[`${part.id}:B`] ?? 0),
       };
-      if (part.kind === 'arduino-uno') state.led = { brightness: pins.D13?.duty ?? 0 };
+      if (part.kind === 'arduino-uno') state.led = { brightness: part.id === this.unoId ? pins.D13?.duty ?? 0 : 0 };
       if (part.kind === 'servo') state.servo = {
         angle: this.powered(part.id, 'V+') ? this.mcu.servoAngle(this.unoPin(part.id, 'SIG') ?? '') : 0,
       };

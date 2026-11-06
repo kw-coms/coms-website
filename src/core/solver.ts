@@ -108,10 +108,11 @@ export function solveCircuit(scene: Scene, analysis: Analysis, pins: Record<stri
     volts: number;
     resistance?: number;
 }> = {}): SolveResult {
+    const unoId = scene.parts.find(part => part.kind === 'arduino-uno')?.id;
     const net = (pid: string, id: string) => analysis.pinToNet[`${pid}:${id}`];
     const grounds = new Set<string>();
     for (const p of scene.parts)
-        if (p.kind === 'arduino-uno')
+        if (p.id === unoId)
             for (const id of ['GND.1', 'GND.2', 'GND.3']) {
                 const n = net(p.id, id);
                 if (n)
@@ -124,7 +125,7 @@ export function solveCircuit(scene: Scene, analysis: Analysis, pins: Record<stri
     const g = ground;
     const warnings: SimWarning[] = [];
     for (const p of scene.parts)
-        if (p.kind === 'arduino-uno' && grounds.has(net(p.id, '5V') ?? ''))
+        if (p.id === unoId && grounds.has(net(p.id, '5V') ?? ''))
             warnings.push({ id: `short:${p.id}`, level: 'error', partId: p.id, message: '5V와 GND가 직접 연결되어 단락되었습니다.' });
     for (const [ref, drive] of Object.entries(externalDrives)) {
         const n = analysis.pinToNet[ref];
@@ -138,6 +139,7 @@ export function solveCircuit(scene: Scene, analysis: Analysis, pins: Record<stri
         const id = p.id;
         switch (p.kind) {
             case 'arduino-uno': {
+                if (id !== unoId) break;
                 add(net(id, '5V'), g, .1, 5, id, 'driver');
                 add(net(id, 'IOREF'), g, .1, 5, id, 'driver');
                 add(net(id, '3V3'), g, .1, 3.3, id, 'driver');
@@ -204,7 +206,7 @@ export function solveCircuit(scene: Scene, analysis: Analysis, pins: Record<stri
                 break;
             }
             case 'l9110s': {
-                const powered = scene.parts.some(uno => uno.kind === 'arduino-uno' && net(id, 'VCC') === net(uno.id, '5V') && net(id, 'GND') === net(uno.id, 'GND.1'));
+                const powered = scene.parts.some(uno => uno.id === unoId && net(id, 'VCC') === net(uno.id, '5V') && net(id, 'GND') === net(uno.id, 'GND.1'));
                 if (powered)
                     for (const [a, b, pa, pb] of [['MA+', 'MA−', 'A-IA', 'A-IB'], ['MB+', 'MB−', 'B-IA', 'B-IB']] as const) {
                         const drive = (inputPin: string): number => {
@@ -247,7 +249,7 @@ export function solveCircuit(scene: Scene, analysis: Analysis, pins: Record<stri
     } });
     // A wire can merge an output pin directly into ground. The normal branch
     // builder omits same-net branches, so account for the 25 Ω output stage here.
-    for (const uno of scene.parts.filter(part => part.kind === 'arduino-uno')) {
+    for (const uno of scene.parts.filter(part => part.id === unoId)) {
         for (const [pin, state] of Object.entries(pins)) {
             if (state.mode !== 'output' || !grounds.has(net(uno.id, pin) ?? '')) continue;
             pinCurrents[pin] = -(5 * clamp(state.duty, 0, 1)) / 25;
@@ -349,7 +351,7 @@ export function solveCircuit(scene: Scene, analysis: Analysis, pins: Record<stri
     // Floating warning only for a pin the user wired something to (another pin on its net besides the header pin itself).
     // An unconnected INPUT pin (every unused pin at reset) never warns; INPUT_PULLUP is mode 'input_pullup', never 'input'.
     for (const p of scene.parts)
-        if (p.kind === 'arduino-uno')
+        if (p.id === unoId)
             for (const [id, state] of Object.entries(pins)) {
                 const netId = net(p.id, id);
                 if (state.mode !== 'input' || netId === undefined || !floating.includes(netId)) continue;
@@ -357,7 +359,7 @@ export function solveCircuit(scene: Scene, analysis: Analysis, pins: Record<stri
                 warnings.push({ id: `floating:${id}`, level: 'warn', partId: p.id, message: `${id} 입력이 떠 있어요(플로팅). 풀업/풀다운 저항이나 INPUT_PULLUP을 쓰세요.` });
             }
     for (const n of analysis.nets) {
-        const outs = n.pins.filter(p => scene.parts.find(x => x.id === p.partId)?.kind === 'arduino-uno').map(p => [p.pinId, pins[p.pinId]] as const).filter(([, s]) => s?.mode === 'output');
+        const outs = n.pins.filter(p => p.partId === unoId).map(p => [p.pinId, pins[p.pinId]] as const).filter(([, s]) => s?.mode === 'output');
         if (outs.some(([, s]) => s!.level === 0) && outs.some(([, s]) => s!.level === 1))
             warnings.push({ id: `contention:${n.id}`, level: 'error', message: '출력 핀끼리 충돌합니다.' });
     }

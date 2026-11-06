@@ -186,6 +186,7 @@ export interface Simulator {
   writeSerial(text: string): void;
   onFrame(cb: (frame: SimFrame) => void): () => void; // ~60 Hz while running, once after setScene
   onSerial(cb: (text: string) => void): () => void;
+  onState?(cb: (state: 'idle' | 'running' | 'paused', error?: string) => void): () => void;
   readonly state: 'idle' | 'running' | 'paused';
   dispose(): void;
 }

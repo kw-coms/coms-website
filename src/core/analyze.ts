@@ -11,6 +11,11 @@ export function analyze(scene: Scene): Analysis {
     const root = (id: string): string => { const p = parent.get(id)!; if (p !== id)
         parent.set(id, root(p)); return parent.get(id)!; };
     const warnings: SimWarning[] = [];
+    const unos = scene.parts.filter(part => part.kind === 'arduino-uno');
+    for (const part of unos.slice(1)) {
+        warnings.push({ id: `multiple-uno:${part.id}`, level: 'error', partId: part.id,
+            message: '아두이노 UNO는 한 회로에 하나만 시뮬레이션할 수 있어요.' });
+    }
     for (const part of scene.parts)
         for (const pin of PARTS[part.kind].pins) {
             const ref = { partId: part.id, pinId: pin.id }, k = key(ref);
@@ -58,7 +63,7 @@ export function analyze(scene: Scene): Analysis {
         const r = root(k);
         grouped.set(r, [...(grouped.get(r) ?? []), ref]);
     }
-    const unoIds = new Set(scene.parts.filter(p => p.kind === 'arduino-uno').map(p => p.id));
+    const unoIds = new Set(unos.slice(0, 1).map(p => p.id));
     const nets: Analysis['nets'] = [], pinToNet: Analysis['pinToNet'] = {};
     const priority = (n: string) => n === 'GND' ? 0 : n === '5V' ? 1 : n === '3V3' ? 2 : n.startsWith('D') ? 3 : n.startsWith('A') ? 4 : 5;
     for (const pins of grouped.values()) {

@@ -6,6 +6,9 @@ const send = (event: Event): void => globalThis.postMessage(event);
 
 simulator.onFrame(value => send({ type: 'frame', value }));
 simulator.onSerial(value => send({ type: 'serial', value }));
+simulator.onState((state, error) => {
+  if (state === 'idle' && error) send({ type: 'error', value: error.replace(/^시뮬레이션 오류: /, '') });
+});
 
 globalThis.onmessage = (event: MessageEvent<Command>) => {
   const command = event.data;

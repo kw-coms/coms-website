@@ -6,6 +6,7 @@ import {
 import type { McuPinState } from '../types';
 import { PinActivity } from './activity';
 import { loadIntelHex } from './hex';
+import { installUnoEeprom, UnoEepromMemoryBackend } from './eeprom';
 
 const MCU_HZ = 16_000_000;
 type PortName = 'B' | 'C' | 'D';
@@ -24,6 +25,7 @@ export class AvrMcu {
   usart!: AVRUSART;
   adc!: AVRADC;
   twi!: AVRTWI;
+  readonly eeprom = new UnoEepromMemoryBackend();
   readonly activity = new PinActivity();
   onSerial?: (text: string) => void;
   onPinChange?: (pin: string, level: 0 | 1, cycle: number) => void;
@@ -42,6 +44,7 @@ export class AvrMcu {
 
   reset(): void {
     this.cpu = new CPU(this.program, 2048);
+    installUnoEeprom(this.cpu, this.eeprom);
     this.activity.reset();
     this.modes.clear();
     this.ports = {

@@ -4,6 +4,7 @@ services:
       context: .
     image: coms-circuit-lab-compiler:local
     init: true
+    restart: unless-stopped
     network_mode: none
     user: "10001:${NGINX_GID:?Set NGINX_GID to the host nginx group ID}"
     volumes:

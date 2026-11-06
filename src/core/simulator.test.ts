@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { LocalSimulator, createSimulator } from './simulator';
 import type { Scene } from './types';
+import { wordsToHex } from './mcu/hex';
+import { SimulationEngine } from './engine';
 const scene: Scene = {
     version: 1,
     parts: [
@@ -12,6 +14,7 @@ const scene: Scene = {
 };
 
 afterEach(() => {
+    vi.restoreAllMocks();
     vi.useRealTimers();
     vi.unstubAllGlobals();
 });
@@ -41,7 +44,7 @@ describe('simulator lifecycle', () => {
         vi.advanceTimersByTime(100);
         expect(count).toBe(1);
     });
-    it('worker error pauses execution and publishes a Korean error warning', () => {
+    it.each(['engine', 'error'])('worker %s failure announces idle and recovers on next start', kind => {
         let worker: {
             onmessage: ((e: MessageEvent) => void) | null;
             onerror: ((e: ErrorEvent) => void) | null;
@@ -61,10 +64,62 @@ describe('simulator lifecycle', () => {
         const sim = createSimulator();
         const frames: string[][] = [];
         sim.onFrame(f => frames.push(f.warnings.map(w => w.message)));
+        const states: string[] = [];
+        sim.onState?.((state, error) => states.push(`${state}:${error ?? ''}`));
+        sim.setScene(scene);
+        const hex = wordsToHex([0xcfff]);
+        sim.loadHex(hex);
+        sim.setSpeed(0.5);
+        sim.setInput({ partId: 'pot', key: 'position', value: 0.9 });
         sim.start();
-        worker!.onmessage!({ data: { type: 'error', value: 'boom' } } as MessageEvent);
-        expect(sim.state).toBe('paused');
+        const crashed = worker!;
+        if (kind === 'engine') worker!.onmessage!({ data: { type: 'error', value: 'boom' } } as MessageEvent);
+        else worker!.onerror!({ message: 'boom', preventDefault: vi.fn() } as unknown as ErrorEvent);
+        expect(sim.state).toBe('idle');
         expect(frames.at(-1)?.[0]).toContain('시뮬레이션 오류: boom');
+        expect(states.at(-1)).toContain('idle:시뮬레이션 오류: boom');
+        expect(crashed.terminate).toHaveBeenCalledOnce();
+        sim.start();
+        expect(worker).not.toBe(crashed);
+        expect(worker!.postMessage.mock.calls.map(([command]) => command.method)).toEqual(['setScene', 'loadHex', 'setSpeed', 'setInput', 'start']);
+        expect(worker!.postMessage).toHaveBeenCalledWith({ method: 'loadHex', value: hex });
+        expect(worker!.postMessage).toHaveBeenCalledWith({ method: 'setInput', value: { partId: 'pot', key: 'position', value: 0.9 } });
+        expect(sim.state).toBe('running');
+        expect(states.at(-1)).toBe('running:');
+        sim.dispose();
+    });
+    it('local simulator announces lifecycle and tick failure', () => {
+        vi.useFakeTimers();
+        const sim = new LocalSimulator();
+        const states: string[] = [];
+        sim.onState?.((state, error) => states.push(`${state}:${error ?? ''}`));
+        sim.setScene(scene);
+        sim.start();
+        sim.pause();
+        sim.start();
+        vi.spyOn(SimulationEngine.prototype, 'step').mockImplementation(() => { throw new Error('tick failed'); });
+        vi.advanceTimersByTime(1);
+        expect(sim.state).toBe('idle');
+        expect(states).toEqual(['running:', 'paused:', 'running:', 'idle:시뮬레이션 오류: tick failed']);
+        sim.dispose();
+    });
+    it('worker message decoding failure announces idle state', () => {
+        let worker: MockWorker;
+        class MockWorker {
+            onmessageerror: (() => void) | null = null;
+            postMessage = vi.fn();
+            terminate = vi.fn();
+            constructor() { worker = this; }
+        }
+        vi.stubGlobal('Worker', MockWorker);
+        const sim = createSimulator();
+        const states: string[] = [];
+        sim.onState?.((state, error) => states.push(`${state}:${error ?? ''}`));
+        sim.start();
+        worker!.onmessageerror?.();
+        expect(sim.state).toBe('idle');
+        expect(states.at(-1)).toContain('워커 메시지를 읽을 수 없습니다.');
+        expect(worker!.terminate).toHaveBeenCalledOnce();
         sim.dispose();
     });
     it('worker path rejects invalid HEX and inputs synchronously', () => {

@@ -6,7 +6,7 @@
 
 | 구성 요소 | 고정 버전 | 근거 |
 |---|---|---|
-| Node | `node:22-bookworm-slim@sha256:<검증한 index digest>` | Dockerfile의 `NODE_IMAGE` placeholder를 실제 digest로 교체해야 빌드 가능 |
+| Node | `node:22-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d` | Dockerfile의 `NODE_IMAGE`에 고정된 digest |
 | Arduino CLI | 1.5.1 | [공식 릴리스 및 SHA-256](https://github.com/arduino/arduino-cli/releases/tag/v1.5.1) |
 | Arduino AVR Boards | 1.8.8 | [공식 패키지 인덱스](https://downloads.arduino.cc/packages/package_index.json) |
 | Servo | 1.2.2 | [버전 메타데이터](https://github.com/arduino-libraries/Servo/blob/1.2.2/library.properties) |
@@ -24,12 +24,14 @@ npm --prefix compiler test
 docker build --pull --platform linux/amd64 -t coms-circuit-lab-compiler:release compiler/
 NGINX_GID=$(getent group www-data | cut -d: -f3)  # 실제 nginx 그룹에 맞게 변경
 export NGINX_GID
-sudo install -d -o 10001 -g "$NGINX_GID" -m 0750 /run/coms-lab
+# 실제 nginx 그룹 이름으로 www-data를 교체하고, Compose 시작 전에 설치한다.
+printf 'd /run/coms-lab 0750 10001 www-data -\n' | sudo tee /etc/tmpfiles.d/coms-lab.conf
+sudo systemd-tmpfiles --create /etc/tmpfiles.d/coms-lab.conf
 docker compose -f compiler/docker-compose.yml up --build -d
 curl --fail -b "$LAB_COOKIE_FILE" https://coms.kw.ac.kr/lab/api/health
 ```
 
-프로덕션 Compose는 네트워크가 없으며 Unix 소켓만 사용한다. `compiler/docker-compose.dev.yml`은 로컬 개발 전용이며 일반 bridge에서 127.0.0.1:8787만 공개하고 `RATE_LIMIT_PER_MIN=120`을 사용한다. 개발용 실행: `docker compose -f compiler/docker-compose.dev.yml up --build -d`. 프로덕션은 non-root uid 10001, read-only root, 256 MiB `/tmp` tmpfs (`noexec,nosuid,nodev`), 모든 capability 제거, no-new-privileges, RAM 768 MiB(추가 swap 없음), CPU 1개, PID 128개를 적용한다. `init: true`로 고아 프로세스를 수거한다. 코어·라이브러리는 `/opt/arduino`에 읽기 전용으로 설치하고 캐시와 작업 파일은 `/tmp`만 사용한다.
+프로덕션 Compose는 `restart: unless-stopped`로 재시작하며 네트워크 없이 Unix 소켓만 사용한다. `compiler/docker-compose.dev.yml`은 로컬 개발 전용이며 일반 bridge에서 127.0.0.1:8787만 공개하고 `RATE_LIMIT_PER_MIN=120`을 사용한다. 개발용 실행: `docker compose -f compiler/docker-compose.dev.yml up --build -d`. 프로덕션은 non-root uid 10001, read-only root, 256 MiB `/tmp` tmpfs (`noexec,nosuid,nodev`), 모든 capability 제거, no-new-privileges, RAM 768 MiB(추가 swap 없음), CPU 1개, PID 128개를 적용한다. `init: true`로 고아 프로세스를 수거한다. 코어·라이브러리는 `/opt/arduino`에 읽기 전용으로 설치하고 캐시와 작업 파일은 `/tmp`만 사용한다.
 
 ## 2. 정적 파일 전송
 
@@ -149,7 +151,10 @@ nginx보다 앱의 본문 제한(80 KiB)이 작다. nginx가 먼저 차단한 10
 ```sh
 # 실제 nginx 실행 그룹의 숫자 GID로 대체한다. www-data는 Debian 예시다.
 NGINX_GID=$(getent group www-data | cut -d: -f3)
-sudo install -d -o 10001 -g "$NGINX_GID" -m 0750 /run/coms-lab
+# 실제 nginx 그룹 이름으로 www-data를 교체한다. /run 재생성 때도 적용된다.
+printf 'd /run/coms-lab 0750 10001 www-data -\n' | sudo tee /etc/tmpfiles.d/coms-lab.conf
+sudo systemd-tmpfiles --create /etc/tmpfiles.d/coms-lab.conf
+stat -c '%a %u %g %n' /run/coms-lab # 750 10001 <NGINX_GID>
 # uid 10001이 소켓을 만들고, 지정 GID를 가진 nginx가 0660 소켓을 읽는다.
 docker run -d --name coms-circuit-lab-compiler \
   --restart unless-stopped --init --stop-timeout 25 \
@@ -165,7 +170,7 @@ docker run -d --name coms-circuit-lab-compiler \
 stat -c '%a %u %g %n' /run/coms-lab/compile.sock # 660 10001 <NGINX_GID>
 ```
 
-`/run`은 재부팅 시 지워질 수 있으므로 systemd-tmpfiles 등으로 디렉터리를 다시 생성해야 한다. nginx 서비스가 실제로 해당 GID로 실행되는지 확인하고, GID 0 및 `/etc/shadow`의 그룹 GID를 사용하지 않는다. 소켓 소유권은 `--user`의 UID:GID와 0117 umask로 정해진다. 이미지의 기본 사용자는 비특권 UID 10001이며 `/etc/shadow`는 기본 파일 권한으로 읽을 수 없다. 소켓 디렉터리는 0750으로 nginx 그룹의 디렉터리 쓰기(삭제·교체)를 막는다. 소켓 자체는 0660이다. 시작 시 기존 소켓에 연결해 `ECONNREFUSED`인 경우에만 inode를 재확인하고 삭제한다. 살아 있는 listener, 일반 파일·symlink, 권한 오류·연결 timeout은 거부한다. SIGKILL/OOM 이후 남은 소켓은 자동 복구된다. 같은 디렉터리에 동시에 두 compiler 인스턴스를 시작하지 않는다(검사와 unlink는 원자적 연산이 아니다). `PORT`를 통한 TCP 수신은 개발용 대안이며 프로덕션에는 사용하지 않는다.
+`/run`은 재부팅 시 지워질 수 있으므로 위 tmpfiles 설정을 **Compose 최초 시작 전** 설치한다. 부팅 시 `systemd-tmpfiles-setup.service`가 디렉터리를 재생성하는지 확인하고, Compose를 systemd unit으로 시작한다면 그 unit의 `ExecStartPre=/usr/bin/systemd-tmpfiles --create /etc/tmpfiles.d/coms-lab.conf`로 시작 순서를 보장한다. nginx 서비스가 실제로 해당 GID로 실행되는지 확인하고, GID 0 및 `/etc/shadow`의 그룹 GID를 사용하지 않는다. 소켓 소유권은 `--user`의 UID:GID와 0117 umask로 정해진다. 이미지의 기본 사용자는 비특권 UID 10001이며 `/etc/shadow`는 기본 파일 권한으로 읽을 수 없다. 소켓 디렉터리는 0750으로 nginx 그룹의 디렉터리 쓰기(삭제·교체)를 막는다. 소켓 자체는 0660이다. 시작 시 기존 소켓에 연결해 `ECONNREFUSED`인 경우에만 inode를 재확인하고 삭제한다. 살아 있는 listener, 일반 파일·symlink, 권한 오류·연결 timeout은 거부한다. SIGKILL/OOM 이후 남은 소켓은 자동 복구된다. 같은 디렉터리에 동시에 두 compiler 인스턴스를 시작하지 않는다(검사와 unlink는 원자적 연산이 아니다). `PORT`를 통한 TCP 수신은 개발용 대안이며 프로덕션에는 사용하지 않는다.
 
 ## 5. 선택적 동아리 로그인 확인
 
@@ -193,12 +198,10 @@ stat -c '%a %u %g %n' /run/coms-lab/compile.sock # 660 10001 <NGINX_GID>
 
 Core dump는 0 B다. `prlimit`이 없으면 제한 없이 실행하지 않고 실패한다. Go 기반 CLI는 가상 메모리 예약이 커 GCC와 같은 주소 공간 제한을 적용하지 않는다. GCC wrapper의 한도는 cc1plus, assembler, linker/LTO에 상속된다. CPU 한도는 프로세스별이며 전체 작업 합산이 아니다. 별도로 기존 **20초 wall-clock 프로세스 그룹 SIGKILL**과 모든 종료 경로의 요청 디렉터리 `finally` 삭제를 유지한다. [Linux rlimit 문서](https://man7.org/linux/man-pages/man2/prlimit.2.html)처럼 주소 공간은 RSS와 다르고 파일 한도는 디렉터리 총량이 아니다.
 
-**실측 미완료 / 배포 전 필수:** 이번 편집 환경은 Docker daemon 접근이 `EPERM`, registry DNS 조회가 실패했다. 위 수치는 검증 전 잠정값이며 실제 AVR 성공·OOM 격리를 확인했다고 주장하지 않는다. `/tmp`는 우선 기존 **256 MiB**, 컨테이너는 **768 MiB**를 유지한다. 임시 용량 예산은 동시 2건 × 96 MiB + 64 MiB 여유로 잡되, 이는 요청별 디스크 quota가 아니다. 실측한 1건 peak에 2배 여유를 두고 두 건을 수용하려면 **1건 peak ≤ 48 MiB**, 동시 2건 peak ≤ 192 MiB를 확인한다. 초과 시 tmpfs와 컨테이너 RAM 예산을 함께 재산정해야 하며 tmpfs만 늘리지 않는다. 파일 크기 제한은 tmpfs 총량 제한을 대체하지 않는다.
+**운영 한도 재검증 필요:** 아래 실측은 컴파일 성공과 관찰된 자원 사용량을 보여주지만 1 GiB tmpfs와 CPU/RAM 제한 없는 컨테이너에서 수행됐다. 운영 설정인 `/tmp` 256 MiB, 메모리 768 MiB, CPU 1개에서의 성공·OOM 격리는 아직 확인되지 않았다. `/tmp`는 우선 기존 **256 MiB**, 컨테이너는 **768 MiB**를 유지한다. 임시 용량 예산은 동시 2건 × 96 MiB + 64 MiB 여유로 잡되, 이는 요청별 디스크 quota가 아니다. 운영 동등 조건에서 1/2건 peak와 성공 여부를 재확인한다. 초과 시 tmpfs와 컨테이너 RAM 예산을 함께 재산정해야 하며 tmpfs만 늘리지 않는다. 파일 크기 제한은 tmpfs 총량 제한을 대체하지 않는다.
 
 ```sh
-# 먼저 registry에서 실제 multi-platform index digest 확인 후 Dockerfile ARG 수정.
-# placeholder를 둔 기본 빌드는 의도적으로 실패한다. mutable tag로 우회하지 않는다.
-docker buildx imagetools inspect node:22-bookworm-slim
+# Dockerfile에는 Node 이미지 digest가 이미 고정돼 있다.
 docker build --pull -t coms-circuit-lab-compiler:release compiler/
 
 # production과 같은 1 CPU / RAM / tmpfs / 사용자 권한. 5-library cold build 1건, 동시 2건.
@@ -213,7 +216,7 @@ for jobs in 1 2; do
 done
 ```
 
-`measure.mjs`는 20 ms 간격으로 작업 프로세스 그룹 RSS/VM, 요청 디렉터리의 할당 디스크 바이트와 최대 파일 크기를 기록하고 실제 컴파일 성공 여부를 JSON으로 출력한다. sampling은 짧은 peak를 놓칠 수 있으므로 여유를 남긴다. cold build 1/2건 모두 성공, 20초 이내, 여유 있는 VM/파일/디스크 수치를 기록한 뒤 한도를 확정한다. 각 요청의 HOME과 CLI 캐시도 요청 디렉터리 아래에 있어 종료 시 같이 지워진다. 배포 담당자는 template/macro/대형 출력 공격과 정상 컴파일을 동시에 실행해 정상 요청 및 서버 생존, cgroup `memory.events`의 `oom_kill` 미증가, 작업 후 디렉터리 삭제까지 확인한다.
+`measure.mjs`는 20 ms 간격으로 작업 프로세스 그룹 RSS/VM, 요청 디렉터리의 할당 디스크 바이트와 최대 파일 크기를 기록하고 실제 컴파일 성공 여부를 JSON으로 출력한다. sampling은 짧은 peak를 놓칠 수 있으므로 여유를 남긴다. 위 운영 동등 명령으로 cold build 1/2건의 성공, 20초 이내 완료, VM/파일/디스크 여유를 재확인한 뒤 한도를 확정한다. 각 요청의 HOME과 CLI 캐시도 요청 디렉터리 아래에 있어 종료 시 같이 지워진다. 배포 담당자는 template/macro/대형 출력 공격과 정상 컴파일을 동시에 실행해 정상 요청 및 서버 생존, cgroup `memory.events`의 `oom_kill` 미증가, 작업 후 디렉터리 삭제까지 확인한다.
 
 ## 7. 버전 갱신
 
@@ -253,8 +256,8 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://coms.kw.ac.kr/lab/api/health
 # 예상: 유효 쿠키 없이 401 또는 403
 ```
 
-- [ ] base index digest placeholder 교체, 이미지 빌드·checksum 및 Node 22 전체 테스트 성공.
-- [ ] 5-library 1/2건 실측값 기록, 잠정 자식 한도·tmpfs/RAM 여유 확정, 공격 중 서버/다른 job 생존 확인.
+- [ ] 고정된 base index digest로 이미지 빌드·checksum 및 Node 22 전체 테스트 성공.
+- [ ] 운영과 동일한 제한에서 5-library 1/2건 재측정, 자식 한도·tmpfs/RAM 여유 및 공격 중 서버/다른 job 생존 확인.
 - [ ] nginx를 통한 health와 실제 compile 성공. 반환 HEX와 한글 힌트 확인.
 - [ ] 파일 탐색 우회 요청은 `reason: rejected`이고 외부 파일 내용이 응답에 없다.
 - [ ] 소켓 디렉터리 0750, 소켓 0660, nginx 그룹 접근 가능. 재부팅 후 디렉터리 재생성됨.
@@ -270,7 +273,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://coms.kw.ac.kr/lab/api/health
 | 1 | 212 MB | 1.52 GB | 1.8 MB | 0.97 s |
 | 2 | 433 MB | 1.52 GB | 3.5 MB | 1.06 s |
 
-따라서 컨테이너 메모리 768 MB, CLI 주소 공간 2 GiB, `/tmp` 256 MiB, 20초 제한은 동시 2개 기준으로 여유가 있습니다. 측정 명령:
+이 수치는 아래 **1 GiB tmpfs, CPU/RAM 제한 없음** 조건에서 관찰됐다. 운영의 768 MiB 메모리, 1 CPU, 256 MiB tmpfs와 동일한 조건을 검증한 결과는 아니다. 기존 측정 명령:
 
 ```sh
 docker run --rm --user 10001:10001 --tmpfs /tmp:size=1g,exec -v "$PWD/compiler:/m:ro" -w /m --entrypoint node coms-circuit-lab-compiler:local /m/measure.mjs 2
