@@ -58,6 +58,43 @@ class RichBodyMediaAttachmentTransactionTest {
         }
     }
 
+    @Test
+    void memberQuotaIgnoresDetachedRowsButSiteCapCountsThem() {
+        long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
+        long count = mediaRows.countPending(actorId);
+        long memberBytes = mediaRows.sumPendingBytes(actorId);
+        long siteBytes = mediaRows.sumAllPendingBytes();
+        mediaRows.saveAndFlush(media(RichBodyMedia.Kind.IMAGE, RichBodyMedia.Scope.NOTICE, actorId));
+        RichBodyMedia detached = media(RichBodyMedia.Kind.IMAGE, RichBodyMedia.Scope.NOTICE, actorId);
+        detached.attach(1L, LocalDateTime.now());
+        detached.detach(LocalDateTime.now(), null);
+        mediaRows.saveAndFlush(detached);
+
+        assertThat(mediaRows.countPending(actorId)).isEqualTo(count + 1);
+        assertThat(mediaRows.sumPendingBytes(actorId)).isEqualTo(memberBytes + 10);
+        assertThat(mediaRows.sumAllPendingBytes()).isEqualTo(siteBytes + 20);
+    }
+
+    @Test
+    void selfDetachedRowsCountTowardUploaderQuotaButOthersDetachedDoNot() {
+        long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
+        long count = mediaRows.countPending(actorId);
+        long bytes = mediaRows.sumPendingBytes(actorId);
+        RichBodyMedia selfDetached = media(RichBodyMedia.Kind.IMAGE, RichBodyMedia.Scope.NOTICE, actorId);
+        selfDetached.attach(1L, LocalDateTime.now());
+        selfDetached.detach(LocalDateTime.now(), actorId);
+        mediaRows.saveAndFlush(selfDetached);
+        assertThat(mediaRows.countPending(actorId)).isEqualTo(count + 1);
+        assertThat(mediaRows.sumPendingBytes(actorId)).isEqualTo(bytes + 10);
+
+        RichBodyMedia byOther = media(RichBodyMedia.Kind.IMAGE, RichBodyMedia.Scope.NOTICE, actorId);
+        byOther.attach(1L, LocalDateTime.now());
+        byOther.detach(LocalDateTime.now(), otherMember().getId());
+        mediaRows.saveAndFlush(byOther);
+        assertThat(mediaRows.countPending(actorId)).isEqualTo(count + 1);
+        assertThat(mediaRows.sumPendingBytes(actorId)).isEqualTo(bytes + 10);
+    }
+
     private enum InvalidReference { MISSING, WRONG_SCOPE, WRONG_KIND, OTHER_UPLOADER, OTHER_OWNER }
 
     @ParameterizedTest
@@ -104,7 +141,7 @@ class RichBodyMediaAttachmentTransactionTest {
     @Test
     void detachedForOver24HoursIsPurgedEvenWithLongerPendingThreshold() {
         var row = oldAttachedMedia();
-        row.detach(LocalDateTime.now().minusHours(25));
+        row.detach(LocalDateTime.now().minusHours(25), null);
         mediaRows.saveAndFlush(row);
 
         richMedia.deleteOrphanedOlderThan(LocalDateTime.now().minusHours(48));
@@ -116,7 +153,7 @@ class RichBodyMediaAttachmentTransactionTest {
     void reattachmentPersistsClearedDetachmentTimestampAndSurvivesPurge() {
         var row = oldAttachedMedia();
         long ownerId = row.getOwnerId();
-        row.detach(LocalDateTime.now().minusHours(25));
+        row.detach(LocalDateTime.now().minusHours(25), null);
         mediaRows.saveAndFlush(row);
         assertThat(mediaRows.findById(row.getId()).orElseThrow().getDetachedAt()).isNotNull();
 
@@ -182,6 +219,100 @@ class RichBodyMediaAttachmentTransactionTest {
         assertThat(settingsRows.findById(1).orElseThrow().getSettings()).isEqualTo(before);
     }
 
+    private Member otherMember() {
+        return members.findByStudentId("2026000888").orElseGet(() -> {
+            Member other = new Member();
+            other.setStudentId("2026000888");
+            other.setName("다른 회원");
+            other.setEmail("rich-rollback-other@example.com");
+            other.setPassword("unused");
+            other.setRole(Member.Role.USER);
+            other.setEmailVerified(true);
+            return members.save(other);
+        });
+    }
+
+    private static String body(long mediaId) {
+        return "[{\"type\":\"image\",\"mediaId\":" + mediaId + "}]";
+    }
+
+    private long uploadedBy(long uploaderId, RichBodyMedia.Scope scope) {
+        return mediaRows.saveAndFlush(media(RichBodyMedia.Kind.IMAGE, scope, uploaderId)).getId();
+    }
+
+    private void assertDetachedBy(long mediaId, long actorId, long ownerId) {
+        var row = mediaRows.findById(mediaId).orElseThrow();
+        assertThat(row.getOwnerId()).isNull();
+        assertThat(row.getDetachedById()).isEqualTo(actorId);
+        assertThat(row.getDetachedFromOwnerId()).isEqualTo(ownerId);
+    }
+
+    @Test
+    void noticeDeleteRecordsActor() {
+        long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
+        Member author = otherMember();
+        long mediaId = uploadedBy(author.getId(), RichBodyMedia.Scope.NOTICE);
+        long id = notices.create(author.getStudentId(), new NoticeRequest("t", body(mediaId), null, false, "GENERAL")).id();
+
+        notices.delete(ACTOR, id);
+
+        assertDetachedBy(mediaId, actorId, id);
+    }
+
+    @Test
+    void noticeEditOutByManagerRecordsManagerNotUploader() {
+        long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
+        Member author = otherMember();
+        long mediaId = uploadedBy(author.getId(), RichBodyMedia.Scope.NOTICE);
+        long id = notices.create(author.getStudentId(), new NoticeRequest("t", body(mediaId), null, false, "GENERAL")).id();
+
+        notices.update(ACTOR, id, new NoticeRequest("t", "[]", null, false, "GENERAL"));
+
+        assertDetachedBy(mediaId, actorId, id);
+    }
+
+    @Test
+    void archiveEditOutRecordsActor() throws Exception {
+        long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
+        Member author = otherMember();
+        long mediaId = uploadedBy(author.getId(), RichBodyMedia.Scope.ARCHIVE);
+        long id = archives.upload("t", body(mediaId), pdf(), author.getStudentId()).id();
+
+        archives.update(ACTOR, id, "t", "[]", "GENERAL", null);
+
+        assertDetachedBy(mediaId, actorId, id);
+    }
+
+    @Test
+    void archiveDeleteRecordsActor() throws Exception {
+        long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
+        Member author = otherMember();
+        long mediaId = uploadedBy(author.getId(), RichBodyMedia.Scope.ARCHIVE);
+        long id = archives.upload("t", body(mediaId), pdf(), author.getStudentId()).id();
+        var auth = new org.springframework.security.authentication.TestingAuthenticationToken(
+                ACTOR, "n/a", "ROLE_ADMIN");
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+        try {
+            archives.delete(id, ACTOR);
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+
+        assertDetachedBy(mediaId, actorId, id);
+    }
+
+    @Test
+    void sponsorSettingsSaveRecordsActor() {
+        long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
+        Member author = otherMember();
+        long mediaId = uploadedBy(author.getId(), RichBodyMedia.Scope.SPONSOR);
+        sponsors.saveSettings(Map.of("introHtml", body(mediaId)), author.getStudentId());
+
+        sponsors.saveSettings(Map.of("introHtml", "[]"), ACTOR);
+
+        assertDetachedBy(mediaId, actorId, 1L);
+    }
+
     private static MockMultipartFile pdf() {
         return new MockMultipartFile("file", "body.pdf", "application/pdf", "%PDF-1.4 body".getBytes());
     }
@@ -198,14 +329,7 @@ class RichBodyMediaAttachmentTransactionTest {
         if (reason == InvalidReference.MISSING) return 987654321L;
         long uploaderId = actorId;
         if (reason == InvalidReference.OTHER_UPLOADER) {
-            Member other = new Member();
-            other.setStudentId("2026000888");
-            other.setName("다른 회원");
-            other.setEmail("rich-rollback-other@example.com");
-            other.setPassword("unused");
-            other.setRole(Member.Role.USER);
-            other.setEmailVerified(true);
-            uploaderId = members.save(other).getId();
+            uploaderId = otherMember().getId();
         }
         RichBodyMedia.Kind kind = reason == InvalidReference.WRONG_KIND
                 ? RichBodyMedia.Kind.FILE : RichBodyMedia.Kind.IMAGE;
@@ -218,7 +342,7 @@ class RichBodyMediaAttachmentTransactionTest {
 
     private static RichBodyMedia media(RichBodyMedia.Kind kind, RichBodyMedia.Scope scope, long uploaderId) {
         return new RichBodyMedia(kind, scope, "stored-rollback-" + java.util.UUID.randomUUID(),
-                "image.png", "image/png", 10, uploaderId);
+                "image.png", "image/png", 10, uploaderId, java.time.LocalDateTime.now());
     }
 
     @FunctionalInterface

@@ -173,7 +173,7 @@ public class NoticeService {
         // editor's own name, which silently undid 회장 author overrides.
         applyRequest(notice, request, notice.getAuthor(), canManageNotice);
         richBodyMediaService.syncAttachments(RichBodyMedia.Scope.NOTICE, notice.getId(), notice.getContent(),
-                canManageNotice ? authorStudentId : null);
+                canManageNotice ? authorStudentId : null, true);
         auditLogService.record(authorStudentId, "NOTICE_UPDATE", "NOTICE", String.valueOf(notice.getId()), "title=" + notice.getTitle(), null);
         return toResponse(notice, voteStats(List.of(notice)), authorStudentId);
     }
@@ -187,7 +187,7 @@ public class NoticeService {
 
     public void delete(String authorStudentId, Long id) {
         Notice notice = getEntity(id);
-        richBodyMediaService.detachAttachments(RichBodyMedia.Scope.NOTICE, id);
+        richBodyMediaService.detachAttachments(RichBodyMedia.Scope.NOTICE, id, authorStudentId);
         repo.delete(notice);
         auditLogService.record(authorStudentId, "NOTICE_DELETE", "NOTICE", String.valueOf(id), "title=" + notice.getTitle(), null);
     }

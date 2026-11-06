@@ -4,8 +4,10 @@ import com.coms.backend.domain.RichBodyMedia;
 import com.coms.backend.domain.Member;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.RichBodyMediaRepository;
+import com.coms.backend.security.SlidingWindowRateLimiter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -38,13 +41,19 @@ public class RichBodyMediaService {
     private final Clock clock;
     private final RichBodyMediaDeleter deleter;
     private final TransactionTemplate uploadTransaction;
+    private final SlidingWindowRateLimiter uploadsByMember;
+    private final long pendingTotalMaxBytes;
 
     public RichBodyMediaService(RichBodyMediaRepository repository, MemberRepository members,
                                 StorageService storage, MediaUploadValidator validator, Clock clock, RichBodyMediaDeleter deleter,
-                                PlatformTransactionManager transactionManager) {
+                                PlatformTransactionManager transactionManager,
+                                @Value("${coms.media.pending-total-max-bytes:8589934592}") long pendingTotalMaxBytes,
+                                @Value("${coms.media.uploads-per-10-minutes:60}") int uploadsPer10Minutes) {
         this.repository = repository; this.members = members; this.storage = storage;
         this.validator = validator; this.clock = clock; this.deleter = deleter;
         this.uploadTransaction = new TransactionTemplate(transactionManager);
+        this.pendingTotalMaxBytes = pendingTotalMaxBytes;
+        this.uploadsByMember = new SlidingWindowRateLimiter(uploadsPer10Minutes, Duration.ofMinutes(10), clock);
     }
 
     public static RichBodyMedia.Scope parseScope(String raw) {
@@ -57,6 +66,10 @@ public class RichBodyMediaService {
     public RichBodyMedia upload(RichBodyMedia.Scope scope, RichBodyMedia.Kind kind, MultipartFile file, String studentId) {
         if (file == null || file.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일을 선택해주세요.");
         var member = members.findByStudentId(studentId).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        if (!uploadsByMember.tryAcquire(studentId)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "업로드를 너무 자주 하고 있습니다. 잠시 후 다시 시도해 주세요.");
+        }
         String type = switch (kind) {
             case IMAGE -> validator.validateImage(file);
             case VIDEO -> validator.validateVideo(file);
@@ -77,7 +90,7 @@ public class RichBodyMediaService {
         checkPendingQuota(member.getId(), file.getSize());
         try {
             String stored = kind == RichBodyMedia.Kind.IMAGE ? storage.storeImage(file, type, extension) : storage.store(file, extension);
-            RichBodyMedia media = new RichBodyMedia(kind, scope, stored, original, type, file.getSize(), member.getId());
+            RichBodyMedia media = new RichBodyMedia(kind, scope, stored, original, type, file.getSize(), member.getId(), LocalDateTime.now(clock));
             try {
                 // Only quota check + insert hold the member lock shared with login/refresh.
                 return uploadTransaction.execute(status -> {
@@ -100,7 +113,13 @@ public class RichBodyMediaService {
     }
 
     private void checkPendingQuota(Long uploaderId, long sizeBytes) {
-        if (repository.countByUploaderIdAndOwnerIdIsNull(uploaderId) >= MAX_PENDING_COUNT
+        // ponytail: the site-wide sum is only serialized per member, so concurrent uploads by different
+        // members can overshoot by their own sizes; a global lock is not worth it for a soft cap.
+        if (repository.sumAllPendingBytes() > pendingTotalMaxBytes - sizeBytes) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "사이트 전체 임시 업로드 용량이 가득 찼습니다. 잠시 후 다시 시도해 주세요.");
+        }
+        if (repository.countPending(uploaderId) >= MAX_PENDING_COUNT
                 || repository.sumPendingBytes(uploaderId) > MAX_PENDING_BYTES - sizeBytes) {
             throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
                     "저장하지 않은 업로드가 너무 많습니다. 글을 저장하거나 잠시 후 다시 시도해 주세요.");
@@ -124,24 +143,38 @@ public class RichBodyMediaService {
 
     public Resource load(RichBodyMedia media) { return storage.load(media.getStoredName()); }
 
+    /** Create path: only the uploader may attach, including their own detached media. */
     @Transactional
     public void syncAttachments(RichBodyMedia.Scope scope, Long ownerId, String content, String actorStudentId) {
+        syncAttachments(scope, ownerId, content, actorStudentId, false);
+    }
+
+    /**
+     * @param actorMayEdit the caller already verified the actor may edit this scope/owner, so
+     *                     media detached from an earlier save (24h grace) may be put back by them
+     *                     even when someone else uploaded it. Never-attached pending media stays
+     *                     uploader-only.
+     */
+    @Transactional
+    public void syncAttachments(RichBodyMedia.Scope scope, Long ownerId, String content, String actorStudentId,
+                                boolean actorMayEdit) {
         Map<Long, RichBodyMedia.Kind> references = parseReferences(content);
         Set<Long> referenced = references.keySet();
-        var actor = actorStudentId == null || references.isEmpty() ? null
-                : members.findByStudentId(actorStudentId).orElse(null);
+        var actor = actorStudentId == null ? null : members.findByStudentId(actorStudentId).orElse(null);
         for (var reference : references.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList()) {
             RichBodyMedia row = repository.findLockedById(reference.getKey()).orElseThrow(RichBodyMediaService::invalidAttachment);
             if (row.getScope() != scope || row.getKind() != reference.getValue()) throw invalidAttachment();
             if (ownerId.equals(row.getOwnerId())) continue;
-            if (row.getOwnerId() != null || actor == null || !actor.getId().equals(row.getUploaderId())) {
+            // A non-uploader editor may only put media back into the owner it was detached from.
+            boolean reattach = actorMayEdit && row.getDetachedAt() != null && ownerId.equals(row.getDetachedFromOwnerId());
+            if (row.getOwnerId() != null || actor == null || !(reattach || actor.getId().equals(row.getUploaderId()))) {
                 throw invalidAttachment();
             }
             row.attach(ownerId, LocalDateTime.now(clock));
         }
         for (RichBodyMedia row : repository.findByScopeAndOwnerId(scope, ownerId).stream()
                 .sorted(Comparator.comparing(RichBodyMedia::getId)).toList()) {
-            if (!referenced.contains(row.getId())) row.detach(LocalDateTime.now(clock));
+            if (!referenced.contains(row.getId())) row.detach(LocalDateTime.now(clock), actor == null ? null : actor.getId());
         }
     }
 
@@ -190,8 +223,9 @@ public class RichBodyMediaService {
     }
 
     @Transactional
-    public void detachAttachments(RichBodyMedia.Scope scope, Long ownerId) {
-        for (RichBodyMedia row : repository.findByScopeAndOwnerId(scope, ownerId)) row.detach(LocalDateTime.now(clock));
+    public void detachAttachments(RichBodyMedia.Scope scope, Long ownerId, String actorStudentId) {
+        Long actorId = actorStudentId == null ? null : members.findByStudentId(actorStudentId).map(Member::getId).orElse(null);
+        for (RichBodyMedia row : repository.findByScopeAndOwnerId(scope, ownerId)) row.detach(LocalDateTime.now(clock), actorId);
     }
 
     public int deleteOrphanedOlderThan(LocalDateTime cutoff) {

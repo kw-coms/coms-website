@@ -149,7 +149,7 @@ class RichBodyMediaControllerIntegrationTest {
         var row = media.findById(id).orElseThrow();
         row.attach(2L, java.time.LocalDateTime.now());
         mvc.perform(get("/api/rich-media/{id}", id).cookie(member)).andExpect(status().isOk());
-        row.detach(java.time.LocalDateTime.now());
+        row.detach(java.time.LocalDateTime.now(), null);
         mvc.perform(get("/api/rich-media/{id}", id).cookie(member)).andExpect(status().isNotFound());
         mvc.perform(get("/api/rich-media/{id}", id).cookie(officer)).andExpect(status().isOk());
     }
@@ -200,15 +200,15 @@ class RichBodyMediaControllerIntegrationTest {
         long uploader = members.findByStudentId(studentId).orElseThrow().getId();
         long other = members.findByStudentId("2026000102").orElseThrow().getId();
         var ignored = new com.coms.backend.domain.RichBodyMedia(com.coms.backend.domain.RichBodyMedia.Kind.FILE,
-                com.coms.backend.domain.RichBodyMedia.Scope.NOTICE, "attached", "a.pdf", "application/pdf", com.coms.backend.service.MediaUploadValidator.MAX_PENDING_BYTES + 1, uploader);
+                com.coms.backend.domain.RichBodyMedia.Scope.NOTICE, "attached", "a.pdf", "application/pdf", com.coms.backend.service.MediaUploadValidator.MAX_PENDING_BYTES + 1, uploader, java.time.LocalDateTime.now());
         ignored.attach(1L, java.time.LocalDateTime.now());
         media.save(ignored);
         media.save(new com.coms.backend.domain.RichBodyMedia(com.coms.backend.domain.RichBodyMedia.Kind.FILE,
-                com.coms.backend.domain.RichBodyMedia.Scope.ARCHIVE, "other", "a.pdf", "application/pdf", com.coms.backend.service.MediaUploadValidator.MAX_PENDING_BYTES + 1, other));
+                com.coms.backend.domain.RichBodyMedia.Scope.ARCHIVE, "other", "a.pdf", "application/pdf", com.coms.backend.service.MediaUploadValidator.MAX_PENDING_BYTES + 1, other, java.time.LocalDateTime.now()));
         mvc.perform(multipart("/api/rich-media/archive/images").file(png()).cookie(cookie(studentId)).header("Origin", ORIGIN))
                 .andExpect(status().isOk());
         media.saveAndFlush(new com.coms.backend.domain.RichBodyMedia(com.coms.backend.domain.RichBodyMedia.Kind.FILE,
-                com.coms.backend.domain.RichBodyMedia.Scope.NOTICE, "pending", "a.pdf", "application/pdf", com.coms.backend.service.MediaUploadValidator.MAX_PENDING_BYTES, uploader));
+                com.coms.backend.domain.RichBodyMedia.Scope.NOTICE, "pending", "a.pdf", "application/pdf", com.coms.backend.service.MediaUploadValidator.MAX_PENDING_BYTES, uploader, java.time.LocalDateTime.now()));
         mvc.perform(multipart("/api/rich-media/archive/images").file(png()).cookie(cookie(studentId)).header("Origin", ORIGIN))
                 .andExpect(status().isTooManyRequests());
     }

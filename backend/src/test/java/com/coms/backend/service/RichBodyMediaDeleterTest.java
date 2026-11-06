@@ -52,13 +52,13 @@ class RichBodyMediaDeleterTest {
     @Test void rechecksDetachmentAgeUnderLock() {
         var recent = media(7L, cutoff.minusDays(30));
         recent.attach(99L, cutoff.minusDays(29));
-        recent.detach(cutoff.plusHours(23));
+        recent.detach(cutoff.plusHours(23), null);
         var expired = media(8L, cutoff.minusDays(30));
         expired.attach(99L, cutoff.minusDays(29));
-        expired.detach(cutoff.minusSeconds(1));
+        expired.detach(cutoff.minusSeconds(1), null);
         var boundary = media(9L, cutoff.minusDays(30));
         boundary.attach(99L, cutoff.minusDays(29));
-        boundary.detach(cutoff);
+        boundary.detach(cutoff, null);
         when(repository.findLockedById(7L)).thenReturn(Optional.of(recent));
         when(repository.findLockedById(8L)).thenReturn(Optional.of(expired));
         when(repository.findLockedById(9L)).thenReturn(Optional.of(boundary));
@@ -76,7 +76,7 @@ class RichBodyMediaDeleterTest {
     @Test void reattachedCandidateSurvivesLockedRecheck() {
         var row = media(10L, cutoff.minusDays(30));
         row.attach(99L, cutoff.minusDays(29));
-        row.detach(cutoff.minusSeconds(1));
+        row.detach(cutoff.minusSeconds(1), null);
         row.attach(99L, cutoff.plusHours(23));
         when(repository.findLockedById(10L)).thenReturn(Optional.of(row));
 
@@ -125,7 +125,7 @@ class RichBodyMediaDeleterTest {
 
     private RichBodyMedia media(Long id, LocalDateTime createdAt) {
         var row = new RichBodyMedia(RichBodyMedia.Kind.FILE, RichBodyMedia.Scope.ARCHIVE,
-                "stored-" + id, "original.pdf", "application/pdf", 1, 7L);
+                "stored-" + id, "original.pdf", "application/pdf", 1, 7L, createdAt);
         ReflectionTestUtils.setField(row, "id", id);
         ReflectionTestUtils.setField(row, "createdAt", createdAt);
         return row;

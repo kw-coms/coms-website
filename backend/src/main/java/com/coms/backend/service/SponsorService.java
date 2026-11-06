@@ -300,10 +300,6 @@ public class SponsorService {
      * typed controller parameter: Spring Boot turns {@code FAIL_ON_UNKNOWN_PROPERTIES} off on the
      * MVC mapper, so an unknown settings key would otherwise be silently dropped instead of refused.
      */
-    public SponsorPageSettings saveSettings(Map<String, Object> body) {
-        return saveSettings(body, null);
-    }
-
     public SponsorPageSettings saveSettings(Map<String, Object> body, String actorStudentId) {
         SponsorPageSettings incoming;
         try {
@@ -321,7 +317,7 @@ public class SponsorService {
         }
         settingsRepository.saveAndFlush(entity);
         richBodyMediaService.syncAttachments(RichBodyMedia.Scope.SPONSOR, 1L,
-                combinedRichBody(validated), actorStudentId);
+                combinedRichBody(validated), actorStudentId, true);
         if (!Objects.equals(previousBannerImageId, validated.bannerImageId())) {
             deleteImageIfUnreferenced(previousBannerImageId);
         }

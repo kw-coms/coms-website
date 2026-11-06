@@ -95,7 +95,7 @@ class SponsorSecurityIntegrationTest {
         sponsorService.create(sponsor("익명", anonymous, true, true, null));
         sponsorService.create(sponsor("만료", expired, false, true, LocalDate.now().minusDays(1)));
         sponsorService.create(sponsor("공개", current, false, true, null));
-        sponsorService.saveSettings(Map.of("bannerImageId", banner));
+        sponsorService.saveSettings(Map.of("bannerImageId", banner), null);
 
         mockMvc.perform(get("/api/sponsors/images/{id}", hidden)).andExpect(status().isNotFound());
         mockMvc.perform(get("/api/sponsors/images/{id}", anonymous)).andExpect(status().isNotFound());

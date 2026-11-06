@@ -77,17 +77,49 @@ class RichBodyMediaMigrationTest {
     }
 
     @Test
+    void v103AddsDetachOriginColumns() throws Exception {
+        try (var connection = DriverManager.getConnection("jdbc:h2:mem:rich_body_media_v103;MODE=PostgreSQL", "sa", "");
+             var statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE members (id BIGINT PRIMARY KEY)");
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration/V102__rich_body_media.sql"));
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration/V103__rich_body_media_detach_origin.sql"));
+            statement.execute("INSERT INTO members (id) VALUES (7)");
+            statement.execute("""
+                    INSERT INTO rich_body_media (kind, scope, stored_name, original_name, content_type, size_bytes,
+                        detached_from_owner_id, detached_by_id) VALUES ('IMAGE','NOTICE','a','a','image/png',1,5,7)""");
+            statement.execute("DELETE FROM members WHERE id = 7");
+            try (var rows = statement.executeQuery("SELECT detached_from_owner_id, detached_by_id FROM rich_body_media")) {
+                assertThat(rows.next()).isTrue();
+                assertThat(rows.getLong(1)).isEqualTo(5L);
+                rows.getLong(2);
+                assertThat(rows.wasNull()).isTrue();
+            }
+        }
+    }
+
+    @Test
     void v102ExecutesAndMatchesHibernateValidate() throws Exception {
         String url = "jdbc:h2:mem:rich_body_media_v102;MODE=PostgreSQL;DB_CLOSE_DELAY=-1";
         try (var connection = DriverManager.getConnection(url, "sa", "");
              var statement = connection.createStatement()) {
             statement.execute("CREATE TABLE members (id BIGINT PRIMARY KEY)");
             ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration/V102__rich_body_media.sql"));
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/migration/V103__rich_body_media_detach_origin.sql"));
             try (var columns = connection.getMetaData().getColumns(null, null, "RICH_BODY_MEDIA", null)) {
                 int count = 0;
                 while (columns.next()) count++;
-                assertThat(count).isEqualTo(12);
+                assertThat(count).isEqualTo(14);
             }
+            boolean detachedByIndexed = false;
+            try (var indexes = connection.getMetaData().getIndexInfo(null, null, "RICH_BODY_MEDIA", false, false)) {
+                while (indexes.next()) {
+                    if ("IDX_RICH_BODY_MEDIA_DETACHED_BY".equalsIgnoreCase(indexes.getString("INDEX_NAME"))
+                            && "DETACHED_BY_ID".equalsIgnoreCase(indexes.getString("COLUMN_NAME"))) {
+                        detachedByIndexed = true;
+                    }
+                }
+            }
+            assertThat(detachedByIndexed).isTrue();
         }
 
         var registry = new StandardServiceRegistryBuilder()

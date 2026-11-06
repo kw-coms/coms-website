@@ -157,20 +157,20 @@ class SponsorServiceTest {
 
     @Test
     void pageSettingsRejectABadAccentColourAndAnUnknownKey() {
-        assertThatThrownBy(() -> sponsorService.saveSettings(settings("red", "grid")))
+        assertThatThrownBy(() -> sponsorService.saveSettings(settings("red", "grid"), null))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("#RRGGBB");
-        assertThatThrownBy(() -> sponsorService.saveSettings(settings("#112233", "carousel")))
+        assertThatThrownBy(() -> sponsorService.saveSettings(settings("#112233", "carousel"), null))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("grid");
         // 알 수 없는 키는 바인딩 단계에서 거부된다 — 서비스가 자체 strict ObjectMapper 로 파싱한다.
         Map<String, Object> withUnknownKey = settings("#112233", "grid");
         withUnknownKey.put("evil", 1);
-        assertThatThrownBy(() -> sponsorService.saveSettings(withUnknownKey))
+        assertThatThrownBy(() -> sponsorService.saveSettings(withUnknownKey, null))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("알 수 없는");
 
-        SponsorPageSettings saved = sponsorService.saveSettings(settings("#112233", "list"));
+        SponsorPageSettings saved = sponsorService.saveSettings(settings("#112233", "list"), null);
         assertThat(saved.accentColor()).isEqualTo("#112233");
         assertThat(saved.layout()).isEqualTo("list");
         assertThat(sponsorService.adminSettings().layout()).isEqualTo("list");
@@ -240,9 +240,9 @@ class SponsorServiceTest {
 
         Long oldBanner = upload("old-banner.png");
         Long newBanner = upload("new-banner.png");
-        sponsorService.saveSettings(settingsWithBanner(oldBanner));
+        sponsorService.saveSettings(settingsWithBanner(oldBanner), null);
 
-        sponsorService.saveSettings(settingsWithBanner(newBanner));
+        sponsorService.saveSettings(settingsWithBanner(newBanner), null);
 
         assertThatThrownBy(() -> sponsorService.imageMeta(oldBanner))
                 .isInstanceOf(ResponseStatusException.class);
@@ -254,14 +254,14 @@ class SponsorServiceTest {
         Long shared = upload("shared.png");
         Long first = sponsorService.create(sponsor("첫째", null, b -> b.logoImageId(shared))).id();
         Long second = sponsorService.create(sponsor("둘째", null, b -> b.logoImageId(shared))).id();
-        sponsorService.saveSettings(settingsWithBanner(shared));
+        sponsorService.saveSettings(settingsWithBanner(shared), null);
 
         sponsorService.delete(first);
         sponsorService.update(second, sponsor("둘째", null, b -> b));
 
         assertThat(sponsorService.imageMeta(shared).getId()).isEqualTo(shared);
 
-        sponsorService.saveSettings(settings("#112233", "grid"));
+        sponsorService.saveSettings(settings("#112233", "grid"), null);
 
         assertThatThrownBy(() -> sponsorService.imageMeta(shared))
                 .isInstanceOf(ResponseStatusException.class);

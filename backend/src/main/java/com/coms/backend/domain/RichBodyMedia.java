@@ -28,16 +28,21 @@ public class RichBodyMedia {
     @Column(name = "owner_id")
     private Long ownerId;
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
     @Column(name = "attached_at")
     private LocalDateTime attachedAt;
     @Column(name = "detached_at")
     private LocalDateTime detachedAt;
+    @Column(name = "detached_from_owner_id")
+    private Long detachedFromOwnerId;
+    @Column(name = "detached_by_id")
+    private Long detachedById;
 
     protected RichBodyMedia() {}
-    public RichBodyMedia(Kind kind, Scope scope, String storedName, String originalName, String contentType, long sizeBytes, Long uploaderId) {
+    public RichBodyMedia(Kind kind, Scope scope, String storedName, String originalName, String contentType, long sizeBytes, Long uploaderId, LocalDateTime createdAt) {
         this.kind = kind; this.scope = scope; this.storedName = storedName; this.originalName = originalName;
         this.contentType = contentType; this.sizeBytes = sizeBytes; this.uploaderId = uploaderId;
+        this.createdAt = createdAt;
     }
     public Long getId() { return id; }
     public Kind getKind() { return kind; }
@@ -51,10 +56,15 @@ public class RichBodyMedia {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getAttachedAt() { return attachedAt; }
     public LocalDateTime getDetachedAt() { return detachedAt; }
+    public Long getDetachedFromOwnerId() { return detachedFromOwnerId; }
+    public Long getDetachedById() { return detachedById; }
     public void attach(Long ownerId, LocalDateTime now) {
         this.ownerId = ownerId; this.attachedAt = now; this.detachedAt = null;
+        this.detachedFromOwnerId = null; this.detachedById = null;
     }
-    public void detach(LocalDateTime now) {
+    /** @param detachedById acting member, or null when there is no actor (not charged to anyone's quota). */
+    public void detach(LocalDateTime now, Long detachedById) {
+        this.detachedFromOwnerId = this.ownerId; this.detachedById = detachedById;
         this.ownerId = null; this.attachedAt = null; this.detachedAt = now;
     }
 }
