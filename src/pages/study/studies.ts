@@ -40,7 +40,7 @@ export const STUDIES: Study[] = [
   {
     id: 'java',
     title: 'Java 기초',
-    subtitle: 'Java 21',
+    subtitle: 'Java 17+',
     description: '클래스와 객체로 프로그램을 짜는 객체지향 기본기.',
     tags: ['Java', '객체지향'],
     progressKey: 'coms-java-study-progress',
