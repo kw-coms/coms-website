@@ -262,8 +262,31 @@ export function initStudyPage(root: HTMLElement, progressKey: string): () => voi
   window.addEventListener('scroll', onScroll, { passive: true, signal })
   onScroll()
 
+  // Tables and code blocks that scroll sideways must be reachable by keyboard (axe: scrollable-region-focusable).
+  // Only the ones that actually overflow become a focusable, labelled region, so short ones add no tab stops.
+  const scrollers = Array.from(root.querySelectorAll<HTMLElement>('.table-wrap, pre'))
+  const scrollLabel = (el: HTMLElement) => (el.matches('.table-wrap') ? '표 (가로로 스크롤할 수 있습니다)' : el.matches('.output') ? '출력 예시 (가로로 스크롤할 수 있습니다)' : '코드 (가로로 스크롤할 수 있습니다)')
+  const markScrollers = () => scrollers.forEach((el) => {
+    const marked = el.hasAttribute('data-scroll-region')
+    if (el.scrollWidth > el.clientWidth + 1) {
+      if (marked || el.hasAttribute('tabindex')) return
+      el.setAttribute('data-scroll-region', '')
+      el.tabIndex = 0
+      el.setAttribute('role', 'region')
+      el.setAttribute('aria-label', scrollLabel(el))
+    } else if (marked) {
+      el.removeAttribute('data-scroll-region'); el.removeAttribute('tabindex'); el.removeAttribute('role'); el.removeAttribute('aria-label')
+    }
+  })
+  markScrollers()
+  const scrollWatch = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(markScrollers)
+  scrollWatch?.observe(root)
+  void document.fonts?.ready.then(() => { if (!disposed) markScrollers() })
+
   return () => {
     disposed = true
+    scrollWatch?.disconnect()
+    scrollers.forEach((el) => { if (el.hasAttribute('data-scroll-region')) { el.removeAttribute('data-scroll-region'); el.removeAttribute('tabindex'); el.removeAttribute('role'); el.removeAttribute('aria-label') } })
     unmountCircuits?.()
     ac.abort()
     io.disconnect()

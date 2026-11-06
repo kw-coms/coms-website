@@ -7,6 +7,8 @@ import { pointOf } from './netlist'
 export function buildScene(def: CircuitDef, uid: string, aria: string): string {
   const k = (name: string) => `${uid}-${name}`
   const sub = (s: string) => s.replace(/__(\w+)/g, (_m, id) => k(id))
+  // free text (aria label, wire notes) is escaped so a `__word` in it is never taken for a gradient id
+  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;').replace(/__/g, '&#95;&#95;')
   const pt = (ref: string | Pt) => pointOf(def, ref)
 
   // Arduino pins that carry a wire get a coloured ring on the silkscreen.
@@ -100,12 +102,12 @@ export function buildScene(def: CircuitDef, uid: string, aria: string): string {
     const a = pt(w.from)
     const b = pt(w.to)
     const ring = (p: Pt) => `<circle class="wend" cx="${p[0]}" cy="${p[1]}" r="9.5" fill="none" stroke-width="2.2"/>`
-    return `<g class="cw" data-w="${i}">${wire(a, b, w.color, w.via, w.note)}${ring(a)}${ring(b)}</g>`
+    return `<g class="cw" data-w="${i}">${wire(a, b, w.color, w.via, esc(w.note))}${ring(a)}${ring(b)}</g>`
   })
 
   // role=img would make the focusable push button inside the drawing presentational (axe: nested-interactive).
   const [W, H] = def.size
-  return sub(`<svg class="circuit-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="${def.parts.some((p) => p.kind === 'tact') ? 'group' : 'img'}" aria-label="${aria.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')}" font-family="ui-sans-serif,system-ui,-apple-system,'Noto Sans KR',sans-serif">
+  return sub(`<svg class="circuit-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" role="${def.parts.some((p) => p.kind === 'tact') ? 'group' : 'img'}" aria-label="${esc(aria)}" font-family="ui-sans-serif,system-ui,-apple-system,'Noto Sans KR',sans-serif">
 ${sharedDefs((n) => `__${n}`)}
 <g class="layer-board">${boards}</g>
 <g class="layer-parts">${parts.join('')}</g>

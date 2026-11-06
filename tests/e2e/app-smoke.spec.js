@@ -4596,8 +4596,8 @@ test.describe('arduino study circuits', () => {
   test('the LED blink simulation toggles the LED like the sketch', async ({ page }) => {
     await page.goto('/study/arduino')
     const fig = circuit(page, 'led-blink')
-    await expect(fig).toHaveClass(/is-live/)
     await fig.scrollIntoViewIfNeeded()
+    await expect(fig).toHaveClass(/is-live/)
     await fig.getByRole('button', { name: '▶ 시뮬레이션' }).click()
     // delay(500) on, delay(500) off: both states show up within a few seconds
     await expect(fig).toHaveAttribute('data-led', 'on')
@@ -4611,8 +4611,8 @@ test.describe('arduino study circuits', () => {
   test('the potentiometer figure shows analogRead and the PWM duty', async ({ page }) => {
     await page.goto('/study/arduino')
     const fig = circuit(page, 'pot-led')
-    await expect(fig).toHaveClass(/is-live/)
     await fig.scrollIntoViewIfNeeded()
+    await expect(fig).toHaveClass(/is-live/)
     await fig.getByRole('button', { name: '▶ 시뮬레이션' }).click()
     await fig.getByRole('slider', { name: /가변저항 값/ }).fill('800')
     await expect(fig.locator('.circuit-status')).toContainText('analogRead(A0) = 800')
@@ -4623,8 +4623,8 @@ test.describe('arduino study circuits', () => {
   test('the button figure follows INPUT_PULLUP: pressed reads LOW and lights the LED', async ({ page }) => {
     await page.goto('/study/arduino')
     const fig = circuit(page, 'button-led')
-    await expect(fig).toHaveClass(/is-live/)
     await fig.scrollIntoViewIfNeeded()
+    await expect(fig).toHaveClass(/is-live/)
     await fig.getByRole('button', { name: '▶ 시뮬레이션' }).click()
     const key = fig.getByRole('button', { name: /택트 스위치/ })
     await key.focus()
@@ -4639,8 +4639,8 @@ test.describe('arduino study circuits', () => {
   test('the CDS night light turns the LED on below the dark threshold, with hysteresis', async ({ page }) => {
     await page.goto('/study/arduino')
     const fig = circuit(page, 'cds-night')
-    await expect(fig).toHaveClass(/is-live/)
     await fig.scrollIntoViewIfNeeded()
+    await expect(fig).toHaveClass(/is-live/)
     await fig.getByRole('button', { name: '▶ 시뮬레이션' }).click()
     const light = fig.getByRole('slider', { name: /주변 밝기/ })
     await light.fill('100') // CDS 1 kohm -> analogRead 930
@@ -4654,8 +4654,8 @@ test.describe('arduino study circuits', () => {
   test('the joystick figure prints the sketch line and the direction', async ({ page }) => {
     await page.goto('/study/arduino')
     const fig = circuit(page, 'joystick')
-    await expect(fig).toHaveClass(/is-live/)
     await fig.scrollIntoViewIfNeeded()
+    await expect(fig).toHaveClass(/is-live/)
     await fig.getByRole('button', { name: '▶ 시뮬레이션' }).click()
     await expect(fig.locator('.circuit-status')).toHaveText('X=512 Y=512 vx=0 SW=- -> CENTER')
     await fig.getByRole('slider', { name: /X축/ }).fill('118')
@@ -4679,8 +4679,8 @@ test.describe('arduino study circuits', () => {
     })
     await page.goto('/study/arduino')
     const fig = circuit(page, 'led-blink')
-    await expect(fig).toHaveClass(/is-live/)
     await fig.scrollIntoViewIfNeeded()
+    await expect(fig).toHaveClass(/is-live/)
     await expect(fig.locator('.circuit-stage')).toHaveClass(/is-flat/)
     const filtered = () => fig.locator('.circuit-svg [filter]').evaluateAll((els) => els.filter((e) => getComputedStyle(e).filter !== 'none').length)
     expect(await filtered()).toBe(0)
@@ -4688,12 +4688,86 @@ test.describe('arduino study circuits', () => {
     await page.evaluate(() => { document.documentElement.dataset.perf = 'full' })
     await expect(fig.locator('.circuit-stage')).not.toHaveClass(/is-flat/)
     expect(await filtered()).toBeGreaterThan(0)
+    // an explicit 평면/3D choice survives later mode flips
+    await fig.getByRole('button', { name: '평면으로 보기' }).click()
+    await expect(fig.locator('.circuit-stage')).toHaveClass(/is-flat/)
+    await page.evaluate(() => { document.documentElement.dataset.perf = 'lite'; document.documentElement.dataset.perf = 'full' })
+    await expect(fig.locator('.circuit-stage')).toHaveClass(/is-flat/)
+  })
+
+  test('scenes are built only when their figure nears the viewport', async ({ page }) => {
+    await page.goto('/study/arduino')
+    await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
+    await expect(page.locator('.circuit-ph')).not.toHaveCount(0)
+    expect(await page.locator('svg.circuit-svg').count(), 'nothing is drawn at the top of the page').toBe(0)
+    const far = circuit(page, 'dc-motor')
+    await expect(far.locator('svg.circuit-svg')).toHaveCount(0)
+    await far.scrollIntoViewIfNeeded()
+    await expect(far.locator('svg.circuit-svg')).toHaveCount(1)
+    await expect(far.locator('.circuit-ph')).toHaveCount(0)
+    expect(await page.locator('svg.circuit-svg').count(), 'only the figures that were reached are built').toBeLessThan(14)
+  })
+
+  test('the sim clock stops while the figure is off screen and resumes afterwards', async ({ page }) => {
+    await page.goto('/study/arduino')
+    const fig = circuit(page, 'led-blink')
+    await fig.scrollIntoViewIfNeeded()
+    await expect(fig).toHaveClass(/is-live/)
+    await fig.getByRole('button', { name: '▶ 시뮬레이션' }).click()
+    await expect(fig).toHaveAttribute('data-led', 'on')
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    await expect(fig).toHaveAttribute('data-offscreen', '')
+    const frozen = await fig.getAttribute('data-led')
+    await page.waitForTimeout(1300) // more than two blink periods
+    expect(await fig.getAttribute('data-led')).toBe(frozen)
+    await fig.scrollIntoViewIfNeeded()
+    await expect(fig).not.toHaveAttribute('data-offscreen', '')
+    await expect(fig).toHaveAttribute('data-led', frozen === 'on' ? 'off' : 'on')
+  })
+
+  test('a table has one tab stop and arrow keys move between its rows', async ({ page }) => {
+    await page.goto('/study/arduino')
+    const fig = circuit(page, 'pot-led')
+    await fig.scrollIntoViewIfNeeded()
+    await expect(fig).toHaveClass(/is-live/)
+    const table = fig.locator('xpath=preceding-sibling::div[contains(@class,"table-wrap")][1]')
+    const rows = table.locator('tr.circuit-row')
+    await expect(rows).toHaveCount(4)
+    await expect(table.locator('tr[tabindex="0"]')).toHaveCount(1)
+    await rows.first().focus()
+    await page.keyboard.press('ArrowDown')
+    await expect(rows.nth(1)).toBeFocused()
+    await expect(rows.nth(1)).toHaveAttribute('tabindex', '0')
+    await expect(rows.first()).toHaveAttribute('tabindex', '-1')
+    await expect(fig.locator('.cw.is-hl')).not.toHaveCount(0)
+    await page.keyboard.press('End')
+    await expect(rows.nth(3)).toBeFocused()
+    await page.keyboard.press('Home')
+    await expect(rows.first()).toBeFocused()
+  })
+
+  test('results reach screen readers through a debounced live region, not the frame loop', async ({ page }) => {
+    await page.goto('/study/arduino')
+    const fig = circuit(page, 'pot-led')
+    await fig.scrollIntoViewIfNeeded()
+    await expect(fig).toHaveClass(/is-live/)
+    await expect(fig.locator('.circuit-status')).not.toHaveAttribute('role', 'status')
+    const live = fig.locator('.circuit-live')
+    await expect(live).toHaveAttribute('aria-live', 'polite')
+    await fig.getByRole('button', { name: '▶ 시뮬레이션' }).click()
+    await fig.getByRole('slider', { name: /가변저항 값/ }).fill('800')
+    await expect(live).toContainText('analogRead(A0) = 800')
   })
 
   test('wiring table rows highlight their wire, and the stepper reveals parts in table order', async ({ page }) => {
     await page.goto('/study/arduino')
     const fig = circuit(page, 'led-blink')
+    await fig.scrollIntoViewIfNeeded()
     await expect(fig).toHaveClass(/is-live/)
+    for (const f of await page.locator('figure.circuit[data-circuit]').all()) { // scenes are built lazily: reach every figure
+      await f.scrollIntoViewIfNeeded()
+      await expect(f).toHaveClass(/is-live/)
+    }
     await fig.scrollIntoViewIfNeeded()
     const rows = page.locator('table.ref tr.circuit-row')
     await expect(rows).toHaveCount(3 + 3 + 4 + 4 + 3 + 2 + 8 + 6 + 4 + 5 + 3 + 2 + 5 + 5) // every circuit's table is linked

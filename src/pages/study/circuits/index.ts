@@ -61,7 +61,7 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
   const { signal } = ac
   const uid = `cc${++counter}`
   const aria = fig.getAttribute('aria-label') || ''
-  const caption = fig.querySelector('figcaption')
+  const caption = Array.from(fig.children).find((c) => c.tagName === 'FIGCAPTION') ?? null
   const cleanups: Array<() => void> = []
   let raf = 0
 
@@ -92,9 +92,12 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
   const svg = plane.querySelector('svg')!
 
   const ctl = h('div', 'circuit-ctl')
-  const status = h('p', 'circuit-status', IDLE[def.sim], { role: 'status', 'aria-live': 'off' })
-  const mounted: HTMLElement[] = [bar, stepper, stage, ctl, status]
-  fig.insertBefore(status, caption)
+  // the visible status line is plain text (it changes every frame while a sim runs); screen readers get a separate, debounced live region
+  const status = h('p', 'circuit-status', IDLE[def.sim])
+  const live = h('div', 'circuit-live', undefined, { role: 'status', 'aria-live': 'polite' })
+  const mounted: HTMLElement[] = [bar, stepper, stage, ctl, status, live]
+  fig.insertBefore(live, caption)
+  fig.insertBefore(status, live)
   fig.insertBefore(ctl, status)
   fig.insertBefore(stage, ctl)
   fig.insertBefore(stepper, stage)
@@ -105,12 +108,24 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
 
   let lastStatus = IDLE[def.sim]
   const setStatus = (s: string) => { if (s !== lastStatus) { lastStatus = s; status.textContent = s } }
+  // announce the latest status ~0.5 s after a user action (never from the animation frame loop)
+  let announceTimer = 0
+  let lastSaid = ''
+  const announce = () => {
+    window.clearTimeout(announceTimer)
+    announceTimer = window.setTimeout(() => { if (lastStatus !== lastSaid) { lastSaid = lastStatus; live.textContent = lastStatus } }, 500)
+  }
+  ;(['input', 'click', 'pointerup', 'keyup'] as const).forEach((ev) => fig.addEventListener(ev, announce, { signal }))
+  cleanups.push(() => window.clearTimeout(announceTimer))
 
   const q = <T extends Element = SVGElement>(sel: string) => svg.querySelector<T>(sel)
   const qa = (sel: string) => Array.from(svg.querySelectorAll<SVGElement>(sel))
 
   /* ---------- 3D tilt ---------- */
-  const view = { flat: reducedMotion() || lite(), rx: VIEW_RX, ry: 0 }
+  let userFlat: boolean | null = null // an explicit 평면/3D choice wins over the automatic (reduced motion / lite mode) default
+  const autoFlat = () => userFlat ?? (reducedMotion() || lite())
+  const view = { flat: autoFlat(), rx: VIEW_RX, ry: 0 }
+  const willChange = (on: boolean) => { plane.style.willChange = on ? 'transform' : '' } // a compositor layer only while the plane is being turned
   const applyView = () => {
     plane.style.transform = view.flat ? 'none' : `rotateX(${view.rx.toFixed(1)}deg) rotateY(${view.ry.toFixed(1)}deg)`
     btnView.textContent = view.flat ? '3D로 보기' : '평면으로 보기'
@@ -121,11 +136,12 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
     view.rx = Math.min(VIEW_RX + VIEW_RX_RANGE, Math.max(VIEW_RX - VIEW_RX_RANGE, view.rx))
     view.ry = Math.min(VIEW_RY_RANGE, Math.max(-VIEW_RY_RANGE, view.ry))
   }
-  btnView.addEventListener('click', () => { view.flat = !view.flat; if (!view.flat) resetView(); else applyView() }, { signal })
+  btnView.addEventListener('click', () => { view.flat = !view.flat; userFlat = view.flat; if (!view.flat) resetView(); else applyView() }, { signal })
   let drag: { x: number; y: number; rx: number; ry: number; id: number } | null = null
   stage.addEventListener('pointerdown', (e) => {
     if (view.flat || (e.target as Element).closest('.hit, button, input')) return
     drag = { x: e.clientX, y: e.clientY, rx: view.rx, ry: view.ry, id: e.pointerId }
+    willChange(true)
   }, { signal })
   stage.addEventListener('pointermove', (e) => {
     if (!drag || e.pointerId !== drag.id) return
@@ -137,7 +153,7 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
     clampView()
     applyView()
   }, { signal })
-  const endDrag = () => { drag = null }
+  const endDrag = () => { drag = null; willChange(false) }
   stage.addEventListener('pointerup', endDrag, { signal })
   stage.addEventListener('pointercancel', endDrag, { signal })
   stage.addEventListener('dblclick', (e) => { if (!(e.target as Element).closest('.hit')) resetView() }, { signal })
@@ -151,14 +167,28 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
     else if (k === 'ArrowDown') view.rx -= 4
     else return
     e.preventDefault()
+    willChange(true)
+    window.clearTimeout(keyTimer)
+    keyTimer = window.setTimeout(() => willChange(false), 400)
     clampView()
     applyView()
   }, { signal })
+  let keyTimer = 0
+  cleanups.push(() => window.clearTimeout(keyTimer))
   applyView()
-  // the site-wide perf switch can flip while the page is open
-  const perfWatch = new MutationObserver(() => { view.flat = reducedMotion() || lite(); if (!view.flat) resetView(); else applyView() })
+  // the site-wide perf switch (<html data-perf>) and the reduced-motion preference can change while the page is open:
+  // only react when the effective default really changes, so the user's angle and explicit choice survive
+  const refreshAuto = () => {
+    const f = autoFlat()
+    if (f === view.flat) return
+    view.flat = f
+    if (!f) resetView(); else applyView()
+  }
+  const perfWatch = new MutationObserver(refreshAuto)
   perfWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-perf'] })
-  cleanups.push(() => perfWatch.disconnect())
+  const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+  motionQuery.addEventListener('change', refreshAuto)
+  cleanups.push(() => { perfWatch.disconnect(); motionQuery.removeEventListener('change', refreshAuto) })
 
   /* ---------- table <-> drawing links and the assembly stepper ---------- */
   const rows = findRows(fig)
@@ -189,19 +219,26 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
 
   if (linked) {
     if (caption) {
-      const hint = h('span', 'circuit-hint', '아래 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다.')
+      const hint = h('span', 'circuit-hint', '아래 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.', { id: `${uid}-hint` })
       caption.append(hint)
       cleanups.push(() => hint.remove())
     }
-    const describedBy = caption ? (caption.id || (caption.id = `${uid}-cap`)) : ''
+    // one tab stop per table (roving tabindex): arrow keys move between the rows
+    const setRowTab = (i: number) => rows.forEach((r, k) => r.setAttribute('tabindex', k === i ? '0' : '-1'))
     rows.forEach((row, i) => {
-      row.setAttribute('tabindex', '0')
-      if (describedBy) row.setAttribute('aria-describedby', describedBy)
+      row.setAttribute('tabindex', i === 0 ? '0' : '-1')
+      if (caption) row.setAttribute('aria-describedby', `${uid}-hint`)
       row.classList.add('circuit-row')
       row.addEventListener('pointerenter', () => hl(i), { signal })
       row.addEventListener('pointerleave', restoreHl, { signal })
-      row.addEventListener('focus', () => hl(i), { signal })
+      row.addEventListener('focus', () => { setRowTab(i); hl(i) }, { signal })
       row.addEventListener('blur', restoreHl, { signal })
+      row.addEventListener('keydown', (e) => {
+        const to = e.key === 'ArrowDown' ? i + 1 : e.key === 'ArrowUp' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? rows.length - 1 : -1
+        if (to < 0 || to >= rows.length) return
+        e.preventDefault()
+        rows[to].focus()
+      }, { signal })
     })
     def.wires.forEach((_w, wi) => {
       const el = wireEl(wi)
@@ -632,9 +669,34 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
   }
 
   lock(true)
-  const loop = (now: number, t0: number) => {
-    runner.frame?.(now - t0, now)
-    raf = requestAnimationFrame((n) => loop(n, t0))
+  // The frame loop only runs while the sim is on AND the figure is on screen AND the tab is visible; the sim clock
+  // does not advance while paused, so a resumed sim continues from where it stopped.
+  let onScreen = true
+  let t0 = 0
+  let pausedTotal = 0
+  let pausedAt = 0
+  const tick = (now: number) => {
+    const n = now - pausedTotal
+    runner.frame?.(n - t0, n)
+    raf = requestAnimationFrame(tick)
+  }
+  function syncLoop() {
+    const should = running && onScreen && !document.hidden && !!runner.frame
+    if (should && !raf) {
+      if (pausedAt) { pausedTotal += performance.now() - pausedAt; pausedAt = 0 }
+      raf = requestAnimationFrame(tick)
+    } else if (!should && raf) {
+      cancelAnimationFrame(raf)
+      raf = 0
+      if (running) pausedAt = performance.now()
+    }
+    fig.toggleAttribute('data-offscreen', !onScreen)
+  }
+  document.addEventListener('visibilitychange', syncLoop, { signal })
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => { onScreen = entries[entries.length - 1].isIntersecting; syncLoop() })
+    io.observe(fig)
+    cleanups.push(() => io.disconnect())
   }
   function setRunning(on: boolean) {
     running = on
@@ -643,9 +705,13 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
     fig.setAttribute('data-sim', on ? 'on' : 'off')
     lock(!on)
     cancelAnimationFrame(raf)
+    raf = 0
+    pausedAt = 0
+    pausedTotal = 0
     if (on) {
+      t0 = performance.now()
       runner.start()
-      if (runner.frame) raf = requestAnimationFrame((t0) => loop(t0, t0))
+      syncLoop()
     } else {
       runner.stop()
       setStatus(IDLE[def.sim])
@@ -657,16 +723,41 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
   return () => {
     ac.abort()
     cancelAnimationFrame(raf)
+    fig.removeAttribute('data-offscreen')
     cleanups.forEach((c) => c())
   }
 }
 
-/** Mounts every circuit figure under `root`; returns a cleanup that removes all of it again. */
+/**
+ * Registers every circuit figure under `root` and builds each scene only when it nears the viewport (a scene is ~50 KB of
+ * SVG, so building all of them at load costs thousands of DOM nodes). Until then a placeholder of the final aspect ratio
+ * keeps the layout from jumping. Returns a cleanup that removes everything again.
+ */
 export function mountCircuits(root: HTMLElement): () => void {
   const cleanups: Array<() => void> = []
+  const pending = new Map<Element, () => void>()
+  const io = 'IntersectionObserver' in window
+    ? new IntersectionObserver((entries) => entries.forEach((en) => {
+        if (!en.isIntersecting) return
+        io!.unobserve(en.target)
+        pending.get(en.target)?.()
+        pending.delete(en.target)
+      }), { rootMargin: '300px 0px' })
+    : null
   root.querySelectorAll<HTMLElement>('figure.circuit[data-circuit]').forEach((fig) => {
     const def = circuitById(fig.getAttribute('data-circuit') || '')
-    if (def) cleanups.push(mountOne(fig, def))
+    if (!def) return
+    const mount = () => { ph?.remove(); cleanups.push(mountOne(fig, def)) }
+    let ph: HTMLElement | null = null
+    if (io) {
+      ph = h('div', 'circuit-ph', undefined, { 'aria-hidden': 'true' })
+      ph.style.aspectRatio = `${def.size[0]} / ${def.size[1]}`
+      ph.style.maxWidth = `${Math.round(def.size[0] * 1.12)}px`
+      fig.insertBefore(ph, Array.from(fig.children).find((c) => c.tagName === 'FIGCAPTION') ?? null)
+      pending.set(fig, mount)
+      io.observe(fig)
+    } else mount()
+    cleanups.push(() => ph?.remove())
   })
-  return () => cleanups.forEach((c) => c())
+  return () => { io?.disconnect(); pending.clear(); cleanups.forEach((c) => c()) }
 }
