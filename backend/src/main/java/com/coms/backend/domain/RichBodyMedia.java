@@ -67,5 +67,4 @@ public class RichBodyMedia {
         this.detachedFromOwnerId = this.ownerId; this.detachedById = detachedById;
         this.ownerId = null; this.attachedAt = null; this.detachedAt = now;
     }
-    public void detach(LocalDateTime now) { detach(now, null); }
 }

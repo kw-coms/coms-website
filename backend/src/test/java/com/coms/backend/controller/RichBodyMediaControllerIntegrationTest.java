@@ -149,7 +149,7 @@ class RichBodyMediaControllerIntegrationTest {
         var row = media.findById(id).orElseThrow();
         row.attach(2L, java.time.LocalDateTime.now());
         mvc.perform(get("/api/rich-media/{id}", id).cookie(member)).andExpect(status().isOk());
-        row.detach(java.time.LocalDateTime.now());
+        row.detach(java.time.LocalDateTime.now(), null);
         mvc.perform(get("/api/rich-media/{id}", id).cookie(member)).andExpect(status().isNotFound());
         mvc.perform(get("/api/rich-media/{id}", id).cookie(officer)).andExpect(status().isOk());
     }

@@ -136,7 +136,7 @@ class RichBodyMediaServiceTest {
     @Test void reattachingClearsDetachmentTimestamp() {
         RichBodyMedia candidate = row(1, RichBodyMedia.Kind.IMAGE, NOTICE, 100);
         candidate.attach(50L, NOW.minusDays(30));
-        candidate.detach(NOW.minusHours(1));
+        candidate.detach(NOW.minusHours(1), null);
         Member actor = mock(Member.class);
         when(actor.getId()).thenReturn(100L);
         when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
@@ -464,7 +464,7 @@ class RichBodyMediaServiceTest {
     private RichBodyMedia detachedRow(long uploaderId) {
         RichBodyMedia candidate = row(1, RichBodyMedia.Kind.IMAGE, NOTICE, uploaderId);
         candidate.attach(50L, NOW.minusDays(30));
-        candidate.detach(NOW.minusHours(1));
+        candidate.detach(NOW.minusHours(1), null);
         when(rows.findLockedById(1L)).thenReturn(Optional.of(candidate));
         Member actor = mock(Member.class);
         when(actor.getId()).thenReturn(999L);

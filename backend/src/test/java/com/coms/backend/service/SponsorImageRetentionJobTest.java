@@ -58,7 +58,7 @@ class SponsorImageRetentionJobTest {
 
         sponsorService.create(new SponsorRequest("공개 후원", null, sponsorLogo, null, null,
                 null, null, null, false, true, null));
-        sponsorService.saveSettings(Map.of("bannerImageId", banner));
+        sponsorService.saveSettings(Map.of("bannerImageId", banner), null);
         entityManager.flush();
         Timestamp old = Timestamp.valueOf(LocalDateTime.now().minusHours(25));
         jdbcTemplate.update("UPDATE sponsor_images SET created_at = ? WHERE id IN (?, ?, ?)",

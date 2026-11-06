@@ -197,6 +197,8 @@ docker compose --env-file .env up -d --build
 | `coms.retention.recruit-application-days` | `COMS_RETENTION_RECRUIT_APPLICATION_DAYS` | 365 | 처리하지 않은 지원서를 지우는 기간 |
 | `coms.retention.recruit-decision-contact-days` | `COMS_RETENTION_RECRUIT_DECISION_CONTACT_DAYS` | 365 | 합격·불합격 기록에서 전화번호·이메일을 지우는 기간 |
 
+알려진 한계: 업로더가 아닌 다른 회원이 글에서 떼어낸(분리한) 본문 미디어는 누구의 회원별 업로드 쿼터에도 합산되지 않는다. 사이트 전체 소프트 캡과 24시간 뒤 자동 삭제가 그 총량을 제한한다.
+
 ## 배포
 
 `main` 브랜치에 push한 뒤 CI가 성공하거나 GitHub Actions에서 검증된 커밋을 수동 지정하면 `.github/workflows/deploy.yml`이 서버에 접속해 Docker Compose로 서비스를 배포합니다.
