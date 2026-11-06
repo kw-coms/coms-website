@@ -49,6 +49,12 @@ ${rad('cap', [[0, '#7aa2e6'], [0.7, '#3f6fc4'], [1, '#27478e']], 0.4, 0.3, 0.8)}
 ${rad('ring', [[0, '#d7dce3'], [0.62, '#aeb5bf'], [0.7, '#f2f4f7'], [1, '#8a919c']])}
 ${rad('mesh', [[0, '#2b2d33'], [1, '#101114']])}
 ${rad('buz', [[0, '#4a4a52'], [0.6, '#26262b'], [1, '#0e0e11']], 0.4, 0.32, 0.8)}
+${rad('sun', [[0, '#fff6b0', 0.95], [0.5, '#ffe45a', 0.4], [1, '#ffd400', 0]])}
+${lin('pcbr', 0, 1, [[0, '#d8483c'], [1, '#a82a22']])}
+${lin('pcbg', 0, 1, [[0, '#1c8a4f'], [1, '#0e5f35']])}
+${lin('glass', 0, 1, [[0, '#6fe0b4'], [1, '#34b985']])}
+${lin('dht', 0, 1, [[0, '#5db4ea'], [1, '#2b7bb9']])}
+${rad('cap2', [[0, '#5a5a62'], [0.7, '#2a2a30'], [1, '#101013']], 0.38, 0.32, 0.8)}
 ${rad('horn', [[0, '#ffffff'], [1, '#d9dde3']], 0.4, 0.3, 0.9)}
 <filter id="${k('sh')}" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#000" flood-opacity=".38"/></filter>
 <filter id="${k('shs')}" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="2.5" stdDeviation="2.2" flood-color="#000" flood-opacity=".4"/></filter>
@@ -254,12 +260,15 @@ ${cap(a)}${cap(b)}</g>`
 
 const legPath = (pts: Pt[]) => `<polyline points="${pts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="#6b717b" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="${pts.map((p) => p.join(',')).join(' ')}" fill="none" stroke="#dfe3e8" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`
 
-/** 220 Ω carbon-film resistor lying between two holes: red-red-brown-gold. */
-export function resistor(a: Pt, b: Pt): string {
+/** 220 Ω (or 10 kΩ) carbon-film resistor lying between two holes. */
+export function resistor(a: Pt, b: Pt, tenK = false): string {
   const mx = (a[0] + b[0]) / 2
   const my = (a[1] + b[1]) / 2
   const ang = (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI
-  const bands: Array<[number, string]> = [[-11, '#c4271c'], [-5, '#c4271c'], [1, '#6b3a1a'], [11, '#d6a92e']]
+  // 220 ohm = red-red-brown-gold, 10 kohm = brown-black-orange-gold
+  const bands: Array<[number, string]> = tenK
+    ? [[-11, '#6b3a1a'], [-5, '#17171a'], [1, '#e8861c'], [11, '#d6a92e']]
+    : [[-11, '#c4271c'], [-5, '#c4271c'], [1, '#6b3a1a'], [11, '#d6a92e']]
   return `<g filter="url(#__shs)">
 ${legPath([a, [mx, my]])}${legPath([b, [mx, my]])}
 <g transform="translate(${n2(mx)} ${n2(my)}) rotate(${n2(ang)})">
@@ -433,4 +442,205 @@ export function obstacle(id: string, cx: number, cy: number, rot: number) {
   <rect x="-46" y="-8" width="92" height="5" rx="3" fill="#e2bd83"/>
   <rect x="-9" y="-8" width="18" height="16" fill="#e9d6ad" fill-opacity=".7"/>
 </g></g>`
+}
+
+/* ------------------------------------------------------------------ chapter 6: modules */
+
+const PIN = (p: Pt) => `<rect x="${n2(p[0] - 3.4)}" y="${n2(p[1] - 3.4)}" width="6.8" height="6.8" fill="#d9bd5a" stroke="#8a7424" stroke-width=".5"/>`
+/** Upright pin captions `dy` below (+) or above (−) the pin tips. */
+function pinCaptions(names: string[], pins: Record<string, Pt>, dy: number, size = 5) {
+  return `<g font-family="ui-sans-serif,system-ui,sans-serif" font-size="${size}" font-weight="800" fill="#fff" fill-opacity=".92" text-anchor="middle">${names
+    .map((n) => `<text x="${pins[n][0]}" y="${n2(pins[n][1] + dy)}">${n}</text>`).join('')}</g>`
+}
+
+/** CDS photoresistor lying between two holes (no polarity); `lean` is where the disc sits relative to the legs. */
+export function cds(id: string, a: Pt, b: Pt, lean: Pt = [0, -1]) {
+  const mx = (a[0] + b[0]) / 2 + lean[0] * 21
+  const my = (a[1] + b[1]) / 2 + lean[1] * 21
+  return {
+    parts: `<g filter="url(#__shs)">
+${legPath([a, [mx, my]])}${legPath([b, [mx, my]])}
+<circle cx="${n2(mx)}" cy="${n2(my)}" r="17.5" fill="#8a5a1a"/>
+<circle cx="${n2(mx)}" cy="${n2(my)}" r="15.6" fill="#e6b04a" stroke="#9a6a1c" stroke-width=".8"/>
+<path d="M${n2(mx - 10)} ${n2(my - 9)}H${n2(mx + 10)}M${n2(mx + 10)} ${n2(my - 3)}H${n2(mx - 10)}M${n2(mx - 10)} ${n2(my + 3)}H${n2(mx + 10)}M${n2(mx + 10)} ${n2(my + 9)}H${n2(mx - 10)}M${n2(mx - 10)} ${n2(my - 9)}V${n2(my - 3)}M${n2(mx + 10)} ${n2(my + 3)}V${n2(my + 9)}" fill="none" stroke="#7a3f12" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+<ellipse cx="${n2(mx - 5)}" cy="${n2(my - 11)}" rx="6" ry="2.6" fill="#fff" fill-opacity=".45" transform="rotate(-20 ${n2(mx - 5)} ${n2(my - 11)})"/>
+</g>`,
+    glow: `<circle data-role="cds-glow-${id}" cx="${n2(mx)}" cy="${n2(my)}" r="40" fill="url(#__sun)" opacity="0" pointer-events="none"/>`,
+    center: [mx, my] as Pt,
+  }
+}
+
+/** 5 mm RGB LED, legs r / common / g / b in four neighbouring holes of one row; the body lies toward `lean`. */
+export function rgbLed(id: string, r: Pt, c: Pt, g: Pt, b: Pt, lean: Pt = [0, 1]) {
+  const legs = [r, c, g, b]
+  const cx = (r[0] + b[0]) / 2 + lean[0] * 26
+  const cy = (r[1] + b[1]) / 2 + lean[1] * 26
+  const names: Array<[string, string]> = [['R', '#d3262c'], ['−', '#55555e'], ['G', '#1f9d4a'], ['B', '#2a6fd6']]
+  return {
+    parts: `<g filter="url(#__shs)">
+${legs.map((p) => legPath([p, [p[0], n2(cy - 8)]])).join('')}
+<circle cx="${n2(cx)}" cy="${n2(cy)}" r="23" fill="#9aa3ad"/>
+<circle cx="${n2(cx)}" cy="${n2(cy)}" r="21" fill="#eef2f6" fill-opacity=".96" stroke="#aab3be" stroke-width=".8"/>
+<circle cx="${n2(cx)}" cy="${n2(cy)}" r="15" fill="#dfe6ee" fill-opacity=".9"/>
+<circle data-role="rgb-lit-${id}" cx="${n2(cx)}" cy="${n2(cy)}" r="17" fill="#000" opacity="0"/>
+<rect x="${n2(cx - 7)}" y="${n2(cy - 6)}" width="4" height="4" fill="#d3262c"/><rect x="${n2(cx - 2)}" y="${n2(cy - 6)}" width="4" height="4" fill="#1f9d4a"/><rect x="${n2(cx + 3)}" y="${n2(cy - 6)}" width="4" height="4" fill="#2a6fd6"/>
+<ellipse cx="${n2(cx - 8)}" cy="${n2(cy - 12)}" rx="7" ry="3.4" fill="#fff" fill-opacity=".7" transform="rotate(-28 ${n2(cx - 8)} ${n2(cy - 12)})"/>
+</g>
+<g font-family="ui-sans-serif,system-ui,sans-serif" font-weight="800" font-size="8" text-anchor="middle">${legs.map((p, i) => `<text x="${p[0]}" y="${n2(cy + 15)}" fill="${names[i][1]}">${names[i][0]}</text>`).join('')}</g>`,
+    glow: `<circle data-role="rgb-glow-${id}" cx="${n2(cx)}" cy="${n2(cy)}" r="40" fill="#000" opacity="0" filter="url(#__blur)" pointer-events="none"/>`,
+    center: [cx, cy] as Pt,
+  }
+}
+
+export const LCD_W = 200
+export const LCD_H = 96
+/** 16x2 character LCD with an I2C backpack strip on the top edge (pins GND VCC SDA SCL). */
+export function lcd(id: string, ox: number, oy: number) {
+  const names = ['GND', 'VCC', 'SDA', 'SCL']
+  const x0 = ox + LCD_W / 2 - 1.5 * P
+  const pins: Record<string, Pt> = {}
+  names.forEach((n, i) => { pins[n] = [n2(x0 + i * P), oy - 9] })
+  const gx = 14
+  const gy = 22
+  const gw = LCD_W - 28
+  const cw = gw / 16
+  const cells = [0, 1].flatMap((row) => Array.from({ length: 16 }, (_, i) => `<rect x="${n2(gx + 4 + i * ((gw - 8) / 16) + 0.8)}" y="${gy + 8 + row * 26}" width="${n2((gw - 8) / 16 - 1.6)}" height="22" rx="1" fill="#0b3b2a" fill-opacity=".14"/>`)).join('')
+  const line = (row: number) => `<text data-role="lcd-l${row + 1}-${id}" x="${gx + 4}" y="${gy + 8 + row * 26 + 17.5}" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="17" font-weight="700" fill="#082a1d" textLength="${n2(gw - 8)}" lengthAdjust="spacingAndGlyphs" style="white-space:pre">${'\u00a0'.repeat(16)}</text>`
+  return {
+    pins,
+    parts: `<g filter="url(#__sh)"><g transform="translate(${ox} ${oy})">
+  <rect x="0" y="5" width="${LCD_W}" height="${LCD_H}" rx="5" fill="#0a4a2a"/>
+  <rect x="0" y="0" width="${LCD_W}" height="${LCD_H}" rx="5" fill="url(#__pcbg)" stroke="#0a4a2a" stroke-width=".8"/>
+  ${[[7, 7], [LCD_W - 7, 7], [7, LCD_H - 7], [LCD_W - 7, LCD_H - 7]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.6" fill="#06331c" stroke="#d9c27a" stroke-width="1.4"/>`).join('')}
+  <rect x="${gx - 4}" y="${gy - 6}" width="${gw + 8}" height="${LCD_H - 2 * gy + 16}" rx="3" fill="#121316"/>
+  <rect data-role="lcd-bl-${id}" x="${gx}" y="${gy}" width="${gw}" height="${LCD_H - 2 * gy + 4}" rx="2" fill="url(#__glass)" opacity=".28"/>
+  ${cells}${line(0)}${line(1)}
+  <rect x="${LCD_W / 2 - 40}" y="-17" width="80" height="19" rx="2.5" fill="#2358b3" stroke="#17408a" stroke-width=".7"/>
+  <text x="${LCD_W / 2}" y="-5" font-size="4.6" font-weight="800" fill="#fff" fill-opacity=".8" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif">I2C 1602</text>
+</g></g>
+<g>${names.map((n) => PIN(pins[n])).join('')}</g>
+<g font-family="ui-sans-serif,system-ui,sans-serif" font-size="5" font-weight="800" fill="#fff" text-anchor="middle">${names.map((n) => `<text x="${pins[n][0]}" y="${n2(oy - 1.5)}">${n}</text>`).join('')}</g>`,
+    glass: [ox + gx, oy + gy] as Pt,
+    cw,
+  }
+}
+
+export const DHT_W = 124
+export const DHT_H = 98
+/** DHT11 3-pin module (S VCC GND) with the pins on the top edge; `ox, oy` is its top-left corner. */
+export function dht11(_id: string, ox: number, oy: number) {
+  const names = ['S', 'VCC', 'GND']
+  const pins: Record<string, Pt> = {}
+  names.forEach((n, i) => { pins[n] = [n2(ox + DHT_W / 2 + (i - 1) * P), oy + 9] })
+  const slots = Array.from({ length: 7 }, (_, i) => `<rect x="30" y="${34 + i * 7.6}" width="64" height="3.6" rx="1.8" fill="#14507a" fill-opacity=".55"/>`).join('')
+  return {
+    pins,
+    parts: `<g filter="url(#__sh)"><g transform="translate(${ox} ${oy})">
+  <rect x="0" y="5" width="${DHT_W}" height="${DHT_H}" rx="5" fill="#0f3f78"/>
+  <rect x="0" y="0" width="${DHT_W}" height="${DHT_H}" rx="5" fill="url(#__hcb)" stroke="#0d3566" stroke-width=".8"/>
+  <rect x="${DHT_W / 2 - 22}" y="2" width="44" height="14" rx="1.5" fill="url(#__black)"/>
+  <rect x="20" y="26" width="84" height="66" rx="5" fill="#1a6aa6"/>
+  <rect x="20" y="24" width="84" height="66" rx="5" fill="url(#__dht)" stroke="#145a8d" stroke-width=".8"/>
+  ${slots}
+  <text x="62" y="86" font-size="9" font-weight="800" fill="#fff" fill-opacity=".92" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif">DHT11</text>
+</g></g>
+<g>${names.map((n) => PIN(pins[n])).join('')}</g>${pinCaptions(names, pins, 17)}`,
+  }
+}
+
+export const JOY_W = 140
+export const JOY_H = 128
+export const JOY_TRAVEL = 15
+/** KY-023 style joystick module. Pins (GND 5V VRx VRy SW) on the bottom edge. The cap sits in `data-role="stick-<id>"`; `hit` is the drag target. */
+export function joystick(id: string, ox: number, oy: number) {
+  const names = ['GND', '5V', 'VRx', 'VRy', 'SW']
+  const pins: Record<string, Pt> = {}
+  names.forEach((n, i) => { pins[n] = [n2(ox + JOY_W / 2 + (i - 2) * P), oy + JOY_H - 9] })
+  const cx = ox + JOY_W / 2
+  const cy = oy + 52
+  return {
+    pins,
+    center: [cx, cy] as Pt,
+    parts: `<g filter="url(#__sh)">
+  <rect x="${ox}" y="${oy + 5}" width="${JOY_W}" height="${JOY_H}" rx="5" fill="#0f3f78"/>
+  <rect x="${ox}" y="${oy}" width="${JOY_W}" height="${JOY_H}" rx="5" fill="url(#__hcb)" stroke="#0d3566" stroke-width=".8"/>
+  <rect x="${ox + JOY_W / 2 - 36}" y="${oy + JOY_H - 16}" width="72" height="14" rx="1.5" fill="url(#__black)"/>
+  <rect x="${cx - 38}" y="${cy - 36}" width="76" height="76" rx="8" fill="#1a1c20"/>
+  <rect x="${cx - 38}" y="${cy - 38}" width="76" height="76" rx="8" fill="url(#__black)" stroke="#0b0b0e" stroke-width=".7"/>
+  <circle cx="${cx}" cy="${cy}" r="31" fill="#0b0b0e" fill-opacity=".55"/>
+  <circle cx="${cx}" cy="${cy}" r="29" fill="none" stroke="#9aa1ac" stroke-width="1.4" stroke-dasharray="3 3"/>
+  <g font-family="ui-sans-serif,system-ui,sans-serif" font-size="7" font-weight="800" fill="#fff" fill-opacity=".6" text-anchor="middle"><text x="${cx}" y="${cy - 31}">▲</text><text x="${cx}" y="${cy + 38}">▼</text><text x="${cx - 33}" y="${cy + 3}">◀</text><text x="${cx + 33}" y="${cy + 3}">▶</text></g>
+  <g data-role="stick-${id}" transform="translate(0 0)">
+    <circle cx="${cx}" cy="${cy + 5}" r="22" fill="#000" fill-opacity=".45"/>
+    <circle cx="${cx}" cy="${cy}" r="21" fill="url(#__cap2)" stroke="#000" stroke-width=".8"/>
+    <circle cx="${cx}" cy="${cy}" r="12" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="1.4"/>
+    <ellipse cx="${cx - 7}" cy="${cy - 9}" rx="8" ry="4" fill="#fff" fill-opacity=".2" transform="rotate(-30 ${cx - 7} ${cy - 9})"/>
+  </g>
+</g>
+<g>${names.map((n) => PIN(pins[n])).join('')}</g>${pinCaptions(names, pins, -9, 5.4)}`,
+    hit: `<circle data-role="stick-hit-${id}" cx="${cx}" cy="${cy}" r="34" fill="transparent" class="hit" style="cursor:grab;touch-action:none"/>`,
+  }
+}
+
+export const DRV_W = 196
+export const DRV_H = 92
+/** L9110S dual DC-motor driver. Header (VCC GND A-IA A-IB B-IA B-IB) on the top edge, motor terminals A and B on the bottom edge. */
+export function l9110s(_id: string, ox: number, oy: number) {
+  const names = ['VCC', 'GND', 'A-IA', 'A-IB', 'B-IA', 'B-IB']
+  const pins: Record<string, Pt> = {}
+  names.forEach((n, i) => { pins[n] = [n2(ox + DRV_W / 2 + (i - 2.5) * P), oy + 9] })
+  const termY = oy + DRV_H - 18
+  const blockX = [DRV_W / 2 - 36, DRV_W / 2 + 36]
+  ;(['MA1', 'MA2', 'MB1', 'MB2'] as const).forEach((n, i) => { pins[n] = [n2(ox + blockX[Math.floor(i / 2)] + (i % 2 ? 9 : -9)), termY] })
+  const block = (cx: number, label: string) => `<rect x="${n2(cx - 20)}" y="${DRV_H - 30}" width="40" height="24" rx="2" fill="#2d6fd0" stroke="#1d4ea0" stroke-width=".8"/>${[-9, 9].map((d) => `<circle cx="${n2(cx + d)}" cy="${DRV_H - 18}" r="5.6" fill="url(#__metal)" stroke="#7d848e" stroke-width=".6"/><path d="M${n2(cx + d - 3.4)} ${DRV_H - 18}h6.8" stroke="#555c66" stroke-width="1.2"/>`).join('')}<text x="${n2(cx)}" y="${DRV_H - 33}" font-size="5.4" font-weight="800" fill="#fff" fill-opacity=".92" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif">MOTOR-${label}</text>`
+  return {
+    pins,
+    parts: `<g filter="url(#__sh)"><g transform="translate(${ox} ${oy})">
+  <rect x="0" y="5" width="${DRV_W}" height="${DRV_H}" rx="5" fill="#7d1f19"/>
+  <rect x="0" y="0" width="${DRV_W}" height="${DRV_H}" rx="5" fill="url(#__pcbr)" stroke="#7d1f19" stroke-width=".8"/>
+  <rect x="${DRV_W / 2 - 46}" y="2" width="92" height="14" rx="1.5" fill="url(#__black)"/>
+  <rect x="${DRV_W / 2 - 30}" y="30" width="60" height="22" rx="2" fill="#17171b"/>
+  ${Array.from({ length: 8 }, (_, i) => `<rect x="${DRV_W / 2 - 27 + i * 7.4}" y="26" width="3" height="5" fill="#c8ccd2"/><rect x="${DRV_W / 2 - 27 + i * 7.4}" y="51" width="3" height="5" fill="#c8ccd2"/>`).join('')}
+  <text x="${DRV_W / 2}" y="45" font-size="8" font-weight="800" fill="#fff" fill-opacity=".85" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif">L9110S</text>
+  ${block(blockX[0], 'A')}${block(blockX[1], 'B')}
+</g></g>
+<g>${names.map((n) => PIN(pins[n])).join('')}</g>${pinCaptions(names, pins, 17, 4.8)}`,
+  }
+}
+
+/** Small hobby DC motor. Terminals t1/t2 on the left; the rotor (fan blade) turns in `data-role="spin-<id>"` around its centre. */
+export function dcMotor(id: string, ox: number, oy: number) {
+  const pins: Record<string, Pt> = { t1: [n2(ox + 4), n2(oy + 18)], t2: [n2(ox + 4), n2(oy + 42)] }
+  const hub: Pt = [ox + 160, oy + 30]
+  const blades = [0, 90, 180, 270].map((a) => `<path d="M0 0 Q9 -6 26 -4 Q30 0 26 4 Q9 6 0 0Z" fill="#e8ecf1" stroke="#9aa3ad" stroke-width=".8" transform="rotate(${a + 20})"/>`).join('')
+  return {
+    pins,
+    hub,
+    parts: `<g filter="url(#__sh)">
+  <rect x="${ox + 6}" y="${oy + 4}" width="100" height="56" rx="14" fill="#7d838d"/>
+  <rect x="${ox + 6}" y="${oy}" width="100" height="56" rx="14" fill="url(#__metalv)" stroke="#6f7680" stroke-width=".8"/>
+  <rect x="${ox}" y="${oy + 6}" width="22" height="44" rx="4" fill="url(#__black)" stroke="#0b0b0e" stroke-width=".7"/>
+  <rect x="${ox - 1}" y="${oy + 14}" width="10" height="8" rx="1.5" fill="url(#__metal)" stroke="#8b929c" stroke-width=".6"/><rect x="${ox - 1}" y="${oy + 38}" width="10" height="8" rx="1.5" fill="url(#__metal)" stroke="#8b929c" stroke-width=".6"/>
+  <path d="M${ox + 30} ${oy + 10}H${ox + 96}" stroke="#fff" stroke-opacity=".6" stroke-width="3" stroke-linecap="round"/>
+  <text x="${ox + 64}" y="${oy + 34}" font-size="9" font-weight="800" fill="#4a5059" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif">DC 3-6V</text>
+  <rect x="${ox + 104}" y="${oy + 24}" width="34" height="12" rx="2" fill="url(#__metal)" stroke="#7d848e" stroke-width=".6"/>
+</g>
+<g data-role="spin-${id}" transform="rotate(0 ${hub[0]} ${hub[1]})" filter="url(#__shs)"><g transform="translate(${hub[0]} ${hub[1]})">${blades}<circle r="6" fill="#6f7680" stroke="#4a5059" stroke-width=".8"/></g></g>`,
+  }
+}
+
+/** 4 x AA battery holder; leads end at `plus` (red) and `minus` (black) on the right. */
+export function battery(_id: string, ox: number, oy: number) {
+  const pins: Record<string, Pt> = { plus: [n2(ox + 170), n2(oy + 17)], minus: [n2(ox + 170), n2(oy + 41)] }
+  const f = 'font-family="ui-sans-serif,system-ui,sans-serif" font-weight="800"'
+  return {
+    pins,
+    parts: `<g filter="url(#__sh)"><g transform="translate(${ox} ${oy})">
+  <path d="M146 17H170" stroke="#8e1414" stroke-width="3.4" stroke-linecap="round"/><path d="M146 41H170" stroke="#101013" stroke-width="3.4" stroke-linecap="round"/>
+  <rect x="0" y="5" width="148" height="56" rx="6" fill="#16161a"/>
+  <rect x="0" y="0" width="148" height="56" rx="6" fill="url(#__black)" stroke="#0b0b0e" stroke-width=".7"/>
+  ${[0, 1, 2, 3].map((i) => `<rect x="${8 + i * 34}" y="8" width="28" height="40" rx="4" fill="#2b2b32"/><rect x="${12 + i * 34}" y="12" width="20" height="32" rx="3" fill="#c9a23a" stroke="#8a6d16" stroke-width=".6"/><text x="${22 + i * 34}" y="32" font-size="9" ${f} fill="#3a2d06" text-anchor="middle">AA</text>`).join('')}
+  <text x="134" y="22" font-size="11" ${f} fill="#ff7a70">+</text><text x="134" y="52" font-size="13" ${f} fill="#8ab4ff">−</text>
+</g></g>`,
+  }
 }

@@ -4636,13 +4636,67 @@ test.describe('arduino study circuits', () => {
     await expect(fig).toHaveAttribute('data-led', 'off')
   })
 
+  test('the CDS night light turns the LED on below the dark threshold, with hysteresis', async ({ page }) => {
+    await page.goto('/study/arduino')
+    const fig = circuit(page, 'cds-night')
+    await expect(fig).toHaveClass(/is-live/)
+    await fig.scrollIntoViewIfNeeded()
+    await fig.getByRole('button', { name: '▶ 시뮬레이션' }).click()
+    const light = fig.getByRole('slider', { name: /주변 밝기/ })
+    await light.fill('100') // CDS 1 kohm -> analogRead 930
+    await expect(fig.locator('.circuit-status')).toContainText('light = 930  LED OFF')
+    await expect(fig).toHaveAttribute('data-led', 'off')
+    await light.fill('0') // CDS 200 kohm -> analogRead about 49
+    await expect(fig.locator('.circuit-status')).toContainText('LED ON')
+    await expect(fig).toHaveAttribute('data-led', 'on')
+  })
+
+  test('the joystick figure prints the sketch line and the direction', async ({ page }) => {
+    await page.goto('/study/arduino')
+    const fig = circuit(page, 'joystick')
+    await expect(fig).toHaveClass(/is-live/)
+    await fig.scrollIntoViewIfNeeded()
+    await fig.getByRole('button', { name: '▶ 시뮬레이션' }).click()
+    await expect(fig.locator('.circuit-status')).toHaveText('X=512 Y=512 vx=0 SW=- -> CENTER')
+    await fig.getByRole('slider', { name: /X축/ }).fill('118')
+    await expect(fig.locator('.circuit-status')).toHaveText('X=118 Y=512 vx=-77 SW=- -> LEFT')
+    await fig.getByRole('slider', { name: /X축/ }).fill('512')
+    await fig.getByRole('slider', { name: /Y축/ }).fill('14')
+    await expect(fig.locator('.circuit-status')).toContainText('-> UP')
+    const sw = fig.getByRole('button', { name: /스틱 누르기/ })
+    await sw.focus()
+    await page.keyboard.down('Space')
+    await expect(fig.locator('.circuit-status')).toContainText('SW=PRESSED')
+    await page.keyboard.up('Space')
+    await expect(fig.locator('.circuit-status')).toContainText('SW=-')
+  })
+
+  test('low-power mode starts flat and drops the SVG filters, live', async ({ page }) => {
+    await page.addInitScript(() => {
+      const set = () => { document.documentElement.dataset.perf = 'lite' }
+      if (document.documentElement) set()
+      else new MutationObserver((_m, o) => { if (document.documentElement) { set(); o.disconnect() } }).observe(document, { childList: true })
+    })
+    await page.goto('/study/arduino')
+    const fig = circuit(page, 'led-blink')
+    await expect(fig).toHaveClass(/is-live/)
+    await fig.scrollIntoViewIfNeeded()
+    await expect(fig.locator('.circuit-stage')).toHaveClass(/is-flat/)
+    const filtered = () => fig.locator('.circuit-svg [filter]').evaluateAll((els) => els.filter((e) => getComputedStyle(e).filter !== 'none').length)
+    expect(await filtered()).toBe(0)
+    // back to the full mode: the tilt returns and filters are applied again
+    await page.evaluate(() => { document.documentElement.dataset.perf = 'full' })
+    await expect(fig.locator('.circuit-stage')).not.toHaveClass(/is-flat/)
+    expect(await filtered()).toBeGreaterThan(0)
+  })
+
   test('wiring table rows highlight their wire, and the stepper reveals parts in table order', async ({ page }) => {
     await page.goto('/study/arduino')
     const fig = circuit(page, 'led-blink')
     await expect(fig).toHaveClass(/is-live/)
     await fig.scrollIntoViewIfNeeded()
     const rows = page.locator('table.ref tr.circuit-row')
-    await expect(rows).toHaveCount(3 + 3 + 4 + 4 + 3 + 2 + 8) // every circuit's table is linked
+    await expect(rows).toHaveCount(3 + 3 + 4 + 4 + 3 + 2 + 8 + 6 + 4 + 5 + 3 + 2 + 5 + 5) // every circuit's table is linked
     const first = fig.locator('xpath=preceding-sibling::div[contains(@class,"table-wrap")][1]').locator('tr.circuit-row').first()
     await first.focus()
     await expect(fig.locator('.cw.is-hl')).toHaveCount(1)

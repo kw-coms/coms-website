@@ -2,11 +2,14 @@
 // draws the scene, adds the 3D tilt, the simulation, the assembly stepper and the table <-> drawing links.
 // Loaded on demand from studyDemos.ts (only when a fragment contains such a figure).
 import { circuitById, type CircuitDef } from './definitions'
+import { JOY_TRAVEL } from './parts'
 import { buildScene } from './scene'
 import * as sim from './sim'
 
 let counter = 0
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+/** Low-power mode (set site-wide on machines without graphics acceleration): flat view, no SVG filters, no continuous animation. */
+const lite = () => document.documentElement.dataset.perf === 'lite'
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string | null, text?: string, attrs: Record<string, string> = {}) {
   const e = document.createElement(tag)
@@ -29,6 +32,13 @@ const IDLE: Record<string, string> = {
   servo: '▶ 시뮬레이션을 누른 뒤 슬라이더로 각도를 바꿔 보세요.',
   buzzer: '▶ 시뮬레이션을 누르면 도레미파솔이 연주되는 동안 소리 파동이 표시됩니다. (실제 소리는 나지 않아요)',
   alarm: '▶ 시뮬레이션을 누른 뒤 슬라이더로 물체의 거리를 바꿔 보세요. 최종 스케치와 같은 구간·간격으로 동작합니다.',
+  cds: '▶ 시뮬레이션을 누른 뒤 슬라이더로 주변 밝기를 바꿔 보세요. 야간등 스케치처럼 analogRead가 300 아래로 내려가면 LED가 켜집니다.',
+  rgb: '▶ 시뮬레이션을 누른 뒤 R·G·B 슬라이더(analogWrite 값)를 움직이거나, 스케치의 색 순환을 재생해 보세요.',
+  lcd: '▶ 시뮬레이션을 누르면 LCD에 글자가 나타납니다. 가변저항 손잡이나 슬라이더로 둘째 줄의 A0 값을 바꿔 보세요.',
+  dht: '▶ 시뮬레이션을 누른 뒤 슬라이더로 온도·습도를 바꿔 보세요. 스케치처럼 2초마다 한 번 읽어 시리얼에 출력합니다.',
+  'dht-lcd': '▶ 시뮬레이션을 누른 뒤 슬라이더로 온도·습도를 바꿔 보세요. 2초마다 읽어 LCD와 시리얼에 함께 표시합니다.',
+  joystick: '▶ 시뮬레이션을 누른 뒤 그림 속 스틱을 끌거나 슬라이더를 움직여 보세요. 스틱 누르기 버튼은 SW(D7)입니다.',
+  motor: '▶ 시뮬레이션을 누른 뒤 슬라이더로 setMotor 속도(−255~255)를 바꾸거나, 스케치의 loop()를 재생해 보세요.',
 }
 
 const VIEW_RX = 22
@@ -100,7 +110,7 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
   const qa = (sel: string) => Array.from(svg.querySelectorAll<SVGElement>(sel))
 
   /* ---------- 3D tilt ---------- */
-  const view = { flat: reducedMotion(), rx: VIEW_RX, ry: 0 }
+  const view = { flat: reducedMotion() || lite(), rx: VIEW_RX, ry: 0 }
   const applyView = () => {
     plane.style.transform = view.flat ? 'none' : `rotateX(${view.rx.toFixed(1)}deg) rotateY(${view.ry.toFixed(1)}deg)`
     btnView.textContent = view.flat ? '3D로 보기' : '평면으로 보기'
@@ -145,6 +155,10 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
     applyView()
   }, { signal })
   applyView()
+  // the site-wide perf switch can flip while the page is open
+  const perfWatch = new MutationObserver(() => { view.flat = reducedMotion() || lite(); if (!view.flat) resetView(); else applyView() })
+  perfWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-perf'] })
+  cleanups.push(() => perfWatch.disconnect())
 
   /* ---------- table <-> drawing links and the assembly stepper ---------- */
   const rows = findRows(fig)
@@ -257,7 +271,53 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
     const d = o.px0 + o.pxPerCm * cm
     q(`[data-role="obj-${def.id}"]`)?.setAttribute('transform', `translate(${(o.dir[0] * d).toFixed(1)} ${(o.dir[1] * d).toFixed(1)})`)
   }
-  const lock = (disabled: boolean) => ctl.querySelectorAll('input').forEach((i) => { i.disabled = disabled })
+  const lock = (disabled: boolean) => ctl.querySelectorAll('input, button').forEach((i) => { (i as HTMLInputElement | HTMLButtonElement).disabled = disabled })
+
+  /** Drag-to-turn handling of the potentiometer knob drawn in the scene (shared by 4-4 and 6-4); returns the function that rotates the knob. */
+  const bindKnob = (id: string, getRaw: () => number, setRaw: (v: number) => void) => {
+    const knob = q(`[data-role="knob-${id}"]`)
+    const hit = q(`[data-role="knob-hit-${id}"]`)
+    const m = /rotate\(0 ([\d.-]+) ([\d.-]+)\)/.exec(knob?.getAttribute('transform') || '')
+    const pivot: [number, number] = m ? [Number(m[1]), Number(m[2])] : [0, 0]
+    if (hit) {
+      let last: number | null = null
+      const angleAt = (e: PointerEvent) => {
+        const r = hit.getBoundingClientRect()
+        return (Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) * 180) / Math.PI
+      }
+      hit.addEventListener('pointerdown', (e) => {
+        if (!running) return
+        e.preventDefault()
+        hit.setPointerCapture?.(e.pointerId)
+        last = angleAt(e)
+      }, { signal })
+      hit.addEventListener('pointermove', (e) => {
+        if (last == null) return
+        const a = angleAt(e)
+        let d = a - last
+        if (d > 180) d -= 360
+        if (d < -180) d += 360
+        last = a
+        setRaw(sim.rawFromKnob(sim.knobFromRaw(getRaw()) + d))
+      }, { signal })
+      const up = () => { last = null }
+      hit.addEventListener('pointerup', up, { signal })
+      hit.addEventListener('pointercancel', up, { signal })
+    }
+    return (v: number) => knob?.setAttribute('transform', `rotate(${sim.knobFromRaw(v).toFixed(1)} ${pivot[0]} ${pivot[1]})`)
+  }
+
+  /** The 16x2 LCD drawn in the scene: backlight and the two text rows. */
+  const lcdView = (id: string) => {
+    const bl = q(`[data-role="lcd-bl-${id}"]`)
+    const rows = [q(`[data-role="lcd-l1-${id}"]`), q(`[data-role="lcd-l2-${id}"]`)]
+    return {
+      show(on: boolean, l1: string, l2: string) {
+        bl?.setAttribute('opacity', on ? '1' : '0.28')
+        ;[l1, l2].forEach((t, i) => { if (rows[i]) rows[i]!.textContent = sim.lcdPad(t).replace(/ /g, '\u00a0') })
+      },
+    }
+  }
 
   interface Runner { start(): void; stop(): void; frame?(elapsed: number, now: number): void }
   let runner: Runner
@@ -302,46 +362,208 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
     }
 
     case 'pot': {
-      const knob = q('[data-role="knob-pot"]')
-      const hit = q('[data-role="knob-hit-pot"]')
-      const m = /rotate\(0 ([\d.-]+) ([\d.-]+)\)/.exec(knob?.getAttribute('transform') || '')
-      const pivot: [number, number] = m ? [Number(m[1]), Number(m[2])] : [0, 0]
       let raw = 512
+      const turn = bindKnob('pot', () => raw, (v) => setRaw(v))
       const slider = range('가변저항 값 (analogRead)', 0, 1023, raw, '', (v) => setRaw(v))
       const setRaw = (v: number) => {
         raw = v
         slider.set(v)
-        knob?.setAttribute('transform', `rotate(${sim.knobFromRaw(v).toFixed(1)} ${pivot[0]} ${pivot[1]})`)
+        turn(v)
         const r = sim.potReadout(v)
         setLed('led', running ? r.duty / 255 : 0)
         if (running) setStatus(`analogRead(A0) = ${r.raw} (약 ${r.volts.toFixed(2)}V) → map → analogWrite(9, ${r.duty}) : LED 밝기 ${Math.round((r.duty / 255) * 100)}%`)
       }
+      runner = { start: () => setRaw(raw), stop: () => setLed('led', 0) }
+      break
+    }
+
+    case 'lcd': {
+      let raw = 512
+      const turn = bindKnob('pot', () => raw, (v) => setRaw(v))
+      const slider = range('가변저항 값 (A0)', 0, 1023, raw, '', (v) => setRaw(v))
+      const setRaw = (v: number) => { raw = v; slider.set(v); turn(v); render() }
+      const lcd = lcdView('lcd')
+      const render = () => {
+        if (!running) { lcd.show(false, '', ''); return }
+        lcd.show(true, sim.lcdPad(sim.LCD_HELLO), sim.lcdA0Line(raw))
+        setStatus(`lcd.print("${sim.LCD_HELLO}") 첫 줄 / 둘째 줄: "A0 = ${raw}" (analogRead(A0) = ${raw}, 0.2초마다 갱신)`)
+      }
+      runner = { start: render, stop: render }
+      break
+    }
+
+    case 'cds': {
+      let light = 70
+      let on = false
+      const glow = q('[data-role="cds-glow-cds"]')
+      range('주변 밝기', 0, 100, light, '%', (v) => { light = v; render() })
+      const render = () => {
+        glow?.setAttribute('opacity', String(((light / 100) * 0.9).toFixed(2)))
+        if (!running) { setLed('led', 0); return }
+        const raw = sim.cdsRaw(light)
+        on = sim.nightLightOn(on, raw)
+        setLed('led', on ? 1 : 0)
+        setStatus(`light = ${raw}  LED ${on ? 'ON' : 'OFF'}   (CDS 약 ${sim.cdsKohm(light).toFixed(1)}kΩ, A0 약 ${((raw * 5) / 1023).toFixed(2)}V, 켜는 값 ${sim.DARK_ON} / 끄는 값 ${sim.DARK_OFF})`)
+      }
+      render()
+      runner = { start: () => { on = false; render() }, stop: () => { on = false; render() } }
+      break
+    }
+
+    case 'rgb': {
+      const rgb: [number, number, number] = [255, 0, 0]
+      let auto: '' | 'mix' | 'wheel' = ''
+      const lit = q('[data-role="rgb-lit-rgb"]')
+      const halo = q('[data-role="rgb-glow-rgb"]')
+      const sliders = ['R (D9)', 'G (D10)', 'B (D11)'].map((l, i) => range(l, 0, 255, rgb[i], '', (v) => { auto = ''; syncModes(); rgb[i] = v; render() }))
+      const modes = (['mix', 'wheel'] as const).map((kind) => {
+        const b = button('cb-mode', kind === 'mix' ? '색 섞기 스케치 재생' : '무지개 스케치 재생')
+        b.setAttribute('aria-pressed', 'false')
+        b.addEventListener('click', () => { auto = auto === kind ? '' : kind; syncModes() }, { signal })
+        ctl.append(b)
+        return b
+      })
+      const syncModes = () => modes.forEach((b, i) => b.setAttribute('aria-pressed', String(auto === (['mix', 'wheel'] as const)[i])))
+      const render = () => {
+        sliders.forEach((s, i) => s.set(rgb[i]))
+        const [r, g, b] = rgb
+        const br = running ? Math.max(r, g, b) / 255 : 0
+        const col = `rgb(${r},${g},${b})`
+        lit?.setAttribute('fill', col)
+        lit?.setAttribute('opacity', String(br))
+        halo?.setAttribute('fill', col)
+        halo?.setAttribute('opacity', String((br * 0.8).toFixed(2)))
+        fig.setAttribute('data-led', br > 0 ? 'on' : 'off')
+        if (running) setStatus(`analogWrite(9, ${r}) · analogWrite(10, ${g}) · analogWrite(11, ${b}) → ${sim.colorName(r, g, b) ?? `rgb(${r}, ${g}, ${b})`}`)
+      }
+      runner = {
+        start: render,
+        stop: () => { auto = ''; syncModes(); render() },
+        frame: (t) => {
+          if (!auto) return
+          const c = auto === 'mix' ? sim.colorAt(t) : sim.wheelAt(t)
+          if (c[0] !== rgb[0] || c[1] !== rgb[1] || c[2] !== rgb[2]) { rgb[0] = c[0]; rgb[1] = c[1]; rgb[2] = c[2]; render() }
+        },
+      }
+      render()
+      break
+    }
+
+    case 'dht':
+    case 'dht-lcd': {
+      let temp = 24
+      let humi = 45
+      let failing = false
+      let readN = 0
+      const lcd = def.sim === 'dht-lcd' ? lcdView('lcd') : null
+      range('온도', 0, 50, temp, '°C', (v) => { temp = v })
+      range('습도', 20, 80, humi, '%', (v) => { humi = v })
+      const failBtn = button('cb-mode', '읽기 실패 만들기 (NaN)')
+      failBtn.setAttribute('aria-pressed', 'false')
+      failBtn.addEventListener('click', () => { failing = !failing; failBtn.setAttribute('aria-pressed', String(failing)) }, { signal })
+      ctl.append(failBtn)
+      const read = () => {
+        const ok = !failing
+        lcd?.show(true, ...sim.dhtLcdLines(ok ? temp : null, ok ? humi : null))
+        setStatus(!ok ? 'DHT read failed  (isnan 검사에 걸려 return)' : lcd ? `Serial: ${sim.dhtSerialShort(temp, humi)}` : sim.dhtSerial(temp, humi))
+      }
+      runner = {
+        start: () => { readN = 0; lcd?.show(true, '', ''); setStatus('delay(2000) 중… 첫 측정까지 2초') },
+        stop: () => lcd?.show(false, '', ''),
+        frame: (t) => {
+          const n = Math.floor(t / sim.DHT_READ_MS)
+          if (n !== readN) { readN = n; read() }
+        },
+      }
+      lcd?.show(false, '', '')
+      break
+    }
+
+    case 'joystick': {
+      let x = 512
+      let y = 512
+      let pressed = false
+      const stick = q('[data-role="stick-joy"]')
+      const hit = q('[data-role="stick-hit-joy"]')
+      const sx = range('X축 (A0)', 0, 1023, x, '', (v) => { x = v; render() })
+      const sy = range('Y축 (A1)', 0, 1023, y, '', (v) => { y = v; render() })
+      const sw = button('cb-mode', '스틱 누르기 (SW)')
+      sw.setAttribute('aria-pressed', 'false')
+      const setSw = (v: boolean) => { if (pressed !== v) { pressed = v; sw.setAttribute('aria-pressed', String(v)); render() } }
+      sw.addEventListener('pointerdown', (e) => { e.preventDefault(); sw.setPointerCapture?.(e.pointerId); setSw(true) }, { signal })
+      sw.addEventListener('pointerup', () => setSw(false), { signal })
+      sw.addEventListener('pointercancel', () => setSw(false), { signal })
+      sw.addEventListener('lostpointercapture', () => setSw(false), { signal })
+      sw.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); setSw(true) } }, { signal })
+      sw.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Enter') setSw(false) }, { signal })
+      sw.addEventListener('blur', () => setSw(false), { signal })
+      ctl.append(sw)
+      const render = () => {
+        sx.set(x); sy.set(y)
+        stick?.setAttribute('transform', `translate(${(sim.joyPos(x) * JOY_TRAVEL).toFixed(1)} ${(sim.joyPos(y) * JOY_TRAVEL).toFixed(1)}) scale(${pressed ? 0.94 : 1})`)
+        if (running) setStatus(sim.joyLine(x, y, pressed))
+      }
       if (hit) {
-        let last: number | null = null
-        const angleAt = (e: PointerEvent) => {
+        let dragging = false
+        const move = (e: PointerEvent) => {
           const r = hit.getBoundingClientRect()
-          return (Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) * 180) / Math.PI
+          const k = (34 / JOY_TRAVEL) / (r.width / 2)
+          x = sim.joyRaw((e.clientX - (r.left + r.width / 2)) * k)
+          y = sim.joyRaw((e.clientY - (r.top + r.height / 2)) * k)
+          render()
         }
-        hit.addEventListener('pointerdown', (e) => {
-          if (!running) return
-          e.preventDefault()
-          hit.setPointerCapture?.(e.pointerId)
-          last = angleAt(e)
-        }, { signal })
-        hit.addEventListener('pointermove', (e) => {
-          if (last == null) return
-          const a = angleAt(e)
-          let d = a - last
-          if (d > 180) d -= 360
-          if (d < -180) d += 360
-          last = a
-          setRaw(sim.rawFromKnob(sim.knobFromRaw(raw) + d))
-        }, { signal })
-        const up = () => { last = null }
+        hit.addEventListener('pointerdown', (e) => { if (!running) return; e.preventDefault(); hit.setPointerCapture?.(e.pointerId); dragging = true; move(e) }, { signal })
+        hit.addEventListener('pointermove', (e) => { if (dragging) move(e) }, { signal })
+        const up = () => { if (dragging) { dragging = false; x = 512; y = 512; render() } } // the spring returns the stick to the middle
         hit.addEventListener('pointerup', up, { signal })
         hit.addEventListener('pointercancel', up, { signal })
       }
-      runner = { start: () => setRaw(raw), stop: () => setLed('led', 0) }
+      runner = { start: render, stop: () => { x = 512; y = 512; pressed = false; sw.setAttribute('aria-pressed', 'false'); render() } }
+      render()
+      break
+    }
+
+    case 'motor': {
+      let speed = 0
+      let follow = false
+      let angle = 0
+      let lastNow = 0
+      let lastStep = 0
+      const spin = q('[data-role="spin-motor"]')
+      const m = /rotate\(0 ([\d.-]+) ([\d.-]+)\)/.exec(spin?.getAttribute('transform') || '')
+      const pivot: [number, number] = m ? [Number(m[1]), Number(m[2])] : [0, 0]
+      const slider = range('속도 setMotor(speed)', -255, 255, speed, '', (v) => { follow = false; syncFollow(); speed = v; report() })
+      const followBtn = button('cb-mode', 'loop() 스케치 재생')
+      followBtn.setAttribute('aria-pressed', 'false')
+      const syncFollow = () => followBtn.setAttribute('aria-pressed', String(follow))
+      followBtn.addEventListener('click', () => { follow = !follow; syncFollow() }, { signal })
+      ctl.append(followBtn)
+      const turns = () => { const p = sim.motorPins(speed); return Math.max(p.ia, p.ib) >= sim.STALL_PWM }
+      const report = () => {
+        slider.set(speed)
+        if (!running) return
+        const p = sim.motorPins(speed)
+        const pwm = Math.max(p.ia, p.ib)
+        setStatus(`setMotor(${speed}) → analogWrite(5, ${p.ia}) · analogWrite(6, ${p.ib}) : ${speed === 0 ? '정지' : !turns() ? `PWM ${pwm}는 너무 낮아 웅 소리만 나고 돌지 않음` : `${speed > 0 ? '정방향' : '역방향'}, 속도 ${Math.round((pwm / 255) * 100)}%`}`)
+      }
+      const draw = () => spin?.setAttribute('transform', `rotate(${(angle % 360).toFixed(1)} ${pivot[0]} ${pivot[1]})`)
+      runner = {
+        start: () => { lastNow = 0; report() },
+        stop: () => { follow = false; syncFollow(); speed = 0; report(); draw() },
+        frame: (t, now) => {
+          if (follow) { const v = sim.motorLoopAt(t); if (v !== speed) { speed = v; report() } }
+          const dt = lastNow ? now - lastNow : 0
+          lastNow = now
+          if (reducedMotion()) { angle = speed === 0 || !turns() ? 0 : speed > 0 ? 25 : -25; draw(); return } // no spinning: a tilt shows the direction
+          const omega = turns() ? (Math.sign(speed) * (Math.abs(speed) / 255) * 900) : 0
+          if (lite()) { // few, stepped updates instead of a smooth spin
+            if (now - lastStep < 150) return
+            angle += (omega * (now - lastStep)) / 1000
+            lastStep = now
+          } else angle += (omega * dt) / 1000
+          draw()
+        },
+      }
       break
     }
 

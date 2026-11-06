@@ -1,7 +1,7 @@
 // Turns a circuit definition into geometry (where is this terminal?) and connectivity (which terminals
 // are electrically the same node?). The drawing uses pointOf; tests/circuits.test.mjs uses nets to prove
 // every drawing matches its wiring table.
-import { bbHole, bbRail, hcsr04, servo, unoPin, type Pt } from './parts'
+import { battery, bbHole, bbRail, dcMotor, dht11, hcsr04, joystick, l9110s, lcd, servo, unoPin, type Pt } from './parts'
 import type { CircuitDef, PartDef, Ref } from './definitions'
 
 const add = (a: Pt, b: Pt): Pt => [a[0] + b[0], a[1] + b[1]]
@@ -10,6 +10,12 @@ const add = (a: Pt, b: Pt): Pt => [a[0] + b[0], a[1] + b[1]]
 export function freePins(def: CircuitDef, part: PartDef): Record<string, Pt> | null {
   if (part.kind === 'hcsr04') return hcsr04(part.id, part.at[0], part.at[1], part.rot).pins
   if (part.kind === 'servo') return servo(part.id, part.at[0], part.at[1], part.rot).pins
+  if (part.kind === 'lcd') return lcd(part.id, part.at[0], part.at[1]).pins
+  if (part.kind === 'dht') return part.s ? null : dht11(part.id, part.at[0], part.at[1]).pins
+  if (part.kind === 'joy') return joystick(part.id, part.at[0], part.at[1]).pins
+  if (part.kind === 'drv') return l9110s(part.id, part.at[0], part.at[1]).pins
+  if (part.kind === 'motor') return dcMotor(part.id, part.at[0], part.at[1]).pins
+  if (part.kind === 'battery') return battery(part.id, part.at[0], part.at[1]).pins
   return null
 }
 
@@ -27,6 +33,9 @@ function partPin(part: PartDef, pin: string): Ref | Pt | null {
       if (pin === 'bl') return `bb:${m[1]}${n[2]}`
       return null
     }
+    case 'cds': return pin === 'a' ? part.a : pin === 'b' ? part.b : null
+    case 'rgb': return pin === 'r' ? part.r : pin === 'c' ? part.c : pin === 'g' ? part.g : pin === 'b' ? part.b : null
+    case 'dht': return part.s ? (pin === 'S' ? part.s : pin === 'VCC' ? part.v! : pin === 'GND' ? part.g! : null) : null
     case 'pot': return pin === 'l' ? part.l : pin === 'm' ? part.m : pin === 'r' ? part.r : null
     case 'buzzer': return pin === 'plus' ? part.plus : pin === 'minus' ? part.minus : null
     default: return null

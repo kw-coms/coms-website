@@ -1,5 +1,5 @@
 // Builds the SVG markup of one circuit from its definition. Pure string work, no DOM.
-import { breadboard, buzzer, hcsr04, led, obstacle, pot, resistor, servo, sharedDefs, tact, uno, wire, WIRE_COLORS, type Pt } from './parts'
+import { battery, breadboard, buzzer, cds, dcMotor, dht11, hcsr04, joystick, l9110s, lcd, led, obstacle, pot, resistor, rgbLed, servo, sharedDefs, tact, uno, wire, WIRE_COLORS, type Pt } from './parts'
 import type { CircuitDef } from './definitions'
 import { pointOf } from './netlist'
 
@@ -25,7 +25,40 @@ export function buildScene(def: CircuitDef, uid: string, aria: string): string {
   def.parts.forEach((p) => {
     switch (p.kind) {
       case 'resistor':
-        parts.push(own(p.id, resistor(pt(p.a), pt(p.b))))
+        parts.push(own(p.id, resistor(pt(p.a), pt(p.b), p.tenK)))
+        break
+      case 'cds': {
+        const c = cds(p.id, pt(p.a), pt(p.b))
+        parts.push(own(p.id, c.parts))
+        fx.push(ownFx(p.id, c.glow))
+        break
+      }
+      case 'rgb': {
+        const r = rgbLed(p.id, pt(p.r), pt(p.c), pt(p.g), pt(p.b))
+        parts.push(own(p.id, r.parts))
+        fx.push(ownFx(p.id, r.glow))
+        break
+      }
+      case 'lcd':
+        parts.push(own(p.id, lcd(p.id, p.at[0], p.at[1]).parts))
+        break
+      case 'dht':
+        parts.push(own(p.id, dht11(p.id, p.at[0], p.at[1]).parts))
+        break
+      case 'joy': {
+        const j = joystick(p.id, p.at[0], p.at[1])
+        parts.push(own(p.id, j.parts))
+        hits.push(ownFx(p.id, j.hit))
+        break
+      }
+      case 'drv':
+        parts.push(own(p.id, l9110s(p.id, p.at[0], p.at[1]).parts))
+        break
+      case 'motor':
+        parts.push(own(p.id, dcMotor(p.id, p.at[0], p.at[1]).parts))
+        break
+      case 'battery':
+        parts.push(own(p.id, battery(p.id, p.at[0], p.at[1]).parts))
         break
       case 'led': {
         const l = led(p.id, pt(p.an), pt(p.ca), [0, 1])

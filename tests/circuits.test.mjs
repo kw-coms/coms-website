@@ -52,6 +52,14 @@ const expected = {
     ['uno:D4', 'res.a'],
     ['res.b', 'led.an'],
   ],
+  'cds-night': [['uno:5V', 'cds.a'], ['cds.b', 'rd.a', 'uno:A0'], ['rd.b', 'uno:GND', 'led.ca'], ['uno:D8', 'res.a'], ['res.b', 'led.an']],
+  'rgb-led': [['uno:D9', 'rr.a'], ['rr.b', 'rgb.r'], ['uno:D10', 'rg.a'], ['rg.b', 'rgb.g'], ['uno:D11', 'rb.a'], ['rb.b', 'rgb.b'], ['rgb.c', 'uno:GND']],
+  'lcd-i2c': [['lcd.GND', 'uno:GND', 'pot.r'], ['lcd.VCC', 'uno:5V', 'pot.l'], ['lcd.SDA', 'uno:A4'], ['lcd.SCL', 'uno:A5'], ['pot.m', 'uno:A0']],
+  dht11: [['dht.S', 'uno:D2'], ['dht.VCC', 'uno:5V'], ['dht.GND', 'uno:GND']],
+  'dht11-lcd': [['dht.S', 'uno:D2'], ['dht.VCC', 'uno:5V', 'lcd.VCC'], ['dht.GND', 'uno:GND', 'lcd.GND'], ['lcd.SDA', 'uno:A4'], ['lcd.SCL', 'uno:A5']],
+  joystick: [['joy.GND', 'uno:GND'], ['joy.5V', 'uno:5V'], ['joy.VRx', 'uno:A0'], ['joy.VRy', 'uno:A1'], ['joy.SW', 'uno:D7']],
+  // the motor runs from its own battery: only the grounds are shared, never the supply
+  'dc-motor': [['bat.plus', 'drv.VCC'], ['bat.minus', 'drv.GND', 'uno:GND'], ['uno:D5', 'drv.A-IA'], ['uno:D6', 'drv.A-IB'], ['drv.MA1', 'motor.t1'], ['drv.MA2', 'motor.t2']],
 }
 for (const d of CIRCUITS) {
   const same = nets(d)
@@ -99,5 +107,78 @@ const starts = []
 run(55, 0, 6000).reduce((prev, [t, on]) => { if (on && !prev) starts.push(t); return on }, false)
 const gaps = starts.slice(1).map((t, i) => t - starts[i])
 assert.ok(gaps.every((g) => g >= sim.beepInterval(55) && g <= sim.beepInterval(55) + 130), `beep spacing follows map(): ${gaps}`)
+
+// ---- chapter 6: the figures follow the numbers printed in the sketches next to them
+const code = html.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+const printed = (snippet) => assert.ok(code.includes(snippet), `sketch text changed: ${snippet}`)
+assert.ok(!nets(def('dc-motor'))('bat.plus', 'uno:5V'), 'the motor supply never touches the Arduino 5V pin')
+assert.ok(!nets(def('dc-motor'))('bat.plus', 'uno:GND'))
+// RGB: three separate resistors, each colour on its own PWM pin
+assert.ok(def('rgb-led').parts.filter((p) => p.kind === 'resistor').length === 3)
+
+// 6-2 night light
+printed('const int DARK_ON  = 300;')
+printed('const int DARK_OFF = 350;')
+assert.equal(sim.DARK_ON, 300)
+assert.equal(sim.DARK_OFF, 350)
+assert.equal(sim.cdsRaw(100), 930) // the page: CDS 1 kohm -> about 930
+assert.ok(Math.abs(sim.cdsRaw(0) - 49) <= 1) // 200 kohm
+assert.ok(sim.cdsRaw(20) < sim.cdsRaw(50) && sim.cdsRaw(50) < sim.cdsRaw(80), 'brighter light -> larger analogRead')
+assert.equal(sim.nightLightOn(false, 299), true)
+assert.equal(sim.nightLightOn(false, 300), false)
+assert.equal(sim.nightLightOn(true, 350), true) // hysteresis: stays on until above 350
+assert.equal(sim.nightLightOn(true, 351), false)
+
+// 6-3 colour table: every row of the page's table equals the simulation's
+for (const [r, g, b, name] of sim.COLORS.filter((c) => c[3] !== '초록' && c[3] !== '파랑')) {
+  assert.ok(html.includes(`<tr><td>${name}</td><td>${r}</td><td>${g}</td><td>${b}</td></tr>`), `colour table row ${name}`)
+}
+printed('delay(800);')
+assert.equal(sim.COLOR_MS, 800)
+assert.deepEqual(sim.colorAt(0).slice(0, 3), [255, 0, 0])
+assert.deepEqual(sim.colorAt(800 * 7).slice(0, 3), [255, 80, 0])
+assert.deepEqual(sim.colorAt(800 * 8).slice(0, 3), [255, 0, 0], 'the cycle wraps after eight colours')
+assert.deepEqual([0, 85, 170, 84, 255].map(sim.wheel), [[255, 0, 0], [0, 255, 0], [0, 0, 255], [3, 252, 0], [255, 0, 0]])
+assert.equal(sim.colorName(255, 255, 0), '노랑')
+assert.equal(sim.colorName(1, 2, 3), null)
+
+// 6-4 LCD
+printed('LiquidCrystal_I2C lcd(0x27, 16, 2);')
+printed('lcd.print("Hello, COM\'s!");')
+assert.equal(sim.LCD_COLS, 16)
+assert.equal(sim.lcdA0Line(512), 'A0 = 512        ')
+assert.equal(sim.lcdA0Line(1023), 'A0 = 1023       ')
+assert.equal(sim.lcdPad('x'.repeat(20)).length, 16)
+
+// 6-5 DHT11
+printed('delay(2000);')
+assert.equal(sim.DHT_READ_MS, 2000)
+assert.equal(sim.dhtSerial(24, 45), 'Temp: 24.0 C   Humidity: 45 %') // the page's printed output
+assert.equal(sim.dhtSerialShort(24, 46), '24.0 C, 46 %')
+assert.deepEqual(sim.dhtLcdLines(24, 45), ['Temp: 24.0°C    ', 'Humi: 45%      '.padEnd(16)])
+assert.deepEqual(sim.dhtLcdLines(null, 45), ['Sensor error    ', ' '.repeat(16)])
+printed('lcd.print("Humi: ");')
+
+// 6-6 joystick: the page's sample output lines
+printed('if (x < 300)')
+printed('} else if (x > 700) {')
+assert.equal(sim.joyVx(118), -77)
+assert.equal(sim.joyVx(1023), 100)
+assert.equal(sim.joyVx(512), 0)
+assert.equal(sim.joyLine(118, 511, false), 'X=118 Y=511 vx=-77 SW=- -> LEFT')
+assert.equal(sim.joyLine(514, 14, false), 'X=514 Y=14 vx=0 SW=- -> UP')
+assert.equal(sim.joyLine(513, 510, true), 'X=513 Y=510 vx=0 SW=PRESSED -> CENTER')
+assert.deepEqual([[512, 512], [299, 512], [700, 512], [701, 512], [512, 300], [512, 701]].map(([x, y]) => sim.joyDir(x, y)), ['CENTER', 'LEFT', 'CENTER', 'RIGHT', 'CENTER', 'DOWN'])
+assert.equal(sim.joyRaw(-1), 0)
+assert.equal(sim.joyRaw(1), 1023)
+
+// 6-7 motor sketch: ramp +5 every 40 ms to 255, hold 1 s, stop 0.8 s, same reversed, hold 1 s, stop 2 s
+printed('for (int s = 0; s <= 255; s += 5)')
+printed('for (int s = 0; s >= -255; s -= 5)')
+assert.equal(sim.MOTOR_LOOP_MS, 8960)
+assert.deepEqual([0, 39, 40, 2079, 2080, 3079, 3080, 3879, 3880, 3920, 5959, 5960, 6959, 6960, 8959, 8960].map(sim.motorLoopAt), [0, 0, 5, 255, 255, 255, 0, 0, 0, -5, -255, -255, -255, 0, 0, 0])
+assert.deepEqual(sim.motorPins(120), { ia: 120, ib: 0 })
+assert.deepEqual(sim.motorPins(-120), { ia: 0, ib: 120 })
+assert.deepEqual(sim.motorPins(999), { ia: 255, ib: 0 }, 'constrain(speed, -255, 255)')
 
 console.log('circuits.test.mjs ok')

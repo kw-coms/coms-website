@@ -730,3 +730,12 @@
   .study-page .circuit-plane, .study-page .circuit-svg .cpart, .study-page .circuit-svg .cfx, .study-page .circuit-svg .cw { transition: none; }
   .study-page .circuit-svg .waves.on circle { animation: none; transform: scale(1.1); opacity: .6; }
 }
+
+/* 회로 그림: 그래픽 가속이 없는 컴퓨터(<html data-perf="lite">)에서는 필터·그림자·연속 애니메이션을 끈다 */
+:root[data-perf='lite'] .study-page .circuit-plane { transition: none; will-change: auto; box-shadow: none; }
+:root[data-perf='lite'] .study-page .circuit-svg [filter],
+:root[data-perf='lite'] .study-page .circuit-svg .is-hl { filter: none; }
+:root[data-perf='lite'] .study-page .circuit-svg .cpart.is-hl :is(rect, circle, path):not([fill='none']) { stroke: #ffc400; stroke-width: 2.6; }
+:root[data-perf='lite'] .study-page .circuit-svg [data-role^='rgb-glow'] { display: none; }
+:root[data-perf='lite'] .study-page .circuit-svg .cpart, :root[data-perf='lite'] .study-page .circuit-svg .cfx, :root[data-perf='lite'] .study-page .circuit-svg .cw { transition: none; }
+:root[data-perf='lite'] .study-page .circuit-svg .waves.on circle { animation: none; transform: scale(1.1); opacity: .6; }
