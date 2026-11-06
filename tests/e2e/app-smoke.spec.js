@@ -2232,6 +2232,23 @@ test('quick jump is offered beside the menu button on a phone', async ({ page })
   expect(overflow).toBeLessThanOrEqual(1)
 })
 
+test('header brand does not overlap the desktop nav at 1024 and 1280', async ({ page }) => {
+  await page.addInitScript(() => {
+    try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ }
+  })
+  await mockAdminApis(page)
+  for (const width of [1024, 1280]) {
+    await page.setViewportSize({ width, height: 800 })
+    await page.goto('/')
+    const brand = page.locator('header').getByRole('button', { name: '홈으로 이동' })
+    const firstItem = page.locator('header nav').first().getByRole('button').first()
+    await expect(firstItem).toBeVisible()
+    const brandBox = await brand.boundingBox()
+    const itemBox = await firstItem.boundingBox()
+    expect(brandBox.x + brandBox.width, `brand vs nav at ${width}px`).toBeLessThanOrEqual(itemBox.x)
+  }
+})
+
 test('top navigation groups activity log and monthly calendar under Records and Tools', async ({ page }) => {
   await mockAdminApis(page)
   await page.goto('/')
@@ -2273,9 +2290,13 @@ test('top navigation groups activity log and monthly calendar under Records and 
   // The toggle of the group that holds the current page is the active one, and only that one.
   await expect(desktopNav.getByRole('button', { name: 'Records', exact: true })).toHaveAttribute('data-active', 'true')
   await expect(desktopNav.getByRole('button', { name: 'Tools', exact: true })).not.toHaveAttribute('data-active', 'true')
+  await expect(desktopNav.getByRole('button', { name: 'Records', exact: true })).toHaveAttribute('aria-current', 'true')
+  await expect(desktopNav.getByRole('button', { name: 'Tools', exact: true })).not.toHaveAttribute('aria-current')
   await page.goto('/draw')
   await expect(desktopNav.getByRole('button', { name: 'Tools', exact: true })).toHaveAttribute('data-active', 'true')
   await expect(desktopNav.getByRole('button', { name: 'Records', exact: true })).not.toHaveAttribute('data-active', 'true')
+  await expect(desktopNav.getByRole('button', { name: 'Tools', exact: true })).toHaveAttribute('aria-current', 'true')
+  await expect(desktopNav.getByRole('button', { name: 'Records', exact: true })).not.toHaveAttribute('aria-current')
   await page.goto('/')
 
   await desktopNav.getByRole('button', { name: 'Records', exact: true }).click()

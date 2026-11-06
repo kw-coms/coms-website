@@ -268,6 +268,7 @@ export default function GlobalNavigation() {
                   onClick={() => setOpenGroup(open ? null : group.id)}
                   className={`${navClass(group.id, groupActive)} inline-flex items-center gap-1`}
                   data-active={groupActive ? 'true' : undefined}
+                  aria-current={groupActive ? 'true' : undefined}
                   aria-expanded={open}
                   aria-controls={`${group.id}-nav-panel`}
                 >
