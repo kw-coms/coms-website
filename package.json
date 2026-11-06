@@ -10,7 +10,8 @@
     "test": "vitest run",
     "typecheck": "tsc -b --noEmit",
     "e2e:compile": "node tools/e2e-compile.mjs",
-    "e2e:browser": "node tools/e2e-browser.mjs"
+    "e2e:browser": "node tools/e2e-browser.mjs",
+    "e2e:prod": "node tools/e2e-prod.mjs"
   },
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.3",

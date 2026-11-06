@@ -3,21 +3,10 @@
 // LAB_SOFTWARE=1 runs Chromium with --disable-gpu (SwiftShader) to exercise the low-quality path. LAB_SHOTS=dir for screenshots.
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { chromeExecutable, GL_ARGS, SHOTS } from './browser.mjs';
 
-const SHOTS = process.env.LAB_SHOTS ?? '/private/tmp/claude-501/-Users-choi-Documents-project/4ddf0f84-0b7f-4154-b3e8-f9ad7e2d8e00/scratchpad/lab-shots-2';
-mkdirSync(SHOTS, { recursive: true });
-const cache = join(homedir(), 'Library/Caches/ms-playwright');
-const shellDir = readdirSync(cache).filter((d) => d.startsWith('chromium_headless_shell')).sort().pop();
-const exe = process.env.CHROME ?? (() => {
-  const base = join(cache, shellDir);
-  for (const sub of readdirSync(base)) {
-    const p = join(base, sub, 'chrome-headless-shell');
-    if (existsSync(p)) return p;
-  }
-})();
+const exe = chromeExecutable();
 
 let dev;
 let base = process.env.LAB_URL;
@@ -38,7 +27,7 @@ const results = [];
 const check = (name, ok, extra = '') => { results.push({ name, ok }); console.log(`${ok ? 'PASS' : 'FAIL'} ${name} ${extra}`); };
 const args = process.env.LAB_SOFTWARE
   ? ['--disable-gpu', '--disable-gpu-compositing', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']
-  : ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
+  : GL_ARGS;
 const browser = await chromium.launch({ executablePath: exe, args });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'light' });
 const page = await ctx.newPage();
@@ -47,6 +36,9 @@ const external = [];
 page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text()); });
 page.on('pageerror', (e) => consoleErrors.push(String(e)));
 page.on('request', (r) => { const u = new URL(r.url()); if (!['localhost', '127.0.0.1'].includes(u.hostname) && u.protocol.startsWith('http')) external.push(r.url()); });
+// replacing a dirty document asks for confirmation: accept every dialog (once, here)
+page.on('dialog', (d) => d.accept().catch(() => {}));
+page.on('crash', () => console.log('PAGE CRASHED'));
 const lab = (fn, arg) => page.evaluate(fn, arg);
 const settle = (ms = 500) => page.waitForTimeout(ms);
 const shot = (name) => page.screenshot({ path: join(SHOTS, `${name}.png`) });
@@ -189,7 +181,6 @@ try {
   const open = async (id) => {
     const title = exs.find((e) => e.id === id).title;
     await page.getByRole('button', { name: '예제 갤러리' }).click();
-    page.once('dialog', (d) => d.accept());
     await page.getByRole('menuitem', { name: title }).first().click();
     await settle(900);
   };
@@ -366,6 +357,39 @@ try {
   await shotStage('06-gallery-top');
 
   // ---- dark, low quality, mobile ----
+  // ---- long session: GPU resources must return to baseline after switching examples and adding/deleting parts ----
+  {
+    const ids = await lab(() => window.__lab.EXAMPLES.map((e) => e.id));
+    const cycle = async () => {
+      for (const id of ids) {
+        await lab((i) => window.__lab.loadScene(window.__lab.EXAMPLES.find((e) => e.id === i).scene), id);
+        await settle(120);
+      }
+    };
+    const home = async () => {
+      await lab((i) => window.__lab.loadScene(window.__lab.EXAMPLES.find((e) => e.id === i).scene), ids[0]);
+      await settle(400);
+      return lab(() => window.__lab.memory());
+    };
+    await cycle(); // warm-up: shared textures are created once per kind
+    const base = await home();
+    await cycle();
+    await cycle();
+    for (let round = 0; round < 5; round++) {
+      const added = await lab(async (round) => {
+        const out = [];
+        for (let i = 0; i < 10; i++) out.push(window.__lab.addPart(['led', 'resistor', 'lcd1602-i2c', 'breadboard-half', 'multimeter'][i % 5], [i * 30, 0, 300 + round * 40]));
+        await new Promise((r) => setTimeout(r, 150));
+        return out.filter(Boolean);
+      }, round);
+      await lab((ids2) => window.__lab.removeParts(ids2), added);
+      await settle(150);
+    }
+    const end = await home();
+    check('long session: geometries return to baseline', end.geometries - base.geometries <= 10, `${base.geometries} -> ${end.geometries}`);
+    check('long session: textures return to baseline', end.textures - base.textures <= 3, `${base.textures} -> ${end.textures}`);
+  }
+
   await ctx.close();
   const dctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'dark' });
   const dp = await dctx.newPage();
