@@ -47,7 +47,7 @@ test.describe('real backend auth', () => {
       await page.goto('/resources')
       await page.getByRole('button', { name: '자료 올리기' }).click()
       await page.getByPlaceholder('자료 제목').fill(title)
-      await page.locator('input[type="file"]').setInputFiles(files)
+      await page.getByLabel('파일 선택', { exact: true }).setInputFiles(files)
       await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
       const creating = page.waitForResponse(response => new URL(response.url()).pathname === '/api/files' && response.request().method() === 'POST')
       await page.getByRole('button', { name: '등록', exact: true }).click()

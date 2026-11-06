@@ -5,6 +5,10 @@ import { parseRichBodyBlocks } from '../richEditor/parseRichBodyBlocks'
 import { fetchLinkPreview, searchYoutubeVideos } from '../../services/communityApi'
 import RichBodyEditor from '../richEditor/RichBodyEditor'
 import { UPLOAD_RICH_FEATURES } from '../richEditor/richBodyFeatures'
+
+// Archive entries already carry their files through "파일 선택"; a second file button inside the
+// description would be two ways to attach the same thing, so the description takes images and video only.
+const ARCHIVE_DESCRIPTION_FEATURES = { ...UPLOAD_RICH_FEATURES, fileUpload: false }
 import { resetRejectedRichBlocks, uploadPendingRichBlocks } from '../richEditor/uploadPendingRichBlocks'
 import { serializeRichBody } from '../richEditor/serializeRichBody'
 import { CategorySegment } from './CategorySegment'
@@ -91,7 +95,7 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
         <RichBodyEditor
           initialBlocks={initialBlocks}
           apiRef={editorApiRef}
-          features={UPLOAD_RICH_FEATURES}
+          features={ARCHIVE_DESCRIPTION_FEATURES}
           allowArchiveFiles
           onError={setError}
           searchYoutube={searchYoutubeVideos}

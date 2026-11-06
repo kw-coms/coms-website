@@ -78,7 +78,7 @@ test('archive replacement sends only the explicitly chosen file', async ({ page 
   })
   await page.goto('/resources/911')
   await page.getByRole('button', { name: '수정', exact: true }).click()
-  await page.locator('input[type=file]').setInputFiles({ name: 'replacement.txt', mimeType: 'text/plain', buffer: Buffer.from('replacement bytes') })
+  await page.getByLabel('파일 선택', { exact: true }).setInputFiles({ name: 'replacement.txt', mimeType: 'text/plain', buffer: Buffer.from('replacement bytes') })
   await expect(page.locator('[contenteditable="true"]').first()).toBeVisible()
   await page.getByRole('button', { name: '수정 저장' }).click()
   await expect(page.getByRole('link', { name: '다운로드' })).toHaveAttribute('href', '/api/files/911/download?v=new-blob')
@@ -1256,7 +1256,7 @@ test('archive write form saves remaining selected files as one post without chan
   await page.goto('/resources')
   await page.getByRole('button', { name: '자료 올리기' }).click()
   await page.getByPlaceholder('자료 제목').fill('공통 제목')
-  await page.locator('input[type="file"]').setInputFiles([
+  await page.getByLabel('파일 선택', { exact: true }).setInputFiles([
     { name: '첫째.pdf', mimeType: 'application/pdf', buffer: Buffer.from('first') },
     { name: '제외.pdf', mimeType: 'application/pdf', buffer: Buffer.from('remove') },
     { name: '둘째.pdf', mimeType: 'application/pdf', buffer: Buffer.from('second') },
@@ -1294,7 +1294,7 @@ test('archive write form keeps its attachment selection after a rejected post', 
   await page.goto('/resources')
   await page.getByRole('button', { name: '자료 올리기' }).click()
   await page.getByPlaceholder('자료 제목').fill('재시도 자료')
-  await page.locator('input[type="file"]').setInputFiles([
+  await page.getByLabel('파일 선택', { exact: true }).setInputFiles([
     { name: '하나.pdf', mimeType: 'application/pdf', buffer: Buffer.from('one') },
     { name: '둘.pdf', mimeType: 'application/pdf', buffer: Buffer.from('two') },
   ])
@@ -1322,7 +1322,7 @@ test('archive edit replaces all attachments with one multipart request', async (
 
   await page.goto('/resources/10')
   await page.getByRole('button', { name: '수정', exact: true }).click()
-  await page.locator('input[type="file"]').setInputFiles([
+  await page.getByLabel('파일 선택', { exact: true }).setInputFiles([
     { name: '새본문.pdf', mimeType: 'application/pdf', buffer: Buffer.from('new') },
     { name: '새부록.pdf', mimeType: 'application/pdf', buffer: Buffer.from('appendix') },
   ])
