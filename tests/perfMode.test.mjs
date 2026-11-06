@@ -240,6 +240,30 @@ assert.equal(getPerfState().noticeDismissed, true, 'remembered across visits')
   drive(100, 6000)
   assert.equal(rootEl.dataset.perf, 'lite', 'frames after the intro are')
 
+  // A sample discarded because the tab was hidden is retried, a bounded number of times.
+  resetPerfModeForTests()
+  window.sessionStorage.setItem('coms.intro.played:v1', '1')
+  window.localStorage.clear()
+  let hiddenNow = true
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => hiddenNow })
+  initPerfMode()
+  window.dispatchEvent(new window.Event('load'))
+  drive(100, 3000) // first window runs hidden: discarded, retry armed
+  assert.equal(rootEl.dataset.perf, 'full')
+  hiddenNow = false
+  drive(100, 6000) // retry runs visible and stalled
+  assert.equal(rootEl.dataset.perf, 'lite', 'a discarded window is looked at again')
+  // Always hidden: the retries run out and the watchdog goes quiet.
+  resetPerfModeForTests()
+  window.localStorage.clear()
+  hiddenNow = true
+  initPerfMode()
+  window.dispatchEvent(new window.Event('load'))
+  drive(100, 30000)
+  assert.equal(rootEl.dataset.perf, 'full')
+  assert.equal(timers.filter((x) => x.fn).length, 0, 'no endless retry loop')
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => false })
+
   // Repeated "auto" does not stack handlers.
   resetPerfModeForTests()
   window.sessionStorage.clear()

@@ -60,6 +60,12 @@
 :root[data-perf='lite'] .activity-detail-modal {
 	box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
 }
+/* The home cards lift on hover with a high-specificity rule (base.css); lite keeps them still. */
+:root[data-perf='lite'] .theme-home .apple-product-panel:hover,
+:root[data-perf='lite'] .theme-home [data-reveal].apple-product-panel:hover {
+	transform: none;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
 /* Tailwind arbitrary shadows with a big blur (0_18px_.., 0_24px_.., 0_32px_..). */
 :root[data-perf='lite'] [class*='shadow-[0_1'][class*='px_rgba'],
 :root[data-perf='lite'] [class*='shadow-[0_2'][class*='px_'],

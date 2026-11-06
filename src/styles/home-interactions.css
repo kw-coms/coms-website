@@ -187,8 +187,9 @@
 		radial-gradient(36% 36% at 82% 20%, color-mix(in srgb, #6f9dff 38%, transparent), transparent 72%),
 		radial-gradient(34% 34% at 88% 66%, color-mix(in srgb, #a0c4ff 30%, transparent), transparent 72%),
 		radial-gradient(50% 50% at 60% 86%, color-mix(in srgb, var(--app-accent-soft) 92%, transparent), transparent 72%);
-	/* No filter: blur() over this full-hero layer was repainted every frame of the drift; the
-	   gradients already fade to transparent, so the picture is the same without it. */
+	/* Lite mode (perf-lite.css) drops this filter: blur() over a full-hero layer is what a
+	   CPU-composited page cannot afford. */
+	filter: blur(40px) saturate(118%);
 	animation: coms-aurora 18s ease-in-out infinite alternate;
 	will-change: transform;
 }
@@ -216,6 +217,7 @@
 }
 :root[data-theme-mode='dark'] .coms-cinema-pin::before {
 	opacity: 0.2;
+	filter: blur(52px);
 }
 /* The wordmark itself: white easing to a cool silver at the foot, with a soft shadow for lift
    instead of the stacked extrusion (text-shadow would show through the clipped fill). Every

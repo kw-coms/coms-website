@@ -159,6 +159,9 @@ let watchTimer = 0
 let watchSampling = 0
 let watchHidden = false
 let watchOn = false
+let watchRetries = 0
+const MAX_RETRIES = 3
+const RETRY_MS = 2000
 
 const SAMPLE_MS = 2000
 const INTRO_FALLBACK_MS = 12000
@@ -188,6 +191,12 @@ function startSample(delay: number) {
       () => watchHidden || document.hidden,
       (deltas) => {
         watchSampling = 0
+        // Discarded (tab was in the background): look again a little later, a few times at most.
+        if (!deltas && watchLive() && watchRetries < MAX_RETRIES) {
+          watchRetries++
+          startSample(RETRY_MS)
+          return
+        }
         if (watchLive() && deltas && framesAreSlow(deltas)) {
           commit({ ...state, mode: 'lite', reason: 'frame-rate', autoLite: true })
           stopWatching()
@@ -212,6 +221,7 @@ function stopWatching() {
 function watchFrameRate() {
   stopWatching()
   watchOn = true
+  watchRetries = 0
   document.addEventListener('visibilitychange', onWatchVisibility)
   if (introWillPlay()) {
     window.addEventListener(SCREEN_ON_EVENT, onWatchScreenOn, { once: true })

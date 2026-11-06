@@ -104,6 +104,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Build output contract (backdrop-filter)
+        run: REQUIRE_DIST=1 node --import tsx tests/backdropFilterBuild.test.mjs
+
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 

@@ -15,6 +15,8 @@ for (const file of sources) {
 
 // When a build exists (npm run build), its CSS must still carry the unprefixed property.
 const assets = new URL('../dist/assets/', import.meta.url).pathname
+// CI runs this again after the build with REQUIRE_DIST=1, so a missing build fails instead of skipping.
+if (process.env.REQUIRE_DIST === '1') assert.ok(existsSync(assets), 'REQUIRE_DIST=1 but dist/assets is missing: build first')
 if (existsSync(assets)) {
   const css = readdirSync(assets).filter((f) => f.endsWith('.css')).map((f) => readFileSync(join(assets, f), 'utf8')).join('\n')
   assert.match(css, /(^|[;{}])backdrop-filter:[^;}]*blur\(/, 'dist css has an unprefixed backdrop-filter with blur')
