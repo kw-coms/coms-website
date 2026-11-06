@@ -24,13 +24,13 @@ describe('headless engine integration', () => {
         e.setScene(scene);
         const led = scene.parts.find(p => p.kind === 'led')!;
         const states = e.mcu.pins();
-        states.D13 = { mode: 'output', level: 0, duty: .25, freq: 500 };
+        states.D8 = { mode: 'output', level: 0, duty: .25, freq: 500 };
         vi.spyOn(e.mcu, 'pins').mockReturnValue(states);
         now = 40;
         const frame = e.frame();
         expect(frame.parts[led.id]!.led!.brightness).toBeGreaterThan(.1);
         const uno = scene.parts.find(p => p.kind === 'arduino-uno')!;
-        expect(frame.netVolts[e.analysis.pinToNet[`${uno.id}:D13`]!]).toBeLessThan(.1);
+        expect(frame.netVolts[e.analysis.pinToNet[`${uno.id}:D8`]!]).toBeLessThan(.1);
     });
     it('propagates a digital output edge to a wired input immediately', () => {
         const scene = structuredClone(board);
@@ -96,10 +96,8 @@ describe('powered peripherals', () => {
     it('does not sound a buzzer without a return wire, even while the output is low', () => {
         const scene = find('buzzer');
         const buzzer = scene.parts.find(part => part.kind === 'buzzer')!;
-        scene.wires = scene.wires.filter(wire =>
-            !(wire.from.partId === buzzer.id && wire.from.pinId === '-')
-            && !(wire.to.partId === buzzer.id && wire.to.pinId === '-'),
-        );
+        // The example returns the buzzer to GND with a short jumper from its breadboard column to the GND rail.
+        scene.wires = scene.wires.filter(wire => !(wire.from.partId === 'board' && wire.to.partId === 'board' && wire.to.pinId.startsWith('tn')));
         const engine = new SimulationEngine();
         engine.setScene(scene);
         const pins = engine.mcu.pins();
