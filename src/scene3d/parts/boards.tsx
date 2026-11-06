@@ -8,6 +8,40 @@ import { makeTexture, type PartProps } from './common';
 
 const P = 2.54;
 const SILVER = '#c9ced3';
+const GOLD = '#d9b44a';
+/** UNO R3 mounting holes (PCB-centred, mm). */
+const MOUNT: [number, number][] = [[-20.3, -24.2], [-19, 24], [31.8, -19.1], [31.8, 8.8]];
+
+/** Socket openings of header strips: dark square well with a gold contact inside (instanced, data-driven from pin positions). */
+export function SocketOpenings({ pins, y }: { pins: PinDef[]; y: number }) {
+  const well = useRef<InstancedMesh>(null);
+  const contact = useRef<InstancedMesh>(null);
+  useLayoutEffect(() => {
+    const o = new Object3D();
+    pins.forEach((p, i) => {
+      for (const [m, dx] of [[well.current, 0], [contact.current, 0.42]] as const) {
+        if (!m) continue;
+        o.position.set(p.pos[0] + dx, y, p.pos[2]);
+        o.rotation.set(-Math.PI / 2, 0, 0);
+        o.updateMatrix();
+        m.setMatrixAt(i, o.matrix);
+      }
+    });
+    for (const m of [well.current, contact.current]) if (m) m.instanceMatrix.needsUpdate = true;
+  }, [pins, y]);
+  return (
+    <>
+      <instancedMesh ref={well} args={[undefined, undefined, pins.length]}>
+        <planeGeometry args={[1.75, 1.75]} />
+        <meshBasicMaterial color="#050607" />
+      </instancedMesh>
+      <instancedMesh ref={contact} args={[undefined, undefined, pins.length]} position={[0, 0.012, 0]}>
+        <planeGeometry args={[0.45, 1.35]} />
+        <meshStandardMaterial color={GOLD} metalness={1} roughness={0.25} />
+      </instancedMesh>
+    </>
+  );
+}
 
 /** Split pins that share a row into contiguous header strips. */
 function strips(pins: PinDef[]) {
@@ -70,11 +104,12 @@ export function ArduinoUno() {
         <planeGeometry args={[W, D]} />
         <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
       </mesh>
-      {[[-29, -20], [29, -20], [-29, 20], [26, 20]].map(([x, z], i) => (
-        <mesh key={i} position={[x!, (DESK_Y - 1.6) / 2, z!]}>
-          <cylinderGeometry args={[3, 3, -DESK_Y - 1.6, 12]} />
-          <meshStandardMaterial color="#2a2f35" />
-        </mesh>
+      {MOUNT.map(([x, z], i) => (
+        <group key={i} position={[x, 0, z]}>
+          <mesh position={[0, (DESK_Y - 1.6) / 2, 0]}><cylinderGeometry args={[2.9, 2.9, -DESK_Y - 1.6, 14]} /><meshStandardMaterial color="#2a2f35" roughness={0.6} /></mesh>
+          <mesh position={[0, 0.045, 0]} rotation-x={-Math.PI / 2}><ringGeometry args={[1.7, 3.3, 24]} /><meshStandardMaterial color="#d9b44a" metalness={0.9} roughness={0.28} /></mesh>
+          <mesh position={[0, 0.06, 0]} rotation-x={-Math.PI / 2}><circleGeometry args={[1.7, 20]} /><meshBasicMaterial color="#0d2b2d" /></mesh>
+        </group>
       ))}
       {/* USB-B and barrel jack on the -X end */}
       <mesh position={[-28.5, 5.7, -11]} castShadow>
@@ -111,33 +146,61 @@ export function ArduinoUno() {
           </mesh>
         );
       })}
-      {def.pins.map((p) => (
-        <mesh key={p.id} position={[p.pos[0], p.pos[1] + 0.02, p.pos[2]]} rotation-x={-Math.PI / 2}>
-          <planeGeometry args={[1.3, 1.3]} />
-          <meshStandardMaterial color="#55585d" metalness={0.6} roughness={0.4} />
-        </mesh>
+      <SocketOpenings pins={def.pins} y={8.53} />
+      {/* ICSP header, ATmega16U2, regulator and a few SMD parts: the board reads as a real PCB */}
+      <mesh position={[30.2, 1.3, 0]} castShadow><boxGeometry args={[5.1, 2.6, 7.7]} /><meshStandardMaterial color="#17191c" roughness={0.55} /></mesh>
+      {[-2.54, 0, 2.54].flatMap((z) => [-1.27, 1.27].map((x) => <mesh key={`${x}${z}`} position={[30.2 + x, 2.65, z]}><boxGeometry args={[0.7, 0.2, 0.7]} /><meshStandardMaterial color={GOLD} metalness={1} roughness={0.25} /></mesh>))}
+      <mesh position={[-9, 0.55, -13]}><boxGeometry args={[7, 1.1, 7]} /><meshStandardMaterial color="#17191c" roughness={0.5} /></mesh>
+      <mesh position={[-22, 1.1, 5]}><boxGeometry args={[6.5, 2.2, 5]} /><meshStandardMaterial color="#1b1d20" roughness={0.5} /></mesh>
+      {[[-4, 14], [-1, 14], [2, 14], [14, 19], [18, 19], [-14, 15], [-14, 18], [22, -9], [24, 3]].map(([x, z], i) => (
+        <mesh key={i} position={[x!, 0.4, z!]}><boxGeometry args={[2, 0.8, 1.2]} /><meshStandardMaterial color={i % 3 === 0 ? '#222' : i % 3 === 1 ? '#c8b58a' : '#8e6b3a'} roughness={0.5} /></mesh>
       ))}
+      {/* gold pads along the ICSP / reset edge */}
+      {[-4, -1.5, 1, 3.5].map((z, i) => <mesh key={i} position={[33.2, 0.05, z + 12]} rotation-x={-Math.PI / 2}><planeGeometry args={[1.4, 1.4]} /><meshStandardMaterial color={GOLD} metalness={1} roughness={0.3} /></mesh>)}
     </group>
+  );
+}
+
+/** Recessed-looking breadboard holes: bevelled rim, dark well, metal contact glint. */
+function Holes({ holes }: { holes: PinDef[] }) {
+  const rim = useRef<InstancedMesh>(null);
+  const well = useRef<InstancedMesh>(null);
+  const glint = useRef<InstancedMesh>(null);
+  useLayoutEffect(() => {
+    const o = new Object3D();
+    holes.forEach((h, i) => {
+      for (const [m, y, dx] of [[rim.current, 0.035, 0], [well.current, 0.05, 0], [glint.current, 0.065, 0.43]] as const) {
+        if (!m) continue;
+        o.position.set(h.pos[0] + dx, y, h.pos[2]);
+        o.rotation.set(-Math.PI / 2, 0, 0);
+        o.updateMatrix();
+        m.setMatrixAt(i, o.matrix);
+      }
+    });
+    for (const m of [rim.current, well.current, glint.current]) if (m) m.instanceMatrix.needsUpdate = true;
+  }, [holes]);
+  return (
+    <>
+      <instancedMesh ref={rim} args={[undefined, undefined, holes.length]}>
+        <planeGeometry args={[2.1, 2.1]} />
+        <meshBasicMaterial color="#c9c3b1" />
+      </instancedMesh>
+      <instancedMesh ref={well} args={[undefined, undefined, holes.length]}>
+        <planeGeometry args={[1.45, 1.45]} />
+        <meshBasicMaterial color="#25282e" />
+      </instancedMesh>
+      <instancedMesh ref={glint} args={[undefined, undefined, holes.length]}>
+        <planeGeometry args={[0.38, 1.1]} />
+        <meshBasicMaterial color="#b4bac3" />
+      </instancedMesh>
+    </>
   );
 }
 
 export function Breadboard({ part }: PartProps) {
   const def = PARTS[part.kind];
   const [W, H, D] = def.size;
-  const ref = useRef<InstancedMesh>(null);
   const holes = def.pins;
-  useLayoutEffect(() => {
-    const m = ref.current;
-    if (!m) return;
-    const o = new Object3D();
-    holes.forEach((h, i) => {
-      o.position.set(h.pos[0], 0.04, h.pos[2]);
-      o.rotation.set(-Math.PI / 2, 0, 0);
-      o.updateMatrix();
-      m.setMatrixAt(i, o.matrix);
-    });
-    m.instanceMatrix.needsUpdate = true;
-  }, [holes]);
   const railInfo = useMemo(() => {
     const r = (prefix: string) => {
       const xs = holes.filter((h) => h.id.startsWith(prefix)).map((h) => h.pos);
@@ -146,12 +209,12 @@ export function Breadboard({ part }: PartProps) {
     return { tp: r('tp'), tn: r('tn'), bp: r('bp'), bn: r('bn') };
   }, [holes]);
   const tex = useMemo(() => {
-    const s = 12;
+    const s = Math.min(22, 4000 / W);
     return makeTexture(Math.round(W * s), Math.round(D * s), (c) => {
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.font = `${2.1 * s}px sans-serif`;
-      c.fillStyle = '#6d7480';
+      c.font = `600 ${2.3 * s}px sans-serif`;
+      c.fillStyle = '#4b5563';
       const px = (x: number) => (x + W / 2) * s;
       const pz = (z: number) => (z + D / 2) * s;
       const cols = new Map<number, number>();
@@ -195,10 +258,7 @@ export function Breadboard({ part }: PartProps) {
       {stripe('tn', '#2563d9', 1.9)}
       {stripe('bp', '#e53935', 1.9)}
       {stripe('bn', '#2563d9', -1.9)}
-      <instancedMesh ref={ref} args={[undefined, undefined, holes.length]}>
-        <planeGeometry args={[1.35, 1.35]} />
-        <meshBasicMaterial color="#3a3e45" />
-      </instancedMesh>
+      <Holes holes={holes} />
       <mesh position={[0, 0.06, 0]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[W, D]} />
         <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />

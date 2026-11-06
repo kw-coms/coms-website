@@ -5,6 +5,7 @@ import { Box3, Box3Helper, Color, Object3D, type InstancedMesh, type Mesh } from
 import type { Vec3 } from '../core/types';
 import { PARTS } from '../ui/core';
 import { useStore, wireHex } from '../ui/store';
+import { visibleWarnings } from '../ui/warnings';
 import { pinPos } from './WireView';
 import { preview } from './sceneRefs';
 import { arcApex, wireGeometry, wirePoints } from './wireGeom';
@@ -90,21 +91,24 @@ export function PreviewWire() {
   );
 }
 
-export function SelectionBox() {
-  const sel = useStore((s) => s.selection);
+function OneBox({ id }: { id: string }) {
   const helper = useMemo(() => new Box3Helper(new Box3(), new Color('#3b82f6')), []);
   useFrame(({ scene }) => {
-    if (sel?.kind !== 'part') return void (helper.visible = false);
     let target: Object3D | undefined;
-    scene.traverse((o) => {
-      if (o.userData.partId === sel.id && !target) target = o;
-    });
+    for (const c of scene.children) if (c.userData.partId === id && !target) target = c;
     if (!target) return void (helper.visible = false);
     helper.visible = true;
+    helper.box.makeEmpty();
     helper.box.setFromObject(target);
     helper.box.expandByScalar(0.8);
   });
   return <primitive object={helper} />;
+}
+export function SelectionBox() {
+  const sel = useStore((s) => s.selection);
+  const multi = useStore((s) => s.multi);
+  const ids = multi.length > 1 ? multi : sel?.kind === 'part' ? [sel.id] : [];
+  return <>{ids.map((id) => <OneBox key={id} id={id} />)}</>;
 }
 
 /** Draggable bend handles for the selected wire (ghost handles at segment midpoints add a bend). */
@@ -150,8 +154,8 @@ export function PartAnnotations() {
   const simW = useStore((s) => s.simWarnings);
   const hide = useStore((s) => s.draft?.hideId);
   const byPart = new Map<string, 'error' | 'warn' | 'info'>();
-  for (const w of [...analysis.warnings, ...simW]) {
-    if (!w.partId) continue;
+  for (const w of visibleWarnings([...analysis.warnings, ...simW], (id) => plist.find((p) => p.id === id)?.kind)) {
+    if (!w.partId || w.level === 'info') continue;
     const cur = byPart.get(w.partId);
     if (!cur || RANK[w.level] > RANK[cur]) byPart.set(w.partId, w.level);
   }

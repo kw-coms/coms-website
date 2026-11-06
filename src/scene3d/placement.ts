@@ -134,3 +134,21 @@ export function commitMove(moved: PartInstance) {
   updateParts([moved, ...kids]);
 }
 export { rotXZ };
+
+/** Commit a group move; children inserted in a moved board that were not selected travel with it. */
+export function commitMoveGroup(moved: PartInstance[]) {
+  const ids = new Set(moved.map((m) => m.id));
+  const out = [...moved];
+  for (const m of moved) {
+    if (!isBoard(m.kind)) continue;
+    const old = parts().find((p) => p.id === m.id);
+    if (!old) continue;
+    const dx = m.pos[0] - old.pos[0], dz = m.pos[2] - old.pos[2];
+    for (const k of childrenOf(m.id))
+      if (!ids.has(k.id)) {
+        ids.add(k.id);
+        out.push({ ...k, pos: [k.pos[0] + dx, k.pos[1], k.pos[2] + dz] as Vec3 });
+      }
+  }
+  updateParts(out);
+}

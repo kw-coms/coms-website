@@ -32,7 +32,7 @@ export function useShortcuts() {
       else if (mod) return;
       else if (k === 'r') rotateDraft() || rotateSelection();
       else if (e.key === 'Delete' || e.key === 'Backspace') (e.preventDefault(), deleteSelection());
-      else if (e.key === 'Escape') set({ wireStart: null, draft: null, selection: null, examplesOpen: false });
+      else if (e.key === 'Escape') set({ wireStart: null, draft: null, selection: null, multi: [], marquee: null, ctx: null, examplesOpen: false });
     };
     const up = (e: KeyboardEvent) => {
       if (e.key !== ' ' || isTyping(e.target)) return;

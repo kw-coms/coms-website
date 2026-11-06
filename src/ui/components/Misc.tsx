@@ -4,7 +4,8 @@ import { fmtVolts } from '../format';
 import { onSimFrame, frameRef } from '../simHost';
 import { resistorBands } from '../core';
 import { fmtOhms } from '../format';
-import { getState, set, TUTORIAL_KEY, useStore } from '../store';
+import { Copy, RotateCw, Trash2 } from 'lucide-react';
+import { deleteBend, deleteSelection, duplicateSelection, getState, rotateSelection, set, TUTORIAL_KEY, updateWire, useStore, WIRE_COLORS } from '../store';
 import { setItem } from '../storage';
 
 const STEPS = [
@@ -74,4 +75,46 @@ export function Tooltip() {
 export function Toast() {
   const msg = useStore((s) => s.toast);
   return msg ? <div className="toast" role="status">{msg}</div> : null;
+}
+
+/** Right-click menu for parts, wires and wire bend points. */
+export function ContextMenu() {
+  const ctx = useStore((s) => s.ctx);
+  const wire = useStore((s) => (s.ctx?.target.kind === 'wire' ? s.hist.present.wires.find((w) => w.id === s.ctx!.target.id) : undefined));
+  useEffect(() => {
+    if (!ctx) return;
+    const close = (e: Event) => { if (!(e.target as HTMLElement)?.closest?.('.ctx-menu')) set({ ctx: null }); };
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && set({ ctx: null });
+    window.addEventListener('pointerdown', close, true);
+    window.addEventListener('keydown', key);
+    window.addEventListener('wheel', close, { passive: true });
+    return () => { window.removeEventListener('pointerdown', close, true); window.removeEventListener('keydown', key); window.removeEventListener('wheel', close); };
+  }, [ctx]);
+  if (!ctx) return null;
+  const run = (fn: () => void) => () => { fn(); set({ ctx: null }); };
+  const t = ctx.target;
+  const x = Math.min(ctx.x, window.innerWidth - 190), y = Math.min(ctx.y, window.innerHeight - 190);
+  return (
+    <div className="ctx-menu" role="menu" aria-label="바로가기 메뉴" style={{ left: x, top: y }}>
+      {t.kind === 'part' && (
+        <>
+          <button role="menuitem" type="button" onClick={run(rotateSelection)}><RotateCw size={15} /> 회전 <kbd>R</kbd></button>
+          <button role="menuitem" type="button" onClick={run(duplicateSelection)}><Copy size={15} /> 복제 <kbd>Ctrl+D</kbd></button>
+          <button role="menuitem" type="button" className="danger" onClick={run(deleteSelection)}><Trash2 size={15} /> 삭제 <kbd>Del</kbd></button>
+        </>
+      )}
+      {t.kind === 'wire' && (
+        <>
+          <div className="ctx-label">선 색 변경</div>
+          <div className="swatches ctx-sw" role="radiogroup" aria-label="전선 색">
+            {WIRE_COLORS.map((c) => (
+              <button key={c.id} type="button" role="radio" aria-checked={wire?.color === c.id} aria-label={c.label} title={c.label} className={`swatch ${wire?.color === c.id ? 'on' : ''}`} style={{ background: c.hex }} onClick={run(() => updateWire(t.id, { color: c.id }))} />
+            ))}
+          </div>
+          <button role="menuitem" type="button" className="danger" onClick={run(deleteSelection)}><Trash2 size={15} /> 전선 삭제 <kbd>Del</kbd></button>
+        </>
+      )}
+      {t.kind === 'bend' && <button role="menuitem" type="button" className="danger" onClick={run(() => deleteBend(t.id, t.index))}><Trash2 size={15} /> 꺾임 점 삭제</button>}
+    </div>
+  );
 }

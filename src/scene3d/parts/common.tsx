@@ -47,6 +47,14 @@ export const GlowSprite = ({ spriteRef, position, color }: { spriteRef: React.Re
   </sprite>
 );
 
+/** Soft additive light pool a lit LED casts on the board/desk under it (no real light per LED). */
+export const GlowPool = ({ poolRef, color }: { poolRef: React.Ref<import('three').Mesh>; color: string }) => (
+  <mesh ref={poolRef} position={[0, 0.12, 0]} rotation-x={-Math.PI / 2} visible={false} renderOrder={3}>
+    <planeGeometry args={[1, 1]} />
+    <meshBasicMaterial map={glowTexture()} color={color} transparent depthWrite={false} blending={AdditiveBlending} opacity={0} toneMapped={false} />
+  </mesh>
+);
+
 const METAL = '#b7bcc2';
 /** Straight pin legs from the insertion point up to `top`. */
 export function Legs({ kind, top = 4, radius = 0.32, color = METAL, only }: { kind: PartInstance['kind']; top?: number; radius?: number; color?: string; only?: string[] }) {

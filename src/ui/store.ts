@@ -9,9 +9,13 @@ import { getItem, setItem } from './storage';
 export type Selection = { kind: 'part' | 'wire'; id: string } | null;
 export type SnapView = { ok: Vec3[]; bad: Vec3[] };
 export type Theme = 'light' | 'dark';
-export type DockTab = 'code' | 'serial' | 'plotter';
-export type SideTab = 'props' | 'warnings' | 'bom';
-export type MobileTab = 'view' | 'parts' | 'props' | 'code' | 'serial' | 'plotter';
+export type SerialTab = 'serial' | 'plotter';
+export type SideTab = 'parts' | 'code' | 'props' | 'warnings' | 'bom';
+export interface CtxMenu {
+  x: number;
+  y: number;
+  target: { kind: 'part' | 'wire'; id: string } | { kind: 'bend'; id: string; index: number };
+}
 export interface HoverInfo {
   ref: PinRef;
   netId?: string;
@@ -29,18 +33,27 @@ export interface State {
   code: string;
   analysis: Analysis;
   selection: Selection;
+  /** All selected part ids when more than one part is selected (includes the primary selection). */
+  multi: string[];
+  marquee: { x0: number; y0: number; x1: number; y1: number } | null;
+  ctx: CtxMenu | null;
   wireStart: PinRef | null;
   hover: HoverInfo | null;
-  draft: { part: PartInstance; hideId?: string; snap: SnapView } | null;
+  draft: { part: PartInstance; hideId?: string; snap: SnapView; extra?: PartInstance[]; hideIds?: string[] } | null;
   inputs: Record<string, Record<string, number | boolean>>;
   simState: 'idle' | 'running' | 'paused';
   speed: number;
   view: 'persp' | 'top';
   labels: boolean;
   theme: Theme;
-  dockTab: DockTab;
   sideTab: SideTab;
-  mobileTab: MobileTab;
+  sideOpen: boolean;
+  sideWidth: number;
+  sheetOpen: boolean;
+  serialTab: SerialTab;
+  serialOpen: boolean;
+  serialH: number;
+  paletteCollapsed: boolean;
   compile: CompileState;
   toast: string | null;
   simWarnings: SimWarning[];
@@ -78,12 +91,24 @@ function startDoc(): { doc: Doc; code: string } {
   return { doc: empty, code: BLANK_CODE };
 }
 
+export const PREFS_KEY = 'coms-lab:prefs';
+function loadPrefs(): Record<string, unknown> {
+  try {
+    return JSON.parse(getItem(PREFS_KEY) ?? '{}') ?? {};
+  } catch {
+    return {};
+  }
+}
+const prefs = loadPrefs();
 const first = startDoc();
 let state: State = {
   hist: initHistory(first.doc),
   code: first.code,
   analysis: analyze(toScene(first.doc, first.code)),
   selection: null,
+  multi: [],
+  marquee: null,
+  ctx: null,
   wireStart: null,
   hover: null,
   draft: null,
@@ -93,9 +118,14 @@ let state: State = {
   view: 'persp',
   labels: false,
   theme: initialTheme(),
-  dockTab: 'code',
-  sideTab: 'props',
-  mobileTab: 'view',
+  sideTab: 'code',
+  sideOpen: prefs.sideOpen !== false,
+  sideWidth: Number(prefs.sideWidth) || 400,
+  sheetOpen: false,
+  serialTab: 'serial',
+  serialOpen: prefs.serialOpen !== false,
+  serialH: Number(prefs.serialH) || 190,
+  paletteCollapsed: prefs.paletteCollapsed === true,
   compile: { status: 'idle' },
   toast: null,
   simWarnings: [],
@@ -125,13 +155,18 @@ function setDoc(doc: Doc, selection?: Selection) {
   const hist = commit(state.hist, doc);
   if (hist === state.hist) return;
   const analysis = analyze(toScene(doc, state.code));
-  set({ hist, analysis, selection: selection === undefined ? validSel(state.selection, doc) : selection });
+  const keep = selection === undefined;
+  set({
+    hist, analysis, selection: keep ? validSel(state.selection, doc) : selection,
+    multi: keep ? state.multi.filter((id) => doc.parts.some((p) => p.id === id)) : [],
+    ...(selection ? { sideTab: 'props' as const, sideOpen: true } : {}),
+  });
 }
 const validSel = (sel: Selection, doc: Doc): Selection =>
   !sel ? null : (sel.kind === 'part' ? doc.parts : doc.wires).some((x) => x.id === sel.id) ? sel : null;
 
 function restoreHist(hist: History<Doc>) {
-  set({ hist, analysis: analyze(toScene(hist.present, state.code)), selection: validSel(state.selection, hist.present), wireStart: null, draft: null });
+  set({ hist, analysis: analyze(toScene(hist.present, state.code)), selection: validSel(state.selection, hist.present), multi: [], wireStart: null, draft: null });
 }
 export const undo = () => restoreHist(undoH(state.hist));
 export const redo = () => restoreHist(redoH(state.hist));
@@ -164,33 +199,97 @@ export function setProp(partId: string, key: string, value: number | string | bo
   const p = getPart(partId);
   if (p) updateParts([{ ...p, props: { ...p.props, [key]: value } }]);
 }
+/** Part ids affected by selection commands: the multi-selection, else the single selected part. */
+export function selectedPartIds(s: State = state): string[] {
+  if (s.multi.length > 1) return s.multi;
+  return s.selection?.kind === 'part' ? [s.selection.id] : [];
+}
+export function selectPart(id: string, additive = false, openPanel = true) {
+  if (!additive) return set({ selection: { kind: 'part', id }, multi: [], ...(openPanel ? { sideTab: 'props' as const, sideOpen: true } : {}) });
+  const cur = selectedPartIds();
+  const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+  set({ multi: next.length > 1 ? next : [], selection: next.length ? { kind: 'part', id: next[next.length - 1]! } : null, sideTab: 'props', sideOpen: true });
+}
+export function selectParts(ids: string[]) {
+  set({ multi: ids.length > 1 ? ids : [], selection: ids.length ? { kind: 'part', id: ids[ids.length - 1]! } : null, ...(ids.length ? { sideTab: 'props' as const, sideOpen: true } : {}) });
+}
+export const clearSelection = () => set({ selection: null, multi: [] });
+
 export function deleteSelection() {
-  const sel = state.selection;
-  if (!sel) return;
+  const ids = selectedPartIds();
   const doc = state.hist.present;
-  if (sel.kind === 'part')
-    setDoc({ ...doc, parts: doc.parts.filter((p) => p.id !== sel.id), wires: doc.wires.filter((w) => w.from.partId !== sel.id && w.to.partId !== sel.id) }, null);
-  else setDoc({ ...doc, wires: doc.wires.filter((w) => w.id !== sel.id) }, null);
+  if (ids.length) {
+    const gone = new Set(ids);
+    return setDoc({ ...doc, parts: doc.parts.filter((p) => !gone.has(p.id)), wires: doc.wires.filter((w) => !gone.has(w.from.partId) && !gone.has(w.to.partId)) }, null);
+  }
+  const sel = state.selection;
+  if (sel?.kind === 'wire') setDoc({ ...doc, wires: doc.wires.filter((w) => w.id !== sel.id) }, null);
+}
+export function deleteWire(id: string) {
+  setDoc({ ...state.hist.present, wires: wires().filter((w) => w.id !== id) }, null);
+}
+export function deleteBend(wireId: string, index: number) {
+  const w = wires().find((q) => q.id === wireId);
+  if (!w?.bends) return;
+  const bends = w.bends.filter((_, i) => i !== index);
+  updateWire(wireId, { bends: bends.length ? bends : undefined });
 }
 export function rotateSelection() {
-  const sel = state.selection;
-  const p = sel?.kind === 'part' ? getPart(sel.id) : undefined;
-  if (p) updateParts([{ ...p, rotY: (((p.rotY + 90) % 360) as RotY) }]);
+  const ids = selectedPartIds();
+  if (!ids.length) return;
+  const list = ids.map((id) => getPart(id)).filter((p): p is PartInstance => !!p);
+  if (list.length === 1) return updateParts([{ ...list[0]!, rotY: (((list[0]!.rotY + 90) % 360) as RotY) }]);
+  // rotate a group 90° about its centre (CW seen from above, matching rotY)
+  const cx = list.reduce((a, p) => a + p.pos[0], 0) / list.length, cz = list.reduce((a, p) => a + p.pos[2], 0) / list.length;
+  updateParts(list.map((p) => {
+    const dx = p.pos[0] - cx, dz = p.pos[2] - cz;
+    return { ...p, rotY: (((p.rotY + 90) % 360) as RotY), pos: [cx + dz, p.pos[1], cz - dx] as Vec3 };
+  }));
 }
 export function duplicateSelection() {
-  const sel = state.selection;
-  const p = sel?.kind === 'part' ? getPart(sel.id) : undefined;
-  if (!p) return;
-  addPart(p.kind, [p.pos[0] + 12.7, p.pos[1], p.pos[2] + 12.7], p.rotY, { ...p.props });
+  const list = selectedPartIds().map((id) => getPart(id)).filter((p): p is PartInstance => !!p);
+  if (!list.length) return;
+  const doc = state.hist.present;
+  const ids = new Set(doc.parts.map((p) => p.id));
+  const map = new Map<string, string>();
+  const copies = list.map((p) => {
+    const prefix = `${p.kind.replace(/[^a-z0-9]/g, '')}-`;
+    let i = 1;
+    while (ids.has(`${prefix}${i}`)) i++;
+    const id = `${prefix}${i}`;
+    ids.add(id);
+    map.set(p.id, id);
+    return { ...p, id, pos: [p.pos[0] + 12.7, p.pos[1], p.pos[2] + 12.7] as Vec3, props: { ...p.props } };
+  });
+  // wires fully inside the group are copied too
+  let wid = wires().length;
+  const taken = new Set(wires().map((w) => w.id));
+  const wcopies = wires().filter((w) => map.has(w.from.partId) && map.has(w.to.partId)).map((w) => {
+    while (taken.has(`w${++wid}`));
+    taken.add(`w${wid}`);
+    return { ...w, id: `w${wid}`, from: { ...w.from, partId: map.get(w.from.partId)! }, to: { ...w.to, partId: map.get(w.to.partId)! }, bends: w.bends?.map((b) => [b[0] + 12.7, b[1], b[2] + 12.7] as Vec3) };
+  });
+  setDoc({ ...doc, parts: [...doc.parts, ...copies], wires: [...doc.wires, ...wcopies] }, null);
+  selectParts(copies.map((c) => c.id));
 }
-let clipboard: PartInstance | null = null;
+let clipboard: PartInstance[] = [];
 export function copySelection() {
-  const sel = state.selection;
-  const p = sel?.kind === 'part' ? getPart(sel.id) : undefined;
-  if (p) clipboard = p;
+  const list = selectedPartIds().map((id) => getPart(id)).filter((p): p is PartInstance => !!p);
+  if (list.length) clipboard = list;
 }
 export function paste() {
-  if (clipboard) addPart(clipboard.kind, [clipboard.pos[0] + 12.7, clipboard.pos[1], clipboard.pos[2] + 12.7], clipboard.rotY, { ...clipboard.props });
+  if (!clipboard.length) return;
+  const doc = state.hist.present;
+  const ids = new Set(doc.parts.map((p) => p.id));
+  const copies = clipboard.map((p) => {
+    const prefix = `${p.kind.replace(/[^a-z0-9]/g, '')}-`;
+    let i = 1;
+    while (ids.has(`${prefix}${i}`)) i++;
+    ids.add(`${prefix}${i}`);
+    return { ...p, id: `${prefix}${i}`, pos: [p.pos[0] + 12.7, p.pos[1], p.pos[2] + 12.7] as Vec3, props: { ...p.props } };
+  });
+  setDoc({ ...doc, parts: [...doc.parts, ...copies] }, null);
+  selectParts(copies.map((c) => c.id));
 }
 
 const PALETTE: WireColor[] = ['blue', 'green', 'yellow', 'orange', 'purple', 'white', 'gray'];
@@ -227,7 +326,7 @@ export function updateWire(id: string, patch: Partial<Wire>) {
 export function loadScene(s: Scene, opts: { keepSim?: boolean } = {}) {
   const doc: Doc = { version: 1, title: s.title, parts: s.parts, wires: s.wires } as Doc;
   set({
-    hist: initHistory(doc), code: s.code, analysis: analyze(s), selection: null, wireStart: null, draft: null, inputs: {},
+    hist: initHistory(doc), code: s.code, analysis: analyze(s), selection: null, multi: [], wireStart: null, draft: null, inputs: {},
     compile: { status: 'idle' }, simWarnings: [], cameraResetTick: state.cameraResetTick + 1,
   });
   void opts;
@@ -259,6 +358,17 @@ subscribe(() => {
 });
 
 export type { SimFrame };
+
+// ---------- layout preferences ----------
+let prefTimer: ReturnType<typeof setTimeout> | undefined;
+let lastPrefs = '';
+subscribe(() => {
+  const cur = JSON.stringify({ sideOpen: state.sideOpen, sideWidth: state.sideWidth, serialOpen: state.serialOpen, serialH: state.serialH, paletteCollapsed: state.paletteCollapsed });
+  if (cur === lastPrefs) return;
+  lastPrefs = cur;
+  clearTimeout(prefTimer);
+  prefTimer = setTimeout(() => setItem(PREFS_KEY, cur), 300);
+});
 
 // ---------- live (non-history) edits finished by one history step, e.g. dragging wire bends ----------
 export function liveWire(id: string, patch: Partial<Wire>) {

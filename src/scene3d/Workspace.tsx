@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, type DragEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, type DragEvent } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei';
-import { PMREMGenerator, RepeatWrapping, type Camera } from 'three';
+import { PMREMGenerator, RepeatWrapping, type DirectionalLight } from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { PARTS } from '../ui/core';
+import { scheduleFrame } from './cameraFrame';
 import { onSimFrame } from '../ui/simHost';
-import { getState, parts, subscribe, useStore } from '../ui/store';
+import { getState, subscribe, useStore } from '../ui/store';
 import { Interaction } from './Interaction';
 import { BendHandles, NetGlow, PartAnnotations, PreviewWire, SelectionBox, SnapRings } from './Overlays';
 import { PartView } from './PartView';
@@ -17,26 +18,65 @@ import { makeTexture } from './parts/common';
 import type { PartKind } from '../core/types';
 import { set } from '../ui/store';
 
-const DARK = { bg: '#161b22', desk: '#232a33', grid: '#2e3744' };
-const LIGHT = { bg: '#e9eff5', desk: '#dde5ee', grid: '#cbd5e1' };
+const DARK = { bg: '#141a21', fog: '#141a21' };
+const LIGHT = { bg: '#e6edf4', fog: '#e6edf4' };
+
+// mulberry32: tiny seeded PRNG so the wood grain is the same on every load
+const rng = (seed: number) => () => {
+  seed = (seed + 0x6d2b79f5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+
+/** 203.2 mm square tile: two planks with grain, faint 25.4 mm grid (theme-aware). */
+function deskTexture(dark: boolean) {
+  const S = 1024;
+  const r = rng(7);
+  const planks = dark ? ['#3b4452', '#343d4a'] : ['#e3c697', '#dcbd8c'];
+  const grain = dark ? '255,255,255' : '110,70,25';
+  const seam = dark ? 'rgba(0,0,0,0.45)' : 'rgba(95,60,20,0.35)';
+  const gridC = dark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.28)';
+  const t = makeTexture(S, S, (g) => {
+    planks.forEach((col, k) => {
+      const y0 = (k * S) / 2;
+      g.fillStyle = col;
+      g.fillRect(0, y0, S, S / 2);
+      for (let i = 0; i < 90; i++) {
+        const y = y0 + r() * (S / 2);
+        g.strokeStyle = `rgba(${grain},${(0.03 + r() * 0.07).toFixed(3)})`;
+        g.lineWidth = 0.6 + r() * 1.8;
+        g.beginPath();
+        g.moveTo(0, y);
+        g.bezierCurveTo(S * 0.3, y + (r() - 0.5) * 9, S * 0.65, y + (r() - 0.5) * 9, S, y + (r() - 0.5) * 4);
+        g.stroke();
+      }
+      g.fillStyle = seam;
+      g.fillRect(0, y0, S, 3);
+    });
+    g.strokeStyle = gridC;
+    g.lineWidth = 2;
+    for (let i = 0; i <= 8; i++) {
+      const q = (i * S) / 8;
+      g.beginPath(); g.moveTo(q, 0); g.lineTo(q, S); g.moveTo(0, q); g.lineTo(S, q); g.stroke();
+    }
+  });
+  t.wrapS = t.wrapT = RepeatWrapping;
+  return t;
+}
 
 function Desk() {
-  const theme = useStore((s) => s.theme);
-  const c = theme === 'dark' ? DARK : LIGHT;
+  const dark = useStore((s) => s.theme === 'dark');
   const tex = useMemo(() => {
-    const t = makeTexture(256, 256, (g) => {
-      g.fillStyle = c.desk; g.fillRect(0, 0, 256, 256);
-      g.strokeStyle = c.grid; g.lineWidth = 2;
-      g.strokeRect(0, 0, 256, 256);
-    });
-    t.wrapS = t.wrapT = RepeatWrapping;
-    t.repeat.set(1600 / 25.4 / 2, 1000 / 25.4 / 2);
+    const t = deskTexture(dark);
+    t.repeat.set(2400 / 203.2, 1800 / 203.2);
     return t;
-  }, [c.desk, c.grid]);
+  }, [dark]);
+  useEffect(() => () => tex.dispose(), [tex]);
   return (
-    <mesh position={[40, DESK_Y - 0.05, 0]} rotation-x={-Math.PI / 2} receiveShadow>
-      <planeGeometry args={[1600, 1000]} />
-      <meshStandardMaterial map={tex} roughness={0.95} />
+    <mesh position={[0, DESK_Y - 0.05, 0]} rotation-x={-Math.PI / 2} receiveShadow>
+      <planeGeometry args={[2400, 1800]} />
+      <meshStandardMaterial map={tex} roughness={0.78} envMapIntensity={0.5} />
     </mesh>
   );
 }
@@ -73,54 +113,20 @@ function Invalidator() {
   return null;
 }
 
-function frameAll(camera: Camera, controls: OrbitControlsImpl | null, view: 'persp' | 'top', aspect: number) {
-  const list = parts();
-  let x0 = -60, x1 = 60, z0 = -40, z1 = 40;
-  if (list.length) {
-    x0 = Infinity; x1 = -Infinity; z0 = Infinity; z1 = -Infinity;
-    for (const p of list) {
-      const s = PARTS[p.kind]?.size ?? [10, 10, 10];
-      const r = Math.max(s[0], s[2]) / 2;
-      x0 = Math.min(x0, p.pos[0] - r); x1 = Math.max(x1, p.pos[0] + r);
-      z0 = Math.min(z0, p.pos[2] - r); z1 = Math.max(z1, p.pos[2] + r);
-    }
-  }
-  const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
-  const w = Math.max(60, x1 - x0) * 1.12, d = Math.max(60, z1 - z0) * 1.12;
-  const cam = camera as Camera & { zoom: number; isOrthographicCamera?: boolean; fov?: number; updateProjectionMatrix(): void };
-  if (view === 'top') {
-    cam.position.set(cx, 800, cz + 0.001);
-    if (controls) controls.target.set(cx, 0, cz);
-    const h = refs.gl?.domElement.clientHeight ?? 600, wpx = refs.gl?.domElement.clientWidth ?? 800;
-    cam.zoom = Math.min(wpx / w, h / d);
-  } else {
-    const fov = ((cam.fov ?? 40) * Math.PI) / 180;
-    const dist = Math.max(d / 2 / Math.tan(fov / 2), w / 2 / Math.tan(fov / 2) / Math.max(aspect, 0.5)) * 1.05;
-    cam.position.set(cx, dist * 0.78, cz + dist * 0.66);
-    if (controls) controls.target.set(cx, -4, cz);
-  }
-  cam.updateProjectionMatrix();
-  controls?.update();
-  refs.invalidate();
-}
-
 function CameraRig() {
   const view = useStore((s) => s.view);
   const tick = useStore((s) => s.cameraResetTick);
   const camera = useThree((s) => s.camera);
-  const size = useThree((s) => s.size);
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
-  const sizeRef = useRef(size);
-  sizeRef.current = size;
   useEffect(() => {
     refs.camera = camera;
     refs.controls = controls;
-    frameAll(camera, controls, view, sizeRef.current.width / sizeRef.current.height);
+    scheduleFrame();
   }, [camera, controls, view, tick]);
   return (
     <>
       {view === 'persp' ? (
-        <PerspectiveCamera makeDefault fov={38} near={5} far={5000} position={[60, 220, 260]} />
+        <PerspectiveCamera makeDefault fov={36} near={8} far={6000} position={[60, 220, 260]} />
       ) : (
         <OrthographicCamera makeDefault near={1} far={3000} position={[0, 800, 0.001]} zoom={4} />
       )}
@@ -131,13 +137,47 @@ function CameraRig() {
         dampingFactor={0.12}
         enableRotate={view === 'persp'}
         screenSpacePanning
-        minDistance={view === 'persp' ? 40 : 0}
-        maxDistance={view === 'persp' ? 1400 : 3000}
-        minZoom={0.6}
-        maxZoom={30}
-        maxPolarAngle={view === 'persp' ? Math.PI / 2.08 : Math.PI}
+        minDistance={view === 'persp' ? 25 : 0}
+        maxDistance={view === 'persp' ? 1800 : 3000}
+        minZoom={0.5}
+        maxZoom={40}
+        minPolarAngle={0.12}
+        maxPolarAngle={view === 'persp' ? Math.PI / 2.1 : Math.PI}
         mouseButtons={{ LEFT: 0, MIDDLE: 1, RIGHT: 2 }}
       />
+    </>
+  );
+}
+
+/** Key light with a shadow frustum fitted to the bench, plus a soft fill from the opposite side. */
+function Lights({ dark }: { dark: boolean }) {
+  const plist = useStore((s) => s.hist.present.parts);
+  const key = useRef<DirectionalLight>(null);
+  const { cx, cz, half } = useMemo(() => {
+    if (!plist.length) return { cx: 0, cz: 0, half: 160 };
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (const p of plist) {
+      const r = Math.max(...(PARTS[p.kind]?.size ?? [20, 0, 20])) + 40;
+      x0 = Math.min(x0, p.pos[0] - r); x1 = Math.max(x1, p.pos[0] + r);
+      z0 = Math.min(z0, p.pos[2] - r); z1 = Math.max(z1, p.pos[2] + r);
+    }
+    return { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, half: Math.min(900, Math.max(150, Math.hypot(x1 - x0, z1 - z0) / 2)) };
+  }, [plist]);
+  useLayoutEffect(() => {
+    const l = key.current;
+    if (!l) return;
+    const c = l.shadow.camera;
+    c.left = -half; c.right = half; c.top = half; c.bottom = -half; c.near = 20; c.far = 1400;
+    c.updateProjectionMatrix();
+    l.target.position.set(cx, 0, cz);
+    l.target.updateMatrixWorld();
+    l.shadow.needsUpdate = true;
+  }, [cx, cz, half]);
+  return (
+    <>
+      <hemisphereLight args={['#ffffff', dark ? '#4b5a70' : '#9aa7b8', dark ? 0.55 : 0.8]} />
+      <directionalLight ref={key} position={[cx + 190, 420, cz + 230]} intensity={dark ? 1.9 : 2.3} castShadow shadow-mapSize={[4096, 4096]} shadow-bias={-0.0003} shadow-normalBias={0.35} shadow-radius={6} shadow-blurSamples={16} />
+      <directionalLight position={[cx - 220, 260, cz - 140]} intensity={dark ? 0.35 : 0.6} />
     </>
   );
 }
@@ -150,7 +190,8 @@ function Content() {
   const hover = useStore((s) => s.hover);
   const analysis = useStore((s) => s.analysis);
   const theme = useStore((s) => s.theme);
-  const shownParts = draft?.hideId ? plist.filter((p) => p.id !== draft.hideId) : plist;
+  const hidden = draft?.hideIds ?? (draft?.hideId ? [draft.hideId] : []);
+  const shownParts = hidden.length ? plist.filter((p) => !hidden.includes(p.id)) : plist;
   const ptsMemo = useMemo(() => {
     const m = new Map<string, [import('../core/types').Vec3, import('../core/types').Vec3]>();
     for (const w of wlist) {
@@ -163,14 +204,13 @@ function Content() {
   return (
     <>
       <color attach="background" args={[bg]} />
-      <hemisphereLight args={['#ffffff', '#7b8ca3', 0.85]} />
-      <directionalLight position={[150, 320, 180]} intensity={2.4} castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} shadow-normalBias={0.6} shadow-radius={5}>
-        <orthographicCamera attach="shadow-camera" args={[-280, 280, 220, -220, 10, 900]} />
-      </directionalLight>
+      <fog attach="fog" args={[bg, 900, 2600]} />
+      <Lights dark={theme === 'dark'} />
       <Env />
       <Desk />
       {shownParts.map((p) => <PartView key={p.id} part={p} />)}
       {draft && <PartView key="__draft" part={draft.part} />}
+      {draft?.extra?.map((p) => <PartView key={`__draft-${p.id}`} part={p} />)}
       {wlist.map((w) => {
         const e = ptsMemo.get(w.id);
         if (!e) return null;
@@ -188,6 +228,12 @@ function Content() {
       <Invalidator />
     </>
   );
+}
+
+function Marquee() {
+  const m = useStore((s) => s.marquee);
+  if (!m) return null;
+  return <div className="marquee" style={{ left: Math.min(m.x0, m.x1), top: Math.min(m.y0, m.y1), width: Math.abs(m.x1 - m.x0), height: Math.abs(m.y1 - m.y0) }} />;
 }
 
 export function Workspace() {
@@ -212,6 +258,7 @@ export function Workspace() {
   };
   return (
     <div ref={wrap} className="workspace" tabIndex={-1} onDragOver={onDragOver} onDrop={onDrop} onDragLeave={() => getState().draft && set({ draft: null })}>
+      <Marquee />
       <Canvas frameloop="demand" shadows="soft" dpr={[1, 2]} gl={{ antialias: true, preserveDrawingBuffer: true }} aria-label="3D 작업대">
         <Content />
       </Canvas>

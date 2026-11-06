@@ -1,9 +1,9 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
-import { MeshPhysicalMaterial, type Group, type Mesh, type MeshStandardMaterial, type Sprite } from 'three';
+import { MeshPhysicalMaterial, MeshStandardMaterial, type Group, type Mesh, type Sprite } from 'three';
 import { resistorBands } from '../../ui/core';
-import { GlowSprite, Legs, inputOf, makeTexture, vis, type PartProps } from './common';
+import { GlowPool, GlowSprite, Legs, inputOf, makeTexture, vis, type PartProps } from './common';
 
 export const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -11,26 +11,41 @@ const LED_COLORS: Record<string, string> = { red: '#ff2f2f', green: '#22d65a', b
 
 export function Led({ part }: PartProps) {
   const color = LED_COLORS[String(part.props.color)] ?? LED_COLORS.red!;
-  const mat = useMemo(() => new MeshPhysicalMaterial({ color, emissive: color, emissiveIntensity: 0, transparent: true, opacity: 0.8, roughness: 0.12, clearcoat: 1 }), [color]);
+  // translucent coloured epoxy: you can see the lead-frame cup and die inside; lit = emissive + halo + light pool
+  const mat = useMemo(() => new MeshPhysicalMaterial({ color, emissive: color, emissiveIntensity: 0, transparent: true, opacity: 0.74, roughness: 0.1, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.2 }), [color]);
+  const die = useMemo(() => new MeshStandardMaterial({ color: '#d8d2c4', emissive: color, emissiveIntensity: 0, metalness: 0.6, roughness: 0.4 }), [color]);
   const glow = useRef<Sprite>(null);
+  const pool = useRef<Mesh>(null);
   useFrame(() => {
     const b = vis(part.id)?.led?.brightness ?? 0;
-    mat.emissiveIntensity = b * 2.4;
+    const e = Math.sqrt(b); // perceptual: low PWM duty stays visibly dim, not off
+    mat.emissiveIntensity = e * 2.6;
+    die.emissiveIntensity = e * 4;
     const g = glow.current;
     if (g) {
       g.visible = b > 0.02;
-      g.scale.setScalar(6 + b * 20);
-      (g.material as { opacity: number }).opacity = Math.min(1, b * 0.95);
+      g.scale.setScalar(7 + e * 20);
+      (g.material as { opacity: number }).opacity = Math.min(1, 0.15 + e * 0.85);
+    }
+    const p = pool.current;
+    if (p) {
+      p.visible = b > 0.02;
+      p.scale.setScalar(10 + e * 22);
+      (p.material as { opacity: number }).opacity = Math.min(0.9, e * 0.8);
     }
   });
   return (
     <group>
       <Legs kind="led" top={4.2} />
-      <mesh position={[0, 4.5, 0]} castShadow material={mat}><cylinderGeometry args={[2.9, 2.9, 0.8, 20]} /></mesh>
-      <mesh position={[0, 6.3, 0]} castShadow material={mat}><cylinderGeometry args={[2.4, 2.4, 3.2, 20]} /></mesh>
-      <mesh position={[0, 7.9, 0]} castShadow material={mat}><sphereGeometry args={[2.4, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2]} /></mesh>
-      <mesh position={[0, 6.2, 0]}><boxGeometry args={[0.5, 3, 1.4]} /><meshStandardMaterial color="#d9dde0" /></mesh>
+      <mesh position={[0, 4.5, 0]} castShadow material={mat}><cylinderGeometry args={[2.9, 2.9, 0.8, 24]} /></mesh>
+      <mesh position={[0, 6.3, 0]} castShadow material={mat}><cylinderGeometry args={[2.4, 2.4, 3.2, 24]} /></mesh>
+      <mesh position={[0, 7.9, 0]} castShadow material={mat}><sphereGeometry args={[2.4, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2]} /></mesh>
+      {/* lead frame: anvil + cup + die */}
+      <mesh position={[0.7, 5.6, 0]}><boxGeometry args={[0.35, 2.2, 1.3]} /><meshStandardMaterial color="#cfd3d6" metalness={0.85} roughness={0.3} /></mesh>
+      <mesh position={[-0.7, 5.3, 0]}><boxGeometry args={[0.35, 1.6, 0.9]} /><meshStandardMaterial color="#cfd3d6" metalness={0.85} roughness={0.3} /></mesh>
+      <mesh position={[-0.7, 6.3, 0]} material={die}><boxGeometry args={[0.9, 0.9, 0.9]} /></mesh>
       <GlowSprite spriteRef={glow} position={[0, 7, 0]} color={color} />
+      <GlowPool poolRef={pool} color={color} />
     </group>
   );
 }
@@ -38,26 +53,39 @@ export function Led({ part }: PartProps) {
 export function RgbLed({ part }: PartProps) {
   const mat = useRef<MeshStandardMaterial>(null);
   const glow = useRef<Sprite>(null);
+  const pool = useRef<Mesh>(null);
   useFrame(() => {
     const v = vis(part.id)?.rgb ?? { r: 0, g: 0, b: 0 };
     const m = Math.max(v.r, v.g, v.b);
+    const e = Math.sqrt(m);
     mat.current?.emissive.setRGB(v.r, v.g, v.b);
-    if (mat.current) mat.current.emissiveIntensity = m * 2.2;
+    if (mat.current) mat.current.emissiveIntensity = e * 2.4;
     const g = glow.current;
     if (g) {
       g.visible = m > 0.02;
-      g.scale.setScalar(6 + m * 22);
-      (g.material as { opacity: number; color: { setRGB: (r: number, g: number, b: number) => void } }).opacity = Math.min(1, m);
-      (g.material as { color: { setRGB: (r: number, g: number, b: number) => void } }).color.setRGB(v.r, v.g, v.b);
+      g.scale.setScalar(7 + e * 22);
+      const gm = g.material as { opacity: number; color: { setRGB: (r: number, g: number, b: number) => void } };
+      gm.opacity = Math.min(1, 0.15 + e * 0.85);
+      gm.color.setRGB(v.r, v.g, v.b);
+    }
+    const p = pool.current;
+    if (p) {
+      p.visible = m > 0.02;
+      p.scale.setScalar(10 + e * 24);
+      const pm = p.material as unknown as { opacity: number; color: { setRGB: (r: number, g: number, b: number) => void } };
+      pm.opacity = Math.min(0.9, e * 0.8);
+      pm.color.setRGB(v.r, v.g, v.b);
     }
   });
   return (
     <group>
       <Legs kind="rgb-led" top={4.2} />
-      <mesh position={[0, 4.5, 0]} castShadow><cylinderGeometry args={[3.2, 3.2, 0.8, 20]} /><meshStandardMaterial color="#e8eaec" transparent opacity={0.8} /></mesh>
-      <mesh position={[0, 6.7, 0]} castShadow><cylinderGeometry args={[2.8, 2.8, 4, 20]} /><meshStandardMaterial ref={mat} color="#f1f3f4" emissive="#000" transparent opacity={0.72} roughness={0.2} /></mesh>
-      <mesh position={[0, 8.7, 0]} castShadow><sphereGeometry args={[2.8, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color="#f1f3f4" transparent opacity={0.72} roughness={0.2} /></mesh>
+      <mesh position={[0, 4.5, 0]} castShadow><cylinderGeometry args={[3.2, 3.2, 0.8, 24]} /><meshStandardMaterial color="#e8eaec" transparent opacity={0.8} /></mesh>
+      <mesh position={[0, 6.7, 0]} castShadow><cylinderGeometry args={[2.8, 2.8, 4, 24]} /><meshStandardMaterial ref={mat} color="#f1f3f4" emissive="#000" transparent opacity={0.72} roughness={0.15} /></mesh>
+      <mesh position={[0, 8.7, 0]} castShadow><sphereGeometry args={[2.8, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color="#f1f3f4" transparent opacity={0.72} roughness={0.15} /></mesh>
+      {[-1.1, 0, 1.1].map((x, i) => <mesh key={x} position={[x * 0.9, 6.2, 0]}><boxGeometry args={[0.3, 2.2 + (i % 2) * 0.6, 0.8]} /><meshStandardMaterial color="#cfd3d6" metalness={0.85} roughness={0.3} /></mesh>)}
       <GlowSprite spriteRef={glow} position={[0, 7.5, 0]} color="#ffffff" />
+      <GlowPool poolRef={pool} color="#ffffff" />
     </group>
   );
 }
@@ -81,7 +109,7 @@ export function Resistor({ part }: PartProps) {
       {[-3, 3].map((x) => <mesh key={x} position={[x, 3.2, 0]} castShadow><sphereGeometry args={[1.45, 14, 10]} /><meshStandardMaterial color="#d9bf8c" roughness={0.65} /></mesh>)}
       {bands.map((c, i) => (
         <mesh key={i} position={[xs[i]!, 3.2, 0]} rotation-z={Math.PI / 2}>
-          <cylinderGeometry args={[1.5, 1.5, 0.7, 20]} />
+          <cylinderGeometry args={[1.52, 1.52, 0.82, 20]} />
           <meshStandardMaterial color={c} roughness={0.5} />
         </mesh>
       ))}

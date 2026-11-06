@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
-import { MeshStandardMaterial, type CanvasTexture, type Group, type Mesh } from 'three';
+import { MeshStandardMaterial, type CanvasTexture, type Group } from 'three';
 import { PARTS } from '../../ui/core';
 import { Cable, Legs, inputOf, makeTexture, vis, type PartProps } from './common';
 import { reduced } from './basic';
@@ -35,8 +35,15 @@ export function Servo({ part }: PartProps) {
 }
 
 export function HcSr04({ part }: PartProps) {
-  const dist = useRef<Mesh>(null);
+  const dist = useRef<Group>(null);
   const tx = useRef<MeshStandardMaterial[]>([]);
+  const obsTex = useMemo(() => makeTexture(256, 180, (c) => {
+    c.fillStyle = '#f2a65a'; c.fillRect(0, 0, 256, 180);
+    c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 6;
+    for (let x = -180; x < 256; x += 36) { c.beginPath(); c.moveTo(x, 180); c.lineTo(x + 180, 0); c.stroke(); }
+    c.fillStyle = '#4a2a0c'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = 'bold 30px sans-serif';
+    c.fillText('장애물', 128, 74); c.font = '20px sans-serif'; c.fillText('끌어서 이동', 128, 112);
+  }), []);
   useFrame(() => {
     const cm = Number(inputOf(part.id, 'distanceCm', 100));
     if (dist.current) dist.current.position.z = 16 + cm * 0.8;
@@ -58,10 +65,13 @@ export function HcSr04({ part }: PartProps) {
         </group>
       ))}
       <mesh position={[0, 15, -1.3]}><boxGeometry args={[10, 5, 1]} /><meshStandardMaterial color="#9aa0a6" metalness={0.8} /></mesh>
-      <mesh ref={dist} position={[0, 12, 96]} castShadow>
-        <boxGeometry args={[34, 24, 4]} />
-        <meshStandardMaterial color="#ff9f43" transparent opacity={0.55} roughness={0.5} />
-      </mesh>
+      <mesh position={[0, 6.5, -1]}><boxGeometry args={[11, 4, 0.8]} /><meshStandardMaterial color="#17191c" /></mesh>
+      {[-1.5, 1.5].map((x) => <mesh key={x} position={[x * 4, 3, 0.5]}><boxGeometry args={[1.4, 2.4, 0.4]} /><meshStandardMaterial color="#d9b44a" metalness={1} roughness={0.3} /></mesh>)}
+      {/* movable obstacle: drag it in the scene (or use the distance slider) */}
+      <group ref={dist} position={[0, 0, 96]} userData={{ obstacle: part.id }}>
+        <mesh position={[0, 1, 0]} castShadow userData={{ obstacle: part.id }}><boxGeometry args={[36, 2, 8]} /><meshStandardMaterial color="#7a4a1c" roughness={0.7} /></mesh>
+        <mesh position={[0, 14, 0]} castShadow userData={{ obstacle: part.id }}><boxGeometry args={[34, 24, 3]} /><meshStandardMaterial map={obsTex} roughness={0.55} /></mesh>
+      </group>
     </group>
   );
 }
@@ -242,6 +252,12 @@ export function NeopixelStrip({ part }: PartProps) {
 
 export function L9110s({ part }: PartProps) {
   void part;
+  const silk = useMemo(() => makeTexture(540, 240, (c) => {
+    c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = 'bold 44px sans-serif'; c.fillText('L9110S', 270, 70);
+    c.font = '26px sans-serif'; c.fillText('MOTOR DRIVER', 270, 124);
+    c.font = 'bold 22px sans-serif'; c.fillText('A', 120, 190); c.fillText('B', 420, 190);
+  }), []);
   return (
     <group>
       <Legs kind="l9110s" top={4} radius={0.3} />
@@ -249,6 +265,7 @@ export function L9110s({ part }: PartProps) {
       {[-5.5, 5.5].map((x) => <mesh key={x} position={[x, 7, -1]} castShadow><boxGeometry args={[7, 2, 5]} /><meshStandardMaterial color="#17191c" /></mesh>)}
       {[-6, 6].map((x) => <mesh key={x} position={[x, 9.4, 7.5]} castShadow><boxGeometry args={[11, 7, 7]} /><meshStandardMaterial color="#2e9e55" roughness={0.5} /></mesh>)}
       <mesh position={[0, 6.4, -8.2]}><boxGeometry args={[26, 0.4, 3]} /><meshStandardMaterial color="#17191c" /></mesh>
+      <mesh position={[0, 6.22, 0.5]} rotation-x={-Math.PI / 2}><planeGeometry args={[27, 12]} /><meshBasicMaterial map={silk} transparent depthWrite={false} toneMapped={false} /></mesh>
     </group>
   );
 }
@@ -273,8 +290,12 @@ export function DcMotor({ part }: PartProps) {
       <mesh position={[8.4, 10.5, -14]} rotation-z={Math.PI / 2}><cylinderGeometry args={[6, 6, 1.2, 24]} /><meshStandardMaterial color="#6d7378" metalness={0.7} /></mesh>
       <group ref={shaft} position={[9, 10.5, -14]}>
         <mesh rotation-z={Math.PI / 2} position={[3, 0, 0]}><cylinderGeometry args={[1, 1, 9, 12]} /><meshStandardMaterial color="#d8dcdf" metalness={0.9} roughness={0.2} /></mesh>
-        <mesh position={[8, 0, 0]} castShadow><boxGeometry args={[0.8, 20, 3.2]} /><meshStandardMaterial color="#ff7043" roughness={0.5} /></mesh>
-        <mesh position={[8, 0, 0]} castShadow><boxGeometry args={[0.8, 3.2, 20]} /><meshStandardMaterial color="#ffa726" roughness={0.5} /></mesh>
+        {/* wheel: rubber tyre, hub and spokes + a white mark so the spin reads */}
+        <mesh position={[7, 0, 0]} rotation-z={Math.PI / 2} castShadow><cylinderGeometry args={[10.5, 10.5, 4.2, 36]} /><meshStandardMaterial color="#1f2124" roughness={0.85} /></mesh>
+        <mesh position={[7, 0, 0]} rotation-z={Math.PI / 2}><cylinderGeometry args={[7.6, 7.6, 4.6, 36]} /><meshStandardMaterial color="#ffb74d" roughness={0.5} /></mesh>
+        <mesh position={[7, 0, 0]} rotation-z={Math.PI / 2}><cylinderGeometry args={[2.2, 2.2, 5.2, 16]} /><meshStandardMaterial color="#cfd3d6" metalness={0.8} roughness={0.3} /></mesh>
+        {[0, 1, 2].map((i) => <mesh key={i} position={[7, 0, 0]} rotation-x={(i * Math.PI) / 3} castShadow><boxGeometry args={[4.9, 14, 1.4]} /><meshStandardMaterial color="#ffe0b2" roughness={0.5} /></mesh>)}
+        <mesh position={[7, 8.9, 0]}><boxGeometry args={[4.9, 1.6, 2.6]} /><meshStandardMaterial color="#ffffff" /></mesh>
       </group>
     </group>
   );

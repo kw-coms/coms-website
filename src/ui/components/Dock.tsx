@@ -5,10 +5,10 @@ import { basicSetup } from 'codemirror';
 import { cpp } from '@codemirror/lang-cpp';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint';
-import { Eraser, Send } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eraser, Send } from 'lucide-react';
 import { sim } from '../simHost';
 import { clearSerial, onSerialLog, plot, serialLog } from '../serial';
-import { getState, set, setCode, useStore, type DockTab } from '../store';
+import { getState, set, setCode, useStore, type SerialTab } from '../store';
 
 const theme = new Compartment();
 const lightTheme = EditorView.theme({ '&': { backgroundColor: 'var(--surface)', color: 'var(--text)', height: '100%' }, '.cm-gutters': { backgroundColor: 'var(--surface-2)', color: 'var(--muted)', border: 'none' } });
@@ -159,19 +159,36 @@ export function Plotter() {
   );
 }
 
-export function Dock() {
-  const tab = useStore((s) => s.dockTab);
-  const tabs: [DockTab, string][] = [['code', '코드'], ['serial', '시리얼 모니터'], ['plotter', '시리얼 플로터']];
+/** Collapsible, resizable bottom split under the code editor: serial monitor / plotter. */
+export function SerialDock() {
+  const tab = useStore((s) => s.serialTab);
+  const open = useStore((s) => s.serialOpen);
+  const h = useStore((s) => s.serialH);
+  const drag = useRef<{ y: number; h: number } | null>(null);
+  const tabs: [SerialTab, string][] = [['serial', '시리얼 모니터'], ['plotter', '시리얼 플로터']];
+  const max = () => Math.max(140, window.innerHeight * 0.6);
   return (
-    <section className="dock panel" aria-label="코드와 시리얼">
-      <div className="tabs" role="tablist">
-        {tabs.map(([id, label]) => <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'on' : ''} onClick={() => set({ dockTab: id })}>{label}</button>)}
+    <section className="serial-dock" aria-label="시리얼 도구" style={open ? { height: h } : undefined}>
+      <div
+        className="serial-split" role="separator" aria-orientation="horizontal" aria-label="시리얼 영역 크기 조절" tabIndex={0}
+        onPointerDown={(e) => { if (!open) return; drag.current = { y: e.clientY, h }; e.currentTarget.setPointerCapture(e.pointerId); }}
+        onPointerMove={(e) => drag.current && set({ serialH: Math.round(Math.max(90, Math.min(max(), drag.current.h + drag.current.y - e.clientY))) })}
+        onPointerUp={() => (drag.current = null)}
+        onKeyDown={(e) => { if (e.key === 'ArrowUp') set({ serialH: Math.min(max(), h + 24) }); if (e.key === 'ArrowDown') set({ serialH: Math.max(90, h - 24) }); }}
+      />
+      <div className="tabs" role="tablist" aria-label="시리얼">
+        {tabs.map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={tab === id && open} className={tab === id && open ? 'on' : ''} onClick={() => set({ serialTab: id, serialOpen: true })}>{label}</button>
+        ))}
+        <button type="button" className="fold" aria-label={open ? '시리얼 영역 접기' : '시리얼 영역 펼치기'} aria-expanded={open} onClick={() => set({ serialOpen: !open })}>
+          {open ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+        </button>
       </div>
-      <div className="dock-body">
-        <div hidden={tab !== 'code'} className="fill"><CodeEditor /></div>
-        {tab === 'serial' && <SerialMonitor />}
-        {tab === 'plotter' && <Plotter />}
-      </div>
+      {open && (
+        <div className="serial-body">
+          {tab === 'serial' ? <SerialMonitor /> : <Plotter />}
+        </div>
+      )}
     </section>
   );
 }

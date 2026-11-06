@@ -65,7 +65,7 @@ export async function run() {
         : r.reason === 'timeout' ? '컴파일 시간이 너무 오래 걸려요. 코드를 줄여 보세요.'
         : r.reason === 'rejected' ? '허용되지 않는 코드가 있어요. #include 목록을 확인해 보세요.'
         : `컴파일 오류 ${r.errors.length}개`;
-      set({ compile: { status: 'error', message: msg, errors: r.errors }, dockTab: 'code', mobileTab: 'code' });
+      set({ compile: { status: 'error', message: msg, errors: r.errors }, sideTab: 'code', sideOpen: true, sheetOpen: true });
       return;
     }
     clearSerial();

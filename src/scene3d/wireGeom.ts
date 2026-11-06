@@ -17,7 +17,7 @@ export function wirePoints(from: Vec3, to: Vec3, bends?: Vec3[]): Vec3[] {
   return [from, a1, arcApex(from, to), b1, to];
 }
 
-export function wireGeometry(points: Vec3[], radius = 0.9): TubeGeometry {
+export function wireGeometry(points: Vec3[], radius = 0.6): TubeGeometry {
   const curve = new CatmullRomCurve3(points.map((p) => new Vector3(...p)), false, 'centripetal');
   return new TubeGeometry(curve, Math.max(24, points.length * 14), radius, 8, false);
 }
