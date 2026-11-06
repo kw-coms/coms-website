@@ -1,5 +1,9 @@
 # syntax=docker/dockerfile:1
-FROM node:22-bookworm-slim AS toolchain
+# REQUIRED BEFORE BUILD: resolve the multi-platform index digest using
+# docker buildx imagetools inspect node:22-bookworm-slim
+# Registry DNS is unavailable in the hardening environment; fail closed until pinned.
+ARG NODE_IMAGE=node:22-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d
+FROM ${NODE_IMAGE} AS toolchain
 ARG TARGETARCH
 ENV ARDUINO_DIRECTORIES_DATA=/opt/arduino/data \
     ARDUINO_DIRECTORIES_USER=/opt/arduino/user \
@@ -31,9 +35,10 @@ RUN arduino-cli core update-index \
       'Adafruit NeoPixel@1.12.5' \
     && chmod -R a+rX /opt/arduino
 
-FROM node:22-bookworm-slim
-# Only runtime shared libraries, certificates, Node and Arduino's own toolchain.
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libstdc++6 \
+FROM ${NODE_IMAGE}
+# Offline compiler: no runtime download client or OS CA bundle is needed.
+# Optional Node fetch authentication uses Node's bundled root certificates.
+RUN apt-get update && apt-get install -y --no-install-recommends libstdc++6 util-linux \
     && rm -rf /var/lib/apt/lists/* /opt/yarn* /usr/local/lib/node_modules/npm \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/yarn /usr/local/bin/yarnpkg \
     && groupadd --gid 10001 compiler && useradd --uid 10001 --gid compiler --no-create-home --shell /usr/sbin/nologin compiler
@@ -45,8 +50,19 @@ ENV NODE_ENV=production PORT=8787 HOME=/tmp \
     ARDUINO_UPDATER_ENABLE_NOTIFICATION=false
 COPY --from=toolchain /usr/local/bin/arduino-cli /usr/local/bin/arduino-cli
 COPY --from=toolchain /opt/arduino /opt/arduino
+COPY --chmod=755 avr-limited.sh /usr/local/libexec/avr-limited
+RUN set -eu; \
+    set -- /opt/arduino/data/packages/arduino/tools/avr-gcc/*; \
+    test "$#" -eq 1; test -x "$1/bin/avr-g++"; \
+    ln -s "$1" /opt/avr-toolchain; \
+    mkdir -p /opt/avr-limited/bin; \
+    for tool in avr-gcc avr-g++ avr-gcc-ar avr-ar avr-objcopy avr-size; do \
+      test -x "/opt/avr-toolchain/bin/$tool"; \
+      ln -s /usr/local/libexec/avr-limited "/opt/avr-limited/bin/$tool"; \
+    done; \
+    /usr/bin/prlimit --version
 WORKDIR /app
-COPY --chown=root:root *.mjs package.json ./
+COPY --chown=root:root server.mjs compile.mjs validation.mjs limits.mjs diagnostics.mjs package.json ./
 USER compiler
 # Fail the image build if the dedicated runtime user can read password hashes.
 RUN test ! -r /etc/shadow

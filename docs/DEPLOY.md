@@ -6,7 +6,7 @@
 
 | 구성 요소 | 고정 버전 | 근거 |
 |---|---|---|
-| Node | 22 계열 (`node:22-bookworm-slim`) | 보안 패치를 받는 태그. 배포 시 이미지 digest도 기록할 것 |
+| Node | `node:22-bookworm-slim@sha256:<검증한 index digest>` | Dockerfile의 `NODE_IMAGE` placeholder를 실제 digest로 교체해야 빌드 가능 |
 | Arduino CLI | 1.5.1 | [공식 릴리스 및 SHA-256](https://github.com/arduino/arduino-cli/releases/tag/v1.5.1) |
 | Arduino AVR Boards | 1.8.8 | [공식 패키지 인덱스](https://downloads.arduino.cc/packages/package_index.json) |
 | Servo | 1.2.2 | [버전 메타데이터](https://github.com/arduino-libraries/Servo/blob/1.2.2/library.properties) |
@@ -15,7 +15,7 @@
 | Adafruit Unified Sensor | 1.1.15 | [버전 메타데이터](https://github.com/adafruit/Adafruit_Sensor/blob/1.1.15/library.properties) |
 | Adafruit NeoPixel | 1.12.5 | [버전 메타데이터](https://github.com/adafruit/Adafruit_NeoPixel/blob/1.12.5/library.properties) |
 
-Dockerfile은 amd64 / arm64 CLI 바이너리의 **리터럴 SHA-256**을 검사한다. AVR 코어와 라이브러리는 빌드 시 설치하고, `--no-deps`로 DHT의 의존성이 임의로 최신 버전으로 바뀌지 않게 한다. 설치 인덱스와 패키지는 Arduino CLI가 검증한다. 다운로드용 curl 등은 builder에만 있고 최종 이미지에는 Node, Arduino 도구, 필요한 공유 라이브러리와 CA 인증서만 남긴다. 소켓 공유 디렉터리 외의 호스트 디렉터리·Docker 소켓·시크릿을 마운트하지 않는다.
+Dockerfile은 amd64 / arm64 CLI 바이너리의 **리터럴 SHA-256**을 검사한다. AVR 코어와 라이브러리는 빌드 시 설치하고, `--no-deps`로 DHT의 의존성이 임의로 최신 버전으로 바뀌지 않게 한다. 설치 인덱스와 패키지는 Arduino CLI가 검증한다. 다운로드용 curl 등은 builder에만 있고 최종 이미지에는 Node, Arduino 도구, 필요한 공유 라이브러리와 리소스 제한용 `util-linux`만 남긴다. 최종 stage의 `ca-certificates` 설치는 제거했다. 오프라인 Arduino 도구는 인증서가 필요 없고, 선택적 Node HTTPS 인증은 Node 내장 CA를 사용한다. 소켓 공유 디렉터리 외의 호스트 디렉터리·Docker 소켓·시크릿을 마운트하지 않는다.
 
 ```sh
 # 저장소 루트에서. Node 22로도 반드시 검증한다.
@@ -24,7 +24,7 @@ npm --prefix compiler test
 docker build --pull --platform linux/amd64 -t coms-circuit-lab-compiler:release compiler/
 NGINX_GID=$(getent group www-data | cut -d: -f3)  # 실제 nginx 그룹에 맞게 변경
 export NGINX_GID
-sudo install -d -o 10001 -g "$NGINX_GID" -m 2770 /run/coms-lab
+sudo install -d -o 10001 -g "$NGINX_GID" -m 0750 /run/coms-lab
 docker compose -f compiler/docker-compose.yml up --build -d
 curl --fail -b "$LAB_COOKIE_FILE" https://coms.kw.ac.kr/lab/api/health
 ```
@@ -54,19 +54,23 @@ rsync -avz --delete -e "ssh -i ~/.ssh/deploy_key -p $DEPLOY_PORT" \
 
 ## 3. 호스트 nginx
 
-`limit_req_zone`은 기존 nginx의 **http 블록**에 한 번만 추가한다. 아래 location들은 `coms.kw.ac.kr` HTTPS server 블록 안에 넣는다. 기존 `/api/`, 로그인, 다른 서비스 설정을 대체하지 않는다.
+`limit_req_zone`과 `limit_conn_zone`은 기존 nginx의 **http 블록**에 한 번만 추가한다. 아래 location들은 `coms.kw.ac.kr` HTTPS server 블록 안에 넣는다. 기존 `/api/`, 로그인, 다른 서비스 설정을 대체하지 않는다.
 
 ```nginx
 # http {}
 limit_req_zone $binary_remote_addr zone=lab_compile:10m rate=10r/m;
+limit_conn_zone $binary_remote_addr zone=lab_compile_conn:10m;
 
 # 기존 HTTPS server {} 안
 location = /lab { return 301 /lab/; }
 
-location ^~ /lab/api/ {
+location = /lab/api/compile {
+    limit_except POST { deny all; }
+    limit_conn lab_compile_conn 4;
+    limit_conn_status 429;
     auth_request /lab/_auth;
-    proxy_pass http://unix:/run/coms-lab/compile.sock:/lab/api/;
-    # nginx 공식 Unix 소켓 문법. location의 /lab/api/를 같은 URI로 치환해 경로 보존.
+    proxy_pass http://unix:/run/coms-lab/compile.sock:/lab/api/compile;
+    # nginx 공식 Unix 소켓 문법. 정확한 compile URI를 보존한다.
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header Cookie "";
@@ -84,6 +88,26 @@ location ^~ /lab/api/ {
     limit_req_status 429;
     error_page 429 = @lab_rate_limited;
 }
+
+# Health는 GET 유지. POST 전용 compile location과 분리한다.
+location = /lab/api/health {
+    limit_except GET { deny all; }
+    auth_request /lab/_auth;
+    proxy_pass http://unix:/run/coms-lab/compile.sock:/lab/api/health;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header Cookie "";
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Connection "";
+    client_max_body_size 100k;
+    client_body_timeout 10s;
+    proxy_connect_timeout 3s;
+    proxy_read_timeout 30s;
+    proxy_request_buffering on;
+    proxy_buffering off;
+}
+location ^~ /lab/api/ { return 404; }
 
 # 실제 백엔드 포트/경로로 치환한다. /api/auth/me가 미인증에 401/403을 반환하는지 검증한다.
 location = /lab/_auth {
@@ -125,7 +149,7 @@ nginx보다 앱의 본문 제한(80 KiB)이 작다. nginx가 먼저 차단한 10
 ```sh
 # 실제 nginx 실행 그룹의 숫자 GID로 대체한다. www-data는 Debian 예시다.
 NGINX_GID=$(getent group www-data | cut -d: -f3)
-sudo install -d -o 10001 -g "$NGINX_GID" -m 2770 /run/coms-lab
+sudo install -d -o 10001 -g "$NGINX_GID" -m 0750 /run/coms-lab
 # uid 10001이 소켓을 만들고, 지정 GID를 가진 nginx가 0660 소켓을 읽는다.
 docker run -d --name coms-circuit-lab-compiler \
   --restart unless-stopped --init --stop-timeout 25 \
@@ -141,7 +165,7 @@ docker run -d --name coms-circuit-lab-compiler \
 stat -c '%a %u %g %n' /run/coms-lab/compile.sock # 660 10001 <NGINX_GID>
 ```
 
-`/run`은 재부팅 시 지워질 수 있으므로 systemd-tmpfiles 등으로 디렉터리를 다시 생성해야 한다. nginx 서비스가 실제로 해당 GID로 실행되는지 확인하고, GID 0 및 `/etc/shadow`의 그룹 GID를 사용하지 않는다. 소켓 소유권은 `--user`의 UID:GID와 0117 umask로 정해진다. 이미지의 기본 사용자는 비특권 UID 10001이며 `/etc/shadow`는 기본 파일 권한으로 읽을 수 없다. 이미 소켓 파일이 있으면 시작을 거부한다. 재시작 시 기존 컨테이너가 종료된 것을 확인하고 오래된 소켓만 삭제한다. `PORT`를 통한 TCP 수신은 개발용 대안이며 프로덕션에는 사용하지 않는다.
+`/run`은 재부팅 시 지워질 수 있으므로 systemd-tmpfiles 등으로 디렉터리를 다시 생성해야 한다. nginx 서비스가 실제로 해당 GID로 실행되는지 확인하고, GID 0 및 `/etc/shadow`의 그룹 GID를 사용하지 않는다. 소켓 소유권은 `--user`의 UID:GID와 0117 umask로 정해진다. 이미지의 기본 사용자는 비특권 UID 10001이며 `/etc/shadow`는 기본 파일 권한으로 읽을 수 없다. 소켓 디렉터리는 0750으로 nginx 그룹의 디렉터리 쓰기(삭제·교체)를 막는다. 소켓 자체는 0660이다. 시작 시 기존 소켓에 연결해 `ECONNREFUSED`인 경우에만 inode를 재확인하고 삭제한다. 살아 있는 listener, 일반 파일·symlink, 권한 오류·연결 timeout은 거부한다. SIGKILL/OOM 이후 남은 소켓은 자동 복구된다. 같은 디렉터리에 동시에 두 compiler 인스턴스를 시작하지 않는다(검사와 unlink는 원자적 연산이 아니다). `PORT`를 통한 TCP 수신은 개발용 대안이며 프로덕션에는 사용하지 않는다.
 
 ## 5. 선택적 동아리 로그인 확인
 
@@ -153,12 +177,43 @@ stat -c '%a %u %g %n' /run/coms-lab/compile.sock # 660 10001 <NGINX_GID>
 - 허용 헤더: `Arduino.h`, `Wire.h`, `SPI.h`, `Servo.h`, `LiquidCrystal_I2C.h`, `DHT.h`, `Adafruit_Sensor.h`, `Adafruit_NeoPixel.h`, `EEPROM.h`, `math.h`, `string.h`, `stdlib.h`, `avr/pgmspace.h`.
 - quoted/macro include, 절대·상대 경로, `..`, 역슬래시, 목록 밖의 슬래시 경로를 거부한다. 줄 연결을 처리한 다음 주석을 제거하고 각 줄을 검사한다.
 - `__has_`로 시작하는 모든 식별자, `asm` 계열, `incbin`, `_Pragma`/`__pragma`, `##`, `%:`/`??=`/`??/`, `\\u`/`\\U` UCN, raw 문자열, 숫자 구분자와 접두 문자 리터럴을 거부한다. 전처리 지시문은 허용 헤더의 리터럴 `#include <name.h>`, `#define`, `#undef`, `#if`, `#ifdef`, `#ifndef`, `#elif`, `#else`, `#endif`, `#error`, `#warning`만 허용한다. `#pragma`의 모든 변형, `#line`, `#include_next`, `#import`, `#embed`, `#ident`, `#sccs`, `#assert`, 잘못된 null 지시문을 거부한다. 교육용 C++ 부분집합이며 조건부 컴파일로 비활성화된 코드도 검사한다.
-- shell 없이 고정 argv로 `arduino-cli compile --fqbn arduino:avr:uno --jobs 1 --warnings all --build-path <tmp>/build --output-dir <tmp>/out sketch`를 실행한다.
+- shell 해석 없이 고정 argv로 `prlimit -- ... arduino-cli compile --fqbn arduino:avr:uno --jobs 1 --warnings all --build-property compiler.path=/opt/avr-limited/bin/ --build-path <tmp>/build --output-dir <tmp>/out sketch`를 실행한다. AVR wrapper는 도구 이름을 allowlist하고 원본 바이너리를 `exec`한다. 서버 환경은 상속하지 않는다: 고정 PATH, 요청별 HOME, `LANG=C`, 고정 Arduino DATA/USER 경로, 요청별 DOWNLOADS/CACHE, updater 비활성화만 자식에 전달한다.
 - 요청별 임시 폴더, 20초 제한, detached 프로세스 그룹 전체 SIGKILL, `finally` 삭제. 생성 HEX를 실행하거나 보드에 업로드하지 않는다.
-- 최대 2개 실행 + 6개 FIFO 대기, 초과 시 429 `busy`. IP별 고정 60초 창 기본 10회 (`RATE_LIMIT_PER_MIN`으로 양의 정수 설정), 초과 시 429 `rate-limited`. 상태는 프로세스 메모리에 있으므로 재시작 시 초기화되며 다중 replica에 공유되지 않는다.
+- 최대 2개 실행 + 6개 FIFO 대기, 초과 시 429 `busy`. IP별 고정 60초 창 기본 10회 (`RATE_LIMIT_PER_MIN`으로 양의 정수 설정), 초과 시 429 `rate-limited`. 요청 경로는 O(1) Map 조회/갱신이며 unref 타이머가 만료 항목을 정리한다. 10,000 IP가 차면 가장 오래 사용하지 않은 IP를 내보내 새 IP를 수용한다. IP 회전 시 퇴출된 카운터가 초기화될 수 있으므로 nginx 제한도 유지한다. 상태는 프로세스 메모리에 있으므로 재시작 시 초기화되며 다중 replica에 공유되지 않는다.
 - `TRUST_PROXY=1`일 때만 X-Forwarded-For 첫 주소를 신뢰한다. nginx는 이를 덮어쓰고 프로덕션은 TCP 포트를 열지 않는다.
 - GCC 진단은 작업 폴더의 정확한 `sketch.ino`와 유효한 사용자 코드 줄·열에서만 추출한다. 다른 파일의 note·출력·인용은 버리고, linker 실패는 고정 메시지와 line 0으로 반환한다. 절대 경로·임시 폴더 이름을 지우고 진단 30개 × 메시지 800자, 프로세스 출력 256 KiB, HEX 192 KiB로 제한한다. HEX 체크섬을 확인하고 bootloader HEX는 반환하지 않는다. `sizeBytes`는 HEX의 데이터 바이트 합계다.
 - 컴파일 문법 오류는 HTTP 200 / `ok:false, reason:compile`, 실행 시간 초과는 HTTP 504 / `reason:timeout`. health는 HTTP 서버 liveness만 증명하며 Arduino 설치·실제 컴파일 성공을 증명하지 않는다.
+
+## 6a. 자식 한도와 실측 게이트
+
+| 대상 | 주소 공간 (soft = hard) | CPU 시간 / 프로세스 | 단일 파일 크기 |
+|---|---:|---:|---:|
+| Arduino CLI 및 일반 자식 | 2 GiB (2147483648 B) | 15초 | 16 MiB (16777216 B) |
+| AVR gcc/g++/ar/objcopy/size 및 그 자식 | 128 MiB (134217728 B) | 10초 | 16 MiB |
+
+Core dump는 0 B다. `prlimit`이 없으면 제한 없이 실행하지 않고 실패한다. Go 기반 CLI는 가상 메모리 예약이 커 GCC와 같은 주소 공간 제한을 적용하지 않는다. GCC wrapper의 한도는 cc1plus, assembler, linker/LTO에 상속된다. CPU 한도는 프로세스별이며 전체 작업 합산이 아니다. 별도로 기존 **20초 wall-clock 프로세스 그룹 SIGKILL**과 모든 종료 경로의 요청 디렉터리 `finally` 삭제를 유지한다. [Linux rlimit 문서](https://man7.org/linux/man-pages/man2/prlimit.2.html)처럼 주소 공간은 RSS와 다르고 파일 한도는 디렉터리 총량이 아니다.
+
+**실측 미완료 / 배포 전 필수:** 이번 편집 환경은 Docker daemon 접근이 `EPERM`, registry DNS 조회가 실패했다. 위 수치는 검증 전 잠정값이며 실제 AVR 성공·OOM 격리를 확인했다고 주장하지 않는다. `/tmp`는 우선 기존 **256 MiB**, 컨테이너는 **768 MiB**를 유지한다. 임시 용량 예산은 동시 2건 × 96 MiB + 64 MiB 여유로 잡되, 이는 요청별 디스크 quota가 아니다. 실측한 1건 peak에 2배 여유를 두고 두 건을 수용하려면 **1건 peak ≤ 48 MiB**, 동시 2건 peak ≤ 192 MiB를 확인한다. 초과 시 tmpfs와 컨테이너 RAM 예산을 함께 재산정해야 하며 tmpfs만 늘리지 않는다. 파일 크기 제한은 tmpfs 총량 제한을 대체하지 않는다.
+
+```sh
+# 먼저 registry에서 실제 multi-platform index digest 확인 후 Dockerfile ARG 수정.
+# placeholder를 둔 기본 빌드는 의도적으로 실패한다. mutable tag로 우회하지 않는다.
+docker buildx imagetools inspect node:22-bookworm-slim
+docker build --pull -t coms-circuit-lab-compiler:release compiler/
+
+# production과 같은 1 CPU / RAM / tmpfs / 사용자 권한. 5-library cold build 1건, 동시 2건.
+# probe와 fixture는 이미지에 넣지 않고 read-only bind mount한다.
+for jobs in 1 2; do
+  docker run --rm --init --network none --read-only \
+    --tmpfs /tmp:rw,noexec,nosuid,nodev,size=256m,mode=1777 \
+    --memory 768m --memory-swap 768m --cpus 1.0 --pids-limit 128 \
+    --user 10001:10001 --cap-drop ALL --security-opt no-new-privileges:true \
+    --mount type=bind,src="$PWD/compiler",dst=/workspace,readonly \
+    --workdir /workspace coms-circuit-lab-compiler:release node measure.mjs "$jobs"
+done
+```
+
+`measure.mjs`는 20 ms 간격으로 작업 프로세스 그룹 RSS/VM, 요청 디렉터리의 할당 디스크 바이트와 최대 파일 크기를 기록하고 실제 컴파일 성공 여부를 JSON으로 출력한다. sampling은 짧은 peak를 놓칠 수 있으므로 여유를 남긴다. cold build 1/2건 모두 성공, 20초 이내, 여유 있는 VM/파일/디스크 수치를 기록한 뒤 한도를 확정한다. 각 요청의 HOME과 CLI 캐시도 요청 디렉터리 아래에 있어 종료 시 같이 지워진다. 배포 담당자는 template/macro/대형 출력 공격과 정상 컴파일을 동시에 실행해 정상 요청 및 서버 생존, cgroup `memory.events`의 `oom_kill` 미증가, 작업 후 디렉터리 삭제까지 확인한다.
 
 ## 7. 버전 갱신
 
@@ -198,9 +253,25 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://coms.kw.ac.kr/lab/api/health
 # 예상: 유효 쿠키 없이 401 또는 403
 ```
 
-- [ ] 이미지 빌드·checksum 및 Node 22 전체 테스트 성공.
+- [ ] base index digest placeholder 교체, 이미지 빌드·checksum 및 Node 22 전체 테스트 성공.
+- [ ] 5-library 1/2건 실측값 기록, 잠정 자식 한도·tmpfs/RAM 여유 확정, 공격 중 서버/다른 job 생존 확인.
 - [ ] nginx를 통한 health와 실제 compile 성공. 반환 HEX와 한글 힌트 확인.
 - [ ] 파일 탐색 우회 요청은 `reason: rejected`이고 외부 파일 내용이 응답에 없다.
-- [ ] 소켓 디렉터리 2770, 소켓 0660, nginx 그룹 접근 가능. 재부팅 후 디렉터리 재생성됨.
+- [ ] 소켓 디렉터리 0750, 소켓 0660, nginx 그룹 접근 가능. 재부팅 후 디렉터리 재생성됨.
 - [ ] `docker inspect`에서 `NetworkMode=none`, 포트 바인딩 없음, 비특권 UID/GID, 읽기 전용 루트 및 리소스 제한 확인.
 - [ ] 요청 제한, 동시성 제한, 시간 초과와 로그의 스케치·쿠키 비노출 확인.
+
+## 실측 리소스 (2026-11-07, coms-circuit-lab-compiler:local, Apple Silicon Docker)
+
+`compiler/measure.mjs`를 이미지 안에서 실행해 라이브러리 5종(Wire, LiquidCrystal_I2C, Servo, DHT, Adafruit_NeoPixel)을 쓰는 스케치를 컴파일한 값입니다.
+
+| 동시 작업 | 총 RSS | arduino-cli VM | /tmp 사용 | 걸린 시간 |
+|---|---|---|---|---|
+| 1 | 212 MB | 1.52 GB | 1.8 MB | 0.97 s |
+| 2 | 433 MB | 1.52 GB | 3.5 MB | 1.06 s |
+
+따라서 컨테이너 메모리 768 MB, CLI 주소 공간 2 GiB, `/tmp` 256 MiB, 20초 제한은 동시 2개 기준으로 여유가 있습니다. 측정 명령:
+
+```sh
+docker run --rm --user 10001:10001 --tmpfs /tmp:size=1g,exec -v "$PWD/compiler:/m:ro" -w /m --entrypoint node coms-circuit-lab-compiler:local /m/measure.mjs 2
+```

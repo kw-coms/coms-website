@@ -1,20 +1,34 @@
-export function createRateLimiter({ limit = 10, windowMs = 60_000, now = Date.now, maxKeys = 10_000 } = {}) {
+export function createRateLimiter({ limit = 10, windowMs = 60_000, now = Date.now, maxKeys = 10_000, setIntervalImpl = setInterval } = {}) {
+  if (!Number.isSafeInteger(maxKeys) || maxKeys < 1) throw new RangeError('maxKeys must be a positive integer');
   const clients = new Map();
+  const sweep = setIntervalImpl(() => {
+    const time = now();
+    for (const [key, entry] of clients) if (entry.resetAt <= time) clients.delete(key);
+  }, windowMs);
+  sweep.unref?.();
   return {
     take(ip) {
       const time = now();
-      // Also bounds memory when clients rotate IPs.
-      for (const [key, entry] of clients) if (entry.resetAt <= time) clients.delete(key);
       let entry = clients.get(ip);
+      if (entry && entry.resetAt <= time) {
+        clients.delete(ip);
+        entry = undefined;
+      }
       if (!entry) {
-        if (clients.size >= maxKeys) return false;
+        if (clients.size >= maxKeys) clients.delete(clients.keys().next().value);
         entry = { count: 0, resetAt: time + windowMs };
+        clients.set(ip, entry);
+      } else {
+        // Map insertion order tracks the least recently used client.
+        clients.delete(ip);
         clients.set(ip, entry);
       }
       if (entry.count >= limit) return false;
       entry.count++;
       return true;
     },
+    close() { clearInterval(sweep); },
+    stats() { return { clients: clients.size }; },
   };
 }
 

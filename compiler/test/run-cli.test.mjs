@@ -19,3 +19,25 @@ test('kills detached compiler process group on timeout', async () => {
 test('terminates compiler after excessive output', async () => {
   await assert.rejects(runCli([], { spawnImpl: nodeSpawn("process.stdout.write('x'.repeat(300000));setInterval(() => {},1000)") }), { code: 'output-limit' });
 });
+
+test('compiler gets only a fixed environment and resource-limited argv', async () => {
+  process.env.COMPILER_TEST_SECRET = 'must-not-inherit';
+  process.env.ARDUINO_BUILD_PROPERTIES = 'must-not-inherit';
+  try {
+    await runCli(['compile', 'sketch'], { cwd: '/tmp', spawnImpl: (file, args, options) => {
+      assert.equal(file, '/usr/bin/prlimit');
+      assert.deepEqual(args, ['--as=2147483648:2147483648', '--cpu=15:15', '--fsize=16777216:16777216', '--core=0:0', '--', '/usr/local/bin/arduino-cli', 'compile', 'sketch']);
+      assert.deepEqual(options.env, {
+        PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/tmp', LANG: 'C',
+        ARDUINO_DIRECTORIES_DATA: '/opt/arduino/data',
+        ARDUINO_DIRECTORIES_USER: '/opt/arduino/user',
+        ARDUINO_DIRECTORIES_DOWNLOADS: '/tmp/downloads', ARDUINO_BUILD_CACHE_PATH: '/tmp/cache',
+        ARDUINO_UPDATER_ENABLE_NOTIFICATION: 'false',
+      });
+      return nodeSpawn('process.exit(0)')(file, args, options);
+    } });
+  } finally {
+    delete process.env.COMPILER_TEST_SECRET;
+    delete process.env.ARDUINO_BUILD_PROPERTIES;
+  }
+});

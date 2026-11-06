@@ -11,30 +11,43 @@ const ALLOWED_DIRECTIVES = new Set(['define', 'undef', 'if', 'ifdef', 'ifndef', 
 // terminators and quoted literals intact; comment-like text in strings is data.
 export function stripComments(source) {
   let result = '', state = 'code';
+  // Recognize only the prefix that permits a header-name token. Track emitted
+  // characters, since removed comments become whitespace in the logical line.
+  let directive = 0;
+  const include = 'include';
+  function emit(c) {
+    result += c;
+    if (c === '\n') { directive = 0; return; }
+    if (directive < 0) return;
+    if (directive === 0) directive = /\s/.test(c) ? 0 : c === '#' ? 1 : -1;
+    else if (directive === 1) directive = /\s/.test(c) ? 1 : c === 'i' ? 2 : -1;
+    else if (directive < 8) directive = c === include[directive - 1] ? directive + 1 : -1;
+    else directive = /\s/.test(c) ? 8 : -1;
+  }
   for (let i = 0; i < source.length; i++) {
     const c = source[i], next = source[i + 1];
     if (state === 'header') {
       if (c === '\n') throw new Error('unterminated header');
-      result += c;
+      emit(c);
       if (c === '>') state = 'code';
     } else if (state === 'line') {
-      result += c === '\n' ? '\n' : ' ';
+      emit(c === '\n' ? '\n' : ' ');
       if (c === '\n') state = 'code';
     } else if (state === 'block') {
-      if (c === '*' && next === '/') { result += '  '; i++; state = 'code'; }
-      else result += ' ';
+      if (c === '*' && next === '/') { emit(' '); emit(' '); i++; state = 'code'; }
+      else emit(' ');
     } else if (state === '"' || state === "'") {
       if (c === '\n') throw new Error('multiline literal');
-      result += c;
-      if (c === '\\' && next !== undefined) result += source[++i];
+      emit(c);
+      if (c === '\\' && next !== undefined) emit(source[++i]);
       else if (c === state) state = 'code';
-    } else if (c === '<' && /^\s*#\s*include\s*$/.test(result.slice(result.lastIndexOf('\n') + 1))) {
+    } else if (c === '<' && directive === 8) {
       // In a header-name token, /* and // are path characters, not comments.
-      result += c; state = 'header';
+      emit(c); state = 'header';
     } else if (c === '/' && (next === '/' || next === '*')) {
-      result += '  '; i++; state = next === '/' ? 'line' : 'block';
+      emit(' '); emit(' '); i++; state = next === '/' ? 'line' : 'block';
     } else {
-      result += c;
+      emit(c);
       if (c === "'" && /[a-zA-Z0-9_]/.test(source[i - 1] || '')) throw new Error('unsupported digit separator or prefixed character');
       if (c === '"' || c === "'") state = c;
     }

@@ -11,10 +11,22 @@ const MAX_HEX = 192 * 1024;
 // Real runner is injectable, so tests need neither Arduino CLI nor its toolchain.
 export function runCli(args, { cwd, timeoutMs = 20_000, spawnImpl = spawn } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawnImpl('arduino-cli', args, {
+    // Go's CLI needs more virtual address space than native AVR tools. The
+    // compiler.path wrappers apply tighter limits to GCC and its descendants.
+    const child = spawnImpl('/usr/bin/prlimit', [
+      '--as=2147483648:2147483648', '--cpu=15:15', '--fsize=16777216:16777216', '--core=0:0',
+      '--', '/usr/local/bin/arduino-cli', ...args,
+    ], {
       cwd, shell: false, detached: true, stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, LC_ALL: 'C', NO_COLOR: '1',
-        ...(cwd ? { ARDUINO_BUILD_CACHE_PATH: join(cwd, 'cache'), ARDUINO_DIRECTORIES_DOWNLOADS: join(cwd, 'downloads') } : {}),
+      // Do not inherit secrets, loader hooks, GCC flags, proxy settings, or
+      // arbitrary ARDUINO_* configuration from the server's environment.
+      env: {
+        PATH: '/usr/local/bin:/usr/bin:/bin', HOME: cwd || '/tmp', LANG: 'C',
+        ARDUINO_DIRECTORIES_DATA: '/opt/arduino/data',
+        ARDUINO_DIRECTORIES_USER: '/opt/arduino/user',
+        ARDUINO_DIRECTORIES_DOWNLOADS: join(cwd || '/tmp', 'downloads'),
+        ARDUINO_BUILD_CACHE_PATH: join(cwd || '/tmp', 'cache'),
+        ARDUINO_UPDATER_ENABLE_NOTIFICATION: 'false',
       },
     });
     let stdout = '', stderr = '', bytes = 0, termination;
@@ -65,6 +77,7 @@ export async function compileSketch(sketch, { runner = runCli, tempRoot = tmpdir
     await writeFile(join(work, 'sketch', 'sketch.ino'), sketch, { mode: 0o600 });
     const result = await runner([
       'compile', '--fqbn', 'arduino:avr:uno', '--jobs', '1', '--warnings', 'all',
+      '--build-property', 'compiler.path=/opt/avr-limited/bin/',
       '--build-path', join(work, 'build'), '--output-dir', join(work, 'out'), 'sketch',
     ], { cwd: work, timeoutMs });
     const messages = parseDiagnostics(`${result.stderr}\n${result.stdout}`, {

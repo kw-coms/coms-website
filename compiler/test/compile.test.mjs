@@ -15,6 +15,7 @@ test('returns HEX, warnings, and byte count using isolated sketch folder', async
       runner: async (args, { cwd }) => {
         assert.equal(await readFile(join(cwd, 'sketch/sketch.ino'), 'utf8'), 'void setup(){}\nvoid loop(){}');
         assert.equal(args[args.indexOf('--fqbn') + 1], 'arduino:avr:uno');
+        assert.equal(args[args.indexOf('--build-property') + 1], 'compiler.path=/opt/avr-limited/bin/');
         await mkdir(join(cwd, 'out'));
         await writeFile(join(cwd, 'out/sketch.ino.hex'), HEX);
         return { code: 0, stdout: '', stderr: 'sketch.ino:1:2: warning: unused variable' };

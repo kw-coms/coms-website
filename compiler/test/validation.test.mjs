@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { performance } from 'node:perf_hooks';
 import { validateSketch, ALLOWED_HEADERS } from '../validation.mjs';
 
 for (const header of ALLOWED_HEADERS) test(`allows ${header}`, () => assert.equal(validateSketch(`#include <${header}>\nvoid setup(){} void loop(){}`), null));
@@ -65,4 +66,22 @@ test('allows allowlisted directives after logical-line normalization', () => {
 test('continued line comments and literal comment markers preserve directive boundaries', () => {
   assert.equal(validateSketch('// ignored \\\n#pragma once\nconst char* s="/*"; char c=\'/\';\n#include <Servo.h>'), null);
   assert.equal(validateSketch('// ignored \\\r\n#pragma once\n#include <Servo.h>'), null);
+});
+
+test('validates worst-case 64 KB inputs within 50 ms each', () => {
+  const cases = new Map([
+    ['unbroken angle brackets', '<'.repeat(64000)],
+    ['spaced angle brackets', ' <'.repeat(32000)],
+    ['newline angle brackets', '\n<'.repeat(32000)],
+    ['repeated comment openers', '/*'.repeat(32000)],
+    ['long quote runs', '"'.repeat(64000)],
+    ['long line splice runs', '\\\n'.repeat(32000)],
+    ['repeated if directives', '#if 1\n'.repeat(10666)],
+  ]);
+  for (const [name, sketch] of cases) {
+    const start = performance.now();
+    validateSketch(sketch);
+    const elapsed = performance.now() - start;
+    assert.ok(elapsed < 50, `${name}: ${elapsed.toFixed(1)} ms`);
+  }
 });

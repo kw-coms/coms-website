@@ -8,11 +8,28 @@ test('allows ten attempts per IP each minute', () => {
   assert.equal(limiter.take('a'), false);
   assert.equal(limiter.take('b'), true);
   now = 60000; assert.equal(limiter.take('a'), true);
+  limiter.close();
 });
-test('bounds number of distinct IP records', () => {
-  const limiter = createRateLimiter({ maxKeys: 1 });
+test('evicts the oldest client when full and sweeps expired clients on an unref timer', () => {
+  let now = 0, tick, timer;
+  const limiter = createRateLimiter({ limit: 1, maxKeys: 2, windowMs: 100,
+    now: () => now,
+    setIntervalImpl: callback => { tick = callback; timer = { unref() { this.unrefed = true; } }; return timer; },
+  });
+  assert.equal(timer.unrefed, true);
   assert.equal(limiter.take('a'), true);
-  assert.equal(limiter.take('b'), false);
+  assert.equal(limiter.take('b'), true);
+  assert.equal(limiter.take('a'), false); // a is now most recently used
+  assert.equal(limiter.take('c'), true); // b is evicted
+  assert.equal(limiter.take('b'), true); // evicted b is admitted again
+  assert.deepEqual(limiter.stats(), { clients: 2 });
+  now = 100; tick();
+  assert.deepEqual(limiter.stats(), { clients: 0 });
+  assert.equal(limiter.take('a'), true);
+  limiter.close();
+});
+test('requires a positive client capacity', () => {
+  for (const maxKeys of [0, -1, 1.5]) assert.throws(() => createRateLimiter({ maxKeys }), RangeError);
 });
 test('admits two active and six queued jobs then rejects ninth', async () => {
   const queue = createCompileQueue(), releases = [];

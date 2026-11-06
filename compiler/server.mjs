@@ -1,8 +1,8 @@
 import { createServer } from 'node:http';
-import { isIP } from 'node:net';
+import { isIP, createConnection } from 'node:net';
 import { pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { lstat } from 'node:fs/promises';
+import { lstat, unlink } from 'node:fs/promises';
 import { validateSketch } from './validation.mjs';
 import { compileSketch, failure } from './compile.mjs';
 import { createRateLimiter, createCompileQueue } from './limits.mjs';
@@ -127,10 +127,22 @@ export function createCompileServer({
 }
 export async function listenCompiler(server, { socketPath = process.env.LISTEN_SOCKET, port = process.env.PORT || 8787 } = {}) {
   if (socketPath) {
-    // Fail closed: never replace a socket another process may still be serving.
+    // A SIGKILL leaves a socket inode behind. Remove it only when a connection
+    // is refused, and only if the inode has not changed during the probe.
     try {
-      await lstat(socketPath);
-      throw new Error('LISTEN_SOCKET path already exists');
+      const existing = await lstat(socketPath);
+      if (!existing.isSocket()) throw new Error('LISTEN_SOCKET path already exists');
+      const probe = await new Promise(resolve => {
+        const connection = createConnection(socketPath);
+        connection.setTimeout(1000);
+        connection.once('connect', () => { connection.destroy(); resolve('active'); });
+        connection.once('error', error => resolve(error.code));
+        connection.once('timeout', () => { connection.destroy(); resolve('timeout'); });
+      });
+      if (probe !== 'ECONNREFUSED') throw new Error('LISTEN_SOCKET path already exists');
+      const current = await lstat(socketPath);
+      if (current.dev !== existing.dev || current.ino !== existing.ino || !current.isSocket()) throw new Error('LISTEN_SOCKET path changed during probe');
+      await unlink(socketPath);
     } catch (error) { if (error.code !== 'ENOENT') throw error; }
     const oldMask = process.umask(0o117); // 0777 & ~0117 = 0660
     try { await new Promise((resolve, reject) => { server.once('error', reject); server.listen(socketPath, () => { server.off('error', reject); resolve(); }); }); }
