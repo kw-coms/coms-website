@@ -26,54 +26,63 @@ class RichBodyMediaServiceTest {
             Clock.fixed(java.time.Instant.parse("2026-11-06T00:00:00Z"), ZoneOffset.UTC), deleter);
     private static final RichBodyMedia.Scope NOTICE = RichBodyMedia.Scope.NOTICE;
 
-    @Test void pendingUploadBelongingToAnotherMemberCannotBeAttached() {
-        RichBodyMedia foreign = row(1, RichBodyMedia.Kind.IMAGE, NOTICE, 200);
-        when(rows.findLockedById(1L)).thenReturn(Optional.of(foreign));
-        when(rows.findByScopeAndOwnerId(NOTICE, 50L)).thenReturn(List.of());
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"0", "-1", "1.5", "\"1\"", "9223372036854775808"})
+    void rejectsMalformedReferenceIds(String id) {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.syncAttachments(NOTICE, 50L,
+                "[{\"type\":\"image\",\"mediaId\":" + id + "}]", "actor"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode().value()).isEqualTo(400));
+        verifyNoInteractions(rows);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"missing", "scope", "kind", "uploader", "owner", "deletedUploader"})
+    void rejectsReferencesThatCannotBeRegistered(String reason) {
+        RichBodyMedia candidate = row(1, reason.equals("kind") ? RichBodyMedia.Kind.FILE : RichBodyMedia.Kind.IMAGE,
+                reason.equals("scope") ? RichBodyMedia.Scope.SPONSOR : NOTICE, reason.equals("uploader") ? 200 : 100);
+        if (reason.equals("owner")) candidate.attach(60L, LocalDateTime.now());
+        if (reason.equals("deletedUploader")) ReflectionTestUtils.setField(candidate, "uploaderId", null);
+        when(rows.findLockedById(1L)).thenReturn(reason.equals("missing") ? Optional.empty() : Optional.of(candidate));
         Member actor = mock(Member.class);
         when(actor.getId()).thenReturn(100L);
         when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
 
-        service.syncAttachments(NOTICE, 50L, image(1), "actor");
-
-        assertThat(foreign.getOwnerId()).isNull();
-        assertThat(foreign.getAttachedAt()).isNull();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.syncAttachments(NOTICE, 50L, image(1), "actor"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class, error -> {
+                    assertThat(error.getStatusCode().value()).isEqualTo(400);
+                    assertThat(error.getReason()).isEqualTo("첨부할 수 없는 파일이 포함되어 있습니다. 다시 올려 주세요.");
+                });
+        verify(rows, never()).findByScopeAndOwnerId(any(), any());
+        assertThat(candidate.getOwnerId()).isEqualTo(reason.equals("owner") ? 60L : null);
     }
 
-    @Test void existingOtherOwnerCannotBeStolenButSameOwnerSurvivesEdit() {
-        RichBodyMedia stolen = row(1, RichBodyMedia.Kind.IMAGE, NOTICE, 100);
-        stolen.attach(60L, LocalDateTime.now());
-        RichBodyMedia retained = row(2, RichBodyMedia.Kind.IMAGE, NOTICE, 200);
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(RichBodyMedia.Kind.class)
+    void newPendingAttachesExistingAttachmentStaysAndRemovedDetaches(RichBodyMedia.Kind kind) {
+        RichBodyMedia pending = row(1, kind, NOTICE, 100);
+        RichBodyMedia retained = row(2, kind, NOTICE, 200);
+        RichBodyMedia removed = row(3, kind, NOTICE, 100);
         retained.attach(50L, LocalDateTime.now());
-        when(rows.findLockedById(1L)).thenReturn(Optional.of(stolen));
+        removed.attach(50L, LocalDateTime.now());
+        when(rows.findLockedById(1L)).thenReturn(Optional.of(pending));
         when(rows.findLockedById(2L)).thenReturn(Optional.of(retained));
-        when(rows.findByScopeAndOwnerId(NOTICE, 50L)).thenReturn(List.of(retained));
+        when(rows.findByScopeAndOwnerId(NOTICE, 50L)).thenReturn(List.of(pending, retained, removed));
+        Member actor = mock(Member.class);
+        when(actor.getId()).thenReturn(100L);
+        when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
+        String field = kind == RichBodyMedia.Kind.FILE ? "fileId" : "mediaId";
+        String body = "[{\"type\":\"%s\",\"%s\":1},{\"type\":\"%s\",\"%s\":2}]"
+                .formatted(kind.name().toLowerCase(java.util.Locale.ROOT), field, kind.name().toLowerCase(java.util.Locale.ROOT), field);
 
-        service.syncAttachments(NOTICE, 50L, "[{\"type\":\"image\",\"mediaId\":1},{\"type\":\"image\",\"mediaId\":2}]", "actor");
+        service.syncAttachments(NOTICE, 50L, body, "actor");
 
-        assertThat(stolen.getOwnerId()).isEqualTo(60L);
+        assertThat(pending.getOwnerId()).isEqualTo(50L);
+        assertThat(pending.getAttachedAt()).isNotNull();
         assertThat(retained.getOwnerId()).isEqualTo(50L);
         assertThat(retained.getAttachedAt()).isNotNull();
-        verifyNoInteractions(members);
-    }
-
-    @Test void wrongScopeAndKindAreIgnoredAndRemovedReferenceIsDetached() {
-        RichBodyMedia otherScope = row(1, RichBodyMedia.Kind.IMAGE, RichBodyMedia.Scope.SPONSOR, 100);
-        RichBodyMedia wrongKind = row(2, RichBodyMedia.Kind.FILE, NOTICE, 100);
-        RichBodyMedia removed = row(3, RichBodyMedia.Kind.IMAGE, NOTICE, 100);
-        removed.attach(50L, LocalDateTime.now());
-        when(rows.findLockedById(1L)).thenReturn(Optional.of(otherScope));
-        when(rows.findLockedById(2L)).thenReturn(Optional.of(wrongKind));
-        when(rows.findByScopeAndOwnerId(NOTICE, 50L)).thenReturn(List.of(removed));
-
-        service.syncAttachments(NOTICE, 50L,
-                "[{\"type\":\"image\",\"mediaId\":1},{\"type\":\"image\",\"mediaId\":2}]", "actor");
-
-        assertThat(otherScope.getOwnerId()).isNull();
-        assertThat(wrongKind.getOwnerId()).isNull();
         assertThat(removed.getOwnerId()).isNull();
         assertThat(removed.getAttachedAt()).isNull();
-        verifyNoInteractions(members);
     }
 
     @Test void deletingOwnerDetachesAllItsRows() {

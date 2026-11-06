@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { ExternalLink, ImagePlus, X } from 'lucide-react'
 import RichBodyEditor from '../../components/richEditor/RichBodyEditor'
 import { UPLOAD_RICH_FEATURES } from '../../components/richEditor/richBodyFeatures'
-import { uploadPendingRichBlocks } from '../../components/richEditor/uploadPendingRichBlocks'
+import { resetRejectedRichBlocks, uploadPendingRichBlocks } from '../../components/richEditor/uploadPendingRichBlocks'
 import { serializeRichBody } from '../../components/richEditor/serializeRichBody'
 import { parseRichBodyBlocks } from '../../components/richEditor/parseRichBodyBlocks'
 import { fetchLinkPreview, searchYoutubeVideos } from '../../services/communityApi'
@@ -50,9 +50,9 @@ export default function AdminSponsorPageDesign({ settings, onSaved }: {
 
   const submit = async (event) => {
     event.preventDefault()
+    const blocks = introEditorRef.current?.getBlocks() || []
     setSaving(true)
     try {
-      const blocks = introEditorRef.current?.getBlocks() || []
       const uploaded = await uploadPendingRichBlocks(blocks, 'sponsor', (id, patch) => introEditorRef.current?.updateFigureMeta(id, patch))
       const introHtml = serializeRichBody(uploaded)
       const saved = await saveSponsorPageSettings({ ...form, introHtml })
@@ -60,6 +60,7 @@ export default function AdminSponsorPageDesign({ settings, onSaved }: {
       onSaved(saved)
       showToast({ message: '후원자 페이지 설정을 저장했습니다.', tone: 'success' })
     } catch (err) {
+      resetRejectedRichBlocks(blocks, err, (id, patch) => introEditorRef.current?.updateFigureMeta(id, patch))
       showToast({ message: err.message || '설정을 저장하지 못했습니다.', tone: 'error' })
     } finally {
       setSaving(false)

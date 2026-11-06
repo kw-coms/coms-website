@@ -47,8 +47,7 @@ class NoticeServiceTest {
                 new MockMultipartFile("file", "guide.pdf", "application/pdf", "%PDF-1.4 guide".getBytes()), "2026123000");
         var otherScope = richBodyMediaService.upload(RichBodyMedia.Scope.ARCHIVE, RichBodyMedia.Kind.FILE,
                 new MockMultipartFile("file", "other.pdf", "application/pdf", "%PDF-1.4 other".getBytes()), "2026123000");
-        String body = "[{\"type\":\"file\",\"fileId\":" + first.getId() + ",\"name\":\"guide.pdf\"},"
-                + "{\"type\":\"file\",\"fileId\":" + otherScope.getId() + ",\"name\":\"other.pdf\"}]";
+        String body = "[{\"type\":\"file\",\"fileId\":" + first.getId() + ",\"name\":\"guide.pdf\"}]";
         var notice = noticeService.create("2026123000", new NoticeRequest("공지", body, null, false, "GENERAL"));
         assertThat(richBodyMediaRepository.findById(first.getId()).orElseThrow().getOwnerId()).isEqualTo(notice.id());
         assertThat(richBodyMediaRepository.findById(otherScope.getId()).orElseThrow().getOwnerId()).isNull();

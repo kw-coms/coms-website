@@ -23,7 +23,7 @@ public class RichBodyMedia {
     private String contentType;
     @Column(name = "size_bytes", nullable = false)
     private long sizeBytes;
-    @Column(name = "uploader_id", nullable = false)
+    @Column(name = "uploader_id")
     private Long uploaderId;
     @Column(name = "owner_id")
     private Long ownerId;

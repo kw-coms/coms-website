@@ -29,7 +29,7 @@ import { useVisibleCount } from '../hooks/useVisibleCount'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import RichBodyEditor from '../components/richEditor/RichBodyEditor'
 import { UPLOAD_RICH_FEATURES } from '../components/richEditor/richBodyFeatures'
-import { uploadPendingRichBlocks } from '../components/richEditor/uploadPendingRichBlocks'
+import { resetRejectedRichBlocks, uploadPendingRichBlocks } from '../components/richEditor/uploadPendingRichBlocks'
 import { renderRichBody, richBodyToPlainText as noticeContentSearchText } from '../components/richEditor/renderRichBody'
 import { serializeRichBody, richBodyPlainText } from '../components/richEditor/serializeRichBody'
 import { parseRichBodyBlocks } from '../components/richEditor/parseRichBodyBlocks'
@@ -141,6 +141,7 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
         : await createNotice(body)
       onSave(saved)
     } catch (err) {
+      resetRejectedRichBlocks(blocks, err, (id, patch) => editorApiRef.current?.updateFigureMeta(id, patch))
       setError(err.message || '저장 중 오류가 발생했습니다.')
     } finally {
       setSaving(false)

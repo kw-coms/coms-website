@@ -41,6 +41,7 @@ class RichBodyMediaControllerIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired MemberRepository members;
     @Autowired JwtTokenProvider jwt;
+    @Autowired com.coms.backend.repository.RichBodyMediaRepository media;
 
     private Cookie member;
     private Cookie officer;
@@ -118,12 +119,50 @@ class RichBodyMediaControllerIntegrationTest {
                 .andExpect(status().isOk());
     }
 
-    @Test void sponsorMediaIsPublicWhileNoticeMediaNeedsLogin() throws Exception {
+    @Test void attachedSponsorMediaIsPublicWhileAttachedNoticeMediaNeedsLogin() throws Exception {
         long sponsorId = uploadId("sponsor", admin);
         long noticeId = uploadId("notice", officer);
+        media.findById(sponsorId).orElseThrow().attach(1L, java.time.LocalDateTime.now());
+        media.findById(noticeId).orElseThrow().attach(2L, java.time.LocalDateTime.now());
         mvc.perform(get("/api/rich-media/{id}", sponsorId)).andExpect(status().isOk());
         mvc.perform(get("/api/rich-media/{id}", noticeId)).andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/rich-media/{id}", noticeId).cookie(member)).andExpect(status().isOk());
+        mvc.perform(get("/api/rich-media/{id}", noticeId).cookie(member)).andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("private")));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"notice", "archive", "sponsor"})
+    void pendingMediaIsOnlyReadableByUploaderOrAdmin(String scope) throws Exception {
+        Cookie uploader = scope.equals("sponsor") ? admin : officer;
+        long id = uploadId(scope, uploader);
+        for (String suffix : new String[]{"", "/download"}) {
+            String url = "/api/rich-media/" + id + suffix;
+            mvc.perform(get(url).cookie(uploader)).andExpect(status().isOk());
+            mvc.perform(get(url).cookie(admin)).andExpect(status().isOk());
+            mvc.perform(get(url).cookie(member)).andExpect(status().isNotFound());
+            mvc.perform(get(url)).andExpect(status().isNotFound());
+        }
+    }
+
+    @Test void detachedMediaIsPrivateAgain() throws Exception {
+        long id = uploadId("archive", officer);
+        var row = media.findById(id).orElseThrow();
+        row.attach(2L, java.time.LocalDateTime.now());
+        mvc.perform(get("/api/rich-media/{id}", id).cookie(member)).andExpect(status().isOk());
+        row.detach();
+        mvc.perform(get("/api/rich-media/{id}", id).cookie(member)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/rich-media/{id}", id).cookie(officer)).andExpect(status().isOk());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"notice", "archive", "sponsor"})
+    void pendingMediaWithDeletedUploaderIsAdminOnly(String scope) throws Exception {
+        long id = uploadId(scope, admin);
+        org.springframework.test.util.ReflectionTestUtils.setField(media.findById(id).orElseThrow(), "uploaderId", null);
+        media.flush();
+        mvc.perform(get("/api/rich-media/{id}", id).cookie(admin)).andExpect(status().isOk());
+        mvc.perform(get("/api/rich-media/{id}", id).cookie(member)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/rich-media/{id}", id)).andExpect(status().isNotFound());
     }
 
     @Test void explicitDownloadIsAttachmentAndCannotBeSniffed() throws Exception {

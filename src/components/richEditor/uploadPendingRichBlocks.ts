@@ -3,6 +3,20 @@ import { uploadRichMedia, type RichMediaScope, type RichMediaKind } from '../../
 
 type Block = { type?: string; status?: string; id?: string; file?: File; name?: string; mediaId?: number; fileId?: number; [key: string]: unknown }
 
+const ATTACHMENT_REJECTED = '첨부할 수 없는 파일이 포함되어 있습니다. 다시 올려 주세요.'
+
+/** A rejected save invalidates ids uploaded by this editor; the retained File allows a fresh upload. */
+export function resetRejectedRichBlocks(blocks: Block[], error: unknown, updateFigureMeta?: (id: string, patch: Record<string, unknown>) => void): void {
+  const response = error as { status?: number; serverMessage?: string } | null
+  if (response?.status !== 400 || response.serverMessage !== ATTACHMENT_REJECTED) return
+  for (const block of blocks) {
+    if (!(block.file instanceof File) || !['image', 'video', 'file'].includes(block.type || '')) continue
+    const patch = { status: 'pending', [block.type === 'file' ? 'fileId' : 'mediaId']: null }
+    if (block.id) updateFigureMeta?.(block.id, patch)
+    Object.assign(block, patch)
+  }
+}
+
 /** Updates the editor as each upload succeeds, so a later failure can resume. */
 export async function uploadPendingRichBlocks(blocks: Block[], scope: RichMediaScope, updateFigureMeta?: (id: string, patch: Record<string, unknown>) => void): Promise<Block[]> {
   const result: Block[] = []

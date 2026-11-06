@@ -5,7 +5,7 @@ import { parseRichBodyBlocks } from '../richEditor/parseRichBodyBlocks'
 import { fetchLinkPreview, searchYoutubeVideos } from '../../services/communityApi'
 import RichBodyEditor from '../richEditor/RichBodyEditor'
 import { UPLOAD_RICH_FEATURES } from '../richEditor/richBodyFeatures'
-import { uploadPendingRichBlocks } from '../richEditor/uploadPendingRichBlocks'
+import { resetRejectedRichBlocks, uploadPendingRichBlocks } from '../richEditor/uploadPendingRichBlocks'
 import { serializeRichBody } from '../richEditor/serializeRichBody'
 import { CategorySegment } from './CategorySegment'
 import { WRITABLE_ARCHIVE_CATEGORIES, archiveAttachments, formatSize } from './archiveUtils'
@@ -37,13 +37,13 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
 
   const submit = async (event) => {
     event.preventDefault()
+    const blocks = editorApiRef.current?.getBlocks() || []
     if (!form.title.trim()) { setError('제목을 입력해주세요.'); return }
     if (!initialFile && files.length === 0) { setError('파일을 선택해주세요.'); return }
     if (!editorApiRef.current) { setError('편집기를 불러오는 중입니다. 잠시 후 저장해주세요.'); return }
     setSaving(true)
     setError('')
     try {
-      const blocks = editorApiRef.current?.getBlocks() || []
       const uploaded = await uploadPendingRichBlocks(blocks, 'archive', (id, patch) => editorApiRef.current?.updateFigureMeta(id, patch))
       const description = serializeRichBody(uploaded)
       const metadata = {
@@ -56,6 +56,7 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
         : await createPost({ ...metadata, files })
       onSave([saved])
     } catch (err) {
+      resetRejectedRichBlocks(blocks, err, (id, patch) => editorApiRef.current?.updateFigureMeta(id, patch))
       setError(err.message || '업로드 중 오류가 발생했습니다.')
     } finally {
       setSaving(false)

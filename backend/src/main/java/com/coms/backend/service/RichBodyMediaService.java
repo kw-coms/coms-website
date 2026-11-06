@@ -1,6 +1,7 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.RichBodyMedia;
+import com.coms.backend.domain.Member;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.RichBodyMediaRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -68,7 +69,13 @@ public class RichBodyMediaService {
     @Transactional(readOnly = true)
     public RichBodyMedia get(Long id, String studentId) {
         RichBodyMedia media = repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (media.getScope() != RichBodyMedia.Scope.SPONSOR && studentId == null) {
+        if (media.getOwnerId() == null) {
+            var reader = studentId == null ? null : members.findByStudentId(studentId).orElse(null);
+            if (reader == null || (reader.getRole() != Member.Role.ADMIN
+                    && !reader.getId().equals(media.getUploaderId()))) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+            }
+        } else if (media.getScope() != RichBodyMedia.Scope.SPONSOR && studentId == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
         return media;
@@ -91,16 +98,19 @@ public class RichBodyMediaService {
                 };
                 if (kind == null) continue;
                 JsonNode idNode = block.path(kind == RichBodyMedia.Kind.FILE ? "fileId" : "mediaId");
-                if (!idNode.canConvertToLong() || idNode.longValue() <= 0) continue;
+                if (idNode.isMissingNode() || idNode.isNull()) continue; // Legacy URL-only blocks.
+                if (!idNode.isIntegralNumber() || !idNode.canConvertToLong() || idNode.longValue() <= 0) {
+                    throw invalidAttachment();
+                }
                 Long id = idNode.longValue();
                 var candidate = repository.findLockedById(id);
-                if (candidate.isEmpty()) continue;
+                if (candidate.isEmpty()) throw invalidAttachment();
                 RichBodyMedia row = candidate.get();
-                if (row.getScope() != scope || row.getKind() != kind) continue;
+                if (row.getScope() != scope || row.getKind() != kind) throw invalidAttachment();
                 if (ownerId.equals(row.getOwnerId())) { referenced.add(id); continue; }
-                if (row.getOwnerId() != null || actorStudentId == null) continue;
+                if (row.getOwnerId() != null || actorStudentId == null) throw invalidAttachment();
                 var actor = members.findByStudentId(actorStudentId);
-                if (actor.isEmpty() || !actor.get().getId().equals(row.getUploaderId())) continue;
+                if (actor.isEmpty() || !actor.get().getId().equals(row.getUploaderId())) throw invalidAttachment();
                 row.attach(ownerId, LocalDateTime.now(clock));
                 referenced.add(id);
             }
@@ -110,6 +120,11 @@ public class RichBodyMediaService {
         for (RichBodyMedia row : repository.findByScopeAndOwnerId(scope, ownerId)) {
             if (!referenced.contains(row.getId())) row.detach();
         }
+    }
+
+    private static ResponseStatusException invalidAttachment() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "첨부할 수 없는 파일이 포함되어 있습니다. 다시 올려 주세요.");
     }
 
     @Transactional

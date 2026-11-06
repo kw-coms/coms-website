@@ -6,7 +6,7 @@ CREATE TABLE rich_body_media (
     original_name VARCHAR(255) NOT NULL,
     content_type VARCHAR(100) NOT NULL,
     size_bytes BIGINT NOT NULL CHECK (size_bytes >= 0),
-    uploader_id BIGINT NOT NULL REFERENCES members(id),
+    uploader_id BIGINT REFERENCES members(id) ON DELETE SET NULL,
     owner_id BIGINT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     attached_at TIMESTAMP
