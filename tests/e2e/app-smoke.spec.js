@@ -2243,9 +2243,15 @@ test('top navigation groups activity log and monthly calendar under Activity', a
   const activityMenu = page.getByRole('navigation', { name: '활동 메뉴' })
   await expect(activityMenu.getByRole('button', { name: /Activity log/ })).toBeVisible()
   await expect(activityMenu.getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
-  const activityMenuBox = await activityMenu.boundingBox()
-  const activityLogBox = await activityMenu.getByRole('button', { name: /Activity log/ }).boundingBox()
-  expect(activityLogBox.width).toBeGreaterThanOrEqual((activityMenuBox.width || 0) - 2)
+  // The menu has two columns (기록·일정 / 참여 도구); each row still fills its own column, so the
+  // whole row is the hit target, and the two groups sit side by side rather than stacked.
+  const activityLogButton = activityMenu.getByRole('button', { name: /Activity log/ })
+  const activityLogColumn = activityMenu.getByRole('list').filter({ has: activityLogButton })
+  const activityLogColumnBox = await activityLogColumn.boundingBox()
+  const activityLogBox = await activityLogButton.boundingBox()
+  expect(activityLogBox.width).toBeGreaterThanOrEqual((activityLogColumnBox.width || 0) - 2)
+  const gatherBox = await activityMenu.getByRole('button', { name: /Gather/ }).boundingBox()
+  expect(gatherBox.x).toBeGreaterThanOrEqual(activityLogBox.x + activityLogBox.width - 2)
   await activityMenu.getByRole('button', { name: /Activity log/ }).click()
   await expect(page).toHaveURL(/\/activity-log$/)
   await page.goto('/')
