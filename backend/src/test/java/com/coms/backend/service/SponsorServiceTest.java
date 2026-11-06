@@ -5,6 +5,10 @@ import com.coms.backend.dto.SponsorPageSettings;
 import com.coms.backend.dto.SponsorRequest;
 import com.coms.backend.dto.SponsorTierRequest;
 import com.coms.backend.dto.SponsorTierResponse;
+import com.coms.backend.domain.Member;
+import com.coms.backend.domain.RichBodyMedia;
+import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.RichBodyMediaRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,8 +48,36 @@ class SponsorServiceTest {
 
     @Autowired
     private SponsorService sponsorService;
+    @Autowired private MemberRepository memberRepository;
+    @Autowired private RichBodyMediaService richBodyMediaService;
+    @Autowired private RichBodyMediaRepository richBodyMediaRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    void pageSettingsKeepMediaReferencedFromEitherRichBody() {
+        Member admin = new Member();
+        admin.setStudentId("2099000123");
+        admin.setName("후원 관리자");
+        admin.setEmail("sponsor-media-test@kw.ac.kr");
+        admin.setPassword("encoded-password");
+        admin.setRole(Member.Role.ADMIN);
+        memberRepository.save(admin);
+        var intro = richBodyMediaService.upload(RichBodyMedia.Scope.SPONSOR, RichBodyMedia.Kind.FILE,
+                new MockMultipartFile("file", "intro.pdf", "application/pdf", "%PDF-1.4 intro".getBytes()), admin.getStudentId());
+        var howTo = richBodyMediaService.upload(RichBodyMedia.Scope.SPONSOR, RichBodyMedia.Kind.FILE,
+                new MockMultipartFile("file", "howto.pdf", "application/pdf", "%PDF-1.4 howto".getBytes()), admin.getStudentId());
+        Map<String, Object> page = settings("#112233", "grid");
+        page.put("introHtml", "[{\"type\":\"file\",\"fileId\":" + intro.getId() + ",\"name\":\"intro.pdf\"}]");
+        page.put("howToSection", Map.of("bodyHtml", "[{\"type\":\"file\",\"fileId\":" + howTo.getId() + ",\"name\":\"howto.pdf\"}]"));
+        sponsorService.saveSettings(page, admin.getStudentId());
+        assertThat(richBodyMediaRepository.findById(intro.getId()).orElseThrow().getOwnerId()).isEqualTo(1L);
+        assertThat(richBodyMediaRepository.findById(howTo.getId()).orElseThrow().getOwnerId()).isEqualTo(1L);
+        page.put("introHtml", null);
+        sponsorService.saveSettings(page, admin.getStudentId());
+        assertThat(richBodyMediaRepository.findById(intro.getId()).orElseThrow().getOwnerId()).isNull();
+        assertThat(richBodyMediaRepository.findById(howTo.getId()).orElseThrow().getOwnerId()).isEqualTo(1L);
+    }
 
     @Test
     void publicListAnonymizesAndNeverCarriesTheAmountNote() throws Exception {

@@ -13,6 +13,7 @@ import {
   EDITOR_SANITIZE_OPTIONS,
   safeYoutubeEmbedSrc,
 } from '../src/pages/community/postEditorUtils.ts'
+import { parseRichBodyBlocks } from '../src/components/richEditor/parseRichBodyBlocks.ts'
 import { renderPostBlocks } from '../src/pages/community/PostBlocks.tsx'
 import { isTiptapSupportedEditorBlocks, tiptapHtmlToEditorHtml } from '../src/pages/community/tiptapTextEditorHtml.ts'
 import { SANITIZE_PROFILES } from '../src/utils/sanitizeHtml.ts'
@@ -47,14 +48,20 @@ assert.equal(parsed[1].embedUrl, 'https://www.youtube.com/embed/abc123')
 assert.equal(parsed[1].width, 80)
 assert.equal(parsed[1].align, 'center')
 
-// upload/poll blocks are intentionally dropped from the URL-only variant
+// saved media ids survive; pending blocks and polls are omitted
 const withMedia = serializeRichBody([
   { type: 'text', content: '본문', id: 'x' },
   { type: 'image', status: 'pending', name: 'a.png', id: 'i' },
+  { type: 'image', mediaId: 12, name: 'saved.png', width: 80, align: 'left' },
+  { type: 'video', mediaId: 13, name: 'saved.mp4' },
+  { type: 'file', fileId: 14, name: 'guide.pdf' },
   { type: 'poll', question: '점심?', options: [], id: 'p' },
 ])
 const withMediaParsed = JSON.parse(withMedia)
-assert.deepEqual(withMediaParsed.map((b) => b.type), ['text'])
+assert.deepEqual(withMediaParsed.map((b) => b.type), ['text', 'image', 'video', 'file'])
+assert.deepEqual(withMediaParsed[1], { type: 'image', mediaId: 12, name: 'saved.png', width: 80, align: 'left' })
+assert.equal(parseRichBodyBlocks(withMedia)[1].url, '/api/rich-media/12')
+assert.equal(parseRichBodyBlocks(withMedia)[3].url, '/api/rich-media/14')
 
 // empty / whitespace-only content serializes to '' so validation can reject it
 assert.equal(serializeRichBody([{ type: 'text', content: '   ', id: 'e' }]), '')

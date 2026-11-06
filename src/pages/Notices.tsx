@@ -28,9 +28,11 @@ const NOTICE_SORT_OPTIONS = [
 import { useVisibleCount } from '../hooks/useVisibleCount'
 import { useDocumentTitle } from '../hooks/useDocumentTitle'
 import RichBodyEditor from '../components/richEditor/RichBodyEditor'
-import { URL_ONLY_RICH_FEATURES } from '../components/richEditor/richBodyFeatures'
+import { UPLOAD_RICH_FEATURES } from '../components/richEditor/richBodyFeatures'
+import { uploadPendingRichBlocks } from '../components/richEditor/uploadPendingRichBlocks'
 import { renderRichBody, richBodyToPlainText as noticeContentSearchText } from '../components/richEditor/renderRichBody'
 import { serializeRichBody, richBodyPlainText } from '../components/richEditor/serializeRichBody'
+import { parseRichBodyBlocks } from '../components/richEditor/parseRichBodyBlocks'
 import { parsePostBlocks } from './community/postEditorUtils'
 import { canManageSensitiveAdmin, canWriteNotice } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
@@ -120,18 +122,19 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
   // Intentionally runs once: re-deriving blocks on every initialNotice change
   // would clobber in-progress edits, so the dependency array is empty by design.
   const initialBlocks = useMemo(
-    () => (initialNotice ? parsePostBlocks({ content: initialNotice.content }) : []),
+    () => (initialNotice ? parseRichBodyBlocks(initialNotice.content || '') : []),
     [], // eslint-disable-line react-hooks/exhaustive-deps
   )
 
   const save = async () => {
     if (!formData.title.trim()) { setError('제목을 입력해주세요.'); return }
     const blocks = editorApiRef.current?.getBlocks() || []
-    const content = serializeRichBody(blocks)
-    if (!content || !richBodyPlainText(blocks)) { setError('내용을 입력해주세요.'); return }
+    if (!richBodyPlainText(blocks) && !blocks.some((b) => ['image', 'video', 'file', 'externalEmbed'].includes(b.type))) { setError('내용을 입력해주세요.'); return }
     setSaving(true)
     setError('')
     try {
+      const uploaded = await uploadPendingRichBlocks(blocks, 'notice', (id, patch) => editorApiRef.current?.updateFigureMeta(id, patch))
+      const content = serializeRichBody(uploaded)
       const body = { ...formData, content, pinned: Boolean(initialNotice?.pinned) }
       const saved = initialNotice
         ? await updateNotice(initialNotice.id, body)
@@ -155,7 +158,8 @@ function NoticeForm({ initialNotice, defaultCategory, onCancel, onSave }: {
       <RichBodyEditor
         initialBlocks={initialBlocks}
         apiRef={editorApiRef}
-        features={URL_ONLY_RICH_FEATURES}
+        features={UPLOAD_RICH_FEATURES}
+        allowArchiveFiles
         error={error}
         onError={setError}
         searchYoutube={searchYoutubeVideos}

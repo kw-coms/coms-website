@@ -38,14 +38,10 @@ import java.util.stream.Collectors;
 @Transactional
 class CommunityMediaService {
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final long MAX_IMAGE_BYTES = 5L * 1024 * 1024;
-    private static final long MAX_VIDEO_BYTES = 100L * 1024 * 1024;
     private static final long MAX_FILE_BYTES = 50L * 1024 * 1024;
     private static final int MAX_EXTRA_IMAGES_PER_POST = 5;
     private static final int MAX_VIDEOS_PER_POST = 3;
     private static final int MAX_FILES_PER_POST = 5;
-    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
-    private static final Set<String> ALLOWED_VIDEO_TYPES = Set.of("video/mp4", "video/webm", "video/quicktime");
     private static final Set<String> ALLOWED_FILE_TYPES = Set.of(
             "application/zip",
             "application/x-zip-compressed",
@@ -59,6 +55,7 @@ class CommunityMediaService {
     private final StorageService storageService;
     private final CommunityDeletionArchiveService deletionArchiveService;
     private final CommunityAccess access;
+    private final MediaUploadValidator uploadValidator;
 
     CommunityMediaService(CommunityPostRepository communityPostRepository,
                           CommunityPostImageRepository imageRepository,
@@ -66,7 +63,8 @@ class CommunityMediaService {
                           CommunityPostVideoRepository videoRepository,
                           StorageService storageService,
                           CommunityDeletionArchiveService deletionArchiveService,
-                          CommunityAccess access) {
+                          CommunityAccess access,
+                          MediaUploadValidator uploadValidator) {
         this.communityPostRepository = communityPostRepository;
         this.imageRepository = imageRepository;
         this.fileRepository = fileRepository;
@@ -74,6 +72,7 @@ class CommunityMediaService {
         this.storageService = storageService;
         this.deletionArchiveService = deletionArchiveService;
         this.access = access;
+        this.uploadValidator = uploadValidator;
     }
 
     // ---- Extra image attachments -------------------------------------------------------------
@@ -93,11 +92,7 @@ class CommunityMediaService {
         for (int i = 0; i < images.size(); i++) {
             MultipartFile image = images.get(i);
             if (image == null || image.isEmpty()) continue;
-            String contentType = image.getContentType() == null ? "" : image.getContentType();
-            requireSniffedImage(image, contentType);
-            if (image.getSize() > MAX_IMAGE_BYTES) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지는 5MB 이하만 업로드할 수 있습니다.");
-            }
+            String contentType = uploadValidator.validateImage(image);
             try {
                 String stored = storageService.storeImage(image, contentType);
                 CommunityPostImage saved = imageRepository.save(new CommunityPostImage(postId, stored, image.getOriginalFilename(), contentType, startPos + i));
@@ -141,16 +136,7 @@ class CommunityMediaService {
         Member member = access.requireMember(studentId);
         CommunityPost post = requirePost(postId);
         access.requireOwnerOrAdmin(post, member);
-        if (video == null || video.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "영상 파일을 선택해주세요.");
-        }
-        String contentType = video.getContentType() == null ? "" : video.getContentType();
-        if (!ALLOWED_VIDEO_TYPES.contains(contentType)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "MP4, WebM, MOV 영상만 업로드할 수 있습니다.");
-        }
-        if (video.getSize() > MAX_VIDEO_BYTES) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "영상은 100MB 이하만 업로드할 수 있습니다.");
-        }
+        String contentType = uploadValidator.validateVideo(video);
         long existing = videoRepository.findByPostIdOrderByPositionAsc(postId).size();
         if (existing >= MAX_VIDEOS_PER_POST) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "게시글 영상은 최대 3개까지 업로드할 수 있습니다.");
@@ -246,11 +232,7 @@ class CommunityMediaService {
         if (image == null || image.isEmpty()) {
             return;
         }
-        String contentType = image.getContentType() == null ? "" : image.getContentType();
-        requireSniffedImage(image, contentType);
-        if (image.getSize() > MAX_IMAGE_BYTES) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지는 5MB 이하만 업로드할 수 있습니다.");
-        }
+        String contentType = uploadValidator.validateImage(image);
         clearImage(post);
         try {
             post.setImageStoredName(storageService.storeImage(image, contentType));
@@ -409,21 +391,6 @@ class CommunityMediaService {
         return lowerName.endsWith(".zip")
                 && (contentType == null || contentType.isBlank() || ALLOWED_FILE_TYPES.contains(contentType))
                 && UploadSniffer.isZip(UploadSniffer.header(file));
-    }
-
-    /**
-     * Requires the upload to really be one of the four image formats we serve inline, AND to match
-     * the type the client declared. Serving a declared {@code image/png} whose bytes are HTML back
-     * inline is a stored-XSS primitive, so a mismatch is rejected rather than corrected.
-     */
-    private void requireSniffedImage(MultipartFile image, String contentType) {
-        if (!ALLOWED_IMAGE_TYPES.contains(contentType)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "JPG, PNG, GIF, WebP 이미지만 업로드할 수 있습니다.");
-        }
-        UploadSniffer.ImageType sniffed = UploadSniffer.imageType(UploadSniffer.header(image));
-        if (sniffed == null || !sniffed.mimeType().equals(contentType)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 파일 내용이 형식과 일치하지 않습니다.");
-        }
     }
 
     private String normalizeArchiveMime(String contentType) {

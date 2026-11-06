@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from 'react'
 import { FileUp, X } from 'lucide-react'
 import { createPost, updateArchiveFile } from '../../services/archiveApi'
-import { parsePostBlocks } from '../../pages/community/postEditorUtils'
+import { parseRichBodyBlocks } from '../richEditor/parseRichBodyBlocks'
 import { fetchLinkPreview, searchYoutubeVideos } from '../../services/communityApi'
 import RichBodyEditor from '../richEditor/RichBodyEditor'
-import { URL_ONLY_RICH_FEATURES } from '../richEditor/richBodyFeatures'
+import { UPLOAD_RICH_FEATURES } from '../richEditor/richBodyFeatures'
+import { uploadPendingRichBlocks } from '../richEditor/uploadPendingRichBlocks'
 import { serializeRichBody } from '../richEditor/serializeRichBody'
 import { CategorySegment } from './CategorySegment'
 import { WRITABLE_ARCHIVE_CATEGORIES, archiveAttachments, formatSize } from './archiveUtils'
@@ -20,7 +21,7 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
   const [error, setError] = useState('')
   const fileInputRef = useRef(null)
   const editorApiRef = useRef(null)
-  const initialBlocks = useMemo(() => initialFile ? parsePostBlocks({ content: initialFile.description }) : [], [initialFile])
+  const initialBlocks = useMemo(() => initialFile ? parseRichBodyBlocks(initialFile.description || '') : [], [initialFile])
   const existingAttachments = initialFile ? archiveAttachments(initialFile) : []
 
   const addFiles = (event) => {
@@ -43,7 +44,8 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
     setError('')
     try {
       const blocks = editorApiRef.current?.getBlocks() || []
-      const description = serializeRichBody(blocks)
+      const uploaded = await uploadPendingRichBlocks(blocks, 'archive', (id, patch) => editorApiRef.current?.updateFigureMeta(id, patch))
+      const description = serializeRichBody(uploaded)
       const metadata = {
         title: form.title.trim(),
         description,
@@ -88,7 +90,8 @@ export function WriteForm({ onCancel, onSave, initialFile }: {
         <RichBodyEditor
           initialBlocks={initialBlocks}
           apiRef={editorApiRef}
-          features={URL_ONLY_RICH_FEATURES}
+          features={UPLOAD_RICH_FEATURES}
+          allowArchiveFiles
           onError={setError}
           searchYoutube={searchYoutubeVideos}
           fetchLinkPreview={fetchLinkPreview}

@@ -149,7 +149,7 @@ public class AdminSponsorController {
                     schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = SponsorPageSettings.class)))
     public ResponseEntity<SponsorPageSettings> savePageSettings(@RequestBody java.util.Map<String, Object> request,
                                                                 Authentication authentication) {
-        SponsorPageSettings saved = sponsorService.saveSettings(request);
+        SponsorPageSettings saved = sponsorService.saveSettings(request, authentication.getName());
         audit(authentication, "ADMIN_SPONSOR_PAGE_UPDATE", "SPONSOR_PAGE", null,
                 "layout=" + saved.layout() + "\naccentColor=" + saved.accentColor());
         return ResponseEntity.ok(saved);

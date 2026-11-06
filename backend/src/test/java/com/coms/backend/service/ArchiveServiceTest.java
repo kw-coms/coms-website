@@ -1,11 +1,13 @@
 package com.coms.backend.service;
 
 import com.coms.backend.domain.Member;
+import com.coms.backend.domain.RichBodyMedia;
 import com.coms.backend.repository.AuditLogRepository;
 import com.coms.backend.repository.ArchiveFileRepository;
 import com.coms.backend.repository.ArchiveAttachmentRepository;
 import com.coms.backend.repository.ArchiveFileVoteRepository;
 import com.coms.backend.repository.MemberRepository;
+import com.coms.backend.repository.RichBodyMediaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +58,8 @@ class ArchiveServiceTest {
 
     @Autowired
     private MemberRepository memberRepository;
+    @Autowired private RichBodyMediaService richBodyMediaService;
+    @Autowired private RichBodyMediaRepository richBodyMediaRepository;
 
     @Autowired
     private AuditLogRepository auditLogRepository;
@@ -69,6 +73,7 @@ class ArchiveServiceTest {
     @BeforeEach
     void setUp() {
         SecurityContextHolder.clearContext();
+        richBodyMediaRepository.deleteAll();
         auditLogRepository.deleteAll();
         archiveFileVoteRepository.deleteAll();
         attachmentRepository.deleteAll();
@@ -80,6 +85,17 @@ class ArchiveServiceTest {
         archiveFileRepository.flush();
         memberRepository.flush();
         saveMember("2026123456", "홍길동", Member.Role.USER);
+    }
+
+    @Test
+    void archiveDescriptionAttachesAndDetachesRichFile() throws Exception {
+        var media = richBodyMediaService.upload(RichBodyMedia.Scope.ARCHIVE, RichBodyMedia.Kind.FILE,
+                pdf("body.pdf", "%PDF-1.4 body"), "2026123456");
+        String body = "[{\"type\":\"file\",\"fileId\":" + media.getId() + ",\"name\":\"body.pdf\"}]";
+        var created = archiveService.upload("자료", body, pdf("main.pdf", "%PDF-1.4 main"), "2026123456");
+        assertThat(richBodyMediaRepository.findById(media.getId()).orElseThrow().getOwnerId()).isEqualTo(created.id());
+        archiveService.update("2026123456", created.id(), "자료", "본문", "GENERAL", null);
+        assertThat(richBodyMediaRepository.findById(media.getId()).orElseThrow().getOwnerId()).isNull();
     }
 
     @Test
@@ -135,7 +151,8 @@ class ArchiveServiceTest {
                 .thenReturn("first-stored")
                 .thenThrow(new IOException("second write failed"));
         ArchiveService failingService = new ArchiveService(files, attachments, failingStorage, members,
-                mock(ArchiveFileVoteRepository.class), mock(RichContentSanitizer.class), mock(AuditLogService.class));
+                mock(ArchiveFileVoteRepository.class), mock(RichContentSanitizer.class), mock(AuditLogService.class),
+                mock(RichBodyMediaService.class));
 
         assertThatThrownBy(() -> failingService.uploadGroup("자료", null, "GENERAL",
                 List.of(pdf("first.pdf", "%PDF-1.4 first"), pdf("second.pdf", "%PDF-1.4 second")), "2026123456"))

@@ -8,6 +8,7 @@ export default function RichEditor(props: {
   initialBlocks: EditorBlock[]
   apiRef?: { current: unknown } | null
   onError?: (message: string) => void
+  isAllowedFile?: (file: File) => boolean
 }) {
   return (
     <Suspense fallback={<div className="min-h-[420px] w-full bg-[var(--app-surface)] px-4 py-5 text-sm text-[var(--theme-body-muted)] sm:px-5" />}>

@@ -4,6 +4,7 @@ import com.coms.backend.domain.ArchiveFile;
 import com.coms.backend.domain.ArchiveAttachment;
 import com.coms.backend.domain.ArchiveFileVote;
 import com.coms.backend.domain.Member;
+import com.coms.backend.domain.RichBodyMedia;
 import com.coms.backend.dto.ArchiveFileResponse;
 import com.coms.backend.dto.ArchiveAttachmentResponse;
 import com.coms.backend.repository.ArchiveAttachmentRepository;
@@ -46,7 +47,7 @@ public class ArchiveService {
     private static final long MAX_ARCHIVE_GROUP_BYTES = 300L * 1024 * 1024;
     private static final int MAX_ARCHIVE_ATTACHMENTS = 20;
     private static final int MAX_TITLE_LENGTH = 200;
-    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+    public static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "pdf", "txt", "md", "csv",
             "doc", "docx", "ppt", "pptx", "xls", "xlsx", "hwp", "hwpx",
             "zip", "jpg", "jpeg", "png", "gif", "webp",
@@ -70,11 +71,12 @@ public class ArchiveService {
     private final ArchiveFileVoteRepository voteRepository;
     private final RichContentSanitizer richContentSanitizer;
     private final AuditLogService auditLogService;
+    private final RichBodyMediaService richBodyMediaService;
 
     public ArchiveService(ArchiveFileRepository repo, ArchiveAttachmentRepository attachmentRepository,
                           StorageService storage, MemberRepository memberRepository,
                           ArchiveFileVoteRepository voteRepository, RichContentSanitizer richContentSanitizer,
-                          AuditLogService auditLogService) {
+                          AuditLogService auditLogService, RichBodyMediaService richBodyMediaService) {
         this.repo = repo;
         this.attachmentRepository = attachmentRepository;
         this.storage = storage;
@@ -82,6 +84,7 @@ public class ArchiveService {
         this.voteRepository = voteRepository;
         this.richContentSanitizer = richContentSanitizer;
         this.auditLogService = auditLogService;
+        this.richBodyMediaService = richBodyMediaService;
     }
 
     @Transactional(rollbackFor = IOException.class)
@@ -122,6 +125,7 @@ public class ArchiveService {
             entity.setUploadedBy(uploaderStudentId);
             entity.setUploaderName(member.getName());
             ArchiveFile saved = repo.save(entity);
+            richBodyMediaService.syncAttachments(RichBodyMedia.Scope.ARCHIVE, saved.getId(), saved.getDescription(), uploaderStudentId);
             for (int i = 0; i < files.size(); i++) {
                 attachmentRepository.save(newAttachment(saved.getId(), files.get(i), newStoredNames.get(i), i));
             }
@@ -194,6 +198,7 @@ public class ArchiveService {
             entity.setDescription(cleanedDescription);
             entity.setCategory(parsedCategory);
             ArchiveFile saved = repo.save(entity);
+            richBodyMediaService.syncAttachments(RichBodyMedia.Scope.ARCHIVE, saved.getId(), saved.getDescription(), editorStudentId);
             auditLogService.record(editor.getStudentId(), "ARCHIVE_FILE_UPDATE", "ARCHIVE_FILE",
                     String.valueOf(saved.getId()), archiveAuditDetail(saved, !incoming.isEmpty()), null);
             return toResponse(saved, voteStats(List.of(saved)), editorStudentId);
@@ -323,6 +328,7 @@ public class ArchiveService {
         ArchiveFile file = repo.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         List<ArchiveAttachment> attachments = attachmentsFor(file);
+        richBodyMediaService.detachAttachments(RichBodyMedia.Scope.ARCHIVE, id);
         attachmentRepository.deleteAll(attachments);
         repo.delete(file);
         if (attachments.isEmpty()) {

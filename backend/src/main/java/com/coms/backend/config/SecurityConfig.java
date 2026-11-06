@@ -76,6 +76,7 @@ public class SecurityConfig {
                                            OriginValidationFilter originValidationFilter,
                                            IntegrationHmacFilter integrationHmacFilter,
                                            com.coms.backend.repository.MemberRepository memberRepository,
+                                           com.coms.backend.repository.RichBodyMediaRepository richBodyMediaRepository,
                                            com.coms.backend.repository.RefreshSessionRepository refreshSessionRepository,
                                            @Value("${app.max-request-body-bytes:8388608}") long maxRequestBodyBytes) throws Exception {
         http
@@ -149,6 +150,24 @@ public class SecurityConfig {
                 // /api/admin/sponsors/** 이라 위쪽 ADMIN 경계에 이미 걸린다. 로고/배너 이미지는
                 // authenticated() 로 끝나는 /api/files/** 아래에 두지 않고 여기로 서빙한다.
                 auth.requestMatchers(HttpMethod.GET, "/api/sponsors", "/api/sponsors/**").permitAll();
+                // A row is public only when its persisted scope is SPONSOR. Other rows need a login.
+                auth.requestMatchers(HttpMethod.GET, "/api/rich-media/{id}", "/api/rich-media/{id}/download")
+                        .access((authentication, context) -> {
+                            boolean signedIn = authentication.get() != null
+                                    && authentication.get().isAuthenticated()
+                                    && !(authentication.get() instanceof org.springframework.security.authentication.AnonymousAuthenticationToken);
+                            boolean publicSponsor = false;
+                            try {
+                                Long id = Long.valueOf(context.getVariables().get("id"));
+                                publicSponsor = richBodyMediaRepository.findById(id)
+                                        .map(media -> media.getScope() == com.coms.backend.domain.RichBodyMedia.Scope.SPONSOR)
+                                        .orElse(false);
+                            } catch (NumberFormatException ignored) {
+                                // Invalid IDs remain inaccessible to anonymous callers.
+                            }
+                            return new org.springframework.security.authorization.AuthorizationDecision(signedIn || publicSponsor);
+                        });
+                auth.requestMatchers("/api/rich-media/**").authenticated();
                 auth.requestMatchers(HttpMethod.GET, "/api/community/posts/*/share", "/api/community/posts/*/share-data", "/api/community/posts/*/share-image").permitAll();
                 auth.requestMatchers(HttpMethod.HEAD, "/api/community/posts/*/share", "/api/community/posts/*/share-data", "/api/community/posts/*/share-image").permitAll();
                 auth.requestMatchers("/api/mini-apps/**").authenticated();

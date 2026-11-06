@@ -4,6 +4,9 @@ import com.coms.backend.domain.Member;
 import com.coms.backend.dto.NoticeRequest;
 import com.coms.backend.repository.MemberRepository;
 import com.coms.backend.repository.NoticeRepository;
+import com.coms.backend.repository.RichBodyMediaRepository;
+import com.coms.backend.domain.RichBodyMedia;
+import org.springframework.mock.web.MockMultipartFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,11 +30,33 @@ class NoticeServiceTest {
     @Autowired
     private MemberRepository memberRepository;
 
+    @Autowired private RichBodyMediaService richBodyMediaService;
+    @Autowired private RichBodyMediaRepository richBodyMediaRepository;
+
     @BeforeEach
     void setUp() {
+        richBodyMediaRepository.deleteAll();
         noticeRepository.deleteAll();
         memberRepository.deleteAll();
         memberRepository.save(admin("2026123000", "관리자"));
+    }
+
+    @Test
+    void noticeSaveAndDeleteSynchronizeRichFiles() {
+        var first = richBodyMediaService.upload(RichBodyMedia.Scope.NOTICE, RichBodyMedia.Kind.FILE,
+                new MockMultipartFile("file", "guide.pdf", "application/pdf", "%PDF-1.4 guide".getBytes()), "2026123000");
+        var otherScope = richBodyMediaService.upload(RichBodyMedia.Scope.ARCHIVE, RichBodyMedia.Kind.FILE,
+                new MockMultipartFile("file", "other.pdf", "application/pdf", "%PDF-1.4 other".getBytes()), "2026123000");
+        String body = "[{\"type\":\"file\",\"fileId\":" + first.getId() + ",\"name\":\"guide.pdf\"},"
+                + "{\"type\":\"file\",\"fileId\":" + otherScope.getId() + ",\"name\":\"other.pdf\"}]";
+        var notice = noticeService.create("2026123000", new NoticeRequest("공지", body, null, false, "GENERAL"));
+        assertThat(richBodyMediaRepository.findById(first.getId()).orElseThrow().getOwnerId()).isEqualTo(notice.id());
+        assertThat(richBodyMediaRepository.findById(otherScope.getId()).orElseThrow().getOwnerId()).isNull();
+        noticeService.update("2026123000", notice.id(), new NoticeRequest("공지", "내용", null, false, "GENERAL"));
+        assertThat(richBodyMediaRepository.findById(first.getId()).orElseThrow().getOwnerId()).isNull();
+        noticeService.update("2026123000", notice.id(), new NoticeRequest("공지", body, null, false, "GENERAL"));
+        noticeService.delete("2026123000", notice.id());
+        assertThat(richBodyMediaRepository.findById(first.getId()).orElseThrow().getOwnerId()).isNull();
     }
 
     @Test

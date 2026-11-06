@@ -1,3 +1,4 @@
+import { parseRichBodyBlocks } from './parseRichBodyBlocks'
 import { renderPostBlocks } from '../../pages/community/PostBlocks'
 import { parsePostBlocks, textContentForSearch } from '../../pages/community/postEditorUtils'
 
@@ -23,14 +24,15 @@ export function isRichBodyContent(value) {
  * legacy plain text falls back to the caller-provided plain renderer so old
  * content keeps rendering exactly as before.
  *
- * Notices/resources never carry uploaded image/video/file blocks (those need
- * community-scoped media-info resolution), so only text + externalEmbed blocks
- * appear here. Poll blocks, if ever present, render read-only with no vote
- * handlers wired.
+ * Stored media ids are resolved to URLs before the community block renderer runs.
  */
 export function renderRichBody(content, renderPlain) {
   if (isRichBodyContent(content)) {
-    return renderPostBlocks({ content })
+    const blocks = parseRichBodyBlocks(content)
+    const imageInfos = blocks.filter((b) => b.type === 'image').map((b) => ({ id: b.mediaId, url: b.url, originalName: b.name }))
+    const videoInfos = blocks.filter((b) => b.type === 'video').map((b) => ({ id: b.mediaId, url: b.url, originalName: b.name }))
+    const fileInfos = blocks.filter((b) => b.type === 'file').map((b) => ({ id: b.fileId, url: b.url, originalName: b.name }))
+    return renderPostBlocks({ content, imageInfos, videoInfos, fileInfos })
   }
   return renderPlain(content)
 }
