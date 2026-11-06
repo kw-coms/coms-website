@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { solveCircuit } from './solver';
+import { ledBrightness, solveCircuit } from './solver';
 import type { Analysis, PartInstance, Scene } from './types';
 
 const part = (id: string, kind: PartInstance['kind'], props: PartInstance['props'] = {}): PartInstance => ({ id, kind, pos: [0, 0, 0], rotY: 0, props });
@@ -26,6 +26,8 @@ describe('DC solver', () => {
     });
     expect(result.branchCurrents.led).toBeGreaterThan(0.012);
     expect(result.branchCurrents.led).toBeLessThan(0.015);
+    expect(result.parts.led?.led?.brightness).toBeGreaterThan(0.9);
+    expect(ledBrightness(0.013)).toBe(1);
     expect(result.warnings.filter(w => w.level === 'error')).toHaveLength(0);
   });
   it('reports a directly driven LED overcurrent', () => {
@@ -139,8 +141,75 @@ describe('DC solver', () => {
   });
   it('moves the potentiometer wiper with its input position', () => {
     const scene: Scene = { version: 1, parts: [part('uno', 'arduino-uno'), part('pot', 'potentiometer')], wires: [], code: '' };
-    const connections = { 'uno:5V': 'v', 'uno:GND.1': 'g', 'pot:1': 'g', 'pot:3': 'v', 'pot:wiper': 'w' };
+    const connections = { 'uno:5V': 'v', 'uno:GND.1': 'g', 'pot:1': 'v', 'pot:3': 'g', 'pot:wiper': 'w' };
     const analysis: Analysis = { pinToNet: connections, nets: ['v','g','w'].map(id => ({id, pins: []})), insertions: {}, warnings: [] };
     expect(solveCircuit(scene, analysis, {}, { pot: { position: 0.25 } }).netVolts.w).toBeCloseTo(1.25, 2);
+  });
+});
+
+describe('interactive parts', () => {
+  it('maps a joystick axis from 0 V to 5 V as position moves from 0 to 1', () => {
+    const scene: Scene = { version: 1, parts: [part('uno', 'arduino-uno'), part('stick', 'joystick')], wires: [], code: '' };
+    const connections = {
+      'uno:5V': 'v', 'uno:GND.1': 'g',
+      'stick:+5V': 'v', 'stick:GND': 'g',
+      'stick:VRx': 'x', 'stick:VRy': 'y',
+    };
+    const analysis: Analysis = { pinToNet: connections, nets: ['v', 'g', 'x', 'y'].map(id => ({ id, pins: [] })), insertions: {}, warnings: [] };
+    const low = solveCircuit(scene, analysis, {}, { stick: { x: 0, y: 0 } });
+    const high = solveCircuit(scene, analysis, {}, { stick: { x: 1, y: 1 } });
+    expect(low.netVolts.x).toBeLessThan(0.01);
+    expect(high.netVolts.x).toBeGreaterThan(4.99);
+  });
+  it('keeps a motor stopped without a powered, grounded driver', () => {
+    const scene: Scene = { version: 1, parts: [part('uno', 'arduino-uno'), part('driver', 'l9110s'), part('motor', 'dc-motor')], wires: [], code: '' };
+    const connections = {
+      'uno:5V': 'v', 'uno:GND.1': 'g', 'uno:D5': 'ia', 'uno:D6': 'ib',
+      'driver:A-IA': 'ia', 'driver:A-IB': 'ib',
+      'driver:MA+': 'plus', 'driver:MA−': 'minus',
+      'motor:+': 'plus', 'motor:-': 'minus',
+    };
+    const analysis: Analysis = {
+      pinToNet: connections,
+      nets: ['v', 'g', 'ia', 'ib', 'plus', 'minus'].map(id => ({
+        id, name: id === 'ia' ? 'D5' : id === 'ib' ? 'D6' : undefined, pins: [],
+      })),
+      insertions: {}, warnings: [],
+    };
+    const pins = { D5: { mode: 'output' as const, level: 1 as const, duty: 1, freq: 0 }, D6: { mode: 'output' as const, level: 0 as const, duty: 0, freq: 0 } };
+    expect(solveCircuit(scene, analysis, pins).parts.motor?.motor?.rpm).toBe(0);
+    const connected = { ...connections, 'driver:VCC': 'v', 'driver:GND': 'g' };
+    const powered = { ...analysis, pinToNet: connected };
+    expect(solveCircuit(scene, powered, pins).parts.motor?.motor?.direction).toBe(1);
+    expect(solveCircuit(scene, powered, pins).parts.motor?.motor?.rpm).toBeGreaterThan(100);
+    const fixedRails = { ...connected, 'driver:A-IA': 'v', 'driver:A-IB': 'g' };
+    const railAnalysis = { ...powered, pinToNet: fixedRails };
+    expect(solveCircuit(scene, railAnalysis).parts.motor?.motor?.direction).toBe(1);
+    expect(solveCircuit(scene, railAnalysis).parts.motor?.motor?.rpm).toBeGreaterThan(100);
+  });
+});
+
+describe('hard-wired GPIO', () => {
+  it('reports overcurrent when HIGH output is tied to GND', () => {
+    const scene: Scene = { version: 1, parts: [part('uno', 'arduino-uno')], wires: [], code: '' };
+    const analysis: Analysis = {
+      pinToNet: { 'uno:GND.1': 'g', 'uno:D2': 'g' },
+      nets: [{ id: 'g', pins: [{ partId: 'uno', pinId: 'GND.1' }, { partId: 'uno', pinId: 'D2' }] }],
+      insertions: {}, warnings: [],
+    };
+    const output = { D2: { mode: 'output' as const, level: 1 as const, duty: 1, freq: 0 } };
+    const result = solveCircuit(scene, analysis, output);
+    expect(Math.abs(result.pinCurrents.D2 ?? 0)).toBeGreaterThan(0.04);
+    expect(result.warnings.some(w => w.id === 'pin-overcurrent:D2')).toBe(true);
+  });
+});
+
+describe('display current limits', () => {
+  it('reports an unresisted seven-segment channel overcurrent', () => {
+    const result = circuit([part('uno', 'arduino-uno'), part('digit', 'seven-segment')], {
+      'uno:5V': 'v', 'uno:GND.1': 'g', 'digit:a': 'v', 'digit:COM.1': 'g',
+    });
+    expect(result.parts.digit?.sevenSeg?.segments[0]).toBe(true);
+    expect(result.warnings.some(w => w.id === 'led-overcurrent:digit:a' && w.level === 'error')).toBe(true);
   });
 });

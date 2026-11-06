@@ -19,8 +19,10 @@ describe('ATmega328P', () => {
     const m = new Mcu();
     m.loadHex(hex([sbi(4, 5), sbi(5, 5), cbi(5, 5), rjmp(-3)]));
     m.step(2);
-    m.step(2); expect(m.pins().D13?.level).toBe(1);
-    m.step(2); expect(m.pins().D13?.level).toBe(0);
+    m.step(2);
+    expect(m.pins().D13?.level).toBe(1);
+    m.step(2);
+    expect(m.pins().D13?.level).toBe(0);
     m.step(100);
     expect(m.pins().D13?.duty).toBeGreaterThan(0);
     expect(m.pins().D13?.freq).toBeGreaterThan(0);
@@ -40,14 +42,19 @@ describe('ATmega328P', () => {
     m.setADC(0, 2.5);
     m.step(5000);
     const adc = m.cpu.readData(0x78) | (m.cpu.readData(0x79) << 8);
-    expect(adc).toBeGreaterThan(450); expect(adc).toBeLessThan(575);
+    expect(adc).toBeGreaterThan(450);
+    expect(adc).toBeLessThan(575);
   });
   it('measures SG90 pulse width', () => {
     const m = new Mcu();
-    m.ports.B.setPin(1, true); m.step(Math.round(1500e-6 * MCU_HZ)); m.ports.B.setPin(1, false);
+    m.ports.B.setPin(1, true);
+    m.step(Math.round(1500e-6 * MCU_HZ));
+    m.ports.B.setPin(1, false);
     // GPIO listener observes output states, so generate a CPU output pulse.
-    m.cpu.writeData(0x24, 2); m.cpu.writeData(0x25, 2);
-    m.step(Math.round(1500e-6 * MCU_HZ)); m.cpu.writeData(0x25, 0);
+    m.cpu.writeData(0x24, 2);
+    m.cpu.writeData(0x25, 2);
+    m.step(Math.round(1500e-6 * MCU_HZ));
+    m.cpu.writeData(0x25, 0);
     expect(m.servoAngle('D9')).toBeCloseTo(92.7, 0);
   });
   it('reports driven input levels from PIN register and output callbacks', () => {
@@ -60,34 +67,112 @@ describe('ATmega328P', () => {
     expect(m.pins().D2?.level).toBe(0);
     const edges: number[] = [];
     m.onPinChange = (pin, level) => { if (pin === 'D13') edges.push(level); };
-    m.cpu.writeData(0x24, 32); m.cpu.writeData(0x25, 32); m.cpu.writeData(0x25, 0);
+    m.cpu.writeData(0x24, 32);
+    m.cpu.writeData(0x25, 32);
+    m.cpu.writeData(0x25, 0);
     expect(edges).toEqual([1, 0]);
   });
   it('cancels pending echo events and preserves an unchanged sensor config', () => {
-    const m = new Mcu(); m.triggerEcho('D8', 'D7', 10);
-    m.cpu.writeData(0x24, 1); m.cpu.writeData(0x25, 1);
-    m.step(160); m.triggerEcho('D8', 'D7', 10); m.cpu.writeData(0x25, 0);
-    m.clearEcho(); m.step(3200 + 10 * 58e-6 * MCU_HZ);
+    const m = new Mcu();
+    m.triggerEcho('D8', 'D7', 10);
+    m.cpu.writeData(0x24, 1);
+    m.cpu.writeData(0x25, 1);
+    m.step(160);
+    m.triggerEcho('D8', 'D7', 10);
+    m.cpu.writeData(0x25, 0);
+    m.clearEcho();
+    m.step(3200 + 10 * 58e-6 * MCU_HZ);
     expect(m.isEchoActive('D7')).toBe(false);
     expect(m.cpu.readData(0x29) & 128).toBe(0);
   });
   it('schedules HC-SR04 echo after a 10us trigger pulse', () => {
-    const m = new Mcu(); m.triggerEcho('D8', 'D7', 10);
-    m.cpu.writeData(0x24, 1); m.cpu.writeData(0x25, 1);
-    m.step(160); m.cpu.writeData(0x25, 0);
-    m.step(3200); expect(m.cpu.readData(0x29) & 128).toBe(128);
-    m.step(Math.round(10 * 58e-6 * MCU_HZ)); expect(m.cpu.readData(0x29) & 128).toBe(0);
+    const m = new Mcu();
+    m.triggerEcho('D8', 'D7', 10);
+    m.cpu.writeData(0x24, 1);
+    m.cpu.writeData(0x25, 1);
+    m.step(160);
+    m.cpu.writeData(0x25, 0);
+    m.step(3200);
+    expect(m.cpu.readData(0x29) & 128).toBe(128);
+    m.step(Math.round(10 * 58e-6 * MCU_HZ));
+    expect(m.cpu.readData(0x29) & 128).toBe(0);
+  });
+  it('runs two independent HC-SR04 sensors at once', () => {
+    const m = new Mcu();
+    m.configureEchoDevices([
+      { trig: 'D8', echo: 'D7', distanceCm: 10 },
+      { trig: 'D9', echo: 'D6', distanceCm: 20 },
+    ]);
+    m.cpu.writeData(0x24, 0x03);
+    m.cpu.writeData(0x25, 0x03);
+    m.step(160);
+    m.cpu.writeData(0x25, 0);
+    m.step(3201);
+    expect(m.isEchoActive('D7')).toBe(true);
+    expect(m.isEchoActive('D6')).toBe(true);
+    m.step(Math.round(10 * 58e-6 * MCU_HZ));
+    expect(m.isEchoActive('D7')).toBe(false);
+    expect(m.isEchoActive('D6')).toBe(true);
+  });
+  it('ACKs two configured LCD addresses and keeps their display state separate', () => {
+    const m = new Mcu();
+    m.configureLcdDevices([0x27, 0x3f]);
+    for (const address of [0x27, 0x3f]) {
+      m.twi.eventHandler.start(false);
+      m.twi.eventHandler.connectToSlave(address, true);
+      expect(m.cpu.data[0xb9]! & 0xf8).toBe(0x18);
+      m.twi.eventHandler.stop();
+    }
+    m.twi.eventHandler.start(false);
+    m.twi.eventHandler.connectToSlave(0x26, true);
+    expect(m.cpu.data[0xb9]! & 0xf8).toBe(0x20);
+    expect(m.lcdState(0x27)?.lines).toEqual([' '.repeat(16), ' '.repeat(16)]);
+    expect(m.lcdState(0x3f)?.lines).toEqual([' '.repeat(16), ' '.repeat(16)]);
+  });
+  it('responds to a DHT11 host pulse when the MCU releases DATA', () => {
+    const m = new Mcu();
+    m.configureDht('D2', () => ({ temperature: 24, humidity: 55 }));
+    m.cpu.writeData(0x2a, 4); // DDRD2 output, PORTD2 remains LOW
+    m.step(18_100 * 16);
+    m.cpu.writeData(0x2a, 0); // release to input
+    m.step(20 * 16);
+    expect(m.dhtBusy('D2')).toBe(true);
+    expect(m.cpu.readData(0x29) & 4).toBe(0);
+    m.step(80 * 16);
+    expect(m.cpu.readData(0x29) & 4).toBe(4);
+  });
+  it('decodes a GRB pixel from actual MCU output transitions', () => {
+    const m = new Mcu();
+    m.configurePixels('D6', 1);
+    m.cpu.writeData(0x2a, 0x40);
+    for (const byte of [0x20, 0x10, 0x30]) {
+      for (let bit = 7; bit >= 0; bit--) {
+        m.cpu.writeData(0x2b, 0x40);
+        m.step(byte & (1 << bit) ? 13 : 6);
+        m.cpu.writeData(0x2b, 0);
+        m.step(14);
+      }
+    }
+    m.step(800);
+    expect(m.pixelColors('D6')).toEqual([[0x10, 0x20, 0x30]]);
   });
 });
 
 describe('PCF8574 + HD44780', () => {
   it('decodes LiquidCrystal_I2C four-bit init and print Hi', () => {
     const lcd = new Lcd1602();
-    const nibble = (v: number, rs = 0) => { lcd.write(v | rs | 8 | 4); lcd.write(v | rs | 8); };
+    const nibble = (v: number, rs = 0) => {
+      lcd.write(v | rs | 8 | 4);
+      lcd.write(v | rs | 8);
+    };
     [0x30, 0x30, 0x30, 0x20].forEach(v => nibble(v));
-    const byte = (v: number, rs = 0) => { nibble(v & 0xf0, rs); nibble((v << 4) & 0xf0, rs); };
+    const byte = (v: number, rs = 0) => {
+      nibble(v & 0xf0, rs);
+      nibble((v << 4) & 0xf0, rs);
+    };
     [0x28, 0x08, 0x01, 0x06, 0x0c].forEach(v => byte(v));
-    byte(72, 1); byte(105, 1);
+    byte(72, 1);
+    byte(105, 1);
     expect(lcd.state.lines[0].slice(0, 2)).toBe('Hi');
   });
   it('ACKs only the configured LCD address', () => {
@@ -114,10 +199,19 @@ describe('PCF8574 + HD44780', () => {
   });
   it('keeps CGRAM writes separate from visible DDRAM text', () => {
     const lcd = new Lcd1602();
-    const nibble = (v: number, rs = 0) => { lcd.write(v | rs | 8 | 4); lcd.write(v | rs | 8); };
+    const nibble = (v: number, rs = 0) => {
+      lcd.write(v | rs | 8 | 4);
+      lcd.write(v | rs | 8);
+    };
     [0x30, 0x30, 0x30, 0x20].forEach(v => nibble(v));
-    const byte = (v: number, rs = 0) => { nibble(v & 0xf0, rs); nibble((v << 4) & 0xf0, rs); };
-    byte(0x40); byte(0xff, 1); byte(0x80); byte(72, 1);
+    const byte = (v: number, rs = 0) => {
+      nibble(v & 0xf0, rs);
+      nibble((v << 4) & 0xf0, rs);
+    };
+    byte(0x40);
+    byte(0xff, 1);
+    byte(0x80);
+    byte(72, 1);
     expect(lcd.state.lines[0].slice(0, 2)).toBe('H ');
   });
 });

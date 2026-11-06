@@ -1,35 +1,91 @@
 import { PARTS } from './parts';
-import type { Scene, PartInstance, PinRef } from './types';
+import type { PartInstance, PinRef, Scene } from './types';
 
-const object = (x: unknown): x is Record<string, unknown> => x !== null && typeof x === 'object' && !Array.isArray(x);
-const vec3 = (x: unknown): x is [number, number, number] => Array.isArray(x) && x.length === 3 && x.every(v => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 1e5);
-const fail = (message: string): never => { throw new Error(message); };
-const allowed = (x: Record<string, unknown>, keys: readonly string[]) => Object.keys(x).every(key => keys.includes(key));
-const safeId = (id: unknown): id is string => typeof id === 'string' && /^[\w-]{1,80}$/.test(id) && !['__proto__', 'constructor', 'prototype'].includes(id);
-const colors = new Set(['red', 'black', 'blue', 'green', 'yellow', 'orange', 'white', 'purple', 'gray']);
+const WIRE_COLORS = new Set(['red', 'black', 'blue', 'green', 'yellow', 'orange', 'white', 'purple', 'gray']);
+const FORBIDDEN_IDS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isVec3(value: unknown): value is [number, number, number] {
+  return Array.isArray(value) && value.length === 3 && value.every(
+    coordinate => typeof coordinate === 'number' && Number.isFinite(coordinate) && Math.abs(coordinate) <= 1e5,
+  );
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  return Object.keys(value).every(key => keys.includes(key));
+}
+
+function isSafeId(value: unknown): value is string {
+  return typeof value === 'string' && /^[\w-]{1,80}$/.test(value) && !FORBIDDEN_IDS.has(value);
+}
+
+function invalid(message: string): never {
+  throw new Error(message);
+}
 
 /** Validate untrusted imported scenes before analysis or rendering. */
-export function validateScene(x: unknown): Scene {
-  if (!object(x)) throw new Error('장면 형식이 올바르지 않습니다.');
-  if (!allowed(x, ['version', 'title', 'parts', 'wires', 'code']) || x.version !== 1 || !Array.isArray(x.parts) || !Array.isArray(x.wires) || typeof x.code !== 'string') throw new Error('장면 형식이 올바르지 않습니다.');
-  if (x.parts.length > 300 || x.wires.length > 600) fail('부품 또는 전선 개수 제한을 초과했습니다.');
-  if (new TextEncoder().encode(x.code).length > 65536) fail('코드는 64 KB 이하이어야 합니다.');
-  if (x.title !== undefined && (typeof x.title !== 'string' || x.title.length > 200)) fail('장면 제목이 올바르지 않습니다.');
+export function validateScene(value: unknown): Scene {
+  if (!isObject(value) || !hasOnlyKeys(value, ['version', 'title', 'parts', 'wires', 'code']) ||
+      value.version !== 1 || !Array.isArray(value.parts) || !Array.isArray(value.wires) ||
+      typeof value.code !== 'string') {
+    invalid('장면 형식이 올바르지 않습니다.');
+  }
+  if (value.parts.length > 300 || value.wires.length > 600) {
+    invalid('부품 또는 전선 개수 제한을 초과했습니다.');
+  }
+  if (new TextEncoder().encode(value.code).length > 64 * 1024) {
+    invalid('코드는 64 KB 이하이어야 합니다.');
+  }
+  if (value.title !== undefined && (typeof value.title !== 'string' || value.title.length > 200)) {
+    invalid('장면 제목이 올바르지 않습니다.');
+  }
+
   const parts = new Map<string, PartInstance>();
-  for (const p of x.parts) {
-    if (!object(p) || !allowed(p, ['id', 'kind', 'pos', 'rotY', 'props']) || !safeId(p.id) || parts.has(p.id) || typeof p.kind !== 'string' || !Object.hasOwn(PARTS, p.kind) || !vec3(p.pos) || ![0,90,180,270].includes(p.rotY as number) || !object(p.props)) fail('부품 정보가 올바르지 않습니다.');
-    const def = PARTS[p.kind as keyof typeof PARTS];
-    for (const [key, value] of Object.entries(p.props)) {
-      const prop = def.props.find(d => d.key === key);
-      if (!prop || (prop.type !== 'enum' && typeof value !== (prop.type === 'boolean' ? 'boolean' : 'number')) || (typeof value === 'number' && (!Number.isFinite(value) || (prop.min !== undefined && value < prop.min) || (prop.max !== undefined && value > prop.max))) || (prop.type === 'enum' && prop.options && !prop.options.some(o => o.value === value))) fail(`${p.id}의 속성 ${key} 값이 올바르지 않습니다.`);
+  for (const candidate of value.parts) {
+    if (!isObject(candidate) || !hasOnlyKeys(candidate, ['id', 'kind', 'pos', 'rotY', 'props']) ||
+        !isSafeId(candidate.id) || parts.has(candidate.id) || typeof candidate.kind !== 'string' ||
+        !Object.hasOwn(PARTS, candidate.kind) || !isVec3(candidate.pos) ||
+        ![0, 90, 180, 270].includes(candidate.rotY as number) || !isObject(candidate.props)) {
+      invalid('부품 정보가 올바르지 않습니다.');
     }
-    parts.set(p.id, p as unknown as PartInstance);
+    const definition = PARTS[candidate.kind as keyof typeof PARTS];
+    for (const [key, propertyValue] of Object.entries(candidate.props)) {
+      const property = definition.props.find(item => item.key === key);
+      const wrongType = property && property.type !== 'enum' &&
+        typeof propertyValue !== (property.type === 'boolean' ? 'boolean' : 'number');
+      const invalidNumber = typeof propertyValue === 'number' &&
+        (!Number.isFinite(propertyValue) ||
+         (property?.min !== undefined && propertyValue < property.min) ||
+         (property?.max !== undefined && propertyValue > property.max) ||
+         (candidate.kind === 'neopixel-strip' && key === 'count' && !Number.isInteger(propertyValue)));
+      const invalidChoice = property?.type === 'enum' && property.options &&
+        !property.options.some(option => option.value === propertyValue);
+      if (!property || wrongType || invalidNumber || invalidChoice) {
+        invalid(`${candidate.id}의 속성 ${key} 값이 올바르지 않습니다.`);
+      }
+    }
+    parts.set(candidate.id, candidate as unknown as PartInstance);
   }
-  const validRef = (r: unknown): r is PinRef => object(r) && allowed(r, ['partId', 'pinId']) && typeof r.partId === 'string' && typeof r.pinId === 'string' && !!parts.get(r.partId) && PARTS[parts.get(r.partId)!.kind].pins.some(pin => pin.id === r.pinId);
+
+  const validPin = (candidate: unknown): candidate is PinRef => {
+    if (!isObject(candidate) || !hasOnlyKeys(candidate, ['partId', 'pinId']) ||
+        typeof candidate.partId !== 'string' || typeof candidate.pinId !== 'string') return false;
+    const part = parts.get(candidate.partId);
+    return !!part && PARTS[part.kind].pins.some(pin => pin.id === candidate.pinId);
+  };
   const wireIds = new Set<string>();
-  for (const w of x.wires) {
-    if (!object(w) || !allowed(w, ['id', 'from', 'to', 'color', 'bends']) || !safeId(w.id) || wireIds.has(w.id) || !validRef(w.from) || !validRef(w.to) || !colors.has(w.color as string) || (w.bends !== undefined && (!Array.isArray(w.bends) || w.bends.length > 20 || !w.bends.every(vec3)))) fail('전선 정보 또는 핀 참조가 올바르지 않습니다.');
-    wireIds.add(w.id);
+  for (const wire of value.wires) {
+    if (!isObject(wire) || !hasOnlyKeys(wire, ['id', 'from', 'to', 'color', 'bends']) ||
+        !isSafeId(wire.id) || wireIds.has(wire.id) || !validPin(wire.from) || !validPin(wire.to) ||
+        !WIRE_COLORS.has(wire.color as string) ||
+        (wire.bends !== undefined && (!Array.isArray(wire.bends) || wire.bends.length > 20 ||
+                                      !wire.bends.every(isVec3)))) {
+      invalid('전선 정보 또는 핀 참조가 올바르지 않습니다.');
+    }
+    wireIds.add(wire.id);
   }
-  return x as unknown as Scene;
+  return value as unknown as Scene;
 }

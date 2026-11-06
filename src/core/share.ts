@@ -1,10 +1,78 @@
 import type { Scene } from './types';
 import { validateScene } from './scene';
+
 export { validateScene } from './scene';
-const fail = (message: string): never => { throw new Error(message); };
-const MAX_DECODED = 32768;
-function base64url(bytes: Uint8Array): string { let s=''; for (let i=0;i<bytes.length;i+=8192) s+=String.fromCharCode(...bytes.subarray(i,i+8192)); return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
-function fromBase64url(text: string): Uint8Array { if (!/^[A-Za-z0-9_-]+$/.test(text) || text.length > 50000) return fail('공유 링크 형식이 올바르지 않습니다.'); const s=atob(text.replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from(s,c=>c.charCodeAt(0)); }
-async function streamBytes(stream: ReadableStream<Uint8Array>, limit: number): Promise<Uint8Array> { const reader=stream.getReader(), chunks:Uint8Array[]=[]; let length=0; try { while(true) { const {done,value}=await reader.read(); if(done) break; length+=value.length; if(length>limit) return fail('공유 데이터가 32 KB를 초과합니다.'); chunks.push(value); } } finally { await reader.cancel().catch(()=>{}); } const out=new Uint8Array(length); let offset=0; for(const chunk of chunks) { out.set(chunk,offset); offset+=chunk.length; } return out; }
-export async function encodeShare(scene: Scene): Promise<string> { const raw=new TextEncoder().encode(JSON.stringify(validateScene(scene))); if(raw.length>MAX_DECODED) return fail('공유 데이터가 32 KB를 초과합니다.'); const writer=new Blob([raw as BlobPart]).stream().pipeThrough(new CompressionStream('deflate-raw')); return base64url(await streamBytes(writer,50000)); }
-export async function decodeShare(hash: string): Promise<Scene> { const value=hash.replace(/^#/, '').replace(/^scene=/,''); try { const compressed=fromBase64url(value); const bytes=await streamBytes(new Blob([compressed as BlobPart]).stream().pipeThrough(new DecompressionStream('deflate-raw')),MAX_DECODED); return validateScene(JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes)) as unknown); } catch(e) { if(e instanceof Error && /공유 데이터|장면|부품|선|코드|제목/.test(e.message)) throw e; return fail('공유 링크를 읽을 수 없습니다.'); } }
+
+const MAX_DECODED_BYTES = 32 * 1024;
+const MAX_ENCODED_CHARS = 50_000;
+
+function fail(message: string): never {
+  throw new Error(message);
+}
+
+function toBase64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function fromBase64Url(encoded: string): Uint8Array {
+  if (!/^[A-Za-z0-9_-]+$/.test(encoded) || encoded.length > MAX_ENCODED_CHARS) {
+    return fail('공유 링크 형식이 올바르지 않습니다.');
+  }
+  const binary = atob(encoded.replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(binary, character => character.charCodeAt(0));
+}
+
+async function readBounded(stream: ReadableStream<Uint8Array>, limit: number): Promise<Uint8Array> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let length = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.length;
+      if (length > limit) fail('공유 데이터가 32 KB를 초과합니다.');
+      chunks.push(value);
+    }
+  } finally {
+    await reader.cancel().catch(() => {});
+  }
+  const result = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return result;
+}
+
+export async function encodeShare(scene: Scene): Promise<string> {
+  const bytes = new TextEncoder().encode(JSON.stringify(validateScene(scene)));
+  if (bytes.length > MAX_DECODED_BYTES) fail('공유 데이터가 32 KB를 초과합니다.');
+  const compressed = new Blob([bytes as BlobPart])
+    .stream()
+    .pipeThrough(new CompressionStream('deflate-raw'));
+  return toBase64Url(await readBounded(compressed, MAX_ENCODED_CHARS));
+}
+
+export async function decodeShare(hash: string): Promise<Scene> {
+  const encoded = hash.replace(/^#/, '').replace(/^scene=/, '');
+  try {
+    const compressed = fromBase64Url(encoded);
+    const decompressed = new Blob([compressed as BlobPart])
+      .stream()
+      .pipeThrough(new DecompressionStream('deflate-raw'));
+    const bytes = await readBounded(decompressed, MAX_DECODED_BYTES);
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return validateScene(JSON.parse(text) as unknown);
+  } catch (error) {
+    if (error instanceof Error && /공유 데이터|장면|부품|선|코드|제목/.test(error.message)) {
+      throw error;
+    }
+    return fail('공유 링크를 읽을 수 없습니다.');
+  }
+}
