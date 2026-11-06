@@ -32,7 +32,7 @@ export const PartView = memo(function PartView({ part }: { part: PartInstance })
       {/* low quality has no shadow maps: a cheap baked blob under the part instead */}
       {low && (
         <mesh position={[part.pos[0], (board ? DESK_Y : part.pos[1]) + 0.08, part.pos[2]]} rotation={[-Math.PI / 2, 0, (part.rotY * Math.PI) / 180]} renderOrder={1}>
-          <planeGeometry args={[size[0] * (board ? 1.25 : 1.9) + 6, size[2] * (board ? 1.25 : 1.9) + 6]} />
+          <planeGeometry args={[size[0] * (board ? 1.15 : 1.4) + 4, size[2] * (board ? 1.15 : 1.4) + 4]} />
           <meshBasicMaterial map={blobTexture()} transparent opacity={board ? 0.5 : 0.4} depthWrite={false} toneMapped={false} />
         </mesh>
       )}

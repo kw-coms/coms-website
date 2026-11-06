@@ -72,6 +72,7 @@ try {
   await page.waitForSelector('canvas');
   await page.getByRole('button', { name: '건너뛰기' }).click().catch(() => {});
   await settle(1500);
+  await page.getByRole('button', { name: '확인' }).click({ timeout: 1000 }).catch(() => {}); // low-quality notice
   check('page loads with canvas', (await page.locator('canvas').count()) > 0);
   const q0 = await lab(() => window.__lab.getState().quality);
   check('quality is auto-detected', ['high', 'medium', 'low'].includes(q0), q0);
@@ -135,8 +136,10 @@ try {
     const led = ids.find((i) => i.startsWith('led'));
     const p1 = await lab((id) => window.__lab.projectPart(id, 5), uno);
     const p2 = await lab((id) => window.__lab.projectPart(id, 5), led);
-    await page.mouse.click(p1.x, p1.y, { modifiers: ['Shift'] });
-    await page.mouse.click(p2.x, p2.y, { modifiers: ['Shift'] });
+    await page.keyboard.down('Shift');
+    await page.mouse.click(p1.x, p1.y);
+    await page.mouse.click(p2.x, p2.y);
+    await page.keyboard.up('Shift');
     await settle(300);
     check('Shift+click multi-selects', (await lab(() => window.__lab.getState().multi.length)) === 2);
     await page.keyboard.press('Escape');
@@ -320,7 +323,7 @@ try {
       check('motor-direction: motor spins (shaft rotates)', !!m && m.rpm > 0 && distinct(s) > 3, JSON.stringify(m));
     },
   };
-  for (const { id } of exs) {
+  for (const { id } of process.env.LAB_SHOTS_ONLY ? [] : exs) {
     try {
       await open(id);
       const fitEx = await lab(() => window.__lab.fillRatio());
@@ -336,7 +339,7 @@ try {
   }
 
   // ---- compile error shows diagnostics and opens the code tab ----
-  await open('builtin-blink');
+  if (!process.env.LAB_SHOTS_ONLY) await open('builtin-blink');
   await lab(() => window.__lab.setCode('void setup() { pinMode(13, OUTPUT) }\nvoid loop() {}\n'));
   await page.getByRole('tab', { name: '속성' }).click();
   await page.getByRole('button', { name: '실행', exact: true }).click();

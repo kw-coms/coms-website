@@ -170,7 +170,7 @@ button { cursor: pointer; }
   .sidepanel, .sidepanel.closed { display: flex; width: 100%; flex: none; border-left: 0; border-top: 1px solid var(--border); box-shadow: 0 -6px 18px rgba(20, 40, 70, 0.14); }
   .sidepanel .side-body { display: none; }
   .sidepanel.sheet-open .side-body { display: flex; height: 44vh; }
-  .side-resizer, .side-fold { display: none; }
+  .side-resizer, .sidepanel .side-tabs .side-fold { display: none; }
   .only-mobile { display: block !important; } .only-mobile-pane { display: flex !important; } .only-mobile-pane[hidden] { display: none !important; }
   .side-tabs { padding: 0 4px; justify-content: space-between; overflow: visible; }
   .side-tabs button { flex: 1; padding: 11px 2px 9px; font-size: 13px; }

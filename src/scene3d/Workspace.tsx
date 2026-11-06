@@ -45,7 +45,7 @@ function deskTexture(dark: boolean) {
       g.fillRect(0, y0, S, S / 2);
       for (let i = 0; i < 90; i++) {
         const y = y0 + r() * (S / 2);
-        g.strokeStyle = `rgba(${grain},${(0.03 + r() * 0.07).toFixed(3)})`;
+        g.strokeStyle = `rgba(${grain},${(dark ? 0.01 + r() * 0.025 : 0.03 + r() * 0.07).toFixed(3)})`;
         g.lineWidth = 0.6 + r() * 1.8;
         g.beginPath();
         g.moveTo(0, y);
