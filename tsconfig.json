@@ -19,6 +19,7 @@
     "strictBindCallApply": true,
     "alwaysStrict": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,

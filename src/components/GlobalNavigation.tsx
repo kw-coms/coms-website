@@ -19,6 +19,7 @@ import {
   tabs,
   navExtraItems,
   activitySectionNavItems,
+  activityNavGroups,
 } from '../data/homeContent'
 import { scrollToTopInstant } from '../utils/themeColors'
 import NotificationButton from './NotificationButton'
@@ -27,6 +28,9 @@ import { ROLE_LABELS, canAccessOperationsPanel } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
 
 const floatingBarBaseClass = 'apple-topbar border-b border-[var(--app-hairline)]'
+
+// The bottom tab bar has room for three; Study stays reachable from the menu.
+const MOBILE_TAB_IDS = ['about', 'activities', 'projects']
 
 function getTabRoute(id) {
   return id === 'recruit' ? '/recruit' : `/${id}`
@@ -42,6 +46,7 @@ function getActiveNavKey(pathname) {
   if (pathname === '/attendance') return 'attendance'
   if (pathname === '/gatherings' || pathname.startsWith('/gatherings/')) return 'gatherings'
   if (pathname === '/projects') return 'projects'
+  if (pathname === '/study' || pathname.startsWith('/study/')) return 'study'
   if (pathname === '/apps') return 'apps'
   if (pathname === '/draw') return 'draw'
   if (pathname.startsWith('/recruit')) return 'recruit'
@@ -76,7 +81,7 @@ export default function GlobalNavigation() {
     setMobileActivityOpen(false)
   }
   const activeKey = getActiveNavKey(location.pathname)
-  const mobileTabs = tabs.slice(0, 3)
+  const mobileTabs = MOBILE_TAB_IDS.flatMap((id) => tabs.filter((tab) => tab.id === id))
   const showMobileTabs = mobileTabs.some((tab) => tab.id === activeKey)
   const primaryNavItems = tabs.map((tab) => ({ ...tab, path: getTabRoute(tab.id) }))
   const noticesNavItem = navExtraItems.find((item) => item.id === 'notices')
@@ -265,27 +270,32 @@ export default function GlobalNavigation() {
               <nav
                 id="activity-nav-panel"
                 aria-label="활동 메뉴"
-                className="absolute left-1/2 top-full z-[90] mt-4 w-64 -translate-x-1/2 overflow-hidden rounded-2xl border border-[var(--app-hairline)] bg-[var(--app-surface)] shadow-[0_18px_45px_rgba(0,0,0,0.12)]"
+                className="absolute left-1/2 top-full z-[90] mt-4 flex w-[34rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 overflow-hidden rounded-2xl border border-[var(--app-hairline)] bg-[var(--app-surface)] shadow-[0_18px_45px_rgba(0,0,0,0.12)]"
               >
-                <ul className="flex flex-col py-1">
-                  {activitySectionNavItems.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => goNavItem(item)}
-                        className="flex w-full items-start gap-3 px-4 py-2.5 transition hover:bg-[var(--app-surface-soft)]"
-                      >
-                        <span className="mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]">
-                          <item.icon size={14} aria-hidden="true" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-left text-sm font-semibold text-[var(--app-text)]">{item.label}</span>
-                          <span className="block text-left text-xs font-medium text-[var(--app-subtle)]">{item.hint}</span>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                {activityNavGroups.map((group) => (
+                  <div key={group.id} className="min-w-0 flex-1 py-2 first:border-r first:border-[var(--app-hairline)]">
+                    <h3 className="px-4 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wide text-[var(--app-subtle)]">{group.label}</h3>
+                    <ul className="flex flex-col">
+                      {activitySectionNavItems.filter((item) => item.group === group.id).map((item) => (
+                        <li key={item.id}>
+                          <button
+                            type="button"
+                            onClick={() => goNavItem(item)}
+                            className="flex w-full items-start gap-3 px-4 py-2.5 transition hover:bg-[var(--app-surface-soft)]"
+                          >
+                            <span className="mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]">
+                              <item.icon size={14} aria-hidden="true" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-left text-sm font-semibold text-[var(--app-text)]">{item.label}</span>
+                              <span className="block text-left text-xs font-medium text-[var(--app-subtle)]">{item.hint}</span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
               </nav>
             )}
           </div>
@@ -404,22 +414,30 @@ export default function GlobalNavigation() {
               </span>
             </button>
             {mobileActivityOpen && (
-              <div id="mobile-activity-panel" className="flex flex-col divide-y divide-[var(--app-hairline)] bg-black/[0.015]">
-                {activitySectionNavItems.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => closeAndGo(item.path)}
-                    className="apple-mobile-menu-item apple-mobile-menu-subitem"
-                  >
-                    <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]">
-                      <item.icon size={13} aria-hidden="true" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-[var(--app-text)]">{item.label}</span>
-                      <span className="mt-0.5 block text-xs leading-relaxed text-[var(--app-muted)]">{item.hint}</span>
-                    </span>
-                  </button>
+              <div id="mobile-activity-panel" className="flex flex-col bg-black/[0.015]">
+                {activityNavGroups.map((group) => (
+                  <div key={group.id} className="border-b border-[var(--app-hairline)] last:border-b-0">
+                    <h3 className="px-4 pb-1 pt-3 text-[11px] font-bold uppercase tracking-wide text-[var(--app-subtle)]">{group.label}</h3>
+                    <ul className="flex flex-col divide-y divide-[var(--app-hairline)]">
+                      {activitySectionNavItems.filter((item) => item.group === group.id).map((item) => (
+                        <li key={item.id}>
+                          <button
+                            type="button"
+                            onClick={() => closeAndGo(item.path)}
+                            className="apple-mobile-menu-item apple-mobile-menu-subitem"
+                          >
+                            <span className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-[var(--app-accent-text)]">
+                              <item.icon size={13} aria-hidden="true" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-semibold text-[var(--app-text)]">{item.label}</span>
+                              <span className="mt-0.5 block text-xs leading-relaxed text-[var(--app-muted)]">{item.hint}</span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
               </div>
             )}

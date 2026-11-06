@@ -6,6 +6,8 @@
 // title, description and canonical URL, and nginx serves it before falling back to index.html.
 // The app itself is identical in every copy.
 
+import { STUDIES } from '../pages/study/studies.ts'
+
 export const SITE_URL = 'https://coms.kw.ac.kr'
 
 export interface PublicPageMeta {
@@ -31,6 +33,16 @@ export const PUBLIC_PAGE_META: PublicPageMeta[] = [
     title: "프로젝트 | KW COM's",
     description: '동아리 안에서 쓰이는 서비스부터 교육용 실습까지, COM\'s 부원들이 팀으로 만든 프로젝트를 소개합니다.',
   },
+  {
+    path: '/study',
+    title: "스터디 | KW COM's",
+    description: "웹, 아두이노, C, Java, Python까지. COM's 스터디 자료를 골라 순서대로 따라 해 보세요.",
+  },
+  ...STUDIES.map((study) => ({
+    path: `/study/${study.id}`,
+    title: `${study.title} | KW COM's`,
+    description: `COM's ${study.title} 스터디. ${study.description}`,
+  })),
   {
     path: '/apps',
     title: "Apps | KW COM's",

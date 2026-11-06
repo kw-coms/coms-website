@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>study sandbox</title>
+<script>
+// Runs the code of one /study demo. The page is served with a CSP `sandbox` (opaque origin, see
+// nginx.frontend.conf), and the parent posts the document exactly once: anything else is ignored.
+(function () {
+  function onMessage(event) {
+    if (window.parent === window || event.source !== window.parent) return;
+    var data = event.data;
+    if (!data || typeof data.doc !== 'string') return;
+    window.removeEventListener('message', onMessage);
+    document.open();
+    document.write(data.doc);
+    document.close();
+  }
+  window.addEventListener('message', onMessage);
+})();
+</script>
+</head>
+<body></body>
+</html>

@@ -20,8 +20,22 @@ assert.equal(existsSync(embedUrl), false, 'unused inline Apps iframe component s
 assert.doesNotMatch(embed, /allow-scripts[^"]*allow-same-origin|allow-same-origin[^"]*allow-scripts/,
   'inline embeds must not combine allow-scripts and allow-same-origin')
 
-assert.doesNotMatch(headers, /frame-src[^;]*'self'/, 'CSP should not imply same-origin Apps iframe support')
-assert.match(headers, /frame-src https:\/\/www\.youtube\.com https:\/\/www\.youtube-nocookie\.com;/,
-  'only explicitly trusted video frame origins should remain allowed')
+// 'self' is allowed for exactly one reason: the /study demo sandbox frame (see below).
+assert.match(headers, /frame-src 'self' https:\/\/www\.youtube\.com https:\/\/www\.youtube-nocookie\.com;/,
+  "frame-src should be 'self' (study sandbox) plus the explicitly trusted video frame origins only")
+
+const nginx = readFileSync(new URL('../nginx.frontend.conf', import.meta.url), 'utf8')
+const sandboxLocation = nginx.match(/location = \/study-sandbox\.html \{([^}]*)\}/)?.[1] ?? ''
+assert.ok(sandboxLocation, 'nginx should have an exact-match location for the study sandbox')
+assert.ok(nginx.indexOf('location = /study-sandbox.html') < nginx.indexOf('location / {'), 'sandbox location must precede the SPA fallback')
+assert.doesNotMatch(sandboxLocation, /security-headers\.conf/, 'sandbox page must not get the site CSP (it needs inline scripts)')
+assert.match(sandboxLocation, /Content-Security-Policy "sandbox allow-scripts allow-modals;/, 'sandbox CSP must force an opaque origin')
+assert.doesNotMatch(sandboxLocation, /allow-same-origin/, 'sandbox must never get allow-same-origin')
+assert.match(sandboxLocation, /connect-src 'none'/, 'sandboxed demo code must not open network connections')
+const sandboxPage = readFileSync(new URL('../public/study-sandbox.html', import.meta.url), 'utf8')
+assert.match(sandboxPage, /event\.source !== window\.parent/, 'sandbox page must only accept messages from its parent')
+const studyDemos = readFileSync(new URL('../src/pages/study/studyDemos.ts', import.meta.url), 'utf8')
+assert.doesNotMatch(studyDemos, /allow-same-origin/, 'demo frames must stay on an opaque origin')
+assert.doesNotMatch(studyDemos, /\.srcdoc\b|setAttribute\('srcdoc'/, 'srcdoc frames inherit the site CSP; use the sandbox page')
 
 console.log('apps public hardening contract passed')

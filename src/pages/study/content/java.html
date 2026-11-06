@@ -1,0 +1,1495 @@
+
+<nav class="toc" aria-label="목차">
+  <div class="toc-title">COM's Java 기초 스터디</div>
+  <div class="progress"><div id="progress-bar"></div></div>
+  <div class="progress-label" id="progress-label">진도 0 / 11</div>
+  <ol>
+    <li><a href="#start">0. 시작하기</a></li>
+    <li class="sub"><a href="#start-what">자바란?</a></li>
+    <li class="sub"><a href="#start-install">JDK · 편집기 설치</a></li>
+    <li class="sub"><a href="#start-first">첫 프로그램 실행</a></li>
+    <li><a href="#anatomy">1. 첫 프로그램 해부</a></li>
+    <li class="sub"><a href="#ana-parts">한 줄씩 뜯어보기</a></li>
+    <li class="sub"><a href="#ana-print">출력과 주석</a></li>
+    <li class="sub"><a href="#ana-error">컴파일 에러 읽기</a></li>
+    <li><a href="#vars">2. 변수와 자료형</a></li>
+    <li class="sub"><a href="#var-types">자료형 종류</a></li>
+    <li class="sub"><a href="#var-cast">계산과 형변환</a></li>
+    <li class="sub"><a href="#var-const">final · var</a></li>
+    <li><a href="#input">3. 입력 받기</a></li>
+    <li class="sub"><a href="#in-scanner">Scanner 기본</a></li>
+    <li class="sub"><a href="#in-trap">줄바꿈 함정</a></li>
+    <li><a href="#flow">4. 조건문 · 반복문</a></li>
+    <li class="sub"><a href="#flow-if">if / else</a></li>
+    <li class="sub"><a href="#flow-switch">switch</a></li>
+    <li class="sub"><a href="#flow-loop">for · while</a></li>
+    <li><a href="#array">5. 배열과 ArrayList</a></li>
+    <li class="sub"><a href="#arr-array">배열</a></li>
+    <li class="sub"><a href="#arr-list">ArrayList</a></li>
+    <li class="sub"><a href="#arr-vs">배열 vs 리스트</a></li>
+    <li><a href="#method">6. 메서드</a></li>
+    <li class="sub"><a href="#m-basic">정의와 호출</a></li>
+    <li class="sub"><a href="#m-static">static이란?</a></li>
+    <li class="sub"><a href="#m-overload">오버로딩</a></li>
+    <li><a href="#class">7. 클래스와 객체</a></li>
+    <li class="sub"><a href="#c-basic">필드 · 생성자</a></li>
+    <li class="sub"><a href="#c-encap">캡슐화</a></li>
+    <li><a href="#inherit">8. 상속과 인터페이스</a></li>
+    <li class="sub"><a href="#inh-extends">extends · super</a></li>
+    <li class="sub"><a href="#inh-poly">다형성</a></li>
+    <li class="sub"><a href="#inh-iface">interface</a></li>
+    <li><a href="#exception">9. 예외 처리</a></li>
+    <li class="sub"><a href="#ex-try">try / catch / finally</a></li>
+    <li class="sub"><a href="#ex-valid">입력 검증</a></li>
+    <li><a href="#project">10. 실습: 성적 관리</a></li>
+    <li><a href="#next">11. 막힐 때 · 다음 단계</a></li>
+  </ol>
+</nav>
+
+<div class="study-main">
+
+<header class="hero">
+  <div class="eyebrow">COM'S STUDY · JAVA 101</div>
+  <h1>처음 배우는 Java<br>콘솔 프로그램 만들기</h1>
+  <p>프로그래밍이 처음이어도 괜찮습니다. 이 페이지를 순서대로 따라 하면 <b>변수 → 조건·반복 → 배열 → 메서드 → 클래스</b>까지 배우고, 마지막에는 메뉴가 있는 <b>성적 관리 프로그램</b>을 직접 완성합니다. 모든 예제는 JDK 17 이상에서 컴파일하고 실행해서 <b>출력 결과를 직접 확인한 코드</b>입니다.</p>
+  <div class="chips"><span class="chip">Java 17+ (JDK 21 이상의 LTS 권장)</span><span class="chip">콘솔 프로그램</span><span class="chip">객체지향 맛보기</span></div>
+</header>
+
+<!-- =============================== 0. 시작하기 =============================== -->
+<section class="part" id="start" data-part="start">
+  <h2>0. 시작하기</h2>
+  <p class="lead">자바가 무엇인지 알아보고, 개발 도구를 설치해서 첫 프로그램을 실행해 봅니다.</p>
+
+  <h3 id="start-what"><span class="num">0-1</span>자바는 어떤 언어일까?</h3>
+  <p>자바(Java)는 안드로이드 앱, 은행·쇼핑몰 서버, 대기업 백엔드까지 폭넓게 쓰이는 언어입니다. 우리 동아리 웹사이트의 백엔드(서버)도 자바 기반의 <b>Spring Boot</b>로 만들어져 있어요. 자바의 가장 큰 특징은 <b>"한 번 컴파일해서 어디서나 실행"</b>입니다.</p>
+  <ul>
+    <li><b>컴파일(compile)</b>: 사람이 쓴 코드(<code>.java</code>)를 컴퓨터가 읽을 수 있는 중간 형태(<code>.class</code>, 바이트코드)로 번역하는 일. 이때 문법 오류도 걸러줍니다.</li>
+    <li><b>JVM</b> (Java Virtual Machine): 바이트코드를 실제로 실행해 주는 "자바 전용 가상 컴퓨터". Windows, macOS, Linux마다 JVM이 따로 있어서 같은 <code>.class</code> 파일이 어디서나 돌아갑니다.</li>
+    <li><b>JDK</b> (Java Development Kit): 개발에 필요한 도구 묶음. 컴파일러 <code>javac</code>, 실행기 <code>java</code>, JVM이 모두 들어 있습니다. 우리가 설치할 것이 바로 이것입니다.</li>
+  </ul>
+  <figure class="figure">
+    <svg viewBox="0 0 640 110" width="100%" role="img" aria-label="Hello.java 파일을 javac로 컴파일하면 Hello.class가 만들어지고, java 명령으로 JVM이 실행하는 흐름">
+      <g fill="none" stroke="currentColor" stroke-width="1.6">
+        <rect x="8" y="30" width="130" height="50" rx="8"/>
+        <rect x="255" y="30" width="130" height="50" rx="8"/>
+        <rect x="500" y="30" width="130" height="50" rx="8"/>
+        <path d="M138 55 H255 M385 55 H500"/>
+        <path d="M246 49 l9 6 l-9 6 M491 49 l9 6 l-9 6"/>
+      </g>
+      <g fill="currentColor" font-size="14" text-anchor="middle">
+        <text x="73" y="60">Hello.java</text>
+        <text x="320" y="60">Hello.class</text>
+        <text x="565" y="60">화면에 출력</text>
+        <text x="196" y="45" font-size="12">javac (컴파일)</text>
+        <text x="442" y="45" font-size="12">java (JVM 실행)</text>
+        <text x="73" y="98" font-size="12">내가 쓴 코드</text>
+        <text x="320" y="98" font-size="12">바이트코드</text>
+      </g>
+    </svg>
+    <figcaption>소스 코드 → 컴파일 → 바이트코드 → JVM 실행</figcaption>
+  </figure>
+
+  <h3 id="start-install"><span class="num">0-2</span>준비물 (모두 무료)</h3>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>준비물</th><th>설명</th></tr>
+    <tr><td><b>JDK 21 이상의 LTS (2026년 기준 최신 LTS는 25)</b></td><td>LTS는 오래 지원되는 안정 버전이라는 뜻. <b>Eclipse Temurin</b>을 추천합니다(adoptium.net → Temurin(LTS 최신 버전) → 내 OS에 맞는 설치 파일). macOS는 <code>brew install --cask temurin@21</code>도 가능.</td></tr>
+    <tr><td><b>IntelliJ IDEA Community</b></td><td>자바 전용 편집기(IDE). 자동 완성과 오류 표시가 강력해서 입문자에게 가장 편합니다. jetbrains.com/idea 에서 Community 버전 설치.</td></tr>
+    <tr><td><b>VS Code</b> (대안)</td><td>이미 쓰고 있다면 확장 "Extension Pack for Java"를 설치하면 자바를 쓸 수 있습니다.</td></tr>
+  </table></div>
+  <p>설치가 끝나면 터미널(Windows는 PowerShell, macOS는 Terminal)을 열어 확인합니다. 아래처럼 버전이 나오면 성공입니다.</p>
+<pre class="code">java -version
+javac -version</pre>
+  <div class="note"><b>이 페이지의 코드는 JDK 17 이상이면 돌아갑니다</b>이미 17을 설치했다면 그대로 따라 해도 됩니다. 새로 설치한다면 JDK 21 이상의 LTS (2026년 기준 최신 LTS는 25)를 추천해요. 아래 예제 중 <code>switch</code>의 화살표(<code>-&gt;</code>) 문법은 Java 14부터 쓸 수 있습니다.</div>
+
+  <h3 id="start-first"><span class="num">0-3</span>Hello, COM's! 실행하기</h3>
+  <ol>
+    <li>바탕화면에 <code>java-study</code> 폴더를 만들고, 그 안에 <code>Hello.java</code> 파일을 만들어 아래 코드를 그대로 저장합니다.</li>
+    <li>터미널에서 그 폴더로 이동합니다. (<code>cd Desktop/java-study</code>)</li>
+    <li><code>javac Hello.java</code> — 컴파일. 아무 말 없이 끝나면 성공이고, 폴더에 <code>Hello.class</code>가 생깁니다.</li>
+    <li><code>java Hello</code> — 실행. <b>.class를 붙이지 않고</b> 클래스 이름만 씁니다.</li>
+  </ol>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Hello</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"Hello, COM's!"</span>);
+    }
+}</pre>
+<pre class="code">javac Hello.java
+java Hello</pre>
+<pre class="output">Hello, COM's!</pre>
+  <div class="warn"><b>파일 이름 = public class 이름</b><code>public class Hello</code>라고 썼다면 파일 이름은 반드시 <code>Hello.java</code>여야 합니다. 대소문자까지 똑같아야 해요. 어기면 컴파일 에러가 납니다. (11장에서 직접 확인해 봅니다.)</div>
+  <div class="tip"><b>한 번에 실행하기</b>Java 11부터는 <code>java Hello.java</code>처럼 소스 파일을 바로 실행할 수도 있습니다. 파일 하나짜리 연습할 때 편합니다. IntelliJ에서는 <code>main</code> 옆의 초록 ▶ 버튼을 누르면 컴파일과 실행을 한꺼번에 해줍니다.</div>
+  <div class="tip"><b>한글이 깨지거나 "unmappable character" 경고가 나온다면</b>한국어 Windows의 <code>javac</code>는 파일을 예전 인코딩(MS949)으로 읽는 경우가 있습니다. <code>javac -encoding UTF-8 Hello.java</code>처럼 인코딩을 알려주면 됩니다. IntelliJ 같은 IDE를 쓰면 신경 쓸 필요가 없고, JDK 18부터는 기본값이 UTF-8이라 JDK 21에서는 이 문제가 거의 없습니다.</div>
+
+  <div class="quiz">
+    <h4>✅ 확인 문제</h4>
+    <details><summary>Q1. 소스 코드(.java)를 바이트코드(.class)로 번역하는 명령은?</summary><span class="ans">javac</span> — 실행은 <code>java</code> 명령이 맡습니다. JVM이 바이트코드를 읽어서 실행해요.</details>
+    <details><summary>Q2. <code>public class Menu</code>가 들어 있는 파일의 이름은?</summary><span class="ans">Menu.java</span> — public 클래스 이름과 파일 이름은 대소문자까지 같아야 합니다.</details>
+    <details><summary>Q3. JDK와 JVM의 차이는?</summary><span class="ans">JVM은 바이트코드를 실행하는 가상 컴퓨터, JDK는 JVM에 컴파일러 등 개발 도구까지 합친 꾸러미</span>입니다. 개발하려면 JDK를 설치해야 합니다.</details>
+  </div>
+
+  <label class="done-check"><input type="checkbox" data-done="start"> 0장 완료!</label>
+</section>
+
+<!-- =============================== 1. 첫 프로그램 해부 =============================== -->
+<section class="part" id="anatomy" data-part="anatomy">
+  <h2>1. 첫 프로그램 해부</h2>
+  <p class="lead">방금 실행한 다섯 줄이 각각 무슨 뜻인지 하나씩 뜯어봅니다.</p>
+
+  <h3 id="ana-parts"><span class="num">1-1</span>한 줄씩 뜯어보기</h3>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Hello</span> {                              <span class="c">← 클래스: 자바 코드는 전부 클래스 안에 쓴다</span>
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {     <span class="c">← 프로그램의 시작점(입구)</span>
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"Hello, COM's!"</span>);   <span class="c">← 화면에 한 줄 출력</span>
+    }
+}</pre>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>부분</th><th>의미</th></tr>
+    <tr><td><code>class Hello { ... }</code></td><td>"Hello"라는 이름의 코드 묶음(클래스). 지금은 "코드를 담는 상자"라고 생각하세요. 7장에서 진짜 의미를 배웁니다.</td></tr>
+    <tr><td><code>public static void main(String[] args)</code></td><td>자바는 <b>항상 main에서 시작</b>합니다. 한 글자라도 다르면 실행이 안 됩니다. 지금은 통째로 외워도 됩니다. (<code>void</code>는 "돌려주는 값 없음", <code>String[] args</code>는 실행할 때 넘기는 값)</td></tr>
+    <tr><td><code>System.out.println(...)</code></td><td>괄호 안의 내용을 화면에 출력하고 줄을 바꿉니다.</td></tr>
+    <tr><td><code>{ }</code> 중괄호</td><td>코드 덩어리의 시작과 끝. 열었으면 반드시 닫아야 하고, 안쪽은 들여쓰기(4칸)로 맞춥니다.</td></tr>
+    <tr><td><code>;</code> 세미콜론</td><td>문장의 끝. 한 문장이 끝날 때마다 붙입니다.</td></tr>
+  </table></div>
+
+  <h3 id="ana-print"><span class="num">1-2</span>출력과 주석</h3>
+  <ul>
+    <li><code>println</code>: 출력 후 줄바꿈 / <code>print</code>: 줄바꿈 없이 출력</li>
+    <li><code>printf</code>: 서식에 맞춰 출력. <code>%s</code>는 문자열, <code>%d</code>는 정수, <code>%.1f</code>는 소수점 한 자리 실수, <code>%n</code>은 줄바꿈</li>
+    <li><code>\n</code>은 줄바꿈, <code>\"</code>는 따옴표 한 글자, <code>\\</code>는 역슬래시 한 글자 (<b>이스케이프 문자</b>)</li>
+    <li>주석: <code>//</code>는 그 줄 끝까지, <code>/* ... */</code>는 여러 줄. 컴파일러가 무시하는 메모입니다.</li>
+  </ul>
+<pre class="code"><span class="c">// 한 줄 주석: 컴파일러가 무시합니다</span>
+<span class="k">public</span> <span class="k">class</span> <span class="k">Anatomy</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"줄바꿈 있음"</span>);
+        <span class="k">System</span>.out.<span class="p">print</span>(<span class="s">"줄바꿈 "</span>);
+        <span class="k">System</span>.out.<span class="p">print</span>(<span class="s">"없음\n"</span>);   <span class="c">// \n 은 줄바꿈 문자</span>
+        <span class="c">/* 여러 줄
+           주석도 가능 */</span>
+        <span class="k">System</span>.out.<span class="p">printf</span>(<span class="s">"이름: %s, 나이: %d살, 키: %.1fcm%n"</span>, <span class="s">"민수"</span>, <span class="num">20</span>, <span class="num">175.5</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"따옴표는 \"이렇게\", 역슬래시는 \\ 이렇게"</span>);
+    }
+}</pre>
+<pre class="output">줄바꿈 있음
+줄바꿈 없음
+이름: 민수, 나이: 20살, 키: 175.5cm
+따옴표는 "이렇게", 역슬래시는 \ 이렇게</pre>
+
+  <h3 id="ana-error"><span class="num">1-3</span>컴파일 에러 읽기</h3>
+  <p>코딩하다 보면 에러는 <b>반드시</b> 만납니다. 겁먹지 말고 메시지를 읽는 법만 알면 됩니다. 일부러 세미콜론을 빼 볼게요.</p>
+  <div class="warn"><b>일부러 틀린 코드입니다 (컴파일 안 됨)</b>아래 코드는 에러를 보여주기 위한 예제입니다.</div>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Broken</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"세미콜론을 빼먹었어요"</span>)
+    }
+}</pre>
+<pre class="output">Broken.java:3: error: ';' expected
+        System.out.println("세미콜론을 빼먹었어요")
+                                         ^
+1 error</pre>
+  <p>읽는 순서는 이렇습니다.</p>
+  <ol>
+    <li><code>Broken.java:3</code> — <b>파일 이름과 줄 번호</b>. 3번째 줄 근처입니다.</li>
+    <li><code>error: ';' expected</code> — <b>무슨 문제인지</b>. 세미콜론이 있어야 한다는 뜻.</li>
+    <li><code>^</code> 표시 — <b>정확한 위치</b>. 줄 끝에서 멈췄죠.</li>
+  </ol>
+  <p>이번에는 변수 이름을 잘못 쓴 경우입니다.</p>
+  <div class="warn"><b>일부러 틀린 코드입니다 (컴파일 안 됨)</b><code>name</code>을 <code>nmae</code>로 오타 냈습니다.</div>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Typo</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">String</span> name = <span class="s">"COM's"</span>;
+        <span class="k">System</span>.out.<span class="p">println</span>(nmae);
+    }
+}</pre>
+<pre class="output">Typo.java:4: error: cannot find symbol
+        System.out.println(nmae);
+                           ^
+  symbol:   variable nmae
+  location: class Typo
+1 error</pre>
+  <p><code>cannot find symbol</code>은 "그런 이름을 모르겠어요"라는 뜻입니다. 오타, 대소문자 실수, 변수를 만들기 전에 사용한 경우에 나옵니다. 아래에 <code>symbol</code>(찾지 못한 이름)과 <code>location</code>(어디서 찾았는지)이 친절하게 적혀 있어요.</p>
+  <div class="tip"><b>에러가 여러 개일 때</b>맨 <b>위</b>에 있는 에러부터 고치세요. 첫 에러 하나 때문에 뒤의 에러가 줄줄이 생기는 경우가 많아서, 하나 고치고 다시 컴파일하면 에러가 확 줄어듭니다.</div>
+
+  <div class="quiz">
+    <h4>✅ 확인 문제</h4>
+    <details><summary>Q1. 프로그램이 가장 먼저 실행되는 메서드의 이름은?</summary><span class="ans">main</span> — <code>public static void main(String[] args)</code></details>
+    <details><summary>Q2. <code>print</code>와 <code>println</code>의 차이는?</summary><span class="ans">println은 출력 뒤에 줄을 바꾸고, print는 바꾸지 않습니다.</span></details>
+    <details><summary>Q3. <code>cannot find symbol</code> 에러가 나면 가장 먼저 확인할 것은?</summary><span class="ans">이름의 오타와 대소문자</span> — <code>symbol:</code> 줄에 적힌 이름이 내가 만든 이름과 정확히 같은지 봅니다.</details>
+  </div>
+
+  <label class="done-check"><input type="checkbox" data-done="anatomy"> 1장 완료!</label>
+</section>
+
+<!-- =============================== 2. 변수와 자료형 =============================== -->
+<section class="part" id="vars" data-part="vars">
+  <h2>2. 변수와 자료형</h2>
+  <p class="lead">값을 저장해 두는 이름표(변수)와, 값의 종류(자료형)를 배웁니다.</p>
+
+  <h3 id="var-types"><span class="num">2-1</span>자료형 종류</h3>
+  <p>자바는 변수를 만들 때 <b>어떤 종류의 값을 담을지</b> 먼저 정해야 합니다. 형식은 <code>자료형 이름 = 값;</code> 입니다.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>자료형</th><th>담는 값</th><th>예</th></tr>
+    <tr><td><code>int</code></td><td>정수 (약 -21억 ~ 21억)</td><td><code>int age = 20;</code></td></tr>
+    <tr><td><code>long</code></td><td>아주 큰 정수. 숫자 끝에 <code>L</code></td><td><code>long big = 3_000_000_000L;</code></td></tr>
+    <tr><td><code>double</code></td><td>소수가 있는 실수</td><td><code>double height = 175.5;</code></td></tr>
+    <tr><td><code>boolean</code></td><td>참/거짓 (<code>true</code>, <code>false</code>)</td><td><code>boolean ok = true;</code></td></tr>
+    <tr><td><code>char</code></td><td>글자 <b>한 개</b>, 작은따옴표</td><td><code>char grade = 'A';</code></td></tr>
+    <tr><td><code>String</code></td><td>문자열(글자 여러 개), 큰따옴표. 대문자 S 주의!</td><td><code>String name = "민수";</code></td></tr>
+  </table></div>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Variables</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">int</span> age = <span class="num">20</span>;                  <span class="c">// 정수</span>
+        <span class="k">long</span> big = <span class="num">3_000_000_000L</span>;     <span class="c">// 아주 큰 정수 (끝에 L)</span>
+        <span class="k">double</span> height = <span class="num">175.5</span>;         <span class="c">// 실수</span>
+        <span class="k">boolean</span> isMember = <span class="k">true</span>;       <span class="c">// 참/거짓</span>
+        <span class="k">char</span> grade = <span class="s">'A'</span>;              <span class="c">// 글자 한 개 (작은따옴표)</span>
+        <span class="k">String</span> name = <span class="s">"민수"</span>;           <span class="c">// 문자열 (큰따옴표)</span>
+
+        <span class="k">System</span>.out.<span class="p">println</span>(name + <span class="s">" / "</span> + age + <span class="s">"살 / "</span> + height + <span class="s">"cm"</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"회원? "</span> + isMember + <span class="s">", 학점: "</span> + grade);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"long: "</span> + big);
+
+        age = age + <span class="num">1</span>;   <span class="c">// 값 바꾸기</span>
+        age++;           <span class="c">// age = age + 1 과 같음</span>
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"내년엔 "</span> + age + <span class="s">"살"</span>);
+
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"int 최댓값: "</span> + <span class="k">Integer</span>.MAX_VALUE);
+        <span class="k">int</span> max = <span class="k">Integer</span>.MAX_VALUE;
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"최댓값 + 1 = "</span> + (max + <span class="num">1</span>));
+    }
+}</pre>
+<pre class="output">민수 / 20살 / 175.5cm
+회원? true, 학점: A
+long: 3000000000
+내년엔 22살
+int 최댓값: 2147483647
+최댓값 + 1 = -2147483648</pre>
+  <ul>
+    <li>변수 이름은 보통 <b>소문자로 시작하는 camelCase</b> (<code>myScore</code>). 숫자로 시작하거나 공백을 넣을 수 없습니다.</li>
+    <li><code>+</code>는 숫자끼리는 덧셈, 문자열이 하나라도 끼면 <b>이어붙이기</b>입니다.</li>
+    <li>마지막 줄을 보세요. <code>int</code>의 최댓값에 1을 더하면 에러가 아니라 <b>조용히 음수로 뒤집힙니다(오버플로)</b>. 큰 숫자가 필요하면 <code>long</code>을 쓰세요.</li>
+  </ul>
+  <div class="warn"><b>String은 대문자, 큰따옴표</b><code>string</code>(소문자)이라고 쓰면 <code>cannot find symbol</code> 에러가 납니다. 또 <code>"A"</code>(문자열)와 <code>'A'</code>(글자 하나)는 서로 다른 종류입니다.</div>
+
+  <h3 id="var-cast"><span class="num">2-2</span>계산과 형변환</h3>
+  <p>가장 자주 틀리는 부분입니다. <b>정수끼리 나누면 결과도 정수</b>라서 소수점이 사라져요. 하나를 <code>double</code>로 바꾸면(<b>형변환, 캐스팅</b>) 실수 나눗셈이 됩니다.</p>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Casting</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">int</span> a = <span class="num">7</span>, b = <span class="num">2</span>;
+        <span class="k">System</span>.out.<span class="p">println</span>(a / b);           <span class="c">// 정수 / 정수 = 정수</span>
+        <span class="k">System</span>.out.<span class="p">println</span>(a % b);           <span class="c">// 나머지</span>
+        <span class="k">System</span>.out.<span class="p">println</span>((<span class="k">double</span>) a / b);  <span class="c">// 하나를 double로 바꾸면 실수 나눗셈</span>
+        <span class="k">System</span>.out.<span class="p">println</span>(a / <span class="num">2.0</span>);
+
+        <span class="k">double</span> avg1 = (<span class="num">90</span> + <span class="num">85</span> + <span class="num">100</span>) / <span class="num">3</span>;    <span class="c">// 함정!</span>
+        <span class="k">double</span> avg2 = (<span class="num">90</span> + <span class="num">85</span> + <span class="num">100</span>) / <span class="num">3.0</span>;
+        <span class="k">System</span>.out.<span class="p">println</span>(avg1 + <span class="s">" vs "</span> + avg2);
+
+        <span class="k">int</span> cut = (<span class="k">int</span>) <span class="num">3.99</span>;                 <span class="c">// 소수점 버림</span>
+        <span class="k">System</span>.out.<span class="p">println</span>(cut);
+
+        <span class="k">char</span> c = <span class="s">'A'</span>;
+        <span class="k">System</span>.out.<span class="p">println</span>(c + <span class="num">1</span>);            <span class="c">// int가 됨</span>
+        <span class="k">System</span>.out.<span class="p">println</span>((<span class="k">char</span>) (c + <span class="num">1</span>));   <span class="c">// 다시 char로</span>
+
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"1"</span> + <span class="num">2</span>);          <span class="c">// 문자열 이어붙이기</span>
+        <span class="k">int</span> n = <span class="k">Integer</span>.<span class="p">parseInt</span>(<span class="s">"42"</span>) + <span class="num">1</span>;   <span class="c">// 문자열 -&gt; 정수</span>
+        <span class="k">System</span>.out.<span class="p">println</span>(n);
+
+        <span class="k">final</span> <span class="k">double</span> PI = <span class="num">3.14159</span>;            <span class="c">// 상수: 바꿀 수 없음</span>
+        <span class="k">var</span> radius = <span class="num">5</span>;                       <span class="c">// 타입 추론: int</span>
+        <span class="k">var</span> message = <span class="s">"원 넓이"</span>;                <span class="c">// 타입 추론: String</span>
+        <span class="k">System</span>.out.<span class="p">println</span>(message + <span class="s">" = "</span> + PI * radius * radius);
+    }
+}</pre>
+<pre class="output">3
+1
+3.5
+3.5
+91.0 vs 91.66666666666667
+3
+66
+B
+12
+43
+원 넓이 = 78.53975</pre>
+  <ul>
+    <li><code>7 / 2</code>는 3, <code>7 % 2</code>(나머지)는 1.</li>
+    <li><code>(90 + 85 + 100) / 3</code>은 평균을 구하려던 코드지만 정수 나눗셈이라 <code>91.0</code>이 됩니다. <code>/ 3.0</code>으로 써야 정확합니다. 왼쪽이 <code>double</code> 변수여도 소용없어요. 계산이 먼저 정수로 끝나기 때문입니다.</li>
+    <li><code>(int) 3.99</code>는 반올림이 아니라 <b>소수점 버림</b>으로 3.</li>
+    <li><code>char</code>에 숫자를 더하면 <code>int</code>가 되므로(<code>'A' + 1</code> → 66), 다시 글자로 보려면 <code>(char)</code>로 바꿉니다.</li>
+    <li><code>Integer.parseInt("42")</code>는 문자열을 정수로 바꿉니다. 숫자가 아닌 문자열이면 에러(예외)가 납니다. (9장)</li>
+  </ul>
+
+  <h3 id="var-const"><span class="num">2-3</span>상수 final, 그리고 var</h3>
+  <ul>
+    <li><code>final</code>을 붙이면 <b>한 번 정한 값을 못 바꾸는 상수</b>가 됩니다. 이름은 관례상 <code>PI</code>, <code>MAX_SIZE</code>처럼 대문자와 밑줄. 바꾸려 하면 컴파일 에러라서 실수를 막아줍니다.</li>
+    <li><code>var</code>는 오른쪽 값을 보고 자료형을 컴파일러가 알아서 정해줍니다(Java 10+). 지역 변수에만 쓸 수 있고, 값을 바로 넣어야 합니다. 입문 단계에서는 자료형을 직접 쓰는 연습을 먼저 권장합니다.</li>
+  </ul>
+
+  <div class="quiz">
+    <h4>✅ 확인 문제</h4>
+    <details><summary>Q1. <code>System.out.println(10 / 4);</code>의 출력은?</summary><span class="ans">2</span> — 정수끼리의 나눗셈은 소수점을 버립니다. 2.5를 얻으려면 <code>10 / 4.0</code>.</details>
+    <details><summary>Q2. <code>"1" + 2 + 3</code>의 결과는?</summary><span class="ans">"123"</span> — 문자열이 끼면 <code>+</code>는 이어붙이기입니다. 왼쪽부터 계산해서 "12", "123".</details>
+    <details><summary>Q3. 글자 한 개 'A'를 담는 자료형과, 문자열 "Hello"를 담는 자료형은?</summary><span class="ans">char, String</span> — char는 소문자 시작의 기본 자료형, String은 대문자 시작의 클래스입니다.</details>
+    <details><summary>Q4. <code>final int MAX = 10;</code> 다음에 <code>MAX = 20;</code>을 쓰면?</summary><span class="ans">컴파일 에러</span> — final 변수는 값을 다시 넣을 수 없습니다.</details>
+  </div>
+
+  <label class="done-check"><input type="checkbox" data-done="vars"> 2장 완료!</label>
+</section>
+
+<!-- =============================== 3. 입력 받기 =============================== -->
+<section class="part" id="input" data-part="input">
+  <h2>3. 입력 받기</h2>
+  <p class="lead">키보드로 값을 입력받아 계산하는 프로그램을 만들어 봅니다.</p>
+
+  <h3 id="in-scanner"><span class="num">3-1</span>Scanner 기본</h3>
+  <p><code>Scanner</code>는 키보드 입력을 읽는 도구입니다. 사용 순서는 항상 같습니다.</p>
+  <ol>
+    <li>맨 위에 <code>import java.util.Scanner;</code> — "Scanner를 가져다 쓰겠다"는 선언</li>
+    <li><code>Scanner sc = new Scanner(System.in);</code> — 키보드(<code>System.in</code>)에 연결된 Scanner 만들기</li>
+    <li><code>sc.nextInt()</code>(정수), <code>sc.nextDouble()</code>(실수), <code>sc.next()</code>(공백 전까지 단어), <code>sc.nextLine()</code>(한 줄 통째로)</li>
+  </ol>
+  <p>두 정수를 입력받아 사칙연산을 하는 간단한 계산기입니다. (아래 결과에서 <code>7</code>, <code>2</code>는 키보드로 입력한 값입니다.)</p>
+<pre class="code"><span class="k">import</span> java.util.<span class="k">Scanner</span>;
+
+<span class="k">public</span> <span class="k">class</span> <span class="k">Calculator</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">Scanner</span> sc = <span class="k">new</span> <span class="k">Scanner</span>(<span class="k">System</span>.in);
+
+        <span class="k">System</span>.out.<span class="p">print</span>(<span class="s">"첫 번째 정수: "</span>);
+        <span class="k">int</span> a = sc.<span class="p">nextInt</span>();
+        <span class="k">System</span>.out.<span class="p">print</span>(<span class="s">"두 번째 정수: "</span>);
+        <span class="k">int</span> b = sc.<span class="p">nextInt</span>();
+
+        <span class="k">System</span>.out.<span class="p">println</span>(a + <span class="s">" + "</span> + b + <span class="s">" = "</span> + (a + b));
+        <span class="k">System</span>.out.<span class="p">println</span>(a + <span class="s">" - "</span> + b + <span class="s">" = "</span> + (a - b));
+        <span class="k">System</span>.out.<span class="p">println</span>(a + <span class="s">" * "</span> + b + <span class="s">" = "</span> + (a * b));
+        <span class="k">System</span>.out.<span class="p">println</span>(a + <span class="s">" / "</span> + b + <span class="s">" = "</span> + (<span class="k">double</span>) a / b);
+    }
+}</pre>
+<pre class="output">첫 번째 정수: 7
+두 번째 정수: 2
+7 + 2 = 9
+7 - 2 = 5
+7 * 2 = 14
+7 / 2 = 3.5</pre>
+  <div class="note"><b>실행하는 방법</b>컴파일 후 <code>java Calculator</code>를 치면 커서가 깜빡이며 입력을 기다립니다. 숫자를 치고 Enter를 누르세요. 한 줄에 <code>7 2</code>처럼 공백으로 구분해 입력해도 됩니다.</div>
+
+  <h3 id="in-trap"><span class="num">3-2</span>nextInt() 다음 nextLine()의 함정</h3>
+  <p>입문자가 거의 100% 한 번은 밟는 함정입니다. <code>nextInt()</code>는 숫자만 읽고, 숫자를 입력한 뒤 누른 <b>Enter(줄바꿈)는 입력 버퍼에 남겨둡니다</b>. 그다음 <code>nextLine()</code>이 그 남은 줄바꿈을 "빈 한 줄"로 읽고 바로 끝나버려요.</p>
+  <div class="warn"><b>컴파일은 되지만 의도대로 동작하지 않는 예제</b>이름을 입력할 기회 없이 지나가 버립니다.</div>
+<pre class="code"><span class="k">import</span> java.util.<span class="k">Scanner</span>;
+
+<span class="k">public</span> <span class="k">class</span> <span class="k">ScannerTrap</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">Scanner</span> sc = <span class="k">new</span> <span class="k">Scanner</span>(<span class="k">System</span>.in);
+        <span class="k">System</span>.out.<span class="p">print</span>(<span class="s">"나이: "</span>);
+        <span class="k">int</span> age = sc.<span class="p">nextInt</span>();
+        <span class="k">System</span>.out.<span class="p">print</span>(<span class="s">"이름: "</span>);
+        <span class="k">String</span> name = sc.<span class="p">nextLine</span>();   <span class="c">// 엇, 입력을 기다리지 않고 지나간다</span>
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"["</span> + name + <span class="s">"] / "</span> + age);
+    }
+}</pre>
+<pre class="output">나이: 20
+이름: [] / 20</pre>
+  <p>가장 쉬운 해결법은 <b>입력을 전부 <code>nextLine()</code>으로 한 줄씩 읽고</b>, 숫자가 필요하면 직접 바꾸는 것입니다. 이 방식은 뒤에 나올 예외 처리(9장)와도 잘 어울려서 실습에서도 씁니다.</p>
+<pre class="code"><span class="k">import</span> java.util.<span class="k">Scanner</span>;
+
+<span class="k">public</span> <span class="k">class</span> <span class="k">ScannerFixed</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">Scanner</span> sc = <span class="k">new</span> <span class="k">Scanner</span>(<span class="k">System</span>.in);
+        <span class="k">System</span>.out.<span class="p">print</span>(<span class="s">"나이: "</span>);
+        <span class="k">int</span> age = <span class="k">Integer</span>.<span class="p">parseInt</span>(sc.<span class="p">nextLine</span>());   <span class="c">// 숫자도 한 줄 통째로 읽고 변환</span>
+        <span class="k">System</span>.out.<span class="p">print</span>(<span class="s">"이름: "</span>);
+        <span class="k">String</span> name = sc.<span class="p">nextLine</span>();
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"["</span> + name + <span class="s">"] / "</span> + age);
+    }
+}</pre>
+<pre class="output">나이: 20
+이름: 민수
+[민수] / 20</pre>
+  <div class="tip"><b>다른 해결법</b><code>nextInt()</code> 바로 뒤에 <code>sc.nextLine();</code>을 한 번 더 호출해서 남은 줄바꿈을 버려도 됩니다. 다만 잊어버리기 쉬워서, "전부 nextLine + 변환" 방식을 습관으로 들이길 권합니다.</div>
+  <div class="note"><b>Scanner를 닫아야 하나요?</b><code>sc.close()</code>로 닫을 수 있지만, 키보드 입력용 Scanner는 프로그램이 끝날 때까지 쓰므로 입문 단계에서는 생략해도 괜찮습니다. 참고로 닫으면 <code>System.in</code>도 같이 닫혀서, 같은 프로그램에서 다시 Scanner를 만들 수 없게 됩니다.</div>
+
+  <div class="quiz">
+    <h4>✅ 확인 문제</h4>
+    <details><summary>Q1. Scanner를 쓰려면 파일 맨 위에 어떤 줄이 필요할까요?</summary><span class="ans">import java.util.Scanner;</span></details>
+    <details><summary>Q2. <code>nextInt()</code> 뒤에 <code>nextLine()</code>을 쓰면 입력을 기다리지 않고 지나가는 이유는?</summary><span class="ans">숫자 뒤의 Enter(줄바꿈)가 버퍼에 남아 있다가 nextLine()에 "빈 줄"로 읽히기 때문</span>입니다.</details>
+    <details><summary>Q3. 공백이 들어간 "Hong Gil Dong" 전체를 읽으려면 <code>next()</code>와 <code>nextLine()</code> 중 무엇을 써야 할까요?</summary><span class="ans">nextLine()</span> — next()는 공백 앞의 "Hong"까지만 읽습니다.</details>
+  </div>
+
+  <label class="done-check"><input type="checkbox" data-done="input"> 3장 완료!</label>
+</section>
+
+<!-- =============================== 4. 조건문과 반복문 =============================== -->
+<section class="part" id="flow" data-part="flow">
+  <h2>4. 조건문 · 반복문</h2>
+  <p class="lead">상황에 따라 다르게 동작하고(조건), 같은 일을 여러 번 하는(반복) 방법입니다.</p>
+
+  <h3 id="flow-if"><span class="num">4-1</span>if / else와 비교 연산</h3>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>연산자</th><th>뜻</th><th>연산자</th><th>뜻</th></tr>
+    <tr><td><code>==</code></td><td>같다</td><td><code>!=</code></td><td>다르다</td></tr>
+    <tr><td><code>&gt;</code> <code>&lt;</code></td><td>크다 / 작다</td><td><code>&gt;=</code> <code>&lt;=</code></td><td>크거나 같다 / 작거나 같다</td></tr>
+    <tr><td><code>&amp;&amp;</code></td><td>그리고 (둘 다 참)</td><td><code>||</code></td><td>또는 (하나라도 참)</td></tr>
+    <tr><td><code>!</code></td><td>부정 (참↔거짓)</td><td><code>? :</code></td><td>삼항 연산자 (<code>조건 ? 참일때 : 거짓일때</code>)</td></tr>
+  </table></div>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Grade</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">int</span> score = <span class="num">85</span>;
+
+        <span class="k">if</span> (score &gt;= <span class="num">90</span>) {
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"A"</span>);
+        } <span class="k">else</span> <span class="k">if</span> (score &gt;= <span class="num">80</span>) {
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"B"</span>);
+        } <span class="k">else</span> {
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"C 이하"</span>);
+        }
+
+        <span class="k">String</span> result = score &gt;= <span class="num">60</span> ? <span class="s">"합격"</span> : <span class="s">"불합격"</span>;   <span class="c">// 삼항 연산자</span>
+        <span class="k">System</span>.out.<span class="p">println</span>(result);
+
+        <span class="k">int</span> day = <span class="num">3</span>;
+        <span class="k">switch</span> (day) {
+            <span class="k">case</span> <span class="num">1</span> -&gt; <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"월요일"</span>);
+            <span class="k">case</span> <span class="num">2</span> -&gt; <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"화요일"</span>);
+            <span class="k">case</span> <span class="num">3</span> -&gt; <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"수요일"</span>);
+            <span class="k">default</span> -&gt; <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"다른 요일"</span>);
+        }
+
+        <span class="k">String</span> type = <span class="k">switch</span> (day) {
+            <span class="k">case</span> <span class="num">6</span>, <span class="num">7</span> -&gt; <span class="s">"주말"</span>;
+            <span class="k">default</span> -&gt; <span class="s">"평일"</span>;
+        };
+        <span class="k">System</span>.out.<span class="p">println</span>(day + <span class="s">"일차는 "</span> + type);
+
+        <span class="k">boolean</span> ok = score &gt;= <span class="num">80</span> &amp;&amp; day != <span class="num">7</span>;   <span class="c">// &amp;&amp; 그리고, || 또는, ! 부정</span>
+        <span class="k">System</span>.out.<span class="p">println</span>(ok);
+    }
+}</pre>
+<pre class="output">B
+합격
+수요일
+3일차는 평일
+true</pre>
+  <div class="warn"><b>= 와 == 는 다릅니다 / 문자열은 equals()로</b><code>=</code>는 값을 <b>넣는</b> 것, <code>==</code>는 <b>비교</b>하는 것입니다. 그리고 <code>String</code>은 <code>==</code>가 아니라 <b><code>name.equals("민수")</code></b>로 비교해야 합니다. <code>==</code>는 내용이 아니라 "같은 객체인지"를 보기 때문에 입력받은 문자열에서 엉뚱하게 false가 나올 수 있어요. (실습에서 <code>equals</code>를 씁니다.)</div>
+
+  <h3 id="flow-switch"><span class="num">4-2</span>switch</h3>
+  <p>값 하나에 따라 여러 갈래로 나눌 때는 <code>switch</code>가 깔끔합니다. 위 예제처럼 <code>case 값 -&gt; 실행할 것</code> 화살표 문법을 쓰면 <code>break</code>를 쓸 필요가 없습니다. <code>case 6, 7 -&gt;</code>처럼 값을 여러 개 묶을 수 있고, <code>String type = switch (...) { ... };</code>처럼 <b>결과 값을 바로 변수에 담을 수도</b> 있습니다. 어디에도 해당하지 않을 때는 <code>default</code>가 실행됩니다.</p>
+  <div class="note"><b>옛날 문법도 알아두세요</b>오래된 자료에는 <code>case 1: ... break;</code> 형태가 나옵니다. 이 방식은 <code>break</code>를 빼먹으면 아래 case까지 줄줄이 실행되는 함정이 있어서, 새 코드는 화살표 문법을 쓰는 것이 안전합니다.</div>
+
+  <h3 id="flow-loop"><span class="num">4-3</span>for · while · 향상된 for</h3>
+  <ul>
+    <li><code>for (시작; 조건; 증감) { }</code>: 횟수가 정해진 반복. <code>i++</code>는 i를 1 늘립니다.</li>
+    <li><code>while (조건) { }</code>: 조건이 참인 동안 반복. 조건이 영원히 참이면 <b>무한 루프</b>(터미널에서 <code>Ctrl+C</code>로 중단).</li>
+    <li><code>for (String s : names)</code>: 배열·리스트의 값을 처음부터 끝까지 하나씩 꺼내는 <b>향상된 for</b>.</li>
+    <li><code>break</code>: 반복을 완전히 끝냄 / <code>continue</code>: 이번 차례만 건너뛰고 다음 차례로.</li>
+  </ul>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Loops</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">for</span> (<span class="k">int</span> i = <span class="num">1</span>; i &lt;= <span class="num">3</span>; i++) {
+            <span class="k">System</span>.out.<span class="p">println</span>(i + <span class="s">"번째"</span>);
+        }
+
+        <span class="k">int</span> sum = <span class="num">0</span>;
+        <span class="k">for</span> (<span class="k">int</span> i = <span class="num">1</span>; i &lt;= <span class="num">10</span>; i++) {
+            sum += i;
+        }
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"1부터 10까지 합: "</span> + sum);
+
+        <span class="k">int</span> n = <span class="num">1</span>;
+        <span class="k">while</span> (n &lt; <span class="num">100</span>) {
+            n *= <span class="num">2</span>;
+        }
+        <span class="k">System</span>.out.<span class="p">println</span>(n);
+
+        <span class="k">String</span>[] names = {<span class="s">"민수"</span>, <span class="s">"지영"</span>, <span class="s">"철수"</span>};
+        <span class="k">for</span> (<span class="k">String</span> s : names) {          <span class="c">// 향상된 for: 하나씩 꺼내기</span>
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"안녕, "</span> + s);
+        }
+
+        <span class="k">for</span> (<span class="k">int</span> i = <span class="num">1</span>; i &lt;= <span class="num">10</span>; i++) {
+            <span class="k">if</span> (i % <span class="num">2</span> == <span class="num">0</span>) <span class="k">continue</span>;     <span class="c">// 짝수는 건너뛰기</span>
+            <span class="k">if</span> (i &gt; <span class="num">7</span>) <span class="k">break</span>;             <span class="c">// 7보다 크면 반복 끝내기</span>
+            <span class="k">System</span>.out.<span class="p">print</span>(i + <span class="s">" "</span>);
+        }
+        <span class="k">System</span>.out.<span class="p">println</span>();
+
+        <span class="k">for</span> (<span class="k">int</span> i = <span class="num">1</span>; i &lt;= <span class="num">3</span>; i++) {    <span class="c">// 반복문 안의 반복문</span>
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"2 x "</span> + i + <span class="s">" = "</span> + (<span class="num">2</span> * i));
+        }
+    }
+}</pre>
+<pre class="output">1번째
+2번째
+3번째
+1부터 10까지 합: 55
+128
+안녕, 민수
+안녕, 지영
+안녕, 철수
+1 3 5 7 
+2 x 1 = 2
+2 x 2 = 4
+2 x 3 = 6</pre>
+  <div class="tip"><b>알아두면 좋은 습관</b><code>if</code>나 <code>for</code> 안의 문장이 한 줄뿐이어도 <code>{ }</code>를 항상 붙이세요. 나중에 줄을 추가했을 때 생기는 실수를 막아줍니다. (위 예제의 <code>continue</code>, <code>break</code> 한 줄짜리는 읽기 쉽도록 예외로 둔 것입니다.)</div>
+
+  <div class="quiz">
+    <h4>✅ 확인 문제</h4>
+    <details><summary>Q1. 두 문자열 <code>a</code>, <code>b</code>의 내용이 같은지 비교하는 올바른 방법은?</summary><span class="ans">a.equals(b)</span> — 문자열에 <code>==</code>를 쓰면 안 됩니다.</details>
+    <details><summary>Q2. <code>for (int i = 0; i &lt; 5; i++)</code>는 몇 번 반복되나요? i는 어떤 값들을 가지나요?</summary><span class="ans">5번</span> — i는 0, 1, 2, 3, 4.</details>
+    <details><summary>Q3. 1부터 100까지 중 3의 배수만 더하려면 어떤 연산자와 문장이 필요할까요?</summary><span class="ans">for 반복 + 나머지 연산자 %</span> — <code>if (i % 3 == 0) { sum += i; }</code></details>
+    <details><summary>Q4. <code>break</code>와 <code>continue</code>의 차이는?</summary><span class="ans">break는 반복 전체를 끝내고, continue는 이번 차례만 건너뜁니다.</span></details>
+  </div>
+  <div class="tip"><b>🧩 4장 미니 과제</b>구구단을 입력받은 단(2~9)만큼 출력하는 프로그램을 만들어 보세요. 단은 <code>Scanner</code>로 입력받고, 2~9 사이가 아니면 "2~9 사이로 입력하세요"라고 알려주세요.</div>
+
+  <label class="done-check"><input type="checkbox" data-done="flow"> 4장 완료!</label>
+</section>
+
+<!-- =============================== 5. 배열과 ArrayList =============================== -->
+<section class="part" id="array" data-part="array">
+  <h2>5. 배열과 ArrayList</h2>
+  <p class="lead">값을 하나씩 변수로 만들기엔 너무 많을 때, 여러 값을 한 번에 담는 방법입니다.</p>
+
+  <h3 id="arr-array"><span class="num">5-1</span>배열</h3>
+  <p>같은 종류의 값을 <b>고정된 개수</b>만큼 담는 상자 줄입니다. 칸 번호(<b>인덱스</b>)는 <b>0부터</b> 시작합니다!</p>
+  <ul>
+    <li><code>int[] scores = {90, 85, 70};</code> — 값을 바로 넣어 만들기</li>
+    <li><code>int[] empty = new int[3];</code> — 3칸짜리 빈 배열 (숫자는 0, 객체는 <code>null</code>로 채워짐)</li>
+    <li><code>scores.length</code> — 칸 수 (괄호 없음! 메서드가 아니라 값)</li>
+  </ul>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">ArrayDemo</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">int</span>[] scores = {<span class="num">90</span>, <span class="num">85</span>, <span class="num">70</span>};
+        <span class="k">int</span>[] empty = <span class="k">new</span> <span class="k">int</span>[<span class="num">3</span>];          <span class="c">// 0으로 채워짐</span>
+        <span class="k">String</span>[] words = <span class="k">new</span> <span class="k">String</span>[<span class="num">2</span>];    <span class="c">// null로 채워짐</span>
+
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"개수: "</span> + scores.length);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"첫 번째: "</span> + scores[<span class="num">0</span>]);
+        scores[<span class="num">1</span>] = <span class="num">95</span>;                    <span class="c">// 값 바꾸기</span>
+
+        <span class="k">int</span> sum = <span class="num">0</span>;
+        <span class="k">for</span> (<span class="k">int</span> i = <span class="num">0</span>; i &lt; scores.length; i++) {
+            sum += scores[i];
+        }
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"합계: "</span> + sum + <span class="s">", 평균: "</span> + (<span class="k">double</span>) sum / scores.length);
+
+        <span class="k">System</span>.out.<span class="p">println</span>(empty[<span class="num">2</span>] + <span class="s">" / "</span> + words[<span class="num">0</span>]);
+        <span class="k">System</span>.out.<span class="p">println</span>(java.util.<span class="k">Arrays</span>.<span class="p">toString</span>(scores));
+    }
+}</pre>
+<pre class="output">개수: 3
+첫 번째: 90
+합계: 255, 평균: 85.0
+0 / null
+[90, 95, 70]</pre>
+  <p>없는 칸을 읽으려고 하면 프로그램이 멈춥니다. 칸이 3개면 유효한 인덱스는 0, 1, 2뿐입니다.</p>
+  <div class="warn"><b>컴파일은 되지만 실행하면 에러가 나는 예제</b>인덱스 3은 존재하지 않습니다.</div>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">OutOfBounds</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">int</span>[] a = {<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>};
+        <span class="k">System</span>.out.<span class="p">println</span>(a[<span class="num">3</span>]);   <span class="c">// 인덱스는 0, 1, 2 까지만 있다</span>
+    }
+}</pre>
+<pre class="output">Exception in thread "main" java.lang.ArrayIndexOutOfBoundsException: Index 3 out of bounds for length 3
+	at OutOfBounds.main(OutOfBounds.java:4)</pre>
+  <p><code>ArrayIndexOutOfBoundsException</code>은 "배열 범위를 벗어난 인덱스"라는 뜻입니다. 메시지에 <b>어떤 인덱스(3)가 길이(3)에서 벗어났는지</b>, 그리고 <code>OutOfBounds.java:4</code>처럼 <b>몇 번째 줄인지</b>가 나옵니다. 반복문 조건을 <code>i &lt;= scores.length</code>로 쓰는 실수가 대표적인 원인이에요. 정답은 <code>i &lt; scores.length</code>입니다.</p>
+
+  <h3 id="arr-list"><span class="num">5-2</span>ArrayList</h3>
+  <p>배열은 크기를 못 바꿉니다. 추가·삭제가 자유로운 <b>늘어나는 배열</b>이 <code>ArrayList</code>입니다. 담을 자료형을 꺾쇠 <code>&lt; &gt;</code> 안에 적습니다. (이것을 <b>제네릭</b>이라고 해요.) 숫자는 <code>int</code> 대신 <code>Integer</code>라고 씁니다.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>메서드</th><th>하는 일</th></tr>
+    <tr><td><code>add(값)</code></td><td>맨 뒤에 추가</td></tr>
+    <tr><td><code>get(번호)</code></td><td>해당 칸의 값 읽기</td></tr>
+    <tr><td><code>size()</code></td><td>들어 있는 개수 (배열의 length에 해당)</td></tr>
+    <tr><td><code>remove(번호)</code> / <code>remove(값)</code></td><td>번호로 삭제 / 값으로 삭제</td></tr>
+    <tr><td><code>contains(값)</code>, <code>isEmpty()</code></td><td>들어 있는지, 비어 있는지</td></tr>
+  </table></div>
+<pre class="code"><span class="k">import</span> java.util.<span class="k">ArrayList</span>;
+
+<span class="k">public</span> <span class="k">class</span> <span class="k">ListDemo</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">ArrayList</span>&lt;<span class="k">String</span>&gt; names = <span class="k">new</span> <span class="k">ArrayList</span>&lt;&gt;();
+        names.<span class="p">add</span>(<span class="s">"민수"</span>);
+        names.<span class="p">add</span>(<span class="s">"지영"</span>);
+        names.<span class="p">add</span>(<span class="s">"철수"</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(names);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"개수: "</span> + names.<span class="p">size</span>());
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"첫 번째: "</span> + names.<span class="p">get</span>(<span class="num">0</span>));
+
+        names.<span class="p">remove</span>(<span class="num">1</span>);                  <span class="c">// 1번 칸 삭제 (인덱스)</span>
+        names.<span class="p">remove</span>(<span class="s">"철수"</span>);              <span class="c">// 값으로 삭제</span>
+        <span class="k">System</span>.out.<span class="p">println</span>(names + <span class="s">" / 민수 있나? "</span> + names.<span class="p">contains</span>(<span class="s">"민수"</span>));
+
+        <span class="k">ArrayList</span>&lt;<span class="k">Integer</span>&gt; nums = <span class="k">new</span> <span class="k">ArrayList</span>&lt;&gt;();   <span class="c">// int 말고 Integer</span>
+        nums.<span class="p">add</span>(<span class="num">10</span>);
+        nums.<span class="p">add</span>(<span class="num">20</span>);
+        nums.<span class="p">add</span>(<span class="num">30</span>);
+        <span class="k">int</span> total = <span class="num">0</span>;
+        <span class="k">for</span> (<span class="k">int</span> x : nums) {
+            total += x;
+        }
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"합: "</span> + total);
+    }
+}</pre>
+<pre class="output">[민수, 지영, 철수]
+개수: 3
+첫 번째: 민수
+[민수] / 민수 있나? true
+합: 60</pre>
+  <div class="note"><b>import 필요</b><code>ArrayList</code>도 <code>Scanner</code>처럼 맨 위에 <code>import java.util.ArrayList;</code>가 필요합니다. 리스트를 그냥 출력하면 <code>[민수, 지영, 철수]</code> 모양으로 예쁘게 나옵니다.</div>
+
+  <h3 id="arr-vs"><span class="num">5-3</span>배열 vs 리스트</h3>
+  <div class="table-wrap"><table class="ref">
+    <tr><th></th><th>배열 <code>int[]</code></th><th>ArrayList</th></tr>
+    <tr><td>크기</td><td>만들 때 고정</td><td>자유롭게 늘고 줆</td></tr>
+    <tr><td>개수 구하기</td><td><code>arr.length</code></td><td><code>list.size()</code></td></tr>
+    <tr><td>읽기 / 쓰기</td><td><code>arr[0]</code> / <code>arr[0] = 5</code></td><td><code>list.get(0)</code> / <code>list.set(0, 5)</code></td></tr>
+    <tr><td>숫자 담기</td><td><code>int</code> 가능</td><td><code>Integer</code>만 가능</td></tr>
+    <tr><td>언제 쓰나</td><td>개수가 정해져 있을 때</td><td>개수가 바뀔 때 (대부분의 경우)</td></tr>
+  </table></div>
+
+  <div class="quiz">
+    <h4>✅ 확인 문제</h4>
+    <details><summary>Q1. 길이가 5인 배열의 마지막 칸 인덱스는?</summary><span class="ans">4</span> — 인덱스는 0부터 시작하므로 0~4.</details>
+    <details><summary>Q2. 배열의 길이는 <code>arr.length</code>, ArrayList의 개수는?</summary><span class="ans">list.size()</span> — 배열은 괄호가 없고 리스트는 괄호가 있습니다.</details>
+    <details><summary>Q3. 문자열을 담는 ArrayList를 만드는 코드는?</summary><span class="ans">ArrayList&lt;String&gt; list = new ArrayList&lt;&gt;();</span></details>
+    <details><summary>Q4. 이 코드의 문제는? <code>int[] a = new int[3]; a[3] = 1;</code></summary><span class="ans">ArrayIndexOutOfBoundsException</span> — 유효한 인덱스는 0, 1, 2뿐입니다.</details>
+  </div>
+
+  <label class="done-check"><input type="checkbox" data-done="array"> 5장 완료!</label>
+</section>
+
+<!-- =============================== 6. 메서드 =============================== -->
+<section class="part" id="method" data-part="method">
+  <h2>6. 메서드</h2>
+  <p class="lead">자주 쓰는 코드에 이름을 붙여 묶어두고, 필요할 때마다 불러 쓰는 방법입니다.</p>
+
+  <h3 id="m-basic"><span class="num">6-1</span>정의와 호출</h3>
+<pre class="code"><span class="c">// 반환 타입  이름(매개변수) { 몸통 }</span>
+<span class="k">static</span> <span class="k">int</span> <span class="p">add</span>(<span class="k">int</span> a, <span class="k">int</span> b) {
+    <span class="k">return</span> a + b;      <span class="c">← 결과를 돌려줌 (반환값)</span>
+}</pre>
+  <ul>
+    <li><b>매개변수</b>: 메서드가 일하려고 받는 재료 (<code>int a, int b</code>)</li>
+    <li><b>반환값</b>: 일을 마치고 돌려주는 결과. <code>return</code>으로 돌려주며, 반환 타입(<code>int</code>)과 맞아야 합니다.</li>
+    <li>돌려줄 게 없으면 반환 타입을 <code>void</code>로 쓰고 <code>return</code>은 생략합니다.</li>
+    <li>호출은 <code>add(3, 4)</code>처럼 이름과 재료를 넘기면 끝. 결과를 변수에 담거나 바로 출력에 쓸 수 있습니다.</li>
+  </ul>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Methods</span> {
+    <span class="k">static</span> <span class="k">int</span> <span class="p">add</span>(<span class="k">int</span> a, <span class="k">int</span> b) {
+        <span class="k">return</span> a + b;
+    }
+
+    <span class="k">static</span> <span class="k">double</span> <span class="p">add</span>(<span class="k">double</span> a, <span class="k">double</span> b) {   <span class="c">// 오버로딩: 이름 같고 매개변수 다름</span>
+        <span class="k">return</span> a + b;
+    }
+
+    <span class="k">static</span> <span class="k">boolean</span> <span class="p">isEven</span>(<span class="k">int</span> n) {
+        <span class="k">return</span> n % <span class="num">2</span> == <span class="num">0</span>;
+    }
+
+    <span class="k">static</span> <span class="k">void</span> <span class="p">greet</span>(<span class="k">String</span> name) {          <span class="c">// 반환값 없음 = void</span>
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"안녕하세요, "</span> + name + <span class="s">"님!"</span>);
+    }
+
+    <span class="k">static</span> <span class="k">double</span> <span class="p">average</span>(<span class="k">int</span>[] nums) {
+        <span class="k">int</span> sum = <span class="num">0</span>;
+        <span class="k">for</span> (<span class="k">int</span> x : nums) {
+            sum += x;
+        }
+        <span class="k">return</span> (<span class="k">double</span>) sum / nums.length;
+    }
+
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="p">greet</span>(<span class="s">"COM's"</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="p">add</span>(<span class="num">3</span>, <span class="num">4</span>));
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="p">add</span>(<span class="num">1.5</span>, <span class="num">2.5</span>));
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="p">isEven</span>(<span class="num">10</span>) + <span class="s">" "</span> + <span class="p">isEven</span>(<span class="num">7</span>));
+        <span class="k">int</span>[] scores = {<span class="num">90</span>, <span class="num">85</span>, <span class="num">70</span>};
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"평균: "</span> + <span class="p">average</span>(scores));
+    }
+}</pre>
+<pre class="output">안녕하세요, COM's님!
+7
+4.0
+true false
+평균: 81.66666666666667</pre>
+
+  <h3 id="m-static"><span class="num">6-2</span>static이란?</h3>
+  <p><code>static</code>이 붙은 메서드는 <b>객체를 만들지 않고도</b> 바로 부를 수 있는 메서드입니다. 우리는 아직 객체를 배우지 않았으니, 지금은 "<code>main</code>에서 부르는 메서드에는 <code>static</code>을 붙인다"고 기억하세요. 7장에서 <code>static</code>이 없는 메서드(객체의 메서드)와 비교합니다. <code>static</code>을 빼고 <code>main</code>에서 부르면 <code>non-static method ... cannot be referenced from a static context</code> 에러가 납니다.</p>
+
+  <h3 id="m-overload"><span class="num">6-3</span>오버로딩</h3>
+  <p>예제에 <code>add</code>가 두 개 있습니다. <b>이름은 같고 매개변수의 종류나 개수가 다르면</b> 같은 이름의 메서드를 여러 개 만들 수 있습니다(<b>오버로딩</b>). 호출할 때 넘긴 값에 맞는 것이 자동으로 선택됩니다. <code>add(3, 4)</code>는 int 버전, <code>add(1.5, 2.5)</code>는 double 버전이 실행돼서 결과가 7, 4.0으로 다르죠. <code>println</code>이 숫자든 문자열이든 다 출력할 수 있는 것도 오버로딩 덕분입니다.</p>
+  <div class="tip"><b>메서드를 나누는 기준</b>한 메서드는 <b>한 가지 일</b>만 하게 만드세요. "평균 구하기", "짝수인지 확인하기"처럼 이름만 봐도 하는 일이 보이면 좋은 메서드입니다. 같은 코드를 복사해서 붙이고 싶어질 때가 메서드로 묶을 타이밍입니다.</div>
+
+  <div class="quiz">
+    <h4>✅ 확인 문제</h4>
+    <details><summary>Q1. 값을 돌려주지 않는 메서드의 반환 타입은?</summary><span class="ans">void</span></details>
+    <details><summary>Q2. 두 정수 중 큰 값을 돌려주는 메서드 <code>max</code>의 첫 줄(선언부)을 써보세요.</summary><span class="ans">static int max(int a, int b)</span> — 몸통에는 <code>return a &gt; b ? a : b;</code>처럼 쓸 수 있어요.</details>
+    <details><summary>Q3. 오버로딩이 가능한 조건은?</summary><span class="ans">메서드 이름은 같고, 매개변수의 개수나 타입이 달라야 합니다.</span> 반환 타입만 다른 것은 안 됩니다.</details>
+  </div>
+
+  <label class="done-check"><input type="checkbox" data-done="method"> 6장 완료!</label>
+</section>
+
+<!-- =============================== 7. 클래스와 객체 =============================== -->
+<section class="part" id="class" data-part="class">
+  <h2>7. 클래스와 객체</h2>
+  <p class="lead">관련된 데이터(필드)와 동작(메서드)을 한 덩어리로 묶는, 자바의 핵심 개념입니다.</p>
+
+  <h3 id="c-basic"><span class="num">7-1</span>클래스 = 설계도, 객체 = 실제 물건</h3>
+  <p>"학생"이라는 개념에는 이름, 점수 같은 <b>데이터</b>와 합격인지 확인하는 <b>동작</b>이 함께 있습니다. 이걸 묶은 설계도가 <b>클래스</b>, 설계도로 찍어낸 실제 학생 한 명 한 명이 <b>객체(인스턴스)</b>입니다. 붕어빵 틀이 클래스, 붕어빵이 객체예요.</p>
+  <ul>
+    <li><b>필드</b>: 객체가 가진 데이터 (<code>name</code>, <code>score</code>)</li>
+    <li><b>생성자</b>: <code>new</code>로 객체를 만들 때 처음 실행되는 특별한 메서드. 이름이 클래스와 같고 반환 타입이 없습니다.</li>
+    <li><b><code>this</code></b>: "이 객체 자신". 매개변수 이름이 필드와 같을 때 <code>this.name = name;</code>처럼 구분해 줍니다.</li>
+    <li><b>메서드</b>: 객체가 할 수 있는 동작. <code>static</code>이 없는 메서드는 <code>객체.메서드()</code>로 부릅니다.</li>
+  </ul>
+
+  <h3 id="c-encap"><span class="num">7-2</span>캡슐화: private + getter/setter</h3>
+  <p>필드를 <code>private</code>으로 숨기고, 읽기·쓰기는 <b>getter / setter</b> 메서드로만 허용하는 것을 <b>캡슐화</b>라고 합니다. 이렇게 하면 <b>잘못된 값이 들어오는 것을 막을 수 있습니다.</b> 아래 <code>setScore</code>는 0~100이 아닌 점수를 거절합니다. 필드를 <code>public</code>으로 열어두면 누구나 <code>score = 9999</code>를 넣을 수 있어요.</p>
+  <p><code>toString()</code>은 객체를 문자열로 바꿔주는 약속된 메서드입니다. 만들어 두면 <code>System.out.println(a)</code>처럼 객체를 바로 출력할 수 있어요. (안 만들면 <code>Student@1b6d3586</code> 같은 알 수 없는 글자가 나옵니다.) <code>@Override</code>는 "부모의 메서드를 내가 다시 정의한다"는 표시로, 8장에서 자세히 봅니다.</p>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Main</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">Student</span> a = <span class="k">new</span> <span class="k">Student</span>(<span class="s">"민수"</span>, <span class="num">80</span>);
+        <span class="k">Student</span> b = <span class="k">new</span> <span class="k">Student</span>(<span class="s">"지영"</span>, <span class="num">95</span>);
+
+        a.<span class="p">setScore</span>(<span class="num">88</span>);
+        a.<span class="p">setScore</span>(<span class="num">150</span>);                 <span class="c">// 범위 밖: 무시됨</span>
+        <span class="k">System</span>.out.<span class="p">println</span>(a);
+        <span class="k">System</span>.out.<span class="p">println</span>(b.<span class="p">getName</span>() + <span class="s">"의 점수: "</span> + b.<span class="p">getScore</span>());
+        <span class="k">System</span>.out.<span class="p">println</span>(a.<span class="p">isPass</span>() + <span class="s">" "</span> + b.<span class="p">isPass</span>());
+    }
+}
+
+<span class="k">class</span> <span class="k">Student</span> {
+    <span class="k">private</span> <span class="k">String</span> name;    <span class="c">// private: 밖에서 직접 못 건드림</span>
+    <span class="k">private</span> <span class="k">int</span> score;
+
+    <span class="k">Student</span>(<span class="k">String</span> name, <span class="k">int</span> score) {   <span class="c">// 생성자: 이름이 클래스와 같고 반환 타입 없음</span>
+        <span class="k">this</span>.name = name;               <span class="c">// this.name = 필드, name = 매개변수</span>
+        <span class="k">this</span>.score = score;
+    }
+
+    <span class="k">String</span> <span class="p">getName</span>() {
+        <span class="k">return</span> name;
+    }
+
+    <span class="k">int</span> <span class="p">getScore</span>() {
+        <span class="k">return</span> score;
+    }
+
+    <span class="k">void</span> <span class="p">setScore</span>(<span class="k">int</span> score) {
+        <span class="k">if</span> (score &lt; <span class="num">0</span> || score &gt; <span class="num">100</span>) {
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"점수는 0~100 사이여야 해요: "</span> + score);
+            <span class="k">return</span>;
+        }
+        <span class="k">this</span>.score = score;
+    }
+
+    <span class="k">boolean</span> <span class="p">isPass</span>() {
+        <span class="k">return</span> score &gt;= <span class="num">60</span>;
+    }
+
+    <span class="k">@Override</span>
+    <span class="k">public</span> <span class="k">String</span> <span class="p">toString</span>() {
+        <span class="k">return</span> <span class="s">"Student{name="</span> + name + <span class="s">", score="</span> + score + <span class="s">"}"</span>;
+    }
+}</pre>
+<pre class="output">점수는 0~100 사이여야 해요: 150
+Student{name=민수, score=88}
+지영의 점수: 95
+true true</pre>
+  <div class="note"><b>한 파일에 클래스가 두 개?</b>예제를 짧게 하려고 <code>Main.java</code> 하나에 <code>Main</code>(public)과 <code>Student</code>를 같이 썼습니다. 한 파일에는 <code>public</code> 클래스를 <b>하나만</b> 둘 수 있고, 그 이름이 파일 이름이 됩니다. 실무에서는 클래스마다 파일을 따로 만들어요. (실습에서 그렇게 합니다.)</div>
+  <div class="tip"><b>IntelliJ가 자동으로 만들어줘요</b>코드 안에서 우클릭 → Generate → Getter and Setter / toString / Constructor. 매번 손으로 칠 필요가 없습니다. 단, 자동 생성 전에 각 부분이 무슨 뜻인지는 꼭 이해하고 넘어가세요.</div>
+
+  <div class="quiz">
+    <h4>✅ 확인 문제</h4>
+    <details><summary>Q1. 클래스와 객체의 관계를 한 문장으로 설명해 보세요.</summary><span class="ans">클래스는 설계도, 객체는 그 설계도로 만든 실제 대상</span>입니다. <code>new Student(...)</code>를 할 때마다 객체가 하나씩 생깁니다.</details>
+    <details><summary>Q2. 필드를 <code>private</code>으로 만드는 이유는?</summary><span class="ans">외부에서 마음대로 바꾸지 못하게 하고, setter 등을 통해 값을 검사하며 바꾸게 하려고</span> (캡슐화)</details>
+    <details><summary>Q3. 생성자 안에서 <code>this.score = score;</code>의 왼쪽과 오른쪽은 각각 무엇인가요?</summary><span class="ans">왼쪽은 객체의 필드, 오른쪽은 생성자의 매개변수</span>입니다.</details>
+  </div>
+  <div class="tip"><b>🧩 7장 미니 과제</b><code>Book</code> 클래스(제목, 쪽수)를 만들고, 쪽수는 1 이상만 허용하는 setter와 <code>toString()</code>을 추가한 뒤 책 3권을 만들어 출력해 보세요.</div>
+
+  <label class="done-check"><input type="checkbox" data-done="class"> 7장 완료!</label>
+</section>
+
+<!-- =============================== 8. 상속과 인터페이스 =============================== -->
+<section class="part" id="inherit" data-part="inherit">
+  <h2>8. 상속과 인터페이스 맛보기</h2>
+  <p class="lead">이미 만든 클래스를 물려받아 확장하고, "이런 일을 할 수 있어야 한다"는 약속을 정하는 방법입니다.</p>
+
+  <h3 id="inh-extends"><span class="num">8-1</span>extends와 super</h3>
+  <p>동물은 모두 이름이 있고 소리를 냅니다. 이런 공통 부분을 <code>Animal</code>에 한 번만 쓰고, <code>Dog</code>와 <code>Cat</code>은 <code>extends</code>로 물려받아 <b>다른 부분만</b> 새로 씁니다.</p>
+  <figure class="figure">
+    <svg viewBox="0 0 420 130" width="100%" role="img" aria-label="Animal 클래스를 Dog와 Cat이 상속하는 구조">
+      <g fill="none" stroke="currentColor" stroke-width="1.6">
+        <rect x="140" y="8" width="140" height="40" rx="8"/>
+        <rect x="30" y="85" width="130" height="38" rx="8"/>
+        <rect x="260" y="85" width="130" height="38" rx="8"/>
+        <path d="M95 85 V66 H210 V48 M325 85 V66 H210"/>
+      </g>
+      <g fill="currentColor" font-size="14" text-anchor="middle">
+        <text x="210" y="33">Animal (이름, sound())</text>
+        <text x="95" y="109">Dog</text>
+        <text x="325" y="109">Cat</text>
+      </g>
+    </svg>
+    <figcaption>Dog와 Cat은 Animal을 상속(extends)한다 — "Dog는 Animal이다"</figcaption>
+  </figure>
+  <ul>
+    <li><code>super(name)</code>: 부모 클래스의 생성자를 호출합니다. 자식 생성자의 <b>첫 줄</b>에 써야 해요.</li>
+    <li><code>@Override</code>: 부모의 메서드를 자식이 <b>같은 이름으로 다시 정의</b>(재정의)한다는 표시. 오타가 나면 컴파일러가 알려줘서 안전합니다.</li>
+    <li><code>protected</code>: 자식 클래스에서는 접근할 수 있지만 외부에서는 못 쓰는 접근 수준.</li>
+  </ul>
+
+  <h3 id="inh-poly"><span class="num">8-2</span>다형성</h3>
+  <p>자식 객체는 부모 타입 변수에 담을 수 있습니다. 아래 <code>Animal[] zoo</code>에는 Dog, Cat, Animal이 섞여 있는데, <code>a.introduce()</code>를 똑같이 불러도 <b>실제 객체가 무엇이냐에 따라 다르게 동작</b>합니다. 이것이 <b>다형성</b>입니다. 새 동물을 추가해도 반복문을 고칠 필요가 없어요.</p>
+
+  <h3 id="inh-iface"><span class="num">8-3</span>interface</h3>
+  <p>인터페이스는 <b>"이런 메서드를 반드시 가져야 한다"는 약속</b>(몸통 없는 메서드 목록)입니다. 클래스는 <code>implements</code>로 이 약속을 지키겠다고 선언하고 내용을 채웁니다. 클래스는 부모를 하나만 <code>extends</code> 할 수 있지만, 인터페이스는 여러 개를 <code>implements</code> 할 수 있습니다. 인터페이스의 메서드는 자동으로 <code>public</code>이라서, 구현하는 쪽도 <code>public</code>을 붙여야 합니다.</p>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Main</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">Animal</span>[] zoo = { <span class="k">new</span> <span class="k">Dog</span>(<span class="s">"바둑이"</span>), <span class="k">new</span> <span class="k">Cat</span>(<span class="s">"나비"</span>), <span class="k">new</span> <span class="k">Animal</span>(<span class="s">"누구게"</span>) };
+        <span class="k">for</span> (<span class="k">Animal</span> a : zoo) {
+            a.<span class="p">introduce</span>();        <span class="c">// 같은 호출인데 객체마다 다르게 동작 = 다형성</span>
+        }
+
+        <span class="k">Swimmable</span> s = <span class="k">new</span> <span class="k">Dog</span>(<span class="s">"해피"</span>);   <span class="c">// 인터페이스 타입으로도 받을 수 있다</span>
+        s.<span class="p">swim</span>();
+    }
+}
+
+<span class="k">interface</span> <span class="k">Swimmable</span> {
+    <span class="k">void</span> <span class="p">swim</span>();                  <span class="c">// 몸통 없이 "할 수 있어야 하는 일"만 약속</span>
+}
+
+<span class="k">class</span> <span class="k">Animal</span> {
+    <span class="k">protected</span> <span class="k">String</span> name;
+
+    <span class="k">Animal</span>(<span class="k">String</span> name) {
+        <span class="k">this</span>.name = name;
+    }
+
+    <span class="k">String</span> <span class="p">sound</span>() {
+        <span class="k">return</span> <span class="s">"..."</span>;
+    }
+
+    <span class="k">void</span> <span class="p">introduce</span>() {
+        <span class="k">System</span>.out.<span class="p">println</span>(name + <span class="s">": "</span> + <span class="p">sound</span>());
+    }
+}
+
+<span class="k">class</span> <span class="k">Dog</span> <span class="k">extends</span> <span class="k">Animal</span> <span class="k">implements</span> <span class="k">Swimmable</span> {
+    <span class="k">Dog</span>(<span class="k">String</span> name) {
+        <span class="k">super</span>(name);              <span class="c">// 부모 생성자 호출</span>
+    }
+
+    <span class="k">@Override</span>
+    <span class="k">String</span> <span class="p">sound</span>() {
+        <span class="k">return</span> <span class="s">"멍멍!"</span>;
+    }
+
+    <span class="k">@Override</span>
+    <span class="k">public</span> <span class="k">void</span> <span class="p">swim</span>() {
+        <span class="k">System</span>.out.<span class="p">println</span>(name + <span class="s">"가 헤엄칩니다."</span>);
+    }
+}
+
+<span class="k">class</span> <span class="k">Cat</span> <span class="k">extends</span> <span class="k">Animal</span> {
+    <span class="k">Cat</span>(<span class="k">String</span> name) {
+        <span class="k">super</span>(name);
+    }
+
+    <span class="k">@Override</span>
+    <span class="k">String</span> <span class="p">sound</span>() {
+        <span class="k">return</span> <span class="s">"야옹~"</span>;
+    }
+}</pre>
+<pre class="output">바둑이: 멍멍!
+나비: 야옹~
+누구게: ...
+해피가 헤엄칩니다.</pre>
+  <div class="note"><b>Spring에서도 똑같이 씁니다</b>우리 웹사이트 백엔드에서도 "서비스 인터페이스"와 "구현 클래스"로 나누는 코드가 많이 나옵니다. 지금은 "약속(interface)과 실제 구현(class)을 분리한다"는 감만 잡아두세요.</div>
+
+  <div class="quiz">
+    <h4>✅ 확인 문제</h4>
+    <details><summary>Q1. 자식 클래스 생성자에서 부모 생성자를 호출하는 키워드는?</summary><span class="ans">super(...)</span> — 자식 생성자의 첫 줄에 씁니다.</details>
+    <details><summary>Q2. <code>Animal a = new Dog("바둑이"); a.introduce();</code>에서 어느 클래스의 <code>sound()</code>가 쓰일까요?</summary><span class="ans">Dog의 sound()</span> — 변수 타입은 Animal이지만 실제 객체가 Dog이므로 재정의된 메서드가 실행됩니다.</details>
+    <details><summary>Q3. 클래스 상속과 인터페이스 구현의 키워드는 각각?</summary><span class="ans">extends, implements</span></details>
+  </div>
+
+  <label class="done-check"><input type="checkbox" data-done="inherit"> 8장 완료!</label>
+</section>
+
+<!-- =============================== 9. 예외 처리 =============================== -->
+<section class="part" id="exception" data-part="exception">
+  <h2>9. 예외 처리</h2>
+  <p class="lead">프로그램이 실행 중에 만나는 문제(예외)를 미리 대비해서, 멈추지 않고 우아하게 처리하는 방법입니다.</p>
+
+  <h3 id="ex-try"><span class="num">9-1</span>try / catch / finally</h3>
+  <p>사용자가 숫자 칸에 "abc"를 쓰는 것처럼 <b>코드 실수가 아니라 상황 때문에</b> 생기는 문제를 예외라고 합니다. 예외가 날 수 있는 코드를 <code>try</code>에 넣고, 예외가 나면 <code>catch</code>가 대신 처리합니다. <code>finally</code>는 예외가 나든 안 나든 <b>항상 마지막에</b> 실행됩니다.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>예외</th><th>언제 생기나</th></tr>
+    <tr><td><code>NumberFormatException</code></td><td><code>Integer.parseInt("abc")</code>처럼 숫자가 아닌 문자열을 숫자로 바꿀 때</td></tr>
+    <tr><td><code>ArithmeticException</code></td><td>정수를 0으로 나눌 때 (<code>10 / 0</code>)</td></tr>
+    <tr><td><code>ArrayIndexOutOfBoundsException</code></td><td>배열 범위를 벗어난 인덱스</td></tr>
+    <tr><td><code>NullPointerException</code></td><td><code>null</code>인 변수로 메서드를 부를 때 (11장)</td></tr>
+    <tr><td><code>IllegalArgumentException</code></td><td>잘못된 값이 들어왔을 때 직접 <code>throw</code>하는 용도로 많이 씀</td></tr>
+  </table></div>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Exceptions</span> {
+    <span class="k">static</span> <span class="k">void</span> <span class="p">checkAge</span>(<span class="k">int</span> age) {
+        <span class="k">if</span> (age &lt; <span class="num">0</span>) {
+            <span class="k">throw</span> <span class="k">new</span> <span class="k">IllegalArgumentException</span>(<span class="s">"나이는 음수일 수 없어요: "</span> + age);
+        }
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"나이 OK: "</span> + age);
+    }
+
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">try</span> {
+            <span class="k">int</span> n = <span class="k">Integer</span>.<span class="p">parseInt</span>(<span class="s">"abc"</span>);
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"여기는 실행되지 않음 "</span> + n);
+        } <span class="k">catch</span> (<span class="k">NumberFormatException</span> e) {
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"숫자가 아니에요: "</span> + e.<span class="p">getMessage</span>());
+        } <span class="k">finally</span> {
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"finally는 무조건 실행"</span>);
+        }
+
+        <span class="k">try</span> {
+            <span class="k">int</span> zero = <span class="num">0</span>;
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="num">10</span> / zero);
+        } <span class="k">catch</span> (<span class="k">ArithmeticException</span> e) {
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"0으로 나눌 수 없어요: "</span> + e.<span class="p">getMessage</span>());
+        }
+
+        <span class="k">try</span> {
+            <span class="p">checkAge</span>(<span class="num">20</span>);
+            <span class="p">checkAge</span>(-<span class="num">5</span>);
+        } <span class="k">catch</span> (<span class="k">IllegalArgumentException</span> e) {
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"잡았다: "</span> + e.<span class="p">getMessage</span>());
+        }
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"프로그램은 계속 진행!"</span>);
+    }
+}</pre>
+<pre class="output">숫자가 아니에요: For input string: "abc"
+finally는 무조건 실행
+0으로 나눌 수 없어요: / by zero
+나이 OK: 20
+잡았다: 나이는 음수일 수 없어요: -5
+프로그램은 계속 진행!</pre>
+  <ul>
+    <li>예외 메시지(<code>e.getMessage()</code>)에는 원인이 담겨 있습니다.</li>
+    <li><code>throw new ...</code>으로 내가 직접 예외를 일으킬 수도 있습니다. 잘못된 값을 받았을 때 "이건 안 돼요!"라고 알리는 방법입니다.</li>
+    <li>예외가 나도 <code>catch</code>로 처리하면 <b>프로그램은 계속 진행</b>됩니다. 마지막 줄이 출력된 것을 확인하세요.</li>
+  </ul>
+  <div class="warn"><b>빈 catch 블록은 금지</b><code>catch (Exception e) { }</code>처럼 아무것도 안 하면 에러가 났다는 사실마저 사라져서 원인을 찾기가 매우 힘듭니다. 최소한 메시지를 출력하세요. 그리고 가능하면 <code>Exception</code> 같은 넓은 이름보다 <code>NumberFormatException</code>처럼 <b>구체적인 예외</b>를 잡으세요.</div>
+
+  <h3 id="ex-valid"><span class="num">9-2</span>입력 검증: 올바를 때까지 다시 묻기</h3>
+  <p>3장에서 배운 "한 줄씩 읽고 변환"과 예외 처리를 합치면, 사용자가 이상한 값을 넣어도 죽지 않는 입력 코드를 만들 수 있습니다. 실습에서도 이 패턴을 씁니다.</p>
+<pre class="code"><span class="k">import</span> java.util.<span class="k">Scanner</span>;
+
+<span class="k">public</span> <span class="k">class</span> <span class="k">SafeInput</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">Scanner</span> sc = <span class="k">new</span> <span class="k">Scanner</span>(<span class="k">System</span>.in);
+        <span class="k">int</span> age = <span class="num">0</span>;
+        <span class="k">while</span> (<span class="k">true</span>) {
+            <span class="k">System</span>.out.<span class="p">print</span>(<span class="s">"나이를 입력하세요: "</span>);
+            <span class="k">String</span> line = sc.<span class="p">nextLine</span>();
+            <span class="k">try</span> {
+                age = <span class="k">Integer</span>.<span class="p">parseInt</span>(line.<span class="p">trim</span>());
+                <span class="k">if</span> (age &lt; <span class="num">0</span>) {
+                    <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"0 이상이어야 해요."</span>);
+                    <span class="k">continue</span>;
+                }
+                <span class="k">break</span>;                       <span class="c">// 올바른 입력: 반복 끝</span>
+            } <span class="k">catch</span> (<span class="k">NumberFormatException</span> e) {
+                <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"숫자만 입력해 주세요."</span>);
+            }
+        }
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"입력한 나이: "</span> + age);
+    }
+}</pre>
+<pre class="output">나이를 입력하세요: abc
+숫자만 입력해 주세요.
+나이를 입력하세요: -3
+0 이상이어야 해요.
+나이를 입력하세요: 20
+입력한 나이: 20</pre>
+  <p><code>while (true)</code> 무한 반복 안에서, 올바른 값이 들어왔을 때만 <code>break</code>로 빠져나옵니다. <code>continue</code>는 음수일 때 다음 차례로 넘어가 다시 묻게 합니다.</p>
+
+  <div class="quiz">
+    <h4>✅ 확인 문제</h4>
+    <details><summary>Q1. 예외가 나든 안 나든 항상 실행되는 블록은?</summary><span class="ans">finally</span></details>
+    <details><summary>Q2. <code>Integer.parseInt("12.5")</code>는 어떤 예외를 일으킬까요?</summary><span class="ans">NumberFormatException</span> — 정수 형태가 아닌 문자열이기 때문입니다.</details>
+    <details><summary>Q3. 아래 코드에서 "B"는 출력될까요? <code>try { int x = 1 / 0; System.out.println("A"); } catch (ArithmeticException e) { System.out.println("B"); }</code></summary><span class="ans">"B"만 출력됩니다.</span> 0으로 나누는 줄에서 예외가 나므로 "A"는 건너뛰고 catch로 이동합니다.</details>
+  </div>
+
+  <label class="done-check"><input type="checkbox" data-done="exception"> 9장 완료!</label>
+</section>
+
+<!-- =============================== 10. 종합 실습 =============================== -->
+<section class="part" id="project" data-part="project">
+  <h2>10. 실습: 콘솔 성적 관리 프로그램</h2>
+  <p class="lead">지금까지 배운 클래스, ArrayList, 메서드, 예외 처리, 반복문을 모두 써서 메뉴가 있는 프로그램을 완성합니다.</p>
+
+  <h3 id="pj-plan"><span class="num">10-0</span>만들 것</h3>
+  <p>학생의 이름과 국어·영어·수학 점수를 관리하는 프로그램입니다. 메뉴를 반복해서 보여주고, 사용자가 번호를 고르면 해당 기능을 실행합니다.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>메뉴</th><th>기능</th><th>사용한 개념</th></tr>
+    <tr><td>1. 학생 추가</td><td>이름과 세 과목 점수를 입력받아 등록 (0~100 검사)</td><td>생성자, <code>ArrayList.add</code>, 예외 처리</td></tr>
+    <tr><td>2. 전체 목록</td><td>등록된 학생 모두 출력</td><td>for, <code>toString</code></td></tr>
+    <tr><td>3. 이름으로 찾기</td><td>이름이 같은 학생 출력</td><td>향상된 for, <code>equals</code></td></tr>
+    <tr><td>4. 학생 삭제</td><td>번호를 골라 삭제</td><td><code>ArrayList.remove</code></td></tr>
+    <tr><td>5. 반 평균</td><td>학생 평균들의 평균</td><td>double 계산, <code>printf</code></td></tr>
+    <tr><td>0. 종료</td><td>프로그램 끝</td><td><code>return</code></td></tr>
+  </table></div>
+  <p>파일은 <b>두 개</b>입니다. <code>Student.java</code>(학생 한 명을 표현하는 클래스)와 <code>GradeApp.java</code>(메뉴와 흐름). 같은 폴더에 두고 <code>javac *.java</code>로 한꺼번에 컴파일한 뒤 <code>java GradeApp</code>으로 실행합니다. IntelliJ에서는 같은 프로젝트에 두 파일을 만들면 됩니다.</p>
+
+  <h3 id="pj-step1"><span class="num">10-1</span>1단계: Student 클래스</h3>
+  <p>7장에서 배운 내용 그대로입니다. 필드는 <code>private final</code>로 만들어 한 번 정하면 못 바꾸게 했고(값을 바꾸는 기능이 필요 없으니까요), 합계와 평균을 계산하는 메서드를 넣었습니다. <code>getTotal() / 3.0</code>으로 나눠서 <b>정수 나눗셈 함정</b>을 피한 점을 확인하세요. <code>String.format</code>은 <code>printf</code>와 같은 서식인데 출력하지 않고 문자열로 돌려줍니다.</p>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Student</span> {
+    <span class="k">private</span> <span class="k">final</span> <span class="k">String</span> name;
+    <span class="k">private</span> <span class="k">final</span> <span class="k">int</span> korean;
+    <span class="k">private</span> <span class="k">final</span> <span class="k">int</span> english;
+    <span class="k">private</span> <span class="k">final</span> <span class="k">int</span> math;
+
+    <span class="k">public</span> <span class="k">Student</span>(<span class="k">String</span> name, <span class="k">int</span> korean, <span class="k">int</span> english, <span class="k">int</span> math) {
+        <span class="k">this</span>.name = name;
+        <span class="k">this</span>.korean = korean;
+        <span class="k">this</span>.english = english;
+        <span class="k">this</span>.math = math;
+    }
+
+    <span class="k">public</span> <span class="k">String</span> <span class="p">getName</span>() {
+        <span class="k">return</span> name;
+    }
+
+    <span class="k">public</span> <span class="k">int</span> <span class="p">getTotal</span>() {
+        <span class="k">return</span> korean + english + math;
+    }
+
+    <span class="k">public</span> <span class="k">double</span> <span class="p">getAverage</span>() {
+        <span class="k">return</span> <span class="p">getTotal</span>() / <span class="num">3.0</span>;
+    }
+
+    <span class="k">@Override</span>
+    <span class="k">public</span> <span class="k">String</span> <span class="p">toString</span>() {
+        <span class="k">return</span> <span class="k">String</span>.<span class="p">format</span>(<span class="s">"%s: 국어 %d, 영어 %d, 수학 %d (합계 %d, 평균 %.1f)"</span>,
+                name, korean, english, math, <span class="p">getTotal</span>(), <span class="p">getAverage</span>());
+    }
+}</pre>
+  <p>잘 만들어졌는지 작은 테스트용 클래스로 먼저 확인합니다. 한 단계씩 확인하며 만드는 것이 오류를 줄이는 비결이에요.</p>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">StudentTest</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">Student</span> s = <span class="k">new</span> <span class="k">Student</span>(<span class="s">"민수"</span>, <span class="num">90</span>, <span class="num">85</span>, <span class="num">100</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(s);
+    }
+}</pre>
+<pre class="output">민수: 국어 90, 영어 85, 수학 100 (합계 275, 평균 91.7)</pre>
+
+  <h3 id="pj-step2"><span class="num">10-2</span>2단계: 메뉴 뼈대 + 학생 추가 · 목록</h3>
+  <p><code>GradeApp</code>을 만듭니다. 포인트를 먼저 짚으면:</p>
+  <ul>
+    <li><code>sc</code>와 <code>students</code>를 <b>클래스 맨 위에 <code>static</code> 필드</b>로 두어, 모든 메서드가 함께 씁니다. 메서드마다 인자로 넘기지 않아도 돼요.</li>
+    <li><code>main</code>은 <code>while (true)</code>로 메뉴를 계속 보여주고, 종료(0)를 고르면 <code>return</code>으로 빠져나옵니다. 기능은 각각 메서드로 나눴습니다.</li>
+    <li><code>readInt</code>는 9장의 입력 검증 패턴입니다. 숫자가 아니면 다시 묻습니다. <code>readScore</code>는 그 위에 0~100 검사를 얹었습니다.</li>
+    <li>메뉴 번호가 아닌 입력은 <code>default</code> 분기에서 안내합니다.</li>
+  </ul>
+<pre class="code"><span class="k">import</span> java.util.<span class="k">ArrayList</span>;
+<span class="k">import</span> java.util.<span class="k">Scanner</span>;
+
+<span class="k">public</span> <span class="k">class</span> <span class="k">GradeApp</span> {
+    <span class="k">private</span> <span class="k">static</span> <span class="k">final</span> <span class="k">Scanner</span> sc = <span class="k">new</span> <span class="k">Scanner</span>(<span class="k">System</span>.in);
+    <span class="k">private</span> <span class="k">static</span> <span class="k">final</span> <span class="k">ArrayList</span>&lt;<span class="k">Student</span>&gt; students = <span class="k">new</span> <span class="k">ArrayList</span>&lt;&gt;();
+
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">while</span> (<span class="k">true</span>) {
+            <span class="p">printMenu</span>();
+            <span class="k">int</span> choice = <span class="p">readInt</span>(<span class="s">"선택: "</span>);
+            <span class="k">switch</span> (choice) {
+                <span class="k">case</span> <span class="num">1</span> -&gt; <span class="p">addStudent</span>();
+                <span class="k">case</span> <span class="num">2</span> -&gt; <span class="p">listStudents</span>();
+                <span class="k">case</span> <span class="num">0</span> -&gt; {
+                    <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"종료합니다."</span>);
+                    <span class="k">return</span>;
+                }
+                <span class="k">default</span> -&gt; <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"없는 메뉴입니다."</span>);
+            }
+        }
+    }
+
+    <span class="k">private</span> <span class="k">static</span> <span class="k">void</span> <span class="p">printMenu</span>() {
+        <span class="k">System</span>.out.<span class="p">println</span>();
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"===== 성적 관리 ====="</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"1. 학생 추가"</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"2. 전체 목록"</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"0. 종료"</span>);
+    }
+
+    <span class="c">// 한 줄을 읽어 정수로 바꾼다. 잘못 입력하면 다시 묻는다.</span>
+    <span class="k">private</span> <span class="k">static</span> <span class="k">int</span> <span class="p">readInt</span>(<span class="k">String</span> prompt) {
+        <span class="k">while</span> (<span class="k">true</span>) {
+            <span class="k">System</span>.out.<span class="p">print</span>(prompt);
+            <span class="k">try</span> {
+                <span class="k">return</span> <span class="k">Integer</span>.<span class="p">parseInt</span>(sc.<span class="p">nextLine</span>().<span class="p">trim</span>());
+            } <span class="k">catch</span> (<span class="k">NumberFormatException</span> e) {
+                <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"숫자만 입력해 주세요."</span>);
+            }
+        }
+    }
+
+    <span class="c">// 0~100 사이 점수만 받는다.</span>
+    <span class="k">private</span> <span class="k">static</span> <span class="k">int</span> <span class="p">readScore</span>(<span class="k">String</span> prompt) {
+        <span class="k">while</span> (<span class="k">true</span>) {
+            <span class="k">int</span> score = <span class="p">readInt</span>(prompt);
+            <span class="k">if</span> (score &gt;= <span class="num">0</span> &amp;&amp; score &lt;= <span class="num">100</span>) {
+                <span class="k">return</span> score;
+            }
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"점수는 0~100 사이여야 해요."</span>);
+        }
+    }
+
+    <span class="k">private</span> <span class="k">static</span> <span class="k">void</span> <span class="p">addStudent</span>() {
+        <span class="k">System</span>.out.<span class="p">print</span>(<span class="s">"이름: "</span>);
+        <span class="k">String</span> name = sc.<span class="p">nextLine</span>().<span class="p">trim</span>();
+        <span class="k">int</span> korean = <span class="p">readScore</span>(<span class="s">"국어: "</span>);
+        <span class="k">int</span> english = <span class="p">readScore</span>(<span class="s">"영어: "</span>);
+        <span class="k">int</span> math = <span class="p">readScore</span>(<span class="s">"수학: "</span>);
+        students.<span class="p">add</span>(<span class="k">new</span> <span class="k">Student</span>(name, korean, english, math));
+        <span class="k">System</span>.out.<span class="p">println</span>(name + <span class="s">" 학생을 추가했어요."</span>);
+    }
+
+    <span class="k">private</span> <span class="k">static</span> <span class="k">void</span> <span class="p">listStudents</span>() {
+        <span class="k">if</span> (students.<span class="p">isEmpty</span>()) {
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"등록된 학생이 없어요."</span>);
+            <span class="k">return</span>;
+        }
+        <span class="k">for</span> (<span class="k">int</span> i = <span class="num">0</span>; i &lt; students.<span class="p">size</span>(); i++) {
+            <span class="k">System</span>.out.<span class="p">println</span>((i + <span class="num">1</span>) + <span class="s">". "</span> + students.<span class="p">get</span>(i));
+        }
+    }
+}</pre>
+  <p>실행해서 "국어 점수에 abc를 넣어 보기"까지 확인한 결과입니다. 입력이 틀려도 프로그램이 죽지 않고 다시 묻는 것을 볼 수 있습니다.</p>
+<pre class="output">===== 성적 관리 =====
+1. 학생 추가
+2. 전체 목록
+0. 종료
+선택: 1
+이름: 민수
+국어: 90
+영어: abc
+숫자만 입력해 주세요.
+영어: 85
+수학: 100
+민수 학생을 추가했어요.
+
+===== 성적 관리 =====
+1. 학생 추가
+2. 전체 목록
+0. 종료
+선택: 2
+1. 민수: 국어 90, 영어 85, 수학 100 (합계 275, 평균 91.7)
+
+===== 성적 관리 =====
+1. 학생 추가
+2. 전체 목록
+0. 종료
+선택: 0
+종료합니다.</pre>
+
+  <h3 id="pj-step3"><span class="num">10-3</span>3단계: 찾기 · 삭제 · 반 평균 추가</h3>
+  <p>2단계 코드에서 바뀌는 곳은 두 군데입니다. 먼저 <code>main</code>의 <code>switch</code>에 <code>case 3 -&gt; findStudent();</code>, <code>case 4 -&gt; removeStudent();</code>, <code>case 5 -&gt; showClassAverage();</code>를 추가하고 <code>printMenu</code>에 메뉴 글자 3줄을 더합니다. 그다음 메서드 세 개 <code>findStudent</code>, <code>removeStudent</code>, <code>showClassAverage</code>를 클래스 맨 아래에 추가합니다. 코드에서 눈여겨볼 점은 이렇습니다. 문자열 비교에 <code>==</code>가 아니라 <code>equals</code>를 쓴 점, 삭제할 때 사용자에게 보이는 번호(1부터)에서 <code>1</code>을 빼서 인덱스(0부터)로 바꾼 점(<code>no - 1</code>), 학생이 없을 때를 먼저 걸러내는 점(<b>빈 리스트 방어</b>)을 눈여겨보세요.</p>
+  <p>아래는 완성된 <code>GradeApp.java</code> 전체입니다. 2단계와 비교하며 위 내용을 찾아보세요. (<code>Student.java</code>는 1단계 그대로입니다.) 막혔다면 펼쳐서 내 코드와 비교해 보세요.</p>
+  <details open><summary>완성 코드 전체: GradeApp.java</summary>
+<pre class="code"><span class="k">import</span> java.util.<span class="k">ArrayList</span>;
+<span class="k">import</span> java.util.<span class="k">Scanner</span>;
+
+<span class="k">public</span> <span class="k">class</span> <span class="k">GradeApp</span> {
+    <span class="k">private</span> <span class="k">static</span> <span class="k">final</span> <span class="k">Scanner</span> sc = <span class="k">new</span> <span class="k">Scanner</span>(<span class="k">System</span>.in);
+    <span class="k">private</span> <span class="k">static</span> <span class="k">final</span> <span class="k">ArrayList</span>&lt;<span class="k">Student</span>&gt; students = <span class="k">new</span> <span class="k">ArrayList</span>&lt;&gt;();
+
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">while</span> (<span class="k">true</span>) {
+            <span class="p">printMenu</span>();
+            <span class="k">int</span> choice = <span class="p">readInt</span>(<span class="s">"선택: "</span>);
+            <span class="k">switch</span> (choice) {
+                <span class="k">case</span> <span class="num">1</span> -&gt; <span class="p">addStudent</span>();
+                <span class="k">case</span> <span class="num">2</span> -&gt; <span class="p">listStudents</span>();
+                <span class="k">case</span> <span class="num">3</span> -&gt; <span class="p">findStudent</span>();
+                <span class="k">case</span> <span class="num">4</span> -&gt; <span class="p">removeStudent</span>();
+                <span class="k">case</span> <span class="num">5</span> -&gt; <span class="p">showClassAverage</span>();
+                <span class="k">case</span> <span class="num">0</span> -&gt; {
+                    <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"종료합니다."</span>);
+                    <span class="k">return</span>;
+                }
+                <span class="k">default</span> -&gt; <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"없는 메뉴입니다."</span>);
+            }
+        }
+    }
+
+    <span class="k">private</span> <span class="k">static</span> <span class="k">void</span> <span class="p">printMenu</span>() {
+        <span class="k">System</span>.out.<span class="p">println</span>();
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"===== 성적 관리 ====="</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"1. 학생 추가"</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"2. 전체 목록"</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"3. 이름으로 찾기"</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"4. 학생 삭제"</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"5. 반 평균"</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"0. 종료"</span>);
+    }
+
+    <span class="c">// 한 줄을 읽어 정수로 바꾼다. 잘못 입력하면 다시 묻는다.</span>
+    <span class="k">private</span> <span class="k">static</span> <span class="k">int</span> <span class="p">readInt</span>(<span class="k">String</span> prompt) {
+        <span class="k">while</span> (<span class="k">true</span>) {
+            <span class="k">System</span>.out.<span class="p">print</span>(prompt);
+            <span class="k">try</span> {
+                <span class="k">return</span> <span class="k">Integer</span>.<span class="p">parseInt</span>(sc.<span class="p">nextLine</span>().<span class="p">trim</span>());
+            } <span class="k">catch</span> (<span class="k">NumberFormatException</span> e) {
+                <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"숫자만 입력해 주세요."</span>);
+            }
+        }
+    }
+
+    <span class="c">// 0~100 사이 점수만 받는다.</span>
+    <span class="k">private</span> <span class="k">static</span> <span class="k">int</span> <span class="p">readScore</span>(<span class="k">String</span> prompt) {
+        <span class="k">while</span> (<span class="k">true</span>) {
+            <span class="k">int</span> score = <span class="p">readInt</span>(prompt);
+            <span class="k">if</span> (score &gt;= <span class="num">0</span> &amp;&amp; score &lt;= <span class="num">100</span>) {
+                <span class="k">return</span> score;
+            }
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"점수는 0~100 사이여야 해요."</span>);
+        }
+    }
+
+    <span class="k">private</span> <span class="k">static</span> <span class="k">void</span> <span class="p">addStudent</span>() {
+        <span class="k">System</span>.out.<span class="p">print</span>(<span class="s">"이름: "</span>);
+        <span class="k">String</span> name = sc.<span class="p">nextLine</span>().<span class="p">trim</span>();
+        <span class="k">int</span> korean = <span class="p">readScore</span>(<span class="s">"국어: "</span>);
+        <span class="k">int</span> english = <span class="p">readScore</span>(<span class="s">"영어: "</span>);
+        <span class="k">int</span> math = <span class="p">readScore</span>(<span class="s">"수학: "</span>);
+        students.<span class="p">add</span>(<span class="k">new</span> <span class="k">Student</span>(name, korean, english, math));
+        <span class="k">System</span>.out.<span class="p">println</span>(name + <span class="s">" 학생을 추가했어요."</span>);
+    }
+
+    <span class="k">private</span> <span class="k">static</span> <span class="k">void</span> <span class="p">listStudents</span>() {
+        <span class="k">if</span> (students.<span class="p">isEmpty</span>()) {
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"등록된 학생이 없어요."</span>);
+            <span class="k">return</span>;
+        }
+        <span class="k">for</span> (<span class="k">int</span> i = <span class="num">0</span>; i &lt; students.<span class="p">size</span>(); i++) {
+            <span class="k">System</span>.out.<span class="p">println</span>((i + <span class="num">1</span>) + <span class="s">". "</span> + students.<span class="p">get</span>(i));
+        }
+    }
+
+    <span class="k">private</span> <span class="k">static</span> <span class="k">void</span> <span class="p">findStudent</span>() {
+        <span class="k">System</span>.out.<span class="p">print</span>(<span class="s">"찾을 이름: "</span>);
+        <span class="k">String</span> name = sc.<span class="p">nextLine</span>().<span class="p">trim</span>();
+        <span class="k">for</span> (<span class="k">Student</span> s : students) {
+            <span class="k">if</span> (s.<span class="p">getName</span>().<span class="p">equals</span>(name)) {
+                <span class="k">System</span>.out.<span class="p">println</span>(s);
+                <span class="k">return</span>;
+            }
+        }
+        <span class="k">System</span>.out.<span class="p">println</span>(name + <span class="s">" 학생을 찾지 못했어요."</span>);
+    }
+
+    <span class="k">private</span> <span class="k">static</span> <span class="k">void</span> <span class="p">removeStudent</span>() {
+        <span class="p">listStudents</span>();
+        <span class="k">if</span> (students.<span class="p">isEmpty</span>()) {
+            <span class="k">return</span>;
+        }
+        <span class="k">int</span> no = <span class="p">readInt</span>(<span class="s">"삭제할 번호: "</span>);
+        <span class="k">if</span> (no &lt; <span class="num">1</span> || no &gt; students.<span class="p">size</span>()) {
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"번호가 범위를 벗어났어요."</span>);
+            <span class="k">return</span>;
+        }
+        <span class="k">Student</span> removed = students.<span class="p">remove</span>(no - <span class="num">1</span>);
+        <span class="k">System</span>.out.<span class="p">println</span>(removed.<span class="p">getName</span>() + <span class="s">" 학생을 삭제했어요."</span>);
+    }
+
+    <span class="k">private</span> <span class="k">static</span> <span class="k">void</span> <span class="p">showClassAverage</span>() {
+        <span class="k">if</span> (students.<span class="p">isEmpty</span>()) {
+            <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"등록된 학생이 없어요."</span>);
+            <span class="k">return</span>;
+        }
+        <span class="k">double</span> sum = <span class="num">0</span>;
+        <span class="k">for</span> (<span class="k">Student</span> s : students) {
+            sum += s.<span class="p">getAverage</span>();
+        }
+        <span class="k">System</span>.out.<span class="p">printf</span>(<span class="s">"반 평균: %.1f점 (%d명)%n"</span>, sum / students.<span class="p">size</span>(), students.<span class="p">size</span>());
+    }
+}</pre>
+  </details>
+  <p>입력 흐름을 확인한 실행 결과입니다. (민수·지영 추가 → 이름 검색 → 반 평균 → 1번 삭제 → 다시 평균 → 종료)</p>
+<pre class="output">===== 성적 관리 =====
+1. 학생 추가
+2. 전체 목록
+3. 이름으로 찾기
+4. 학생 삭제
+5. 반 평균
+0. 종료
+선택: 1
+이름: 민수
+국어: 90
+영어: 85
+수학: 100
+민수 학생을 추가했어요.
+
+===== 성적 관리 =====
+1. 학생 추가
+2. 전체 목록
+3. 이름으로 찾기
+4. 학생 삭제
+5. 반 평균
+0. 종료
+선택: 1
+이름: 지영
+국어: 70
+영어: 80
+수학: 95
+지영 학생을 추가했어요.
+
+===== 성적 관리 =====
+1. 학생 추가
+2. 전체 목록
+3. 이름으로 찾기
+4. 학생 삭제
+5. 반 평균
+0. 종료
+선택: 3
+찾을 이름: 지영
+지영: 국어 70, 영어 80, 수학 95 (합계 245, 평균 81.7)
+
+===== 성적 관리 =====
+1. 학생 추가
+2. 전체 목록
+3. 이름으로 찾기
+4. 학생 삭제
+5. 반 평균
+0. 종료
+선택: 5
+반 평균: 86.7점 (2명)
+
+===== 성적 관리 =====
+1. 학생 추가
+2. 전체 목록
+3. 이름으로 찾기
+4. 학생 삭제
+5. 반 평균
+0. 종료
+선택: 4
+1. 민수: 국어 90, 영어 85, 수학 100 (합계 275, 평균 91.7)
+2. 지영: 국어 70, 영어 80, 수학 95 (합계 245, 평균 81.7)
+삭제할 번호: 1
+민수 학생을 삭제했어요.
+
+===== 성적 관리 =====
+1. 학생 추가
+2. 전체 목록
+3. 이름으로 찾기
+4. 학생 삭제
+5. 반 평균
+0. 종료
+선택: 5
+반 평균: 81.7점 (1명)
+
+===== 성적 관리 =====
+1. 학생 추가
+2. 전체 목록
+3. 이름으로 찾기
+4. 학생 삭제
+5. 반 평균
+0. 종료
+선택: 0
+종료합니다.</pre>
+  <div class="tip"><b>🧪 직접 테스트해 볼 것</b>점수에 <code>101</code>이나 <code>-5</code>, 문자 입력하기 / 학생이 없을 때 2·4·5번 메뉴 / 없는 이름 검색 / 삭제 번호에 <code>0</code>이나 학생 수보다 큰 값 입력. 어느 경우에도 프로그램이 멈추면 안 됩니다.</div>
+
+  <h3 id="pj-challenge"><span class="num">10-4</span>🚀 도전 과제</h3>
+  <p>완성한 프로그램에 기능을 더해 보세요. 막히면 힌트를 열어보세요.</p>
+  <details><summary>도전 1. 학생을 총점 높은 순으로 정렬해서 보여주기</summary>가장 쉬운 방법은 <code>ArrayList</code>의 <code>sort</code>에 비교 기준을 넘기는 것입니다. 람다식 <code>(a, b) -&gt; Integer.compare(b.getTotal(), a.getTotal())</code>을 쓰면 됩니다. (<code>a</code>, <code>b</code>가 학생 두 명이고, 결과가 음수면 a가 앞에 옵니다.) "Java sort Comparator 람다"로 검색해 보세요.</details>
+  <details><summary>도전 2. 같은 이름의 학생은 추가하지 못하게 하기</summary><code>addStudent</code> 안에서 이름을 입력받은 직후 <code>findByName(name)</code> 같은 메서드로 이미 있는지 확인하고, 있으면 안내 메시지를 출력한 뒤 <code>return</code>합니다. 3번 메뉴의 반복문을 별도 메서드로 빼면 재사용할 수 있어요.</details>
+  <details><summary>도전 3. 과목별 평균과 최고점자 출력하기</summary><code>Student</code>에 <code>getKorean()</code> 같은 getter를 추가하고, <code>showClassAverage</code>에서 과목별로 합계를 구합니다. 최고점자는 "지금까지 본 최댓값"과 "그 학생"을 변수 두 개로 들고 반복문을 돌립니다.</details>
+  <details><summary>도전 4. 학생 데이터를 파일에 저장하기 (어려움)</summary>프로그램을 종료하면 데이터가 사라집니다. <code>java.nio.file.Files</code>의 <code>writeString</code>/<code>readAllLines</code>로 한 줄에 한 명씩 저장하고, 시작할 때 읽어오게 해보세요. <code>IOException</code> 예외 처리가 필요합니다. 9장에서 배운 try/catch를 쓰면 됩니다.</details>
+
+  <label class="done-check"><input type="checkbox" data-done="project"> 10장 실습 완료!</label>
+</section>
+
+<!-- =============================== 11. 다음 단계 =============================== -->
+<section class="part" id="next">
+  <h2>11. 막힐 때 · 다음 단계</h2>
+
+  <h3 id="nx-err"><span class="num">11-1</span>자주 보는 에러 모음</h3>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>에러 메시지</th><th>보통의 원인</th><th>확인할 것</th></tr>
+    <tr><td><code>cannot find symbol</code></td><td>이름 오타, 대소문자, 선언 전 사용, import 누락</td><td><code>symbol:</code> 줄에 적힌 이름을 확인. <code>Scanner</code>, <code>ArrayList</code>는 import 했나?</td></tr>
+    <tr><td><code>';' expected</code></td><td>세미콜론, 괄호, 중괄호 짝</td><td>에러 줄의 <b>바로 윗줄</b>도 확인</td></tr>
+    <tr><td><code>class X is public, should be declared in a file named X.java</code></td><td>클래스 이름과 파일 이름 불일치</td><td>파일 이름 변경 또는 클래스 이름 변경</td></tr>
+    <tr><td><code>incompatible types: possible lossy conversion from double to int</code></td><td>큰 타입을 작은 타입에 그냥 대입</td><td><code>(int)</code> 캐스팅 또는 변수를 <code>double</code>로</td></tr>
+    <tr><td><code>NullPointerException</code></td><td><code>null</code> 변수로 메서드 호출</td><td>변수에 객체를 넣었나? 스택 트레이스의 줄 번호로 이동</td></tr>
+    <tr><td><code>ArrayIndexOutOfBoundsException</code> / <code>IndexOutOfBoundsException</code></td><td>범위를 벗어난 인덱스</td><td>반복 조건 <code>&lt;</code> vs <code>&lt;=</code>, 리스트가 비어 있지 않은지</td></tr>
+    <tr><td><code>InputMismatchException</code></td><td><code>nextInt()</code>에 숫자가 아닌 입력</td><td>한 줄로 읽고 <code>parseInt</code> + try/catch (3장, 9장)</td></tr>
+    <tr><td><code>Could not find or load main class</code></td><td>실행 위치나 이름이 틀림</td><td><code>.class</code>를 붙이지 않았나? <code>.java</code> 파일이 있는 폴더에서 실행했나?</td></tr>
+  </table></div>
+
+  <h3 id="nx-file"><span class="num">11-2</span>클래스 이름과 파일 이름이 다를 때</h3>
+  <p>0장에서 말한 규칙을 어기면 어떻게 되는지 봅니다. 파일은 <code>Hello2.java</code>인데 안에는 <code>public class Hello</code>가 들어 있는 경우입니다.</p>
+  <div class="warn"><b>일부러 틀린 코드입니다 (컴파일 안 됨)</b>파일 이름: <code>Hello2.java</code></div>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Hello</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">System</span>.out.<span class="p">println</span>(<span class="s">"파일 이름과 클래스 이름이 달라요"</span>);
+    }
+}</pre>
+<pre class="output">Hello2.java:1: error: class Hello is public, should be declared in a file named Hello.java
+public class Hello {
+       ^
+1 error</pre>
+  <p>에러 메시지가 해결책을 그대로 알려줍니다. 파일 이름을 <code>Hello.java</code>로 바꾸세요.</p>
+
+  <h3 id="nx-npe"><span class="num">11-3</span>NullPointerException</h3>
+  <p><code>null</code>은 "아무 객체도 가리키지 않는다"는 뜻입니다. 가리키는 게 없는데 메서드를 부르면 이 예외가 납니다. 초기화하지 않은 <code>String</code> 필드, 배열의 빈 칸(<code>new String[2]</code>의 값은 모두 null), 찾지 못해서 null을 돌려주는 메서드의 결과 등에서 자주 만납니다.</p>
+  <div class="warn"><b>컴파일은 되지만 실행하면 에러가 나는 예제</b>null인 문자열의 길이를 구하려고 합니다.</div>
+<pre class="code"><span class="k">public</span> <span class="k">class</span> <span class="k">Npe</span> {
+    <span class="k">public</span> <span class="k">static</span> <span class="k">void</span> <span class="p">main</span>(<span class="k">String</span>[] args) {
+        <span class="k">String</span> s = <span class="k">null</span>;                 <span class="c">// 아무것도 가리키지 않음</span>
+        <span class="k">System</span>.out.<span class="p">println</span>(s.<span class="p">length</span>());  <span class="c">// 없는 것에게 일을 시킴</span>
+    }
+}</pre>
+<pre class="output">Exception in thread "main" java.lang.NullPointerException: Cannot invoke "String.length()" because "&lt;local1&gt;" is null
+	at Npe.main(Npe.java:4)</pre>
+  <ul>
+    <li>메시지의 <code>Cannot invoke "String.length()" because "&lt;local1&gt;" is null</code>은 "null인 변수에 <code>length()</code>를 부르려 했다"는 뜻입니다. 변수 이름이 <code>&lt;local1&gt;</code>으로 나오는 것은 컴파일할 때 이름 정보를 넣지 않아서이고, <code>javac -g</code>로 컴파일하거나 IDE에서 실행하면 실제 변수 이름(<code>s</code>)이 나옵니다.</li>
+    <li><code>at Npe.main(Npe.java:4)</code> — 에러 난 <b>파일과 줄 번호</b>. 스택 트레이스는 항상 이 줄부터 읽습니다. 여러 줄이면 내가 쓴 파일 이름이 나오는 가장 위쪽 줄이 단서입니다.</li>
+    <li>해결: 변수에 값이 들어가는지 확인하고, <code>if (s != null)</code>로 미리 검사하거나 처음부터 <code>null</code>이 되지 않게 설계합니다.</li>
+  </ul>
+
+  <h3 id="nx-tips"><span class="num">11-4</span>막혔을 때 이렇게 해보세요</h3>
+  <ol>
+    <li><b>에러 메시지를 끝까지 읽기.</b> 파일, 줄 번호, 원인이 다 적혀 있습니다.</li>
+    <li><b>영어 에러 메시지를 그대로 복사해서 검색.</b> 거의 모든 에러는 누군가 이미 질문했습니다. (내 변수 이름은 빼고 검색)</li>
+    <li><b>의심 가는 곳에 <code>System.out.println</code>을 넣어서</b> 변수 값이 내 생각과 같은지 확인. 가장 원시적이지만 가장 확실한 디버깅입니다. IntelliJ의 디버거(줄 옆을 클릭해 중단점 → Debug 실행)도 익혀 두면 좋아요.</li>
+    <li><b>코드를 작게 줄여서</b> 문제가 되는 부분만 따로 실행해 보기.</li>
+    <li>그래도 안 되면 COM's 스터디방에 <b>에러 메시지 전체와 코드</b>를 올려 질문하기. 어디까지 해봤는지 함께 적으면 더 빨리 도움받을 수 있어요.</li>
+  </ol>
+
+  <h3 id="nx-ref"><span class="num">11-5</span>참고 자료</h3>
+  <ul>
+    <li><a href="https://dev.java/learn/" target="_blank" rel="noopener noreferrer">dev.java Learn</a> — Oracle의 공식 자바 학습 사이트(영어).</li>
+    <li><a href="https://docs.oracle.com/en/java/javase/21/docs/api/" target="_blank" rel="noopener noreferrer">Java SE 21 API 문서</a> — <code>String</code>, <code>ArrayList</code> 등 모든 클래스의 메서드 사전. "String 메서드"처럼 궁금한 클래스를 찾아보는 습관을 들이세요.</li>
+    <li><a href="https://adoptium.net/" target="_blank" rel="noopener noreferrer">Adoptium (Temurin JDK)</a> — JDK 다운로드.</li>
+  </ul>
+
+  <h3 id="nx-next"><span class="num">11-6</span>다음에 배우면 좋은 것</h3>
+  <ol>
+    <li><b>컬렉션 더 깊이</b> — <code>HashMap</code>(이름→점수처럼 짝을 저장), <code>HashSet</code>(중복 없는 모음), <code>List</code> 인터페이스.</li>
+    <li><b>람다식과 스트림</b> — 리스트를 걸러내고(filter), 변환하고(map), 합치는 일을 짧게 쓰는 방법. 현대 자바 코드에서 매우 자주 보입니다.</li>
+    <li><b>패키지와 빌드 도구 (Gradle / Maven)</b> — 파일이 많아졌을 때 정리하고, 라이브러리를 가져다 쓰는 법.</li>
+    <li><b>Git &amp; GitHub</b> — 코드 저장과 협업.</li>
+    <li><b>Spring Boot 맛보기</b> — 웹 서버를 자바로 만드는 프레임워크. 이 동아리 웹사이트 백엔드도 Spring Boot입니다. 클래스, 인터페이스, 컬렉션, 예외 처리가 탄탄하면 훨씬 수월하게 시작할 수 있어요.</li>
+    <li><b>알고리즘 문제 풀이</b> — 백준·프로그래머스에서 자바로 풀며 문법과 사고력을 같이 키우기. 입력은 <code>Scanner</code>로 충분하지만 큰 입력에는 <code>BufferedReader</code>를 씁니다.</li>
+  </ol>
+
+  <footer>COM's Java 기초 스터디 · 광운대학교 중앙 컴퓨터 학술동아리 COM's</footer>
+</section>
+
+</div>

@@ -23,6 +23,11 @@ const long = documentTitleFor('/community/9', '가'.repeat(200))
 assert.ok(long.length < 90, 'very long item titles are clamped')
 assert.ok(long.startsWith('가'.repeat(59) + '…'))
 
+// Study pages are titled from the registry; an unknown study id is a 404.
+assert.equal(documentTitleFor('/study'), "스터디 | KW COM's")
+assert.equal(documentTitleFor('/study/web'), "웹 기초 | KW COM's")
+assert.equal(routeLabel('/study/nope'), null)
+
 // Unknown paths render the 404 page; the title must say so and ignore any stale detail.
 assert.equal(routeLabel('/nope'), null)
 assert.equal(documentTitleFor('/nope', '남은 제목'), "페이지를 찾을 수 없음 | KW COM's")
@@ -33,7 +38,8 @@ const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8')
 const paths = [...app.matchAll(/<Route path="([^"*]+)"/g)].map((match) => match[1])
 assert.ok(paths.length >= 20, 'expected to read the route table from App.tsx')
 for (const path of paths) {
-  const sample = path.replace(/:[A-Za-z]+/g, '1')
+  // /study/:id is labelled from the study registry, so the sample needs a real id.
+  const sample = path.replace('/study/:id', '/study/web').replace(/:[A-Za-z]+/g, '1')
   assert.notEqual(routeLabel(sample), null, `route ${path} needs a document title in src/routes/pageTitles.ts`)
 }
 

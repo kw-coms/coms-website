@@ -1,0 +1,983 @@
+
+<nav class="toc" aria-label="목차">
+  <div class="toc-title">COM's 웹 기초 스터디</div>
+  <div class="progress"><div id="progress-bar"></div></div>
+  <div class="progress-label" id="progress-label">진도 0 / 5</div>
+  <ol>
+    <li><a href="#start">0. 시작하기</a></li>
+    <li><a href="#html">1. HTML — 뼈대</a></li>
+    <li class="sub"><a href="#html-tag">태그란?</a></li>
+    <li class="sub"><a href="#html-skeleton">기본 뼈대</a></li>
+    <li class="sub"><a href="#html-text">글자 태그</a></li>
+    <li class="sub"><a href="#html-link">링크 · 이미지</a></li>
+    <li class="sub"><a href="#html-list">목록 · 표</a></li>
+    <li class="sub"><a href="#html-layout">구역 나누기</a></li>
+    <li class="sub"><a href="#html-form">입력 받기</a></li>
+    <li><a href="#css">2. CSS — 꾸미기</a></li>
+    <li class="sub"><a href="#css-basic">문법과 연결</a></li>
+    <li class="sub"><a href="#css-selector">선택자</a></li>
+    <li class="sub"><a href="#css-text">색 · 글자 · 단위</a></li>
+    <li class="sub"><a href="#css-box">박스 모델</a></li>
+    <li class="sub"><a href="#css-flex">Flexbox 배치</a></li>
+    <li class="sub"><a href="#css-hover">hover · 반응형</a></li>
+    <li><a href="#js">3. JavaScript — 동작</a></li>
+    <li class="sub"><a href="#js-start">연결과 콘솔</a></li>
+    <li class="sub"><a href="#js-var">변수와 자료형</a></li>
+    <li class="sub"><a href="#js-flow">조건문 · 반복문</a></li>
+    <li class="sub"><a href="#js-func">함수</a></li>
+    <li class="sub"><a href="#js-dom">DOM 조작</a></li>
+    <li class="sub"><a href="#js-event">이벤트</a></li>
+    <li><a href="#project">4. 실습: 할 일 목록</a></li>
+    <li><a href="#next">5. 막힐 때 · 다음 단계</a></li>
+  </ol>
+</nav>
+
+<div class="study-main">
+
+<header class="hero">
+  <div class="eyebrow">COM'S STUDY · WEB 101</div>
+  <h1>처음 만드는 웹페이지<br>HTML · CSS · JavaScript</h1>
+  <p>코딩을 처음 하는 사람도 이 페이지만 순서대로 따라오면 간단한 웹페이지를 직접 만들 수 있도록 구성했습니다. 모든 예제는 <b>이 페이지 안에서 바로 고쳐보고 결과를 확인</b>할 수 있어요.</p>
+  <div class="chips"><span class="chip html">HTML</span><span class="chip css">CSS</span><span class="chip js">JavaScript</span></div>
+</header>
+
+<!-- =============================== 0. 시작하기 =============================== -->
+<section class="part" id="start" data-part="start">
+  <h2>0. 시작하기</h2>
+  <p class="lead">웹페이지가 무엇으로 이루어져 있는지, 그리고 무엇을 준비해야 하는지 알아봅니다.</p>
+
+  <h3>웹페이지는 세 가지로 만들어진다</h3>
+  <p>우리가 보는 모든 웹사이트는 결국 브라우저(크롬 등)가 <b>텍스트 파일</b>을 읽어서 화면에 그려준 결과입니다. 그 파일에 쓰는 언어가 세 가지예요. 집 짓기에 비유하면 이렇습니다.</p>
+  <div class="trio">
+    <div class="html"><div class="big">HTML</div><p><b>뼈대·구조</b><br>여기에 제목, 여기에 사진, 여기에 버튼. "무엇이 있는지"를 정합니다.</p></div>
+    <div class="css"><div class="big">CSS</div><p><b>인테리어·디자인</b><br>제목은 빨간색, 버튼은 둥글게. "어떻게 보이는지"를 정합니다.</p></div>
+    <div class="js"><div class="big">JavaScript</div><p><b>전기·움직임</b><br>버튼을 누르면 메뉴가 열린다. "어떻게 동작하는지"를 정합니다.</p></div>
+  </div>
+  <p>순서도 이대로 배우는 게 좋습니다. HTML 없이 꾸밀 수 없고, 꾸밀 대상이 있어야 움직일 수 있으니까요.</p>
+
+  <h3>준비물 (무료)</h3>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>준비물</th><th>용도</th></tr>
+    <tr><td><b>Chrome 브라우저</b></td><td>만든 페이지를 열어보고, <code>F12</code>로 개발자 도구를 써서 오류를 확인합니다.</td></tr>
+    <tr><td><b>VS Code</b></td><td>코드를 쓰는 편집기. code.visualstudio.com 에서 설치.</td></tr>
+    <tr><td><b>Live Server</b> (VS Code 확장)</td><td>저장할 때마다 브라우저가 자동으로 새로고침됩니다. VS Code 왼쪽 확장(Extensions) 탭에서 검색해 설치.</td></tr>
+  </table></div>
+
+  <h3>내 컴퓨터에서 첫 파일 만들기</h3>
+  <ol>
+    <li>바탕화면에 <code>my-web</code> 폴더를 만들고, VS Code에서 <b>파일 → 폴더 열기</b>로 엽니다.</li>
+    <li>새 파일을 만들고 이름을 <code>index.html</code>로 저장합니다. (확장자 <code>.html</code>이 중요!)</li>
+    <li>빈 파일에 <code>!</code> 한 글자를 치고 <code>Tab</code> 키를 누르면 기본 뼈대가 자동으로 채워집니다.</li>
+    <li><code>&lt;body&gt;</code>와 <code>&lt;/body&gt;</code> 사이에 <code>안녕하세요!</code>라고 쓰고 저장(<code>Ctrl+S</code>).</li>
+    <li>파일에서 우클릭 → <b>Open with Live Server</b>. 브라우저에 글자가 보이면 성공입니다.</li>
+  </ol>
+
+  <div class="note"><b>이 페이지의 예제 사용법</b>아래처럼 생긴 상자가 나오면, 위쪽 코드를 직접 고쳐보세요. 고치는 즉시 아래 <b>결과</b>가 바뀝니다. 탭(HTML/CSS/JS)을 눌러 파일을 바꿔 볼 수 있고, 망가뜨려도 <b>되돌리기</b>를 누르면 원래대로 돌아옵니다.</div>
+
+  <div class="demo" data-height="90" data-hint="'안녕하세요'를 본인 이름으로 바꿔보세요.">
+<textarea data-lang="html"><h1>안녕하세요, COM's!</h1>
+<p>제 첫 웹페이지입니다.</p></textarea>
+  </div>
+
+  <label class="done-check"><input type="checkbox" data-done="start"> 0장 완료!</label>
+</section>
+
+<!-- =============================== 1. HTML =============================== -->
+<section class="part" id="html" data-part="html">
+  <h2><span class="chip html tag">HTML</span>1. HTML — 뼈대 만들기</h2>
+  <p class="lead">HTML(HyperText Markup Language)은 "이건 제목, 이건 문단"처럼 내용에 이름표를 붙이는 언어입니다.</p>
+
+  <h3 id="html-tag"><span class="num">1-1</span>태그란?</h3>
+  <p>HTML은 <b>태그</b>로 내용을 감싸서 의미를 붙입니다. 태그는 꺾쇠 <code>&lt; &gt;</code>로 씁니다.</p>
+<pre class="code"><span class="k">&lt;p&gt;</span>안녕하세요<span class="k">&lt;/p&gt;</span>
+<span class="c">↑ 여는 태그   ↑ 내용   ↑ 닫는 태그 (앞에 / 가 붙음)</span></pre>
+  <p>태그에는 추가 정보인 <b>속성</b>을 붙일 수 있습니다. <code>이름="값"</code> 형태로 여는 태그 안에 씁니다.</p>
+<pre class="code"><span class="k">&lt;a</span> <span class="p">href</span>=<span class="s">"https://coms.kw.ac.kr"</span><span class="k">&gt;</span>COM's 홈페이지<span class="k">&lt;/a&gt;</span>
+<span class="c">   ↑ 속성 이름   ↑ 속성 값 (따옴표로 감쌈)</span></pre>
+  <p>몇몇 태그는 감쌀 내용이 없어서 닫는 태그가 없습니다. 예: <code>&lt;img&gt;</code>(이미지), <code>&lt;br&gt;</code>(줄바꿈), <code>&lt;input&gt;</code>(입력칸).</p>
+  <p>태그 안에 태그를 넣을 수도 있습니다(<b>중첩</b>). 이때는 <b>나중에 연 것을 먼저 닫아야</b> 합니다.</p>
+<pre class="code"><span class="c">&lt;!-- 올바름 --&gt;</span>
+<span class="k">&lt;p&gt;</span>이건 <span class="k">&lt;strong&gt;</span>중요<span class="k">&lt;/strong&gt;</span>해요<span class="k">&lt;/p&gt;</span>
+
+<span class="c">&lt;!-- 틀림: 순서가 엇갈림 --&gt;</span>
+<span class="k">&lt;p&gt;</span>이건 <span class="k">&lt;strong&gt;</span>중요<span class="k">&lt;/p&gt;</span>해요<span class="k">&lt;/strong&gt;</span></pre>
+  <div class="tip"><b>주석</b><code>&lt;!-- 이렇게 쓰면 --&gt;</code> 화면에 안 보이는 메모가 됩니다. 코드 설명을 남길 때 씁니다.</div>
+
+  <h3 id="html-skeleton"><span class="num">1-2</span>모든 HTML 파일의 기본 뼈대</h3>
+  <p>VS Code에서 <code>!</code> + <code>Tab</code>으로 만든 뼈대가 바로 이것입니다. 외울 필요는 없고, 각 줄이 무슨 역할인지만 알면 됩니다.</p>
+<pre class="code"><span class="k">&lt;!DOCTYPE html&gt;</span>                 <span class="c">← "이 파일은 HTML입니다" 선언</span>
+<span class="k">&lt;html</span> <span class="p">lang</span>=<span class="s">"ko"</span><span class="k">&gt;</span>               <span class="c">← 문서 전체. lang="ko"는 한국어 문서라는 뜻</span>
+<span class="k">&lt;head&gt;</span>                          <span class="c">← 화면에 안 보이는 설정 정보</span>
+  <span class="k">&lt;meta</span> <span class="p">charset</span>=<span class="s">"UTF-8"</span><span class="k">&gt;</span>       <span class="c">← 한글이 깨지지 않게 하는 설정</span>
+  <span class="k">&lt;meta</span> <span class="p">name</span>=<span class="s">"viewport"</span> <span class="p">content</span>=<span class="s">"width=device-width, initial-scale=1.0"</span><span class="k">&gt;</span>
+                                  <span class="c">← 휴대폰에서도 알맞은 크기로 보이게</span>
+  <span class="k">&lt;title&gt;</span>내 페이지<span class="k">&lt;/title&gt;</span>       <span class="c">← 브라우저 탭에 뜨는 제목</span>
+<span class="k">&lt;/head&gt;</span>
+<span class="k">&lt;body&gt;</span>                          <span class="c">← 실제로 화면에 보이는 내용은 전부 여기에!</span>
+
+<span class="k">&lt;/body&gt;</span>
+<span class="k">&lt;/html&gt;</span></pre>
+  <div class="note"><b>이 페이지의 예제에서는</b>매번 뼈대를 쓰면 길어지니까, 예제 상자에는 <code>&lt;body&gt;</code> 안에 들어갈 내용만 씁니다. 내 컴퓨터에서 연습할 때는 꼭 위 뼈대 안의 <code>&lt;body&gt;</code>에 넣으세요.</div>
+
+  <h3 id="html-text"><span class="num">1-3</span>글자를 표현하는 태그</h3>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>태그</th><th>뜻</th><th>설명</th></tr>
+    <tr><td><code>&lt;h1&gt;</code> ~ <code>&lt;h6&gt;</code></td><td>제목(heading)</td><td>숫자가 작을수록 큰 제목. <code>h1</code>은 페이지에 보통 하나만.</td></tr>
+    <tr><td><code>&lt;p&gt;</code></td><td>문단(paragraph)</td><td>일반 글. 문단끼리는 자동으로 간격이 생김.</td></tr>
+    <tr><td><code>&lt;br&gt;</code></td><td>줄바꿈</td><td>HTML은 코드에서 엔터를 쳐도 줄이 안 바뀝니다. 바꾸려면 이걸 씀.</td></tr>
+    <tr><td><code>&lt;strong&gt;</code></td><td>강조(굵게)</td><td>중요한 내용.</td></tr>
+    <tr><td><code>&lt;em&gt;</code></td><td>강조(기울임)</td><td>말할 때 힘을 주는 부분.</td></tr>
+  </table></div>
+  <div class="demo" data-height="300" data-hint="&lt;h1&gt;을 &lt;h4&gt;로 바꿔보고, 두 번째 문단의 &lt;br&gt;을 지워서 차이를 확인해보세요.">
+<textarea data-lang="html"><h1>가장 큰 제목 h1</h1>
+<h2>조금 작은 제목 h2</h2>
+<h3>더 작은 제목 h3</h3>
+
+<p>이건 문단입니다. 코드에서
+엔터를 쳐도 화면에서는     띄어쓰기 여러 개도
+한 칸으로 합쳐져요.</p>
+
+<p>줄을 바꾸고 싶으면<br>이렇게 br 태그를 씁니다.</p>
+
+<p>이 부분은 <strong>굵게 강조</strong>하고, 이 부분은 <em>기울여서 강조</em>합니다.</p></textarea>
+  </div>
+
+  <h3 id="html-link"><span class="num">1-4</span>링크와 이미지</h3>
+<pre class="code"><span class="k">&lt;a</span> <span class="p">href</span>=<span class="s">"이동할 주소"</span><span class="k">&gt;</span>클릭할 글자<span class="k">&lt;/a&gt;</span>
+<span class="k">&lt;img</span> <span class="p">src</span>=<span class="s">"이미지 주소"</span> <span class="p">alt</span>=<span class="s">"이미지 설명"</span><span class="k">&gt;</span></pre>
+  <ul>
+    <li><code>href</code>: 이동할 주소. <code>target="_blank"</code>를 붙이면 새 탭에서 열립니다.</li>
+    <li><code>src</code>: 이미지 파일 위치. 인터넷 주소도 되고, 내 폴더에 있는 <code>cat.jpg</code> 같은 파일 이름도 됩니다.</li>
+    <li><code>alt</code>: 이미지가 안 뜰 때 나오는 글, 시각장애인용 화면 읽기 프로그램이 읽어주는 글. 꼭 쓰는 습관을 들이세요.</li>
+    <li><code>width</code>: 이미지 너비(픽셀).</li>
+  </ul>
+  <div class="demo" data-height="330" data-hint="width 값을 바꿔보고, src를 일부러 틀리게 써서 alt 글자가 나오는지 보세요.">
+<textarea data-lang="html"><p>
+  <a href="https://coms.kw.ac.kr" target="_blank">COM's 홈페이지 (새 탭)</a>
+</p>
+<p>
+  <a href="https://developer.mozilla.org/ko/">MDN 웹 문서</a>
+</p>
+
+<img src="https://picsum.photos/id/1025/400/250" alt="강아지 사진" width="300"></textarea>
+  </div>
+  <div class="tip"><b>내 컴퓨터의 이미지 쓰기</b><code>index.html</code>과 같은 폴더에 <code>photo.jpg</code>를 넣었다면 <code>src="photo.jpg"</code>, <code>images</code> 폴더 안에 넣었다면 <code>src="images/photo.jpg"</code>라고 씁니다. 이걸 <b>상대 경로</b>라고 해요.</div>
+
+  <h3 id="html-list"><span class="num">1-5</span>목록과 표</h3>
+  <p><code>&lt;ul&gt;</code>은 점 목록(unordered list), <code>&lt;ol&gt;</code>은 번호 목록(ordered list)이고, 각 항목은 <code>&lt;li&gt;</code>(list item)로 씁니다.</p>
+  <p>표는 <code>&lt;table&gt;</code> 안에 줄(<code>&lt;tr&gt;</code>)을 만들고, 줄 안에 칸을 넣습니다. 제목 칸은 <code>&lt;th&gt;</code>, 일반 칸은 <code>&lt;td&gt;</code>입니다.</p>
+  <div class="demo" data-height="380" data-hint="목록에 &lt;li&gt;를 하나 더 추가하고, 표에 새 줄(&lt;tr&gt;)을 추가해보세요.">
+<textarea data-lang="html"><h3>COM's 활동 (점 목록)</h3>
+<ul>
+  <li>스터디</li>
+  <li>프로젝트</li>
+  <li>MT</li>
+</ul>
+
+<h3>공부 순서 (번호 목록)</h3>
+<ol>
+  <li>HTML</li>
+  <li>CSS</li>
+  <li>JavaScript</li>
+</ol>
+
+<h3>시간표 (표)</h3>
+<table border="1">
+  <tr>
+    <th>요일</th>
+    <th>스터디</th>
+  </tr>
+  <tr>
+    <td>월</td>
+    <td>웹 기초</td>
+  </tr>
+  <tr>
+    <td>수</td>
+    <td>알고리즘</td>
+  </tr>
+</table></textarea>
+  </div>
+
+  <h3 id="html-layout"><span class="num">1-6</span>구역 나누기: div와 시맨틱 태그</h3>
+  <p>지금까지는 글자를 다뤘다면, 이제 페이지를 <b>구역(상자)</b>으로 나눕니다. 나중에 CSS로 배치할 때 이 상자 단위로 움직이게 돼요.</p>
+  <ul>
+    <li><code>&lt;div&gt;</code>: 아무 의미 없는 <b>상자</b>. 묶어야 할 때 가장 많이 씁니다. 한 줄을 통째로 차지합니다.</li>
+    <li><code>&lt;span&gt;</code>: 글자 일부만 감싸는 <b>작은 상자</b>. 줄을 바꾸지 않습니다.</li>
+  </ul>
+  <p>div만 써도 되지만, 구역의 의미가 드러나는 <b>시맨틱(semantic, 의미 있는) 태그</b>를 쓰면 코드를 읽기 쉽고 검색엔진도 내용을 잘 이해합니다.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>태그</th><th>용도</th></tr>
+    <tr><td><code>&lt;header&gt;</code></td><td>페이지 맨 위 (로고, 사이트 이름)</td></tr>
+    <tr><td><code>&lt;nav&gt;</code></td><td>메뉴 (다른 페이지로 가는 링크 모음)</td></tr>
+    <tr><td><code>&lt;main&gt;</code></td><td>페이지의 핵심 내용</td></tr>
+    <tr><td><code>&lt;section&gt;</code></td><td>내용 안의 한 단락/주제</td></tr>
+    <tr><td><code>&lt;footer&gt;</code></td><td>페이지 맨 아래 (연락처, 저작권)</td></tr>
+  </table></div>
+  <div class="demo" data-height="340" data-hint="CSS 탭은 상자 경계를 보이게 하려고 넣어둔 것입니다. 지금은 몰라도 돼요. HTML 탭에서 section을 하나 더 추가해보세요.">
+<textarea data-lang="html"><header>
+  <h1>COM's</h1>
+</header>
+
+<nav>
+  <a href="#">소개</a> |
+  <a href="#">활동</a> |
+  <a href="#">지원하기</a>
+</nav>
+
+<main>
+  <section>
+    <h2>동아리 소개</h2>
+    <p>광운대학교 중앙 컴퓨터 학술동아리 <span class="point">COM's</span>입니다.</p>
+  </section>
+  <section>
+    <h2>활동</h2>
+    <p>스터디, 프로젝트, 친목 활동을 합니다.</p>
+  </section>
+</main>
+
+<footer>
+  <p>복지관 403호</p>
+</footer></textarea>
+<textarea data-lang="css">header, nav, main, section, footer {
+  border: 2px dashed #999;
+  padding: 6px;
+  margin: 6px;
+}
+.point { background: yellow; }</textarea>
+  </div>
+
+  <h3 id="html-form"><span class="num">1-7</span>입력 받기: input, button</h3>
+  <p>사용자에게서 무언가를 입력받을 때 씁니다. 지금은 <b>모양만</b> 만들고, 실제로 입력한 값을 쓰는 건 3장 JavaScript에서 합니다.</p>
+  <ul>
+    <li><code>&lt;input type="text"&gt;</code>: 한 줄 입력칸. <code>type</code>을 <code>password</code>, <code>email</code>, <code>number</code>, <code>checkbox</code>, <code>date</code> 등으로 바꾸면 모양과 기능이 달라집니다.</li>
+    <li><code>placeholder</code>: 입력칸에 흐리게 보이는 안내 문구.</li>
+    <li><code>&lt;label&gt;</code>: 입력칸의 이름표. <code>for</code> 값과 input의 <code>id</code>를 같게 하면, 글자를 눌러도 입력칸이 선택됩니다.</li>
+    <li><code>&lt;button&gt;</code>: 버튼.</li>
+  </ul>
+  <div class="demo" data-height="230" data-hint="'이름' 글자를 클릭해보세요. 입력칸이 선택됩니다. type을 date로 바꿔보세요.">
+<textarea data-lang="html"><label for="name">이름</label>
+<input type="text" id="name" placeholder="홍길동">
+<br><br>
+<label for="pw">비밀번호</label>
+<input type="password" id="pw">
+<br><br>
+<label><input type="checkbox"> 회칙에 동의합니다</label>
+<br><br>
+<button>지원하기</button></textarea>
+  </div>
+
+  <div class="quiz">
+    <h4>✅ 확인 문제</h4>
+    <details><summary>Q1. 화면에 실제로 보이는 내용은 &lt;head&gt;와 &lt;body&gt; 중 어디에 써야 할까요?</summary><span class="ans">&lt;body&gt;</span> — head에는 제목(탭 이름), 글자 인코딩 같은 설정만 들어갑니다.</details>
+    <details><summary>Q2. 이미지가 안 뜰 때 대신 보이는 글을 정하는 속성은?</summary><span class="ans">alt</span> — <code>&lt;img src="..." alt="설명"&gt;</code></details>
+    <details><summary>Q3. 다음 코드의 잘못된 점은? <code>&lt;p&gt;안녕 &lt;strong&gt;반가워&lt;/p&gt;&lt;/strong&gt;</code></summary><span class="ans">닫는 순서가 틀렸습니다.</span> 나중에 연 strong을 먼저 닫아야 해요: <code>&lt;p&gt;안녕 &lt;strong&gt;반가워&lt;/strong&gt;&lt;/p&gt;</code></details>
+    <details><summary>Q4. 번호가 붙는 목록을 만드는 태그는 ul과 ol 중 무엇일까요?</summary><span class="ans">ol</span> (ordered list). ul은 점 목록입니다.</details>
+  </div>
+  <div class="tip"><b>🧩 1장 미니 과제</b>내 컴퓨터에 <code>index.html</code>을 만들고 "자기소개 페이지"를 만들어보세요. 조건: 제목(h1), 사진 1장, 좋아하는 것 목록(ul), 내 깃허브나 SNS 링크 1개.</div>
+
+  <label class="done-check"><input type="checkbox" data-done="html"> 1장 HTML 완료!</label>
+</section>
+
+<!-- =============================== 2. CSS =============================== -->
+<section class="part" id="css" data-part="css">
+  <h2><span class="chip css tag">CSS</span>2. CSS — 꾸미기</h2>
+  <p class="lead">CSS(Cascading Style Sheets)는 HTML 요소의 색, 크기, 위치를 정하는 언어입니다.</p>
+
+  <h3 id="css-basic"><span class="num">2-1</span>CSS 문법과 HTML에 연결하는 방법</h3>
+  <p>CSS는 <b>"누구를"</b> + <b>"어떻게"</b> 꾸밀지 쓰는 규칙의 모음입니다.</p>
+<pre class="code"><span class="k">h1</span> {                <span class="c">← 선택자: 누구를? (모든 h1을)</span>
+  <span class="p">color</span>: <span class="s">red</span>;        <span class="c">← 속성: 값;  (글자색을 빨강으로)</span>
+  <span class="p">font-size</span>: <span class="s">40px</span>;   <span class="c">← 세미콜론(;)으로 하나씩 끝냄</span>
+}                   <span class="c">← 중괄호로 묶음</span></pre>
+  <p>HTML에 CSS를 적용하는 방법은 세 가지인데, <b>3번(별도 파일)</b>을 쓰는 게 정석입니다.</p>
+<pre class="code"><span class="c">&lt;!-- 1. 태그에 직접 (inline) : 간단하지만 관리가 어려움 --&gt;</span>
+<span class="k">&lt;h1</span> <span class="p">style</span>=<span class="s">"color: red;"</span><span class="k">&gt;</span>제목<span class="k">&lt;/h1&gt;</span>
+
+<span class="c">&lt;!-- 2. head 안에 style 태그 --&gt;</span>
+<span class="k">&lt;style&gt;</span>
+  h1 { color: red; }
+<span class="k">&lt;/style&gt;</span>
+
+<span class="c">&lt;!-- 3. 별도 파일 style.css를 만들고 head 안에서 연결 (권장) --&gt;</span>
+<span class="k">&lt;link</span> <span class="p">rel</span>=<span class="s">"stylesheet"</span> <span class="p">href</span>=<span class="s">"style.css"</span><span class="k">&gt;</span></pre>
+  <div class="note"><b>이 페이지의 예제에서는</b>CSS 탭에 쓴 내용이 3번처럼 자동으로 연결됩니다.</div>
+
+  <h3 id="css-selector"><span class="num">2-2</span>선택자: 누구를 꾸밀지 고르기</h3>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>선택자</th><th>CSS에서</th><th>HTML에서</th><th>뜻</th></tr>
+    <tr><td>태그</td><td><code>p { }</code></td><td><code>&lt;p&gt;</code></td><td>모든 p 태그</td></tr>
+    <tr><td>클래스</td><td><code>.card { }</code></td><td><code>&lt;div class="card"&gt;</code></td><td>class가 card인 것 전부 (점 . 으로 시작)</td></tr>
+    <tr><td>아이디</td><td><code>#logo { }</code></td><td><code>&lt;div id="logo"&gt;</code></td><td>id가 logo인 딱 하나 (샵 # 으로 시작)</td></tr>
+    <tr><td>자손</td><td><code>nav a { }</code></td><td></td><td>nav <b>안에 있는</b> a만</td></tr>
+    <tr><td>여러 개</td><td><code>h1, h2 { }</code></td><td></td><td>h1과 h2 둘 다</td></tr>
+  </table></div>
+  <div class="warn"><b>class vs id</b><b>class</b>는 여러 요소에 같은 이름을 붙일 수 있고, 한 요소에 여러 개(<code>class="card big"</code>)도 붙일 수 있습니다. <b>id</b>는 페이지에서 딱 하나만 존재해야 합니다. 꾸밀 때는 주로 <b>class</b>를 쓰세요.</div>
+  <div class="demo" data-height="230" data-hint="세 번째 p에도 class=&quot;highlight&quot;를 붙여보세요. 그리고 CSS에서 .highlight의 색을 바꿔보세요.">
+<textarea data-lang="html"><h2 id="title">선택자 연습</h2>
+<p>평범한 문단</p>
+<p class="highlight">하이라이트 문단</p>
+<p>또 평범한 문단</p>
+<div class="box">
+  <p>box 안에 있는 문단</p>
+</div></textarea>
+<textarea data-lang="css">/* 모든 p */
+p {
+  color: gray;
+}
+
+/* class가 highlight인 것 */
+.highlight {
+  color: crimson;
+  font-weight: bold;
+}
+
+/* id가 title인 것 */
+#title {
+  color: royalblue;
+}
+
+/* .box 안에 있는 p만 */
+.box p {
+  background: lightyellow;
+}</textarea>
+  </div>
+  <div class="tip"><b>규칙이 겹치면?</b>위 예제에서 "하이라이트 문단"은 <code>p</code>(회색)와 <code>.highlight</code>(빨강) 규칙을 둘 다 받는데 빨강이 됩니다. 대략 <b>id &gt; class &gt; 태그</b> 순으로 더 구체적인 선택자가 이기고, 같은 수준이면 <b>나중에 쓴 것</b>이 이깁니다.</div>
+
+  <h3 id="css-text"><span class="num">2-3</span>색 · 글자 · 단위</h3>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>속성</th><th>예시</th><th>설명</th></tr>
+    <tr><td><code>color</code></td><td><code>color: tomato;</code></td><td>글자색</td></tr>
+    <tr><td><code>background-color</code></td><td><code>background-color: #f0f0f0;</code></td><td>배경색</td></tr>
+    <tr><td><code>font-size</code></td><td><code>font-size: 20px;</code></td><td>글자 크기</td></tr>
+    <tr><td><code>font-weight</code></td><td><code>font-weight: bold;</code></td><td>굵기 (normal, bold, 100~900)</td></tr>
+    <tr><td><code>text-align</code></td><td><code>text-align: center;</code></td><td>정렬 (left, center, right)</td></tr>
+    <tr><td><code>line-height</code></td><td><code>line-height: 1.6;</code></td><td>줄 간격 (글자 크기의 1.6배)</td></tr>
+    <tr><td><code>width</code> / <code>height</code></td><td><code>width: 50%;</code></td><td>너비 / 높이</td></tr>
+  </table></div>
+  <p><b>색을 쓰는 방법</b>: 이름(<code>red</code>), 16진수 코드(<code>#ff0000</code>), RGB(<code>rgb(255, 0, 0)</code>) 모두 같은 빨강입니다. VS Code에서 색 코드 옆 작은 네모를 누르면 색을 고를 수 있어요.</p>
+  <p><b>단위</b>: <code>px</code>는 고정 크기, <code>%</code>는 부모 상자 대비 비율, <code>rem</code>은 기본 글자 크기(보통 16px)의 배수입니다. 처음엔 <code>px</code>와 <code>%</code>만 알아도 충분합니다.</p>
+  <div class="demo" data-height="200" data-hint="#2b59c3을 다른 색 코드로, font-size를 더 크게 바꿔보세요.">
+<textarea data-lang="html"><div class="banner">
+  <h1>COM's 웹 스터디</h1>
+  <p>매주 수요일 저녁 7시, 복지관 403호</p>
+</div></textarea>
+<textarea data-lang="css">.banner {
+  background-color: #2b59c3;
+  color: white;
+  text-align: center;
+  width: 80%;
+}
+.banner h1 {
+  font-size: 32px;
+}
+.banner p {
+  font-size: 15px;
+  color: rgb(220, 230, 255);
+}</textarea>
+  </div>
+
+  <h3 id="css-box"><span class="num">2-4</span>박스 모델: 모든 요소는 상자다</h3>
+  <p>CSS에서 <b>가장 중요한 개념</b>입니다. 화면의 모든 요소는 아래처럼 네 겹의 상자로 이루어져 있습니다.</p>
+  <div class="boxmodel">
+    <div class="bm bm-margin">margin (바깥 여백: 다른 상자와의 거리)
+      <div class="bm bm-border">border (테두리)
+        <div class="bm bm-padding">padding (안쪽 여백: 테두리와 내용 사이)
+          <div class="bm-content">content (내용)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+<pre class="code"><span class="k">.card</span> {
+  <span class="p">padding</span>: <span class="s">20px</span>;              <span class="c">← 네 방향 모두 20px</span>
+  <span class="p">padding</span>: <span class="s">10px 20px</span>;         <span class="c">← 위아래 10px, 좌우 20px</span>
+  <span class="p">margin-top</span>: <span class="s">30px</span>;           <span class="c">← 한 방향만 (top, right, bottom, left)</span>
+  <span class="p">border</span>: <span class="s">2px solid black</span>;   <span class="c">← 두께 · 모양(solid 실선, dashed 점선) · 색</span>
+  <span class="p">border-radius</span>: <span class="s">12px</span>;        <span class="c">← 모서리를 둥글게</span>
+}</pre>
+  <div class="demo" data-height="280" data-hint="padding을 40px로, margin을 0으로 바꿔서 각각 어떤 공간이 변하는지 확인하세요.">
+<textarea data-lang="html"><div class="card">첫 번째 카드</div>
+<div class="card">두 번째 카드</div></textarea>
+<textarea data-lang="css">.card {
+  background: #fff3c4;
+  padding: 20px;
+  margin: 16px;
+  border: 3px solid #e0a800;
+  border-radius: 12px;
+  width: 200px;
+}</textarea>
+  </div>
+  <div class="warn"><b>width가 생각보다 커지는 이유</b>기본 설정에서는 <code>width: 200px</code>가 <b>내용만</b>의 너비라서, padding과 border가 더해져 실제로는 더 넓어집니다. CSS 파일 맨 위에 아래 코드를 넣어두면 width가 테두리까지 포함한 크기가 되어 계산이 쉬워집니다. 거의 모든 사이트가 이렇게 씁니다.
+<pre class="code"><span class="k">*</span> { <span class="p">box-sizing</span>: <span class="s">border-box</span>; }   <span class="c">← * 는 "모든 요소"</span></pre></div>
+
+  <h3 id="css-flex"><span class="num">2-5</span>Flexbox: 상자를 가로로 나란히 배치하기</h3>
+  <p>div는 기본적으로 한 줄씩 세로로 쌓입니다. 메뉴나 카드처럼 <b>가로로 나란히</b> 놓고 싶을 때 <b>Flexbox</b>를 씁니다. 핵심은 <b>부모 상자에</b> <code>display: flex</code>를 주는 것입니다.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>속성 (부모에 씀)</th><th>뜻</th><th>자주 쓰는 값</th></tr>
+    <tr><td><code>display: flex</code></td><td>자식들을 가로로 나열</td><td></td></tr>
+    <tr><td><code>justify-content</code></td><td>가로 방향 정렬</td><td><code>flex-start</code>, <code>center</code>, <code>space-between</code>, <code>space-around</code></td></tr>
+    <tr><td><code>align-items</code></td><td>세로 방향 정렬</td><td><code>stretch</code>, <code>center</code>, <code>flex-start</code></td></tr>
+    <tr><td><code>gap</code></td><td>자식 사이 간격</td><td><code>10px</code></td></tr>
+    <tr><td><code>flex-direction</code></td><td>나열 방향</td><td><code>row</code>(가로), <code>column</code>(세로)</td></tr>
+    <tr><td><code>flex-wrap</code></td><td>넘치면 줄바꿈</td><td><code>wrap</code></td></tr>
+  </table></div>
+  <div class="demo" data-height="230" data-hint="justify-content를 center, space-around로 바꿔보고, flex-direction: column;을 추가해보세요. display: flex;를 지우면 어떻게 될까요?">
+<textarea data-lang="html"><div class="container">
+  <div class="item">1</div>
+  <div class="item">2</div>
+  <div class="item tall">3</div>
+</div></textarea>
+<textarea data-lang="css">.container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  background: #e8eefc;
+  padding: 10px;
+  height: 160px;
+}
+.item {
+  background: #2b59c3;
+  color: white;
+  width: 60px;
+  padding: 16px;
+  text-align: center;
+  border-radius: 8px;
+}
+.tall {
+  height: 120px;
+}</textarea>
+  </div>
+  <p>실제 사이트의 상단 메뉴는 대부분 이렇게 만듭니다.</p>
+  <div class="demo" data-height="120" data-hint="justify-content: space-between;이 로고와 메뉴를 양 끝으로 밀어냅니다. center로 바꿔보세요.">
+<textarea data-lang="html"><header class="top">
+  <div class="logo">COM's</div>
+  <nav class="menu">
+    <a href="#">소개</a>
+    <a href="#">활동</a>
+    <a href="#">지원</a>
+  </nav>
+</header></textarea>
+<textarea data-lang="css">.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #1d1d1f;
+  padding: 14px 20px;
+}
+.logo {
+  color: white;
+  font-weight: bold;
+  font-size: 20px;
+}
+.menu {
+  display: flex;
+  gap: 16px;
+}
+.menu a {
+  color: #ccc;
+  text-decoration: none; /* 링크 밑줄 없애기 */
+}</textarea>
+  </div>
+
+  <h3 id="css-hover"><span class="num">2-6</span>마우스 반응(hover)과 반응형</h3>
+  <p>선택자 뒤에 <code>:hover</code>를 붙이면 <b>마우스를 올렸을 때만</b> 적용되는 스타일이 됩니다. <code>transition</code>을 주면 변화가 부드럽게 일어납니다.</p>
+  <p><b>반응형</b>은 화면 크기에 따라 디자인을 바꾸는 것입니다. <code>@media (max-width: 600px) { }</code> 안에 쓴 규칙은 화면 너비가 600px 이하일 때만 적용됩니다.</p>
+  <div class="demo" data-height="160" data-hint="버튼에 마우스를 올려보세요. 결과 창 오른쪽 아래 모서리를 끌어 너비를 바꾸긴 어려우니, max-width 값을 2000px로 바꿔서 반응형 규칙이 적용된 모습을 확인해보세요.">
+<textarea data-lang="html"><button class="btn">마우스를 올려보세요</button>
+<p class="info">화면이 넓을 때는 파란 글씨, 좁을 때는 빨간 글씨</p></textarea>
+<textarea data-lang="css">.btn {
+  background: #2b59c3;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer; /* 마우스 모양을 손가락으로 */
+  transition: 0.2s;
+}
+.btn:hover {
+  background: #183a8a;
+  transform: scale(1.05); /* 1.05배 커짐 */
+}
+
+.info { color: blue; }
+
+@media (max-width: 600px) {
+  .info { color: red; }
+}</textarea>
+  </div>
+
+  <div class="quiz">
+    <h4>✅ 확인 문제</h4>
+    <details><summary>Q1. <code>&lt;div class="menu"&gt;</code>를 꾸미려면 CSS 선택자를 어떻게 써야 할까요?</summary><span class="ans">.menu</span> — 클래스는 점(.)으로 시작합니다. id였다면 #menu.</details>
+    <details><summary>Q2. 테두리와 내용 사이의 안쪽 여백은 margin과 padding 중 무엇일까요?</summary><span class="ans">padding</span> — margin은 테두리 바깥, 다른 요소와의 거리입니다.</details>
+    <details><summary>Q3. 세 개의 div를 가로로 나란히 놓으려면 어디에 무엇을 써야 할까요?</summary><span class="ans">세 div를 감싸는 부모에 display: flex;</span> — 자식이 아니라 부모에 씁니다.</details>
+    <details><summary>Q4. 다음 CSS가 동작하지 않는 이유는? <code>.title { color: red }  .title { font-size 20px; }</code></summary><span class="ans">font-size 뒤에 콜론(:)이 빠졌습니다.</span> <code>font-size: 20px;</code> (참고로 마지막 속성의 세미콜론은 생략해도 동작하지만, 항상 쓰는 습관이 좋습니다.)</details>
+  </div>
+  <div class="tip"><b>🧩 2장 미니 과제</b>1장에서 만든 자기소개 페이지에 <code>style.css</code>를 연결해서 꾸며보세요. 조건: 상단에 Flexbox 메뉴, 내용은 카드 모양(padding + border-radius), 버튼 또는 링크에 hover 효과.</div>
+
+  <label class="done-check"><input type="checkbox" data-done="css"> 2장 CSS 완료!</label>
+</section>
+
+<!-- =============================== 3. JavaScript =============================== -->
+<section class="part" id="js" data-part="js">
+  <h2><span class="chip js tag">JS</span>3. JavaScript — 움직이게 하기</h2>
+  <p class="lead">JavaScript는 브라우저가 실행하는 프로그래밍 언어입니다. 버튼을 눌렀을 때 무언가 바뀌는 모든 기능이 JS로 만들어집니다.</p>
+
+  <h3 id="js-start"><span class="num">3-1</span>연결 방법과 콘솔</h3>
+  <p>JS 파일 <code>script.js</code>를 만들고, HTML의 <b><code>&lt;/body&gt;</code> 바로 위</b>에서 연결합니다.</p>
+<pre class="code"><span class="k">&lt;body&gt;</span>
+  <span class="k">&lt;h1&gt;</span>내 페이지<span class="k">&lt;/h1&gt;</span>
+  <span class="c">... 내용 ...</span>
+
+  <span class="k">&lt;script</span> <span class="p">src</span>=<span class="s">"script.js"</span><span class="k">&gt;&lt;/script&gt;</span>   <span class="c">← body가 끝나기 직전에!</span>
+<span class="k">&lt;/body&gt;</span></pre>
+  <div class="warn"><b>왜 맨 아래에?</b>브라우저는 HTML을 위에서부터 읽습니다. JS가 위에 있으면, 아직 만들어지지 않은 버튼을 찾으려다 오류가 납니다. (head에 두고 싶다면 <code>&lt;script src="script.js" defer&gt;&lt;/script&gt;</code>처럼 <code>defer</code>를 붙이면 됩니다.)</div>
+  <p><code>console.log(값)</code>은 값을 <b>콘솔</b>에 출력합니다. 화면에는 안 보이고, 브라우저에서 <code>F12</code> → <b>Console</b> 탭에서 볼 수 있어요. 코드가 제대로 도는지 확인할 때 가장 많이 씁니다. 이 페이지 예제에서는 결과 아래 <b>콘솔</b> 칸에 출력됩니다.</p>
+  <div class="demo" data-height="60" data-hint="console.log 줄을 하나 더 추가해서 아무 말이나 출력해보세요.">
+<textarea data-lang="html"><p>화면에는 이 글만 보입니다. 아래 콘솔을 확인하세요.</p></textarea>
+<textarea data-lang="js">console.log("안녕하세요!");
+console.log(1 + 2);
+console.log("1" + "2");  // 글자끼리 +는 이어붙이기
+
+// 슬래시 두 개(//) 뒤는 주석: 실행되지 않는 메모</textarea>
+  </div>
+
+  <h3 id="js-var"><span class="num">3-2</span>변수와 자료형</h3>
+  <p><b>변수</b>는 값에 이름을 붙여 저장해두는 상자입니다.</p>
+<pre class="code"><span class="k">const</span> school = <span class="s">"광운대"</span>;   <span class="c">← const: 한 번 넣으면 바꿀 수 없음 (기본으로 이걸 쓰기)</span>
+<span class="k">let</span> score = <span class="s">80</span>;           <span class="c">← let: 나중에 값을 바꿀 수 있음</span>
+score = <span class="s">95</span>;               <span class="c">← let이라 가능. const였다면 오류</span></pre>
+  <div class="tip"><b>var는?</b>옛날 방식이라 예상치 못한 문제를 일으킬 수 있습니다. <b>기본은 const, 바뀌어야 하는 값만 let</b>으로 쓰세요.</div>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>자료형</th><th>예시</th><th>설명</th></tr>
+    <tr><td>숫자 (number)</td><td><code>42</code>, <code>3.14</code></td><td>사칙연산 <code>+ - * /</code>, 나머지 <code>%</code></td></tr>
+    <tr><td>문자열 (string)</td><td><code>"안녕"</code>, <code>'hi'</code></td><td>따옴표로 감싼 글자</td></tr>
+    <tr><td>불리언 (boolean)</td><td><code>true</code>, <code>false</code></td><td>참/거짓. 조건문에서 사용</td></tr>
+    <tr><td>배열 (array)</td><td><code>["사과", "배"]</code></td><td>여러 값을 순서대로. 0번부터 셈</td></tr>
+    <tr><td>객체 (object)</td><td><code>{ name: "민수", age: 20 }</code></td><td>이름(key)과 값(value)의 묶음</td></tr>
+  </table></div>
+  <div class="demo" data-height="40" data-hint="fruits에 과일을 하나 추가(push)한 뒤 길이를 다시 출력해보세요. member에 grade 속성을 추가해보세요.">
+<textarea data-lang="html"><p>콘솔을 확인하세요 ↓</p></textarea>
+<textarea data-lang="js">const name = "민수";
+let age = 20;
+age = age + 1;
+
+console.log(name, age);
+
+// 백틱(`)으로 감싸면 ${ } 안에 변수를 넣을 수 있음
+console.log(`${name}은(는) ${age}살입니다`);
+
+// 배열: 대괄호, 0번부터 시작
+const fruits = ["사과", "바나나", "포도"];
+console.log(fruits[0]);       // 첫 번째
+console.log(fruits.length);   // 개수
+fruits.push("딸기");          // 끝에 추가
+console.log(fruits);
+
+// 객체: 중괄호, 점(.)으로 꺼냄
+const member = { name: "민수", major: "컴정공", gen: 60 };
+console.log(member.major);
+console.log(member.gen + "기");</textarea>
+  </div>
+
+  <h3 id="js-flow"><span class="num">3-3</span>조건문과 반복문</h3>
+  <p><b>조건문</b>: "만약 ~라면 이걸 하고, 아니면 저걸 해라."</p>
+<pre class="code"><span class="k">if</span> (조건) {
+  <span class="c">// 조건이 true일 때 실행</span>
+} <span class="k">else if</span> (다른 조건) {
+  <span class="c">// 첫 조건은 false, 이 조건은 true일 때</span>
+} <span class="k">else</span> {
+  <span class="c">// 모두 false일 때</span>
+}</pre>
+  <p>비교 연산자: <code>===</code>(같다), <code>!==</code>(다르다), <code>&gt;</code>, <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=</code>. 조건 여러 개를 묶을 땐 <code>&amp;&amp;</code>(그리고), <code>||</code>(또는).</p>
+  <div class="warn"><b>= 와 === 는 다릅니다</b><code>=</code>는 값을 <b>넣는</b> 것(대입), <code>===</code>는 같은지 <b>비교</b>하는 것입니다. <code>==</code>(등호 두 개)도 있지만 <code>"5" == 5</code>가 true가 되는 등 헷갈리므로 항상 <code>===</code>를 쓰세요.</div>
+  <p><b>반복문</b>: 같은 일을 여러 번 할 때 씁니다.</p>
+<pre class="code"><span class="k">for</span> (<span class="k">let</span> i = <span class="s">0</span>; i &lt; <span class="s">5</span>; i++) {   <span class="c">← i를 0부터 시작, 5보다 작은 동안, 1씩 증가</span>
+  console.log(i);                 <span class="c">← 0, 1, 2, 3, 4 출력</span>
+}
+
+<span class="k">for</span> (<span class="k">const</span> fruit <span class="k">of</span> fruits) {     <span class="c">← 배열의 값을 하나씩 꺼냄</span>
+  console.log(fruit);
+}</pre>
+  <div class="demo" data-height="40" data-hint="score를 바꿔서 학점이 바뀌는지 보고, 구구단을 2단 대신 7단으로 바꿔보세요.">
+<textarea data-lang="html"><p>콘솔을 확인하세요 ↓</p></textarea>
+<textarea data-lang="js">const score = 85;
+
+if (score >= 90) {
+  console.log("A 학점");
+} else if (score >= 80) {
+  console.log("B 학점");
+} else {
+  console.log("C 이하");
+}
+
+// 구구단 2단
+for (let i = 1; i <= 9; i++) {
+  console.log(`2 x ${i} = ${2 * i}`);
+}
+
+// 배열 돌기
+const studies = ["웹", "알고리즘", "C언어"];
+for (const s of studies) {
+  console.log(s + " 스터디");
+}</textarea>
+  </div>
+
+  <h3 id="js-func"><span class="num">3-4</span>함수: 코드에 이름 붙이기</h3>
+  <p><b>함수</b>는 여러 줄의 코드를 묶어 이름을 붙인 것입니다. 한 번 만들어두면 이름만 불러서 몇 번이고 다시 쓸 수 있어요. 수학의 f(x)처럼 값을 받아서(매개변수) 결과를 돌려줄(return) 수 있습니다.</p>
+<pre class="code"><span class="k">function</span> 함수이름(매개변수) {   <span class="c">← 만들기 (정의)</span>
+  <span class="c">// 할 일</span>
+  <span class="k">return</span> 결과;               <span class="c">← 결과를 돌려줌 (없어도 됨)</span>
+}
+
+함수이름(값);                   <span class="c">← 부르기 (호출): 이때 실제로 실행됨</span></pre>
+  <div class="demo" data-height="40" data-hint="greet 함수를 다른 이름으로 한 번 더 불러보고, 곱셈을 하는 multiply 함수를 직접 만들어보세요.">
+<textarea data-lang="html"><p>콘솔을 확인하세요 ↓</p></textarea>
+<textarea data-lang="js">function greet(name) {
+  console.log(`${name}님, COM's에 오신 걸 환영합니다!`);
+}
+
+greet("민수");
+greet("지은");
+
+function add(a, b) {
+  return a + b;
+}
+
+const result = add(3, 5);
+console.log(result);          // 8
+console.log(add(10, 20));     // 30
+
+// 화살표 함수: 같은 뜻을 짧게 쓰는 방법
+const square = (x) => x * x;
+console.log(square(4));       // 16</textarea>
+  </div>
+
+  <h3 id="js-dom"><span class="num">3-5</span>DOM 조작: JS로 HTML 바꾸기</h3>
+  <p>여기서부터가 웹 JS의 진짜 핵심입니다. 브라우저는 HTML을 읽어서 <b>DOM</b>(Document Object Model)이라는 나무 구조로 만들어둡니다. JS는 <code>document</code>를 통해 이 나무에서 요소를 <b>찾고</b>, <b>바꿀</b> 수 있습니다.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>코드</th><th>뜻</th></tr>
+    <tr><td><code>document.querySelector("선택자")</code></td><td>CSS 선택자와 똑같은 방식으로 요소를 <b>하나</b> 찾음 (<code>"#id"</code>, <code>".class"</code>, <code>"p"</code>)</td></tr>
+    <tr><td><code>document.querySelectorAll("선택자")</code></td><td>해당하는 요소를 <b>전부</b> 찾음</td></tr>
+    <tr><td><code>요소.textContent = "글자"</code></td><td>안의 글자를 바꿈</td></tr>
+    <tr><td><code>요소.style.color = "red"</code></td><td>스타일을 직접 바꿈 (<code>background-color</code> → <code>backgroundColor</code>처럼 하이픈 대신 대문자)</td></tr>
+    <tr><td><code>요소.classList.add("이름")</code></td><td>class 추가 (<code>remove</code> 제거, <code>toggle</code> 있으면 빼고 없으면 넣기)</td></tr>
+    <tr><td><code>document.createElement("li")</code></td><td>새 요소 만들기</td></tr>
+    <tr><td><code>부모.appendChild(자식)</code></td><td>요소를 부모 안 맨 끝에 붙이기</td></tr>
+    <tr><td><code>요소.remove()</code></td><td>요소 삭제</td></tr>
+  </table></div>
+  <div class="demo" data-height="230" data-hint="JS 탭의 마지막 세 줄(새 항목 만들기)을 복사해서 항목을 하나 더 추가해보세요.">
+<textarea data-lang="html"><h2 id="title">원래 제목</h2>
+<p class="msg">이 문장은 JS가 꾸밉니다</p>
+<ul id="list">
+  <li>원래 있던 항목</li>
+</ul></textarea>
+<textarea data-lang="css">.big {
+  font-size: 24px;
+  font-weight: bold;
+  background: lightyellow;
+}</textarea>
+<textarea data-lang="js">// 1. 찾기
+const title = document.querySelector("#title");
+const msg = document.querySelector(".msg");
+const list = document.querySelector("#list");
+
+// 2. 글자 바꾸기
+title.textContent = "JS가 바꾼 제목!";
+
+// 3. 스타일 바꾸기
+title.style.color = "tomato";
+
+// 4. class 붙이기 (CSS 탭의 .big이 적용됨)
+msg.classList.add("big");
+
+// 5. 새 요소 만들어서 붙이기
+const newItem = document.createElement("li");
+newItem.textContent = "JS가 추가한 항목";
+list.appendChild(newItem);</textarea>
+  </div>
+  <div class="tip"><b>스타일은 class로 바꾸는 게 좋아요</b><code>style.color</code>로 하나하나 바꾸는 것보다, CSS에 미리 class를 만들어두고 JS에서는 <code>classList</code>로 붙였다 뗐다 하는 쪽이 관리하기 쉽습니다. 디자인은 CSS, 동작은 JS로 역할을 나누는 거예요.</div>
+
+  <h3 id="js-event"><span class="num">3-6</span>이벤트: 클릭하면 반응하게 만들기</h3>
+  <p>지금까지의 JS는 페이지가 열리자마자 한 번 실행되고 끝났습니다. <b>이벤트</b>를 쓰면 "사용자가 ~하면 이 함수를 실행해라"라고 예약할 수 있습니다.</p>
+<pre class="code">요소.<span class="p">addEventListener</span>(<span class="s">"click"</span>, <span class="k">function</span> () {
+  <span class="c">// 요소를 클릭할 때마다 여기가 실행됨</span>
+});</pre>
+  <p>자주 쓰는 이벤트: <code>"click"</code>(클릭), <code>"input"</code>(입력칸 내용이 바뀔 때), <code>"keydown"</code>(키보드 누를 때), <code>"submit"</code>(폼 제출), <code>"mouseenter"</code>(마우스 올릴 때).</p>
+  <div class="demo" data-height="120" data-hint="'-1' 버튼을 HTML에 추가하고, 누르면 숫자가 줄어들게 JS를 작성해보세요.">
+<textarea data-lang="html"><p>클릭 수: <span id="count">0</span></p>
+<button id="plus">+1</button>
+<button id="reset">초기화</button></textarea>
+<textarea data-lang="css">#count { font-size: 28px; font-weight: bold; color: #2b59c3; }
+button { font-size: 16px; padding: 6px 14px; }</textarea>
+<textarea data-lang="js">const countEl = document.querySelector("#count");
+const plusBtn = document.querySelector("#plus");
+const resetBtn = document.querySelector("#reset");
+
+let count = 0;   // 바뀌는 값이니까 let
+
+plusBtn.addEventListener("click", function () {
+  count = count + 1;
+  countEl.textContent = count;
+});
+
+resetBtn.addEventListener("click", function () {
+  count = 0;
+  countEl.textContent = count;
+});</textarea>
+  </div>
+  <p>입력칸에 적은 값은 <code>입력칸.value</code>로 꺼냅니다.</p>
+  <div class="demo" data-height="140" data-hint="이름을 입력하고 버튼을 눌러보세요. 아무것도 안 쓰고 누르면 어떻게 되나요? if문으로 처리되어 있어요.">
+<textarea data-lang="html"><input id="name-input" type="text" placeholder="이름을 입력하세요">
+<button id="hello-btn">인사하기</button>
+<p id="output"></p></textarea>
+<textarea data-lang="js">const input = document.querySelector("#name-input");
+const btn = document.querySelector("#hello-btn");
+const output = document.querySelector("#output");
+
+btn.addEventListener("click", function () {
+  const name = input.value;   // 입력칸의 값 꺼내기
+
+  if (name === "") {
+    output.textContent = "이름을 먼저 입력해주세요!";
+  } else {
+    output.textContent = `${name}님, 반가워요 👋`;
+  }
+});</textarea>
+  </div>
+
+  <div class="quiz">
+    <h4>✅ 확인 문제</h4>
+    <details><summary>Q1. 나중에 값을 바꿀 변수는 const와 let 중 무엇으로 만들어야 할까요?</summary><span class="ans">let</span> — const로 만든 변수에 다시 값을 넣으면 오류가 납니다.</details>
+    <details><summary>Q2. <code>const arr = ["a", "b", "c"];</code>에서 "b"를 꺼내는 코드는?</summary><span class="ans">arr[1]</span> — 배열은 0번부터 셉니다.</details>
+    <details><summary>Q3. id가 <code>submit</code>인 버튼을 JS에서 찾는 코드는?</summary><span class="ans">document.querySelector("#submit")</span> — CSS 선택자처럼 #을 붙입니다.</details>
+    <details><summary>Q4. 버튼을 눌러도 아무 반응이 없고, 콘솔에 <code>Cannot read properties of null</code>이라는 오류가 뜹니다. 가장 흔한 원인 두 가지는?</summary><span class="ans">① querySelector의 선택자가 틀려서 요소를 못 찾음 (# 이나 . 빠뜨림, 오타) ② script 태그가 HTML 요소보다 위에 있어서 요소가 만들어지기 전에 실행됨.</span> null은 "찾은 게 없다"는 뜻입니다.</details>
+  </div>
+
+  <label class="done-check"><input type="checkbox" data-done="js"> 3장 JavaScript 완료!</label>
+</section>
+
+<!-- =============================== 4. 실습 =============================== -->
+<section class="part" id="project" data-part="project">
+  <h2>4. 종합 실습: 할 일 목록 만들기</h2>
+  <p class="lead">지금까지 배운 HTML · CSS · JS를 모두 써서 실제로 동작하는 작은 앱을 만듭니다.</p>
+
+  <h3>만들 것</h3>
+  <ul>
+    <li>입력칸에 할 일을 쓰고 <b>추가</b>를 누르면 목록에 생긴다.</li>
+    <li>할 일 글자를 클릭하면 <b>완료 표시</b>(취소선)가 됐다 풀렸다 한다.</li>
+    <li><b>삭제</b> 버튼을 누르면 사라진다.</li>
+  </ul>
+
+  <h3>단계별 생각하기</h3>
+  <ol>
+    <li><b>HTML</b>: 제목, 입력칸, 추가 버튼, 그리고 할 일이 들어갈 빈 목록 <code>&lt;ul&gt;</code>을 만든다. 목록 항목은 JS가 만들 거라 비워둔다.</li>
+    <li><b>CSS</b>: 가운데 카드 모양으로, 입력칸과 버튼은 Flexbox로 나란히. 완료된 항목에 붙일 <code>.done</code> 클래스(취소선)를 미리 만들어둔다.</li>
+    <li><b>JS</b>: 추가 버튼에 click 이벤트 → 입력값을 꺼내서 → <code>li</code>를 만들고 → 목록에 붙인다. 만들 때 글자 클릭(완료)과 삭제 버튼 이벤트도 같이 달아준다.</li>
+  </ol>
+
+  <div class="demo" data-height="380" data-hint="CSS 탭 내용을 전부 지워보세요. 꾸밈 없는 HTML 뼈대만 남은 모습을 볼 수 있습니다. (되돌리기로 복구)">
+<textarea data-lang="html"><div class="app">
+  <h1>📝 할 일 목록</h1>
+
+  <div class="input-row">
+    <input id="todo-input" type="text" placeholder="할 일을 입력하세요">
+    <button id="add-btn">추가</button>
+  </div>
+
+  <ul id="todo-list"></ul>
+</div></textarea>
+<textarea data-lang="css">* { box-sizing: border-box; }
+
+body {
+  background: #f0f3fa;
+  font-family: sans-serif;
+}
+
+.app {
+  max-width: 400px;
+  margin: 20px auto;   /* auto: 좌우 가운데 정렬 */
+  background: white;
+  padding: 24px;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 24px;
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+}
+
+#todo-input {
+  flex: 1;             /* 남는 공간을 전부 차지 */
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 15px;
+}
+
+#add-btn {
+  padding: 10px 16px;
+  background: #2b59c3;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#todo-list {
+  list-style: none;    /* 점 없애기 */
+  padding: 0;
+}
+
+#todo-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 4px;
+  border-bottom: 1px solid #eee;
+}
+
+#todo-list li span {
+  cursor: pointer;
+}
+
+/* 완료된 항목: JS가 li에 done 클래스를 붙이면 적용 */
+#todo-list li.done span {
+  text-decoration: line-through;
+  color: #aaa;
+}
+
+.del {
+  background: none;
+  border: none;
+  color: #d33;
+  cursor: pointer;
+}</textarea>
+<textarea data-lang="js">// 1. 필요한 요소 찾아두기
+const input = document.querySelector("#todo-input");
+const addBtn = document.querySelector("#add-btn");
+const list = document.querySelector("#todo-list");
+
+// 2. 할 일을 추가하는 함수
+function addTodo() {
+  const text = input.value.trim();  // trim(): 앞뒤 공백 제거
+
+  // 빈 칸이면 추가하지 않고 함수 종료
+  if (text === "") {
+    alert("할 일을 입력하세요!");
+    return;
+  }
+
+  // li 만들기
+  const li = document.createElement("li");
+
+  // 할 일 글자 (클릭하면 완료 토글)
+  const span = document.createElement("span");
+  span.textContent = text;
+  span.addEventListener("click", function () {
+    li.classList.toggle("done");
+  });
+
+  // 삭제 버튼
+  const delBtn = document.createElement("button");
+  delBtn.textContent = "삭제";
+  delBtn.className = "del";
+  delBtn.addEventListener("click", function () {
+    li.remove();
+  });
+
+  // 조립해서 목록에 붙이기
+  li.appendChild(span);
+  li.appendChild(delBtn);
+  list.appendChild(li);
+
+  // 입력칸 비우고 다시 커서 두기
+  input.value = "";
+  input.focus();
+}
+
+// 3. 추가 버튼을 누르면 addTodo 실행
+addBtn.addEventListener("click", addTodo);</textarea>
+  </div>
+
+  <h3>코드에서 짚고 넘어갈 점</h3>
+  <ul>
+    <li><code>addBtn.addEventListener("click", addTodo)</code>에서 <code>addTodo</code> 뒤에 괄호 <code>()</code>가 <b>없습니다</b>. 괄호를 붙이면 "지금 바로 실행"이 되어버리고, 빼면 "클릭할 때 실행할 함수는 이거야"라고 <b>넘겨주는</b> 것이 됩니다.</li>
+    <li><code>return;</code>은 함수를 그 자리에서 끝냅니다. 빈 칸일 때 아래 코드가 실행되지 않게 막는 역할이에요.</li>
+    <li>완료 표시는 JS가 직접 취소선을 그리지 않고, <code>done</code> 클래스만 붙였다 뗍니다. 모양은 CSS가 담당합니다.</li>
+  </ul>
+
+  <h3>🚀 도전 과제</h3>
+  <p>위 예제 상자에서 직접 코드를 고쳐서 기능을 추가해보세요. 막히면 힌트를 열어보세요.</p>
+  <details><summary>도전 1. Enter 키를 눌러도 추가되게 하기</summary>입력칸에 <code>keydown</code> 이벤트를 달고, 눌린 키가 Enter인지 확인합니다.
+<pre class="code">input.addEventListener(<span class="s">"keydown"</span>, <span class="k">function</span> (event) {
+  <span class="k">if</span> (event.key === <span class="s">"Enter"</span>) {
+    addTodo();
+  }
+});</pre></details>
+  <details><summary>도전 2. "남은 할 일: N개" 표시하기</summary>HTML에 <code>&lt;p id="remain"&gt;&lt;/p&gt;</code>를 추가하고, 개수를 세서 표시하는 함수를 만든 뒤 추가·삭제·완료할 때마다 부릅니다.
+<pre class="code"><span class="k">function</span> updateRemain() {
+  <span class="k">const</span> all = document.querySelectorAll(<span class="s">"#todo-list li"</span>).length;
+  <span class="k">const</span> done = document.querySelectorAll(<span class="s">"#todo-list li.done"</span>).length;
+  document.querySelector(<span class="s">"#remain"</span>).textContent = <span class="s">`남은 할 일: ${all - done}개`</span>;
+}</pre></details>
+  <details><summary>도전 3. 새로고침해도 목록이 남아있게 하기 (어려움)</summary>브라우저의 <code>localStorage</code>에 저장합니다. 할 일 목록을 배열로 관리하고, 바뀔 때마다 <code>localStorage.setItem("todos", JSON.stringify(배열))</code>로 저장, 페이지가 열릴 때 <code>JSON.parse(localStorage.getItem("todos"))</code>로 불러와서 다시 그립니다. "localStorage 사용법"으로 검색해보세요. (이 페이지의 예제 상자 안에서는 보안상 동작하지 않으니 내 컴퓨터에서 해보세요.)</details>
+
+  <h3>✍️ 자유 연습장</h3>
+  <p>빈 상자입니다. 배운 걸 마음대로 써보세요.</p>
+  <div class="demo" data-height="220">
+<textarea data-lang="html"></textarea>
+<textarea data-lang="css"></textarea>
+<textarea data-lang="js"></textarea>
+  </div>
+
+  <label class="done-check"><input type="checkbox" data-done="project"> 4장 실습 완료!</label>
+</section>
+
+<!-- =============================== 5. 다음 단계 =============================== -->
+<section class="part" id="next">
+  <h2>5. 막힐 때 · 다음 단계</h2>
+
+  <h3>자주 하는 실수 체크리스트</h3>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>증상</th><th>확인할 것</th></tr>
+    <tr><td>한글이 깨져요</td><td><code>&lt;meta charset="UTF-8"&gt;</code>가 head에 있는지</td></tr>
+    <tr><td>CSS가 적용이 안 돼요</td><td><code>&lt;link&gt;</code>의 파일 이름/경로 오타, 선택자의 <code>.</code> <code>#</code> 누락, 콜론·세미콜론·중괄호 짝</td></tr>
+    <tr><td>이미지가 안 떠요</td><td>파일 이름 대소문자, 확장자(.jpg / .png), 폴더 경로</td></tr>
+    <tr><td>JS가 아무 반응이 없어요</td><td><code>F12</code> → Console에 빨간 오류가 있는지. <code>&lt;script&gt;</code>가 body 맨 아래에 있는지</td></tr>
+    <tr><td>수정했는데 그대로예요</td><td>저장(<code>Ctrl+S</code>)했는지, 새로고침했는지 (Live Server는 자동)</td></tr>
+  </table></div>
+
+  <h3>개발자 도구(F12) 활용</h3>
+  <ul>
+    <li><b>Elements</b> 탭: 아무 웹사이트나 열고 <code>F12</code> → 왼쪽 위 화살표 아이콘 → 요소를 클릭하면 그 부분의 HTML과 CSS가 보입니다. 오른쪽 스타일 값을 직접 고쳐볼 수도 있어요. (새로고침하면 원래대로 돌아가니 안심하세요.) 마음에 드는 사이트가 어떻게 만들어졌는지 훔쳐보는 게 최고의 공부입니다.</li>
+    <li><b>Console</b> 탭: JS 오류가 빨간 글씨로 나오고, 몇 번째 줄인지 알려줍니다. 오류 메시지를 그대로 검색하면 대부분 답이 나와요.</li>
+    <li>왼쪽 위 휴대폰 모양 아이콘: 모바일 화면에서 어떻게 보이는지 확인.</li>
+  </ul>
+
+  <h3>참고 자료</h3>
+  <ul>
+    <li><a href="https://developer.mozilla.org/ko/docs/Learn" target="_blank">MDN 웹 문서</a> — 웹 개발의 공식 사전. "MDN + 궁금한 것"으로 검색하는 습관을 들이세요.</li>
+    <li><a href="https://flexboxfroggy.com/#ko" target="_blank">Flexbox Froggy</a> — 개구리를 옮기며 Flexbox를 익히는 게임.</li>
+    <li><a href="https://ko.javascript.info/" target="_blank">모던 JavaScript 튜토리얼</a> — JS를 더 깊게 공부할 때.</li>
+  </ul>
+
+  <h3>다음에 배우면 좋은 것</h3>
+  <ol>
+    <li><b>Git &amp; GitHub</b> — 코드 저장과 협업. <b>GitHub Pages</b>로 만든 페이지를 무료로 인터넷에 올릴 수 있습니다.</li>
+    <li><b>CSS Grid · 반응형 디자인</b> — 더 복잡한 레이아웃.</li>
+    <li><b>fetch / API</b> — 날씨, 영화 정보 같은 외부 데이터를 가져와 화면에 보여주기.</li>
+    <li><b>React 등 프레임워크</b> — 큰 웹 서비스를 효율적으로 만드는 도구. 기초 JS가 탄탄해진 뒤에 시작하세요.</li>
+  </ol>
+
+  <footer>COM's 웹 기초 스터디 · 광운대학교 중앙 컴퓨터 학술동아리 COM's</footer>
+</section>
+
+</div>
