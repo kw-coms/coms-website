@@ -2246,10 +2246,9 @@ test('top navigation groups activity log and monthly calendar under Activity', a
   // The menu has two columns (기록·일정 / 참여 도구); each row still fills its own column, so the
   // whole row is the hit target, and the two groups sit side by side rather than stacked.
   const activityLogButton = activityMenu.getByRole('button', { name: /Activity log/ })
-  const activityLogColumn = activityMenu.getByRole('list').filter({ has: activityLogButton })
-  const activityLogColumnBox = await activityLogColumn.boundingBox()
+  const activityLogColumnWidth = await activityLogButton.evaluate((el) => el.closest('ul').getBoundingClientRect().width)
   const activityLogBox = await activityLogButton.boundingBox()
-  expect(activityLogBox.width).toBeGreaterThanOrEqual((activityLogColumnBox.width || 0) - 2)
+  expect(activityLogBox.width).toBeGreaterThanOrEqual(activityLogColumnWidth - 2)
   const gatherBox = await activityMenu.getByRole('button', { name: /Gather/ }).boundingBox()
   expect(gatherBox.x).toBeGreaterThanOrEqual(activityLogBox.x + activityLogBox.width - 2)
   await activityMenu.getByRole('button', { name: /Activity log/ }).click()
