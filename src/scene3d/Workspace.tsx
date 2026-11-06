@@ -6,6 +6,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { PARTS } from '../ui/core';
 import { scheduleFrame } from './cameraFrame';
+import { QualityRig } from './Quality';
 import { onSimFrame } from '../ui/simHost';
 import { getState, subscribe, useStore } from '../ui/store';
 import { Interaction } from './Interaction';
@@ -81,7 +82,7 @@ function Desk() {
   );
 }
 
-function Env() {
+function Env({ strength }: { strength: number }) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   useEffect(() => {
@@ -89,13 +90,13 @@ function Env() {
     const env = new RoomEnvironment();
     const rt = pm.fromScene(env, 0.04);
     scene.environment = rt.texture;
-    scene.environmentIntensity = 0.55;
+    scene.environmentIntensity = strength;
     return () => {
       scene.environment = null;
       rt.dispose();
       pm.dispose();
     };
-  }, [gl, scene]);
+  }, [gl, scene, strength]);
   return null;
 }
 
@@ -150,7 +151,7 @@ function CameraRig() {
 }
 
 /** Key light with a shadow frustum fitted to the bench, plus a soft fill from the opposite side. */
-function Lights({ dark }: { dark: boolean }) {
+function Lights({ dark, quality }: { dark: boolean; quality: 'high' | 'medium' | 'low' }) {
   const plist = useStore((s) => s.hist.present.parts);
   const key = useRef<DirectionalLight>(null);
   const { cx, cz, half } = useMemo(() => {
@@ -172,12 +173,12 @@ function Lights({ dark }: { dark: boolean }) {
     l.target.position.set(cx, 0, cz);
     l.target.updateMatrixWorld();
     l.shadow.needsUpdate = true;
-  }, [cx, cz, half]);
+  }, [cx, cz, half, quality]);
   return (
     <>
-      <hemisphereLight args={['#ffffff', dark ? '#4b5a70' : '#9aa7b8', dark ? 0.55 : 0.8]} />
-      <directionalLight ref={key} position={[cx + 190, 420, cz + 230]} intensity={dark ? 1.9 : 2.3} castShadow shadow-mapSize={[4096, 4096]} shadow-bias={-0.0003} shadow-normalBias={0.35} shadow-radius={6} shadow-blurSamples={16} />
-      <directionalLight position={[cx - 220, 260, cz - 140]} intensity={dark ? 0.35 : 0.6} />
+      <hemisphereLight args={['#ffffff', dark ? '#4b5a70' : '#9aa7b8', quality === 'low' ? (dark ? 1.1 : 1.5) : dark ? 0.55 : 0.8]} />
+      <directionalLight key={quality} ref={key} position={[cx + 190, 420, cz + 230]} intensity={dark ? 1.9 : 2.3} castShadow={quality !== 'low'} shadow-mapSize={quality === 'high' ? [4096, 4096] : [2048, 2048]} shadow-bias={-0.0003} shadow-normalBias={0.35} shadow-radius={quality === 'high' ? 6 : 3} shadow-blurSamples={16} />
+      {quality !== 'low' && <directionalLight position={[cx - 220, 260, cz - 140]} intensity={dark ? 0.35 : 0.6} />}
     </>
   );
 }
@@ -190,6 +191,7 @@ function Content() {
   const hover = useStore((s) => s.hover);
   const analysis = useStore((s) => s.analysis);
   const theme = useStore((s) => s.theme);
+  const quality = useStore((s) => s.quality);
   const hidden = draft?.hideIds ?? (draft?.hideId ? [draft.hideId] : []);
   const shownParts = hidden.length ? plist.filter((p) => !hidden.includes(p.id)) : plist;
   const ptsMemo = useMemo(() => {
@@ -205,8 +207,9 @@ function Content() {
     <>
       <color attach="background" args={[bg]} />
       <fog attach="fog" args={[bg, 900, 2600]} />
-      <Lights dark={theme === 'dark'} />
-      <Env />
+      <Lights dark={theme === 'dark'} quality={quality} />
+      {quality !== 'low' && <Env strength={quality === 'high' ? 0.55 : 0.4} />}
+      <QualityRig />
       <Desk />
       {shownParts.map((p) => <PartView key={p.id} part={p} />)}
       {draft && <PartView key="__draft" part={draft.part} />}
@@ -238,6 +241,8 @@ function Marquee() {
 
 export function Workspace() {
   const wrap = useRef<HTMLDivElement>(null);
+  const quality = useStore((s) => s.quality);
+  const aa = useRef(getState().quality !== 'low').current; // antialias is fixed at context creation
   const onDragOver = (e: DragEvent) => {
     if (!e.dataTransfer.types.includes('application/x-part-kind')) return;
     e.preventDefault();
@@ -259,7 +264,7 @@ export function Workspace() {
   return (
     <div ref={wrap} className="workspace" tabIndex={-1} onDragOver={onDragOver} onDrop={onDrop} onDragLeave={() => getState().draft && set({ draft: null })}>
       <Marquee />
-      <Canvas frameloop="demand" shadows="soft" dpr={[1, 2]} gl={{ antialias: true, preserveDrawingBuffer: true }} aria-label="3D 작업대">
+      <Canvas frameloop="demand" shadows={quality === 'low' ? false : quality === 'high' ? 'soft' : true} dpr={quality === 'high' ? [1, 2] : quality === 'medium' ? [1, 1.5] : 0.75} gl={{ antialias: aa, preserveDrawingBuffer: true, powerPreference: 'high-performance' }} aria-label="3D 작업대">
         <Content />
       </Canvas>
     </div>

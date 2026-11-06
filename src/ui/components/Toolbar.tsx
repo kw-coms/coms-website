@@ -5,7 +5,8 @@ import {
 import { EXAMPLES } from '../core';
 import { copyShareLink, exportJson, importJson, loadExample, snapshotPng, toggleTheme } from '../actions';
 import { cancelCompile, pause, reset, run, setSpeed, stop } from '../simHost';
-import { canRedo, canUndo, redo, set, undo, useStore } from '../store';
+import { canRedo, canUndo, redo, set, setQualityMode, undo, useStore } from '../store';
+import type { QualityMode } from '../quality';
 
 const Btn = ({ label, onClick, children, active, disabled, className = '' }: { label: string; onClick: () => void; children: React.ReactNode; active?: boolean; disabled?: boolean; className?: string }) => (
   <button type="button" className={`tb ${active ? 'on' : ''} ${className}`} onClick={onClick} aria-label={label} title={label} aria-pressed={active} disabled={disabled}>
@@ -22,6 +23,8 @@ export function Toolbar() {
   const theme = useStore((s) => s.theme);
   const undoable = useStore(canUndo);
   const redoable = useStore(canRedo);
+  const qmode = useStore((s) => s.qualityMode);
+  const qeff = useStore((s) => s.quality);
   const exOpen = useStore((s) => s.examplesOpen);
   const file = useRef<HTMLInputElement>(null);
   const [more, setMore] = useState(false);
@@ -39,6 +42,15 @@ export function Toolbar() {
         <span className="sr">속도</span>
         <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="시뮬레이션 속도">
           {[0.25, 0.5, 1, 1.5, 2].map((v) => <option key={v} value={v}>×{v}</option>)}
+        </select>
+      </label>
+      <label className="speed quality" title="화질 (느린 컴퓨터에서는 낮춰 보세요)">
+        <span className="tb-more-text">화질</span>
+        <select value={qmode} onChange={(e) => setQualityMode(e.target.value as QualityMode)} aria-label="화질">
+          <option value="auto">화질: 자동{qmode === 'auto' ? ` (${{ high: '높음', medium: '보통', low: '낮음' }[qeff]})` : ''}</option>
+          <option value="high">화질: 높음</option>
+          <option value="medium">화질: 보통</option>
+          <option value="low">화질: 낮음</option>
         </select>
       </label>
       <div className="tb-group" role="group" aria-label="편집">

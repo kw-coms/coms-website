@@ -5,6 +5,7 @@ import type {
 import { EXAMPLES, PARTS, analyze } from './core';
 import { commit, initHistory, redo as redoH, undo as undoH, type History } from './history';
 import { getItem, setItem } from './storage';
+import { detectSoftwareRendering, initialQuality, loadQualityMode, saveQualityMode, type Quality, type QualityMode } from './quality';
 
 export type Selection = { kind: 'part' | 'wire'; id: string } | null;
 export type SnapView = { ok: Vec3[]; bad: Vec3[] };
@@ -60,6 +61,10 @@ export interface State {
   tutorial: boolean;
   examplesOpen: boolean;
   cameraResetTick: number;
+  qualityMode: QualityMode;
+  quality: Quality;
+  /** Message shown once when auto-quality fell back to low (acceleration seems off). */
+  qualityNotice: string | null;
 }
 
 const BLANK_CODE = `void setup() {\n  pinMode(13, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(500);\n  digitalWrite(13, LOW);\n  delay(500);\n}\n`;
@@ -100,6 +105,9 @@ function loadPrefs(): Record<string, unknown> {
   }
 }
 const prefs = loadPrefs();
+const NOTICE_KEY = 'coms-lab:perf-notice';
+const qualityMode = loadQualityMode();
+const softwareHint = qualityMode === 'auto' && detectSoftwareRendering();
 const first = startDoc();
 let state: State = {
   hist: initHistory(first.doc),
@@ -132,6 +140,9 @@ let state: State = {
   tutorial: getItem(TUTORIAL_KEY) !== '1',
   examplesOpen: false,
   cameraResetTick: 0,
+  qualityMode,
+  quality: initialQuality(qualityMode, softwareHint),
+  qualityNotice: qualityMode === 'auto' && softwareHint && getItem(NOTICE_KEY) !== '1' ? '그래픽 가속이 꺼져 있는 것 같아요. 부드럽게 쓰도록 화질을 낮췄어요. 위쪽 ⋯ 메뉴의 화질에서 바꿀 수 있어요.' : null,
 };
 
 const listeners = new Set<() => void>();
@@ -381,4 +392,23 @@ export function liveEnd(start: Doc) {
   const base = { ...state.hist, present: start };
   const hist = commit(base, final);
   set({ hist, analysis: analyze(toScene(final, state.code)) });
+}
+
+// ---------- render quality ----------
+/** User choice (auto/high/medium/low); auto starts from the detection result. */
+export function setQualityMode(mode: QualityMode) {
+  saveQualityMode(mode);
+  set({ qualityMode: mode, quality: initialQuality(mode, mode === 'auto' && detectSoftwareRendering()) });
+}
+/** Runtime step from the frame-time governor (auto mode only). */
+export function stepQuality(dir: 'down' | 'up') {
+  if (state.qualityMode !== 'auto') return;
+  const order: Quality[] = ['low', 'medium', 'high'];
+  const i = order.indexOf(state.quality) + (dir === 'up' ? 1 : -1);
+  if (i < 0 || i > 2) return;
+  set({ quality: order[i]!, ...(dir === 'down' && i === 0 && getItem(NOTICE_KEY) !== '1' ? { qualityNotice: '화면이 느려져서 화질을 낮췄어요. ⋯ 메뉴의 화질에서 바꿀 수 있어요.' } : {}) });
+}
+export function dismissQualityNotice() {
+  setItem(NOTICE_KEY, '1');
+  set({ qualityNotice: null });
 }

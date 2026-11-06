@@ -47,6 +47,20 @@ export const GlowSprite = ({ spriteRef, position, color }: { spriteRef: React.Re
   </sprite>
 );
 
+let blobTex: CanvasTexture | null = null;
+/** Baked soft shadow blob (low quality). */
+export function blobTexture(): CanvasTexture {
+  blobTex ??= makeTexture(128, 128, (c) => {
+    const g = c.createRadialGradient(64, 64, 8, 64, 64, 62);
+    g.addColorStop(0, 'rgba(20,24,30,0.9)');
+    g.addColorStop(0.55, 'rgba(20,24,30,0.45)');
+    g.addColorStop(1, 'rgba(20,24,30,0)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, 128, 128);
+  });
+  return blobTex;
+}
+
 /** Soft additive light pool a lit LED casts on the board/desk under it (no real light per LED). */
 export const GlowPool = ({ poolRef, color }: { poolRef: React.Ref<import('three').Mesh>; color: string }) => (
   <mesh ref={poolRef} position={[0, 0.12, 0]} rotation-x={-Math.PI / 2} visible={false} renderOrder={3}>

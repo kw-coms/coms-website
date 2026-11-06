@@ -66,4 +66,4 @@ async function closeup(kind: PartKind, az = 25, el = 38, fill = 0.8) {
   await nextFrames(2);
 }
 
-(window as unknown as { __lab: unknown }).__lab = { gallery, closeup, viewAngle, frameAll, partsBox, set, EXAMPLES, setSimInput, projectPart, getState, project, litOf, addPart, frame: () => frameRef.current, simState: () => sim.state, camera: () => refs.camera?.position.toArray() };
+(window as unknown as { __lab: unknown }).__lab = { loadScene, gallery, closeup, viewAngle, frameAll, partsBox, set, EXAMPLES, setSimInput, projectPart, getState, project, litOf, addPart, frame: () => frameRef.current, simState: () => sim.state, camera: () => refs.camera?.position.toArray() };

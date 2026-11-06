@@ -12,8 +12,8 @@ const LED_COLORS: Record<string, string> = { red: '#ff2f2f', green: '#22d65a', b
 export function Led({ part }: PartProps) {
   const color = LED_COLORS[String(part.props.color)] ?? LED_COLORS.red!;
   // translucent coloured epoxy: you can see the lead-frame cup and die inside; lit = emissive + halo + light pool
-  const mat = useMemo(() => new MeshPhysicalMaterial({ color, emissive: color, emissiveIntensity: 0, transparent: true, opacity: 0.74, roughness: 0.1, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.2 }), [color]);
-  const die = useMemo(() => new MeshStandardMaterial({ color: '#d8d2c4', emissive: color, emissiveIntensity: 0, metalness: 0.6, roughness: 0.4 }), [color]);
+  const mat = useMemo(() => new MeshPhysicalMaterial({ userData: { dynamic: true }, color, emissive: color, emissiveIntensity: 0, transparent: true, opacity: 0.74, roughness: 0.1, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.2 }), [color]);
+  const die = useMemo(() => new MeshStandardMaterial({ userData: { dynamic: true }, color: '#d8d2c4', emissive: color, emissiveIntensity: 0, metalness: 0.6, roughness: 0.4 }), [color]);
   const glow = useRef<Sprite>(null);
   const pool = useRef<Mesh>(null);
   useFrame(() => {
@@ -81,7 +81,7 @@ export function RgbLed({ part }: PartProps) {
     <group>
       <Legs kind="rgb-led" top={4.2} />
       <mesh position={[0, 4.5, 0]} castShadow><cylinderGeometry args={[3.2, 3.2, 0.8, 24]} /><meshStandardMaterial color="#e8eaec" transparent opacity={0.8} /></mesh>
-      <mesh position={[0, 6.7, 0]} castShadow><cylinderGeometry args={[2.8, 2.8, 4, 24]} /><meshStandardMaterial ref={mat} color="#f1f3f4" emissive="#000" transparent opacity={0.72} roughness={0.15} /></mesh>
+      <mesh position={[0, 6.7, 0]} castShadow><cylinderGeometry args={[2.8, 2.8, 4, 24]} /><meshStandardMaterial userData={{ dynamic: true }} ref={mat} color="#f1f3f4" emissive="#000" transparent opacity={0.72} roughness={0.15} /></mesh>
       <mesh position={[0, 8.7, 0]} castShadow><sphereGeometry args={[2.8, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2]} /><meshStandardMaterial color="#f1f3f4" transparent opacity={0.72} roughness={0.15} /></mesh>
       {[-1.1, 0, 1.1].map((x, i) => <mesh key={x} position={[x * 0.9, 6.2, 0]}><boxGeometry args={[0.3, 2.2 + (i % 2) * 0.6, 0.8]} /><meshStandardMaterial color="#cfd3d6" metalness={0.85} roughness={0.3} /></mesh>)}
       <GlowSprite spriteRef={glow} position={[0, 7.5, 0]} color="#ffffff" />
@@ -210,7 +210,7 @@ export function Buzzer({ part }: PartProps) {
       <mesh position={[-3.6, 9.25, 2.4]} rotation-x={-Math.PI / 2}><planeGeometry args={[0.3, 1.3]} /><meshBasicMaterial color="#eee" /></mesh>
       <group ref={rings} position={[0, 11, 0]} visible={false}>
         {[0, 1, 2].map((i) => (
-          <mesh key={i} rotation-x={Math.PI / 2}><torusGeometry args={[3, 0.18, 8, 36]} /><meshStandardMaterial color="#6cc0ff" emissive="#6cc0ff" emissiveIntensity={1} transparent opacity={0.5} /></mesh>
+          <mesh key={i} rotation-x={Math.PI / 2}><torusGeometry args={[3, 0.18, 8, 36]} /><meshStandardMaterial userData={{ dynamic: true }} color="#6cc0ff" emissive="#6cc0ff" emissiveIntensity={1} transparent opacity={0.5} /></mesh>
         ))}
       </group>
     </group>

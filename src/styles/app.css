@@ -149,7 +149,9 @@ button { cursor: pointer; }
 .ctx-menu > button:hover { background: var(--surface-2); } .ctx-menu .danger { color: var(--danger); }
 .ctx-menu kbd { margin-left: auto; font: 11px ui-monospace, Menlo, monospace; color: var(--muted); }
 .ctx-label { padding: 6px 10px 0; font-size: 12px; color: var(--muted); } .ctx-sw { margin: 8px 8px 10px; }
-.ann-obs { display: none; }
+.perf-notice { position: fixed; left: 50%; top: 58px; transform: translateX(-50%); z-index: 90; display: flex; gap: 12px; align-items: center; max-width: min(92vw, 560px); padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--accent); box-shadow: var(--shadow); font-size: 13px; }
+.perf-notice button { flex: none; height: 30px; padding: 0 12px; border-radius: 7px; border: 0; background: var(--accent); color: var(--accent-text); font-weight: 600; }
+.speed.quality select { max-width: 150px; }
 
 @media (max-width: 1100px) { .palette:not(.folded):not(.in-sheet) { width: 190px; } .tb-text { display: none; } .sidepanel { --side-w: min(var(--side-w), 46vw); } }
 @media (max-width: 1000px) {

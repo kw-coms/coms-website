@@ -6,7 +6,7 @@ import { ContextMenu, Toast, Tooltip, Tutorial } from './ui/components/Misc';
 import { Palette } from './ui/components/Palette';
 import { Toolbar } from './ui/components/Toolbar';
 import { useShortcuts } from './ui/shortcuts';
-import { useStore } from './ui/store';
+import { dismissQualityNotice, useStore } from './ui/store';
 
 function StageStatus() {
   const wireStart = useStore((s) => s.wireStart);
@@ -29,10 +29,15 @@ export function App() {
   const theme = useStore((s) => s.theme);
   const open = useStore((s) => s.sideOpen);
   const sheet = useStore((s) => s.sheetOpen);
+  const quality = useStore((s) => s.quality);
+  const notice = useStore((s) => s.qualityNotice);
   useShortcuts();
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+  useLayoutEffect(() => {
+    document.documentElement.dataset.perf = quality === 'low' ? 'lite' : 'full';
+  }, [quality]);
   useEffect(() => {
     void loadFromLocationHash();
     const onHash = () => void loadFromLocationHash();
@@ -50,6 +55,12 @@ export function App() {
         </div>
         <SidePanel />
       </main>
+      {notice && (
+        <div className="perf-notice" role="status">
+          <span>{notice}</span>
+          <button type="button" onClick={dismissQualityNotice}>확인</button>
+        </div>
+      )}
       <Tutorial />
       <Tooltip />
       <ContextMenu />

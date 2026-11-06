@@ -59,7 +59,7 @@ export function HcSr04({ part }: PartProps) {
         <group key={x} position={[x, 15, 0.8]}>
           <mesh position={[0, 0, 5.5]} rotation-x={Math.PI / 2} castShadow>
             <cylinderGeometry args={[8.1, 8.1, 11, 28]} />
-            <meshStandardMaterial ref={(m) => { if (m) tx.current[i] = m; }} color="#cfd4d9" metalness={0.85} roughness={0.3} emissive="#6cf" emissiveIntensity={0} />
+            <meshStandardMaterial userData={{ dynamic: true }} ref={(m) => { if (m) tx.current[i] = m; }} color="#cfd4d9" metalness={0.85} roughness={0.3} emissive="#6cf" emissiveIntensity={0} />
           </mesh>
           <mesh position={[0, 0, 11.05]} rotation-x={Math.PI / 2}><circleGeometry args={[6.4, 28]} /><meshStandardMaterial color="#222" /></mesh>
         </group>
@@ -208,7 +208,7 @@ export function SevenSegment({ part }: PartProps) {
   const item = (i: number, w: number, d: number, x: number, z: number) => (
     <mesh key={i} position={[x, 9.06, z]}>
       <boxGeometry args={[w, 0.1, d]} />
-      <meshStandardMaterial ref={(m) => { if (m) mats.current[i] = m; }} color="#3a1210" emissive="#ff2a1a" emissiveIntensity={0} />
+      <meshStandardMaterial userData={{ dynamic: true }} ref={(m) => { if (m) mats.current[i] = m; }} color="#3a1210" emissive="#ff2a1a" emissiveIntensity={0} />
     </mesh>
   );
   return (
@@ -243,7 +243,7 @@ export function NeopixelStrip({ part }: PartProps) {
       {Array.from({ length: n }, (_, i) => (
         <mesh key={i} position={[i * 10, 3.8, -11]} castShadow>
           <boxGeometry args={[5, 1.4, 5]} />
-          <meshStandardMaterial ref={(m) => { if (m) mats.current[i] = m; }} color="#8c8c8c" roughness={0.4} emissive="#000" />
+          <meshStandardMaterial userData={{ dynamic: true }} ref={(m) => { if (m) mats.current[i] = m; }} color="#8c8c8c" roughness={0.4} emissive="#000" />
         </mesh>
       ))}
     </group>
