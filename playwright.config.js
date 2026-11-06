@@ -12,6 +12,11 @@ const PORT = process.env.PLAYWRIGHT_PORT || 4173
 // the backend's dev cors.allowed-origins allow-list trusts
 // (http://localhost:3000); the OriginValidationFilter rejects unsafe requests
 // from untrusted origins.
+const ORIGIN_FOR_STORAGE = process.env.E2E_BACKEND === '1' ? `http://localhost:${process.env.PLAYWRIGHT_DEV_PORT || 3000}` : `http://127.0.0.1:${PORT}`
+const perfStorage = (value) => ({
+  cookies: [],
+  origins: [{ origin: ORIGIN_FOR_STORAGE, localStorage: [{ name: 'kwcoms-perf-mode:v1', value }] }],
+})
 const BACKEND_MODE = process.env.E2E_BACKEND === '1'
 const DEV_PORT = process.env.PLAYWRIGHT_DEV_PORT || 3000
 
@@ -41,14 +46,9 @@ export default defineConfig({
   use: {
     baseURL: BACKEND_MODE ? `http://localhost:${DEV_PORT}` : `http://127.0.0.1:${PORT}`,
     // CI browsers have no GPU, so "auto" would pick the lite look and move every visual
-    // baseline. Pin the full look; tests of the lite mode set their own value.
-    storageState: {
-      cookies: [],
-      origins: [{
-        origin: BACKEND_MODE ? `http://localhost:${DEV_PORT}` : `http://127.0.0.1:${PORT}`,
-        localStorage: [{ name: 'kwcoms-perf-mode:v1', value: 'full' }],
-      }],
-    },
+    // baseline. Pin the full look (and with nothing stored, automated browsers default to full anyway); suites of the
+    // lite look pin 'lite' themselves.
+    storageState: perfStorage('full'),
     trace: 'on-first-retry',
   },
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
@@ -84,6 +84,27 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 900 },
+      },
+    },
+    // The accessibility suite again in the lite look (no blur, flat tints): contrast must hold
+    // without the backdrop. The first-visit intro does not play in lite, so its test is left out.
+    {
+      name: 'accessibility-lite',
+      testMatch: /accessibility\.spec\.js/,
+      grepInvert: /first-visit intro/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 900 },
+        storageState: perfStorage('lite'),
+      },
+    },
+    {
+      name: 'lite-visual',
+      testMatch: /lite\.spec\.js/,
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 900 },
+        storageState: perfStorage('lite'),
       },
     },
     {

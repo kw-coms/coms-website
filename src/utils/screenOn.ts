@@ -3,3 +3,6 @@
 export const SCREEN_ON_EVENT = 'coms:screen-on'
 
 export type ScreenOnDetail = { y: number }
+
+// sessionStorage flag the boot intro sets once it has played (read by perfMode to know whether it will).
+export const INTRO_SESSION_KEY = 'coms.intro.played:v1'

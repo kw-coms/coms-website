@@ -23,7 +23,7 @@ import ClubCalendarSection from '../../features/clubCalendar/ClubCalendarSection
 import HeroField from './HeroField'
 import { BuildMini, ClubOsVisual, FlowMini, JoinFlowVisual, JoinMini, LearningStackVisual, ProjectLabVisual } from './HomeVisuals'
 import { scrollToTopInstant } from '../../utils/themeColors'
-import { getPerfState } from '../../utils/perfMode'
+import { getPerfState, subscribePerf } from '../../utils/perfMode'
 import { useAuth } from '../../contexts/useAuth'
 
 const LATEST_NOTICE_QUERY_KEY = ['app-shell', 'latest-notice']
@@ -106,10 +106,20 @@ export default function HomeView() {
       })
     }
     onScroll()
+    // Lite skips the hero's scroll/pointer variables; on the way back to full, recompute them
+    // (and clear the pointer tilt) so the hero does not wait for the next scroll to catch up.
+    const offPerf = subscribePerf(() => {
+      if (getPerfState().mode !== 'lite') {
+        heroInnerRef.current?.style.removeProperty('--coms-rx')
+        heroInnerRef.current?.style.removeProperty('--coms-ry')
+        onScroll()
+      }
+    })
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onScroll)
     return () => {
       io.disconnect()
+      offPerf()
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
       document.documentElement.classList.remove('home-snap-scroll')

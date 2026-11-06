@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
-import { SCREEN_ON_EVENT } from './screenOn'
-import { forgetStoredValue, readStoredValue, storeValue } from './themeColors'
+import { INTRO_SESSION_KEY, SCREEN_ON_EVENT } from './screenOn'
+import { readStoredValue, storeValue } from './themeColors'
 
 // Render mode. Without hardware graphics acceleration the browser paints and composites on the
 // CPU (SwiftShader, "Microsoft Basic Render Driver", llvmpipe ...), and backdrop blur, big
@@ -10,10 +10,12 @@ import { forgetStoredValue, readStoredValue, storeValue } from './themeColors'
 
 export const PERF_MODE_KEY = 'kwcoms-perf-mode:v1'
 export const PERF_NOTICE_KEY = 'kwcoms-perf-notice:v1'
+// The WebGL probe answer is kept for the tab's session: the machine does not change meanwhile.
+export const PERF_PROBE_KEY = 'kwcoms-perf-probe:v1'
 
 export type PerfPreference = 'auto' | 'lite' | 'full'
 export type PerfMode = 'lite' | 'full'
-export type PerfReason = 'user' | 'webgl' | 'renderer' | 'reduced-motion' | 'frame-rate'
+export type PerfReason = 'user' | 'webgl' | 'renderer' | 'frame-rate'
 export type PerfState = {
   preference: PerfPreference
   mode: PerfMode
@@ -51,29 +53,31 @@ export function probeGraphics(doc: Document = document): GraphicsProbe {
   }
 }
 
-export function decideAutoMode(probe: GraphicsProbe, reducedMotion: boolean): { mode: PerfMode; reason: PerfReason | null } {
+export function decideAutoMode(probe: GraphicsProbe): { mode: PerfMode; reason: PerfReason | null } {
   if (!probe.accelerated) return { mode: 'lite', reason: probe.renderer ? 'renderer' : 'webgl' }
-  if (reducedMotion) return { mode: 'lite', reason: 'reduced-motion' }
   return { mode: 'full', reason: null }
 }
 
-// Median frame over 28 ms (under ~35 fps), or a third of the frames over 50 ms.
+// A third of the frames stalled past 50 ms. Deliberately NOT a median test: a steady ~33 ms
+// cadence (a 30 fps cap from Energy Saver / battery saver, a 24-30 Hz display) is smooth, not
+// slow, and must never switch the look.
 export function framesAreSlow(deltas: number[]) {
   if (deltas.length < 20) return false
-  const sorted = [...deltas].sort((a, b) => a - b)
-  const median = sorted[Math.floor(sorted.length / 2)]
-  const stalled = deltas.filter((d) => d > 50).length / deltas.length
-  return median > 28 || stalled > 0.3
+  return deltas.filter((d) => d > 50).length / deltas.length > 0.3
 }
 
 type Raf = (cb: (t: number) => void) => number
 
-// Collects rAF frame gaps for `ms`, then reports them (null when the page was hidden meanwhile).
+// A gap this long is the page having been hidden or frozen, not a slow frame.
+const RESUME_GAP_MS = 1000
+
+// Collects rAF frame gaps for `ms`, then reports them. Reports null (sample discarded) when the
+// page was hidden at any tick or a frame gap looks like a resume from the background.
 export function sampleFrames(raf: Raf, ms: number, isHidden: () => boolean, done: (deltas: number[] | null) => void) {
   const stamps: number[] = []
   let hidden = false
   const tick = (t: number) => {
-    hidden = hidden || isHidden()
+    hidden = hidden || isHidden() || (stamps.length > 0 && t - stamps[stamps.length - 1] > RESUME_GAP_MS)
     stamps.push(t)
     if (t - stamps[0] < ms) {
       raf(tick)
@@ -87,7 +91,6 @@ export function sampleFrames(raf: Raf, ms: number, isHidden: () => boolean, done
 let state: PerfState = { preference: 'auto', mode: 'full', reason: null, autoLite: false, noticeDismissed: false }
 const listeners = new Set<() => void>()
 let probeCache: GraphicsProbe | null = null
-let watchToken = 0
 
 export const getPerfState = () => state
 export function subscribePerf(listener: () => void) {
@@ -104,46 +107,126 @@ function commit(next: PerfState) {
   listeners.forEach((listener) => listener())
 }
 
-const prefersReducedMotion = () =>
-  typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+// The probe makes a WebGL context, which is not free on the machines this is for, so ask once
+// per session. It runs synchronously before the first render on purpose: deferring it would
+// paint the full look first and then flip to lite, a visible flash of the very effects being
+// removed (and the hero animation would already have started).
+function graphicsProbe(): GraphicsProbe {
+  if (probeCache) return probeCache
+  try {
+    const saved = JSON.parse(window.sessionStorage.getItem(PERF_PROBE_KEY) || 'null')
+    if (saved && typeof saved.accelerated === 'boolean' && typeof saved.renderer === 'string') {
+      probeCache = { accelerated: saved.accelerated, renderer: saved.renderer }
+      return probeCache
+    }
+  } catch {
+    // Unreadable cache: probe again.
+  }
+  probeCache = probeGraphics()
+  try {
+    window.sessionStorage.setItem(PERF_PROBE_KEY, JSON.stringify(probeCache))
+  } catch {
+    // Not cached; the module-level copy still serves this page.
+  }
+  return probeCache
+}
+
+// With nothing stored, a browser driven by automation (navigator.webdriver: Playwright, CI) stays
+// on the full look instead of probing: headless CI has no GPU, and a test that clears storage
+// must not silently end up on the lite look. An explicitly stored "auto" still probes.
+function defaultPreference(): PerfPreference {
+  return window.navigator?.webdriver ? 'full' : 'auto'
+}
 
 function applyPreference(preference: PerfPreference) {
   if (preference === 'auto') {
-    probeCache ??= probeGraphics()
-    const { mode, reason } = decideAutoMode(probeCache, prefersReducedMotion())
-    commit({ ...state, preference, mode, reason, autoLite: mode === 'lite' && reason !== 'reduced-motion' })
+    const { mode, reason } = decideAutoMode(graphicsProbe())
+    commit({ ...state, preference, mode, reason, autoLite: mode === 'lite' })
     if (mode === 'full') watchFrameRate()
+    else stopWatching()
   } else {
+    stopWatching()
     commit({ ...state, preference, mode: preference, reason: 'user', autoLite: false })
   }
 }
 
-// Frame-rate watchdog, only while the mode is "auto" and still full: sample once after load and
-// once after the boot intro hands over. A slow window switches to lite for good (no flapping).
+// ---- Frame-rate watchdog ---------------------------------------------------------------------
+// Only while the mode is "auto" and still full. The boot intro is a full-screen canvas, so its
+// own cost must not count: when it is going to play, sample only after it hands over
+// (SCREEN_ON_EVENT); otherwise sample once the page has loaded. A slow window switches to lite
+// for good (no flapping). Handlers live at module scope so a repeated "auto" never stacks them.
+let watchTimer = 0
+let watchSampling = 0
+let watchHidden = false
+let watchOn = false
+
+const SAMPLE_MS = 2000
+const INTRO_FALLBACK_MS = 12000
+
+function introWillPlay() {
+  try {
+    return window.location.pathname === '/' && window.sessionStorage.getItem(INTRO_SESSION_KEY) !== '1'
+  } catch {
+    return false
+  }
+}
+
+const watchLive = () => watchOn && state.preference === 'auto' && state.mode === 'full'
+const onWatchVisibility = () => {
+  if (document.hidden) watchHidden = true
+}
+
+function startSample(delay: number) {
+  window.clearTimeout(watchTimer)
+  watchTimer = window.setTimeout(() => {
+    if (!watchLive() || watchSampling) return
+    watchHidden = document.hidden
+    watchSampling = 1
+    sampleFrames(
+      (cb) => window.requestAnimationFrame(cb),
+      SAMPLE_MS,
+      () => watchHidden || document.hidden,
+      (deltas) => {
+        watchSampling = 0
+        if (watchLive() && deltas && framesAreSlow(deltas)) {
+          commit({ ...state, mode: 'lite', reason: 'frame-rate', autoLite: true })
+          stopWatching()
+        }
+      },
+    )
+  }, delay)
+}
+
+const onWatchLoad = () => startSample(600)
+const onWatchScreenOn = () => startSample(900)
+const onWatchIntroGaveUp = () => startSample(0)
+
+function stopWatching() {
+  watchOn = false
+  window.clearTimeout(watchTimer)
+  window.removeEventListener('load', onWatchLoad)
+  window.removeEventListener(SCREEN_ON_EVENT, onWatchScreenOn)
+  document.removeEventListener('visibilitychange', onWatchVisibility)
+}
+
 function watchFrameRate() {
-  const token = ++watchToken
-  const live = () => token === watchToken && state.preference === 'auto' && state.mode === 'full'
-  const run = (delay: number) =>
-    window.setTimeout(() => {
-      if (!live()) return
-      sampleFrames(
-        (cb) => window.requestAnimationFrame(cb),
-        2000,
-        () => document.hidden,
-        (deltas) => {
-          if (live() && deltas && framesAreSlow(deltas)) commit({ ...state, mode: 'lite', reason: 'frame-rate', autoLite: true })
-        },
-      )
-    }, delay)
-  const afterLoad = () => run(600)
-  if (document.readyState === 'complete') afterLoad()
-  else window.addEventListener('load', afterLoad, { once: true })
-  window.addEventListener(SCREEN_ON_EVENT, () => run(900), { once: true })
+  stopWatching()
+  watchOn = true
+  document.addEventListener('visibilitychange', onWatchVisibility)
+  if (introWillPlay()) {
+    window.addEventListener(SCREEN_ON_EVENT, onWatchScreenOn, { once: true })
+    // The intro always lets go within seconds; if its event never arrives, sample anyway.
+    watchTimer = window.setTimeout(onWatchIntroGaveUp, INTRO_FALLBACK_MS)
+  } else if (document.readyState === 'complete') {
+    onWatchLoad()
+  } else {
+    window.addEventListener('load', onWatchLoad, { once: true })
+  }
 }
 
 export function setPerfPreference(preference: PerfPreference) {
-  if (preference === 'auto') forgetStoredValue(PERF_MODE_KEY)
-  else storeValue(PERF_MODE_KEY, preference)
+  // Stored even for "auto": an explicit "auto" outranks the automation default.
+  storeValue(PERF_MODE_KEY, preference)
   applyPreference(preference)
 }
 
@@ -156,12 +239,14 @@ export function dismissPerfNotice() {
 export function initPerfMode() {
   if (typeof window === 'undefined') return
   state = { ...state, noticeDismissed: readStoredValue(PERF_NOTICE_KEY) === '1' }
-  applyPreference(parsePerfPreference(readStoredValue(PERF_MODE_KEY)))
+  const stored = readStoredValue(PERF_MODE_KEY)
+  applyPreference(stored === null ? defaultPreference() : parsePerfPreference(stored))
 }
 
 // Test hook: forget the cached probe and watchers.
 export function resetPerfModeForTests() {
   probeCache = null
-  watchToken++
+  stopWatching()
+  watchSampling = 0
   state = { preference: 'auto', mode: 'full', reason: null, autoLite: false, noticeDismissed: false }
 }

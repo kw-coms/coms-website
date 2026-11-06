@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import {
   PERF_MODE_KEY,
   PERF_NOTICE_KEY,
+  PERF_PROBE_KEY,
   decideAutoMode,
   dismissPerfNotice,
   framesAreSlow,
@@ -63,15 +64,16 @@ assert.deepEqual(probeGraphics(fakeDoc(hwGl)), { accelerated: true, renderer: 'A
 assert.equal(probeGraphics({ createElement: () => { throw new Error('blocked') } }).accelerated, false, 'a throwing probe means lite, not a crash')
 
 // ─── startup decision ────────────────────────────────────────────────────────
-assert.deepEqual(decideAutoMode({ accelerated: true, renderer: 'GPU' }, false), { mode: 'full', reason: null })
-assert.deepEqual(decideAutoMode({ accelerated: false, renderer: '' }, false), { mode: 'lite', reason: 'webgl' })
-assert.deepEqual(decideAutoMode({ accelerated: false, renderer: 'SwiftShader' }, false), { mode: 'lite', reason: 'renderer' })
-assert.deepEqual(decideAutoMode({ accelerated: true, renderer: 'GPU' }, true), { mode: 'lite', reason: 'reduced-motion' })
+assert.deepEqual(decideAutoMode({ accelerated: true, renderer: 'GPU' }), { mode: 'full', reason: null })
+assert.deepEqual(decideAutoMode({ accelerated: false, renderer: '' }), { mode: 'lite', reason: 'webgl' })
+assert.deepEqual(decideAutoMode({ accelerated: false, renderer: 'SwiftShader' }), { mode: 'lite', reason: 'renderer' })
 
 // ─── frame-rate watchdog ─────────────────────────────────────────────────────
 const steady = Array.from({ length: 120 }, () => 16.7)
 assert.equal(framesAreSlow(steady), false)
-assert.equal(framesAreSlow(Array.from({ length: 60 }, () => 40)), true, 'a 40 ms median is slow')
+assert.equal(framesAreSlow(Array.from({ length: 60 }, () => 33.4)), false, 'a steady 30 fps cadence (Energy Saver, 30 Hz display) is not slow')
+assert.equal(framesAreSlow(Array.from({ length: 60 }, () => 41.7)), false, 'a steady 24 Hz cadence is not slow either')
+assert.equal(framesAreSlow(Array.from({ length: 60 }, () => 70)), true, 'frames that all stall past 50 ms are slow')
 assert.equal(framesAreSlow([...Array.from({ length: 70 }, () => 17), ...Array.from({ length: 40 }, () => 80)]), true, 'over 30% of frames above 50 ms is slow')
 assert.equal(framesAreSlow([...Array.from({ length: 110 }, () => 17), ...Array.from({ length: 4 }, () => 300)]), false, 'a few load-time hitches are not slow')
 assert.equal(framesAreSlow(Array.from({ length: 5 }, () => 200)), false, 'too few frames to judge')
@@ -89,8 +91,21 @@ const run = (gap, { hidden = false, ms = 2000 } = {}) => {
 }
 const fast = run(16.7)
 assert.ok(fast.length > 100 && fast.every((d) => Math.abs(d - 16.7) < 0.01))
-assert.equal(framesAreSlow(run(45)), true)
+assert.equal(framesAreSlow(run(70)), true)
+assert.equal(framesAreSlow(run(33.4)), false)
 assert.equal(run(45, { hidden: true }), null, 'a window that saw the page hidden is discarded')
+// A long gap in the middle is a resume from the background, not a slow frame: discard.
+{
+  const queue = []
+  let result = 'unset'
+  sampleFrames((cb) => queue.push(cb), 2000, () => false, (d) => { result = d })
+  let t = 0
+  for (let i = 0; queue.length; i++) {
+    t += i === 30 ? 5000 : 16.7
+    queue.shift()(t)
+  }
+  assert.equal(result, null, 'a frame gap over a second discards the sample')
+}
 
 // ─── store: preference wins, applies live, is remembered ─────────────────────
 const root = document.documentElement
@@ -123,7 +138,7 @@ assert.equal(window.localStorage.getItem(PERF_MODE_KEY), 'full')
 setPerfPreference('lite')
 assert.equal(root.dataset.perf, 'lite')
 setPerfPreference('auto')
-assert.equal(window.localStorage.getItem(PERF_MODE_KEY), null, 'auto clears the stored choice')
+assert.equal(window.localStorage.getItem(PERF_MODE_KEY), 'auto', 'an explicit auto is stored (it outranks a build-time default)')
 assert.deepEqual(seen, ['full', 'lite', 'lite'])
 off()
 
@@ -134,5 +149,113 @@ assert.equal(window.localStorage.getItem(PERF_NOTICE_KEY), '1')
 resetPerfModeForTests()
 initPerfMode()
 assert.equal(getPerfState().noticeDismissed, true, 'remembered across visits')
+
+// ─── automation default ──────────────────────────────────────────────────────
+{
+  resetPerfModeForTests()
+  window.sessionStorage.clear()
+  window.localStorage.clear()
+  Object.defineProperty(window.navigator, 'webdriver', { configurable: true, get: () => true })
+  initPerfMode()
+  assert.equal(root.dataset.perf, 'full', 'an automated browser with nothing stored stays full (no GPU in CI)')
+  resetPerfModeForTests()
+  window.localStorage.setItem(PERF_MODE_KEY, 'auto')
+  initPerfMode()
+  assert.equal(root.dataset.perf, 'lite', 'an explicit auto still probes')
+  Object.defineProperty(window.navigator, 'webdriver', { configurable: true, get: () => false })
+  window.localStorage.clear()
+}
+
+// ─── the probe answer is kept for the session ────────────────────────────────
+{
+  resetPerfModeForTests()
+  window.sessionStorage.clear()
+  let calls = 0
+  window.HTMLCanvasElement.prototype.getContext = () => { calls++; return null }
+  window.localStorage.clear()
+  initPerfMode()
+  initPerfMode()
+  assert.equal(calls, 1, 'the WebGL probe runs once')
+  assert.match(window.sessionStorage.getItem(PERF_PROBE_KEY), /"accelerated":false/)
+  resetPerfModeForTests()
+  initPerfMode()
+  assert.equal(calls, 1, 'a later page load of the session reads the cached answer')
+}
+
+// ─── watchdog with fake timers / rAF ─────────────────────────────────────────
+{
+  const realSetTimeout = window.setTimeout
+  const realClearTimeout = window.clearTimeout
+  const realRaf = window.requestAnimationFrame
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }) // jsdom has no visible page
+  let now = 0
+  let timers = []
+  let rafQueue = []
+  window.setTimeout = (fn, ms) => { timers.push({ at: now + ms, fn }); return timers.length }
+  window.clearTimeout = (id) => { if (timers[id - 1]) timers[id - 1].fn = null }
+  window.requestAnimationFrame = (cb) => rafQueue.push(cb)
+  const advance = (gap) => { // drive the page: run due timers, then one frame
+    now += gap
+    for (const timer of timers.filter((x) => x.fn && x.at <= now)) { const fn = timer.fn; timer.fn = null; fn() }
+    const cbs = rafQueue; rafQueue = []
+    cbs.forEach((cb) => cb(now))
+  }
+  const drive = (gap, ms) => { for (let spent = 0; spent < ms; spent += gap) advance(gap) }
+  const goodGl = fakeGl('ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 Direct3D11)')
+  window.HTMLCanvasElement.prototype.getContext = () => goodGl
+  const rootEl = document.documentElement
+
+  // A machine that stalls after load: lite once, and no flip back.
+  resetPerfModeForTests()
+  window.sessionStorage.clear()
+  window.sessionStorage.setItem('coms.intro.played:v1', '1') // intro already played: sample after load
+  window.localStorage.clear()
+  initPerfMode()
+  assert.equal(rootEl.dataset.perf, 'full')
+  window.dispatchEvent(new window.Event('load')) // (a no-op when the document had already loaded)
+  drive(100, 3000) // timers fire; the sampler gets frames 100 ms apart (stalled)
+  drive(100, 3000)
+  assert.equal(rootEl.dataset.perf, 'lite', 'a stalled window switches to lite')
+  assert.equal(getPerfState().reason, 'frame-rate')
+  assert.equal(getPerfState().autoLite, true)
+  drive(16.7, 6000)
+  assert.equal(rootEl.dataset.perf, 'lite', 'it never flips back')
+
+  // A steady 30 fps cadence stays full.
+  resetPerfModeForTests()
+  window.localStorage.clear()
+  initPerfMode()
+  window.dispatchEvent(new window.Event('load'))
+  drive(33.4, 6000)
+  assert.equal(rootEl.dataset.perf, 'full', 'a 30 fps cap does not switch the look')
+
+  // With the intro still to play, the load sample is skipped; only the hand-over samples.
+  resetPerfModeForTests()
+  window.sessionStorage.clear()
+  window.localStorage.clear()
+  initPerfMode()
+  drive(100, 8000)
+  assert.equal(rootEl.dataset.perf, 'full', 'intro frames are not judged')
+  window.dispatchEvent(new window.CustomEvent('coms:screen-on'))
+  drive(100, 6000)
+  assert.equal(rootEl.dataset.perf, 'lite', 'frames after the intro are')
+
+  // Repeated "auto" does not stack handlers.
+  resetPerfModeForTests()
+  window.sessionStorage.clear()
+  window.localStorage.clear()
+  initPerfMode()
+  setPerfPreference('auto')
+  setPerfPreference('auto')
+  window.dispatchEvent(new window.CustomEvent('coms:screen-on'))
+  const before = timers.filter((x) => x.fn).length
+  assert.ok(before <= 3, 'timers are replaced, not accumulated (' + before + ')')
+  setPerfPreference('full')
+  assert.equal(timers.filter((x) => x.fn).length, 0, 'choosing a fixed mode stops the watchdog')
+
+  window.setTimeout = realSetTimeout
+  window.clearTimeout = realClearTimeout
+  window.requestAnimationFrame = realRaf
+}
 
 console.log('perfMode tests passed')

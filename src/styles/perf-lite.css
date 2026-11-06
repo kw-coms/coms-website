@@ -13,8 +13,6 @@
 :root[data-perf='lite'] *,
 :root[data-perf='lite'] *::before,
 :root[data-perf='lite'] *::after {
-	/* Unprefixed only: the minifier collapses an adjacent -webkit- twin into the prefixed
-	   spelling, which Chromium ignores. */
 	backdrop-filter: none !important;
 }
 
@@ -27,12 +25,12 @@
 :root[data-perf='lite'] .apple-mobile-tabs,
 :root[data-perf='lite'] .coms-to-top,
 :root[data-perf='lite'] .coms-toast {
-	background: color-mix(in srgb, var(--app-surface) 96%, transparent);
+	background: var(--app-surface);
 }
 :root[data-perf='lite'] .apple-mobile-menu-panel,
 :root[data-perf='lite'] .activity-detail-header,
 :root[data-perf='lite'] .apple-product-panel {
-	background: color-mix(in srgb, var(--app-surface) 98%, transparent);
+	background: var(--app-surface);
 }
 
 /* ---- Shadows: small and cheap ------------------------------------------------------------ */
@@ -176,13 +174,37 @@
 	will-change: auto;
 }
 
-/* ---- Transitions: short, opacity/transform only ------------------------------------------- */
-:root[data-perf='lite'] *,
-:root[data-perf='lite'] *::before,
-:root[data-perf='lite'] *::after {
-	transition-property: opacity, transform !important;
-	transition-duration: 120ms !important;
-	transition-delay: 0s !important;
+/* ---- Route/entrance fades: the page is simply there ---------------------------------------- */
+:root[data-perf='lite'] .coms-page-enter,
+:root[data-perf='lite'] .calendar-empty-state {
+	animation: none;
+}
+
+/* ---- Scroll reveals: content is simply there (no per-section fade/slide-in layers) ----------- */
+:root[data-perf='lite'] .reveal-ready [data-reveal],
+:root[data-perf='lite'] .reveal-ready [data-reveal-dir] {
+	opacity: 1;
+	transform: none;
+	transition: none;
+	will-change: auto;
+}
+
+/* ---- Transitions: short, opacity/transform only -------------------------------------------
+   Only elements that already transition are touched (Tailwind's transition utilities); a blanket
+   rule would add transitions to per-frame, script-driven transforms and override intentional
+   `transition: none`. Colour/shadow/size changes simply snap; opacity and transform ease briefly. */
+:root[data-perf='lite'] [class~='transition'],
+:root[data-perf='lite'] [class~='transition-all'],
+:root[data-perf='lite'] [class~='transition-colors'],
+:root[data-perf='lite'] [class~='transition-shadow'],
+:root[data-perf='lite'] [class~='transition-transform'],
+:root[data-perf='lite'] [class~='transition-opacity'] {
+	transition-property: opacity, transform;
+	transition-duration: 120ms;
+}
+:root[data-perf='lite'] .coms-scroll-progress,
+:root[data-perf='lite'] .coms-hero-field {
+	transition: none;
 }
 
 /* ---- One-time "we switched to lite" notice ------------------------------------------------ */
@@ -237,7 +259,8 @@
 	.coms-perf-notice {
 		flex-direction: column;
 		align-items: stretch;
-		bottom: calc(1rem + var(--apple-mobile-tabs-height, 0px));
+		/* Clear of the back-to-top button (2.75rem at bottom 1.1rem). */
+		bottom: 4.75rem;
 	}
 	.coms-perf-notice-actions {
 		justify-content: flex-end;

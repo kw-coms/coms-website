@@ -62,9 +62,22 @@ export default function AppearanceControl({
               {isDark ? '라이트 모드' : '다크 모드'}
             </button>
 
-            <div className="appearance-perf-row flex flex-wrap items-center gap-2 lg:justify-end" role="radiogroup" aria-label="화면 효과">
-              <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">화면 효과</span>
-              <div className="inline-flex items-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] p-1">
+            <div className="appearance-perf-row flex flex-wrap items-center gap-2 lg:justify-end">
+              <span id="perf-choice-label" className="mr-1 text-xs font-semibold text-[var(--app-muted)]">화면 효과</span>
+              <div
+                role="radiogroup"
+                aria-labelledby="perf-choice-label"
+                className="inline-flex items-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] p-1"
+                onKeyDown={(event) => {
+                  const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
+                  if (!step) return
+                  event.preventDefault()
+                  const index = PERF_CHOICES.findIndex((choice) => choice.value === perf.preference)
+                  const next = PERF_CHOICES[(index + step + PERF_CHOICES.length) % PERF_CHOICES.length]
+                  setPerfPreference(next.value)
+                  event.currentTarget.querySelector<HTMLElement>(`[data-perf-choice="${next.value}"]`)?.focus()
+                }}
+              >
                 {PERF_CHOICES.map((choice) => {
                   const active = perf.preference === choice.value
                   return (
@@ -73,6 +86,7 @@ export default function AppearanceControl({
                       type="button"
                       role="radio"
                       aria-checked={active}
+                      tabIndex={active ? 0 : -1}
                       data-perf-choice={choice.value}
                       onClick={() => setPerfPreference(choice.value)}
                       className={`min-h-9 rounded-full px-3 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 ${active ? 'bg-[var(--app-text)] text-[var(--app-surface)]' : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'}`}

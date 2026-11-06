@@ -606,7 +606,6 @@ html.home-snap-scroll .home-snap-section {
 	color: var(--app-text);
 	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
 	backdrop-filter: saturate(180%) blur(18px);
-	-webkit-backdrop-filter: saturate(180%) blur(18px);
 	opacity: 0;
 	transform: translateY(12px) scale(0.9);
 	pointer-events: none;

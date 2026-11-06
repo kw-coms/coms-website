@@ -4551,6 +4551,16 @@ test.describe('lite rendering mode', () => {
     await page.reload()
     await expect(page.locator('html')).toHaveAttribute('data-perf', 'lite')
 
+    // Roving tabindex: only the chosen option is a tab stop, arrows move and apply.
+    const lite = group.getByRole('radio', { name: '가볍게' })
+    await expect(lite).toHaveAttribute('tabindex', '0')
+    await expect(group.getByRole('radio', { name: '자동' })).toHaveAttribute('tabindex', '-1')
+    await lite.focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(group.getByRole('radio', { name: '화려하게' })).toBeFocused()
+    await expect(page.locator('html')).toHaveAttribute('data-perf', 'full')
+    await page.keyboard.press('ArrowLeft')
+    await expect(page.locator('html')).toHaveAttribute('data-perf', 'lite')
     await group.getByRole('radio', { name: '화려하게' }).click()
     await expect(page.locator('html')).toHaveAttribute('data-perf', 'full')
     expect(await glassBlur(page)).toContain('blur')
@@ -4560,7 +4570,7 @@ test.describe('lite rendering mode', () => {
     await mockOptionalApis(page)
     await page.addInitScript(() => {
       window.sessionStorage.setItem('coms.intro.played:v1', '1')
-      window.localStorage.removeItem('kwcoms-perf-mode:v1')
+      window.localStorage.setItem('kwcoms-perf-mode:v1', 'auto')
       // A browser that cannot give a hardware WebGL context.
       const real = HTMLCanvasElement.prototype.getContext
       HTMLCanvasElement.prototype.getContext = function (type, opts) {
@@ -4569,7 +4579,7 @@ test.describe('lite rendering mode', () => {
     })
     await page.goto('/activities')
     await expect(page.locator('html')).toHaveAttribute('data-perf', 'lite')
-    const notice = page.getByRole('status').filter({ hasText: '가벼운 화면으로 바꿨어요' })
+    const notice = page.locator('.coms-perf-notice').filter({ hasText: '가벼운 화면으로 바꿨어요' })
     await expect(notice).toBeVisible()
     await notice.getByRole('button', { name: '확인' }).click()
     await expect(notice).toHaveCount(0)

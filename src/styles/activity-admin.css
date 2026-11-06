@@ -290,7 +290,6 @@
 	background: color-mix(in srgb, var(--app-surface) 92%, transparent);
 	padding: 1.2rem;
 	backdrop-filter: blur(14px);
-	-webkit-backdrop-filter: blur(14px);
 }
 
 .activity-detail-eyebrow,

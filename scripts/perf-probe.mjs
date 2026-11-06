@@ -101,7 +101,8 @@ async function record(browser, page, label, action, { preArmed = false } = {}) {
   await action()
   const buffer = await browser.stopTracing()
   const { frames, long } = await page.evaluate(() => { window.__rec = false; return { frames: window.__frames, long: window.__long } })
-  return { label, ...summarize(frames, long, sumTrace(buffer)) }
+  const perf = await page.evaluate(() => document.documentElement.dataset.perf)
+  return { label: `${label} [${perf}]`, ...summarize(frames, long, sumTrace(buffer)) }
 }
 
 async function scrollThrough(page) {

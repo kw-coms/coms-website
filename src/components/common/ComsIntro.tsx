@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { mixHex, normalizeHex } from '../../utils/themeColors'
-import { SCREEN_ON_EVENT, type ScreenOnDetail } from '../../utils/screenOn'
+import { INTRO_SESSION_KEY, SCREEN_ON_EVENT, type ScreenOnDetail } from '../../utils/screenOn'
 import { getPerfState } from '../../utils/perfMode'
 
 /**
@@ -16,8 +16,6 @@ import { getPerfState } from '../../utils/perfMode'
 
 // Module-level so an SPA route change back to "/" doesn't replay it, but a full
 // page reload (which re-imports the module) does.
-const INTRO_SESSION_KEY = 'coms.intro.played:v1'
-
 function introAlreadyPlayed() {
   try {
     return sessionStorage.getItem(INTRO_SESSION_KEY) === '1'
