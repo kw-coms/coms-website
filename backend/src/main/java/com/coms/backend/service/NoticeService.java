@@ -4,6 +4,7 @@ import com.coms.backend.domain.Notice;
 import com.coms.backend.domain.NoticeVote;
 import com.coms.backend.domain.Member;
 import com.coms.backend.domain.Permission;
+import com.coms.backend.domain.RichBodyMedia;
 import com.coms.backend.dto.NoticeRequest;
 import com.coms.backend.dto.NoticeResponse;
 import com.coms.backend.repository.MemberRepository;
@@ -32,10 +33,12 @@ public class NoticeService {
     private final NoticeVoteRepository voteRepository;
     private final RichContentSanitizer richContentSanitizer;
     private final PermissionService permissionService;
+    private final RichBodyMediaService richBodyMediaService;
 
     public NoticeService(NoticeRepository repo, MemberRepository memberRepository, NotificationService notificationService,
                          AuditLogService auditLogService, NoticeVoteRepository voteRepository,
-                         RichContentSanitizer richContentSanitizer, PermissionService permissionService) {
+                         RichContentSanitizer richContentSanitizer, PermissionService permissionService,
+                         RichBodyMediaService richBodyMediaService) {
         this.repo = repo;
         this.memberRepository = memberRepository;
         this.notificationService = notificationService;
@@ -43,6 +46,7 @@ public class NoticeService {
         this.voteRepository = voteRepository;
         this.richContentSanitizer = richContentSanitizer;
         this.permissionService = permissionService;
+        this.richBodyMediaService = richBodyMediaService;
     }
 
     @Transactional(readOnly = true)
@@ -124,6 +128,7 @@ public class NoticeService {
         applyRequest(notice, request, authorName(authorStudentId));
         notice.setAuthorStudentId(authorStudentId);
         Notice saved = repo.save(notice);
+        richBodyMediaService.syncAttachments(RichBodyMedia.Scope.NOTICE, saved.getId(), saved.getContent(), authorStudentId);
         notificationService.notifyNoticeCreated(saved);
         auditLogService.record(authorStudentId, "NOTICE_CREATE", "NOTICE", String.valueOf(saved.getId()), "title=" + saved.getTitle(), null);
         return toResponse(saved, voteStats(List.of(saved)), authorStudentId);
@@ -167,6 +172,8 @@ public class NoticeService {
         // Keep the displayed author on edits — previously every edit stomped it with the
         // editor's own name, which silently undid 회장 author overrides.
         applyRequest(notice, request, notice.getAuthor(), canManageNotice);
+        richBodyMediaService.syncAttachments(RichBodyMedia.Scope.NOTICE, notice.getId(), notice.getContent(),
+                canManageNotice ? authorStudentId : null);
         auditLogService.record(authorStudentId, "NOTICE_UPDATE", "NOTICE", String.valueOf(notice.getId()), "title=" + notice.getTitle(), null);
         return toResponse(notice, voteStats(List.of(notice)), authorStudentId);
     }
@@ -180,6 +187,7 @@ public class NoticeService {
 
     public void delete(String authorStudentId, Long id) {
         Notice notice = getEntity(id);
+        richBodyMediaService.detachAttachments(RichBodyMedia.Scope.NOTICE, id);
         repo.delete(notice);
         auditLogService.record(authorStudentId, "NOTICE_DELETE", "NOTICE", String.valueOf(id), "title=" + notice.getTitle(), null);
     }
@@ -211,7 +219,7 @@ public class NoticeService {
         if (!owner && editor.getRole() != Member.Role.ADMIN) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
-        return canManageNotice;
+        return canManageNotice || editor.getRole() == Member.Role.ADMIN;
     }
 
     private String authorName(String studentId) {

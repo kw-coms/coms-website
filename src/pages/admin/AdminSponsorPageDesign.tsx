@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState } from 'react'
 import { ExternalLink, ImagePlus, X } from 'lucide-react'
 import RichBodyEditor from '../../components/richEditor/RichBodyEditor'
-import { URL_ONLY_RICH_FEATURES } from '../../components/richEditor/richBodyFeatures'
+import { UPLOAD_RICH_FEATURES } from '../../components/richEditor/richBodyFeatures'
+import { resetRejectedRichBlocks, uploadPendingRichBlocks } from '../../components/richEditor/uploadPendingRichBlocks'
 import { serializeRichBody } from '../../components/richEditor/serializeRichBody'
-import { parsePostBlocks } from '../community/postEditorUtils'
+import { parseRichBodyBlocks } from '../../components/richEditor/parseRichBodyBlocks'
 import { fetchLinkPreview, searchYoutubeVideos } from '../../services/communityApi'
 import { showToast } from '../../components/common/Toast'
 import { saveSponsorPageSettings, sponsorImageSrc, uploadSponsorImage } from '../../services/sponsorApi'
@@ -27,7 +28,7 @@ export default function AdminSponsorPageDesign({ settings, onSaved }: {
   const [uploadingBanner, setUploadingBanner] = useState(false)
   const introEditorRef = useRef(null)
   // 마운트 시 한 번만 블록으로 변환한다 — 매 렌더마다 다시 만들면 편집 중인 내용이 날아간다.
-  const introBlocks = useMemo(() => parsePostBlocks({ content: settings.introHtml }), [])  // eslint-disable-line react-hooks/exhaustive-deps
+  const introBlocks = useMemo(() => parseRichBodyBlocks(settings.introHtml || ''), [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const update = (patch: Partial<SponsorPageSettings>) => setForm((prev) => ({ ...prev, ...patch }))
   const updateHowTo = (patch: Partial<SponsorPageSettings['howToSection']>) =>
@@ -49,14 +50,17 @@ export default function AdminSponsorPageDesign({ settings, onSaved }: {
 
   const submit = async (event) => {
     event.preventDefault()
+    const blocks = introEditorRef.current?.getBlocks() || []
     setSaving(true)
     try {
-      const introHtml = serializeRichBody(introEditorRef.current?.getBlocks() || [])
+      const uploaded = await uploadPendingRichBlocks(blocks, 'sponsor', (id, patch) => introEditorRef.current?.updateFigureMeta(id, patch))
+      const introHtml = serializeRichBody(uploaded)
       const saved = await saveSponsorPageSettings({ ...form, introHtml })
       setForm(saved)
       onSaved(saved)
       showToast({ message: '후원자 페이지 설정을 저장했습니다.', tone: 'success' })
     } catch (err) {
+      resetRejectedRichBlocks(blocks, err, (id, patch) => introEditorRef.current?.updateFigureMeta(id, patch))
       showToast({ message: err.message || '설정을 저장하지 못했습니다.', tone: 'error' })
     } finally {
       setSaving(false)
@@ -165,7 +169,8 @@ export default function AdminSponsorPageDesign({ settings, onSaved }: {
             <RichBodyEditor
               initialBlocks={introBlocks}
               apiRef={introEditorRef}
-              features={URL_ONLY_RICH_FEATURES}
+              features={UPLOAD_RICH_FEATURES}
+              allowArchiveFiles
               searchYoutube={searchYoutubeVideos}
               fetchLinkPreview={fetchLinkPreview}
             />

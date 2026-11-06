@@ -149,6 +149,10 @@ public class SecurityConfig {
                 // /api/admin/sponsors/** 이라 위쪽 ADMIN 경계에 이미 걸린다. 로고/배너 이미지는
                 // authenticated() 로 끝나는 /api/files/** 아래에 두지 않고 여기로 서빙한다.
                 auth.requestMatchers(HttpMethod.GET, "/api/sponsors", "/api/sponsors/**").permitAll();
+                // The service enforces row ownership and returns 404 for inaccessible pending media.
+                auth.requestMatchers(HttpMethod.GET, "/api/rich-media/{id}", "/api/rich-media/{id}/download").permitAll();
+                auth.requestMatchers(HttpMethod.POST, "/api/rich-media/sponsor/**").hasRole("ADMIN");
+                auth.requestMatchers("/api/rich-media/**").authenticated();
                 auth.requestMatchers(HttpMethod.GET, "/api/community/posts/*/share", "/api/community/posts/*/share-data", "/api/community/posts/*/share-image").permitAll();
                 auth.requestMatchers(HttpMethod.HEAD, "/api/community/posts/*/share", "/api/community/posts/*/share-data", "/api/community/posts/*/share-image").permitAll();
                 auth.requestMatchers("/api/mini-apps/**").authenticated();

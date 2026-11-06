@@ -7,7 +7,9 @@ import {
   externalBlockFromUrl,
   newPollBlock,
 } from '../../pages/community/postEditorUtils'
+import { RICH_FILE_ACCEPT, isAllowedRichFile } from './archiveFileOptions'
 import { FULL_RICH_FEATURES } from './richBodyFeatures'
+import { RICH_BODY_LIMITS } from '../../pages/community/validateUploadBlock'
 
 type EditorApi = {
   formatBlock: (command: string, value?: unknown) => void
@@ -32,10 +34,12 @@ export default function RichBodyEditor({
   onError,
   searchYoutube,
   fetchLinkPreview,
+  allowArchiveFiles = false,
 }: {
   initialBlocks: { type?: string; [key: string]: unknown }[]
   apiRef?: { current: EditorApi | null } | null
   features?: Record<string, boolean>
+  allowArchiveFiles?: boolean
   error?: string
   onError?: (message: string) => void
   searchYoutube?: (query: string) => Promise<{ items?: unknown[] } | null>
@@ -256,8 +260,8 @@ export default function RichBodyEditor({
         )}
         {features.fileUpload && (
         <label className="inline-flex cursor-pointer items-center gap-1.5 rounded border border-black/15 bg-[var(--app-surface)] px-3 py-2 text-sm font-semibold text-[var(--theme-body-mid)] hover:bg-black/5">
-          <Paperclip size={14} />압축파일
-          <input type="file" multiple accept=".zip,application/zip,application/x-zip-compressed" className="hidden"
+          <Paperclip size={14} />첨부파일
+          <input type="file" multiple accept={allowArchiveFiles ? RICH_FILE_ACCEPT : ".zip,application/zip,application/x-zip-compressed"} className="hidden"
             onChange={(e) => { editorApiRef.current?.insertFiles(Array.from(e.target.files)); e.target.value = '' }} />
         </label>
         )}
@@ -418,7 +422,7 @@ export default function RichBodyEditor({
       </div>
       )}
       {error && <p className="border-b border-[var(--app-hairline)] bg-red-50 px-3 py-2 text-sm font-semibold text-red-500">{error}</p>}
-      <RichEditor initialBlocks={initialBlocks} apiRef={editorApiRef} onError={(msg) => setError(msg)} />
+      <RichEditor isAllowedFile={allowArchiveFiles ? isAllowedRichFile : undefined} uploadLimits={allowArchiveFiles ? RICH_BODY_LIMITS : undefined} initialBlocks={initialBlocks} apiRef={editorApiRef} onError={(msg) => setError(msg)} />
     </div>
   )
 }

@@ -25,18 +25,18 @@ export function renderPostBlocks(post, options: {
   const { onPollVote, onPollClose, pollVoting, pollClosing } = options
   const imageDownloadUrl = (url) => {
     if (!url) return null
-    if (url.endsWith('/image')) return apiUrl(`${url}/download`)
+    if (url.endsWith('/image') || /\/api\/rich-media\/\d+$/.test(url)) return apiUrl(`${url}/download`)
     return apiUrl(url.replace(/\/images\/(\d+)$/, '/images/$1/download'))
   }
   const videoDownloadUrl = (url) => (
-    url ? apiUrl(url.replace(/\/videos\/(\d+)$/, '/videos/$1/download')) : null
+    url ? apiUrl(/\/api\/rich-media\/\d+$/.test(url) ? `${url}/download` : url.replace(/\/videos\/(\d+)$/, '/videos/$1/download')) : null
   )
   const attachments = blocks
     .filter((block) => (block.type === 'image' || block.type === 'video' || block.type === 'file') && block.url)
     .map((block) => ({
       key: `${block.type}-${block.url}`,
       name: block.name || (block.type === 'image' ? 'image' : block.type === 'video' ? 'video' : 'attachment.zip'),
-      href: block.type === 'image' ? imageDownloadUrl(block.url) : block.type === 'video' ? videoDownloadUrl(block.url) : apiUrl(block.url),
+      href: block.type === 'image' ? imageDownloadUrl(block.url) : block.type === 'video' ? videoDownloadUrl(block.url) : apiUrl(/\/api\/rich-media\/\d+$/.test(block.url) ? `${block.url}/download` : block.url),
     }))
     .filter((item, index, items) => item.href && items.findIndex((candidate) => candidate.href === item.href) === index)
   const allAttachments = attachments

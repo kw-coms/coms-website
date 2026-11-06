@@ -4,6 +4,7 @@ import com.coms.backend.domain.Sponsor;
 import com.coms.backend.domain.SponsorImage;
 import com.coms.backend.domain.SponsorPageSettingsEntity;
 import com.coms.backend.domain.SponsorTier;
+import com.coms.backend.domain.RichBodyMedia;
 import com.coms.backend.dto.SponsorAdminResponse;
 import com.coms.backend.dto.SponsorImageResponse;
 import com.coms.backend.dto.SponsorPageResponse;
@@ -79,6 +80,7 @@ public class SponsorService {
     private final StorageService storageService;
     private final RichContentSanitizer sanitizer;
     private final SponsorImageDeleter imageDeleter;
+    private final RichBodyMediaService richBodyMediaService;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final Clock clock;
 
@@ -89,6 +91,7 @@ public class SponsorService {
                           StorageService storageService,
                           RichContentSanitizer sanitizer,
                           SponsorImageDeleter imageDeleter,
+                          RichBodyMediaService richBodyMediaService,
                           Clock clock) {
         this.sponsorRepository = sponsorRepository;
         this.tierRepository = tierRepository;
@@ -97,6 +100,7 @@ public class SponsorService {
         this.storageService = storageService;
         this.sanitizer = sanitizer;
         this.imageDeleter = imageDeleter;
+        this.richBodyMediaService = richBodyMediaService;
         this.clock = clock;
     }
 
@@ -297,6 +301,10 @@ public class SponsorService {
      * MVC mapper, so an unknown settings key would otherwise be silently dropped instead of refused.
      */
     public SponsorPageSettings saveSettings(Map<String, Object> body) {
+        return saveSettings(body, null);
+    }
+
+    public SponsorPageSettings saveSettings(Map<String, Object> body, String actorStudentId) {
         SponsorPageSettings incoming;
         try {
             incoming = objectMapper.convertValue(body, SponsorPageSettings.class);
@@ -312,10 +320,27 @@ public class SponsorService {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "페이지 설정을 저장하지 못했습니다.");
         }
         settingsRepository.saveAndFlush(entity);
+        richBodyMediaService.syncAttachments(RichBodyMedia.Scope.SPONSOR, 1L,
+                combinedRichBody(validated), actorStudentId);
         if (!Objects.equals(previousBannerImageId, validated.bannerImageId())) {
             deleteImageIfUnreferenced(previousBannerImageId);
         }
         return validated;
+    }
+
+    private String combinedRichBody(SponsorPageSettings settings) {
+        var blocks = objectMapper.createArrayNode();
+        for (String body : new String[] {settings.introHtml(),
+                settings.howToSection() == null ? null : settings.howToSection().bodyHtml()}) {
+            if (body == null || body.isBlank()) continue;
+            try {
+                var parsed = objectMapper.readTree(body);
+                if (parsed.isArray()) parsed.forEach(blocks::add);
+            } catch (com.fasterxml.jackson.core.JsonProcessingException ignored) {
+                // Plain legacy copy has no media IDs to attach.
+            }
+        }
+        return blocks.toString();
     }
 
     // ---- Admin: images -------------------------------------------------------------------

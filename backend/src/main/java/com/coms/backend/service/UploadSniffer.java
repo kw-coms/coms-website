@@ -105,6 +105,25 @@ final class UploadSniffer {
         };
     }
 
+    /** Container signature check, without trusting the multipart MIME declaration. */
+    static boolean matchesVideoType(String contentType, byte[] header) {
+        if ("video/webm".equals(contentType)) {
+            return startsWith(header, new byte[]{0x1A, 0x45, (byte) 0xDF, (byte) 0xA3});
+        }
+        if (header == null || header.length < 12) return false;
+        boolean ftyp = regionMatches(header, 4, new byte[]{'f', 't', 'y', 'p'});
+        boolean quickTime = regionMatches(header, 8, new byte[]{'q', 't', ' ', ' '});
+        if ("video/mp4".equals(contentType)) return ftyp && !quickTime;
+        if ("video/quicktime".equals(contentType)) {
+            // Older QuickTime files can start with a movie/media atom, without ftyp.
+            return (ftyp && quickTime)
+                    || regionMatches(header, 4, new byte[]{'m', 'o', 'o', 'v'})
+                    || regionMatches(header, 4, new byte[]{'m', 'd', 'a', 't'})
+                    || regionMatches(header, 4, new byte[]{'w', 'i', 'd', 'e'});
+        }
+        return false;
+    }
+
     private static boolean startsWith(byte[] header, byte[] signature) {
         return regionMatches(header, 0, signature);
     }

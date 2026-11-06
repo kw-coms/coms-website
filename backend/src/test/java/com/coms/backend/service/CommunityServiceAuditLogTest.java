@@ -445,7 +445,7 @@ class CommunityServiceAuditLogTest {
         Long originalVideoId = communityService.addVideo(
                 author.getStudentId(),
                 created.id(),
-                new MockMultipartFile("video", "demo.mp4", "video/mp4", "video".getBytes())
+                new MockMultipartFile("video", "demo.mp4", "video/mp4", new byte[]{0, 0, 0, 16, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm', 0, 0, 0, 0})
         );
         Long originalFileId = communityService.addFile(
                 author.getStudentId(),

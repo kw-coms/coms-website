@@ -1,18 +1,17 @@
 import { textContentForSearch } from '../../pages/community/postEditorUtils'
 
-/**
- * Serializes editor blocks for the URL-only rich-body variant used by
- * notices and resources. Only text and externalEmbed blocks are persisted;
- * uploaded image/video/file and poll blocks are not reachable in that variant
- * because they require community-scoped backend endpoints.
- *
- * Returns a JSON string of blocks, or '' when there is no meaningful content.
- */
+/** Serializes rich blocks with saved media ids; pending uploads are excluded. */
 export function serializeRichBody(blocks) {
   const list = Array.isArray(blocks) ? blocks : []
   const serialized = list
     .map((b) => {
       if (b.type === 'text') return { type: 'text', content: b.content }
+      if ((b.type === 'image' || b.type === 'video') && Number.isSafeInteger(b.mediaId) && b.mediaId > 0) {
+        return { type: b.type, mediaId: b.mediaId, name: b.name, width: b.width || 75, align: b.align || 'center' }
+      }
+      if (b.type === 'file' && Number.isSafeInteger(b.fileId) && b.fileId > 0) {
+        return { type: 'file', fileId: b.fileId, name: b.name }
+      }
       if (b.type === 'externalEmbed') {
         if (b.kind === 'link') {
           // Link cards carry OG metadata and never an iframe/embedUrl; persist only the
@@ -47,7 +46,7 @@ export function serializeRichBody(blocks) {
     .filter(Boolean)
 
   const hasMeaning = serialized.some(
-    (b) => (b.type === 'text' && textContentForSearch(b.content).trim()) || b.type === 'externalEmbed',
+    (b) => (b.type === 'text' && textContentForSearch(b.content).trim()) || b.type === 'externalEmbed' || b.type === 'image' || b.type === 'video' || b.type === 'file',
   )
   if (!hasMeaning) return ''
   return JSON.stringify(serialized)
