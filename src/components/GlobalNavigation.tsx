@@ -71,6 +71,7 @@ export default function GlobalNavigation() {
   const groupWrapperRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const groupToggleRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const mobileMenuToggleRef = useRef<HTMLButtonElement | null>(null)
+  const progressRef = useRef<HTMLDivElement | null>(null)
   // Every navigation closes the mobile menu, not only its own links: the brand link, a
   // notification row and the browser's Back button change the route without closeAndGo.
   // location.key (not pathname) so /admin -> /admin?tab=… from a notification counts too.
@@ -100,7 +101,8 @@ export default function GlobalNavigation() {
         setScrolled(y > 8)
         setShowTop(y > 600)
         const max = document.documentElement.scrollHeight - window.innerHeight
-        document.documentElement.style.setProperty('--scroll-progress', (max > 0 ? y / max : 0).toFixed(4))
+        // On the bar itself: a custom property changed on <html> restyles the whole document.
+        progressRef.current?.style.setProperty('--scroll-progress', (max > 0 ? y / max : 0).toFixed(4))
       })
     }
     onScroll()
@@ -206,7 +208,7 @@ export default function GlobalNavigation() {
 
   return (
     <>
-    <div className="coms-scroll-progress" aria-hidden="true" />
+    <div ref={progressRef} className="coms-scroll-progress" aria-hidden="true" />
     <button
       type="button"
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}

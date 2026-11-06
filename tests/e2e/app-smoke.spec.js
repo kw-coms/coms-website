@@ -4510,3 +4510,71 @@ test('a member without calendar rights is not offered the calendar button', asyn
   await expect(page.locator('ol li').first()).toContainText('10:00 ~ 11:30')
   await expect(page.getByRole('button', { name: /캘린더에 등록/ })).toHaveCount(0)
 })
+
+// A throwaway glass element (Tailwind's backdrop-blur-md, as the Login/Sponsors panels use).
+const glassBlur = async (page) => page.evaluate(() => {
+  const el = document.createElement('div')
+  el.className = 'backdrop-blur-md'
+  document.body.append(el)
+  const value = getComputedStyle(el).backdropFilter
+  el.remove()
+  return value
+})
+
+test.describe('lite rendering mode', () => {
+  test('forcing lite sets data-perf and drops the glass blur', async ({ page }) => {
+    await mockOptionalApis(page)
+    await page.addInitScript(() => {
+      window.sessionStorage.setItem('coms.intro.played:v1', '1')
+      window.localStorage.setItem('kwcoms-perf-mode:v1', 'lite')
+    })
+    await page.goto('/activities')
+    await expect(page.locator('html')).toHaveAttribute('data-perf', 'lite')
+    expect(await glassBlur(page)).toBe('none')
+    // Auto chose nothing here, so the "we switched" notice stays away.
+    await expect(page.getByText('가벼운 화면으로 바꿨어요')).toHaveCount(0)
+  })
+
+  test('the screen-effects setting switches the look live and is remembered', async ({ page }) => {
+    await mockOptionalApis(page)
+    await page.addInitScript(() => window.sessionStorage.setItem('coms.intro.played:v1', '1'))
+    await page.goto('/activities')
+    await expect(page.locator('html')).toHaveAttribute('data-perf', 'full')
+    expect(await glassBlur(page)).toContain('blur')
+
+    const group = page.getByRole('radiogroup', { name: '화면 효과' })
+    await group.getByRole('radio', { name: '가볍게' }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-perf', 'lite')
+    await expect(group.getByRole('radio', { name: '가볍게' })).toHaveAttribute('aria-checked', 'true')
+    expect(await glassBlur(page)).toBe('none')
+
+    await page.reload()
+    await expect(page.locator('html')).toHaveAttribute('data-perf', 'lite')
+
+    await group.getByRole('radio', { name: '화려하게' }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-perf', 'full')
+    expect(await glassBlur(page)).toContain('blur')
+  })
+
+  test('auto without graphics acceleration picks lite and tells the visitor once', async ({ page }) => {
+    await mockOptionalApis(page)
+    await page.addInitScript(() => {
+      window.sessionStorage.setItem('coms.intro.played:v1', '1')
+      window.localStorage.removeItem('kwcoms-perf-mode:v1')
+      // A browser that cannot give a hardware WebGL context.
+      const real = HTMLCanvasElement.prototype.getContext
+      HTMLCanvasElement.prototype.getContext = function (type, opts) {
+        return type === 'webgl' && opts?.failIfMajorPerformanceCaveat ? null : real.call(this, type, opts)
+      }
+    })
+    await page.goto('/activities')
+    await expect(page.locator('html')).toHaveAttribute('data-perf', 'lite')
+    const notice = page.getByRole('status').filter({ hasText: '가벼운 화면으로 바꿨어요' })
+    await expect(notice).toBeVisible()
+    await notice.getByRole('button', { name: '확인' }).click()
+    await expect(notice).toHaveCount(0)
+    await page.reload()
+    await expect(page.locator('html')).toHaveAttribute('data-perf', 'lite')
+    await expect(page.getByText('가벼운 화면으로 바꿨어요')).toHaveCount(0)
+  })
+})

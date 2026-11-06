@@ -1,6 +1,13 @@
 import { Moon, Sun } from 'lucide-react'
 import { accentSwatches, footerLinkGroups } from '../data/homeContent'
 import { DEFAULT_ACCENT, normalizeHex } from '../utils/themeColors'
+import { setPerfPreference, usePerfState, type PerfPreference } from '../utils/perfMode'
+
+const PERF_CHOICES: { value: PerfPreference; label: string }[] = [
+  { value: 'auto', label: '자동' },
+  { value: 'lite', label: '가볍게' },
+  { value: 'full', label: '화려하게' },
+]
 
 export default function AppearanceControl({
   accentColor,
@@ -26,6 +33,7 @@ export default function AppearanceControl({
   const accent = normalizeHex(accentColor)
   const isDark = themeMode === 'dark'
   const fontSelectValue = selectedFontId ? String(selectedFontId) : ''
+  const perf = usePerfState()
 
   return (
     <footer className="appearance-control apple-footer-surface border-t border-[var(--app-hairline)] bg-[var(--app-surface-soft)] px-5 py-8 text-[var(--app-muted)]">
@@ -53,6 +61,31 @@ export default function AppearanceControl({
               </span>
               {isDark ? '라이트 모드' : '다크 모드'}
             </button>
+
+            <div className="appearance-perf-row flex flex-wrap items-center gap-2 lg:justify-end" role="radiogroup" aria-label="화면 효과">
+              <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">화면 효과</span>
+              <div className="inline-flex items-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] p-1">
+                {PERF_CHOICES.map((choice) => {
+                  const active = perf.preference === choice.value
+                  return (
+                    <button
+                      key={choice.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      data-perf-choice={choice.value}
+                      onClick={() => setPerfPreference(choice.value)}
+                      className={`min-h-9 rounded-full px-3 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 ${active ? 'bg-[var(--app-text)] text-[var(--app-surface)]' : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'}`}
+                    >
+                      {choice.label}
+                    </button>
+                  )
+                })}
+              </div>
+              <span className="text-[11px] text-[var(--app-subtle)]">
+                {perf.preference === 'auto' ? (perf.mode === 'lite' ? '지금은 가벼운 화면' : '지금은 화려한 화면') : ''}
+              </span>
+            </div>
 
             {activeFonts.length > 0 && (
               <div className="appearance-font-row flex flex-wrap items-center gap-2 lg:justify-end" aria-label="폰트 설정">

@@ -23,6 +23,7 @@ import ClubCalendarSection from '../../features/clubCalendar/ClubCalendarSection
 import HeroField from './HeroField'
 import { BuildMini, ClubOsVisual, FlowMini, JoinFlowVisual, JoinMini, LearningStackVisual, ProjectLabVisual } from './HomeVisuals'
 import { scrollToTopInstant } from '../../utils/themeColors'
+import { getPerfState } from '../../utils/perfMode'
 import { useAuth } from '../../contexts/useAuth'
 
 const LATEST_NOTICE_QUERY_KEY = ['app-shell', 'latest-notice']
@@ -98,6 +99,7 @@ export default function HomeView() {
       if (raf) return
       raf = requestAnimationFrame(() => {
         raf = 0
+        if (getPerfState().mode === 'lite') return
         // 0 with the hero in full view, 1 once the page has scrolled most of it away.
         const out = Math.min(1, Math.max(0, -track.getBoundingClientRect().top / Math.max(1, track.offsetHeight * 0.85)))
         track.style.setProperty('--hero-out', out.toFixed(3))
@@ -206,6 +208,7 @@ export default function HomeView() {
                 ref={heroInnerRef}
                 className="coms-cinema-content relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center"
                 onPointerMove={(e) => {
+                  if (getPerfState().mode === 'lite') return
                   const r = e.currentTarget.getBoundingClientRect()
                   const px = (e.clientX - r.left) / r.width - 0.5
                   const py = (e.clientY - r.top) / r.height - 0.5

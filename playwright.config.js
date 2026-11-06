@@ -40,6 +40,15 @@ export default defineConfig({
   },
   use: {
     baseURL: BACKEND_MODE ? `http://localhost:${DEV_PORT}` : `http://127.0.0.1:${PORT}`,
+    // CI browsers have no GPU, so "auto" would pick the lite look and move every visual
+    // baseline. Pin the full look; tests of the lite mode set their own value.
+    storageState: {
+      cookies: [],
+      origins: [{
+        origin: BACKEND_MODE ? `http://localhost:${DEV_PORT}` : `http://127.0.0.1:${PORT}`,
+        localStorage: [{ name: 'kwcoms-perf-mode:v1', value: 'full' }],
+      }],
+    },
     trace: 'on-first-retry',
   },
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
