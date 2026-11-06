@@ -18,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -72,6 +73,8 @@ public class RichBodyMediaService {
             original = org.springframework.util.StringUtils.stripFilenameExtension(original) + "." + extension;
             if (original.length() > 255) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일 이름이 너무 깁니다.");
         }
+        // Best-effort early rejection; the locked re-check below remains authoritative.
+        checkPendingQuota(member.getId(), file.getSize());
         try {
             String stored = kind == RichBodyMedia.Kind.IMAGE ? storage.storeImage(file, type, extension) : storage.store(file, extension);
             RichBodyMedia media = new RichBodyMedia(kind, scope, stored, original, type, file.getSize(), member.getId());
@@ -79,16 +82,28 @@ public class RichBodyMediaService {
                 // Only quota check + insert hold the member lock shared with login/refresh.
                 return uploadTransaction.execute(status -> {
                     members.findWithLockById(member.getId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
-                    if (repository.countByUploaderIdAndOwnerIdIsNull(member.getId()) >= MAX_PENDING_COUNT
-                            || repository.sumPendingBytes(member.getId()) > MAX_PENDING_BYTES - file.getSize()) {
-                        throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
-                                "저장하지 않은 업로드가 너무 많습니다. 글을 저장하거나 잠시 후 다시 시도해 주세요.");
-                    }
+                    checkPendingQuota(member.getId(), file.getSize());
                     return repository.saveAndFlush(media);
                 });
-            } catch (RuntimeException e) { storage.delete(stored); throw e; }
+            } catch (RuntimeException e) {
+                try {
+                    storage.delete(stored);
+                } catch (RuntimeException del) {
+                    log.error("Could not delete rich media file {}", stored, del);
+                    e.addSuppressed(del);
+                }
+                throw e;
+            }
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장에 실패했습니다.");
+        }
+    }
+
+    private void checkPendingQuota(Long uploaderId, long sizeBytes) {
+        if (repository.countByUploaderIdAndOwnerIdIsNull(uploaderId) >= MAX_PENDING_COUNT
+                || repository.sumPendingBytes(uploaderId) > MAX_PENDING_BYTES - sizeBytes) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "저장하지 않은 업로드가 너무 많습니다. 글을 저장하거나 잠시 후 다시 시도해 주세요.");
         }
     }
 
@@ -124,7 +139,8 @@ public class RichBodyMediaService {
             }
             row.attach(ownerId, LocalDateTime.now(clock));
         }
-        for (RichBodyMedia row : repository.findByScopeAndOwnerId(scope, ownerId)) {
+        for (RichBodyMedia row : repository.findByScopeAndOwnerId(scope, ownerId).stream()
+                .sorted(Comparator.comparing(RichBodyMedia::getId)).toList()) {
             if (!referenced.contains(row.getId())) row.detach();
         }
     }

@@ -166,8 +166,8 @@ class RichBodyMediaServiceTest {
         when(actor.getRole()).thenReturn(role);
         when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
         when(members.findWithLockById(100L)).thenReturn(Optional.of(actor));
-        when(rows.countByUploaderIdAndOwnerIdIsNull(100L)).thenReturn(count);
-        when(rows.sumPendingBytes(100L)).thenReturn(bytes);
+        when(rows.countByUploaderIdAndOwnerIdIsNull(100L)).thenReturn(0L, count);
+        when(rows.sumPendingBytes(100L)).thenReturn(0L, bytes);
         var file = new org.springframework.mock.web.MockMultipartFile("file", "a.pdf", "application/pdf", new byte[]{1});
         when(validator.validateFile(file)).thenReturn("application/pdf");
         when(storage.store(file, "pdf")).thenReturn("stored.pdf");
@@ -185,6 +185,72 @@ class RichBodyMediaServiceTest {
         order.verify(transactions).rollback(any());
         order.verify(storage).delete("stored.pdf");
         verify(rows, never()).saveAndFlush(any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"30,0", "0,524288000"})
+    void preCheckOverQuotaStoresNothing(long count, long bytes) throws Exception {
+        var file = prepareUpload();
+        when(rows.countByUploaderIdAndOwnerIdIsNull(100L)).thenReturn(count);
+        when(rows.sumPendingBytes(100L)).thenReturn(bytes);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class, error -> {
+                    assertThat(error.getStatusCode().value()).isEqualTo(429);
+                    assertThat(error.getReason()).isEqualTo("저장하지 않은 업로드가 너무 많습니다. 글을 저장하거나 잠시 후 다시 시도해 주세요.");
+                });
+        verifyNoInteractions(storage, transactions);
+        verify(members, never()).findWithLockById(anyLong());
+        verify(rows, never()).saveAndFlush(any());
+    }
+
+    @Test void saveFailureDeletesStoredFileAndPropagatesOriginalException() throws Exception {
+        var file = prepareUpload();
+        var failure = new IllegalStateException("database unavailable");
+        when(rows.saveAndFlush(any())).thenThrow(failure);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor"))
+                .isSameAs(failure);
+        var order = inOrder(transactions, storage);
+        order.verify(transactions).rollback(any());
+        order.verify(storage).delete("stored.pdf");
+    }
+
+    @Test void memberMissingInsideTransactionDeletesStoredFile() throws Exception {
+        var file = prepareUpload();
+        when(members.findWithLockById(100L)).thenReturn(Optional.empty());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode().value()).isEqualTo(401));
+        var order = inOrder(transactions, storage);
+        order.verify(transactions).rollback(any());
+        order.verify(storage).delete("stored.pdf");
+        verify(rows, never()).saveAndFlush(any());
+    }
+
+    @Test void cleanupFailureIsSuppressedOnOriginalException() throws Exception {
+        var file = prepareUpload();
+        var failure = new IllegalStateException("database unavailable");
+        var deletionFailure = new IllegalStateException("disk unavailable");
+        when(rows.saveAndFlush(any())).thenThrow(failure);
+        doThrow(deletionFailure).when(storage).delete("stored.pdf");
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor"))
+                .isSameAs(failure);
+        assertThat(failure.getSuppressed()).containsExactly(deletionFailure);
+        verify(storage).delete("stored.pdf");
+    }
+
+    private org.springframework.mock.web.MockMultipartFile prepareUpload() throws Exception {
+        Member actor = mock(Member.class);
+        when(actor.getId()).thenReturn(100L);
+        when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
+        when(members.findWithLockById(100L)).thenReturn(Optional.of(actor));
+        var file = new org.springframework.mock.web.MockMultipartFile("file", "a.pdf", "application/pdf", new byte[]{1});
+        when(validator.validateFile(file)).thenReturn("application/pdf");
+        when(storage.store(file, "pdf")).thenReturn("stored.pdf");
+        return file;
     }
 
     @Test void exactPendingByteLimitAndThirtiethUploadAreAllowed() throws Exception {
@@ -276,6 +342,21 @@ class RichBodyMediaServiceTest {
         order.verify(rows).findLockedById(3L);
         order.verify(rows).findByScopeAndOwnerId(NOTICE, 50L);
         order.verifyNoMoreInteractions();
+    }
+
+    @Test void detachesRemovedRowsInAscendingIdOrder() {
+        var first = spy(row(1, RichBodyMedia.Kind.IMAGE, NOTICE, 100));
+        var second = spy(row(2, RichBodyMedia.Kind.IMAGE, NOTICE, 100));
+        var third = spy(row(3, RichBodyMedia.Kind.IMAGE, NOTICE, 100));
+        for (var media : List.of(first, second, third)) media.attach(50L, LocalDateTime.now());
+        when(rows.findByScopeAndOwnerId(NOTICE, 50L)).thenReturn(List.of(third, first, second));
+
+        service.syncAttachments(NOTICE, 50L, "[]", null);
+
+        var order = inOrder(first, second, third);
+        order.verify(first).detach();
+        order.verify(second).detach();
+        order.verify(third).detach();
     }
 
     private void assertBadAttachment(String content) {
