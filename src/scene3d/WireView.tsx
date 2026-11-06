@@ -18,7 +18,8 @@ export const WireView = memo(function WireView({ wire, a, b, selected, glow }: {
   const color = wireHex(wire.color);
   const dark = useMemo(() => `#${new Color(color).multiplyScalar(0.55).getHexString()}`, [color]);
   return (
-    <group>
+    // key: R3F leaves the old colour on the existing materials when another example reuses the wire id
+    <group key={color}>
       <mesh geometry={geo} castShadow userData={{ wireId: wire.id }}>
         <meshPhysicalMaterial color={color} roughness={0.28} clearcoat={0.9} clearcoatRoughness={0.15} emissive={glow ? '#33e0ff' : selected ? '#ffffff' : '#000000'} emissiveIntensity={glow ? 0.9 : selected ? 0.25 : 0} />
       </mesh>
