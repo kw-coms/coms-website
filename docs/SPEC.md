@@ -24,11 +24,12 @@ World = millimetres, Y up, breadboard top surface at y = 0. Parts rotate only ar
 Pin `pos` is the local position of the pin's insertion point (bottom of the leg for through-hole parts, the hole/socket for boards).
 A pin is *inserted* into a breadboard hole or UNO header socket when their world XZ positions are within 0.6 mm. Pitch 2.54 mm.
 
-## Parts (M1)
+## Parts
 Arduino UNO R3 · breadboard (half 30 cols, full 63 cols) · jumper wire · LED (빨강/초록/파랑/노랑/흰색) · resistor (any value, E12/E24 presets, color bands from value) ·
 4-leg pushbutton · slide switch · potentiometer 10k (knob) · photoresistor/CDS (light slider) · piezo buzzer (tone) · RGB LED (common cathode/anode) ·
 SG90 servo (pulse width → angle) · HC-SR04 (distance slider, trig/echo timing) · LCD1602 I2C (PCF8574 @0x27, HD44780 text) · multimeter (V / mA).
-M2: DHT11, joystick, 7-segment, NeoPixel strip, L9110S + DC motor, study-page "Lab에서 열기" links, club-account save.
+DHT11 (temperature/humidity sliders, real single-wire timing) · joystick (x/y + push) · 7-segment (common cathode/anode) · NeoPixel strip (WS2812 timing decoded, prop count) · L9110S driver + DC motor (needs its own supply, PWM speed, direction).
+No demo/prototype stage: the first version shown to the user is the complete one (user instruction 2026-11-07). Later, outside this repo: study-page "Lab에서 열기" links after deployment.
 
 ## Electrical model
 DC operating point via Modified Nodal Analysis, recomputed whenever MCU pin states or user inputs change (throttled to ≤ 60 Hz):

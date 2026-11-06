@@ -20,7 +20,13 @@ export type PartKind =
   | 'servo'
   | 'hc-sr04'
   | 'lcd1602-i2c'
-  | 'multimeter';
+  | 'multimeter'
+  | 'dht11'
+  | 'joystick'
+  | 'seven-segment'
+  | 'neopixel-strip'
+  | 'l9110s'
+  | 'dc-motor';
 
 export type PartCategory = '보드' | '기본' | '입력' | '출력' | '센서' | '디스플레이' | '측정';
 
@@ -47,7 +53,7 @@ export interface PropDef {
 }
 
 export interface SimInputDef {
-  key: 'pressed' | 'position' | 'lux' | 'distanceCm';
+  key: 'pressed' | 'position' | 'lux' | 'distanceCm' | 'temperature' | 'humidity' | 'x' | 'y';
   label: string; // Korean
   type: 'momentary' | 'range';
   min?: number;
@@ -136,6 +142,10 @@ export interface PartVisualState {
   lcd?: { lines: [string, string]; backlight: boolean; cursor?: { row: number; col: number; visible: boolean } };
   meter?: { reading: string; mode: 'V' | 'mA' };
   hcsr04?: { pinging: boolean };
+  sevenSeg?: { segments: boolean[] }; // a,b,c,d,e,f,g,dp
+  pixels?: { colors: [number, number, number][] }; // 0..255 per channel, one per LED
+  motor?: { rpm: number; direction: -1 | 0 | 1 };
+  dht?: { busy: boolean };
   /** Per-pin voltages for tooltips. */
   pinVolts?: Record<string, number>;
 }
