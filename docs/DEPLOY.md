@@ -278,3 +278,15 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://coms.kw.ac.kr/lab/api/health
 ```sh
 docker run --rm --user 10001:10001 --tmpfs /tmp:size=1g,exec -v "$PWD/compiler:/m:ro" -w /m --entrypoint node coms-circuit-lab-compiler:local /m/measure.mjs 2
 ```
+
+## Content-Security-Policy (`/lab/`)
+
+`/lab/` 응답에는 아래 CSP를 붙인다. `tools/e2e-prod.mjs`(`npm run e2e:prod`)가 이 헤더로 운영 빌드를 띄워 위반이 없는지, 워커가 뜨는지, Blink가 컴파일·실행되는지 확인한다.
+
+```
+default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self'
+```
+
+- `style-src 'unsafe-inline'`: CodeMirror가 `<style>` 요소를 주입하므로 필요하다.
+- `img-src data:`: `index.html`의 인라인 파비콘 때문에 필요하다.
+- 메인 사이트 CSP가 `/lab/`에도 적용된다면, 위 항목이 빠지지 않았는지 nginx `location /lab/`에서 `add_header Content-Security-Policy ... always;`로 확인한다.
