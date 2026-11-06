@@ -206,6 +206,16 @@ export function initStudyPage(root: HTMLElement, progressKey: string): () => voi
     d.console.scrollTop = d.console.scrollHeight
   }, { signal })
 
+  // Circuit drawings (Tinkercad-style 3D scenes + simulation): a separate chunk, fetched only when the fragment has one.
+  let disposed = false
+  let unmountCircuits: (() => void) | null = null
+  if (root.querySelector('figure.circuit[data-circuit]')) {
+    import('./circuits').then(
+      (m) => { if (!disposed) unmountCircuits = m.mountCircuits(root) },
+      () => { /* chunk failed to load: the static caption and aria-label of each figure remain */ },
+    )
+  }
+
   // Progress checkboxes
   let saved: Record<string, boolean> = {}
   try { saved = JSON.parse(localStorage.getItem(progressKey) || '{}') || {} } catch { saved = {} }
@@ -253,6 +263,8 @@ export function initStudyPage(root: HTMLElement, progressKey: string): () => voi
   onScroll()
 
   return () => {
+    disposed = true
+    unmountCircuits?.()
     ac.abort()
     io.disconnect()
     timers.forEach((t) => window.clearTimeout(t))

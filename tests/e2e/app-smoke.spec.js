@@ -4588,3 +4588,74 @@ test.describe('lite rendering mode', () => {
     await expect(page.getByText('가벼운 화면으로 바꿨어요')).toHaveCount(0)
   })
 })
+
+// /study/arduino draws each wiring table as an interactive circuit (separate chunk, loaded when the page has one).
+test.describe('arduino study circuits', () => {
+  const circuit = (page, id) => page.locator(`figure.circuit[data-circuit="${id}"]`)
+
+  test('the LED blink simulation toggles the LED like the sketch', async ({ page }) => {
+    await page.goto('/study/arduino')
+    const fig = circuit(page, 'led-blink')
+    await expect(fig).toHaveClass(/is-live/)
+    await fig.scrollIntoViewIfNeeded()
+    await fig.getByRole('button', { name: '▶ 시뮬레이션' }).click()
+    // delay(500) on, delay(500) off: both states show up within a few seconds
+    await expect(fig).toHaveAttribute('data-led', 'on')
+    await expect(fig).toHaveAttribute('data-led', 'off')
+    await expect(fig).toHaveAttribute('data-led', 'on')
+    await fig.getByRole('button', { name: '■ 정지' }).click()
+    await expect(fig).toHaveAttribute('data-led', 'off')
+    await expect(fig).toHaveAttribute('data-sim', 'off')
+  })
+
+  test('the potentiometer figure shows analogRead and the PWM duty', async ({ page }) => {
+    await page.goto('/study/arduino')
+    const fig = circuit(page, 'pot-led')
+    await expect(fig).toHaveClass(/is-live/)
+    await fig.scrollIntoViewIfNeeded()
+    await fig.getByRole('button', { name: '▶ 시뮬레이션' }).click()
+    await fig.getByRole('slider', { name: /가변저항 값/ }).fill('800')
+    await expect(fig.locator('.circuit-status')).toContainText('analogRead(A0) = 800')
+    await expect(fig.locator('.circuit-status')).toContainText('analogWrite(9, 199)') // map(800, 0, 1023, 0, 255) = 199
+    await expect(fig).toHaveAttribute('data-led', 'on')
+  })
+
+  test('the button figure follows INPUT_PULLUP: pressed reads LOW and lights the LED', async ({ page }) => {
+    await page.goto('/study/arduino')
+    const fig = circuit(page, 'button-led')
+    await expect(fig).toHaveClass(/is-live/)
+    await fig.scrollIntoViewIfNeeded()
+    await fig.getByRole('button', { name: '▶ 시뮬레이션' }).click()
+    const key = fig.getByRole('button', { name: /택트 스위치/ })
+    await key.focus()
+    await page.keyboard.down('Space')
+    await expect(fig.locator('.circuit-status')).toContainText('D2 = LOW')
+    await expect(fig).toHaveAttribute('data-led', 'on')
+    await page.keyboard.up('Space')
+    await expect(fig.locator('.circuit-status')).toContainText('D2 = HIGH')
+    await expect(fig).toHaveAttribute('data-led', 'off')
+  })
+
+  test('wiring table rows highlight their wire, and the stepper reveals parts in table order', async ({ page }) => {
+    await page.goto('/study/arduino')
+    const fig = circuit(page, 'led-blink')
+    await expect(fig).toHaveClass(/is-live/)
+    await fig.scrollIntoViewIfNeeded()
+    const rows = page.locator('table.ref tr.circuit-row')
+    await expect(rows).toHaveCount(3 + 3 + 4 + 4 + 3 + 2 + 8) // every circuit's table is linked
+    const first = fig.locator('xpath=preceding-sibling::div[contains(@class,"table-wrap")][1]').locator('tr.circuit-row').first()
+    await first.focus()
+    await expect(fig.locator('.cw.is-hl')).toHaveCount(1)
+    await expect(first).toHaveClass(/circuit-row-on/)
+
+    await fig.getByRole('button', { name: '조립 순서 보기' }).click()
+    await expect(fig.locator('.circuit-progress')).toHaveText('1 / 3')
+    await expect(fig.locator('.cstep-off')).not.toHaveCount(0) // LED and the GND wire are still hidden
+    await fig.getByRole('button', { name: '다음 단계' }).click()
+    await fig.getByRole('button', { name: '다음 단계' }).click()
+    await expect(fig.locator('.circuit-progress')).toHaveText('3 / 3')
+    await expect(fig.locator('.cstep-off')).toHaveCount(0)
+    await fig.getByRole('button', { name: '전체 보기' }).click()
+    await expect(fig.locator('.circuit-stepper')).toBeHidden()
+  })
+})
