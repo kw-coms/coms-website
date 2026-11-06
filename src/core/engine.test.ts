@@ -5,6 +5,18 @@ import type { Scene } from './types';
 const find = (kind: string) => structuredClone(EXAMPLES.find(e => e.scene.parts.some(p => p.kind === kind))!.scene);
 const board: Scene = { version: 1, parts: [{ id: 'u', kind: 'arduino-uno', pos: [0, 0, 0], rotY: 0, props: {} }], wires: [], code: '' };
 describe('headless engine integration', () => {
+    it('reports a floating wired INPUT only after the sketch reads that pin', () => {
+        const scene = structuredClone(board);
+        scene.parts.push({ id: 'b', kind: 'pushbutton', pos: [0, 0, 0], rotY: 0, props: {} });
+        scene.wires.push({ id: 'w1', from: { partId: 'u', pinId: 'D2' }, to: { partId: 'b', pinId: '1' }, color: 'blue' });
+        scene.wires.push({ id: 'w2', from: { partId: 'b', pinId: '3' }, to: { partId: 'u', pinId: 'GND.1' }, color: 'black' });
+        const e = new SimulationEngine();
+        e.setScene(scene);
+        const floating = () => e.frame().warnings.filter(w => w.id.startsWith('floating:')).map(w => w.id);
+        expect(floating()).toEqual([]);
+        e.mcu.cpu.readData(0x29); // PIND, as digitalRead does
+        expect(floating()).toEqual(['floating:D2']);
+    });
     it('PWM LED brightness integrates on-current without turning input voltage into a duty average', () => {
         let now = 0;
         const e = new SimulationEngine(() => now);

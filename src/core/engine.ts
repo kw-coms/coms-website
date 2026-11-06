@@ -348,7 +348,7 @@ export class SimulationEngine {
       timeMs: this.mcu.cpu.cycles / MCU_HZ * 1000,
       realtimeRatio: realtimeRatio ?? (this.elapsedReal > 0 ? this.elapsedCycles / MCU_HZ / (this.elapsedReal / 1000) : 0),
       pins, parts, netVolts: solution.netVolts,
-      warnings: [...new Map([...this.analysis.warnings, ...solution.warnings].map(warning => [warning.id, warning])).values()],
+      warnings: [...new Map([...this.analysis.warnings, ...solution.warnings.filter(warning => !warning.id.startsWith('floating:') || (pins[warning.id.slice(9)]?.mode === 'input' && this.mcu.readPins.has(warning.id.slice(9))))].map(warning => [warning.id, warning])).values()],
     };
   }
 }

@@ -37,6 +37,7 @@ class SketchRun {
       this.clock += 20;
       this.frame = this.engine.step(Math.min(20, ms - elapsed) * 16_000);
       expect(this.frame.warnings.filter(warning => warning.level === 'error')).toEqual([]);
+      expect(this.frame.warnings.filter(warning => warning.id.startsWith('floating:'))).toEqual([]);
       observe?.(this.frame);
     }
     this.realMs += performance.now() - start;

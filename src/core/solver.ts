@@ -346,11 +346,16 @@ export function solveCircuit(scene: Scene, analysis: Analysis, pins: Record<stri
             }
     }
     const floating = analysis.nets.filter(n => !reached.has(n.id)).map(n => n.id);
+    // Floating warning only for a pin the user wired something to (another pin on its net besides the header pin itself).
+    // An unconnected INPUT pin (every unused pin at reset) never warns; INPUT_PULLUP is mode 'input_pullup', never 'input'.
     for (const p of scene.parts)
         if (p.kind === 'arduino-uno')
-            for (const [id, state] of Object.entries(pins))
-                if (state.mode === 'input' && net(p.id, id) !== undefined && floating.includes(net(p.id, id)!))
-                    warnings.push({ id: `floating:${id}`, level: 'warn', partId: p.id, message: `${id} 입력 핀이 플로팅 상태입니다.` });
+            for (const [id, state] of Object.entries(pins)) {
+                const netId = net(p.id, id);
+                if (state.mode !== 'input' || netId === undefined || !floating.includes(netId)) continue;
+                if (!analysis.nets.find(n => n.id === netId)?.pins.some(r => r.partId !== p.id || r.pinId !== id)) continue;
+                warnings.push({ id: `floating:${id}`, level: 'warn', partId: p.id, message: `${id} 입력이 떠 있어요(플로팅). 풀업/풀다운 저항이나 INPUT_PULLUP을 쓰세요.` });
+            }
     for (const n of analysis.nets) {
         const outs = n.pins.filter(p => scene.parts.find(x => x.id === p.partId)?.kind === 'arduino-uno').map(p => [p.pinId, pins[p.pinId]] as const).filter(([, s]) => s?.mode === 'output');
         if (outs.some(([, s]) => s!.level === 0) && outs.some(([, s]) => s!.level === 1))

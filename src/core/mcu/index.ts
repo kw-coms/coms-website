@@ -1,7 +1,7 @@
 import {
   CPU, avrInstruction, AVRIOPort, portBConfig, portCConfig, portDConfig,
   PinState, AVRTimer, timer0Config, timer1Config, timer2Config, AVRUSART,
-  usart0Config, AVRADC, adcConfig, AVRTWI, twiConfig,
+  usart0Config, AVRADC, adcConfig, AVRTWI, twiConfig, ADCMuxInputType,
 } from 'avr8js';
 import type { McuPinState } from '../types';
 import { Lcd1602 } from './lcd';
@@ -41,6 +41,8 @@ export class Mcu {
   private dht = new Map<string, DHT11Protocol>();
   private dhtSamples = new Map<string, () => { temperature: number; humidity: number }>();
   private pixels = new Map<string, WS2812Protocol>();
+  /** Pins the sketch has actually read (digitalRead → PINx access, analogRead → ADC mux); used to gate floating-input warnings. */
+  readPins = new Set<string>();
   constructor(onSerial: (text: string) => void = () => { }) {
     this.onSerial = onSerial;
     this.reset();
@@ -55,6 +57,20 @@ export class Mcu {
     this.usart.onByteTransmit = byte => this.onSerial(String.fromCharCode(byte));
     this.adc = new AVRADC(this.cpu, adcConfig);
     this.adc.avcc = 5;
+    this.readPins = new Set();
+    const adcRead = this.adc.onADCRead;
+    this.adc.onADCRead = input => {
+      if (input.type === ADCMuxInputType.SingleEnded) this.readPins.add(`A${input.channel}`);
+      adcRead(input);
+    };
+    // ponytail: PINx is a whole-port register, so a read marks every pin of that port; bit-level needs instruction decode.
+    for (const port of ['B', 'C', 'D'] as const) {
+      const pinAddr = this.ports[port].portConfig.PIN;
+      this.cpu.readHooks[pinAddr] = addr => {
+        for (const [n, [p]] of Object.entries(map)) if (p === port) this.readPins.add(n);
+        return this.cpu.data[addr]!;
+      };
+    }
     this.twi = new AVRTWI(this.cpu, twiConfig, MCU_HZ);
     this.lcd = new Lcd1602(this.lcd.address);
     this.lcds = new Map([...this.lcds.keys()].map(address => [address, new Lcd1602(address)]));
@@ -177,7 +193,7 @@ export class Mcu {
     for (const [name, [port, bit]] of Object.entries(map)) {
       const state = this.ports[port].pinState(bit);
       const mode = state === PinState.Input ? 'input' : state === PinState.InputPullUp ? 'input_pullup' : 'output';
-      const level: 0 | 1 = mode === 'output' ? (state === PinState.High ? 1 : 0) : ((this.cpu.readData(this.ports[port].portConfig.PIN) & (1 << bit)) ? 1 : 0);
+      const level: 0 | 1 = mode === 'output' ? (state === PinState.High ? 1 : 0) : ((this.cpu.data[this.ports[port].portConfig.PIN]! & (1 << bit)) ? 1 : 0);
       const events = this.history.get(name);
       let previousLevel: 0 | 1 = 0;
       let previousCycle = cutoff;

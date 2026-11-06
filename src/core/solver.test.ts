@@ -44,6 +44,17 @@ describe('DC solver', () => {
     expect(solveCircuit(scene, analysis, pins).netVolts.in).toBeCloseTo(5, 2);
     expect(solveCircuit(scene, analysis, pins, { button: { pressed: true } }).netVolts.in).toBeLessThan(0.01);
   });
+  it('warns about a floating INPUT only when something is wired to the pin', () => {
+    // Choice: a pin nothing is wired to never warns, even if the sketch reads it (nothing for the user to fix on the board).
+    const scene: Scene = { version: 1, parts: [part('uno', 'arduino-uno'), part('button', 'pushbutton')], wires: [], code: '' };
+    const connections = { 'uno:D2': 'in', 'uno:GND.1': 'g', 'button:1': 'in', 'button:3': 'g', 'uno:D3': 'lone' };
+    const net = (id: string): Analysis['nets'][number] => ({ id, pins: Object.entries(connections).filter(([, n]) => n === id).map(([ref]) => ({ partId: ref.split(':')[0]!, pinId: ref.split(':')[1]! })) });
+    const analysis: Analysis = { pinToNet: connections, nets: ['in', 'g', 'lone'].map(net), insertions: {}, warnings: [] };
+    const pin = (mode: 'input' | 'input_pullup') => ({ mode, level: 0 as const, duty: 0, freq: 0 });
+    const ids = (pins: Record<string, ReturnType<typeof pin>>) => solveCircuit(scene, analysis, pins).warnings.filter(w => w.id.startsWith('floating:')).map(w => w.id);
+    expect(ids({ D2: pin('input'), D3: pin('input') })).toEqual(['floating:D2']);
+    expect(ids({ D2: pin('input_pullup'), D3: pin('input_pullup') })).toEqual([]);
+  });
   it('reports a direct short through a closed switch', () => {
     const scene: Scene = { version: 1, parts: [part('uno', 'arduino-uno'), part('button', 'pushbutton')], wires: [], code: '' };
     const connections = { 'uno:5V': 'v', 'uno:GND.1': 'g', 'button:1': 'v', 'button:3': 'g' };
