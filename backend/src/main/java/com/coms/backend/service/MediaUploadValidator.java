@@ -14,6 +14,12 @@ import java.util.Set;
 @Component
 public class MediaUploadValidator {
     private static final long MB = 1024L * 1024;
+    public static final int MAX_BODY_IMAGES = 20;
+    public static final int MAX_BODY_VIDEOS = 3;
+    public static final int MAX_BODY_FILES = 10;
+    public static final int MAX_BODY_MEDIA_BLOCKS = 200;
+    public static final long MAX_PENDING_BYTES = 500 * MB;
+    public static final int MAX_PENDING_COUNT = 30;
     private static final Set<String> IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
     private static final Set<String> VIDEO_TYPES = Set.of("video/mp4", "video/webm", "video/quicktime");
 
@@ -52,7 +58,22 @@ public class MediaUploadValidator {
             throw badRequest("파일 내용이 확장자와 일치하지 않습니다.");
         }
         // Files are always attachments; never persist a client-supplied active MIME type.
-        return SafeMediaTypes.forDownload(file.getContentType()).toString();
+        var safeType = SafeMediaTypes.forDownload(file.getContentType());
+        String baseType = safeType.getType() + "/" + safeType.getSubtype();
+        return baseType.length() <= 100 ? baseType : "application/octet-stream";
+    }
+
+    public static String canonicalExtension(String validatedType) {
+        return switch (validatedType) {
+            case "image/jpeg" -> "jpg";
+            case "image/png" -> "png";
+            case "image/gif" -> "gif";
+            case "image/webp" -> "webp";
+            case "video/mp4" -> "mp4";
+            case "video/webm" -> "webm";
+            case "video/quicktime" -> "mov";
+            default -> throw new IllegalArgumentException("Unsupported media type: " + validatedType);
+        };
     }
 
     public static String cleanOriginalFilename(MultipartFile file) {

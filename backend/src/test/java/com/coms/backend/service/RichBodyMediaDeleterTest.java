@@ -4,6 +4,7 @@ import com.coms.backend.domain.RichBodyMedia;
 import com.coms.backend.repository.RichBodyMediaRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,6 +32,34 @@ class RichBodyMediaDeleterTest {
         verify(repository).delete(old);
         verify(storage, never()).delete("stored-2");
         verify(storage, never()).delete("stored-3");
+    }
+
+    @Test void deletesFileOnlyAfterCommit() {
+        var old = media(4L, cutoff.minusSeconds(1));
+        when(repository.findLockedById(4L)).thenReturn(Optional.of(old));
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            assertThat(deleter.deleteIfStillOrphan(4L, cutoff)).isTrue();
+            verify(repository).delete(old);
+            verify(storage, never()).delete(anyString());
+            TransactionSynchronizationManager.getSynchronizations().forEach(sync -> sync.afterCommit());
+            verify(storage).delete("stored-4");
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test void keepsFileWhenTransactionDoesNotCommit() {
+        var old = media(5L, cutoff.minusSeconds(1));
+        when(repository.findLockedById(5L)).thenReturn(Optional.of(old));
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            assertThat(deleter.deleteIfStillOrphan(5L, cutoff)).isTrue();
+            TransactionSynchronizationManager.getSynchronizations().forEach(sync -> sync.afterCompletion(1));
+            verify(storage, never()).delete(anyString());
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     private RichBodyMedia media(Long id, LocalDateTime createdAt) {

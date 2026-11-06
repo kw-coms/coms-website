@@ -9,6 +9,7 @@ import {
 } from '../../pages/community/postEditorUtils'
 import { RICH_FILE_ACCEPT, isAllowedRichFile } from './archiveFileOptions'
 import { FULL_RICH_FEATURES } from './richBodyFeatures'
+import { RICH_BODY_LIMITS } from '../../pages/community/validateUploadBlock'
 
 type EditorApi = {
   formatBlock: (command: string, value?: unknown) => void
@@ -421,7 +422,7 @@ export default function RichBodyEditor({
       </div>
       )}
       {error && <p className="border-b border-[var(--app-hairline)] bg-red-50 px-3 py-2 text-sm font-semibold text-red-500">{error}</p>}
-      <RichEditor isAllowedFile={allowArchiveFiles ? isAllowedRichFile : undefined} initialBlocks={initialBlocks} apiRef={editorApiRef} onError={(msg) => setError(msg)} />
+      <RichEditor isAllowedFile={allowArchiveFiles ? isAllowedRichFile : undefined} uploadLimits={allowArchiveFiles ? RICH_BODY_LIMITS : undefined} initialBlocks={initialBlocks} apiRef={editorApiRef} onError={(msg) => setError(msg)} />
     </div>
   )
 }

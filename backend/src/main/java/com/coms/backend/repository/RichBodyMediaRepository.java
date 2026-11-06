@@ -11,6 +11,9 @@ import java.util.Optional;
 public interface RichBodyMediaRepository extends JpaRepository<RichBodyMedia, Long> {
     List<RichBodyMedia> findByScopeAndOwnerId(RichBodyMedia.Scope scope, Long ownerId);
     List<RichBodyMedia> findByOwnerIdIsNullAndCreatedAtBefore(LocalDateTime cutoff);
+    long countByUploaderIdAndOwnerIdIsNull(Long uploaderId);
+    @org.springframework.data.jpa.repository.Query("select coalesce(sum(m.sizeBytes), 0) from RichBodyMedia m where m.uploaderId = :uploaderId and m.ownerId is null")
+    long sumPendingBytes(@org.springframework.data.repository.query.Param("uploaderId") Long uploaderId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select m from RichBodyMedia m where m.id = :id")
     Optional<RichBodyMedia> findLockedById(@org.springframework.data.repository.query.Param("id") Long id);

@@ -8,6 +8,9 @@ import java.io.IOException;
 public interface StorageService {
     String store(MultipartFile file) throws IOException;
 
+    /** Store rich-body media with a validated extension, independent of the client filename. */
+    String store(MultipartFile file, String extension) throws IOException;
+
     /**
      * Store an image, stripping embedded metadata (EXIF GPS, camera/device tags, etc.) for the
      * formats that can be safely re-encoded — currently JPEG and PNG, which are decoded and

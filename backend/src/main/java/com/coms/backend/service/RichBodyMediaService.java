@@ -16,9 +16,13 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.LocalDateTime;
-import java.util.HashSet;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
+
+import static com.coms.backend.service.MediaUploadValidator.*;
 
 @Service
 public class RichBodyMediaService {
@@ -48,6 +52,13 @@ public class RichBodyMediaService {
     public RichBodyMedia upload(RichBodyMedia.Scope scope, RichBodyMedia.Kind kind, MultipartFile file, String studentId) {
         if (file == null || file.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일을 선택해주세요.");
         var member = members.findByStudentId(studentId).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        // Serialize quota checks and inserts for the same uploader, including administrators.
+        members.findWithLockById(member.getId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        if (repository.countByUploaderIdAndOwnerIdIsNull(member.getId()) >= MAX_PENDING_COUNT
+                || repository.sumPendingBytes(member.getId()) > MAX_PENDING_BYTES - file.getSize()) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "저장하지 않은 업로드가 너무 많습니다. 글을 저장하거나 잠시 후 다시 시도해 주세요.");
+        }
         String type = switch (kind) {
             case IMAGE -> validator.validateImage(file);
             case VIDEO -> validator.validateVideo(file);
@@ -57,8 +68,15 @@ public class RichBodyMediaService {
         if (original.isBlank() || original.length() > 255 || original.contains("..")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올바른 파일 이름이 필요합니다.");
         }
+        String extension = kind == RichBodyMedia.Kind.FILE
+                ? org.springframework.util.StringUtils.getFilenameExtension(original).toLowerCase(Locale.ROOT)
+                : MediaUploadValidator.canonicalExtension(type);
+        if (kind != RichBodyMedia.Kind.FILE) {
+            original = org.springframework.util.StringUtils.stripFilenameExtension(original) + "." + extension;
+            if (original.length() > 255) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일 이름이 너무 깁니다.");
+        }
         try {
-            String stored = kind == RichBodyMedia.Kind.IMAGE ? storage.storeImage(file, type) : storage.store(file);
+            String stored = kind == RichBodyMedia.Kind.IMAGE ? storage.storeImage(file, type) : storage.store(file, extension);
             try { return repository.saveAndFlush(new RichBodyMedia(kind, scope, stored, original, type, file.getSize(), member.getId())); }
             catch (RuntimeException e) { storage.delete(stored); throw e; }
         } catch (IOException e) {
@@ -76,7 +94,7 @@ public class RichBodyMediaService {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND);
             }
         } else if (media.getScope() != RichBodyMedia.Scope.SPONSOR && studentId == null) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         return media;
     }
@@ -85,41 +103,61 @@ public class RichBodyMediaService {
 
     @Transactional
     public void syncAttachments(RichBodyMedia.Scope scope, Long ownerId, String content, String actorStudentId) {
-        Set<Long> referenced = new HashSet<>();
+        Map<Long, RichBodyMedia.Kind> references = parseReferences(content);
+        Set<Long> referenced = references.keySet();
+        var actor = actorStudentId == null || references.isEmpty() ? null
+                : members.findByStudentId(actorStudentId).orElse(null);
+        for (var reference : references.entrySet()) {
+            RichBodyMedia row = repository.findLockedById(reference.getKey()).orElseThrow(RichBodyMediaService::invalidAttachment);
+            if (row.getScope() != scope || row.getKind() != reference.getValue()) throw invalidAttachment();
+            if (ownerId.equals(row.getOwnerId())) continue;
+            if (row.getOwnerId() != null || actor == null || !actor.getId().equals(row.getUploaderId())) {
+                throw invalidAttachment();
+            }
+            row.attach(ownerId, LocalDateTime.now(clock));
+        }
+        for (RichBodyMedia row : repository.findByScopeAndOwnerId(scope, ownerId)) {
+            if (!referenced.contains(row.getId())) row.detach();
+        }
+    }
+
+    /** Validate the whole body before taking any database locks. */
+    private static Map<Long, RichBodyMedia.Kind> parseReferences(String content) {
+        Map<Long, RichBodyMedia.Kind> references = new LinkedHashMap<>();
+        Map<RichBodyMedia.Kind, Integer> counts = new EnumMap<>(RichBodyMedia.Kind.class);
+        int mediaBlocks = 0;
         try {
             JsonNode blocks = JSON.readTree(content == null ? "" : content);
             if (blocks != null && blocks.isArray()) for (JsonNode block : blocks) {
-                String type = block.path("type").asText();
-                RichBodyMedia.Kind kind = switch (type) {
+                RichBodyMedia.Kind kind = switch (block.path("type").asText()) {
                     case "image" -> RichBodyMedia.Kind.IMAGE;
                     case "video" -> RichBodyMedia.Kind.VIDEO;
                     case "file" -> RichBodyMedia.Kind.FILE;
                     default -> null;
                 };
                 if (kind == null) continue;
+                if (++mediaBlocks > MAX_BODY_MEDIA_BLOCKS) throw invalidAttachment();
                 JsonNode idNode = block.path(kind == RichBodyMedia.Kind.FILE ? "fileId" : "mediaId");
                 if (idNode.isMissingNode() || idNode.isNull()) continue; // Legacy URL-only blocks.
                 if (!idNode.isIntegralNumber() || !idNode.canConvertToLong() || idNode.longValue() <= 0) {
                     throw invalidAttachment();
                 }
-                Long id = idNode.longValue();
-                var candidate = repository.findLockedById(id);
-                if (candidate.isEmpty()) throw invalidAttachment();
-                RichBodyMedia row = candidate.get();
-                if (row.getScope() != scope || row.getKind() != kind) throw invalidAttachment();
-                if (ownerId.equals(row.getOwnerId())) { referenced.add(id); continue; }
-                if (row.getOwnerId() != null || actorStudentId == null) throw invalidAttachment();
-                var actor = members.findByStudentId(actorStudentId);
-                if (actor.isEmpty() || !actor.get().getId().equals(row.getUploaderId())) throw invalidAttachment();
-                row.attach(ownerId, LocalDateTime.now(clock));
-                referenced.add(id);
+                var previous = references.putIfAbsent(idNode.longValue(), kind);
+                if (previous != null) {
+                    if (previous != kind) throw invalidAttachment();
+                    continue;
+                }
+                int limit = switch (kind) {
+                    case IMAGE -> MAX_BODY_IMAGES;
+                    case VIDEO -> MAX_BODY_VIDEOS;
+                    case FILE -> MAX_BODY_FILES;
+                };
+                if (counts.merge(kind, 1, Integer::sum) > limit) throw invalidAttachment();
             }
         } catch (IOException ignored) {
             // Legacy plain text has no media references.
         }
-        for (RichBodyMedia row : repository.findByScopeAndOwnerId(scope, ownerId)) {
-            if (!referenced.contains(row.getId())) row.detach();
-        }
+        return references;
     }
 
     private static ResponseStatusException invalidAttachment() {

@@ -29,6 +29,18 @@ class LocalStorageServiceTest {
     Path uploads;
 
     @Test
+    void storedNameUsesOnlyUuidAndValidatedExtensionEvenForLongClientName() throws Exception {
+        String longName = "한".repeat(200) + ".html";
+        var file = new MockMultipartFile("image", longName, "image/gif", "GIF89a".getBytes(StandardCharsets.US_ASCII));
+        var storage = new LocalStorageService(uploads.toString());
+
+        String stored = storage.storeImage(file, "image/gif");
+
+        assertThat(stored).matches("[0-9a-f-]{36}\\.gif");
+        assertThat(Files.readAllBytes(uploads.resolve(stored))).isEqualTo(file.getBytes());
+    }
+
+    @Test
     void failedRawCopyRemovesItsPartialFileAndKeepsOtherUploads() throws Exception {
         Files.writeString(uploads.resolve("preserved.txt"), "existing contents");
         IOException failure = new IOException("upload stream interrupted");

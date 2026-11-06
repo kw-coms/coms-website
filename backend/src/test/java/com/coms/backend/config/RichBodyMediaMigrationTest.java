@@ -52,6 +52,15 @@ class RichBodyMediaMigrationTest {
                     VALUES ('IMAGE', 'NOTICE', 'pending', 'pending.png', 'image/png', 10, 100, NULL, NULL),
                            ('IMAGE', 'NOTICE', 'attached', 'attached.png', 'image/png', 10, 100, 50, CURRENT_TIMESTAMP)
                     """);
+            try (var indexes = connection.getMetaData().getIndexInfo(null, null,
+                    connection.getMetaData().storesUpperCaseIdentifiers() ? "RICH_BODY_MEDIA" : "rich_body_media", false, false)) {
+                boolean uploaderIndexed = false;
+                while (indexes.next()) {
+                    if ("idx_rich_body_media_uploader".equalsIgnoreCase(indexes.getString("INDEX_NAME"))
+                            && "uploader_id".equalsIgnoreCase(indexes.getString("COLUMN_NAME"))) uploaderIndexed = true;
+                }
+                assertThat(uploaderIndexed).isTrue();
+            }
             assertThat(statement.executeUpdate("DELETE FROM members WHERE id = 100")).isEqualTo(1);
             try (var rows = statement.executeQuery("SELECT uploader_id, owner_id, attached_at FROM rich_body_media ORDER BY id")) {
                 assertThat(rows.next()).isTrue();

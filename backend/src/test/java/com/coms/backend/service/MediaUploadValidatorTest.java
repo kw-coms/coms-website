@@ -44,6 +44,17 @@ class MediaUploadValidatorTest {
                 .isInstanceOf(ResponseStatusException.class);
         assertThat(validator.validateFile(file("notes.txt", "text/html", "<script/>")))
                 .isEqualTo("application/octet-stream");
+        assertThat(validator.validateFile(file("notes.pdf", "application/pdf; charset=UTF-8", "%PDF-1.7")))
+                .isEqualTo("application/pdf");
+        assertThat(validator.validateFile(file("notes.pdf", "application/" + "x".repeat(110), "%PDF-1.7")))
+                .isEqualTo("application/octet-stream");
+    }
+
+    @Test
+    void canonicalExtensionsFollowValidatedImageAndVideoTypes() {
+        assertThat(MediaUploadValidator.canonicalExtension("image/jpeg")).isEqualTo("jpg");
+        assertThat(MediaUploadValidator.canonicalExtension("image/gif")).isEqualTo("gif");
+        assertThat(MediaUploadValidator.canonicalExtension("video/quicktime")).isEqualTo("mov");
     }
 
     @Test

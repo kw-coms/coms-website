@@ -13,3 +13,4 @@ CREATE TABLE rich_body_media (
 );
 CREATE INDEX idx_rich_body_media_orphans ON rich_body_media(owner_id, created_at);
 CREATE INDEX idx_rich_body_media_owner ON rich_body_media(scope, owner_id);
+CREATE INDEX idx_rich_body_media_uploader ON rich_body_media(uploader_id);

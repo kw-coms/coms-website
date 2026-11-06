@@ -151,6 +151,7 @@ public class SecurityConfig {
                 auth.requestMatchers(HttpMethod.GET, "/api/sponsors", "/api/sponsors/**").permitAll();
                 // The service enforces row ownership and returns 404 for inaccessible pending media.
                 auth.requestMatchers(HttpMethod.GET, "/api/rich-media/{id}", "/api/rich-media/{id}/download").permitAll();
+                auth.requestMatchers(HttpMethod.POST, "/api/rich-media/sponsor/**").hasRole("ADMIN");
                 auth.requestMatchers("/api/rich-media/**").authenticated();
                 auth.requestMatchers(HttpMethod.GET, "/api/community/posts/*/share", "/api/community/posts/*/share-data", "/api/community/posts/*/share-image").permitAll();
                 auth.requestMatchers(HttpMethod.HEAD, "/api/community/posts/*/share", "/api/community/posts/*/share-data", "/api/community/posts/*/share-image").permitAll();

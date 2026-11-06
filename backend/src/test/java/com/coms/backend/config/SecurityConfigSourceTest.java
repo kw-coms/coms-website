@@ -121,6 +121,15 @@ class SecurityConfigSourceTest {
     }
 
     @Test
+    void sponsorUploadRequiresAdminBeforeGeneralRichMediaRule() throws Exception {
+        String source = Files.readString(Path.of("src/main/java/com/coms/backend/config/SecurityConfig.java"));
+        String adminRule = "auth.requestMatchers(HttpMethod.POST, \"/api/rich-media/sponsor/**\").hasRole(\"ADMIN\")";
+        assertThat(source).contains(adminRule);
+        assertThat(source.indexOf(adminRule))
+                .isLessThan(source.indexOf("auth.requestMatchers(\"/api/rich-media/**\").authenticated()"));
+    }
+
+    @Test
     void communityModerationIsPermissionGatedEverywhere() throws Exception {
         String source = Files.readString(Path.of("src/main/java/com/coms/backend/config/SecurityConfig.java"));
 

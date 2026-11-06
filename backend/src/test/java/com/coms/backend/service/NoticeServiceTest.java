@@ -242,6 +242,22 @@ class NoticeServiceTest {
     }
 
     @Test
+    void ownerWithoutNoticeWriteCannotAttachPendingMediaOnEdit() {
+        memberRepository.save(user("2026000001", "선택회원"));
+        var notice = noticeService.create("2026123000", new NoticeRequest("공지", "내용", null, false, null));
+        noticeService.updateAuthor("2026123000", notice.id(), null, "2026000001");
+        var pending = richBodyMediaService.upload(RichBodyMedia.Scope.NOTICE, RichBodyMedia.Kind.FILE,
+                new MockMultipartFile("file", "guide.pdf", "application/pdf", "%PDF-1.4 guide".getBytes()), "2026000001");
+        String body = "[{\"type\":\"file\",\"fileId\":" + pending.getId() + "}]";
+
+        assertThatThrownBy(() -> noticeService.update("2026000001", notice.id(),
+                new NoticeRequest("수정", body, null, false, "GENERAL")))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        ex -> assertThat(ex.getStatusCode().value()).isEqualTo(400));
+        assertThat(richBodyMediaRepository.findById(pending.getId()).orElseThrow().getOwnerId()).isNull();
+    }
+
+    @Test
     void pagesNoticesInTheSameOrderAsTheUnpagedListAndReportsTheFullTotal() {
         for (int i = 1; i <= 5; i++) {
             noticeService.create("2026123000", new NoticeRequest("공지 " + i, "내용", null, false, null));

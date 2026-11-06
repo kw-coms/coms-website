@@ -8,7 +8,7 @@ import { Color } from '@tiptap/extension-color'
 import { BackgroundColor, FontFamily, TextStyle } from '@tiptap/extension-text-style'
 import { isSafeUrl } from '../../utils/sanitizeHtml'
 import { isAllowedArchiveFile, localId } from './postEditorUtils'
-import { validateUploadBlock } from './validateUploadBlock'
+import { validateUploadBlock, type UploadLimits } from './validateUploadBlock'
 import { blockJsonToPmDoc, pmDocToBlockJson } from './tiptapBlockConverters'
 import FigureToolbar from './FigureToolbar'
 import { EmbedBlock, FileBlock, ImageBlock, PollBlock, VideoBlock } from './tiptapFigureNodes'
@@ -74,11 +74,12 @@ function findFigureNodePosition(doc: ProseMirrorNode, id: string) {
   return found
 }
 
-export default function TiptapTextEditor({ initialBlocks, apiRef, onError, isAllowedFile = isAllowedArchiveFile }: {
+export default function TiptapTextEditor({ initialBlocks, apiRef, onError, isAllowedFile = isAllowedArchiveFile, uploadLimits }: {
   initialBlocks: EditorBlock[]
   apiRef?: EditorApiRef | null
   onError?: (message: string) => void
   isAllowedFile?: (file: File) => boolean
+  uploadLimits?: UploadLimits
 }) {
   const editorContentRef = useRef<HTMLDivElement | null>(null)
   const insertFileRef = useRef<(file: File) => void>(() => undefined)
@@ -185,7 +186,7 @@ export default function TiptapTextEditor({ initialBlocks, apiRef, onError, isAll
 
   const insertFile = useCallback((file: File) => {
     if (!editor) return
-    const { type, error } = validateUploadBlock(file, currentBlocks(), isAllowedFile)
+    const { type, error } = validateUploadBlock(file, currentBlocks(), isAllowedFile, uploadLimits)
     if (error || !type) { onErrorRef.current?.(error || '지원하지 않는 파일 형식입니다.'); return }
     onErrorRef.current?.('')
 
@@ -201,7 +202,7 @@ export default function TiptapTextEditor({ initialBlocks, apiRef, onError, isAll
       width: 75,
       align: 'center',
     })
-  }, [currentBlocks, editor, insertPmBlock, isAllowedFile])
+  }, [currentBlocks, editor, insertPmBlock, isAllowedFile, uploadLimits])
 
   useEffect(() => {
     insertFileRef.current = insertFile

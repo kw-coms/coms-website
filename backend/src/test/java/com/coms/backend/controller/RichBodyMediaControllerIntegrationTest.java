@@ -119,13 +119,13 @@ class RichBodyMediaControllerIntegrationTest {
                 .andExpect(status().isOk());
     }
 
-    @Test void attachedSponsorMediaIsPublicWhileAttachedNoticeMediaNeedsLogin() throws Exception {
+    @Test void attachedSponsorMediaIsPublicWhileAttachedNoticeMediaIsHiddenFromAnonymous() throws Exception {
         long sponsorId = uploadId("sponsor", admin);
         long noticeId = uploadId("notice", officer);
         media.findById(sponsorId).orElseThrow().attach(1L, java.time.LocalDateTime.now());
         media.findById(noticeId).orElseThrow().attach(2L, java.time.LocalDateTime.now());
         mvc.perform(get("/api/rich-media/{id}", sponsorId)).andExpect(status().isOk());
-        mvc.perform(get("/api/rich-media/{id}", noticeId)).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/rich-media/{id}", noticeId)).andExpect(status().isNotFound());
         mvc.perform(get("/api/rich-media/{id}", noticeId).cookie(member)).andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("private")));
     }
@@ -171,6 +171,55 @@ class RichBodyMediaControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"))
                 .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.startsWith("attachment;")));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"notice", "archive"})
+    void anonymousCannotDistinguishAttachedPendingOrMissingMedia(String scope) throws Exception {
+        long attached = uploadId(scope, officer);
+        long pending = uploadId(scope, officer);
+        media.findById(attached).orElseThrow().attach(1L, java.time.LocalDateTime.now());
+        for (long id : new long[]{attached, pending, Long.MAX_VALUE}) {
+            for (String suffix : new String[]{"", "/download"}) {
+                mvc.perform(get("/api/rich-media/" + id + suffix)).andExpect(status().isNotFound());
+            }
+        }
+    }
+
+    @Test void sponsorAuthorizationRunsBeforeRequiredMultipartBinding() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/rich-media/sponsor/images")
+                        .cookie(member).header("Origin", ORIGIN).contentType("application/json").content("{}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"2026000101", "2026000103"})
+    void pendingQuotaCountsOnlyThisUploadersUnattachedRowsAcrossScopes(String studentId) throws Exception {
+        long uploader = members.findByStudentId(studentId).orElseThrow().getId();
+        long other = members.findByStudentId("2026000102").orElseThrow().getId();
+        var ignored = new com.coms.backend.domain.RichBodyMedia(com.coms.backend.domain.RichBodyMedia.Kind.FILE,
+                com.coms.backend.domain.RichBodyMedia.Scope.NOTICE, "attached", "a.pdf", "application/pdf", 600L * 1024 * 1024, uploader);
+        ignored.attach(1L, java.time.LocalDateTime.now());
+        media.save(ignored);
+        media.save(new com.coms.backend.domain.RichBodyMedia(com.coms.backend.domain.RichBodyMedia.Kind.FILE,
+                com.coms.backend.domain.RichBodyMedia.Scope.ARCHIVE, "other", "a.pdf", "application/pdf", 600L * 1024 * 1024, other));
+        mvc.perform(multipart("/api/rich-media/archive/images").file(png()).cookie(cookie(studentId)).header("Origin", ORIGIN))
+                .andExpect(status().isOk());
+        media.saveAndFlush(new com.coms.backend.domain.RichBodyMedia(com.coms.backend.domain.RichBodyMedia.Kind.FILE,
+                com.coms.backend.domain.RichBodyMedia.Scope.NOTICE, "pending", "a.pdf", "application/pdf", 500L * 1024 * 1024, uploader));
+        mvc.perform(multipart("/api/rich-media/archive/images").file(png()).cookie(cookie(studentId)).header("Origin", ORIGIN))
+                .andExpect(status().isTooManyRequests());
+    }
+
+    @Test void imageWithHtmlNameDownloadsWithCanonicalExtension() throws Exception {
+        var result = mvc.perform(multipart("/api/rich-media/archive/images")
+                        .file(new MockMultipartFile("image", "x.html", "image/png", PNG)).cookie(member).header("Origin", ORIGIN))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.name").value("x.png")).andReturn();
+        long id = new com.fasterxml.jackson.databind.ObjectMapper().readTree(result.getResponse().getContentAsString()).get("id").asLong();
+        var response = mvc.perform(get("/api/rich-media/{id}/download", id).cookie(member))
+                .andExpect(status().isOk()).andReturn().getResponse();
+        org.assertj.core.api.Assertions.assertThat(org.springframework.http.ContentDisposition.parse(response.getHeader("Content-Disposition")).getFilename())
+                .isEqualTo("x.png");
     }
 
     private long uploadId(String scope, Cookie cookie) throws Exception {

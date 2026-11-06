@@ -112,6 +112,123 @@ class RichBodyMediaServiceTest {
         verify(deleter).deleteIfStillOrphan(2L, cutoff);
     }
 
+    @Test void repeatedIdsAreResolvedOnlyOnce() {
+        RichBodyMedia candidate = row(1, RichBodyMedia.Kind.IMAGE, NOTICE, 100);
+        Member actor = mock(Member.class);
+        when(actor.getId()).thenReturn(100L);
+        when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
+        when(rows.findLockedById(1L)).thenReturn(Optional.of(candidate));
+        service.syncAttachments(NOTICE, 50L, "[" + String.join(",", java.util.Collections.nCopies(200,
+                "{\"type\":\"image\",\"mediaId\":1}")) + "]", "actor");
+        verify(rows, times(1)).findLockedById(1L);
+        verify(members, times(1)).findByStudentId("actor");
+        assertThat(candidate.getOwnerId()).isEqualTo(50L);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"{\"type\":\"image\",\"mediaId\":1}", "{\"type\":\"video\",\"url\":\"legacy\"}"})
+    void tooManyMediaBlocksFailBeforeAnyDatabaseWork(String block) {
+        assertBadAttachment("[" + String.join(",", java.util.Collections.nCopies(201, block)) + "]");
+        verifyNoInteractions(rows, members);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"IMAGE,20", "VIDEO,3", "FILE,10"})
+    void distinctKindLimitIsAcceptedAndOneOverFailsBeforeDatabaseWork(RichBodyMedia.Kind kind, int limit) {
+        String field = kind == RichBodyMedia.Kind.FILE ? "fileId" : "mediaId";
+        var blocks = new java.util.ArrayList<String>();
+        for (long id = 1; id <= limit; id++) {
+            RichBodyMedia candidate = row(id, kind, NOTICE, 100);
+            candidate.attach(50L, LocalDateTime.now());
+            when(rows.findLockedById(id)).thenReturn(Optional.of(candidate));
+            blocks.add("{\"type\":\"" + kind.name().toLowerCase(java.util.Locale.ROOT) + "\",\"" + field + "\":" + id + "}");
+        }
+        service.syncAttachments(NOTICE, 50L, "[" + String.join(",", blocks) + "]", null);
+        verify(rows, times(limit)).findLockedById(anyLong());
+        clearInvocations(rows, members);
+        blocks.add("{\"type\":\"" + kind.name().toLowerCase(java.util.Locale.ROOT) + "\",\"" + field + "\":" + (limit + 1) + "}");
+        assertBadAttachment("[" + String.join(",", blocks) + "]");
+        verifyNoInteractions(rows, members);
+    }
+
+    @Test void sameIdWithConflictingKindsIsRejectedBeforeDatabaseWork() {
+        assertBadAttachment("[{\"type\":\"image\",\"mediaId\":1},{\"type\":\"video\",\"mediaId\":1}]");
+        verifyNoInteractions(rows, members);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"USER,30,0", "ADMIN,30,0", "USER,0,524288000", "ADMIN,0,524288000"})
+    void pendingQuotaRejectsBeforeStorage(Member.Role role, long count, long bytes) {
+        Member actor = mock(Member.class);
+        when(actor.getId()).thenReturn(100L);
+        when(actor.getRole()).thenReturn(role);
+        when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
+        when(members.findWithLockById(100L)).thenReturn(Optional.of(actor));
+        when(rows.countByUploaderIdAndOwnerIdIsNull(100L)).thenReturn(count);
+        when(rows.sumPendingBytes(100L)).thenReturn(bytes);
+        var file = new org.springframework.mock.web.MockMultipartFile("file", "a.pdf", "application/pdf", new byte[]{1});
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class, error -> {
+                    assertThat(error.getStatusCode().value()).isEqualTo(429);
+                    assertThat(error.getReason()).isEqualTo("저장하지 않은 업로드가 너무 많습니다. 글을 저장하거나 잠시 후 다시 시도해 주세요.");
+                });
+        verifyNoInteractions(storage, validator);
+        var order = inOrder(members, rows);
+        order.verify(members).findWithLockById(100L);
+        order.verify(rows).countByUploaderIdAndOwnerIdIsNull(100L);
+    }
+
+    @Test void exactPendingByteLimitAndThirtiethUploadAreAllowed() throws Exception {
+        Member actor = mock(Member.class);
+        when(actor.getId()).thenReturn(100L);
+        when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
+        when(members.findWithLockById(100L)).thenReturn(Optional.of(actor));
+        when(rows.countByUploaderIdAndOwnerIdIsNull(100L)).thenReturn(29L);
+        when(rows.sumPendingBytes(100L)).thenReturn(524288000L - 1);
+        var file = new org.springframework.mock.web.MockMultipartFile("file", "a.pdf", "application/pdf", new byte[]{1});
+        when(validator.validateFile(file)).thenReturn("application/pdf");
+        when(storage.store(file, "pdf")).thenReturn("stored.pdf");
+        when(rows.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        assertThat(service.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor").getOriginalName()).isEqualTo("a.pdf");
+        verify(storage).store(file, "pdf");
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"IMAGE,image/jpeg,jpg", "IMAGE,image/png,png", "IMAGE,image/gif,gif", "IMAGE,image/webp,webp",
+            "VIDEO,video/mp4,mp4", "VIDEO,video/webm,webm", "VIDEO,video/quicktime,mov"})
+    void downloadNameUsesValidatedType(RichBodyMedia.Kind kind, String type, String extension) throws Exception {
+        Member actor = mock(Member.class);
+        when(actor.getId()).thenReturn(100L);
+        when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
+        when(members.findWithLockById(100L)).thenReturn(Optional.of(actor));
+        var file = new org.springframework.mock.web.MockMultipartFile("file", "x.html", type, new byte[]{1});
+        when(validator.validateImage(file)).thenReturn(type);
+        when(validator.validateVideo(file)).thenReturn(type);
+        when(rows.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        assertThat(service.upload(NOTICE, kind, file, "actor").getOriginalName()).isEqualTo("x." + extension);
+        if (kind == RichBodyMedia.Kind.IMAGE) verify(storage).storeImage(file, type);
+        else verify(storage).store(file, extension);
+    }
+
+    @Test void originalNameTooLongIsRejectedBeforeStorage() {
+        Member actor = mock(Member.class);
+        when(actor.getId()).thenReturn(100L);
+        when(members.findByStudentId("actor")).thenReturn(Optional.of(actor));
+        when(members.findWithLockById(100L)).thenReturn(Optional.of(actor));
+        var file = new org.springframework.mock.web.MockMultipartFile("file", "가".repeat(252) + ".pdf", "application/pdf", new byte[]{1});
+        when(validator.validateFile(file)).thenReturn("application/pdf");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.upload(NOTICE, RichBodyMedia.Kind.FILE, file, "actor"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode().value()).isEqualTo(400));
+        verifyNoInteractions(storage);
+    }
+
+    private void assertBadAttachment(String content) {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.syncAttachments(NOTICE, 50L, content, "actor"))
+                .isInstanceOfSatisfying(org.springframework.web.server.ResponseStatusException.class,
+                        error -> assertThat(error.getStatusCode().value()).isEqualTo(400));
+    }
+
     private static String image(long id) { return "[{\"type\":\"image\",\"mediaId\":" + id + "}]"; }
 
     private static RichBodyMedia row(long id, RichBodyMedia.Kind kind, RichBodyMedia.Scope scope, long uploaderId) {
