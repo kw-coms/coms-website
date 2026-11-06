@@ -409,7 +409,7 @@ class ArchiveServiceTest {
                 .map(attachment -> attachment.getStoredName()).toList();
         authenticate("2026000001", "ROLE_ADMIN");
 
-        archiveService.delete(created.id());
+        archiveService.delete(created.id(), "2026000001");
 
         assertThat(archiveFileRepository.findById(created.id())).isEmpty();
         assertThat(attachmentRepository.findByArchiveFileIdOrderByPositionAsc(created.id())).isEmpty();

@@ -75,6 +75,26 @@ class RichBodyMediaAttachmentTransactionTest {
         assertThat(mediaRows.sumAllPendingBytes()).isEqualTo(siteBytes + 20);
     }
 
+    @Test
+    void selfDetachedRowsCountTowardUploaderQuotaButOthersDetachedDoNot() {
+        long actorId = members.findByStudentId(ACTOR).orElseThrow().getId();
+        long count = mediaRows.countPending(actorId);
+        long bytes = mediaRows.sumPendingBytes(actorId);
+        RichBodyMedia selfDetached = media(RichBodyMedia.Kind.IMAGE, RichBodyMedia.Scope.NOTICE, actorId);
+        selfDetached.attach(1L, LocalDateTime.now());
+        selfDetached.detach(LocalDateTime.now(), actorId);
+        mediaRows.saveAndFlush(selfDetached);
+        assertThat(mediaRows.countPending(actorId)).isEqualTo(count + 1);
+        assertThat(mediaRows.sumPendingBytes(actorId)).isEqualTo(bytes + 10);
+
+        RichBodyMedia byOther = media(RichBodyMedia.Kind.IMAGE, RichBodyMedia.Scope.NOTICE, actorId);
+        byOther.attach(1L, LocalDateTime.now());
+        byOther.detach(LocalDateTime.now(), actorId + 1000);
+        mediaRows.saveAndFlush(byOther);
+        assertThat(mediaRows.countPending(actorId)).isEqualTo(count + 1);
+        assertThat(mediaRows.sumPendingBytes(actorId)).isEqualTo(bytes + 10);
+    }
+
     private enum InvalidReference { MISSING, WRONG_SCOPE, WRONG_KIND, OTHER_UPLOADER, OTHER_OWNER }
 
     @ParameterizedTest

@@ -324,11 +324,11 @@ public class ArchiveService {
     // archive.manage-gated — second lock behind ArchiveController's own @PreAuthorize; the
     // /api/files/** URL rule in SecurityConfig only requires a logged-in member.
     @PreAuthorize("@perm.has(authentication,'ARCHIVE_MANAGE')")
-    public void delete(Long id) {
+    public void delete(Long id, String actorStudentId) {
         ArchiveFile file = repo.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         List<ArchiveAttachment> attachments = attachmentsFor(file);
-        richBodyMediaService.detachAttachments(RichBodyMedia.Scope.ARCHIVE, id);
+        richBodyMediaService.detachAttachments(RichBodyMedia.Scope.ARCHIVE, id, actorStudentId);
         attachmentRepository.deleteAll(attachments);
         repo.delete(file);
         if (attachments.isEmpty()) {

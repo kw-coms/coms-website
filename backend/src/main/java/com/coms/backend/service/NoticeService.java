@@ -187,7 +187,7 @@ public class NoticeService {
 
     public void delete(String authorStudentId, Long id) {
         Notice notice = getEntity(id);
-        richBodyMediaService.detachAttachments(RichBodyMedia.Scope.NOTICE, id);
+        richBodyMediaService.detachAttachments(RichBodyMedia.Scope.NOTICE, id, authorStudentId);
         repo.delete(notice);
         auditLogService.record(authorStudentId, "NOTICE_DELETE", "NOTICE", String.valueOf(id), "title=" + notice.getTitle(), null);
     }

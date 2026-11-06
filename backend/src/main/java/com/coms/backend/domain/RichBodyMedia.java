@@ -33,6 +33,10 @@ public class RichBodyMedia {
     private LocalDateTime attachedAt;
     @Column(name = "detached_at")
     private LocalDateTime detachedAt;
+    @Column(name = "detached_from_owner_id")
+    private Long detachedFromOwnerId;
+    @Column(name = "detached_by_id")
+    private Long detachedById;
 
     protected RichBodyMedia() {}
     public RichBodyMedia(Kind kind, Scope scope, String storedName, String originalName, String contentType, long sizeBytes, Long uploaderId, LocalDateTime createdAt) {
@@ -52,10 +56,16 @@ public class RichBodyMedia {
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getAttachedAt() { return attachedAt; }
     public LocalDateTime getDetachedAt() { return detachedAt; }
+    public Long getDetachedFromOwnerId() { return detachedFromOwnerId; }
+    public Long getDetachedById() { return detachedById; }
     public void attach(Long ownerId, LocalDateTime now) {
         this.ownerId = ownerId; this.attachedAt = now; this.detachedAt = null;
+        this.detachedFromOwnerId = null; this.detachedById = null;
     }
-    public void detach(LocalDateTime now) {
+    /** @param detachedById acting member, or null when there is no actor (not charged to anyone's quota). */
+    public void detach(LocalDateTime now, Long detachedById) {
+        this.detachedFromOwnerId = this.ownerId; this.detachedById = detachedById;
         this.ownerId = null; this.attachedAt = null; this.detachedAt = now;
     }
+    public void detach(LocalDateTime now) { detach(now, null); }
 }

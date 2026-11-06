@@ -97,7 +97,7 @@ class RichBodyMediaServiceTest {
         second.attach(50L, LocalDateTime.now());
         when(rows.findByScopeAndOwnerId(NOTICE, 50L)).thenReturn(List.of(first, second));
 
-        service.detachAttachments(NOTICE, 50L);
+        service.detachAttachments(NOTICE, 50L, null);
 
         assertThat(first.getOwnerId()).isNull();
         assertThat(second.getOwnerId()).isNull();
@@ -399,9 +399,9 @@ class RichBodyMediaServiceTest {
         service.syncAttachments(NOTICE, 50L, "[]", null);
 
         var order = inOrder(first, second, third);
-        order.verify(first).detach(NOW);
-        order.verify(second).detach(NOW);
-        order.verify(third).detach(NOW);
+        order.verify(first).detach(NOW, null);
+        order.verify(second).detach(NOW, null);
+        order.verify(third).detach(NOW, null);
     }
 
     private static final String QUOTA_MESSAGE_SITE = "사이트 전체 임시 업로드 용량이 가득 찼습니다. 잠시 후 다시 시도해 주세요.";
@@ -463,7 +463,7 @@ class RichBodyMediaServiceTest {
 
     private RichBodyMedia detachedRow(long uploaderId) {
         RichBodyMedia candidate = row(1, RichBodyMedia.Kind.IMAGE, NOTICE, uploaderId);
-        candidate.attach(40L, NOW.minusDays(30));
+        candidate.attach(50L, NOW.minusDays(30));
         candidate.detach(NOW.minusHours(1));
         when(rows.findLockedById(1L)).thenReturn(Optional.of(candidate));
         Member actor = mock(Member.class);
@@ -479,6 +479,20 @@ class RichBodyMediaServiceTest {
 
         assertThat(candidate.getOwnerId()).isEqualTo(50L);
         assertThat(candidate.getDetachedAt()).isNull();
+    }
+
+    @Test void editorMayReattachOnlyIntoTheOwnerItWasDetachedFrom_andFieldsClear() {
+        RichBodyMedia candidate = detachedRow(100);
+        assertThat(candidate.getDetachedFromOwnerId()).isEqualTo(50L);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.syncAttachments(NOTICE, 51L, image(1), "editor", true))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(candidate.getOwnerId()).isNull();
+
+        service.syncAttachments(NOTICE, 50L, image(1), "editor", true);
+        assertThat(candidate.getOwnerId()).isEqualTo(50L);
+        assertThat(candidate.getDetachedFromOwnerId()).isNull();
+        assertThat(candidate.getDetachedById()).isNull();
     }
 
     @Test void createPathDoesNotLetNonUploaderReattachDetachedMedia() {

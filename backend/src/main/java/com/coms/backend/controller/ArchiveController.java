@@ -186,8 +186,8 @@ public class ArchiveController {
 
     @PreAuthorize("@perm.has(authentication,'ARCHIVE_MANAGE')")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        archiveService.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable Long id, Authentication authentication) {
+        archiveService.delete(id, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 }

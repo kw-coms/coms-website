@@ -160,13 +160,13 @@ public class RichBodyMediaService {
                                 boolean actorMayEdit) {
         Map<Long, RichBodyMedia.Kind> references = parseReferences(content);
         Set<Long> referenced = references.keySet();
-        var actor = actorStudentId == null || references.isEmpty() ? null
-                : members.findByStudentId(actorStudentId).orElse(null);
+        var actor = actorStudentId == null ? null : members.findByStudentId(actorStudentId).orElse(null);
         for (var reference : references.entrySet().stream().sorted(Map.Entry.comparingByKey()).toList()) {
             RichBodyMedia row = repository.findLockedById(reference.getKey()).orElseThrow(RichBodyMediaService::invalidAttachment);
             if (row.getScope() != scope || row.getKind() != reference.getValue()) throw invalidAttachment();
             if (ownerId.equals(row.getOwnerId())) continue;
-            boolean reattach = actorMayEdit && row.getDetachedAt() != null;
+            // A non-uploader editor may only put media back into the owner it was detached from.
+            boolean reattach = actorMayEdit && row.getDetachedAt() != null && ownerId.equals(row.getDetachedFromOwnerId());
             if (row.getOwnerId() != null || actor == null || !(reattach || actor.getId().equals(row.getUploaderId()))) {
                 throw invalidAttachment();
             }
@@ -174,7 +174,7 @@ public class RichBodyMediaService {
         }
         for (RichBodyMedia row : repository.findByScopeAndOwnerId(scope, ownerId).stream()
                 .sorted(Comparator.comparing(RichBodyMedia::getId)).toList()) {
-            if (!referenced.contains(row.getId())) row.detach(LocalDateTime.now(clock));
+            if (!referenced.contains(row.getId())) row.detach(LocalDateTime.now(clock), actor == null ? null : actor.getId());
         }
     }
 
@@ -223,8 +223,9 @@ public class RichBodyMediaService {
     }
 
     @Transactional
-    public void detachAttachments(RichBodyMedia.Scope scope, Long ownerId) {
-        for (RichBodyMedia row : repository.findByScopeAndOwnerId(scope, ownerId)) row.detach(LocalDateTime.now(clock));
+    public void detachAttachments(RichBodyMedia.Scope scope, Long ownerId, String actorStudentId) {
+        Long actorId = actorStudentId == null ? null : members.findByStudentId(actorStudentId).map(Member::getId).orElse(null);
+        for (RichBodyMedia row : repository.findByScopeAndOwnerId(scope, ownerId)) row.detach(LocalDateTime.now(clock), actorId);
     }
 
     public int deleteOrphanedOlderThan(LocalDateTime cutoff) {
