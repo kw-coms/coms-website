@@ -1,0 +1,12 @@
+node_modules
+dist
+.DS_Store
+.env
+.env.local
+*.local
+npm-debug.log*
+.vite
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+.omc/
