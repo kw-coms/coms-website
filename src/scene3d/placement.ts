@@ -47,20 +47,21 @@ export function groundPoint(cx: number, cy: number, y = 0): Vec3 | null {
 export function pickPin(cx: number, cy: number, hideId?: string): WorldPin | null {
   const r = rayFromClient(cx, cy);
   if (!r) return null;
-  const v = new Vector3();
+  // plain numbers, no per-pin allocations (two boards are ~1.7k pins per hover)
+  const o = r.ray.origin, dir = r.ray.direction;
+  const ortho = !!refs.camera && (refs.camera as { isOrthographicCamera?: boolean }).isOrthographicCamera;
+  const orthoTol = ortho ? 1.5 / Math.max(0.2, (refs.camera as unknown as { zoom: number }).zoom) * 2.2 : 0;
   let best: WorldPin | null = null;
   let bestScore = Infinity;
   for (const p of worldPins()) {
     if (p.ref.partId === hideId) continue;
-    v.set(p.pos[0], p.pos[1], p.pos[2]);
-    const t = v.clone().sub(r.ray.origin).dot(r.ray.direction);
+    const wx = p.pos[0] - o.x, wy = p.pos[1] - o.y, wz = p.pos[2] - o.z;
+    const t = wx * dir.x + wy * dir.y + wz * dir.z;
     if (t <= 0) continue;
-    const d = r.ray.at(t, new Vector3()).distanceTo(v);
-    const tol = refs.camera && 'zoom' in refs.camera && (refs.camera as { isOrthographicCamera?: boolean }).isOrthographicCamera
-      ? 1.5 / Math.max(0.2, (refs.camera as { zoom: number }).zoom) * 2.2
-      : Math.max(1.3, t * 0.005);
-    if (d > tol) continue;
-    const score = d + (p.board ? 0.3 : 0) - t * 1e-6;
+    const tol = ortho ? orthoTol : Math.max(1.3, t * 0.005);
+    const d2 = wx * wx + wy * wy + wz * wz - t * t;
+    if (d2 > tol * tol) continue;
+    const score = Math.sqrt(Math.max(0, d2)) + (p.board ? 0.3 : 0) - t * 1e-6;
     if (score < bestScore) {
       bestScore = score;
       best = p;

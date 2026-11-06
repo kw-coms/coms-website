@@ -82,6 +82,7 @@ export function PreviewWire() {
   useEffect(() => {
     seen.current = -1;
   }, [start]);
+  useEffect(() => () => mesh.current?.geometry.dispose(), []);
   if (!a) return null;
   return (
     <mesh ref={mesh} renderOrder={7}>
@@ -93,6 +94,7 @@ export function PreviewWire() {
 
 function OneBox({ id }: { id: string }) {
   const helper = useMemo(() => new Box3Helper(new Box3(), new Color('#3b82f6')), []);
+  useEffect(() => () => { helper.geometry.dispose(); (helper.material as { dispose(): void }).dispose(); }, [helper]);
   useFrame(({ scene }) => {
     let target: Object3D | undefined;
     for (const c of scene.children) if (c.userData.partId === id && !target) target = c;

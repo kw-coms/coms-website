@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { CanvasTexture, SRGBColorSpace, AdditiveBlending } from 'three';
 import type { PartInstance, PartVisualState, Vec3 } from '../../core/types';
 import { PARTS } from '../../ui/core';
@@ -27,6 +27,22 @@ export function makeTexture(w: number, h: number, draw: (c: CanvasRenderingConte
   t.colorSpace = SRGBColorSpace;
   t.anisotropy = 8;
   return t;
+}
+
+/** Static textures are shared per key (one GPU upload per kind, never per instance): drag drafts and example switches reuse them. */
+const texCache = new Map<string, CanvasTexture>();
+export function cachedTexture(key: string, w: number, h: number, draw: (c: CanvasRenderingContext2D) => void): CanvasTexture {
+  let t = texCache.get(key);
+  if (!t) texCache.set(key, (t = makeTexture(w, h, draw)));
+  return t;
+}
+
+/** A per-instance GPU resource (material, dynamic texture) that is disposed when the component unmounts or `deps` change. */
+export function useOwned<T extends { dispose(): void }>(factory: () => T, deps: React.DependencyList): T {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const obj = useMemo(factory, deps);
+  useEffect(() => () => obj.dispose(), [obj]);
+  return obj;
 }
 
 let glowTex: CanvasTexture | null = null;

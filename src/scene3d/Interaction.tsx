@@ -89,6 +89,7 @@ export function Interaction() {
     };
 
     const onDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse' && !e.isPrimary) return; // a second finger must not hijack a drag
       if (e.button === 2) {
         rightDown = { x: e.clientX, y: e.clientY };
         return;
@@ -182,6 +183,7 @@ export function Interaction() {
     };
 
     const onMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse' && !e.isPrimary) return; // a second finger must not hijack a drag
       const st = getState();
       if (!down) {
         // hover
@@ -252,6 +254,7 @@ export function Interaction() {
     };
 
     const onUp = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse' && !e.isPrimary) return; // a second finger must not hijack a drag
       const d = down;
       down = null;
       if (el.hasPointerCapture?.(e.pointerId)) el.releasePointerCapture(e.pointerId);

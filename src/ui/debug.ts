@@ -2,7 +2,7 @@
 import { Vector3 } from 'three';
 import { EXAMPLES, PARTS, pinWorldPos } from './core';
 import { refs } from '../scene3d/sceneRefs';
-import { addPart, getState, loadScene, selectPart, set, updateParts, updateWire } from './store';
+import { addPart, deleteSelection, getState, loadScene, selectParts, selectPart, set, updateParts, updateWire } from './store';
 import { frameAll, partsBox, viewAngle } from '../scene3d/cameraFrame';
 import type { PartKind, Scene } from '../core/types';
 import { frameRef, setSimInput, sim } from './simHost';
@@ -102,4 +102,8 @@ function fillRatio() {
   return Math.max((x1 - x0) / 2, (y1 - y0) / 2);
 }
 
-(window as unknown as { __lab: unknown }).__lab = { setCode, serialClear: clearSerial, updateWire, selectPart, projectWorld, fillRatio, serial: () => serialLog.text, probe, loadScene, gallery, closeup, viewAngle, frameAll, partsBox, set, EXAMPLES, setSimInput, projectPart, getState, project, litOf, addPart, frame: () => frameRef.current, simState: () => sim.state, camera: () => refs.camera?.position.toArray() };
+/** GPU resources alive in the renderer (leak probe for the long-session e2e). */
+const memory = () => ({ geometries: refs.gl?.info.memory.geometries ?? -1, textures: refs.gl?.info.memory.textures ?? -1 });
+function removeParts(ids: string[]) { selectParts(ids); deleteSelection(); }
+
+(window as unknown as { __lab: unknown }).__lab = { memory, removeParts, setCode, serialClear: clearSerial, updateWire, selectPart, projectWorld, fillRatio, serial: () => serialLog.text, probe, loadScene, gallery, closeup, viewAngle, frameAll, partsBox, set, EXAMPLES, setSimInput, projectPart, getState, project, litOf, addPart, frame: () => frameRef.current, simState: () => sim.state, camera: () => refs.camera?.position.toArray() };

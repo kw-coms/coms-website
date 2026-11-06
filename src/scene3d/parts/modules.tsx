@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import { MeshStandardMaterial, type CanvasTexture, type Group } from 'three';
 import { PARTS } from '../../ui/core';
-import { Cable, Legs, inputOf, makeTexture, vis, type PartProps } from './common';
+import { Cable, Legs, cachedTexture, inputOf, makeTexture, useOwned, vis, type PartProps } from './common';
 import { reduced } from './basic';
 
 const METAL = '#bfc4c9';
@@ -37,7 +37,7 @@ export function Servo({ part }: PartProps) {
 export function HcSr04({ part }: PartProps) {
   const dist = useRef<Group>(null);
   const tx = useRef<MeshStandardMaterial[]>([]);
-  const obsTex = useMemo(() => makeTexture(256, 180, (c) => {
+  const obsTex = useMemo(() => cachedTexture('hcsr04-obs', 256, 180, (c) => {
     c.fillStyle = '#f2a65a'; c.fillRect(0, 0, 256, 180);
     c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 6;
     for (let x = -180; x < 256; x += 36) { c.beginPath(); c.moveTo(x, 180); c.lineTo(x + 180, 0); c.stroke(); }
@@ -80,7 +80,7 @@ const LCD_ON = '#a5d63a', LCD_OFF = '#3a4a34';
 export function Lcd1602({ part }: PartProps) {
   const tex = useRef<CanvasTexture | null>(null);
   const last = useRef('');
-  const t = useMemo(() => {
+  const t = useOwned(() => {
     const x = makeTexture(640, 128, () => {});
     tex.current = x;
     return x;
@@ -121,7 +121,7 @@ export function Lcd1602({ part }: PartProps) {
 
 export function Multimeter({ part }: PartProps) {
   const last = useRef('');
-  const t = useMemo(() => makeTexture(256, 128, () => {}), []);
+  const t = useOwned(() => makeTexture(256, 128, () => {}), []);
   useFrame(() => {
     const m = vis(part.id)?.meter;
     const mode = m?.mode ?? String(part.props.mode ?? 'V');
@@ -252,7 +252,7 @@ export function NeopixelStrip({ part }: PartProps) {
 
 export function L9110s({ part }: PartProps) {
   void part;
-  const silk = useMemo(() => makeTexture(540, 240, (c) => {
+  const silk = useMemo(() => cachedTexture('l9110s', 540, 240, (c) => {
     c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle';
     c.font = 'bold 44px sans-serif'; c.fillText('L9110S', 270, 70);
     c.font = '26px sans-serif'; c.fillText('MOTOR DRIVER', 270, 124);

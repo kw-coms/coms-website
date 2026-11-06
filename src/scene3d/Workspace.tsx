@@ -93,6 +93,7 @@ function Env({ strength }: { strength: number }) {
     scene.environmentIntensity = strength;
     return () => {
       scene.environment = null;
+      env.dispose();
       rt.dispose();
       pm.dispose();
     };
@@ -105,7 +106,14 @@ function Invalidator() {
   const invalidate = useThree((s) => s.invalidate);
   useEffect(() => {
     const a = subscribe(() => invalidate());
-    const b = onSimFrame(() => invalidate());
+    // a frame only costs a render when something the scene shows actually changed
+    let last = '';
+    const b = onSimFrame((f) => {
+      const key = JSON.stringify([f.pins, f.parts, f.netVolts]);
+      if (key === last) return;
+      last = key;
+      invalidate();
+    });
     return () => {
       a();
       b();
@@ -264,7 +272,7 @@ export function Workspace() {
   return (
     <div ref={wrap} className="workspace" tabIndex={-1} onDragOver={onDragOver} onDrop={onDrop} onDragLeave={() => getState().draft && set({ draft: null })}>
       <Marquee />
-      <Canvas frameloop="demand" shadows={quality === 'low' ? false : quality === 'high' ? 'soft' : true} dpr={quality === 'high' ? [1, 2] : quality === 'medium' ? [1, 1.5] : 0.75} gl={{ antialias: aa, preserveDrawingBuffer: true, powerPreference: 'high-performance' }} aria-label="3D 작업대">
+      <Canvas frameloop="demand" shadows={quality === 'low' ? false : quality === 'high' ? 'soft' : true} dpr={quality === 'high' ? [1, 2] : quality === 'medium' ? [1, 1.5] : 0.75} gl={{ antialias: aa, powerPreference: 'high-performance' }} aria-label="3D 작업대">
         <Content />
       </Canvas>
     </div>

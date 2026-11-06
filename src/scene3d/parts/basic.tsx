@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import { MeshPhysicalMaterial, MeshStandardMaterial, type Group, type Mesh, type Sprite } from 'three';
 import { resistorBands } from '../../ui/core';
-import { GlowPool, GlowSprite, Legs, inputOf, makeTexture, vis, type PartProps } from './common';
+import { GlowPool, GlowSprite, Legs, cachedTexture, inputOf, useOwned, vis, type PartProps } from './common';
 
 export const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -12,8 +12,8 @@ const LED_COLORS: Record<string, string> = { red: '#ff2f2f', green: '#22d65a', b
 export function Led({ part }: PartProps) {
   const color = LED_COLORS[String(part.props.color)] ?? LED_COLORS.red!;
   // translucent coloured epoxy: you can see the lead-frame cup and die inside; lit = emissive + halo + light pool
-  const mat = useMemo(() => new MeshPhysicalMaterial({ userData: { dynamic: true }, color, emissive: color, emissiveIntensity: 0, transparent: true, opacity: 0.74, roughness: 0.1, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.2 }), [color]);
-  const die = useMemo(() => new MeshStandardMaterial({ userData: { dynamic: true }, color: '#d8d2c4', emissive: color, emissiveIntensity: 0, metalness: 0.6, roughness: 0.4 }), [color]);
+  const mat = useOwned(() => new MeshPhysicalMaterial({ userData: { dynamic: true }, color, emissive: color, emissiveIntensity: 0, transparent: true, opacity: 0.74, roughness: 0.1, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.2 }), [color]);
+  const die = useOwned(() => new MeshStandardMaterial({ userData: { dynamic: true }, color: '#d8d2c4', emissive: color, emissiveIntensity: 0, metalness: 0.6, roughness: 0.4 }), [color]);
   const glow = useRef<Sprite>(null);
   const pool = useRef<Mesh>(null);
   useFrame(() => {
@@ -168,7 +168,7 @@ export function Potentiometer({ part }: PartProps) {
 }
 
 export function Photoresistor({ part }: PartProps) {
-  const tex = useMemo(() => makeTexture(128, 128, (c) => {
+  const tex = useMemo(() => cachedTexture('photoresistor', 128, 128, (c) => {
     c.fillStyle = '#e8a840'; c.fillRect(0, 0, 128, 128);
     c.strokeStyle = '#5a3a14'; c.lineWidth = 7;
     c.beginPath();

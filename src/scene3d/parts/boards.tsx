@@ -7,7 +7,7 @@ import { DESK_Y } from '../sceneRefs';
 import { useFrame } from '@react-three/fiber';
 import { AdditiveBlending, type MeshStandardMaterial, type Sprite } from 'three';
 import { frameRef } from '../../ui/simHost';
-import { glowTexture, makeTexture, type PartProps } from './common';
+import { cachedTexture, glowTexture, type PartProps } from './common';
 
 const P = 2.54;
 const SILVER = '#c9ced3';
@@ -91,7 +91,7 @@ export function ArduinoUno() {
   const groups = useMemo(() => strips(def.pins), [def]);
   const tex = useMemo(() => {
     const s = 16;
-    return makeTexture(Math.round(W * s), Math.round(D * s), (c) => {
+    return cachedTexture('uno', Math.round(W * s), Math.round(D * s), (c) => {
       c.clearRect(0, 0, W * s, D * s);
       c.fillStyle = 'rgba(255,255,255,0.92)';
       c.textAlign = 'center';
@@ -232,7 +232,7 @@ export function Breadboard({ part }: PartProps) {
   }, [holes]);
   const tex = useMemo(() => {
     const s = Math.min(22, 4000 / W);
-    return makeTexture(Math.round(W * s), Math.round(D * s), (c) => {
+    return cachedTexture(`bb:${part.kind}`, Math.round(W * s), Math.round(D * s), (c) => {
       c.textAlign = 'center';
       c.textBaseline = 'middle';
       c.font = `600 ${2.3 * s}px sans-serif`;
@@ -257,7 +257,7 @@ export function Breadboard({ part }: PartProps) {
         c.fillText(sign, px(railInfo[key].x0 - 3.6), pz(railInfo[key].z));
       }
     });
-  }, [holes, W, D, railInfo]);
+  }, [part.kind, holes, W, D, railInfo]);
   const stripe = (key: 'tp' | 'tn' | 'bp' | 'bn', color: string, dz: number) => {
     const r = railInfo[key];
     return (
