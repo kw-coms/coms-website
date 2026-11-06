@@ -749,8 +749,6 @@
 /* 한 번에 한 줄씩만 낭독되는 스크린 리더용 영역과, 화면 밖 회로의 자리표시 상자 */
 .study-page .circuit-live { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 .study-page .circuit { position: relative; }
-.study-page .circuit-ph { width: 100%; margin: 0 auto var(--ph-x, 240px); border-radius: 14px; background: var(--surface-2, rgba(127, 140, 160, .1)); border: 1px solid var(--line); }
 .study-page .circuit[data-offscreen] .circuit-svg .waves.on circle { animation-play-state: paused; }
 
 .study-page [data-scroll-region]:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
-@media (max-width: 520px) { .study-page .circuit-ph { margin-bottom: var(--ph-xm, 400px); } }

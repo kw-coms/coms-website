@@ -56,13 +56,37 @@ function findRows(fig: HTMLElement): HTMLTableRowElement[] {
   return []
 }
 
-function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
+interface Mounted {
+  /** builds the SVG scene into its (already sized) box; everything else of the figure is live from the start */
+  attach(): void
+  /** the box the scene goes into: what the viewport observer watches */
+  plane: HTMLElement
+  dispose(): void
+}
+
+/**
+ * Renders the whole chrome of one figure (bar, stepper, controls, status line, caption hint, the empty stage box) at once.
+ * Only the SVG scene is built later, into a box whose size is fixed by the scene's viewBox, so nothing ever changes height.
+ * If anything throws, everything done so far is undone and null is returned (the static figure stays as it was).
+ */
+function mountOne(fig: HTMLElement, def: CircuitDef): Mounted | null {
   const ac = new AbortController()
+  const cleanups: Array<() => void> = []
+  try {
+    return mountChrome(fig, def, ac, cleanups)
+  } catch (err) {
+    console.error('circuit figure failed to mount', def.id, err)
+    ac.abort()
+    cleanups.forEach((c) => { try { c() } catch { /* best effort */ } })
+    return null
+  }
+}
+
+function mountChrome(fig: HTMLElement, def: CircuitDef, ac: AbortController, cleanups: Array<() => void>): Mounted {
   const { signal } = ac
   const uid = `cc${++counter}`
   const aria = fig.getAttribute('aria-label') || ''
   const caption = Array.from(fig.children).find((c) => c.tagName === 'FIGCAPTION') ?? null
-  const cleanups: Array<() => void> = []
   let raf = 0
 
   /* ---------- DOM ---------- */
@@ -87,9 +111,12 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
   })
   const plane = h('div', 'circuit-plane')
   plane.style.maxWidth = `${Math.round(def.size[0] * 1.12)}px`
-  plane.innerHTML = buildScene(def, uid, aria)
+  plane.style.aspectRatio = `${def.size[0]} / ${def.size[1]}` // the scene's viewBox: the box has its final size before the SVG exists
   stage.append(plane)
-  const svg = plane.querySelector('svg')!
+  // The scene is built later (when the figure nears the viewport); code that needs its elements runs through onScene
+  let svg: SVGSVGElement | null = null
+  const sceneHooks: Array<() => void> = []
+  const onScene = (fn: () => void) => { if (svg) fn(); else sceneHooks.push(fn) }
 
   const ctl = h('div', 'circuit-ctl')
   // the visible status line is plain text (it changes every frame while a sim runs); screen readers get a separate, debounced live region
@@ -122,8 +149,8 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
   }, { signal })
   cleanups.push(() => window.clearTimeout(announceTimer))
 
-  const q = <T extends Element = SVGElement>(sel: string) => svg.querySelector<T>(sel)
-  const qa = (sel: string) => Array.from(svg.querySelectorAll<SVGElement>(sel))
+  const q = <T extends Element = SVGElement>(sel: string) => svg?.querySelector<T>(sel) ?? null
+  const qa = (sel: string) => (svg ? Array.from(svg.querySelectorAll<SVGElement>(sel)) : [])
 
   /* ---------- 3D tilt ---------- */
   let userFlat: boolean | null = null // an explicit 평면/3D choice wins over the automatic (reduced motion / lite mode) default
@@ -208,7 +235,7 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
   const partEls = (id: string) => qa(`[data-cpart="${id}"]`)
 
   function clearHl() {
-    svg.querySelectorAll('.is-hl').forEach((n) => n.classList.remove('is-hl'))
+    svg?.querySelectorAll('.is-hl').forEach((n) => n.classList.remove('is-hl'))
     rows.forEach((r) => r.classList.remove('circuit-row-on'))
   }
   function hl(i: number | null) {
@@ -244,13 +271,13 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
         rows[to].focus()
       }, { signal })
     })
-    def.wires.forEach((_w, wi) => {
+    onScene(() => def.wires.forEach((_w, wi) => {
       const el = wireEl(wi)
       const si = stepOfWire.get(wi)
       if (!el || si == null) return
       el.addEventListener('pointerenter', () => { clearHl(); el.classList.add('is-hl'); rows[si].classList.add('circuit-row-on') }, { signal })
       el.addEventListener('pointerleave', restoreHl, { signal })
-    })
+    }))
     cleanups.push(() => rows.forEach((row) => {
       row.removeAttribute('tabindex'); rows[0]?.closest('table')?.removeAttribute('aria-describedby')
       row.classList.remove('circuit-row', 'circuit-row-on', 'circuit-row-current')
@@ -263,10 +290,10 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
     const { on, n } = stepper$
     stepper.hidden = !on
     btnSteps.setAttribute('aria-pressed', String(on))
-    svg.querySelectorAll('.cstep-off').forEach((x) => x.classList.remove('cstep-off'))
+    svg?.querySelectorAll('.cstep-off').forEach((x) => x.classList.remove('cstep-off'))
     rows.forEach((r, i) => r.classList.toggle('circuit-row-current', on && i === n - 1))
     if (on) {
-      svg.querySelectorAll<SVGElement>('[data-cpart]').forEach((x) => {
+      svg?.querySelectorAll<SVGElement>('[data-cpart]').forEach((x) => {
         const f = firstStep.get(x.getAttribute('data-cpart')!)
         if (f != null && f >= n) x.classList.add('cstep-off')
       })
@@ -316,48 +343,55 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
 
   /** Drag-to-turn handling of the potentiometer knob drawn in the scene (shared by 4-4 and 6-4); returns the function that rotates the knob. */
   const bindKnob = (id: string, getRaw: () => number, setRaw: (v: number) => void) => {
-    const knob = q(`[data-role="knob-${id}"]`)
-    const hit = q(`[data-role="knob-hit-${id}"]`)
-    const m = /rotate\(0 ([\d.-]+) ([\d.-]+)\)/.exec(knob?.getAttribute('transform') || '')
-    const pivot: [number, number] = m ? [Number(m[1]), Number(m[2])] : [0, 0]
-    if (hit) {
-      let last: number | null = null
-      const angleAt = (e: PointerEvent) => {
-        const r = hit.getBoundingClientRect()
-        return (Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) * 180) / Math.PI
+    let pivot: [number, number] = [0, 0]
+    const turn = (v: number) => q(`[data-role="knob-${id}"]`)?.setAttribute('transform', `rotate(${sim.knobFromRaw(v).toFixed(1)} ${pivot[0]} ${pivot[1]})`)
+    onScene(() => {
+      const knob = q(`[data-role="knob-${id}"]`)
+      const hit = q(`[data-role="knob-hit-${id}"]`)
+      const m = /rotate\(0 ([\d.-]+) ([\d.-]+)\)/.exec(knob?.getAttribute('transform') || '')
+      pivot = m ? [Number(m[1]), Number(m[2])] : [0, 0]
+      if (hit) {
+        let last: number | null = null
+        const angleAt = (e: PointerEvent) => {
+          const r = hit.getBoundingClientRect()
+          return (Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) * 180) / Math.PI
+        }
+        hit.addEventListener('pointerdown', (e) => {
+          if (!running) return
+          e.preventDefault()
+          hit.setPointerCapture?.(e.pointerId)
+          last = angleAt(e)
+        }, { signal })
+        hit.addEventListener('pointermove', (e) => {
+          if (last == null) return
+          const a = angleAt(e)
+          let d = a - last
+          if (d > 180) d -= 360
+          if (d < -180) d += 360
+          last = a
+          setRaw(sim.rawFromKnob(sim.knobFromRaw(getRaw()) + d))
+        }, { signal })
+        const up = () => { last = null }
+        hit.addEventListener('pointerup', up, { signal })
+        hit.addEventListener('pointercancel', up, { signal })
       }
-      hit.addEventListener('pointerdown', (e) => {
-        if (!running) return
-        e.preventDefault()
-        hit.setPointerCapture?.(e.pointerId)
-        last = angleAt(e)
-      }, { signal })
-      hit.addEventListener('pointermove', (e) => {
-        if (last == null) return
-        const a = angleAt(e)
-        let d = a - last
-        if (d > 180) d -= 360
-        if (d < -180) d += 360
-        last = a
-        setRaw(sim.rawFromKnob(sim.knobFromRaw(getRaw()) + d))
-      }, { signal })
-      const up = () => { last = null }
-      hit.addEventListener('pointerup', up, { signal })
-      hit.addEventListener('pointercancel', up, { signal })
-    }
-    return (v: number) => knob?.setAttribute('transform', `rotate(${sim.knobFromRaw(v).toFixed(1)} ${pivot[0]} ${pivot[1]})`)
+      turn(getRaw())
+    })
+    return turn
   }
 
   /** The 16x2 LCD drawn in the scene: backlight and the two text rows. */
   const lcdView = (id: string) => {
-    const bl = q(`[data-role="lcd-bl-${id}"]`)
-    const rows = [q(`[data-role="lcd-l1-${id}"]`), q(`[data-role="lcd-l2-${id}"]`)]
-    return {
-      show(on: boolean, l1: string, l2: string) {
-        bl?.setAttribute('opacity', on ? '1' : '0.28')
-        ;[l1, l2].forEach((t, i) => { if (rows[i]) rows[i]!.textContent = sim.lcdPad(t).replace(/ /g, '\u00a0') })
-      },
+    let cur = { on: false, l1: '', l2: '' }
+    const apply = () => {
+      q(`[data-role="lcd-bl-${id}"]`)?.setAttribute('opacity', cur.on ? '1' : '0.28')
+      ;[cur.l1, cur.l2].forEach((t, i) => {
+        const row = q(`[data-role="lcd-l${i + 1}-${id}"]`)
+        if (row) row.textContent = sim.lcdPad(t).replace(/ /g, '\u00a0')
+      })
     }
+    onScene(apply)
+    return { show(on: boolean, l1: string, l2: string) { cur = { on, l1, l2 }; apply() } }
   }
 
   interface Runner { start(): void; stop(): void; frame?(elapsed: number, now: number): void }
@@ -378,18 +412,18 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
 
     case 'button': {
       let pressed = false
-      const hit = q('[data-role="btn-hit-btn"]')
-      const cap = q('[data-role="btn-cap-btn"]')
       const render = () => {
-        cap?.setAttribute('transform', pressed ? 'translate(0 1.8)' : '')
-        hit?.setAttribute('aria-pressed', String(pressed))
+        q('[data-role="btn-cap-btn"]')?.setAttribute('transform', pressed ? 'translate(0 1.8)' : '')
+        q('[data-role="btn-hit-btn"]')?.setAttribute('aria-pressed', String(pressed))
         const read = sim.buttonRead(pressed)
         if (!running) { setLed('led', 0); return }
         setLed('led', pressed ? 1 : 0)
         setStatus(`D2 = ${read} (${pressed ? '눌림 → GND와 연결' : '안 눌림, 내부 풀업이 HIGH로 당김'}) → digitalWrite(8, ${pressed ? 'HIGH' : 'LOW'}), LED ${pressed ? '켜짐' : '꺼짐'}`)
       }
       const set = (v: boolean) => { if (pressed !== v) { pressed = v; render() } }
-      if (hit) {
+      onScene(() => {
+        const hit = q('[data-role="btn-hit-btn"]')
+        if (!hit) return
         hit.addEventListener('pointerdown', (e) => { e.preventDefault(); hit.setPointerCapture?.((e as PointerEvent).pointerId); set(true) }, { signal })
         hit.addEventListener('pointerup', () => set(false), { signal })
         hit.addEventListener('pointercancel', () => set(false), { signal })
@@ -397,7 +431,8 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
         hit.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); set(true) } }, { signal })
         hit.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Enter') set(false) }, { signal })
         hit.addEventListener('blur', () => set(false), { signal })
-      }
+        render()
+      })
       runner = { start: render, stop: () => { render() } }
       break
     }
@@ -436,17 +471,16 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
     case 'cds': {
       let light = 70
       let on = false
-      const glow = q('[data-role="cds-glow-cds"]')
       range('주변 밝기', 0, 100, light, '%', (v) => { light = v; render() })
       const render = () => {
-        glow?.setAttribute('opacity', String(((light / 100) * 0.9).toFixed(2)))
+        q('[data-role="cds-glow-cds"]')?.setAttribute('opacity', String(((light / 100) * 0.9).toFixed(2)))
         if (!running) { setLed('led', 0); return }
         const raw = sim.cdsRaw(light)
         on = sim.nightLightOn(on, raw)
         setLed('led', on ? 1 : 0)
         setStatus(`light = ${raw}  LED ${on ? 'ON' : 'OFF'}   (CDS 약 ${sim.cdsKohm(light).toFixed(1)}kΩ, A0 약 ${((raw * 5) / 1023).toFixed(2)}V, 켜는 값 ${sim.DARK_ON} / 끄는 값 ${sim.DARK_OFF})`)
       }
-      render()
+      onScene(() => render())
       runner = { start: () => { on = false; render() }, stop: () => { on = false; render() } }
       break
     }
@@ -454,8 +488,6 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
     case 'rgb': {
       const rgb: [number, number, number] = [255, 0, 0]
       let auto: '' | 'mix' | 'wheel' = ''
-      const lit = q('[data-role="rgb-lit-rgb"]')
-      const halo = q('[data-role="rgb-glow-rgb"]')
       const sliders = ['R (D9)', 'G (D10)', 'B (D11)'].map((l, i) => range(l, 0, 255, rgb[i], '', (v) => { auto = ''; syncModes(); rgb[i] = v; render() }))
       const modes = (['mix', 'wheel'] as const).map((kind) => {
         const b = button('cb-mode', kind === 'mix' ? '색 섞기 스케치 재생' : '무지개 스케치 재생')
@@ -470,6 +502,8 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
         const [r, g, b] = rgb
         const br = running ? Math.max(r, g, b) / 255 : 0
         const col = `rgb(${r},${g},${b})`
+        const lit = q('[data-role="rgb-lit-rgb"]')
+        const halo = q('[data-role="rgb-glow-rgb"]')
         lit?.setAttribute('fill', col)
         lit?.setAttribute('opacity', String(br))
         halo?.setAttribute('fill', col)
@@ -486,7 +520,7 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
           if (c[0] !== rgb[0] || c[1] !== rgb[1] || c[2] !== rgb[2]) { rgb[0] = c[0]; rgb[1] = c[1]; rgb[2] = c[2]; render() }
         },
       }
-      render()
+      onScene(() => render())
       break
     }
 
@@ -524,8 +558,6 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
       let x = 512
       let y = 512
       let pressed = false
-      const stick = q('[data-role="stick-joy"]')
-      const hit = q('[data-role="stick-hit-joy"]')
       const sx = range('X축 (A0)', 0, 1023, x, '', (v) => { x = v; render() })
       const sy = range('Y축 (A1)', 0, 1023, y, '', (v) => { y = v; render() })
       const sw = button('cb-mode', '스틱 누르기 (SW)')
@@ -541,10 +573,12 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
       ctl.append(sw)
       const render = () => {
         sx.set(x); sy.set(y)
-        stick?.setAttribute('transform', `translate(${(sim.joyPos(x) * JOY_TRAVEL).toFixed(1)} ${(sim.joyPos(y) * JOY_TRAVEL).toFixed(1)}) scale(${pressed ? 0.94 : 1})`)
+        q('[data-role="stick-joy"]')?.setAttribute('transform', `translate(${(sim.joyPos(x) * JOY_TRAVEL).toFixed(1)} ${(sim.joyPos(y) * JOY_TRAVEL).toFixed(1)}) scale(${pressed ? 0.94 : 1})`)
         if (running) setStatus(sim.joyLine(x, y, pressed))
       }
-      if (hit) {
+      onScene(() => {
+        const hit = q('[data-role="stick-hit-joy"]')
+        if (!hit) return
         let dragging = false
         const move = (e: PointerEvent) => {
           const r = hit.getBoundingClientRect()
@@ -558,9 +592,9 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
         const up = () => { if (dragging) { dragging = false; x = 512; y = 512; render() } } // the spring returns the stick to the middle
         hit.addEventListener('pointerup', up, { signal })
         hit.addEventListener('pointercancel', up, { signal })
-      }
+        render()
+      })
       runner = { start: render, stop: () => { x = 512; y = 512; pressed = false; sw.setAttribute('aria-pressed', 'false'); render() } }
-      render()
       break
     }
 
@@ -570,9 +604,11 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
       let angle = 0
       let lastNow = 0
       let lastStep = 0
-      const spin = q('[data-role="spin-motor"]')
-      const m = /rotate\(0 ([\d.-]+) ([\d.-]+)\)/.exec(spin?.getAttribute('transform') || '')
-      const pivot: [number, number] = m ? [Number(m[1]), Number(m[2])] : [0, 0]
+      let pivot: [number, number] = [0, 0]
+      onScene(() => {
+        const m = /rotate\(0 ([\d.-]+) ([\d.-]+)\)/.exec(q('[data-role="spin-motor"]')?.getAttribute('transform') || '')
+        pivot = m ? [Number(m[1]), Number(m[2])] : [0, 0]
+      })
       const slider = range('속도 setMotor(speed)', -255, 255, speed, '', (v) => { follow = false; syncFollow(); speed = v; report() })
       const followBtn = button('cb-mode', 'loop() 스케치 재생')
       followBtn.setAttribute('aria-pressed', 'false')
@@ -587,7 +623,7 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
         const pwm = Math.max(p.ia, p.ib)
         setStatus(`setMotor(${speed}) → analogWrite(5, ${p.ia}) · analogWrite(6, ${p.ib}) : ${speed === 0 ? '정지' : !turns() ? `PWM ${pwm}는 너무 낮아 웅 소리만 나고 돌지 않음` : `${speed > 0 ? '정방향' : '역방향'}, 속도 ${Math.round((pwm / 255) * 100)}%`}`)
       }
-      const draw = () => spin?.setAttribute('transform', `rotate(${(angle % 360).toFixed(1)} ${pivot[0]} ${pivot[1]})`)
+      const draw = () => q('[data-role="spin-motor"]')?.setAttribute('transform', `rotate(${(angle % 360).toFixed(1)} ${pivot[0]} ${pivot[1]})`)
       runner = {
         start: () => { lastNow = 0; report() },
         stop: () => { follow = false; syncFollow(); speed = 0; report(); draw() },
@@ -618,7 +654,7 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
         const us = sim.echoMicros(cm)
         setStatus(`Echo가 HIGH였던 시간 = ${us}µs → ${us} × 0.034 / 2 = ${sim.cmFromMicros(us).toFixed(1)}cm`)
       }
-      moveObject(cm)
+      onScene(() => moveObject(cm))
       runner = {
         start: () => { if (def.sim === 'ultrasonic') report() },
         stop: () => { setLed('led', 0); setWaves('bz', false) },
@@ -640,17 +676,19 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
     }
 
     case 'servo': {
-      const horn = q('[data-role="horn-sv"]')
-      const m = /rotate\(0 ([\d.-]+) ([\d.-]+)\)/.exec(horn?.getAttribute('transform') || '')
-      const pivot: [number, number] = m ? [Number(m[1]), Number(m[2])] : [0, 0]
+      let pivot: [number, number] = [0, 0]
+      onScene(() => {
+        const m = /rotate\(0 ([\d.-]+) ([\d.-]+)\)/.exec(q('[data-role="horn-sv"]')?.getAttribute('transform') || '')
+        pivot = m ? [Number(m[1]), Number(m[2])] : [0, 0]
+      })
       let angle = 90
       const turn = (v: number) => {
         angle = v
-        horn?.setAttribute('transform', `rotate(${-v} ${pivot[0]} ${pivot[1]})`)
+        q('[data-role="horn-sv"]')?.setAttribute('transform', `rotate(${-v} ${pivot[0]} ${pivot[1]})`)
         if (running) setStatus(`myServo.write(${v}) → 서보 혼이 ${v}°로 이동`)
       }
       range('각도', 0, 180, angle, '°', turn)
-      turn(angle)
+      onScene(() => turn(angle))
       runner = { start: () => turn(angle), stop: () => {} }
       break
     }
@@ -713,6 +751,7 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
     pausedAt = 0
     pausedTotal = 0
     if (on) {
+      attach() // a scene must exist before it can be simulated (a keyboard user can reach the play button first)
       t0 = performance.now()
       runner.start()
       syncLoop()
@@ -724,80 +763,48 @@ function mountOne(fig: HTMLElement, def: CircuitDef): () => void {
   btnPlay.addEventListener('click', () => setRunning(!running), { signal })
   btnPlay.setAttribute('aria-pressed', 'false')
 
-  return () => {
+  const attach = () => {
+    if (svg) return
+    plane.innerHTML = buildScene(def, uid, aria)
+    svg = plane.querySelector('svg')
+    sceneHooks.splice(0).forEach((fn) => fn())
+    applyStepper()
+  }
+  const dispose = () => {
     ac.abort()
     cancelAnimationFrame(raf)
     fig.removeAttribute('data-offscreen')
     cleanups.forEach((c) => c())
   }
-}
-
-/** Height of everything around the drawing (bar, controls, status line, caption hint) per circuit: [wide, narrow (<= 520px)], measured from the mounted figures, so the placeholder reserves the final height. */
-const PLACEHOLDER_EXTRA: Record<string, [number, number]> = {
-  'led-blink': [166, 207], 'button-led': [166, 227], 'pot-led': [199, 287], ultrasonic: [199, 286], servo: [199, 288], buzzer: [166, 210], alarm: [185, 291],
-  'cds-night': [215, 307], 'rgb-led': [241, 504], 'lcd-i2c': [185, 310], dht11: [241, 428], 'dht11-lcd': [227, 430], joystick: [241, 428], 'dc-motor': [210, 348],
+  return { attach, plane, dispose }
 }
 
 /**
- * Registers every circuit figure under `root` and builds each scene only when it nears the viewport (a scene is ~50 KB of
- * SVG, so building all of them at load costs thousands of DOM nodes). Until then a placeholder of the final aspect ratio
- * keeps the layout from jumping. Returns a cleanup that removes everything again.
+ * Brings every circuit figure under `root` to life. The chrome of each figure is rendered at once; its SVG scene (~50 KB,
+ * a few hundred DOM nodes) is built only when the stage box nears the viewport. The box already has its final size, so
+ * building the scene never moves anything. Returns a cleanup that puts the static figures back.
  */
 export function mountCircuits(root: HTMLElement): () => void {
-  const cleanups: Array<() => void> = []
-  const pending = new Map<Element, () => void>()
+  const mounted: Mounted[] = []
+  const pending = new Map<Element, Mounted>()
+  const build = (m: Mounted) => {
+    try { m.attach() } catch (err) { console.error('circuit scene failed to build', err); m.dispose() }
+  }
   const io = 'IntersectionObserver' in window
     ? new IntersectionObserver((entries) => entries.forEach((en) => {
         if (!en.isIntersecting) return
         io!.unobserve(en.target)
-        pending.get(en.target)?.()
+        const m = pending.get(en.target)
         pending.delete(en.target)
+        if (m) build(m)
       }), { rootMargin: '300px 0px' })
     : null
-  const figs = Array.from(root.querySelectorAll<HTMLElement>('figure.circuit[data-circuit]'))
-  // read first, write after: which figures sit wholly above the viewport and how tall they are right now
-  const was = figs.map((f) => { const r = f.getBoundingClientRect(); return { above: r.bottom <= 0, h: r.height } })
-  figs.forEach((fig) => {
+  root.querySelectorAll<HTMLElement>('figure.circuit[data-circuit]').forEach((fig) => {
     const def = circuitById(fig.getAttribute('data-circuit') || '')
-    if (!def) return
-    const mount = () => {
-      const before = fig.getBoundingClientRect()
-      try {
-        ph?.remove()
-        cleanups.push(mountOne(fig, def))
-      } catch {
-        // a broken scene must not take the others down: put the static figure back and carry on
-        ph?.remove()
-        fig.querySelectorAll(':scope > .circuit-bar, :scope > .circuit-stepper, :scope > .circuit-stage, :scope > .circuit-ctl, :scope > .circuit-status, :scope > .circuit-live').forEach((n) => n.remove())
-        fig.classList.remove('is-live')
-        fig.removeAttribute('data-sim')
-        return
-      }
-      // A figure wholly above the viewport changes height here (placeholder vs real): scroll by the difference so the text being read stays put
-      // (Chrome and Firefox anchor the scroll position themselves, Safari does not).
-      if (before.bottom <= 0) {
-        const delta = fig.getBoundingClientRect().height - before.height
-        if (Math.abs(delta) >= 1) window.scrollBy({ top: delta, left: 0, behavior: 'instant' as ScrollBehavior })
-      }
-    }
-    let ph: HTMLElement | null = null
-    if (io) {
-      ph = h('div', 'circuit-ph', undefined, { 'aria-hidden': 'true' })
-      ph.style.aspectRatio = `${def.size[0]} / ${def.size[1]}`
-      ph.style.maxWidth = `${Math.round(def.size[0] * 1.12)}px`
-      const extra = PLACEHOLDER_EXTRA[def.id] ?? [190, 350]
-      ph.style.setProperty('--ph-x', `${extra[0]}px`)
-      ph.style.setProperty('--ph-xm', `${extra[1]}px`)
-      fig.insertBefore(ph, Array.from(fig.children).find((c) => c.tagName === 'FIGCAPTION') ?? null)
-      pending.set(fig, mount)
-      io.observe(fig)
-    } else mount()
-    cleanups.push(() => ph?.remove())
+    const m = def ? mountOne(fig, def) : null
+    if (!m) return
+    mounted.push(m)
+    if (io) { pending.set(m.plane, m); io.observe(m.plane) } else build(m)
   })
-  // the placeholders were inserted after the browser may already have jumped to a #hash or restored a scroll position:
-  // keep the text on screen where it was
-  let grown = 0
-  figs.forEach((fig, i) => { if (was[i].above) grown += fig.getBoundingClientRect().height - was[i].h })
-  if (Math.abs(grown) >= 1) window.scrollBy({ top: grown, left: 0, behavior: 'instant' as ScrollBehavior })
-  return () => { io?.disconnect(); pending.clear(); cleanups.forEach((c) => c()) }
+  return () => { io?.disconnect(); pending.clear(); mounted.forEach((m) => m.dispose()) }
 }

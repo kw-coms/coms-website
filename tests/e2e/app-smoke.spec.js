@@ -4681,6 +4681,7 @@ test.describe('arduino study circuits', () => {
     const fig = circuit(page, 'led-blink')
     await fig.scrollIntoViewIfNeeded()
     await expect(fig).toHaveClass(/is-live/)
+    await expect(fig.locator('svg.circuit-svg')).toHaveCount(1)
     await expect(fig.locator('.circuit-stage')).toHaveClass(/is-flat/)
     const filtered = () => fig.locator('.circuit-svg [filter]').evaluateAll((els) => els.filter((e) => getComputedStyle(e).filter !== 'none').length)
     expect(await filtered()).toBe(0)
@@ -4695,16 +4696,16 @@ test.describe('arduino study circuits', () => {
     await expect(fig.locator('.circuit-stage')).toHaveClass(/is-flat/)
   })
 
-  test('scenes are built only when their figure nears the viewport', async ({ page }) => {
+  test('scenes are built only when their figure nears the viewport; the rest of each figure is there from the start', async ({ page }) => {
     await page.goto('/study/arduino')
     await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
-    await expect(page.locator('.circuit-ph')).not.toHaveCount(0)
-    expect(await page.locator('svg.circuit-svg').count(), 'nothing is drawn at the top of the page').toBe(0)
+    await expect(page.locator('figure.circuit.is-live')).toHaveCount(14) // bar, controls, status line: all rendered at once
+    expect(await page.locator('svg.circuit-svg').count(), 'no scene is drawn at the top of the page').toBe(0)
     const far = circuit(page, 'dc-motor')
+    await expect(far.getByRole('button', { name: '▶ 시뮬레이션' })).toBeAttached()
     await expect(far.locator('svg.circuit-svg')).toHaveCount(0)
     await far.scrollIntoViewIfNeeded()
     await expect(far.locator('svg.circuit-svg')).toHaveCount(1)
-    await expect(far.locator('.circuit-ph')).toHaveCount(0)
     expect(await page.locator('svg.circuit-svg').count(), 'only the figures that were reached are built').toBeLessThan(14)
   })
 
@@ -4725,27 +4726,45 @@ test.describe('arduino study circuits', () => {
     await expect(fig).toHaveAttribute('data-led', frozen === 'on' ? 'off' : 'on')
   })
 
-  test('text being read stays put while figures above it are built (scroll up, placeholder height mismatch, no browser anchoring)', async ({ page }) => {
-    await page.goto('/study/arduino')
-    await expect(page.locator('.circuit-ph').first()).toBeAttached()
-    // worst case: no native scroll anchoring (Safari) and placeholders that are far from the real height
-    await page.addStyleTag({ content: 'html, body, * { overflow-anchor: none !important; }' })
-    await page.evaluate(() => document.querySelectorAll('.circuit-ph').forEach((el) => { el.style.setProperty('--ph-x', '10px'); el.style.setProperty('--ph-xm', '10px') }))
-    await page.evaluate(() => { document.getElementById('mod-motor').scrollIntoView(); window.scrollBy(0, -150) })
-    await page.waitForTimeout(300)
-    const probe = () => page.evaluate(() => document.getElementById('mod-motor').getBoundingClientRect().top)
-    const start = await probe()
-    for (let i = 1; i <= 8; i += 1) {
-      await page.evaluate(() => window.scrollBy(0, -260))
-      await page.waitForTimeout(250)
-      expect(Math.abs((await probe()) - (start + 260 * i)), `after scroll step ${i}`).toBeLessThanOrEqual(2)
+  // Building a scene must never move anything: the stage box has its final size (the scene's viewBox) before the SVG exists.
+  for (const view of [
+    { name: '375px', width: 375 }, { name: '768px', width: 768 }, { name: '1024px', width: 1024 }, { name: '1280px', width: 1280 }, { name: '1440px', width: 1440 },
+    { name: '125% text size', width: 1024, fontSize: '125%' },
+  ]) {
+    for (const anchoring of ['native scroll anchoring', 'no scroll anchoring']) {
+      test(`scrolling up through figures moves nothing: ${view.name}, ${anchoring}`, async ({ page }) => {
+        await page.setViewportSize({ width: view.width, height: 800 })
+        await page.goto('/study/arduino')
+        await expect(page.locator('figure.circuit.is-live')).toHaveCount(14)
+        if (anchoring === 'no scroll anchoring') await page.addStyleTag({ content: 'html, body, * { overflow-anchor: none !important; }' })
+        if (view.fontSize) await page.evaluate((fs) => { document.documentElement.style.fontSize = fs }, view.fontSize)
+        await page.waitForTimeout(200)
+        expect(await page.locator('svg.circuit-svg').count()).toBe(0)
+        const heights = () => page.evaluate(() => [...document.querySelectorAll('figure.circuit')].map((f) => f.getBoundingClientRect().height))
+        const before = await heights()
+        await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+        await page.waitForTimeout(300)
+        const probe = () => page.evaluate(() => ({ top: document.querySelector('#next h2').getBoundingClientRect().top, y: window.scrollY }))
+        const start = await probe()
+        let steps = 0
+        for (let y = start.y; y > 0 && steps < 150; steps += 1) {
+          await page.evaluate(() => window.scrollBy(0, -700))
+          await page.waitForTimeout(70)
+          const now = await probe()
+          expect(Math.abs(now.top - (start.top + (start.y - now.y))), `probe drift at scroll ${Math.round(now.y)}`).toBeLessThanOrEqual(1)
+          y = now.y
+        }
+        await page.waitForTimeout(200)
+        const after = await heights()
+        expect(await page.locator('svg.circuit-svg').count(), 'every figure was reached and built').toBe(14)
+        after.forEach((h, i) => expect(Math.abs(h - before[i]), `figure ${i} height before/after its scene was built`).toBeLessThanOrEqual(1))
+      })
     }
-    expect(await page.locator('svg.circuit-svg').count()).toBeGreaterThan(0) // figures above really were built during the scroll
-  })
+  }
 
-  test('a table-of-contents jump past many placeholders still lands on its heading', async ({ page }) => {
+  test('a table-of-contents jump past many unbuilt scenes still lands on its heading', async ({ page }) => {
     await page.goto('/study/arduino')
-    await expect(page.locator('.circuit-ph').first()).toBeAttached()
+    await expect(page.locator('figure.circuit.is-live')).toHaveCount(14)
     await page.locator('nav.toc a[href="#mod-motor"]').click()
     const top = () => page.evaluate(() => Math.round(document.getElementById('mod-motor').getBoundingClientRect().top))
     await expect.poll(top, { timeout: 8000 }).toBeLessThan(160)
@@ -4787,16 +4806,21 @@ test.describe('arduino study circuits', () => {
     await expect(page.locator('figure.circuit')).toHaveCount(0)
     await page.locator('a[href="/study/arduino"]').first().click()
     await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
-    expect(await page.locator('svg.circuit-svg').count(), 'a fresh page builds nothing until figures are reached').toBe(0)
+    await expect(page.locator('figure.circuit.is-live')).toHaveCount(14)
+    expect(await page.locator('svg.circuit-svg').count(), 'a fresh page builds no scene until figures are reached').toBe(0)
     for (const id of ['led-blink', 'cds-night']) await circuit(page, id).scrollIntoViewIfNeeded()
     await expect(circuit(page, 'cds-night')).toHaveClass(/is-live/)
     for (const id of ['led-blink', 'cds-night']) await expect(circuit(page, id).locator('svg.circuit-svg')).toHaveCount(1)
-    await expect(page.locator('figure.circuit.is-live')).toHaveCount(await page.locator('svg.circuit-svg').count())
+    await expect(page.locator('figure.circuit-live, svg.circuit-svg')).toHaveCount(await page.locator('svg.circuit-svg').count())
     // unmounting restores the static page: nothing left behind on the table rows or the figures
     await page.getByRole('link', { name: /스터디 목록/ }).click()
     await page.locator('a[href="/study/arduino"]').first().click()
     await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
-    expect(await page.locator('tr[tabindex], [data-offscreen], .circuit-live, figure.circuit.is-live').count()).toBe(0)
+    // a second visit renders exactly one set of chrome per figure and one scene per reached figure
+    await expect(page.locator('.circuit-bar')).toHaveCount(14)
+    await expect(page.locator('.circuit-live')).toHaveCount(14)
+    await expect(page.locator('tr[tabindex="0"]')).toHaveCount(14)
+    await expect(page.locator('svg.circuit-svg')).toHaveCount(0)
   })
 
   test('a table has one tab stop and arrow keys move between its rows', async ({ page }) => {
@@ -4804,6 +4828,7 @@ test.describe('arduino study circuits', () => {
     const fig = circuit(page, 'pot-led')
     await fig.scrollIntoViewIfNeeded()
     await expect(fig).toHaveClass(/is-live/)
+    await expect(fig.locator('svg.circuit-svg')).toHaveCount(1)
     const table = fig.locator('xpath=preceding-sibling::div[contains(@class,"table-wrap")][1]')
     const rows = table.locator('tr.circuit-row')
     await expect(rows).toHaveCount(4)
