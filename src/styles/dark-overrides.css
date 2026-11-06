@@ -47,7 +47,7 @@
 	background: transparent;
 }
 
-/* The global nav (and its desktop Activity dropdown) renders outside the
+/* The global nav (and its desktop Records/Tools dropdowns) renders outside the
    .apple-route / .theme-home page wrappers, so it does not inherit the
    utility remaps below. Mirror the essential ones here so the bar, its
    hairline border, the dropdown surface, and the admin button stay legible

@@ -249,8 +249,8 @@ test.describe('home boot intro', () => {
 })
 
 // The home sections under the hero: every card is a real control that goes where it says.
-// The tools row on the home lists what the Activity menu holds and takes a member there.
-test('home tools row lists the Activity menu and opens a tool', async ({ page }) => {
+// The tools row on the home lists what the Records and Tools menus hold and takes a member there.
+test('home tools row lists the Records and Tools menus and opens a tool', async ({ page }) => {
   await page.addInitScript(() => {
     try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ }
   })
@@ -262,9 +262,12 @@ test('home tools row lists the Activity menu and opens a tool', async ({ page })
   await tools.scrollIntoViewIfNeeded()
   const tiles = tools.getByRole('button')
   // The same entries, in the same order, as the menu in the header.
-  await page.getByRole('button', { name: 'Activity' }).click()
-  const menu = await page.getByRole('navigation', { name: '활동 메뉴' }).getByRole('button').evaluateAll(items => items.map(item => item.querySelector('span span:last-child').textContent))
-  await page.keyboard.press('Escape')
+  const menu = []
+  for (const [button, label] of [['Records', '기록·일정 메뉴'], ['Tools', '참여 도구 메뉴']]) {
+    await page.getByRole('button', { name: button, exact: true }).click()
+    menu.push(...await page.getByRole('navigation', { name: label }).getByRole('button').evaluateAll(items => items.map(item => item.querySelector('span span:last-child').textContent)))
+    await page.keyboard.press('Escape')
+  }
   expect(menu.length).toBeGreaterThanOrEqual(4)
   await expect(tiles).toHaveCount(menu.length)
   const titles = await tiles.evaluateAll(items => items.map(item => item.querySelector('.coms-tool-title').textContent))
@@ -2229,34 +2232,44 @@ test('quick jump is offered beside the menu button on a phone', async ({ page })
   expect(overflow).toBeLessThanOrEqual(1)
 })
 
-test('top navigation groups activity log and monthly calendar under Activity', async ({ page }) => {
+test('top navigation groups activity log and monthly calendar under Records and Tools', async ({ page }) => {
   await mockAdminApis(page)
   await page.goto('/')
 
   const desktopNav = page.locator('header nav').first()
   await expect(desktopNav.getByRole('button', { name: 'Notices' })).toBeVisible()
-  await expect(desktopNav.getByRole('button', { name: 'Activity' })).toBeVisible()
+  await expect(desktopNav.getByRole('button', { name: 'Records', exact: true })).toBeVisible()
+  await expect(desktopNav.getByRole('button', { name: 'Tools', exact: true })).toBeVisible()
+  await expect(desktopNav.getByRole('button', { name: 'Activity', exact: true })).toHaveCount(0)
   await expect(desktopNav.getByRole('button', { name: 'Activity log' })).toHaveCount(0)
   await expect(desktopNav.getByRole('button', { name: 'Monthly calendar' })).toHaveCount(0)
 
-  await desktopNav.getByRole('button', { name: 'Activity' }).click()
-  const activityMenu = page.getByRole('navigation', { name: '활동 메뉴' })
+  await desktopNav.getByRole('button', { name: 'Records', exact: true }).click()
+  const activityMenu = page.getByRole('navigation', { name: '기록·일정 메뉴' })
   await expect(activityMenu.getByRole('button', { name: /Activity log/ })).toBeVisible()
   await expect(activityMenu.getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
-  // The menu has two columns (기록·일정 / 참여 도구); each row still fills its own column, so the
-  // whole row is the hit target, and the two groups sit side by side rather than stacked.
+  // Each row fills its panel, so the whole row is the hit target, and the Tools entries are
+  // not in the Records panel.
   const activityLogButton = activityMenu.getByRole('button', { name: /Activity log/ })
   const activityLogColumnWidth = await activityLogButton.evaluate((el) => el.closest('ul').getBoundingClientRect().width)
   const activityLogBox = await activityLogButton.boundingBox()
   expect(activityLogBox.width).toBeGreaterThanOrEqual(activityLogColumnWidth - 2)
-  const gatherBox = await activityMenu.getByRole('button', { name: /Gather/ }).boundingBox()
-  expect(gatherBox.x).toBeGreaterThanOrEqual(activityLogBox.x + activityLogBox.width - 2)
+  await expect(activityMenu.getByRole('button', { name: /Gather/ })).toHaveCount(0)
+  // Only one dropdown is open at a time: opening Tools closes Records.
+  await desktopNav.getByRole('button', { name: 'Tools', exact: true }).click()
+  await expect(activityMenu).toBeHidden()
+  const toolsMenu = page.getByRole('navigation', { name: '참여 도구 메뉴' })
+  await expect(toolsMenu.getByRole('button', { name: /Gather/ })).toBeVisible()
+  await expect(toolsMenu.getByRole('button', { name: /Activity log/ })).toHaveCount(0)
+  await desktopNav.getByRole('button', { name: 'Records', exact: true }).click()
+  await expect(toolsMenu).toBeHidden()
+  await expect(activityMenu).toBeVisible()
   await activityMenu.getByRole('button', { name: /Activity log/ }).click()
   await expect(page).toHaveURL(/\/activity-log$/)
   await page.goto('/')
 
-  await desktopNav.getByRole('button', { name: 'Activity' }).click()
-  await page.getByRole('navigation', { name: '활동 메뉴' }).getByRole('button', { name: /Monthly calendar/ }).click()
+  await desktopNav.getByRole('button', { name: 'Records', exact: true }).click()
+  await page.getByRole('navigation', { name: '기록·일정 메뉴' }).getByRole('button', { name: /Monthly calendar/ }).click()
   await expect(page).toHaveURL(/\/monthly-calendar$/)
   await page.goto('/')
   await desktopNav.getByRole('button', { name: 'Apps' }).click()
@@ -2276,9 +2289,13 @@ test('top navigation groups activity log and monthly calendar under Activity', a
   await page.getByLabel('메뉴 열기').click()
   const mobileMenu = page.getByRole('navigation', { name: '모바일 메뉴' })
   await expect(mobileMenu.getByRole('button', { name: /^Notices/ })).toBeVisible()
-  await expect(mobileMenu.getByRole('button', { name: /^Activity/ })).toBeVisible()
+  await expect(mobileMenu.getByRole('button', { name: /^Records/ })).toBeVisible()
+  await expect(mobileMenu.getByRole('button', { name: /^Tools/ })).toBeVisible()
   await expect(mobileMenu.getByRole('button', { name: /Activity log/ })).toHaveCount(0)
-  await mobileMenu.getByRole('button', { name: /^Activity/ }).click()
+  await expect(mobileMenu.getByRole('button', { name: /Gather/ })).toHaveCount(0)
+  await mobileMenu.getByRole('button', { name: /^Records/ }).click()
+  await mobileMenu.getByRole('button', { name: /^Tools/ }).click()
+  await expect(mobileMenu.getByRole('button', { name: /Gather/ })).toBeVisible()
   await expect(mobileMenu.getByRole('button', { name: /Activity log/ })).toBeVisible()
   await expect(mobileMenu.getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
   const mobileSubitemBox = await mobileMenu.getByRole('button', { name: /Activity log/ }).boundingBox()
@@ -2338,9 +2355,9 @@ test.describe('draw page', () => {
     await mockOptionalApis(page)
     await page.goto('/draw')
     await expect(page.getByRole('heading', { level: 1, name: '뽑기' })).toBeVisible()
-    // It is in the Activity menu, and a guest may use it.
-    await page.getByRole('button', { name: 'Activity' }).click()
-    await expect(page.getByRole('navigation', { name: '활동 메뉴' }).getByRole('button', { name: /Draw/ })).toBeVisible()
+    // It is in the Tools menu, and a guest may use it.
+    await page.getByRole('button', { name: 'Tools', exact: true }).click()
+    await expect(page.getByRole('navigation', { name: '참여 도구 메뉴' }).getByRole('button', { name: /Draw/ })).toBeVisible()
     await page.keyboard.press('Escape')
 
     const names = page.getByRole('textbox', { name: /^이름/ })

@@ -331,7 +331,7 @@ export default function HomeView() {
                 )
               })}
             </div>
-            {/* What the Activity menu holds, one tap away. The list is the menu's own, so a
+            {/* What the Records and Tools menus hold, one tap away. The list is the menu's own, so a
                 tool added to the menu shows up here too. */}
             <div className="coms-tools" data-reveal>
               <p className="coms-label"><i />Tools</p>

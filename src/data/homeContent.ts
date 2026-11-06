@@ -443,12 +443,12 @@ export const navExtraItems = [
   { id: 'community', label: 'Community', path: '/community', auth: true },
 ]
 
-// Two columns in the Activity menu: what the club did and when, and the tools members use.
+// Two top-level nav dropdowns (Records, Tools): what the club did and when, and the tools members use.
 // Keep activitySectionNavItems ordered group by group: the home tools row lists the same flat
 // array and must read in the same order as the menu.
 export const activityNavGroups = [
-  { id: 'records', label: '기록·일정' },
-  { id: 'tools', label: '참여 도구' },
+  { id: 'records', label: '기록·일정', navLabel: 'Records' },
+  { id: 'tools', label: '참여 도구', navLabel: 'Tools' },
 ] as const
 
 export const activitySectionNavItems = [

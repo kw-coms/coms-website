@@ -41,13 +41,13 @@ assert.match(
 assert.match(
   nav,
   /className="apple-mobile-menu-item apple-mobile-menu-subitem"/,
-  'mobile Activity submenu rows should reuse the shared menu item touch sizing',
+  'mobile Records/Tools submenu rows should reuse the shared menu item touch sizing',
 )
 
 assert.match(
   css,
   /\.apple-mobile-menu-subitem \{[\s\S]*?min-height: 3\.75rem;[\s\S]*?align-items: flex-start;[\s\S]*?padding: 0\.75rem 1\.25rem 0\.75rem 1\.5rem;/,
-  'mobile Activity submenu rows should keep stable finger-sized hit areas',
+  'mobile Records/Tools submenu rows should keep stable finger-sized hit areas',
 )
 
 assert.doesNotMatch(
@@ -66,7 +66,7 @@ assert.match(
 // through the menu's own closeAndGo, so the menu has to follow the route itself.
 assert.match(
   nav,
-  /if \(location\.key !== menuLocationKey\) \{[\s\S]*?setMobileMenuOpen\(false\)[\s\S]*?setMobileActivityOpen\(false\)/,
+  /if \(location\.key !== menuLocationKey\) \{[\s\S]*?setMobileMenuOpen\(false\)[\s\S]*?setMobileOpenGroups\(\[\]\)/,
   'mobile menu should close on every route change, not only from its own links',
 )
 
