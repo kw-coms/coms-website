@@ -2,6 +2,8 @@
 // browser tabs, history entries and bookmarks were indistinguishable and a screen reader
 // had nothing to announce on navigation.
 
+import { findStudy } from '../pages/study/studies.ts'
+
 export const SITE_NAME = "KW COM's"
 export const SITE_TITLE = "KW COM's — 광운대학교 컴퓨터 학술동아리"
 export const NOT_FOUND_LABEL = '페이지를 찾을 수 없음'
@@ -9,7 +11,7 @@ export const NOT_FOUND_LABEL = '페이지를 찾을 수 없음'
 const MAX_DETAIL_LENGTH = 60
 
 // First match wins, so more specific paths come before their section prefix.
-const ROUTE_LABELS: Array<[pattern: RegExp, label: string]> = [
+const ROUTE_LABELS: Array<[pattern: RegExp, label: string | ((...groups: string[]) => string | null)]> = [
   [/^\/about$/, '동아리 소개'],
   [/^\/activities$/, '활동'],
   [/^\/activity-log$/, '활동 기록'],
@@ -19,6 +21,8 @@ const ROUTE_LABELS: Array<[pattern: RegExp, label: string]> = [
   [/^\/attendance$/, '출석 체크'],
   [/^\/gatherings(\/[^/]+)?$/, '모임 신청'],
   [/^\/projects$/, '프로젝트'],
+  [/^\/study$/, '스터디'],
+  [/^\/study\/([^/]+)$/, (id) => findStudy(id)?.title ?? null],
   [/^\/apps$/, 'Apps'],
   [/^\/draw$/, '뽑기'],
   [/^\/sponsors$/, '후원자'],
@@ -44,8 +48,11 @@ function normalizePath(pathname: string) {
 export function routeLabel(pathname: string): string | null {
   const path = normalizePath(pathname)
   if (path === '/') return ''
-  const match = ROUTE_LABELS.find(([pattern]) => pattern.test(path))
-  return match ? match[1] : null
+  for (const [pattern, label] of ROUTE_LABELS) {
+    const m = pattern.exec(path)
+    if (m) return typeof label === 'function' ? label(...m.slice(1)) : label
+  }
+  return null
 }
 
 function clampDetail(detail: string) {

@@ -1,5 +1,6 @@
 import {
   Binary,
+  BookOpen,
   CalendarClock,
   UserPlus,
   CalendarDays,
@@ -16,6 +17,7 @@ export const tabs = [
   // Menu-row icon tints: the 200-level shades these used were nearly invisible on the light surface.
   { id: 'about', label: 'About', hint: '정체성', icon: Binary, accent: 'text-cyan-500' },
   { id: 'activities', label: 'Activities', hint: '세미나·스터디', icon: Sparkles, accent: 'text-rose-500' },
+  { id: 'study', label: 'Study', hint: '스터디 자료', icon: BookOpen, accent: 'text-emerald-500' },
   { id: 'projects', label: 'Projects', hint: '실전 제작', icon: CircuitBoard, accent: 'text-violet-500' },
   { id: 'recruit', label: 'Recruit', hint: '지원 안내', icon: Rocket, accent: 'text-sky-500' },
 ]
@@ -441,9 +443,16 @@ export const navExtraItems = [
   { id: 'community', label: 'Community', path: '/community', auth: true },
 ]
 
+// Two columns in the Activity menu: what the club did and when, and the tools members use.
+export const activityNavGroups = [
+  { id: 'records', label: '기록·일정' },
+  { id: 'tools', label: '참여 도구' },
+] as const
+
 export const activitySectionNavItems = [
   {
     id: 'activity-log',
+    group: 'records',
     label: 'Activity log',
     hint: '활동 기록',
     path: '/activity-log',
@@ -452,6 +461,7 @@ export const activitySectionNavItems = [
   },
   {
     id: 'monthly-calendar',
+    group: 'records',
     label: 'Monthly calendar',
     hint: '월별 일정',
     path: '/monthly-calendar',
@@ -460,6 +470,7 @@ export const activitySectionNavItems = [
   },
   {
     id: 'gatherings',
+    group: 'tools',
     label: 'Gather',
     hint: '모임 신청',
     path: '/gatherings',
@@ -468,6 +479,7 @@ export const activitySectionNavItems = [
   },
   {
     id: 'meet',
+    group: 'tools',
     label: 'Meet',
     hint: '일정 조율',
     path: '/meet',
@@ -476,6 +488,7 @@ export const activitySectionNavItems = [
   },
   {
     id: 'attendance',
+    group: 'tools',
     label: 'Attendance',
     hint: '출석 체크',
     path: '/attendance',
@@ -484,6 +497,7 @@ export const activitySectionNavItems = [
   },
   {
     id: 'activity-events',
+    group: 'records',
     label: 'Events',
     hint: '회지·인기투표',
     path: '/activity-events',
@@ -492,6 +506,7 @@ export const activitySectionNavItems = [
   },
   {
     id: 'draw',
+    group: 'tools',
     label: 'Draw',
     hint: '조 편성·뽑기',
     path: '/draw',

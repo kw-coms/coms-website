@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -51,7 +51,9 @@ const publicPageHtmlPlugin = {
     const outDir = outputOptions.dir || 'dist'
     const indexHtml = readFileSync(join(outDir, 'index.html'), 'utf8')
     for (const page of PUBLIC_PAGE_META) {
-      writeFileSync(join(outDir, `${page.path.slice(1)}.html`), renderPublicPageHtml(indexHtml, page))
+      const file = join(outDir, `${page.path.slice(1)}.html`)
+      mkdirSync(dirname(file), { recursive: true }) // nested paths such as /study/web
+      writeFileSync(file, renderPublicPageHtml(indexHtml, page))
     }
   },
 }
@@ -88,6 +90,8 @@ const pwaPlugin = VitePWA({
     navigateFallbackDenylist: [
       /^\/api\//,
       /\/(share|share-data|share-image)$/,
+      // Demo sandbox for /study: a real document with its own CSP (nginx.frontend.conf), never the SPA shell.
+      /^\/study-sandbox\.html$/,
       // Sibling apps the host nginx serves under sub-paths of this origin.
       // Without these the SW hijacks their navigations and renders the SPA 404.
       /^\/(foodclub|gameclub|BugSnap|LogDoctor|PRDoctor|worldcup|tier|team-randomizer|companion|phonemote)(\/|$)/,

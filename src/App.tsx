@@ -55,6 +55,8 @@ const ActivityLogPage = lazy(() => import('./pages/home/detailPages').then((m) =
 const ClubEventPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.ClubEventPage })))
 const MonthlyCalendarPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.MonthlyCalendarPage })))
 const AppsPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.AppsPage })))
+const StudyHubPage = lazy(() => import('./pages/study/StudyHubPage'))
+const StudyPage = lazy(() => import('./pages/study/StudyPage'))
 const ProjectsDetailPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.ProjectsDetailPage })))
 
 const ComsIntro = lazy(() => import('./components/common/ComsIntro'))
@@ -174,6 +176,8 @@ function App() {
         <Route path="/gatherings" element={<RequireAuth><GatheringsPage /></RequireAuth>} />
         <Route path="/gatherings/:id" element={<RequireAuth><GatheringsPage /></RequireAuth>} />
         <Route path="/projects" element={<ProjectsDetailPage />} />
+        <Route path="/study" element={<StudyHubPage />} />
+        <Route path="/study/:id" element={<StudyPage />} />
         <Route path="/apps" element={<AppsPage />} />
         <Route path="/draw" element={<DrawPage />} />
         <Route path="/sponsors" element={<SponsorsPage />} />
