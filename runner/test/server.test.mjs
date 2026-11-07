@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createRateLimiter } from '../limits.mjs';
 import { createRunnerServer, listenRunner, resolveSocketPath, resolveStateFile, validateRequest, MAX_BODY_BYTES, clientIp, rateLimitPerMinute } from '../server.mjs';
 
 const good = { lang: 'python', code: 'print(1)', stdin: 'hello' };
@@ -183,4 +184,16 @@ test('LISTEN_SOCKET and DENYLIST_FILE are confined to their directories', () => 
   for (const bad of ['/etc/passwd', '/var/lib/coms-study/../x.json', '/var/lib/coms-study/sub/a.json', '/tmp/denylist.json', '/var/lib/coms-study/a.sock']) {
     assert.throws(() => resolveStateFile(bad), /DENYLIST_FILE must be/, bad);
   }
+});
+
+test('a request refused for its headers does not use up the member run budget', async t => {
+  const runner = createRunnerServer({ logger() {}, trustProxy: true, executor: async () => ({ ok: true, stage: 'run', stdout: '', stderr: '', exitCode: 0, signal: null, timedOut: false, truncated: false, timeMs: 1, diagnostics: [] }),
+    limiter: createRateLimiter({ limit: 2 }) });
+  if (!await listenOrSkip(t, runner)) return;
+  const post = (headers) => fetch(`http://127.0.0.1:${runner.address().port}/study/api/run`, { method: 'POST', headers: { 'x-runner-client': 'member1', ...headers }, body: JSON.stringify({ lang: 'python', code: 'print(1)' }) });
+  for (let i = 0; i < 5; i++) assert.equal((await post({ 'content-type': 'text/plain' })).status, 400);
+  assert.equal((await post({ 'content-type': 'application/json' })).status, 200);
+  assert.equal((await post({ 'content-type': 'application/json' })).status, 200);
+  assert.equal((await post({ 'content-type': 'application/json' })).status, 429);
+  await new Promise(resolve => runner.close(resolve));
 });

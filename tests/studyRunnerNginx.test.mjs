@@ -23,7 +23,7 @@ assert.doesNotMatch(nginx, /limit_(req|conn)_zone [^;]*(\$cookie_|\$http_)/, 'no
 
 const run = block('location = /study/api/run {')
 for (const part of [
-  /\$request_method != POST\) \{ return 405/,
+  /\$request_method != POST\) \{ return 405/, /\$http_sec_fetch_site = cross-site\) \{ return 403 '\{"error":"rejected"/,
   /http_cookie ~ "\^\.\{4097,\}"\) \{ return 431/, /token=\[\^;\]\*;/,
   /limit_req zone=study_pre_ip burst=/, /limit_req zone=study_pre burst=/, /limit_conn study_pre_ip_conn /, /limit_conn study_pre_conn /,
   /auth_request \/lab\/_auth;/, /auth_request_set \$runner_client \$upstream_http_x_member_id;/,

@@ -110,13 +110,14 @@ export function createRunnerServer({
         response.setHeader('Retry-After', String(denyList.remainingSeconds?.(key) ?? 900));
         return send(429, { error: 'rate-limited', messageKo: '이 계정에서 실행기를 불안정하게 만든 요청이 있어 잠시 실행이 제한돼요. 잠시 후 다시 시도해 주세요.' });
       }
+      // Cheap header checks first: a request that is refused here must not use up the member's run budget.
+      const contentType = request.headers['content-type'] || '';
+      if (!/^application\/json\s*(?:;\s*charset\s*=\s*utf-8\s*)?$/i.test(contentType) || request.headers['content-encoding']) return send(400, rejected('압축하지 않은 application/json 본문을 보내 주세요.'));
+      if (Number(request.headers['content-length']) > MAX_BODY_BYTES) return send(400, rejected('요청 본문은 96 KB 이하여야 해요.'));
       if (!limiter.take(key)) {
         response.setHeader('Retry-After', '60');
         return send(429, { error: 'rate-limited', messageKo: '1분 동안의 실행 요청 한도를 넘었어요. 잠시 기다려 주세요.' });
       }
-      const contentType = request.headers['content-type'] || '';
-      if (!/^application\/json\s*(?:;\s*charset\s*=\s*utf-8\s*)?$/i.test(contentType) || request.headers['content-encoding']) return send(400, rejected('압축하지 않은 application/json 본문을 보내 주세요.'));
-      if (Number(request.headers['content-length']) > MAX_BODY_BYTES) return send(400, rejected('요청 본문은 96 KB 이하여야 해요.'));
       let body;
       try { body = await readJson(request); }
       catch (error) { response.setHeader('Connection', 'close'); return send(400, rejected(error.message)); }
