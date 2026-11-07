@@ -1,11 +1,12 @@
 // Browser e2e: node tools/e2e-browser.mjs
 // Starts `vite` itself unless LAB_URL is set. Needs the real compile service (LAB_COMPILE_URL, default http://127.0.0.1:8787).
-// LAB_SOFTWARE=1 runs Chromium with --disable-gpu (SwiftShader) to exercise the low-quality path. Screenshots go to <tmpdir>/lab-shots.
+// LAB_SOFTWARE=1 runs Chromium with --disable-gpu (SwiftShader) to exercise the low-quality path. Screenshots go to the fixed <lab>/shots-browser directory.
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { chromeExecutable, compileOrigin, GL_ARGS, SHOTS } from './browser.mjs';
+import { chromeExecutable, compileOrigin, GL_ARGS, outDir, saveScreenshot } from './browser.mjs';
 
+const OUT = outDir('shots-browser');
 const exe = chromeExecutable();
 
 let dev;
@@ -20,7 +21,7 @@ if (!base) {
     await new Promise((r) => setTimeout(r, 250));
   }
 }
-const compileUp = await fetch(`${COMPILE}/lab/api/health`).then((r) => r.ok, () => false);
+const compileUp = await fetch(new URL('/lab/api/health', COMPILE), { redirect: 'error' }).then((r) => r.ok, () => false);
 if (!compileUp) { console.log(`FAIL compile service not reachable at ${COMPILE}: start it (see docs/DEPLOY.md); this e2e does not mock it`); dev?.kill(); process.exit(2); }
 
 const results = [];
@@ -41,7 +42,7 @@ page.on('dialog', (d) => d.accept().catch(() => {}));
 page.on('crash', () => console.log('PAGE CRASHED'));
 const lab = (fn, arg) => page.evaluate(fn, arg);
 const settle = (ms = 500) => page.waitForTimeout(ms);
-const shot = (name) => page.screenshot({ path: join(SHOTS, `${name}.png`) });
+const shot = (name) => saveScreenshot(page, join(OUT, `${name}.png`));
 const sample = async (fn, arg, n = 24, dt = 150) => { const out = []; for (let i = 0; i < n; i++) { out.push(await lab(fn, arg)); await settle(dt); } return out; };
 const distinct = (a) => new Set(a.map((x) => JSON.stringify(x))).size;
 const frameTimes = async (label) => {
@@ -254,7 +255,7 @@ try {
       const hc = await pid('hc-sr04');
       await page.getByRole('tab', { name: '코드', exact: true }).click();
       await page.getByRole('tab', { name: '시리얼 모니터' }).click();
-      const read = async (cm) => { await setIn(hc, 'distanceCm', cm); await lab(() => (window.__lab.serialClear?.(), 0)); await settle(1600); const t = await lab(() => window.__lab.serial()); const m = [...t.matchAll(/(\d+(?:\.\d+)?)/g)].map((x) => Number(x[1])); return m[m.length - 1]; };
+      const read = async (cm) => { await setIn(hc, 'distanceCm', cm); await lab(() => (window.__lab.serialClear?.(), 0)); await settle(1600); const raw = await lab(() => window.__lab.serial()); const t = raw.slice(0, raw.lastIndexOf('\n') + 1); /* complete lines only: the serial arrives one byte at a time (9600 baud), a sample can land inside "29.98" and read "2" */ const m = [...t.matchAll(/(\d+(?:\.\d+)?)/g)].map((x) => Number(x[1])); return m[m.length - 1]; };
       const a = await read(30), b = await read(120);
       check('ultrasonic: serial distance follows the sensor', Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - 30) < 8 && Math.abs(b - 120) < 15, `30->${a} 120->${b}`);
       // drag the obstacle block in the 3D view
@@ -321,7 +322,7 @@ try {
       check(`example ${id}: auto-framed`, fitEx > 0.5 && fitEx < 1, fitEx.toFixed(2));
       await run();
       await (checks[id] ?? (async () => check(`example ${id}: runs`, true)))();
-      if (shots[id]) { await settle(300); await shot(shots[id]); }
+      if (Object.hasOwn(shots, id)) { await settle(300); await shot(shots[id]); }
       await stop();
     } catch (e) {
       check(`example ${id}: end-to-end`, false, String(e).split('\n')[0]);
@@ -348,7 +349,7 @@ try {
   await settle(500);
   await lab(() => window.__lab.gallery());
   await settle(900);
-  const shotStage = async (n) => { await settle(600); await page.locator('.stage').screenshot({ path: join(SHOTS, `${n}.png`) }); };
+  const shotStage = async (n) => { await settle(600); await saveScreenshot(page.locator('.stage'), join(OUT, `${n}.png`)); };
   await lab(() => window.__lab.viewAngle(undefined, 0, 42));
   await shotStage('04-gallery-front');
   await lab(() => window.__lab.viewAngle(undefined, 55, 30));
@@ -397,12 +398,12 @@ try {
   await dp.evaluate(() => { localStorage.setItem('coms-lab:tutorial-done', '1'); localStorage.setItem('coms-lab:perf-notice', '1'); });
   await dp.reload({ waitUntil: 'networkidle' });
   await dp.waitForTimeout(1800);
-  await dp.screenshot({ path: join(SHOTS, '02-dark-1440.png') });
+  await saveScreenshot(dp, join(OUT, '02-dark-1440.png'));
   await dp.evaluate(() => localStorage.setItem('coms-lab:quality', 'low'));
   await dp.reload({ waitUntil: 'networkidle' });
   await dp.evaluate(() => { window.__lab.loadScene(window.__lab.EXAMPLES.find((e) => e.id === 'external-blink').scene); });
   await dp.waitForTimeout(2000);
-  await dp.screenshot({ path: join(SHOTS, '12-low-quality.png') });
+  await saveScreenshot(dp, join(OUT, '12-low-quality.png'));
   check('low quality renders (screenshot saved)', (await dp.evaluate(() => window.__lab.getState().quality)) === 'low');
   await dctx.close();
   const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
@@ -413,14 +414,14 @@ try {
   await mp.waitForTimeout(1800);
   const overflow = await mp.evaluate(() => ({ doc: document.documentElement.scrollWidth - innerWidth, bar: (() => { const t = document.querySelector('.toolbar'); return t.scrollWidth - t.clientWidth; })() }));
   check('mobile 390px: toolbar and page do not scroll sideways', overflow.doc <= 0 && overflow.bar <= 0, JSON.stringify(overflow));
-  await mp.screenshot({ path: join(SHOTS, '13-mobile-390.png') });
+  await saveScreenshot(mp, join(OUT, '13-mobile-390.png'));
   await mctx.close();
 
   check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
   check('no external requests (CSP)', external.length === 0, external.slice(0, 3).join(' '));
 } catch (e) {
   console.log('ABORT', String(e).split('\n')[0]);
-  await page.screenshot({ path: join(SHOTS, 'fail.png') }).catch(() => {});
+  await saveScreenshot(page, join(OUT, 'fail.png')).catch(() => {});
   results.push({ name: 'script aborted', ok: false });
 } finally {
   await browser.close();

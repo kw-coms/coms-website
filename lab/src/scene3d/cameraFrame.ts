@@ -3,7 +3,7 @@ import { getState } from '../ui/store';
 import { refs } from './sceneRefs';
 
 /** Fraction of the canvas the bench should fill (limiting dimension). */
-export const FILL = 0.82;
+export const FILL = 0.88;
 const ELEV = (44 * Math.PI) / 180;
 const YAW = (16 * Math.PI) / 180;
 export const DEFAULT_DIR = new Vector3(Math.sin(YAW) * Math.cos(ELEV), Math.sin(ELEV), Math.cos(YAW) * Math.cos(ELEV));
@@ -123,7 +123,7 @@ export function frameAll(opts: { animate?: boolean } = {}) {
     fly({ pos: f.position, target: f.target }, !!opts.animate);
     const ctl = refs.controls;
     if (ctl) {
-      ctl.minDistance = 25;
+      ctl.minDistance = 12;
       ctl.maxDistance = Math.max(600, box.getSize(new Vector3()).length() * 5);
     }
   }

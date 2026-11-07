@@ -60,7 +60,7 @@ function readJson(request) {
   });
 }
 export function createCompileServer({
-  runner, tempRoot, queue = createCompileQueue(), limiter = createRateLimiter({ limit: rateLimitPerMinute() }),
+  runner, debugRunner, tempRoot, queue = createCompileQueue(), limiter = createRateLimiter({ limit: rateLimitPerMinute() }),
   trustProxy = process.env.TRUST_PROXY === '1', logger = entry => console.log(JSON.stringify(entry)),
 } = {}) {
   const server = createServer({ maxHeaderSize: 16 * 1024 }, async (request, response) => {
@@ -102,11 +102,12 @@ export function createCompileServer({
       let body;
       try { body = await readJson(request); }
       catch (error) { response.setHeader('Connection', 'close'); return send(400, failure('rejected', error.message)); }
+      if (body?.debug !== undefined && typeof body.debug !== 'boolean') return send(400, failure('rejected', 'debug는 true 또는 false여야 해요.'));
       const rejection = validateSketch(body?.sketch);
       if (rejection) return send(400, failure('rejected', rejection));
       const pending = queue.submit(() => {
         if (response.destroyed) return failure('rejected', '요청이 중단되었어요.');
-        return compileSketch(body.sketch, { runner, tempRoot });
+        return compileSketch(body.sketch, { runner, debugRunner, tempRoot, debug: body.debug === true });
       });
       if (!pending) { response.setHeader('Retry-After', '20'); return send(429, failure('busy', '컴파일 대기열이 가득 찼어요. 잠시 후 다시 시도해 주세요.')); }
       const result = await pending;

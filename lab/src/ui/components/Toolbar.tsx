@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  BookOpen, Camera, Download, Focus, Grid3x3, Loader2, Moon, Pause, Play, Redo2, RotateCcw, Share2, Square, Sun, Tag, Undo2, Upload, Box, Ellipsis,
+  BookOpen, Camera, Download, Focus, Grid3x3, Loader2, Moon, Pause, Play, Redo2, RotateCcw, Share2, Square, Sun, Tag, Undo2, Upload, Box, Ellipsis, FileCode2, FileSpreadsheet, StickyNote, Workflow,
 } from 'lucide-react';
 import { EXAMPLES } from '../core';
-import { copyShareLink, exportJson, importJson, loadExample, snapshotPng, toggleTheme } from '../actions';
+import { copyShareLink, exportBom, exportIno, exportJson, importJson, loadExample, snapshotPng, toggleTheme } from '../actions';
 import { cancelCompile, pause, reset, run, setSpeed, stop } from '../simHost';
-import { canRedo, canUndo, redo, set, setQualityMode, undo, useStore } from '../store';
+import { addNote, canRedo, canUndo, redo, set, setQualityMode, undo, useStore } from '../store';
+import { viewCenterGround } from '../../scene3d/placement';
 import type { QualityMode } from '../quality';
 
 const Btn = ({ label, onClick, children, active, disabled, className = '' }: { label: string; onClick: () => void; children: React.ReactNode; active?: boolean; disabled?: boolean; className?: string }) => (
@@ -26,6 +27,7 @@ export function Toolbar() {
   const qmode = useStore((s) => s.qualityMode);
   const qeff = useStore((s) => s.quality);
   const exOpen = useStore((s) => s.examplesOpen);
+  const schematic = useStore((s) => s.schematic);
   const file = useRef<HTMLInputElement>(null);
   const [more, setMore] = useState(false);
   const compiling = compile.status === 'compiling';
@@ -71,12 +73,16 @@ export function Toolbar() {
         <Btn label="3D 보기" onClick={() => set({ view: 'persp' })} active={view === 'persp'}><Box size={18} /> <span className="tb-text">3D</span></Btn>
         <Btn label="위에서 보기 (배선용)" onClick={() => set({ view: 'top' })} active={view === 'top'}><Grid3x3 size={18} /> <span className="tb-text">위에서</span></Btn>
         <Btn label="카메라 리셋" onClick={() => set({ cameraResetTick: Date.now() })}><Focus size={18} /> <span className="tb-more-text">카메라 리셋</span></Btn>
+        <Btn label="회로도 보기" onClick={() => set({ schematic: !schematic })} active={schematic}><Workflow size={18} /> <span className="tb-more-text">회로도</span></Btn>
+        <Btn label="메모 붙이기" onClick={() => { const [x, z] = viewCenterGround(); addNote([x, -9, z]); }}><StickyNote size={18} /> <span className="tb-more-text">메모</span></Btn>
         <Btn label="부품 이름 표시" onClick={() => set({ labels: !labels })} active={labels}><Tag size={18} /> <span className="tb-more-text">이름 표시</span></Btn>
       </div>
       <div className="tb-group" role="group" aria-label="파일">
         <Btn label="공유 링크 복사" onClick={() => void copyShareLink()}><Share2 size={18} /> <span className="tb-more-text">공유 링크</span></Btn>
         <Btn label="JSON 내보내기" onClick={exportJson}><Download size={18} /> <span className="tb-more-text">내보내기</span></Btn>
         <Btn label="JSON 불러오기" onClick={() => file.current?.click()}><Upload size={18} /> <span className="tb-more-text">불러오기</span></Btn>
+        <Btn label=".ino 스케치로 내보내기" onClick={exportIno}><FileCode2 size={18} /> <span className="tb-more-text">.ino 내보내기</span></Btn>
+        <Btn label="부품 목록 CSV로 내보내기" onClick={exportBom}><FileSpreadsheet size={18} /> <span className="tb-more-text">부품 CSV</span></Btn>
         <Btn label="PNG로 저장" onClick={snapshotPng}><Camera size={18} /> <span className="tb-more-text">PNG 저장</span></Btn>
         <Btn label={theme === 'dark' ? '밝은 테마로' : '어두운 테마로'} onClick={toggleTheme}>{theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />} <span className="tb-more-text">테마</span></Btn>
       </div>

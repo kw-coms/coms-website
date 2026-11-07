@@ -1,5 +1,6 @@
 import type { Scene, PartKind, PartInstance, PinRef, RotY, Vec3, Wire, WireColor } from './types';
 import { PARTS } from './parts';
+import { V2_EXAMPLES } from './examples-v2';
 
 type Example = { id: string; title: string; chapter?: string; scene: Scene };
 
@@ -716,3 +717,5 @@ void loop() {
       .feed('backGND');
   }),
 ];
+
+EXAMPLES.push(...V2_EXAMPLES);

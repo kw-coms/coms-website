@@ -96,3 +96,28 @@ test('RATE_LIMIT_PER_MIN configures the handler per member', async () => {
     else process.env.RATE_LIMIT_PER_MIN = previous;
   }
 });
+
+test('debug request must be a boolean before compiler invocation', async () => {
+  let called = false;
+  const server = serverWith({ runner: async () => { called = true; throw new Error('not reached'); } });
+  for (const debug of ['true', 1, {}, null]) {
+    const result = await invoke(server, { body: JSON.stringify({ sketch: 'void setup(){}', debug }) });
+    assert.equal(result.status, 400); assert.equal(result.body.reason, 'rejected');
+  }
+  assert.equal(called, false);
+});
+test('HTTP debug true reaches extraction and returns DebugInfo, never ELF', async () => {
+  const { mkdir, writeFile } = await import('node:fs/promises');
+  const { join } = await import('node:path');
+  let extracted = false;
+  const server = serverWith({ runner: async (_args, { cwd }) => {
+    await mkdir(join(cwd, 'out')); await mkdir(join(cwd, 'build'));
+    await writeFile(join(cwd, 'out/sketch.ino.hex'), ':0100000001FE\n:00000001FF\n');
+    await writeFile(join(cwd, 'build/sketch.ino.elf'), 'ELF_SENTINEL');
+    return { code: 0, stdout: '', stderr: '' };
+  }, debugRunner: async () => { extracted = true; return { code: 0, stdout: '', stderr: '' }; } });
+  const result = await invoke(server, { body: JSON.stringify({ sketch: 'void setup(){}', debug: true }) });
+  assert.equal(result.status, 200); assert.equal(extracted, true);
+  assert.deepEqual(result.body.debug, { lines: [], globals: [], truncated: false });
+  assert.doesNotMatch(JSON.stringify(result.body), /ELF_SENTINEL|\.elf/);
+});

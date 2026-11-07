@@ -2,11 +2,12 @@
 // src/core/__fixtures__/examples-hex.json (guarded by src/core/examples.e2e.test.ts).
 // Needs the service (LAB_COMPILE_URL, default http://127.0.0.1:8787), see docs/DEPLOY.md.
 import { createServer } from 'vite';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { compileOrigin } from './browser.mjs';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { compileOrigin, outDir, writeOutputFile } from './browser.mjs';
 
 const COMPILE = compileOrigin();
-const OUT = new URL('../src/core/__fixtures__/examples-hex.json', import.meta.url);
+const OUT = join(outDir('src'), 'core', '__fixtures__', 'examples-hex.json');
 
 const vite = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
 const { EXAMPLES } = await vite.ssrLoadModule('/src/core/examples.ts');
@@ -16,8 +17,9 @@ const { compiler } = JSON.parse(readFileSync(OUT, 'utf8'));
 const examples = {};
 let failed = false;
 for (const example of EXAMPLES) {
-  const response = await fetch(`${COMPILE}/lab/api/compile`, {
+  const response = await fetch(new URL('/lab/api/compile', COMPILE), {
     method: 'POST',
+    redirect: 'error',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sketch: example.scene.code }),
   });
@@ -31,5 +33,5 @@ for (const example of EXAMPLES) {
   console.log(`ok   ${example.id} ${result.sizeBytes} bytes`);
 }
 if (failed) process.exit(1);
-writeFileSync(OUT, JSON.stringify({ compiler, examples }, null, 1) + '\n');
+await writeOutputFile(OUT, JSON.stringify({ compiler, examples }, null, 1) + '\n');
 console.log(`wrote ${Object.keys(examples).length} examples`);

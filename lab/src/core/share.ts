@@ -1,5 +1,5 @@
 import type { Scene } from './types';
-import { validateScene } from './scene';
+import { stringifyJsonBounded, validateScene } from './scene';
 
 export { validateScene } from './scene';
 
@@ -51,7 +51,10 @@ async function readBounded(stream: ReadableStream<Uint8Array>, limit: number): P
 }
 
 export async function encodeShare(scene: Scene): Promise<string> {
-  const bytes = new TextEncoder().encode(JSON.stringify(validateScene(scene)));
+  const checked = validateScene(scene);
+  const json = stringifyJsonBounded(checked, Infinity, MAX_DECODED_BYTES, true);
+  if (json === null) fail('공유 데이터가 32 KB를 초과합니다.');
+  const bytes = new TextEncoder().encode(json);
   if (bytes.length > MAX_DECODED_BYTES) fail('공유 데이터가 32 KB를 초과합니다.');
   const compressed = new Blob([bytes as BlobPart])
     .stream()
@@ -70,7 +73,7 @@ export async function decodeShare(hash: string): Promise<Scene> {
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     return validateScene(JSON.parse(text) as unknown);
   } catch (error) {
-    if (error instanceof Error && /공유 데이터|장면|부품|선|코드|제목/.test(error.message)) {
+    if (error instanceof Error && /공유 데이터|장면|부품|선|코드|제목|블록|메모|미션/.test(error.message)) {
       throw error;
     }
     return fail('공유 링크를 읽을 수 없습니다.');

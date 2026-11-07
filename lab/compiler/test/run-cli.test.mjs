@@ -41,3 +41,19 @@ test('compiler gets only a fixed environment and resource-limited argv', async (
     delete process.env.ARDUINO_BUILD_PROPERTIES;
   }
 });
+
+test('debug tool has fixed executable/flags, bounded address space and clean environment', async () => {
+  const { runDebugTool } = await import('../compile.mjs');
+  await runDebugTool('/tmp/build/sketch.ino.elf', { cwd: '/tmp', spawnImpl: (file, args, options) => {
+    assert.equal(file, '/usr/bin/prlimit');
+    assert.equal(args[0], '--as=134217728:134217728');
+    assert.deepEqual(args.slice(5), ['/opt/avr-toolchain/bin/avr-readelf', '--wide', '--debug-dump=info', '--debug-dump=rawline', '--debug-dump=decodedline', '/tmp/build/sketch.ino.elf']);
+    assert.equal(options.shell, false); assert.equal(options.detached, true); assert.equal(options.env.LANG, 'C');
+    return nodeSpawn('process.exit(0)')(file, args, options);
+  } });
+});
+test('debug tool kills the process group at its output cap and deadline', async () => {
+  const { runDebugTool } = await import('../compile.mjs');
+  await assert.rejects(runDebugTool('/tmp/a.elf', { spawnImpl: nodeSpawn("process.stdout.write('x'.repeat(5*1024*1024));setInterval(()=>{},1000)") }), { code: 'output-limit' });
+  await assert.rejects(runDebugTool('/tmp/a.elf', { timeoutMs: 100, spawnImpl: nodeSpawn('setInterval(()=>{},1000)') }), { code: 'timeout' });
+});

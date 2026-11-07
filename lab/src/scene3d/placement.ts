@@ -4,6 +4,7 @@ import { PARTS, pinWorldPos } from '../ui/core';
 import { buildIndex, rotXZ, snapPart, type SnapTarget } from '../ui/snap';
 import { addPart, getState, parts, set, updateParts, type SnapView } from '../ui/store';
 import { DESK_Y, refs } from './sceneRefs';
+import { focusParts, partsBox } from './cameraFrame';
 
 export const isBoard = (k: PartKind) => k === 'arduino-uno' || k.startsWith('breadboard');
 
@@ -58,7 +59,7 @@ export function pickPin(cx: number, cy: number, hideId?: string): WorldPin | nul
     const wx = p.pos[0] - o.x, wy = p.pos[1] - o.y, wz = p.pos[2] - o.z;
     const t = wx * dir.x + wy * dir.y + wz * dir.z;
     if (t <= 0) continue;
-    const tol = ortho ? orthoTol : Math.max(1.3, t * 0.005);
+    const tol = ortho ? orthoTol : Math.max(1.6, t * 0.007);
     const d2 = wx * wx + wy * wy + wz * wz - t * t;
     if (d2 > tol * tol) continue;
     const score = Math.sqrt(Math.max(0, d2)) + (p.board ? 0.3 : 0) - t * 1e-6;
@@ -115,10 +116,29 @@ export function dropFromPalette(kind: PartKind, cx: number, cy: number, rotY: Ro
   const { part } = placeAt(base, [g[0], g[2]]);
   addPart(kind, part.pos, rotY);
 }
+/** Parts that end up tiny on screen are hard to grab: fly in when the new part is under ~90 px. */
+function ensureGrabbable(id: string) {
+  const go = () => {
+    const b = partsBox([id]);
+    const cam = refs.camera;
+    const el = refs.gl?.domElement;
+    if (!b || !cam || !el) return;
+    let x0 = 9, x1 = -9, y0 = 9, y1 = -9;
+    const v = new Vector3();
+    for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) {
+      v.set(x, y, z).project(cam);
+      x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y);
+    }
+    const px = Math.max(((x1 - x0) / 2) * el.clientWidth, ((y1 - y0) / 2) * el.clientHeight);
+    if (px < 90) focusParts([id]);
+  };
+  requestAnimationFrame(() => requestAnimationFrame(go));
+}
 export function addAtCenter(kind: PartKind) {
   const [x, z] = viewCenterGround();
   const base: PartInstance = { id: '__new', kind, pos: [0, 0, 0], rotY: 0, props: {} };
-  addPart(kind, placeAt(base, [x, z]).part.pos, 0);
+  const id = addPart(kind, placeAt(base, [x, z]).part.pos, 0);
+  if (id && !isBoard(kind)) ensureGrabbable(id);
 }
 
 /** Boards carry the parts inserted into them. */

@@ -113,7 +113,7 @@ const checks: Record<string, (run: SketchRun) => void> = {
     }
   },
   ultrasonic: run => {
-    for (const distance of [5, 50, 100]) {
+    for (const distance of [5, 30, 50, 100, 120]) {
       run.input('sonar', 'distanceCm', distance);
       run.run(100);
       run.serial = '';
@@ -207,14 +207,51 @@ function checkBlink(run: SketchRun, partId: string): void {
 
 describe('real arduino-cli sketches: visible output and realtime throughput', () => {
   it('covers every fixture and gallery example', () => {
-    expect(Object.keys(checks).sort()).toEqual(EXAMPLES.map(example => example.id).sort());
-    expect(Object.keys(fixtures.examples).sort()).toEqual(Object.keys(checks).sort());
+    expect(Object.keys(checks).sort()).toEqual(EXAMPLES.slice(0, 17).map(example => example.id).sort());
+    expect(Object.keys(fixtures.examples).sort()).toEqual(EXAMPLES.map(example => example.id).sort());
   });
-  for (const example of EXAMPLES) {
+  for (const example of EXAMPLES.slice(0, 17)) {
     it(example.id, () => {
       const run = new SketchRun(example.id);
       checks[example.id]!(run);
-      run.report(example.id);
+      if (process.env.LAB_REALTIME_TEST === '1') run.report(example.id);
+    }, 60_000);
+  }
+});
+
+const v2Checks: Record<string, (run: SketchRun) => void> = {
+  'transistor-motor': run => { expect(run.run(100).parts.motor?.motor?.rpm).toBeGreaterThan(0); expect(run.run(1100).parts.motor?.motor?.rpm).toBeLessThan(1); },
+  'relay-lamp': run => { const on=run.run(100); expect(on.parts.r?.relay?.closed).toBe(true); expect(on.parts.bulb?.bulb?.brightness).toBeGreaterThan(.1); const off=run.run(1400); expect(off.parts.r?.relay?.closed).toBe(false); expect(off.parts.bulb?.bulb?.brightness).toBeLessThan(.1); },
+  'shift-register-eight': run => { expect(Object.values(run.run(350).parts.ic?.ic?.outputs ?? {}).filter(Boolean).length).toBeGreaterThan(0); },
+  'timer-555-blink': run => { const states = new Set<number>(); run.run(3500, f => states.add(f.parts.ic?.ic?.outputs?.['3'] ?? 0)); expect(states.size).toBe(2); },
+  'rc-oscilloscope': run => { const trace = run.run(200).scopes?.scope; expect(trace?.channels[0]?.length).toBeGreaterThan(2); },
+  'regulator-7805': run => { expect(run.run(100).parts.reg?.pinVolts?.OUT).toBeCloseTo(5, 1); },
+  'tmp36-thermometer': run => { run.input('sensor','temperature',35); run.run(600); expect(Math.abs(Number(run.serial.trim().split('\n').at(-1)) - 35)).toBeLessThan(1); },
+  'pir-alarm': run => { run.input('sensor','motion',true); expect(run.run(100).parts.led?.led?.brightness).toBeGreaterThan(.1); },
+  'keypad-password': run => { for (const key of [1,2,3,5]) { run.input('pad','key',key); run.run(40); run.input('pad','key',0); run.run(40); } expect(run.frame.pins.D13?.level).toBe(1); },
+  'ir-remote-led': run => {
+    // Same path as the UI remote panel: irCode set to the NEC code, then back to 0 after ~180 ms.
+    const press = () => { run.input('ir', 'irCode', 0xFF18E7); run.run(180); run.input('ir', 'irCode', 0); return run.run(100).parts.led?.led?.brightness ?? 0; };
+    expect(run.run(100).parts.led?.led?.brightness ?? 0).toBeLessThan(.01);
+    expect(press()).toBeGreaterThan(.4);
+    expect(press()).toBeLessThan(.01);
+    run.input('ir', 'irCode', 0xFFA25D); run.run(180); run.input('ir', 'irCode', 0); // other button: ignored
+    expect(run.run(100).parts.led?.led?.brightness ?? 0).toBeLessThan(.01);
+  },
+  'four-digit-counter': run => { const digits=run.run(300).parts.display?.digits?.segments; expect(digits).toHaveLength(4); expect(digits?.some(row => row.slice(0,7).every((on, i) => on === [true,true,true,true,true,true,false][i]))).toBe(true); },
+  'l293d-direction': run => { expect(run.run(200).parts.motor?.motor?.direction).toBe(1); expect(run.run(1100).parts.motor?.motor?.direction).toBe(-1); },
+  'logic-truth-table': run => { run.input('dip','switches',3); expect(run.run(100).parts.ic?.ic?.outputs?.['3']).toBe(1); expect(run.frame.parts.led?.led?.brightness).toBeGreaterThan(.1); },
+};
+describe('v2 starters', () => {
+  it('has an output expectation for every starter', () => {
+    expect(Object.keys(v2Checks).sort()).toEqual(EXAMPLES.slice(17).map(e => e.id).sort());
+    expect(Object.keys(fixtures.examples).sort()).toEqual(EXAMPLES.map(example => example.id).sort());
+  });
+  for (const example of EXAMPLES.slice(17)) {
+    it(example.id, () => {
+      const run = new SketchRun(example.id);
+      v2Checks[example.id]!(run);
+      if (process.env.LAB_REALTIME_TEST === '1') run.report(example.id);
     }, 60_000);
   }
 });

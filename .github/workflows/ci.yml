@@ -153,12 +153,14 @@ jobs:
         working-directory: lab
         run: npm test
 
-      # `npm test` ran the realtime check (src/core/examples.e2e.test.ts) on its own, after the other
-      # files, so that nothing steals the runner's two cores while it measures simulation speed.
-      # The rest of the core is repeated here only so a simulator failure is named in the log.
+      # Run wall-clock assertions separately, with file parallelism disabled.
+      - name: Realtime acceptance
+        working-directory: lab
+        run: npm run test:realtime
+
       - name: Simulator core tests
         working-directory: lab
-        run: npx vitest run src/core --exclude src/core/examples.e2e.test.ts
+        run: npx vitest run src/core
 
       - name: Compiler service tests
         working-directory: lab

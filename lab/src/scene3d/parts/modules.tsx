@@ -109,8 +109,8 @@ export function Lcd1602({ part }: PartProps) {
   });
   return (
     <group>
-      <Legs kind="lcd1602-i2c" top={5} />
-      <mesh position={[0, 7, -1.4]}><boxGeometry args={[40, 4, 1.6]} /><meshStandardMaterial color="#17191c" /></mesh>
+      <Legs kind={part.kind} top={5} />
+      {part.kind === 'lcd1602-i2c' && <mesh position={[0, 7, -1.4]}><boxGeometry args={[40, 4, 1.6]} /><meshStandardMaterial color="#17191c" /></mesh>}
       <mesh position={[0, 20, 0]} castShadow><boxGeometry args={[80, 36, 1.6]} /><meshStandardMaterial color="#0a6b3d" roughness={0.45} /></mesh>
       <mesh position={[0, 21, 2.4]} castShadow><boxGeometry args={[71.2, 25.2, 3.2]} /><meshStandardMaterial color="#1a1d20" roughness={0.5} /></mesh>
       <mesh position={[0, 21, 4.02]}><planeGeometry args={[64.5, 14.6]} /><meshBasicMaterial map={t} toneMapped={false} /></mesh>
