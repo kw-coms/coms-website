@@ -2,18 +2,13 @@
 
 /** One block's record: the draft and, optionally, the one-step backup of the draft it replaced ("이전 코드 복원"). */
 export interface Saved { code: string; backup?: string; at: number }
-type StorageLike = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem' | 'key' | 'length'>>
+type StorageLike = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem'>>
 
 // One localStorage record per block (`<prefix><pageId>:<blockKey>`), so tabs editing different blocks never share a value.
 // The earlier page-wide `<prefix><pageId>` object never shipped (PR #520 is the first release): an intentional pre-release reset, no migration.
 const KEY_PREFIX = 'coms-study-playground:'
-// Block keys include a hash of the original code, so lesson revisions orphan records. Each mounted block refreshes a
-// `<record key>:seen` timestamp (on mount, when the tab becomes visible, and daily while open), and a page prunes only
-// its own orphans whose record AND `seen` are both older than 30 days. A tab that stays open refreshes `seen` at least
-// daily, so a live tab's draft (even for an older lesson version) cannot be pruned, and growth is bounded per page by
-// 30 days of lesson revisions. A global size cap was rejected because it can delete other tabs' live drafts.
-const ORPHAN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000
-const SEEN = ':seen'
+// Records are never deleted automatically. Growth is bounded by lesson revisions x blocks, which is slow; when the
+// quota fills, saves fail with the existing notice. Accepted limit: automatic pruning can delete live drafts.
 
 export function fnv1a(text: string): string {
   let h = 0x811c9dc5
@@ -29,40 +24,9 @@ export function createStore(pageId: string, storage?: StorageLike | null) {
     if (storage !== undefined) return storage
     try { return window.localStorage } catch { return null }
   }
-  const pagePrefix = `${KEY_PREFIX}${pageId}:`
-  const keyOf = (block: string) => pagePrefix + block
+  const keyOf = (block: string) => `${KEY_PREFIX}${pageId}:${block}`
 
   return {
-    /** Marks a mounted block as alive. Writes only the timestamp (never reads the draft); a failure is ignored. */
-    touch(block: string, now = Date.now()): void {
-      try { handle()?.setItem(keyOf(block) + SEEN, String(now)) } catch { /* the draft does not depend on it */ }
-    },
-    /** Deletes this page's records (and their `seen` keys) of blocks not in `current` when both the record and `seen` are older than 30 days; unparseable and missing count as old. Never touches another page's keys or a current block's. */
-    prune(current: string[], now = Date.now()): void {
-      const st = handle()
-      if (!st || typeof st.key !== 'function' || typeof st.length !== 'number') return
-      try {
-        const live = new Set(current)
-        const newest = new Map<string, number>() // block -> newest of its record `at` and `seen`
-        for (let i = 0; i < st.length; i++) {
-          const k = st.key(i)
-          if (!k || !k.startsWith(pagePrefix)) continue
-          const isSeen = k.endsWith(SEEN)
-          const block = k.slice(pagePrefix.length, isSeen ? -SEEN.length : undefined)
-          let at = -Infinity
-          try {
-            const raw = st.getItem(k) ?? ''
-            if (isSeen) { const n = Number(raw); if (raw !== '' && Number.isFinite(n)) at = n }
-            else { const v = JSON.parse(raw); if (v && typeof v.code === 'string' && typeof v.at === 'number') at = v.at }
-          } catch { /* unparseable: old */ }
-          newest.set(block, Math.max(newest.get(block) ?? -Infinity, at))
-        }
-        for (const [block, at] of newest) {
-          if (live.has(block) || now - at <= ORPHAN_MAX_AGE_MS) continue
-          st.removeItem?.(keyOf(block)); st.removeItem?.(keyOf(block) + SEEN)
-        }
-      } catch { /* pruning is best effort */ }
-    },
     get(block: string): Saved | null {
       try {
         const raw = handle()?.getItem(keyOf(block))

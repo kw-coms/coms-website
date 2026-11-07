@@ -56,3 +56,4 @@ Wall 10 s (compile 15 s), CPU 3 s (Java 6 s; compile 10 s CPU), memory via conta
 
 ## Saved drafts (frontend)
 The study playground keeps each block's draft in its own `localStorage` record, `coms-study-playground:<pageId>:<blockKey>` = `{ code, backup?, at }`, written only by `saveBlock` (`src/pages/study/playground/storage.ts`), which is fully synchronous so exit flushes never miss a queued save. Limit, accepted: `localStorage` has no cross-process atomicity, so another tab's write can land between `saveBlock`'s read and write (microseconds); a draft changed by another tab since this tab last looked is kept as the one-step backup instead of being overwritten unseen.
+Records are never deleted automatically: growth is bounded by lesson revisions × blocks (slow), and when the quota fills, saves fail with the existing notice. Accepted limit, because automatic pruning can delete live drafts.

@@ -162,51 +162,14 @@ assert.equal(createStore('c', backing).get('k'), null, 'the old page-wide key is
   assert.equal(restoreBlock(st, b, 'typing'), 'restored')
 }
 {
-  // Orphan prune: only this page's records of vanished blocks, and only when the record AND its `seen` are over 30 days old.
-  const DAY = 24 * 60 * 60 * 1000, now = 100 * DAY
+  // Drafts are never deleted automatically: two lesson versions of one page share storage; an old 40-day draft and
+  // its backup survive mounting the new version and any number of saves there.
+  const DAY = 24 * 60 * 60 * 1000
   const m = mem()
-  const c = createStore('c', m), java = createStore('java', m)
-  c.put('0-current', { code: 'mine', at: 1 })              // mounted but ancient: survives
-  c.touch('0-current', 1)                                  // ... and so does its stale `seen`
-  c.put('1-old', { code: 'x', at: now - 31 * DAY })        // orphan, stale record, no seen: removed
-  c.put('2-recent', { code: 'x', at: now - 29 * DAY })     // fresh record: survives
-  c.put('4-aged', { code: 'x', at: now - 40 * DAY }); c.touch('4-aged', now - DAY)          // stale record, fresh seen: survives
-  c.put('5-fresh', { code: 'x', at: now - DAY }); c.touch('5-fresh', now - 40 * DAY)        // fresh record, stale seen: survives
-  c.put('6-both', { code: 'x', backup: 'b', at: now - 40 * DAY }); c.touch('6-both', now - 40 * DAY) // both stale: removed with its seen key
-  m.setItem('coms-study-playground:c:7-orphanseen:seen', String(now - 40 * DAY))            // orphan seen without a record: old
-  m.setItem('coms-study-playground:c:3-junk', '{nope')     // unparseable counts as old
-  java.put('1-old', { code: 'other page', at: 1 })         // another page's ancient record: never touched
-  java.put('9-orphan', { code: 'other page', at: 1 })
-  c.prune(['0-current'], now)
-  assert.equal(c.get('0-current').code, 'mine'); assert.notEqual(m.getItem('coms-study-playground:c:0-current:seen'), null)
-  for (const keep of ['2-recent', '4-aged', '5-fresh']) assert.equal(c.get(keep).code, 'x', keep)
-  for (const gone of ['1-old', '6-both']) assert.equal(c.get(gone), null, gone)
-  assert.equal(m.getItem('coms-study-playground:c:6-both:seen'), null, 'the seen key goes with the record')
-  assert.equal(m.getItem('coms-study-playground:c:7-orphanseen:seen'), null)
-  assert.equal(m.getItem('coms-study-playground:c:3-junk'), null)
-  assert.equal(java.get('1-old').code, 'other page'); assert.equal(java.get('9-orphan').code, 'other page')
-  java.prune([], now) // the other page prunes its own orphans only
-  assert.equal(java.get('9-orphan'), null); assert.equal(c.get('2-recent').code, 'x')
-}
-{
-  // The reviewer's case: tab A runs the old lesson version with an aged, clean draft; tab B (new version) prunes.
-  const DAY = 24 * 60 * 60 * 1000, now = 100 * DAY
-  const m = mem()
-  const a = createStore('c', m), b = createStore('c', m)
-  a.put('0-oldversion', { code: 'draft', backup: 'older draft', at: now - 40 * DAY })
-  a.touch('0-oldversion', now) // A mounted it just now
-  b.prune(['0-newversion'], now)
-  assert.deepEqual([a.get('0-oldversion').code, a.get('0-oldversion').backup], ['draft', 'older draft'], 'a live tab\'s draft survives the other tab\'s prune')
-}
-{
-  // A failing `seen` write (quota) never breaks saving and never marks anything dirty.
-  const inner = mem()
-  const flaky = { ...inner, setItem: (k, v) => { if (k.endsWith(':seen')) throw new DOMException('full', 'QuotaExceededError'); inner.setItem(k, v) } }
-  const st = createStore('s', flaky)
-  st.touch('0-a')
-  const b = { key: '0-a', baseline: null, dirty: false }
-  assert.equal(saveBlock(st, b, 'code', 'init'), true)
-  assert.equal(st.get('0-a').code, 'code'); assert.equal(b.dirty, false)
+  const oldVersion = createStore('c', m), newVersion = createStore('c', m)
+  oldVersion.put('0-oldversion', { code: 'draft', backup: 'older draft', at: Date.now() - 40 * DAY })
+  for (let i = 0; i < 50; i++) saveBlock(newVersion, { key: `${i}-newversion`, baseline: null, dirty: true }, `edit ${i}`, 'init')
+  assert.deepEqual([oldVersion.get('0-oldversion').code, oldVersion.get('0-oldversion').backup], ['draft', 'older draft'])
 }
 {
   // A full storage: nothing is evicted, the save fails, the edit stays pending.
