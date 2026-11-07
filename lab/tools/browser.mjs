@@ -34,7 +34,12 @@ export function outDir(defaultName, value = process.env.SHOTS_OUT ?? defaultName
   return target;
 }
 
-/** Write an output file without following an existing symlink at the leaf. */
+/**
+ * Write an output file without following an existing symlink at the leaf.
+ * Not race-safe against a concurrent process swapping a parent directory between outDir()'s
+ * check and open(): accepted, because these are local dev/CI tools and anyone who can mutate
+ * the worktree can already change the code they run.
+ */
 export async function writeOutputFile(file, data) {
   if (typeof file !== 'string' || !file || basename(file) === '.' || basename(file) === '..') {
     throw new Error('출력 파일 경로가 올바르지 않습니다.');
