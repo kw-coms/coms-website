@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createCompileServer, checkAuth, clientIp } from '../server.mjs';
+import { createCompileServer, checkAuth, clientIp, rateKey } from '../server.mjs';
 import { createServer } from 'node:net';
 import { createRateLimiter, createCompileQueue } from '../limits.mjs';
 
@@ -78,6 +78,24 @@ test('uses right-most forwarded IP only when proxy trust enabled', () => {
   assert.equal(clientIp(request, false), '127.0.0.1');
   assert.equal(clientIp({ headers: { 'x-forwarded-for': '1.1.1.1, junk' }, socket: { remoteAddress: '::ffff:10.0.0.1' } }, true), '10.0.0.1');
   assert.equal(clientIp({ headers: { 'x-forwarded-for': '2001:db8:1:2::7' }, socket: { remoteAddress: '127.0.0.1' } }, true), clientIp({ headers: {}, socket: { remoteAddress: '2001:db8:1:2::8' } }));
+});
+test('rate key: X-Lab-Client only with proxy trust, valid shape only', () => {
+  const peer = { remoteAddress: '127.0.0.1' };
+  const request = (client, xff) => ({ headers: { 'x-lab-client': client, ...(xff ? { 'x-forwarded-for': xff } : {}) }, socket: peer });
+  assert.equal(rateKey(request('AbC_-123xyZ9'), true), 'client:AbC_-123xyZ9');
+  assert.notEqual(rateKey(request('AbC_-123xyZ9'), true), rateKey(request('Other_-123xy'), true));
+  assert.equal(rateKey(request('AbC_-123xyZ9', '5.6.7.8'), false), '127.0.0.1', 'ignored without TRUST_PROXY');
+  assert.equal(rateKey(request('short'), true), '127.0.0.1', 'too short');
+  assert.equal(rateKey(request('has space and ;;'), true), '127.0.0.1', 'bad characters');
+  assert.equal(rateKey(request('', '5.6.7.8'), true), '5.6.7.8', 'falls back to the forwarded address');
+});
+httpTest('rate limits per X-Lab-Client when proxy trust enabled', async () => {
+  await withServer({ limiter: createRateLimiter({ limit: 1 }), trustProxy: true }, async url => {
+    const as = client => ({ headers: { 'x-lab-client': client, 'x-forwarded-for': '1.2.3.4' } });
+    assert.equal((await post(url, '#include "bad"', as('memberAAAA1'))).status, 400);
+    assert.equal((await post(url, '#include "bad"', as('memberBBBB2'))).status, 400, 'another member has its own budget');
+    assert.equal((await post(url, '#include "bad"', as('memberAAAA1'))).status, 429);
+  });
 });
 httpTest('returns busy when bounded compile queue is full', async () => {
   const queue = createCompileQueue({ concurrency: 1, maxQueued: 0 });
