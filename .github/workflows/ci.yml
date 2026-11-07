@@ -204,6 +204,27 @@ jobs:
             runner node test/toolchain.mjs
           docker compose -p studyrt -f docker-compose.yml down -v
 
+      - name: Verify exercise solutions against the real runner
+        working-directory: runner
+        env:
+          NGINX_GID: "101"
+          RUNNER_SOCKET_VOLUME: ci-socket
+          RUNNER_STATE_VOLUME: ci-state
+          RATE_LIMIT_PER_MIN: "1000"
+        run: |
+          set -euo pipefail
+          [ -f ../scripts/verify-exercises.mjs ] || exit 0
+          docker compose -p studyrt -f docker-compose.yml up -d runner
+          trap 'docker compose -p studyrt -f docker-compose.yml down -v' EXIT
+          for attempt in $(seq 1 60); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' studyrt-runner-1)" = healthy ] && break
+            if [ "$attempt" -eq 60 ]; then docker logs --tail=50 studyrt-runner-1; exit 1; fi
+            sleep 1
+          done
+          docker compose -p studyrt -f docker-compose.yml run --rm --no-deps \
+            --volume "$GITHUB_WORKSPACE:/repo:ro" --workdir /repo runner \
+            node scripts/verify-exercises.mjs --runner unix:/run/coms-study/run.sock
+
       - name: Compose end to end (seccomp, member key, restart after a crash, deny-list)
         working-directory: runner
         run: node test/compose-e2e.mjs

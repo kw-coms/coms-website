@@ -18,6 +18,68 @@ test('validation counts UTF-8 bytes and rejects invalid shapes', () => {
   assert.throws(() => rateLimitPerMinute('0'));
 });
 
+test('multi-case validation enforces shape, count, per-case and aggregate UTF-8 limits', () => {
+  const multi = { lang: 'python', code: 'print(input())', tests: ['a', 'b'] };
+  assert.equal(validateRequest(multi), null);
+  assert.equal(validateRequest({ ...multi, tests: ['한'.repeat(5_461)] }), null); // 16,383 bytes
+  assert.equal(validateRequest({ ...multi, tests: ['x'.repeat(16_384), 'y'.repeat(16_384)] }), null);
+  for (const tests of [undefined, null, 'one', {}, [], Array(1), Array(11).fill(''), [1], ['ok', null],
+    ['한'.repeat(5_462)], ['x'.repeat(16_384), 'y'.repeat(16_384), 'z']]) {
+    assert.match(validateRequest({ ...multi, tests }), /테스트 입력/, String(tests));
+  }
+  assert.match(validateRequest({ ...multi, stdin: '' }), /함께 보낼 수 없어요/);
+});
+
+test('HTTP multi-case request is one queued, rate-limited and in-flight run', async t => {
+  const received = [], releases = [];
+  let takes = 0, submissions = 0;
+  const server = createRunnerServer({ trustProxy: true, logger() {},
+    limiter: { take() { takes++; return takes <= 2; }, close() {} },
+    queue: { submit(job) { submissions++; return job(); } },
+    executor: body => { received.push(body); return new Promise(resolve => releases.push(() => resolve({ ...result, results: [] }))); },
+  });
+  if (!await listenOrSkip(t, server)) return;
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const url = `http://127.0.0.1:${server.address().port}/study/api/run`;
+  const post = body => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-runner-client': 'alice' }, body: JSON.stringify(body) });
+  const multi = { lang: 'python', code: 'print(input())', tests: ['a', 'b', 'c'] };
+  const first = post(multi);
+  while (!releases.length) await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(received, [multi]);
+  assert.equal(submissions, 1);
+  const concurrent = await post(multi);
+  assert.equal(concurrent.status, 429);
+  assert.equal((await concurrent.json()).error, 'busy');
+  assert.equal(submissions, 1);
+  releases[0]();
+  const response = await first;
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).results, []);
+  assert.equal(takes, 2);
+  assert.equal((await post(multi)).status, 429);
+  assert.equal(submissions, 1);
+});
+
+test('HTTP rejects malformed multi-case requests before the executor', async t => {
+  let runs = 0;
+  const server = createRunnerServer({ logger() {}, limiter: { take: () => true, close() {} }, executor: async () => { runs++; return result; } });
+  if (!await listenOrSkip(t, server)) return;
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const url = `http://127.0.0.1:${server.address().port}/study/api/run`;
+  for (const body of [
+    { lang: 'c', code: 'int main(){}', stdin: '', tests: [''] },
+    { lang: 'c', code: 'int main(){}', tests: [] },
+    { lang: 'c', code: 'int main(){}', tests: ['x'.repeat(16_385)] },
+  ]) {
+    const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal(response.status, 400);
+    const payload = await response.json();
+    assert.equal(payload.error, 'rejected');
+    assert.match(payload.messageKo, /[가-힣]/);
+  }
+  assert.equal(runs, 0);
+});
+
 test('proxy header only trusted at rightmost valid hop', () => {
   const request = { headers: { 'x-forwarded-for': '1.2.3.4, 2001:db8::1' }, socket: { remoteAddress: '127.0.0.1' } };
   assert.equal(clientIp(request), '127.0.0.1');
