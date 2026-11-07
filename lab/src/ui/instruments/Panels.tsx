@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { ExternalLink, Pin, Pause, Play, Ruler } from 'lucide-react';
+import { ExternalLink, Pin, Pause, Play, Ruler, Volume2, VolumeX } from 'lucide-react';
 import type { LogicTrace, PartInstance, ScopeTrace } from '../../core/types';
 import { PARTS } from '../core';
 import { onSimFrame, frameRef, setSimInput } from '../simHost';
-import { setInstUi, setProp, setScope, useStore } from '../store';
+import { setBeepMuted, setInstUi, setProp, setScope, useStore } from '../store';
 import { PropField } from '../components/Inspector';
 import {
   CH_COLORS, DEFAULT_LOGIC, SPAN_STEPS, TIME_STEPS, VOLT_STEPS, drawLogic, drawScope, fmtT, fmtV, frozen, logicStats, measureScope, scopeCursors, scopeSettings,
@@ -161,10 +161,14 @@ export function FuncGenPanel({ part }: { part: PartInstance }) {
 export function MeterPanel({ part }: { part: PartInstance }) {
   useFrameTick();
   const m = frameRef.current?.parts[part.id]?.meter;
+  const muted = useStore((s) => s.beepMuted);
   return (
     <div className="inst-body">
       <div className="supply-read"><div><b>{m?.reading ?? '0.00'}</b><small>{m?.mode ?? ''}</small></div></div>
       {PARTS[part.kind].props.map((d) => <PropField key={d.key} part={part} def={d} />)}
+      <button type="button" className={muted ? '' : 'on'} aria-pressed={!muted} onClick={() => setBeepMuted(!muted)}>
+        {muted ? <><VolumeX size={14} /> 도통 소리 꺼짐</> : <><Volume2 size={14} /> 도통 소리 켜짐</>}
+      </button>
       <p className="muted small">저항(Ω)·연속성 모드는 전원이 꺼진 부품에만 쓰세요. 연속성은 이어져 있으면 소리가 나요.</p>
     </div>
   );

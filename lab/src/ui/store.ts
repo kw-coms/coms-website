@@ -87,6 +87,8 @@ export interface State {
   /** The 2D schematic view replaces the 3D stage. */
   schematic: boolean;
   /** Mission being worked on (list when null) and saved progress. */
+  /** Multimeter continuity beep muted by the user (remembered in this browser). */
+  beepMuted: boolean;
   missionId: string | null;
   missionProgress: Record<string, MissionProgress>;
   /** Note being edited in place. */
@@ -162,6 +164,7 @@ function loadPrefs(): Record<string, unknown> {
 const prefs = loadPrefs();
 const NOTICE_KEY = 'coms-lab:perf-notice';
 export const MISSIONS_KEY = 'coms-lab:missions';
+export const BEEP_MUTED_KEY = 'coms-lab:beep-muted';
 function loadMissionProgress(): Record<string, MissionProgress> {
   try {
     const v = JSON.parse(getItem(MISSIONS_KEY) ?? '{}');
@@ -213,6 +216,7 @@ let state: State = {
   instUi: {},
   info: null,
   schematic: false,
+  beepMuted: getItem(BEEP_MUTED_KEY) === '1',
   missionId: first.doc.mission ?? null,
   missionProgress: loadMissionProgress(),
   editingNote: null,
@@ -264,6 +268,10 @@ export function setInstUi(id: string, patch: Partial<InstUi>) {
 }
 export function setScope(id: string, patch: Partial<ScopeUi>) {
   setInstUi(id, { scope: { ...state.instUi[id]?.scope, ...patch } });
+}
+export function setBeepMuted(muted: boolean) {
+  setItem(BEEP_MUTED_KEY, muted ? '1' : '0');
+  set({ beepMuted: muted });
 }
 export function setMissionId(id: string | null) {
   set({ missionId: id });

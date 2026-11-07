@@ -1,6 +1,7 @@
 import type { SimFrame, SimInput, SimWarning, Wire } from '../core/types';
 import { createSimulator } from './core';
 import { compileSketch, CompileUnreachable } from './compileClient';
+import { createBeeper, continuityHolds } from './beep';
 import { clearSerial, pushSerial } from './serial';
 import { getState, onSceneLoaded, scene, set, setInput as storeSetInput, subscribe, toast } from './store';
 
@@ -27,6 +28,11 @@ sim.onFrame((f) => {
   }
 });
 sim.onSerial(pushSerial);
+
+// multimeter continuity beep: only while the simulation runs, unmuted, and a meter in continuity mode has a closed path
+const beeper = createBeeper();
+sim.onFrame((f) => beeper.set(sim.state === 'running' && !getState().beepMuted && continuityHolds(f)));
+subscribe(() => { if (getState().simState !== 'running' || getState().beepMuted) beeper.set(false); });
 
 // debugger state from frames (paused line, globals): only the store re-renders when it actually changes
 let lastDebug = '';
@@ -170,6 +176,7 @@ export function pause() {
 export function stop() {
   cancelCompile();
   sim.stop();
+  beeper.set(false);
   forgetProgram();
   set({ inputs: {}, simWarnings: [], debug: null });
   lastWarn = '';
