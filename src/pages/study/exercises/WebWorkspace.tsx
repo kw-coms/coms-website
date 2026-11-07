@@ -34,7 +34,7 @@ export default function WebWorkspace({ exercise, onSolved }: { exercise: WebExer
   const [busy, setBusy] = useState(false)
   const busyRef = useRef(false)
   const gradeAbort = useRef<AbortController | null>(null)
-  const [message, setMessage] = useState('')
+  const [message, setMessage] = useState(shared ? '공유된 코드는 실행 버튼을 눌러야 미리보기가 돼요' : '')
   const frameRef = useRef<HTMLIFrameElement>(null)
   const editorHost = useRef<HTMLDivElement>(null)
   const editor = useRef<PgEditor | null>(null)
@@ -68,11 +68,12 @@ export default function WebWorkspace({ exercise, onSolved }: { exercise: WebExer
   }, [tab, exercise.id, shared])
 
   useEffect(() => {
+    if (shared) return
     const timer = window.setTimeout(() => {
       if (!busyRef.current && frameRef.current) loadWebPreview(frameRef.current, filesRef.current)
     }, 400)
     return () => window.clearTimeout(timer)
-  }, [files, busy])
+  }, [files, busy, shared])
 
   useEffect(() => () => { runId.current++; gradeAbort.current?.abort(); flushSaves() }, [])
 

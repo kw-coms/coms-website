@@ -53,7 +53,8 @@ Data files: `src/pages/study/exercises/problems/{core,c,java,python,web}.ts`, ea
 ## 3. Grading (C/Java/Python)
 - Program = `mode === 'function' ? harness[lang].replace(marker, studentCode) : studentCode`.
 - One request runs every case: `POST /study/api/run` with `{ lang, code, tests: string[] }` (runner §7). Cases = examples + tests (≤ 10 per problem).
-- Per case verdict, in this order: 컴파일 에러 (whole submission) · 시간 초과 (`timedOut`) · 런타임 에러 (non-zero exit or signal; show stderr) · 출력 초과 (`truncated`) · 오답 (compare fails; show input, expected, actual and a line diff using `playground/compare.ts`) · 정답.
+- Per case verdict, in this order: 컴파일 에러 (whole submission) · 시간 초과 (`timedOut`) · 출력 초과 (`truncated`; the runner may also report SIGKILL) · 런타임 에러 (non-zero exit or signal; show stderr) · 오답 (compare fails; show input, expected, actual and a line diff using `playground/compare.ts`) · 정답.
+- Output comparison uses the shared `exercises/compare.ts`: `tokens` (default) splits on whitespace and compares literal tokens; `lines` normalizes CRLF/bare CR to LF, removes one final newline, and preserves all spaces (including leading/trailing spaces) and remaining blank lines. Float mode tokenizes like `tokens`, accepts decimal/exponent numeric tokens only (not hex), and requires finite values with `abs(actual - expected) <= tolerance * max(1, abs(expected))`. Signed zero compares numerically; nonnumeric tokens (including literal `NaN`/`Infinity`) compare exactly. Decimal overflow never passes numeric comparison.
 - Function-mode line numbers in diagnostics are mapped back to the student's code (subtract the harness lines before the marker); diagnostics inside the harness are shown as "채점 코드" errors.
 - "실행" runs the program once with a custom stdin box (default: first example) via the normal single-run API; "제출" grades all cases. Ctrl/⌘+Enter = 실행, Ctrl/⌘+Shift+Enter = 제출.
 - Not logged in: the editor works, 실행/제출 show the playground's login prompt (returns to the same problem).
@@ -87,5 +88,5 @@ Response 200: `{ ok, stage, stderr (compile), diagnostics, timeMs, results: [{ s
 
 ## 10. Tests
 - `tests/studyExercises.test.mjs` (node --test, no network): schema, unique ids, chapter ids exist in the study HTML, ≤ 10 cases, harness markers present, mini-markdown renders.
-- `runner/test/exercises.mjs`: runs every reference solution (and every starter, expecting a failure) through the real runner (multi-case API) — wired into the CI "Study code runner" job.
+- `scripts/verify-exercises.mjs`: runs every reference solution (and every starter, expecting a failure) through the real runner (multi-case API) — wired into the CI "Study code runner" job.
 - Frontend unit tests for grading verdicts, line mapping, compare modes; a Playwright e2e (mocked runner) for list → problem → submit → solved ✓ → list shows ✓.

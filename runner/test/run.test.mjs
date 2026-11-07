@@ -189,6 +189,19 @@ test('shared run deadline includes cleanup, splits wall time and skips the suffi
   assert.ok(r.results.slice(0, 3).every(x => x.timedOut));
 });
 
+test('remaining cases are skipped when less than 250 ms of shared wall time remains', async () => {
+  let time = 0;
+  let runs = 0;
+  const r = await runCode({ lang: 'python', code: '', tests: ['first', 'second'] }, {
+    now: () => time,
+    executor: async () => { runs++; time += 9_751; return success; },
+    cleanup: async () => {}, clearIpc: async () => {},
+  });
+  assert.equal(runs, 1);
+  assert.equal(r.results[0].skipped, undefined);
+  assert.deepEqual(r.results[1], { skipped: true });
+});
+
 test('multi-case compile failure has no results and does not run any case', async () => {
   let calls = 0;
   const r = await runCode({ lang: 'c', code: '', tests: ['1', '2'] }, {

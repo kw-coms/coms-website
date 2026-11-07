@@ -32,6 +32,7 @@ export type PostRunResult =
 export const RUN_URL = '/study/api/run'
 export const MAX_CODE_BYTES = 64 * 1024
 export const MAX_STDIN_BYTES = 16 * 1024
+export const MAX_BODY_BYTES = 112 * 1024
 // The runner answers within ~55 s (25 s queue + 15 s compile + 10 s run) and the host proxy cuts at 60 s.
 const CLIENT_TIMEOUT_MS = 58_000
 
@@ -86,6 +87,8 @@ export async function runRemote(lang: RunLang, code: string, stdin: string, sign
 
 /** Shared transport for single-run and multi-case requests. Keep auth, retry and errors identical. */
 export async function postRun(body: { lang: RunLang; code: string; stdin?: string; tests?: string[] }, signal?: AbortSignal): Promise<PostRunResult> {
+  const jsonBody = JSON.stringify(body)
+  if (bytes(jsonBody) > MAX_BODY_BYTES) return { kind: 'rejected', messageKo: '요청 본문은 112 KB 이하여야 해요.' }
   let timeout: AbortSignal | null = null
   try {
     // Every attempt gets its own deadline: the retry after a renewed session must not inherit what the first one used up.
@@ -95,7 +98,7 @@ export async function postRun(body: { lang: RunLang; code: string; stdin?: strin
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: jsonBody,
         signal: either(signal, timeout),
       })
     }
@@ -116,7 +119,7 @@ export async function postRun(body: { lang: RunLang; code: string; stdin?: strin
         retryAfterSec: retryAfterSeconds(res.headers.get('Retry-After'), data, rate ? 10 : 5),
       }
     }
-    if (res.status === 400) return { kind: 'rejected', messageKo: typeof data?.messageKo === 'string' ? data.messageKo : '실행할 수 없는 코드예요.' }
+    if (res.status === 400 || res.status === 413) return { kind: 'rejected', messageKo: typeof data?.messageKo === 'string' ? data.messageKo : '요청 본문은 112 KB 이하여야 해요.' }
     if (!res.ok || !data) return { kind: 'network', messageKo: '실행 서버가 응답하지 않아요. 잠시 뒤에 다시 시도해 주세요.' }
     return { kind: 'output', data }
   } catch (e) {

@@ -341,7 +341,7 @@ export async function runCode({ lang, code, stdin = '', tests }, {
     for (let index = 0; index < tests.length; index++) {
       if (index > 0) await cleanBetween();
       const remaining = RUN_WALL_MS - (now() - runStarted);
-      if (remaining <= 0) {
+      if (remaining < 250) {
         results.push(...tests.slice(index).map(() => ({ skipped: true })));
         break;
       }

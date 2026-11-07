@@ -4,6 +4,8 @@ import type { WebExercise, WebFiles } from './types'
 export interface WebCheckResult { name: string; passed: boolean; message: string }
 
 // The iframe has an opaque origin. The parent validates source, origin and a fresh nonce.
+// Student JavaScript can read the nonce in its own document and forge a local pass;
+// this self-cheating limit is accepted because exercise progress is local only.
 // JSON is escaped before it is embedded in an inline script, so a check cannot close the script tag.
 export function buildExerciseDoc(files: WebFiles, checks: WebExercise['checks'], nonce: string): string {
   const payload = JSON.stringify({ names: checks.map((c) => c.name), nonce }).replace(/</g, '\\u003c')
