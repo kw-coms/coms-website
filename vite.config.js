@@ -92,6 +92,8 @@ const pwaPlugin = VitePWA({
       /\/(share|share-data|share-image)$/,
       // Demo sandbox for /study: a real document with its own CSP (nginx.frontend.conf), never the SPA shell.
       /^\/study-sandbox\.html$/,
+      // Circuit Lab (lab/): its own app, built into the same image under /lab/ (Dockerfile.frontend).
+      /^\/lab(\/|$)/,
       // Sibling apps the host nginx serves under sub-paths of this origin.
       // Without these the SW hijacks their navigations and renders the SPA 404.
       /^\/(foodclub|gameclub|BugSnap|LogDoctor|PRDoctor|worldcup|tier|team-randomizer|companion|phonemote)(\/|$)/,
