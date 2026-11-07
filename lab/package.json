@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc -b --noEmit",
-    "e2e:compile": "node tools/e2e-compile.mjs",
+    "fixtures:compile": "node tools/compile-fixtures.mjs",
     "e2e:browser": "node tools/e2e-browser.mjs",
     "e2e:blocks": "node tools/e2e-blocks.mjs",
     "e2e:ui": "node tools/e2e-ui-v2.mjs",
