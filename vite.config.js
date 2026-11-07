@@ -92,6 +92,8 @@ const pwaPlugin = VitePWA({
       /\/(share|share-data|share-image)$/,
       // Demo sandbox for /study: a real document with its own CSP (nginx.frontend.conf), never the SPA shell.
       /^\/study-sandbox\.html$/,
+      // The code runner API of the study playground (fetch calls, never navigations; denied for completeness).
+      /^\/study\/api\//,
       // Circuit Lab (lab/): its own app, built into the same image under /lab/ (Dockerfile.frontend).
       /^\/lab(\/|$)/,
       // Sibling apps the host nginx serves under sub-paths of this origin.
@@ -178,6 +180,11 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      // The study playground's code runner (runner/docker-compose.dev.yml listens here; production reaches it through nginx).
+      '/study/api': {
+        target: 'http://127.0.0.1:8788',
         changeOrigin: true,
       }
     }
