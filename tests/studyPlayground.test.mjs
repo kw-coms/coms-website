@@ -326,6 +326,12 @@ await assert.rejects(pending, 'an aborted run rejects (the caller ignores it)')
     assert.equal(refreshes, 2, 'the second run started a new refresh')
   } finally { AbortSignal.timeout = realTimeout }
 
+  // (d) a refresh the server answers with a non-401 error (an origin-check 403, a 5xx) is not a hang: still "sign in"
+  for (const status of [403, 500]) {
+    globalThis.fetch = async (url) => url === '/api/auth/refresh' ? new Response('{}', { status }) : new Response('{}', { status: 401 })
+    assert.equal((await runRemote('c', 'x', '')).kind, 'login', `refresh ${status} keeps the sign-in prompt`)
+  }
+
   // (b) caller A aborts while the shared refresh is pending; caller B still gets the refreshed session
   let release
   let refreshCalls = 0

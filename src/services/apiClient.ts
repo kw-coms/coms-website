@@ -34,7 +34,8 @@ function notifySessionExpired() {
 //  - 'rejected'    the server refused to renew the session (401): it is gone for good.
 //  - 'unavailable' network failure / 5xx / anything else: unknown, so the session
 //                  state must not be touched on this evidence alone.
-type RefreshOutcome = 'refreshed' | 'rejected' | 'unavailable'
+//  - 'timeout'     the refresh did not answer within its own deadline (same handling as 'unavailable').
+type RefreshOutcome = 'refreshed' | 'rejected' | 'unavailable' | 'timeout'
 let refreshInFlight: Promise<RefreshOutcome> | null = null
 // Bumped once per SUCCESSFUL refresh. A request that was already in flight when
 // someone else rotated the token gets a 401 from the token it was sent with, not
@@ -63,8 +64,8 @@ function refreshDeadline(): { signal: AbortSignal; expired: Promise<never> } {
 async function tryRefreshToken(): Promise<RefreshOutcome> {
   if (refreshInFlight) return refreshInFlight
   refreshInFlight = (async (): Promise<RefreshOutcome> => {
+    const deadline = refreshDeadline()
     try {
-      const deadline = refreshDeadline()
       const res = await Promise.race([fetch(apiUrl('/api/auth/refresh'), { method: 'POST', credentials: 'include', signal: deadline.signal }), deadline.expired])
       if (res.ok) {
         refreshGeneration += 1
@@ -72,7 +73,7 @@ async function tryRefreshToken(): Promise<RefreshOutcome> {
       }
       return res.status === 401 ? 'rejected' : 'unavailable'
     } catch {
-      return 'unavailable'
+      return deadline.signal.aborted ? 'timeout' : 'unavailable'
     } finally {
       refreshInFlight = null
     }
