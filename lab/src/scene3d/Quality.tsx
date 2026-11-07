@@ -1,0 +1,97 @@
+import { useEffect, useRef } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import { MeshLambertMaterial, type Material, type Mesh, type MeshStandardMaterial, type Object3D } from 'three';
+import { createGovernor } from '../ui/quality';
+import { getState, stepQuality, subscribe, useStore } from '../ui/store';
+
+type StdLike = MeshStandardMaterial & { userData: { dynamic?: boolean; lite?: Material } };
+
+/** Lite replacements are owned here: created on demand, disposed when switching back or when their source material left the scene. */
+const lites = new Map<Material, MeshLambertMaterial>();
+function liteOf(m: StdLike): Material {
+  const have = lites.get(m);
+  if (have) return have;
+  const l = new MeshLambertMaterial({
+    color: m.color, map: m.map, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity, transparent: m.transparent,
+    opacity: m.opacity, side: m.side, depthWrite: m.depthWrite,
+  });
+  lites.set(m, l);
+  return l;
+}
+function releaseLites(live: Set<Material>) {
+  for (const [full, l] of lites) if (!live.has(full)) { l.dispose(); lites.delete(full); }
+}
+
+/** Low quality: swap static PBR materials for cheap Lambert ones (and back). Materials driven per frame are left alone. */
+export function applyLite(root: Object3D, on: boolean) {
+  const live = new Set<Material>();
+  root.traverse((o) => {
+    const m = o as Mesh;
+    if (!m.isMesh) return;
+    const mat = m.material as StdLike | Material[];
+    if (on) {
+      if (Array.isArray(mat) || !(mat as StdLike).isMeshStandardMaterial || mat.userData.dynamic) return;
+      m.userData.fullMat = mat;
+      live.add(mat);
+      m.material = liteOf(mat);
+    } else if (m.userData.fullMat) {
+      m.material = m.userData.fullMat as Material;
+      delete m.userData.fullMat;
+    }
+  });
+  releaseLites(live);
+}
+
+/**
+ * Quality plumbing inside the Canvas: applies lite materials, and watches frame times so auto mode steps down
+ * (and, cautiously, back up) without flapping. Only back-to-back frames count, idle gaps are ignored.
+ */
+export function QualityRig() {
+  const scene = useThree((s) => s.scene);
+  const invalidate = useThree((s) => s.invalidate);
+  const quality = useStore((s) => s.quality);
+  const setDpr = useThree((s) => s.setDpr);
+  const controls = useThree((s) => s.controls) as { addEventListener?: (t: string, f: () => void) => void; removeEventListener?: (t: string, f: () => void) => void } | null;
+  const gov = useRef(createGovernor());
+  const last = useRef(0);
+  const orbiting = useRef(false);
+  useEffect(() => {
+    const run = () => requestAnimationFrame(() => { applyLite(scene, getState().quality === 'low'); invalidate(); });
+    run();
+    // parts/wires mounted later must be converted too
+    let prev = getState().hist.present;
+    const off = subscribe(() => { const cur = getState().hist.present; if (cur !== prev) { prev = cur; if (getState().quality === 'low') run(); } });
+    return () => { off(); applyLite(scene, false); };
+  }, [scene, invalidate, quality]);
+  useEffect(() => { gov.current.reset(); }, [quality]);
+  // while the user orbits/zooms, render at lower resolution (restored on release)
+  useEffect(() => {
+    if (!controls?.addEventListener) return;
+    const on = () => { orbiting.current = true; };
+    const off = () => { orbiting.current = false; };
+    controls.addEventListener('start', on);
+    controls.addEventListener('end', off);
+    return () => { controls.removeEventListener?.('start', on); controls.removeEventListener?.('end', off); orbiting.current = false; };
+  }, [controls]);
+  useEffect(() => {
+    if (quality === 'high' || !controls?.addEventListener) return;
+    const base = quality === 'low' ? 0.75 : Math.min(1.5, window.devicePixelRatio || 1);
+    const start = () => setDpr(quality === 'low' ? 0.5 : 0.75);
+    const end = () => { setDpr(base); invalidate(); };
+    controls.addEventListener('start', start);
+    controls.addEventListener('end', end);
+    return () => { controls.removeEventListener?.('start', start); controls.removeEventListener?.('end', end); setDpr(base); };
+  }, [controls, quality, setDpr, invalidate]);
+  useFrame(() => {
+    // demand rendering: only frames driven continuously (a running simulation or an orbit drag) say anything about GPU speed
+    if (!orbiting.current && getState().simState !== 'running') { last.current = 0; return; }
+    const now = performance.now();
+    const dt = last.current ? now - last.current : 0;
+    last.current = now;
+    if (dt > 100) gov.current.reset();
+    if (dt > 100 || dt < 1) return;
+    const r = gov.current.push(dt);
+    if (r) stepQuality(r);
+  });
+  return null;
+}

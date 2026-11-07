@@ -2367,12 +2367,15 @@ test('top navigation groups activity log and monthly calendar under Records and 
   const activityLogBox = await activityLogButton.boundingBox()
   expect(activityLogBox.width).toBeGreaterThanOrEqual(activityLogColumnWidth - 2)
   await expect(activityMenu.getByRole('button', { name: /Gather/ })).toHaveCount(0)
+  await expect(activityMenu.getByRole('button', { name: /Circuit Lab/ })).toHaveCount(0)
   // Only one dropdown is open at a time: opening Tools closes Records.
   await desktopNav.getByRole('button', { name: 'Tools', exact: true }).click()
   await expect(activityMenu).toBeHidden()
   const toolsMenu = page.getByRole('navigation', { name: '참여 도구 메뉴' })
   await expect(toolsMenu.getByRole('button', { name: /Gather/ })).toBeVisible()
   await expect(toolsMenu.getByRole('button', { name: /Activity log/ })).toHaveCount(0)
+  // Circuit Lab is a separate app at /lab/: a Tools entry, and the Records panel does not list it.
+  await expect(toolsMenu.getByRole('button', { name: /Circuit Lab/ })).toBeVisible()
   await desktopNav.getByRole('button', { name: 'Records', exact: true }).click()
   await expect(toolsMenu).toBeHidden()
   await expect(activityMenu).toBeVisible()
@@ -2419,6 +2422,7 @@ test('top navigation groups activity log and monthly calendar under Records and 
   await mobileMenu.getByRole('button', { name: /^Tools/ }).click()
   await expect(mobileMenu.getByRole('button', { name: /Gather/ })).toBeVisible()
   await expect(mobileMenu.getByRole('button', { name: /Activity log/ })).toBeVisible()
+  await expect(mobileMenu.getByRole('button', { name: /Circuit Lab/ })).toBeVisible()
   await expect(mobileMenu.getByRole('button', { name: /Monthly calendar/ })).toBeVisible()
   // The two collapsibles are independent: closing Records leaves Tools open.
   await mobileMenu.getByRole('button', { name: /^Records/ }).click()
@@ -2429,6 +2433,16 @@ test('top navigation groups activity log and monthly calendar under Records and 
   const mobileSubitemBox = await mobileMenu.getByRole('button', { name: /Activity log/ }).boundingBox()
   expect(mobileSubitemBox.height).toBeGreaterThanOrEqual(44)
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+})
+
+// /lab/ is not a route of the SPA: the menu entry must load the page from the server.
+test('Tools menu opens Circuit Lab with a full page load, not a router navigation', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.goto('/')
+  await page.locator('header nav').first().getByRole('button', { name: 'Tools', exact: true }).click()
+  const labRequest = page.waitForRequest((request) => request.isNavigationRequest() && new URL(request.url()).pathname === '/lab/')
+  await page.getByRole('navigation', { name: '참여 도구 메뉴' }).getByRole('button', { name: /Circuit Lab/ }).click()
+  await labRequest
 })
 
 test('community list stays dense but readable on mobile', async ({ page }) => {

@@ -23,6 +23,7 @@ import {
   activityNavGroups,
 } from '../data/homeContent'
 import { scrollToTopInstant } from '../utils/themeColors'
+import { isFullPageLink } from '../utils/fullPageLink'
 import NotificationButton from './NotificationButton'
 import { openQuickSearch } from '../utils/quickSearch'
 import { ROLE_LABELS, canAccessOperationsPanel } from '../utils/roleAccess'
@@ -165,6 +166,10 @@ export default function GlobalNavigation() {
   }, [location.hash, location.pathname])
 
   const goPageTop = (to: To, options?: NavigateOptions) => {
+    if (isFullPageLink(to)) {
+      window.location.assign(to)
+      return
+    }
     scrollToTopInstant()
     navigate(to, options)
   }
