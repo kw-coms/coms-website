@@ -18,8 +18,9 @@ function hasOnlyKeys(value: Record<string, unknown>, keys: readonly string[]): b
   return Object.keys(value).every(key => keys.includes(key));
 }
 
-function isSafeId(value: unknown): value is string {
-  return typeof value === 'string' && /^[\w-]{1,80}$/.test(value) && !FORBIDDEN_IDS.has(value);
+/** Ids of parts and wires become object keys: a short allowlist, and never the names that reach Object.prototype. */
+export function isSafeId(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value) && !FORBIDDEN_IDS.has(value);
 }
 
 function invalid(message: string): never {

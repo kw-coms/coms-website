@@ -106,3 +106,28 @@ describe('powered peripherals', () => {
         expect(engine.frame().parts[buzzer.id]!.buzzer!.on).toBe(false);
     });
 });
+
+describe('hostile input addressing', () => {
+  const engine = () => {
+    const sim = new SimulationEngine(() => 0);
+    sim.setScene({ version: 1, code: '', wires: [], parts: [{ id: 'button', kind: 'pushbutton', pos: [0, 0, 0], rotY: 0, props: {} }] } as Scene);
+    return sim;
+  };
+  it.each(['__proto__', 'constructor', 'prototype', 'toString', 'hasOwnProperty'])('setInput rejects part id %s without touching Object.prototype', id => {
+    expect(() => engine().setInput({ partId: id, key: 'pressed', value: true })).toThrow();
+    expect(({} as Record<string, unknown>).pressed).toBeUndefined();
+    expect(Object.prototype).not.toHaveProperty('pressed');
+  });
+  it('setInput rejects input keys that are not defined for the part', () => {
+    const sim = engine();
+    for (const key of ['__proto__', 'constructor', 'toString']) {
+      expect(() => sim.setInput({ partId: 'button', key: key as never, value: true })).toThrow();
+    }
+    expect(Object.prototype).not.toHaveProperty('pressed');
+  });
+  it('a real input still works', () => {
+    const sim = engine();
+    sim.setInput({ partId: 'button', key: 'pressed', value: true });
+    expect(sim.inputs.button!.pressed).toBe(true);
+  });
+});

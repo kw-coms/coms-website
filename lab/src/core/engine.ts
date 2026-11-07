@@ -1,7 +1,7 @@
 import type { Analysis, McuPinState, PartVisualState, Scene, SimFrame, SimInput } from './types';
 import { analyze } from './analyze';
 import { PARTS } from './parts';
-import { validateScene } from './scene';
+import { isSafeId, validateScene } from './scene';
 import { ledBrightness, solveCircuit, type SolveResult } from './solver';
 import { Mcu, MCU_HZ, UNO_PIN_MAP } from './mcu';
 
@@ -16,7 +16,7 @@ export class SimulationEngine {
   analysis: Analysis = analyze(EMPTY_SCENE);
   mcu = new Mcu(text => this.onSerial(text));
   onSerial: (text: string) => void = () => {};
-  inputs: Record<string, Record<string, number | boolean>> = {};
+  inputs: Record<string, Record<string, number | boolean>> = Object.create(null);
   private unoId: string | undefined;
   private hex: string | undefined;
   private solution: SolveResult | undefined;
@@ -104,9 +104,15 @@ export class SimulationEngine {
       const pins = net.pins.filter(ref => ref.partId === this.unoId && UNO_PIN_MAP[ref.pinId]).map(ref => ref.pinId);
       for (const pin of pins) this.linkedInputs.set(pin, pins.filter(peer => peer !== pin));
     }
-    this.inputs = Object.fromEntries(this.scene.parts.map(part => [
-      part.id, Object.fromEntries((PARTS[part.kind].inputs ?? []).map(input => [input.key, this.inputs[part.id]?.[input.key] ?? input.default])),
-    ]));
+    // Part ids and input keys come from imported scenes: null-prototype tables keep a hostile id
+    // such as `__proto__` an ordinary key, never a write into Object.prototype.
+    const previous = this.inputs;
+    this.inputs = Object.create(null) as typeof this.inputs;
+    for (const part of this.scene.parts) {
+      const values = Object.create(null) as Record<string, number | boolean>;
+      for (const input of PARTS[part.kind].inputs ?? []) values[input.key] = previous[part.id]?.[input.key] ?? input.default;
+      this.inputs[part.id] = values;
+    }
     this.dirty = true;
     this.solution = undefined;
     this.configureDevices();
@@ -206,14 +212,15 @@ export class SimulationEngine {
   }
 
   setInput(input: SimInput): void {
-    const part = this.scene.parts.find(candidate => candidate.id === input.partId);
+    const part = isSafeId(input.partId) ? this.scene.parts.find(candidate => candidate.id === input.partId) : undefined;
     const definition = part && PARTS[part.kind].inputs?.find(candidate => candidate.key === input.key);
-    if (!part || !definition) throw new Error('존재하지 않는 부품 입력입니다.');
+    const values = part && Object.hasOwn(this.inputs, part.id) ? this.inputs[part.id] : undefined;
+    if (!part || !definition || !values) throw new Error('존재하지 않는 부품 입력입니다.');
     const valid = definition.type === 'momentary'
       ? typeof input.value === 'boolean'
       : typeof input.value === 'number' && Number.isFinite(input.value);
     if (!valid) throw new Error('입력값 형식이 올바르지 않습니다.');
-    this.inputs[input.partId]![input.key] = typeof input.value === 'number'
+    values[definition.key] = typeof input.value === 'number'
       ? clamp(input.value, definition.min ?? 0, definition.max ?? 1)
       : input.value;
     this.dirty = true;

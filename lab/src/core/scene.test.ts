@@ -54,3 +54,28 @@ describe('import limits', () => {
     await expect(encodeShare(maximum)).rejects.toThrow('32 KB');
   });
 });
+
+describe('hostile ids (share links and imported JSON)', () => {
+  const base = (id: string): unknown => ({
+    version: 1, code: '', parts: [{ id, kind: 'led', pos: [0, 0, 0], rotY: 0, props: {} }], wires: [],
+  });
+  it.each(['__proto__', 'constructor', 'prototype', 'a.b', 'a b', '', 'x'.repeat(65), 'é', '__proto__\n'])('rejects part id %j', id => {
+    expect(() => validateScene(base(id))).toThrow();
+  });
+  it('rejects a wire id that would reach Object.prototype', () => {
+    const scene = base('led') as { wires: unknown[] };
+    scene.wires = [{ id: '__proto__', from: { partId: 'led', pinId: 'anode' }, to: { partId: 'led', pinId: 'cathode' }, color: 'red', bends: [] }];
+    expect(() => validateScene(scene)).toThrow();
+  });
+  it('a share link carrying such an id is refused and pollutes nothing', async () => {
+    // Built by hand: encodeShare validates, so a hostile link can only come from somewhere else.
+    const json = '{"version":1,"code":"","parts":[{"id":"__proto__","kind":"led","pos":[0,0,0],"rotY":0,"props":{}}],"wires":[]}';
+    const compressed = new Blob([new TextEncoder().encode(json) as BlobPart]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+    const bytes = new Uint8Array(await new Response(compressed).arrayBuffer());
+    const hash = btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    await expect(decodeShare(hash)).rejects.toThrow();
+    await expect(encodeShare(JSON.parse(json) as Scene)).rejects.toThrow();
+    expect(({} as Record<string, unknown>).anode).toBeUndefined();
+    expect(Object.prototype).not.toHaveProperty('brightness');
+  });
+});
