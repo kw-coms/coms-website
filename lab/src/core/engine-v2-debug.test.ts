@@ -8,7 +8,7 @@ const program = wordsToHex([0xd002, 0x0000, 0xcfff, 0x0000, 0x9508]);
 const info: DebugInfo = { lines: [
   { addr: 0, line: 1 }, { addr: 2, line: 2 }, { addr: 4, line: 3 },
   { addr: 6, line: 4 }, { addr: 8, line: 5 },
-], globals: [] };
+], globals: [], truncated: false };
 const scene: Scene = { version: 2, parts: [], wires: [], code: '' };
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });

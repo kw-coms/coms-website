@@ -34,7 +34,7 @@ describe('simHost.run stale compile guard', () => {
 // rjmp, nop, rjmp .-2 (an endless loop at word 2), nop, ret: line N is the Nth instruction
 const hex = wordsToHex([0xd002, 0x0000, 0xcfff, 0x0000, 0x9508]);
 const lines = [1, 2, 3, 4, 5].map((line, i) => ({ addr: i * 2, line }));
-const debugInfo = (extra: object = {}): DebugInfo => ({ lines, globals: [], ...extra });
+const debugInfo = (extra: object = {}): DebugInfo => ({ lines, globals: [], truncated: false, ...extra });
 const compiled = (debug: DebugInfo | undefined = debugInfo()) => ({ ok: true, hex, warnings: [], debug }) satisfies CompileResult;
 const time = () => frameRef.current?.timeMs ?? 0;
 

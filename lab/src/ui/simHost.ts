@@ -152,7 +152,7 @@ export async function run() {
     clearSerial();
     sim.loadHex(r.hex);
     compiledWithDebug = !!r.debug;
-    set({ debugTruncated: (r.debug as { truncated?: boolean } | undefined)?.truncated === true });
+    set({ debugTruncated: r.debug?.truncated === true });
     if (!r.debug) codeLines = null;
     if (r.debug) { codeLines = [...new Set(r.debug.lines.map((l) => l.line))].sort((a, b) => a - b); resnap(); }
     if (r.debug) sim.debug?.load(r.debug);

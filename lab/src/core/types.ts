@@ -271,7 +271,7 @@ export interface CompilerMessage {
 }
 
 export type CompileResult =
-  | { ok: true; hex: string; warnings: CompilerMessage[]; sizeBytes?: number; debug?: DebugInfo & { truncated: boolean } }
+  | { ok: true; hex: string; warnings: CompilerMessage[]; sizeBytes?: number; debug?: DebugInfo }
   | { ok: false; errors: CompilerMessage[]; reason?: 'compile' | 'rejected' | 'timeout' | 'busy' | 'rate-limited' | 'unauthorized' };
 
 export interface DebugInfo {
@@ -279,6 +279,8 @@ export interface DebugInfo {
   lines: { addr: number; line: number }[];
   /** globals defined in the sketch: SRAM address, size in bytes, C type name */
   globals: { name: string; addr: number; size: number; type: string }[];
+  /** compiler could not map every sketch line; always present on a debug build, a missing value is read as false */
+  truncated: boolean;
 }
 
 // ---------- core helpers exported from src/core/index.ts (lane A implements) ----------

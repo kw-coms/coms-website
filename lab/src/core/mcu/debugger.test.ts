@@ -8,6 +8,7 @@ const info = {
     { name: 'count', addr: 0x800100, size: 2, type: 'int' },
     { name: 'flags', addr: 0x800102, size: 3, type: 'byte[3]' },
   ],
+  truncated: false,
 };
 
 describe('AVR line debugger', () => {
@@ -53,7 +54,7 @@ describe('AVR line debugger', () => {
 
   it('formats byte-sized signed and unsigned globals and rejects undersized scalars', () => {
     const mcu = create();
-    mcu.debugger.load({ lines: info.lines, globals: [
+    mcu.debugger.load({ lines: info.lines, truncated: false, globals: [
       { name: 'u', addr: 0x800110, size: 1, type: 'uint8_t' },
       { name: 's', addr: 0x800111, size: 1, type: 'int8_t' },
       { name: 'bad', addr: 0x800112, size: 1, type: 'uint32_t' },
@@ -64,7 +65,7 @@ describe('AVR line debugger', () => {
 
   it('formats AVR double scalars and arrays as four-byte floats', () => {
     const mcu = create();
-    mcu.debugger.load({ lines: info.lines, globals: [
+    mcu.debugger.load({ lines: info.lines, truncated: false, globals: [
       { name: 'scalar', addr: 0x800120, size: 4, type: 'double' },
       { name: 'array', addr: 0x800124, size: 8, type: 'double[2]' },
       { name: 'short', addr: 0x80012c, size: 3, type: 'double' },
@@ -82,7 +83,7 @@ describe('AVR line debugger', () => {
       const unsigned = /unsigned|uint/.test(type);
       const first = unsigned ? 18446744073709551615n : -9223372036854775808n;
       const second = 9007199254740993n;
-      mcu.debugger.load({ lines: info.lines, globals: [
+      mcu.debugger.load({ lines: info.lines, truncated: false, globals: [
         { name: 'scalar', addr: 0x800140, size: 8, type },
         { name: 'array', addr: 0x800140, size: 16, type: `${type}[2]` },
         { name: 'short', addr: 0x800150, size: 4, type },
