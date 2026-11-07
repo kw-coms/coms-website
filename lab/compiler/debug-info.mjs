@@ -26,7 +26,7 @@ export function parseDebugInfo(output, { sketchPath, sketchLines }) {
       stack.length = depth;
       current = undefined;
       if (!die[3]) continue;
-      current = { tag: die[3], attrs: {}, children: [], parent: stack[depth - 1], cu };
+      current = { tag: die[3], attrs: Object.create(null), children: [], parent: stack[depth - 1], cu };
       if (depth === 0) { cu = current; current.cu = current; }
       current.parent?.children.push(current);
       stack.push(current);
@@ -60,7 +60,7 @@ export function parseDebugInfo(output, { sketchPath, sketchLines }) {
     const entry = row.match(/^\s*(\S+)\s+(\d+)\s+(0x[\da-f]+)(?:\s|$)/i);
     if (!entry || !filePath || resolve(filePath) !== wanted || entry[1] !== basename(wanted)) continue;
     const line = Number(entry[2]), addr = Number(entry[3]);
-    if (validLine(line) && addr >= 0 && addr < 32768 && addr % 2 === 0 && lines.size < MAX_DEBUG_LINES) lines.set(addr, line);
+    if (validLine(line) && addr >= 0 && addr < 32768 && addr % 2 === 0) lines.set(addr, line);
   }
   // Attribute ownership matters: an abstract_origin/specification can live in
   // another CU whose DW_AT_decl_file uses a different line table.
@@ -128,6 +128,7 @@ export function parseDebugInfo(output, { sketchPath, sketchLines }) {
     }
   }
   const globals = [], names = new Set();
+  let globalsTruncated = false;
   for (const node of dies.values()) {
     if (node.tag !== 'DW_TAG_variable' || !globalScope(node)) continue;
     const declared = attribute(node, 'decl_file');
@@ -140,8 +141,12 @@ export function parseDebugInfo(output, { sketchPath, sketchLines }) {
     const addr = Number.parseInt(location[1], 16) - DATA_BASE;
     const type = typeInfo(dies.get(ref(attribute(node, 'type')?.value)));
     if (!type || !safeType(type.type) || !Number.isInteger(type.size) || type.size < 1 || addr < 0x100 || addr + type.size > 0x900) continue;
+    if (globals.length === MAX_DEBUG_GLOBALS) { globalsTruncated = true; break; }
     globals.push({ name, addr, size: type.size, type: type.type }); names.add(name);
-    if (globals.length === MAX_DEBUG_GLOBALS) break;
   }
-  return { lines: [...lines].sort(([a], [b]) => a - b).map(([addr, line]) => ({ addr, line })), globals };
+  return {
+    lines: [...lines].sort(([a], [b]) => a - b).slice(0, MAX_DEBUG_LINES).map(([addr, line]) => ({ addr, line })),
+    globals,
+    truncated: lines.size > MAX_DEBUG_LINES || globalsTruncated,
+  };
 }

@@ -90,9 +90,11 @@ export async function compileSketch(sketch, { runner = runCli, debugRunner = run
     const result = await runner([
       'compile', '--fqbn', 'arduino:avr:uno', '--jobs', '1', '--warnings', 'all',
       '--build-property', 'compiler.path=/opt/avr-limited/bin/',
-      '--build-property', 'compiler.c.extra_flags=-g',
-      '--build-property', 'compiler.cpp.extra_flags=-g',
-      '--build-property', 'compiler.c.elf.extra_flags=-g',
+      ...(debug === true ? [
+        '--build-property', 'compiler.c.extra_flags=-g',
+        '--build-property', 'compiler.cpp.extra_flags=-g',
+        '--build-property', 'compiler.c.elf.extra_flags=-g',
+      ] : []),
       '--build-path', join(work, 'build'), '--output-dir', join(work, 'out'), 'sketch',
     ], { cwd: work, timeoutMs });
     const messages = parseDiagnostics(`${result.stderr}\n${result.stdout}`, {

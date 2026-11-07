@@ -271,7 +271,7 @@ export interface CompilerMessage {
 }
 
 export type CompileResult =
-  | { ok: true; hex: string; warnings: CompilerMessage[]; sizeBytes?: number; debug?: DebugInfo }
+  | { ok: true; hex: string; warnings: CompilerMessage[]; sizeBytes?: number; debug?: DebugInfo & { truncated: boolean } }
   | { ok: false; errors: CompilerMessage[]; reason?: 'compile' | 'rejected' | 'timeout' | 'busy' | 'rate-limited' | 'unauthorized' };
 
 export interface DebugInfo {

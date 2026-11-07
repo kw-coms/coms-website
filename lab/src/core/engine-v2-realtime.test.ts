@@ -5,7 +5,7 @@ import { V2_EXAMPLES } from './examples-v2';
 
 describe('v2 analog-only realtime throughput', () => {
   for (const id of ['timer-555-blink', 'rc-oscilloscope']) {
-    it(`${id} sustains at least 0.5× with an honest reported ratio`, () => {
+    it(`${id} completes 2 seconds of simulation and sustains realtime in the serial gate`, () => {
       const example = V2_EXAMPLES.find(candidate => candidate.id === id)!;
       const engine = new SimulationEngine();
       const start = performance.now();
@@ -16,9 +16,11 @@ describe('v2 analog-only realtime throughput', () => {
       const measured = frame.timeMs / wallMs;
       process.stdout.write(`${id}: ${frame.timeMs.toFixed(0)} simulated ms / ${wallMs.toFixed(1)} wall ms = ${measured.toFixed(2)}×; frame ${frame.realtimeRatio.toFixed(2)}×\n`);
       expect(frame.timeMs).toBeGreaterThanOrEqual(2000);
-      expect(measured).toBeGreaterThanOrEqual(.5);
-      // Engine ratio excludes scene construction and the test's assertions.
-      expect(Math.abs(frame.realtimeRatio / measured - 1)).toBeLessThan(.15);
+      if (process.env.LAB_REALTIME_TEST === '1') {
+        expect(measured, `${id} must sustain realtime including scene construction`).toBeGreaterThanOrEqual(1);
+        // Engine ratio excludes scene construction and the test's assertions.
+        expect(Math.abs(frame.realtimeRatio / measured - 1)).toBeLessThan(.15);
+      }
     }, 30_000);
   }
 });

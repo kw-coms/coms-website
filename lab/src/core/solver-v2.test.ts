@@ -17,6 +17,44 @@ describe('v2 analog devices', () => {
     expect(result!.netVolts.x).toBeGreaterThan(3.0);
     expect(result!.netVolts.x).toBeLessThan(3.3);
   });
+  it('approaches the winding-resistance voltage divider after 100 ms', () => {
+    const { scene, analysis } = circuit([
+      part('s', 'power-supply', { volts: 5 }),
+      part('coil', 'inductor', { millihenries: 10, seriesOhms: 100 }),
+      part('load', 'resistor', { ohms: 100 }),
+    ], {
+      's:OUT+': 'v', 's:OUT-': 'g', 'coil:1': 'v', 'coil:2': 'out',
+      'load:1': 'out', 'load:2': 'g',
+    });
+    const state = newTransientState();
+    let result;
+    for (let step = 1; step <= 2000; step++) {
+      result = solveCircuit(scene, analysis, {}, {}, {}, { dtMs: .05, timeMs: step * .05, state });
+    }
+    expect(result!.netVolts.out).toBeCloseTo(5 * 100 / 200.1, 2);
+    expect(state.inductors.coil!.volts).toBeCloseTo(0, 2);
+  });
+  it('follows the RL time constant with substantial winding resistance', () => {
+    const { scene, analysis } = circuit([
+      part('s', 'power-supply', { volts: 5 }),
+      part('coil', 'inductor', { millihenries: 10, seriesOhms: 100 }),
+      part('load', 'resistor', { ohms: 100 }),
+    ], {
+      's:OUT+': 'v', 's:OUT-': 'g', 'coil:1': 'v', 'coil:2': 'out',
+      'load:1': 'out', 'load:2': 'g',
+    });
+    const state = newTransientState();
+    const tauMs = 1000 * .01 / 200.1;
+    const finalVolts = 5 * 100 / 200.1;
+    let result;
+    for (let step = 1; step <= 40; step++) {
+      result = solveCircuit(scene, analysis, {}, {}, {}, { dtMs: tauMs / 20, timeMs: step * tauMs / 20, state });
+      if (step === 20 || step === 40) {
+        const expected = finalVolts * (1 - Math.exp(-step / 20));
+        expect(result.netVolts.out).toBeCloseTo(expected, 1);
+      }
+    }
+  });
   it('forward biases diode to roughly 0.6 V through 1 kΩ', () => {
     const { scene, analysis } = circuit([part('bat', 'power-supply', { volts: 5 }), part('r', 'resistor', { ohms: 1000 }), part('d', 'diode')], { 'bat:OUT+': 'v', 'bat:OUT-': 'g', 'r:1': 'v', 'r:2': 'a', 'd:A': 'a', 'd:K': 'g' });
     const result = solveCircuit(scene, analysis);

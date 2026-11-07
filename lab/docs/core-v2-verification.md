@@ -1,16 +1,29 @@
 # ENGINE v2 verification — 2026-11-07
 
-Scope: `lab/src/core/**` only. No commits, compiler invocation, or dependencies added by this lane.
+Scope: Lane A engine/compiler/headless fixes. No commits, Docker rebuilds, or new dependencies.
 All 65 catalog kinds are defined (21 original + 44 new), with 13 new starters.
 
 ## Verification
 
-- PASS: `npx vitest run src/core --no-file-parallelism`: 28 files, **234 passed, 13 skipped**.
-- PASS: `npx tsc -b --noEmit` (entire current lab checkout).
-- PASS: `git diff --check -- lab/src/core`.
-- No lint script is configured in lab/package.json.
-- NOT_RUN: real compiler / regenerated HEX for the 13 new starters; their E2E checks skip with an explicit fixture-missing reason. Original 17 compiled sketches execute real existing HEX.
-- NOT_RUN: browser/3D/manual/device acceptance and an actual 2-vCPU CI host. Timings below use isolated sequential Vitest files on this host, not CI hardware certification.
+- PASS: `npx tsc --noEmit` (solution configuration; references only).
+- PASS: `npx vitest run`: **53 files, 467 passed, 12 skipped**. All 17 original + 13 v2 starter fixture tests execute; none skip. The 12 existing skips are live Blockly compilation tests whose compiler server is unavailable in this sandbox.
+- PASS: `npm run test:realtime`: **2 files, 34 passed, 0 skipped**. All 30 starters meet measured ≥1× through `run.report()`, including analog-only starters. Engine/example timing assertions run only in this dedicated serial command, also wired into CI. The ±15% ratio comparison is preserved there.
+- PASS: `cd compiler && node --test "test/*.test.mjs"`: **265 passed, 10 skipped, 0 failed** (275 total). Existing network/socket integration tests skip because the sandbox rejects TCP/Unix listeners with EPERM; no tests were weakened or newly skipped.
+- PASS: `git diff --check`.
+- Additional check: `npx tsc -p tsconfig.app.json --noEmit` reports **six existing errors** at `src/ui/blocks/generate.ts:589` (`B.id` / `B.name`). This file is owned by the other lane and was not edited. The solution-level command above does not typecheck referenced projects.
+- No lint script is configured in `lab/package.json`.
+- NOT_RUN: real AVR compilation, Docker rebuild, browser/3D/manual/device acceptance, and an actual 2-vCPU CI host. Existing checked-in HEX is used for all 30 starters; the running dev compiler is still the old build.
+- Existing hostile-input duration guards in `scene.test.ts` and `ui/blocks/generate.test.ts` remain untouched in the other lane's prohibited files; these are not engine throughput acceptance tests.
+
+## Lane A regression evidence
+
+- Inductor winding resistance: pre-fix 100 ms load voltage **3.3311 V**, expected **2.4988 V**; at one time constant **1.7492 V**, expected **1.5795 V**. Both pass after storing terminal voltage minus winding I·R. Capacitors have no ESR property/separate series stamp; the analogous double-counting path is absent.
+- Behavioral convergence: pre-fix six-inverter chain returned `[1,0,1,0,0,0]`; now `[1,0,1,0,1,0]`. Odd ring returns with a Korean warning and remains dirty.
+- Realtime: the stronger gate caught keypad-password at **0.79×**. A bounded exact-state cache for standalone UNO + keypad circuits lifts final measured throughput to **1.97×**. `engine-keypad-cache.test.ts` fails before the optimization and verifies reuse, correct input reads, and invalidation on key/reset/topology changes. No speed threshold was lowered.
+- Compiler: non-debug flags, reverse-address cap ordering, boolean truncation, and inherited-attribute regressions failed before correction. Debug response contract is `DebugInfo & { truncated: boolean }`.
+- AVR globals: five new cases failed before the fix. Four-byte `double` and exact signed/unsigned 64-bit scalar/array values now pass, including values beyond JavaScript Number precision and undersized-buffer rejection.
+- Schematic and exports: five new tests cover placement, no symbol overlap, exact pin routing, determinism, exact `.ino` text/filename, Korean BOM names, grouping, quote escaping and UTF-8 BOM bytes. No product change was required for these modules.
+- Cloud scope: SPEC-v2 §4 moved verbatim to `SPEC-v2-cloud.md`, marked next phase / separate PR / sensitive backend + DB schema / two cross-model reviews.
 
 ## Model evidence
 
@@ -37,30 +50,45 @@ Tests: `solver-v2.test.ts`, `semiconductor-acceptance.test.ts`, `auxiliary-model
 
 ## Realtime measurements
 
-| Original sketch | Simulated ms | Wall ms | Ratio |
-|---|---:|---:|---:|
-| builtin-blink | 2300 | 465.6 | 4.94x |
-| external-blink | 2300 | 465.4 | 4.94x |
-| button-led | 300 | 57.2 | 5.24x |
-| serial-hello | 1200 | 247.0 | 4.86x |
-| pot-led | 800 | 172.4 | 4.64x |
-| night-light | 400 | 87.9 | 4.55x |
-| rgb-cycle | 1200 | 250.9 | 4.78x |
-| servo-sweep | 5500 | 1532.7 | 3.59x |
-| melody | 1200 | 256.8 | 4.67x |
-| ultrasonic | 1800 | 377.8 | 4.76x |
-| lcd-counter | 2300 | 471.6 | 4.88x |
-| distance-alarm | 750 | 165.9 | 4.52x |
-| dht-lcd | 3400 | 686.4 | 4.95x |
-| joystick-direction | 1700 | 350.1 | 4.86x |
-| seven-count | 9200 | 1843.6 | 4.99x |
-| neopixel-rainbow | 600 | 136.6 | 4.39x |
-| motor-direction | 4200 | 909.6 | 4.62x |
+Final serial local run, 2026-11-07. Actual CI hardware was not exercised.
 
-| Transient circuit | Simulated ms | Wall ms | Measured / frame ratio |
+| Starter | Simulated ms | Wall ms | Ratio |
 |---|---:|---:|---:|
-| Standalone 555 | 2000 | 232.1 | 8.62x / 8.75x |
-| RC + scope | 2000 | 45.0 | 44.48x / 44.94x |
+| builtin-blink | 2300 | 457.4 | 5.03x |
+| external-blink | 2300 | 444.9 | 5.17x |
+| button-led | 300 | 164.1 | 1.83x |
+| serial-hello | 1200 | 286.1 | 4.19x |
+| pot-led | 800 | 184.2 | 4.34x |
+| night-light | 400 | 94.6 | 4.23x |
+| rgb-cycle | 1200 | 257.1 | 4.67x |
+| servo-sweep | 5500 | 1448.0 | 3.80x |
+| melody | 1200 | 250.9 | 4.78x |
+| ultrasonic | 1800 | 354.3 | 5.08x |
+| lcd-counter | 2300 | 454.7 | 5.06x |
+| distance-alarm | 750 | 273.8 | 2.74x |
+| dht-lcd | 3400 | 673.7 | 5.05x |
+| joystick-direction | 1700 | 346.4 | 4.91x |
+| seven-count | 9200 | 1814.4 | 5.07x |
+| neopixel-rainbow | 600 | 189.2 | 3.17x |
+| motor-direction | 4200 | 914.2 | 4.59x |
+| transistor-motor | 1200 | 259.7 | 4.62x |
+| relay-lamp | 1500 | 652.0 | 2.30x |
+| shift-register-eight | 350 | 84.5 | 4.14x |
+| timer-555-blink | 3500 | 369.4 | 9.47x |
+| rc-oscilloscope | 200 | 6.1 | 32.56x |
+| regulator-7805 | 100 | 0.2 | 473.84x |
+| tmp36-thermometer | 600 | 119.8 | 5.01x |
+| pir-alarm | 100 | 21.2 | 4.73x |
+| keypad-password | 320 | 162.4 | 1.97x |
+| ir-remote-led | 940 | 227.1 | 4.14x |
+| four-digit-counter | 300 | 106.3 | 2.82x |
+| l293d-direction | 1300 | 269.5 | 4.82x |
+| logic-truth-table | 100 | 15.0 | 6.66x |
+
+| Analog circuit (extended run) | Simulated ms | Wall ms | Measured / frame ratio |
+|---|---:|---:|---:|
+| timer-555-blink | 2000 | 225.9 | 8.86x / 9.00x |
+| rc-oscilloscope | 2000 | 46.1 | 43.34x / 43.78x |
 
 ## Deliberate model limits
 
@@ -68,40 +96,30 @@ Tests: `solver-v2.test.ts`, `semiconductor-acceptance.test.ts`, `auxiliary-model
 - Motors use electrical resistance and voltage-based RPM/direction; bulb uses a single thermal state. Relay transfer is instantaneous at a coil threshold, with topology/turn-off flyback warnings rather than destructive arc simulation. IC propagation and regulator thermal dynamics are omitted.
 - Adaptive next-step control uses embedded BE/trapezoid C/L error estimates, bounded 1 microsecond–1 millisecond steps plus waveform/instrument limits. It does not roll back already executed AVR instructions. Extreme fast circuits are resolution-limited and actual throughput is reported, not fabricated.
 - Scope display is uniformly resampled with interpolation, bounded to 512 points; this is not an unlimited bandwidth instrument.
-- Shared contract retains existing required shapes. Only optional nested `meter.measurementMode` and `meter.continuity` fields were added.
+- Compile-response debug payload now requires boolean `truncated`; standalone simulator `DebugInfo` remains compatible with existing fixture inputs.
 
-## Changed files
+## Changed files (Lane A only)
 
-- `lab/src/core/analyze.ts`
-- `lab/src/core/auxiliary-models.test.ts`
-- `lab/src/core/behavioral.test.ts`
-- `lab/src/core/behavioral.ts`
-- `lab/src/core/electrical-warnings-v2.test.ts`
-- `lab/src/core/electrical-warnings-v2.ts`
-- `lab/src/core/engine-v2-debug.test.ts`
-- `lab/src/core/engine-v2-protocols.test.ts`
+- `.github/workflows/ci.yml`
+- `lab/compiler/DEBUG.md`
+- `lab/compiler/compile.mjs`
+- `lab/compiler/debug-info.mjs`
+- `lab/compiler/test/compile.test.mjs`
+- `lab/compiler/test/debug-info.test.mjs`
+- `lab/compiler/test/handler.test.mjs`
+- `lab/docs/SPEC-v2-cloud.md`
+- `lab/docs/SPEC-v2.md`
+- `lab/docs/core-v2-verification.md`
+- `lab/package.json`
+- `lab/src/core/engine-keypad-cache.test.ts`
+- `lab/src/core/engine-settling.test.ts`
 - `lab/src/core/engine-v2-realtime.test.ts`
-- `lab/src/core/engine-v2.test.ts`
 - `lab/src/core/engine.ts`
-- `lab/src/core/examples-v2.ts`
 - `lab/src/core/examples.e2e.test.ts`
-- `lab/src/core/examples.test.ts`
-- `lab/src/core/examples.ts`
-- `lab/src/core/instruments.test.ts`
-- `lab/src/core/instruments.ts`
-- `lab/src/core/local-simulator.ts`
 - `lab/src/core/mcu/debugger.test.ts`
 - `lab/src/core/mcu/debugger.ts`
-- `lab/src/core/mcu/index.ts`
-- `lab/src/core/mcu/lcd.ts`
-- `lab/src/core/parts/catalog-v2.test.ts`
-- `lab/src/core/parts/index.ts`
-- `lab/src/core/scene.test.ts`
-- `lab/src/core/scene.ts`
-- `lab/src/core/semiconductor-acceptance.test.ts`
-- `lab/src/core/share.ts`
-- `lab/src/core/simulator.ts`
 - `lab/src/core/solver-v2.test.ts`
 - `lab/src/core/solver.ts`
 - `lab/src/core/types.ts`
-- `lab/src/core/worker.ts`
+- `lab/src/ui/exports.test.ts`
+- `lab/src/ui/schematic/layout.test.ts`

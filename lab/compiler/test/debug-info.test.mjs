@@ -28,17 +28,17 @@ test('recorded DWARF4 supports typedefs, const pointers and SRAM globals', () =>
   assert.ok(result.globals.some(g => g.name === 'counter' && g.type === 'volatile int'));
 });
 test('requires exact sketch path, not merely matching basename', () => {
-  assert.deepEqual(parseDebugInfo(lto, { ...options, sketchPath: '/foreign/sketch.ino' }), { lines: [], globals: [] });
+  assert.deepEqual(parseDebugInfo(lto, { ...options, sketchPath: '/foreign/sketch.ino' }), { lines: [], globals: [], truncated: false });
   const result = parseDebugInfo(lto.replaceAll('/fixture/sketch', '/foreign'), options);
-  assert.deepEqual(result, { lines: [], globals: [] });
+  assert.deepEqual(result, { lines: [], globals: [], truncated: false });
 });
 test('excludes out of range line numbers, malformed addresses and location expressions', () => {
-  assert.deepEqual(parseDebugInfo(lto, { ...options, sketchLines: 0 }), { lines: [], globals: [] });
+  assert.deepEqual(parseDebugInfo(lto, { ...options, sketchLines: 0 }), { lines: [], globals: [], truncated: false });
   const bad = lto.replaceAll('DW_OP_addr: 800', 'DW_OP_addr: 810');
   assert.deepEqual(parseDebugInfo(bad, options).globals, []);
   const dynamic = lto.replaceAll('DW_OP_addr:', 'DW_OP_fbreg:');
   assert.deepEqual(parseDebugInfo(dynamic, options).globals, []);
-  assert.deepEqual(parseDebugInfo('', options), { lines: [], globals: [] });
+  assert.deepEqual(parseDebugInfo('', options), { lines: [], globals: [], truncated: false });
 });
 test('bounds text input and line response, sorts and deduplicates byte addresses', () => {
   assert.throws(() => parseDebugInfo('x'.repeat(MAX_DEBUG_OUTPUT + 1), options), /limit/);
@@ -46,8 +46,27 @@ test('bounds text input and line response, sorts and deduplicates byte addresses
     + Array.from({ length: 5000 }, (_, n) => `sketch.ino 5 0x${(n * 2).toString(16)}\n`).join('');
   const result = parseDebugInfo(text, options);
   assert.equal(result.lines.length, MAX_DEBUG_LINES);
+  assert.equal(result.truncated, true);
   assert.ok(Buffer.byteLength(JSON.stringify(result)) < 128 * 1024);
   assert.deepEqual(parseDebugInfo(text + 'sketch.ino 5 0x1\nsketch.ino 5 0x8000\n', options), result);
+});
+test('line cap keeps lowest addresses even when readelf lists them last', () => {
+  const text = 'Decoded dump of debug contents of section .debug_line:\n/fixture/sketch/sketch.ino:\n'
+    + Array.from({ length: MAX_DEBUG_LINES + 2 }, (_, n) => `sketch.ino 5 0x${((MAX_DEBUG_LINES + 1 - n) * 2).toString(16)}\n`).join('');
+  const result = parseDebugInfo(text, options);
+  assert.equal(result.lines.length, MAX_DEBUG_LINES);
+  assert.equal(result.lines[0].addr, 0);
+  assert.equal(result.lines.at(-1).addr, (MAX_DEBUG_LINES - 1) * 2);
+  assert.equal(result.truncated, true);
+});
+test('DWARF attributes cannot inherit values from Object.prototype', () => {
+  const missingLocation = lto.replace(/^.*DW_AT_location.*\n/gm, '');
+  Object.prototype.location = '(DW_OP_addr: 800109)';
+  try {
+    assert.ok(!parseDebugInfo(missingLocation, options).globals.some(g => g.name === 'counter'));
+  } finally {
+    delete Object.prototype.location;
+  }
 });
 test('malicious type/name strings and cyclic type references are omitted', () => {
   assert.ok(!parseDebugInfo(lto.replaceAll(': counter', ': /etc/passwd'), options).globals.some(g => g.name.includes('/')));
