@@ -62,7 +62,7 @@ test('edited code is saved per block, restored with a badge, and "원래대로" 
   await openEditor(page, 0)
   await replaceCode(page, 0, '#include <stdio.h>\nint main(void) { printf("mine\\n"); return 0; }\n')
   await expect(page.locator('#code-0 .pg-badge')).toHaveText('수정한 코드')
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('mine') // save is debounced
+  await expect.poll(() => draftsRaw(page)).toContain('mine') // save is debounced
   await page.reload()
   await expect(page.locator('#code-0 .cm-editor')).toHaveCount(0)
   const badge = page.locator('#code-0 button.pg-badge')
@@ -282,7 +282,7 @@ test('opening a share link keeps the reader\'s saved draft; leaving or reloading
   await openStudy(page, 'c')
   await openEditor(page, 0)
   await replaceCode(page, 0, MINE)
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('내코드') // save is debounced
+  await expect.poll(() => draftsRaw(page)).toContain('내코드') // save is debounced
   const url = await makeShareUrl(browser, THEIRS)
 
   const shared = await context.newPage()
@@ -295,8 +295,8 @@ test('opening a share link keeps the reader\'s saved draft; leaving or reloading
   // Editing inside the temporary view is not saved either.
   await replaceCode(shared, 0, THEIRS + '// 더 고침\n')
   await shared.evaluate(() => window.dispatchEvent(new Event('pagehide'))) // flushes any pending save now
-  expect(await shared.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('내코드')
-  expect(await shared.evaluate(() => localStorage.getItem('coms-study-playground:c'))).not.toContain('공유됨')
+  expect(await draftsRaw(shared)).toContain('내코드')
+  expect(await draftsRaw(shared)).not.toContain('공유됨')
 
   // Reload (same link, then the plain page): the saved draft is intact.
   await shared.reload()
@@ -322,7 +322,7 @@ test('"이 코드로 저장" replaces the draft and "이전 코드 복원" bring
   await openStudy(page, 'c')
   await openEditor(page, 0)
   await replaceCode(page, 0, MINE)
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('내코드') // save is debounced
+  await expect.poll(() => draftsRaw(page)).toContain('내코드') // save is debounced
   const url = await makeShareUrl(browser, THEIRS)
 
   const shared = await context.newPage()
@@ -353,7 +353,7 @@ test('leaving a shared view uses the draft saved by another tab meanwhile, not t
   await openStudy(page, 'c')
   await openEditor(page, 0)
   await replaceCode(page, 0, MINE)
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('내코드')
+  await expect.poll(() => draftsRaw(page)).toContain('내코드')
   const url = await makeShareUrl(browser, THEIRS)
 
   const shared = await context.newPage()
@@ -364,7 +364,7 @@ test('leaving a shared view uses the draft saved by another tab meanwhile, not t
   // The first tab saves a newer draft while the shared view is open.
   const NEWER = MINE.replace('내코드', '더새로운코드')
   await replaceCode(page, 0, NEWER)
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('더새로운코드')
+  await expect.poll(() => draftsRaw(page)).toContain('더새로운코드')
 
   await shared.getByRole('button', { name: '내 코드로 돌아가기' }).click()
   await expect(editorOf(shared, 0)).toContainText('더새로운코드')
@@ -375,27 +375,28 @@ test('leaving a shared view uses the draft saved by another tab meanwhile, not t
   await again.goto(url)
   await expect(again.locator('#code-0 .pg-shared')).toBeVisible()
   await replaceCode(page, 0, MINE.replace('내코드', '가장새로운코드'))
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('가장새로운코드')
+  await expect.poll(() => draftsRaw(page)).toContain('가장새로운코드')
   await again.getByRole('button', { name: '이 코드로 저장' }).click()
   await again.locator('#code-0').getByRole('button', { name: /이전 코드 복원/ }).click()
   await expect(editorOf(again, 0)).toContainText('가장새로운코드')
 })
 
-// The saved draft of block 0 and its one-step backup, parsed from storage.
-async function drafts(page) {
-  return page.evaluate(() => {
-    const data = JSON.parse(localStorage.getItem('coms-study-playground:c') || '{}')
-    const id = Object.keys(data).find((k) => !k.endsWith('~prev'))
-    return { primary: id ? data[id].code : null, backup: id && data[id + '~prev'] ? data[id + '~prev'].code : null }
-  })
+// Every saved record of the C page (one localStorage record per block), as one string for substring checks.
+const draftsRaw = (page) => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('coms-study-playground:c:')).map((k) => localStorage.getItem(k)).join('\n') || null)
+// The saved draft of block n (default 0) and its one-step backup, parsed from storage.
+async function drafts(page, n = 0) {
+  return page.evaluate((i) => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith(`coms-study-playground:c:${i}-`))
+    const rec = k ? JSON.parse(localStorage.getItem(k)) : null
+    return { primary: rec ? rec.code : null, backup: rec && rec.backup !== undefined ? rec.backup : null }
+  }, n)
 }
-// Rewrites the saved draft in storage as another tab would have, without going through this page's editor.
+// Rewrites block 0's saved draft in storage as another tab would have, without going through this page's editor.
 async function saveElsewhere(page, from, to) {
   await page.evaluate(([f, t]) => {
-    const k = 'coms-study-playground:c'
-    const data = JSON.parse(localStorage.getItem(k))
-    for (const id of Object.keys(data)) if (!id.endsWith('~prev')) data[id] = { code: data[id].code.replace(f, t), at: Date.now() }
-    localStorage.setItem(k, JSON.stringify(data))
+    const k = Object.keys(localStorage).find((x) => x.startsWith('coms-study-playground:c:0-'))
+    const rec = JSON.parse(localStorage.getItem(k))
+    localStorage.setItem(k, JSON.stringify({ ...rec, code: rec.code.replace(f, t), at: Date.now() }))
   }, [from, to])
 }
 // Freezes the page's clock so the 400 ms autosave debounce only fires when the test advances it.
@@ -409,7 +410,7 @@ test('returning to your draft never autosaves over a newer draft another tab sav
   await openStudy(page, 'c')
   await openEditor(page, 0)
   await replaceCode(page, 0, MINE)
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('내코드')
+  await expect.poll(() => draftsRaw(page)).toContain('내코드')
   const url = await makeShareUrl(browser, THEIRS)
 
   const shared = await context.newPage()
@@ -435,13 +436,11 @@ test('restore is declined when another tab saved meanwhile; the pending edit is 
   await openStudy(page, 'c')
   await openEditor(page, 0)
   await replaceCode(page, 0, MINE) // A
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('내코드')
+  await expect.poll(() => draftsRaw(page)).toContain('내코드')
   await page.evaluate(() => { // an older draft the reader could restore
-    const k = 'coms-study-playground:c'
-    const data = JSON.parse(localStorage.getItem(k))
-    const id = Object.keys(data)[0]
-    data[id + '~prev'] = { code: '#include <stdio.h>\nint main(void) { puts("옛날코드"); return 0; }\n', at: Date.now() }
-    localStorage.setItem(k, JSON.stringify(data))
+    const k = Object.keys(localStorage).find((x) => x.startsWith('coms-study-playground:c:0-'))
+    const rec = JSON.parse(localStorage.getItem(k))
+    localStorage.setItem(k, JSON.stringify({ ...rec, backup: '#include <stdio.h>\nint main(void) { puts("옛날코드"); return 0; }\n' }))
   })
 
   const tab = await context.newPage()
@@ -465,14 +464,14 @@ test('restore is declined when another tab saved meanwhile; the pending edit is 
   expect(backup).toContain('다른탭이저장')
 })
 
-test('two tabs saving at once from the same baseline: one ends as the draft, the other as the backup, nothing lost', async ({ page, context }) => {
+test('two tabs saving from the same baseline: one ends as the draft, the other as the backup, nothing lost', async ({ page, context }) => {
   await mockRun(page, () => ({ json: OK }))
   await page.clock.install()
   await openStudy(page, 'c')
   await openEditor(page, 0)
   await replaceCode(page, 0, MINE)
   await page.clock.runFor(1000)
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('내코드')
+  await expect.poll(() => draftsRaw(page)).toContain('내코드')
 
   const other = await context.newPage()
   await other.clock.install()
@@ -482,9 +481,15 @@ test('two tabs saving at once from the same baseline: one ends as the draft, the
   await expect(editorOf(other, 0)).toContainText('내코드')
   await freeze(page)
   await freeze(other)
+  await page.bringToFront() // keyboard input only reaches the foreground tab
   await replaceCode(page, 0, MINE.replace('내코드', '첫번째'))
+  await expect(editorOf(page, 0)).toContainText('첫번째')
+  await other.bringToFront()
   await replaceCode(other, 0, MINE.replace('내코드', '두번째'))
-  await Promise.all([page.clock.runFor(1000), other.clock.runFor(1000)])
+  await expect(editorOf(other, 0)).toContainText('두번째')
+  // One after the other: firing both at the same instant would hit the accepted read-then-write window of localStorage.
+  await page.clock.runFor(1000)
+  await other.clock.runFor(1000)
   await expect.poll(async () => {
     const d = await drafts(page)
     return [d.primary, d.backup].filter(Boolean).join('|')
@@ -499,7 +504,7 @@ test('typing after returning keeps the newer draft of another tab as the backup'
   await openStudy(page, 'c')
   await openEditor(page, 0)
   await replaceCode(page, 0, MINE)
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('내코드')
+  await expect.poll(() => draftsRaw(page)).toContain('내코드')
   const url = await makeShareUrl(browser, THEIRS)
 
   const shared = await context.newPage()
@@ -508,13 +513,68 @@ test('typing after returning keeps the newer draft of another tab as the backup'
   await shared.getByRole('button', { name: '내 코드로 돌아가기' }).click()
   await expect(editorOf(shared, 0)).toContainText('내코드')
   await replaceCode(page, 0, MINE.replace('내코드', '다른탭코드'))
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('다른탭코드')
+  await expect.poll(() => draftsRaw(page)).toContain('다른탭코드')
 
   await replaceCode(shared, 0, MINE.replace('내코드', '여기서고침'))
   await shared.evaluate(() => window.dispatchEvent(new Event('pagehide')))
-  const raw = await page.evaluate(() => localStorage.getItem('coms-study-playground:c'))
+  const raw = await draftsRaw(page)
   expect(raw).toContain('여기서고침')
   expect(raw).toContain('다른탭코드') // kept as the one-step backup, not lost
+})
+
+test('two tabs editing different blocks keep both edits', async ({ page, context }) => {
+  await mockRun(page, () => ({ json: OK }))
+  await page.clock.install()
+  await openStudy(page, 'c')
+  const other = await context.newPage()
+  await other.clock.install()
+  await mockRun(other, () => ({ json: OK }))
+  await openStudy(other, 'c')
+  await openEditor(page, 0)
+  await openEditor(other, 3)
+  await replaceCode(page, 0, MINE.replace('내코드', '블록영'))
+  await replaceCode(other, 3, MINE.replace('내코드', '블록일'))
+  await Promise.all([page.clock.runFor(1000), other.clock.runFor(1000)])
+  await expect.poll(async () => (await drafts(page, 0)).primary).toContain('블록영')
+  await expect.poll(async () => (await drafts(page, 3)).primary).toContain('블록일')
+  expect((await drafts(page, 0)).backup).toBeNull()
+  expect((await drafts(page, 3)).backup).toBeNull()
+})
+
+test('pagehide right after typing, before the debounce, still saves the edit', async ({ page }) => {
+  await mockRun(page, () => ({ json: OK }))
+  await page.clock.install()
+  await openStudy(page, 'c')
+  await openEditor(page, 0)
+  await freeze(page)
+  await replaceCode(page, 0, MINE)
+  expect((await drafts(page)).primary).toBeNull() // the debounce has not fired
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')))
+  expect((await drafts(page)).primary).toContain('내코드')
+})
+
+test('closing a shared view while another tab saved a draft leaves that draft untouched', async ({ page, context, browser }) => {
+  await mockRun(page, () => ({ json: OK }))
+  await openStudy(page, 'c')
+  await openEditor(page, 0)
+  await replaceCode(page, 0, MINE)
+  await expect.poll(() => draftsRaw(page)).toContain('내코드')
+  const url = await makeShareUrl(browser, THEIRS)
+
+  const shared = await context.newPage()
+  await shared.clock.install()
+  await mockRun(shared, () => ({ json: OK }))
+  await shared.goto(url)
+  await expect(shared.locator('#code-0 .pg-shared')).toBeVisible()
+  await freeze(shared)
+  await replaceCode(shared, 0, THEIRS + '// 보는 중 고침\n') // typing in the temporary view
+  await saveElsewhere(page, '내코드', '다른탭B')
+  const before = await draftsRaw(page)
+  await shared.getByRole('button', { name: '내 코드로 돌아가기' }).click()
+  await shared.evaluate(() => window.dispatchEvent(new Event('pagehide')))
+  await shared.clock.runFor(1000)
+  expect(await draftsRaw(page)).toBe(before) // nothing written, no backup invented
+  await expect(editorOf(shared, 0)).toContainText('다른탭B')
 })
 
 test('a reader with no saved draft can leave a shared view for the original code', async ({ page, browser }) => {
@@ -524,7 +584,7 @@ test('a reader with no saved draft can leave a shared view for the original code
   await expect(page.locator('#code-0 .pg-shared')).toBeVisible()
   await page.getByRole('button', { name: '내 코드로 돌아가기' }).click()
   await expect(editorOf(page, 0)).toContainText("Hello, COM's!")
-  expect(await page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toBeNull()
+  expect(await draftsRaw(page)).toBeNull()
 })
 
 test('full screen mode is a modal dialog that Escape closes', async ({ page }) => {

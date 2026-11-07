@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { JSDOM } from 'jsdom'
 import { classifyBlock, initialCode, stripAnnotations, needsStdin, applyTemplate } from '../src/pages/study/playground/classify.ts'
 import { compareOutput, normalizeOutput } from '../src/pages/study/playground/compare.ts'
-import { createStore, blockKey, encodeShareHash, decodeShareHash, SHARE_MAX_CHARS } from '../src/pages/study/playground/storage.ts'
+import { createStore, saveBlock, restoreBlock, blockKey, encodeShareHash, decodeShareHash, SHARE_MAX_CHARS } from '../src/pages/study/playground/storage.ts'
 import { buildLabScene, encodeLabShare, labLink } from '../src/pages/study/playground/labShare.ts'
 import { runRemote, retryAfterSeconds } from '../src/pages/study/playground/runner.ts'
 import { setSessionExpiredHandler } from '../src/services/apiClient.ts'
@@ -83,41 +83,58 @@ assert.deepEqual(diff.diff.map((d) => `${d.kind}:${d.text}`), ['same:a', 'del:b'
 assert.equal(compareOutput('', '').match, true)
 
 // ---------- 5. persistence ----------
-const mem = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v) } }
+const mem = () => { const m = new Map(); return { m, getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v), removeItem: (k) => void m.delete(k) } }
 const backing = mem()
 const store = createStore('c', backing)
 const key = blockKey(3, 'int main(){}')
 assert.equal(store.get(key), null)
-store.set(key, 'edited')
+store.put(key, { code: 'edited', at: 1 })
 assert.equal(createStore('c', backing).get(key).code, 'edited', 'survives a new store instance (revisit)')
 assert.equal(createStore('java', backing).get(key), null, 'per page')
-store.clear(key)
+assert.deepEqual([...backing.m.keys()], [`coms-study-playground:c:${key}`], 'one record per block, no page-wide object')
+store.remove(key)
 assert.equal(store.get(key), null)
-{
-  // The one-step backup of a draft that a shared code was saved over lives beside it and survives clear().
-  const backups = createStore('c', mem())
-  assert.equal(backups.getBackup(key), null)
-  backups.set(key, 'mine')
-  backups.setBackup(key, 'mine')
-  backups.set(key, 'shared')
-  assert.equal(backups.get(key).code, 'shared')
-  assert.equal(backups.getBackup(key).code, 'mine')
-  backups.clear(key)
-  assert.equal(backups.getBackup(key).code, 'mine', 'resetting a block keeps the backup')
-  backups.clearBackup(key)
-  assert.equal(backups.getBackup(key), null)
-}
 assert.notEqual(blockKey(3, 'a'), blockKey(3, 'b'), 'the key follows the original text')
 const blocked = createStore('c', { getItem() { throw new Error('blocked') }, setItem() { throw new Error('blocked') } })
-blocked.set('k', 'v')
+blocked.put('k', { code: 'v', at: 1 })
 assert.equal(blocked.get('k'), null, 'blocked storage never throws')
 assert.equal(createStore('c', null).get('k'), null)
-backing.setItem('coms-study-playground:c', '{not json')
+backing.setItem('coms-study-playground:c:k', '{not json')
 assert.equal(createStore('c', backing).get('k'), null, 'corrupt JSON is ignored')
-const many = createStore('big', mem())
-for (let i = 0; i < 100; i++) many.set(`k${i}`, 'x')
-assert.equal(many.get('k99').code, 'x')
-assert.equal(many.get('k0'), null, 'oldest entries are dropped past the cap')
+backing.setItem('coms-study-playground:c', '{"k":{"code":"old page-wide format"}}')
+assert.equal(createStore('c', backing).get('k'), null, 'the old page-wide key is ignored')
+{
+  // saveBlock / restoreBlock: the only write path of a draft.
+  const st = createStore('p', mem())
+  const state = (k, baseline = null) => ({ key: k, baseline, dirty: true })
+  const A = state('a'), B = state('b')
+  saveBlock(st, A, 'a1', 'a0'); saveBlock(st, B, 'b1', 'b0')
+  assert.deepEqual([st.get('a').code, st.get('b').code], ['a1', 'b1'], 'different blocks do not interfere')
+  assert.equal(A.baseline, 'a1'); assert.equal(A.dirty, false)
+  saveBlock(st, A, 'a2', 'a0')
+  assert.equal(st.get('a').backup, undefined, 'own previous save is not a backup')
+  st.put('a', { code: 'a-elsewhere', at: 2 }) // another tab saved
+  saveBlock(st, A, 'a3', 'a0')
+  assert.deepEqual([st.get('a').code, st.get('a').backup], ['a3', 'a-elsewhere'], 'the other tab draft is kept as the backup')
+  assert.equal(st.get('b').code, 'b1')
+  // Restore: declined when another tab changed the draft; the record and the state stay untouched.
+  A.dirty = true
+  st.put('a', { code: 'a-elsewhere2', backup: 'a-old', at: 3 })
+  assert.equal(restoreBlock(st, A, 'a-typing'), 'declined')
+  assert.deepEqual(st.get('a'), { code: 'a-elsewhere2', backup: 'a-old', at: 3 }); assert.equal(A.dirty, true)
+  // Accepted when nothing changed: the editor text (unsaved edits included) becomes the backup.
+  A.baseline = 'a-elsewhere2'
+  assert.equal(restoreBlock(st, A, 'a-typing'), 'restored')
+  assert.equal(st.get('a').code, 'a-old'); assert.equal(st.get('a').backup, 'a-typing')
+  assert.equal(A.baseline, 'a-old'); assert.equal(A.dirty, false)
+  assert.equal(restoreBlock(st, B, 'x'), 'none', 'no backup, nothing to restore')
+  // Back to the original code removes the record unless a backup still hangs on it.
+  saveBlock(st, B, 'b0', 'b0'); assert.equal(st.get('b'), null); assert.equal(B.baseline, null)
+  // The shared-view save: the draft being replaced becomes the backup.
+  const C = state('c'); saveBlock(st, C, 'mine', 'c0')
+  C.baseline = null; saveBlock(st, C, 'shared', 'c0')
+  assert.deepEqual([st.get('c').code, st.get('c').backup], ['shared', 'mine'])
+}
 
 // ---------- 6. share link codec ----------
 const korean = '#include <stdio.h>\nint main(void) {\n    printf("안녕, 광운!\\n");\n}\n'

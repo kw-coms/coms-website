@@ -53,3 +53,6 @@ Used by the container healthcheck over the unix socket; do **not** expose it thr
 
 ## Limits (per run)
 Wall 10 s (compile 15 s), CPU 3 s (Java 6 s; compile 10 s CPU), memory via container/cgroup (Java `-Xmx192m -Xss1m -XX:MaxMetaspaceSize=96m`, javac `-Xmx256m`), output 64 KB per stream, processes+threads ≤ 32 (C/Python) or ≤ 128 (Java) for the dedicated job uid 10100, open files ≤ 64 (Java 256), files ≤ 8 MB, no network, private 0700 job dir on a tmpfs wiped after every job, killed process group, every uid-10100 process killed after each job, one job at a time per container (queue ≤ 8, then 429 busy). If sandbox cleanup ever fails the runner answers `503 {"error":"unavailable"}` (Retry-After 30) and restarts itself.
+
+## Saved drafts (frontend)
+The study playground keeps each block's draft in its own `localStorage` record, `coms-study-playground:<pageId>:<blockKey>` = `{ code, backup?, at }`, written only by `saveBlock` (`src/pages/study/playground/storage.ts`), which is fully synchronous so exit flushes never miss a queued save. Limit, accepted: `localStorage` has no cross-process atomicity, so another tab's write can land between `saveBlock`'s read and write (microseconds); a draft changed by another tab since this tab last looked is kept as the one-step backup instead of being overwritten unseen.

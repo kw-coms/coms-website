@@ -1,12 +1,11 @@
 // Per-block persistence (localStorage, every access guarded) and the "공유 링크" hash codec.
 
-export interface Saved { code: string; at: number }
-type StorageLike = Pick<Storage, 'getItem' | 'setItem'>
+/** One block's record: the draft and, optionally, the one-step backup of the draft it replaced ("이전 코드 복원"). */
+export interface Saved { code: string; backup?: string; at: number }
+type StorageLike = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem'>>
 
+// One localStorage record per block (`<prefix><pageId>:<blockKey>`), so tabs editing different blocks never share a value.
 const KEY_PREFIX = 'coms-study-playground:'
-const MAX_ENTRIES = 80
-// The one-step backup of a block's previous draft lives next to it under this suffix.
-const BACKUP = '~prev'
 
 export function fnv1a(text: string): string {
   let h = 0x811c9dc5
@@ -18,38 +17,59 @@ export function fnv1a(text: string): string {
 export const blockKey = (index: number, originalCode: string) => `${index}-${fnv1a(originalCode)}`
 
 export function createStore(pageId: string, storage?: StorageLike | null) {
-  const key = KEY_PREFIX + pageId
   const handle = (): StorageLike | null => {
     if (storage !== undefined) return storage
     try { return window.localStorage } catch { return null }
   }
-  const read = (): Record<string, Saved> => {
-    try {
-      const raw = handle()?.getItem(key)
-      const data = raw ? JSON.parse(raw) : {}
-      return data && typeof data === 'object' && !Array.isArray(data) ? data : {}
-    } catch { return {} }
-  }
-  const write = (data: Record<string, Saved>) => {
-    const keys = Object.keys(data)
-    if (keys.length > MAX_ENTRIES) keys.sort((x, y) => data[x].at - data[y].at).slice(0, keys.length - MAX_ENTRIES).forEach((k) => delete data[k])
-    try { handle()?.setItem(key, JSON.stringify(data)) } catch { /* storage blocked or full: the edit just is not kept */ }
-  }
+  const keyOf = (block: string) => `${KEY_PREFIX}${pageId}:${block}`
   return {
     get(block: string): Saved | null {
-      const v = read()[block]
-      return v && typeof v.code === 'string' ? v : null
+      try {
+        const raw = handle()?.getItem(keyOf(block))
+        const v = raw ? JSON.parse(raw) : null
+        if (!v || typeof v !== 'object' || typeof v.code !== 'string') return null
+        return { code: v.code, backup: typeof v.backup === 'string' ? v.backup : undefined, at: typeof v.at === 'number' ? v.at : 0 }
+      } catch { return null }
     },
-    set(block: string, code: string) { const data = read(); data[block] = { code, at: Date.now() }; write(data) },
-    clear(block: string) { const data = read(); delete data[block]; write(data) },
-    /** The draft a block had before a shared code was saved over it ("이전 코드 복원"). */
-    getBackup(block: string): Saved | null {
-      const v = read()[block + BACKUP]
-      return v && typeof v.code === 'string' ? v : null
+    put(block: string, rec: Saved) {
+      try { handle()?.setItem(keyOf(block), JSON.stringify(rec)) } catch { /* storage blocked or full: the edit just is not kept */ }
     },
-    setBackup(block: string, code: string) { const data = read(); data[block + BACKUP] = { code, at: Date.now() }; write(data) },
-    clearBackup(block: string) { const data = read(); delete data[block + BACKUP]; write(data) },
+    remove(block: string) {
+      try { handle()?.removeItem?.(keyOf(block)) } catch { /* ignore */ }
+    },
   }
+}
+export type DraftStore = ReturnType<typeof createStore>
+
+/** What a block remembers about its stored draft: the value this tab last read or wrote (`baseline`) and whether it holds an unsaved user edit. */
+export interface DraftState { key: string; baseline: string | null; dirty: boolean }
+
+/**
+ * The only place a draft is written. Synchronous on purpose: nothing is ever queued, so an exit flush cannot miss it.
+ * Accepted limit: localStorage has no cross-process atomicity, so another tab's write can land between the getItem
+ * and the setItem below (one task, microseconds). That window is traded for an end-to-end synchronous design.
+ */
+export function saveBlock(store: DraftStore, b: DraftState, code: string, initial: string) {
+  const stored = store.get(b.key)
+  let backup = stored?.backup
+  // Another tab saved since this tab last looked: its draft becomes the backup instead of being overwritten unseen.
+  if (stored && stored.code !== b.baseline && stored.code !== code) backup = stored.code
+  if (code === initial && backup === undefined) store.remove(b.key)
+  else store.put(b.key, { code, backup, at: Date.now() })
+  b.baseline = code === initial && backup === undefined ? null : code
+  b.dirty = false
+}
+
+/** "이전 코드 복원": 'declined' when another tab changed the draft since this tab last looked (nothing is touched). */
+export function restoreBlock(store: DraftStore, b: DraftState, currentText: string): 'restored' | 'declined' | 'none' {
+  const stored = store.get(b.key)
+  if (!stored?.backup) return 'none'
+  if (stored.code !== b.baseline) return 'declined'
+  const old = stored.backup
+  store.put(b.key, { code: old, backup: currentText === old ? undefined : currentText, at: Date.now() })
+  b.baseline = old
+  b.dirty = false
+  return 'restored'
 }
 
 // ---- share link: #pg=<blockIndex>.<base64url(utf8 code)> ----
