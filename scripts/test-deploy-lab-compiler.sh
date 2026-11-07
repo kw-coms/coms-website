@@ -4,6 +4,10 @@
 # can be checked without a server. Needs Docker and the nginx:1.28-alpine image (any small image works).
 # It uses the container name coms-lab-compiler (as the real deploy does), so it refuses to run if one exists.
 #
+# The order of the steps is not restated here: it is read from .github/workflows/deploy.yml, checked
+# against what the deploy must do (snapshot before build, rollback in the failure branch, start only
+# after the health check, finalize last), and then executed as found.
+#
 # Usage: scripts/test-deploy-lab-compiler.sh
 set -euo pipefail
 
@@ -53,54 +57,70 @@ image_id() { local id; id="$(docker image inspect -f '{{.Id}}' "coms-lab-compile
 running_id() { docker inspect -f '{{.Image}}' coms-lab-compiler 2>/dev/null || echo none; }
 tags() { docker image ls coms-lab-compiler --format '{{.Tag}}' | sort | paste -sd, -; }
 
-# One release as the workflow runs it: snapshot -> build -> (site up + health) -> start -> finalize.
+deploy_yml="$here/../.github/workflows/deploy.yml"
+read -r -a order <<< "$(grep -E '^[[:space:]]+lab_(diagnostics|snapshot_previous|build|rollback|start|finalize_tags)$' "$deploy_yml" | tr -d ' ' | paste -sd' ' -)"
+check "deploy.yml calls the compiler steps in a safe order" "${order[*]}" "lab_diagnostics lab_snapshot_previous lab_build lab_rollback lab_start lab_finalize_tags"
+line() { grep -n -E "$1" "$deploy_yml" | head -n 1 | cut -d: -f1; }
+check "rollback sits in the failure branch (after the health check, before the success path)" \
+  "$([ "$(line '^\s+if ! site_is_healthy')" -lt "$(line '^\s+lab_rollback$')" ] && [ "$(line '^\s+lab_rollback$')" -lt "$(line '^\s+lab_start$')" ] && echo yes)" yes
+check "the compiler is started only after the site's health check" \
+  "$([ "$(line '^\s+if ! site_is_healthy')" -lt "$(line '^\s+lab_start$')" ] && echo yes)" yes
+rollback_at=0; for i in "${!order[@]}"; do [ "${order[$i]}" = lab_rollback ] && rollback_at=$i; done
+pre=("${order[@]:0:rollback_at}")              # before the health check
+success=("${order[@]:rollback_at+1}")           # health check passed
+failure=("${order[rollback_at]}")               # health check failed -> the site rolls back
+
+# One release as the workflow runs it. site_ok=0 simulates a failed site health check (rollback).
 release() { # tag [site_ok=1]
   NEW_TAG="$1"; export COMS_IMAGE_TAG="$1"
-  lab_diagnostics > /dev/null
-  lab_snapshot_previous
-  lab_build
-  if [ "${2:-1}" = 1 ]; then lab_start; lab_finalize_tags; else lab_rollback; fi
+  for step in "${pre[@]}"; do "$step" > /dev/null; done
+  if [ "${2:-1}" = 1 ]; then for step in "${success[@]}"; do "$step"; done; else for step in "${failure[@]}"; do "$step"; done; fi
+}
+state() { # name expected_tags expected_latest_ref expected_previous_ref(or none) expected_running_ref
+  check "$1: tags" "$(tags)" "$2"
+  check "$1: latest" "$(image_id latest)" "$3"
+  check "$1: previous" "$(image_id previous)" "$4"
+  check "$1: running" "$(running_id)" "$5"
 }
 
 echo "== release 1 (first deploy: no compiler exists yet)"
 release r1
-check "no previous snapshot on the first deploy" "$LAB_PREVIOUS" 0
-check "r1 is running" "$(running_id)" "$(image_id r1)"
-check "tags after r1" "$(tags)" "latest,r1"
 r1_id="$(image_id r1)"
+check "no previous snapshot on the first deploy" "$LAB_PREVIOUS" 0
+state "r1" "latest,r1" "$r1_id" none "$r1_id"
 
-echo "== release 2 rolls back (site unhealthy): the compiler stays on r1"
+echo "== release 2: site health check fails -> site rolls back, compiler untouched"
 release r2 0
-check "r1 still running after the site rollback" "$(running_id)" "$(image_id r1)"
-check "previous snapshot is r1" "$(image_id previous)" "$(image_id r1)"
-check "latest points back at r1" "$(image_id latest)" "$(image_id r1)"
+state "r2 rolled back" "latest,previous,r1,r2" "$r1_id" "$r1_id" "$r1_id"
 
 echo "== release 2 again, healthy"
 release r2
-check "r2 is running" "$(running_id)" "$(image_id r2)"
-check "previous is r1's image" "$(image_id previous)" "$r1_id"
-check "latest is r2" "$(image_id latest)" "$(image_id r2)"
-check "tags after r2 (r1 pruned, previous kept)" "$(tags)" "latest,previous,r2"
 r2_id="$(image_id r2)"
+state "r2" "latest,previous,r2" "$r2_id" "$r1_id" "$r2_id"
 
-echo "== release 3: the new compiler fails to start -> previous one comes back, deploy goes on"
+echo "== release 3: the new compiler fails to start -> previous comes back and stays \`latest\`"
 eval "$(declare -f lab_compose | sed 's/^lab_compose/orig_lab_compose/')"
 lab_compose() { if [ "${COMS_IMAGE_TAG:-}" = r3 ] && [ "$1" = up ]; then echo "simulated start error" >&2; return 1; fi; orig_lab_compose "$@"; }
 release r3
-check "the previous (r2) compiler is running again" "$(running_id)" "$r2_id"
+check "r3 was not activated" "$LAB_ACTIVATED" 0
+state "r3 failed to start" "latest,previous,r2,r3" "$r2_id" "$r2_id" "$r2_id"
 unset -f lab_compose
 eval "$(declare -f orig_lab_compose | sed 's/^orig_lab_compose/lab_compose/')"
 
-echo "== release 4: image build fails -> warning only, running compiler untouched"
-before="$(running_id)"
+echo "== release 4: image build fails -> warning only, nothing changes"
 FAIL=1 release r4
-check "build failure leaves the running compiler alone" "$(running_id)" "$before"
 check "nothing built" "$LAB_BUILT" 0
+state "r4 build failed" "latest,previous,r2,r3" "$r2_id" "$r2_id" "$r2_id"
 
 echo "== release 5: low memory -> compiler skipped entirely"
 LAB_AVAILABLE_MB=500 release r5
-check "low memory leaves the running compiler alone" "$(running_id)" "$before"
 check "no r5 image" "$(image_id r5)" none
+state "r5 low memory" "latest,previous,r2,r3" "$r2_id" "$r2_id" "$r2_id"
+
+echo "== release 6: recovers; old and failed images are pruned"
+release r6
+r6_id="$(image_id r6)"
+state "r6" "latest,previous,r6" "$r6_id" "$r2_id" "$r6_id"
 
 if [ "$fails" -ne 0 ]; then echo "$fails check(s) failed" >&2; exit 1; fi
 echo "all deploy-lab-compiler checks passed"
