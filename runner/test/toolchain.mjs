@@ -349,3 +349,46 @@ test('SysV shm accumulation (attached, written, detached segments) is bounded by
   if (process.env.RUNNER_EXPECT_IPC_LIMITS === '1') assert.ok(total <= 16 * 1024 * 1024 && n <= 16, `unbounded: ${r.stdout}`);
   await ipcClean('shm accumulation');
 });
+
+test('SIGSTOP attacker (setsid, loops over every uid-10100 pid) cannot wedge cleanup or the event loop; health keeps answering', options('c', true), async () => {
+  const sock = '/run/coms-study/watchdog.sock';
+  const child = spawn(process.execPath, ['server.mjs'], { cwd: '/app', stdio: ['ignore', 'ignore', 'pipe'],
+    env: { PATH: '/usr/local/bin:/usr/bin:/bin', RUNNER_CONTAINER: '1', LISTEN_SOCKET: sock, RATE_LIMIT_PER_MIN: '100' } });
+  let stderr = ''; child.stderr.on('data', d => { stderr += d; });
+  const exited = new Promise(resolve => child.once('exit', (code, signal) => resolve({ code, signal })));
+  const call = (method, path, body, timeout = 30_000) => new Promise((resolve, reject) => {
+    const payload = body && JSON.stringify(body);
+    const req = http.request({ socketPath: sock, path, method, timeout, headers: payload ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) } : {} },
+      res => { let data = ''; res.on('data', c => { data += c; }); res.on('end', () => resolve({ status: res.statusCode, data })); });
+    req.on('timeout', () => req.destroy(new Error('timeout'))); req.on('error', reject); req.end(payload);
+  });
+  let watching = true, worst = 0, probes = 0, failures = [];
+  try {
+    for (let i = 0; i < 100 && !(await access(sock).then(() => true, () => false)); i++) await new Promise(r => setTimeout(r, 50));
+    const watchdog = (async () => {
+      while (watching) {
+        const t0 = Date.now();
+        try { const r = await call('GET', '/study/api/health', null, 2000); if (r.status !== 200) failures.push(r.status); } catch (e) { failures.push(e.message); }
+        worst = Math.max(worst, Date.now() - t0); probes++;
+        await new Promise(r => setTimeout(r, 100));
+      }
+    })();
+    const attacker = '#define _POSIX_C_SOURCE 200809L\n#include <dirent.h>\n#include <signal.h>\n#include <stdlib.h>\n#include <stdio.h>\n#include <unistd.h>\nint main(void){pid_t parent=getpid();if(fork()==0){setsid();pid_t me=getpid();for(;;){DIR*d=opendir("/proc");struct dirent*e;while(d&&(e=readdir(d))){int pid=atoi(e->d_name);if(pid>1&&pid!=me&&pid!=parent)kill(pid,SIGSTOP);}if(d)closedir(d);usleep(500);}}usleep(300000);puts("armed");return 0;}';
+    const hostile = await call('POST', '/study/api/run', { lang: 'c', code: attacker });
+    assert.equal(hostile.status, 200, `${hostile.data} ${stderr}`);
+    const next = await call('POST', '/study/api/run', { lang: 'python', code: 'print("after")' });
+    assert.equal(next.status, 200, `${next.data} ${stderr}`); assert.equal(JSON.parse(next.data).stdout, 'after\n');
+    watching = false; await watchdog;
+    assert.deepEqual(failures, [], 'health must always answer'); assert.ok(probes >= 10, `only ${probes} probes`); assert.ok(worst < 2000, `health stalled ${worst} ms`);
+    const survivors = [];
+    for (const pid of (await readdir('/proc')).filter(p => /^\d+$/.test(p))) if ((await readFile(`/proc/${pid}/status`, 'utf8').catch(() => '')).match(new RegExp(`^Uid:\\s+${JOB_ID}`, 'm'))) survivors.push(pid);
+    assert.deepEqual(survivors, [], 'no uid-10100 process may survive');
+  } finally { watching = false; child.kill('SIGKILL'); await exited; await unlink(sock).catch(() => {}); }
+  await afterwards('after SIGSTOP attacker');
+});
+
+test('no synchronous process spawning remains on request or cleanup paths', async () => {
+  for (const file of ['run.mjs', 'server.mjs', 'limits.mjs', 'diagnostics.mjs']) {
+    assert.doesNotMatch(await readFile(new URL(`../${file}`, import.meta.url), 'utf8'), /execFileSync|spawnSync|execSync/, file);
+  }
+});

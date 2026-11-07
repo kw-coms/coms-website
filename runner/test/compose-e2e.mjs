@@ -4,10 +4,15 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { randomBytes } from 'node:crypto';
 
 const dir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const project = 'studye2e', container = `${project}-runner-1`;
-const env = { ...process.env, NGINX_GID: '101' };
+// Unique project and volume names: this script must never be able to see, mount or delete the
+// production runner's volumes (coms-study-runner-socket / coms-study-runner-state).
+const suffix = randomBytes(4).toString('hex');
+const project = `studye2e${suffix}`, container = `${project}-runner-1`;
+const socketVolume = `e2e-socket-${suffix}`, stateVolume = `e2e-state-${suffix}`;
+const env = { ...process.env, NGINX_GID: '101', RUNNER_SOCKET_VOLUME: socketVolume, RUNNER_STATE_VOLUME: stateVolume };
 const sh = (cmd, args, opts = {}) => execFileSync(cmd, args, { encoding: 'utf8', env, cwd: dir, ...opts });
 const compose = (...args) => sh('docker', ['compose', '-p', project, '-f', 'docker-compose.yml', ...args]);
 const exec = (...args) => sh('docker', ['exec', container, ...args]);
@@ -25,7 +30,14 @@ http.request({ socketPath: '/run/coms-study/run.sock', path: '/study/api/run', m
 }).end(body);`;
 const post = (member, lang, code) => JSON.parse(exec('node', '--input-type=module', '-e', CLIENT, member, lang, code));
 
-try { compose('down', '-v'); } catch { /* nothing to remove */ }
+// Refuse to run unless the resolved configuration uses ONLY the throw-away volume names.
+const resolved = JSON.parse(compose('config', '--format', 'json'));
+const volumeNames = Object.values(resolved.volumes ?? {}).map(v => v.name).sort();
+assert.deepEqual(volumeNames, [socketVolume, stateVolume].sort(), `refusing to run: resolved volumes ${volumeNames}`);
+for (const volume of resolved.services.runner.volumes) assert.ok(volume.source in resolved.volumes && [socketVolume, stateVolume].includes(resolved.volumes[volume.source].name), `refusing to run: ${volume.source}`);
+assert.ok(!volumeNames.some(name => /^coms-study-runner-/.test(name)), 'refusing to run: production volume names');
+const existing = sh('docker', ['volume', 'ls', '-q']).split('\n');
+assert.ok(![socketVolume, stateVolume].some(name => existing.includes(name)), 'refusing to run: test volume already exists');
 compose('up', '-d', '--build');
 try {
   await until('healthy', () => sh('docker', ['inspect', '-f', '{{.State.Health.Status}}', container]).trim() === 'healthy', 240);

@@ -32,7 +32,7 @@ tini (PID 1, root)
 - 모든 컴파일·실행은 `setpriv`로 **UID/GID 10100**(보조 그룹 없음, capability 전부 0, `no_new_privs`)으로 전환한 뒤 실행합니다. root → 비root 전환에서 커널이 permitted/effective/ambient capability를 비우므로 실패 시 "닫힌" 쪽으로 동작합니다. 작업은 서버 프로세스에 신호를 보내거나 ptrace하거나 `/proc/<pid>/{mem,environ,fd,cwd}`를 열 수 없고(UID 불일치), `kill(-1)`도 서버에 닿지 않습니다. 작업 환경 변수는 `PATH, LANG, HOME, TMPDIR`뿐입니다.
 - `RLIMIT_NPROC`은 UID 단위로 스레드까지 센다는 점이 핵심입니다. 서버와 같은 UID를 쓰면 JVM이 시작도 못 하고 포크 폭탄도 서버 쪽 프로세스를 세므로 막히지 않았습니다. 이제 작업 UID만 세므로 NPROC가 정확히 학생 프로세스를 제한합니다.
 - 파일: `/jobs`(tmpfs, **root 소유, 모드 1777 sticky**)가 유일한 쓰기 위치입니다. 작업 UID는 마운트 루트를 chmod/rename/삭제할 수 없고 자기 항목만 만들거나 지울 수 있습니다(정리가 목록을 읽어야 해서 `1733`이 아니라 `1777`; 작업 UID가 유일한 사용자입니다). 작업마다 작업 UID가 만든 0700 하위 디렉터리 `/jobs/coms-<랜덤>`을 `TMPDIR`/`HOME`/cwd로 씁니다. 루트 파일시스템은 읽기 전용이며 `/tmp`, `/run/coms-study`(nginx와 공유하는 소켓 디렉터리, 소켓은 `root:nginx 0660`), `/app` 등은 10100이 쓸 수 없습니다. `/dev/shm`과 `/dev/mqueue`는 Docker가 1777로 만들기 때문에 쓰기가 가능하며 작업 후 지웁니다.
-- 정리(작업 전·컴파일 후·작업 후): ① **작업 UID로** `kill -9 -1`을 반복 실행해 `setsid`/이중 fork 데몬을 포함한 모든 10100 프로세스를 종료하고 `/proc`에 남은 10100 프로세스(좀비 포함)가 없을 때까지 확인, ② 서버가 `/proc/sysvipc/{shm,msg,sem}`를 직접 읽어 uid 또는 cuid가 10100인 객체를 골라 작업 UID로 `ipcrm -m/-q/-s <id>`로 하나씩 제거(`ipcrm --all`은 권한 검사로 모드 0 객체를 건너뛰므로 쓰지 않음; 소유자·생성자는 모드와 무관하게 IPC_RMID 가능, IPC_SET으로 uid를 넘겨도 cuid로 제거됨. 붙은 shm은 ①에서 attacher가 죽은 뒤 사라짐)한 뒤 다시 읽어 남은 객체가 없는지 확인, ③ 작업 UID로 `/jobs`·`/dev/shm`·`/dev/mqueue`(POSIX 메시지 큐 포함)의 10100 소유 항목에 `chmod -R u+rwx`(권한 000 트리 복구, 심볼릭 링크 제외) 후 `rm -rf`를 셸 없이 argv로 실행(종료 코드·타임아웃이 곧바로 예외)하고, 서버가 세 마운트가 **완전히 비었는지** 직접 읽어 확인. 하나라도 실패하면 러너는 오염(poisoned) 상태가 되어 해당 요청과 대기 요청에 `503 {"error":"unavailable"}`(Retry-After 30)를 돌려주고, 약 1.5초 뒤 서버가 **종료 코드 70으로 종료**합니다. tini도 함께 끝나 컨테이너가 종료되고 `restart: unless-stopped`가 새 컨테이너(비워진 tmpfs)로 다시 띄웁니다. 재시작 중 nginx 재시도는 필요 없고 클라이언트는 503 메시지를 보고 다시 시도하면 됩니다. 소유자가 직접 지우므로 `CAP_DAC_OVERRIDE`/`CAP_FOWNER`/`CAP_CHOWN`이 필요 없습니다.
+- 정리(작업 전·컴파일 후·작업 후): ① **특권을 가진 서버가 직접**(CAP_KILL) `/proc`을 훑어 uid(실제·유효·저장·fs)가 10100인 모든 PID에 `SIGKILL`을 보내(`setsid`/이중 fork 데몬, `SIGSTOP`을 뿌리는 공격 프로세스 포함; SIGKILL은 막거나 멈출 수 없음) 비동기로 반복하며(데드라인 3초, 이벤트 루프를 막지 않음) `/proc`에 남은 10100 프로세스(좀비 포함)가 없을 때까지 확인, ② 서버가 `/proc/sysvipc/{shm,msg,sem}`를 직접 읽어 uid 또는 cuid가 10100인 객체를 골라 작업 UID로 `ipcrm -m/-q/-s <id>`로 하나씩 제거(`ipcrm --all`은 권한 검사로 모드 0 객체를 건너뛰므로 쓰지 않음; 소유자·생성자는 모드와 무관하게 IPC_RMID 가능, IPC_SET으로 uid를 넘겨도 cuid로 제거됨. 붙은 shm은 ①에서 attacher가 죽은 뒤 사라짐)한 뒤 다시 읽어 남은 객체가 없는지 확인, ③ 작업 UID로 `/jobs`·`/dev/shm`·`/dev/mqueue`(POSIX 메시지 큐 포함)의 10100 소유 항목에 `chmod -R u+rwx`(권한 000 트리 복구, 심볼릭 링크 제외) 후 `rm -rf`를 셸 없이 argv로 실행(종료 코드·타임아웃이 곧바로 예외)하고, 서버가 세 마운트가 **완전히 비었는지** 직접 읽어 확인. 작업 UID로 실행하는 보조 프로세스(IPC 제거, 파일 삭제, 작업 디렉터리 생성)는 항상 ①로 모든 작업 프로세스를 먼저 죽인 뒤 비동기 `spawn`(SIGKILL 데드라인 10~15초)으로 실행하며 시간 초과도 정리 실패입니다. 동기 `execFileSync`/`spawnSync`는 어떤 경로에도 없습니다(테스트가 소스를 검사). 하나라도 실패하면 러너는 오염(poisoned) 상태가 되어 해당 요청과 대기 요청에 `503 {"error":"unavailable"}`(Retry-After 30)를 돌려주고, 약 1.5초 뒤 서버가 **종료 코드 70으로 종료**합니다. tini도 함께 끝나 컨테이너가 종료되고 `restart: unless-stopped`가 새 컨테이너(비워진 tmpfs)로 다시 띄웁니다. 재시작 중 nginx 재시도는 필요 없고 클라이언트는 503 메시지를 보고 다시 시도하면 됩니다. 소유자가 직접 지우므로 `CAP_DAC_OVERRIDE`/`CAP_FOWNER`/`CAP_CHOWN`이 필요 없습니다.
 
 ### seccomp 프로파일
 
@@ -116,10 +116,13 @@ docker run --rm --network none --user 0:101 --read-only \
 ```sh
 cd runner
 export NGINX_GID=101
+# Throw-away volume names: never run tests against the production volumes (coms-study-runner-*).
+export RUNNER_SOCKET_VOLUME=test-socket-$$ RUNNER_STATE_VOLUME=test-state-$$
 docker compose -p studyrt -f docker-compose.yml build
 docker compose -p studyrt -f docker-compose.yml run --rm --no-deps \
   -e RUNNER_TOOLCHAIN_TESTS=1 -e RUNNER_CONTAINER_ATTACK_TESTS=1 -e RUNNER_EXPECT_IPC_LIMITS=1 runner node test/toolchain.mjs
-node test/compose-e2e.mjs   # 컨테이너를 띄워 Seccomp:2, 회원 키(401), 서버 SIGKILL 후 재시작·deny-list를 확인
+docker compose -p studyrt -f docker-compose.yml down -v   # 테스트 볼륨만 삭제
+node test/compose-e2e.mjs   # (임의 접미사의 프로젝트·볼륨 이름을 스스로 만들고, 해석된 설정이 그 이름만 쓰는지 확인한 뒤에만 실행) 컨테이너를 띄워 Seccomp:2, 회원 키(401), 서버 SIGKILL 후 재시작·deny-list를 확인
 node --test test/*.test.mjs # compose.test.mjs는 `docker compose config`로 설정 계약을 검사
 ```
 

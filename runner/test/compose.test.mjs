@@ -60,3 +60,12 @@ test('Dockerfile healthcheck, setuid removal and state dir permissions', () => {
   assert.match(file, /chmod 0700 \/var\/lib\/coms-study/);
   assert.doesNotMatch(file, /PLACEHOLDER/);
 });
+
+test('production compose: explicit production volume names, overridable for tests', { skip }, () => {
+  const out = JSON.parse(execFileSync('docker', ['compose', '-f', join(dir, 'docker-compose.yml'), 'config', '--format', 'json'],
+    { encoding: 'utf8', env: { ...process.env, NGINX_GID: '101', RUNNER_SOCKET_VOLUME: '', RUNNER_STATE_VOLUME: '' }, stdio: ['ignore', 'pipe', 'ignore'] }));
+  assert.deepEqual(Object.values(out.volumes).map(v => v.name).sort(), ['coms-study-runner-socket', 'coms-study-runner-state']);
+  const overridden = JSON.parse(execFileSync('docker', ['compose', '-f', join(dir, 'docker-compose.yml'), 'config', '--format', 'json'],
+    { encoding: 'utf8', env: { ...process.env, NGINX_GID: '101', RUNNER_SOCKET_VOLUME: 'x-socket', RUNNER_STATE_VOLUME: 'x-state' }, stdio: ['ignore', 'pipe', 'ignore'] }));
+  assert.deepEqual(Object.values(overridden.volumes).map(v => v.name).sort(), ['x-socket', 'x-state']);
+});

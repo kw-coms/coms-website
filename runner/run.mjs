@@ -1,4 +1,4 @@
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdtemp, writeFile, readFile, readdir, rm } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
@@ -11,16 +11,13 @@ export const RUN_WALL_MS = 10_000;
 let poisoned = false;
 export const runnerHealthy = () => !poisoned;
 let active = false;
-let clockTicks;
+// /proc tick rate (USER_HZ) is the fixed ABI value 100 on every Linux architecture; no subprocess needed.
+const CLOCK_TICKS = 100;
 async function readCpuSeconds(pid) {
-  if (!clockTicks) {
-    clockTicks = Number(execFileSync('/usr/bin/getconf', ['CLK_TCK'], { encoding: 'utf8', timeout: 1000, env: { PATH: '/usr/bin:/bin', LANG: 'C' } }).trim());
-    if (!Number.isFinite(clockTicks) || clockTicks <= 0) throw new Error('Invalid CPU clock tick rate');
-  }
   const stat = await readFile(`/proc/${pid}/stat`, 'utf8');
   // Fields after comm (which can itself contain spaces and parentheses) start at 3.
   const fields = stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/);
-  return fields.slice(11, 15).reduce((sum, value) => sum + Number(value), 0) / clockTicks;
+  return fields.slice(11, 15).reduce((sum, value) => sum + Number(value), 0) / CLOCK_TICKS;
 }
 
 // Jobs run as a dedicated uid/gid that owns nothing but /jobs and its own IPC objects.
@@ -31,8 +28,32 @@ const JOB_WRITABLE = [JOB_ROOT, '/dev/shm', '/dev/mqueue'];
 // setresuid root->10100 clears permitted/effective/ambient caps; the rest is belt and braces.
 const JOB_PRIV = [`--reuid=${JOB_ID}`, `--regid=${JOB_ID}`, '--clear-groups', '--inh-caps=-all', '--ambient-caps=-all', '--no-new-privs'];
 const CLEAN_ENV = { PATH: '/usr/bin:/bin', LANG: 'C.UTF-8' };
-export const asJob = (command, args = [], options = {}) => execFileSync('/usr/bin/setpriv',
-  [...JOB_PRIV, '--', command, ...args], { timeout: 10_000, maxBuffer: 16 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'], env: CLEAN_ENV, encoding: 'utf8', ...options });
+// Helper that must run AS the job uid (file wipe, IPC removal, workspace creation). Asynchronous with a hard
+// deadline and SIGKILL, so a stopped or wedged helper can never block the event loop; a timeout rejects
+// (the callers treat that as a cleanup failure). The supervisor kills every job process BEFORE using it.
+export function asJob(command, args = [], { input = '', timeoutMs = 10_000 } = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('/usr/bin/setpriv', [...JOB_PRIV, '--', command, ...args], { env: CLEAN_ENV, shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '', err = '', settled = false, timedOut = false;
+    const finish = fn => { if (settled) return; settled = true; clearTimeout(timer); clearTimeout(backstop); fn(); };
+    let backstop;
+    const timer = setTimeout(() => {
+      timedOut = true; child.kill('SIGKILL');
+      // If something else keeps the pipes open after the kill, do not wait for 'close'.
+      backstop = setTimeout(() => finish(() => { child.stdout.destroy(); child.stderr.destroy(); reject(Object.assign(new Error(`${command} timed out`), { timedOut: true })); }), 1000);
+    }, timeoutMs);
+    for (const [stream, sink] of [[child.stdout, chunk => { if (out.length < 65_536) out += chunk; }], [child.stderr, chunk => { if (err.length < 4096) err += chunk; }]]) {
+      stream.setEncoding('utf8'); stream.on('data', sink); stream.on('error', () => {});
+    }
+    child.stdin.on('error', () => {});
+    child.stdin.end(input);
+    child.once('error', error => finish(() => reject(error)));
+    child.once('close', (code, signal) => finish(() => {
+      if (code === 0 && !timedOut) resolve(out);
+      else reject(Object.assign(new Error(timedOut ? `${command} timed out` : `${command} failed (${code ?? signal}): ${err.replace(/[\x00-\x1f]/g, ' ').slice(0, 200)}`), { timedOut, code }));
+    }));
+  });
+}
 
 export const NPROC = { c: 32, python: 32, java: 128 };
 export function stageLimits(lang, stage) {
@@ -57,27 +78,31 @@ export async function assertContainer() {
   }
 }
 
-async function jobProcessesRemain() {
+// Every pid whose real, effective, saved or fs uid is the job uid (zombies awaiting tini included).
+async function jobPids() {
+  const pids = [];
   for (const pid of await readdir('/proc')) {
     if (!/^\d+$/.test(pid)) continue;
     try {
       const status = await readFile(`/proc/${pid}/status`, 'utf8');
-      // Any of real/effective/saved uid; a zombie awaiting tini still counts.
-      if (status.match(/^Uid:\s+(.*)$/m)?.[1].split(/\s+/).slice(0, 3).some(uid => Number(uid) === JOB_ID)) return true;
+      if (status.match(/^Uid:\s+(.*)$/m)?.[1].split(/\s+/).slice(0, 4).some(uid => Number(uid) === JOB_ID)) pids.push(Number(pid));
     } catch (error) { if (error.code !== 'ENOENT' && error.code !== 'ESRCH') throw error; }
   }
-  return false;
+  return pids;
 }
 
 export async function killJobProcesses() {
   await assertContainer();
-  // kill(-1) AS the job uid reaches every job-uid process (setsid/double-fork daemons
-  // included) and cannot reach the server, which has another uid. Repeat: a dying
-  // process may still fork.
-  const deadline = performance.now() + 2000;
+  // Reaping is done by the privileged supervisor itself (CAP_KILL): SIGKILL cannot be blocked, ignored or
+  // stopped, so job processes (setsid/double-fork daemons, SIGSTOP-ing attackers) cannot interfere, and
+  // nothing here blocks the event loop. Repeat until none remain: a dying process may still fork.
+  const deadline = performance.now() + 3000;
   while (true) {
-    try { asJob('/bin/sh', ['-c', 'kill -9 -1']); } catch { /* exit 1 when there was nothing to kill */ }
-    if (!(await jobProcessesRemain())) return;
+    const pids = await jobPids();
+    if (!pids.length) return;
+    for (const pid of pids) {
+      try { process.kill(pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+    }
     if (performance.now() >= deadline) throw new Error('Job processes did not terminate');
     await new Promise(resolve => setTimeout(resolve, 10));
   }
@@ -118,22 +143,22 @@ async function jobIpcObjects(readFileImpl, uid) {
 export async function clearSystemVIpc({ execImpl = asJob, readFileImpl = readFile, uid = JOB_ID } = {}) {
   const found = await jobIpcObjects(readFileImpl, uid);
   for (let i = 0; i < found.length; i += 100) {
-    execImpl('/usr/bin/ipcrm', found.slice(i, i + 100).flat(), { timeout: 5000, stdio: ['ignore', 'ignore', 'pipe'] });
+    await execImpl('/usr/bin/ipcrm', found.slice(i, i + 100).flat(), { timeoutMs: 5000 });
   }
   if ((await jobIpcObjects(readFileImpl, uid)).length) throw new Error('System V IPC cleanup failed');
 }
 
 // Everything the job uid can write lives on the three mounts above. Deleting as the owner
 // needs no capability, but mode-000 trees must be re-opened first (chmod -R is pre-order).
-// argv only, no shell, so no quoting layer can swallow a terminator; execFileSync throws on any
+// argv only, no shell, so no quoting layer can swallow a terminator; asJob rejects on any
 // non-zero exit or timeout, so a failed step can never be mistaken for success.
 // chmod -R follows a command-line symlink, so symlinks are never handed to it (rm -rf removes them as links).
 const ownEntries = (dir, notLink, ...action) => ['-P', dir, '-mindepth', '1', '-maxdepth', '1', '-user', String(JOB_ID), ...(notLink ? ['!', '-type', 'l'] : []), '-exec', ...action, '+'];
 export async function wipeJobFiles({ run = asJob, readdirImpl = readdir, dirs = JOB_WRITABLE } = {}) {
   for (const dir of dirs) {
     try { await readdirImpl(dir); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
-    run('/usr/bin/find', ownEntries(dir, true, 'chmod', '-R', 'u+rwx', '--', '{}'), { timeout: 20_000 });
-    run('/usr/bin/find', ownEntries(dir, false, 'rm', '-rf', '--', '{}'), { timeout: 20_000 });
+    await run('/usr/bin/find', ownEntries(dir, true, 'chmod', '-R', 'u+rwx', '--', '{}'), { timeoutMs: 15_000 });
+    await run('/usr/bin/find', ownEntries(dir, false, 'rm', '-rf', '--', '{}'), { timeoutMs: 15_000 });
   }
   // The server owns /jobs (root, 1777: the job uid must be able to list it to clean up, but as a
   // non-owner it can't chmod/rename the root or touch others' entries), so it can list every mount root: nothing may remain,
@@ -241,7 +266,7 @@ export async function runCode({ lang, code, stdin = '' }, {
     if (real) {
       work = join(JOB_ROOT, `coms-${randomBytes(6).toString('hex')}`);
       // The job-owned 0700 dir is created and filled as the job uid; the server never needs access.
-      asJob('/bin/sh', ['-c', 'umask 077; mkdir "$1" && cat > "$1/$2"', 'sh', work, file], { input: code });
+      await asJob('/bin/sh', ['-c', 'umask 077; mkdir "$1" && cat > "$1/$2"', 'sh', work, file], { input: code });
     } else {
       work = await mkdtemp(join(tempRoot, 'coms-study-'));
       await writeFile(join(work, file), code, { mode: 0o600 });

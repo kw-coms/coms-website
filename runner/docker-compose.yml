@@ -60,7 +60,8 @@ services:
         max-file: "3"
 volumes:
   study-runner-socket:
-    name: coms-study-runner-socket
+    # Explicit production name; tests override it (RUNNER_SOCKET_VOLUME) so they can never touch it.
+    name: ${RUNNER_SOCKET_VOLUME:-coms-study-runner-socket}
     driver: local
     driver_opts:
       type: tmpfs
@@ -68,4 +69,4 @@ volumes:
       o: "size=1m,mode=0755"
   study-runner-state:
     # Plain disk-backed volume: a tmpfs-driver volume is emptied on every container stop/start.
-    name: coms-study-runner-state
+    name: ${RUNNER_STATE_VOLUME:-coms-study-runner-state}
