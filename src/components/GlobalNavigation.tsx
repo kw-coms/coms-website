@@ -224,7 +224,8 @@ export default function GlobalNavigation() {
           show from 768px, where it overlapped the brand and the account buttons. The brand never
           shrinks at lg (min-w-max), so the grid gap is the least that ever separates it from the nav;
           the horizontal padding and the xl nav gap are trimmed to leave room for that at 1024-1535px
-          whichever face is drawn (the Linux fallback face used to push the nav 3px from the brand). */}
+          whichever face is drawn (the Linux fallback face used to push the nav 3px from the brand). The account name is capped at
+          7rem below 2xl so even a very long name leaves the cluster inside the bar at 1280px. */}
       <div className={`${floatingBarBaseClass} relative mx-auto flex items-center justify-between gap-4 px-4 sm:px-6 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:px-6 2xl:px-8`}>
         <button
           type="button"
@@ -337,7 +338,7 @@ export default function GlobalNavigation() {
             <button
               type="button"
               onClick={() => goPageTop('/settings')}
-              className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] text-[11px] font-bold text-[var(--app-text)] transition hover:bg-black/5 xl:size-auto xl:max-w-[9rem] xl:border-transparent xl:bg-transparent xl:px-2.5 xl:py-1 xl:text-xs xl:font-semibold xl:text-[var(--app-muted)] xl:hover:text-[var(--app-text)]"
+              className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] text-[11px] font-bold text-[var(--app-text)] transition hover:bg-black/5 xl:size-auto xl:max-w-[7rem] 2xl:max-w-[9rem] xl:border-transparent xl:bg-transparent xl:px-2.5 xl:py-1 xl:text-xs xl:font-semibold xl:text-[var(--app-muted)] xl:hover:text-[var(--app-text)]"
               title="계정 설정"
             >
               <span className="xl:hidden" aria-hidden="true">{user.name?.[0] ?? '?'}</span>

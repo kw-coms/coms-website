@@ -2232,9 +2232,22 @@ test('quick jump is offered beside the menu button on a phone', async ({ page })
   expect(overflow).toBeLessThanOrEqual(1)
 })
 
-// The brand and the first nav item must keep a real gap at the tightest desktop widths with whichever face is drawn:
-// the site font (Pretendard, display: swap) at first paint, after it has arrived, or - when its request fails - the
-// metric-matched fallback for good. Nothing here waits for document.fonts.
+// The site font (Pretendard, display: swap) as a reader on a slow link sees it: its font files are held for 1.5 s, so the page is
+// drawn in the metric-matched fallback first and the real font swaps in later. Returns a check that the font really was pending.
+const holdSiteFont = async (page) => {
+  await page.route(/pretendard.*\.woff2/i, async (route) => { await new Promise((resolve) => setTimeout(resolve, 1500)); await route.continue() })
+}
+const siteFontStatuses = (page) => page.evaluate(() => [...document.fonts].filter((f) => f.family.includes('Pretendard Variable')).map((f) => f.status))
+const siteFontLoaded = (page) => page.waitForFunction(() => [...document.fonts].some((f) => f.family.includes('Pretendard Variable') && f.status === 'loaded'))
+const expectSiteFontPending = async (page) => {
+  await expect.poll(async () => (await siteFontStatuses(page)).length, { message: 'a Pretendard Variable FontFace is declared' }).toBeGreaterThan(0)
+  const statuses = await siteFontStatuses(page)
+  expect(statuses.some((status) => status === 'loading' || status === 'unloaded') && !statuses.includes('loaded'), `the site font is still pending (${statuses.join(', ')})`).toBe(true)
+}
+
+// The brand and the first nav item must keep a real gap at the tightest desktop widths with whichever face is drawn: the
+// metric-matched fallback at first paint (site font held), the site font after it has arrived, or the fallback for good when
+// the font request fails. First paint is measured while the font is pending, never after waiting for document.fonts.
 const HEADER_MIN_GAP = 12
 for (const siteFont of ['arriving', 'blocked']) {
   for (const theme of ['light', 'dark']) {
@@ -2245,6 +2258,7 @@ for (const siteFont of ['arriving', 'blocked']) {
       }, theme)
       await mockAdminApis(page)
       if (siteFont === 'blocked') await page.route(/pretendard/i, (route) => route.abort())
+      else await holdSiteFont(page)
       for (const width of [1024, 1152, 1280]) {
         await page.setViewportSize({ width, height: 800 })
         await page.goto('/')
@@ -2255,16 +2269,52 @@ for (const siteFont of ['arriving', 'blocked']) {
           const b = await brand.boundingBox()
           return (await firstItem.boundingBox()).x - (b.x + b.width)
         }
-        expect(await gap(), `brand vs nav at ${width}px, first paint`).toBeGreaterThanOrEqual(HEADER_MIN_GAP)
-        await page.waitForTimeout(800)
-        expect(await gap(), `brand vs nav at ${width}px, 800 ms later`).toBeGreaterThanOrEqual(HEADER_MIN_GAP)
+        if (siteFont === 'arriving') await expectSiteFontPending(page)
+        expect(await gap(), `brand vs nav at ${width}px, first paint${siteFont === 'arriving' ? ' (fallback face)' : ''}`).toBeGreaterThanOrEqual(HEADER_MIN_GAP)
+        if (siteFont === 'arriving') await siteFontLoaded(page)
+        else await page.waitForTimeout(800)
+        expect(await gap(), `brand vs nav at ${width}px, after the swap`).toBeGreaterThanOrEqual(HEADER_MIN_GAP)
       }
     })
   }
 }
 
-// Layout shift while the site font arrives late (held 1.5 s, so it is still pending when a loaded CI machine shows the page): the fallback face is metric-matched to Pretendard, so the
-// swap must not reflow the page. Shifts caused by the reader's own input are excluded by the API (hadRecentInput).
+// A long display name widens the account cluster: the brand never shrinks and the nav keeps its gap, so the cluster must
+// stay inside the bar (and the nav be pushed, not painted over) - in the fallback face and in the site font.
+for (const siteFont of ['arriving', 'blocked']) {
+  test(`header with a 20-character Korean name stays inside the bar at 1280 and 1366, site font ${siteFont}`, async ({ page }) => {
+    await page.addInitScript(() => { try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ } })
+    await mockAdminApis(page)
+    await page.route('**/api/auth/me', (route) => route.fulfill({ status: 200, json: { id: 1, name: '가나다라마바사아자차카타파하거너더러머버', studentId: '2020123456', role: 'ADMIN', emailVerified: true } }))
+    if (siteFont === 'blocked') await page.route(/pretendard/i, (route) => route.abort())
+    else await holdSiteFont(page)
+    for (const width of [1280, 1366]) {
+      await page.setViewportSize({ width, height: 800 })
+      await page.goto('/')
+      const firstItem = page.locator('header nav').first().getByRole('button').first()
+      await expect(firstItem).toBeVisible()
+      await expect(page.locator('header').getByText('가나다라마바사아자차카타파하거너더러머버').first()).toBeAttached()
+      const measure = () => page.evaluate(() => {
+        const bar = document.querySelector('header [class*="lg:grid"]')
+        const [brand, nav, cluster] = [...bar.children].map((el) => el.getBoundingClientRect())
+        return { gap: nav.left - brand.right, clusterRight: cluster.right, barRight: bar.getBoundingClientRect().right, scroll: document.documentElement.scrollWidth - document.documentElement.clientWidth }
+      })
+      const check = async (when) => {
+        const m = await measure()
+        expect(m.gap, `brand vs nav at ${width}px, ${when}`).toBeGreaterThanOrEqual(HEADER_MIN_GAP)
+        expect(m.clusterRight, `account cluster inside the bar at ${width}px, ${when}`).toBeLessThanOrEqual(m.barRight)
+        expect(m.scroll, `no horizontal scroll at ${width}px, ${when}`).toBeLessThanOrEqual(1)
+      }
+      if (siteFont === 'arriving') await expectSiteFontPending(page)
+      await check('first paint')
+      if (siteFont === 'arriving') { await siteFontLoaded(page); await check('after the swap') }
+    }
+  })
+}
+
+// Layout shift while the site font arrives late (held 1.5 s, so it is still pending when a loaded CI machine shows the page): the
+// fallback face is metric-matched to Pretendard, so the swap must not reflow the page. Shifts caused by the reader's own input
+// are excluded by the API (hadRecentInput).
 for (const path of ['/', '/study/arduino']) {
   test(`the site font swapping in late shifts nothing on ${path}`, async ({ page }) => {
     await page.addInitScript(() => {
@@ -2275,16 +2325,16 @@ for (const path of ['/', '/study/arduino']) {
       }).observe({ type: 'layout-shift', buffered: true })
     })
     await mockAdminApis(page)
-    await page.route(/pretendard/i, async (route) => { await new Promise((resolve) => setTimeout(resolve, 1500)); await route.continue() })
+    await holdSiteFont(page)
     await page.goto(path)
     // Shifts while the page itself is still arriving (lazy chunks, the footer) are not the font's; count from the first heading on,
-    // and make sure the site font was still pending then, or there would be no swap to measure.
+    // and make sure a Pretendard FontFace is declared and not yet loaded then, or there would be no swap to measure.
     await page.locator('h1').first().waitFor()
-    const seen = await page.evaluate(() => ({ at: performance.now(), loaded: [...document.fonts].some((f) => f.family.includes('Pretendard Variable') && f.status === 'loaded') }))
-    expect(seen.loaded, 'the site font must still be pending when the content shows').toBe(false)
-    await page.waitForFunction(() => [...document.fonts].some((f) => f.family.includes('Pretendard Variable') && f.status === 'loaded'))
+    const at = await page.evaluate(() => performance.now())
+    await expectSiteFontPending(page)
+    await siteFontLoaded(page)
     await page.waitForTimeout(1000)
-    const shifts = (await page.evaluate(() => window.__shifts)).filter((s) => s.at >= seen.at)
+    const shifts = (await page.evaluate(() => window.__shifts)).filter((s) => s.at >= at)
     const cls = shifts.reduce((sum, s) => sum + s.value, 0)
     expect(cls, `layout shift: ${JSON.stringify(shifts)}`).toBeLessThan(0.02)
   })
@@ -4854,7 +4904,8 @@ test.describe('arduino study circuits', () => {
       await page.addInitScript((fontSize) => {
         // every height a figure's own rows (all of it but the prose caption) ever have, from the moment it is in the page.
         // The caption is left out: the fallback face is metric-matched to Pretendard, not identical, so when the site font
-        // arrives a caption can still re-wrap by a line where its text sits on a wrap point (joystick at 375px, 22.75px)
+        // arrives a caption can still re-wrap by a line where its text sits on a wrap point (joystick at 375px, 22.75px, with WenQuanYi
+        // and with Noto Sans CJK KR alike - re-checked: whole-figure heights from first paint fail only there)
         const seen = new WeakSet()
         window.__figureHeights = {}
         const rows = (f) => f.getBoundingClientRect().height - f.querySelector('figcaption').getBoundingClientRect().height
