@@ -17,14 +17,20 @@ const block = (header) => {
 
 // The zones are http-level; the compile route is members-only, POST-only, limited and socket-bound.
 // Pre-login limits are one shared bucket: nothing a client sends (cookies, headers, addresses) can multiply it.
-assert.match(nginx, /^limit_req_zone \$lab_global zone=lab_pre:/m)
+assert.match(nginx, /^limit_req_zone \$lab_global zone=lab_pre:64k rate=600r\/m;/m)
 assert.match(nginx, /^limit_conn_zone \$lab_global zone=lab_pre_conn:/m)
 assert.match(nginx, /map \$host \$lab_global \{\s*default lab;/)
-assert.doesNotMatch(nginx, /^\s*(set_real_ip_from|real_ip_header)\b/m, 'no trust in a client address that the host config would have to supply')
-assert.doesNotMatch(nginx, /limit_(req|conn)_zone [^;]*(\$cookie_|\$http_|\$remote_addr|\$binary_remote_addr)/, 'no limit key a client can vary')
+// The client address is trusted only from Docker's private ranges, as the host nginx overwrites X-Real-IP.
+assert.match(nginx, /^\s*set_real_ip_from 172\.16\.0\.0\/12;/m)
+assert.match(nginx, /^\s*real_ip_header X-Real-IP;/m)
+assert.doesNotMatch(nginx, /set_real_ip_from (0\.0\.0\.0|::|\d+\.\d+\.\d+\.\d+\/(?:[0-9]|1[01])(?!\d))/, 'never trust a wide range')
+assert.match(nginx, /^limit_req_zone \$binary_remote_addr zone=lab_pre_ip:10m rate=30r\/m;/m)
+assert.match(nginx, /^limit_conn_zone \$binary_remote_addr zone=lab_pre_ip_conn:/m)
+assert.match(nginx, /proxy_set_header X-Real-IP \$remote_addr;/, 'the host nginx line this relies on is quoted in the conf')
+assert.doesNotMatch(nginx, /limit_(req|conn)_zone [^;]*(\$cookie_|\$http_)/, 'no limit key taken straight from a client header or cookie')
 const compile = block('location = /lab/api/compile {')
 for (const part of [/!= POST\) \{ return 405/, /auth_request \/lab\/_auth/, /client_max_body_size 100k/,
-  /proxy_set_header Cookie ""/, /auth_request_set \$lab_member \$upstream_http_x_member_id;/, /proxy_set_header X-Lab-Client \$lab_member;/, /proxy_set_header X-Forwarded-For ""/, /limit_req zone=lab_pre burst=40/, /limit_conn lab_pre_conn 16/, /http_cookie ~ "\^\.\{4097,\}"\) \{ return 431/, /token=\[\^;\]\*;/, /proxy_pass http:\/\/unix:\/run\/coms-lab\/compile\.sock:\/lab\/api\/compile;/, /proxy_read_timeout 30s/]) {
+  /proxy_set_header Cookie ""/, /auth_request_set \$lab_member \$upstream_http_x_member_id;/, /proxy_set_header X-Lab-Client \$lab_member;/, /proxy_set_header X-Forwarded-For ""/, /limit_req zone=lab_pre_ip burst=15/, /limit_conn lab_pre_ip_conn 6/, /limit_req zone=lab_pre burst=200/, /limit_conn lab_pre_conn 64/, /http_cookie ~ "\^\.\{4097,\}"\) \{ return 431/, /token=\[\^;\]\*;/, /proxy_pass http:\/\/unix:\/run\/coms-lab\/compile\.sock:\/lab\/api\/compile;/, /proxy_read_timeout 55s/]) {
   assert.match(compile, part)
 }
 // The compiler never receives the cookie, and every answer nginx writes itself carries nosniff + HSTS.
@@ -53,6 +59,13 @@ for (const location of ['location = /lab/index.html {', 'location ^~ /lab/assets
 
 // Compose: no network, read-only, shared socket volume, and the site must not wait for the compiler.
 const service = compose.slice(compose.indexOf('  coms-lab-compiler:'), compose.indexOf('  coms-frontend:'))
+assert.match(service, /seccomp=\.\/lab\/compiler\/seccomp\.json/, 'seccomp is pinned to the repository profile, not the engine default')
+const seccomp = JSON.parse(readFileSync(new URL('../lab/compiler/seccomp.json', import.meta.url), 'utf8'))
+assert.equal(seccomp.defaultAction, 'SCMP_ACT_ERRNO')
+// Rules gated on a capability are inert: the compiler runs with cap_drop ALL.
+const allowed = new Set(seccomp.syscalls.flatMap((rule) => (rule.action === 'SCMP_ACT_ALLOW' && !rule.includes?.caps ? rule.names : [])))
+for (const name of ['ptrace', 'process_vm_readv', 'process_vm_writev', 'mount', 'bpf', 'keyctl']) assert.ok(!allowed.has(name), `${name} must not be allowed unconditionally`)
+for (const name of ['read', 'write', 'execve', 'clone', 'prlimit64', 'wait4']) assert.ok(allowed.has(name), `${name} is needed by the compiler`)
 for (const part of [/network_mode: none/, /read_only: true/, /cap_drop: \[ALL\]/, /no-new-privileges:true/, /user: "10001:101"/, /LISTEN_SOCKET: \/run\/coms-lab\/compile\.sock/, /lab-sock:\/run\/coms-lab/]) {
   assert.match(service, part)
 }

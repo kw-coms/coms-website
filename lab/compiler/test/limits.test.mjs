@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRateLimiter, createCompileQueue, normalizeIp } from '../limits.mjs';
+import { createRateLimiter, createCompileQueue, normalizeIp, QUEUE_WAIT_EXPIRED } from '../limits.mjs';
 
 test('allows ten attempts per IP each minute', () => {
   let now = 0; const limiter = createRateLimiter({ now: () => now });
@@ -73,4 +73,26 @@ test('starts next job when active job rejects', async () => {
   const second = queue.submit(() => 42);
   await assert.rejects(first);
   assert.equal(await second, 42);
+});
+test('a queued job that cannot start within maxWaitMs is dropped and the slot is not lost', async () => {
+  let fire;
+  const queue = createCompileQueue({ concurrency: 1, maxQueued: 2, maxWaitMs: 1000, setTimeoutImpl: fn => { fire = fn; return { unref() {} }; } });
+  let release;
+  const running = queue.submit(() => new Promise(resolve => { release = resolve; }));
+  const waiting = queue.submit(() => 'never runs');
+  assert.deepEqual(queue.stats(), { active: 1, queued: 1 });
+  fire();
+  assert.equal(await waiting, QUEUE_WAIT_EXPIRED);
+  assert.deepEqual(queue.stats(), { active: 1, queued: 0 });
+  release('done');
+  assert.equal(await running, 'done');
+  assert.equal(await queue.submit(() => 'next'), 'next');
+});
+test('a queued job that starts in time clears its wait timer', async () => {
+  const cleared = [];
+  const queue = createCompileQueue({ concurrency: 1, maxWaitMs: 1000, setTimeoutImpl: () => { const timer = { unref() {} }; cleared.push(timer); return timer; } });
+  const first = queue.submit(() => 1);
+  const second = queue.submit(() => 2);
+  assert.equal(await first, 1); assert.equal(await second, 2);
+  assert.equal(cleared.length, 1);
 });

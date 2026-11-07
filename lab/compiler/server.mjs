@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { lstat, unlink } from 'node:fs/promises';
 import { validateSketch } from './validation.mjs';
 import { compileSketch, failure } from './compile.mjs';
-import { createRateLimiter, createCompileQueue, normalizeIp } from './limits.mjs';
+import { createRateLimiter, createCompileQueue, normalizeIp, QUEUE_WAIT_EXPIRED } from './limits.mjs';
 
 export const MAX_BODY_BYTES = 80 * 1024;
 export const AUTH_MESSAGE = '로그인한 동아리원만 컴파일할 수 있어요.';
@@ -123,6 +123,7 @@ export function createCompileServer({
       });
       if (!pending) { response.setHeader('Retry-After', '20'); return send(429, failure('busy', '컴파일 대기열이 가득 찼어요. 잠시 후 다시 시도해 주세요.')); }
       const result = await pending;
+      if (result === QUEUE_WAIT_EXPIRED) { response.setHeader('Retry-After', '20'); return send(429, failure('busy', '컴파일 대기열이 가득 찼어요. 잠시 후 다시 시도해 주세요.')); }
       return send(result.ok || result.reason === 'compile' ? 200 : 504, result);
     } catch {
       send(500, failure('compile', '서버에서 요청을 처리하지 못했어요.'));

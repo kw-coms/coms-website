@@ -48,7 +48,12 @@ export function createRateLimiter({ limit = 10, windowMs = 60_000, now = Date.no
   };
 }
 
-export function createCompileQueue({ concurrency = 2, maxQueued = 6 } = {}) {
+// Resolved (instead of the job's result) for a job that waited maxWaitMs without getting a slot.
+export const QUEUE_WAIT_EXPIRED = Symbol('queue-wait-expired');
+
+// maxWaitMs bounds the time spent waiting for a slot so that wait + the 20 s compile stays well
+// under the 60 s the host proxy gives a request (it sets no proxy_read_timeout of its own).
+export function createCompileQueue({ concurrency = 2, maxQueued = 6, maxWaitMs = 25_000, setTimeoutImpl = setTimeout } = {}) {
   let active = 0;
   const waiting = [];
   function start(job, resolve, reject) {
@@ -56,15 +61,25 @@ export function createCompileQueue({ concurrency = 2, maxQueued = 6 } = {}) {
     Promise.resolve().then(job).then(resolve, reject).finally(() => {
       active--;
       const next = waiting.shift();
-      if (next) start(...next);
+      if (next) {
+        clearTimeout(next.timer);
+        start(next.job, next.resolve, next.reject);
+      }
     });
   }
   return {
     submit(job) {
       if (active >= concurrency && waiting.length >= maxQueued) return null;
       return new Promise((resolve, reject) => {
-        if (active < concurrency) start(job, resolve, reject);
-        else waiting.push([job, resolve, reject]);
+        if (active < concurrency) return start(job, resolve, reject);
+        const entry = { job, resolve, reject, timer: undefined };
+        entry.timer = setTimeoutImpl(() => {
+          const index = waiting.indexOf(entry);
+          if (index !== -1) waiting.splice(index, 1);
+          resolve(QUEUE_WAIT_EXPIRED);
+        }, maxWaitMs);
+        entry.timer.unref?.();
+        waiting.push(entry);
       });
     },
     stats: () => ({ active, queued: waiting.length }),

@@ -113,3 +113,17 @@ httpTest('returns busy when bounded compile queue is full', async () => {
     release(); await first;
   });
 });
+httpTest('a request that waits too long for a slot gets 429 busy, well before the proxy would time out', async () => {
+  const queue = createCompileQueue({ concurrency: 1, maxQueued: 1, maxWaitMs: 150 });
+  let release, started;
+  const running = new Promise(resolve => { release = resolve; });
+  const entered = new Promise(resolve => { started = resolve; });
+  await withServer({ queue, runner: async () => { started(); await running; return { code: 1, stderr: 'sketch.ino:1:1: error: bad', stdout: '' }; } }, async url => {
+    const first = post(url); await entered;
+    const begun = Date.now();
+    const second = await post(url);
+    assert.equal(second.status, 429); assert.equal((await second.json()).reason, 'busy');
+    assert.ok(Date.now() - begun < 2000);
+    release(); await first;
+  });
+});
