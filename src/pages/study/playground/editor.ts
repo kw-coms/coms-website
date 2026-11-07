@@ -74,6 +74,8 @@ export interface EditorOptions {
   label: string
   onChange(value: string): void
   onRun(): void
+  onSubmit?(): void
+  readOnly?: boolean
 }
 
 export async function createEditor(opts: EditorOptions): Promise<PgEditor> {
@@ -85,6 +87,7 @@ export async function createEditor(opts: EditorOptions): Promise<PgEditor> {
     { key: 'Escape', run: () => { tabFree = true; return true } },
     { key: 'Tab', run: (v) => (tabFree ? false : indentMore(v)) },
     { key: 'Shift-Tab', run: (v) => (tabFree ? false : indentLess(v)) },
+    { key: 'Mod-Shift-Enter', run: () => { opts.onSubmit?.(); return !!opts.onSubmit } },
     { key: 'Mod-Enter', run: () => { opts.onRun(); return true } },
   ]))
   const view = new EditorView({
@@ -93,6 +96,7 @@ export async function createEditor(opts: EditorOptions): Promise<PgEditor> {
       doc: opts.doc,
       extensions: [
         tabKeys,
+        EditorState.readOnly.of(!!opts.readOnly),
         lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(), drawSelection(), history(), bracketMatching(), closeBrackets(), indentOnInput(),
         lintGutter(),
         EditorState.tabSize.of(indent.length), indentUnit.of(indent),

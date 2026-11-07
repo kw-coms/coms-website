@@ -25,6 +25,10 @@ export type RunResult =
   | { kind: 'rejected'; messageKo: string }
   | { kind: 'network'; messageKo: string }
 
+export type PostRunResult =
+  | { kind: 'output'; data: Record<string, unknown> }
+  | Exclude<RunResult, { kind: 'output' }>
+
 export const RUN_URL = '/study/api/run'
 export const MAX_CODE_BYTES = 64 * 1024
 export const MAX_STDIN_BYTES = 16 * 1024
@@ -76,6 +80,12 @@ function either(user: AbortSignal | undefined, timeout: AbortSignal): AbortSigna
 export async function runRemote(lang: RunLang, code: string, stdin: string, signal?: AbortSignal): Promise<RunResult> {
   if (bytes(code) > MAX_CODE_BYTES) return { kind: 'rejected', messageKo: '코드가 너무 길어요. 64KB 이하로 줄여 주세요.' }
   if (bytes(stdin) > MAX_STDIN_BYTES) return { kind: 'rejected', messageKo: '입력이 너무 길어요. 16KB 이하로 줄여 주세요.' }
+  const result = await postRun({ lang, code, stdin }, signal)
+  return result.kind === 'output' ? { kind: 'output', output: asOutput(result.data) } : result
+}
+
+/** Shared transport for single-run and multi-case requests. Keep auth, retry and errors identical. */
+export async function postRun(body: { lang: RunLang; code: string; stdin?: string; tests?: string[] }, signal?: AbortSignal): Promise<PostRunResult> {
   let timeout: AbortSignal | null = null
   try {
     // Every attempt gets its own deadline: the retry after a renewed session must not inherit what the first one used up.
@@ -85,7 +95,7 @@ export async function runRemote(lang: RunLang, code: string, stdin: string, sign
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lang, code, stdin }),
+        body: JSON.stringify(body),
         signal: either(signal, timeout),
       })
     }
@@ -108,7 +118,7 @@ export async function runRemote(lang: RunLang, code: string, stdin: string, sign
     }
     if (res.status === 400) return { kind: 'rejected', messageKo: typeof data?.messageKo === 'string' ? data.messageKo : '실행할 수 없는 코드예요.' }
     if (!res.ok || !data) return { kind: 'network', messageKo: '실행 서버가 응답하지 않아요. 잠시 뒤에 다시 시도해 주세요.' }
-    return { kind: 'output', output: asOutput(data) }
+    return { kind: 'output', data }
   } catch (e) {
     if (signal?.aborted) throw e
     const timedOut = timeout?.aborted === true

@@ -1,7 +1,10 @@
+import { lazy, Suspense } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { STUDIES } from './studies'
 import './study.css'
+
+const StudyPracticeSummary = lazy(() => import('./exercises/StudyPracticeSummary'))
 
 /** Number of finished parts saved for a study, or 0 (also when storage is unavailable). */
 function savedDone(progressKey: string) {
@@ -35,6 +38,7 @@ export default function StudyHubPage() {
                     <ArrowRight size={15} aria-hidden="true" />
                   </span>
                 </Link>
+                <Suspense fallback={<div style={{ minHeight: 80 }} />}><StudyPracticeSummary studyId={study.id} /></Suspense>
               </li>
             )
           })}
