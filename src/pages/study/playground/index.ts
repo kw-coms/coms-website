@@ -262,9 +262,27 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     const was = b.stage.classList.contains('is-edited')
     if (was !== b.edited) renderBar(b)
   }
+  // Every write of a draft or its backup runs inside this lock, and reads the storage inside it too, so two tabs
+  // cannot interleave their read-compare-write. Without the Web Locks API (old browsers) it runs unserialized.
+  function withDraftLock<T>(key: string, fn: () => T): Promise<T> {
+    const locks = (navigator as Navigator & { locks?: LockManager }).locks
+    return locks ? locks.request(`study-draft:${key}`, async () => fn()) : Promise.resolve().then(fn)
+  }
+  /** Saves the block under the lock. */
   function persist(b: Block) {
     window.clearTimeout(b.saveTimer)
     b.saveTimer = 0
+    void withDraftLock(b.key, () => persistNow(b))
+  }
+  /** Synchronous save, for pagehide / dispose / leaving to the login page, which cannot wait for an async lock.
+   *  Best effort: it skips the lock, so in the rare instant another tab is saving the same block it can still race
+   *  (the compare against the baseline below still keeps that tab's draft as the backup in the common case). */
+  function persistNowUnlocked(b: Block) {
+    window.clearTimeout(b.saveTimer)
+    b.saveTimer = 0
+    persistNow(b)
+  }
+  function persistNow(b: Block) {
     if (b.shared) return // a shared link's code stays a temporary view until "이 코드로 저장"
     // Another tab saved a newer draft since this tab last looked: keep it as the one-step backup instead of silently overwriting it.
     const stored = store.get(b.key)?.code ?? null
@@ -462,7 +480,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     setBusy(b, false)
     switch (result.kind) {
       case 'login': {
-        persist(b)
+        persistNowUnlocked(b)
         ensurePanel(b)
         b.els.chips.textContent = ''
         b.els.out.hidden = b.els.err.hidden = b.els.diag.hidden = true
@@ -608,11 +626,14 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     b.host?.querySelector('.pg-shared')?.remove()
     if (save) {
       // One step back: the draft this replaces stays available as "이전 코드 복원".
-      const previous = store.get(b.key)?.code ?? null
-      if (previous !== null && previous !== value) store.setBackup(b.key, previous)
-      b.baseline = previous
       b.current = value
-      persist(b)
+      void withDraftLock(b.key, () => {
+        const previous = store.get(b.key)?.code ?? null
+        if (previous !== null && previous !== value) store.setBackup(b.key, previous)
+        b.baseline = previous
+        persistNow(b)
+        renderBar(b) // the "이전 코드 복원" button depends on the backup written just now
+      })
       showToast('이 코드로 저장했어요. 이전 코드는 "이전 코드 복원"으로 되살릴 수 있어요.')
     } else {
       const own = ownDraft(b)
@@ -626,15 +647,23 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     b.editor?.focus()
   }
   function restoreBackup(b: Block) {
-    const backup = store.getBackup(b.key)
-    if (!backup) return
-    const now = b.editor ? b.editor.getValue() : b.current
-    if (now !== backup.code) store.setBackup(b.key, now) // swap: restoring can itself be undone once
-    else store.clearBackup(b.key)
-    loadCode(b, backup.code)
-    persist(b)
-    renderBar(b)
-    showToast('이전 코드를 되살렸어요.')
+    void withDraftLock(b.key, () => {
+      const backup = store.getBackup(b.key)
+      if (!backup) return
+      // Another tab saved this block since this tab last looked: restoring now would bury its draft. Decline and
+      // leave the code (and its pending autosave, which takes the normal conflict path) exactly as it is.
+      if ((store.get(b.key)?.code ?? null) !== b.baseline) {
+        showToast('다른 탭에서 이 코드가 바뀌어서 되돌리기를 멈췄어요. 지금 코드는 그대로 있어요.')
+        return
+      }
+      const now = b.editor ? b.editor.getValue() : b.current // unsaved edits included
+      if (now !== backup.code) store.setBackup(b.key, now) // swap: restoring can itself be undone once
+      else store.clearBackup(b.key)
+      loadCode(b, backup.code)
+      persistNow(b)
+      renderBar(b)
+      showToast('이전 코드를 되살렸어요.')
+    })
   }
 
   async function onClick(ev: MouseEvent) {
@@ -656,7 +685,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
       case 'lab': await labOpen(b); break
       case 'reset':
         loadCode(b, b.initial)
-        if (!b.shared) { store.clear(b.key); b.baseline = null } // in a shared view only the view changes; the saved draft stays
+        if (!b.shared) void withDraftLock(b.key, () => { store.clear(b.key); b.baseline = null }) // in a shared view only the view changes; the saved draft stays
         renderBar(b)
         b.editor?.focus()
         showToast('원래 코드로 되돌렸어요.')
@@ -711,7 +740,8 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     if (b && !(e.target as Element | null)?.closest?.('.cm-editor')) setFull(b, false)
   }, { signal })
 
-  window.addEventListener('pagehide', () => blocks.forEach((b) => b.saveTimer && persist(b)), { signal })
+  // Only a pending user edit is written (loadCode drops the timer), synchronously: see persistNowUnlocked.
+  window.addEventListener('pagehide', () => blocks.forEach((b) => b.saveTimer && persistNowUnlocked(b)), { signal })
 
   // ---------- deep links: a shared code (#pg=…) or a block anchor (#code-N, e.g. back from the login page) ----------
   const shared = decodeShareHash(location.hash)
@@ -738,7 +768,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     disposed = true
     ac.abort()
     blocks.forEach((b) => {
-      if (b.saveTimer) persist(b)
+      if (b.saveTimer) persistNowUnlocked(b)
       b.abort?.abort()
       window.clearInterval(b.busyTimer)
       b.editor?.destroy()

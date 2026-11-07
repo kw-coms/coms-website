@@ -381,6 +381,29 @@ test('leaving a shared view uses the draft saved by another tab meanwhile, not t
   await expect(editorOf(again, 0)).toContainText('가장새로운코드')
 })
 
+// The saved draft of block 0 and its one-step backup, parsed from storage.
+async function drafts(page) {
+  return page.evaluate(() => {
+    const data = JSON.parse(localStorage.getItem('coms-study-playground:c') || '{}')
+    const id = Object.keys(data).find((k) => !k.endsWith('~prev'))
+    return { primary: id ? data[id].code : null, backup: id && data[id + '~prev'] ? data[id + '~prev'].code : null }
+  })
+}
+// Rewrites the saved draft in storage as another tab would have, without going through this page's editor.
+async function saveElsewhere(page, from, to) {
+  await page.evaluate(([f, t]) => {
+    const k = 'coms-study-playground:c'
+    const data = JSON.parse(localStorage.getItem(k))
+    for (const id of Object.keys(data)) if (!id.endsWith('~prev')) data[id] = { code: data[id].code.replace(f, t), at: Date.now() }
+    localStorage.setItem(k, JSON.stringify(data))
+  }, [from, to])
+}
+// Freezes the page's clock so the 400 ms autosave debounce only fires when the test advances it.
+async function freeze(page) {
+  const now = await page.evaluate(() => Date.now())
+  await page.clock.pauseAt(now + 1000)
+}
+
 test('returning to your draft never autosaves over a newer draft another tab saves right after', async ({ page, context, browser }) => {
   await mockRun(page, () => ({ json: OK }))
   await openStudy(page, 'c')
@@ -390,24 +413,85 @@ test('returning to your draft never autosaves over a newer draft another tab sav
   const url = await makeShareUrl(browser, THEIRS)
 
   const shared = await context.newPage()
+  await shared.clock.install()
   await mockRun(shared, () => ({ json: OK }))
   await shared.goto(url)
   await expect(shared.locator('#code-0 .pg-shared')).toBeVisible()
+  await freeze(shared)
   await shared.getByRole('button', { name: '내 코드로 돌아가기' }).click()
+  await expect(editorOf(shared, 0)).toContainText('내코드')
 
-  // Inside the 400 ms autosave window of the returning tab, the other tab saves a newer draft (written straight
-  // to storage so it is certain to land before the deadline).
-  await page.evaluate(() => {
+  // The other tab saves a newer draft before the returning tab's 400 ms deadline.
+  await saveElsewhere(page, '내코드', '더새로운코드')
+  await shared.clock.runFor(1000) // past the deadline
+  await shared.evaluate(() => window.dispatchEvent(new Event('pagehide')))
+  const { primary, backup } = await drafts(page)
+  expect(primary).toContain('더새로운코드')
+  expect(backup).toBeNull()
+})
+
+test('restore is declined when another tab saved meanwhile; the pending edit is kept and the other draft ends up as the backup', async ({ page, context }) => {
+  await mockRun(page, () => ({ json: OK }))
+  await openStudy(page, 'c')
+  await openEditor(page, 0)
+  await replaceCode(page, 0, MINE) // A
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('내코드')
+  await page.evaluate(() => { // an older draft the reader could restore
     const k = 'coms-study-playground:c'
     const data = JSON.parse(localStorage.getItem(k))
-    for (const id of Object.keys(data)) data[id].code = data[id].code.replace('내코드', '더새로운코드')
+    const id = Object.keys(data)[0]
+    data[id + '~prev'] = { code: '#include <stdio.h>\nint main(void) { puts("옛날코드"); return 0; }\n', at: Date.now() }
     localStorage.setItem(k, JSON.stringify(data))
   })
-  await expect(editorOf(shared, 0)).toContainText('내코드')
-  await shared.evaluate(() => new Promise((resolve) => setTimeout(resolve, 600))) // past the deadline
-  await shared.evaluate(() => window.dispatchEvent(new Event('pagehide')))
-  expect(await page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('더새로운코드')
-  expect(await page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).not.toContain('"code":"#include <stdio.h>\\nint main(void) { puts(\\"내코드\\")')
+
+  const tab = await context.newPage()
+  await tab.clock.install()
+  await mockRun(tab, () => ({ json: OK }))
+  await tab.goto('/study/c')
+  await tab.locator('#code-0 button.pg-badge').click()
+  await expect(editorOf(tab, 0)).toContainText('내코드')
+  await freeze(tab)
+  await replaceCode(tab, 0, MINE.replace('내코드', '고치는중')) // C, autosave pending
+  await saveElsewhere(page, '내코드', '다른탭이저장') // B
+
+  await tab.locator('#code-0').getByRole('button', { name: /이전 코드 복원/ }).click()
+  await expect(tab.getByText('다른 탭에서 이 코드가 바뀌어서 되돌리기를 멈췄어요.')).toBeVisible()
+  await expect(editorOf(tab, 0)).toContainText('고치는중')
+  await expect(editorOf(tab, 0)).not.toContainText('옛날코드')
+
+  await tab.clock.runFor(1000) // the pending autosave takes the normal conflict path
+  const { primary, backup } = await drafts(page)
+  expect(primary).toContain('고치는중')
+  expect(backup).toContain('다른탭이저장')
+})
+
+test('two tabs saving at once from the same baseline: one ends as the draft, the other as the backup, nothing lost', async ({ page, context }) => {
+  await mockRun(page, () => ({ json: OK }))
+  await page.clock.install()
+  await openStudy(page, 'c')
+  await openEditor(page, 0)
+  await replaceCode(page, 0, MINE)
+  await page.clock.runFor(1000)
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('내코드')
+
+  const other = await context.newPage()
+  await other.clock.install()
+  await mockRun(other, () => ({ json: OK }))
+  await other.goto('/study/c')
+  await other.locator('#code-0 button.pg-badge').click()
+  await expect(editorOf(other, 0)).toContainText('내코드')
+  await freeze(page)
+  await freeze(other)
+  await replaceCode(page, 0, MINE.replace('내코드', '첫번째'))
+  await replaceCode(other, 0, MINE.replace('내코드', '두번째'))
+  await Promise.all([page.clock.runFor(1000), other.clock.runFor(1000)])
+  await expect.poll(async () => {
+    const d = await drafts(page)
+    return [d.primary, d.backup].filter(Boolean).join('|')
+  }).toMatch(/(첫번째[\s\S]*두번째|두번째[\s\S]*첫번째)/)
+  const { primary, backup } = await drafts(page)
+  expect(primary).not.toBeNull()
+  expect(backup).not.toBeNull()
 })
 
 test('typing after returning keeps the newer draft of another tab as the backup', async ({ page, context, browser }) => {
