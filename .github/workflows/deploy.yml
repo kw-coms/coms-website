@@ -283,7 +283,8 @@ jobs:
             # server keeps running it, and only the live and previous release images are kept.
             docker tag "coms-backend:$NEW_TAG" coms-backend:latest
             docker tag "coms-frontend:$NEW_TAG" coms-frontend:latest
-            for repo in coms-backend coms-frontend; do
+            docker tag "coms-lab-compiler:$NEW_TAG" coms-lab-compiler:latest
+            for repo in coms-backend coms-frontend coms-lab-compiler; do
               docker image ls "$repo" --format '{{.Tag}}' | while read -r tag; do
                 case "$tag" in
                   "$NEW_TAG"|previous|latest|"<none>") ;;

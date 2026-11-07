@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-const compose = readFileSync(new URL('../../compiler/docker-compose.yml', import.meta.url), 'utf8');
+// The site's compose file (repo root) runs the compiler next to coms-frontend; compiler/docker-compose.dev.yml is local dev only.
+const rootCompose = readFileSync(new URL('../../../docker-compose.yml', import.meta.url), 'utf8');
+const compose = rootCompose.slice(rootCompose.indexOf('  coms-lab-compiler:'), rootCompose.indexOf('  coms-frontend:'));
 const dockerfile = readFileSync(new URL('../../compiler/Dockerfile', import.meta.url), 'utf8');
 const guide = readFileSync(new URL('../../docs/DEPLOY.md', import.meta.url), 'utf8');
 
 describe('production deployment contract', () => {
-  it('restarts the compiler and creates its socket directory at boot', () => {
+  it('restarts the compiler and shares its socket directory with nginx through a volume', () => {
     expect(compose).toMatch(/^    restart: unless-stopped$/m);
-    expect(guide).toContain('d /run/coms-lab 0750 10001 www-data -');
-    expect(guide).toContain('systemd-tmpfiles --create /etc/tmpfiles.d/coms-lab.conf');
+    expect(compose).toMatch(/^      - lab-sock:\/run\/coms-lab$/m);
+    expect(compose).toMatch(/^    user: "10001:101"$/m);
+    expect(dockerfile).toContain('chown 10001:101 /run/coms-lab');
+    expect(guide).toContain('lab-sock');
+    expect(guide).not.toContain('systemd-tmpfiles');
   });
 
   it('documents the pinned image and distinguishes measured from production limits', () => {

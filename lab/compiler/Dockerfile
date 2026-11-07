@@ -61,6 +61,10 @@ RUN set -eu; \
       ln -s /usr/local/libexec/avr-limited "/opt/avr-limited/bin/$tool"; \
     done; \
     /usr/bin/prlimit --version
+# Socket directory for the volume shared with nginx (docker-compose.yml). A fresh named volume copies
+# this owner and mode, so the compiler (uid 10001) can create the socket and group 101 (the nginx
+# group in nginx:alpine) can reach it. Dockerfile.frontend creates the same directory.
+RUN mkdir -p /run/coms-lab && chown 10001:101 /run/coms-lab && chmod 0750 /run/coms-lab
 WORKDIR /app
 COPY --chown=root:root server.mjs compile.mjs validation.mjs limits.mjs diagnostics.mjs package.json ./
 USER compiler
