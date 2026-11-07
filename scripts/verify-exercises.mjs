@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Usage: node scripts/verify-exercises.mjs --local [--only id]
 //        node scripts/verify-exercises.mjs --runner http://localhost:3000
-import { register } from 'tsx/esm/api'
+// The runner image has no node_modules. Problem files only use erasable types, so there
+// run it with `node --experimental-strip-types` (Node 22.6+; default from 23.6).
 import { readdir, mkdtemp, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
@@ -10,7 +11,11 @@ import { spawn } from 'node:child_process'
 import http from 'node:http'
 import https from 'node:https'
 
-register()
+try {
+  (await import('tsx/esm/api')).register()
+} catch (err) {
+  if (err?.code !== 'ERR_MODULE_NOT_FOUND') throw err
+}
 const root = fileURLToPath(new URL('../', import.meta.url))
 const markers = { c: '/*@USER@*/', java: '/*@USER@*/', python: '#@USER@' }
 

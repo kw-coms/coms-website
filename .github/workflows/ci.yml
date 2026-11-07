@@ -223,7 +223,7 @@ jobs:
           done
           docker compose -p studyrt -f docker-compose.yml run --rm --no-deps \
             --volume "$GITHUB_WORKSPACE:/repo:ro" --workdir /repo runner \
-            node scripts/verify-exercises.mjs --runner unix:/run/coms-study/run.sock
+            node --experimental-strip-types scripts/verify-exercises.mjs --runner unix:/run/coms-study/run.sock
 
       - name: Compose end to end (seccomp, member key, restart after a crash, deny-list)
         working-directory: runner
