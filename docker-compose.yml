@@ -140,7 +140,10 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=256m,mode=1777
     cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
+    # Docker 29.9.0's default seccomp profile (the server's engine) minus the unconditional ptrace /
+    # process_vm_* rules, pinned in the repository so the filter does not depend on the engine
+    # (Docker Desktop may report unconfined). Upgrade by diffing against the new engine's default.json.
+    security_opt: ["no-new-privileges:true", "seccomp=./lab/compiler/seccomp.json"]
     mem_limit: 768m
     memswap_limit: 768m
     cpus: 1.0
@@ -149,7 +152,7 @@ services:
     environment:
       LISTEN_SOCKET: /run/coms-lab/compile.sock
       RATE_LIMIT_PER_MIN: "${LAB_RATE_LIMIT_PER_MIN:-10}"
-      # nginx overwrites X-Forwarded-For with the visitor's address.
+      # nginx sends X-Lab-Client (the member id the backend vouched for) and required for every request.
       TRUST_PROXY: "1"
       # Login is checked by nginx (auth_request); the container has no network to check it itself.
       AUTH_CHECK_URL: ""
