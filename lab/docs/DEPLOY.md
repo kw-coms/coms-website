@@ -15,6 +15,7 @@ Circuit Lab은 **동아리 사이트와 같은 저장소·같은 배포**로 나
 - **호스트 nginx는 바꾸지 않는다.** `/api`만 백엔드로 보내고 나머지는 프런트 컨테이너로 보내는 기존 설정에서 `/lab/*`도 이미 프런트 컨테이너에 도달한다.
 - `Dockerfile.frontend`의 `lab-build` 단계가 `lab/`을 `npm ci && npm run build`(`tsc -b` 포함)로 빌드해 `/usr/share/nginx/html/lab/`에 복사한다. 사이트 본체 빌드와 의존성은 완전히 분리된다.
 - `docker-compose.yml`의 `coms-lab-compiler` 서비스는 `lab/compiler`에서 빌드되고(이미지 태그는 `coms-lab-compiler:${COMS_IMAGE_TAG}`), `lab-sock` 볼륨의 Unix 소켓으로만 통신한다.
+- **컴파일러는 배포를 실패시키거나 사이트를 롤백시킬 수 없다.** 배포 스크립트(`.github/workflows/deploy.yml`)는 사이트 서비스를 이름으로 올리고(`up -d --remove-orphans db db-backup coms-backend coms-frontend`), 컴파일러 단계는 `scripts/deploy-lab-compiler.sh`의 경고 전용 함수로만 실행한다: 서버 여유(`free -m`, `df -h /`) 출력 → 가용 메모리 1200 MB 미만이면 컴파일러 빌드·기동 생략 → 실행 중 이미지를 `coms-lab-compiler:previous`로 스냅샷(첫 배포는 없음) → 빌드 실패는 경고만 → **사이트 헬스 체크 통과 후에만** 새 컴파일러 기동(실패 시 previous로 복원) → 사이트 롤백 시 컴파일러도 previous로 → 성공 시 `latest` 갱신과 live+previous만 남기고 정리. `scripts/test-deploy-lab-compiler.sh`가 임시 compose 프로젝트로 여러 릴리스(첫 배포, 롤백, 시작 실패, 빌드 실패, 저메모리)를 검증한다.
 - **컴파일러가 죽어도 사이트는 산다.** `coms-frontend`는 컴파일러에 `depends_on` 하지 않는다. 컴파일러가 없으면 `/lab/api/compile`이 502를 반환하고 Lab은 "컴파일 서버에 연결할 수 없어요"를 보여 준다(회로 보기·시뮬레이션은 계속 동작). 배포 헬스 체크와 롤백(`--no-build coms-backend coms-frontend`)에도 컴파일러는 들어가지 않는다.
 
 ## 1. 버전과 이미지
@@ -54,12 +55,12 @@ Compose의 `coms-lab-compiler`는 `restart: unless-stopped`로 재시작하며 �
 | `/lab` | `/lab/`으로 301 (상대 `Location`, https 유지) |
 | `/lab/index.html`, `/lab/` 그 외 | Lab CSP(`security-headers-lab.conf`), `Cache-Control: no-cache`. 없는 경로(`/lab/anything`)는 `/lab/index.html`로 fallback |
 | `/lab/assets/*` | 해시 파일: `max-age=31536000, immutable`. 없으면 404 (앱 셸을 주지 않는다) |
-| `POST /lab/api/compile` | `limit_req` 분당 10회(burst 10)·`limit_conn` 4 → 429 JSON, `auth_request /lab/_auth` → 비로그인 401 JSON, 본문 100 KiB 제한, 소켓으로 프록시 (Cookie 제거, XFF는 `$remote_addr`로 덮어씀, 타임아웃 30초). 다른 메서드는 405 |
+| `POST /lab/api/compile` | 세션별 `limit_req` 분당 10회(burst 10)·`limit_conn` 4(+ 쿠키 없는 요청용 공용 한도) → 429 JSON, `auth_request /lab/_auth` → 비로그인 401 JSON, 본문 100 KiB 제한, 소켓으로 프록시 (Cookie 제거, `X-Lab-Client`로 세션 키 전달, XFF 제거, 타임아웃 30초). 다른 메서드는 405 |
 | `GET /lab/api/health` | 컴파일러 프로세스 liveness. 컴파일러가 없으면 502. 로그인 불필요 |
 | 그 외 `/lab/api/*` | 404 |
 
 - `limit_req_zone` / `limit_conn_zone`은 이 파일이 http 블록 안에 include되므로 파일 맨 위(server 밖)에 선언한다. 호스트 nginx는 건드리지 않는다.
-- 호스트 nginx는 Docker bridge를 거쳐 오므로 `$remote_addr`가 모든 방문자에게 같은 게이트웨이 주소가 된다. 서버 블록의 `set_real_ip_from`(사설 대역) + `real_ip_header X-Real-IP`가 호스트가 덮어쓴 `X-Real-IP`로 `$remote_addr`를 복원한다(백엔드의 `ClientIpResolver`와 같은 신뢰 모델). **호스트 nginx가 `X-Real-IP $remote_addr`를 설정해야 한다**(백엔드가 이미 의존한다). 설정되지 않으면 모든 방문자가 하나의 한도를 나눠 쓴다.
+- **한도는 주소가 아니라 로그인 세션 기준이다.** 호스트 nginx는 Docker bridge를 거쳐 오므로 `$remote_addr`는 모든 방문자에게 같은 게이트웨이 주소이고, 호스트 설정(`X-Real-IP` 등)은 이 저장소에서 확인할 수 없다. 그래서 `limit_req`/`limit_conn` 키는 세션 쿠키 `token`(JWT: header.payload.signature)의 **서명 앞 12자**(`$lab_client`)다. 세션을 구분하기엔 충분하고 위조에는 쓸 수 없다. 위조 쿠키는 새 버킷을 받지만 바로 뒤의 `auth_request`에서 걸러진다. 쿠키가 없는 요청(미로그인·만료)은 분당 60회의 공용 버킷(`lab_anon`)을 쓰고 모두 401이다. 액세스 토큰이 갱신되면 버킷도 새로 시작된다. 호스트 nginx 설정에 의존하는 부분은 없다.
 - 헤더: `security-headers-common.conf`(사이트와 공통인 비-CSP 헤더) + 사이트용 CSP(`security-headers.conf`) 또는 Lab용 CSP(`security-headers-lab.conf`). `add_header`는 location에 하나라도 있으면 상속되지 않으므로 각 location이 둘 중 하나를 include한다.
 
 ## 4. 컴파일러 컨테이너와 외부 통신 차단
@@ -70,7 +71,7 @@ Compose의 `coms-lab-compiler`는 `restart: unless-stopped`로 재시작하며 �
 - 컴파일러는 `user: "10001:101"`로 실행한다. **101은 `nginx:alpine` 이미지의 `nginx` 그룹 GID**이고(`nginx:1.28-alpine`에서 `id nginx` = uid 101, gid 101), nginx worker가 이 그룹이다. 서버는 `umask 0117`로 소켓을 만들어 `0660 10001:101`이 된다.
 - 새 볼륨은 처음 마운트될 때 이미지의 해당 디렉터리 소유자·모드를 복사한다. 두 이미지(`Dockerfile.frontend`, `lab/compiler/Dockerfile`)가 `/run/coms-lab`을 **같은 `10001:101`, 0750**으로 만들어 두므로 어느 컨테이너가 먼저 볼륨을 만들어도 같다. 0750이라 nginx 그룹은 디렉터리를 읽고 통과만 할 수 있고 소켓을 지우거나 바꿀 수 없다.
 - 시작 시 기존 소켓에 연결해 `ECONNREFUSED`인 경우에만 inode를 재확인하고 삭제한다. 살아 있는 listener, 일반 파일·symlink, 권한 오류·연결 timeout은 거부한다. SIGKILL/OOM 이후 남은 소켓은 자동 복구된다. 같은 볼륨에 컴파일러 두 개를 동시에 띄우지 않는다. `PORT`를 통한 TCP 수신은 개발용 대안이며 프로덕션에는 사용하지 않는다.
-- `TRUST_PROXY=1`: nginx가 `X-Forwarded-For`를 방문자 주소로 덮어쓴다.
+- `TRUST_PROXY=1`: nginx가 보내는 `X-Lab-Client`(위 서명 12자. 쿠키·토큰 자체는 컴파일러에 전달되지 않는다)를 컴파일러 자체의 클라이언트별 한도 키로 쓴다. 헤더가 없거나 형식이 다르면 `X-Forwarded-For`의 가장 오른쪽 주소, 그것도 없으면 소켓 주소를 쓴다. 전역 실행/대기 큐(2+6)는 그대로다.
 - `.env`에서 `LAB_RATE_LIMIT_PER_MIN`(기본 10)으로 컴파일러 자체의 IP별 분당 한도를 바꿀 수 있다. nginx 한도(분당 10, burst 10)는 별개다.
 
 ## 5. 로그인 확인
@@ -81,7 +82,7 @@ Compose의 `coms-lab-compiler`는 `restart: unless-stopped`로 재시작하며 �
 {"ok":false,"errors":[{"line":0,"severity":"error","message":"로그인한 동아리원만 컴파일할 수 있어요."}]}
 ```
 
-백엔드가 내려가 있으면 인증 서브요청이 실패해 컴파일은 500을 반환한다(Lab은 연결 오류 문구를 보인다). 액세스 토큰이 만료되고 refresh만 남은 사용자는 사이트에서 한 번 활동(토큰 갱신)한 뒤 컴파일할 수 있다.
+백엔드가 내려가 있으면 인증 서브요청이 실패해 컴파일은 500을 반환한다(Lab은 연결 오류 문구를 보인다). 액세스 토큰이 만료돼 401이 오면 Lab이 사이트의 `POST /api/auth/refresh`를 한 번 호출해 다시 시도하고(`lab/src/ui/compileClient.ts`), 그래도 401이면 "로그인한 동아리원만 컴파일할 수 있어요."와 `/login?returnTo=/lab/` 링크를 보여 준다(사이트 로그인은 `returnTo=/lab/`로 되돌려 보낸다). `/lab/api/*`에는 refresh 쿠키가 가지 않는다(경로 `/api/auth/refresh`).
 
 ## 6. 요청 검증·실행 정책
 
@@ -92,7 +93,7 @@ Compose의 `coms-lab-compiler`는 `restart: unless-stopped`로 재시작하며 �
 - shell 해석 없이 고정 argv로 `prlimit -- ... arduino-cli compile --fqbn arduino:avr:uno --jobs 1 --warnings all --build-property compiler.path=/opt/avr-limited/bin/ --build-path <tmp>/build --output-dir <tmp>/out sketch`를 실행한다. AVR wrapper는 도구 이름을 allowlist하고 원본 바이너리를 `exec`한다. 서버 환경은 상속하지 않는다: 고정 PATH, 요청별 HOME, `LANG=C`, 고정 Arduino DATA/USER 경로, 요청별 DOWNLOADS/CACHE, updater 비활성화만 자식에 전달한다.
 - 요청별 임시 폴더, 20초 제한, detached 프로세스 그룹 전체 SIGKILL, `finally` 삭제. 생성 HEX를 실행하거나 보드에 업로드하지 않는다.
 - 최대 2개 실행 + 6개 FIFO 대기, 초과 시 429 `busy`. IP별 고정 60초 창 기본 10회 (`RATE_LIMIT_PER_MIN`으로 양의 정수 설정), 초과 시 429 `rate-limited`. 요청 경로는 O(1) Map 조회/갱신이며 unref 타이머가 만료 항목을 정리한다. IPv6는 /64로 묶고 `::ffff:` IPv4 매핑은 IPv4로 정규화한다. 10,000 IP가 차도 만료 전 항목은 내보내지 않으며, 새 IP는 공유 overflow 버킷(같은 분당 한도) 하나로 합산 제한한다(IP 회전으로 카운터를 초기화할 수 없음). nginx 제한도 유지한다. 상태는 프로세스 메모리에 있으므로 재시작 시 초기화되며 다중 replica에 공유되지 않는다.
-- `TRUST_PROXY=1`일 때만 X-Forwarded-For의 가장 오른쪽 주소를 신뢰한다. nginx는 `$remote_addr`로 이를 덮어쓰고 프로덕션은 TCP 포트를 열지 않는다.
+- `TRUST_PROXY=1`일 때만 `X-Lab-Client`(8~64자 `[A-Za-z0-9_-]`)를 클라이언트 키로 신뢰한다. 없으면 X-Forwarded-For의 가장 오른쪽 주소, 그것도 없으면 소켓 주소다. 프로덕션은 TCP 포트를 열지 않는다.
 - GCC 진단은 작업 폴더의 정확한 `sketch.ino`와 유효한 사용자 코드 줄·열에서만 추출한다. 다른 파일의 note·출력·인용은 버리고, linker 실패는 고정 메시지와 line 0으로 반환한다. 절대 경로·임시 폴더 이름을 지우고 진단 30개 × 메시지 800자, 프로세스 출력 256 KiB, HEX 192 KiB로 제한한다. HEX 체크섬을 확인하고 bootloader HEX는 반환하지 않는다. `sizeBytes`는 HEX의 데이터 바이트 합계다.
 - 컴파일 문법 오류는 HTTP 200 / `ok:false, reason:compile`, 실행 시간 초과는 HTTP 504 / `reason:timeout`. health는 HTTP 서버 liveness만 증명하며 Arduino 설치·실제 컴파일 성공을 증명하지 않는다.
 

@@ -26,6 +26,7 @@ export interface CompileState {
   message?: string;
   errors?: CompilerMessage[];
   compiledCode?: string;
+  needsLogin?: boolean; // the compile was refused for lack of a session: offer the site's login
 }
 type Doc = Omit<Scene, 'code'>;
 

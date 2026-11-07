@@ -203,7 +203,7 @@ export interface CompilerMessage {
 
 export type CompileResult =
   | { ok: true; hex: string; warnings: CompilerMessage[]; sizeBytes?: number }
-  | { ok: false; errors: CompilerMessage[]; reason?: 'compile' | 'rejected' | 'timeout' | 'busy' | 'rate-limited' };
+  | { ok: false; errors: CompilerMessage[]; reason?: 'compile' | 'rejected' | 'timeout' | 'busy' | 'rate-limited' | 'unauthorized' };
 
 // ---------- core helpers exported from src/core/index.ts (lane A implements) ----------
 // export const PARTS: Record<PartKind, PartDef>

@@ -9,6 +9,7 @@ import { ChevronDown, ChevronUp, Eraser, Send } from 'lucide-react';
 import { sim } from '../simHost';
 import { clearSerial, onSerialLog, plot, serialLog } from '../serial';
 import { getState, MAX_CODE_BYTES, set, setCode, toast, useStore, type SerialTab } from '../store';
+import { LOGIN_URL } from '../compileClient';
 
 const theme = new Compartment();
 const lightTheme = EditorView.theme({ '&': { backgroundColor: 'var(--surface)', color: 'var(--text)', height: '100%' }, '.cm-gutters': { backgroundColor: 'var(--surface-2)', color: 'var(--muted)', border: 'none' } });
@@ -69,6 +70,7 @@ export function CodeEditor() {
       {compile.status === 'error' && (
         <div className="compile-msg" role="alert">
           <strong>{compile.message}</strong>
+          {compile.needsLogin && <div><a href={LOGIN_URL}>로그인하러 가기</a> (로그인하면 이 화면으로 돌아와요)</div>}
           {compile.errors?.slice(0, 6).map((e, i) => (
             <div key={i}>{e.line}줄: {e.message}{e.hintKo && <em> — {e.hintKo}</em>}</div>
           ))}

@@ -99,12 +99,13 @@ export async function run() {
       return;
     }
     if (!r.ok) {
-      const msg = r.reason === 'busy' ? '컴파일 서버가 바빠요. 잠시 후 다시 시도해 주세요.'
+      const msg = r.reason === 'unauthorized' ? '로그인한 동아리원만 컴파일할 수 있어요.'
+        : r.reason === 'busy' ? '컴파일 서버가 바빠요. 잠시 후 다시 시도해 주세요.'
         : r.reason === 'rate-limited' ? '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.'
         : r.reason === 'timeout' ? '컴파일 시간이 너무 오래 걸려요. 코드를 줄여 보세요.'
         : r.reason === 'rejected' ? '허용되지 않는 코드가 있어요. #include 목록을 확인해 보세요.'
         : `컴파일 오류 ${r.errors.length}개`;
-      set({ compile: { status: 'error', message: msg, errors: r.errors }, sideTab: 'code', sideOpen: true, sheetOpen: true });
+      set({ compile: { status: 'error', message: msg, errors: r.reason === 'unauthorized' ? [] : r.errors, needsLogin: r.reason === 'unauthorized' }, sideTab: 'code', sideOpen: true, sheetOpen: true });
       return;
     }
     clearSerial();
