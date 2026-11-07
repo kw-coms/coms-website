@@ -23,6 +23,7 @@ import ClubCalendarSection from '../../features/clubCalendar/ClubCalendarSection
 import HeroField from './HeroField'
 import { BuildMini, ClubOsVisual, FlowMini, JoinFlowVisual, JoinMini, LearningStackVisual, ProjectLabVisual } from './HomeVisuals'
 import { scrollToTopInstant } from '../../utils/themeColors'
+import { isFullPageLink } from '../../utils/fullPageLink'
 import { getPerfState, subscribePerf } from '../../utils/perfMode'
 import { useAuth } from '../../contexts/useAuth'
 
@@ -140,6 +141,10 @@ export default function HomeView() {
 
   const goNotices = () => navigate('/notices')
   const goPageTop = (to: To, options?: NavigateOptions) => {
+    if (isFullPageLink(to)) {
+      window.location.assign(to)
+      return
+    }
     scrollToTopInstant()
     navigate(to, options)
   }

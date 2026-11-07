@@ -39,7 +39,7 @@ export function LoginPage() {
       <Login
         onCancel={() => navigate('/', { replace: true })}
         onSuccess={() => returnTo ? window.location.assign(returnTo) : navigate(successPath, { replace: true })}
-        goSignup={() => navigate(returnTo ? `/signup?returnTo=%2Fcompanion%2Frespond${location.hash}` : '/signup')}
+        goSignup={() => navigate(returnTo?.startsWith('/companion/') ? `/signup?returnTo=%2Fcompanion%2Frespond${location.hash}` : '/signup')}
       />
     </PageShell>
   )

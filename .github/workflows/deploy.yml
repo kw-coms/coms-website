@@ -254,11 +254,20 @@ jobs:
               ROLLBACK_READY=1
             fi
 
+            # Circuit Lab's compiler is optional for the site: its steps (scripts/deploy-lab-compiler.sh)
+            # only ever warn, they never fail the deploy or trigger the site's rollback.
+            . ./scripts/deploy-lab-compiler.sh
+            lab_diagnostics
+            lab_snapshot_previous
+
             # CI already ran the full backend and frontend suites on this exact commit (this job
             # only starts after a green CI run), so the server only builds the images. Building
             # first keeps the current release serving until the new images exist.
-            $COMPOSE --env-file .env -f docker-compose.yml build
-            $COMPOSE --env-file .env -f docker-compose.yml up -d --remove-orphans
+            $COMPOSE --env-file .env -f docker-compose.yml build coms-backend coms-frontend
+            lab_build
+            # The site's services by name: a bare `up -d` would also start the compiler, whose
+            # failure must not abort the deploy. (A new service in docker-compose.yml needs adding here.)
+            $COMPOSE --env-file .env -f docker-compose.yml up -d --remove-orphans db db-backup coms-backend coms-frontend
 
             if ! site_is_healthy; then
               $COMPOSE --env-file .env -f docker-compose.yml ps
@@ -268,6 +277,7 @@ jobs:
                 docker tag coms-backend:previous coms-backend:latest
                 docker tag coms-frontend:previous coms-frontend:latest
                 COMS_IMAGE_TAG=previous $COMPOSE --env-file .env -f docker-compose.yml up -d --no-build coms-backend coms-frontend
+                lab_rollback
                 if site_is_healthy; then
                   echo "Rollback finished: the site is running the previous release again." >&2
                 else
@@ -278,6 +288,9 @@ jobs:
               fi
               exit 1
             fi
+
+            # The site is healthy. Only now is the compiler replaced; whatever happens, the deploy goes on.
+            lab_start
 
             # The release is live. `latest` follows it so a manual `docker compose up -d` on the
             # server keeps running it, and only the live and previous release images are kept.
@@ -294,5 +307,6 @@ jobs:
             # Images named after the compose project (the names used before this file set its own)
             # are no longer referenced by anything.
             docker image ls --format '{{.Repository}}:{{.Tag}}' | grep -E -- '-coms-(backend|frontend):latest$' | xargs -r docker rmi >/dev/null 2>&1 || true
+            lab_finalize_tags
             docker image prune -f
           REMOTE

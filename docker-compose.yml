@@ -117,6 +117,45 @@ services:
       db:
         condition: service_healthy
 
+  # Compiles the Arduino sketches of Circuit Lab (/lab/, lab/). It runs untrusted code paths through
+  # arduino-cli, so it has no network at all: nginx in coms-frontend reaches it through a unix socket
+  # on the lab-sock volume, after checking the visitor's session with the backend. Hardening and the
+  # measurements behind the limits: lab/docs/DEPLOY.md. The site does not depend on this service:
+  # if it is down, /lab/api/compile answers 502 and the rest of the site is unaffected.
+  coms-lab-compiler:
+    image: coms-lab-compiler:${COMS_IMAGE_TAG:-latest}
+    build:
+      context: ./lab/compiler
+    container_name: coms-lab-compiler
+    init: true
+    restart: unless-stopped
+    logging: *default-logging
+    network_mode: none
+    # uid 10001 (the image's compiler user), gid 101 = the nginx group in nginx:alpine, so the 0660
+    # socket is reachable by the nginx workers and by nobody else.
+    user: "10001:101"
+    volumes:
+      - lab-sock:/run/coms-lab
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=256m,mode=1777
+    cap_drop: [ALL]
+    # Docker 29.9.0's default seccomp profile (the server's engine) minus the unconditional ptrace /
+    # process_vm_* rules, pinned in the repository so the filter does not depend on the engine
+    # (Docker Desktop may report unconfined). Upgrade by diffing against the new engine's default.json.
+    security_opt: ["no-new-privileges:true", "seccomp=./lab/compiler/seccomp.json"]
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: 1.0
+    pids_limit: 128
+    stop_grace_period: 25s
+    environment:
+      LISTEN_SOCKET: /run/coms-lab/compile.sock
+      RATE_LIMIT_PER_MIN: "${LAB_RATE_LIMIT_PER_MIN:-10}"
+      # nginx sends X-Lab-Client (the member id the backend vouched for) and requires it on every request.
+      TRUST_PROXY: "1"
+      # Login is checked by nginx (auth_request); the container has no network and makes no calls itself.
+
   coms-frontend:
     image: coms-frontend:${COMS_IMAGE_TAG:-latest}
     build:
@@ -143,6 +182,10 @@ services:
     logging: *default-logging
     ports:
       - "127.0.0.1:3000:80"
+    volumes:
+      # The compiler's unix socket (see coms-lab-compiler). Connecting needs write access to the
+      # socket file, which the shared group gives; the directory itself stays read-only here.
+      - lab-sock:/run/coms-lab:ro
     healthcheck:
       # nginx:1.28-alpine has BusyBox wget but no curl. Use 127.0.0.1, not
       # localhost: in-container "localhost" resolution is unreliable (observed
@@ -159,3 +202,4 @@ services:
 volumes:
   pgdata:
   backend-uploads:
+  lab-sock:
