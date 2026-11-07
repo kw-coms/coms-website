@@ -83,7 +83,7 @@ assert.deepEqual(diff.diff.map((d) => `${d.kind}:${d.text}`), ['same:a', 'del:b'
 assert.equal(compareOutput('', '').match, true)
 
 // ---------- 5. persistence ----------
-const mem = () => { const m = new Map(); return { m, getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v), removeItem: (k) => void m.delete(k) } }
+const mem = () => { const m = new Map(); return { m, getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v), removeItem: (k) => void m.delete(k), get length() { return m.size }, key: (i) => [...m.keys()][i] ?? null } }
 const backing = mem()
 const store = createStore('c', backing)
 const key = blockKey(3, 'int main(){}')
@@ -130,10 +130,57 @@ assert.equal(createStore('c', backing).get('k'), null, 'the old page-wide key is
   assert.equal(restoreBlock(st, B, 'x'), 'none', 'no backup, nothing to restore')
   // Back to the original code removes the record unless a backup still hangs on it.
   saveBlock(st, B, 'b0', 'b0'); assert.equal(st.get('b'), null); assert.equal(B.baseline, null)
+  // An empty draft is a draft: saving shared code over it keeps '' as the backup, and restore gives '' back.
+  const E = state('e'); saveBlock(st, E, '', 'e0')
+  assert.equal(st.get('e').code, '')
+  E.baseline = null; saveBlock(st, E, 'shared', 'e0')
+  assert.equal(st.get('e').backup, '')
+  assert.equal(restoreBlock(st, E, 'shared'), 'restored'); assert.equal(st.get('e').code, '')
   // The shared-view save: the draft being replaced becomes the backup.
   const C = state('c'); saveBlock(st, C, 'mine', 'c0')
   C.baseline = null; saveBlock(st, C, 'shared', 'c0')
   assert.deepEqual([st.get('c').code, st.get('c').backup], ['shared', 'mine'])
+}
+{
+  // A write that fails (quota, private mode) keeps the edit pending; the next flush retries and succeeds.
+  const inner = mem(); let failing = true
+  const flaky = { ...inner, getItem: inner.getItem, setItem: (k, v) => { if (failing) throw new DOMException('full', 'QuotaExceededError'); inner.setItem(k, v) } }
+  Object.defineProperty(flaky, 'length', { get: () => inner.m.size })
+  const st = createStore('f', flaky)
+  const b = { key: 'k', baseline: 'old', dirty: true }
+  st.pin('k') // mounted, as in the page
+  assert.equal(saveBlock(st, b, 'new', 'init'), false)
+  assert.deepEqual([b.baseline, b.dirty], ['old', true], 'a failed write keeps baseline and dirty')
+  failing = false
+  assert.equal(saveBlock(st, b, 'new', 'init'), true)
+  assert.deepEqual([b.baseline, b.dirty, st.get('k').code], ['new', false, 'new'], 'the retry succeeds')
+  // Restore: a failed write changes nothing, the editor text is kept by the caller.
+  st.put('k', { code: 'new', backup: 'older', at: 1 })
+  failing = true
+  assert.equal(restoreBlock(st, b, 'typing'), 'failed')
+  assert.equal(st.get('k').code, 'new'); assert.equal(b.baseline, 'new')
+  failing = false
+  assert.equal(restoreBlock(st, b, 'typing'), 'restored')
+}
+{
+  // Records are bounded: 1000 revisions of one block never leave more than 200, and the mounted block survives.
+  const m = mem(); const st = createStore('p', m)
+  st.put('0-current', { code: 'mine', at: 1 }); st.pin('0-current')
+  for (let i = 0; i < 1000; i++) st.put(`0-rev${i}`, { code: 'x', at: 100 + i })
+  assert.ok(m.m.size <= 200, `records: ${m.m.size}`)
+  assert.equal(st.get('0-current').code, 'mine')
+  assert.equal(st.get('0-rev999').code, 'x', 'the newest survive')
+  m.setItem('coms-study-playground:p:junk', '{nope'); st.put('0-more', { code: 'y', at: 5000 })
+  for (let i = 0; i < 300; i++) st.put(`0-b${i}`, { code: 'x', at: 6000 + i })
+  assert.equal(m.getItem('coms-study-playground:p:junk'), null, 'unparseable records go first')
+  // Quota path: a full storage evicts old records, then the write succeeds.
+  const inner = mem()
+  const tiny = { ...inner, setItem: (k, v) => { if (!inner.m.has(k) && inner.m.size >= 5) throw new DOMException('full', 'QuotaExceededError'); inner.setItem(k, v) } }
+  Object.defineProperty(tiny, 'length', { get: () => inner.m.size })
+  const q = createStore('q', tiny)
+  for (let i = 0; i < 5; i++) q.put(`b${i}`, { code: 'x', at: i + 1 })
+  assert.equal(q.put('fresh', { code: 'z', at: 99 }), true)
+  assert.equal(q.get('fresh').code, 'z')
 }
 
 // ---------- 6. share link codec ----------

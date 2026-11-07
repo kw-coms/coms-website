@@ -2,10 +2,13 @@
 
 /** One block's record: the draft and, optionally, the one-step backup of the draft it replaced ("이전 코드 복원"). */
 export interface Saved { code: string; backup?: string; at: number }
-type StorageLike = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem'>>
+type StorageLike = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem' | 'key' | 'length'>>
 
 // One localStorage record per block (`<prefix><pageId>:<blockKey>`), so tabs editing different blocks never share a value.
+// The earlier page-wide `<prefix><pageId>` object never shipped (PR #520 is the first release): an intentional pre-release reset, no migration.
 const KEY_PREFIX = 'coms-study-playground:'
+/** Block keys include a hash of the original code, so lesson revisions orphan records: keep at most this many. */
+export const MAX_RECORDS = 200
 
 export function fnv1a(text: string): string {
   let h = 0x811c9dc5
@@ -16,13 +19,39 @@ export function fnv1a(text: string): string {
 /** Stable id of a block: position + a hash of its original text, so an edited page invalidates old edits. */
 export const blockKey = (index: number, originalCode: string) => `${index}-${fnv1a(originalCode)}`
 
+const isQuota = (e: unknown) => e instanceof Error && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || (e as { code?: number }).code === 22 || (e as { code?: number }).code === 1014)
+
 export function createStore(pageId: string, storage?: StorageLike | null) {
   const handle = (): StorageLike | null => {
     if (storage !== undefined) return storage
     try { return window.localStorage } catch { return null }
   }
   const keyOf = (block: string) => `${KEY_PREFIX}${pageId}:${block}`
+  const pinned = new Set<string>() // blocks mounted on this page are never evicted
+
+  /** Removes the oldest records beyond MAX_RECORDS (at least `atLeast` of them); unparseable records count as oldest. */
+  function evict(atLeast = 0): number {
+    const st = handle()
+    if (!st || typeof st.key !== 'function' || typeof st.length !== 'number') return 0
+    const entries: { key: string; at: number }[] = []
+    try {
+      for (let i = 0; i < st.length; i++) {
+        const k = st.key(i)
+        if (!k || !k.startsWith(KEY_PREFIX)) continue
+        let at = -1
+        try { const v = JSON.parse(st.getItem(k) ?? ''); if (v && typeof v.code === 'string' && typeof v.at === 'number') at = v.at } catch { /* unparseable: oldest */ }
+        entries.push({ key: k, at })
+      }
+      const count = Math.max(entries.length - MAX_RECORDS, atLeast)
+      const victims = entries.filter((e) => !pinned.has(e.key)).sort((x, y) => x.at - y.at).slice(0, count)
+      victims.forEach((v) => st.removeItem?.(v.key))
+      return victims.length
+    } catch { return 0 }
+  }
+
   return {
+    /** Marks a block as mounted: its record is never evicted. */
+    pin(block: string) { pinned.add(keyOf(block)) },
     get(block: string): Saved | null {
       try {
         const raw = handle()?.getItem(keyOf(block))
@@ -31,11 +60,21 @@ export function createStore(pageId: string, storage?: StorageLike | null) {
         return { code: v.code, backup: typeof v.backup === 'string' ? v.backup : undefined, at: typeof v.at === 'number' ? v.at : 0 }
       } catch { return null }
     },
-    put(block: string, rec: Saved) {
-      try { handle()?.setItem(keyOf(block), JSON.stringify(rec)) } catch { /* storage blocked or full: the edit just is not kept */ }
+    /** True when the record was written. On a full storage it evicts old records and retries once. */
+    put(block: string, rec: Saved): boolean {
+      const st = handle()
+      if (!st) return false
+      const value = JSON.stringify(rec)
+      try { st.setItem(keyOf(block), value) } catch (e) {
+        if (!isQuota(e)) return false
+        evict(Math.max(1, Math.ceil(MAX_RECORDS / 10)))
+        try { st.setItem(keyOf(block), value) } catch { return false }
+      }
+      evict()
+      return true
     },
-    remove(block: string) {
-      try { handle()?.removeItem?.(keyOf(block)) } catch { /* ignore */ }
+    remove(block: string): boolean {
+      try { handle()?.removeItem?.(keyOf(block)); return true } catch { return false }
     },
   }
 }
@@ -49,24 +88,26 @@ export interface DraftState { key: string; baseline: string | null; dirty: boole
  * Accepted limit: localStorage has no cross-process atomicity, so another tab's write can land between the getItem
  * and the setItem below (one task, microseconds). That window is traded for an end-to-end synchronous design.
  */
-export function saveBlock(store: DraftStore, b: DraftState, code: string, initial: string) {
+export function saveBlock(store: DraftStore, b: DraftState, code: string, initial: string): boolean {
   const stored = store.get(b.key)
   let backup = stored?.backup
   // Another tab saved since this tab last looked: its draft becomes the backup instead of being overwritten unseen.
   if (stored && stored.code !== b.baseline && stored.code !== code) backup = stored.code
-  if (code === initial && backup === undefined) store.remove(b.key)
-  else store.put(b.key, { code, backup, at: Date.now() })
-  b.baseline = code === initial && backup === undefined ? null : code
+  const unedited = code === initial && backup === undefined
+  const ok = unedited ? store.remove(b.key) : store.put(b.key, { code, backup, at: Date.now() })
+  if (!ok) return false // baseline and dirty stay, so the next flush retries
+  b.baseline = unedited ? null : code
   b.dirty = false
+  return true
 }
 
-/** "이전 코드 복원": 'declined' when another tab changed the draft since this tab last looked (nothing is touched). */
-export function restoreBlock(store: DraftStore, b: DraftState, currentText: string): 'restored' | 'declined' | 'none' {
+/** "이전 코드 복원": 'declined' when another tab changed the draft since this tab last looked, 'failed' when the write did not go through (nothing is touched either way). */
+export function restoreBlock(store: DraftStore, b: DraftState, currentText: string): 'restored' | 'declined' | 'failed' | 'none' {
   const stored = store.get(b.key)
-  if (!stored?.backup) return 'none'
+  if (stored?.backup === undefined) return 'none'
   if (stored.code !== b.baseline) return 'declined'
   const old = stored.backup
-  store.put(b.key, { code: old, backup: currentText === old ? undefined : currentText, at: Date.now() })
+  if (!store.put(b.key, { code: old, backup: currentText === old ? undefined : currentText, at: Date.now() })) return 'failed'
   b.baseline = old
   b.dirty = false
   return 'restored'

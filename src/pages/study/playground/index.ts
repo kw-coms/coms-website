@@ -4,7 +4,7 @@
 // Every pre.code gets a stage wrapper + toolbar at init (the toolbar's space is reserved in CSS, so nothing moves).
 // No editor exists until "직접 해보기" is pressed. The returned cleanup undoes everything (StrictMode runs effects twice).
 
-import { showToast } from '../../../components/common/Toast'
+import { dismissToast, showToast } from '../../../components/common/Toast'
 import { buildDoc, buildRawDoc, SANDBOX_URL } from '../studyDemos'
 import { classifyBlock, initialCode, langLabel, type BlockDecision, type PageLang } from './classify'
 import { compareOutput } from './compare'
@@ -153,6 +153,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     b.stage.prepend(b.bar)
     b.stage.id = b.anchor
     renderBar(b)
+    store.pin(b.key)
     blocks.push(b)
     byStage.set(b.stage, b)
   })
@@ -181,7 +182,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
         b.els.run = run
         right.appendChild(run)
       }
-      if (!b.shared && store.get(b.key)?.backup) {
+      if (!b.shared && store.get(b.key)?.backup !== undefined) {
         const restore = btn('restore', '↶ 이전 코드 복원')
         restore.title = '공유 코드로 저장하기 전의 내 코드를 되살려요'
         right.appendChild(restore)
@@ -271,7 +272,20 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
   function flush(b: Block) {
     window.clearTimeout(b.saveTimer)
     b.saveTimer = 0
-    if (b.dirty && !b.shared) saveBlock(store, b, b.current, b.initial)
+    if (b.dirty && !b.shared) saveDraft(b, b.current)
+  }
+  // One notice per failure streak (full storage, private mode); it goes away after the next successful write.
+  let failureToast = 0
+  function reportSave(ok: boolean) {
+    if (ok && failureToast) { dismissToast(failureToast); failureToast = 0 }
+    if (!ok && !failureToast) failureToast = showToast({ message: '브라우저 저장 공간이 부족해서 코드를 저장하지 못했어요. 다른 탭이나 사이트 데이터를 정리해 주세요.', tone: 'error', duration: 0 })
+  }
+  /** saveBlock plus the notice; on failure the block stays dirty so the next debounce or exit flush retries. */
+  function saveDraft(b: Block, code: string): boolean {
+    const ok = saveBlock(store, b, code, b.initial)
+    if (!ok) b.dirty = true
+    reportSave(ok)
+    return ok
   }
   /** Puts code into the editor on the page's own initiative: no autosave is scheduled and a pending one is dropped. */
   function loadCode(b: Block, value: string) {
@@ -612,8 +626,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
       // One step back: the draft this replaces stays available as "이전 코드 복원".
       b.current = value
       b.baseline = null // whatever draft is stored now is the one being replaced: saveBlock keeps it as the backup
-      saveBlock(store, b, value, b.initial)
-      showToast('이 코드로 저장했어요. 이전 코드는 "이전 코드 복원"으로 되살릴 수 있어요.')
+      if (saveDraft(b, value)) showToast('이 코드로 저장했어요. 이전 코드는 "이전 코드 복원"으로 되살릴 수 있어요.')
     } else {
       const own = ownDraft(b)
       b.baseline = store.get(b.key)?.code ?? null
@@ -629,7 +642,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
   function restoreBackup(b: Block) {
     const now = b.editor ? b.editor.getValue() : b.current // unsaved edits included
     const rec = store.get(b.key)
-    if (!rec?.backup) return
+    if (rec?.backup === undefined) return
     const result = restoreBlock(store, b, now)
     if (result === 'declined') {
       // Another tab saved this block since this tab last looked: restoring now would bury its draft. The editor text
@@ -637,6 +650,11 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
       showToast('다른 탭에서 이 코드가 바뀌어서 되돌리기를 멈췄어요. 지금 코드는 그대로 있어요.')
       return
     }
+    if (result === 'failed') { // nothing was written: the editor text stays
+      reportSave(false)
+      return
+    }
+    reportSave(true)
     window.clearTimeout(b.saveTimer)
     b.saveTimer = 0
     loadCode(b, rec.backup)
@@ -663,7 +681,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
       case 'lab': await labOpen(b); break
       case 'reset':
         loadCode(b, b.initial)
-        if (!b.shared) saveBlock(store, b, b.initial, b.initial) // in a shared view only the view changes; the saved draft stays
+        if (!b.shared) saveDraft(b, b.initial) // in a shared view only the view changes; the saved draft stays
         renderBar(b)
         b.editor?.focus()
         showToast('원래 코드로 되돌렸어요.')
