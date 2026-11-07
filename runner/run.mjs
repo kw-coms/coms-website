@@ -32,7 +32,7 @@ const JOB_WRITABLE = [JOB_ROOT, '/dev/shm', '/dev/mqueue'];
 const JOB_PRIV = [`--reuid=${JOB_ID}`, `--regid=${JOB_ID}`, '--clear-groups', '--inh-caps=-all', '--ambient-caps=-all', '--no-new-privs'];
 const CLEAN_ENV = { PATH: '/usr/bin:/bin', LANG: 'C.UTF-8' };
 export const asJob = (command, args = [], options = {}) => execFileSync('/usr/bin/setpriv',
-  [...JOB_PRIV, '--', command, ...args], { timeout: 10_000, stdio: ['pipe', 'pipe', 'pipe'], env: CLEAN_ENV, encoding: 'utf8', ...options });
+  [...JOB_PRIV, '--', command, ...args], { timeout: 10_000, maxBuffer: 16 * 1024 * 1024, stdio: ['pipe', 'pipe', 'pipe'], env: CLEAN_ENV, encoding: 'utf8', ...options });
 
 export const NPROC = { c: 32, python: 32, java: 128 };
 export function stageLimits(lang, stage) {
@@ -110,17 +110,26 @@ export async function clearSystemVIpc({ execImpl = asJob, readFileImpl = readFil
   }
 }
 
-// Everything the job uid can write lives on the three mounts above; the rest is read-only
-// or not world-writable. Deleting as the owner needs no capability, but a 000 directory must
-// be re-opened first (find -exec runs before descent).
-const WIPE = `for d in "$@"; do [ -d "$d" ] || continue
-find "$d" -mindepth 1 -user ${JOB_ID} -type d -exec chmod u+rwx {} \; 2>/dev/null
-find "$d" -mindepth 1 -maxdepth 1 -user ${JOB_ID} -exec rm -rf -- {} +
-done
-find "$@" -xdev -mindepth 1 -user ${JOB_ID} -print -quit 2>/dev/null`;
-export async function wipeJobFiles({ run = asJob } = {}) {
-  const leftover = run('/bin/sh', ['-c', WIPE, 'sh', ...JOB_WRITABLE]);
-  if (String(leftover).trim()) throw new Error('Job files survived cleanup');
+// Everything the job uid can write lives on the three mounts above. Deleting as the owner
+// needs no capability, but mode-000 trees must be re-opened first (chmod -R is pre-order).
+// argv only, no shell, so no quoting layer can swallow a terminator; execFileSync throws on any
+// non-zero exit or timeout, so a failed step can never be mistaken for success.
+// chmod -R follows a command-line symlink, so symlinks are never handed to it (rm -rf removes them as links).
+const ownEntries = (dir, notLink, ...action) => ['-P', dir, '-mindepth', '1', '-maxdepth', '1', '-user', String(JOB_ID), ...(notLink ? ['!', '-type', 'l'] : []), '-exec', ...action, '+'];
+export async function wipeJobFiles({ run = asJob, readdirImpl = readdir, dirs = JOB_WRITABLE } = {}) {
+  for (const dir of dirs) {
+    try { await readdirImpl(dir); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+    run('/usr/bin/find', ownEntries(dir, true, 'chmod', '-R', 'u+rwx', '--', '{}'), { timeout: 20_000 });
+    run('/usr/bin/find', ownEntries(dir, false, 'rm', '-rf', '--', '{}'), { timeout: 20_000 });
+  }
+  // The server owns /jobs (root, 1777: the job uid must be able to list it to clean up, but as a
+  // non-owner it can't chmod/rename the root or touch others' entries), so it can list every mount root: nothing may remain,
+  // job-owned or otherwise (an entry the job uid cannot delete is a cleanup failure too).
+  for (const dir of dirs) {
+    let names;
+    try { names = await readdirImpl(dir); } catch (error) { if (error.code === 'ENOENT') continue; throw error; }
+    if (names.length) throw new Error(`Job files survived cleanup in ${dir}`);
+  }
 }
 
 export function executeStage(command, args, {

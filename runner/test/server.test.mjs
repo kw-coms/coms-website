@@ -126,3 +126,13 @@ test('Unix socket refuses active and non-socket paths, recovers stale inode', as
   assert.equal(runner.address(), path);
   await new Promise(resolve => runner.close(resolve));
 });
+
+test('poisoned runner answers 503 unavailable and signals fatal via onFatal', async t => {
+  let fatal = 0, healthy = true;
+  const server = createRunnerServer({ healthCheck: () => healthy, onFatal: () => { fatal++; }, logger() {}, limiter: { take: () => true, close() {} },
+    executor: async () => { healthy = false; throw new Error('Job files survived cleanup'); } });
+  if (!await listenOrSkip(t, server)) return;
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/study/api/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ lang: 'python', code: 'print(1)' }) });
+  assert.equal(response.status, 503); assert.equal((await response.json()).error, 'unavailable'); assert.equal(fatal, 1);
+});

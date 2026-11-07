@@ -6,6 +6,8 @@ import { existsSync } from 'node:fs';
 import { readFile, readdir, access } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { spawn } from 'node:child_process';
+import { writeFile, unlink } from 'node:fs/promises';
+import http from 'node:http';
 import { runCode, assertContainer, runnerHealthy, JOB_ID } from '../run.mjs';
 
 const enabled = process.env.RUNNER_TOOLCHAIN_TESTS === '1';
@@ -180,9 +182,10 @@ test('files, /dev/shm and POSIX queues from one job are gone for the next; previ
   const head = '#define _POSIX_C_SOURCE 200809L\n#include <mqueue.h>\n#include <fcntl.h>\n#include <stdio.h>\n#include <sys/mman.h>\n#include <unistd.h>\n';
   const first = await run('c', head + '// SECRET-SOURCE-MARKER-4471\nint main(void){FILE*f=fopen("/dev/shm/leak","w");if(!f)return 1;fputs("SECRET-SOURCE-MARKER-4471",f);fclose(f);if(mq_open("/coms_q",O_CREAT|O_RDWR,0600,NULL)==(mqd_t)-1)return 2;if(shm_open("/coms_shm",O_CREAT|O_RDWR,0600)<0)return 3;FILE*g=fopen("hidden","w");fclose(g);puts("made");return 0;}');
   assert.equal(first.stdout, 'made\n', JSON.stringify(first));
-  const next = await py('import os,json\nfound=[]\nfor root in ("/jobs","/dev/shm","/dev/mqueue"):\n for d,_,fs in os.walk(root):\n  for f in fs:\n   p=os.path.join(d,f)\n   if p.startswith("/jobs/") and p.endswith("main.py"): continue\n   found.append(p)\n  \nsrc=[]\nfor d,_,fs in os.walk("/jobs"):\n  for f in fs:\n    try:\n      if "SECRET-SOURCE-MARKER" in open(os.path.join(d,f),errors="ignore").read() and f!="main.py": src.append(f)\n    except OSError: pass\nprint(json.dumps({"found":found,"src":src,"jobs":len(os.listdir("/jobs"))}))');
+  const next = await py('import os,json\nfound=[]\nfor root in ("/jobs","/dev/shm","/dev/mqueue"):\n for d,_,fs in os.walk(root):\n  for f in fs:\n   p=os.path.join(d,f)\n   if p.startswith("/jobs/") and p.endswith("main.py"): continue\n   found.append(p)\n  \nsrc=[]\nfor d,_,fs in os.walk("/jobs"):\n  for f in fs:\n    try:\n      if "SECRET-SOURCE-MARKER" in open(os.path.join(d,f),errors="ignore").read() and f!="main.py": src.append(f)\n    except OSError: pass\nprint(json.dumps({"found":found,"src":src}))');
   const o = json(next);
-  assert.deepEqual(o.found, []); assert.deepEqual(o.src, []); assert.equal(o.jobs, 1);
+  assert.deepEqual(o.found, []); assert.deepEqual(o.src, []);
+  assert.deepEqual(await readdir('/jobs'), []);
 });
 
 test('System V IPC owned by the job uid is removed (ipcs shows nothing)', options('c', true), async () => {
@@ -231,4 +234,56 @@ test('after the whole attack suite no job-uid process survives and the runner is
     const status = await readFile(`/proc/${pid}/status`, 'utf8').catch(() => '');
     assert.doesNotMatch(status, new RegExp(`^Uid:\\s+${JOB_ID}`, 'm'), `pid ${pid} survived`);
   }
+});
+
+// ---- Cleanup robustness: a job must never be able to wedge the runner (regression tests) ----
+// After every hostile job a normal job must succeed and every job-writable mount must be empty.
+const afterwards = async label => {
+  const next = await py('print("fine")');
+  assert.equal(next.stdout, 'fine\n', `${label}: ${JSON.stringify(next)}`); assert.ok(runnerHealthy(), label);
+  // The job above ran (and was wiped) too; the server owns /jobs and may list it.
+  for (const dir of ['/jobs', '/dev/shm', '/dev/mqueue']) assert.deepEqual(await readdir(dir), [], `${label}: ${dir}`);
+};
+const hostile = [
+  ['non-empty mode-000 directory tree and mode-000 files', 'import os\nos.makedirs("a/b/c")\nfor p in ("a/b/c/f","a/b/f","a/f","top"):\n  open(p,"w").write("x"); os.chmod(p,0)\nfor p in ("a/b/c","a/b","a"): os.chmod(p,0)\nprint("made")'],
+  ['mode-000 working directory itself', 'import os\nos.makedirs("x/y"); open("x/y/f","w").close(); os.chmod("x/y",0); os.chmod("x",0); os.chmod(os.getcwd(),0)\nprint("made")'],
+  ['chmod/rename/replace of the /jobs mount root and its entries', 'import os,json\nr=[]\nfor f in (lambda: os.chmod("/jobs",0), lambda: os.rename("/jobs","/jobs2"), lambda: os.rmdir("/jobs"), lambda: os.chown("/jobs",10100,10100)):\n  try: f(); r.append("UNSAFE")\n  except OSError: r.append("denied")\nd=os.getcwd(); os.chmod(d,0o700); os.rename(d,"/jobs/renamed"); os.symlink("/","/jobs/link-to-root"); open("/jobs/loose","w").write("x"); os.mkdir("/jobs/loosedir"); open("/jobs/loosedir/f","w").close(); os.chmod("/jobs/loosedir",0)\nprint(json.dumps(r))'],
+  ['3000 levels of nested directories', 'import os\nfor i in range(3000):\n  os.mkdir("d"); os.chdir("d")\nprint("deep")'],
+  ['inode exhaustion up to the tmpfs cap', 'import os\nn=0\ntry:\n  while True:\n    open("f%d"%n,"w").close(); n+=1\nexcept OSError as e:\n  print("full",e.errno,n>1000)'],
+  ['FIFO, unix socket, hard link and symlink loops', 'import os,socket\nos.mkfifo("fifo"); s=socket.socket(socket.AF_UNIX); s.bind("sock")\nos.symlink("b","a"); os.symlink("a","b"); os.mkdir("dir"); os.symlink("..","dir/up"); os.symlink(".","self"); open("h","w").write("x"); os.link("h","h2")\nprint("made")'],
+];
+for (const [name, code] of hostile) {
+  test(`cleanup survives: ${name}`, options('python', true), async () => {
+    const r = await py(code);
+    assert.equal(r.exitCode, 0, JSON.stringify(r)); assert.ok(!/UNSAFE/.test(r.stdout), r.stdout);
+    await afterwards(name);
+  });
+}
+test('cleanup survives: a background process holding files while the job exits', options('c', true), async () => {
+  const r = await run('c', '#define _POSIX_C_SOURCE 200809L\n#include <unistd.h>\n#include <fcntl.h>\nint main(void){if(fork()==0){setsid();int f=open("held",O_CREAT|O_WRONLY,0);for(;;)pause();}return 0;}');
+  assert.equal(r.exitCode, 0, JSON.stringify(r)); await afterwards('daemon holding mode-000 file');
+});
+
+test('unremovable leftover poisons the runner; server answers 503 and exits non-zero for a container restart', options('python', true), async () => {
+  // A root-owned entry in the sticky /jobs cannot be deleted by uid 10100: real cleanup failure.
+  const stuck = '/jobs/stuck'; const sock = '/run/coms-study/fault.sock';
+  await writeFile(stuck, 'x');
+  const child = spawn(process.execPath, ['server.mjs'], { cwd: '/app', stdio: ['ignore', 'ignore', 'pipe'],
+    env: { PATH: '/usr/local/bin:/usr/bin:/bin', RUNNER_CONTAINER: '1', LISTEN_SOCKET: sock, RATE_LIMIT_PER_MIN: '100' } });
+  let stderr = ''; child.stderr.on('data', d => { stderr += d; });
+  const exited = new Promise(resolve => child.once('exit', (code, signal) => resolve({ code, signal })));
+  try {
+    for (let i = 0; i < 100 && !(await access(sock).then(() => true, () => false)); i++) await new Promise(r => setTimeout(r, 50));
+    const body = JSON.stringify({ lang: 'python', code: 'print(1)' });
+    const response = await new Promise((resolve, reject) => {
+      const req = http.request({ socketPath: sock, path: '/study/api/run', method: 'POST', headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } },
+        res => { let data = ''; res.on('data', c => { data += c; }); res.on('end', () => resolve({ status: res.statusCode, data })); });
+      req.on('error', reject); req.end(body);
+    });
+    assert.equal(response.status, 503, response.data); assert.equal(JSON.parse(response.data).error, 'unavailable');
+    const result = await Promise.race([exited, new Promise(resolve => setTimeout(() => resolve('still running'), 6000))]);
+    assert.deepEqual(result, { code: 70, signal: null }, stderr);
+    assert.match(stderr, /job cleanup failed/);
+  } finally { child.kill('SIGKILL'); await unlink(stuck).catch(() => {}); await unlink(sock).catch(() => {}); }
+  await afterwards('after fault test');
 });

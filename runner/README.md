@@ -31,8 +31,8 @@ tini (PID 1, root)
 - 서버는 컨테이너 root이지만 `cap_drop: ALL` 후 `SETUID`, `SETGID`, `KILL`만 남깁니다. `DAC_OVERRIDE`가 없으므로 UID 10100 소유 파일은 서버도 읽지 못합니다. `no-new-privileges`, 읽기 전용 루트, `network_mode: none`, private IPC/PID namespace를 함께 씁니다.
 - 모든 컴파일·실행은 `setpriv`로 **UID/GID 10100**(보조 그룹 없음, capability 전부 0, `no_new_privs`)으로 전환한 뒤 실행합니다. root → 비root 전환에서 커널이 permitted/effective/ambient capability를 비우므로 실패 시 "닫힌" 쪽으로 동작합니다. 작업은 서버 프로세스에 신호를 보내거나 ptrace하거나 `/proc/<pid>/{mem,environ,fd,cwd}`를 열 수 없고(UID 불일치), `kill(-1)`도 서버에 닿지 않습니다. 작업 환경 변수는 `PATH, LANG, HOME, TMPDIR`뿐입니다.
 - `RLIMIT_NPROC`은 UID 단위로 스레드까지 센다는 점이 핵심입니다. 서버와 같은 UID를 쓰면 JVM이 시작도 못 하고 포크 폭탄도 서버 쪽 프로세스를 세므로 막히지 않았습니다. 이제 작업 UID만 세므로 NPROC가 정확히 학생 프로세스를 제한합니다.
-- 파일: `/jobs`(tmpfs, 소유자 10100, 0700)가 유일한 쓰기 위치이고 작업마다 `/jobs/coms-<랜덤>` 하위 디렉터리를 `TMPDIR`/`HOME`/cwd로 씁니다. 루트 파일시스템은 읽기 전용이며 `/tmp`, `/run/coms-study`(nginx와 공유하는 소켓 디렉터리, 소켓은 `root:nginx 0660`), `/app` 등은 10100이 쓸 수 없습니다. `/dev/shm`과 `/dev/mqueue`는 Docker가 1777로 만들기 때문에 쓰기가 가능하며 작업 후 지웁니다.
-- 정리(작업 전·컴파일 후·작업 후): ① **작업 UID로** `kill -9 -1`을 반복 실행해 `setsid`/이중 fork 데몬을 포함한 모든 10100 프로세스를 종료하고 `/proc`에 남은 10100 프로세스(좀비 포함)가 없을 때까지 확인, ② 작업 UID로 `ipcrm --all` 후 `/proc/sysvipc/{shm,msg,sem}`에 uid/cuid 10100 객체가 없는지 확인, ③ 작업 UID로 `/jobs`·`/dev/shm`·`/dev/mqueue`(POSIX 메시지 큐 포함)에서 10100 소유 파일을 삭제(권한 000 디렉터리는 `chmod u+rwx` 후 삭제)하고 남은 것이 없는지 확인. 하나라도 실패하면 health가 503이 되고 다음 작업을 받지 않습니다(재시작 필요). 소유자가 직접 지우므로 `CAP_DAC_OVERRIDE`/`CAP_FOWNER`/`CAP_CHOWN`이 필요 없습니다.
+- 파일: `/jobs`(tmpfs, **root 소유, 모드 1777 sticky**)가 유일한 쓰기 위치입니다. 작업 UID는 마운트 루트를 chmod/rename/삭제할 수 없고 자기 항목만 만들거나 지울 수 있습니다(정리가 목록을 읽어야 해서 `1733`이 아니라 `1777`; 작업 UID가 유일한 사용자입니다). 작업마다 작업 UID가 만든 0700 하위 디렉터리 `/jobs/coms-<랜덤>`을 `TMPDIR`/`HOME`/cwd로 씁니다. 루트 파일시스템은 읽기 전용이며 `/tmp`, `/run/coms-study`(nginx와 공유하는 소켓 디렉터리, 소켓은 `root:nginx 0660`), `/app` 등은 10100이 쓸 수 없습니다. `/dev/shm`과 `/dev/mqueue`는 Docker가 1777로 만들기 때문에 쓰기가 가능하며 작업 후 지웁니다.
+- 정리(작업 전·컴파일 후·작업 후): ① **작업 UID로** `kill -9 -1`을 반복 실행해 `setsid`/이중 fork 데몬을 포함한 모든 10100 프로세스를 종료하고 `/proc`에 남은 10100 프로세스(좀비 포함)가 없을 때까지 확인, ② 작업 UID로 `ipcrm --all` 후 `/proc/sysvipc/{shm,msg,sem}`에 uid/cuid 10100 객체가 없는지 확인, ③ 작업 UID로 `/jobs`·`/dev/shm`·`/dev/mqueue`(POSIX 메시지 큐 포함)의 10100 소유 항목에 `chmod -R u+rwx`(권한 000 트리 복구, 심볼릭 링크 제외) 후 `rm -rf`를 셸 없이 argv로 실행(종료 코드·타임아웃이 곧바로 예외)하고, 서버가 세 마운트가 **완전히 비었는지** 직접 읽어 확인. 하나라도 실패하면 러너는 오염(poisoned) 상태가 되어 해당 요청과 대기 요청에 `503 {"error":"unavailable"}`(Retry-After 30)를 돌려주고, 약 1.5초 뒤 서버가 **종료 코드 70으로 종료**합니다. tini도 함께 끝나 컨테이너가 종료되고 `restart: unless-stopped`가 새 컨테이너(비워진 tmpfs)로 다시 띄웁니다. 재시작 중 nginx 재시도는 필요 없고 클라이언트는 503 메시지를 보고 다시 시도하면 됩니다. 소유자가 직접 지우므로 `CAP_DAC_OVERRIDE`/`CAP_FOWNER`/`CAP_CHOWN`이 필요 없습니다.
 
 ### 대안 비교 (이 구조를 택한 이유)
 
@@ -60,7 +60,7 @@ tini (PID 1, root)
 - 작업은 `/proc`을 통해 서버와 tini의 존재·cmdline·상태를 읽을 수 있습니다(비밀 아님). PID namespace는 컨테이너 단위라서 작업 간 프로세스 격리는 순차 실행과 정리로 보장합니다(동시 작업 없음).
 - 비밀(토큰, 키)을 컨테이너 환경 변수나 파일에 넣지 마세요. 작업이 직접 읽지는 못하지만 방어를 한 겹 더 두는 것입니다.
 - capability bounding set은 `SETUID, SETGID, KILL`로 남습니다(`CAP_SETPCAP` 없이는 줄일 수 없음). 작업 프로세스는 비root + `no_new_privs`이고 파일 capability가 없어 이를 사용할 수 없으며 테스트가 이를 확인합니다.
-- 정리 실패 시 컨테이너 재시작이 필요합니다. `restart: unless-stopped`는 unhealthy만으로 재시작하지 않으므로 모니터가 `/study/api/health`의 503을 보고 재시작해야 합니다.
+- 정리 실패는 위처럼 프로세스 종료 → 컨테이너 자동 재시작으로 복구됩니다(회귀 테스트: root 소유 잔여 파일로 503과 종료 코드 70 확인). 재시작 사이 몇 초 동안은 요청이 실패합니다.
 - 개발 Compose는 포트와 브리지 네트워크를 열므로(작업이 외부 네트워크에 접근 가능) 신뢰할 수 있는 로컬 입력에만 사용하세요.
 
 ## 실행
@@ -83,7 +83,7 @@ cd runner
 node --test test/*.test.mjs        # 단위·HTTP 테스트(호스트에서 실행 가능)
 docker build -t coms-study-runner:local .
 docker run --rm --network none --user 0:101 --read-only \
-  --tmpfs "/jobs:rw,exec,nosuid,nodev,size=64m,nr_inodes=4096,mode=0700,uid=10100,gid=10100" \
+  --tmpfs "/jobs:rw,exec,nosuid,nodev,size=64m,nr_inodes=4096,mode=1777" \
   --tmpfs /run/coms-study:rw,nosuid,nodev,size=1m,mode=0755 \
   --cap-drop ALL --cap-add SETUID --cap-add SETGID --cap-add KILL \
   --security-opt no-new-privileges:true \

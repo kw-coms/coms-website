@@ -13,7 +13,7 @@ services:
     read_only: true
     tmpfs:
       # The only place the job uid can write besides /dev/shm and /dev/mqueue (wiped after every job).
-      - /jobs:rw,exec,nosuid,nodev,size=64m,nr_inodes=4096,mode=0700,uid=10100,gid=10100
+      - /jobs:rw,exec,nosuid,nodev,size=64m,nr_inodes=4096,mode=1777
     cap_drop: [ALL]
     cap_add: [SETUID, SETGID, KILL]
     security_opt: ["no-new-privileges:true"]

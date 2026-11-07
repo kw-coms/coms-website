@@ -66,6 +66,7 @@ export function createRunnerServer({
   limiter = createRateLimiter({ limit: rateLimitPerMinute() }),
   trustProxy = process.env.TRUST_PROXY === '1',
   logger = entry => console.log(JSON.stringify(entry)),
+  onFatal = () => {},
 } = {}) {
   const server = createServer({ maxHeaderSize: 16 * 1024 }, async (request, response) => {
     const started = Date.now(), id = randomUUID();
@@ -105,7 +106,15 @@ export function createRunnerServer({
       if (!pending) { response.setHeader('Retry-After', '20'); return send(429, { error: 'busy', messageKo: '실행 대기열이 가득 찼어요. 잠시 후 다시 시도해 주세요.' }); }
       const result = await pending;
       if (result !== null) send(200, result);
-    } catch { send(500, rejected('서버에서 요청을 처리하지 못했어요.')); }
+    } catch {
+      // Cleanup failure poisons the runner: answer 503 and let the process exit so the
+      // container is recreated (fresh tmpfs). Never keep serving from an unclean sandbox.
+      if (!healthCheck()) {
+        response.setHeader('Retry-After', '30');
+        send(503, { error: 'unavailable', messageKo: '실행기를 다시 시작하는 중이에요. 잠시 후 다시 시도해 주세요.' });
+        onFatal();
+      } else send(500, rejected('서버에서 요청을 처리하지 못했어요.'));
+    }
     finally { if (!request.complete) request.resume(); }
   });
   server.on('close', () => limiter.close?.());
@@ -144,7 +153,19 @@ export async function listenRunner(server, { socketPath = process.env.LISTEN_SOC
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const server = createRunnerServer();
+  let server;
+  let exiting = false;
+  server = createRunnerServer({
+    onFatal() {
+      if (exiting) return;
+      exiting = true;
+      console.error(JSON.stringify({ event: 'fatal', reason: 'job cleanup failed; exiting for container restart' }));
+      server.close();
+      // Give in-flight 503 responses a moment to flush, then die non-zero: tini exits and
+      // Docker's restart policy recreates the container.
+      setTimeout(() => process.exit(70), 1500);
+    },
+  });
   listenRunner(server).catch(error => { console.error(error.message); process.exitCode = 1; });
   const shutdown = () => { server.close(); setTimeout(() => process.exit(0), 25_000).unref(); };
   process.on('SIGTERM', shutdown);

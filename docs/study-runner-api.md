@@ -25,7 +25,7 @@ Response 200 (the program ran or failed to compile — both are normal outcomes)
   "diagnostics": [ { "line": 3, "column": 5, "severity": "error", "message": "…", "hintKo": "…" } ]
 }
 ```
-Errors: 400 `{ "error": "rejected", "messageKo": "…" }` (bad JSON, unknown lang, size), 401 (not logged in, from nginx), 429 `{ "error": "busy" | "rate-limited", "messageKo": "…" }`.
+Errors: 400 `{ "error": "rejected", "messageKo": "…" }` (bad JSON, unknown lang, size), 401 (not logged in, from nginx), 503 `{ "error": "unavailable", "messageKo": "…" }` (runner restarting after a failed cleanup), 429 `{ "error": "busy" | "rate-limited", "messageKo": "…" }`.
 
 ## Languages
 - `c`: gcc, `-std=c17 -O1 -Wall -Wextra -lm`, file `main.c`.
@@ -33,4 +33,4 @@ Errors: 400 `{ "error": "rejected", "messageKo": "…" }` (bad JSON, unknown lan
 - `python`: CPython 3.12, file `main.py`, `-I -u`.
 
 ## Limits (per run)
-Wall 10 s (compile 15 s), CPU 3 s (Java 6 s), memory via container/cgroup (Java `-Xmx192m -Xss8m`), output 64 KB per stream, processes ≤ 32, files ≤ 8 MB, no network, fresh temp dir, killed process group, all processes of the runner uid killed after each job, one job at a time per container (queue ≤ 8, then 429 busy).
+Wall 10 s (compile 15 s), CPU 3 s (Java 6 s), memory via container/cgroup (Java `-Xmx192m -Xss1m -XX:MaxMetaspaceSize=96m`, javac `-Xmx256m`), output 64 KB per stream, processes+threads ≤ 32 (C/Python) or ≤ 128 (Java) for the dedicated job uid 10100, open files ≤ 64 (Java 256), files ≤ 8 MB, no network, private 0700 job dir on a tmpfs wiped after every job, killed process group, every uid-10100 process killed after each job, one job at a time per container (queue ≤ 8, then 429 busy). If sandbox cleanup ever fails the runner answers `503 {"error":"unavailable"}` (Retry-After 30) and restarts itself.
