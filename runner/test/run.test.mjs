@@ -28,10 +28,11 @@ test('stage passes stdin exactly and launches prlimit without inherited environm
   const result = await executeStage('/usr/bin/gcc', ['main.c'], { ...fake, cwd: '/tmp/work', stdin: 'hello\n', lang: 'c', stage: 'compile' });
   assert.equal(input, 'hello\n'); assert.equal(result.stdout, '안녕'); assert.equal(result.exitCode, 0);
   const call = fake.calls[0];
-  // uid switch first (setpriv), then env -C enters the 0700 job dir, then prlimit, then the program.
-  assert.equal(call.command, '/usr/bin/setpriv'); assert.equal(call.options.shell, false);
-  assert.deepEqual(call.args.slice(0, 7), ['--reuid=10100', '--regid=10100', '--clear-groups', '--inh-caps=-all', '--ambient-caps=-all', '--no-new-privs', '--']);
-  assert.deepEqual(call.args.slice(7, 11), ['/usr/bin/env', '-C', '/tmp/work', '/usr/bin/prlimit']);
+  // oom pin (choom, still root), uid switch (setpriv), then env -C enters the 0700 job dir, then prlimit, then the program.
+  assert.equal(call.command, '/usr/bin/choom'); assert.equal(call.options.shell, false);
+  assert.deepEqual(call.args.slice(0, 4), ['-n', '1000', '--', '/usr/bin/setpriv']);
+  assert.deepEqual(call.args.slice(4, 11), ['--reuid=10100', '--regid=10100', '--clear-groups', '--inh-caps=-all', '--ambient-caps=-all', '--no-new-privs', '--']);
+  assert.deepEqual(call.args.slice(11, 15), ['/usr/bin/env', '-C', '/tmp/work', '/usr/bin/prlimit']);
   assert.deepEqual(call.args.slice(-3), ['--', '/usr/bin/gcc', 'main.c']);
   assert.equal(call.options.detached, true);
   assert.deepEqual(call.options.env, { PATH: '/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8', HOME: '/tmp/work', TMPDIR: '/tmp/work' });
@@ -113,8 +114,8 @@ test('invalid UTF8 and path redaction remain byte bounded', async () => {
   const fake = fakeProcess(c => { c.stdout.write(Buffer.alloc(MAX_OUTPUT_BYTES, 255)); finish(c); });
   const decoded = await executeStage('program', [], { ...fake, cwd: '/tmp/work', lang: 'c', stage: 'run' });
   assert.ok(Buffer.byteLength(decoded.stdout) <= MAX_OUTPUT_BYTES);
-  const r = await runCode({ lang: 'python', code: '' }, { executor: async () => ({ ...success, stdout: '/a '.repeat(21845) }), cleanup: async () => {} });
-  assert.ok(Buffer.byteLength(r.stdout) <= MAX_OUTPUT_BYTES);
+  const r = await runCode({ lang: 'python', code: '' }, { executor: async () => ({ ...success, stderr: '/usr '.repeat(8000) }), cleanup: async () => {} });
+  assert.ok(Buffer.byteLength(r.stderr) <= MAX_OUTPUT_BYTES);
   assert.equal(r.truncated, true);
 });
 
@@ -141,4 +142,11 @@ test('System V IPC cleanup removes each owned or created object by id and reject
   calls.length = 0;
   await clearSystemVIpc({ execImpl: (...args) => calls.push(args), readFileImpl: async path => path.endsWith('/shm') ? 'key shmid uid cuid\n' : 'key id uid cuid\n', uid: 10100 });
   assert.equal(calls.length, 0);
+});
+
+test('student stdout keeps slashes, dates and URLs; stderr still loses system paths', async () => {
+  const text = '1/2 = 0.5\n2024/11/07 and/or http://x.y/z /usr/bin/x';
+  const r = await runCode({ lang: 'python', code: '' }, { executor: async () => ({ ...success, stdout: text, stderr: `${text}\n  File "/app/x.py", line 1` }), cleanup: async () => {} });
+  assert.equal(r.stdout, text);
+  assert.equal(r.stderr.split('\n')[0], '1/2 = 0.5'); assert.match(r.stderr, /^2024\/11\/07 and\/or http:\/\/x\.y\/z \[경로\]$/m); assert.doesNotMatch(r.stderr, /\/app/);
 });

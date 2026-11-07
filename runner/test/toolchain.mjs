@@ -300,7 +300,8 @@ for (const [name, body] of [
   ['mode-000 shared memory, message queue and semaphore', 'if(shmget(IPC_PRIVATE,4096,IPC_CREAT|0)<0||msgget(IPC_PRIVATE,IPC_CREAT|0)<0||semget(IPC_PRIVATE,1,IPC_CREAT|0)<0) return 1;'],
   ['shm whose owner uid was given away with IPC_SET (creator uid remains)', 'int id=shmget(IPC_PRIVATE,4096,IPC_CREAT|0600); struct shmid_ds d; if(id<0||shmctl(id,IPC_STAT,&d)) return 1; d.shm_perm.uid=0; d.shm_perm.mode=0; if(shmctl(id,IPC_SET,&d)) return 2;'],
   ['mode-000 POSIX shm and message queue', 'if(shm_open("/z000",O_CREAT|O_RDWR,0)<0) return 1; if(mq_open("/z000q",O_CREAT|O_RDWR,0,NULL)==(mqd_t)-1) return 2;'],
-  ['500 SysV objects of all kinds with alternating modes', 'for(int i=0;i<500;i++){int m=i%2?0:0600; int r=i%3==0?shmget(IPC_PRIVATE,4096,IPC_CREAT|m):i%3==1?msgget(IPC_PRIVATE,IPC_CREAT|m):semget(IPC_PRIVATE,1,IPC_CREAT|m); if(r<0){printf("failed at %d\\n",i);return 1;}}'],
+  // Up to 500 objects; the compose sysctls (shmmni 64, msgmni 32, semmni 64) stop it earlier, which is fine.
+  ['up to 500 SysV objects of all kinds with alternating modes', 'int n=0; for(int i=0;i<500;i++){int m=i%2?0:0600; int r=i%3==0?shmget(IPC_PRIVATE,4096,IPC_CREAT|m):i%3==1?msgget(IPC_PRIVATE,IPC_CREAT|m):semget(IPC_PRIVATE,1,IPC_CREAT|m); if(r<0)continue; n++;} if(n<20) return 1;'],
 ]) {
   test(`IPC cleanup survives: ${name}`, options('c', true), async () => {
     const r = await run('c', `${ipcHead}int main(void){${body} puts("made"); return 0;}`);
@@ -315,4 +316,36 @@ test('IPC cleanup survives: attached shm segment whose attacher sleeps in a sets
 test('seccomp profile is active and denies user namespaces, mount and ptrace', options('python', true), async () => {
   const o = json(await py('import ctypes,json,os\nl=ctypes.CDLL(None,use_errno=True)\nr={}\nr["unshare_userns"]=l.unshare(0x10000000)\nr["mount"]=l.mount(b"none",b"/jobs",b"tmpfs",0,None)\nr["traceme"]=l.ptrace(0,0,0,0)\nprint(json.dumps(r))'));
   for (const [name, value] of Object.entries(o)) assert.equal(value, -1, name);
+});
+
+test('job oom_score_adj is 1000 (inherited by children), the server stays at 0', options('python', true), async () => {
+  const o = json(await py('import subprocess,json\nprint(json.dumps([open("/proc/self/oom_score_adj").read().strip(), subprocess.run(["/bin/cat","/proc/self/oom_score_adj"],capture_output=True,text=True).stdout.strip()]))'));
+  assert.deepEqual(o, ['1000', '1000']);
+  assert.equal((await readFile('/proc/self/oom_score_adj', 'utf8')).trim(), '0');
+  assert.equal((await readFile('/proc/1/oom_score_adj', 'utf8')).trim(), '0');
+});
+
+test('job cannot lower its oom_score_adj', options('python', true), async () => {
+  const o = json(await py('import json\ntry:\n with open("/proc/self/oom_score_adj","w") as f: f.write("0")\n r="UNSAFE"\nexcept OSError: r="denied"\nprint(json.dumps([r, open("/proc/self/oom_score_adj").read().strip()]))'));
+  assert.deepEqual(o, ['denied', '1000']);
+});
+
+test('multi-process memory hog is OOM-killed inside the job; the server survives and the next job runs', options('c', true), async () => {
+  const hog = '#define _POSIX_C_SOURCE 200809L\n#include <stdlib.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/wait.h>\n#include <stdio.h>\nint main(void){for(int i=0;i<30;i++){if(fork()==0){char*p=malloc(48<<20);if(!p)_exit(3);memset(p,1,48<<20);sleep(30);_exit(0);}}int st,bad=0;while(wait(&st)>0)if(WIFSIGNALED(st))bad++;printf("killed %d\\n",bad);return 0;}';
+  const r = await run('c', hog);
+  // Either the OOM killer or the wall clock ends it; what matters is that it ended and nothing else did.
+  assert.ok(r.timedOut || r.signal || /^killed [1-9]/.test(r.stdout), JSON.stringify(r));
+  await ipcClean('memory hog'); // normal job succeeds, runner healthy
+  assert.ok(Number((await readFile('/proc/self/stat', 'utf8')).split(' ')[0]) === process.pid);
+});
+
+test('SysV shm accumulation (attached, written, detached segments) is bounded by the IPC limits and does not hurt the server', options('c', true), async () => {
+  const r = await run('c', `${ipcHead}#include <string.h>\nint main(void){long total=0;int n=0;for(int i=0;i<200;i++){int id=shmget(IPC_PRIVATE,1<<20,IPC_CREAT|0600);if(id<0)break;char*p=shmat(id,0,0);if(p==(void*)-1)break;memset(p,7,1<<20);shmdt(p);total+=1<<20;n++;}printf("%d %ld\\n",n,total);return 0;}`);
+  assert.equal(r.exitCode, 0, JSON.stringify(r));
+  const [n, total] = r.stdout.trim().split(' ').map(Number);
+  assert.ok(n >= 1, r.stdout);
+  const shmall = Number((await readFile('/proc/sys/kernel/shmall', 'utf8')).trim()) * 4096;
+  assert.ok(total <= shmall, `${total} > shmall ${shmall}`);
+  if (process.env.RUNNER_EXPECT_IPC_LIMITS === '1') assert.ok(total <= 16 * 1024 * 1024 && n <= 16, `unbounded: ${r.stdout}`);
+  await ipcClean('shm accumulation');
 });

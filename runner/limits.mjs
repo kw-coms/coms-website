@@ -56,7 +56,10 @@ export function createRateLimiter({ limit = 10, windowMs = 60_000, now = Date.no
   };
 }
 
-export function createRunQueue() {
+export const QUEUE_TIMEOUT = Symbol('queue-timeout');
+// One job at a time. A request that cannot start within maxWaitMs resolves QUEUE_TIMEOUT so the
+// whole request (wait + compile 15 s + run 10 s + cleanup) stays well under the proxy's 60 s.
+export function createRunQueue({ maxWaitMs = 25_000, setTimeoutImpl = setTimeout, clearTimeoutImpl = clearTimeout } = {}) {
   let active = 0;
   const waiting = [];
   function start(job, resolve, reject) {
@@ -64,39 +67,77 @@ export function createRunQueue() {
     Promise.resolve().then(job).then(resolve, reject).finally(() => {
       active = 0;
       const next = waiting.shift();
-      if (next) start(...next);
+      if (next) { clearTimeoutImpl(next.timer); start(next.job, next.resolve, next.reject); }
     });
   }
   return {
     submit(job) {
       if (active && waiting.length >= 8) return null;
       return new Promise((resolve, reject) => {
-        if (active) waiting.push([job, resolve, reject]);
-        else start(job, resolve, reject);
+        if (!active) return start(job, resolve, reject);
+        const entry = { job, resolve, reject };
+        entry.timer = setTimeoutImpl(() => {
+          const index = waiting.indexOf(entry);
+          if (index >= 0) { waiting.splice(index, 1); resolve(QUEUE_TIMEOUT); }
+        }, maxWaitMs);
+        entry.timer?.unref?.();
+        waiting.push(entry);
       });
     },
     stats: () => ({ active, queued: waiting.length }),
   };
 }
 
-// Persistent deny-list of clients whose job made sandbox cleanup fail (each such failure costs
-// a container restart for everybody). Lives on a small named volume that outlives process and
-// container restarts; a missing/corrupt file just means an empty list.
-export function createDenyList({ file, ttlMs = 15 * 60_000, max = 1000, now = Date.now, fs } = {}) {
-  const { readFileSync, writeFileSync, renameSync } = fs;
-  let entries = new Map();
-  const prune = () => { const t = now(); for (const [key, until] of entries) if (until <= t) entries.delete(key); };
+// Crash-safe small state files on the disk-backed state volume (root-only dir, files 0600).
+function writeFileAtomic(fs, file, text) {
+  const tmp = `${file}.tmp`;
+  const fd = fs.openSync(tmp, 'w', 0o600);
+  try { fs.writeSync(fd, text); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  fs.renameSync(tmp, file);
+}
+const describe = error => ({ name: error?.name, code: error?.code, message: String(error?.message).replace(/[\x00-\x1f]/g, ' ').slice(0, 200) });
+
+// Persistent deny-list of clients whose job made sandbox cleanup fail or crashed the server (each
+// costs a restart for everybody). Outlives process and container restarts. A missing file means
+// empty; any other read/write failure is logged, never silent.
+export function createDenyList({ file, ttlMs = 15 * 60_000, max = 1000, now = Date.now, fs, logger = () => {} } = {}) {
+  const entries = new Map();
   try {
-    const parsed = JSON.parse(readFileSync(file, 'utf8'));
-    if (parsed && typeof parsed === 'object') for (const [key, until] of Object.entries(parsed)) if (Number.isFinite(until)) entries.set(key, until);
-  } catch { /* first start or unreadable: start empty */ }
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new TypeError('deny-list file is not an object');
+    const t = now();
+    for (const [key, until] of Object.entries(parsed).slice(-max)) {
+      if (key.length > 100 || !Number.isFinite(until) || until <= t) continue;
+      entries.set(key, Math.min(until, t + ttlMs)); // a tampered far-future expiry cannot lock a client out for long
+    }
+  } catch (error) { if (error.code !== 'ENOENT') logger({ event: 'denylist-read-failed', ...describe(error) }); }
+  const prune = () => { const t = now(); for (const [key, until] of entries) if (until <= t) entries.delete(key); };
   return {
     has(key) { const until = entries.get(key); return until !== undefined && until > now(); },
+    remainingSeconds(key) { return Math.max(1, Math.ceil(((entries.get(key) ?? 0) - now()) / 1000)); },
     add(key) {
       prune();
       if (entries.size >= max && !entries.has(key)) entries.delete(entries.keys().next().value);
       entries.set(key, now() + ttlMs);
-      try { writeFileSync(`${file}.tmp`, JSON.stringify(Object.fromEntries(entries))); renameSync(`${file}.tmp`, file); } catch { /* best effort; must not block the restart */ }
+      try { writeFileAtomic(fs, file, JSON.stringify(Object.fromEntries(entries))); }
+      catch (error) { logger({ event: 'denylist-write-failed', ...describe(error) }); }
+    },
+  };
+}
+
+// The one job currently running, durably recorded BEFORE it starts and removed after its cleanup.
+// A record found at startup means the previous server died mid-job (OOM, SIGKILL, crash): the
+// client that submitted it is blamed.
+export function createInflight({ file, fs, logger = () => {} } = {}) {
+  return {
+    begin(record) { writeFileAtomic(fs, file, JSON.stringify(record)); },
+    end() { try { fs.unlinkSync(file); } catch (error) { if (error.code !== 'ENOENT') logger({ event: 'inflight-clear-failed', ...describe(error) }); } },
+    recover() {
+      let record = null;
+      try { record = JSON.parse(fs.readFileSync(file, 'utf8')); }
+      catch (error) { if (error.code !== 'ENOENT') logger({ event: 'inflight-read-failed', ...describe(error) }); }
+      this.end();
+      return record && typeof record.clientKey === 'string' ? record : null;
     },
   };
 }

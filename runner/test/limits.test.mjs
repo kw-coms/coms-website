@@ -47,16 +47,36 @@ test('rejected job frees the single execution slot', async () => {
   assert.equal(await queue.submit(() => 42), 42);
 });
 
-test('deny list persists across instances, expires and tolerates a corrupt file', async () => {
-  const { createDenyList } = await import('../limits.mjs');
+test('deny list persists, expires, clamps tampered expiries, logs read failures and writes 0600 atomically', async () => {
+  const { createDenyList, createInflight } = await import('../limits.mjs');
   const fs = await import('node:fs');
-  const { mkdtempSync, writeFileSync } = fs;
-  const dir = mkdtempSync((await import('node:os')).tmpdir() + '/deny-'), file = `${dir}/d.json`;
-  let t = 1000;
-  const make = () => createDenyList({ file, ttlMs: 500, now: () => t, fs });
-  writeFileSync(file, '{not json'); assert.equal(make().has('1.2.3.4'), false);
-  make().add('1.2.3.4');
-  const again = make();
-  assert.equal(again.has('1.2.3.4'), true); assert.equal(again.has('5.6.7.8'), false);
-  t = 1600; assert.equal(make().has('1.2.3.4'), false);
+  const dir = fs.mkdtempSync((await import('node:os')).tmpdir() + '/deny-'), file = `${dir}/d.json`;
+  let t = 1000; const logs = [];
+  const make = () => createDenyList({ file, ttlMs: 500, now: () => t, fs, logger: e => logs.push(e) });
+  assert.equal(make().has('m:a'), false); assert.deepEqual(logs, []); // ENOENT is silent
+  fs.writeFileSync(file, '{not json'); assert.equal(make().has('m:a'), false); assert.equal(logs[0].event, 'denylist-read-failed');
+  fs.writeFileSync(file, JSON.stringify({ 'm:far': 9e15, 'm:old': 5, 'm:ok': 1200 }));
+  const loaded = make();
+  assert.equal(loaded.has('m:old'), false); assert.equal(loaded.has('m:ok'), true);
+  assert.equal(loaded.remainingSeconds('m:far'), 1); t = 1501; assert.equal(loaded.has('m:far'), false); // clamped to now+ttl
+  t = 1000; make().add('m:a');
+  assert.equal((fs.statSync(file).mode & 0o777), 0o600); assert.ok(!fs.existsSync(`${file}.tmp`));
+  assert.equal(make().has('m:a'), true); t = 1600; assert.equal(make().has('m:a'), false);
+  const flight = createInflight({ file: `${dir}/inflight.json`, fs });
+  assert.equal(flight.recover(), null);
+  flight.begin({ clientKey: 'm:x', jobId: 'j', startedAt: 1 });
+  assert.equal(flight.recover().clientKey, 'm:x'); assert.equal(flight.recover(), null);
+  flight.begin({ clientKey: 'm:y' }); flight.end(); assert.equal(flight.recover(), null);
+});
+
+test('queued request that cannot start within the wait cap resolves QUEUE_TIMEOUT and frees its slot', async () => {
+  const { QUEUE_TIMEOUT } = await import('../limits.mjs');
+  const timers = [];
+  const queue = createRunQueue({ maxWaitMs: 25_000, setTimeoutImpl: fn => { timers.push(fn); return timers.length; }, clearTimeoutImpl() {} });
+  let release; const first = queue.submit(() => new Promise(resolve => { release = resolve; }));
+  const second = queue.submit(() => 'never');
+  assert.deepEqual(queue.stats(), { active: 1, queued: 1 });
+  timers[0]();
+  assert.equal(await second, QUEUE_TIMEOUT); assert.deepEqual(queue.stats(), { active: 1, queued: 0 });
+  release('done'); assert.equal(await first, 'done');
 });

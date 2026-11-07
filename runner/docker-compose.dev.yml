@@ -9,17 +9,39 @@ services:
     user: "0:0"
     read_only: true
     tmpfs:
+      # The only place the job uid can write besides /dev/shm and /dev/mqueue (wiped after every job).
       - /jobs:rw,exec,nosuid,nodev,size=64m,nr_inodes=4096,mode=1777
+      # POSIX shm: explicit and small (also counted in the 768m cgroup).
+      - /dev/shm:rw,noexec,nosuid,nodev,size=8m,nr_inodes=1024,mode=1777
     cap_drop: [ALL]
-    cap_add: [SETUID, SETGID, KILL]
-    # Explicit profile (Docker's default minus ptrace/process_vm_*): never depend on the daemon default.
-    security_opt: ["no-new-privileges:true", "seccomp=./seccomp.json"]
+    cap_add:
+      - SETUID  # setpriv switches each job to uid 10100 (the server keeps uid 0)
+      - SETGID  # ... and gid 10100, clearing supplementary groups
+      - KILL    # server kills the job's process group on timeout / output flood
+      - SYS_RESOURCE  # only to pin oom_score_adj=1000 (+min) on jobs before they drop to uid 10100
+    security_opt:
+      - "no-new-privileges:true"
+      # Explicit profile (Docker's default minus ptrace/process_vm_*): never depend on the daemon default.
+      # A root compose that includes this file sets RUNNER_SECCOMP=./runner/seccomp.json.
+      - "seccomp=${RUNNER_SECCOMP:-./seccomp.json}"
     mem_limit: 768m
     memswap_limit: 768m
     cpus: 1.0
     pids_limit: 256
     ipc: private
-    shm_size: 8m
+    # IPC limits are namespaced, so a job cannot exhaust anything outside this container:
+    # SysV shm <= 16 MiB total (4096 pages), 4 MiB per segment, 64 segments; small queues/semaphores.
+    sysctls:
+      kernel.shmmax: "4194304"
+      kernel.shmall: "4096"
+      kernel.shmmni: "64"
+      kernel.msgmax: "8192"
+      kernel.msgmnb: "16384"
+      kernel.msgmni: "32"
+      kernel.sem: "32 1024 32 64"
+      fs.mqueue.queues_max: "16"
+      fs.mqueue.msg_max: "10"
+      fs.mqueue.msgsize_max: "8192"
     stop_grace_period: 25s
     environment:
       HOST: "0.0.0.0"

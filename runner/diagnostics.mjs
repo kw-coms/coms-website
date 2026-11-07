@@ -2,9 +2,12 @@ import { basename } from 'node:path';
 
 export const MAX_DIAGNOSTICS = 100;
 
-// Redact paths before either compiler messages or arbitrary program output leave
-// the container. Keep only the source basename so locations remain useful.
-export function stripPaths(text, { tempDir = '' } = {}) {
+// Redact paths before compiler messages or program stderr leave the container. The job's own
+// temp dir is always removed; elsewhere only Windows-style paths and absolute paths under
+// known system prefixes are rewritten, so ordinary text such as `1/2`, `2024/11/07`,
+// `and/or` or `http://x.y/z` survives. Program stdout passes redactSystemPaths: false.
+const SYSTEM_PATH = String.raw`\/(?:jobs|tmp|usr|opt|proc|app|run|etc|var|home|dev|sys|root|bin|sbin|lib|lib64|mnt|srv|boot)(?:\/[^\s<>"'\x60;,):]*)?`;
+export function stripPaths(text, { tempDir = '', redactSystemPaths = true } = {}) {
   let value = String(text).replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
     .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '');
   if (tempDir) {
@@ -13,13 +16,14 @@ export function stripPaths(text, { tempDir = '' } = {}) {
     value = value.split(tempDir).join('[작업폴더]');
     value = value.split(basename(tempDir)).join('[작업폴더]');
   }
+  if (!redactSystemPaths) return value;
   const redact = path => {
     const leaf = path.replace(/[\\/]+$/, '').split(/[\\/]/).pop();
     return /^(?:main\.c|main\.py|[A-Za-z_$][\w$]*\.java)$/.test(leaf) ? leaf : '[경로]';
   };
-  value = value.replace(/(["'`])((?:[A-Za-z]:[\\/]|\/|\\\\)[^\n]*?)\1/g,
-    (_, quote, path) => `${quote}${redact(path)}${quote}`);
-  return value.replace(/(?:[A-Za-z]:[\\/]|\\\\|\/)[^\s<>"'`;,):]*/g, redact);
+  const system = new RegExp(`(?<![\\w.:/~-])${SYSTEM_PATH}`, 'g');
+  value = value.replace(/(["'\x60])((?:(?<!\w)[A-Za-z]:[\\/]|\\\\)[^\n]*?)\1/g, (_, quote, path) => `${quote}${redact(path)}${quote}`);
+  return value.replace(/(?:(?<!\w)[A-Za-z]:[\\/]|\\\\)[^\s<>"'\x60;,):]*/g, redact).replace(system, redact);
 }
 
 export function hintFor(message) {

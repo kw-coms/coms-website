@@ -68,13 +68,14 @@ test('HTTP queue holds eight waiting requests and rejects the next', async t => 
   const queue = createRunQueue();
   const releases = [];
   const server = createRunnerServer({
-    queue, logger() {}, limiter: { take: () => true, close() {} },
+    queue, logger() {}, limiter: { take: () => true, close() {} }, trustProxy: true,
     executor: () => new Promise(resolve => releases.push(() => resolve(result))),
   });
   if (!await listenOrSkip(t, server)) return;
   t.after(() => new Promise(resolve => server.close(resolve)));
   const url = `http://127.0.0.1:${server.address().port}/study/api/run`;
-  const submit = () => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(good) });
+  let n = 0;
+  const submit = () => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-runner-client': `member${n++}` }, body: JSON.stringify(good) });
   const accepted = Array.from({ length: 9 }, submit);
   const deadline = Date.now() + 3000;
   while (queue.stats().queued !== 8 && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 5));
@@ -140,12 +141,35 @@ test('poisoned runner answers 503 unavailable and signals fatal via onFatal', as
 test('denied client gets 429 before the queue; a poisoning request is passed to onFatal with its ip', async t => {
   let ran = 0, fatalIp;
   const denied = new Set();
-  const server = createRunnerServer({ healthCheck: () => ran === 0, onFatal: ({ ip }) => { fatalIp = ip; denied.add(ip); }, logger() {}, limiter: { take: () => true, close() {} },
-    denyList: { has: ip => denied.has(ip) }, executor: async () => { ran++; throw new Error('cleanup'); } });
+  const server = createRunnerServer({ healthCheck: () => ran === 0, onFatal: ({ key }) => { fatalIp = key; denied.add(key); }, logger() {}, limiter: { take: () => true, close() {} },
+    denyList: { has: key => denied.has(key), remainingSeconds: () => 321 }, executor: async () => { ran++; throw new Error('cleanup'); } });
   if (!await listenOrSkip(t, server)) return;
   t.after(() => new Promise(resolve => server.close(resolve)));
   const post = () => fetch(`http://127.0.0.1:${server.address().port}/study/api/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ lang: 'python', code: 'print(1)' }) });
-  assert.equal((await post()).status, 503); assert.equal(fatalIp, '127.0.0.1');
+  assert.equal((await post()).status, 503); assert.equal(fatalIp, 'ip:127.0.0.1');
   const second = await post();
-  assert.equal(second.status, 429); assert.equal(second.headers.get('retry-after'), '900'); assert.equal(ran, 1);
+  assert.equal(second.status, 429); assert.equal(second.headers.get('retry-after'), '321'); assert.equal(ran, 1);
+});
+
+test('member key: header required behind the proxy, validated, prefixed; one in-flight request per member', async t => {
+  const { clientKey } = await import('../server.mjs');
+  const request = headers => ({ headers, socket: { remoteAddress: '10.0.0.5' } });
+  assert.equal(clientKey(request({ 'x-runner-client': 'u_42-A' }), true), 'm:u_42-A');
+  for (const bad of [undefined, '', 'a b', 'x'.repeat(65), 'a;b', '../x', 'é']) assert.equal(clientKey(request({ 'x-runner-client': bad }), true), null, String(bad));
+  assert.equal(clientKey(request({}), false), 'ip:10.0.0.5');
+  const releases = [], seen = [];
+  const server = createRunnerServer({ trustProxy: true, logger: entry => seen.push(entry), limiter: { take: () => true, close() {} },
+    executor: () => new Promise(resolve => releases.push(() => resolve(result))) });
+  if (!await listenOrSkip(t, server)) return;
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const url = `http://127.0.0.1:${server.address().port}/study/api/run`;
+  const post = member => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', ...(member ? { 'x-runner-client': member } : {}) }, body: JSON.stringify(good) });
+  assert.equal((await post()).status, 401); assert.equal((await post('bad key')).status, 401);
+  const first = post('alice');
+  while (!releases.length) await new Promise(resolve => setImmediate(resolve));
+  const again = await post('alice');
+  assert.equal(again.status, 429); assert.equal((await again.json()).error, 'busy');
+  releases[0](); assert.equal((await first).status, 200);
+  assert.ok(seen.every(e => e.client === undefined || /^[0-9a-f]{8}$/.test(e.client)));
+  assert.ok(!JSON.stringify(seen).includes('alice'));
 });

@@ -39,7 +39,7 @@ export function stageLimits(lang, stage) {
   const cpu = stage === 'compile' ? 10 : lang === 'java' ? 6 : 3;
   // NPROC counts threads of the job uid only (the server has another uid). The JVM needs
   // ~30 threads even for hello world, so Java gets 128; the container pids limit still bounds all.
-  const args = [`--cpu=${cpu}:${cpu + 1}`, `--nproc=${NPROC[lang]}:${NPROC[lang]}`, '--fsize=8388608:8388608', `--nofile=${lang === 'java' ? 256 : 64}:${lang === 'java' ? 256 : 64}`, '--core=0:0'];
+  const args = [`--cpu=${cpu}:${cpu + 1}`, `--nproc=${NPROC[lang]}:${NPROC[lang]}`, '--fsize=8388608:8388608', '--msgqueue=262144:262144', '--sigpending=512:512', '--locks=16:16', `--nofile=${lang === 'java' ? 256 : 64}:${lang === 'java' ? 256 : 64}`, '--core=0:0'];
   // Both JVMs reserve far more address space than their heaps. Container memory
   // is the ceiling; javac uses -J-Xmx256m and java uses -Xmx192m instead of AS.
   if (lang !== 'java') {
@@ -153,7 +153,11 @@ export function executeStage(command, args, {
 } = {}) {
   return new Promise((resolve, reject) => {
     // cwd is entered by `env -C` after the uid switch: the 0700 job dir is unreadable to the server.
-    const child = spawnImpl('/usr/bin/setpriv', [...JOB_PRIV, '--', '/usr/bin/env', '-C', cwd,
+    // choom runs first, while still root with CAP_SYS_RESOURCE: writing 1000 with that capability also pins
+    // oom_score_adj_min, so the job (non-root after setpriv) can never lower it again. A memcg OOM
+    // therefore always picks job processes, never the server. cwd is entered by `env -C` after the uid
+    // switch: the 0700 job dir is unreadable to the server.
+    const child = spawnImpl('/usr/bin/choom', ['-n', '1000', '--', '/usr/bin/setpriv', ...JOB_PRIV, '--', '/usr/bin/env', '-C', cwd,
       '/usr/bin/prlimit', ...stageLimits(lang, stage), '--', command, ...args], {
       cwd: '/', shell: false, detached: true, stdio: ['pipe', 'pipe', 'pipe'],
       env: { PATH: '/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8', HOME: cwd, TMPDIR: cwd },
@@ -245,7 +249,8 @@ export async function runCode({ lang, code, stdin = '' }, {
     let compile;
     const invoke = (command, args, stage) => executor(command, args, { cwd: work, stdin: stage === 'run' ? stdin : '', lang, stage });
     const response = (result, stage) => {
-      const out = boundUtf8(stripPaths(result.stdout, { tempDir: work }));
+      // stdout is the student's own output: only the job dir is removed, other text is left alone.
+      const out = boundUtf8(stripPaths(result.stdout, { tempDir: work, redactSystemPaths: false }));
       const err = boundUtf8(stripPaths(result.stderr, { tempDir: work }));
       const stdout = out.text, stderr = err.text;
       return { ok: stage === 'run', stage, stdout, stderr, exitCode: result.exitCode,
