@@ -1,4 +1,5 @@
 import { PARTS } from './parts';
+import { blockFieldsProblem, isSafeOriginalName } from './blockFields';
 import { socketInsertions } from './socket-insertions';
 import type { PartInstance, PinRef, Scene } from './types';
 
@@ -211,12 +212,13 @@ function mutationSize(type: string, es: unknown): number {
           (es.hasStatements !== undefined && typeof es.hasStatements !== 'boolean')) return -1;
       if (es.params === undefined) return 0;
       return Array.isArray(es.params) && es.params.length <= MAX_PROC_PARAMS &&
-        es.params.every(p => isObject(p) && Object.values(p).every(shortStr) && hasOnlyKeys(p, ['name', 'id', 'argId', 'type']))
+        es.params.every(p => isObject(p) && Object.values(p).every(shortStr) && hasOnlyKeys(p, ['name', 'id', 'argId', 'type']) &&
+          (p.name === undefined || isSafeOriginalName(p.name)))
         ? es.params.length : -1;
     }
     case 'procedures_callnoreturn':
     case 'procedures_callreturn': {
-      if (!isObject(es) || !hasOnlyKeys(es, ['name', 'params']) || (es.name !== undefined && !shortStr(es.name))) return -1;
+      if (!isObject(es) || !hasOnlyKeys(es, ['name', 'params']) || (es.name !== undefined && !isSafeOriginalName(es.name))) return -1;
       if (es.params === undefined) return 0;
       return Array.isArray(es.params) && es.params.length <= MAX_PROC_PARAMS && es.params.every(shortStr) ? es.params.length : -1;
     }
@@ -239,7 +241,7 @@ export function blocksProblem(state: unknown): string | null {
   const ws = state.blocks;
   if (ws !== undefined && (!isObject(ws) || (ws.blocks !== undefined && !Array.isArray(ws.blocks)))) return bad;
   if (state.variables !== undefined && (!Array.isArray(state.variables) || state.variables.length > 1000 ||
-      !state.variables.every(v => isObject(v) && (v.id === undefined || typeof v.id === 'string') && (v.name === undefined || typeof v.name === 'string')))) return bad;
+      !state.variables.every(v => isObject(v) && (v.id === undefined || typeof v.id === 'string') && (v.name === undefined || isSafeOriginalName(v.name))))) return bad;
   const todo: unknown[] = isObject(ws) && Array.isArray(ws.blocks) ? [...ws.blocks] : [];
   let mutations = 0;
   for (let n = 0; todo.length; n++) {
@@ -252,6 +254,8 @@ export function blocksProblem(state: unknown): string | null {
     mutations += size;
     if (mutations > MAX_MUTATION_TOTAL) return `블록 항목의 총합이 너무 큽니다. (${MAX_MUTATION_TOTAL.toLocaleString('ko-KR')}개 이하)`;
     if (b.fields !== undefined && !isObject(b.fields)) return bad;
+    const fieldProblem = blockFieldsProblem(b.type, b.fields);
+    if (fieldProblem) return fieldProblem;
     if (b.inputs !== undefined && !isObject(b.inputs)) return bad;
     if (b.next !== undefined && !isObject(b.next)) return bad;
     const slots = [...Object.values((b.inputs ?? {}) as object), b.next].filter(slot => slot !== undefined);
