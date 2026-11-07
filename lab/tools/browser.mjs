@@ -2,7 +2,7 @@
 // directory (contained in the lab directory, with no symlink traversal).
 import { constants, existsSync, lstatSync, mkdirSync, readdirSync } from 'node:fs';
 import { open } from 'node:fs/promises';
-import { homedir, platform } from 'node:os';
+import { userInfo, platform } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -10,11 +10,19 @@ export { compileOrigin } from './compile-origin.mjs';
 
 export const LAB_ROOT = fileURLToPath(new URL('../', import.meta.url));
 
-/** Resolve screenshot output below lab, rejecting escapes and every existing symlink. */
-export function outDir(defaultName, value = process.env.SHOTS_OUT ?? defaultName) {
-  const fail = () => { throw new Error('SHOTS_OUT은 lab 디렉터리 안의 경로여야 하며 심볼릭 링크를 사용할 수 없습니다.'); };
-  if (typeof value !== 'string' || !value.trim() || value.includes('\0')) fail();
-  const target = resolve(LAB_ROOT, value);
+/** Create an internal, fixed-name output directory; environment and argv are never consulted. */
+export function outDir(name) {
+  if (typeof name !== 'string' || !/^[a-z0-9-]+$/.test(name) || name.trim() !== name) {
+    throw new Error('출력 디렉터리 이름은 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.');
+  }
+  const target = join(LAB_ROOT, name);
+  ensureDirectory(target);
+  return target;
+}
+
+/** Shared filesystem checks for fixed output directories and script-owned fixture paths. */
+function ensureDirectory(target) {
+  const fail = () => { throw new Error('출력 경로는 lab 디렉터리 안에 있어야 하며 심볼릭 링크를 사용할 수 없습니다.'); };
   const within = relative(LAB_ROOT, target);
   if (within.startsWith('..') || isAbsolute(within)) fail();
   let current = resolve(LAB_ROOT);
@@ -28,15 +36,13 @@ export function outDir(defaultName, value = process.env.SHOTS_OUT ?? defaultName
     try { mkdirSync(current); } catch (error) {
       if (error.code !== 'EEXIST') throw error;
     }
-    // lstat also rejects dangling links and links pointing back inside lab.
     checkDirectory(current);
   }
-  return target;
 }
 
 /**
  * Write an output file without following an existing symlink at the leaf.
- * Not race-safe against a concurrent process swapping a parent directory between outDir()'s
+ * Not race-safe against a concurrent process swapping a parent directory between ensureDirectory()'s
  * check and open(): accepted, because these are local dev/CI tools and anyone who can mutate
  * the worktree can already change the code they run.
  */
@@ -44,7 +50,8 @@ export async function writeOutputFile(file, data) {
   if (typeof file !== 'string' || !file || basename(file) === '.' || basename(file) === '..') {
     throw new Error('출력 파일 경로가 올바르지 않습니다.');
   }
-  const dir = outDir('unused', dirname(file));
+  const dir = resolve(LAB_ROOT, dirname(file));
+  ensureDirectory(dir);
   const target = join(dir, basename(file));
   if (typeof constants.O_NOFOLLOW !== 'number') throw new Error('이 환경은 심볼릭 링크를 막는 안전한 파일 쓰기를 지원하지 않습니다.');
   try {
@@ -72,9 +79,10 @@ export async function saveScreenshot(target, file) {
 }
 
 function cacheDir() {
-  if (platform() === 'darwin') return join(homedir(), 'Library/Caches/ms-playwright');
-  if (platform() === 'win32') return join(homedir(), 'AppData/Local/ms-playwright');
-  return join(homedir(), '.cache/ms-playwright');
+  const home = userInfo().homedir; // OS account directory, independent of HOME/USERPROFILE overrides.
+  if (platform() === 'darwin') return join(home, 'Library/Caches/ms-playwright');
+  if (platform() === 'win32') return join(home, 'AppData/Local/ms-playwright');
+  return join(home, '.cache/ms-playwright');
 }
 
 export function chromeExecutable() {

@@ -1,6 +1,6 @@
 // Browser e2e: node tools/e2e-browser.mjs
 // Starts `vite` itself unless LAB_URL is set. Needs the real compile service (LAB_COMPILE_URL, default http://127.0.0.1:8787).
-// LAB_SOFTWARE=1 runs Chromium with --disable-gpu (SwiftShader) to exercise the low-quality path. Screenshots go to <lab>/shots-browser (or a contained SHOTS_OUT).
+// LAB_SOFTWARE=1 runs Chromium with --disable-gpu (SwiftShader) to exercise the low-quality path. Screenshots go to the fixed <lab>/shots-browser directory.
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
@@ -322,7 +322,7 @@ try {
       check(`example ${id}: auto-framed`, fitEx > 0.5 && fitEx < 1, fitEx.toFixed(2));
       await run();
       await (checks[id] ?? (async () => check(`example ${id}: runs`, true)))();
-      if (shots[id]) { await settle(300); await shot(shots[id]); }
+      if (Object.hasOwn(shots, id)) { await settle(300); await shot(shots[id]); }
       await stop();
     } catch (e) {
       check(`example ${id}: end-to-end`, false, String(e).split('\n')[0]);

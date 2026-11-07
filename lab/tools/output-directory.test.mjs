@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { basename, join, relative, resolve } from 'node:path';
+import { basename, join } from 'node:path';
 import { LAB_ROOT, outDir, saveScreenshot, writeOutputFile } from './browser.mjs';
 
 describe('contained output files', () => {
@@ -12,7 +13,8 @@ describe('contained output files', () => {
   beforeEach(() => {
     previousEnv = process.env.SHOTS_OUT;
     delete process.env.SHOTS_OUT;
-    inside = mkdtempSync(join(LAB_ROOT, '.output-path-test-'));
+    inside = join(LAB_ROOT, `output-test-${randomUUID()}`);
+    mkdirSync(inside);
     outside = mkdtempSync(join(tmpdir(), 'lab-output-outside-'));
   });
   afterEach(() => {
@@ -22,39 +24,37 @@ describe('contained output files', () => {
     rmSync(outside, { recursive: true, force: true });
   });
 
-  it('resolves defaults and overrides relative to lab', () => {
-    const requested = join(basename(inside), 'nested', 'screens');
-    assert.equal(outDir(requested), resolve(LAB_ROOT, requested));
-    assert.equal(existsSync(join(inside, 'nested', 'screens')), true);
-    process.env.SHOTS_OUT = join(inside, 'environment');
-    assert.equal(outDir('unused'), join(inside, 'environment'));
-    assert.equal(outDir('unused', join(inside, 'argument')), join(inside, 'argument'));
+  it('uses only the internal name and ignores SHOTS_OUT', () => {
+    process.env.SHOTS_OUT = join(outside, 'environment');
+    assert.equal(outDir(basename(inside)), inside);
+    assert.equal(existsSync(join(outside, 'environment')), false);
   });
 
-  it('rejects absolute escapes, parent traversal, and sibling-prefix paths', () => {
-    for (const path of [join(outside, 'screens'), relative(LAB_ROOT, outside), '../escape', `${resolve(LAB_ROOT)}-sibling/screens`]) {
-      process.env.SHOTS_OUT = path;
-      assert.throws(() => outDir('unused'), /SHOTS_OUT.*lab.*심볼릭 링크/);
+  it('rejects bad names instead of interpreting them as paths', () => {
+    for (const name of ['..', '/abs', '', 'UPPER', '\0', 'nested/name', 'shots\n']) {
+      assert.throws(() => outDir(name), /출력 디렉터리 이름/);
     }
-    assert.equal(existsSync(join(outside, 'screens')), false);
   });
 
   for (const kind of ['outside', 'inside', 'dangling']) {
-    it(`rejects ${kind} directory symlinks at the leaf and in parents`, () => {
+    it(`rejects ${kind} directory symlinks for fixed names and file parents`, async () => {
       const target = kind === 'outside' ? outside : kind === 'inside' ? join(inside, 'real') : join(outside, 'missing');
       if (kind === 'inside') mkdirSync(target);
-      const link = join(inside, 'link');
-      symlinkSync(target, link, 'dir');
-      assert.throws(() => outDir('unused', link), /심볼릭 링크/);
-      assert.throws(() => outDir('unused', join(link, 'screens')), /심볼릭 링크/);
-      assert.equal(existsSync(join(target, 'screens')), false);
+      const name = `${basename(inside)}-link`;
+      const link = join(LAB_ROOT, name);
+      try {
+        symlinkSync(target, link, 'dir');
+        assert.throws(() => outDir(name), /심볼릭 링크/);
+        await assert.rejects(writeOutputFile(join(link, 'screen.png'), 'replace'), /심볼릭 링크/);
+        assert.equal(existsSync(join(target, 'screen.png')), false);
+      } finally { rmSync(link, { force: true }); }
     });
   }
 
-  it('rejects files, empty strings, and null bytes as directories', () => {
-    const file = join(inside, 'file');
-    writeFileSync(file, 'existing content');
-    for (const value of [file, '', '\0']) assert.throws(() => outDir('unused', value), /SHOTS_OUT/);
+  it('keeps the fixed fixture writer contained in lab', async () => {
+    const file = join(outside, 'screen.png');
+    await assert.rejects(writeOutputFile(file, 'replace'), /lab/);
+    assert.equal(existsSync(file), false);
   });
 
   it('writes screenshot buffers and ordinary output through the shared writer', async () => {

@@ -1,4 +1,4 @@
-// Lab v2 UI e2e: node tools/e2e-ui-v2.mjs [shotsDir]   (needs the compile service at 127.0.0.1:8787; starts vite itself unless LAB_URL is set)
+// Lab v2 UI e2e: node tools/e2e-ui-v2.mjs   (needs the compile service at 127.0.0.1:8787; starts vite itself unless LAB_URL is set)
 // Covers: debugger gutter + bar (set, hit, step, resume with the main Run button), notes (add / edit / delete, kept in the scene
 // and in a share link), mission restore through a share link, hostile share links (huge Blockly mutator, hidden code in a block
 // scene), and the scope time/div control writing the part's props.
@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { chromeExecutable, compileOrigin, GL_ARGS, outDir, saveScreenshot } from './browser.mjs';
 
-const OUT = outDir('shots-ui-v2', process.argv[2]);
+const OUT = outDir('shots-ui-v2');
 const COMPILE = compileOrigin();
 if (!(await fetch(new URL('/lab/api/health', COMPILE), { redirect: 'error' }).then((r) => r.ok, () => false))) { console.log(`FAIL compile service not reachable at ${COMPILE}`); process.exit(2); }
 let dev, base = process.env.LAB_URL;

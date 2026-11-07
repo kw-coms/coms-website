@@ -1,5 +1,5 @@
 // v2 browser e2e: node tools/e2e-v2.mjs  (needs the compile service at 127.0.0.1:8787; starts vite itself unless LAB_URL is set)
-// Screenshots go to SHOTS_OUT (default <lab>/shots-v2).
+// Screenshots go to the fixed <lab>/shots-v2 directory.
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';

@@ -1,4 +1,4 @@
-// Blocks e2e: node tools/e2e-blocks.mjs [shotsDir]
+// Blocks e2e: node tools/e2e-blocks.mjs
 // Builds a blink program from blocks with the mouse, runs it on the real compile service and checks that the LED toggles.
 // Also checks: Blockly loads lazily, nothing leaves the origin and no CSP violation (the Lab's real CSP is applied to the page),
 // the three modes, the one-way switch, light/dark, keyboard and touch. Needs the compile service (LAB_COMPILE_URL, default 127.0.0.1:8787).
@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { join } from 'node:path';
 import { chromeExecutable, compileOrigin, GL_ARGS, outDir, saveScreenshot } from './browser.mjs';
 
-const OUT = outDir('shots-blocks', process.argv[2]);
+const OUT = outDir('shots-blocks');
 const COMPILE = compileOrigin();
 if (!(await fetch(new URL('/lab/api/health', COMPILE), { redirect: 'error' }).then((r) => r.ok, () => false))) { console.log(`FAIL compile service not reachable at ${COMPILE}`); process.exit(2); }
 const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";

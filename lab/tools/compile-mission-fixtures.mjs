@@ -2,11 +2,11 @@
 // rewrites src/missions/__fixtures__/missions-hex.json (consumed by src/missions/reference.test.ts, which runs the
 // reference solutions through the checkers without needing the compiler). Needs LAB_COMPILE_URL (default http://127.0.0.1:8787).
 import { createServer } from 'vite';
-import { fileURLToPath } from 'node:url';
-import { compileOrigin, writeOutputFile } from './browser.mjs';
+import { join } from 'node:path';
+import { compileOrigin, outDir, writeOutputFile } from './browser.mjs';
 
 const COMPILE = compileOrigin();
-const OUT = new URL('../src/missions/__fixtures__/missions-hex.json', import.meta.url);
+const OUT = join(outDir('src'), 'missions', '__fixtures__', 'missions-hex.json');
 
 const vite = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
 const { MISSIONS } = await vite.ssrLoadModule('/src/missions/catalog.ts');
@@ -33,5 +33,5 @@ for (const mission of MISSIONS) {
   console.log(`ok   ${mission.id} ${result.sizeBytes} bytes`);
 }
 if (failed) process.exit(1);
-await writeOutputFile(fileURLToPath(OUT), JSON.stringify({ missions }, null, 1) + '\n');
+await writeOutputFile(OUT, JSON.stringify({ missions }, null, 1) + '\n');
 console.log(`wrote ${Object.keys(missions).length} missions`);
