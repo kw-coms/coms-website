@@ -107,6 +107,10 @@ class Block {
   /** A shared link's code is open as a temporary view: nothing is saved until the reader chooses to. */
   shared = false
   savedBeforeShare: string | null = null
+  /** What this tab last read from / wrote to storage for the block: a save finding something else there means another tab saved meanwhile. */
+  baseline: string | null
+  /** True while the page itself loads code into the editor (restore, back, reset): that is not typing and must not autosave. */
+  programmatic = false
   els: Record<string, HTMLElement> = {}
 
   constructor(readonly index: number, readonly pre: HTMLElement, readonly raw: string, decision: BlockDecision, saved: string | null, page: PageLang) {
@@ -115,6 +119,7 @@ class Block {
     this.key = blockKey(index, raw)
     this.anchor = blockAnchor(index)
     this.current = saved ?? this.initial
+    this.baseline = saved
     this.expected = decision.run ? expectedOutputAfter(pre, page) : null
   }
   get lang() { return this.decision.lang }
@@ -238,7 +243,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
 
   function closeEditor(b: Block) {
     if (b.full) setFull(b, false)
-    if (b.shared) { b.shared = false; b.current = ownDraft(b) } // closing a shared view drops it
+    if (b.shared) { b.shared = false; b.current = ownDraft(b); b.baseline = store.get(b.key)?.code ?? null } // closing a shared view drops it
     else if (b.editor) b.current = b.editor.getValue()
     if (b.editor) { b.editor.destroy(); b.editor = null }
     b.host?.remove()
@@ -249,6 +254,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
   }
 
   function onEdit(b: Block, value: string) {
+    if (b.programmatic) return
     b.current = value
     b.editor?.clearDiagnostics()
     window.clearTimeout(b.saveTimer)
@@ -260,8 +266,21 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     window.clearTimeout(b.saveTimer)
     b.saveTimer = 0
     if (b.shared) return // a shared link's code stays a temporary view until "이 코드로 저장"
+    // Another tab saved a newer draft since this tab last looked: keep it as the one-step backup instead of silently overwriting it.
+    const stored = store.get(b.key)?.code ?? null
+    if (stored !== null && stored !== b.baseline && stored !== b.current) store.setBackup(b.key, stored)
     if (b.edited) store.set(b.key, b.current)
     else store.clear(b.key)
+    b.baseline = b.edited ? b.current : null
+  }
+  /** Puts code into the editor on the page's own initiative: no autosave is scheduled and a pending one is dropped. */
+  function loadCode(b: Block, value: string) {
+    b.programmatic = true
+    try { b.editor?.setValue(value) } finally { b.programmatic = false }
+    b.current = value
+    window.clearTimeout(b.saveTimer)
+    b.saveTimer = 0
+    b.editor?.clearDiagnostics()
   }
 
   // ---------- full screen ----------
@@ -591,14 +610,14 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
       // One step back: the draft this replaces stays available as "이전 코드 복원".
       const previous = store.get(b.key)?.code ?? null
       if (previous !== null && previous !== value) store.setBackup(b.key, previous)
+      b.baseline = previous
       b.current = value
       persist(b)
       showToast('이 코드로 저장했어요. 이전 코드는 "이전 코드 복원"으로 되살릴 수 있어요.')
     } else {
       const own = ownDraft(b)
-      b.current = own
-      b.editor?.setValue(own)
-      b.editor?.clearDiagnostics()
+      b.baseline = store.get(b.key)?.code ?? null
+      loadCode(b, own)
       showToast('내 코드로 돌아왔어요.')
     }
     b.savedBeforeShare = null
@@ -612,9 +631,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     const now = b.editor ? b.editor.getValue() : b.current
     if (now !== backup.code) store.setBackup(b.key, now) // swap: restoring can itself be undone once
     else store.clearBackup(b.key)
-    b.current = backup.code
-    b.editor?.setValue(backup.code)
-    b.editor?.clearDiagnostics()
+    loadCode(b, backup.code)
     persist(b)
     renderBar(b)
     showToast('이전 코드를 되살렸어요.')
@@ -638,11 +655,8 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
         break
       case 'lab': await labOpen(b); break
       case 'reset':
-        b.editor?.setValue(b.initial)
-        b.editor?.clearDiagnostics()
-        b.current = b.initial
-        window.clearTimeout(b.saveTimer)
-        if (!b.shared) store.clear(b.key) // in a shared view only the view changes; the saved draft stays
+        loadCode(b, b.initial)
+        if (!b.shared) { store.clear(b.key); b.baseline = null } // in a shared view only the view changes; the saved draft stays
         renderBar(b)
         b.editor?.focus()
         showToast('원래 코드로 되돌렸어요.')
