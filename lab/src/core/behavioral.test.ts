@@ -79,6 +79,19 @@ describe('v2 behavioral devices', () => {
     expect(h.tick(time).outputs.chip?.OUT).toBe(0); // stop mark
     expect(h.tick(h.device.nextEventMs(time)!).outputs.chip?.OUT).toBe(1);
   });
+  it('flips OUT at every edge when time is quantized to CPU cycles', () => {
+    for (let startCycle = 1_600_000; startCycle < 1_600_040; startCycle++) {
+      const h = harness('ir-receiver', { VCC: 5, GND: 0 }, { irCode: 0x00ff18e7 });
+      let time = startCycle / 16000, expected = 0;
+      expect(h.tick(time).outputs.chip?.OUT).toBe(0);
+      for (let edge = 0, next = h.device.nextEventMs(time); next !== undefined; edge++, next = h.device.nextEventMs(time)) {
+        time = Math.ceil(next * 16000) / 16000; // the engine stops on the first cycle at or after the edge
+        expected ^= 1;
+        expect(h.tick(time).outputs.chip?.OUT, `start ${startCycle} edge ${edge}`).toBe(expected);
+      }
+      expect(expected).toBe(1);
+    }
+  });
   it('retransmits the same NEC button after the input is released', () => {
     const h = harness('ir-receiver', { VCC: 5, GND: 0 }, { irCode: 0x00ff18e7 });
     expect(h.tick(0).outputs.chip?.OUT).toBe(0);

@@ -102,11 +102,16 @@ void loop() { digitalWrite(8,digitalRead(2)); delay(20); }
 `, [['sensor','pir'],...ledItems()], [...rail('sensor'),['sensor.OUT','uno.D2','blue'],...led('D8')]),
   create('keypad-password', '키패드 비밀번호', '키패드', `
 // 행을 하나씩 LOW로 당기고 열의 LOW를 읽어 눌린 키를 찾습니다.
+// 열(6~9)은 INPUT_PULLUP: 키를 누르지 않으면 내부 풀업 저항이 HIGH로 잡아 줍니다.
+// 선택되지 않은 행(2~5)도 INPUT_PULLUP으로 둡니다. INPUT(풀업 없음)으로 두면
+// 핀이 어디에도 연결되지 않은 채 떠 있어(플로팅) 노이즈가 들어오고, 눌린 키를 통해
+// 다른 행의 떠 있는 값이 열로 새어 오작동할 수 있습니다.
+// 선택된 행만 OUTPUT LOW로 바꾸므로 눌린 키의 열만 LOW가 됩니다.
 const byte rowPins[4]={2,3,4,5}, colPins[4]={6,7,8,9};
 const char keys[4][4]={{'1','2','3','A'},{'4','5','6','B'},{'7','8','9','C'},{'*','0','#','D'}};
 char entered[5]={0}; byte count=0;
-void setup(){ for(byte r=0;r<4;r++)pinMode(rowPins[r],INPUT); for(byte c=0;c<4;c++)pinMode(colPins[c],INPUT_PULLUP); pinMode(13,OUTPUT); }
-void loop(){ for(byte r=0;r<4;r++){ for(byte i=0;i<4;i++)pinMode(rowPins[i],INPUT); pinMode(rowPins[r],OUTPUT); digitalWrite(rowPins[r],LOW); for(byte c=0;c<4;c++)if(digitalRead(colPins[c])==LOW){ char k=keys[r][c]; if(count<4)entered[count++]=k; if(count==4){ digitalWrite(13,entered[0]=='1'&&entered[1]=='2'&&entered[2]=='3'&&entered[3]=='4'); count=0; } while(digitalRead(colPins[c])==LOW) delay(5); delay(20); } } }
+void setup(){ for(byte r=0;r<4;r++)pinMode(rowPins[r],INPUT_PULLUP); for(byte c=0;c<4;c++)pinMode(colPins[c],INPUT_PULLUP); pinMode(13,OUTPUT); }
+void loop(){ for(byte r=0;r<4;r++){ for(byte i=0;i<4;i++)pinMode(rowPins[i],INPUT_PULLUP); pinMode(rowPins[r],OUTPUT); digitalWrite(rowPins[r],LOW); for(byte c=0;c<4;c++)if(digitalRead(colPins[c])==LOW){ char k=keys[r][c]; if(count<4)entered[count++]=k; if(count==4){ digitalWrite(13,entered[0]=='1'&&entered[1]=='2'&&entered[2]=='3'&&entered[3]=='4'); count=0; } while(digitalRead(colPins[c])==LOW) delay(5); delay(20); } } }
 `, [['pad','keypad-4x4']], [
   ...Array.from({length:4},(_,i):Link=>[`uno.D${i+2}`,`pad.${i+1}`,'blue']),...Array.from({length:4},(_,i):Link=>[`uno.D${i+6}`,`pad.${i+5}`,'green']),
   ]),

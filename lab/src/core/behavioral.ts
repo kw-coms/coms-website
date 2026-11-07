@@ -155,7 +155,8 @@ export class BehavioralDevices {
         const signal = this.ir.get(id);
         let low = false;
         if (signal) {
-          let us = (timeMs - signal.started) * 1000;
+          // Edges are scheduled on CPU-cycle boundaries (62.5 ns); the epsilon keeps float rounding from landing a hair before an edge the scheduler already stopped at.
+          let us = (timeMs - signal.started) * 1000 + 1e-3;
           const packet = necWireBits(signal.code);
           if (us < 9000) low = true;
           else {

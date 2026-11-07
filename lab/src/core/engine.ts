@@ -9,6 +9,7 @@ import { Instruments } from './instruments';
 
 const EMPTY_SCENE: Scene = { version: 1, parts: [], wires: [], code: '' };
 const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min(max, value));
+const MOTOR_TAU_MS = 30; // rotor inertia: smooths the 490 Hz analogWrite PWM into a steady speed
 type PinStates = Record<string, McuPinState>;
 type ExternalDrives = Record<string, { volts: number }>;
 
@@ -35,6 +36,7 @@ export class SimulationEngine {
   private dhtPins = new Set<string>();
   private pixelPins = new Set<string>();
   private transient = newTransientState();
+  private motorDv = new Map<string, { target: number; dv: number; timeMs: number }>();
   private behavior = new BehavioralDevices();
   private instruments = new Instruments();
   private v2 = false;
@@ -126,6 +128,7 @@ export class SimulationEngine {
       'function-generator', 'oscilloscope', 'logic-analyzer', 'light-bulb',
     ].includes(part.kind));
     this.transient = newTransientState();
+    this.motorDv.clear();
     this.behavior.reset();
     this.instruments.reset();
     this.analogStepMs = .25;
@@ -359,6 +362,12 @@ export class SimulationEngine {
         this.solution = solveCircuit(this.scene, this.analysis, instantaneous, this.inputs, behavior.drives,
           { timeMs, dtMs: 0, state: this.transient, links: behavior.links });
       }
+      for (const part of this.scene.parts.filter(part => part.kind === 'dc-motor')) {
+        const motor = this.solution.parts[part.id]?.motor;
+        if (!motor) continue;
+        const target = motor.direction * motor.rpm / 200 * 5; // inverse of the solver's rpm mapping (sign kept)
+        this.motorDv.set(part.id, { target, dv: this.motorAt(part.id, timeMs) ?? target, timeMs });
+      }
       for (const [id, visual] of Object.entries(behavior.visuals)) {
         this.solution.parts[id] = { ...this.solution.parts[id], ...visual };
       }
@@ -493,6 +502,12 @@ export class SimulationEngine {
     return frame;
   }
 
+  /** A DC motor's inertia low-passes PWM (instantaneous drive would flicker rpm 0/full at every analogWrite edge); the held target decays toward the latest solve even when no new edge triggers one. */
+  private motorAt(id: string, timeMs: number): number | undefined {
+    const m = this.motorDv.get(id);
+    return m && m.dv + (m.target - m.dv) * (1 - Math.exp(-Math.max(0, timeMs - m.timeMs) / MOTOR_TAU_MS));
+  }
+
   frame(realtimeRatio?: number): SimFrame {
     this.solve();
     const solution = this.solution!;
@@ -501,6 +516,8 @@ export class SimulationEngine {
     for (const part of this.scene.parts) {
       const state: PartVisualState = { ...solution.parts[part.id] };
       const activity = (pin: string) => pins[this.unoPin(part.id, pin) ?? ''];
+      const dv = part.kind === 'dc-motor' ? this.motorAt(part.id, this.mcu.cpu.cycles / MCU_HZ * 1000) : undefined;
+      if (dv !== undefined) state.motor = { rpm: Math.round(200 * Math.min(1, Math.abs(dv) / 5)), direction: dv > .1 ? 1 : dv < -.1 ? -1 : 0 };
       if (part.kind === 'led') state.led = { brightness: ledBrightness(this.opticalCurrents[part.id] ?? 0) };
       if (part.kind === 'rgb-led') state.rgb = {
         r: ledBrightness(this.opticalCurrents[`${part.id}:R`] ?? 0),

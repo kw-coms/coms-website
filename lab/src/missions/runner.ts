@@ -83,6 +83,7 @@ export async function checkMission(
   let latest: SimFrame | undefined;
   let runFrames: SimFrame[] = [];
   let runSerial = '';
+  let schedule: number | undefined;
   let stateError: string | undefined;
   const waiters = new Set<() => void>();
   const wake = () => { for (const waiter of waiters) waiter(); };
@@ -110,10 +111,11 @@ export async function checkMission(
       if (step.kind === 'setInput') { simulator.setInput({ partId: step.partId, key: step.key, value: step.value }); continue; }
       if (step.kind === 'run') {
         if (!(step.ms > 0 && step.ms <= MAX_RUN_MS)) return fail(i + 1, '실행 시간이 올바르지 않습니다.');
-        const base = latest?.timeMs ?? 0;
+        // Absolute schedule: a frame's overshoot past one run must not shift every later sample (the checker steps are sample times, not delays).
+        schedule = (schedule ?? latest?.timeMs ?? 0) + step.ms;
         runFrames = latest ? [latest] : [];
         runSerial = '';
-        while (!latest || latest.timeMs < base + step.ms) {
+        while (!latest || latest.timeMs < schedule) {
           if (stateError) return fail(i + 1, stateError);
           if (options.signal?.aborted) return fail(i + 1, '검사가 취소되었습니다.');
           const remaining = deadline - Date.now();

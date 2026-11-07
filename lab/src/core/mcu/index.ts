@@ -122,6 +122,27 @@ export class Mcu {
     this.dhtSamples.clear();
     this.pixels.clear();
     for (const [port, configuration] of [['B', portBConfig], ['C', portCConfig], ['D', portDConfig]] as const) {
+      // pinMode(INPUT_PULLUP) on a reset pin only writes PORT (DDR stays 0): the pull-up must still reach the electrical solve at once,
+      // otherwise the first digitalRead() sees a pre-pullup LOW and fires a phantom button press.
+      const originalPort = this.cpu.writeHooks[configuration.PORT]!;
+      this.cpu.writeHooks[configuration.PORT] = (value, oldValue, address, mask) => {
+        const result = originalPort(value, oldValue, address, mask);
+        const changed = value ^ oldValue;
+        for (const [name, [mappedPort, bit]] of Object.entries(map)) {
+          // The net voltage from the last solve is stale (floating input) at the instant a pull-up is enabled; real silicon reads HIGH immediately, and the next solve replaces this with the real net voltage.
+          if (mappedPort === port && changed & value & (1 << bit) && !(this.cpu.data[configuration.DDR]! & (1 << bit)) && !this.echoActive.has(name)) {
+            this.lastInput.set(name, true);
+            this.ports[port].setPin(bit, true);
+          }
+        }
+        if (changed && this.onPinModeChange) {
+          for (const [name, [mappedPort, bit]] of Object.entries(map)) {
+            if (mappedPort !== port || !(changed & (1 << bit)) || this.cpu.data[configuration.DDR]! & (1 << bit)) continue;
+            this.onPinModeChange(name, value & (1 << bit) ? 'input_pullup' : 'input');
+          }
+        }
+        return result;
+      };
       const original = this.cpu.writeHooks[configuration.DDR]!;
       this.cpu.writeHooks[configuration.DDR] = (value, oldValue, address, mask) => {
         const result = original(value, oldValue, address, mask);

@@ -232,7 +232,15 @@ const v2Checks: Record<string, (run: SketchRun) => void> = {
   'tmp36-thermometer': run => { run.input('sensor','temperature',35); run.run(600); expect(Math.abs(Number(run.serial.trim().split('\n').at(-1)) - 35)).toBeLessThan(1); },
   'pir-alarm': run => { run.input('sensor','motion',true); expect(run.run(100).parts.led?.led?.brightness).toBeGreaterThan(.1); },
   'keypad-password': run => { for (const key of [1,2,3,5]) { run.input('pad','key',key); run.run(40); run.input('pad','key',0); run.run(40); } expect(run.frame.pins.D13?.level).toBe(1); },
-  'ir-remote-led': run => { const before=run.run(100).parts.led?.led?.brightness ?? 0; run.input('ir','irCode',0x00ff18e7); const after=run.run(200).parts.led?.led?.brightness ?? 0; expect(after).toBeGreaterThan(before+.1); },
+  'ir-remote-led': run => {
+    // Same path as the UI remote panel: irCode set to the NEC code, then back to 0 after ~180 ms.
+    const press = () => { run.input('ir', 'irCode', 0xFF18E7); run.run(180); run.input('ir', 'irCode', 0); return run.run(100).parts.led?.led?.brightness ?? 0; };
+    expect(run.run(100).parts.led?.led?.brightness ?? 0).toBeLessThan(.01);
+    expect(press()).toBeGreaterThan(.4);
+    expect(press()).toBeLessThan(.01);
+    run.input('ir', 'irCode', 0xFFA25D); run.run(180); run.input('ir', 'irCode', 0); // other button: ignored
+    expect(run.run(100).parts.led?.led?.brightness ?? 0).toBeLessThan(.01);
+  },
   'four-digit-counter': run => { const digits=run.run(300).parts.display?.digits?.segments; expect(digits).toHaveLength(4); expect(digits?.some(row => row.slice(0,7).every((on, i) => on === [true,true,true,true,true,true,false][i]))).toBe(true); },
   'l293d-direction': run => { expect(run.run(200).parts.motor?.motor?.direction).toBe(1); expect(run.run(1100).parts.motor?.motor?.direction).toBe(-1); },
   'logic-truth-table': run => { run.input('dip','switches',3); expect(run.run(100).parts.ic?.ic?.outputs?.['3']).toBe(1); expect(run.frame.parts.led?.led?.brightness).toBeGreaterThan(.1); },
