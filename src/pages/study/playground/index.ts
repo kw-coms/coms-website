@@ -65,6 +65,17 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
+/** The page's expected output for a block: the pre.output right after it (shell blocks with the compile/run commands may sit in between). */
+function expectedOutputAfter(pre: HTMLElement, page: PageLang): string | null {
+  let next = pre.nextElementSibling
+  while (next?.matches('pre.code')) {
+    const d = classifyBlock(page, next.textContent ?? '', { lang: next.getAttribute('data-lang') })
+    if (d.lang !== 'shell' && d.lang !== 'repl') return null
+    next = next.nextElementSibling
+  }
+  return next?.matches('pre.output') ? next.textContent ?? null : null
+}
+
 class Block {
   readonly decision: BlockDecision
   readonly initial: string
@@ -95,14 +106,13 @@ class Block {
   current: string
   els: Record<string, HTMLElement> = {}
 
-  constructor(readonly index: number, readonly pre: HTMLElement, readonly raw: string, decision: BlockDecision, saved: string | null) {
+  constructor(readonly index: number, readonly pre: HTMLElement, readonly raw: string, decision: BlockDecision, saved: string | null, page: PageLang) {
     this.decision = decision
     this.initial = decision.run ? initialCode(decision, raw) : raw
     this.key = blockKey(index, raw)
     this.anchor = blockAnchor(index)
     this.current = saved ?? this.initial
-    const next = pre.nextElementSibling
-    this.expected = decision.run && next?.matches('pre.output') ? next.textContent ?? null : null
+    this.expected = decision.run ? expectedOutputAfter(pre, page) : null
   }
   get lang() { return this.decision.lang }
   get isWeb() { return this.lang === 'html' || this.lang === 'js' }
@@ -127,10 +137,10 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     const attrs = { run: pre.getAttribute('data-run'), template: pre.getAttribute('data-template'), lang: pre.getAttribute('data-lang') }
     const decision = classifyBlock(opts.pageId, raw, attrs)
     const saved = decision.run ? store.get(blockKey(index, raw))?.code ?? null : null
-    const b = new Block(index, pre, raw, decision, saved)
+    const b = new Block(index, pre, raw, decision, saved, opts.pageId)
     pre.parentNode!.insertBefore(b.stage, pre)
     b.stage.appendChild(pre)
-    b.stage.appendChild(b.bar)
+    b.stage.prepend(b.bar)
     b.stage.id = b.anchor
     renderBar(b)
     blocks.push(b)
@@ -388,8 +398,10 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     err.textContent = e.stderr
     out.hidden = !e.stdout
     err.hidden = !e.stderr
-    if (!e.stdout && !e.stderr && !e.diagnostics.length) status(b, e.web ? '콘솔에 출력된 내용이 없어요.' : '출력이 없어요.', 'info')
+    if (!e.stdout && !e.stderr && !e.diagnostics.length && !(e.web && b.lang === 'html')) status(b, e.web ? '콘솔에 출력된 내용이 없어요.' : '출력이 없어요.', 'info')
     else status(b, '', 'info')
+    const cmp = b.panel?.querySelector<HTMLElement>('.pg-compare')
+    if (cmp) cmp.hidden = e.compileFailed
     const res = b.panel?.querySelector('.pg-compare-result')
     if (res) { res.textContent = ''; res.className = 'pg-compare-result' }
   }

@@ -107,6 +107,7 @@ const pwaPlugin = VitePWA({
       '**/common-*.js', // highlight.js (its "common" language bundle)
       '**/vendor-sentry-*.js',
       '**/study-content-*.js', // /study lesson markup (~525 KB for the five studies), fetched when one is opened
+      '**/study-editor-*.js', // CodeMirror of the /study playground (~350 KB), fetched when someone presses "직접 해보기"
     ],
     maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
     runtimeCaching: [
@@ -138,8 +139,13 @@ export default defineConfig({
     sourcemap: sentryAuthToken ? 'hidden' : false,
     rollupOptions: {
       output: {
-        // The /study lesson fragments get a recognisable name so workbox's globIgnores can keep them out of the precache.
-        chunkFileNames: (chunk) => (chunk.moduleIds.some((id) => id.includes('/src/pages/study/content/')) ? 'assets/study-content-[name]-[hash].js' : 'assets/[name]-[hash].js'),
+        // The /study lesson fragments and the code editor of "직접 해보기" (CodeMirror + its language packs) get recognisable
+        // names so workbox's globIgnores can keep them out of the precache: they are fetched when a study page / an editor is opened.
+        chunkFileNames: (chunk) => {
+          if (chunk.moduleIds.some((id) => id.includes('/src/pages/study/content/'))) return 'assets/study-content-[name]-[hash].js'
+          if (chunk.moduleIds.some((id) => /\/node_modules\/(@codemirror|@lezer|crelt|style-mod|w3c-keyname)\/|\/src\/pages\/study\/playground\/editor\./.test(id))) return 'assets/study-editor-[name]-[hash].js'
+          return 'assets/[name]-[hash].js'
+        },
         // Split heavy vendors into their own long-cached chunks so they
         // parallelize and survive app-code redeploys. ponytail: coarse grouping
         // by package, finer splits only if a chunk actually gets too big.

@@ -1,12 +1,11 @@
 /* "직접 해보기" playground of the /study code blocks. Everything lives under .study-page. */
 
-/* Space for the toolbar is reserved from the first paint (the toolbar is absolutely positioned), so adding it moves nothing. */
-.study-page pre.code { padding-top: 48px; }
+/* The toolbar is absolutely positioned over the 48px top padding that study.css gives every pre.code, so adding it moves nothing. */
 .study-page .pg-stage { position: relative; }
 .study-page .pg-stage.is-editing { margin: 1em 0; }
 
 .study-page .pg-bar {
-  position: absolute; top: 0; left: 0; right: 0; height: 36px;
+  position: absolute; z-index: 1; top: 0; left: 0; right: 0; height: 36px;
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 0 8px 0 14px;
   background: rgba(255, 255, 255, .05);
@@ -50,7 +49,7 @@
   position: static; height: auto; min-height: 36px; padding: 5px 8px 5px 14px; flex-wrap: wrap; row-gap: 6px; overflow: visible;
   background: var(--code-bg); border-bottom: 1px solid rgba(255, 255, 255, .1);
 }
-.study-page .pg-stage.is-editing .pg-bar-right { flex-wrap: wrap; }
+.study-page .pg-stage.is-editing .pg-bar-right { flex: 1 1 auto; flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
 .study-page .pg-editor { background: var(--code-bg); color: var(--code-text); }
 .study-page .pg-stage:not(:has(.pg-out)) .pg-editor { border-radius: 0 0 var(--radius) var(--radius); }
 .study-page .pg-editor-loading { margin: 0; padding: 14px 18px; color: #aab3c9; font-size: 13px; }
@@ -120,8 +119,8 @@
 /* ---- full screen ---- */
 html.pg-lock { overflow: hidden; }
 .study-page .pg-stage.pg-full {
-  position: fixed; inset: 0; z-index: 1200; margin: 0; display: flex; flex-direction: column;
-  background: var(--code-bg); padding-top: env(safe-area-inset-top); overflow: hidden;
+  position: fixed; inset: calc(var(--apple-nav-height, 44px) + env(safe-area-inset-top)) 0 0 0; z-index: 2; margin: 0; display: flex; flex-direction: column;
+  background: var(--code-bg); overflow: hidden;
 }
 .study-page .pg-stage.pg-full .pg-editor { flex: 1 1 50%; min-height: 0; display: flex; flex-direction: column; }
 .study-page .pg-stage.pg-full .pg-editor .cm-editor { flex: 1; min-height: 0; max-height: none; --pg-editor-max: none; }
