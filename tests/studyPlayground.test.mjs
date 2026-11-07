@@ -147,7 +147,7 @@ globalThis.CompressionStream = realCS
 
 // ---------- 8. runner ----------
 const realFetch = globalThis.fetch
-const reply = (status, body, headers = {}) => async (_url, init) => { reply.last = JSON.parse(init.body); return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } }) }
+const reply = (status, body, headers = {}) => async (_url, init) => { if (init.body) reply.last = JSON.parse(init.body); return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } }) }
 globalThis.fetch = reply(200, { ok: true, stage: 'run', stdout: 'hi\n', stderr: '', exitCode: 0, signal: null, timedOut: false, truncated: false, timeMs: 12, diagnostics: [] })
 let r = await runRemote('c', 'int main(){}', 'in')
 assert.equal(r.kind, 'output')
@@ -160,6 +160,10 @@ assert.equal(r.output.ok, false)
 assert.deepEqual(r.output.diagnostics.map((d) => d.line), [3], 'malformed diagnostics are dropped')
 globalThis.fetch = reply(401, {})
 assert.equal((await runRemote('python', 'x', '')).kind, 'login')
+globalThis.fetch = reply(403, {})
+assert.equal((await runRemote('python', 'x', '')).kind, 'login', 'a plain 403 still asks to sign in')
+globalThis.fetch = reply(403, { error: 'rejected', messageKo: '이 사이트에서만 코드를 실행할 수 있어요.' })
+assert.deepEqual(await runRemote('python', 'x', ''), { kind: 'rejected', messageKo: '이 사이트에서만 코드를 실행할 수 있어요.' }, 'the cross-site refusal explains itself')
 {
   // An expired access cookie: refresh once, retry once; a refused refresh asks to sign in without retrying.
   const calls = []
@@ -218,6 +222,57 @@ globalThis.fetch = async (_u, init) => new Promise((_, rej) => init.signal.addEv
 const pending = runRemote('c', 'x', '', ctl.signal)
 ctl.abort()
 await assert.rejects(pending, 'an aborted run rejects (the caller ignores it)')
+{
+  // A stalled session refresh must never hang the run button (the refresh is shared with the whole page).
+  const okBody = () => new Response(JSON.stringify({ ok: true, stage: 'run', stdout: 'ok\n', stderr: '', exitCode: 0, diagnostics: [] }))
+  const realTimeout = AbortSignal.timeout.bind(AbortSignal)
+  const keepAlive = setInterval(() => {}, 20) // AbortSignal.timeout timers are unref'd: keep node running while we wait for them
+
+  // (a) the refresh never answers (and ignores the abort): runRemote still settles by a deadline, in Korean
+  AbortSignal.timeout = (ms) => realTimeout(Math.min(ms, 40))
+  try {
+    let refreshes = 0
+    globalThis.fetch = async (url) => {
+      if (url === '/api/auth/refresh') { refreshes++; return new Promise(() => {}) }
+      return new Response('{}', { status: 401 })
+    }
+    const stalled = await runRemote('c', 'x', '')
+    assert.equal(stalled.kind, 'network')
+    assert.match(stalled.messageKo, /로그인 상태를 확인하지 못했어요/)
+    assert.equal(refreshes, 1)
+
+    // (c) the stalled refresh times out on its own (scaled to 40 ms here), so the next run can refresh again and succeed
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    let healthy = false
+    globalThis.fetch = async (url, init) => {
+      if (url === '/api/auth/refresh') { refreshes++; return new Response(null, { status: 204 }) }
+      healthy = healthy || init?.method === 'POST' && refreshes >= 2
+      return refreshes >= 2 ? okBody() : new Response('{}', { status: 401 })
+    }
+    assert.equal((await runRemote('c', 'x', '')).kind, 'output')
+    assert.equal(refreshes, 2, 'the second run started a new refresh')
+  } finally { AbortSignal.timeout = realTimeout }
+
+  // (b) caller A aborts while the shared refresh is pending; caller B still gets the refreshed session
+  let release
+  let refreshCalls = 0
+  let posts = 0
+  globalThis.fetch = async (url) => {
+    if (url === '/api/auth/refresh') { refreshCalls++; await new Promise((resolve) => { release = resolve }); return new Response(null, { status: 204 }) }
+    posts++
+    return posts <= 2 ? new Response('{}', { status: 401 }) : okBody()
+  }
+  const aborter = new AbortController()
+  const a = runRemote('c', 'a', '', aborter.signal)
+  const b = runRemote('c', 'b', '')
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  aborter.abort()
+  await assert.rejects(a, { name: 'AbortError' })
+  release()
+  assert.equal((await b).kind, 'output')
+  assert.equal(refreshCalls, 1, 'A and B shared one refresh')
+  clearInterval(keepAlive)
+}
 {
   // Older Safari has neither AbortSignal.any nor AbortSignal.timeout: the run must still work and still be abortable.
   const { any, timeout } = AbortSignal

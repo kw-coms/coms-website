@@ -23,22 +23,42 @@ const UNAUTHORIZED_MSG = '로그인한 동아리원만 컴파일할 수 있어�
 // below then rides on those cookies.
 const REFRESH_TIMEOUT_MS = 15_000
 let refreshInFlight: Promise<boolean> | null = null
-function refreshSession(fetchImpl: typeof fetch, signal: AbortSignal): Promise<boolean> {
-  refreshInFlight ??= (async () => {
+
+// The shared refresh has only its own deadline - never a caller's signal - so one caller aborting cannot fail
+// the others. Each caller then waits for it no longer than its own signal allows.
+function startRefresh(fetchImpl: typeof fetch): Promise<boolean> {
+  return (async () => {
     try {
-      // Its own deadline (not the compile's): a hung refresh must not hold the page for the compile's whole time.
-      const deadline = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(REFRESH_TIMEOUT_MS) : undefined
-      const combined = deadline && typeof AbortSignal.any === 'function' ? AbortSignal.any([signal, deadline]) : signal
-      const res = await fetchImpl('/api/auth/refresh', { method: 'POST', credentials: 'include', signal: combined });
-      return res.ok;
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') throw e;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS);
+      const expired = new Promise<never>((_, reject) => controller.signal.addEventListener('abort', () => reject(new Error('refresh timed out')), { once: true }));
+      expired.catch(() => {});
+      try {
+        const res = await Promise.race([fetchImpl('/api/auth/refresh', { method: 'POST', credentials: 'include', signal: controller.signal }), expired]);
+        return res.ok;
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch {
       return false;
     } finally {
       refreshInFlight = null;
     }
   })();
-  return refreshInFlight;
+}
+
+function refreshSession(fetchImpl: typeof fetch, signal: AbortSignal): Promise<boolean> {
+  refreshInFlight ??= startRefresh(fetchImpl);
+  const shared = refreshInFlight;
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(new DOMException('aborted', 'AbortError'));
+    if (signal.aborted) return onAbort();
+    signal.addEventListener('abort', onAbort, { once: true });
+    shared.then(
+      (ok) => { signal.removeEventListener('abort', onAbort); resolve(ok); },
+      (error) => { signal.removeEventListener('abort', onAbort); reject(error); },
+    );
+  });
 }
 
 async function post(sketch: string, signal: AbortSignal, fetchImpl: typeof fetch): Promise<Response> {

@@ -238,7 +238,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
 
   function closeEditor(b: Block) {
     if (b.full) setFull(b, false)
-    if (b.shared) { b.shared = false; b.current = b.savedBeforeShare ?? b.initial } // closing a shared view drops it
+    if (b.shared) { b.shared = false; b.current = ownDraft(b) } // closing a shared view drops it
     else if (b.editor) b.current = b.editor.getValue()
     if (b.editor) { b.editor.destroy(); b.editor = null }
     b.host?.remove()
@@ -578,6 +578,10 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
   function dropShareHash() {
     if (/^#pg=/.test(location.hash)) history.replaceState(history.state, '', `${location.pathname}${location.search}`)
   }
+  // The reader's own code now: re-read at leave time, since another tab may have saved a newer draft since the link was opened.
+  function ownDraft(b: Block): string {
+    return store.get(b.key)?.code ?? b.initial
+  }
   function leaveShared(b: Block, save: boolean) {
     if (!b.shared) return
     const value = b.editor ? b.editor.getValue() : b.current
@@ -585,12 +589,13 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     b.host?.querySelector('.pg-shared')?.remove()
     if (save) {
       // One step back: the draft this replaces stays available as "이전 코드 복원".
-      if (b.savedBeforeShare !== null && b.savedBeforeShare !== value) store.setBackup(b.key, b.savedBeforeShare)
+      const previous = store.get(b.key)?.code ?? null
+      if (previous !== null && previous !== value) store.setBackup(b.key, previous)
       b.current = value
       persist(b)
       showToast('이 코드로 저장했어요. 이전 코드는 "이전 코드 복원"으로 되살릴 수 있어요.')
     } else {
-      const own = b.savedBeforeShare ?? b.initial
+      const own = ownDraft(b)
       b.current = own
       b.editor?.setValue(own)
       b.editor?.clearDiagnostics()

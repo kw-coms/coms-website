@@ -32,6 +32,7 @@ All error bodies are JSON with a Korean `messageKo`; `Content-Type: application/
 | --- | --- | --- | --- |
 | 400 | `{ "error": "rejected", "messageKo" }` | bad JSON, wrong content type, unknown `lang`, size limits | – |
 | 401 | `{ "error": "unauthorized", "messageKo" }` | `X-Runner-Client` missing/malformed (nginx must set it from `auth_request`; also returned by nginx itself when not logged in) | – |
+| 403 | `{ "error": "rejected", "messageKo" }` | refused by nginx before the runner: the browser labels the request cross-site (`Sec-Fetch-Site: cross-site`). Applies to `POST /study/api/run` (`/study/api/health` is internal and never behind that nginx check); the frontend shows `messageKo` instead of asking to sign in | – |
 | 404 | `{ "error": "rejected", "messageKo" }` | any path other than `/study/api/run` and `/study/api/health` | – |
 | 405 | `{ "error": "rejected", "messageKo" }` | non-POST on `/study/api/run` (`Allow: POST`) | – |
 | 429 | `{ "error": "rate-limited", "messageKo" }` | more than the per-member limit (default **10 runs/min per member**) | 60 |
