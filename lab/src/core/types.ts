@@ -26,9 +26,19 @@ export type PartKind =
   | 'seven-segment'
   | 'neopixel-strip'
   | 'l9110s'
-  | 'dc-motor';
+  | 'dc-motor'
+  // ---- v2 (docs/SPEC-v2.md) ----
+  | 'battery-9v' | 'battery-aa-pack' | 'coin-cell-3v' | 'power-supply'
+  | 'capacitor-ceramic' | 'capacitor-electrolytic' | 'diode' | 'zener' | 'inductor'
+  | 'dip-switch-4' | 'keypad-4x4' | 'tilt-switch' | 'breadboard-mini'
+  | 'tmp36' | 'pir' | 'flex-sensor' | 'force-sensor' | 'soil-moisture' | 'gas-sensor' | 'ir-receiver'
+  | 'light-bulb' | 'vibration-motor' | 'gearmotor' | 'neopixel-ring' | 'seven-segment-4digit' | 'lcd1602-parallel'
+  | 'npn' | 'pnp' | 'nmos' | 'tip120' | 'relay-spdt' | 'l293d' | 'shift-register-595'
+  | 'logic-7400' | 'logic-7408' | 'logic-7432' | 'logic-7486' | 'logic-7404'
+  | 'timer-555' | 'regulator-7805' | 'optocoupler-4n35'
+  | 'oscilloscope' | 'function-generator' | 'logic-analyzer';
 
-export type PartCategory = '보드' | '기본' | '입력' | '출력' | '센서' | '디스플레이' | '측정';
+export type PartCategory = '보드' | '전원' | '기본' | '입력' | '출력' | '센서' | '디스플레이' | '반도체' | 'IC' | '측정';
 
 export type PinRole = 'digital' | 'analog' | 'power' | 'gnd' | 'passive' | 'hole';
 
@@ -53,7 +63,10 @@ export interface PropDef {
 }
 
 export interface SimInputDef {
-  key: 'pressed' | 'position' | 'lux' | 'distanceCm' | 'temperature' | 'humidity' | 'x' | 'y';
+  key:
+    | 'pressed' | 'position' | 'lux' | 'distanceCm' | 'temperature' | 'humidity' | 'x' | 'y'
+    // v2
+    | 'tilt' | 'motion' | 'force' | 'bend' | 'moisture' | 'gas' | 'irCode' | 'key' | 'switches';
   label: string; // Korean
   type: 'momentary' | 'range';
   min?: number;
@@ -96,12 +109,26 @@ export interface Wire {
   bends?: Vec3[];
 }
 
+export interface Note {
+  id: string;
+  pos: Vec3;
+  text: string; // ≤ 500 chars
+  color?: 'yellow' | 'blue' | 'green' | 'pink';
+}
+
+export type CodeMode = 'blocks' | 'blocks+text' | 'text';
+
 export interface Scene {
-  version: 1;
+  /** 1 = original; 2 adds blocks/codeMode/notes/mission. validateScene upgrades 1 → 2. */
+  version: 1 | 2;
   title?: string;
   parts: PartInstance[];
   wires: Wire[];
   code: string;
+  codeMode?: CodeMode; // default 'text' for v1 scenes
+  blocks?: unknown; // Blockly serialization JSON (validated size ≤ 256 KB)
+  notes?: Note[];
+  mission?: string; // mission id when the scene belongs to a mission
 }
 
 // ---------- static analysis (no MCU needed) ----------
@@ -146,6 +173,14 @@ export interface PartVisualState {
   pixels?: { colors: [number, number, number][] }; // 0..255 per channel, one per LED
   motor?: { rpm: number; direction: -1 | 0 | 1 };
   dht?: { busy: boolean };
+  // v2
+  bulb?: { brightness: number }; // 0..1
+  vibration?: { on: boolean };
+  relay?: { closed: boolean };
+  digits?: { segments: boolean[][] }; // per digit: a..g,dp (persistence-of-vision averaged)
+  supply?: { volts: number; amps: number; limiting: boolean };
+  capacitor?: { volts: number; overVoltage: boolean; reversed: boolean };
+  ic?: { outputs: Record<string, 0 | 1> }; // logic ICs, 595, 555 output for tooltips/LEDs
   /** Per-pin voltages for tooltips. */
   pinVolts?: Record<string, number>;
 }
@@ -164,6 +199,31 @@ export interface SimFrame {
   parts: Record<string, PartVisualState>; // by part id
   netVolts: Record<string, number>; // by net id
   warnings: SimWarning[];
+  /** v2 instruments, by instrument part id. Samples are decimated for display. */
+  scopes?: Record<string, ScopeTrace>;
+  logic?: Record<string, LogicTrace>;
+  /** v2 debugger state when paused at a breakpoint/step. */
+  debug?: DebugState;
+}
+
+export interface ScopeTrace {
+  t0Ms: number; // simulated time of the first sample
+  dtMs: number; // sample spacing
+  channels: number[][]; // volts per channel
+  triggered: boolean;
+}
+
+export interface LogicTrace {
+  t0Ms: number;
+  dtMs: number;
+  channels: (0 | 1)[][];
+}
+
+export interface DebugState {
+  paused: boolean;
+  line?: number; // 1-based sketch line
+  reason?: 'breakpoint' | 'step' | 'pause';
+  globals?: { name: string; value: string; type: string }[];
 }
 
 export interface SimInput {
@@ -187,6 +247,15 @@ export interface Simulator {
   onFrame(cb: (frame: SimFrame) => void): () => void; // ~60 Hz while running, once after setScene
   onSerial(cb: (text: string) => void): () => void;
   onState?(cb: (state: 'idle' | 'running' | 'paused', error?: string) => void): () => void;
+  /** v2 debugger (present when the hex was compiled with debug info). */
+  debug?: {
+    load(info: DebugInfo): void;
+    setBreakpoints(lines: number[]): void;
+    continue(): void;
+    stepOver(): void;
+    stepInto(): void;
+    stepOut(): void;
+  };
   readonly state: 'idle' | 'running' | 'paused';
   dispose(): void;
 }
@@ -202,8 +271,15 @@ export interface CompilerMessage {
 }
 
 export type CompileResult =
-  | { ok: true; hex: string; warnings: CompilerMessage[]; sizeBytes?: number }
+  | { ok: true; hex: string; warnings: CompilerMessage[]; sizeBytes?: number; debug?: DebugInfo }
   | { ok: false; errors: CompilerMessage[]; reason?: 'compile' | 'rejected' | 'timeout' | 'busy' | 'rate-limited' | 'unauthorized' };
+
+export interface DebugInfo {
+  /** program address (byte) → 1-based sketch line, from the ELF line table (sketch file only) */
+  lines: { addr: number; line: number }[];
+  /** globals defined in the sketch: SRAM address, size in bytes, C type name */
+  globals: { name: string; addr: number; size: number; type: string }[];
+}
 
 // ---------- core helpers exported from src/core/index.ts (lane A implements) ----------
 // export const PARTS: Record<PartKind, PartDef>
