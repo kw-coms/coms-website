@@ -64,3 +64,50 @@ test('failed compile preserves bounded user diagnostics and Korean hints', async
   assert.ok(result.errors[0].message.length <= 800);
   assert.match(result.errors[0].hintKo, /세미콜론/);
 });
+
+const debugFixture = await readFile(new URL('./fixtures/debug/avr-gcc7-lto.txt', import.meta.url), 'utf8');
+async function debugCompileRunner(args, { cwd }) {
+  for (const property of ['compiler.c.extra_flags=-g', 'compiler.cpp.extra_flags=-g', 'compiler.c.elf.extra_flags=-g']) assert.ok(args.includes(property));
+  assert.ok(!args.some(arg => /-O0|-fno-lto/.test(arg)));
+  await mkdir(join(cwd, 'out')); await mkdir(join(cwd, 'build'));
+  await writeFile(join(cwd, 'out/sketch.ino.hex'), HEX);
+  await writeFile(join(cwd, 'build/sketch.ino.elf'), 'ELF_SENTINEL');
+  return { code: 0, stdout: '', stderr: '' };
+}
+test('debug opt-in returns bounded sketch information and removes ELF with workdir', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'compiler-test-'));
+  try {
+    const result = await compileSketch('\n'.repeat(10), { debug: true, tempRoot: root, runner: debugCompileRunner,
+      debugRunner: async (elf, { cwd, timeoutMs }) => {
+        assert.equal(elf, join(cwd, 'build/sketch.ino.elf'));
+        assert.ok(timeoutMs > 0 && timeoutMs <= 20_000);
+        assert.equal(await readFile(elf, 'utf8'), 'ELF_SENTINEL');
+        return { code: 0, stdout: debugFixture.replaceAll('/fixture/sketch', join(cwd, 'sketch')), stderr: '' };
+      } });
+    assert.equal(result.ok, true);
+    assert.equal(result.debug.lines[0].line, 5);
+    assert.equal(result.debug.globals[0].addr, 256);
+    assert.doesNotMatch(JSON.stringify(result), /ELF_SENTINEL|fixture|circuit-lab|\.elf/);
+    assert.deepEqual(await readdir(root), []);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+test('normal compiles never invoke ELF extractor or return debug', async () => {
+  const result = await compileSketch('void setup(){}', { runner: debugCompileRunner,
+    debugRunner: () => { throw new Error('must not run'); } });
+  assert.equal(result.ok, true); assert.equal('debug' in result, false);
+});
+test('debug extraction error and output limit fail closed without leaking tool output', async () => {
+  for (const debugRunner of [
+    async () => ({ code: 1, stdout: '/secret.elf ELF_SENTINEL', stderr: '/secret' }),
+    async () => ({ code: 0, stdout: 'x'.repeat(4 * 1024 * 1024 + 1), stderr: '' }),
+  ]) {
+    const result = await compileSketch('x', { debug: true, runner: debugCompileRunner, debugRunner });
+    assert.equal(result.ok, false); assert.equal(result.reason, 'compile');
+    assert.doesNotMatch(JSON.stringify(result), /secret|ELF_SENTINEL/);
+  }
+});
+test('debug extraction shares compile deadline and maps timeout without paths', async () => {
+  const result = await compileSketch('x', { debug: true, runner: debugCompileRunner,
+    debugRunner: async () => { throw Object.assign(new Error('/secret.elf'), { code: 'timeout' }); } });
+  assert.equal(result.reason, 'timeout'); assert.doesNotMatch(JSON.stringify(result), /secret/);
+});
