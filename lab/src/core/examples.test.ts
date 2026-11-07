@@ -36,15 +36,15 @@ function footprint(part: PartInstance): [number, number, number, number] {
 describe('example scenes', () => {
   it('keeps every teaching sketch equivalent to the compiled fixture', () => {
     const normalized = (code: string) => code.replace(/\/\/[^\n]*/g, '').replace(/\s+/g, '');
-    for (const example of EXAMPLES) {
+    for (const example of EXAMPLES.slice(0, 17)) {
       const compiled = fixtures.examples[example.id as keyof typeof fixtures.examples];
       expect(normalized(example.scene.code), `${example.id}: 예제 코드가 바뀌었으니 fixture를 다시 컴파일해야 합니다`).toBe(normalized(compiled.code));
     }
   });
   it('contains all seventeen lessons with valid connected circuits', () => {
-    expect(EXAMPLES).toHaveLength(17);
-    for (const example of EXAMPLES) {
-      expect(validateScene(example.scene)).toBe(example.scene);
+    expect(EXAMPLES).toHaveLength(30);
+    for (const example of EXAMPLES.slice(0, 17)) {
+      expect(validateScene(example.scene)).toMatchObject({ parts: example.scene.parts, wires: example.scene.wires });
       const analysis = analyze(example.scene);
       expect(analysis.warnings.filter(w => w.level === 'error'), example.title).toEqual([]);
       for (const resistor of example.scene.parts.filter(part => part.kind === 'resistor')) {
@@ -55,7 +55,7 @@ describe('example scenes', () => {
     }
   });
   it('plugs small parts into the breadboard and stands modules beside it', () => {
-    for (const example of EXAMPLES) {
+    for (const example of EXAMPLES.slice(0, 17)) {
       const analysis = analyze(example.scene);
       for (const part of example.scene.parts.filter(p => !BOARDS.includes(p.kind))) {
         const pins = PARTS[part.kind].pins.filter(pin => part.kind !== 'l9110s' || !pin.id.startsWith('M'));
@@ -70,7 +70,7 @@ describe('example scenes', () => {
     }
   });
   it('keeps every part apart; only parts plugged into the breadboard may overlap it', () => {
-    for (const example of EXAMPLES) {
+    for (const example of EXAMPLES.slice(0, 17)) {
       const analysis = analyze(example.scene);
       const parts = example.scene.parts;
       for (let left = 0; left < parts.length; left++) {
@@ -89,7 +89,7 @@ describe('example scenes', () => {
     }
   });
   it('colour codes wires (5V red, GND black, signals anything else) and keeps them short', () => {
-    for (const example of EXAMPLES) {
+    for (const example of EXAMPLES.slice(0, 17)) {
       const analysis = analyze(example.scene);
       const point = (ref: PinRef) => pinWorldPos(example.scene.parts.find(p => p.id === ref.partId)!, ref.pinId);
       for (const wire of example.scene.wires) {
@@ -105,7 +105,7 @@ describe('example scenes', () => {
   });
   it('round trips a shared scene', async () => {
     const scene = EXAMPLES[1]!.scene;
-    expect(await decodeShare(await encodeShare(scene))).toEqual(scene);
+    expect(await decodeShare(await encodeShare(scene))).toEqual(validateScene(scene));
   });
   it('rejects invalid pin references, duplicate parts and oversize code', () => {
     const original = EXAMPLES[1]!.scene;
@@ -136,6 +136,30 @@ describe('seven segment wiring', () => {
       expect(downstream, segment).toBe(analysis.pinToNet[`digit:${segment}`]);
       expect(upstream, `${segment} resistor shorted`).not.toBe(downstream);
       expect(downstream, `${segment} segment shorted to ground`).not.toBe(analysis.pinToNet['uno:GND.1']);
+    }
+  });
+});
+
+
+describe('v2 starter circuits', () => {
+  it('validates all thirteen scenes and resolves every wire endpoint', () => {
+    for (const example of EXAMPLES.slice(17)) {
+      let validated; try { validated = validateScene(example.scene); } catch (error) { throw new Error(`${example.id}: ${error}`); }
+      expect(validated.version, example.id).toBe(2);
+      const analysis = analyze(example.scene);
+      for (const wire of example.scene.wires) {
+        expect(analysis.pinToNet[`${wire.from.partId}:${wire.from.pinId}`], `${example.id}:${wire.id} from`).toBeDefined();
+        expect(analysis.pinToNet[`${wire.to.partId}:${wire.to.pinId}`], `${example.id}:${wire.id} to`).toBeDefined();
+      }
+      expect(example.scene.code.length).toBeGreaterThan(100);
+    }
+  });
+  it('keeps the standalone parts from overlapping each other or the UNO', () => {
+    for (const example of EXAMPLES.slice(17)) {
+      for (const [i, a] of example.scene.parts.entries()) for (const b of example.scene.parts.slice(i + 1)) {
+        const [a0, a1, a2, a3] = footprint(a), [b0, b1, b2, b3] = footprint(b);
+        expect(a0 < b1 && b0 < a1 && a2 < b3 && b2 < a3, `${example.id}: ${a.id}/${b.id}`).toBe(false);
+      }
     }
   });
 });

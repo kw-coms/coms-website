@@ -1,5 +1,6 @@
 import { LocalSimulator } from './local-simulator';
 import type { Command, Event } from './simulator';
+import type { Scene } from './types';
 
 const simulator = new LocalSimulator();
 const send = (event: Event): void => globalThis.postMessage(event);
@@ -15,7 +16,7 @@ globalThis.onmessage = (event: MessageEvent<Command>) => {
   try {
     switch (command.method) {
       case 'setScene':
-        simulator.setScene(command.value);
+        simulator.setScene(JSON.parse(command.value) as Scene);
         break;
       case 'loadHex':
         simulator.loadHex(command.value);
@@ -26,8 +27,29 @@ globalThis.onmessage = (event: MessageEvent<Command>) => {
       case 'setSpeed':
         simulator.setSpeed(command.value);
         break;
+      case 'setMissionMode':
+        simulator.setMissionMode();
+        break;
       case 'setInput':
         simulator.setInput(command.value);
+        break;
+      case 'debugLoad':
+        simulator.debug.load(command.value);
+        break;
+      case 'debugBreakpoints':
+        simulator.debug.setBreakpoints(command.value);
+        break;
+      case 'debugContinue':
+        simulator.debug.continue();
+        break;
+      case 'debugStepInto':
+        simulator.debug.stepInto();
+        break;
+      case 'debugStepOver':
+        simulator.debug.stepOver();
+        break;
+      case 'debugStepOut':
+        simulator.debug.stepOut();
         break;
       default:
         simulator[command.method]();

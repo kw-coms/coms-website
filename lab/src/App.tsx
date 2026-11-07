@@ -6,6 +6,9 @@ import { SidePanel } from './ui/components/SidePanel';
 import { ContextMenu, Toast, Tooltip, Tutorial } from './ui/components/Misc';
 import { Palette } from './ui/components/Palette';
 import { Toolbar } from './ui/components/Toolbar';
+import { PartInfoDialog } from './ui/components/PartInfo';
+import { FloatingInstruments } from './ui/instruments/Panels';
+import { Schematic } from './ui/schematic/Schematic';
 import { onSimFrame } from './ui/simHost';
 import { useShortcuts } from './ui/shortcuts';
 import { dismissQualityNotice, useStore } from './ui/store';
@@ -86,6 +89,7 @@ export function App() {
           <ErrorBoundary fallback="3D를 표시할 수 없어요. 브라우저의 그래픽 가속(WebGL)이 꺼져 있을 수 있어요. 코드 편집과 시리얼 창은 그대로 쓸 수 있고, 페이지를 새로고침하면 다시 시도해요.">
             <Workspace />
           </ErrorBoundary>
+          <Schematic />
           <StageStatus />
           <LedStatus />
         </div>
@@ -104,6 +108,8 @@ export function App() {
           <button type="button" onClick={dismissQualityNotice}>확인</button>
         </div>
       )}
+      <FloatingInstruments />
+      <PartInfoDialog />
       <Tutorial />
       <Tooltip />
       <ContextMenu />

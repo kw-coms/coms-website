@@ -8,6 +8,7 @@ import { Lcd1602 } from './lcd';
 import { loadIntelHex as parseIntelHex } from './hex';
 import { DHT11Protocol, WS2812Protocol } from './protocols';
 import { installUnoEeprom, UnoEepromMemoryBackend } from './eeprom';
+import { AvrDebugger } from './debugger';
 
 export const MCU_HZ = 16_000_000;
 // Bound once: calling avr8js through the import binding in the stepping loop is a property lookup per
@@ -27,6 +28,7 @@ export function loadIntelHex(hex: string): Uint16Array<ArrayBuffer> {
 }
 
 export class Mcu {
+  readonly debugger = new AvrDebugger();
   cpu!: CPU;
   ports!: Record<'B' | 'C' | 'D', AVRIOPort>;
   adc!: AVRADC;
@@ -36,6 +38,7 @@ export class Mcu {
   lcd = new Lcd1602();
   onSerial: (text: string) => void;
   onPinChange?: (pin: string, level: 0 | 1) => void;
+  onPinModeChange?: (pin: string, mode: McuPinState['mode']) => void;
   private serialQueue: number[] = [];
   private serialScheduled = false;
   private echoActive = new Set<string>();
@@ -55,6 +58,7 @@ export class Mcu {
     this.reset();
   }
   reset(program: Uint16Array<ArrayBuffer> = new Uint16Array(16384)): void {
+    this.debugger.resetRuntime();
     this.cpu = new CPU(program, 2048);
     installUnoEeprom(this.cpu, this.eeprom);
     this.ports = { B: new AVRIOPort(this.cpu, portBConfig), C: new AVRIOPort(this.cpu, portCConfig), D: new AVRIOPort(this.cpu, portDConfig) };
@@ -118,11 +122,40 @@ export class Mcu {
     this.dhtSamples.clear();
     this.pixels.clear();
     for (const [port, configuration] of [['B', portBConfig], ['C', portCConfig], ['D', portDConfig]] as const) {
+      // pinMode(INPUT_PULLUP) on a reset pin only writes PORT (DDR stays 0): the pull-up must still reach the electrical solve at once,
+      // otherwise the first digitalRead() sees a pre-pullup LOW and fires a phantom button press.
+      const originalPort = this.cpu.writeHooks[configuration.PORT]!;
+      this.cpu.writeHooks[configuration.PORT] = (value, oldValue, address, mask) => {
+        const result = originalPort(value, oldValue, address, mask);
+        const changed = value ^ oldValue;
+        for (const [name, [mappedPort, bit]] of Object.entries(map)) {
+          // The net voltage from the last solve is stale (floating input) at the instant a pull-up is enabled; real silicon reads HIGH immediately, and the next solve replaces this with the real net voltage.
+          if (mappedPort === port && changed & value & (1 << bit) && !(this.cpu.data[configuration.DDR]! & (1 << bit)) && !this.echoActive.has(name)) {
+            this.lastInput.set(name, true);
+            this.ports[port].setPin(bit, true);
+          }
+        }
+        if (changed && this.onPinModeChange) {
+          for (const [name, [mappedPort, bit]] of Object.entries(map)) {
+            if (mappedPort !== port || !(changed & (1 << bit)) || this.cpu.data[configuration.DDR]! & (1 << bit)) continue;
+            this.onPinModeChange(name, value & (1 << bit) ? 'input_pullup' : 'input');
+          }
+        }
+        return result;
+      };
       const original = this.cpu.writeHooks[configuration.DDR]!;
       this.cpu.writeHooks[configuration.DDR] = (value, oldValue, address, mask) => {
         const result = original(value, oldValue, address, mask);
         const released = oldValue & ~value;
         const asserted = value & ~oldValue;
+        if ((released || asserted) && this.onPinModeChange) {
+          for (const [name, [mappedPort, bit]] of Object.entries(map)) {
+            if (mappedPort !== port || !((released | asserted) & (1 << bit))) continue;
+            const mode = value & (1 << bit) ? 'output'
+              : this.cpu.data[configuration.PORT]! & (1 << bit) ? 'input_pullup' : 'input';
+            this.onPinModeChange(name, mode);
+          }
+        }
         if (released || asserted) {
           for (const [name, [mappedPort, bit]] of Object.entries(map)) {
             if (mappedPort !== port) continue;
@@ -161,12 +194,20 @@ export class Mcu {
       });
     }
   }
-  loadHex(hex: string): void { this.reset(loadIntelHex(hex)); }
+  loadHex(hex: string): void { this.debugger.unload(); this.reset(loadIntelHex(hex)); }
   step(cycles: number): void {
     this.scheduleSerial();
     const target = this.cpu.cycles + cycles;
     const cpu = this.cpu;
-    while (cpu.cycles < target) {
+    if (this.debugger.active) {
+      while (cpu.cycles < target && this.debugger.before(cpu)) {
+        const opcode = cpu.progMem[cpu.pc]!;
+        const spBefore = cpu.SP;
+        execute(cpu);
+        cpu.tick();
+        this.debugger.after(opcode, spBefore, cpu.SP);
+      }
+    } else while (cpu.cycles < target) {
       execute(cpu);
       cpu.tick();
     }

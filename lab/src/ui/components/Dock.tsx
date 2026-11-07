@@ -1,20 +1,49 @@
 import { useEffect, useRef, useState } from 'react';
-import { EditorState, Compartment } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { EditorState, Compartment, StateEffect, StateField } from '@codemirror/state';
+import { Decoration, EditorView, GutterMarker, gutter } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
 import { cpp } from '@codemirror/lang-cpp';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint';
 import { ChevronDown, ChevronUp, Eraser, Send } from 'lucide-react';
-import { sim } from '../simHost';
+import { sim, toggleBreakpoint } from '../simHost';
 import { clearSerial, onSerialLog, plot, serialLog } from '../serial';
 import { getState, MAX_CODE_BYTES, set, setCode, toast, useStore, type SerialTab } from '../store';
 import { LOGIN_URL } from '../compileClient';
 
 const theme = new Compartment();
+const roComp = new Compartment();
+
+// ---- debugger: breakpoint gutter + current-line highlight ----
+interface DebugView { bps: number[]; line?: number }
+const setDebugView = StateEffect.define<DebugView>();
+const debugField = StateField.define<DebugView>({
+  create: () => ({ bps: [] }),
+  update: (v, tr) => tr.effects.reduce((acc, e) => (e.is(setDebugView) ? e.value : acc), v),
+});
+class BpMarker extends GutterMarker {
+  toDOM() { const d = document.createElement('span'); d.className = 'bp-dot'; d.title = '중단점 (눌러서 해제)'; return d; }
+}
+const bpMarker = new BpMarker();
+class BpHint extends GutterMarker {
+  toDOM() { const d = document.createElement('span'); d.className = 'bp-dot ghost'; return d; }
+}
+const bpGutter = gutter({
+  class: 'cm-bp-gutter',
+  lineMarker: (view, line) => (view.state.field(debugField).bps.includes(view.state.doc.lineAt(line.from).number) ? bpMarker : null),
+  // without this the dots only appear when the document or viewport changes, not when a breakpoint is toggled
+  lineMarkerChange: (update) => update.startState.field(debugField).bps !== update.state.field(debugField).bps,
+  initialSpacer: () => new BpHint(),
+  domEventHandlers: { mousedown: (view, line) => { toggleBreakpoint(view.state.doc.lineAt(line.from).number); return true; } },
+});
+const currentLine = EditorView.decorations.compute([debugField], (state) => {
+  const ln = state.field(debugField).line;
+  if (!ln || ln < 1 || ln > state.doc.lines) return Decoration.none;
+  return Decoration.set([Decoration.line({ class: 'cm-debug-line' }).range(state.doc.line(ln).from)]);
+});
 const lightTheme = EditorView.theme({ '&': { backgroundColor: 'var(--surface)', color: 'var(--text)', height: '100%' }, '.cm-gutters': { backgroundColor: 'var(--surface-2)', color: 'var(--muted)', border: 'none' } });
 
-export function CodeEditor() {
+export function CodeEditor({ readOnly = false }: { readOnly?: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const dark = useStore((s) => s.theme === 'dark');
@@ -26,7 +55,7 @@ export function CodeEditor() {
       state: EditorState.create({
         doc: getState().code,
         extensions: [
-          basicSetup, cpp(), lintGutter(), EditorView.lineWrapping,
+          basicSetup, cpp(), bpGutter, debugField, currentLine, lintGutter(), EditorView.lineWrapping, roComp.of(EditorState.readOnly.of(readOnly)),
           theme.of(getState().theme === 'dark' ? oneDark : lightTheme),
           EditorState.transactionFilter.of((tr) => {
             // refuse input past the core's code limit instead of letting the document become unimportable
@@ -46,6 +75,18 @@ export function CodeEditor() {
   useEffect(() => {
     view.current?.dispatch({ effects: theme.reconfigure(dark ? oneDark : lightTheme) });
   }, [dark]);
+  useEffect(() => {
+    view.current?.dispatch({ effects: roComp.reconfigure(EditorState.readOnly.of(readOnly)) });
+  }, [readOnly]);
+  const bps = useStore((s) => s.breakpoints);
+  const dbg = useStore((s) => s.debug);
+  const dbgLine = dbg?.paused ? dbg.line : undefined;
+  useEffect(() => {
+    const v = view.current;
+    if (!v) return;
+    v.dispatch({ effects: setDebugView.of({ bps, line: dbgLine }) });
+    if (dbgLine && dbgLine <= v.state.doc.lines) v.dispatch({ effects: EditorView.scrollIntoView(v.state.doc.line(dbgLine).from, { y: 'center' }) });
+  }, [bps, dbgLine]);
   useEffect(() => {
     const v = view.current;
     if (v && v.state.doc.toString() !== code) v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: code } });

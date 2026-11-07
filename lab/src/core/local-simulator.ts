@@ -1,10 +1,12 @@
-import type { Analysis, Scene, SimFrame, SimInput, Simulator } from './types';
+import type { Analysis, DebugInfo, Scene, SimFrame, SimInput, Simulator } from './types';
 import { SimulationEngine } from './engine';
 import { MCU_HZ } from './mcu';
 
 /** The worker host and main-thread fallback share the same lifecycle. */
 export class LocalSimulator implements Simulator {
-  private engine = new SimulationEngine();
+  private missionMode = false;
+  private engine: SimulationEngine = new SimulationEngine((): number =>
+    this.missionMode ? this.engine.mcu.cpu.cycles / MCU_HZ * 1000 : performance.now());
   private frames = new Set<(frame: SimFrame) => void>();
   private serial = new Set<(text: string) => void>();
   private states = new Set<(state: Simulator['state'], error?: string) => void>();
@@ -15,6 +17,15 @@ export class LocalSimulator implements Simulator {
   private started = 0;
   private simulatedAtStart = 0;
   private _state: Simulator['state'] = 'idle';
+
+  readonly debug = {
+    load: (info: DebugInfo): void => { this.engine.mcu.debugger.load(info); this.emit(); },
+    setBreakpoints: (lines: number[]): void => { this.engine.mcu.debugger.setBreakpoints(lines); },
+    continue: (): void => { this.engine.mcu.debugger.continue(this.engine.mcu.cpu); this.start(); },
+    stepInto: (): void => { this.engine.mcu.debugger.stepInto(this.engine.mcu.cpu); this.start(); },
+    stepOver: (): void => { this.engine.mcu.debugger.stepOver(this.engine.mcu.cpu); this.start(); },
+    stepOut: (): void => { this.engine.mcu.debugger.stepOut(this.engine.mcu.cpu); this.start(); },
+  };
 
   get state(): Simulator['state'] {
     return this._state;
@@ -78,15 +89,23 @@ export class LocalSimulator implements Simulator {
         ? (this.engine.mcu.cpu.cycles - this.simulatedAtStart) / MCU_HZ / elapsedSeconds
         : 0;
       this.emit(frame);
+      if (this.engine.mcu.debugger.isPaused) {
+        this.timer = undefined;
+        this.transition('paused');
+        return;
+      }
       this.timer = setTimeout(tick, Math.max(0, 1000 / 60 - (performance.now() - started)));
     };
     this.timer = setTimeout(tick, 0);
   }
 
   pause(): void {
+    const wasRunning = this._state === 'running';
     if (this.timer !== undefined) clearTimeout(this.timer);
     this.timer = undefined;
+    if (wasRunning) this.engine.mcu.debugger.pause();
     if (this._state === 'running') this.transition('paused');
+    if (wasRunning && this.engine.mcu.debugger.active) this.emit();
   }
 
   stop(): void {
@@ -105,6 +124,11 @@ export class LocalSimulator implements Simulator {
   setSpeed(value: number): void {
     if (!Number.isFinite(value)) throw new Error('속도가 올바르지 않습니다.');
     this.speed = Math.max(0.25, Math.min(2, value));
+  }
+
+  setMissionMode(): void {
+    if (this._state !== 'idle') throw new Error('미션 모드는 실행 전에 설정해야 합니다.');
+    this.missionMode = true;
   }
 
   setInput(input: SimInput): void {

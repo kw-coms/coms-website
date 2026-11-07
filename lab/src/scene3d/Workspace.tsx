@@ -12,6 +12,7 @@ import { getState, subscribe, useStore } from '../ui/store';
 import { Interaction } from './Interaction';
 import { BendHandles, NetGlow, PartAnnotations, PreviewWire, SelectionBox, SnapRings } from './Overlays';
 import { PartView } from './PartView';
+import { Notes } from './NoteView';
 import { WireView, pinPos } from './WireView';
 import { dropFromPalette, groundPoint, placeAt } from './placement';
 import { DESK_Y, refs } from './sceneRefs';
@@ -146,7 +147,7 @@ function CameraRig() {
         dampingFactor={0.12}
         enableRotate={view === 'persp'}
         screenSpacePanning
-        minDistance={view === 'persp' ? 25 : 0}
+        minDistance={view === 'persp' ? 12 : 0}
         maxDistance={view === 'persp' ? 1800 : 3000}
         minZoom={0.5}
         maxZoom={40}
@@ -228,6 +229,7 @@ function Content() {
         const net = analysis.pinToNet[`${w.from.partId}:${w.from.pinId}`];
         return <WireView key={w.id} wire={w} a={e[0]} b={e[1]} selected={sel?.kind === 'wire' && sel.id === w.id} glow={!!hover?.netId && hover.netId === net} />;
       })}
+      <Notes />
       <NetGlow />
       <SnapRings />
       <PreviewWire />

@@ -1,0 +1,16 @@
+.mode-bar { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.mode-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.mode-seg button { border: 0; background: var(--surface-2); color: var(--text); padding: 5px 12px; min-height: 32px; font: inherit; cursor: pointer; }
+.mode-seg button + button { border-left: 1px solid var(--border); }
+.mode-seg button[aria-pressed='true'] { background: var(--accent); color: var(--accent-text); font-weight: 600; }
+.mode-seg button:disabled { opacity: 0.5; cursor: not-allowed; }
+.mode-seg button:focus-visible { outline: 2px solid var(--accent-2); outline-offset: -2px; }
+.mode-note { font-size: 12px; color: var(--muted); flex: 1 1 200px; }
+.mode-confirm { margin: 6px 8px; padding: 10px 12px; border: 1px solid var(--danger); border-radius: 8px; background: color-mix(in srgb, var(--danger) 10%, var(--surface)); }
+.mode-confirm p { margin: 0 0 8px; }
+.mode-confirm button { margin-right: 6px; min-height: 32px; padding: 4px 12px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; cursor: pointer; }
+.mode-confirm button.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+.blocks-host { position: absolute; inset: 0; touch-action: none; }
+.blocks-warn { margin: 0; padding: 4px 10px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); background: var(--surface-2); }
+/* phone: the bottom sheet is short, give a block program most of the screen */
+@media (max-width: 768px) { .mode-seg button { min-height: 40px; padding: 6px 14px; } .sidepanel.sheet-open:has(.blocks-slot) .side-body { flex: none; height: 74vh; } }

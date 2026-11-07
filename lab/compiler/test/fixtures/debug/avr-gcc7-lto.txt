@@ -1,0 +1,1280 @@
+Contents of the .debug_info section:
+
+  Compilation Unit @ offset 0x0:
+   Length:        0x5f0 (32-bit)
+   Version:       2
+   Abbrev Offset: 0x0
+   Pointer Size:  4
+ <0><b>: Abbrev Number: 1 (DW_TAG_compile_unit)
+    <c>   DW_AT_producer    : (indirect string, offset: 0x0): avr-libc 2.0.0
+    <10>   DW_AT_stmt_list   : 0x0
+ <1><14>: Abbrev Number: 2 (DW_TAG_base_type)
+    <15>   DW_AT_name        : (indirect string, offset: 0xf): uint8_t
+    <19>   DW_AT_byte_size   : 1
+    <1a>   DW_AT_encoding    : 8	(unsigned char)
+ <1><1b>: Abbrev Number: 3 (DW_TAG_base_type)
+    <1c>   DW_AT_name        : (indirect string, offset: 0x17): uint16_t
+    <20>   DW_AT_byte_size   : 2
+    <21>   DW_AT_encoding    : 7	(unsigned)
+ <1><22>: Abbrev Number: 4 (DW_TAG_array_type)
+    <23>   DW_AT_type        : <0x14>
+ <2><27>: Abbrev Number: 5 (DW_TAG_subrange_type)
+    <28>   DW_AT_type        : <0x1b>
+    <2c>   DW_AT_upper_bound : 1023
+ <2><2e>: Abbrev Number: 0
+ <1><2f>: Abbrev Number: 6 (DW_TAG_variable)
+    <30>   DW_AT_name        : (indirect string, offset: 0x20): __eeprom
+    <34>   DW_AT_decl_file   : 0
+    <35>   DW_AT_decl_line   : 0
+    <36>   DW_AT_type        : <0x22>
+    <3a>   DW_AT_external    : 1
+    <3b>   DW_AT_location    : 5 byte block: 3 0 0 81 0 	(DW_OP_addr: 810000)
+ <1><41>: Abbrev Number: 7 (DW_TAG_variable)
+    <42>   DW_AT_name        : (indirect string, offset: 0x29): UDR0
+    <46>   DW_AT_decl_file   : 0
+    <47>   DW_AT_decl_line   : 0
+    <48>   DW_AT_type        : <0x14>
+    <4c>   DW_AT_external    : 1
+    <4d>   DW_AT_location    : 5 byte block: 3 c6 0 80 0 	(DW_OP_addr: 8000c6)
+ <1><53>: Abbrev Number: 8 (DW_TAG_variable)
+    <54>   DW_AT_name        : (indirect string, offset: 0x2e): UCSR0A
+    <58>   DW_AT_decl_file   : 0
+    <59>   DW_AT_decl_line   : 0
+    <5a>   DW_AT_type        : <0x14>
+    <5e>   DW_AT_external    : 1
+    <5f>   DW_AT_location    : 5 byte block: 3 c0 0 80 0 	(DW_OP_addr: 8000c0)
+ <1><65>: Abbrev Number: 9 (DW_TAG_variable)
+    <66>   DW_AT_name        : (indirect string, offset: 0x35): UCSR0B
+    <6a>   DW_AT_decl_file   : 0
+    <6b>   DW_AT_decl_line   : 0
+    <6c>   DW_AT_type        : <0x14>
+    <70>   DW_AT_external    : 1
+    <71>   DW_AT_location    : 5 byte block: 3 c1 0 80 0 	(DW_OP_addr: 8000c1)
+ <1><77>: Abbrev Number: 10 (DW_TAG_variable)
+    <78>   DW_AT_name        : (indirect string, offset: 0x3c): UCSR0C
+    <7c>   DW_AT_decl_file   : 0
+    <7d>   DW_AT_decl_line   : 0
+    <7e>   DW_AT_type        : <0x14>
+    <82>   DW_AT_external    : 1
+    <83>   DW_AT_location    : 5 byte block: 3 c2 0 80 0 	(DW_OP_addr: 8000c2)
+ <1><89>: Abbrev Number: 11 (DW_TAG_variable)
+    <8a>   DW_AT_name        : (indirect string, offset: 0x43): UBRR0
+    <8e>   DW_AT_decl_file   : 0
+    <8f>   DW_AT_decl_line   : 0
+    <90>   DW_AT_type        : <0x1b>
+    <94>   DW_AT_external    : 1
+    <95>   DW_AT_location    : 5 byte block: 3 c4 0 80 0 	(DW_OP_addr: 8000c4)
+ <1><9b>: Abbrev Number: 12 (DW_TAG_variable)
+    <9c>   DW_AT_name        : (indirect string, offset: 0x49): TWAMR
+    <a0>   DW_AT_decl_file   : 0
+    <a1>   DW_AT_decl_line   : 0
+    <a2>   DW_AT_type        : <0x14>
+    <a6>   DW_AT_external    : 1
+    <a7>   DW_AT_location    : 5 byte block: 3 bd 0 80 0 	(DW_OP_addr: 8000bd)
+ <1><ad>: Abbrev Number: 13 (DW_TAG_variable)
+    <ae>   DW_AT_name        : (indirect string, offset: 0x4f): TWBR
+    <b2>   DW_AT_decl_file   : 0
+    <b3>   DW_AT_decl_line   : 0
+    <b4>   DW_AT_type        : <0x14>
+    <b8>   DW_AT_external    : 1
+    <b9>   DW_AT_location    : 5 byte block: 3 b8 0 80 0 	(DW_OP_addr: 8000b8)
+ <1><bf>: Abbrev Number: 14 (DW_TAG_variable)
+    <c0>   DW_AT_name        : (indirect string, offset: 0x54): TWCR
+    <c4>   DW_AT_decl_file   : 0
+    <c5>   DW_AT_decl_line   : 0
+    <c6>   DW_AT_type        : <0x14>
+    <ca>   DW_AT_external    : 1
+    <cb>   DW_AT_location    : 5 byte block: 3 bc 0 80 0 	(DW_OP_addr: 8000bc)
+ <1><d1>: Abbrev Number: 15 (DW_TAG_variable)
+    <d2>   DW_AT_name        : (indirect string, offset: 0x59): TWSR
+    <d6>   DW_AT_decl_file   : 0
+    <d7>   DW_AT_decl_line   : 0
+    <d8>   DW_AT_type        : <0x14>
+    <dc>   DW_AT_external    : 1
+    <dd>   DW_AT_location    : 5 byte block: 3 b9 0 80 0 	(DW_OP_addr: 8000b9)
+ <1><e3>: Abbrev Number: 16 (DW_TAG_variable)
+    <e4>   DW_AT_name        : (indirect string, offset: 0x5e): TWDR
+    <e8>   DW_AT_decl_file   : 0
+    <e9>   DW_AT_decl_line   : 0
+    <ea>   DW_AT_type        : <0x14>
+    <ee>   DW_AT_external    : 1
+    <ef>   DW_AT_location    : 5 byte block: 3 bb 0 80 0 	(DW_OP_addr: 8000bb)
+ <1><f5>: Abbrev Number: 17 (DW_TAG_variable)
+    <f6>   DW_AT_name        : (indirect string, offset: 0x63): TWAR
+    <fa>   DW_AT_decl_file   : 0
+    <fb>   DW_AT_decl_line   : 0
+    <fc>   DW_AT_type        : <0x14>
+    <100>   DW_AT_external    : 1
+    <101>   DW_AT_location    : 5 byte block: 3 ba 0 80 0 	(DW_OP_addr: 8000ba)
+ <1><107>: Abbrev Number: 18 (DW_TAG_variable)
+    <108>   DW_AT_name        : (indirect string, offset: 0x68): TIMSK1
+    <10c>   DW_AT_decl_file   : 0
+    <10d>   DW_AT_decl_line   : 0
+    <10e>   DW_AT_type        : <0x14>
+    <112>   DW_AT_external    : 1
+    <113>   DW_AT_location    : 5 byte block: 3 6f 0 80 0 	(DW_OP_addr: 80006f)
+ <1><119>: Abbrev Number: 19 (DW_TAG_variable)
+    <11a>   DW_AT_name        : (indirect string, offset: 0x6f): TIFR1
+    <11e>   DW_AT_decl_file   : 0
+    <11f>   DW_AT_decl_line   : 0
+    <120>   DW_AT_type        : <0x14>
+    <124>   DW_AT_external    : 1
+    <125>   DW_AT_location    : 5 byte block: 3 36 0 80 0 	(DW_OP_addr: 800036)
+ <1><12b>: Abbrev Number: 20 (DW_TAG_variable)
+    <12c>   DW_AT_name        : (indirect string, offset: 0x75): TCCR1A
+    <130>   DW_AT_decl_file   : 0
+    <131>   DW_AT_decl_line   : 0
+    <132>   DW_AT_type        : <0x14>
+    <136>   DW_AT_external    : 1
+    <137>   DW_AT_location    : 5 byte block: 3 80 0 80 0 	(DW_OP_addr: 800080)
+ <1><13d>: Abbrev Number: 21 (DW_TAG_variable)
+    <13e>   DW_AT_name        : (indirect string, offset: 0x7c): TCCR1B
+    <142>   DW_AT_decl_file   : 0
+    <143>   DW_AT_decl_line   : 0
+    <144>   DW_AT_type        : <0x14>
+    <148>   DW_AT_external    : 1
+    <149>   DW_AT_location    : 5 byte block: 3 81 0 80 0 	(DW_OP_addr: 800081)
+ <1><14f>: Abbrev Number: 22 (DW_TAG_variable)
+    <150>   DW_AT_name        : (indirect string, offset: 0x83): TCCR1C
+    <154>   DW_AT_decl_file   : 0
+    <155>   DW_AT_decl_line   : 0
+    <156>   DW_AT_type        : <0x14>
+    <15a>   DW_AT_external    : 1
+    <15b>   DW_AT_location    : 5 byte block: 3 82 0 80 0 	(DW_OP_addr: 800082)
+ <1><161>: Abbrev Number: 23 (DW_TAG_variable)
+    <162>   DW_AT_name        : (indirect string, offset: 0x8a): TCNT1
+    <166>   DW_AT_decl_file   : 0
+    <167>   DW_AT_decl_line   : 0
+    <168>   DW_AT_type        : <0x1b>
+    <16c>   DW_AT_external    : 1
+    <16d>   DW_AT_location    : 5 byte block: 3 84 0 80 0 	(DW_OP_addr: 800084)
+ <1><173>: Abbrev Number: 24 (DW_TAG_variable)
+    <174>   DW_AT_name        : (indirect string, offset: 0x90): OCR1A
+    <178>   DW_AT_decl_file   : 0
+    <179>   DW_AT_decl_line   : 0
+    <17a>   DW_AT_type        : <0x1b>
+    <17e>   DW_AT_external    : 1
+    <17f>   DW_AT_location    : 5 byte block: 3 88 0 80 0 	(DW_OP_addr: 800088)
+ <1><185>: Abbrev Number: 25 (DW_TAG_variable)
+    <186>   DW_AT_name        : (indirect string, offset: 0x96): OCR1B
+    <18a>   DW_AT_decl_file   : 0
+    <18b>   DW_AT_decl_line   : 0
+    <18c>   DW_AT_type        : <0x1b>
+    <190>   DW_AT_external    : 1
+    <191>   DW_AT_location    : 5 byte block: 3 8a 0 80 0 	(DW_OP_addr: 80008a)
+ <1><197>: Abbrev Number: 26 (DW_TAG_variable)
+    <198>   DW_AT_name        : (indirect string, offset: 0x9c): ICR1
+    <19c>   DW_AT_decl_file   : 0
+    <19d>   DW_AT_decl_line   : 0
+    <19e>   DW_AT_type        : <0x1b>
+    <1a2>   DW_AT_external    : 1
+    <1a3>   DW_AT_location    : 5 byte block: 3 86 0 80 0 	(DW_OP_addr: 800086)
+ <1><1a9>: Abbrev Number: 27 (DW_TAG_variable)
+    <1aa>   DW_AT_name        : (indirect string, offset: 0xa1): GTCCR
+    <1ae>   DW_AT_decl_file   : 0
+    <1af>   DW_AT_decl_line   : 0
+    <1b0>   DW_AT_type        : <0x14>
+    <1b4>   DW_AT_external    : 1
+    <1b5>   DW_AT_location    : 5 byte block: 3 43 0 80 0 	(DW_OP_addr: 800043)
+ <1><1bb>: Abbrev Number: 28 (DW_TAG_variable)
+    <1bc>   DW_AT_name        : (indirect string, offset: 0xa7): TIMSK2
+    <1c0>   DW_AT_decl_file   : 0
+    <1c1>   DW_AT_decl_line   : 0
+    <1c2>   DW_AT_type        : <0x14>
+    <1c6>   DW_AT_external    : 1
+    <1c7>   DW_AT_location    : 5 byte block: 3 70 0 80 0 	(DW_OP_addr: 800070)
+ <1><1cd>: Abbrev Number: 29 (DW_TAG_variable)
+    <1ce>   DW_AT_name        : (indirect string, offset: 0xae): TIFR2
+    <1d2>   DW_AT_decl_file   : 0
+    <1d3>   DW_AT_decl_line   : 0
+    <1d4>   DW_AT_type        : <0x14>
+    <1d8>   DW_AT_external    : 1
+    <1d9>   DW_AT_location    : 5 byte block: 3 37 0 80 0 	(DW_OP_addr: 800037)
+ <1><1df>: Abbrev Number: 30 (DW_TAG_variable)
+    <1e0>   DW_AT_name        : (indirect string, offset: 0xb4): TCCR2A
+    <1e4>   DW_AT_decl_file   : 0
+    <1e5>   DW_AT_decl_line   : 0
+    <1e6>   DW_AT_type        : <0x14>
+    <1ea>   DW_AT_external    : 1
+    <1eb>   DW_AT_location    : 5 byte block: 3 b0 0 80 0 	(DW_OP_addr: 8000b0)
+ <1><1f1>: Abbrev Number: 31 (DW_TAG_variable)
+    <1f2>   DW_AT_name        : (indirect string, offset: 0xbb): TCCR2B
+    <1f6>   DW_AT_decl_file   : 0
+    <1f7>   DW_AT_decl_line   : 0
+    <1f8>   DW_AT_type        : <0x14>
+    <1fc>   DW_AT_external    : 1
+    <1fd>   DW_AT_location    : 5 byte block: 3 b1 0 80 0 	(DW_OP_addr: 8000b1)
+ <1><203>: Abbrev Number: 32 (DW_TAG_variable)
+    <204>   DW_AT_name        : (indirect string, offset: 0xc2): TCNT2
+    <208>   DW_AT_decl_file   : 0
+    <209>   DW_AT_decl_line   : 0
+    <20a>   DW_AT_type        : <0x14>
+    <20e>   DW_AT_external    : 1
+    <20f>   DW_AT_location    : 5 byte block: 3 b2 0 80 0 	(DW_OP_addr: 8000b2)
+ <1><215>: Abbrev Number: 33 (DW_TAG_variable)
+    <216>   DW_AT_name        : (indirect string, offset: 0xc8): OCR2B
+    <21a>   DW_AT_decl_file   : 0
+    <21b>   DW_AT_decl_line   : 0
+    <21c>   DW_AT_type        : <0x14>
+    <220>   DW_AT_external    : 1
+    <221>   DW_AT_location    : 5 byte block: 3 b4 0 80 0 	(DW_OP_addr: 8000b4)
+ <1><227>: Abbrev Number: 34 (DW_TAG_variable)
+    <228>   DW_AT_name        : (indirect string, offset: 0xce): OCR2A
+    <22c>   DW_AT_decl_file   : 0
+    <22d>   DW_AT_decl_line   : 0
+    <22e>   DW_AT_type        : <0x14>
+    <232>   DW_AT_external    : 1
+    <233>   DW_AT_location    : 5 byte block: 3 b3 0 80 0 	(DW_OP_addr: 8000b3)
+ <1><239>: Abbrev Number: 35 (DW_TAG_variable)
+    <23a>   DW_AT_name        : (indirect string, offset: 0xd4): ASSR
+    <23e>   DW_AT_decl_file   : 0
+    <23f>   DW_AT_decl_line   : 0
+    <240>   DW_AT_type        : <0x14>
+    <244>   DW_AT_external    : 1
+    <245>   DW_AT_location    : 5 byte block: 3 b6 0 80 0 	(DW_OP_addr: 8000b6)
+ <1><24b>: Abbrev Number: 36 (DW_TAG_variable)
+    <24c>   DW_AT_name        : (indirect string, offset: 0xd9): GTCCR
+    <250>   DW_AT_decl_file   : 0
+    <251>   DW_AT_decl_line   : 0
+    <252>   DW_AT_type        : <0x14>
+    <256>   DW_AT_external    : 1
+    <257>   DW_AT_location    : 5 byte block: 3 43 0 80 0 	(DW_OP_addr: 800043)
+ <1><25d>: Abbrev Number: 37 (DW_TAG_variable)
+    <25e>   DW_AT_name        : (indirect string, offset: 0xdf): ADMUX
+    <262>   DW_AT_decl_file   : 0
+    <263>   DW_AT_decl_line   : 0
+    <264>   DW_AT_type        : <0x14>
+    <268>   DW_AT_external    : 1
+    <269>   DW_AT_location    : 5 byte block: 3 7c 0 80 0 	(DW_OP_addr: 80007c)
+ <1><26f>: Abbrev Number: 38 (DW_TAG_variable)
+    <270>   DW_AT_name        : (indirect string, offset: 0xe5): ADC
+    <274>   DW_AT_decl_file   : 0
+    <275>   DW_AT_decl_line   : 0
+    <276>   DW_AT_type        : <0x1b>
+    <27a>   DW_AT_external    : 1
+    <27b>   DW_AT_location    : 5 byte block: 3 78 0 80 0 	(DW_OP_addr: 800078)
+ <1><281>: Abbrev Number: 39 (DW_TAG_variable)
+    <282>   DW_AT_name        : (indirect string, offset: 0xe9): ADCSRA
+    <286>   DW_AT_decl_file   : 0
+    <287>   DW_AT_decl_line   : 0
+    <288>   DW_AT_type        : <0x14>
+    <28c>   DW_AT_external    : 1
+    <28d>   DW_AT_location    : 5 byte block: 3 7a 0 80 0 	(DW_OP_addr: 80007a)
+ <1><293>: Abbrev Number: 40 (DW_TAG_variable)
+    <294>   DW_AT_name        : (indirect string, offset: 0xf0): ADCSRB
+    <298>   DW_AT_decl_file   : 0
+    <299>   DW_AT_decl_line   : 0
+    <29a>   DW_AT_type        : <0x14>
+    <29e>   DW_AT_external    : 1
+    <29f>   DW_AT_location    : 5 byte block: 3 7b 0 80 0 	(DW_OP_addr: 80007b)
+ <1><2a5>: Abbrev Number: 41 (DW_TAG_variable)
+    <2a6>   DW_AT_name        : (indirect string, offset: 0xf7): DIDR0
+    <2aa>   DW_AT_decl_file   : 0
+    <2ab>   DW_AT_decl_line   : 0
+    <2ac>   DW_AT_type        : <0x14>
+    <2b0>   DW_AT_external    : 1
+    <2b1>   DW_AT_location    : 5 byte block: 3 7e 0 80 0 	(DW_OP_addr: 80007e)
+ <1><2b7>: Abbrev Number: 42 (DW_TAG_variable)
+    <2b8>   DW_AT_name        : (indirect string, offset: 0xfd): ACSR
+    <2bc>   DW_AT_decl_file   : 0
+    <2bd>   DW_AT_decl_line   : 0
+    <2be>   DW_AT_type        : <0x14>
+    <2c2>   DW_AT_external    : 1
+    <2c3>   DW_AT_location    : 5 byte block: 3 50 0 80 0 	(DW_OP_addr: 800050)
+ <1><2c9>: Abbrev Number: 43 (DW_TAG_variable)
+    <2ca>   DW_AT_name        : (indirect string, offset: 0x102): DIDR1
+    <2ce>   DW_AT_decl_file   : 0
+    <2cf>   DW_AT_decl_line   : 0
+    <2d0>   DW_AT_type        : <0x14>
+    <2d4>   DW_AT_external    : 1
+    <2d5>   DW_AT_location    : 5 byte block: 3 7f 0 80 0 	(DW_OP_addr: 80007f)
+ <1><2db>: Abbrev Number: 44 (DW_TAG_variable)
+    <2dc>   DW_AT_name        : (indirect string, offset: 0x108): PORTB
+    <2e0>   DW_AT_decl_file   : 0
+    <2e1>   DW_AT_decl_line   : 0
+    <2e2>   DW_AT_type        : <0x14>
+    <2e6>   DW_AT_external    : 1
+    <2e7>   DW_AT_location    : 5 byte block: 3 25 0 80 0 	(DW_OP_addr: 800025)
+ <1><2ed>: Abbrev Number: 45 (DW_TAG_variable)
+    <2ee>   DW_AT_name        : (indirect string, offset: 0x10e): DDRB
+    <2f2>   DW_AT_decl_file   : 0
+    <2f3>   DW_AT_decl_line   : 0
+    <2f4>   DW_AT_type        : <0x14>
+    <2f8>   DW_AT_external    : 1
+    <2f9>   DW_AT_location    : 5 byte block: 3 24 0 80 0 	(DW_OP_addr: 800024)
+ <1><2ff>: Abbrev Number: 46 (DW_TAG_variable)
+    <300>   DW_AT_name        : (indirect string, offset: 0x113): PINB
+    <304>   DW_AT_decl_file   : 0
+    <305>   DW_AT_decl_line   : 0
+    <306>   DW_AT_type        : <0x14>
+    <30a>   DW_AT_external    : 1
+    <30b>   DW_AT_location    : 5 byte block: 3 23 0 80 0 	(DW_OP_addr: 800023)
+ <1><311>: Abbrev Number: 47 (DW_TAG_variable)
+    <312>   DW_AT_name        : (indirect string, offset: 0x118): PORTC
+    <316>   DW_AT_decl_file   : 0
+    <317>   DW_AT_decl_line   : 0
+    <318>   DW_AT_type        : <0x14>
+    <31c>   DW_AT_external    : 1
+    <31d>   DW_AT_location    : 5 byte block: 3 28 0 80 0 	(DW_OP_addr: 800028)
+ <1><323>: Abbrev Number: 48 (DW_TAG_variable)
+    <324>   DW_AT_name        : (indirect string, offset: 0x11e): DDRC
+    <328>   DW_AT_decl_file   : 0
+    <329>   DW_AT_decl_line   : 0
+    <32a>   DW_AT_type        : <0x14>
+    <32e>   DW_AT_external    : 1
+    <32f>   DW_AT_location    : 5 byte block: 3 27 0 80 0 	(DW_OP_addr: 800027)
+ <1><335>: Abbrev Number: 49 (DW_TAG_variable)
+    <336>   DW_AT_name        : (indirect string, offset: 0x123): PINC
+    <33a>   DW_AT_decl_file   : 0
+    <33b>   DW_AT_decl_line   : 0
+    <33c>   DW_AT_type        : <0x14>
+    <340>   DW_AT_external    : 1
+    <341>   DW_AT_location    : 5 byte block: 3 26 0 80 0 	(DW_OP_addr: 800026)
+ <1><347>: Abbrev Number: 50 (DW_TAG_variable)
+    <348>   DW_AT_name        : (indirect string, offset: 0x128): PORTD
+    <34c>   DW_AT_decl_file   : 0
+    <34d>   DW_AT_decl_line   : 0
+    <34e>   DW_AT_type        : <0x14>
+    <352>   DW_AT_external    : 1
+    <353>   DW_AT_location    : 5 byte block: 3 2b 0 80 0 	(DW_OP_addr: 80002b)
+ <1><359>: Abbrev Number: 51 (DW_TAG_variable)
+    <35a>   DW_AT_name        : (indirect string, offset: 0x12e): DDRD
+    <35e>   DW_AT_decl_file   : 0
+    <35f>   DW_AT_decl_line   : 0
+    <360>   DW_AT_type        : <0x14>
+    <364>   DW_AT_external    : 1
+    <365>   DW_AT_location    : 5 byte block: 3 2a 0 80 0 	(DW_OP_addr: 80002a)
+ <1><36b>: Abbrev Number: 52 (DW_TAG_variable)
+    <36c>   DW_AT_name        : (indirect string, offset: 0x133): PIND
+    <370>   DW_AT_decl_file   : 0
+    <371>   DW_AT_decl_line   : 0
+    <372>   DW_AT_type        : <0x14>
+    <376>   DW_AT_external    : 1
+    <377>   DW_AT_location    : 5 byte block: 3 29 0 80 0 	(DW_OP_addr: 800029)
+ <1><37d>: Abbrev Number: 53 (DW_TAG_variable)
+    <37e>   DW_AT_name        : (indirect string, offset: 0x138): OCR0B
+    <382>   DW_AT_decl_file   : 0
+    <383>   DW_AT_decl_line   : 0
+    <384>   DW_AT_type        : <0x14>
+    <388>   DW_AT_external    : 1
+    <389>   DW_AT_location    : 5 byte block: 3 48 0 80 0 	(DW_OP_addr: 800048)
+ <1><38f>: Abbrev Number: 54 (DW_TAG_variable)
+    <390>   DW_AT_name        : (indirect string, offset: 0x13e): OCR0A
+    <394>   DW_AT_decl_file   : 0
+    <395>   DW_AT_decl_line   : 0
+    <396>   DW_AT_type        : <0x14>
+    <39a>   DW_AT_external    : 1
+    <39b>   DW_AT_location    : 5 byte block: 3 47 0 80 0 	(DW_OP_addr: 800047)
+ <1><3a1>: Abbrev Number: 55 (DW_TAG_variable)
+    <3a2>   DW_AT_name        : (indirect string, offset: 0x144): TCNT0
+    <3a6>   DW_AT_decl_file   : 0
+    <3a7>   DW_AT_decl_line   : 0
+    <3a8>   DW_AT_type        : <0x14>
+    <3ac>   DW_AT_external    : 1
+    <3ad>   DW_AT_location    : 5 byte block: 3 46 0 80 0 	(DW_OP_addr: 800046)
+ <1><3b3>: Abbrev Number: 56 (DW_TAG_variable)
+    <3b4>   DW_AT_name        : (indirect string, offset: 0x14a): TCCR0B
+    <3b8>   DW_AT_decl_file   : 0
+    <3b9>   DW_AT_decl_line   : 0
+    <3ba>   DW_AT_type        : <0x14>
+    <3be>   DW_AT_external    : 1
+    <3bf>   DW_AT_location    : 5 byte block: 3 45 0 80 0 	(DW_OP_addr: 800045)
+ <1><3c5>: Abbrev Number: 57 (DW_TAG_variable)
+    <3c6>   DW_AT_name        : (indirect string, offset: 0x151): TCCR0A
+    <3ca>   DW_AT_decl_file   : 0
+    <3cb>   DW_AT_decl_line   : 0
+    <3cc>   DW_AT_type        : <0x14>
+    <3d0>   DW_AT_external    : 1
+    <3d1>   DW_AT_location    : 5 byte block: 3 44 0 80 0 	(DW_OP_addr: 800044)
+ <1><3d7>: Abbrev Number: 58 (DW_TAG_variable)
+    <3d8>   DW_AT_name        : (indirect string, offset: 0x158): TIMSK0
+    <3dc>   DW_AT_decl_file   : 0
+    <3dd>   DW_AT_decl_line   : 0
+    <3de>   DW_AT_type        : <0x14>
+    <3e2>   DW_AT_external    : 1
+    <3e3>   DW_AT_location    : 5 byte block: 3 6e 0 80 0 	(DW_OP_addr: 80006e)
+ <1><3e9>: Abbrev Number: 59 (DW_TAG_variable)
+    <3ea>   DW_AT_name        : (indirect string, offset: 0x15f): TIFR0
+    <3ee>   DW_AT_decl_file   : 0
+    <3ef>   DW_AT_decl_line   : 0
+    <3f0>   DW_AT_type        : <0x14>
+    <3f4>   DW_AT_external    : 1
+    <3f5>   DW_AT_location    : 5 byte block: 3 35 0 80 0 	(DW_OP_addr: 800035)
+ <1><3fb>: Abbrev Number: 60 (DW_TAG_variable)
+    <3fc>   DW_AT_name        : (indirect string, offset: 0x165): GTCCR
+    <400>   DW_AT_decl_file   : 0
+    <401>   DW_AT_decl_line   : 0
+    <402>   DW_AT_type        : <0x14>
+    <406>   DW_AT_external    : 1
+    <407>   DW_AT_location    : 5 byte block: 3 43 0 80 0 	(DW_OP_addr: 800043)
+ <1><40d>: Abbrev Number: 61 (DW_TAG_variable)
+    <40e>   DW_AT_name        : (indirect string, offset: 0x16b): EICRA
+    <412>   DW_AT_decl_file   : 0
+    <413>   DW_AT_decl_line   : 0
+    <414>   DW_AT_type        : <0x14>
+    <418>   DW_AT_external    : 1
+    <419>   DW_AT_location    : 5 byte block: 3 69 0 80 0 	(DW_OP_addr: 800069)
+ <1><41f>: Abbrev Number: 62 (DW_TAG_variable)
+    <420>   DW_AT_name        : (indirect string, offset: 0x171): EIMSK
+    <424>   DW_AT_decl_file   : 0
+    <425>   DW_AT_decl_line   : 0
+    <426>   DW_AT_type        : <0x14>
+    <42a>   DW_AT_external    : 1
+    <42b>   DW_AT_location    : 5 byte block: 3 3d 0 80 0 	(DW_OP_addr: 80003d)
+ <1><431>: Abbrev Number: 63 (DW_TAG_variable)
+    <432>   DW_AT_name        : (indirect string, offset: 0x177): EIFR
+    <436>   DW_AT_decl_file   : 0
+    <437>   DW_AT_decl_line   : 0
+    <438>   DW_AT_type        : <0x14>
+    <43c>   DW_AT_external    : 1
+    <43d>   DW_AT_location    : 5 byte block: 3 3c 0 80 0 	(DW_OP_addr: 80003c)
+ <1><443>: Abbrev Number: 64 (DW_TAG_variable)
+    <444>   DW_AT_name        : (indirect string, offset: 0x17c): PCICR
+    <448>   DW_AT_decl_file   : 0
+    <449>   DW_AT_decl_line   : 0
+    <44a>   DW_AT_type        : <0x14>
+    <44e>   DW_AT_external    : 1
+    <44f>   DW_AT_location    : 5 byte block: 3 68 0 80 0 	(DW_OP_addr: 800068)
+ <1><455>: Abbrev Number: 65 (DW_TAG_variable)
+    <456>   DW_AT_name        : (indirect string, offset: 0x182): PCMSK2
+    <45a>   DW_AT_decl_file   : 0
+    <45b>   DW_AT_decl_line   : 0
+    <45c>   DW_AT_type        : <0x14>
+    <460>   DW_AT_external    : 1
+    <461>   DW_AT_location    : 5 byte block: 3 6d 0 80 0 	(DW_OP_addr: 80006d)
+ <1><467>: Abbrev Number: 66 (DW_TAG_variable)
+    <468>   DW_AT_name        : (indirect string, offset: 0x189): PCMSK1
+    <46c>   DW_AT_decl_file   : 0
+    <46d>   DW_AT_decl_line   : 0
+    <46e>   DW_AT_type        : <0x14>
+    <472>   DW_AT_external    : 1
+    <473>   DW_AT_location    : 5 byte block: 3 6c 0 80 0 	(DW_OP_addr: 80006c)
+ <1><479>: Abbrev Number: 67 (DW_TAG_variable)
+    <47a>   DW_AT_name        : (indirect string, offset: 0x190): PCMSK0
+    <47e>   DW_AT_decl_file   : 0
+    <47f>   DW_AT_decl_line   : 0
+    <480>   DW_AT_type        : <0x14>
+    <484>   DW_AT_external    : 1
+    <485>   DW_AT_location    : 5 byte block: 3 6b 0 80 0 	(DW_OP_addr: 80006b)
+ <1><48b>: Abbrev Number: 68 (DW_TAG_variable)
+    <48c>   DW_AT_name        : (indirect string, offset: 0x197): PCIFR
+    <490>   DW_AT_decl_file   : 0
+    <491>   DW_AT_decl_line   : 0
+    <492>   DW_AT_type        : <0x14>
+    <496>   DW_AT_external    : 1
+    <497>   DW_AT_location    : 5 byte block: 3 3b 0 80 0 	(DW_OP_addr: 80003b)
+ <1><49d>: Abbrev Number: 69 (DW_TAG_variable)
+    <49e>   DW_AT_name        : (indirect string, offset: 0x19d): SPDR
+    <4a2>   DW_AT_decl_file   : 0
+    <4a3>   DW_AT_decl_line   : 0
+    <4a4>   DW_AT_type        : <0x14>
+    <4a8>   DW_AT_external    : 1
+    <4a9>   DW_AT_location    : 5 byte block: 3 4e 0 80 0 	(DW_OP_addr: 80004e)
+ <1><4af>: Abbrev Number: 70 (DW_TAG_variable)
+    <4b0>   DW_AT_name        : (indirect string, offset: 0x1a2): SPSR
+    <4b4>   DW_AT_decl_file   : 0
+    <4b5>   DW_AT_decl_line   : 0
+    <4b6>   DW_AT_type        : <0x14>
+    <4ba>   DW_AT_external    : 1
+    <4bb>   DW_AT_location    : 5 byte block: 3 4d 0 80 0 	(DW_OP_addr: 80004d)
+ <1><4c1>: Abbrev Number: 71 (DW_TAG_variable)
+    <4c2>   DW_AT_name        : (indirect string, offset: 0x1a7): SPCR
+    <4c6>   DW_AT_decl_file   : 0
+    <4c7>   DW_AT_decl_line   : 0
+    <4c8>   DW_AT_type        : <0x14>
+    <4cc>   DW_AT_external    : 1
+    <4cd>   DW_AT_location    : 5 byte block: 3 4c 0 80 0 	(DW_OP_addr: 80004c)
+ <1><4d3>: Abbrev Number: 72 (DW_TAG_variable)
+    <4d4>   DW_AT_name        : (indirect string, offset: 0x1ac): WDTCSR
+    <4d8>   DW_AT_decl_file   : 0
+    <4d9>   DW_AT_decl_line   : 0
+    <4da>   DW_AT_type        : <0x14>
+    <4de>   DW_AT_external    : 1
+    <4df>   DW_AT_location    : 5 byte block: 3 60 0 80 0 	(DW_OP_addr: 800060)
+ <1><4e5>: Abbrev Number: 73 (DW_TAG_variable)
+    <4e6>   DW_AT_name        : (indirect string, offset: 0x1b3): PRR
+    <4ea>   DW_AT_decl_file   : 0
+    <4eb>   DW_AT_decl_line   : 0
+    <4ec>   DW_AT_type        : <0x14>
+    <4f0>   DW_AT_external    : 1
+    <4f1>   DW_AT_location    : 5 byte block: 3 64 0 80 0 	(DW_OP_addr: 800064)
+ <1><4f7>: Abbrev Number: 74 (DW_TAG_variable)
+    <4f8>   DW_AT_name        : (indirect string, offset: 0x1b7): OSCCAL
+    <4fc>   DW_AT_decl_file   : 0
+    <4fd>   DW_AT_decl_line   : 0
+    <4fe>   DW_AT_type        : <0x14>
+    <502>   DW_AT_external    : 1
+    <503>   DW_AT_location    : 5 byte block: 3 66 0 80 0 	(DW_OP_addr: 800066)
+ <1><509>: Abbrev Number: 75 (DW_TAG_variable)
+    <50a>   DW_AT_name        : (indirect string, offset: 0x1be): CLKPR
+    <50e>   DW_AT_decl_file   : 0
+    <50f>   DW_AT_decl_line   : 0
+    <510>   DW_AT_type        : <0x14>
+    <514>   DW_AT_external    : 1
+    <515>   DW_AT_location    : 5 byte block: 3 61 0 80 0 	(DW_OP_addr: 800061)
+ <1><51b>: Abbrev Number: 76 (DW_TAG_variable)
+    <51c>   DW_AT_name        : (indirect string, offset: 0x1c4): SREG
+    <520>   DW_AT_decl_file   : 0
+    <521>   DW_AT_decl_line   : 0
+    <522>   DW_AT_type        : <0x14>
+    <526>   DW_AT_external    : 1
+    <527>   DW_AT_location    : 5 byte block: 3 5f 0 80 0 	(DW_OP_addr: 80005f)
+ <1><52d>: Abbrev Number: 77 (DW_TAG_variable)
+    <52e>   DW_AT_name        : (indirect string, offset: 0x1c9): SP
+    <532>   DW_AT_decl_file   : 0
+    <533>   DW_AT_decl_line   : 0
+    <534>   DW_AT_type        : <0x1b>
+    <538>   DW_AT_external    : 1
+    <539>   DW_AT_location    : 5 byte block: 3 5d 0 80 0 	(DW_OP_addr: 80005d)
+ <1><53f>: Abbrev Number: 78 (DW_TAG_variable)
+    <540>   DW_AT_name        : (indirect string, offset: 0x1cc): SPMCSR
+    <544>   DW_AT_decl_file   : 0
+    <545>   DW_AT_decl_line   : 0
+    <546>   DW_AT_type        : <0x14>
+    <54a>   DW_AT_external    : 1
+    <54b>   DW_AT_location    : 5 byte block: 3 57 0 80 0 	(DW_OP_addr: 800057)
+ <1><551>: Abbrev Number: 79 (DW_TAG_variable)
+    <552>   DW_AT_name        : (indirect string, offset: 0x1d3): MCUCR
+    <556>   DW_AT_decl_file   : 0
+    <557>   DW_AT_decl_line   : 0
+    <558>   DW_AT_type        : <0x14>
+    <55c>   DW_AT_external    : 1
+    <55d>   DW_AT_location    : 5 byte block: 3 55 0 80 0 	(DW_OP_addr: 800055)
+ <1><563>: Abbrev Number: 80 (DW_TAG_variable)
+    <564>   DW_AT_name        : (indirect string, offset: 0x1d9): MCUSR
+    <568>   DW_AT_decl_file   : 0
+    <569>   DW_AT_decl_line   : 0
+    <56a>   DW_AT_type        : <0x14>
+    <56e>   DW_AT_external    : 1
+    <56f>   DW_AT_location    : 5 byte block: 3 54 0 80 0 	(DW_OP_addr: 800054)
+ <1><575>: Abbrev Number: 81 (DW_TAG_variable)
+    <576>   DW_AT_name        : (indirect string, offset: 0x1df): SMCR
+    <57a>   DW_AT_decl_file   : 0
+    <57b>   DW_AT_decl_line   : 0
+    <57c>   DW_AT_type        : <0x14>
+    <580>   DW_AT_external    : 1
+    <581>   DW_AT_location    : 5 byte block: 3 53 0 80 0 	(DW_OP_addr: 800053)
+ <1><587>: Abbrev Number: 82 (DW_TAG_variable)
+    <588>   DW_AT_name        : (indirect string, offset: 0x1e4): GPIOR2
+    <58c>   DW_AT_decl_file   : 0
+    <58d>   DW_AT_decl_line   : 0
+    <58e>   DW_AT_type        : <0x14>
+    <592>   DW_AT_external    : 1
+    <593>   DW_AT_location    : 5 byte block: 3 4b 0 80 0 	(DW_OP_addr: 80004b)
+ <1><599>: Abbrev Number: 83 (DW_TAG_variable)
+    <59a>   DW_AT_name        : (indirect string, offset: 0x1eb): GPIOR1
+    <59e>   DW_AT_decl_file   : 0
+    <59f>   DW_AT_decl_line   : 0
+    <5a0>   DW_AT_type        : <0x14>
+    <5a4>   DW_AT_external    : 1
+    <5a5>   DW_AT_location    : 5 byte block: 3 4a 0 80 0 	(DW_OP_addr: 80004a)
+ <1><5ab>: Abbrev Number: 84 (DW_TAG_variable)
+    <5ac>   DW_AT_name        : (indirect string, offset: 0x1f2): GPIOR0
+    <5b0>   DW_AT_decl_file   : 0
+    <5b1>   DW_AT_decl_line   : 0
+    <5b2>   DW_AT_type        : <0x14>
+    <5b6>   DW_AT_external    : 1
+    <5b7>   DW_AT_location    : 5 byte block: 3 3e 0 80 0 	(DW_OP_addr: 80003e)
+ <1><5bd>: Abbrev Number: 85 (DW_TAG_variable)
+    <5be>   DW_AT_name        : (indirect string, offset: 0x1f9): EEAR
+    <5c2>   DW_AT_decl_file   : 0
+    <5c3>   DW_AT_decl_line   : 0
+    <5c4>   DW_AT_type        : <0x1b>
+    <5c8>   DW_AT_external    : 1
+    <5c9>   DW_AT_location    : 5 byte block: 3 41 0 80 0 	(DW_OP_addr: 800041)
+ <1><5cf>: Abbrev Number: 86 (DW_TAG_variable)
+    <5d0>   DW_AT_name        : (indirect string, offset: 0x1fe): EEDR
+    <5d4>   DW_AT_decl_file   : 0
+    <5d5>   DW_AT_decl_line   : 0
+    <5d6>   DW_AT_type        : <0x14>
+    <5da>   DW_AT_external    : 1
+    <5db>   DW_AT_location    : 5 byte block: 3 40 0 80 0 	(DW_OP_addr: 800040)
+ <1><5e1>: Abbrev Number: 87 (DW_TAG_variable)
+    <5e2>   DW_AT_name        : (indirect string, offset: 0x203): EECR
+    <5e6>   DW_AT_decl_file   : 0
+    <5e7>   DW_AT_decl_line   : 0
+    <5e8>   DW_AT_type        : <0x14>
+    <5ec>   DW_AT_external    : 1
+    <5ed>   DW_AT_location    : 5 byte block: 3 3f 0 80 0 	(DW_OP_addr: 80003f)
+ <1><5f3>: Abbrev Number: 0
+  Compilation Unit @ offset 0x5f4:
+   Length:        0x109 (32-bit)
+   Version:       2
+   Abbrev Offset: 0x5a2
+   Pointer Size:  4
+ <0><5ff>: Abbrev Number: 1 (DW_TAG_compile_unit)
+    <600>   DW_AT_producer    : (indirect string, offset: 0x2aa): GNU GIMPLE 7.3.0 -mn-flash=1 -mmcu=avr5 -mn-flash=1 -mno-skip-bug -mmcu=avr5 -g -Os -Os -fmath-errno -fsigned-zeros -ftrapping-math -fno-trapv -fno-openmp -fno-openacc -fno-exceptions -fltrans
+    <604>   DW_AT_language    : 4	(C++)
+    <605>   DW_AT_name        : (indirect string, offset: 0x273): <artificial>
+    <609>   DW_AT_comp_dir    : (indirect string, offset: 0x235): /fixture/build
+    <60d>   DW_AT_ranges      : 0x0
+    <611>   DW_AT_low_pc      : 0x0
+    <615>   DW_AT_entry_pc    : 0x0
+    <619>   DW_AT_stmt_list   : 0x1a
+ <1><61d>: Abbrev Number: 2 (DW_TAG_typedef)
+    <61e>   DW_AT_name        : (indirect string, offset: 0x215): uint8_t
+    <622>   DW_AT_decl_file   : 3
+    <623>   DW_AT_decl_line   : 126
+    <624>   DW_AT_type        : <0x62d>
+ <1><628>: Abbrev Number: 3 (DW_TAG_volatile_type)
+    <629>   DW_AT_type        : <0x61d>
+ <1><62d>: Abbrev Number: 4 (DW_TAG_base_type)
+    <62e>   DW_AT_byte_size   : 1
+    <62f>   DW_AT_encoding    : 8	(unsigned char)
+    <630>   DW_AT_name        : (indirect string, offset: 0x28c): unsigned char
+ <1><634>: Abbrev Number: 5 (DW_TAG_subprogram)
+    <635>   DW_AT_name        : (indirect string, offset: 0x22b): loop
+    <639>   DW_AT_decl_file   : 2
+    <63a>   DW_AT_decl_line   : 6
+    <63b>   DW_AT_inline      : 1	(inlined)
+ <1><63c>: Abbrev Number: 6 (DW_TAG_subprogram)
+    <63d>   DW_AT_external    : 1
+    <63e>   DW_AT_name        : (indirect string, offset: 0x29a): main
+    <642>   DW_AT_decl_file   : 1
+    <643>   DW_AT_decl_line   : 2
+    <644>   DW_AT_type        : <0x679>
+    <648>   DW_AT_noreturn    : 1
+    <649>   DW_AT_low_pc      : 0x96
+    <64d>   DW_AT_high_pc     : 0x10e
+    <651>   DW_AT_frame_base  : 3 byte block: 92 20 2 	(DW_OP_bregx: 32 (r32) 2)
+    <655>   DW_AT_GNU_all_tail_call_sites: 1
+    <656>   DW_AT_sibling     : <0x679>
+ <2><65a>: Abbrev Number: 7 (DW_TAG_inlined_subroutine)
+    <65b>   DW_AT_abstract_origin: <0x680>
+    <65f>   DW_AT_low_pc      : 0x96
+    <663>   DW_AT_high_pc     : 0x9e
+    <667>   DW_AT_call_file   : 1
+    <668>   DW_AT_call_line   : 2
+ <2><669>: Abbrev Number: 7 (DW_TAG_inlined_subroutine)
+    <66a>   DW_AT_abstract_origin: <0x634>
+    <66e>   DW_AT_low_pc      : 0x9e
+    <672>   DW_AT_high_pc     : 0xfa
+    <676>   DW_AT_call_file   : 1
+    <677>   DW_AT_call_line   : 2
+ <2><678>: Abbrev Number: 0
+ <1><679>: Abbrev Number: 8 (DW_TAG_base_type)
+    <67a>   DW_AT_byte_size   : 2
+    <67b>   DW_AT_encoding    : 5	(signed)
+    <67c>   DW_AT_name        : int
+ <1><680>: Abbrev Number: 5 (DW_TAG_subprogram)
+    <681>   DW_AT_name        : (indirect string, offset: 0x36b): setup
+    <685>   DW_AT_decl_file   : 2
+    <686>   DW_AT_decl_line   : 5
+    <687>   DW_AT_inline      : 1	(inlined)
+ <1><688>: Abbrev Number: 9 (DW_TAG_variable)
+    <689>   DW_AT_name        : (indirect string, offset: 0x280): temperature
+    <68d>   DW_AT_decl_file   : 2
+    <68e>   DW_AT_decl_line   : 3
+    <68f>   DW_AT_type        : <0x6a0>
+    <693>   DW_AT_location    : 5 byte block: 3 0 1 80 0 	(DW_OP_addr: 800100)
+ <1><699>: Abbrev Number: 4 (DW_TAG_base_type)
+    <69a>   DW_AT_byte_size   : 4
+    <69b>   DW_AT_encoding    : 4	(float)
+    <69c>   DW_AT_name        : (indirect string, offset: 0x21d): float
+ <1><6a0>: Abbrev Number: 3 (DW_TAG_volatile_type)
+    <6a1>   DW_AT_type        : <0x699>
+ <1><6a5>: Abbrev Number: 10 (DW_TAG_array_type)
+    <6a6>   DW_AT_type        : <0x628>
+    <6aa>   DW_AT_sibling     : <0x6b5>
+ <2><6ae>: Abbrev Number: 11 (DW_TAG_subrange_type)
+    <6af>   DW_AT_type        : <0x6ba>
+    <6b3>   DW_AT_upper_bound : 2
+ <2><6b4>: Abbrev Number: 0
+ <1><6b5>: Abbrev Number: 3 (DW_TAG_volatile_type)
+    <6b6>   DW_AT_type        : <0x6a5>
+ <1><6ba>: Abbrev Number: 4 (DW_TAG_base_type)
+    <6bb>   DW_AT_byte_size   : 2
+    <6bc>   DW_AT_encoding    : 7	(unsigned)
+    <6bd>   DW_AT_name        : (indirect string, offset: 0x208): unsigned int
+ <1><6c1>: Abbrev Number: 9 (DW_TAG_variable)
+    <6c2>   DW_AT_name        : (indirect string, offset: 0x230): leds
+    <6c6>   DW_AT_decl_file   : 2
+    <6c7>   DW_AT_decl_line   : 2
+    <6c8>   DW_AT_type        : <0x6b5>
+    <6cc>   DW_AT_location    : 5 byte block: 3 4 1 80 0 	(DW_OP_addr: 800104)
+ <1><6d2>: Abbrev Number: 9 (DW_TAG_variable)
+    <6d3>   DW_AT_name        : (indirect string, offset: 0x29f): coreGlobal
+    <6d7>   DW_AT_decl_file   : 1
+    <6d8>   DW_AT_decl_line   : 1
+    <6d9>   DW_AT_type        : <0x6ea>
+    <6dd>   DW_AT_location    : 5 byte block: 3 7 1 80 0 	(DW_OP_addr: 800107)
+ <1><6e3>: Abbrev Number: 8 (DW_TAG_base_type)
+    <6e4>   DW_AT_byte_size   : 2
+    <6e5>   DW_AT_encoding    : 5	(signed)
+    <6e6>   DW_AT_name        : int
+ <1><6ea>: Abbrev Number: 3 (DW_TAG_volatile_type)
+    <6eb>   DW_AT_type        : <0x6e3>
+ <1><6ef>: Abbrev Number: 9 (DW_TAG_variable)
+    <6f0>   DW_AT_name        : (indirect string, offset: 0x223): counter
+    <6f4>   DW_AT_decl_file   : 2
+    <6f5>   DW_AT_decl_line   : 1
+    <6f6>   DW_AT_type        : <0x6ea>
+    <6fa>   DW_AT_location    : 5 byte block: 3 9 1 80 0 	(DW_OP_addr: 800109)
+ <1><700>: Abbrev Number: 0
+  Compilation Unit @ offset 0x701:
+   Length:        0xaa (32-bit)
+   Version:       2
+   Abbrev Offset: 0x63c
+   Pointer Size:  4
+ <0><70c>: Abbrev Number: 1 (DW_TAG_compile_unit)
+    <70d>   DW_AT_stmt_list   : 0x111
+    <711>   DW_AT_low_pc      : 0x2da
+    <715>   DW_AT_high_pc     : 0x2de
+    <719>   DW_AT_name        : ../../../../gcc/libgcc/config/avr/lib1funcs.S
+    <747>   DW_AT_comp_dir    : /Users/jenkins/jenkins/workspace/avr-gcc-staging/label/mac-mini/gcc-build/avr/avr5/libgcc
+    <7a1>   DW_AT_producer    : GNU AS 2.26
+    <7ad>   DW_AT_language    : 32769	(MIPS assembler)
+  Compilation Unit @ offset 0x7af:
+   Length:        0xaa (32-bit)
+   Version:       2
+   Abbrev Offset: 0x650
+   Pointer Size:  4
+ <0><7ba>: Abbrev Number: 1 (DW_TAG_compile_unit)
+    <7bb>   DW_AT_stmt_list   : 0x173
+    <7bf>   DW_AT_low_pc      : 0x10e
+    <7c3>   DW_AT_high_pc     : 0x136
+    <7c7>   DW_AT_name        : ../../../../gcc/libgcc/config/avr/lib1funcs.S
+    <7f5>   DW_AT_comp_dir    : /Users/jenkins/jenkins/workspace/avr-gcc-staging/label/mac-mini/gcc-build/avr/avr5/libgcc
+    <84f>   DW_AT_producer    : GNU AS 2.26
+    <85b>   DW_AT_language    : 32769	(MIPS assembler)
+  Compilation Unit @ offset 0x85d:
+   Length:        0xaa (32-bit)
+   Version:       2
+   Abbrev Offset: 0x664
+   Pointer Size:  4
+ <0><868>: Abbrev Number: 1 (DW_TAG_compile_unit)
+    <869>   DW_AT_stmt_list   : 0x23b
+    <86d>   DW_AT_low_pc      : 0x74
+    <871>   DW_AT_high_pc     : 0x8a
+    <875>   DW_AT_name        : ../../../../gcc/libgcc/config/avr/lib1funcs.S
+    <8a3>   DW_AT_comp_dir    : /Users/jenkins/jenkins/workspace/avr-gcc-staging/label/mac-mini/gcc-build/avr/avr5/libgcc
+    <8fd>   DW_AT_producer    : GNU AS 2.26
+    <909>   DW_AT_language    : 32769	(MIPS assembler)
+  Compilation Unit @ offset 0x90b:
+   Length:        0xaa (32-bit)
+   Version:       2
+   Abbrev Offset: 0x678
+   Pointer Size:  4
+ <0><916>: Abbrev Number: 1 (DW_TAG_compile_unit)
+    <917>   DW_AT_stmt_list   : 0x2d3
+    <91b>   DW_AT_low_pc      : 0x136
+    <91f>   DW_AT_high_pc     : 0x15e
+    <923>   DW_AT_name        : ../../../../gcc/libgcc/config/avr/lib1funcs.S
+    <951>   DW_AT_comp_dir    : /Users/jenkins/jenkins/workspace/avr-gcc-staging/label/mac-mini/gcc-build/avr/avr5/libgcc
+    <9ab>   DW_AT_producer    : GNU AS 2.26
+    <9b7>   DW_AT_language    : 32769	(MIPS assembler)
+
+Raw dump of debug contents of section .debug_line:
+
+  Offset:                      0x0
+  Length:                      22
+  DWARF Version:               2
+  Prologue Length:             16
+  Minimum Instruction Length:  2
+  Initial value of 'is_stmt':  1
+  Line Base:                   -5
+  Line Range:                  14
+  Opcode Base:                 10
+
+ Opcodes:
+  Opcode 1 has 0 args
+  Opcode 2 has 1 args
+  Opcode 3 has 1 args
+  Opcode 4 has 1 args
+  Opcode 5 has 1 args
+  Opcode 6 has 0 args
+  Opcode 7 has 0 args
+  Opcode 8 has 0 args
+  Opcode 9 has 1 args
+
+ The Directory Table is empty.
+
+ The File Name Table is empty.
+
+ No Line Number Statements.
+  Offset:                      0x1a
+  Length:                      243
+  DWARF Version:               2
+  Prologue Length:             183
+  Minimum Instruction Length:  2
+  Initial value of 'is_stmt':  1
+  Line Base:                   -5
+  Line Range:                  14
+  Opcode Base:                 10
+
+ Opcodes:
+  Opcode 1 has 0 args
+  Opcode 2 has 1 args
+  Opcode 3 has 1 args
+  Opcode 4 has 1 args
+  Opcode 5 has 1 args
+  Opcode 6 has 0 args
+  Opcode 7 has 0 args
+  Opcode 8 has 0 args
+  Opcode 9 has 1 args
+
+ The Directory Table (offset 0x32):
+  1	/fixture/core
+  2	/fixture/sketch
+  3	/fixture/toolchain/avr/include
+
+ The File Name Table (offset 0xb4):
+  Entry	Dir	Time	Size	Name
+  1	1	0	0	main.cpp
+  2	2	0	0	sketch.ino
+  3	3	0	0	stdint.h
+
+ Line Number Statements:
+  [0x000000db]  Extended opcode 2: set Address to 0x96
+  [0x000000e2]  Special opcode 6: advance Address by 0 to 0x96 and Line by 1 to 2
+  [0x000000e3]  Set File Name to entry 2 in the File Name Table
+  [0x000000e5]  Advance Line by 3 to 5
+  [0x000000e7]  Advance PC by fixed size amount 0 to 0x96
+  [0x000000ea]  Copy
+  [0x000000eb]  Advance Line by 3 to 8
+  [0x000000ed]  Advance PC by fixed size amount 8 to 0x9e
+  [0x000000f0]  Copy
+  [0x000000f1]  Advance Line by -1 to 7
+  [0x000000f3]  Advance PC by fixed size amount 4 to 0xa2
+  [0x000000f6]  Copy
+  [0x000000f7]  Advance Line by 1 to 8
+  [0x000000f9]  Advance PC by fixed size amount 18 to 0xb4
+  [0x000000fc]  Copy
+  [0x000000fd]  Advance Line by 1 to 9
+  [0x000000ff]  Advance PC by fixed size amount 26 to 0xce
+  [0x00000102]  Copy
+  [0x00000103]  Set File Name to entry 1 in the File Name Table
+  [0x00000105]  Advance Line by -7 to 2
+  [0x00000107]  Advance PC by fixed size amount 44 to 0xfa
+  [0x0000010a]  Copy
+  [0x0000010b]  Advance PC by fixed size amount 20 to 0x10e
+  [0x0000010e]  Extended opcode 1: End of Sequence
+
+
+  Offset:                      0x111
+  Length:                      94
+  DWARF Version:               2
+  Prologue Length:             65
+  Minimum Instruction Length:  2
+  Initial value of 'is_stmt':  1
+  Line Base:                   -5
+  Line Range:                  14
+  Opcode Base:                 10
+
+ Opcodes:
+  Opcode 1 has 0 args
+  Opcode 2 has 1 args
+  Opcode 3 has 1 args
+  Opcode 4 has 1 args
+  Opcode 5 has 1 args
+  Opcode 6 has 0 args
+  Opcode 7 has 0 args
+  Opcode 8 has 0 args
+  Opcode 9 has 1 args
+
+ The Directory Table (offset 0x129):
+  1	../../../../gcc/libgcc/config/avr
+
+ The File Name Table (offset 0x14c):
+  Entry	Dir	Time	Size	Name
+  1	1	0	0	lib1funcs.S
+
+ Line Number Statements:
+  [0x0000015c]  Extended opcode 2: set Address to 0x2da
+  [0x00000163]  Advance Line by 2277 to 2278
+  [0x00000166]  Copy
+  [0x00000167]  Advance Line by 2 to 2280
+  [0x00000169]  Advance PC by fixed size amount 2 to 0x2dc
+  [0x0000016c]  Copy
+  [0x0000016d]  Advance PC by fixed size amount 2 to 0x2de
+  [0x00000170]  Extended opcode 1: End of Sequence
+
+
+  Offset:                      0x173
+  Length:                      196
+  DWARF Version:               2
+  Prologue Length:             65
+  Minimum Instruction Length:  2
+  Initial value of 'is_stmt':  1
+  Line Base:                   -5
+  Line Range:                  14
+  Opcode Base:                 10
+
+ Opcodes:
+  Opcode 1 has 0 args
+  Opcode 2 has 1 args
+  Opcode 3 has 1 args
+  Opcode 4 has 1 args
+  Opcode 5 has 1 args
+  Opcode 6 has 0 args
+  Opcode 7 has 0 args
+  Opcode 8 has 0 args
+  Opcode 9 has 1 args
+
+ The Directory Table (offset 0x18b):
+  1	../../../../gcc/libgcc/config/avr
+
+ The File Name Table (offset 0x1ae):
+  Entry	Dir	Time	Size	Name
+  1	1	0	0	lib1funcs.S
+
+ Line Number Statements:
+  [0x000001be]  Extended opcode 2: set Address to 0x10e
+  [0x000001c5]  Advance Line by 1439 to 1440
+  [0x000001c8]  Copy
+  [0x000001c9]  Advance Line by 1 to 1441
+  [0x000001cb]  Advance PC by fixed size amount 2 to 0x110
+  [0x000001ce]  Copy
+  [0x000001cf]  Advance Line by 1 to 1442
+  [0x000001d1]  Advance PC by fixed size amount 2 to 0x112
+  [0x000001d4]  Copy
+  [0x000001d5]  Advance Line by 1 to 1443
+  [0x000001d7]  Advance PC by fixed size amount 2 to 0x114
+  [0x000001da]  Copy
+  [0x000001db]  Advance Line by 1 to 1444
+  [0x000001dd]  Advance PC by fixed size amount 2 to 0x116
+  [0x000001e0]  Copy
+  [0x000001e1]  Advance Line by 2 to 1446
+  [0x000001e3]  Advance PC by fixed size amount 2 to 0x118
+  [0x000001e6]  Copy
+  [0x000001e7]  Advance Line by 1 to 1447
+  [0x000001e9]  Advance PC by fixed size amount 2 to 0x11a
+  [0x000001ec]  Copy
+  [0x000001ed]  Advance Line by 1 to 1448
+  [0x000001ef]  Advance PC by fixed size amount 2 to 0x11c
+  [0x000001f2]  Copy
+  [0x000001f3]  Advance Line by 1 to 1449
+  [0x000001f5]  Advance PC by fixed size amount 4 to 0x120
+  [0x000001f8]  Copy
+  [0x000001f9]  Advance Line by 1 to 1450
+  [0x000001fb]  Advance PC by fixed size amount 2 to 0x122
+  [0x000001fe]  Copy
+  [0x000001ff]  Advance Line by 1 to 1451
+  [0x00000201]  Advance PC by fixed size amount 2 to 0x124
+  [0x00000204]  Copy
+  [0x00000205]  Advance Line by 3 to 1454
+  [0x00000207]  Advance PC by fixed size amount 2 to 0x126
+  [0x0000020a]  Copy
+  [0x0000020b]  Advance Line by 1 to 1455
+  [0x0000020d]  Advance PC by fixed size amount 2 to 0x128
+  [0x00000210]  Copy
+  [0x00000211]  Advance Line by 1 to 1456
+  [0x00000213]  Advance PC by fixed size amount 2 to 0x12a
+  [0x00000216]  Copy
+  [0x00000217]  Advance Line by 1 to 1457
+  [0x00000219]  Advance PC by fixed size amount 2 to 0x12c
+  [0x0000021c]  Copy
+  [0x0000021d]  Advance Line by 3 to 1460
+  [0x0000021f]  Advance PC by fixed size amount 2 to 0x12e
+  [0x00000222]  Copy
+  [0x00000223]  Advance Line by 1 to 1461
+  [0x00000225]  Advance PC by fixed size amount 2 to 0x130
+  [0x00000228]  Copy
+  [0x00000229]  Advance Line by 1 to 1462
+  [0x0000022b]  Advance PC by fixed size amount 2 to 0x132
+  [0x0000022e]  Copy
+  [0x0000022f]  Advance Line by 2 to 1464
+  [0x00000231]  Advance PC by fixed size amount 2 to 0x134
+  [0x00000234]  Copy
+  [0x00000235]  Advance PC by fixed size amount 2 to 0x136
+  [0x00000238]  Extended opcode 1: End of Sequence
+
+
+  Offset:                      0x23b
+  Length:                      148
+  DWARF Version:               2
+  Prologue Length:             65
+  Minimum Instruction Length:  2
+  Initial value of 'is_stmt':  1
+  Line Base:                   -5
+  Line Range:                  14
+  Opcode Base:                 10
+
+ Opcodes:
+  Opcode 1 has 0 args
+  Opcode 2 has 1 args
+  Opcode 3 has 1 args
+  Opcode 4 has 1 args
+  Opcode 5 has 1 args
+  Opcode 6 has 0 args
+  Opcode 7 has 0 args
+  Opcode 8 has 0 args
+  Opcode 9 has 1 args
+
+ The Directory Table (offset 0x253):
+  1	../../../../gcc/libgcc/config/avr
+
+ The File Name Table (offset 0x276):
+  Entry	Dir	Time	Size	Name
+  1	1	0	0	lib1funcs.S
+
+ Line Number Statements:
+  [0x00000286]  Extended opcode 2: set Address to 0x74
+  [0x0000028d]  Advance Line by 2408 to 2409
+  [0x00000290]  Copy
+  [0x00000291]  Advance Line by 1 to 2410
+  [0x00000293]  Advance PC by fixed size amount 2 to 0x76
+  [0x00000296]  Copy
+  [0x00000297]  Advance Line by 1 to 2411
+  [0x00000299]  Advance PC by fixed size amount 2 to 0x78
+  [0x0000029c]  Copy
+  [0x0000029d]  Advance Line by 1 to 2412
+  [0x0000029f]  Advance PC by fixed size amount 2 to 0x7a
+  [0x000002a2]  Copy
+  [0x000002a3]  Advance Line by 1 to 2413
+  [0x000002a5]  Advance PC by fixed size amount 2 to 0x7c
+  [0x000002a8]  Copy
+  [0x000002a9]  Advance Line by 1 to 2414
+  [0x000002ab]  Advance PC by fixed size amount 2 to 0x7e
+  [0x000002ae]  Copy
+  [0x000002af]  Advance Line by 3 to 2417
+  [0x000002b1]  Advance PC by fixed size amount 2 to 0x80
+  [0x000002b4]  Copy
+  [0x000002b5]  Advance Line by 5 to 2422
+  [0x000002b7]  Advance PC by fixed size amount 2 to 0x82
+  [0x000002ba]  Copy
+  [0x000002bb]  Advance Line by 2 to 2424
+  [0x000002bd]  Advance PC by fixed size amount 2 to 0x84
+  [0x000002c0]  Copy
+  [0x000002c1]  Advance Line by 1 to 2425
+  [0x000002c3]  Advance PC by fixed size amount 2 to 0x86
+  [0x000002c6]  Copy
+  [0x000002c7]  Advance Line by 1 to 2426
+  [0x000002c9]  Advance PC by fixed size amount 2 to 0x88
+  [0x000002cc]  Copy
+  [0x000002cd]  Advance PC by fixed size amount 2 to 0x8a
+  [0x000002d0]  Extended opcode 1: End of Sequence
+
+
+  Offset:                      0x2d3
+  Length:                      202
+  DWARF Version:               2
+  Prologue Length:             65
+  Minimum Instruction Length:  2
+  Initial value of 'is_stmt':  1
+  Line Base:                   -5
+  Line Range:                  14
+  Opcode Base:                 10
+
+ Opcodes:
+  Opcode 1 has 0 args
+  Opcode 2 has 1 args
+  Opcode 3 has 1 args
+  Opcode 4 has 1 args
+  Opcode 5 has 1 args
+  Opcode 6 has 0 args
+  Opcode 7 has 0 args
+  Opcode 8 has 0 args
+  Opcode 9 has 1 args
+
+ The Directory Table (offset 0x2eb):
+  1	../../../../gcc/libgcc/config/avr
+
+ The File Name Table (offset 0x30e):
+  Entry	Dir	Time	Size	Name
+  1	1	0	0	lib1funcs.S
+
+ Line Number Statements:
+  [0x0000031e]  Extended opcode 2: set Address to 0x136
+  [0x00000325]  Advance Line by 1407 to 1408
+  [0x00000328]  Copy
+  [0x00000329]  Advance Line by 1 to 1409
+  [0x0000032b]  Advance PC by fixed size amount 2 to 0x138
+  [0x0000032e]  Copy
+  [0x0000032f]  Advance Line by 1 to 1410
+  [0x00000331]  Advance PC by fixed size amount 2 to 0x13a
+  [0x00000334]  Copy
+  [0x00000335]  Advance Line by 1 to 1411
+  [0x00000337]  Advance PC by fixed size amount 2 to 0x13c
+  [0x0000033a]  Copy
+  [0x0000033b]  Advance Line by 2 to 1413
+  [0x0000033d]  Advance PC by fixed size amount 2 to 0x13e
+  [0x00000340]  Copy
+  [0x00000341]  Advance Line by 1 to 1414
+  [0x00000343]  Advance PC by fixed size amount 2 to 0x140
+  [0x00000346]  Copy
+  [0x00000347]  Advance Line by 1 to 1415
+  [0x00000349]  Advance PC by fixed size amount 2 to 0x142
+  [0x0000034c]  Copy
+  [0x0000034d]  Advance Line by 1 to 1416
+  [0x0000034f]  Advance PC by fixed size amount 2 to 0x144
+  [0x00000352]  Copy
+  [0x00000353]  Advance Line by 1 to 1417
+  [0x00000355]  Advance PC by fixed size amount 2 to 0x146
+  [0x00000358]  Copy
+  [0x00000359]  Advance Line by 1 to 1418
+  [0x0000035b]  Advance PC by fixed size amount 2 to 0x148
+  [0x0000035e]  Copy
+  [0x0000035f]  Advance Line by 1 to 1419
+  [0x00000361]  Advance PC by fixed size amount 2 to 0x14a
+  [0x00000364]  Copy
+  [0x00000365]  Advance Line by 2 to 1421
+  [0x00000367]  Advance PC by fixed size amount 2 to 0x14c
+  [0x0000036a]  Copy
+  [0x0000036b]  Advance Line by 1 to 1422
+  [0x0000036d]  Advance PC by fixed size amount 2 to 0x14e
+  [0x00000370]  Copy
+  [0x00000371]  Advance Line by 1 to 1423
+  [0x00000373]  Advance PC by fixed size amount 2 to 0x150
+  [0x00000376]  Copy
+  [0x00000377]  Advance Line by 1 to 1424
+  [0x00000379]  Advance PC by fixed size amount 2 to 0x152
+  [0x0000037c]  Copy
+  [0x0000037d]  Advance Line by 1 to 1425
+  [0x0000037f]  Advance PC by fixed size amount 2 to 0x154
+  [0x00000382]  Copy
+  [0x00000383]  Advance Line by 1 to 1426
+  [0x00000385]  Advance PC by fixed size amount 2 to 0x156
+  [0x00000388]  Copy
+  [0x00000389]  Advance Line by 2 to 1428
+  [0x0000038b]  Advance PC by fixed size amount 2 to 0x158
+  [0x0000038e]  Copy
+  [0x0000038f]  Advance Line by 2 to 1430
+  [0x00000391]  Advance PC by fixed size amount 2 to 0x15a
+  [0x00000394]  Copy
+  [0x00000395]  Advance Line by 2 to 1432
+  [0x00000397]  Advance PC by fixed size amount 2 to 0x15c
+  [0x0000039a]  Copy
+  [0x0000039b]  Advance PC by fixed size amount 2 to 0x15e
+  [0x0000039e]  Extended opcode 1: End of Sequence
+
+
+Decoded dump of debug contents of section .debug_line:
+
+
+CU: /fixture/core/main.cpp:
+File name                            Line number    Starting address
+main.cpp                                       2                0x96
+
+/fixture/sketch/sketch.ino:
+sketch.ino                                     5                0x96
+
+sketch.ino                                     8                0x9e
+
+sketch.ino                                     7                0xa2
+
+sketch.ino                                     8                0xb4
+
+sketch.ino                                     9                0xce
+
+
+/fixture/core/main.cpp:
+main.cpp                                       2                0xfa
+
+
+CU: ../../../../gcc/libgcc/config/avr/lib1funcs.S:
+File name                            Line number    Starting address
+lib1funcs.S                                 2278               0x2da
+
+lib1funcs.S                                 2280               0x2dc
+
+
+CU: ../../../../gcc/libgcc/config/avr/lib1funcs.S:
+File name                            Line number    Starting address
+lib1funcs.S                                 1440               0x10e
+
+lib1funcs.S                                 1441               0x110
+
+lib1funcs.S                                 1442               0x112
+
+lib1funcs.S                                 1443               0x114
+
+lib1funcs.S                                 1444               0x116
+
+lib1funcs.S                                 1446               0x118
+
+lib1funcs.S                                 1447               0x11a
+
+lib1funcs.S                                 1448               0x11c
+
+lib1funcs.S                                 1449               0x120
+
+lib1funcs.S                                 1450               0x122
+
+lib1funcs.S                                 1451               0x124
+
+lib1funcs.S                                 1454               0x126
+
+lib1funcs.S                                 1455               0x128
+
+lib1funcs.S                                 1456               0x12a
+
+lib1funcs.S                                 1457               0x12c
+
+lib1funcs.S                                 1460               0x12e
+
+lib1funcs.S                                 1461               0x130
+
+lib1funcs.S                                 1462               0x132
+
+lib1funcs.S                                 1464               0x134
+
+
+CU: ../../../../gcc/libgcc/config/avr/lib1funcs.S:
+File name                            Line number    Starting address
+lib1funcs.S                                 2409                0x74
+
+lib1funcs.S                                 2410                0x76
+
+lib1funcs.S                                 2411                0x78
+
+lib1funcs.S                                 2412                0x7a
+
+lib1funcs.S                                 2413                0x7c
+
+lib1funcs.S                                 2414                0x7e
+
+lib1funcs.S                                 2417                0x80
+
+lib1funcs.S                                 2422                0x82
+
+lib1funcs.S                                 2424                0x84
+
+lib1funcs.S                                 2425                0x86
+
+lib1funcs.S                                 2426                0x88
+
+
+CU: ../../../../gcc/libgcc/config/avr/lib1funcs.S:
+File name                            Line number    Starting address
+lib1funcs.S                                 1408               0x136
+
+lib1funcs.S                                 1409               0x138
+
+lib1funcs.S                                 1410               0x13a
+
+lib1funcs.S                                 1411               0x13c
+
+lib1funcs.S                                 1413               0x13e
+
+lib1funcs.S                                 1414               0x140
+
+lib1funcs.S                                 1415               0x142
+
+lib1funcs.S                                 1416               0x144
+
+lib1funcs.S                                 1417               0x146
+
+lib1funcs.S                                 1418               0x148
+
+lib1funcs.S                                 1419               0x14a
+
+lib1funcs.S                                 1421               0x14c
+
+lib1funcs.S                                 1422               0x14e
+
+lib1funcs.S                                 1423               0x150
+
+lib1funcs.S                                 1424               0x152
+
+lib1funcs.S                                 1425               0x154
+
+lib1funcs.S                                 1426               0x156
+
+lib1funcs.S                                 1428               0x158
+
+lib1funcs.S                                 1430               0x15a
+
+lib1funcs.S                                 1432               0x15c
+
+

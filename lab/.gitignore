@@ -12,3 +12,9 @@ npm-debug.log*
 .omc/
 .serena/
 .ignore
+
+# Screenshot outputs written by the browser tools
+shots-v2/
+shots-ui-v2/
+shots-blocks/
+shots-browser/

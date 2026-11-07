@@ -10,9 +10,10 @@
 // index.html favicon is a data: URI (img-src data:); the simulator runs in a same-origin module Worker (worker-src 'self').
 import { chromium } from 'playwright-core';
 import { execSync } from 'node:child_process';
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
-import { extname, join, normalize } from 'node:path';
+import { request as httpsRequest } from 'node:https';
+import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromeExecutable, compileOrigin, GL_ARGS } from './browser.mjs';
 
@@ -23,13 +24,29 @@ const COMPILE = new URL(compileOrigin());
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
 
 if (!process.env.LAB_SKIP_BUILD) execSync('npm run build', { cwd: root, stdio: 'inherit' });
-const compileUp = await fetch(`${COMPILE.origin}/lab/api/health`).then((r) => r.ok, () => false);
+const compileUp = await fetch(new URL('/lab/api/health', COMPILE), { redirect: 'error' }).then((r) => r.ok, () => false);
 if (!compileUp) { console.log(`FAIL compile service not reachable at ${COMPILE.origin} (see docs/DEPLOY.md)`); process.exit(2); }
 
+// Only local build files become filesystem paths. Request URLs select in-memory assets.
+const assets = new Map();
+const pending = [{ directory: dist, url: '/lab/' }];
+while (pending.length) {
+  const { directory, url } = pending.pop();
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const file = join(directory, entry.name);
+    const key = url + entry.name;
+    if (entry.isDirectory()) pending.push({ directory: file, url: key + '/' });
+    else if (entry.isFile()) assets.set(key, {
+      body: readFileSync(file), type: MIME[extname(entry.name)] ?? 'application/octet-stream',
+    });
+  }
+}
 const server = createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
-  if (url.pathname.startsWith('/lab/api/')) {
-    const up = httpRequest({ host: COMPILE.hostname, port: COMPILE.port, path: url.pathname + url.search, method: req.method, headers: { ...req.headers, host: COMPILE.host } }, (r) => {
+  if (url.pathname === '/lab/api/compile') {
+    const target = new URL('/lab/api/compile', COMPILE);
+    const request = COMPILE.protocol === 'https:' ? httpsRequest : httpRequest;
+    const up = request(target, { method: req.method, headers: { ...req.headers, host: target.host } }, (r) => {
       res.writeHead(r.statusCode ?? 502, r.headers);
       r.pipe(res);
     });
@@ -37,11 +54,9 @@ const server = createServer((req, res) => {
     req.pipe(up);
     return;
   }
-  const rel = normalize(decodeURIComponent(url.pathname.replace(/^\/lab\/?/, ''))).replace(/^(\.\.[/\\])+/, '');
-  let file = join(dist, rel);
-  if (!url.pathname.startsWith('/lab') || !existsSync(file) || statSync(file).isDirectory()) file = join(dist, 'index.html');
-  res.writeHead(200, { 'Content-Type': MIME[extname(file)] ?? 'application/octet-stream', 'Content-Security-Policy': CSP, 'Cache-Control': 'no-store' });
-  createReadStream(file).pipe(res);
+  const asset = assets.get(url.pathname) ?? assets.get('/lab/index.html');
+  res.writeHead(200, { 'Content-Type': asset.type, 'Content-Security-Policy': CSP, 'Cache-Control': 'no-store' });
+  res.end(asset.body);
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const base = `http://127.0.0.1:${server.address().port}/lab/`;

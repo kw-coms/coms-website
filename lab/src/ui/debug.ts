@@ -5,7 +5,8 @@ import { refs } from '../scene3d/sceneRefs';
 import { addPart, deleteSelection, getState, loadScene, selectParts, selectPart, set, updateParts, updateWire } from './store';
 import { frameAll, partsBox, viewAngle } from '../scene3d/cameraFrame';
 import type { PartKind, Scene } from '../core/types';
-import { frameRef, setSimInput, sim } from './simHost';
+import { frameRef, setSimInput, sim, toggleBreakpoint } from './simHost';
+import { MISSIONS } from '../missions';
 import { clearSerial, serialLog } from './serial';
 import { setCode } from './store';
 
@@ -106,4 +107,4 @@ function fillRatio() {
 const memory = () => ({ geometries: refs.gl?.info.memory.geometries ?? -1, textures: refs.gl?.info.memory.textures ?? -1 });
 function removeParts(ids: string[]) { selectParts(ids); deleteSelection(); }
 
-(window as unknown as { __lab: unknown }).__lab = { memory, removeParts, setCode, serialClear: clearSerial, updateWire, selectPart, projectWorld, fillRatio, serial: () => serialLog.text, probe, loadScene, gallery, closeup, viewAngle, frameAll, partsBox, set, EXAMPLES, setSimInput, projectPart, getState, project, litOf, addPart, frame: () => frameRef.current, simState: () => sim.state, camera: () => refs.camera?.position.toArray() };
+(window as unknown as { __lab: unknown }).__lab = { PARTS, toggleBreakpoint, MISSIONS, memory, removeParts, setCode, serialClear: clearSerial, updateWire, selectPart, projectWorld, fillRatio, serial: () => serialLog.text, probe, loadScene, gallery, closeup, viewAngle, frameAll, partsBox, set, EXAMPLES, setSimInput, projectPart, getState, project, litOf, addPart, frame: () => frameRef.current, simState: () => sim.state, camera: () => refs.camera?.position.toArray() };

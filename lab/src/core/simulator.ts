@@ -1,15 +1,19 @@
-import type { Analysis, Scene, SimFrame, SimInput, Simulator } from './types';
+import type { Analysis, DebugInfo, Scene, SimFrame, SimInput, Simulator } from './types';
 import { analyze } from './analyze';
-import { validateScene } from './scene';
+import { cloneJson, stringifyJsonBounded, validateScene } from './scene';
 import { loadIntelHex } from './mcu';
 import { PARTS } from './parts';
 import { LocalSimulator } from './local-simulator';
 
 export type Command =
-  | { method: 'setScene'; value: Scene }
+  | { method: 'setScene'; value: string }
   | { method: 'loadHex' | 'writeSerial'; value: string }
   | { method: 'setInput'; value: SimInput }
   | { method: 'setSpeed'; value: number }
+  | { method: 'setMissionMode' }
+  | { method: 'debugLoad'; value: DebugInfo }
+  | { method: 'debugBreakpoints'; value: number[] }
+  | { method: 'debugContinue' | 'debugStepInto' | 'debugStepOver' | 'debugStepOut' }
   | { method: 'start' | 'pause' | 'stop' | 'reset' | 'dispose' };
 
 export type Event =
@@ -28,7 +32,10 @@ class WorkerSimulator implements Simulator {
   private failed = false;
   private disposed = false;
   private hex: string | undefined;
+  private debugInfo?: DebugInfo;
+  private debugLines: number[] = [];
   private speed = 1;
+  private missionMode = false;
   private inputs = new Map<string, SimInput>();
   private scene: Scene = { version: 1, parts: [], wires: [], code: '' };
   private lastFrame: SimFrame = {
@@ -38,6 +45,15 @@ class WorkerSimulator implements Simulator {
   get state(): Simulator['state'] {
     return this._state;
   }
+
+  readonly debug = {
+    load: (info: DebugInfo): void => { this.debugInfo = info; this.send({ method: 'debugLoad', value: info }); },
+    setBreakpoints: (lines: number[]): void => { this.debugLines = [...lines]; this.send({ method: 'debugBreakpoints', value: lines }); },
+    continue: (): void => { this.send({ method: 'debugContinue' }); this.transition('running'); },
+    stepInto: (): void => { this.send({ method: 'debugStepInto' }); this.transition('running'); },
+    stepOver: (): void => { this.send({ method: 'debugStepOver' }); this.transition('running'); },
+    stepOut: (): void => { this.send({ method: 'debugStepOut' }); this.transition('running'); },
+  };
 
   constructor() {
     this.createWorker();
@@ -61,6 +77,7 @@ class WorkerSimulator implements Simulator {
       if (message.type === 'frame') {
         this.lastFrame = message.value;
         for (const listener of this.frames) listener(message.value);
+        if (message.value.debug?.paused) this.transition('paused');
       } else if (message.type === 'serial') {
         for (const listener of this.serial) listener(message.value);
       } else {
@@ -97,8 +114,10 @@ class WorkerSimulator implements Simulator {
   setScene(scene: Scene): Analysis {
     const valid = validateScene(scene);
     const result = analyze(valid);
-    this.send({ method: 'setScene', value: valid });
-    this.scene = structuredClone(valid);
+    const json = stringifyJsonBounded(valid, Infinity, Infinity, true);
+    if (json === null) throw new Error('장면 형식이 올바르지 않습니다.');
+    this.send({ method: 'setScene', value: json });
+    this.scene = cloneJson(valid);
     this.inputs = new Map([...this.inputs].filter(([, value]) => {
       const part = valid.parts.find(candidate => candidate.id === value.partId);
       return !!part && !!PARTS[part.kind].inputs?.some(input => input.key === value.key);
@@ -118,8 +137,13 @@ class WorkerSimulator implements Simulator {
       this.failed = false;
       try {
         this.createWorker();
-        this.send({ method: 'setScene', value: this.scene });
+        if (this.missionMode) this.send({ method: 'setMissionMode' });
+        const json = stringifyJsonBounded(this.scene, Infinity, Infinity, true);
+        if (json === null) throw new Error('장면 형식이 올바르지 않습니다.');
+        this.send({ method: 'setScene', value: json });
         if (this.hex) this.send({ method: 'loadHex', value: this.hex });
+        if (this.debugInfo) this.send({ method: 'debugLoad', value: this.debugInfo });
+        if (this.debugLines.length) this.send({ method: 'debugBreakpoints', value: this.debugLines });
         this.send({ method: 'setSpeed', value: this.speed });
         for (const value of this.inputs.values()) this.send({ method: 'setInput', value });
       } catch (error) {
@@ -149,6 +173,11 @@ class WorkerSimulator implements Simulator {
     if (!Number.isFinite(value)) throw new Error('속도가 올바르지 않습니다.');
     this.speed = Math.max(0.25, Math.min(2, value));
     this.send({ method: 'setSpeed', value: this.speed });
+  }
+
+  setMissionMode(): void {
+    this.missionMode = true;
+    this.send({ method: 'setMissionMode' });
   }
 
   setInput(value: SimInput): void {
