@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { isIP, createConnection } from 'node:net';
 import { pathToFileURL } from 'node:url';
+import { basename, resolve as resolvePath, sep } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { lstat, unlink } from 'node:fs/promises';
 import { validateSketch } from './validation.mjs';
@@ -33,17 +34,6 @@ export function clientIp(request, trustProxy = false) {
   }
   return normalizeIp(request.socket.remoteAddress || 'unknown');
 }
-export async function checkAuth(cookie, url, { fetchImpl = fetch, timeoutMs = 3000 } = {}) {
-  if (!url) return true;
-  try {
-    const response = await fetchImpl(url, {
-      method: 'GET', headers: { Cookie: cookie || '' },
-      redirect: 'manual', signal: AbortSignal.timeout(timeoutMs),
-    });
-    await response.body?.cancel();
-    return response.status === 200;
-  } catch { return false; }
-}
 function readJson(request) {
   return new Promise((resolve, reject) => {
     let size = 0, chunks = [], settled = false;
@@ -71,10 +61,8 @@ function readJson(request) {
 }
 export function createCompileServer({
   runner, tempRoot, queue = createCompileQueue(), limiter = createRateLimiter({ limit: rateLimitPerMinute() }),
-  trustProxy = process.env.TRUST_PROXY === '1', authCheckUrl = process.env.AUTH_CHECK_URL || '',
-  fetchImpl = fetch, logger = entry => console.log(JSON.stringify(entry)),
+  trustProxy = process.env.TRUST_PROXY === '1', logger = entry => console.log(JSON.stringify(entry)),
 } = {}) {
-  if (authCheckUrl && !/^https?:$/.test(new URL(authCheckUrl).protocol)) throw new Error('AUTH_CHECK_URL must use HTTP(S)');
   const server = createServer({ maxHeaderSize: 16 * 1024 }, async (request, response) => {
     const started = Date.now(), id = randomUUID();
     response.setHeader('X-Content-Type-Options', 'nosniff');
@@ -116,7 +104,6 @@ export function createCompileServer({
       catch (error) { response.setHeader('Connection', 'close'); return send(400, failure('rejected', error.message)); }
       const rejection = validateSketch(body?.sketch);
       if (rejection) return send(400, failure('rejected', rejection));
-      if (!await checkAuth(request.headers.cookie, authCheckUrl, { fetchImpl })) return send(401, failure('rejected', AUTH_MESSAGE));
       const pending = queue.submit(() => {
         if (response.destroyed) return failure('rejected', '요청이 중단되었어요.');
         return compileSketch(body.sketch, { runner, tempRoot });
@@ -139,8 +126,21 @@ export function createCompileServer({
   server.maxConnections = 128;
   return server;
 }
-export async function listenCompiler(server, { socketPath = process.env.LISTEN_SOCKET, port = process.env.PORT || 8787 } = {}) {
-  if (socketPath) {
+// Login is checked by nginx (auth_request) before a request reaches the compiler; the compiler never
+// calls out to anything. LISTEN_SOCKET is an operator setting, but it names a file this process
+// creates and deletes, so it is confined to the directory the compose volume mounts.
+export const SOCKET_DIR = '/run/coms-lab';
+export function resolveSocketPath(requested, socketDir = SOCKET_DIR) {
+  const directory = resolvePath(socketDir);
+  const resolved = resolvePath(directory, String(requested));
+  if (!resolved.startsWith(directory + sep) || basename(resolved) !== resolved.slice(directory.length + 1) || !/^[A-Za-z0-9._-]+\.sock$/.test(basename(resolved))) {
+    throw new Error(`LISTEN_SOCKET must be a *.sock file directly inside ${directory}`);
+  }
+  return resolved;
+}
+export async function listenCompiler(server, { socketPath: requestedSocket = process.env.LISTEN_SOCKET, port = process.env.PORT || 8787, socketDir = SOCKET_DIR } = {}) {
+  if (requestedSocket) {
+    const socketPath = resolveSocketPath(requestedSocket, socketDir);
     // A SIGKILL leaves a socket inode behind. Remove it only when a connection
     // is refused, and only if the inode has not changed during the probe.
     try {

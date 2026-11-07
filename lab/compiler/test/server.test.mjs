@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createCompileServer, checkAuth, clientIp, rateKey } from '../server.mjs';
+import { createCompileServer, clientIp, rateKey, resolveSocketPath } from '../server.mjs';
 import { createServer } from 'node:net';
 import { createRateLimiter, createCompileQueue } from '../limits.mjs';
 
@@ -48,22 +48,18 @@ httpTest('rejects body larger than 80 KiB', async () => {
     assert.equal(response.status, 400); assert.equal((await response.json()).reason, 'rejected');
   });
 });
-httpTest('rejects missing auth and forwards cookie to configured endpoint', async () => {
-  let cookie;
-  await withServer({ authCheckUrl: 'https://example.test/me', fetchImpl: async (_url, options) => {
-    cookie = options.headers.Cookie;
-    return { status: 401, body: { cancel: async () => {} } };
-  } }, async url => {
-    const response = await post(url, undefined, { headers: { cookie: 'token=abc' } });
-    assert.equal(response.status, 401);
-    assert.equal((await response.json()).errors[0].message, '로그인한 동아리원만 컴파일할 수 있어요.');
-    assert.equal(cookie, 'token=abc');
-  });
+test('the compiler makes no outbound requests (login is nginx auth_request)', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../server.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /\bfetch\s*\(|AUTH_CHECK_URL|checkAuth|node:https?'.*request/);
 });
-test('does not authorize redirects', async () => {
-  assert.equal(await checkAuth('', 'https://example.test/me', { fetchImpl: async (_, options) => {
-    assert.equal(options.redirect, 'manual'); return { status: 302, body: { cancel: async () => {} } };
-  } }), false);
+test('LISTEN_SOCKET is confined to the socket directory', () => {
+  assert.equal(resolveSocketPath('/run/coms-lab/compile.sock'), '/run/coms-lab/compile.sock');
+  assert.equal(resolveSocketPath('compile.sock'), '/run/coms-lab/compile.sock');
+  for (const bad of ['/etc/passwd', '/run/coms-lab/../x.sock', '/run/coms-lab/sub/a.sock', '/run/coms-labx/a.sock', '/tmp/a.sock', '/run/coms-lab/a.txt', '', '/run/coms-lab/.sock/..']) {
+    assert.throws(() => resolveSocketPath(bad), /LISTEN_SOCKET must be/, bad);
+  }
+  assert.equal(resolveSocketPath('/var/x/a.sock', '/var/x'), '/var/x/a.sock');
 });
 httpTest('rate limits per real peer when proxy trust disabled', async () => {
   await withServer({ limiter: createRateLimiter({ limit: 1 }), trustProxy: false }, async url => {

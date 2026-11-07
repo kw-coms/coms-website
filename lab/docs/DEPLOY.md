@@ -71,13 +71,14 @@ Compose의 `coms-lab-compiler`는 `restart: unless-stopped`로 재시작하며 �
 - **seccomp**: `security_opt`가 `seccomp=./lab/compiler/seccomp.json`을 가리킨다. 운영 서버 엔진(Docker 29.9.0, 커널 7.0)과 같은 moby `docker-v29.9.0`의 공식 기본 프로파일(`vendor/github.com/moby/profiles/seccomp/default.json`)에서 무조건 허용되던 `ptrace`/`process_vm_readv`/`process_vm_writev`만 제거했고(CAP_SYS_PTRACE 조건부 항목은 우리가 모든 capability를 제거하므로 무효), 나머지는 그대로라 새 커널의 syscall(`statmount`, `listmount`, `mseal` 등)이 막히지 않는다. 엔진 기본값(Docker Desktop은 unconfined로 보고될 수 있음)에 의존하지 않도록 저장소에 고정하며, 엔진을 올릴 때 새 `default.json`과 비교한다. CI가 PID 1의 `Seccomp: 2`를 확인한다.
 - 컴파일러는 `user: "10001:101"`로 실행한다. **101은 `nginx:alpine` 이미지의 `nginx` 그룹 GID**이고(`nginx:1.28-alpine`에서 `id nginx` = uid 101, gid 101), nginx worker가 이 그룹이다. 서버는 `umask 0117`로 소켓을 만들어 `0660 10001:101`이 된다.
 - 새 볼륨은 처음 마운트될 때 이미지의 해당 디렉터리 소유자·모드를 복사한다. 두 이미지(`Dockerfile.frontend`, `lab/compiler/Dockerfile`)가 `/run/coms-lab`을 **같은 `10001:101`, 0750**으로 만들어 두므로 어느 컨테이너가 먼저 볼륨을 만들어도 같다. 0750이라 nginx 그룹은 디렉터리를 읽고 통과만 할 수 있고 소켓을 지우거나 바꿀 수 없다.
+- `LISTEN_SOCKET`은 `/run/coms-lab/` 바로 아래의 `*.sock` 파일이어야 하며(경로를 resolve해 확인, 아니면 시작을 거부한다) 컴파일러는 그 밖의 경로를 만들거나 지우지 않는다.
 - 시작 시 기존 소켓에 연결해 `ECONNREFUSED`인 경우에만 inode를 재확인하고 삭제한다. 살아 있는 listener, 일반 파일·symlink, 권한 오류·연결 timeout은 거부한다. SIGKILL/OOM 이후 남은 소켓은 자동 복구된다. 같은 볼륨에 컴파일러 두 개를 동시에 띄우지 않는다. `PORT`를 통한 TCP 수신은 개발용 대안이며 프로덕션에는 사용하지 않는다.
 - `TRUST_PROXY=1`: `X-Lab-Client`(nginx가 `/api/auth/me`의 `X-Member-Id`로 채움. 쿠키·토큰은 컴파일러에 전달되지 않는다)가 **필수**이며 컴파일러 자체의 회원별 한도 키다. 헤더가 없거나 형식(`[A-Za-z0-9_-]{1,64}`)이 다르면 로그인 검사를 통과하지 않은 요청으로 보고 401을 반환한다. `TRUST_PROXY` 없이(로컬 개발) 실행하면 소켓 주소를 키로 쓴다.
 - `.env`에서 `LAB_RATE_LIMIT_PER_MIN`(기본 10)으로 컴파일러의 회원별 분당 한도를 바꿀 수 있다.
 
 ## 5. 로그인 확인
 
-`AUTH_CHECK_URL`은 네트워크 접근이 필요하므로 `network_mode: none` 컴파일러에서는 비활성화한다. 대신 프런트 nginx의 [`auth_request`](https://nginx.org/en/docs/http/ngx_http_auth_request_module.html)가 컴파일 요청 전에 내부 location `/lab/_auth`로 백엔드 `GET /api/auth/me`(Docker DNS의 `coms-backend:8080`)를 조회한다. 쿠키는 이 인증 서브요청에만 전달하고 컴파일러로는 보내지 않는다. 2xx면 통과, 401/403이면 다음 JSON을 401로 반환한다.
+`AUTH_CHECK_URL` 기능은 제거됐다(컴파일러는 외부로 아무 요청도 보내지 않는다). 로그인 확인은 프런트 nginx의 [`auth_request`](https://nginx.org/en/docs/http/ngx_http_auth_request_module.html)가 컴파일 요청 전에 내부 location `/lab/_auth`로 백엔드 `GET /api/auth/me`(Docker DNS의 `coms-backend:8080`)를 조회해 수행한다. 쿠키는 이 인증 서브요청에만 전달하고 컴파일러로는 보내지 않는다. 2xx면 통과, 401/403이면 다음 JSON을 401로 반환한다.
 
 ```json
 {"ok":false,"errors":[{"line":0,"severity":"error","message":"로그인한 동아리원만 컴파일할 수 있어요."}]}

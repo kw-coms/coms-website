@@ -43,14 +43,10 @@ test('in-memory handler rejects oversized request', async () => {
   const result = await invoke(serverWith(), { body: JSON.stringify({ sketch: 'x'.repeat(82000) }) });
   assert.equal(result.status, 400); assert.equal(result.body.reason, 'rejected');
 });
-test('in-memory handler requires authentication when configured', async () => {
-  let forwarded;
-  const server = serverWith({ authCheckUrl: 'https://example.test/me', fetchImpl: async (_url, options) => {
-    forwarded = options.headers.Cookie;
-    return { status: 401, body: { cancel: async () => {} } };
-  } });
-  const result = await invoke(server, { body: sketchBody, headers: { cookie: 'token=abc' } });
-  assert.equal(result.status, 401); assert.equal(forwarded, 'token=abc');
+test('in-memory handler behind nginx (TRUST_PROXY) refuses a request nginx did not vouch for', async () => {
+  const server = serverWith({ trustProxy: true });
+  const result = await invoke(server, { body: sketchBody, headers: { cookie: 'token=abc', 'x-forwarded-for': '1.2.3.4' } });
+  assert.equal(result.status, 401);
 });
 test('in-memory handler enforces per-IP rate limit', async () => {
   const server = serverWith({ limiter: createRateLimiter({ limit: 1 }) });

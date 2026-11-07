@@ -152,10 +152,9 @@ services:
     environment:
       LISTEN_SOCKET: /run/coms-lab/compile.sock
       RATE_LIMIT_PER_MIN: "${LAB_RATE_LIMIT_PER_MIN:-10}"
-      # nginx sends X-Lab-Client (the member id the backend vouched for) and required for every request.
+      # nginx sends X-Lab-Client (the member id the backend vouched for) and requires it on every request.
       TRUST_PROXY: "1"
-      # Login is checked by nginx (auth_request); the container has no network to check it itself.
-      AUTH_CHECK_URL: ""
+      # Login is checked by nginx (auth_request); the container has no network and makes no calls itself.
 
   coms-frontend:
     image: coms-frontend:${COMS_IMAGE_TAG:-latest}

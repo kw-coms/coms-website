@@ -23,9 +23,9 @@ test('socket listener serves health with mode 0660 and rejects regular-file repl
     catch (error) { if (error.code === 'EPERM') { t.skip('sandbox denies Unix socket listen'); return; } throw error; }
     await new Promise(resolve => probe.close(resolve));
     const server = createCompileServer({ logger: () => {} });
-    await listenCompiler(server, { socketPath: socket });
+    await listenCompiler(server, { socketPath: socket, socketDir: dir });
     try {
-      await assert.rejects(listenCompiler(createCompileServer(), { socketPath: socket }), /already exists/);
+      await assert.rejects(listenCompiler(createCompileServer(), { socketPath: socket, socketDir: dir }), /already exists/);
       assert.equal((await stat(socket)).mode & 0o777, 0o660);
       const body = await new Promise((resolve, reject) => {
         const req = request({ socketPath: socket, path: '/lab/api/health' }, res => {
@@ -36,11 +36,11 @@ test('socket listener serves health with mode 0660 and rejects regular-file repl
       assert.deepEqual(JSON.parse(body), { ok: true });
     } finally { await new Promise(resolve => server.close(resolve)); }
     await writeFile(socket, 'keep');
-    await assert.rejects(listenCompiler(createCompileServer(), { socketPath: socket }), /already exists/);
+    await assert.rejects(listenCompiler(createCompileServer(), { socketPath: socket, socketDir: dir }), /already exists/);
     assert.equal((await stat(socket)).isFile(), true);
     await unlink(socket);
     await symlink(join(dir, 'missing-target'), socket);
-    await assert.rejects(listenCompiler(createCompileServer(), { socketPath: socket }), /already exists/);
+    await assert.rejects(listenCompiler(createCompileServer(), { socketPath: socket, socketDir: dir }), /already exists/);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
@@ -68,12 +68,12 @@ test('reclaims a socket left by SIGKILL but refuses a live listener', async t =>
       if (reported.error === 'EPERM') { t.skip('sandbox denies Unix socket listen'); return; }
       throw new Error(`socket child listen failed: ${reported.error}`);
     }
-    await assert.rejects(listenCompiler(createCompileServer(), { socketPath: socket }), /already exists/);
+    await assert.rejects(listenCompiler(createCompileServer(), { socketPath: socket, socketDir: dir }), /already exists/);
     child.kill('SIGKILL');
     await new Promise(resolve => child.once('exit', resolve));
     assert.equal((await stat(socket)).isSocket(), true);
     const server = createCompileServer({ logger: () => {} });
-    await listenCompiler(server, { socketPath: socket });
+    await listenCompiler(server, { socketPath: socket, socketDir: dir });
     await new Promise(resolve => server.close(resolve));
   } finally {
     child.kill('SIGKILL');

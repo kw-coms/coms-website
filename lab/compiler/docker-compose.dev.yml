@@ -19,7 +19,6 @@ services:
     stop_grace_period: 25s
     environment:
       TRUST_PROXY: "0"
-      AUTH_CHECK_URL: ""
       RATE_LIMIT_PER_MIN: "120"
     logging:
       driver: json-file
