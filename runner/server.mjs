@@ -4,7 +4,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { lstat, unlink } from 'node:fs/promises';
 import * as fsSync from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { dirname } from 'node:path';
+import { basename, resolve as resolvePath, sep } from 'node:path';
 import { runCode, runnerHealthy } from './run.mjs';
 import { createRunQueue, createRateLimiter, createDenyList, createInflight, normalizeIp, QUEUE_TIMEOUT } from './limits.mjs';
 
@@ -158,8 +158,26 @@ export function createRunnerServer({
   return server;
 }
 
-export async function listenRunner(server, { socketPath = process.env.LISTEN_SOCKET, port = process.env.PORT || 8788, host = process.env.HOST || '127.0.0.1' } = {}) {
-  if (socketPath) {
+// LISTEN_SOCKET and DENYLIST_FILE are operator settings, but they name files this process creates, replaces
+// and deletes, so each is confined to the directory the compose volume mounts (and nothing else is
+// ever touched). Anything outside makes the server refuse to start.
+export const SOCKET_DIR = '/run/coms-study';
+export const STATE_DIR = '/var/lib/coms-study';
+function confine(requested, directory, extension, what) {
+  const root = resolvePath(directory);
+  const resolved = resolvePath(root, String(requested));
+  const name = basename(resolved);
+  if (!resolved.startsWith(root + sep) || resolved !== resolvePath(root, name) || !new RegExp(`^[A-Za-z0-9._-]+\\.${extension}$`).test(name)) {
+    throw new Error(`${what} must be a *.${extension} file directly inside ${root}`);
+  }
+  return resolved;
+}
+export const resolveSocketPath = (requested, directory = SOCKET_DIR) => confine(requested, directory, 'sock', 'LISTEN_SOCKET');
+export const resolveStateFile = (requested, directory = STATE_DIR) => confine(requested, directory, 'json', 'DENYLIST_FILE');
+
+export async function listenRunner(server, { socketPath: requestedSocket = process.env.LISTEN_SOCKET, port = process.env.PORT || 8788, host = process.env.HOST || '127.0.0.1', socketDir = SOCKET_DIR } = {}) {
+  if (requestedSocket) {
+    const socketPath = resolveSocketPath(requestedSocket, socketDir);
     try {
       const existing = await lstat(socketPath);
       if (!existing.isSocket()) throw new Error('LISTEN_SOCKET path already exists');
@@ -188,9 +206,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   let server;
   let exiting = false;
   const log = entry => console.log(JSON.stringify(entry));
-  const stateDir = process.env.DENYLIST_FILE ? dirname(process.env.DENYLIST_FILE) : null;
-  const denyList = stateDir ? createDenyList({ file: process.env.DENYLIST_FILE, fs: fsSync, logger: log }) : undefined;
-  const inflight = stateDir ? createInflight({ file: `${stateDir}/inflight.json`, fs: fsSync, logger: log }) : undefined;
+  const denyFile = process.env.DENYLIST_FILE ? resolveStateFile(process.env.DENYLIST_FILE) : null;
+  const denyList = denyFile ? createDenyList({ file: denyFile, fs: fsSync, logger: log }) : undefined;
+  const inflight = denyFile ? createInflight({ file: resolvePath(STATE_DIR, 'inflight.json'), fs: fsSync, logger: log }) : undefined;
   // A record left behind means the previous process died mid-job (OOM, SIGKILL, crash): blame its client.
   const crashed = inflight?.recover();
   if (crashed) {

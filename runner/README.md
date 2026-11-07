@@ -81,6 +81,8 @@ curl -fsS http://127.0.0.1:8788/study/api/health
 curl -fsS -H 'Content-Type: application/json' -d '{"lang":"python","code":"print(input())","stdin":"hello"}' http://127.0.0.1:8788/study/api/run
 ```
 
+`LISTEN_SOCKET`은 `/run/coms-study/` 바로 아래의 `*.sock`, `DENYLIST_FILE`은 `/var/lib/coms-study/` 바로 아래의 `*.json`이어야 하며 아니면 서버가 시작을 거부합니다(서버가 만들고 지우는 파일을 볼륨 안으로 한정).
+
 프로덕션에서는 nginx와 runner가 `coms-study-runner-socket` 볼륨(소켓 전용 1 MiB tmpfs)을 공유합니다. `NGINX_GID`를 nginx 프로세스의 그룹 ID로 지정하고 `NGINX_GID=101 docker compose -f docker-compose.yml up --build -d`를 실행하세요. 서버의 기본 그룹이 nginx 그룹이라서 소켓은 `root:nginx 0660`으로 만들어집니다. nginx는 `unix:/run/coms-study/run.sock`으로 프록시하고 `auth_request`를 먼저 적용해야 합니다. 서비스에 TCP 포트는 노출되지 않습니다. 헬스체크는 같은 소켓으로 `/study/api/health`를 호출합니다.
 
 ### 클라이언트 키와 nginx 설정

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRunnerServer, listenRunner, validateRequest, MAX_BODY_BYTES, clientIp, rateLimitPerMinute } from '../server.mjs';
+import { createRunnerServer, listenRunner, resolveSocketPath, resolveStateFile, validateRequest, MAX_BODY_BYTES, clientIp, rateLimitPerMinute } from '../server.mjs';
 
 const good = { lang: 'python', code: 'print(1)', stdin: 'hello' };
 async function listenOrSkip(t, server) {
@@ -113,17 +113,17 @@ test('Unix socket refuses active and non-socket paths, recovers stale inode', as
   try { await new Promise((resolve, reject) => { active.once('error', reject); active.listen(path, resolve); }); }
   catch (error) { if (error.code !== 'EPERM') throw error; t.skip('Unix sockets unavailable in this sandbox'); return; }
   const runner = createRunnerServer({ logger() {}, limiter: { take: () => true, close() {} } });
-  await assert.rejects(listenRunner(runner, { socketPath: path }), /already exists/);
+  await assert.rejects(listenRunner(runner, { socketPath: path, socketDir: dir }), /already exists/);
   await new Promise(resolve => active.close(resolve));
   await rm(path, { force: true });
   await writeFile(path, 'not a socket');
-  await assert.rejects(listenRunner(runner, { socketPath: path }), /already exists/);
+  await assert.rejects(listenRunner(runner, { socketPath: path, socketDir: dir }), /already exists/);
   await rm(path, { force: true });
   const child = spawn(process.execPath, ['-e', "const n=require('node:net');n.createServer().listen(process.argv[1],()=>console.log('ready'))", path], { stdio: ['ignore', 'pipe', 'pipe'] });
   await new Promise((resolve, reject) => { child.stdout.once('data', resolve); child.once('error', reject); });
   child.kill('SIGKILL');
   await new Promise(resolve => child.once('close', resolve));
-  await listenRunner(runner, { socketPath: path });
+  await listenRunner(runner, { socketPath: path, socketDir: dir });
   assert.equal(runner.address(), path);
   await new Promise(resolve => runner.close(resolve));
 });
@@ -172,4 +172,15 @@ test('member key: header required behind the proxy, validated, prefixed; one in-
   releases[0](); assert.equal((await first).status, 200);
   assert.ok(seen.every(e => e.client === undefined || /^[0-9a-f]{8}$/.test(e.client)));
   assert.ok(!JSON.stringify(seen).includes('alice'));
+});
+
+test('LISTEN_SOCKET and DENYLIST_FILE are confined to their directories', () => {
+  assert.equal(resolveSocketPath('/run/coms-study/run.sock'), '/run/coms-study/run.sock');
+  assert.equal(resolveStateFile('/var/lib/coms-study/denylist.json'), '/var/lib/coms-study/denylist.json');
+  for (const bad of ['/etc/passwd', '/run/coms-study/../x.sock', '/run/coms-study/sub/a.sock', '/run/coms-studyx/a.sock', '/tmp/a.sock', '/run/coms-study/a.txt', '']) {
+    assert.throws(() => resolveSocketPath(bad), /LISTEN_SOCKET must be/, bad);
+  }
+  for (const bad of ['/etc/passwd', '/var/lib/coms-study/../x.json', '/var/lib/coms-study/sub/a.json', '/tmp/denylist.json', '/var/lib/coms-study/a.sock']) {
+    assert.throws(() => resolveStateFile(bad), /DENYLIST_FILE must be/, bad);
+  }
 });
