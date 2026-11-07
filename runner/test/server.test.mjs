@@ -1,9 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { Readable } from 'node:stream';
 import { createRateLimiter } from '../limits.mjs';
 import { createRunnerServer, listenRunner, resolveSocketPath, resolveStateFile, validateRequest, MAX_BODY_BYTES, clientIp, rateLimitPerMinute } from '../server.mjs';
 
 const good = { lang: 'python', code: 'print(1)', stdin: 'hello' };
+const maxFields = { lang: 'python', code: 'x'.repeat(60 * 1024) + '\n'.repeat(4 * 1024), tests: ['a'.repeat(16 * 1024), 'b'.repeat(16 * 1024)] };
+const escapedOverLimit = { ...maxFields, code: '"'.repeat(64 * 1024) };
 async function listenOrSkip(t, server) {
   try { await listenRunner(server, { port: 0, socketPath: '', host: '127.0.0.1' }); return true; }
   catch (error) { if (error.code !== 'EPERM') throw error; t.skip('socket listen is unavailable in this sandbox'); return false; }
@@ -14,8 +18,110 @@ const result = { ok: true, stage: 'run', stdout: '1\n', stderr: '', exitCode: 0,
 test('validation counts UTF-8 bytes and rejects invalid shapes', () => {
   assert.equal(validateRequest(good), null);
   for (const body of [null, [], { ...good, lang: 'js' }, { ...good, code: '한'.repeat(22_000) }, { ...good, stdin: '한'.repeat(6_000) }, { ...good, stdin: 1 }]) assert.ok(validateRequest(body));
-  assert.equal(MAX_BODY_BYTES, 96 * 1024);
+  assert.equal(MAX_BODY_BYTES, 112 * 1024);
   assert.throws(() => rateLimitPerMinute('0'));
+});
+
+test('production proxy allows the runner body limit', async () => {
+  const config = await readFile(new URL('../../nginx.frontend.conf', import.meta.url), 'utf8');
+  const route = config.match(/location = \/study\/api\/run \{([\s\S]*?)proxy_pass/);
+  assert.ok(route, 'runner proxy location must exist');
+  assert.match(route[1], /client_max_body_size\s+112k;/);
+});
+
+test('max-size valid JSON fits the body cap', () => {
+  assert.equal(validateRequest(maxFields), null);
+  assert.ok(Buffer.byteLength(JSON.stringify(maxFields)) > 96 * 1024);
+  assert.ok(Buffer.byteLength(JSON.stringify(maxFields)) <= MAX_BODY_BYTES);
+  assert.equal(validateRequest(escapedOverLimit), null, 'field limits alone permit escaped JSON beyond the body cap');
+  assert.ok(Buffer.byteLength(JSON.stringify(escapedOverLimit)) > MAX_BODY_BYTES);
+});
+
+test('request handler accepts max fields and rejects escaped body overflow without a listening socket', async () => {
+  const accepted = [];
+  const server = createRunnerServer({ executor: async body => { accepted.push(body); return result; }, logger() {},
+    limiter: { take: () => true, close() {} }, queue: { submit: job => job() } });
+  const request = (body, contentLength = true) => new Promise(resolve => {
+    const json = JSON.stringify(body);
+    const incoming = Readable.from([Buffer.from(json)]);
+    incoming.method = 'POST'; incoming.url = '/study/api/run'; incoming.complete = true;
+    incoming.socket = { remoteAddress: '127.0.0.1' };
+    incoming.headers = { 'content-type': 'application/json', ...(contentLength ? { 'content-length': String(Buffer.byteLength(json)) } : {}) };
+    const response = { destroyed: false, setHeader() {}, writeHead(status) { this.status = status; },
+      end(payload) { resolve({ status: this.status, payload: JSON.parse(payload) }); } };
+    server.emit('request', incoming, response);
+  });
+  const acceptedResponse = await request(maxFields);
+  assert.equal(acceptedResponse.status, 200);
+  assert.deepEqual(accepted, [maxFields]);
+  for (const contentLength of [true, false]) {
+    const rejectedResponse = await request(escapedOverLimit, contentLength);
+    assert.equal(rejectedResponse.status, 400);
+    assert.equal(rejectedResponse.payload.error, 'rejected');
+  }
+  assert.equal(accepted.length, 1);
+});
+
+test('multi-case validation enforces shape, count, per-case and aggregate UTF-8 limits', () => {
+  const multi = { lang: 'python', code: 'print(input())', tests: ['a', 'b'] };
+  assert.equal(validateRequest(multi), null);
+  assert.equal(validateRequest({ ...multi, tests: ['한'.repeat(5_461)] }), null); // 16,383 bytes
+  assert.equal(validateRequest({ ...multi, tests: ['x'.repeat(16_384), 'y'.repeat(16_384)] }), null);
+  for (const tests of [undefined, null, 'one', {}, [], Array(1), Array(11).fill(''), [1], ['ok', null],
+    ['한'.repeat(5_462)], ['x'.repeat(16_384), 'y'.repeat(16_384), 'z']]) {
+    assert.match(validateRequest({ ...multi, tests }), /테스트 입력/, String(tests));
+  }
+  assert.match(validateRequest({ ...multi, stdin: '' }), /함께 보낼 수 없어요/);
+});
+
+test('HTTP multi-case request is one queued, rate-limited and in-flight run', async t => {
+  const received = [], releases = [];
+  let takes = 0, submissions = 0;
+  const server = createRunnerServer({ trustProxy: true, logger() {},
+    limiter: { take() { takes++; return takes <= 2; }, close() {} },
+    queue: { submit(job) { submissions++; return job(); } },
+    executor: body => { received.push(body); return new Promise(resolve => releases.push(() => resolve({ ...result, results: [] }))); },
+  });
+  if (!await listenOrSkip(t, server)) return;
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const url = `http://127.0.0.1:${server.address().port}/study/api/run`;
+  const post = body => fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-runner-client': 'alice' }, body: JSON.stringify(body) });
+  const multi = { lang: 'python', code: 'print(input())', tests: ['a', 'b', 'c'] };
+  const first = post(multi);
+  while (!releases.length) await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(received, [multi]);
+  assert.equal(submissions, 1);
+  const concurrent = await post(multi);
+  assert.equal(concurrent.status, 429);
+  assert.equal((await concurrent.json()).error, 'busy');
+  assert.equal(submissions, 1);
+  releases[0]();
+  const response = await first;
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).results, []);
+  assert.equal(takes, 2);
+  assert.equal((await post(multi)).status, 429);
+  assert.equal(submissions, 1);
+});
+
+test('HTTP rejects malformed multi-case requests before the executor', async t => {
+  let runs = 0;
+  const server = createRunnerServer({ logger() {}, limiter: { take: () => true, close() {} }, executor: async () => { runs++; return result; } });
+  if (!await listenOrSkip(t, server)) return;
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const url = `http://127.0.0.1:${server.address().port}/study/api/run`;
+  for (const body of [
+    { lang: 'c', code: 'int main(){}', stdin: '', tests: [''] },
+    { lang: 'c', code: 'int main(){}', tests: [] },
+    { lang: 'c', code: 'int main(){}', tests: ['x'.repeat(16_385)] },
+  ]) {
+    const response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal(response.status, 400);
+    const payload = await response.json();
+    assert.equal(payload.error, 'rejected');
+    assert.match(payload.messageKo, /[가-힣]/);
+  }
+  assert.equal(runs, 0);
 });
 
 test('proxy header only trusted at rightmost valid hop', () => {
@@ -48,6 +154,20 @@ test('HTTP accepts valid run, rejects bad input and logs metadata only', async t
   assert.equal(response.status, 400); // Chunked body crossing the cap.
   assert.equal(JSON.stringify(logs).includes(good.code), false);
   assert.equal(JSON.stringify(logs).includes(good.stdin), false);
+});
+
+test('HTTP accepts max-size valid JSON and rejects larger JSON', async t => {
+  const accepted = [];
+  const server = createRunnerServer({ executor: async body => { accepted.push(body); return result; }, logger() {}, limiter: { take: () => true, close() {} } });
+  if (!await listenOrSkip(t, server)) return;
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const url = `http://127.0.0.1:${server.address().port}/study/api/run`;
+  let response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(maxFields) });
+  assert.equal(response.status, 200);
+  assert.equal(accepted.length, 1);
+  response = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(escapedOverLimit) });
+  assert.ok([400, 413].includes(response.status));
+  assert.equal(accepted.length, 1);
 });
 
 test('HTTP 429 distinguishes rate limit and busy', async t => {

@@ -6,6 +6,7 @@ import { performance } from 'node:perf_hooks';
 import { stripPaths, parseDiagnostics, detectJavaClass } from './diagnostics.mjs';
 
 export const MAX_OUTPUT_BYTES = 64 * 1024;
+export const CASE_OUTPUT_BYTES = 8 * 1024;
 export const COMPILE_WALL_MS = 15_000;
 export const RUN_WALL_MS = 10_000;
 let poisoned = false;
@@ -56,8 +57,8 @@ export function asJob(command, args = [], { input = '', timeoutMs = 10_000 } = {
 }
 
 export const NPROC = { c: 32, python: 32, java: 128 };
-export function stageLimits(lang, stage) {
-  const cpu = stage === 'compile' ? 10 : lang === 'java' ? 6 : 3;
+export function stageLimits(lang, stage, cpuOverride) {
+  const cpu = cpuOverride ?? (stage === 'compile' ? 10 : lang === 'java' ? 6 : 3);
   // NPROC counts threads of the job uid only (the server has another uid). The JVM needs
   // ~30 threads even for hello world, so Java gets 128; the container pids limit still bounds all.
   const args = [`--cpu=${cpu}:${cpu + 1}`, `--nproc=${NPROC[lang]}:${NPROC[lang]}`, '--fsize=8388608:8388608', '--msgqueue=262144:262144', '--sigpending=512:512', '--locks=16:16', `--nofile=${lang === 'java' ? 256 : 64}:${lang === 'java' ? 256 : 64}`, '--core=0:0'];
@@ -112,17 +113,37 @@ export async function killJobProcesses() {
   }
 }
 
-function boundUtf8(value) {
+function boundUtf8(value, maxBytes = MAX_OUTPUT_BYTES) {
   const bytes = Buffer.from(value, 'utf8');
-  if (bytes.length <= MAX_OUTPUT_BYTES) return { text: value, truncated: false };
-  let end = MAX_OUTPUT_BYTES;
+  if (bytes.length <= maxBytes) return { text: value, truncated: false };
+  let end = maxBytes;
   // Back up over a partial character, never cut a multibyte sequence.
   while (end > 0 && (bytes[end] & 0xc0) === 0x80) end--;
   return { text: bytes.subarray(0, end).toString('utf8'), truncated: true };
 }
 
-function decodeBounded(buffer) {
-  return boundUtf8(new TextDecoder().decode(buffer));
+// Budget the JSON representation too: control characters can expand sixfold on the wire.
+// Twenty case streams plus compile diagnostics must still fit the 200 KiB response contract.
+function boundCaseOutput(value) {
+  const bounded = boundUtf8(value, CASE_OUTPUT_BYTES);
+  if (Buffer.byteLength(JSON.stringify(bounded.text)) - 2 <= CASE_OUTPUT_BYTES) return bounded;
+  let text = '', size = 0;
+  for (const char of bounded.text) {
+    const cost = Buffer.byteLength(JSON.stringify(char)) - 2;
+    if (size + cost > CASE_OUTPUT_BYTES) break;
+    text += char; size += cost;
+  }
+  return { text, truncated: true };
+}
+
+function caseDiagnostics(stderr, options) {
+  const diagnostics = parseDiagnostics(stderr, options);
+  while (Buffer.byteLength(JSON.stringify(diagnostics)) > CASE_OUTPUT_BYTES) diagnostics.pop();
+  return diagnostics;
+}
+
+function decodeBounded(buffer, maxBytes) {
+  return boundUtf8(new TextDecoder().decode(buffer), maxBytes);
 }
 
 // ipcrm --all enumerates with permission checks and skips mode-0 objects, so enumerate
@@ -179,6 +200,8 @@ export function executeStage(command, args, {
   setTimeoutImpl = setTimeout, clearTimeoutImpl = clearTimeout,
   setIntervalImpl = setInterval, clearIntervalImpl = clearInterval, cpuSeconds = readCpuSeconds,
   timeoutMs = stage === 'compile' ? COMPILE_WALL_MS : RUN_WALL_MS,
+  cpuLimit = stage === 'compile' ? 10 : lang === 'java' ? 6 : 3,
+  maxOutputBytes = MAX_OUTPUT_BYTES,
 } = {}) {
   return new Promise((resolve, reject) => {
     // cwd is entered by `env -C` after the uid switch: the 0700 job dir is unreadable to the server.
@@ -188,7 +211,7 @@ export function executeStage(command, args, {
     // switch: the 0700 job dir is unreadable to the server. nice 19 (raising is unprivileged, lowering needs
     // CAP_SYS_NICE) keeps CPU-hungry jobs from starving the supervisor's reaper and health endpoint.
     const child = spawnImpl('/usr/bin/choom', ['-n', '1000', '--', '/usr/bin/setpriv', ...JOB_PRIV, '--', '/usr/bin/nice', '-n', '19', '/usr/bin/env', '-C', cwd,
-      '/usr/bin/prlimit', ...stageLimits(lang, stage), '--', command, ...args], {
+      '/usr/bin/prlimit', ...stageLimits(lang, stage, cpuLimit), '--', command, ...args], {
       cwd: '/', shell: false, detached: true, stdio: ['pipe', 'pipe', 'pipe'],
       env: { PATH: '/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8', HOME: cwd, TMPDIR: cwd },
     });
@@ -204,7 +227,6 @@ export function executeStage(command, args, {
       child.stdin.destroy(); child.stdout.destroy(); child.stderr.destroy();
     };
     const timer = setTimeoutImpl(() => { timedOut = true; stop(); }, timeoutMs);
-    const cpuLimit = stage === 'compile' ? 10 : lang === 'java' ? 6 : 3;
     let cpuLimitReached = false;
     // An ignored SIGXCPU ends in SIGKILL, otherwise indistinguishable from OOM.
     // Observe CPU usage during the one-second soft/hard gap; also stop promptly
@@ -222,7 +244,7 @@ export function executeStage(command, args, {
       child[stream].on('data', chunk => {
         if (truncated || settled) return;
         const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-        const remaining = MAX_OUTPUT_BYTES - sizes[stream];
+        const remaining = maxOutputBytes - sizes[stream];
         buffers[stream].push(bytes.subarray(0, remaining));
         sizes[stream] += Math.min(bytes.length, remaining);
         if (bytes.length > remaining) { truncated = true; stop(); }
@@ -237,8 +259,8 @@ export function executeStage(command, args, {
     child.once('close', (exitCode, signal) => {
       if (settled) return;
       settled = true; clearTimeoutImpl(timer); clearIntervalImpl(cpuTimer); killGroup();
-      const out = decodeBounded(Buffer.concat(buffers.stdout));
-      const err = decodeBounded(Buffer.concat(buffers.stderr));
+      const out = decodeBounded(Buffer.concat(buffers.stdout), maxOutputBytes);
+      const err = decodeBounded(Buffer.concat(buffers.stderr), maxOutputBytes);
       resolve({ stdout: out.text, stderr: err.text,
         exitCode, signal: signal || null, timedOut: timedOut || cpuLimitReached || signal === 'SIGXCPU', truncated: truncated || out.truncated || err.truncated });
     });
@@ -246,8 +268,9 @@ export function executeStage(command, args, {
   });
 }
 
-export async function runCode({ lang, code, stdin = '' }, {
-  executor = executeStage, cleanup = killJobProcesses, tempRoot = '/tmp', now = () => performance.now(),
+export async function runCode({ lang, code, stdin = '', tests }, {
+  executor = executeStage, cleanup = killJobProcesses,
+  clearIpc = cleanup === killJobProcesses ? clearSystemVIpc : async () => {}, tempRoot = '/tmp', now = () => performance.now(),
 } = {}) {
   const real = cleanup === killJobProcesses;
   if (real) {
@@ -257,6 +280,11 @@ export async function runCode({ lang, code, stdin = '' }, {
   if (active) throw new Error('Runner already active');
   active = true;
   const started = now();
+  const multi = tests !== undefined;
+  const cleanBetween = async () => {
+    try { await cleanup(); await clearIpc(); }
+    catch (error) { poisoned = true; throw error; }
+  };
   let work;
   try {
     // A prior server crash may have interrupted its finally block. Reset the
@@ -277,7 +305,7 @@ export async function runCode({ lang, code, stdin = '' }, {
       await writeFile(join(work, file), code, { mode: 0o600 });
     }
     let compile;
-    const invoke = (command, args, stage) => executor(command, args, { cwd: work, stdin: stage === 'run' ? stdin : '', lang, stage });
+    const invoke = (command, args, stage, overrides = {}) => executor(command, args, { cwd: work, stdin: stage === 'run' ? stdin : '', lang, stage, ...overrides });
     const response = (result, stage) => {
       // stdout is the student's own output: only the job dir is removed, other text is left alone.
       const out = boundUtf8(stripPaths(result.stdout, { tempDir: work, redactSystemPaths: false }));
@@ -295,14 +323,40 @@ export async function runCode({ lang, code, stdin = '' }, {
     else if (lang === 'java') compile = await invoke('/opt/java/openjdk/bin/javac', [...jvm.map(x => `-J${x}`), '-J-Xmx256m', '-J-Xss2m', '-J-XX:MaxMetaspaceSize=128m', '-encoding', 'UTF-8', file], 'compile');
     else if (lang !== 'python') throw new Error('Unknown language');
     if (compile) {
-      if (compile.exitCode !== 0 || compile.truncated || compile.timedOut) return response(compile, 'compile');
+      if (compile.exitCode !== 0 || compile.truncated || compile.timedOut) {
+        if (!multi) return response(compile, 'compile');
+        const stderr = boundCaseOutput(stripPaths(compile.stderr, { tempDir: work })).text;
+        return { ok: false, stage: 'compile', stderr, diagnostics: caseDiagnostics(stderr, { lang, tempDir: work }),
+          timeMs: Math.max(0, Math.round(now() - started)) };
+      }
       // No compiler-spawned daemon may overlap execution of the program.
       try { await cleanup(); } catch (error) { if (real) poisoned = true; throw error; }
     }
-    const result = lang === 'c' ? await invoke(join(work, 'program'), [], 'run') : lang === 'python'
-      ? await invoke('/usr/local/bin/python3', ['-I', '-u', 'main.py'], 'run')
-      : await invoke('/opt/java/openjdk/bin/java', ['-Xmx192m', '-Xss1m', '-XX:MaxMetaspaceSize=96m', ...jvm, '-cp', '.', className], 'run');
-    return response(result, 'run');
+    const run = overrides => lang === 'c' ? invoke(join(work, 'program'), [], 'run', overrides) : lang === 'python'
+      ? invoke('/usr/local/bin/python3', ['-I', '-u', 'main.py'], 'run', overrides)
+      : invoke('/opt/java/openjdk/bin/java', ['-Xmx192m', '-Xss1m', '-XX:MaxMetaspaceSize=96m', ...jvm, '-cp', '.', className], 'run', overrides);
+    if (!multi) return response(await run(), 'run');
+    // Compilation is outside the shared run budget; inter-case reaping is inside it.
+    const runStarted = now(), results = [];
+    for (let index = 0; index < tests.length; index++) {
+      if (index > 0) await cleanBetween();
+      const remaining = RUN_WALL_MS - (now() - runStarted);
+      if (remaining < 250) {
+        results.push(...tests.slice(index).map(() => ({ skipped: true })));
+        break;
+      }
+      const caseStarted = now();
+      const result = await run({ stdin: tests[index], timeoutMs: Math.min(remaining, 4000),
+        cpuLimit: lang === 'java' ? 4 : 2, maxOutputBytes: CASE_OUTPUT_BYTES });
+      const out = boundCaseOutput(stripPaths(result.stdout, { tempDir: work, redactSystemPaths: false }));
+      const err = boundCaseOutput(stripPaths(result.stderr, { tempDir: work }));
+      results.push({ stdout: out.text, stderr: err.text, exitCode: result.exitCode, signal: result.signal,
+        timedOut: result.timedOut, truncated: result.truncated || out.truncated || err.truncated,
+        timeMs: Math.max(0, Math.round(now() - caseStarted)) });
+    }
+    const stderr = boundCaseOutput(stripPaths(compile?.stderr ?? '', { tempDir: work })).text;
+    return { ok: true, stage: 'run', stderr, diagnostics: caseDiagnostics(stderr, { lang, tempDir: work }),
+      timeMs: Math.max(0, Math.round(now() - started)), results };
   } finally {
     try {
       // Always reap before deleting files or releasing the single-job slot.

@@ -74,6 +74,8 @@ export interface EditorOptions {
   label: string
   onChange(value: string): void
   onRun(): void
+  onSubmit?(): void
+  readOnly?: boolean
 }
 
 export async function createEditor(opts: EditorOptions): Promise<PgEditor> {
@@ -85,6 +87,7 @@ export async function createEditor(opts: EditorOptions): Promise<PgEditor> {
     { key: 'Escape', run: () => { tabFree = true; return true } },
     { key: 'Tab', run: (v) => (tabFree ? false : indentMore(v)) },
     { key: 'Shift-Tab', run: (v) => (tabFree ? false : indentLess(v)) },
+    { key: 'Mod-Shift-Enter', run: () => { opts.onSubmit?.(); return !!opts.onSubmit } },
     { key: 'Mod-Enter', run: () => { opts.onRun(); return true } },
   ]))
   const view = new EditorView({
@@ -93,6 +96,7 @@ export async function createEditor(opts: EditorOptions): Promise<PgEditor> {
       doc: opts.doc,
       extensions: [
         tabKeys,
+        EditorState.readOnly.of(!!opts.readOnly),
         lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(), drawSelection(), history(), bracketMatching(), closeBrackets(), indentOnInput(),
         lintGutter(),
         EditorState.tabSize.of(indent.length), indentUnit.of(indent),
@@ -101,7 +105,8 @@ export async function createEditor(opts: EditorOptions): Promise<PgEditor> {
         theme,
         language,
         placeholder('여기에 코드를 쓰세요'),
-        EditorView.contentAttributes.of({ 'aria-label': opts.label, 'aria-multiline': 'true', spellcheck: 'false', autocapitalize: 'off', autocorrect: 'off' }),
+        // tabindex: the scroller is tabindex=-1 and axe doesn't count contenteditable as focusable (scrollable-region-focusable).
+        EditorView.contentAttributes.of({ 'aria-label': opts.label, 'aria-multiline': 'true', spellcheck: 'false', autocapitalize: 'off', autocorrect: 'off', tabindex: '0' }),
         EditorView.domEventHandlers({ keydown: (e) => { if (e.key !== 'Tab' && e.key !== 'Shift' && e.key !== 'Escape') tabFree = false; return false } }),
         EditorView.updateListener.of((u) => { if (u.docChanged) opts.onChange(u.state.doc.toString()) }),
       ],

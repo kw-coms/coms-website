@@ -8,6 +8,7 @@ import { initStudyPage } from './studyDemos'
 import { initPlayground } from './playground'
 import type { PageLang } from './playground/classify'
 import './study.css'
+import './exercises/exercises.css'
 import './playground/playground.css'
 
 function StudyBody({ id }: { id: string }) {
@@ -41,6 +42,17 @@ function StudyBody({ id }: { id: string }) {
 
   // "직접 해보기": editors, runners and per-block saves for the code blocks. The login redirect returns to the same block.
   useEffect(() => (html && layoutRef.current ? initPlayground(layoutRef.current, { pageId: id as PageLang, onLogin: (hash) => goLogin.current(hash) }) : undefined), [html, id])
+
+  useEffect(() => {
+    if (!html || !layoutRef.current) return
+    let disposed = false
+    let cleanup: (() => void) | undefined
+    const root = layoutRef.current
+    void import('./exercises/inline').then(({ initExerciseLinks }) => {
+      if (!disposed) cleanup = initExerciseLinks(root, id, navigate)
+    })
+    return () => { disposed = true; cleanup?.() }
+  }, [html, id, navigate])
 
   return (
     <div className="study-page">

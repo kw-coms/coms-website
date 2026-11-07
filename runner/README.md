@@ -2,18 +2,20 @@
 
 스터디 예제의 C, Java, Python 소스를 받아 컴파일·실행하고 표준 출력, 오류, 초보자용 진단을 JSON으로 돌려줍니다. API는 [`docs/study-runner-api.md`](../docs/study-runner-api.md)의 `POST /study/api/run`과 `GET /study/api/health`를 따릅니다. 사이트 배포 방법(Compose 서비스, nginx 연결, 배포 단계, CI)은 [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md#6-스터디-직접-해보기와-코드-실행기-선택)에 있습니다. 인증은 이 서비스가 아니라 같은 출처의 nginx `auth_request` → 백엔드 `/api/auth/me`가 맡습니다. **인증된 회원만** 이 소켓에 접근하도록 nginx 위치 설정을 제한해야 합니다. HTML/CSS/JS는 기존 브라우저 샌드박스에서 실행합니다.
 
+실습 문제 채점은 단일 `stdin` 대신 `tests` 문자열 배열(1–10개)을 보내 한 요청에서 여러 입력을 순서대로 실행합니다. C/Java 소스는 한 번만 컴파일하고, 각 케이스 사이에 작업 UID의 모든 프로세스와 System V IPC를 정리합니다. 전체 실행은 10초를 공유하며 케이스당 벽시계 최대 4초·CPU 2초(Java 4초), stdout/stderr는 케이스별 8 KiB로 제한됩니다. 시간이 다한 뒤 남은 결과는 `{ "skipped": true }`로 표시되며, 이 요청도 회원 실행 횟수와 큐에서는 1회로 셉니다.
+
 ## 자원 제한
 
 | 항목 | 제한 |
 | --- | --- |
-| 요청 | JSON 본문 96 KiB, 소스 64 KiB, stdin 16 KiB |
+| 요청 | JSON 본문 112 KiB, 소스 64 KiB, stdin 16 KiB 또는 tests 1–10개(각 16 KiB, 합계 32 KiB) |
 | 실행 | 동시 1개, 대기 8개까지; 초과 시 HTTP 429 `busy` |
 | 빈도 | 기본 IP당 분당 10회; IPv6 /64 단위, 주소 테이블 초과 시 공유 버킷 |
-| 시간 | 컴파일 벽시계 15초·CPU 10초; 실행 벽시계 10초·CPU 3초(Java 6초) |
+| 시간 | 컴파일 벽시계 15초·CPU 10초; 단일 실행 벽시계 10초·CPU 3초(Java 6초); 다중 실행은 전체 벽시계 10초, 케이스당 최대 4초·CPU 2초(Java 4초) |
 | 메모리 | 컨테이너 768 MiB; gcc AS 1 GiB; C/Python 실행 AS 256 MiB; Java 실행 `-Xmx192m -XX:MaxMetaspaceSize=96m -Xss1m`, javac `-J-Xmx256m -J-XX:MaxMetaspaceSize=128m` |
 | 프로세스·파일 | NPROC(작업 UID 전용) C/Python 32, Java 128; FSIZE 8 MiB, NOFILE 64(Java 256), CORE 0; 컨테이너 `pids_limit` 256 |
 | 디스크 | `/jobs` tmpfs 64 MiB·inode 4096, `/dev/shm` 8 MiB; 작업 후 전부 삭제 |
-| 출력 | stdout·stderr 각각 최대 64 KiB; 초과 시 프로세스 종료와 `truncated: true` |
+| 출력 | 단일 실행 stdout·stderr 각각 최대 64 KiB; 다중 실행은 케이스별 각각 8 KiB; 초과 시 `truncated: true` |
 
 JVM 공통 옵션: `-XX:+UseSerialGC -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 -XX:ActiveProcessorCount=1 -XX:-UsePerfData -XX:+DisableAttachMechanism -Xshare:auto -Xlog:disable`(javac는 `-J-` 접두). `-Xlog:disable`은 JVM 경고가 학생 stdout에 섞이지 않게 합니다. `javac`/`java`에는 AS 제한을 적용하지 않습니다. JVM은 실제 힙보다 훨씬 넓은 가상 주소 공간을 예약하므로 RLIMIT_AS가 정상 실행까지 막을 수 있습니다. GCC는 `-std=c17 -O1 -Wall -Wextra -lm`, Python은 `python3 -I -u`, Java는 JDK 21을 사용합니다. CPU 제한의 hard 값은 soft 값보다 1초 크게 두고, 100ms마다 `/proc/<pid>/stat`를 읽어 soft budget에서 먼저 종료합니다. `SIGXCPU`와 벽시계 종료는 `timedOut`으로 표시합니다.
 
