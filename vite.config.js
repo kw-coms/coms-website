@@ -108,7 +108,7 @@ const pwaPlugin = VitePWA({
       '**/Admin-*.js',
       '**/common-*.js', // highlight.js (its "common" language bundle)
       '**/vendor-sentry-*.js',
-      '**/study-content-*.js', // /study lesson markup (~525 KB for the five studies), fetched when one is opened
+      '**/study-content-*.js', // /study lesson markup (~525 KB for the five studies) and circuit drawings, fetched when a study is opened
     ],
     maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
     runtimeCaching: [
@@ -140,8 +140,8 @@ export default defineConfig({
     sourcemap: sentryAuthToken ? 'hidden' : false,
     rollupOptions: {
       output: {
-        // The /study lesson fragments get a recognisable name so workbox's globIgnores can keep them out of the precache.
-        chunkFileNames: (chunk) => (chunk.moduleIds.some((id) => id.includes('/src/pages/study/content/')) ? 'assets/study-content-[name]-[hash].js' : 'assets/[name]-[hash].js'),
+        // The /study lesson fragments (and the circuit-drawing chunk) get a recognisable name so workbox's globIgnores can keep them out of the precache.
+        chunkFileNames: (chunk) => (chunk.moduleIds.some((id) => id.includes('/src/pages/study/content/') || id.includes('/src/pages/study/circuits/')) ? 'assets/study-content-[name]-[hash].js' : 'assets/[name]-[hash].js'),
         // Split heavy vendors into their own long-cached chunks so they
         // parallelize and survive app-code redeploys. ponytail: coarse grouping
         // by package, finer splits only if a chunk actually gets too big.

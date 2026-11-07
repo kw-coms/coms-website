@@ -10,6 +10,7 @@
     "test": "npm run typecheck && npm run lint && npm run test:unit",
     "test:unit": "node scripts/run-unit-tests.mjs",
     "lint": "eslint .",
+    "gen:circuits": "node --import tsx scripts/gen-circuit-chrome.mjs",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "e2e": "cross-env PWA_DISABLE=1 npm run build && playwright test",
