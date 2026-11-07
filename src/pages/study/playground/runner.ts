@@ -78,6 +78,20 @@ function either(user: AbortSignal | undefined, timeout: AbortSignal): AbortSigna
   return controller.signal
 }
 
+/** Waits for `work` but stops waiting when the caller aborts (AbortError) or the run's deadline passes (TimeoutError); `work` itself keeps going for its other waiters. */
+function settleBy<T>(work: Promise<T>, signal: AbortSignal | undefined, limit: AbortSignal | null): Promise<T | 'timeout'> {
+  return new Promise((resolve, reject) => {
+    const done = () => { signal?.removeEventListener('abort', onAbort); limit?.removeEventListener('abort', onLimit) }
+    const onAbort = () => { done(); reject(new DOMException('aborted', 'AbortError')) }
+    const onLimit = () => { done(); resolve('timeout') }
+    if (signal?.aborted) return onAbort()
+    if (limit?.aborted) return onLimit()
+    signal?.addEventListener('abort', onAbort, { once: true })
+    limit?.addEventListener('abort', onLimit, { once: true })
+    work.then((value) => { done(); resolve(value) }, (error) => { done(); reject(error) })
+  })
+}
+
 export async function runRemote(lang: RunLang, code: string, stdin: string, signal?: AbortSignal): Promise<RunResult> {
   if (bytes(code) > MAX_CODE_BYTES) return { kind: 'rejected', messageKo: '코드가 너무 길어요. 64KB 이하로 줄여 주세요.' }
   if (bytes(stdin) > MAX_STDIN_BYTES) return { kind: 'rejected', messageKo: '입력이 너무 길어요. 16KB 이하로 줄여 주세요.' }
@@ -106,11 +120,18 @@ export async function postRun(body: { lang: RunLang; code: string; stdin?: strin
     let res = await post()
     if (res.status === 401) {
       // The access cookie is short-lived: renew it through the site's own single-flight refresh (which also
-      // signs the page out when the session is really gone), retry once, then ask to sign in.
-      if (await renewSessionAfter401(generation)) res = await post()
+      // signs the page out when the session is really gone), retry once, then ask to sign in. The refresh is
+      // shared with the rest of the page and has its own deadline; this caller only waits for it until its own
+      // signal or run deadline, without cancelling it for the others. Only a refresh that did not answer in time
+      // gets the network message: any other failure (a 403 from the origin check, a 5xx) keeps the 401 and asks to sign in.
+      const outcome = await settleBy(renewSessionAfter401(generation), signal, timeout)
+      if (outcome === 'refreshed') res = await post()
+      else if (outcome === 'timeout') return { kind: 'network', messageKo: '로그인 상태를 확인하지 못했어요. 잠시 뒤에 다시 시도해 주세요.' }
     }
-    if (res.status === 401 || res.status === 403) return { kind: 'login' }
     const data = (await res.json().catch(() => null)) as Record<string, unknown> | null
+    // 401/403 mean "sign in" - except nginx's 403 for a request the browser labels cross-site, which says why.
+    if (res.status === 403 && data?.error === 'rejected') return { kind: 'rejected', messageKo: typeof data.messageKo === 'string' ? data.messageKo : '이 사이트에서만 코드를 실행할 수 있어요.' }
+    if (res.status === 401 || res.status === 403) return { kind: 'login' }
     if (res.status === 429) {
       const rate = data?.error === 'rate-limited'
       return {

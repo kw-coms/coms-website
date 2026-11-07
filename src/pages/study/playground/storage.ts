@@ -1,12 +1,14 @@
 // Per-block persistence (localStorage, every access guarded) and the "공유 링크" hash codec.
 
-export interface Saved { code: string; at: number }
-type StorageLike = Pick<Storage, 'getItem' | 'setItem'>
+/** One block's record: the draft and, optionally, the one-step backup of the draft it replaced ("이전 코드 복원"). */
+export interface Saved { code: string; backup?: string; at: number }
+type StorageLike = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem'>>
 
+// One localStorage record per block (`<prefix><pageId>:<blockKey>`), so tabs editing different blocks never share a value.
+// The earlier page-wide `<prefix><pageId>` object never shipped (PR #520 is the first release): an intentional pre-release reset, no migration.
 const KEY_PREFIX = 'coms-study-playground:'
-const MAX_ENTRIES = 80
-// The one-step backup of a block's previous draft lives next to it under this suffix.
-const BACKUP = '~prev'
+// Records are never deleted automatically. Growth is bounded by lesson revisions x blocks, which is slow; when the
+// quota fills, saves fail with the existing notice. Accepted limit: automatic pruning can delete live drafts.
 
 export function fnv1a(text: string): string {
   let h = 0x811c9dc5
@@ -18,38 +20,64 @@ export function fnv1a(text: string): string {
 export const blockKey = (index: number, originalCode: string) => `${index}-${fnv1a(originalCode)}`
 
 export function createStore(pageId: string, storage?: StorageLike | null) {
-  const key = KEY_PREFIX + pageId
   const handle = (): StorageLike | null => {
     if (storage !== undefined) return storage
     try { return window.localStorage } catch { return null }
   }
-  const read = (): Record<string, Saved> => {
-    try {
-      const raw = handle()?.getItem(key)
-      const data = raw ? JSON.parse(raw) : {}
-      return data && typeof data === 'object' && !Array.isArray(data) ? data : {}
-    } catch { return {} }
-  }
-  const write = (data: Record<string, Saved>) => {
-    const keys = Object.keys(data)
-    if (keys.length > MAX_ENTRIES) keys.sort((x, y) => data[x].at - data[y].at).slice(0, keys.length - MAX_ENTRIES).forEach((k) => delete data[k])
-    try { handle()?.setItem(key, JSON.stringify(data)) } catch { /* storage blocked or full: the edit just is not kept */ }
-  }
+  const keyOf = (block: string) => `${KEY_PREFIX}${pageId}:${block}`
+
   return {
     get(block: string): Saved | null {
-      const v = read()[block]
-      return v && typeof v.code === 'string' ? v : null
+      try {
+        const raw = handle()?.getItem(keyOf(block))
+        const v = raw ? JSON.parse(raw) : null
+        if (!v || typeof v !== 'object' || typeof v.code !== 'string') return null
+        return { code: v.code, backup: typeof v.backup === 'string' ? v.backup : undefined, at: typeof v.at === 'number' ? v.at : 0 }
+      } catch { return null }
     },
-    set(block: string, code: string) { const data = read(); data[block] = { code, at: Date.now() }; write(data) },
-    clear(block: string) { const data = read(); delete data[block]; write(data) },
-    /** The draft a block had before a shared code was saved over it ("이전 코드 복원"). */
-    getBackup(block: string): Saved | null {
-      const v = read()[block + BACKUP]
-      return v && typeof v.code === 'string' ? v : null
+    /** True when the record was written. A full storage fails the write (nothing is evicted); the caller keeps the edit pending. */
+    put(block: string, rec: Saved): boolean {
+      try { const st = handle(); if (!st) return false; st.setItem(keyOf(block), JSON.stringify(rec)); return true } catch { return false }
     },
-    setBackup(block: string, code: string) { const data = read(); data[block + BACKUP] = { code, at: Date.now() }; write(data) },
-    clearBackup(block: string) { const data = read(); delete data[block + BACKUP]; write(data) },
+    /** True when the record is gone; false when storage or removeItem is unavailable or throws. */
+    remove(block: string): boolean {
+      try { const st = handle(); if (!st?.removeItem) return false; st.removeItem(keyOf(block)); return true } catch { return false }
+    },
   }
+}
+export type DraftStore = ReturnType<typeof createStore>
+
+/** What a block remembers about its stored draft: the value this tab last read or wrote (`baseline`) and whether it holds an unsaved user edit. */
+export interface DraftState { key: string; baseline: string | null; dirty: boolean }
+
+/**
+ * The only place a draft is written. Synchronous on purpose: nothing is ever queued, so an exit flush cannot miss it.
+ * Accepted limit: localStorage has no cross-process atomicity, so another tab's write can land between the getItem
+ * and the setItem below (one task, microseconds). That window is traded for an end-to-end synchronous design.
+ */
+export function saveBlock(store: DraftStore, b: DraftState, code: string, initial: string): boolean {
+  const stored = store.get(b.key)
+  let backup = stored?.backup
+  // Another tab saved since this tab last looked: its draft becomes the backup instead of being overwritten unseen.
+  if (stored && stored.code !== b.baseline && stored.code !== code) backup = stored.code
+  const unedited = code === initial && backup === undefined
+  const ok = unedited ? store.remove(b.key) : store.put(b.key, { code, backup, at: Date.now() })
+  if (!ok) return false // baseline and dirty stay, so the next flush retries
+  b.baseline = unedited ? null : code
+  b.dirty = false
+  return true
+}
+
+/** "이전 코드 복원": 'declined' when another tab changed the draft since this tab last looked, 'failed' when the write did not go through (nothing is touched either way). */
+export function restoreBlock(store: DraftStore, b: DraftState, currentText: string): 'restored' | 'declined' | 'failed' | 'none' {
+  const stored = store.get(b.key)
+  if (stored?.backup === undefined) return 'none'
+  if (stored.code !== b.baseline) return 'declined'
+  const old = stored.backup
+  if (!store.put(b.key, { code: old, backup: currentText === old ? undefined : currentText, at: Date.now() })) return 'failed'
+  b.baseline = old
+  b.dirty = false
+  return 'restored'
 }
 
 // ---- share link: #pg=<blockIndex>.<base64url(utf8 code)> ----

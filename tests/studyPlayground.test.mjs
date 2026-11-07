@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { JSDOM } from 'jsdom'
 import { classifyBlock, initialCode, stripAnnotations, needsStdin, applyTemplate } from '../src/pages/study/playground/classify.ts'
 import { compareOutput, normalizeOutput } from '../src/pages/study/playground/compare.ts'
-import { createStore, blockKey, encodeShareHash, decodeShareHash, SHARE_MAX_CHARS } from '../src/pages/study/playground/storage.ts'
+import { createStore, saveBlock, restoreBlock, blockKey, encodeShareHash, decodeShareHash, SHARE_MAX_CHARS } from '../src/pages/study/playground/storage.ts'
 import { buildLabScene, encodeLabShare, labLink } from '../src/pages/study/playground/labShare.ts'
 import { runRemote, retryAfterSeconds } from '../src/pages/study/playground/runner.ts'
 import { setSessionExpiredHandler } from '../src/services/apiClient.ts'
@@ -83,41 +83,114 @@ assert.deepEqual(diff.diff.map((d) => `${d.kind}:${d.text}`), ['same:a', 'del:b'
 assert.equal(compareOutput('', '').match, true)
 
 // ---------- 5. persistence ----------
-const mem = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v) } }
+const mem = () => { const m = new Map(); return { m, getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v), removeItem: (k) => void m.delete(k), get length() { return m.size }, key: (i) => [...m.keys()][i] ?? null } }
 const backing = mem()
 const store = createStore('c', backing)
 const key = blockKey(3, 'int main(){}')
 assert.equal(store.get(key), null)
-store.set(key, 'edited')
+store.put(key, { code: 'edited', at: 1 })
 assert.equal(createStore('c', backing).get(key).code, 'edited', 'survives a new store instance (revisit)')
 assert.equal(createStore('java', backing).get(key), null, 'per page')
-store.clear(key)
+assert.deepEqual([...backing.m.keys()], [`coms-study-playground:c:${key}`], 'one record per block, no page-wide object')
+store.remove(key)
 assert.equal(store.get(key), null)
-{
-  // The one-step backup of a draft that a shared code was saved over lives beside it and survives clear().
-  const backups = createStore('c', mem())
-  assert.equal(backups.getBackup(key), null)
-  backups.set(key, 'mine')
-  backups.setBackup(key, 'mine')
-  backups.set(key, 'shared')
-  assert.equal(backups.get(key).code, 'shared')
-  assert.equal(backups.getBackup(key).code, 'mine')
-  backups.clear(key)
-  assert.equal(backups.getBackup(key).code, 'mine', 'resetting a block keeps the backup')
-  backups.clearBackup(key)
-  assert.equal(backups.getBackup(key), null)
-}
 assert.notEqual(blockKey(3, 'a'), blockKey(3, 'b'), 'the key follows the original text')
 const blocked = createStore('c', { getItem() { throw new Error('blocked') }, setItem() { throw new Error('blocked') } })
-blocked.set('k', 'v')
+blocked.put('k', { code: 'v', at: 1 })
 assert.equal(blocked.get('k'), null, 'blocked storage never throws')
 assert.equal(createStore('c', null).get('k'), null)
-backing.setItem('coms-study-playground:c', '{not json')
+backing.setItem('coms-study-playground:c:k', '{not json')
 assert.equal(createStore('c', backing).get('k'), null, 'corrupt JSON is ignored')
-const many = createStore('big', mem())
-for (let i = 0; i < 100; i++) many.set(`k${i}`, 'x')
-assert.equal(many.get('k99').code, 'x')
-assert.equal(many.get('k0'), null, 'oldest entries are dropped past the cap')
+backing.setItem('coms-study-playground:c', '{"k":{"code":"old page-wide format"}}')
+assert.equal(createStore('c', backing).get('k'), null, 'the old page-wide key is ignored')
+{
+  // saveBlock / restoreBlock: the only write path of a draft.
+  const st = createStore('p', mem())
+  const state = (k, baseline = null) => ({ key: k, baseline, dirty: true })
+  const A = state('a'), B = state('b')
+  saveBlock(st, A, 'a1', 'a0'); saveBlock(st, B, 'b1', 'b0')
+  assert.deepEqual([st.get('a').code, st.get('b').code], ['a1', 'b1'], 'different blocks do not interfere')
+  assert.equal(A.baseline, 'a1'); assert.equal(A.dirty, false)
+  saveBlock(st, A, 'a2', 'a0')
+  assert.equal(st.get('a').backup, undefined, 'own previous save is not a backup')
+  st.put('a', { code: 'a-elsewhere', at: 2 }) // another tab saved
+  saveBlock(st, A, 'a3', 'a0')
+  assert.deepEqual([st.get('a').code, st.get('a').backup], ['a3', 'a-elsewhere'], 'the other tab draft is kept as the backup')
+  assert.equal(st.get('b').code, 'b1')
+  // Restore: declined when another tab changed the draft; the record and the state stay untouched.
+  A.dirty = true
+  st.put('a', { code: 'a-elsewhere2', backup: 'a-old', at: 3 })
+  assert.equal(restoreBlock(st, A, 'a-typing'), 'declined')
+  assert.deepEqual(st.get('a'), { code: 'a-elsewhere2', backup: 'a-old', at: 3 }); assert.equal(A.dirty, true)
+  // Accepted when nothing changed: the editor text (unsaved edits included) becomes the backup.
+  A.baseline = 'a-elsewhere2'
+  assert.equal(restoreBlock(st, A, 'a-typing'), 'restored')
+  assert.equal(st.get('a').code, 'a-old'); assert.equal(st.get('a').backup, 'a-typing')
+  assert.equal(A.baseline, 'a-old'); assert.equal(A.dirty, false)
+  assert.equal(restoreBlock(st, B, 'x'), 'none', 'no backup, nothing to restore')
+  // Back to the original code removes the record unless a backup still hangs on it.
+  saveBlock(st, B, 'b0', 'b0'); assert.equal(st.get('b'), null); assert.equal(B.baseline, null)
+  // An empty draft is a draft: saving shared code over it keeps '' as the backup, and restore gives '' back.
+  const E = state('e'); saveBlock(st, E, '', 'e0')
+  assert.equal(st.get('e').code, '')
+  E.baseline = null; saveBlock(st, E, 'shared', 'e0')
+  assert.equal(st.get('e').backup, '')
+  assert.equal(restoreBlock(st, E, 'shared'), 'restored'); assert.equal(st.get('e').code, '')
+  // The shared-view save: the draft being replaced becomes the backup.
+  const C = state('c'); saveBlock(st, C, 'mine', 'c0')
+  C.baseline = null; saveBlock(st, C, 'shared', 'c0')
+  assert.deepEqual([st.get('c').code, st.get('c').backup], ['shared', 'mine'])
+}
+{
+  // A write that fails (quota, private mode) keeps the edit pending; the next flush retries and succeeds.
+  const inner = mem(); let failing = true
+  const flaky = { ...inner, getItem: inner.getItem, setItem: (k, v) => { if (failing) throw new DOMException('full', 'QuotaExceededError'); inner.setItem(k, v) } }
+  Object.defineProperty(flaky, 'length', { get: () => inner.m.size })
+  const st = createStore('f', flaky)
+  const b = { key: 'k', baseline: 'old', dirty: true }
+  assert.equal(saveBlock(st, b, 'new', 'init'), false)
+  assert.deepEqual([b.baseline, b.dirty], ['old', true], 'a failed write keeps baseline and dirty')
+  failing = false
+  assert.equal(saveBlock(st, b, 'new', 'init'), true)
+  assert.deepEqual([b.baseline, b.dirty, st.get('k').code], ['new', false, 'new'], 'the retry succeeds')
+  // Restore: a failed write changes nothing, the editor text is kept by the caller.
+  st.put('k', { code: 'new', backup: 'older', at: 1 })
+  failing = true
+  assert.equal(restoreBlock(st, b, 'typing'), 'failed')
+  assert.equal(st.get('k').code, 'new'); assert.equal(b.baseline, 'new')
+  failing = false
+  assert.equal(restoreBlock(st, b, 'typing'), 'restored')
+}
+{
+  // Drafts are never deleted automatically: two lesson versions of one page share storage; an old 40-day draft and
+  // its backup survive mounting the new version and any number of saves there.
+  const DAY = 24 * 60 * 60 * 1000
+  const m = mem()
+  const oldVersion = createStore('c', m), newVersion = createStore('c', m)
+  oldVersion.put('0-oldversion', { code: 'draft', backup: 'older draft', at: Date.now() - 40 * DAY })
+  for (let i = 0; i < 50; i++) saveBlock(newVersion, { key: `${i}-newversion`, baseline: null, dirty: true }, `edit ${i}`, 'init')
+  assert.deepEqual([oldVersion.get('0-oldversion').code, oldVersion.get('0-oldversion').backup], ['draft', 'older draft'])
+}
+{
+  // A full storage: nothing is evicted, the save fails, the edit stays pending.
+  const inner = mem()
+  const tiny = { ...inner, setItem: (k, v) => { if (!inner.m.has(k) && inner.m.size >= 3) throw new DOMException('full', 'QuotaExceededError'); inner.setItem(k, v) } }
+  Object.defineProperty(tiny, 'length', { get: () => inner.m.size })
+  const q = createStore('q', tiny)
+  for (let i = 0; i < 3; i++) q.put(`b${i}`, { code: 'x', at: 1 })
+  const b = { key: 'fresh', baseline: null, dirty: true }
+  assert.equal(saveBlock(q, b, 'z', 'init'), false)
+  assert.equal(inner.m.size, 3, 'no record was deleted'); assert.equal(b.dirty, true)
+  assert.equal(q.get('b0').code, 'x')
+}
+{
+  // A failed removal (unavailable or throwing) keeps baseline and dirty.
+  const b = { key: 'k', baseline: 'old', dirty: true }
+  for (const st of [createStore('r', null), createStore('r', { getItem: () => null, setItem() {} }), createStore('r', { getItem: () => null, setItem() {}, removeItem() { throw new Error('blocked') } })]) {
+    assert.equal(saveBlock(st, b, 'init', 'init'), false)
+    assert.deepEqual([b.baseline, b.dirty], ['old', true])
+  }
+}
 
 // ---------- 6. share link codec ----------
 const korean = '#include <stdio.h>\nint main(void) {\n    printf("안녕, 광운!\\n");\n}\n'
@@ -147,7 +220,7 @@ globalThis.CompressionStream = realCS
 
 // ---------- 8. runner ----------
 const realFetch = globalThis.fetch
-const reply = (status, body, headers = {}) => async (_url, init) => { reply.last = JSON.parse(init.body); return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } }) }
+const reply = (status, body, headers = {}) => async (_url, init) => { if (init.body) reply.last = JSON.parse(init.body); return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } }) }
 globalThis.fetch = reply(200, { ok: true, stage: 'run', stdout: 'hi\n', stderr: '', exitCode: 0, signal: null, timedOut: false, truncated: false, timeMs: 12, diagnostics: [] })
 let r = await runRemote('c', 'int main(){}', 'in')
 assert.equal(r.kind, 'output')
@@ -160,6 +233,10 @@ assert.equal(r.output.ok, false)
 assert.deepEqual(r.output.diagnostics.map((d) => d.line), [3], 'malformed diagnostics are dropped')
 globalThis.fetch = reply(401, {})
 assert.equal((await runRemote('python', 'x', '')).kind, 'login')
+globalThis.fetch = reply(403, {})
+assert.equal((await runRemote('python', 'x', '')).kind, 'login', 'a plain 403 still asks to sign in')
+globalThis.fetch = reply(403, { error: 'rejected', messageKo: '이 사이트에서만 코드를 실행할 수 있어요.' })
+assert.deepEqual(await runRemote('python', 'x', ''), { kind: 'rejected', messageKo: '이 사이트에서만 코드를 실행할 수 있어요.' }, 'the cross-site refusal explains itself')
 {
   // An expired access cookie: refresh once, retry once; a refused refresh asks to sign in without retrying.
   const calls = []
@@ -218,6 +295,63 @@ globalThis.fetch = async (_u, init) => new Promise((_, rej) => init.signal.addEv
 const pending = runRemote('c', 'x', '', ctl.signal)
 ctl.abort()
 await assert.rejects(pending, 'an aborted run rejects (the caller ignores it)')
+{
+  // A stalled session refresh must never hang the run button (the refresh is shared with the whole page).
+  const okBody = () => new Response(JSON.stringify({ ok: true, stage: 'run', stdout: 'ok\n', stderr: '', exitCode: 0, diagnostics: [] }))
+  const realTimeout = AbortSignal.timeout.bind(AbortSignal)
+  const keepAlive = setInterval(() => {}, 20) // AbortSignal.timeout timers are unref'd: keep node running while we wait for them
+
+  // (a) the refresh never answers (and ignores the abort): runRemote still settles by a deadline, in Korean
+  AbortSignal.timeout = (ms) => realTimeout(Math.min(ms, 40))
+  try {
+    let refreshes = 0
+    globalThis.fetch = async (url) => {
+      if (url === '/api/auth/refresh') { refreshes++; return new Promise(() => {}) }
+      return new Response('{}', { status: 401 })
+    }
+    const stalled = await runRemote('c', 'x', '')
+    assert.equal(stalled.kind, 'network')
+    assert.match(stalled.messageKo, /로그인 상태를 확인하지 못했어요/)
+    assert.equal(refreshes, 1)
+
+    // (c) the stalled refresh times out on its own (scaled to 40 ms here), so the next run can refresh again and succeed
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    let healthy = false
+    globalThis.fetch = async (url, init) => {
+      if (url === '/api/auth/refresh') { refreshes++; return new Response(null, { status: 204 }) }
+      healthy = healthy || init?.method === 'POST' && refreshes >= 2
+      return refreshes >= 2 ? okBody() : new Response('{}', { status: 401 })
+    }
+    assert.equal((await runRemote('c', 'x', '')).kind, 'output')
+    assert.equal(refreshes, 2, 'the second run started a new refresh')
+  } finally { AbortSignal.timeout = realTimeout }
+
+  // (d) a refresh the server answers with a non-401 error (an origin-check 403, a 5xx) is not a hang: still "sign in"
+  for (const status of [403, 500]) {
+    globalThis.fetch = async (url) => url === '/api/auth/refresh' ? new Response('{}', { status }) : new Response('{}', { status: 401 })
+    assert.equal((await runRemote('c', 'x', '')).kind, 'login', `refresh ${status} keeps the sign-in prompt`)
+  }
+
+  // (b) caller A aborts while the shared refresh is pending; caller B still gets the refreshed session
+  let release
+  let refreshCalls = 0
+  let posts = 0
+  globalThis.fetch = async (url) => {
+    if (url === '/api/auth/refresh') { refreshCalls++; await new Promise((resolve) => { release = resolve }); return new Response(null, { status: 204 }) }
+    posts++
+    return posts <= 2 ? new Response('{}', { status: 401 }) : okBody()
+  }
+  const aborter = new AbortController()
+  const a = runRemote('c', 'a', '', aborter.signal)
+  const b = runRemote('c', 'b', '')
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  aborter.abort()
+  await assert.rejects(a, { name: 'AbortError' })
+  release()
+  assert.equal((await b).kind, 'output')
+  assert.equal(refreshCalls, 1, 'A and B shared one refresh')
+  clearInterval(keepAlive)
+}
 {
   // Older Safari has neither AbortSignal.any nor AbortSignal.timeout: the run must still work and still be abortable.
   const { any, timeout } = AbortSignal

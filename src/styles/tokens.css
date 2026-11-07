@@ -1,7 +1,7 @@
 
 :root {
 	color-scheme: light;
-	--apple-font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Apple SD Gothic Neo', 'Segoe UI', 'Malgun Gothic', sans-serif;
+	--apple-font-family: 'Pretendard Variable', 'Pretendard Fallback Latin', 'Pretendard Fallback Apple', 'Pretendard Fallback Noto', 'Pretendard Fallback Malgun', 'Pretendard Fallback WenQuanYi', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Apple SD Gothic Neo', 'Segoe UI', 'Malgun Gothic', sans-serif;
 	font-family: var(--apple-font-family);
 	--app-bg: #f5f5f7;
 	--app-surface: #ffffff;

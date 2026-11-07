@@ -4,14 +4,14 @@
 // Every pre.code gets a stage wrapper + toolbar at init (the toolbar's space is reserved in CSS, so nothing moves).
 // No editor exists until "직접 해보기" is pressed. The returned cleanup undoes everything (StrictMode runs effects twice).
 
-import { showToast } from '../../../components/common/Toast'
+import { dismissToast, showToast } from '../../../components/common/Toast'
 import { buildDoc, buildRawDoc, SANDBOX_URL } from '../studyDemos'
 import { classifyBlock, initialCode, langLabel, type BlockDecision, type PageLang } from './classify'
 import { compareOutput } from './compare'
 import { encodeLabShare, labLink, LAB_URL } from './labShare'
 import type { PgEditor } from './editor'
 import { runRemote, type Diagnostic, type RunLang, type RunResult } from './runner'
-import { blockAnchor, blockKey, createStore, decodeShareHash, encodeShareHash } from './storage'
+import { blockAnchor, blockKey, createStore, decodeShareHash, encodeShareHash, restoreBlock, saveBlock } from './storage'
 
 export interface PlaygroundOptions {
   pageId: PageLang
@@ -107,6 +107,12 @@ class Block {
   /** A shared link's code is open as a temporary view: nothing is saved until the reader chooses to. */
   shared = false
   savedBeforeShare: string | null = null
+  /** What this tab last read from / wrote to storage for the block: a save finding something else there means another tab saved meanwhile. */
+  baseline: string | null
+  /** A user edit not yet saved. Set only by typing in a non-shared block; programmatic loads never set it. */
+  dirty = false
+  /** True while the page itself loads code into the editor (restore, back, reset): that is not typing and must not autosave. */
+  programmatic = false
   els: Record<string, HTMLElement> = {}
 
   constructor(readonly index: number, readonly pre: HTMLElement, readonly raw: string, decision: BlockDecision, saved: string | null, page: PageLang) {
@@ -115,6 +121,7 @@ class Block {
     this.key = blockKey(index, raw)
     this.anchor = blockAnchor(index)
     this.current = saved ?? this.initial
+    this.baseline = saved
     this.expected = decision.run ? expectedOutputAfter(pre, page) : null
   }
   get lang() { return this.decision.lang }
@@ -174,7 +181,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
         b.els.run = run
         right.appendChild(run)
       }
-      if (!b.shared && store.getBackup(b.key)) {
+      if (!b.shared && store.get(b.key)?.backup !== undefined) {
         const restore = btn('restore', '↶ 이전 코드 복원')
         restore.title = '공유 코드로 저장하기 전의 내 코드를 되살려요'
         right.appendChild(restore)
@@ -238,7 +245,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
 
   function closeEditor(b: Block) {
     if (b.full) setFull(b, false)
-    if (b.shared) { b.shared = false; b.current = b.savedBeforeShare ?? b.initial } // closing a shared view drops it
+    if (b.shared) { b.shared = false; window.clearTimeout(b.saveTimer); b.saveTimer = 0; b.current = ownDraft(b); b.baseline = store.get(b.key)?.code ?? null; b.dirty = false } // closing a shared view drops it
     else if (b.editor) b.current = b.editor.getValue()
     if (b.editor) { b.editor.destroy(); b.editor = null }
     b.host?.remove()
@@ -249,19 +256,44 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
   }
 
   function onEdit(b: Block, value: string) {
+    if (b.programmatic) return
     b.current = value
     b.editor?.clearDiagnostics()
-    window.clearTimeout(b.saveTimer)
-    b.saveTimer = window.setTimeout(() => persist(b), 400)
+    if (!b.shared) { // a shared link's code is a temporary view: typing in it never marks the draft dirty
+      b.dirty = true
+      window.clearTimeout(b.saveTimer)
+      b.saveTimer = window.setTimeout(() => flush(b), 400)
+    }
     const was = b.stage.classList.contains('is-edited')
     if (was !== b.edited) renderBar(b)
   }
-  function persist(b: Block) {
+  /** Writes a pending user edit, synchronously (debounce, pagehide, dispose, leaving for the login page). */
+  function flush(b: Block) {
     window.clearTimeout(b.saveTimer)
     b.saveTimer = 0
-    if (b.shared) return // a shared link's code stays a temporary view until "이 코드로 저장"
-    if (b.edited) store.set(b.key, b.current)
-    else store.clear(b.key)
+    if (b.dirty && !b.shared) saveDraft(b, b.current)
+  }
+  // One notice per failure streak (full storage, private mode); it goes away after the next successful write.
+  let failureToast = 0
+  function reportSave(ok: boolean) {
+    if (ok && failureToast) { dismissToast(failureToast); failureToast = 0 }
+    if (!ok && !failureToast) failureToast = showToast({ message: '브라우저 저장 공간이 부족해서 코드를 저장하지 못했어요. 다른 탭이나 사이트 데이터를 정리해 주세요.', tone: 'error', duration: 0 })
+  }
+  /** saveBlock plus the notice; on failure the block stays dirty so the next debounce or exit flush retries. */
+  function saveDraft(b: Block, code: string): boolean {
+    const ok = saveBlock(store, b, code, b.initial)
+    if (!ok) b.dirty = true
+    reportSave(ok)
+    return ok
+  }
+  /** Puts code into the editor on the page's own initiative: no autosave is scheduled and a pending one is dropped. */
+  function loadCode(b: Block, value: string) {
+    b.programmatic = true
+    try { b.editor?.setValue(value) } finally { b.programmatic = false }
+    b.current = value
+    window.clearTimeout(b.saveTimer)
+    b.saveTimer = 0
+    b.editor?.clearDiagnostics()
   }
 
   // ---------- full screen ----------
@@ -443,7 +475,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     setBusy(b, false)
     switch (result.kind) {
       case 'login': {
-        persist(b)
+        flush(b)
         ensurePanel(b)
         b.els.chips.textContent = ''
         b.els.out.hidden = b.els.err.hidden = b.els.diag.hidden = true
@@ -578,22 +610,27 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
   function dropShareHash() {
     if (/^#pg=/.test(location.hash)) history.replaceState(history.state, '', `${location.pathname}${location.search}`)
   }
+  // The reader's own code now: re-read at leave time, since another tab may have saved a newer draft since the link was opened.
+  function ownDraft(b: Block): string {
+    return store.get(b.key)?.code ?? b.initial
+  }
   function leaveShared(b: Block, save: boolean) {
     if (!b.shared) return
     const value = b.editor ? b.editor.getValue() : b.current
     b.shared = false
+    window.clearTimeout(b.saveTimer)
+    b.saveTimer = 0
     b.host?.querySelector('.pg-shared')?.remove()
     if (save) {
       // One step back: the draft this replaces stays available as "이전 코드 복원".
-      if (b.savedBeforeShare !== null && b.savedBeforeShare !== value) store.setBackup(b.key, b.savedBeforeShare)
       b.current = value
-      persist(b)
-      showToast('이 코드로 저장했어요. 이전 코드는 "이전 코드 복원"으로 되살릴 수 있어요.')
+      b.baseline = null // whatever draft is stored now is the one being replaced: saveBlock keeps it as the backup
+      if (saveDraft(b, value)) showToast('이 코드로 저장했어요. 이전 코드는 "이전 코드 복원"으로 되살릴 수 있어요.')
     } else {
-      const own = b.savedBeforeShare ?? b.initial
-      b.current = own
-      b.editor?.setValue(own)
-      b.editor?.clearDiagnostics()
+      const own = ownDraft(b)
+      b.baseline = store.get(b.key)?.code ?? null
+      b.dirty = false
+      loadCode(b, own)
       showToast('내 코드로 돌아왔어요.')
     }
     b.savedBeforeShare = null
@@ -602,15 +639,24 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     b.editor?.focus()
   }
   function restoreBackup(b: Block) {
-    const backup = store.getBackup(b.key)
-    if (!backup) return
-    const now = b.editor ? b.editor.getValue() : b.current
-    if (now !== backup.code) store.setBackup(b.key, now) // swap: restoring can itself be undone once
-    else store.clearBackup(b.key)
-    b.current = backup.code
-    b.editor?.setValue(backup.code)
-    b.editor?.clearDiagnostics()
-    persist(b)
+    const now = b.editor ? b.editor.getValue() : b.current // unsaved edits included
+    const rec = store.get(b.key)
+    if (rec?.backup === undefined) return
+    const result = restoreBlock(store, b, now)
+    if (result === 'declined') {
+      // Another tab saved this block since this tab last looked: restoring now would bury its draft. The editor text
+      // and its pending autosave stay as they are (that save then keeps the other draft as the backup).
+      showToast('다른 탭에서 이 코드가 바뀌어서 되돌리기를 멈췄어요. 지금 코드는 그대로 있어요.')
+      return
+    }
+    if (result === 'failed') { // nothing was written: the editor text stays
+      reportSave(false)
+      return
+    }
+    reportSave(true)
+    window.clearTimeout(b.saveTimer)
+    b.saveTimer = 0
+    loadCode(b, rec.backup)
     renderBar(b)
     showToast('이전 코드를 되살렸어요.')
   }
@@ -625,7 +671,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     if (action === 'login') { ev.preventDefault(); opts.onLogin(`#${b.anchor}`); return }
     switch (action) {
       case 'edit':
-        if (b.editor || b.loading) { persist(b); closeEditor(b); (b.bar.querySelector('[data-pg="edit"]') as HTMLElement | null)?.focus() }
+        if (b.editor || b.loading) { flush(b); closeEditor(b); (b.bar.querySelector('[data-pg="edit"]') as HTMLElement | null)?.focus() }
         else await openEditor(b)
         break
       case 'run':
@@ -633,11 +679,8 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
         break
       case 'lab': await labOpen(b); break
       case 'reset':
-        b.editor?.setValue(b.initial)
-        b.editor?.clearDiagnostics()
-        b.current = b.initial
-        window.clearTimeout(b.saveTimer)
-        if (!b.shared) store.clear(b.key) // in a shared view only the view changes; the saved draft stays
+        loadCode(b, b.initial)
+        if (!b.shared) saveDraft(b, b.initial) // in a shared view only the view changes; the saved draft stays
         renderBar(b)
         b.editor?.focus()
         showToast('원래 코드로 되돌렸어요.')
@@ -692,7 +735,8 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     if (b && !(e.target as Element | null)?.closest?.('.cm-editor')) setFull(b, false)
   }, { signal })
 
-  window.addEventListener('pagehide', () => blocks.forEach((b) => b.saveTimer && persist(b)), { signal })
+  window.addEventListener('pagehide', () => blocks.forEach(flush), { signal })
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') blocks.forEach(flush) }, { signal })
 
   // ---------- deep links: a shared code (#pg=…) or a block anchor (#code-N, e.g. back from the login page) ----------
   const shared = decodeShareHash(location.hash)
@@ -719,7 +763,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     disposed = true
     ac.abort()
     blocks.forEach((b) => {
-      if (b.saveTimer) persist(b)
+      flush(b)
       b.abort?.abort()
       window.clearInterval(b.busyTimer)
       b.editor?.destroy()
@@ -727,6 +771,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
       b.stage.parentNode?.insertBefore(b.pre, b.stage)
       b.stage.remove()
     })
+    if (failureToast) { dismissToast(failureToast); failureToast = 0 } // the toast host outlives this page
     inerted.splice(0).forEach((n) => n.removeAttribute('inert'))
     document.documentElement.classList.remove('pg-lock')
   }

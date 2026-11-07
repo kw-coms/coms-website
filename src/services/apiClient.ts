@@ -34,7 +34,8 @@ function notifySessionExpired() {
 //  - 'rejected'    the server refused to renew the session (401): it is gone for good.
 //  - 'unavailable' network failure / 5xx / anything else: unknown, so the session
 //                  state must not be touched on this evidence alone.
-type RefreshOutcome = 'refreshed' | 'rejected' | 'unavailable'
+//  - 'timeout'     the refresh did not answer within its own deadline (same handling as 'unavailable').
+type RefreshOutcome = 'refreshed' | 'rejected' | 'unavailable' | 'timeout'
 let refreshInFlight: Promise<RefreshOutcome> | null = null
 // Bumped once per SUCCESSFUL refresh. A request that was already in flight when
 // someone else rotated the token gets a 401 from the token it was sent with, not
@@ -43,18 +44,36 @@ let refreshInFlight: Promise<RefreshOutcome> | null = null
 // captured before the request against the current one tells the two cases apart:
 // if it moved, just retry; the cookie is already fresh.
 let refreshGeneration = 0
+// The refresh has its own finite deadline: a stalled /api/auth/refresh must never hold every request of the
+// page (and each caller waiting on it) forever. It is raced as well as signalled, so it settles even when a
+// fetch implementation ignores the abort.
+export const REFRESH_TIMEOUT_MS = 15_000
+function refreshDeadline(): { signal: AbortSignal; expired: Promise<never> } {
+  const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(REFRESH_TIMEOUT_MS) : (() => {
+    const controller = new AbortController()
+    setTimeout(() => controller.abort(), REFRESH_TIMEOUT_MS)
+    return controller.signal
+  })()
+  const expired = new Promise<never>((_, reject) => {
+    if (signal.aborted) reject(new Error('refresh timed out'))
+    else signal.addEventListener('abort', () => reject(new Error('refresh timed out')), { once: true })
+  })
+  expired.catch(() => {}) // a lost race must not become an unhandled rejection
+  return { signal, expired }
+}
 async function tryRefreshToken(): Promise<RefreshOutcome> {
   if (refreshInFlight) return refreshInFlight
   refreshInFlight = (async (): Promise<RefreshOutcome> => {
+    const deadline = refreshDeadline()
     try {
-      const res = await fetch(apiUrl('/api/auth/refresh'), { method: 'POST', credentials: 'include' })
+      const res = await Promise.race([fetch(apiUrl('/api/auth/refresh'), { method: 'POST', credentials: 'include', signal: deadline.signal }), deadline.expired])
       if (res.ok) {
         refreshGeneration += 1
         return 'refreshed'
       }
       return res.status === 401 ? 'rejected' : 'unavailable'
     } catch {
-      return 'unavailable'
+      return deadline.signal.aborted ? 'timeout' : 'unavailable'
     } finally {
       refreshInFlight = null
     }
@@ -66,11 +85,11 @@ async function tryRefreshToken(): Promise<RefreshOutcome> {
 // the same single-flight refresh, generation guard and session-expiry notification as every other request.
 // Take the generation before sending, and after a 401 retry once when this returns true.
 export const sessionGeneration = () => refreshGeneration
-export async function renewSessionAfter401(generationBeforeRequest: number): Promise<boolean> {
-  if (refreshGeneration > generationBeforeRequest) return true // someone already renewed the cookie
+export async function renewSessionAfter401(generationBeforeRequest: number): Promise<RefreshOutcome> {
+  if (refreshGeneration > generationBeforeRequest) return 'refreshed' // someone already renewed the cookie
   const outcome = await tryRefreshToken()
   if (outcome === 'rejected') notifySessionExpired()
-  return outcome === 'refreshed'
+  return outcome
 }
 
 // Shared 401 recovery for request / requestNoContent / requestBlob, which all ran an identical

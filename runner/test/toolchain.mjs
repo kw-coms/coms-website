@@ -12,6 +12,10 @@ import { runCode, assertContainer, runnerHealthy, JOB_ID, asJob, executeStage, k
 
 // run.mjs gives the reaper 6 s before it declares the sandbox unclean (poison + restart).
 const REAP_DEADLINE_MS = 6000;
+// Typical-case bounds (the original fixed bounds, 1.7 s and 1 s, times 1.5) applied to the median of repeated runs.
+const STORM_MEDIAN_MS = 2550;
+const REAPER_MEDIAN_MS = 1500;
+const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 const enabled = process.env.RUNNER_TOOLCHAIN_TESTS === '1';
 let reason = enabled ? '' : 'requires disposable container; set RUNNER_TOOLCHAIN_TESTS=1';
 if (enabled) {
@@ -453,12 +457,12 @@ test('SIGSTOP attackers plus fork storms cannot wedge cleanup or the event loop;
       const next = await call('POST', '/study/api/run', { lang: 'python', code: 'print("after")' });
       assert.equal(next.status, 200, `round ${round}: ${next.data} ${stderr}`); assert.equal(JSON.parse(next.data).stdout, 'after\n');
     }
-    // A job (~0.35 s) plus its cleanup must finish inside the reaper's own 6 s deadline (run.mjs: past it the
-    // runner poisons itself and restarts). A tight wall-clock bound only measures the CI runner's load, so the
-    // measured times are logged and the assertion is the deadline.
-    console.log(`# job + cleanup under storm (ms): ${timings.join(', ')}`);
-    assert.ok(Math.max(...timings) < REAP_DEADLINE_MS, `slow cleanup under storm: ${timings}`);
-    console.log(`# storm+attacker request times (ms): ${timings.join(', ')}`);
+    // A job (~0.35 s) plus its cleanup. Hard ceiling: the reaper's own 6 s deadline (run.mjs: past it the runner
+    // poisons itself and restarts). Regression signal: the MEDIAN of the repeated runs stays within 1.5x the
+    // original 1.7 s bound, which a noisy CI runner does not move but a real slowdown of the cleanup does.
+    console.log(`# job + cleanup under storm+attackers (ms): ${timings.join(', ')}`);
+    assert.ok(Math.max(...timings) < REAP_DEADLINE_MS, `cleanup under storm hit the reaping deadline: ${timings}`);
+    assert.ok(median(timings) <= STORM_MEDIAN_MS, `cleanup under storm regressed (median ${median(timings)} ms): ${timings}`);
     watching = false; await watchdog;
     assert.deepEqual(failures, [], 'health must always answer'); assert.ok(probes >= 5, `only ${probes} probes`); assert.ok(worst < 2000, `health stalled ${worst} ms`);
     const survivors = [];
@@ -490,6 +494,7 @@ test('reaper: killJobProcesses finishes inside its deadline against fork storms 
     await clearSystemVIpc(); await wipeJobFiles();
   }
   console.log(`# reaper times under storm+attackers (ms): ${timings.join(', ')}`);
-  assert.ok(Math.max(...timings) < REAP_DEADLINE_MS, `reaper too slow: ${timings}`);
+  assert.ok(Math.max(...timings) < REAP_DEADLINE_MS, `reaper hit its deadline: ${timings}`);
+  assert.ok(median(timings) <= REAPER_MEDIAN_MS, `reaper regressed (median ${median(timings)} ms): ${timings}`);
   assert.ok(runnerHealthy());
 });
