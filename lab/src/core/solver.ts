@@ -546,7 +546,13 @@ export function solveCircuit(scene: Scene, analysis: Analysis, pins: Record<stri
             if (p.kind === 'inductor') {
                 const a = net(id, '1'), b = net(id, '2');
                 const index = branches.findIndex(branch => branch.part === id && branch.a === a && branch.b === b);
-                if (a && b && index >= 0) context.state.inductors[id] = { volts: (volts[a] ?? 0) - (volts[b] ?? 0), amps: currents[index] ?? 0 };
+                if (a && b && index >= 0) {
+                    const amps = currents[index] ?? 0;
+                    context.state.inductors[id] = {
+                        volts: (volts[a] ?? 0) - (volts[b] ?? 0) - amps * Number(p.props.seriesOhms ?? 0),
+                        amps,
+                    };
+                }
             }
         }
     }

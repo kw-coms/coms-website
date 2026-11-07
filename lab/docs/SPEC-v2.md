@@ -25,7 +25,4 @@ Instruments: oscilloscope (2 ch, time/div, volts/div, trigger), function-generat
 Tinkercad-like blocks for Arduino: output (digitalWrite, analogWrite, tone/noTone, servo write, NeoPixel set/show, LCD print/clear/cursor, 7-seg digit), input (digitalRead, analogRead, pulseIn/ultrasonic distance, DHT temp/humidity, IR code received, keypad key), control (wait, repeat, while, if/else, for, every N ms), math, text, variables, serial print/read, custom functions. Generates readable C++ live (Blocks+Text). Switching to Text is one-way with a confirmation, like Tinkercad.
 
 ## 4. Beyond Tinkercad (our additions)
-- Club cloud: save circuits to the member's account, list "내 회로", share with the club gallery (공개/비공개), fork others' circuits. (Backend: Spring + Flyway table; sensitive → two cross-model reviews.)
-- Missions: guided tasks aligned with the 아두이노 기초 study (e.g. 신호등, 버튼 카운터, 거리 경보기) with automatic checking by running the circuit headlessly and asserting behaviour.
-- Logic analyzer instrument; auto-generated 2D schematic view; Korean part info popups (what it is, pins, typical wiring, common mistakes); .ino export and BOM CSV; sticky notes.
-- Readability: default camera framing so parts are big enough to grab; magnetic pin snapping feedback; part labels toggle.
+See [SPEC-v2-cloud.md](SPEC-v2-cloud.md) for the next phase (separate PR).

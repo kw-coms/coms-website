@@ -92,10 +92,18 @@ test('debug opt-in returns bounded sketch information and removes ELF with workd
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 test('normal compiles never invoke ELF extractor or return debug', async () => {
-  const result = await compileSketch('void setup(){}', { runner: debugCompileRunner,
+  const result = await compileSketch('void setup(){}', { runner: async (args, context) => {
+    assert.ok(!args.some(arg => /(?:^|=)-g$/.test(arg)), 'normal compilation must not pass -g');
+    return debugCompileRunnerWithoutFlags(args, context);
+  },
     debugRunner: () => { throw new Error('must not run'); } });
   assert.equal(result.ok, true); assert.equal('debug' in result, false);
 });
+async function debugCompileRunnerWithoutFlags(_args, { cwd }) {
+  await mkdir(join(cwd, 'out'));
+  await writeFile(join(cwd, 'out/sketch.ino.hex'), HEX);
+  return { code: 0, stdout: '', stderr: '' };
+}
 test('debug extraction error and output limit fail closed without leaking tool output', async () => {
   for (const debugRunner of [
     async () => ({ code: 1, stdout: '/secret.elf ELF_SENTINEL', stderr: '/secret' }),

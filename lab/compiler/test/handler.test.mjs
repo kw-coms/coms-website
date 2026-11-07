@@ -118,6 +118,6 @@ test('HTTP debug true reaches extraction and returns DebugInfo, never ELF', asyn
   }, debugRunner: async () => { extracted = true; return { code: 0, stdout: '', stderr: '' }; } });
   const result = await invoke(server, { body: JSON.stringify({ sketch: 'void setup(){}', debug: true }) });
   assert.equal(result.status, 200); assert.equal(extracted, true);
-  assert.deepEqual(result.body.debug, { lines: [], globals: [] });
+  assert.deepEqual(result.body.debug, { lines: [], globals: [], truncated: false });
   assert.doesNotMatch(JSON.stringify(result.body), /ELF_SENTINEL|\.elf/);
 });

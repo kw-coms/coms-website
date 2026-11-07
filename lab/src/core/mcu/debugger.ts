@@ -98,14 +98,17 @@ function formatGlobal(cpu: CPU, g: DebugInfo['globals'][number]): string {
   const view = cpu.dataView;
   const array = /\[(\d+)\]/.exec(type);
   const signed = !/unsigned|uint|byte/.test(type);
-  const width = /long|int32|uint32|float/.test(type) ? 4
+  // AVR uses 32-bit double; read 64-bit integers as BigInt to preserve precision.
+  const width = /long\s+long|u?int64/.test(type) ? 8
+    : /long|int32|uint32|float|double/.test(type) ? 4
     : /int16|uint16|short|\b(?:unsigned\s+)?int\b/.test(type) ? 2 : 1;
   if (!array && g.size < width) return '?';
   const read = (offset: number): string => {
     const at = addr + offset;
-    if (/float/.test(type)) return String(Number(view.getFloat32(at, true).toPrecision(7)));
+    if (/float|double/.test(type)) return String(Number(view.getFloat32(at, true).toPrecision(7)));
     if (/bool/.test(type)) return cpu.data[at] ? 'true' : 'false';
     if (/char/.test(type)) return JSON.stringify(String.fromCharCode(cpu.data[at]!));
+    if (width === 8) return String(signed ? view.getBigInt64(at, true) : view.getBigUint64(at, true));
     if (width === 4) return String(signed ? view.getInt32(at, true) : view.getUint32(at, true));
     if (width === 2) return String(signed ? view.getInt16(at, true) : view.getUint16(at, true));
     return String(signed && !/byte/.test(type) ? view.getInt8(at) : view.getUint8(at));

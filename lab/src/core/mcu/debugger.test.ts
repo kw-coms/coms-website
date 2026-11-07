@@ -62,6 +62,38 @@ describe('AVR line debugger', () => {
     expect(mcu.debugger.state(mcu.cpu)?.globals?.map(g => g.value)).toEqual(['255', '-1', '?']);
   });
 
+  it('formats AVR double scalars and arrays as four-byte floats', () => {
+    const mcu = create();
+    mcu.debugger.load({ lines: info.lines, globals: [
+      { name: 'scalar', addr: 0x800120, size: 4, type: 'double' },
+      { name: 'array', addr: 0x800124, size: 8, type: 'double[2]' },
+      { name: 'short', addr: 0x80012c, size: 3, type: 'double' },
+    ] });
+    mcu.cpu.dataView.setFloat32(0x120, -12.5, true);
+    mcu.cpu.dataView.setFloat32(0x124, 1.25, true);
+    mcu.cpu.dataView.setFloat32(0x128, -0.5, true);
+    expect(mcu.debugger.state(mcu.cpu)?.globals?.map(g => g.value))
+      .toEqual(['-12.5', '[1.25, -0.5]', '?']);
+  });
+
+  it.each(['long long', 'int64_t', 'unsigned long long', 'uint64_t'])(
+    'formats %s without losing 64-bit precision, including arrays', type => {
+      const mcu = create();
+      const unsigned = /unsigned|uint/.test(type);
+      const first = unsigned ? 18446744073709551615n : -9223372036854775808n;
+      const second = 9007199254740993n;
+      mcu.debugger.load({ lines: info.lines, globals: [
+        { name: 'scalar', addr: 0x800140, size: 8, type },
+        { name: 'array', addr: 0x800140, size: 16, type: `${type}[2]` },
+        { name: 'short', addr: 0x800150, size: 4, type },
+      ] });
+      mcu.cpu.dataView.setBigUint64(0x140, BigInt.asUintN(64, first), true);
+      mcu.cpu.dataView.setBigUint64(0x148, second, true);
+      expect(mcu.debugger.state(mcu.cpu)?.globals?.map(g => g.value))
+        .toEqual([String(first), `[${first}, ${second}]`, '?']);
+    },
+  );
+
   it('tracks interrupt entry and RETI as a nested frame for step over', () => {
     const mcu = create();
     const debug = mcu.debugger;

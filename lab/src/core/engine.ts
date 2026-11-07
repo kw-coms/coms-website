@@ -39,6 +39,8 @@ export class SimulationEngine {
   private motorDv = new Map<string, { target: number; dv: number; timeMs: number }>();
   private behavior = new BehavioralDevices();
   private instruments = new Instruments();
+  private keypadCache = new Map<string, SolveResult>();
+  private keypadCacheEnabled = false;
   private v2 = false;
   private dynamic = false;
   private solving = false;
@@ -123,6 +125,10 @@ export class SimulationEngine {
     // Editing source must not reset protocol transactions or the running circuit.
     if (unchanged) return this.analysis;
     this.v2 = this.scene.parts.some(part => !this.legacyKinds.has(part.kind));
+    // A standalone UNO/keypad circuit has no time-dependent or edge-triggered device state.
+    this.keypadCacheEnabled = this.scene.parts.length === 2
+      && this.scene.parts.some(part => part.kind === 'arduino-uno')
+      && this.scene.parts.some(part => part.kind === 'keypad-4x4');
     this.dynamic = this.scene.parts.some(part => [
       'capacitor-ceramic', 'capacitor-electrolytic', 'inductor', 'timer-555',
       'function-generator', 'oscilloscope', 'logic-analyzer', 'light-bulb',
@@ -135,6 +141,7 @@ export class SimulationEngine {
     this.analogTimeMs = this.mcu.cpu.cycles / 16000;
     this.lastAnalogPins = undefined;
     this.recentWarnings.clear();
+    this.keypadCache.clear();
     this.unoId = this.scene.parts.find(part => part.kind === 'arduino-uno')?.id;
     this.mcu.clearEcho();
     this.analysis = analyze(this.scene);
@@ -259,6 +266,7 @@ export class SimulationEngine {
     this.analogTimeMs = this.mcu.cpu.cycles / 16000;
     this.lastAnalogPins = undefined;
     this.recentWarnings.clear();
+    this.keypadCache.clear();
     this.solution = undefined;
     this.dirty = true;
     this.elapsedReal = 0;
@@ -280,6 +288,7 @@ export class SimulationEngine {
     values[definition.key] = typeof input.value === 'number'
       ? clamp(input.value, definition.min ?? 0, definition.max ?? 1)
       : input.value;
+    this.keypadCache.clear();
     this.dirty = true;
     if (input.key === 'distanceCm') this.configureDevices();
   }
@@ -345,6 +354,24 @@ export class SimulationEngine {
       const pins = heldPins ?? this.mcu.pins();
       const instantaneous: PinStates = Object.fromEntries(Object.entries(pins).map(([id, state]) => [id, { ...state, duty: state.level }]));
       const timeMs = this.mcu.cpu.cycles / MCU_HZ * 1000;
+      const cacheKey = this.keypadCacheEnabled && dtMs === 0
+        ? Object.entries(pins).map(([id, state]) => `${id}:${state.mode}:${state.level}`).join('|')
+        : undefined;
+      const cached = cacheKey === undefined ? undefined : this.keypadCache.get(cacheKey);
+      if (cached) {
+        this.solution = cached;
+        this.transient.previous = cached.netVolts;
+        this.opticalCurrents = cached.currents;
+        for (const [id, state] of Object.entries(pins)) {
+          if (this.unoId && state.mode !== 'output' && !this.echoPins.has(id) && !this.mcu.dhtBusy(id)) {
+            this.mcu.setVoltage(id, this.voltage(this.unoId, id));
+          }
+        }
+        this.analogTimeMs = timeMs;
+        this.lastAnalogPins = instantaneous;
+        this.dirty = false;
+        return;
+      }
       const old = this.solution?.netVolts ?? {};
       const oldCaps = dtMs > 0 ? { ...this.transient.capacitors } : undefined;
       const oldCoils = dtMs > 0 ? { ...this.transient.inductors } : undefined;
@@ -352,16 +379,25 @@ export class SimulationEngine {
       this.solution = solveCircuit(this.scene, this.analysis, instantaneous, this.inputs, behavior.drives,
         { timeMs, dtMs, state: this.transient, links: behavior.links });
       const edgeWarnings = this.solution.warnings.filter(warning => warning.id.startsWith('relay-turnoff-spike:'));
-      // Supply startup and cascaded combinational logic settle without advancing C/L history.
-      for (let iteration = 0; iteration < 4; iteration++) {
+      // Allow one propagation per gate (including gates chained inside one IC), plus supply startup.
+      const settleBudget = 2 + this.scene.parts.reduce((count, part) => count +
+        (part.kind === 'logic-7404' ? 6 : part.kind.startsWith('logic-74') ? 4
+          : ['shift-register-595', 'l293d', 'timer-555', 'keypad-4x4', 'pir',
+            'ir-receiver', 'lcd1602-parallel', 'seven-segment-4digit'].includes(part.kind) ? 1 : 0), 0);
+      let settled = false;
+      for (let iteration = 0; iteration < settleBudget; iteration++) {
         const next = this.behavior.tick(this.scene, this.analysis, this.solution.netVolts, this.inputs, timeMs);
         const changed = JSON.stringify(next.drives) !== JSON.stringify(behavior.drives)
           || JSON.stringify(next.links) !== JSON.stringify(behavior.links);
         behavior = next;
-        if (!changed) break;
+        if (!changed) { settled = true; break; }
         this.solution = solveCircuit(this.scene, this.analysis, instantaneous, this.inputs, behavior.drives,
           { timeMs, dtMs: 0, state: this.transient, links: behavior.links });
       }
+      if (!settled) this.solution.warnings.push({
+        id: 'behavior-nonconvergent', level: 'warn',
+        message: '회로의 동작 출력이 수렴하지 않았습니다. 연결을 확인해 주세요.',
+      });
       for (const part of this.scene.parts.filter(part => part.kind === 'dc-motor')) {
         const motor = this.solution.parts[part.id]?.motor;
         if (!motor) continue;
@@ -410,7 +446,11 @@ export class SimulationEngine {
       }
       this.analogTimeMs = timeMs;
       this.lastAnalogPins = instantaneous;
-      this.dirty = false;
+      this.dirty = !settled;
+      if (cacheKey !== undefined && settled) {
+        if (this.keypadCache.size >= 64) this.keypadCache.clear();
+        this.keypadCache.set(cacheKey, this.solution);
+      }
     } finally { this.solving = false; }
   }
 
