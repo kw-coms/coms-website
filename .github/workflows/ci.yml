@@ -157,6 +157,11 @@ jobs:
         working-directory: lab
         run: node --test compiler/test
 
+      # The compiler steps of the deploy (snapshot / start / restore / prune), read in the order
+      # deploy.yml calls them, over several releases with a stand-in image.
+      - name: Deploy script for the compiler
+        run: scripts/test-deploy-lab-compiler.sh
+
   # The deploy builds both images on the server and starts them with this same compose file,
   # and nothing before it ever built them. Do it here first, on a throwaway database, so a
   # Dockerfile, entrypoint, nginx or prod-profile start-up problem fails the pull request
@@ -252,20 +257,33 @@ jobs:
           grep -q '"hex":":' <<< "$result"
           echo "Blink compiled through /lab/api/compile"
 
+          # The compiler runs under the pinned seccomp profile (lab/compiler/seccomp.json), not the engine default.
+          [ "$(docker exec coms-lab-compiler awk '/^Seccomp:/ {print $2}' /proc/1/status)" = 2 ]
+          docker inspect coms-lab-compiler --format '{{json .HostConfig.SecurityOpt}}' | grep -q 'no-new-privileges'
+
           # Forged session cookies are refused by the login check and cost the member nothing: the
           # per-member budget (10 a minute, kept by the compiler under the id the backend returned)
           # is untouched by them, a client-sent X-Lab-Client changes nothing, and the 11th real
-          # compile of this minute is 429.
+          # compile of this minute is 429. Clients are told apart by X-Real-IP, which the host nginx
+          # overwrites in production (here the request comes from the Docker bridge, so it is believed).
           for i in $(seq 1 15); do
-            [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Cookie: token=forged.part$i.signature$i" -H 'X-Lab-Client: 2026000001' -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")" = 401 ]
+            [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "X-Real-IP: 203.0.113.$((100 + i))" -H "Cookie: token=forged.part$i.signature$i" -H 'X-Lab-Client: 2026000001' -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")" = 401 ]
           done
-          [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Cookie: token=a=1; token=b" -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")" = 400 ]
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-Real-IP: 203.0.113.150' -H "Cookie: token=a=1; token=b" -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")" = 400 ]
           for i in $(seq 2 10); do
-            curl -fsS -o /dev/null -X POST -H "Cookie: $cookies" -H 'X-Lab-Client: someone-else' -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile"
+            curl -fsS -o /dev/null -X POST -H 'X-Real-IP: 203.0.113.200' -H "Cookie: $cookies" -H 'X-Lab-Client: someone-else' -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile"
           done
-          limited="$(curl -s -w '\n%{http_code}' -X POST -H "Cookie: $cookies" -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")"
+          limited="$(curl -s -w '\n%{http_code}' -X POST -H 'X-Real-IP: 203.0.113.200' -H "Cookie: $cookies" -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")"
           [ "$(tail -n 1 <<< "$limited")" = 429 ]
           grep -q '"reason":"rate-limited"' <<< "$limited"
+
+          # Before login the limit is per client address: one address runs out, another does not.
+          codes=""
+          for i in $(seq 1 25); do
+            codes="$codes $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-Real-IP: 203.0.113.99' -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")"
+          done
+          grep -q 429 <<< "$codes"
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-Real-IP: 203.0.113.98' -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")" = 401 ]
 
           # The compiler is optional for the site: down means 502 for the Lab, nothing else.
           docker stop coms-lab-compiler > /dev/null
