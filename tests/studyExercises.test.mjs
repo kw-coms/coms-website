@@ -37,6 +37,18 @@ test('all problem chapters match the allowlist and a study page section', async 
   assert.deepEqual(await chapterMismatches(problems), [])
 })
 
+test('every chapter has at least two problems, starting at level 1 (spec §9)', () => {
+  for (const [lang, allowed] of Object.entries(chapters)) {
+    for (const chapter of allowed) {
+      const levels = problems
+        .filter(p => lang === 'web' ? !('langs' in p) && p.chapter === chapter : p.langs?.includes(lang) && p.chapter?.[lang] === chapter)
+        .map(p => p.level)
+      assert.ok(levels.length >= 2, `${lang}/${chapter}: ${levels.length} problem(s), need at least 2`)
+      assert.equal(Math.min(...levels), 1, `${lang}/${chapter}: easiest problem is level ${Math.min(...levels)}, need level 1`)
+    }
+  }
+})
+
 test('web schema accepts the start and project chapters', () => {
   const web = problems.find(problem => !('langs' in problem))
   assert.ok(web)
