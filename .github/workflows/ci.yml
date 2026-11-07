@@ -157,7 +157,7 @@ jobs:
 
       - name: Compiler service tests
         working-directory: lab
-        run: node --test compiler/test
+        run: node --test "compiler/test/*.test.mjs"
 
       # The compiler steps of the deploy (snapshot / start / restore / prune), read in the order
       # deploy.yml calls them, over several releases with a stand-in image.

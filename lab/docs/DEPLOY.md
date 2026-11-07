@@ -37,7 +37,7 @@ Dockerfile은 amd64 / arm64 CLI 바이너리의 **리터럴 SHA-256**을 검사�
 
 ```sh
 # 저장소 루트에서. Node 22로도 반드시 검증한다.
-node --test lab/compiler/test/
+node --test "lab/compiler/test/*.test.mjs"
 docker build --pull --platform linux/amd64 -t coms-lab-compiler:release lab/compiler/
 docker build -f Dockerfile.frontend -t coms-frontend:release .   # lab-build 단계 포함
 ```
@@ -145,7 +145,7 @@ docker run --rm --network none --read-only \
   --tmpfs /tmp:rw,nosuid,nodev,size=256m \
   --user 10001:10001 --cap-drop ALL --security-opt no-new-privileges:true \
   --mount type=bind,src="$PWD/lab",dst=/workspace,readonly \
-  --workdir /workspace/compiler node:22-bookworm-slim node --test test/
+  --workdir /workspace/compiler node:22-bookworm-slim node --test "test/*.test.mjs"
 ```
 
 ## 8. 배포 smoke checklist

@@ -112,7 +112,7 @@ docker compose -f lab/compiler/docker-compose.dev.yml up --build -d   # 127.0.0.
 | --- | --- |
 | `npm run typecheck` / `npm test` | 타입 검사 / vitest (회로·시뮬레이터 코어 포함) |
 | `npx vitest run src/core` | 시뮬레이터 코어 테스트만 |
-| `node --test compiler/test` | 컴파일 서비스 테스트 (Node 22 이상) |
+| `node --test "compiler/test/*.test.mjs"` | 컴파일 서비스 테스트 (Node 22 이상) |
 | `npm run e2e:browser`, `npm run e2e:prod` | 브라우저 e2e (자세한 사용법은 `lab/tools/`) |
 
 운영 배포(이미지 구성, nginx, 소켓, 한도)는 [lab/docs/DEPLOY.md](../lab/docs/DEPLOY.md)에 있습니다.
