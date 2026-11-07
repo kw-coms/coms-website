@@ -398,9 +398,10 @@ jobs:
           # The container is the hardened one: pinned seccomp profile, no network, read-only root.
           [ "$(docker exec coms-study-runner awk '/^Seccomp:/ {print $2}' /proc/1/status)" = 2 ]
           [ "$(docker inspect -f '{{.HostConfig.NetworkMode}} {{.HostConfig.ReadonlyRootfs}}' coms-study-runner)" = "none true" ]
+          docker inspect -f 'CapAdd={{json .HostConfig.CapAdd}} CapDrop={{json .HostConfig.CapDrop}}' coms-study-runner
           # Exactly the four capabilities the server needs (it is container-root; every job drops to uid 10100).
-          [ "$(docker inspect -f '{{range .HostConfig.CapAdd}}{{.}} {{end}}' coms-study-runner | tr ' ' '\n' | grep . | sort | paste -sd, -)" = "KILL,SETGID,SETUID,SYS_RESOURCE" ]
-          [ "$(docker inspect -f '{{json .HostConfig.CapDrop}}' coms-study-runner)" = '["ALL"]' ]
+          [ "$(docker inspect -f '{{range .HostConfig.CapAdd}}{{.}} {{end}}' coms-study-runner | tr ' ' '\n' | sed 's/^CAP_//' | grep . | sort | paste -sd, -)" = "KILL,SETGID,SETUID,SYS_RESOURCE" ]
+          [ "$(docker inspect -f '{{range .HostConfig.CapDrop}}{{.}} {{end}}' coms-study-runner | sed 's/CAP_//g; s/ *$//')" = "ALL" ]
 
           # The runner's per-member limit (10 a minute) is the answer, in the contract's shape, once it is used up.
           limited=""
