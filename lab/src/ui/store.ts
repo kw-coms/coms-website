@@ -3,6 +3,7 @@ import type {
   Analysis, CodeMode, CompilerMessage, DebugState, Note, PartInstance, PartKind, PinRef, RotY, Scene, SimFrame, SimWarning, Vec3, Wire, WireColor,
 } from '../core/types';
 import { EXAMPLES, PARTS, analyze, validateScene } from './core';
+import { stringifyJsonBounded } from '../core/scene';
 import { commit, initHistory, redo as redoH, undo as undoH, type History } from './history';
 import { getItem, setItem } from './storage';
 import { DEFAULT_BLOCKS } from './blocks/starters';
@@ -283,7 +284,8 @@ export function saveMissionProgress(id: string, p: MissionProgress) {
 }
 
 // ---------- whole-document dirty state (scene + code vs the last loaded/exported baseline) ----------
-const docKey = () => JSON.stringify(scene());
+const serializeScene = () => stringifyJsonBounded(scene(), Infinity, Infinity, true);
+const docKey = () => serializeScene() ?? '';
 // A restored autosave has no baseline: it exists nowhere else, so it always counts as unsaved work.
 let baseline = first.restored ? '' : docKey();
 export const markClean = () => { baseline = docKey(); };
@@ -544,7 +546,8 @@ let saveWarned = false;
 function saveNow() {
   clearTimeout(saveTimer);
   saveTimer = undefined;
-  if (setItem(SAVE_KEY, JSON.stringify(scene()))) saveWarned = false;
+  const json = serializeScene();
+  if (json !== null && setItem(SAVE_KEY, json)) saveWarned = false;
   else if (!saveWarned) {
     saveWarned = true;
     toast('자동 저장에 실패했어요. 저장 공간이 부족하거나 막혀 있을 수 있어요. 내보내기로 파일에 저장해 두세요.', 8000);

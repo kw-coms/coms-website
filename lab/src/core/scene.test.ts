@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { acquisitionOnlyChanges, sameCircuit, validateScene } from './scene';
+import { acquisitionOnlyChanges, cloneJson, sameCircuit, stringifyJsonBounded, validateScene } from './scene';
+import { SimulationEngine } from './engine';
 import { encodeShare, decodeShare } from './share';
 import type { Scene } from './types';
 import { PARTS } from './parts';
@@ -158,6 +159,14 @@ describe('v2 scene metadata', () => {
     for (let n = 0; n < 999; n++) ok = [ok]; // still inside the limit: the depth check is what rejected the one above
     expect(() => validateScene({ ...base(), blocks: ok })).toThrow('블록 구조'); // fails later, on shape, not on depth
     expect(() => validateScene({ ...base(), blocks: { value: Number.POSITIVE_INFINITY } })).toThrow('블록');
+    const hidden = [] as unknown[] & { extra?: unknown };
+    hidden.extra = hidden;
+    expect(() => validateScene({ ...base(), blocks: hidden })).toThrow('블록');
+    const sparse: unknown[] = [];
+    sparse.length = 1_000_000_000;
+    expect(() => validateScene({ ...base(), blocks: sparse })).toThrow('블록');
+    const copied = cloneJson(hidden);
+    expect(copied.extra).toBe(copied); // bounded clone handles aliases/cycles
   });
   it('rejects hostile notes, modes and mission ids', () => {
     expect(() => validateScene({ ...base(), notes: Array.from({ length: 101 }, (_, n) => ({ id: `n${n}`, pos: [0, 0, 0], text: '' })) })).toThrow('100개');
@@ -205,6 +214,22 @@ describe('validateScene: blocks shape', () => {
     expect(() => validateScene(sceneWith(ok('lab_loop')))).not.toThrow();
     expect(() => validateScene(sceneWith(chain(100, 'next')))).not.toThrow();
   });
+  it('keeps supported deep workspaces serializable and cloneable on a small stack', async () => {
+    const workspace = chain(450, 'next'); // 902 JSON levels, within the 1,000-level contract
+    const input = sceneWith(workspace) as Scene;
+    const checked = validateScene(input);
+    const json = stringifyJsonBounded(checked, Infinity, Infinity, true);
+    expect(json).not.toBeNull();
+    expect(stringifyJsonBounded(JSON.parse(json!), Infinity, Infinity, true)).toBe(json);
+    expect(stringifyJsonBounded(JSON.parse(stringifyJsonBounded(checked, Infinity, Infinity, true, 2)!), Infinity, Infinity, true)).toBe(json);
+    expect(stringifyJsonBounded({ a: [1, { b: 'x' }] }, Infinity, Infinity, true, 2))
+      .toBe(JSON.stringify({ a: [1, { b: 'x' }] }, null, 2));
+    const copy = cloneJson(checked);
+    expect(stringifyJsonBounded(copy, Infinity, Infinity, true)).toBe(json);
+    const engine = new SimulationEngine();
+    expect(() => engine.setScene(checked)).not.toThrow();
+    expect(stringifyJsonBounded(await decodeShare(await encodeShare(checked)), Infinity, Infinity, true)).toBe(json);
+  });
   it.each(['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf', 'bad type!', ''])('rejects block type %j', (type) => {
     expect(() => validateScene(JSON.parse(JSON.stringify(sceneWith(ok(type)))))).toThrow(/블록/);
   });
@@ -219,7 +244,12 @@ describe('validateScene: blocks shape', () => {
   it('rejects 10k-deep nesting quickly, both through next and through inputs', () => {
     for (const key of ['next', 'inputs'] as const) {
       const t0 = Date.now();
-      expect(() => validateScene(JSON.parse(JSON.stringify(sceneWith(chain(10_000, key)))))).toThrow(/블록/);
+      expect(() => validateScene(sceneWith(chain(10_000, key)))).toThrow(/블록/);
+      // JSON.parse builds the imported-file shape without stringifying a deep object in the test.
+      const prefix = key === 'next' ? '{"type":"lab_serial_println","next":{"block":' : '{"type":"logic_negate","inputs":{"BOOL":{"block":';
+      const suffix = key === 'next' ? '}}' : '}}}';
+      const parsed = JSON.parse('{"blocks":{"blocks":[' + prefix.repeat(10_000) + '{"type":"lab_serial_println"}' + suffix.repeat(10_000) + ']}}');
+      expect(() => validateScene(sceneWith(parsed))).toThrow(/블록/);
       expect(Date.now() - t0).toBeLessThan(2000);
     }
   });

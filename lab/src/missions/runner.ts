@@ -95,6 +95,9 @@ export async function checkMission(
     const analysis = (options.analyzer ?? analyze)(scene);
     if (analysis.warnings.some(warning => warning.level === 'error')) return fail(0, '회로 오류를 해결해 주세요.');
     simulator = (options.simulatorFactory ?? createSimulator)();
+    // Checker samples are specified in simulated milliseconds. Keep legacy
+    // electrical solves on that clock even when host frame delivery is slow.
+    simulator.setMissionMode?.();
     offFrame = simulator.onFrame(frame => {
       latest = frame;
       if (frame.warnings.some(warning => warning.level === 'error')) stateError = '시뮬레이션 오류를 해결해 주세요.';

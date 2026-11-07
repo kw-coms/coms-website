@@ -13,7 +13,9 @@ const hasOwn = (o: object, k: unknown): k is string => typeof k === 'string' && 
 /** Own-property table lookup; undefined for anything inherited or non-string. */
 const own = <T>(table: Record<string, T>, key: unknown): T | undefined => (hasOwn(table, key) ? table[key] : undefined);
 /** Small non-negative integer from untrusted JSON (item / branch counts), capped so a crafted 1e9 cannot spin the loops. */
-const count = (v: unknown, def: number): number => { const n = Math.trunc(Number(v ?? def)); return Number.isFinite(n) ? Math.min(Math.max(n, 0), 256) : def; };
+const safeText = (v: unknown, fallback = ''): string =>
+  typeof v === 'string' || typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v)) ? String(v) : fallback;
+const count = (v: unknown, def: number): number => { const n = Math.trunc(Number(safeText(v, String(def)))); return Number.isFinite(n) ? Math.min(Math.max(n, 0), 256) : def; };
 
 export interface GenOptions {
   /** LEDs on the NeoPixel strip (scene part prop `count`). */
@@ -106,8 +108,8 @@ class Ctx {
   }
   varIdent(b: B, field = 'VAR'): string {
     const f = b.fields?.[field];
-    const id = typeof f === 'object' && f ? (f as { id?: string }).id : String(f ?? '');
-    const name = (id && this.varNames.get(id)) || (typeof f === 'object' && f ? (f as { name?: string }).name : undefined) || id || 'x';
+    const id = typeof f === 'object' && f ? safeText((f as { id?: unknown }).id) : safeText(f);
+    const name = (id && this.varNames.get(id)) || (typeof f === 'object' && f ? safeText((f as { name?: unknown }).name) : '') || id || 'x';
     return this.ident(name, 'var');
   }
   varType(ident: string): Ty { return this.known.vars.get(ident) ?? 'int'; }
@@ -118,7 +120,7 @@ class Ctx {
     this.serial = true;
   }
 
-  field(b: B, name: string, def = ''): string { return String(b.fields?.[name] ?? def); }
+  field(b: B, name: string, def = ''): string { return safeText(b.fields?.[name], def); }
   pin(b: B, name: string, mode?: string): string {
     const v = this.field(b, name);
     if (!/^A?\d{1,2}$/.test(v)) { this.warn(`핀 "${v}"을(를) 알 수 없어요. 13번 핀으로 바꿨어요.`); return '13'; }
@@ -367,7 +369,7 @@ const S: Record<string, SH> = {
 };
 
 function call(g: Ctx, b: B): string {
-  const name = String(b.extraState?.name ?? b.fields?.NAME ?? '');
+  const name = safeText(b.extraState?.name ?? b.fields?.NAME);
   const f = g.fnIdent(name);
   const params = Array.isArray(b.extraState?.params) ? (b.extraState.params as unknown[]) : [];
   const args = params.map((_, i) => {
@@ -384,9 +386,9 @@ function call(g: Ctx, b: B): string {
 type XH = (g: Ctx, b: B) => E;
 const e = (c: string, t: Ty, p = ATOM): E => ({ c, t, p });
 const X: Record<string, XH> = {
-  math_number: (_g, b) => lit(Number(b.fields?.NUM ?? 0) || 0),
+  math_number: (_g, b) => lit(Number(safeText(b.fields?.NUM, '0')) || 0),
   logic_boolean: (_g, b) => e(b.fields?.BOOL === 'FALSE' ? 'false' : 'true', 'bool'),
-  text: (_g, b) => ({ ...e(cStr(String(b.fields?.TEXT ?? '')), 'String'), lit: true }),
+  text: (_g, b) => ({ ...e(cStr(safeText(b.fields?.TEXT)), 'String'), lit: true }),
   text_join: (g, b) => {
     const n = count(b.extraState?.itemCount, 2);
     const parts: E[] = [];
@@ -455,7 +457,7 @@ const X: Record<string, XH> = {
     return e(v, g.varType(v));
   },
   procedures_callreturn: (g, b) => {
-    const f = g.fnIdent(String(b.extraState?.name ?? ''));
+    const f = g.fnIdent(safeText(b.extraState?.name));
     const t = g.known.fnRet.get(f);
     return e(call(g, b), t && t !== 'void' ? t : 'int');
   },
@@ -515,7 +517,7 @@ function run(tops: B[], varNames: Map<string, string>, opts: GenOptions, known: 
     if (b.type === 'controls_for') g.forVars.add(g.varIdent(b));
     else if (b.type === 'variables_set' || b.type === 'math_change') g.setVars.add(g.varIdent(b));
     else if (b.type === 'procedures_defnoreturn' || b.type === 'procedures_defreturn') {
-      g.fnIdent(String(b.fields?.NAME ?? 'fn'));
+      g.fnIdent(safeText(b.fields?.NAME, 'fn'));
       for (const p of Array.isArray(b.extraState?.params) ? (b.extraState.params as { name?: string }[]) : []) if (p?.name && typeof p.name === 'string') g.paramVars.add(g.ident(p.name, 'var'));
     }
   }
@@ -527,7 +529,7 @@ function run(tops: B[], varNames: Map<string, string>, opts: GenOptions, known: 
     if (t.type === 'lab_setup') { setups++; setup.push(...g.body(t, 'DO')); }
     else if (t.type === 'lab_loop') { loops++; loop.push(...g.body(t, 'DO')); }
     else if (t.type === 'procedures_defnoreturn' || t.type === 'procedures_defreturn') {
-      const name = g.fnIdent(String(t.fields?.NAME ?? 'fn'));
+      const name = g.fnIdent(safeText(t.fields?.NAME, 'fn'));
       const pnames = (Array.isArray(t.extraState?.params) ? (t.extraState.params as { name?: string }[]) : []).map((p) => g.ident(typeof p?.name === 'string' ? p.name : 'p', 'var'));
       const ptypes = pnames.map((_, i) => g.known.fnParams.get(name)?.[i] ?? 'int');
       const body = g.body(t, 'STACK');

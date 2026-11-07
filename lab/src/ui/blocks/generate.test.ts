@@ -368,6 +368,20 @@ describe('generate() survives hostile block JSON', () => {
     for (let i = 0; i < 10_000; i++) stack = { type: 'controls_if', inputs: { DO0: { block: stack } } };
     expect(generate(wrapLoop(stack)).warnings.join('\n')).toContain('깊게 겹쳐');
   });
+  it('does not coerce nested arrays in hostile scalar fields', () => {
+    let nested: unknown = 'x';
+    for (let i = 0; i < 10_000; i++) nested = [nested];
+    const result = generate(wrapLoop({ type: 'lab_serial_print', inputs: { VALUE: { block: { type: 'text', fields: { TEXT: nested } } } } }));
+    expect(result.code).toContain('Serial.print("")');
+    expect(result.code).toContain('void loop()');
+  });
+  it('generates a supported nested expression on a small stack', () => {
+    let nested: unknown = { type: 'logic_boolean', fields: { BOOL: 'TRUE' } };
+    for (let i = 0; i < 80; i++) nested = { type: 'logic_negate', inputs: { BOOL: { block: nested } } };
+    const result = generate(wrapLoop({ type: 'lab_serial_print', inputs: { VALUE: { block: nested } } }));
+    expect(result.warnings).not.toContain('블록 데이터가 올바르지 않아서 코드를 만들지 못했어요. 블록을 다시 만들어 주세요.');
+    expect(result.code).toContain('Serial.print(');
+  });
   it('a huge sibling chain stops at the block limit', () => {
     let chain: unknown = undefined;
     for (let i = 0; i < 50_000; i++) chain = { type: 'lab_serial_println', next: chain ? { block: chain } : undefined };

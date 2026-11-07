@@ -74,25 +74,98 @@ function invalid(message: string): never {
 export const MAX_BLOCKS = 5000;
 const MAX_BLOCKS_JSON_DEPTH = 1000;
 
-function validBlocks(value: unknown): boolean {
-  const seen = new Set<object>();
-  const visit = (entry: unknown, depth: number): boolean => {
-    if (depth > MAX_BLOCKS_JSON_DEPTH) return false;
-    if (entry === null || typeof entry === 'string' || typeof entry === 'boolean') return true;
-    if (typeof entry === 'number') return Number.isFinite(entry);
-    if (typeof entry !== 'object' || seen.has(entry)) return false;
-    if (!Array.isArray(entry) && (Object.getPrototypeOf(entry) !== Object.prototype && Object.getPrototypeOf(entry) !== null)) return false;
-    seen.add(entry);
-    const valid = Object.entries(entry).every(([key, child]) =>
-      !FORBIDDEN_IDS.has(key) && visit(child, depth + 1));
-    seen.delete(entry);
-    return valid;
-  };
+type JsonWork = { kind: 'value'; value: unknown; depth: number }
+  | { kind: 'text'; value: string }
+  | { kind: 'leave'; value: object };
+
+/** Iterative JSON validation and serialization. No recursive builtin sees an unbounded tree. */
+export function stringifyJsonBounded(value: unknown, maxDepth: number, maxBytes: number, omitUndefined = false, indent = 0): string | null {
+  const pending: JsonWork[] = [{ kind: 'value', value, depth: 0 }];
+  const active = new Set<object>();
+  const chunks: string[] = [];
+  const encoder = new TextEncoder();
+  let bytes = 0;
   try {
-    return visit(value, 0) && new TextEncoder().encode(JSON.stringify(value)).length <= 256 * 1024;
+    while (pending.length) {
+      const task = pending.pop()!;
+      if (task.kind === 'leave') { active.delete(task.value); continue; }
+      if (task.kind === 'text') {
+        bytes += encoder.encode(task.value).length;
+        if (bytes > maxBytes) return null;
+        chunks.push(task.value);
+        continue;
+      }
+      if (task.depth > maxDepth) return null;
+      const entry = task.value;
+      if (entry === null || typeof entry === 'string' || typeof entry === 'boolean' ||
+          (typeof entry === 'number' && Number.isFinite(entry))) {
+        pending.push({ kind: 'text', value: JSON.stringify(entry) });
+        continue;
+      }
+      if (typeof entry !== 'object' || active.has(entry) ||
+          (!Array.isArray(entry) && Object.getPrototypeOf(entry) !== Object.prototype && Object.getPrototypeOf(entry) !== null)) return null;
+      active.add(entry);
+      const array = Array.isArray(entry);
+      if (array) {
+        // Array.from would allocate `length` slots before the byte limit is checked.
+        if (Number.isFinite(maxBytes) && entry.length + 1 > maxBytes - bytes) return null;
+        // JSON arrays cannot represent enumerable named properties. Reject them before
+        // a later clone or Blockly loader could traverse a hidden nested value.
+        for (const key of Object.keys(entry)) {
+          if (!/^(0|[1-9]\d*)$/.test(key) || Number(key) >= entry.length) return null;
+        }
+      }
+      const fields: [string, unknown][] = array
+        ? Array.from({ length: entry.length }, (_, index): [string, unknown] => [String(index), index in entry ? entry[index] : null])
+        : Object.entries(entry).filter(([, child]) => !omitUndefined || child !== undefined);
+      if (array && omitUndefined) for (const field of fields) if (field[1] === undefined) field[1] = null;
+      const pretty = indent > 0 && fields.length > 0;
+      pending.push({ kind: 'leave', value: entry });
+      pending.push({ kind: 'text', value: `${pretty ? `\n${' '.repeat(task.depth * indent)}` : ''}${array ? ']' : '}'}` });
+      for (let i = fields.length - 1; i >= 0; i--) {
+        const [key, child] = fields[i]!;
+        if (FORBIDDEN_IDS.has(key)) return null;
+        if (i < fields.length - 1) pending.push({ kind: 'text', value: pretty ? ',\n' : ',' });
+        pending.push({ kind: 'value', value: child, depth: task.depth + 1 });
+        if (!array) pending.push({ kind: 'text', value: `${JSON.stringify(key)}:${pretty ? ' ' : ''}` });
+        if (pretty) pending.push({ kind: 'text', value: ' '.repeat((task.depth + 1) * indent) });
+      }
+      pending.push({ kind: 'text', value: `${array ? '[' : '{'}${pretty ? '\n' : ''}` });
+    }
+    return chunks.join('');
   } catch {
-    return false;
+    return null;
   }
+}
+
+/** Clone validated JSON without structuredClone's call-stack-dependent depth. */
+export function cloneJson<T>(value: T): T {
+  if (value === null || typeof value !== 'object') return value;
+  const root: object = Array.isArray(value) ? [] : {};
+  const pending: { source: object; target: object }[] = [{ source: value, target: root }];
+  const copies = new Map<object, object>([[value, root]]);
+  while (pending.length) {
+    const { source, target } = pending.pop()!;
+    if (Array.isArray(source) && Array.isArray(target)) target.length = source.length;
+    for (const [key, child] of Object.entries(source)) {
+      if (child !== null && typeof child === 'object') {
+        let copy = copies.get(child);
+        if (!copy) {
+          copy = Array.isArray(child) ? [] : {};
+          copies.set(child, copy);
+          pending.push({ source: child, target: copy });
+        }
+        Object.defineProperty(target, key, { value: copy, enumerable: true, writable: true, configurable: true });
+      } else {
+        Object.defineProperty(target, key, { value: child, enumerable: true, writable: true, configurable: true });
+      }
+    }
+  }
+  return root as T;
+}
+
+function validBlocks(value: unknown): boolean {
+  return stringifyJsonBounded(value, MAX_BLOCKS_JSON_DEPTH, 256 * 1024) !== null;
 }
 
 /**
@@ -161,6 +234,7 @@ function mutationSize(type: string, es: unknown): number {
  */
 export function blocksProblem(state: unknown): string | null {
   const bad = '블록 구조가 올바르지 않습니다.';
+  if (!validBlocks(state)) return '블록 데이터는 올바른 JSON이며 256 KB 이하, 1,000단계 이하의 깊이이어야 합니다.';
   if (!isObject(state)) return bad;
   const ws = state.blocks;
   if (ws !== undefined && (!isObject(ws) || (ws.blocks !== undefined && !Array.isArray(ws.blocks)))) return bad;

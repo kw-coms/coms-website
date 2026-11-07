@@ -34,6 +34,77 @@ const hostile: [string, object][] = [
 ];
 
 describe('hostile block workspaces', () => {
+  it('rejects a 10k-deep workspace before Blockly loading on a small stack', () => {
+    let block: object = { type: 'lab_serial_println' };
+    for (let i = 0; i < 10_000; i++) block = { type: 'lab_serial_println', next: { block } };
+    const ws = new Blockly.Workspace();
+    expect(loadBlocks(ws, top(block))).toMatch(/블록/);
+    expect(ws.getAllBlocks(false).map(b => b.type).sort()).toEqual(['lab_loop', 'lab_setup']);
+    ws.dispose();
+  });
+  it('loads a valid 450-block chain and preserves every connection on a small stack', () => {
+    let block: object = { type: 'lab_wait' };
+    for (let i = 0; i < 450; i++) block = { type: 'lab_wait', next: { block } };
+    const ws = new Blockly.Workspace();
+    expect(loadBlocks(ws, top(block))).toBeNull();
+    expect(ws.getAllBlocks(false)).toHaveLength(451);
+    let next = ws.getTopBlocks(false)[0];
+    for (let i = 0; i < 450; i++) {
+      next = next?.getNextBlock() ?? undefined;
+      expect(next?.type).toBe('lab_wait');
+    }
+    expect(() => Blockly.serialization.workspaces.save(ws)).not.toThrow();
+    ws.dispose();
+  });
+  it.each([false, true])('loads a valid deep shadow and restores it after a real block is unplugged (%s)', obscured => {
+    let shadow: object = { type: 'logic_boolean', fields: { BOOL: 'TRUE' } };
+    for (let i = 0; i < 200; i++) shadow = { type: 'logic_negate', inputs: { BOOL: { shadow } } };
+    const root = { type: 'lab_serial_print', inputs: { VALUE: { shadow, ...(obscured ? { block: { type: 'math_number', fields: { NUM: 1 } } } : {}) } } };
+    const ws = new Blockly.Workspace();
+    expect(loadBlocks(ws, top(root))).toBeNull();
+    const value = ws.getTopBlocks(false).find(block => block.type === 'lab_serial_print')!.getInput('VALUE')!.connection!;
+    if (obscured) {
+      expect(value.targetBlock()?.type).toBe('math_number');
+      const saved = Blockly.serialization.workspaces.save(ws);
+      expect(blocksProblem(saved)).toBeNull();
+      const stored = (saved.blocks as { blocks: { inputs?: { VALUE?: { shadow?: unknown } } }[] }).blocks[0]!.inputs?.VALUE?.shadow;
+      let shadowNode = stored as { type?: string; inputs?: { BOOL?: { shadow?: unknown } } } | undefined;
+      for (let i = 0; i < 200; i++) {
+        expect(shadowNode?.type).toBe('logic_negate');
+        shadowNode = shadowNode?.inputs?.BOOL?.shadow as typeof shadowNode;
+      }
+      expect(shadowNode?.type).toBe('logic_boolean');
+      value.disconnect();
+    }
+    let current = value.targetBlock();
+    for (let i = 0; i < 200; i++) {
+      expect(current?.type).toBe('logic_negate');
+      current = current?.getInput('BOOL')?.connection?.targetBlock() ?? null;
+    }
+    expect(current?.type).toBe('logic_boolean');
+    expect(blocksProblem(Blockly.serialization.workspaces.save(ws))).toBeNull();
+    ws.dispose();
+  });
+  it('preserves an edited deep shadow when a real block replaces it and is unplugged', () => {
+    let shadow: object = { type: 'logic_boolean', fields: { BOOL: 'TRUE' } };
+    for (let i = 0; i < 200; i++) shadow = { type: 'logic_negate', inputs: { BOOL: { shadow } } };
+    const ws = new Blockly.Workspace();
+    expect(loadBlocks(ws, top({ type: 'lab_serial_print', inputs: { VALUE: { shadow } } }))).toBeNull();
+    const value = ws.getTopBlocks(false).find(block => block.type === 'lab_serial_print')!.getInput('VALUE')!.connection!;
+    let leaf = value.targetBlock();
+    for (let i = 0; i < 200; i++) leaf = leaf?.getInput('BOOL')?.connection?.targetBlock() ?? null;
+    expect(leaf?.type).toBe('logic_boolean');
+    leaf!.setFieldValue('FALSE', 'BOOL');
+    const real = Blockly.serialization.blocks.append({ type: 'math_number', fields: { NUM: 1 } }, ws);
+    expect(value.connect(real.outputConnection!)).toBe(true);
+    expect(value.targetBlock()?.type).toBe('math_number');
+    value.disconnect();
+    leaf = value.targetBlock();
+    for (let i = 0; i < 200; i++) leaf = leaf?.getInput('BOOL')?.connection?.targetBlock() ?? null;
+    expect(leaf?.type).toBe('logic_boolean');
+    expect(leaf?.getFieldValue('BOOL')).toBe('FALSE');
+    ws.dispose();
+  });
   it.each(hostile)('validateScene refuses %s with a Korean error, quickly', (_n, block) => {
     const t0 = Date.now();
     expect(() => validateScene(scene(top(block)))).toThrow(/블록|항목/);

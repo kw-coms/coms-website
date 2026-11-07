@@ -34,4 +34,6 @@ it('survives start / stop / switch-example sequences for every example with its 
   });
   sim.dispose();
   expect(failures).toEqual([]);
-});
+// Every example runs real firmware through multiple lifecycle transitions; allow
+// slow CI runners to finish this coverage (throughput is tested separately).
+}, 60_000);

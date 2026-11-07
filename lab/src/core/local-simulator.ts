@@ -4,7 +4,9 @@ import { MCU_HZ } from './mcu';
 
 /** The worker host and main-thread fallback share the same lifecycle. */
 export class LocalSimulator implements Simulator {
-  private engine = new SimulationEngine();
+  private missionMode = false;
+  private engine: SimulationEngine = new SimulationEngine((): number =>
+    this.missionMode ? this.engine.mcu.cpu.cycles / MCU_HZ * 1000 : performance.now());
   private frames = new Set<(frame: SimFrame) => void>();
   private serial = new Set<(text: string) => void>();
   private states = new Set<(state: Simulator['state'], error?: string) => void>();
@@ -122,6 +124,11 @@ export class LocalSimulator implements Simulator {
   setSpeed(value: number): void {
     if (!Number.isFinite(value)) throw new Error('속도가 올바르지 않습니다.');
     this.speed = Math.max(0.25, Math.min(2, value));
+  }
+
+  setMissionMode(): void {
+    if (this._state !== 'idle') throw new Error('미션 모드는 실행 전에 설정해야 합니다.');
+    this.missionMode = true;
   }
 
   setInput(input: SimInput): void {

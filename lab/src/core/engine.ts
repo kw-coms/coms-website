@@ -1,7 +1,7 @@
 import type { Analysis, McuPinState, PartVisualState, Scene, SimFrame, SimInput, SimWarning } from './types';
 import { analyze } from './analyze';
 import { PARTS } from './parts';
-import { acquisitionOnlyChanges, isSafeId, validateScene } from './scene';
+import { acquisitionOnlyChanges, cloneJson, isSafeId, validateScene } from './scene';
 import { ledBrightness, solveCircuit, type SolveResult, newTransientState } from './solver';
 import { Mcu, MCU_HZ, UNO_PIN_MAP } from './mcu';
 import { BehavioralDevices } from './behavioral';
@@ -118,7 +118,7 @@ export class SimulationEngine {
   }
 
   setScene(scene: Scene): Analysis {
-    const next = structuredClone(validateScene(scene));
+    const next = cloneJson(validateScene(scene));
     const acquisitionChanges = acquisitionOnlyChanges(this.scene, next);
     this.scene = next;
     if (acquisitionChanges !== undefined) {

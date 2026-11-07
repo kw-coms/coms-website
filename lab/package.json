@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:small-stack": "vitest run --pool=forks --execArgv=--stack-size=256 src/core/scene.test.ts src/core/simulator.test.ts src/ui/blocks src/ui/shareHash.test.ts",
     "typecheck": "tsc -b --noEmit",
     "fixtures:compile": "node tools/compile-fixtures.mjs",
     "e2e:browser": "node tools/e2e-browser.mjs",

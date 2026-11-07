@@ -244,6 +244,8 @@ export interface Simulator {
   stop(): void; // pause + reset outputs to idle
   reset(): void;
   setSpeed(multiplier: number): void; // 0.25..2
+  /** Mission checks use simulated time for legacy electrical solve cadence. */
+  setMissionMode?(): void;
   setInput(input: SimInput): void;
   writeSerial(text: string): void;
   onFrame(cb: (frame: SimFrame) => void): () => void; // ~60 Hz while running, once after setScene

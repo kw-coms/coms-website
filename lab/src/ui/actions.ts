@@ -6,6 +6,7 @@ import { BACKUP_KEY, getState, isDirty, loadScene, markClean, scene, set, THEME_
 import { stop } from './simHost';
 import { getItem, setItem } from './storage';
 import type { Scene } from '../core/types';
+import { stringifyJsonBounded } from '../core/scene';
 
 function download(name: string, href: string) {
   const a = document.createElement('a');
@@ -32,7 +33,10 @@ function replaceWith(s: Scene) {
 }
 
 export function exportJson() {
-  downloadText(`${scene().title ?? 'circuit-lab'}.json`, JSON.stringify(scene(), null, 2));
+  const current = scene();
+  const json = stringifyJsonBounded(current, Infinity, Infinity, true, 2);
+  if (json === null) return void toast('회로를 내보낼 수 없어요.');
+  downloadText(`${current.title ?? 'circuit-lab'}.json`, json);
   markClean();
 }
 

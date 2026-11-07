@@ -6,7 +6,7 @@ import * as Blockly from 'blockly/core';
 import 'blockly/blocks';
 import * as Ko from 'blockly/msg/ko';
 import { COLOUR, CUSTOM_BLOCKS, TOOLBOX, type PinKind, PIN_VALUES } from './defs';
-import { blocksProblem } from '../../core/scene';
+import { blocksProblem, stringifyJsonBounded } from '../../core/scene';
 import './blocks.css';
 
 Blockly.setLocale(Ko as unknown as Record<string, string>);
@@ -63,8 +63,84 @@ export function loadBlocks(w: Blockly.Workspace, s: unknown): string | null {
   w.clear();
   const problem = s && typeof s === 'object' ? blocksProblem(s) : null;
   if (problem) console.warn('블록 불러오기를 건너뛰었어요:', problem);
-  Blockly.serialization.workspaces.load(s && typeof s === 'object' && !problem ? s as object : START_WORKSPACE(), w);
+  const state = s && typeof s === 'object' && !problem ? s as object : START_WORKSPACE();
+  if (stringifyJsonBounded(state, 64, 256 * 1024) !== null) {
+    Blockly.serialization.workspaces.load(state, w);
+  } else {
+    // Blockly's deserializer recursively follows next/input blocks. A valid
+    // 450-block workspace can exceed the JS stack on smaller hosts.
+    const workspace = state as { blocks?: { blocks?: Blockly.serialization.blocks.State[] } };
+    const roots = workspace.blocks?.blocks ?? [];
+    Blockly.serialization.workspaces.load({ ...state, blocks: { ...workspace.blocks, blocks: [] } }, w);
+    loadDeepBlocks(w, roots);
+  }
   return problem;
+}
+
+function loadDeepBlocks(w: Blockly.Workspace, roots: Blockly.serialization.blocks.State[]): void {
+  type State = Blockly.serialization.blocks.State;
+  type Task = { state: State; parent?: Blockly.Connection; loaded?: Blockly.Block };
+  const pending: Task[] = roots.map(root => ({ state: root })).reverse();
+  const shadows = new WeakMap<Blockly.Connection, State>();
+  const wrapped = new WeakSet<Blockly.Connection>();
+  const ready = new WeakSet<Blockly.Connection>();
+  const building = new Set<Blockly.Connection>();
+  const drain = (): void => {
+    while (pending.length) {
+      const { state, parent, loaded } = pending.pop()!;
+      const { inputs, next, ...shallow } = state;
+      const block = loaded ?? Blockly.serialization.blocks.appendInternal(shallow, w, { parentConnection: parent });
+      const connect = (connection: Blockly.Connection | null | undefined, slot: Blockly.serialization.blocks.ConnectionState) => {
+        if (!connection) throw new Error('블록 연결이 올바르지 않습니다.');
+        if (slot.shadow) attachShadow(connection, slot.shadow, !!slot.block);
+        if (slot.block) pending.push({ state: slot.block, parent: connection });
+      };
+      if (next) connect(block.nextConnection, next);
+      for (const [name, slot] of Object.entries(inputs ?? {}).reverse()) connect(block.getInput(name)?.connection, slot);
+    }
+    for (const connection of building) ready.add(connection);
+    building.clear();
+  };
+  const attachShadow = (connection: Blockly.Connection, state: State, obscured: boolean): void => {
+    const { inputs: _inputs, next: _next, ...shallow } = state;
+    void _inputs; void _next;
+    connection.setShadowState(shallow);
+    shadows.set(connection, state);
+    if (!wrapped.has(connection)) {
+      wrapped.add(connection);
+      const originalRespawn = Reflect.get(connection, 'respawnShadow_') as () => void;
+      const originalGet = connection.getShadowState.bind(connection);
+      // Blockly respawns from shadowState recursively. Keep its stored state
+      // shallow and restore descendants through the same iterative loader.
+      Reflect.set(connection, 'respawnShadow_', () => {
+        originalRespawn.call(connection);
+        const shadow = connection.targetBlock();
+        const saved = shadows.get(connection);
+        if (shadow?.isShadow() && saved) { pending.push({ state: saved, loaded: shadow }); drain(); }
+      });
+      Reflect.set(connection, 'getShadowState', (current?: boolean) => {
+        const saved = shadows.get(connection);
+        if (!saved) return originalGet(current);
+        if (!current) {
+          const { inputs: _inputs, next: _next, ...shallowState } = saved;
+          void _inputs; void _next;
+          return shallowState; // Blockly's recursive respawn sees only one block.
+        }
+        const active = connection.targetBlock();
+        if (!active?.isShadow()) return saved;
+        if (!ready.has(connection)) return saved;
+        const latest = originalGet(true);
+        if (latest) shadows.set(connection, latest);
+        return latest;
+      });
+    }
+    const shadow = connection.targetBlock();
+    if (!obscured && shadow?.isShadow()) {
+      building.add(connection);
+      pending.push({ state, loaded: shadow });
+    }
+  };
+  drain();
 }
 
 export default function BlocksEditor({ state, dark, hints, readOnly, onChange }: BlocksEditorProps) {
@@ -103,7 +179,7 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
       } finally { loading.current = false; }
     };
     load(state);
-    last.current = JSON.stringify(state ?? null);
+    last.current = stringifyJsonBounded(state ?? null, 1000, 256 * 1024) ?? '';
     let timer = 0;
     w.addChangeListener((ev: Blockly.Events.Abstract) => {
       if (loading.current || ev.isUiEvent) return;
@@ -111,7 +187,7 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         const s = Blockly.serialization.workspaces.save(w);
-        last.current = JSON.stringify(s);
+        last.current = stringifyJsonBounded(s, 1000, 256 * 1024) ?? '';
         cb.current(s);
       }, 300);
     });
@@ -126,7 +202,7 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
 
   // the document changed from outside (undo, another example, opened file): reload the workspace
   useEffect(() => {
-    const key = JSON.stringify(state ?? null);
+    const key = stringifyJsonBounded(state ?? null, 1000, 256 * 1024) ?? '';
     if (key === last.current || !ws.current) return;
     last.current = key;
     loader.current(state);

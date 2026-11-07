@@ -137,6 +137,29 @@ describe('simulator lifecycle', () => {
         expect(() => sim.setInput({ partId: 'pot', key: 'position', value: true })).toThrow('형식');
         sim.dispose();
     });
+    it('sends mission clock mode before scene setup and start on the worker path', () => {
+        let worker: MockWorker;
+        class MockWorker {
+            onmessageerror: (() => void) | null = null;
+            postMessage = vi.fn();
+            terminate = vi.fn();
+            constructor() { worker = this; }
+        }
+        vi.stubGlobal('Worker', MockWorker);
+        const sim = createSimulator();
+        sim.setMissionMode?.();
+        sim.setScene(scene);
+        sim.start();
+        expect(worker!.postMessage.mock.calls.map(([command]) => command.method)).toEqual([
+            'setMissionMode', 'setScene', 'start',
+        ]);
+        worker!.onmessageerror?.();
+        sim.start();
+        expect(worker!.postMessage.mock.calls.map(([command]) => command.method)).toEqual([
+            'setMissionMode', 'setScene', 'setSpeed', 'start',
+        ]);
+        sim.dispose();
+    });
     it('uses the local simulator when browser Worker construction fails', () => {
         class UnavailableWorker {
             constructor() {
