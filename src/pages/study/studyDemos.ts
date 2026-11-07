@@ -1,5 +1,5 @@
 // Behaviour of a /study page (ported from the standalone web-study.html), generic over the study:
-// editable HTML/CSS/JS demos (only where the markup has .demo boxes), a copy button on code blocks, "done" checkboxes saved in localStorage, TOC scroll-spy.
+// editable HTML/CSS/JS demos (only where the markup has .demo boxes), "done" checkboxes saved in localStorage, TOC scroll-spy.
 //
 // Demo code runs inside <iframe sandbox="allow-scripts allow-modals" src="/study-sandbox.html">.
 // The site CSP forbids inline scripts and srcdoc/blob frames inherit it, so the sandbox page
@@ -8,24 +8,35 @@
 // never touch this page's cookies or storage.
 
 const LABELS: Record<string, string> = { html: 'HTML', css: 'CSS', js: 'JS' }
-const SANDBOX_URL = '/study-sandbox.html'
+export const SANDBOX_URL = '/study-sandbox.html'
 
 type Code = Record<string, string>
 
-function buildDoc(code: Code, id: number) {
-  const hook =
-    '<script>(function(){var ID=' + id + ';' +
+function hookScript(id: number) {
+  return '<script>(function(){var ID=' + id + ';' +
     "function f(a){if(a===undefined)return'undefined';if(typeof a==='string')return a;if(typeof a==='function')return String(a);" +
     "if(a&&a.nodeType)return'<'+a.nodeName.toLowerCase()+'>';try{return JSON.stringify(a);}catch(e){return String(a);}}" +
     "function s(t,args){try{parent.postMessage({__demo:ID,type:t,msg:Array.prototype.map.call(args,f).join(' ')},'*');}catch(e){}}" +
     "['log','info','warn','error'].forEach(function(t){var o=console[t];console[t]=function(){s(t,arguments);if(o)o.apply(console,arguments);};});" +
     "window.addEventListener('error',function(e){s('error',['오류: '+e.message+(e.lineno?' ('+e.lineno+'번째 줄 근처)':'')]);});" +
+    "window.addEventListener('unhandledrejection',function(e){s('error',['오류: '+(e.reason&&e.reason.message||e.reason)]);});" +
     '})();</script>'
+}
+
+export function buildDoc(code: Code, id: number) {
   const base = "<style>body{font-family:system-ui,-apple-system,'Noto Sans KR',sans-serif;margin:12px;color:#222;line-height:1.5}</style>"
-  return '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">' + hook + base +
+  return '<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">' + hookScript(id) + base +
     '<style>' + (code.css || '') + '</style></head><body>' + (code.html || '') +
     (code.js ? '<script>' + code.js.replace(/<\/script/gi, '<\\/script') + '\n</script>' : '') +
     '</body></html>'
+}
+
+/** A complete HTML document typed by the user: the console hook goes right after <head> (or <html>) so it stays in standards mode. */
+export function buildRawDoc(source: string, id: number) {
+  const hook = hookScript(id)
+  if (/<head[^>]*>/i.test(source)) return source.replace(/<head[^>]*>/i, (m) => m + hook)
+  if (/<html[^>]*>/i.test(source)) return source.replace(/<html[^>]*>/i, (m) => m + hook)
+  return hook + source
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string | null, text?: string) {
@@ -166,21 +177,6 @@ export function initStudyPage(root: HTMLElement, progressKey: string): () => voi
 
     switchTab(langs[0])
     demos.push({ id: idx, box, frame, console: consoleBox, run, started: false })
-  })
-
-  // Copy button on every code block (demo editors have their own).
-  root.querySelectorAll<HTMLElement>('pre.code').forEach((pre) => {
-    const btn = el('button', 'code-copy', '복사')
-    btn.type = 'button'
-    btn.setAttribute('aria-label', '코드 복사')
-    btn.addEventListener('click', () => {
-      const text = pre.cloneNode(true) as HTMLElement
-      text.querySelector('.code-copy')?.remove()
-      const done = () => { btn.textContent = '복사됨!'; timers.add(window.setTimeout(() => { btn.textContent = '복사' }, 1200)) }
-      navigator.clipboard?.writeText(text.textContent || '').then(done, () => { /* clipboard blocked: leave the label */ })
-    }, { signal })
-    pre.appendChild(btn)
-    created.push(btn)
   })
 
   // Run a demo when it scrolls near the viewport (keeps page load light).

@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import NotFoundPage from '../../components/NotFoundPage'
 import { findStudy } from './studies'
 import { loadStudyHtml } from './studyContent'
 import { initStudyPage } from './studyDemos'
+import { initPlayground } from './playground'
+import type { PageLang } from './playground/classify'
 import './study.css'
+import './playground/playground.css'
 
 function StudyBody({ id }: { id: string }) {
   const study = findStudy(id)!
@@ -13,6 +16,8 @@ function StudyBody({ id }: { id: string }) {
   const [loaded, setLoaded] = useState<{ id: string; html: string } | null>(null)
   const [failed, setFailed] = useState(false)
   const layoutRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
+  const location = useLocation()
   const html = loaded?.id === id ? loaded.html : null
 
   useEffect(() => {
@@ -25,6 +30,15 @@ function StudyBody({ id }: { id: string }) {
   }, [id])
 
   useEffect(() => (html && layoutRef.current ? initStudyPage(layoutRef.current, study.progressKey) : undefined), [html, study.progressKey])
+
+  // The playground calls the latest login handler without being re-created when the router state changes.
+  const goLogin = useRef<(hash: string) => void>(() => {})
+  useEffect(() => {
+    goLogin.current = (hash) => navigate('/login', { state: { from: { pathname: location.pathname, search: location.search, hash } } })
+  })
+
+  // "직접 해보기": editors, runners and per-block saves for the code blocks. The login redirect returns to the same block.
+  useEffect(() => (html && layoutRef.current ? initPlayground(layoutRef.current, { pageId: id as PageLang, onLogin: (hash) => goLogin.current(hash) }) : undefined), [html, id])
 
   return (
     <div className="study-page">
