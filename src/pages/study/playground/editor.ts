@@ -105,7 +105,8 @@ export async function createEditor(opts: EditorOptions): Promise<PgEditor> {
         theme,
         language,
         placeholder('여기에 코드를 쓰세요'),
-        EditorView.contentAttributes.of({ 'aria-label': opts.label, 'aria-multiline': 'true', spellcheck: 'false', autocapitalize: 'off', autocorrect: 'off' }),
+        // tabindex: the scroller is tabindex=-1 and axe doesn't count contenteditable as focusable (scrollable-region-focusable).
+        EditorView.contentAttributes.of({ 'aria-label': opts.label, 'aria-multiline': 'true', spellcheck: 'false', autocapitalize: 'off', autocorrect: 'off', tabindex: '0' }),
         EditorView.domEventHandlers({ keydown: (e) => { if (e.key !== 'Tab' && e.key !== 'Shift' && e.key !== 'Escape') tabFree = false; return false } }),
         EditorView.updateListener.of((u) => { if (u.docChanged) opts.onChange(u.state.doc.toString()) }),
       ],
