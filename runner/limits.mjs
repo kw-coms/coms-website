@@ -78,3 +78,25 @@ export function createRunQueue() {
     stats: () => ({ active, queued: waiting.length }),
   };
 }
+
+// Persistent deny-list of clients whose job made sandbox cleanup fail (each such failure costs
+// a container restart for everybody). Lives on a small named volume that outlives process and
+// container restarts; a missing/corrupt file just means an empty list.
+export function createDenyList({ file, ttlMs = 15 * 60_000, max = 1000, now = Date.now, fs } = {}) {
+  const { readFileSync, writeFileSync, renameSync } = fs;
+  let entries = new Map();
+  const prune = () => { const t = now(); for (const [key, until] of entries) if (until <= t) entries.delete(key); };
+  try {
+    const parsed = JSON.parse(readFileSync(file, 'utf8'));
+    if (parsed && typeof parsed === 'object') for (const [key, until] of Object.entries(parsed)) if (Number.isFinite(until)) entries.set(key, until);
+  } catch { /* first start or unreadable: start empty */ }
+  return {
+    has(key) { const until = entries.get(key); return until !== undefined && until > now(); },
+    add(key) {
+      prune();
+      if (entries.size >= max && !entries.has(key)) entries.delete(entries.keys().next().value);
+      entries.set(key, now() + ttlMs);
+      try { writeFileSync(`${file}.tmp`, JSON.stringify(Object.fromEntries(entries))); renameSync(`${file}.tmp`, file); } catch { /* best effort; must not block the restart */ }
+    },
+  };
+}

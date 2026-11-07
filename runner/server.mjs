@@ -2,9 +2,10 @@ import { createServer } from 'node:http';
 import { isIP, createConnection } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { lstat, unlink } from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { runCode, runnerHealthy } from './run.mjs';
-import { createRunQueue, createRateLimiter, normalizeIp } from './limits.mjs';
+import { createRunQueue, createRateLimiter, createDenyList, normalizeIp } from './limits.mjs';
 
 export const MAX_BODY_BYTES = 96 * 1024;
 const MAX_CODE_BYTES = 64 * 1024;
@@ -67,6 +68,7 @@ export function createRunnerServer({
   trustProxy = process.env.TRUST_PROXY === '1',
   logger = entry => console.log(JSON.stringify(entry)),
   onFatal = () => {},
+  denyList = { has: () => false },
 } = {}) {
   const server = createServer({ maxHeaderSize: 16 * 1024 }, async (request, response) => {
     const started = Date.now(), id = randomUUID();
@@ -87,7 +89,12 @@ export function createRunnerServer({
       if (request.method === 'GET' && path === '/study/api/health') return healthCheck() ? send(200, { ok: true }) : send(503, { ok: false });
       if (path !== '/study/api/run') return send(404, rejected('요청한 경로를 찾을 수 없어요.'));
       if (request.method !== 'POST') { response.setHeader('Allow', 'POST'); return send(405, rejected('POST 요청만 사용할 수 있어요.')); }
-      if (!limiter.take(clientIp(request, trustProxy))) {
+      const ip = clientIp(request, trustProxy);
+      if (denyList.has(ip)) {
+        response.setHeader('Retry-After', '900');
+        return send(429, { error: 'rate-limited', messageKo: '이 주소에서 실행기를 불안정하게 만든 요청이 있어 잠시 실행이 제한돼요. 15분 뒤에 다시 시도해 주세요.' });
+      }
+      if (!limiter.take(ip)) {
         response.setHeader('Retry-After', '60');
         return send(429, { error: 'rate-limited', messageKo: '1분 동안의 실행 요청 한도를 넘었어요. 잠시 기다려 주세요.' });
       }
@@ -112,7 +119,7 @@ export function createRunnerServer({
       if (!healthCheck()) {
         response.setHeader('Retry-After', '30');
         send(503, { error: 'unavailable', messageKo: '실행기를 다시 시작하는 중이에요. 잠시 후 다시 시도해 주세요.' });
-        onFatal();
+        onFatal({ ip: clientIp(request, trustProxy) });
       } else send(500, rejected('서버에서 요청을 처리하지 못했어요.'));
     }
     finally { if (!request.complete) request.resume(); }
@@ -155,10 +162,16 @@ export async function listenRunner(server, { socketPath = process.env.LISTEN_SOC
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   let server;
   let exiting = false;
+  // Optional: persist which client broke cleanup so a restart does not reset abuse protection.
+  const denyFile = process.env.DENYLIST_FILE;
+  const denyList = denyFile ? createDenyList({ file: denyFile, fs: fsSync }) : undefined;
   server = createRunnerServer({
-    onFatal() {
+    denyList,
+    onFatal({ ip } = {}) {
       if (exiting) return;
       exiting = true;
+      // The first failing request is the one whose job (or leftovers) broke cleanup.
+      if (ip) denyList?.add(ip);
       console.error(JSON.stringify({ event: 'fatal', reason: 'job cleanup failed; exiting for container restart' }));
       server.close();
       // Give in-flight 503 responses a moment to flush, then die non-zero: tini exits and

@@ -136,3 +136,16 @@ test('poisoned runner answers 503 unavailable and signals fatal via onFatal', as
   const response = await fetch(`http://127.0.0.1:${server.address().port}/study/api/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ lang: 'python', code: 'print(1)' }) });
   assert.equal(response.status, 503); assert.equal((await response.json()).error, 'unavailable'); assert.equal(fatal, 1);
 });
+
+test('denied client gets 429 before the queue; a poisoning request is passed to onFatal with its ip', async t => {
+  let ran = 0, fatalIp;
+  const denied = new Set();
+  const server = createRunnerServer({ healthCheck: () => ran === 0, onFatal: ({ ip }) => { fatalIp = ip; denied.add(ip); }, logger() {}, limiter: { take: () => true, close() {} },
+    denyList: { has: ip => denied.has(ip) }, executor: async () => { ran++; throw new Error('cleanup'); } });
+  if (!await listenOrSkip(t, server)) return;
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const post = () => fetch(`http://127.0.0.1:${server.address().port}/study/api/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ lang: 'python', code: 'print(1)' }) });
+  assert.equal((await post()).status, 503); assert.equal(fatalIp, '127.0.0.1');
+  const second = await post();
+  assert.equal(second.status, 429); assert.equal(second.headers.get('retry-after'), '900'); assert.equal(ran, 1);
+});

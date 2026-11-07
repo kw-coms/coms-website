@@ -133,6 +133,7 @@ test('job process has uid/gid 10100, no groups, zero capability sets and no_new_
   assert.deepEqual(o.Groups, []);
   for (const key of ['CapInh', 'CapPrm', 'CapEff', 'CapAmb']) assert.match(o[key][0], /^0+$/, key);
   assert.deepEqual(o.NoNewPrivs, ['1']);
+  assert.deepEqual(o.Seccomp, ['2'], 'run the container with --security-opt seccomp=runner/seccomp.json');
 });
 
 test('job cannot regain root or another uid', options('python', true), async () => {
@@ -286,4 +287,32 @@ test('unremovable leftover poisons the runner; server answers 503 and exits non-
     assert.match(stderr, /job cleanup failed/);
   } finally { child.kill('SIGKILL'); await unlink(stuck).catch(() => {}); await unlink(sock).catch(() => {}); }
   await afterwards('after fault test');
+});
+
+// ---- IPC objects created with mode 0 (invisible to `ipcrm --all`) must not poison the runner ----
+const ipcHead = '#define _GNU_SOURCE\n#include <sys/ipc.h>\n#include <sys/shm.h>\n#include <sys/msg.h>\n#include <sys/sem.h>\n#include <sys/mman.h>\n#include <mqueue.h>\n#include <fcntl.h>\n#include <stdio.h>\n#include <unistd.h>\n#include <signal.h>\n';
+const ipcClean = async label => {
+  const next = await run('c', '#include <stdio.h>\nint main(void){puts("fine");}');
+  assert.equal(next.stdout, 'fine\n', `${label}: ${JSON.stringify(next)}`); assert.ok(runnerHealthy(), `${label}: poisoned`);
+  for (const kind of ['shm', 'msg', 'sem']) assert.equal((await readFile(`/proc/sysvipc/${kind}`, 'utf8')).trim().split('\n').length, 1, `${label}: ${kind}`);
+};
+for (const [name, body] of [
+  ['mode-000 shared memory, message queue and semaphore', 'if(shmget(IPC_PRIVATE,4096,IPC_CREAT|0)<0||msgget(IPC_PRIVATE,IPC_CREAT|0)<0||semget(IPC_PRIVATE,1,IPC_CREAT|0)<0) return 1;'],
+  ['shm whose owner uid was given away with IPC_SET (creator uid remains)', 'int id=shmget(IPC_PRIVATE,4096,IPC_CREAT|0600); struct shmid_ds d; if(id<0||shmctl(id,IPC_STAT,&d)) return 1; d.shm_perm.uid=0; d.shm_perm.mode=0; if(shmctl(id,IPC_SET,&d)) return 2;'],
+  ['mode-000 POSIX shm and message queue', 'if(shm_open("/z000",O_CREAT|O_RDWR,0)<0) return 1; if(mq_open("/z000q",O_CREAT|O_RDWR,0,NULL)==(mqd_t)-1) return 2;'],
+  ['500 SysV objects of all kinds with alternating modes', 'for(int i=0;i<500;i++){int m=i%2?0:0600; int r=i%3==0?shmget(IPC_PRIVATE,4096,IPC_CREAT|m):i%3==1?msgget(IPC_PRIVATE,IPC_CREAT|m):semget(IPC_PRIVATE,1,IPC_CREAT|m); if(r<0){printf("failed at %d\\n",i);return 1;}}'],
+]) {
+  test(`IPC cleanup survives: ${name}`, options('c', true), async () => {
+    const r = await run('c', `${ipcHead}int main(void){${body} puts("made"); return 0;}`);
+    assert.equal(r.stdout, 'made\n', JSON.stringify(r)); await ipcClean(name);
+  });
+}
+test('IPC cleanup survives: attached shm segment whose attacher sleeps in a setsid daemon', options('c', true), async () => {
+  const r = await run('c', `${ipcHead}int main(void){int id=shmget(IPC_PRIVATE,4096,IPC_CREAT|0); if(id<0) return 1; if(fork()==0){setsid(); shmat(id,0,0); for(;;) pause();} usleep(200000); puts("made"); return 0;}`);
+  assert.equal(r.stdout, 'made\n', JSON.stringify(r)); await ipcClean('attached shm');
+});
+
+test('seccomp profile is active and denies user namespaces, mount and ptrace', options('python', true), async () => {
+  const o = json(await py('import ctypes,json,os\nl=ctypes.CDLL(None,use_errno=True)\nr={}\nr["unshare_userns"]=l.unshare(0x10000000)\nr["mount"]=l.mount(b"none",b"/jobs",b"tmpfs",0,None)\nr["traceme"]=l.ptrace(0,0,0,0)\nprint(json.dumps(r))'));
+  for (const [name, value] of Object.entries(o)) assert.equal(value, -1, name);
 });

@@ -96,18 +96,31 @@ function decodeBounded(buffer) {
   return boundUtf8(new TextDecoder().decode(buffer));
 }
 
-export async function clearSystemVIpc({ execImpl = asJob, readFileImpl = readFile, uid = JOB_ID } = {}) {
-  // Dedicated private IPC namespace only: SysV objects survive their creators.
-  // Run as the job uid, which owns every object a job can create.
-  execImpl('/usr/bin/ipcrm', ['--all'], { timeout: 1000, stdio: 'ignore' });
-  for (const kind of ['shm', 'msg', 'sem']) {
+// ipcrm --all enumerates with permission checks and skips mode-0 objects, so enumerate
+// /proc/sysvipc here (world-readable) and IPC_RMID each id explicitly as the job uid: the
+// owner or creator may remove an object whatever its mode (even after IPC_SET gave away the uid).
+// Run after the kill step so attached segments lose their attachers and actually vanish.
+const IPC_KINDS = [['shm', '-m'], ['msg', '-q'], ['sem', '-s']];
+async function jobIpcObjects(readFileImpl, uid) {
+  const found = [];
+  for (const [kind, flag] of IPC_KINDS) {
     const [header, ...rows] = (await readFileImpl(`/proc/sysvipc/${kind}`, 'utf8')).trim().split('\n');
     const columns = header.trim().split(/\s+/);
     const owners = ['uid', 'cuid'].map(name => columns.indexOf(name));
-    if (owners[0] < 0 || rows.some(row => { const f = row.trim().split(/\s+/); return owners.some(i => i >= 0 && Number(f[i]) === uid); })) {
-      throw new Error('System V IPC cleanup failed');
+    if (owners[0] < 0 || columns.length < 2) throw new Error('System V IPC table unreadable');
+    for (const row of rows) {
+      const fields = row.trim().split(/\s+/);
+      if (owners.some(i => i >= 0 && Number(fields[i]) === uid)) found.push([flag, fields[1]]);
     }
   }
+  return found;
+}
+export async function clearSystemVIpc({ execImpl = asJob, readFileImpl = readFile, uid = JOB_ID } = {}) {
+  const found = await jobIpcObjects(readFileImpl, uid);
+  for (let i = 0; i < found.length; i += 100) {
+    execImpl('/usr/bin/ipcrm', found.slice(i, i + 100).flat(), { timeout: 5000, stdio: ['ignore', 'ignore', 'pipe'] });
+  }
+  if ((await jobIpcObjects(readFileImpl, uid)).length) throw new Error('System V IPC cleanup failed');
 }
 
 // Everything the job uid can write lives on the three mounts above. Deleting as the owner

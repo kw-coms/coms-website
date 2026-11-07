@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       gcc libc6-dev util-linux tini libstdc++6 libzstd1 libssl3 libsqlite3-0 \
       zlib1g libbz2-1.0 liblzma5 libreadline8 libffi8 libexpat1 \
       libuuid1 libcrypt1 libncursesw6 libtinfo6 \
-    && mkdir -p /opt/runner /run/coms-study /jobs \
+    && mkdir -p /opt/runner /run/coms-study /jobs /var/lib/coms-study \
     && groupadd --gid 10100 jobrunner \
     && useradd --uid 10100 --gid 10100 --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin jobrunner \
     && dpkg-query -W -f='${Package}=${Version}\n' \

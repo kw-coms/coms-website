@@ -12,7 +12,8 @@ services:
       - /jobs:rw,exec,nosuid,nodev,size=64m,nr_inodes=4096,mode=1777
     cap_drop: [ALL]
     cap_add: [SETUID, SETGID, KILL]
-    security_opt: ["no-new-privileges:true"]
+    # Explicit profile (Docker's default minus ptrace/process_vm_*): never depend on the daemon default.
+    security_opt: ["no-new-privileges:true", "seccomp=./seccomp.json"]
     mem_limit: 768m
     memswap_limit: 768m
     cpus: 1.0

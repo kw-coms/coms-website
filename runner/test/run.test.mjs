@@ -128,10 +128,17 @@ test('CPU polling catches an ignored SIGXCPU without classifying unrelated SIGKI
   assert.equal(other.timedOut, false);
 });
 
-test('System V IPC cleanup invokes ipcrm and rejects surviving UID objects', async () => {
+test('System V IPC cleanup removes each owned or created object by id and rejects survivors', async () => {
   const { clearSystemVIpc } = await import('../run.mjs');
   const calls = [];
-  await clearSystemVIpc({ execImpl: (...args) => calls.push(args), readFileImpl: async () => 'key shmid uid\n', uid: 10100 });
-  assert.equal(calls[0][0], '/usr/bin/ipcrm'); assert.deepEqual(calls[0][1], ['--all']);
-  await assert.rejects(clearSystemVIpc({ execImpl() {}, readFileImpl: async () => 'key shmid uid\n123 456 10100\n', uid: 10100 }), /IPC/);
+  let removed = false;
+  const table = { shm: 'key shmid perms uid gid cuid cgid\n0 11 0 0 0 10100 0\n0 12 600 5 5 5 5\n', msg: 'key msqid perms uid gid cuid cgid\n0 21 0 10100 1 1 1\n', sem: 'key semid perms uid gid cuid cgid\n' };
+  const reader = async path => removed ? table[path.split('/').pop()].split('\n')[0] + '\n' : table[path.split('/').pop()];
+  await clearSystemVIpc({ execImpl: (...args) => { calls.push(args); removed = true; }, readFileImpl: reader, uid: 10100 });
+  assert.equal(calls.length, 1); assert.equal(calls[0][0], '/usr/bin/ipcrm');
+  assert.deepEqual(calls[0][1], ['-m', '11', '-q', '21']); // other users' objects are never touched
+  await assert.rejects(clearSystemVIpc({ execImpl() {}, readFileImpl: async path => table[path.split('/').pop()], uid: 10100 }), /IPC/);
+  calls.length = 0;
+  await clearSystemVIpc({ execImpl: (...args) => calls.push(args), readFileImpl: async path => path.endsWith('/shm') ? 'key shmid uid cuid\n' : 'key id uid cuid\n', uid: 10100 });
+  assert.equal(calls.length, 0);
 });

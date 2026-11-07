@@ -32,7 +32,11 @@ tini (PID 1, root)
 - 모든 컴파일·실행은 `setpriv`로 **UID/GID 10100**(보조 그룹 없음, capability 전부 0, `no_new_privs`)으로 전환한 뒤 실행합니다. root → 비root 전환에서 커널이 permitted/effective/ambient capability를 비우므로 실패 시 "닫힌" 쪽으로 동작합니다. 작업은 서버 프로세스에 신호를 보내거나 ptrace하거나 `/proc/<pid>/{mem,environ,fd,cwd}`를 열 수 없고(UID 불일치), `kill(-1)`도 서버에 닿지 않습니다. 작업 환경 변수는 `PATH, LANG, HOME, TMPDIR`뿐입니다.
 - `RLIMIT_NPROC`은 UID 단위로 스레드까지 센다는 점이 핵심입니다. 서버와 같은 UID를 쓰면 JVM이 시작도 못 하고 포크 폭탄도 서버 쪽 프로세스를 세므로 막히지 않았습니다. 이제 작업 UID만 세므로 NPROC가 정확히 학생 프로세스를 제한합니다.
 - 파일: `/jobs`(tmpfs, **root 소유, 모드 1777 sticky**)가 유일한 쓰기 위치입니다. 작업 UID는 마운트 루트를 chmod/rename/삭제할 수 없고 자기 항목만 만들거나 지울 수 있습니다(정리가 목록을 읽어야 해서 `1733`이 아니라 `1777`; 작업 UID가 유일한 사용자입니다). 작업마다 작업 UID가 만든 0700 하위 디렉터리 `/jobs/coms-<랜덤>`을 `TMPDIR`/`HOME`/cwd로 씁니다. 루트 파일시스템은 읽기 전용이며 `/tmp`, `/run/coms-study`(nginx와 공유하는 소켓 디렉터리, 소켓은 `root:nginx 0660`), `/app` 등은 10100이 쓸 수 없습니다. `/dev/shm`과 `/dev/mqueue`는 Docker가 1777로 만들기 때문에 쓰기가 가능하며 작업 후 지웁니다.
-- 정리(작업 전·컴파일 후·작업 후): ① **작업 UID로** `kill -9 -1`을 반복 실행해 `setsid`/이중 fork 데몬을 포함한 모든 10100 프로세스를 종료하고 `/proc`에 남은 10100 프로세스(좀비 포함)가 없을 때까지 확인, ② 작업 UID로 `ipcrm --all` 후 `/proc/sysvipc/{shm,msg,sem}`에 uid/cuid 10100 객체가 없는지 확인, ③ 작업 UID로 `/jobs`·`/dev/shm`·`/dev/mqueue`(POSIX 메시지 큐 포함)의 10100 소유 항목에 `chmod -R u+rwx`(권한 000 트리 복구, 심볼릭 링크 제외) 후 `rm -rf`를 셸 없이 argv로 실행(종료 코드·타임아웃이 곧바로 예외)하고, 서버가 세 마운트가 **완전히 비었는지** 직접 읽어 확인. 하나라도 실패하면 러너는 오염(poisoned) 상태가 되어 해당 요청과 대기 요청에 `503 {"error":"unavailable"}`(Retry-After 30)를 돌려주고, 약 1.5초 뒤 서버가 **종료 코드 70으로 종료**합니다. tini도 함께 끝나 컨테이너가 종료되고 `restart: unless-stopped`가 새 컨테이너(비워진 tmpfs)로 다시 띄웁니다. 재시작 중 nginx 재시도는 필요 없고 클라이언트는 503 메시지를 보고 다시 시도하면 됩니다. 소유자가 직접 지우므로 `CAP_DAC_OVERRIDE`/`CAP_FOWNER`/`CAP_CHOWN`이 필요 없습니다.
+- 정리(작업 전·컴파일 후·작업 후): ① **작업 UID로** `kill -9 -1`을 반복 실행해 `setsid`/이중 fork 데몬을 포함한 모든 10100 프로세스를 종료하고 `/proc`에 남은 10100 프로세스(좀비 포함)가 없을 때까지 확인, ② 서버가 `/proc/sysvipc/{shm,msg,sem}`를 직접 읽어 uid 또는 cuid가 10100인 객체를 골라 작업 UID로 `ipcrm -m/-q/-s <id>`로 하나씩 제거(`ipcrm --all`은 권한 검사로 모드 0 객체를 건너뛰므로 쓰지 않음; 소유자·생성자는 모드와 무관하게 IPC_RMID 가능, IPC_SET으로 uid를 넘겨도 cuid로 제거됨. 붙은 shm은 ①에서 attacher가 죽은 뒤 사라짐)한 뒤 다시 읽어 남은 객체가 없는지 확인, ③ 작업 UID로 `/jobs`·`/dev/shm`·`/dev/mqueue`(POSIX 메시지 큐 포함)의 10100 소유 항목에 `chmod -R u+rwx`(권한 000 트리 복구, 심볼릭 링크 제외) 후 `rm -rf`를 셸 없이 argv로 실행(종료 코드·타임아웃이 곧바로 예외)하고, 서버가 세 마운트가 **완전히 비었는지** 직접 읽어 확인. 하나라도 실패하면 러너는 오염(poisoned) 상태가 되어 해당 요청과 대기 요청에 `503 {"error":"unavailable"}`(Retry-After 30)를 돌려주고, 약 1.5초 뒤 서버가 **종료 코드 70으로 종료**합니다. tini도 함께 끝나 컨테이너가 종료되고 `restart: unless-stopped`가 새 컨테이너(비워진 tmpfs)로 다시 띄웁니다. 재시작 중 nginx 재시도는 필요 없고 클라이언트는 503 메시지를 보고 다시 시도하면 됩니다. 소유자가 직접 지우므로 `CAP_DAC_OVERRIDE`/`CAP_FOWNER`/`CAP_CHOWN`이 필요 없습니다.
+
+### seccomp 프로파일
+
+Docker 데몬의 기본값(Docker Desktop은 `seccomp=unconfined`로 보고될 수 있음)에 의존하지 않고 `runner/seccomp.json`을 두 Compose 파일의 `security_opt: seccomp=./seccomp.json`으로 명시합니다. 내용은 Docker 27.3.1의 공식 `default.json`에서 **`ptrace`, `process_vm_readv`, `process_vm_writev` 허용 항목만 제거**한 것입니다(툴체인에 불필요). `mount`, `unshare`/`clone`의 사용자 네임스페이스, `bpf`, `keyctl` 등 위험한 시스템 콜은 기본 프로파일대로 막힙니다(`CAP_SYS_ADMIN` 조건부 허용은 우리가 그 capability를 주지 않으므로 무효). `test/toolchain.mjs`가 작업 프로세스의 `/proc/self/status`에서 `Seccomp: 2`를 확인하고, `unshare(CLONE_NEWUSER)`, `mount`, `ptrace(TRACEME)`가 실제로 `-1`임을 검증합니다. 업그레이드 시 새 엔진 버전의 `default.json`과 비교하세요.
 
 ### 대안 비교 (이 구조를 택한 이유)
 
@@ -61,6 +65,7 @@ tini (PID 1, root)
 - 비밀(토큰, 키)을 컨테이너 환경 변수나 파일에 넣지 마세요. 작업이 직접 읽지는 못하지만 방어를 한 겹 더 두는 것입니다.
 - capability bounding set은 `SETUID, SETGID, KILL`로 남습니다(`CAP_SETPCAP` 없이는 줄일 수 없음). 작업 프로세스는 비root + `no_new_privs`이고 파일 capability가 없어 이를 사용할 수 없으며 테스트가 이를 확인합니다.
 - 정리 실패는 위처럼 프로세스 종료 → 컨테이너 자동 재시작으로 복구됩니다(회귀 테스트: root 소유 잔여 파일로 503과 종료 코드 70 확인). 재시작 사이 몇 초 동안은 요청이 실패합니다.
+- **재시작 남용**: 정리를 일부러 실패시켜 재시작을 유발하는 요청은 비용이 큽니다. 실패를 일으킨 요청의 클라이언트 키(`TRUST_PROXY`일 때 nginx가 넣은 `X-Forwarded-For`의 마지막 값, IPv6는 /64)를 `/var/lib/coms-study/denylist.json`에 기록하고, 재시작 후 15분 동안 그 키는 `429 rate-limited`(Retry-After 900)를 받습니다. 메모리 속 속도 제한기는 재시작하면 초기화되므로(tmpfs 볼륨은 컨테이너 중지 때 비워지는 것을 확인) 이 파일만 **디스크 기반 named volume** `coms-study-runner-state`에 둡니다(작업 UID는 쓸 수 없음, 항목 최대 1000개). 같은 NAT 뒤 모든 회원이 함께 제한될 수 있는 것이 단점입니다.
 - 개발 Compose는 포트와 브리지 네트워크를 열므로(작업이 외부 네트워크에 접근 가능) 신뢰할 수 있는 로컬 입력에만 사용하세요.
 
 ## 실행
@@ -86,7 +91,7 @@ docker run --rm --network none --user 0:101 --read-only \
   --tmpfs "/jobs:rw,exec,nosuid,nodev,size=64m,nr_inodes=4096,mode=1777" \
   --tmpfs /run/coms-study:rw,nosuid,nodev,size=1m,mode=0755 \
   --cap-drop ALL --cap-add SETUID --cap-add SETGID --cap-add KILL \
-  --security-opt no-new-privileges:true \
+  --security-opt no-new-privileges:true --security-opt seccomp=seccomp.json \
   --memory 768m --memory-swap 768m --cpus 1 --pids-limit 256 --ipc private --shm-size 8m \
   -e RUNNER_TOOLCHAIN_TESTS=1 -e RUNNER_CONTAINER_ATTACK_TESTS=1 \
   -w /app coms-study-runner:local node test/toolchain.mjs

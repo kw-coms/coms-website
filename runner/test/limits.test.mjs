@@ -46,3 +46,17 @@ test('rejected job frees the single execution slot', async () => {
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(await queue.submit(() => 42), 42);
 });
+
+test('deny list persists across instances, expires and tolerates a corrupt file', async () => {
+  const { createDenyList } = await import('../limits.mjs');
+  const fs = await import('node:fs');
+  const { mkdtempSync, writeFileSync } = fs;
+  const dir = mkdtempSync((await import('node:os')).tmpdir() + '/deny-'), file = `${dir}/d.json`;
+  let t = 1000;
+  const make = () => createDenyList({ file, ttlMs: 500, now: () => t, fs });
+  writeFileSync(file, '{not json'); assert.equal(make().has('1.2.3.4'), false);
+  make().add('1.2.3.4');
+  const again = make();
+  assert.equal(again.has('1.2.3.4'), true); assert.equal(again.has('5.6.7.8'), false);
+  t = 1600; assert.equal(make().has('1.2.3.4'), false);
+});
