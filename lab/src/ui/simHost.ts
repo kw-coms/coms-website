@@ -2,7 +2,7 @@ import type { SimFrame, SimInput, SimWarning, Wire } from '../core/types';
 import { createSimulator } from './core';
 import { compileSketch, CompileUnreachable } from './compileClient';
 import { clearSerial, pushSerial } from './serial';
-import { getState, scene, set, setInput as storeSetInput, subscribe, toast } from './store';
+import { getState, onSceneLoaded, scene, set, setInput as storeSetInput, subscribe, toast } from './store';
 
 export const sim = createSimulator();
 export const frameRef: { current: SimFrame | null } = { current: null };
@@ -90,6 +90,13 @@ let abort: AbortController | null = null;
 let compiledWithDebug = false;
 /** Sketch lines that have machine code (from the last debug build); null until a debug build exists. */
 let codeLines: number[] | null = null;
+/** Forget the previous program's line table: breakpoints must never snap to another sketch's lines. */
+function forgetProgram() {
+  compiledWithDebug = false;
+  codeLines = null;
+  set({ debugTruncated: false });
+}
+onSceneLoaded(forgetProgram);
 /** Snap a requested line to the next line with code (like VS Code); null when no later line has code. */
 function snapLine(line: number): number | null {
   if (!codeLines) return line;
@@ -108,7 +115,8 @@ export async function run() {
   const s = getState();
   if (s.compile.status === 'compiling') return;
   if (sim.state === 'paused' && s.compile.compiledCode === s.code && (compiledWithDebug || !s.breakpoints.length)) {
-    sim.start();
+    // through the debugger: it clears its paused flag and steps over the breakpoint it stopped on (a bare start() stays frozen)
+    if (sim.debug) sim.debug.continue(); else sim.start();
     return syncState();
   }
   if (sim.state === 'running' && s.compile.compiledCode === s.code && (compiledWithDebug || !s.breakpoints.length)) return;
@@ -138,6 +146,8 @@ export async function run() {
     clearSerial();
     sim.loadHex(r.hex);
     compiledWithDebug = !!r.debug;
+    set({ debugTruncated: (r.debug as { truncated?: boolean } | undefined)?.truncated === true });
+    if (!r.debug) codeLines = null;
     if (r.debug) { codeLines = [...new Set(r.debug.lines.map((l) => l.line))].sort((a, b) => a - b); resnap(); }
     if (r.debug) sim.debug?.load(r.debug);
     sim.debug?.setBreakpoints(getState().breakpoints);
@@ -160,6 +170,7 @@ export function pause() {
 export function stop() {
   cancelCompile();
   sim.stop();
+  forgetProgram();
   set({ inputs: {}, simWarnings: [], debug: null });
   lastWarn = '';
   syncState();

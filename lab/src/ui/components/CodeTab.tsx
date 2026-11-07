@@ -11,15 +11,21 @@ import { CodeEditor, SerialDock } from './Dock';
 // Blockly is only downloaded when a blocks mode is opened.
 const BlocksEditor = lazy(() => import('../blocks/BlocksEditor'));
 
+/** Shown when the compiler could not map every sketch line (debug.truncated). */
+export const TRUNCATED_NOTICE = '스케치가 커서 일부 줄에는 중단점을 걸 수 없어요';
+
 /** 계속 / 한 줄씩 / 함수 안으로 / 함수 밖으로 + the variables of the paused program. */
 export function DebugBar() {
   const bps = useStore((s) => s.breakpoints);
   const dbg = useStore((s) => s.debug);
   const sim = useStore((s) => s.simState);
+  const truncated = useStore((s) => s.debugTruncated);
   const paused = !!dbg?.paused;
-  if (!bps.length && !paused) return <p className="debug-hint">줄 번호 왼쪽을 눌러 중단점을 찍고 실행하면 그 줄에서 멈춰요.</p>;
+  const notice = truncated && <p className="debug-hint debug-truncated" role="status">{TRUNCATED_NOTICE}</p>;
+  if (!bps.length && !paused) return <>{notice}<p className="debug-hint">줄 번호 왼쪽을 눌러 중단점을 찍고 실행하면 그 줄에서 멈춰요.</p></>;
   return (
     <div className="debug-bar" role="group" aria-label="디버거">
+      {notice}
       <div className="debug-btns">
         <button type="button" disabled={!paused} onClick={debugContinue} title="다음 중단점까지 계속"><Play size={14} /> 계속</button>
         <button type="button" disabled={!paused} onClick={debugStepOver} title="한 줄씩 실행"><StepForward size={14} /> 한 줄씩</button>

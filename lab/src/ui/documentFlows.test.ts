@@ -218,3 +218,83 @@ describe('rotateSelection of a breadboard', () => {
     expect(Object.keys(m.store.getState().analysis.insertions).sort()).toEqual(insertedBefore);
   });
 });
+
+describe('block-mode scenes never run hidden code, and mission scenes open on their mission', () => {
+  const HIDDEN = 'void setup() { pinMode(13, OUTPUT); }\nvoid loop() { digitalWrite(13, HIGH); /* HIDDEN */ }\n';
+  const blockScene = async (m: Mods, codeMode: 'blocks' | 'blocks+text' | 'text', code = HIDDEN) => {
+    const { STARTER_BLOCKS } = await import('./blocks/starters');
+    return { ...example(m, 'external-blink'), codeMode, blocks: STARTER_BLOCKS['external-blink'], code } as Scene;
+  };
+  const generated = async (m: Mods, s: Scene) => {
+    const { generate } = await import('./blocks/generate');
+    const { sceneContext } = await import('./blocks/context');
+    return generate(s.blocks, sceneContext(s.parts, m.core.analyze(s)).opts).code;
+  };
+
+  it.each(['blocks', 'blocks+text'] as const)('loadScene (%s) regenerates the code from the blocks', async (mode) => {
+    const m = await boot();
+    const s = await blockScene(m, mode);
+    m.store.loadScene(s);
+    expect(m.store.getState().code).toBe(await generated(m, s));
+    expect(m.store.getState().code).not.toContain('HIDDEN');
+    expect(m.store.isDirty()).toBe(false);
+  });
+  it('a block mode without blocks starts from the default program, not from the hidden code', async () => {
+    const m = await boot();
+    m.store.loadScene({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks: undefined, code: HIDDEN } as Scene);
+    expect(m.store.getState().code).not.toContain('HIDDEN');
+    expect(m.store.getState().hist.present.blocks).toBeTruthy();
+  });
+  it('text mode keeps its own code', async () => {
+    const m = await boot();
+    m.store.loadScene(await blockScene(m, 'text'));
+    expect(m.store.getState().code).toBe(HIDDEN);
+  });
+  it('importJson of such a file loads the blocks code', async () => {
+    const m = await boot();
+    const s = await blockScene(m, 'blocks');
+    await m.actions.importJson(new File([JSON.stringify(s)], 'c.json', { type: 'application/json' }));
+    expect(m.store.getState().code).toBe(await generated(m, s));
+  });
+  it('a share link of such a scene loads the blocks code', async () => {
+    const m = await boot();
+    const s = await blockScene(m, 'blocks');
+    loc.hash = m.share.shareHash(await m.core.encodeShare(s));
+    await m.actions.loadFromLocationHash();
+    expect(m.store.getState().code).toBe(await generated(m, s));
+  });
+  it('the autosave restore at startup also regenerates', async () => {
+    const m0 = await boot();
+    const s = await blockScene(m0, 'blocks');
+    mem.set(m0.store.SAVE_KEY, JSON.stringify(s));
+    const m = await boot();
+    expect(m.store.getState().code).toBe(await generated(m, s));
+  });
+
+  it('a share link carrying a mission restores missionId and opens the mission panel', async () => {
+    const m = await boot();
+    const { MISSIONS } = await import('../missions');
+    const mission = MISSIONS[1]!;
+    expect(m.store.getState().missionId).toBeNull();
+    loc.hash = m.share.shareHash(await m.core.encodeShare(structuredClone(mission.starterScene)));
+    await m.actions.loadFromLocationHash();
+    expect(m.store.getState().missionId).toBe(mission.id);
+    expect(m.store.getState().sideTab).toBe('missions');
+    expect(m.store.getState().sideOpen).toBe(true);
+  });
+  it('importJson restores the mission, and loading any other scene leaves it', async () => {
+    const m = await boot();
+    const { MISSIONS } = await import('../missions');
+    const mission = MISSIONS[0]!;
+    await m.actions.importJson(new File([JSON.stringify(mission.starterScene)], 'm.json', { type: 'application/json' }));
+    expect(m.store.getState().missionId).toBe(mission.id);
+    m.actions.loadExample('button-led');
+    expect(m.store.getState().missionId).toBeNull();
+  });
+  it('the autosave restore keeps the mission', async () => {
+    const m0 = await boot();
+    const { MISSIONS } = await import('../missions');
+    mem.set(m0.store.SAVE_KEY, JSON.stringify(MISSIONS[0]!.starterScene));
+    expect((await boot()).store.getState().missionId).toBe(MISSIONS[0]!.id);
+  });
+});

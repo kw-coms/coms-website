@@ -5,6 +5,9 @@ import type {
 import { EXAMPLES, PARTS, analyze, validateScene } from './core';
 import { commit, initHistory, redo as redoH, undo as undoH, type History } from './history';
 import { getItem, setItem } from './storage';
+import { DEFAULT_BLOCKS } from './blocks/starters';
+import { sceneContext } from './blocks/context';
+import { generate } from './blocks/generate';
 import { detectSoftwareRendering, initialQuality, loadQualityMode, saveQualityMode, type Quality, type QualityMode } from './quality';
 
 export type Selection = { kind: 'part' | 'wire'; id: string } | null;
@@ -75,6 +78,8 @@ export interface State {
   breakpoints: number[];
   /** Latest debugger state from the simulator (paused line, globals). */
   debug: DebugState | null;
+  /** The last debug build could not map every sketch line (compiler reported debug.truncated). */
+  debugTruncated: boolean;
   /** Per-instrument panel UI state (scope knobs, floating window position). */
   instUi: Record<string, InstUi>;
   /** Part whose Korean info popup is open. */
@@ -110,6 +115,17 @@ const docOf = (s: Scene): Doc => {
   return rest as Doc;
 };
 
+/**
+ * In a block mode the code is always exactly what the blocks generate (ModeBar keeps it so while the tab is open).
+ * A scene file or share link can say otherwise, and its hidden `code` would run instead of the blocks the user sees,
+ * so every way in (load, import, autosave restore) regenerates it here.
+ */
+function withGeneratedCode(s: Scene, analysis: Analysis): Scene {
+  if ((s.codeMode ?? 'text') === 'text') return s;
+  const blocks = s.blocks ?? DEFAULT_BLOCKS;
+  return { ...s, blocks, code: generate(blocks, sceneContext(s.parts, analysis).opts).code };
+}
+
 function initialTheme(): Theme {
   const saved = getItem(THEME_KEY);
   if (saved === 'light' || saved === 'dark') return saved;
@@ -121,7 +137,8 @@ function startDoc(): { doc: Doc; code: string; restored: boolean; failed: boolea
   let failed = false;
   if (raw) {
     try {
-      const s = validateScene(JSON.parse(raw));
+      const parsed = validateScene(JSON.parse(raw));
+      const s = withGeneratedCode(parsed, analyze(parsed));
       return { doc: docOf(s), code: s.code, restored: true, failed: false };
     } catch {
       // keep the raw data for the user, then start from the default example
@@ -192,10 +209,11 @@ let state: State = {
   restoreNotice: first.failed,
   breakpoints: [],
   debug: null,
+  debugTruncated: false,
   instUi: {},
   info: null,
   schematic: false,
-  missionId: null,
+  missionId: first.doc.mission ?? null,
   missionProgress: loadMissionProgress(),
   editingNote: null,
   qualityNotice: qualityMode === 'auto' && softwareHint && getItem(NOTICE_KEY) !== '1' ? '그래픽 가속이 꺼져 있는 것 같아요. 부드럽게 쓰도록 화질을 낮췄어요. 위쪽 ⋯ 메뉴의 화질에서 바꿀 수 있어요.' : null,
@@ -478,14 +496,23 @@ export function updateWire(id: string, patch: Partial<Wire>) {
   void setDoc({ ...state.hist.present, wires: wires().map((w) => (w.id === id ? { ...w, ...patch } : w)) });
 }
 
-export function loadScene(s: Scene, opts: { keepSim?: boolean } = {}) {
+/** Called after every whole-document load, so the simulator host can drop per-program state (line tables) of the old sketch. */
+const loadListeners = new Set<() => void>();
+export const onSceneLoaded = (cb: () => void) => (loadListeners.add(cb), () => loadListeners.delete(cb));
+
+export function loadScene(input: Scene, opts: { keepSim?: boolean } = {}) {
   void opts;
+  const analysis = analyze(input);
+  const s = withGeneratedCode(input, analysis);
   const doc = docOf(s);
   set({
-    hist: initHistory(doc), code: s.code, analysis: analyze(s), selection: null, multi: [], wireStart: null, draft: null, inputs: {},
-    compile: { status: 'idle' }, simWarnings: [], cameraResetTick: state.cameraResetTick + 1, debug: null, instUi: {}, breakpoints: [], editingNote: null,
+    hist: initHistory(doc), code: s.code, analysis, selection: null, multi: [], wireStart: null, draft: null, inputs: {},
+    compile: { status: 'idle' }, simWarnings: [], cameraResetTick: state.cameraResetTick + 1, debug: null, debugTruncated: false, instUi: {}, breakpoints: [], editingNote: null,
+    // a scene that belongs to a mission opens on it; any other scene leaves the mission
+    missionId: s.mission ?? null, ...(s.mission ? { sideTab: 'missions' as const, sideOpen: true } : {}),
   });
   markClean();
+  loadListeners.forEach((cb) => cb());
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
