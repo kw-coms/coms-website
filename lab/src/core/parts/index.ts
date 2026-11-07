@@ -13,10 +13,16 @@ const choice = (key: string, label: string, values: (string | number)[], value =
 });
 const range = (key: SimInputDef['key'], label: string, value: number, min: number, max: number): SimInputDef => ({ key, label, type: 'range', default: value, min, max });
 const pressed: SimInputDef = { key: 'pressed', label: '누르기', type: 'momentary', default: false };
+// Audited instrument controls: multimeter mode changes loading/test current; every
+// function-generator and power-supply prop changes the source. None are exempt.
+const acquisitionOnlyProps: Partial<Record<PartKind, readonly string[]>> = {
+    oscilloscope: ['timeDiv', 'voltsDiv', 'trigger'],
+    'logic-analyzer': ['timeDiv'],
+};
 const def = (
     kind: PartKind, title: string, category: PartDef['category'], size: PartDef['size'],
     pins: PinDef[], props: PropDef[] = [], inputs?: SimInputDef[],
-): PartDef => ({ kind, title, category, size, pins, props, inputs });
+): PartDef => ({ kind, title, category, size, pins, props, inputs, acquisitionOnlyProps: acquisitionOnlyProps[kind] ?? [] });
 // UNO origin is PCB centre, PCB top y=0. Socket openings sit on 8.5 mm headers.
 // Coordinates use USB at -X, digital headers at -Z. The D7/D8 gap is 160 mil.
 const unoPins: PinDef[] = [];

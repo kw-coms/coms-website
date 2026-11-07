@@ -11,6 +11,12 @@ export class Instruments {
   private buffers = new Map<string, Buffer>();
   reset(): void { this.buffers.clear(); }
 
+  /** Rearm changed instruments at the current circuit voltage without touching other captures. */
+  reconfigure(ids: string[], scene: Scene, analysis: Analysis, volts: Record<string, number>, timeMs: number): void {
+    for (const id of ids) this.buffers.delete(id);
+    this.sample({ ...scene, parts: scene.parts.filter(part => ids.includes(part.id)) }, analysis, volts, timeMs);
+  }
+
   sample(scene: Scene, analysis: Analysis, volts: Record<string, number>, timeMs: number): void {
     if (!Number.isFinite(timeMs)) return;
     for (const part of scene.parts) {

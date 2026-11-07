@@ -1,7 +1,7 @@
 import type { Analysis, McuPinState, PartVisualState, Scene, SimFrame, SimInput, SimWarning } from './types';
 import { analyze } from './analyze';
 import { PARTS } from './parts';
-import { isSafeId, validateScene } from './scene';
+import { acquisitionOnlyChanges, isSafeId, validateScene } from './scene';
 import { ledBrightness, solveCircuit, type SolveResult, newTransientState } from './solver';
 import { Mcu, MCU_HZ, UNO_PIN_MAP } from './mcu';
 import { BehavioralDevices } from './behavioral';
@@ -121,9 +121,17 @@ export class SimulationEngine {
     const next = structuredClone(validateScene(scene));
     const unchanged = JSON.stringify(next.parts) === JSON.stringify(this.scene.parts)
       && JSON.stringify(next.wires) === JSON.stringify(this.scene.wires);
+    const acquisitionChanges = unchanged ? undefined : acquisitionOnlyChanges(this.scene, next);
     this.scene = next;
     // Editing source must not reset protocol transactions or the running circuit.
     if (unchanged) return this.analysis;
+    if (acquisitionChanges !== undefined) {
+      // No solve/reset: C/L history, behavioral devices, firmware and simulation time
+      // belong to the circuit under measurement, not to an instrument's controls.
+      if (this.solution) this.instruments.reconfigure(acquisitionChanges, next, this.analysis,
+        this.solution.netVolts, this.mcu.cpu.cycles / MCU_HZ * 1000);
+      return this.analysis;
+    }
     this.v2 = this.scene.parts.some(part => !this.legacyKinds.has(part.kind));
     // A standalone UNO/keypad circuit has no time-dependent or edge-triggered device state.
     this.keypadCacheEnabled = this.scene.parts.length === 2

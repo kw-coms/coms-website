@@ -4,6 +4,26 @@ import type { PartInstance, PinRef, Scene } from './types';
 const WIRE_COLORS = new Set(['red', 'black', 'blue', 'green', 'yellow', 'orange', 'white', 'purple', 'gray']);
 const FORBIDDEN_IDS = new Set(['__proto__', 'constructor', 'prototype']);
 
+/** Return affected instruments only if every part/wire change is acquisition-only.
+ * Keep the existing conservative comparison for geometry, wiring and electrical props.
+ */
+export function acquisitionOnlyChanges(previous: Scene, next: Scene): string[] | undefined {
+  if (previous.parts.length !== next.parts.length || JSON.stringify(previous.wires) !== JSON.stringify(next.wires)) return;
+  const changed: string[] = [];
+  for (let i = 0; i < next.parts.length; i++) {
+    const before = previous.parts[i]!;
+    const after = next.parts[i]!;
+    if (JSON.stringify(before) === JSON.stringify(after)) continue;
+    const withoutAcquisition = (part: PartInstance) => ({
+      ...part,
+      props: Object.fromEntries(Object.entries(part.props).filter(([key]) => !PARTS[part.kind].acquisitionOnlyProps.includes(key))),
+    });
+    if (JSON.stringify(withoutAcquisition(before)) !== JSON.stringify(withoutAcquisition(after))) return;
+    changed.push(after.id);
+  }
+  return changed;
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

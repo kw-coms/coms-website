@@ -2,6 +2,15 @@ import { expect, it } from 'vitest';
 import { PARTS, breadboardGroups } from './index';
 import { analyze } from '../analyze';
 
+it('limits acquisition-only controls to passive scope and analyzer settings', () => {
+  expect(PARTS.oscilloscope.acquisitionOnlyProps).toEqual(['timeDiv', 'voltsDiv', 'trigger']);
+  expect(PARTS['logic-analyzer'].acquisitionOnlyProps).toEqual(['timeDiv']);
+  for (const part of Object.values(PARTS)) {
+    for (const key of part.acquisitionOnlyProps) expect(part.props.some(prop => prop.key === key)).toBe(true);
+    if (!['oscilloscope', 'logic-analyzer'].includes(part.kind)) expect(part.acquisitionOnlyProps).toEqual([]);
+  }
+});
+
 it('maps the mini board to 170 holes in 34 separate strips', () => {
   expect(PARTS['breadboard-mini'].pins).toHaveLength(170);
   expect(breadboardGroups('breadboard-mini')).toHaveLength(34);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateScene } from './scene';
+import { acquisitionOnlyChanges, validateScene } from './scene';
 import { encodeShare, decodeShare } from './share';
 import type { Scene } from './types';
 
@@ -8,6 +8,40 @@ const scene = (code = ''): Scene => ({
   code,
   parts: [{ id: 'pixels', kind: 'neopixel-strip', pos: [0, 0, 0], rotY: 0, props: { count: 8 } }],
   wires: [],
+});
+
+describe('acquisition-only scene changes', () => {
+  const measured = (): Scene => ({ version: 2, code: '', wires: [], parts: [
+    { id: 'scope', kind: 'oscilloscope', pos: [0, 0, 0], rotY: 0, props: { timeDiv: 100, trigger: 2.5 } },
+    { id: 'r', kind: 'resistor', pos: [100, 0, 0], rotY: 0, props: { ohms: 10000 } },
+  ] });
+
+  it('accepts added and removed acquisition settings without mutating either scene', () => {
+    const before = measured(), after = measured();
+    delete after.parts[0]!.props.trigger;
+    after.parts[0]!.props.voltsDiv = 2;
+    expect(acquisitionOnlyChanges(before, after)).toEqual(['scope']);
+    expect(before).toEqual(measured());
+    expect(after.parts[0]!.props).toEqual({ timeDiv: 100, voltsDiv: 2 });
+  });
+
+  it.each(['resistance', 'position', 'rotation', 'kind', 'id', 'addition', 'removal', 'wire', 'unknown prop'])
+  ('rejects an acquisition edit mixed with %s changes', change => {
+    const before = measured(), after = measured();
+    after.parts[0]!.props.timeDiv = 200;
+    switch (change) {
+      case 'resistance': after.parts[1]!.props.ohms = 20000; break;
+      case 'position': after.parts[0]!.pos[0] = 1; break;
+      case 'rotation': after.parts[0]!.rotY = 90; break;
+      case 'kind': after.parts[0]!.kind = 'logic-analyzer'; break;
+      case 'id': after.parts[0]!.id = 'other'; break;
+      case 'addition': after.parts.push({ ...after.parts[1]!, id: 'extra' }); break;
+      case 'removal': after.parts.pop(); break;
+      case 'wire': after.wires.push({ id: 'w', color: 'blue', from: { partId: 'scope', pinId: 'CH1' }, to: { partId: 'r', pinId: '1' } }); break;
+      case 'unknown prop': after.parts[0]!.props.unknown = 1; break;
+    }
+    expect(acquisitionOnlyChanges(before, after)).toBeUndefined();
+  });
 });
 
 describe('import limits', () => {

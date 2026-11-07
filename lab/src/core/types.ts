@@ -81,6 +81,8 @@ export interface PartDef {
   size: Vec3; // bounding box, for picking/placement
   pins: PinDef[]; // for breadboards: every hole
   props: PropDef[];
+  /** Acquisition/display controls with no electrical effect; all other props retain the electrical update path. */
+  acquisitionOnlyProps: readonly string[];
   /** Interactive inputs the user can drive while the sim runs (button press, knob, light, distance). */
   inputs?: SimInputDef[];
 }
