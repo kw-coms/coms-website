@@ -922,15 +922,16 @@ print(best)
         expected: `B
 `,
         explain: "85는 80 이상이고 90 미만입니다."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `0
 `,
         expected: `D
-`
-      },
+`,
+        explain: "0점은 70점보다 낮으므로 D입니다."
+      }
+    ],
+    tests: [
       {
         stdin: `70
 `,
@@ -1030,15 +1031,16 @@ else:
         expected: `LEAP
 `,
         explain: "2024는 4의 배수이며 100의 배수가 아닙니다."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `1900
 `,
         expected: `COMMON
-`
-      },
+`,
+        explain: "1900은 100의 배수이지만 400의 배수가 아니므로 평년입니다."
+      }
+    ],
+    tests: [
       {
         stdin: `2000
 `,
@@ -1128,15 +1130,16 @@ print("LEAP" if y%400 == 0 or (y%4 == 0 and y%100 != 0) else "COMMON")
         expected: `5000
 `,
         explain: "12세는 어린이 할인 대상입니다."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `0
 `,
         expected: `5000
-`
-      },
+`,
+        explain: "0세도 12세 이하에 포함되므로 어린이 요금 5000원을 냅니다."
+      }
+    ],
+    tests: [
       {
         stdin: `13
 `,
@@ -1671,15 +1674,16 @@ print(product)
         expected: `6
 `,
         explain: "2+0+4=6입니다."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `0
 `,
         expected: `0
-`
-      },
+`,
+        explain: "번호가 0이면 더할 숫자도 0 하나이므로 합은 0입니다."
+      }
+    ],
+    tests: [
       {
         stdin: `9
 `,
@@ -2000,16 +2004,17 @@ for row in range(1, n+1):
         expected: `9 2
 `,
         explain: "최고점 9가 2, 3번에 있으므로 2번을 고릅니다."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `1
 -100
 `,
         expected: `-100 1
-`
-      },
+`,
+        explain: "점수가 하나뿐이므로 음수여도 그 점수가 최고점이며 위치는 1입니다."
+      }
+    ],
+    tests: [
       {
         stdin: `4
 0
@@ -2125,16 +2130,17 @@ print(best, position)
         expected: `2
 `,
         explain: "평균은 5이므로 7과 10만 셉니다."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `1
 100
 `,
         expected: `0
-`
-      },
+`,
+        explain: "점수가 하나이면 그 값이 평균과 같습니다. 평균보다 높은 점수는 없습니다."
+      }
+    ],
+    tests: [
       {
         stdin: `4
 0
@@ -2359,16 +2365,17 @@ for i in range(n - 1, -1, -1):
         expected: `3
 `,
         explain: "2가 세 번 있습니다."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `0
 5
 `,
         expected: `0
-`
-      },
+`,
+        explain: "목록 길이가 0이므로 찾는 번호 5가 나타난 횟수는 0입니다."
+      }
+    ],
+    tests: [
       {
         stdin: `4
 0
@@ -2590,15 +2597,16 @@ print()
         expected: `YES
 `,
         explain: "거꾸로 읽어도 level입니다."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `A
 `,
         expected: `YES
-`
-      },
+`,
+        explain: "글자가 하나인 단어는 어느 방향에서 읽어도 같으므로 YES입니다."
+      }
+    ],
+    tests: [
       {
         stdin: `AbA
 `,
@@ -2689,15 +2697,16 @@ print("YES" if s == s[::-1] else "NO")
         expected: `2
 `,
         explain: "O와 u가 모음입니다."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `b
 `,
         expected: `0
-`
-      },
+`,
+        explain: "b는 모음 다섯 종류에 포함되지 않으므로 개수는 0입니다."
+      }
+    ],
+    tests: [
       {
         stdin: `AEIOU
 `,
@@ -2796,15 +2805,16 @@ print(count)
         expected: `3
 `,
         explain: "공백 묶음 사이에 세 단어가 있습니다."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `
 `,
         expected: `0
-`
-      },
+`,
+        explain: "빈 줄에는 공백으로 구분할 단어가 없으므로 0입니다."
+      }
+    ],
+    tests: [
       {
         stdin: `    
 `,
@@ -2907,15 +2917,16 @@ print(len(s.split()))
         expected: `1
 `,
         explain: "17은 1과 17로만 나누어떨어져요."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `0
 `,
         expected: `0
-`
-      },
+`,
+        explain: "소수는 2 이상의 정수여야 하므로 0은 소수가 아닙니다."
+      }
+    ],
+    tests: [
       {
         stdin: `1
 `,
@@ -3024,16 +3035,17 @@ print(is_prime(n))
         expected: `6
 `,
         explain: "6칸씩 자르면 두 끈 모두 남지 않아요."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `0
 0
 `,
         expected: `0
-`
-      },
+`,
+        explain: "두 길이가 모두 0인 경우에는 문제에서 정한 규칙에 따라 0을 반환합니다."
+      }
+    ],
+    tests: [
       {
         stdin: `0
 27
@@ -3122,7 +3134,7 @@ print(gcd(a,b))
   {
     id: "core-clamp-temperature",
     title: "온도 표시 범위",
-    level: 2,
+    level: 1,
     topics: ["함수", "조건문"],
     langs: ["c", "java", "python"],
     chapter: {
@@ -3144,17 +3156,18 @@ print(gcd(a,b))
         expected: `30
 `,
         explain: "38은 상한 30보다 높아요."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `-100000
 -100000
 100000
 `,
         expected: `-100000
-`
-      },
+`,
+        explain: "온도가 하한과 같으므로 이미 허용 구간 안에 있습니다. 입력값을 그대로 반환합니다."
+      }
+    ],
+    tests: [
       {
         stdin: `5
 5
@@ -3265,15 +3278,16 @@ print(clamp(x,low,high))
         expected: `4
 `,
         explain: "2048은 숫자 네 칸에 인쇄해요."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `0
 `,
         expected: `1
-`
-      },
+`,
+        explain: "0도 숫자 한 글자로 인쇄하므로 한 칸이 필요합니다."
+      }
+    ],
+    tests: [
       {
         stdin: `9
 `,
@@ -3381,16 +3395,17 @@ print(count_digits(n))
         expected: `-8
 `,
         explain: "(-2)×(-2)×(-2)=-8이에요."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `0
 0
 `,
         expected: `1
-`
-      },
+`,
+        explain: "지수가 0이면 밑에 관계없이 이 문제의 규칙에 따라 1을 반환합니다."
+      }
+    ],
+    tests: [
       {
         stdin: `10
 8
@@ -3682,16 +3697,17 @@ print(moves(int(input())))
         expected: `2
 `,
         explain: "7은 세 번째 칸, 0부터 세면 2예요."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `0
 7
 `,
         expected: `-1
-`
-      },
+`,
+        explain: "번호표가 하나도 없으므로 목표 번호 7을 찾을 수 없어 -1입니다."
+      }
+    ],
+    tests: [
       {
         stdin: `1
 -5
@@ -3832,16 +3848,17 @@ print(answer)
 1 2 3
 `,
         explain: "3과 1, 이어서 3과 2가 자리를 바꿔요."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `0
 `,
         expected: `0
 
-`
-      },
+`,
+        explain: "정렬할 수가 없으므로 교환 횟수는 0이며 둘째 줄은 비어 있습니다."
+      }
+    ],
+    tests: [
       {
         stdin: `1
 -1
@@ -3978,16 +3995,17 @@ print(*a)
         expected: `1 2 4 4 5
 `,
         explain: "두 줄의 맨 앞 숫자 중 작은 것부터 골라요."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `0
 0
 `,
         expected: `EMPTY
-`
-      },
+`,
+        explain: "두 목록이 모두 비어 있으므로 합친 목록도 비어 있어 EMPTY를 출력합니다."
+      }
+    ],
+    tests: [
       {
         stdin: `0
 2
@@ -4116,9 +4134,9 @@ else:
     topics: ["배열", "시뮬레이션"],
     langs: ["c", "java", "python"],
     chapter: {
-      c: "array",
-      java: "array",
-      python: "str"
+      c: "project",
+      java: "project",
+      python: "project"
     },
     statement: "행사 자판기에는 500원·100원·50원·10원 동전 재고가 있습니다. 여러 손님의 거스름돈을 차례로 처리하세요. **큰 동전부터 가능한 만큼 쓰는 규칙**을 따릅니다. 필요한 금액을 끝까지 만들 수 없다면 `FAIL`을 출력하고 동전 재고는 바꾸지 않습니다. 다른 조합은 다시 탐색하지 않습니다.",
     inputSpec: "첫 줄에 500원·100원·50원·10원 동전 개수 각 하나 (0~20), 둘째 줄 손님 수 `n` (0 ≤ n ≤ 20), 다음 `n`줄에 가격 `price`와 받은 돈 `paid` (0 ≤ price ≤ paid ≤ 10000, 둘 다 10의 배수).",
@@ -4134,9 +4152,7 @@ else:
 FAIL
 `,
         explain: "첫 손님 뒤에는 500원 동전이 없어 둘째 손님에게 600원을 줄 수 없어요."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `0 0 0 0
 2
@@ -4145,8 +4161,11 @@ FAIL
 `,
         expected: `OK 0 0 0 0
 FAIL
-`
-      },
+`,
+        explain: "첫 손님은 가격과 낸 돈이 같아 동전이 필요 없습니다. 둘째 손님의 거스름돈 10원은 재고가 없어 줄 수 없습니다."
+      }
+    ],
+    tests: [
       {
         stdin: `20 20 20 20
 2
@@ -4340,9 +4359,9 @@ for _ in range(n):
     topics: ["배열", "탐색", "시뮬레이션"],
     langs: ["c", "java", "python"],
     chapter: {
-      c: "array",
-      java: "array",
-      python: "data"
+      c: "project",
+      java: "project",
+      python: "project"
     },
     statement: "엘리베이터는 주어진 시작 층에서 출발합니다. 요청된 층 중 **현재 층과 가장 가까운 층**을 다음 목적지로 고릅니다. 거리가 같으면 낮은 층을 먼저 방문해요. 같은 층 요청도 각각 한 번 방문한 것으로 기록합니다.",
     inputSpec: "첫 줄 시작 층 `start` (1~100), 둘째 줄 요청 수 `n` (0~20), 다음 `n`줄에 요청 층 (1~100)이 주어집니다. 모든 요청은 출발 전에 접수되어 있습니다.",
@@ -4359,17 +4378,18 @@ for _ in range(n):
 6
 `,
         explain: "1층에서 가장 가까운 2층부터 가면 1+2+3=6층을 움직여요."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `1
 0
 `,
         expected: `EMPTY
 0
-`
-      },
+`,
+        explain: "방문 요청이 없으므로 방문 목록은 EMPTY이고 이동 거리도 0입니다."
+      }
+    ],
+    tests: [
       {
         stdin: `1
 3
@@ -4544,9 +4564,9 @@ print(total)
     topics: ["배열", "시뮬레이션"],
     langs: ["c", "java", "python"],
     chapter: {
-      c: "array",
-      java: "array",
-      python: "str"
+      c: "project",
+      java: "project",
+      python: "project"
     },
     statement: "간식 A·B·C의 재고를 관리해요. 한 주문에는 세 품목의 변화량이 함께 들어옵니다. 적용 후 **하나라도 음수**가 되면 주문 전체를 거절하고 세 재고 모두 그대로 둡니다. 양수는 입고, 음수는 판매입니다.",
     inputSpec: "첫 줄 A·B·C 초기 재고 (각 0~1000), 둘째 줄 주문 수 `n` (0 ≤ n ≤ 100), 다음 `n`줄에 A·B·C 변화량 (각 -1000~1000). 중간 재고는 각 100000 이하입니다.",
@@ -4562,16 +4582,17 @@ print(total)
         expected: `4 0 0 1
 `,
         explain: "두 번째 주문은 A가 부족해 전부 거절해요."
-      }
-    ],
-    tests: [
+      },
       {
         stdin: `0 0 0
 0
 `,
         expected: `0 0 0 0
-`
-      },
+`,
+        explain: "주문이 없으므로 초기 재고가 그대로 남고 거절 횟수도 0입니다."
+      }
+    ],
+    tests: [
       {
         stdin: `0 0 0
 2
