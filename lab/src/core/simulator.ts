@@ -1,4 +1,4 @@
-import type { Analysis, Scene, SimFrame, SimInput, Simulator } from './types';
+import type { Analysis, DebugInfo, Scene, SimFrame, SimInput, Simulator } from './types';
 import { analyze } from './analyze';
 import { validateScene } from './scene';
 import { loadIntelHex } from './mcu';
@@ -10,6 +10,9 @@ export type Command =
   | { method: 'loadHex' | 'writeSerial'; value: string }
   | { method: 'setInput'; value: SimInput }
   | { method: 'setSpeed'; value: number }
+  | { method: 'debugLoad'; value: DebugInfo }
+  | { method: 'debugBreakpoints'; value: number[] }
+  | { method: 'debugContinue' | 'debugStepInto' | 'debugStepOver' | 'debugStepOut' }
   | { method: 'start' | 'pause' | 'stop' | 'reset' | 'dispose' };
 
 export type Event =
@@ -28,6 +31,8 @@ class WorkerSimulator implements Simulator {
   private failed = false;
   private disposed = false;
   private hex: string | undefined;
+  private debugInfo?: DebugInfo;
+  private debugLines: number[] = [];
   private speed = 1;
   private inputs = new Map<string, SimInput>();
   private scene: Scene = { version: 1, parts: [], wires: [], code: '' };
@@ -38,6 +43,15 @@ class WorkerSimulator implements Simulator {
   get state(): Simulator['state'] {
     return this._state;
   }
+
+  readonly debug = {
+    load: (info: DebugInfo): void => { this.debugInfo = info; this.send({ method: 'debugLoad', value: info }); },
+    setBreakpoints: (lines: number[]): void => { this.debugLines = [...lines]; this.send({ method: 'debugBreakpoints', value: lines }); },
+    continue: (): void => { this.send({ method: 'debugContinue' }); this.transition('running'); },
+    stepInto: (): void => { this.send({ method: 'debugStepInto' }); this.transition('running'); },
+    stepOver: (): void => { this.send({ method: 'debugStepOver' }); this.transition('running'); },
+    stepOut: (): void => { this.send({ method: 'debugStepOut' }); this.transition('running'); },
+  };
 
   constructor() {
     this.createWorker();
@@ -61,6 +75,7 @@ class WorkerSimulator implements Simulator {
       if (message.type === 'frame') {
         this.lastFrame = message.value;
         for (const listener of this.frames) listener(message.value);
+        if (message.value.debug?.paused) this.transition('paused');
       } else if (message.type === 'serial') {
         for (const listener of this.serial) listener(message.value);
       } else {
@@ -120,6 +135,8 @@ class WorkerSimulator implements Simulator {
         this.createWorker();
         this.send({ method: 'setScene', value: this.scene });
         if (this.hex) this.send({ method: 'loadHex', value: this.hex });
+        if (this.debugInfo) this.send({ method: 'debugLoad', value: this.debugInfo });
+        if (this.debugLines.length) this.send({ method: 'debugBreakpoints', value: this.debugLines });
         this.send({ method: 'setSpeed', value: this.speed });
         for (const value of this.inputs.values()) this.send({ method: 'setInput', value });
       } catch (error) {

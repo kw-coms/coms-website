@@ -1,9 +1,11 @@
-import type { Analysis, McuPinState, PartVisualState, Scene, SimFrame, SimInput } from './types';
+import type { Analysis, McuPinState, PartVisualState, Scene, SimFrame, SimInput, SimWarning } from './types';
 import { analyze } from './analyze';
 import { PARTS } from './parts';
 import { isSafeId, validateScene } from './scene';
-import { ledBrightness, solveCircuit, type SolveResult } from './solver';
+import { ledBrightness, solveCircuit, type SolveResult, newTransientState } from './solver';
 import { Mcu, MCU_HZ, UNO_PIN_MAP } from './mcu';
+import { BehavioralDevices } from './behavioral';
+import { Instruments } from './instruments';
 
 const EMPTY_SCENE: Scene = { version: 1, parts: [], wires: [], code: '' };
 const clamp = (value: number, min = 0, max = 1) => Math.max(min, Math.min(max, value));
@@ -29,14 +31,35 @@ export class SimulationEngine {
   private elapsedCycles = 0;
   private echoPins = new Set<string>();
   private linkedInputs = new Map<string, string[]>();
+  private wiredParts = new Set<string>();
   private dhtPins = new Set<string>();
   private pixelPins = new Set<string>();
+  private transient = newTransientState();
+  private behavior = new BehavioralDevices();
+  private instruments = new Instruments();
+  private v2 = false;
+  private dynamic = false;
+  private solving = false;
+  private analogStepMs = .25;
+  private analogTimeMs = 0;
+  private lastAnalogPins: PinStates | undefined;
+  private recentWarnings = new Map<string, { until: number; warning: SimWarning }>();
+  private readonly legacyKinds = new Set([
+    'arduino-uno', 'breadboard-half', 'breadboard-full', 'breadboard-mini', 'led', 'rgb-led',
+    'resistor', 'pushbutton', 'slide-switch', 'potentiometer', 'photoresistor', 'buzzer',
+    'servo', 'hc-sr04', 'lcd1602-i2c', 'multimeter', 'dht11', 'joystick', 'seven-segment',
+    'neopixel-strip', 'neopixel-ring', 'l9110s', 'dc-motor',
+  ]);
 
   get nextSolveDelay(): number {
     return Math.max(0, this.lastSolve + this.solveInterval - this.now());
   }
 
   constructor(private now: () => number = () => performance.now()) {
+    this.mcu.onPinModeChange = () => {
+      this.dirty = true;
+      if (this.v2 && !this.solving) this.onElectricalEdge();
+    };
     this.mcu.onPinChange = (pin, level) => {
       // GPIO peers need edge-accurate input without performing MNA at CPU speed.
       for (const peer of this.linkedInputs.get(pin) ?? []) {
@@ -45,6 +68,7 @@ export class SimulationEngine {
         if (!(direction & (1 << bit))) this.mcu.setVoltage(peer, level * 5);
       }
       this.dirty = true;
+      if (this.v2 && !this.solving) this.onElectricalEdge();
     };
   }
 
@@ -96,10 +120,28 @@ export class SimulationEngine {
     this.scene = next;
     // Editing source must not reset protocol transactions or the running circuit.
     if (unchanged) return this.analysis;
+    this.v2 = this.scene.parts.some(part => !this.legacyKinds.has(part.kind));
+    this.dynamic = this.scene.parts.some(part => [
+      'capacitor-ceramic', 'capacitor-electrolytic', 'inductor', 'timer-555',
+      'function-generator', 'oscilloscope', 'logic-analyzer', 'light-bulb',
+    ].includes(part.kind));
+    this.transient = newTransientState();
+    this.behavior.reset();
+    this.instruments.reset();
+    this.analogStepMs = .25;
+    this.analogTimeMs = this.mcu.cpu.cycles / 16000;
+    this.lastAnalogPins = undefined;
+    this.recentWarnings.clear();
     this.unoId = this.scene.parts.find(part => part.kind === 'arduino-uno')?.id;
     this.mcu.clearEcho();
     this.analysis = analyze(this.scene);
     this.linkedInputs.clear();
+    this.wiredParts.clear();
+    for (const net of this.analysis.nets) {
+      if (new Set(net.pins.map(pin => pin.partId)).size > 1) {
+        for (const pin of net.pins) this.wiredParts.add(pin.partId);
+      }
+    }
     for (const net of this.analysis.nets) {
       const pins = net.pins.filter(ref => ref.partId === this.unoId && UNO_PIN_MAP[ref.pinId]).map(ref => ref.pinId);
       for (const pin of pins) this.linkedInputs.set(pin, pins.filter(peer => peer !== pin));
@@ -110,7 +152,12 @@ export class SimulationEngine {
     this.inputs = Object.create(null) as typeof this.inputs;
     for (const part of this.scene.parts) {
       const values = Object.create(null) as Record<string, number | boolean>;
-      for (const input of PARTS[part.kind].inputs ?? []) values[input.key] = previous[part.id]?.[input.key] ?? input.default;
+      for (const input of PARTS[part.kind].inputs ?? []) {
+        const old = previous[part.id]?.[input.key];
+        values[input.key] = typeof old === 'number' && input.type === 'range'
+          ? clamp(old, input.min ?? 0, input.max ?? 1)
+          : typeof old === 'boolean' && input.type === 'momentary' ? old : input.default;
+      }
       this.inputs[part.id] = values;
     }
     this.dirty = true;
@@ -174,7 +221,7 @@ export class SimulationEngine {
           }));
         }
       }
-      if (part.kind === 'neopixel-strip' && this.powered(part.id, '5V')) {
+      if ((part.kind === 'neopixel-strip' || part.kind === 'neopixel-ring') && this.powered(part.id, '5V')) {
         const pin = this.unoPin(part.id, 'DIN');
         if (pin) {
           nextPixels.add(pin);
@@ -196,12 +243,19 @@ export class SimulationEngine {
   }
 
   reset(): void {
-    if (this.hex) this.mcu.loadHex(this.hex);
+    if (this.hex) this.mcu.reset(Uint16Array.from(this.mcu.cpu.progMem));
     else this.mcu.reset();
     this.afterReset();
   }
 
   private afterReset(): void {
+    this.transient = newTransientState();
+    this.behavior.reset();
+    this.instruments.reset();
+    this.analogStepMs = .25;
+    this.analogTimeMs = this.mcu.cpu.cycles / 16000;
+    this.lastAnalogPins = undefined;
+    this.recentWarnings.clear();
     this.solution = undefined;
     this.dirty = true;
     this.elapsedReal = 0;
@@ -274,7 +328,98 @@ export class SimulationEngine {
     return { drive, factors };
   }
 
+  /** Stateful devices advance only here, never as a side effect of reading a frame. */
+  private onElectricalEdge(): void {
+    const elapsed = this.mcu.cpu.cycles / 16000 - this.analogTimeMs;
+    if (this.dynamic && elapsed > 0 && this.lastAnalogPins) this.solveV2(elapsed, this.lastAnalogPins);
+    this.solveV2(0);
+  }
+
+  private solveV2(dtMs: number, heldPins?: PinStates): void {
+    if (this.solving) return;
+    this.solving = true;
+    try {
+      const pins = heldPins ?? this.mcu.pins();
+      const instantaneous: PinStates = Object.fromEntries(Object.entries(pins).map(([id, state]) => [id, { ...state, duty: state.level }]));
+      const timeMs = this.mcu.cpu.cycles / MCU_HZ * 1000;
+      const old = this.solution?.netVolts ?? {};
+      const oldCaps = dtMs > 0 ? { ...this.transient.capacitors } : undefined;
+      const oldCoils = dtMs > 0 ? { ...this.transient.inductors } : undefined;
+      let behavior = this.behavior.tick(this.scene, this.analysis, old, this.inputs, timeMs);
+      this.solution = solveCircuit(this.scene, this.analysis, instantaneous, this.inputs, behavior.drives,
+        { timeMs, dtMs, state: this.transient, links: behavior.links });
+      const edgeWarnings = this.solution.warnings.filter(warning => warning.id.startsWith('relay-turnoff-spike:'));
+      // Supply startup and cascaded combinational logic settle without advancing C/L history.
+      for (let iteration = 0; iteration < 4; iteration++) {
+        const next = this.behavior.tick(this.scene, this.analysis, this.solution.netVolts, this.inputs, timeMs);
+        const changed = JSON.stringify(next.drives) !== JSON.stringify(behavior.drives)
+          || JSON.stringify(next.links) !== JSON.stringify(behavior.links);
+        behavior = next;
+        if (!changed) break;
+        this.solution = solveCircuit(this.scene, this.analysis, instantaneous, this.inputs, behavior.drives,
+          { timeMs, dtMs: 0, state: this.transient, links: behavior.links });
+      }
+      for (const [id, visual] of Object.entries(behavior.visuals)) {
+        this.solution.parts[id] = { ...this.solution.parts[id], ...visual };
+      }
+      this.solution.warnings.push(...behavior.warnings, ...edgeWarnings);
+      for (const warning of this.solution.warnings) {
+        if (warning.id.startsWith('relay-turnoff-spike:')) this.recentWarnings.set(warning.id, { until: timeMs + 1000, warning });
+      }
+      for (const [id, entry] of this.recentWarnings) {
+        if (entry.until < timeMs) this.recentWarnings.delete(id);
+        else this.solution.warnings.push(entry.warning);
+      }
+      if (oldCaps && dtMs > 0) {
+        let error = 0;
+        for (const part of this.scene.parts) {
+          const previous = oldCaps[part.id], current = this.transient.capacitors[part.id];
+          if (!previous || !current) continue;
+          const capacitance = Number(part.props.capacitance ?? 100)
+            * (part.kind === 'capacitor-ceramic' ? 1e-9 : 1e-6);
+          // Embedded backward-Euler / trapezoid defect estimates local voltage error.
+          const defect = Math.abs(current.amps - previous.amps) * dtMs / 2000 / capacitance;
+          error = Math.max(error, defect / (.001 + .002 * Math.abs(current.volts)));
+        }
+        for (const part of this.scene.parts) {
+          const previous = oldCoils?.[part.id], current = this.transient.inductors[part.id];
+          if (!previous || !current) continue;
+          const inductance = Number(part.props.millihenries ?? 10) / 1000;
+          const defect = Math.abs(current.volts - previous.volts) * dtMs / 2000 / inductance;
+          error = Math.max(error, defect / (.00001 + .002 * Math.abs(current.amps)));
+        }
+        const factor = error > 0 ? Math.max(.25, Math.min(2, .8 / Math.sqrt(error))) : 2;
+        this.analogStepMs = Math.max(.001, Math.min(1, dtMs * factor));
+      }
+      this.opticalCurrents = this.solution.currents;
+      this.instruments.sample(this.scene, this.analysis, this.solution.netVolts, timeMs);
+      this.configureDevices();
+      for (const [id, state] of Object.entries(pins)) {
+        if (this.unoId && state.mode !== 'output' && !this.echoPins.has(id) && !this.mcu.dhtBusy(id)) {
+          this.mcu.setVoltage(id, this.voltage(this.unoId, id));
+        }
+      }
+      this.analogTimeMs = timeMs;
+      this.lastAnalogPins = instantaneous;
+      this.dirty = false;
+    } finally { this.solving = false; }
+  }
+
+  private dynamicStepMs(): number {
+    let limit = 1;
+    for (const part of this.scene.parts) {
+      if (part.kind === 'function-generator') limit = Math.min(limit, 1000 / Number(part.props.frequencyHz ?? 1000) / 80);
+
+      if (part.kind === 'oscilloscope' || part.kind === 'logic-analyzer') limit = Math.min(limit, Number(part.props.timeDiv ?? 1) * 10 / 512);
+    }
+    return Math.max(.001, Math.min(limit, this.analogStepMs));
+  }
+
   private solve(): void {
+    if (this.v2) {
+      if (this.dirty || !this.solution) this.solveV2(0);
+      return;
+    }
     const pins = this.mcu.pins();
     const signature = JSON.stringify(pins);
     if (signature !== this.lastSignature) this.dirty = true;
@@ -326,7 +471,21 @@ export class SimulationEngine {
     const started = performance.now();
     const before = this.mcu.cpu.cycles;
     this.solve();
-    this.mcu.step(Math.floor(cycles));
+    if (this.v2) {
+      const end = this.mcu.cpu.cycles + Math.floor(cycles);
+      while (this.mcu.cpu.cycles < end) {
+        const beforeStep = this.mcu.cpu.cycles;
+        const event = this.behavior.nextEventMs(beforeStep / 16000);
+        const nextEventCycles = event === undefined ? Infinity : Math.max(1, Math.ceil(event * 16000 - beforeStep));
+        const count = Math.min(end - beforeStep, nextEventCycles,
+          this.dynamic ? Math.max(16, Math.floor(this.dynamicStepMs() * 16000)) : Infinity);
+        if (this.unoId) this.mcu.step(count);
+        else this.mcu.cpu.cycles += count;
+        const elapsed = (this.mcu.cpu.cycles - beforeStep) / 16000;
+        if (elapsed <= 0) break; // debugger paused before an instruction
+        if (this.dynamic || event !== undefined || this.dirty) this.solveV2(Math.max(0, this.mcu.cpu.cycles / 16000 - this.analogTimeMs));
+      }
+    } else this.mcu.step(Math.floor(cycles));
     const frame = this.frame();
     this.elapsedCycles += this.mcu.cpu.cycles - before;
     this.elapsedReal += performance.now() - started;
@@ -361,13 +520,13 @@ export class SimulationEngine {
         ? this.mcu.lcdState(Number(part.props.address ?? 0x27)) : { lines: [' '.repeat(16), ' '.repeat(16)], backlight: false };
       if (part.kind === 'hc-sr04') state.hcsr04 = { pinging: this.mcu.isEchoActive(this.unoPin(part.id, 'ECHO') ?? '') };
       if (part.kind === 'dht11') state.dht = { busy: this.mcu.dhtBusy(this.unoPin(part.id, 'DATA') ?? '') };
-      if (part.kind === 'neopixel-strip') {
+      if ((part.kind === 'neopixel-strip' || part.kind === 'neopixel-ring')) {
         const colors = this.mcu.pixelColors(this.unoPin(part.id, 'DIN') ?? '');
         state.pixels = { colors: colors.length
           ? colors.map(color => [...color])
           : Array.from({ length: Number(part.props.count ?? 8) }, () => [0, 0, 0]) };
       }
-      if (part.kind === 'multimeter') {
+      if (part.kind === 'multimeter' && (part.props.mode === 'V' || part.props.mode === 'mA' || !part.props.mode)) {
         const mode = part.props.mode === 'mA' ? 'mA' : 'V';
         state.meter = { mode, reading: mode === 'V'
           ? (this.voltage(part.id, 'V') - this.voltage(part.id, 'COM')).toFixed(3)
@@ -379,7 +538,9 @@ export class SimulationEngine {
       timeMs: this.mcu.cpu.cycles / MCU_HZ * 1000,
       realtimeRatio: realtimeRatio ?? (this.elapsedReal > 0 ? this.elapsedCycles / MCU_HZ / (this.elapsedReal / 1000) : 0),
       pins, parts, netVolts: solution.netVolts,
-      warnings: [...new Map([...this.analysis.warnings, ...solution.warnings.filter(warning => !warning.id.startsWith('floating:') || (pins[warning.id.slice(9)]?.mode === 'input' && this.mcu.readPins.has(warning.id.slice(9))))].map(warning => [warning.id, warning])).values()],
+      ...(this.v2 ? this.instruments.traces() : {}),
+      debug: this.mcu.debugger.state(this.mcu.cpu),
+      warnings: [...new Map([...this.analysis.warnings.filter(warning => !warning.id.startsWith('unconnected:') || (warning.partId && this.wiredParts.has(warning.partId))), ...solution.warnings.filter(warning => !warning.id.startsWith('floating:') || (pins[warning.id.slice(9)]?.mode === 'input' && this.mcu.readPins.has(warning.id.slice(9))))].map(warning => [warning.id, warning])).values()],
     };
   }
 }

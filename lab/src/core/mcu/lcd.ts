@@ -37,6 +37,10 @@ export class Lcd1602 {
     }
     this.previous = value;
   }
+  /** Parallel HD44780 bus: the host calls this on E falling, with RS and RW already decoded. */
+  writeParallel(byte: number, rs: boolean): void {
+    this.execute(byte & 255, rs);
+  }
   private execute(byte: number, rs: boolean): void {
     if (rs) {
       if (this.cgram) {

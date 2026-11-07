@@ -29,6 +29,24 @@ globalThis.onmessage = (event: MessageEvent<Command>) => {
       case 'setInput':
         simulator.setInput(command.value);
         break;
+      case 'debugLoad':
+        simulator.debug.load(command.value);
+        break;
+      case 'debugBreakpoints':
+        simulator.debug.setBreakpoints(command.value);
+        break;
+      case 'debugContinue':
+        simulator.debug.continue();
+        break;
+      case 'debugStepInto':
+        simulator.debug.stepInto();
+        break;
+      case 'debugStepOver':
+        simulator.debug.stepOver();
+        break;
+      case 'debugStepOut':
+        simulator.debug.stepOut();
+        break;
       default:
         simulator[command.method]();
     }

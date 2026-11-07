@@ -24,7 +24,7 @@ export function analyze(scene: Scene): Analysis {
         }
     for (const part of scene.parts) {
         const links = part.kind.startsWith('breadboard-') ? breadboardGroups(part.kind) :
-            ['arduino-uno', 'seven-segment', 'pushbutton'].includes(part.kind) ? partInternalConnections(part.kind) : [];
+            ['arduino-uno', 'seven-segment', 'pushbutton', 'l293d'].includes(part.kind) ? partInternalConnections(part.kind) : [];
         for (const group of links)
             for (const id of group.slice(1))
                 join(`${part.id}:${group[0]}`, `${part.id}:${id}`);

@@ -167,7 +167,7 @@ export interface PartVisualState {
   servo?: { angle: number }; // degrees 0..180
   buzzer?: { on: boolean; freq: number };
   lcd?: { lines: [string, string]; backlight: boolean; cursor?: { row: number; col: number; visible: boolean } };
-  meter?: { reading: string; mode: 'V' | 'mA' };
+  meter?: { reading: string; mode: 'V' | 'mA'; measurementMode?: 'V' | 'mA' | 'Ω' | 'continuity'; continuity?: boolean };
   hcsr04?: { pinging: boolean };
   sevenSeg?: { segments: boolean[] }; // a,b,c,d,e,f,g,dp
   pixels?: { colors: [number, number, number][] }; // 0..255 per channel, one per LED

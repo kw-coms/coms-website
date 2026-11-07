@@ -70,7 +70,7 @@ export async function decodeShare(hash: string): Promise<Scene> {
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     return validateScene(JSON.parse(text) as unknown);
   } catch (error) {
-    if (error instanceof Error && /공유 데이터|장면|부품|선|코드|제목/.test(error.message)) {
+    if (error instanceof Error && /공유 데이터|장면|부품|선|코드|제목|블록|메모|미션/.test(error.message)) {
       throw error;
     }
     return fail('공유 링크를 읽을 수 없습니다.');

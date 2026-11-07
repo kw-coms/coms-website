@@ -27,10 +27,31 @@ function invalid(message: string): never {
   throw new Error(message);
 }
 
+function validBlocks(value: unknown): boolean {
+  const seen = new Set<object>();
+  const visit = (entry: unknown, depth: number): boolean => {
+    if (depth > 64) return false;
+    if (entry === null || typeof entry === 'string' || typeof entry === 'boolean') return true;
+    if (typeof entry === 'number') return Number.isFinite(entry);
+    if (typeof entry !== 'object' || seen.has(entry)) return false;
+    if (!Array.isArray(entry) && (Object.getPrototypeOf(entry) !== Object.prototype && Object.getPrototypeOf(entry) !== null)) return false;
+    seen.add(entry);
+    const valid = Object.entries(entry).every(([key, child]) =>
+      !FORBIDDEN_IDS.has(key) && visit(child, depth + 1));
+    seen.delete(entry);
+    return valid;
+  };
+  try {
+    return visit(value, 0) && new TextEncoder().encode(JSON.stringify(value)).length <= 256 * 1024;
+  } catch {
+    return false;
+  }
+}
+
 /** Validate untrusted imported scenes before analysis or rendering. */
 export function validateScene(value: unknown): Scene {
-  if (!isObject(value) || !hasOnlyKeys(value, ['version', 'title', 'parts', 'wires', 'code']) ||
-      value.version !== 1 || !Array.isArray(value.parts) || !Array.isArray(value.wires) ||
+  if (!isObject(value) || !hasOnlyKeys(value, ['version', 'title', 'parts', 'wires', 'code', 'blocks', 'codeMode', 'notes', 'mission']) ||
+      (value.version !== 1 && value.version !== 2) || !Array.isArray(value.parts) || !Array.isArray(value.wires) ||
       typeof value.code !== 'string') {
     invalid('장면 형식이 올바르지 않습니다.');
   }
@@ -42,6 +63,24 @@ export function validateScene(value: unknown): Scene {
   }
   if (value.title !== undefined && (typeof value.title !== 'string' || value.title.length > 200)) {
     invalid('장면 제목이 올바르지 않습니다.');
+  }
+  if (value.blocks !== undefined && !validBlocks(value.blocks)) invalid('블록 데이터는 올바른 JSON이며 256 KB 이하이어야 합니다.');
+  if (value.codeMode !== undefined && !['blocks', 'blocks+text', 'text'].includes(value.codeMode as string)) {
+    invalid('코드 모드가 올바르지 않습니다.');
+  }
+  if (value.mission !== undefined && !isSafeId(value.mission)) invalid('미션 ID가 올바르지 않습니다.');
+  if (value.notes !== undefined) {
+    if (!Array.isArray(value.notes) || value.notes.length > 100) invalid('메모는 100개 이하이어야 합니다.');
+    const ids = new Set<string>();
+    for (const note of value.notes) {
+      if (!isObject(note) || !hasOnlyKeys(note, ['id', 'pos', 'text', 'color']) ||
+          !isSafeId(note.id) || ids.has(note.id) || !isVec3(note.pos) ||
+          typeof note.text !== 'string' || note.text.length > 500 ||
+          (note.color !== undefined && !['yellow', 'blue', 'green', 'pink'].includes(note.color as string))) {
+        invalid('메모 정보가 올바르지 않습니다.');
+      }
+      ids.add(note.id);
+    }
   }
 
   const parts = new Map<string, PartInstance>();
@@ -88,5 +127,7 @@ export function validateScene(value: unknown): Scene {
     }
     wireIds.add(wire.id);
   }
-  return value as unknown as Scene;
+  return value.version === 1
+    ? { ...(value as unknown as Scene), version: 2, codeMode: value.codeMode as Scene['codeMode'] ?? 'text' }
+    : value as unknown as Scene;
 }
