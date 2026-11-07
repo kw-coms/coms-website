@@ -21,7 +21,7 @@ export function layoutSchematic(parts: PartInstance[], defs: Record<string, Part
   const comps = parts.filter((p) => !isBoard(p.kind) && defs[p.kind]);
   // nets restricted to component pins
   const nets = an.nets.map((n) => ({ id: n.id, name: n.name, pins: n.pins.filter((r) => comps.some((c) => c.id === r.partId) && defs[comps.find((c) => c.id === r.partId)!.kind]!.pins.some((d) => d.id === r.pinId && d.role !== 'hole')) }))
-    .filter((n) => n.pins.length >= 2 || (n.pins.length === 1 && n.name && POWER.test(n.name)));
+    .filter((n) => new Set(n.pins.map((r) => r.partId)).size >= 2);
   const isPower = (n: { name?: string }) => !!n.name && POWER.test(n.name);
   const used = new Set(nets.flatMap((n) => n.pins.map((r) => `${r.partId}:${r.pinId}`)));
   // depth by BFS over signal nets from the board

@@ -31,15 +31,15 @@ const N = (v: unknown, d: number) => (Number.isFinite(Number(v)) ? Number(v) : d
 const first = (props: Record<string, unknown>, ...keys: string[]) => keys.map((k) => props[k]).find((v) => v !== undefined);
 
 /** Slanted front panel: a bench box whose top-front face tilts toward the viewer. */
-function Bench({ kind, w, d, h = 30, color = '#2b3138', panel = '#d9dde1', children }: { kind: PartKind; w: number; d: number; h?: number; color?: string; panel?: string; children: ReactNode }) {
+function Bench({ kind, w, d, h = 30, color = '#46515c', panel = '#d9dde1', children }: { kind: PartKind; w: number; d: number; h?: number; color?: string; panel?: string; children: ReactNode }) {
   const b = pinBox(kind);
   return (
     <group>
       <Legs kind={kind} top={3} radius={0.4} />
       <group position={[b.cx, 0, 0]}>
         <Box s={[w, h, d]} p={[0, h / 2 + 2, -d / 2 - 14]} color={color} rough={0.5} />
-        <group position={[0, h + 3, -26]} rotation-x={-0.62}>
-          <Box s={[w - 2, 3, 62]} p={[0, 0, 0]} color={panel} rough={0.55} />
+        <group position={[0, h + 3, -(d / 2 + 14)]} rotation-x={-0.5}>
+          <Box s={[w - 2, 3, d - 4]} p={[0, 0, 0]} color={panel} rough={0.55} />
           {children}
         </group>
       </group>
@@ -95,7 +95,7 @@ export function PowerSupply({ part }: PartProps) {
     if (cc.current) cc.current.emissiveIntensity = s?.limiting ? 2.4 : 0;
   });
   return (
-    <Bench kind="power-supply" w={120} d={96} h={34}>
+    <Bench kind="power-supply" w={120} d={68} h={26}>
       <Plane tex={disp} w={50} h={21} p={[-28, 1.7, -14]} />
       <Lamp p={[-4, 1.8, 4]} color="#31ff72" refFn={(m) => { cv.current = m; }} />
       <Lamp p={[6, 1.8, 4]} color="#ff3b30" refFn={(m) => { cc.current = m; }} />
@@ -124,9 +124,9 @@ export function Oscilloscope({ part }: PartProps) {
   const ps = pinsOf('oscilloscope');
   const b = pinBox('oscilloscope');
   return (
-    <Bench kind="oscilloscope" w={150} d={100} h={36} color="#30363d" panel="#cfd5da">
-      <Box s={[96, 1, 76]} p={[-18, 2, -2]} color="#101418" shadow={false} />
-      <Plane tex={tex} w={90} h={72} p={[-18, 2.6, -2]} />
+    <Bench kind="oscilloscope" w={150} d={76} h={26} color="#4a545e" panel="#cfd5da">
+      <Box s={[88, 1, 70]} p={[-18, 2, 0]} color="#101418" shadow={false} />
+      <Plane tex={tex} w={84} h={67} p={[-18, 2.6, 0]} />
       {[0, 1, 2].map((i) => <Knob key={i} p={[47, 1.5, -20 + i * 18]} r={4.2} angle={i} />)}
       {[0, 1, 2, 3].map((i) => <Box key={i} s={[7, 1.6, 4]} p={[44 + (i % 2) * 11, 2, 12 + Math.floor(i / 2) * 7]} color="#3a424a" shadow={false} />)}
       <Silk text="COM'S SCOPE" w={30} h={4} p={[-48, 1.7, 30]} rot={[-Math.PI / 2, 0, 0]} color="#30363d" />
@@ -160,7 +160,7 @@ export function FunctionGenerator({ part }: PartProps) {
   );
   const b = pinBox('function-generator');
   return (
-    <Bench kind="function-generator" w={116} d={80} h={30} color="#37403b" panel="#d3d8d4">
+    <Bench kind="function-generator" w={116} d={64} h={24} color="#4d5a52" panel="#d3d8d4">
       <Plane tex={tex} w={64} h={30} p={[-14, 1.7, -14]} />
       <Knob p={[34, 1.5, -14]} r={6} angle={Math.log10(freq) / 2} />
       {['~', '⊓', '△', '⩘'].map((s, i) => <Box key={s} s={[7, 1.6, 5]} p={[-36 + i * 10, 2, 12]} color={['sine', 'square', 'triangle', 'sawtooth'][i] === wave ? '#31ff72' : '#3a424a'} shadow={false} />)}

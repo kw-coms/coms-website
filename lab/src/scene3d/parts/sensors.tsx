@@ -16,7 +16,8 @@ export function Pir({ part }: PartProps) {
   const b = pinBox('pir');
   return (
     <group position={[b.cx, 0, 0]}>
-      <Legs kind="pir" top={3} radius={0.3} />
+      <Legs kind="pir" top={8} radius={0.3} />
+      <group position={[0, 0, 5]}>
       <Box s={[32, 1.6, 24]} p={[0, 8, -14]} color="#1c7a52" rough={0.45} />
       <Cyl r={11.5} h={8} p={[0, 12.6, -14]} color="#f1f3f4" rough={0.4} seg={32} />
       <mesh ref={lens} position={[0, 16.6, -14]} castShadow>
@@ -25,6 +26,7 @@ export function Pir({ part }: PartProps) {
       </mesh>
       {[[-12, 5], [12, 5]].map(([x, z]) => <Cyl key={String(x)} r={1.6} h={1.8} p={[x!, 9, z! - 14]} color="#c9ced3" metal={0.7} seg={14} />)}
       <Silk text="HC-SR501" w={14} h={3} p={[0, 8.9, -3]} color="#e9ecef" />
+      </group>
     </group>
   );
 }
@@ -69,13 +71,15 @@ export function SoilMoisture({ part }: PartProps) {
   void part;
   return (
     <group>
-      <Legs kind="soil-moisture" top={3} radius={0.3} />
+      <Legs kind="soil-moisture" top={6} radius={0.3} />
+      <group position={[0, 0, 3]}>
       <Box s={[22, 1.4, 16]} p={[0, 6, -8]} color="#1c7a52" rough={0.45} />
       <Box s={[7, 5, 3]} p={[-6, 8.4, -7]} color="#1b1d21" />
       <Box s={[18, 1.6, 52]} p={[0, 6, -42]} color="#f2d24a" rough={0.5} />
       <Box s={[3.4, 1.7, 52]} p={[-5.5, 6, -42]} color="#b8860b" metal={0.4} rough={0.4} shadow={false} />
       <Box s={[3.4, 1.7, 52]} p={[5.5, 6, -42]} color="#b8860b" metal={0.4} rough={0.4} shadow={false} />
       <Cyl r={0.9} h={0.2} p={[8, 6.9, -4]} color="#c8ced4" shadow={false} />
+      </group>
     </group>
   );
 }
@@ -89,7 +93,8 @@ export function GasSensor({ part }: PartProps) {
   });
   return (
     <group>
-      <Legs kind="gas-sensor" top={3} radius={0.3} />
+      <Legs kind="gas-sensor" top={6} radius={0.3} />
+      <group position={[0, 0, 6]}>
       <Box s={[32, 1.4, 21]} p={[0, 6, -14]} color="#1c4f9e" rough={0.45} />
       <Cyl r={7.2} h={9} p={[0, 11.2, -14]} color="#b9bdc2" metal={0.85} rough={0.3} seg={30} />
       <mesh ref={heat} position={[0, 15.8, -14]} rotation-x={-Math.PI / 2}>
@@ -98,6 +103,7 @@ export function GasSensor({ part }: PartProps) {
       </mesh>
       <Silk text="MQ-2" w={8} h={3} p={[0, 15.85, -14]} color="#16181b" />
       <Box s={[7, 5, 3]} p={[-10, 8.4, -4]} color="#1b1d21" />
+      </group>
     </group>
   );
 }

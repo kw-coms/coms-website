@@ -35,8 +35,8 @@ export function Battery9v({ part }: PartProps) {
       <Box s={[26.5, 17.5, 48.5]} p={[0, 9.4, -28]} color="#2c3036" rough={0.45} />
       <Box s={[26.6, 13, 33]} p={[0, 9, -22]} color="#e7b416" rough={0.4} />
       <Box s={[26.7, 6, 10]} p={[0, 9.4, -43]} color="#2c3036" rough={0.45} />
-      <Silk text="9V" w={14} h={7} p={[0, 18.2, -26]} color="#1a1d21" font="bold" />
-      <Silk text="ALKALINE" w={20} h={3} p={[0, 18.2, -33]} color="#1a1d21" />
+      <Silk text="9V" w={14} h={7} p={[0, 18.2, -26]} color="#f2f2f2" font="bold" />
+      <Silk text="ALKALINE" w={20} h={3} p={[0, 18.2, -33]} color="#e7b416" />
       <Cyl r={4.2} h={2.4} p={[-6, 19.4, -4.2]} color="#c9ced3" metal={0.8} rough={0.3} seg={6} />
       <Cyl r={3.2} h={2.4} p={[6, 19.4, -4.2]} color="#c9ced3" metal={0.8} rough={0.3} seg={20} />
     </group>
