@@ -1,0 +1,12 @@
+{
+  "name": "coms-study-runner",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs test/toolchain.mjs",
+    "test:toolchain": "node test/toolchain.mjs",
+    "check": "node --check server.mjs && node --check run.mjs && node --check limits.mjs && node --check diagnostics.mjs"
+  }
+}
