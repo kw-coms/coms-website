@@ -1,6 +1,21 @@
 # COM's Circuit Lab 배포
 
-정적 앱은 `https://coms.kw.ac.kr/lab/`, 컴파일 API는 같은 origin의 `/lab/api/`에서 제공한다. API 계약은 `src/core/types.ts`의 `CompileResult` / `CompilerMessage`다. Node 패키지 의존성은 없다. 실제 Docker 빌드·Arduino 컴파일·호스트 nginx/방화벽 검증은 배포 담당자가 수행한다.
+Circuit Lab은 **동아리 사이트와 같은 저장소·같은 배포**로 나간다. 정적 앱은 `https://coms.kw.ac.kr/lab/`, 컴파일 API는 같은 origin의 `/lab/api/`다. API 계약은 `lab/src/core/types.ts`의 `CompileResult` / `CompilerMessage`다. `main`에 머지하면 CI 통과 후 기존 `deploy.yml`이 서버에서 `docker compose build` / `up -d`를 실행하며, Lab을 위한 별도 배포 단계는 없다. 앱 개발·테스트 방법은 [docs/DEVELOPMENT.md](../../docs/DEVELOPMENT.md)의 "Circuit Lab 실행"에 있다.
+
+## 0. 구성 한눈에 보기
+
+```
+브라우저 ──https──> 호스트 nginx ──/api/*──────────> coms-backend (127.0.0.1:8080)
+                        └─ 그 외 (/lab/* 포함) ───> coms-frontend 컨테이너 (127.0.0.1:3000, nginx)
+                                                      ├─ /lab/            정적 Lab (이미지 안 /usr/share/nginx/html/lab)
+                                                      ├─ /lab/_auth       (내부) coms-backend /api/auth/me 로 로그인 확인
+                                                      └─ /lab/api/compile ──unix 소켓──> coms-lab-compiler (network_mode none)
+```
+
+- **호스트 nginx는 바꾸지 않는다.** `/api`만 백엔드로 보내고 나머지는 프런트 컨테이너로 보내는 기존 설정에서 `/lab/*`도 이미 프런트 컨테이너에 도달한다.
+- `Dockerfile.frontend`의 `lab-build` 단계가 `lab/`을 `npm ci && npm run build`(`tsc -b` 포함)로 빌드해 `/usr/share/nginx/html/lab/`에 복사한다. 사이트 본체 빌드와 의존성은 완전히 분리된다.
+- `docker-compose.yml`의 `coms-lab-compiler` 서비스는 `lab/compiler`에서 빌드되고(이미지 태그는 `coms-lab-compiler:${COMS_IMAGE_TAG}`), `lab-sock` 볼륨의 Unix 소켓으로만 통신한다.
+- **컴파일러가 죽어도 사이트는 산다.** `coms-frontend`는 컴파일러에 `depends_on` 하지 않는다. 컴파일러가 없으면 `/lab/api/compile`이 502를 반환하고 Lab은 "컴파일 서버에 연결할 수 없어요"를 보여 준다(회로 보기·시뮬레이션은 계속 동작). 배포 헬스 체크와 롤백(`--no-build coms-backend coms-frontend`)에도 컴파일러는 들어가지 않는다.
 
 ## 1. 버전과 이미지
 
@@ -18,163 +33,55 @@
 Dockerfile은 amd64 / arm64 CLI 바이너리의 **리터럴 SHA-256**을 검사한다. AVR 코어와 라이브러리는 빌드 시 설치하고, `--no-deps`로 DHT의 의존성이 임의로 최신 버전으로 바뀌지 않게 한다. 설치 인덱스와 패키지는 Arduino CLI가 검증한다. 다운로드용 curl 등은 builder에만 있고 최종 이미지에는 Node, Arduino 도구, 필요한 공유 라이브러리와 리소스 제한용 `util-linux`만 남긴다. 최종 stage의 `ca-certificates` 설치는 제거했다. 오프라인 Arduino 도구는 인증서가 필요 없고, 선택적 Node HTTPS 인증은 Node 내장 CA를 사용한다. 소켓 공유 디렉터리 외의 호스트 디렉터리·Docker 소켓·시크릿을 마운트하지 않는다.
 
 ```sh
+
+```sh
 # 저장소 루트에서. Node 22로도 반드시 검증한다.
-node --test compiler/test/
-npm --prefix compiler test
-docker build --pull --platform linux/amd64 -t coms-circuit-lab-compiler:release compiler/
-NGINX_GID=$(getent group www-data | cut -d: -f3)  # 실제 nginx 그룹에 맞게 변경
-export NGINX_GID
-# 실제 nginx 그룹 이름으로 www-data를 교체하고, Compose 시작 전에 설치한다.
-printf 'd /run/coms-lab 0750 10001 www-data -\n' | sudo tee /etc/tmpfiles.d/coms-lab.conf
-sudo systemd-tmpfiles --create /etc/tmpfiles.d/coms-lab.conf
-docker compose -f compiler/docker-compose.yml up --build -d
-curl --fail -b "$LAB_COOKIE_FILE" https://coms.kw.ac.kr/lab/api/health
+node --test lab/compiler/test/
+docker build --pull --platform linux/amd64 -t coms-lab-compiler:release lab/compiler/
+docker build -f Dockerfile.frontend -t coms-frontend:release .   # lab-build 단계 포함
 ```
 
-프로덕션 Compose는 `restart: unless-stopped`로 재시작하며 네트워크 없이 Unix 소켓만 사용한다. `compiler/docker-compose.dev.yml`은 로컬 개발 전용이며 일반 bridge에서 127.0.0.1:8787만 공개하고 `RATE_LIMIT_PER_MIN=120`을 사용한다. 개발용 실행: `docker compose -f compiler/docker-compose.dev.yml up --build -d`. 프로덕션은 non-root uid 10001, read-only root, 256 MiB `/tmp` tmpfs (`noexec,nosuid,nodev`), 모든 capability 제거, no-new-privileges, RAM 768 MiB(추가 swap 없음), CPU 1개, PID 128개를 적용한다. `init: true`로 고아 프로세스를 수거한다. 코어·라이브러리는 `/opt/arduino`에 읽기 전용으로 설치하고 캐시와 작업 파일은 `/tmp`만 사용한다.
+Compose의 `coms-lab-compiler`는 `restart: unless-stopped`로 재시작하며 네트워크 없이 Unix 소켓만 사용한다. `lab/compiler/docker-compose.dev.yml`은 로컬 개발 전용이며 일반 bridge에서 127.0.0.1:8787만 공개하고 `RATE_LIMIT_PER_MIN=120`을 사용한다(`docker compose -f lab/compiler/docker-compose.dev.yml up --build -d`). 프로덕션은 non-root uid 10001, read-only root, 256 MiB `/tmp` tmpfs (`noexec,nosuid,nodev`), 모든 capability 제거, no-new-privileges, RAM 768 MiB(추가 swap 없음), CPU 1개, PID 128개를 적용한다. `init: true`로 고아 프로세스를 수거한다. 코어·라이브러리는 `/opt/arduino`에 읽기 전용으로 설치하고 캐시와 작업 파일은 `/tmp`만 사용한다.
 
-## 2. 정적 파일 전송
+## 2. 정적 파일
 
-`../coms-worldcup/.github/workflows/deploy.yml`과 동일하게 `dist/`의 **내용**을 전송한다. Node 22에서 install → test → build 순서다. 이 문서는 workflow 자체를 추가하지 않는다.
+`Dockerfile.frontend`가 `lab/dist`를 이미지에 넣는다. Vite `base`는 `/lab/`이어야 한다(`lab/vite.config.ts`). 사이트의 서비스 워커(PWA)는 `/lab` 경로를 앱 셸로 가로채지 않도록 `vite.config.js`의 `navigateFallbackDenylist`에 등록돼 있다. 사이트 메뉴(Tools → Circuit Lab)는 라우터가 아니라 `window.location.assign('/lab/')`로 이동한다(`src/utils/fullPageLink.ts`).
 
-```sh
-npm ci
-npm test
-npm run build
-# CI에서는 기존 SSH_HOST/SSH_USER/SSH_PORT/SSH_KEY 보관·주입 방식을 사용한다.
-# 아래 변수는 실제 배포 대상과 이미 검증된 known_hosts/키를 가리켜야 한다.
-DEPLOY_HOST=coms.kw.ac.kr
-DEPLOY_USER=kw
-DEPLOY_PORT=22
-ssh -i ~/.ssh/deploy_key -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST" \
-  'mkdir -p /var/www/coms-circuit-lab'
-rsync -avz --delete -e "ssh -i ~/.ssh/deploy_key -p $DEPLOY_PORT" \
-  dist/ "$DEPLOY_USER@$DEPLOY_HOST":/var/www/coms-circuit-lab/
+## 3. 프런트 컨테이너의 nginx (`nginx.frontend.conf`)
+
+| 경로 | 동작 |
+|---|---|
+| `/lab` | `/lab/`으로 301 (상대 `Location`, https 유지) |
+| `/lab/index.html`, `/lab/` 그 외 | Lab CSP(`security-headers-lab.conf`), `Cache-Control: no-cache`. 없는 경로(`/lab/anything`)는 `/lab/index.html`로 fallback |
+| `/lab/assets/*` | 해시 파일: `max-age=31536000, immutable`. 없으면 404 (앱 셸을 주지 않는다) |
+| `POST /lab/api/compile` | `limit_req` 분당 10회(burst 10)·`limit_conn` 4 → 429 JSON, `auth_request /lab/_auth` → 비로그인 401 JSON, 본문 100 KiB 제한, 소켓으로 프록시 (Cookie 제거, XFF는 `$remote_addr`로 덮어씀, 타임아웃 30초). 다른 메서드는 405 |
+| `GET /lab/api/health` | 컴파일러 프로세스 liveness. 컴파일러가 없으면 502. 로그인 불필요 |
+| 그 외 `/lab/api/*` | 404 |
+
+- `limit_req_zone` / `limit_conn_zone`은 이 파일이 http 블록 안에 include되므로 파일 맨 위(server 밖)에 선언한다. 호스트 nginx는 건드리지 않는다.
+- 호스트 nginx는 Docker bridge를 거쳐 오므로 `$remote_addr`가 모든 방문자에게 같은 게이트웨이 주소가 된다. 서버 블록의 `set_real_ip_from`(사설 대역) + `real_ip_header X-Real-IP`가 호스트가 덮어쓴 `X-Real-IP`로 `$remote_addr`를 복원한다(백엔드의 `ClientIpResolver`와 같은 신뢰 모델). **호스트 nginx가 `X-Real-IP $remote_addr`를 설정해야 한다**(백엔드가 이미 의존한다). 설정되지 않으면 모든 방문자가 하나의 한도를 나눠 쓴다.
+- 헤더: `security-headers-common.conf`(사이트와 공통인 비-CSP 헤더) + 사이트용 CSP(`security-headers.conf`) 또는 Lab용 CSP(`security-headers-lab.conf`). `add_header`는 location에 하나라도 있으면 상속되지 않으므로 각 location이 둘 중 하나를 include한다.
+
+## 4. 컴파일러 컨테이너와 외부 통신 차단
+
+프로덕션은 `network_mode: none`과 Unix 소켓으로 동작한다. Docker 포트 공개나 bridge가 없다. [nginx `proxy_pass` 공식 문서](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_pass)는 `http://unix:/path/socket:/uri/` 문법과 location URI 치환을 명시한다.
+
+- 이름 있는 볼륨 `lab-sock`을 컴파일러와 `coms-frontend`의 `/run/coms-lab`에 마운트한다(프런트는 `:ro`; Unix 소켓에 `connect`하려면 소켓 파일의 쓰기 권한이 필요하지만 읽기 전용 마운트여도 소켓 연결은 막히지 않는다 — 아래 smoke에서 확인).
+- 컴파일러는 `user: "10001:101"`로 실행한다. **101은 `nginx:alpine` 이미지의 `nginx` 그룹 GID**이고(`nginx:1.28-alpine`에서 `id nginx` = uid 101, gid 101), nginx worker가 이 그룹이다. 서버는 `umask 0117`로 소켓을 만들어 `0660 10001:101`이 된다.
+- 새 볼륨은 처음 마운트될 때 이미지의 해당 디렉터리 소유자·모드를 복사한다. 두 이미지(`Dockerfile.frontend`, `lab/compiler/Dockerfile`)가 `/run/coms-lab`을 **같은 `10001:101`, 0750**으로 만들어 두므로 어느 컨테이너가 먼저 볼륨을 만들어도 같다. 0750이라 nginx 그룹은 디렉터리를 읽고 통과만 할 수 있고 소켓을 지우거나 바꿀 수 없다.
+- 시작 시 기존 소켓에 연결해 `ECONNREFUSED`인 경우에만 inode를 재확인하고 삭제한다. 살아 있는 listener, 일반 파일·symlink, 권한 오류·연결 timeout은 거부한다. SIGKILL/OOM 이후 남은 소켓은 자동 복구된다. 같은 볼륨에 컴파일러 두 개를 동시에 띄우지 않는다. `PORT`를 통한 TCP 수신은 개발용 대안이며 프로덕션에는 사용하지 않는다.
+- `TRUST_PROXY=1`: nginx가 `X-Forwarded-For`를 방문자 주소로 덮어쓴다.
+- `.env`에서 `LAB_RATE_LIMIT_PER_MIN`(기본 10)으로 컴파일러 자체의 IP별 분당 한도를 바꿀 수 있다. nginx 한도(분당 10, burst 10)는 별개다.
+
+## 5. 로그인 확인
+
+`AUTH_CHECK_URL`은 네트워크 접근이 필요하므로 `network_mode: none` 컴파일러에서는 비활성화한다. 대신 프런트 nginx의 [`auth_request`](https://nginx.org/en/docs/http/ngx_http_auth_request_module.html)가 컴파일 요청 전에 내부 location `/lab/_auth`로 백엔드 `GET /api/auth/me`(Docker DNS의 `coms-backend:8080`)를 조회한다. 쿠키는 이 인증 서브요청에만 전달하고 컴파일러로는 보내지 않는다. 2xx면 통과, 401/403이면 다음 JSON을 401로 반환한다.
+
+```json
+{"ok":false,"errors":[{"line":0,"severity":"error","message":"로그인한 동아리원만 컴파일할 수 있어요."}]}
 ```
 
-`--delete`는 목적지의 불필요한 파일을 삭제한다. 목적지가 `/var/www/coms-circuit-lab/`인지 확인하고 기존 배포본은 별도 보관한다. Vite `base`는 `/lab/`이어야 한다.
-
-## 3. 호스트 nginx
-
-`limit_req_zone`과 `limit_conn_zone`은 기존 nginx의 **http 블록**에 한 번만 추가한다. 아래 location들은 `coms.kw.ac.kr` HTTPS server 블록 안에 넣는다. 기존 `/api/`, 로그인, 다른 서비스 설정을 대체하지 않는다.
-
-```nginx
-# http {}
-limit_req_zone $binary_remote_addr zone=lab_compile:10m rate=10r/m;
-limit_conn_zone $binary_remote_addr zone=lab_compile_conn:10m;
-
-# 기존 HTTPS server {} 안
-location = /lab { return 301 /lab/; }
-
-location = /lab/api/compile {
-    limit_except POST { deny all; }
-    limit_conn lab_compile_conn 4;
-    limit_conn_status 429;
-    auth_request /lab/_auth;
-    proxy_pass http://unix:/run/coms-lab/compile.sock:/lab/api/compile;
-    # nginx 공식 Unix 소켓 문법. 정확한 compile URI를 보존한다.
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header Cookie "";
-    # 클라이언트가 보낸 XFF를 덧붙이지 않고 덮어쓴다.
-    proxy_set_header X-Forwarded-For $remote_addr;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header Connection "";
-    client_max_body_size 100k;
-    client_body_timeout 10s;
-    proxy_connect_timeout 3s;
-    proxy_read_timeout 30s;
-    proxy_request_buffering on;
-    proxy_buffering off;
-    limit_req zone=lab_compile burst=10 nodelay;
-    limit_req_status 429;
-    error_page 429 = @lab_rate_limited;
-}
-
-# Health는 GET 유지. POST 전용 compile location과 분리한다.
-location = /lab/api/health {
-    limit_except GET { deny all; }
-    auth_request /lab/_auth;
-    proxy_pass http://unix:/run/coms-lab/compile.sock:/lab/api/health;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header Cookie "";
-    proxy_set_header X-Forwarded-For $remote_addr;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header Connection "";
-    client_max_body_size 100k;
-    client_body_timeout 10s;
-    proxy_connect_timeout 3s;
-    proxy_read_timeout 30s;
-    proxy_request_buffering on;
-    proxy_buffering off;
-}
-location ^~ /lab/api/ { return 404; }
-
-# 실제 백엔드 포트/경로로 치환한다. /api/auth/me가 미인증에 401/403을 반환하는지 검증한다.
-location = /lab/_auth {
-    internal;
-    proxy_pass http://127.0.0.1:BACKEND_PORT/api/auth/me;
-    proxy_pass_request_body off;
-    proxy_set_header Content-Length "";
-    proxy_set_header Cookie $http_cookie;
-}
-
-location @lab_rate_limited {
-    default_type application/json;
-    add_header Cache-Control no-store always;
-    add_header Retry-After 60 always;
-    return 429 '{"ok":false,"reason":"rate-limited","errors":[{"line":0,"severity":"error","message":"요청이 너무 많아요. 잠시 후 다시 시도해 주세요."}]}';
-}
-
-location /lab/ {
-    alias /var/www/coms-circuit-lab/;
-    try_files $uri $uri/ /lab/index.html;
-}
-```
-
-```sh
-sudo nginx -t
-sudo systemctl reload nginx
-curl --fail -b "$LAB_COOKIE_FILE" https://coms.kw.ac.kr/lab/api/health
-curl --fail -I https://coms.kw.ac.kr/lab/
-```
-
-nginx보다 앱의 본문 제한(80 KiB)이 작다. nginx가 먼저 차단한 100 KiB 초과 요청 등은 nginx 자체 응답일 수 있다. 앱 자체는 잘못된 JSON·타입·크기를 HTTP 400 `reason: rejected`로 반환한다. API에 CORS 헤더를 추가하지 않는다. nginx 앞에 신뢰 프록시가 있다면 그 프록시에 한정한 `real_ip` 설정을 검증한 뒤 `$remote_addr`를 사용한다.
-
-**대기시간 주의:** 2개 실행 + 6개 대기에서 작업마다 20초가 걸리면 마지막 요청은 약 80초가 필요하다. 위 요구 설정의 `proxy_read_timeout 30s`에서는 긴 대기 요청이 먼저 504가 될 수 있다. 클라이언트는 즉시 무한 재시도하지 않아야 한다. 모든 대기 요청의 완료 응답을 보장해야 하는 운영 정책이라면 nginx와 클라이언트 제한을 함께 95초 이상으로 조정한다. 끊긴 연결의 대기 작업은 실행 시 건너뛰지만 이미 실행 중인 컴파일은 최대 20초 안에 종료한다.
-
-## 4. 프로덕션 컨테이너와 외부 통신 차단
-
-프로덕션은 `network_mode: none`과 Unix 소켓으로 동작한다. 호스트 nginx가 `/run/coms-lab/compile.sock`으로 접속하므로 Docker 포트 공개나 bridge가 없다. [nginx `proxy_pass` 공식 문서](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_pass)는 `http://unix:/path/socket:/uri/` 문법과 location URI 치환을 명시한다.
-
-```sh
-# 실제 nginx 실행 그룹의 숫자 GID로 대체한다. www-data는 Debian 예시다.
-NGINX_GID=$(getent group www-data | cut -d: -f3)
-# 실제 nginx 그룹 이름으로 www-data를 교체한다. /run 재생성 때도 적용된다.
-printf 'd /run/coms-lab 0750 10001 www-data -\n' | sudo tee /etc/tmpfiles.d/coms-lab.conf
-sudo systemd-tmpfiles --create /etc/tmpfiles.d/coms-lab.conf
-stat -c '%a %u %g %n' /run/coms-lab # 750 10001 <NGINX_GID>
-# uid 10001이 소켓을 만들고, 지정 GID를 가진 nginx가 0660 소켓을 읽는다.
-docker run -d --name coms-circuit-lab-compiler \
-  --restart unless-stopped --init --stop-timeout 25 \
-  --network none --user "10001:$NGINX_GID" \
-  --mount type=bind,src=/run/coms-lab,dst=/run/coms-lab \
-  --read-only --tmpfs /tmp:rw,noexec,nosuid,nodev,size=256m,mode=1777 \
-  --cap-drop ALL --security-opt no-new-privileges:true \
-  --memory 768m --memory-swap 768m --cpus 1.0 --pids-limit 128 \
-  --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
-  --env LISTEN_SOCKET=/run/coms-lab/compile.sock \
-  --env TRUST_PROXY=1 \
-  coms-circuit-lab-compiler:release
-stat -c '%a %u %g %n' /run/coms-lab/compile.sock # 660 10001 <NGINX_GID>
-```
-
-`/run`은 재부팅 시 지워질 수 있으므로 위 tmpfiles 설정을 **Compose 최초 시작 전** 설치한다. 부팅 시 `systemd-tmpfiles-setup.service`가 디렉터리를 재생성하는지 확인하고, Compose를 systemd unit으로 시작한다면 그 unit의 `ExecStartPre=/usr/bin/systemd-tmpfiles --create /etc/tmpfiles.d/coms-lab.conf`로 시작 순서를 보장한다. nginx 서비스가 실제로 해당 GID로 실행되는지 확인하고, GID 0 및 `/etc/shadow`의 그룹 GID를 사용하지 않는다. 소켓 소유권은 `--user`의 UID:GID와 0117 umask로 정해진다. 이미지의 기본 사용자는 비특권 UID 10001이며 `/etc/shadow`는 기본 파일 권한으로 읽을 수 없다. 소켓 디렉터리는 0750으로 nginx 그룹의 디렉터리 쓰기(삭제·교체)를 막는다. 소켓 자체는 0660이다. 시작 시 기존 소켓에 연결해 `ECONNREFUSED`인 경우에만 inode를 재확인하고 삭제한다. 살아 있는 listener, 일반 파일·symlink, 권한 오류·연결 timeout은 거부한다. SIGKILL/OOM 이후 남은 소켓은 자동 복구된다. 같은 디렉터리에 동시에 두 compiler 인스턴스를 시작하지 않는다(검사와 unlink는 원자적 연산이 아니다). `PORT`를 통한 TCP 수신은 개발용 대안이며 프로덕션에는 사용하지 않는다.
-
-## 5. 선택적 동아리 로그인 확인
-
-`AUTH_CHECK_URL`은 네트워크 접근이 필요하므로 `--network none` 프로덕션에서는 비활성화한다. 대신 nginx [`auth_request`](https://nginx.org/en/docs/http/ngx_http_auth_request_module.html)가 컴파일과 health 요청 전에 기존 인증 백엔드의 `/api/auth/me`를 조회한다. 설정의 `BACKEND_PORT`는 실제 로컬 백엔드 포트로 교체하고 nginx가 `http_auth_request_module`을 포함하는지 `nginx -V`로 확인한다. 쿠키는 인증 서브요청에만 전달하며, 인증 API가 미인증에 401/403을 반환하는지 먼저 확인한다. nginx `auth_request`는 2xx를 허용하고 401/403을 거부한다. 인증 서브요청 실패 시 API 접근이 막히는지 배포 smoke에서 확인한다.
+백엔드가 내려가 있으면 인증 서브요청이 실패해 컴파일은 500을 반환한다(Lab은 연결 오류 문구를 보인다). 액세스 토큰이 만료되고 refresh만 남은 사용자는 사이트에서 한 번 활동(토큰 갱신)한 뒤 컴파일할 수 있다.
 
 ## 6. 요청 검증·실행 정책
 
@@ -202,7 +109,7 @@ Core dump는 0 B다. `prlimit`이 없으면 제한 없이 실행하지 않고 �
 
 ```sh
 # Dockerfile에는 Node 이미지 digest가 이미 고정돼 있다.
-docker build --pull -t coms-circuit-lab-compiler:release compiler/
+docker build --pull -t coms-circuit-lab-compiler:release lab/compiler/
 
 # production과 같은 1 CPU / RAM / tmpfs / 사용자 권한. 5-library cold build 1건, 동시 2건.
 # probe와 fixture는 이미지에 넣지 않고 read-only bind mount한다.
@@ -211,8 +118,8 @@ for jobs in 1 2; do
     --tmpfs /tmp:rw,noexec,nosuid,nodev,size=256m,mode=1777 \
     --memory 768m --memory-swap 768m --cpus 1.0 --pids-limit 128 \
     --user 10001:10001 --cap-drop ALL --security-opt no-new-privileges:true \
-    --mount type=bind,src="$PWD/compiler",dst=/workspace,readonly \
-    --workdir /workspace coms-circuit-lab-compiler:release node measure.mjs "$jobs"
+    --mount type=bind,src="$PWD/lab/compiler",dst=/workspace,readonly \
+    --workdir /workspace coms-lab-compiler:release node measure.mjs "$jobs"
 done
 ```
 
@@ -226,47 +133,42 @@ done
 4. 아래 테스트와 보안 회귀, 네트워크가 차단된 cold/warm compile을 다시 검증한다. 배포한 이미지 digest와 이전 digest를 기록해 이미지 단위로 rollback한다.
 
 ```sh
-docker build --no-cache --pull -t coms-circuit-lab-compiler:next compiler/
+docker build --no-cache --pull -t coms-circuit-lab-compiler:next lab/compiler/
 docker image inspect coms-circuit-lab-compiler:next --format '{{.Id}}'
 # 각 요청의 격리 한도와 동일한 환경에서 Node 22 테스트. 자동 skip이 없는지 출력 확인.
 docker run --rm --network none --read-only \
   --tmpfs /tmp:rw,nosuid,nodev,size=256m \
   --user 10001:10001 --cap-drop ALL --security-opt no-new-privileges:true \
-  --mount type=bind,src="$PWD",dst=/workspace,readonly \
+  --mount type=bind,src="$PWD/lab",dst=/workspace,readonly \
   --workdir /workspace/compiler node:22-bookworm-slim node --test test/
 ```
 
 ## 8. 배포 smoke checklist
 
-아래 요청은 **호스트에서 nginx를 통해** 실행한다. 컨테이너 네트워크가 없으므로 컨테이너에서 외부 주소에 접속할 수 없다.
+`main` 머지 후 호스트에서 확인한다. 컨테이너는 네트워크가 없으므로 컨테이너에서 외부로 나갈 수 없다.
 
 ```sh
-sudo nginx -t
-test -n "$LAB_COOKIE_FILE" # 호스트의 유효 회원 세션 쿠키 파일 경로; 값은 로그에 출력하지 않는다.
-curl --fail -b "$LAB_COOKIE_FILE" https://coms.kw.ac.kr/lab/api/health
-curl -sS -b "$LAB_COOKIE_FILE" -H 'Content-Type: application/json' \
-  --data '{"sketch":"void setup() {}\nvoid loop() {}"}' \
-  https://coms.kw.ac.kr/lab/api/compile
-curl -sS -b "$LAB_COOKIE_FILE" -H 'Content-Type: application/json' \
-  --data '{"sketch":"#include <../../etc/passwd>\nvoid setup() {}\nvoid loop() {}"}' \
-  https://coms.kw.ac.kr/lab/api/compile
-stat -c '%a %u %g %n' /run/coms-lab/compile.sock
-# 예상: 660, uid 10001, nginx GID
-curl -sS -o /dev/null -w '%{http_code}\n' https://coms.kw.ac.kr/lab/api/health
-# 예상: 유효 쿠키 없이 401 또는 403
+docker compose ps coms-lab-compiler coms-frontend             # 둘 다 Up (healthy)
+docker inspect coms-lab-compiler --format '{{.HostConfig.NetworkMode}} {{.Config.User}} {{.HostConfig.ReadonlyRootfs}}'  # none 10001:101 true
+docker exec coms-frontend ls -ln /run/coms-lab                # srw-rw---- 10001 101 compile.sock
+curl -fsS https://coms.kw.ac.kr/lab/api/health                # 200
+curl -sS -o /dev/null -w '%{http_code}\n' -H 'Content-Type: application/json' --data '{"sketch":"void setup(){}\nvoid loop(){}"}' https://coms.kw.ac.kr/lab/api/compile   # 로그인 쿠키 없이: 401
+# 로그인한 브라우저에서 https://coms.kw.ac.kr/lab/ 의 Blink 예제를 컴파일
 ```
 
 - [ ] 고정된 base index digest로 이미지 빌드·checksum 및 Node 22 전체 테스트 성공.
 - [ ] 운영과 동일한 제한에서 5-library 1/2건 재측정, 자식 한도·tmpfs/RAM 여유 및 공격 중 서버/다른 job 생존 확인.
-- [ ] nginx를 통한 health와 실제 compile 성공. 반환 HEX와 한글 힌트 확인.
-- [ ] 파일 탐색 우회 요청은 `reason: rejected`이고 외부 파일 내용이 응답에 없다.
-- [ ] 소켓 디렉터리 0750, 소켓 0660, nginx 그룹 접근 가능. 재부팅 후 디렉터리 재생성됨.
+- [ ] `/lab/api/health` 200, 로그인 후 실제 compile 성공. 반환 HEX와 한글 힌트 확인.
+- [ ] 비로그인 compile은 401 JSON, 파일 탐색 우회 요청은 `reason: rejected`이고 외부 파일 내용이 응답에 없다.
+- [ ] 소켓 `0660 10001:101`, 소켓 디렉터리 `0750`. 컴파일러를 `docker stop`하면 `/lab/api/compile`이 502이고 사이트 `/`는 계속 200.
 - [ ] `docker inspect`에서 `NetworkMode=none`, 포트 바인딩 없음, 비특권 UID/GID, 읽기 전용 루트 및 리소스 제한 확인.
-- [ ] 요청 제한, 동시성 제한, 시간 초과와 로그의 스케치·쿠키 비노출 확인.
+- [ ] 요청 제한(429), 동시성 제한, 시간 초과와 로그의 스케치·쿠키 비노출 확인.
 
-## 실측 리소스 (2026-11-07, coms-circuit-lab-compiler:local, Apple Silicon Docker)
+CI(`.github/workflows/ci.yml`)의 "Production images build & boot" 잡이 같은 compose 파일로 스택을 올려 프런트 컨테이너를 통한 비로그인 401, 로그인 후 Blink 컴파일, health를 자동 확인한다.
 
-`compiler/measure.mjs`를 이미지 안에서 실행해 라이브러리 5종(Wire, LiquidCrystal_I2C, Servo, DHT, Adafruit_NeoPixel)을 쓰는 스케치를 컴파일한 값입니다.
+## 실측 리소스 (2026-11-07, coms-lab-compiler:local, Apple Silicon Docker)
+
+`lab/compiler/measure.mjs`를 이미지 안에서 실행해 라이브러리 5종(Wire, LiquidCrystal_I2C, Servo, DHT, Adafruit_NeoPixel)을 쓰는 스케치를 컴파일한 값입니다.
 
 | 동시 작업 | 총 RSS | arduino-cli VM | /tmp 사용 | 걸린 시간 |
 |---|---|---|---|---|
@@ -276,17 +178,17 @@ curl -sS -o /dev/null -w '%{http_code}\n' https://coms.kw.ac.kr/lab/api/health
 이 수치는 아래 **1 GiB tmpfs, CPU/RAM 제한 없음** 조건에서 관찰됐다. 운영의 768 MiB 메모리, 1 CPU, 256 MiB tmpfs와 동일한 조건을 검증한 결과는 아니다. 기존 측정 명령:
 
 ```sh
-docker run --rm --user 10001:10001 --tmpfs /tmp:size=1g,exec -v "$PWD/compiler:/m:ro" -w /m --entrypoint node coms-circuit-lab-compiler:local /m/measure.mjs 2
+docker run --rm --user 10001:10001 --tmpfs /tmp:size=1g,exec -v "$PWD/lab/compiler:/m:ro" -w /m --entrypoint node coms-lab-compiler:local /m/measure.mjs 2
 ```
 
 ## Content-Security-Policy (`/lab/`)
 
-`/lab/` 응답에는 아래 CSP를 붙인다. `tools/e2e-prod.mjs`(`npm run e2e:prod`)가 이 헤더로 운영 빌드를 띄워 위반이 없는지, 워커가 뜨는지, Blink가 컴파일·실행되는지 확인한다.
+`/lab/` 응답에는 `security-headers-lab.conf`의 아래 CSP가 붙는다(프런트 nginx의 `/lab/` location 전부). `lab/tools/e2e-prod.mjs`(`npm run e2e:prod`)가 이 헤더로 운영 빌드를 띄워 위반이 없는지, 워커가 뜨는지, Blink가 컴파일·실행되는지 확인한다.
 
 ```
-default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self'
+default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
 ```
 
 - `style-src 'unsafe-inline'`: CodeMirror가 `<style>` 요소를 주입하므로 필요하다.
 - `img-src data:`: `index.html`의 인라인 파비콘 때문에 필요하다.
-- 메인 사이트 CSP가 `/lab/`에도 적용된다면, 위 항목이 빠지지 않았는지 nginx `location /lab/`에서 `add_header Content-Security-Policy ... always;`로 확인한다.
+- 사이트(SPA)의 CSP는 `/lab/`에 적용되지 않는다. 사이트 CSP를 바꿀 때 Lab 파일을 같이 바꿀 필요는 없고, 공통 헤더(HSTS 등)는 `security-headers-common.conf`에서 한 번만 바꾼다.

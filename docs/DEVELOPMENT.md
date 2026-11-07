@@ -35,6 +35,7 @@ coms-website/
 │       │   ├── security/         # JWT, 인증 필터
 │       │   └── config/           # 보안, 시간, Flyway 설정
 │       └── resources/db/migration/   # Flyway migration
+├── lab/                          # COM's Circuit Lab (/lab/): 별도 Vite 앱과 Arduino 컴파일 서비스(lab/compiler)
 ├── tests/                        # 프론트엔드 단위 테스트(*.test.mjs)와 Playwright E2E(e2e/)
 ├── public/                       # 정적 파일, PWA manifest, 서비스 워커 푸시 핸들러
 ├── scripts/                      # 테스트 실행기, 운영 스모크 테스트, Windows 보조 스크립트
@@ -91,6 +92,31 @@ npm run dev
 
 프론트엔드는 `http://localhost:3000`에서 실행됩니다. Vite 개발 서버는 `/api` 요청을 `http://localhost:8080`으로 프록시합니다.
 
+### 5. Circuit Lab 실행 (선택)
+
+Circuit Lab(`/lab/`)은 `lab/`에 있는 별도 앱입니다. 자체 `package.json`과 lockfile이 있고, 루트의 `npm test`·ESLint·타입 검사·Playwright는 `lab/`을 보지 않습니다. 사이트 메뉴(Tools → Circuit Lab)는 SPA 라우트가 아니라 `/lab/` 전체 페이지로 이동합니다.
+
+```bash
+cd lab
+npm ci
+npm run dev        # http://localhost:5173/lab/ (포트가 사용 중이면 Vite가 알려 주는 번호)
+```
+
+회로 보기·시뮬레이션은 이것만으로 됩니다. **스케치 컴파일**에는 Arduino 컴파일 서비스가 필요하며, 개발 서버가 `/lab/api`를 `http://127.0.0.1:8787`로 프록시합니다(`LAB_COMPILE_URL`로 변경). 컴파일 서비스는 Docker로 띄웁니다. 로그인 검사는 개발용에서 꺼져 있습니다.
+
+```bash
+docker compose -f lab/compiler/docker-compose.dev.yml up --build -d   # 127.0.0.1:8787
+```
+
+| 명령 (`lab/`에서) | 하는 일 |
+| --- | --- |
+| `npm run typecheck` / `npm test` | 타입 검사 / vitest (회로·시뮬레이터 코어 포함) |
+| `npx vitest run src/core` | 시뮬레이터 코어 테스트만 |
+| `node --test compiler/test` | 컴파일 서비스 테스트 (Node 22 이상) |
+| `npm run e2e:browser`, `npm run e2e:prod` | 브라우저 e2e (자세한 사용법은 `lab/tools/`) |
+
+운영 배포(이미지 구성, nginx, 소켓, 한도)는 [lab/docs/DEPLOY.md](../lab/docs/DEPLOY.md)에 있습니다.
+
 ## 테스트와 빌드
 
 ### Frontend
@@ -130,6 +156,7 @@ docker compose --env-file .env up -d --build
 | Frontend | `http://127.0.0.1:3000` |
 | Backend | `http://127.0.0.1:8080` |
 | Health Check | `http://127.0.0.1:8080/actuator/health` |
+| Circuit Lab | `http://127.0.0.1:3000/lab/` (컴파일은 로그인 필요) |
 
 프론트엔드 Docker 빌드는 Vite 빌드 시점의 `.env` 값을 사용합니다. 로컬 Docker에서 프론트엔드가 백엔드에 직접 접근해야 한다면 `VITE_API_BASE_URL=http://localhost:8080/api`처럼 설정한 뒤 다시 빌드하세요. 운영 환경에서는 보통 reverse proxy가 `/api`를 백엔드로 전달하도록 구성합니다.
 
