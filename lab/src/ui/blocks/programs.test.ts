@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { workspace, type N } from './build';
 import { generate } from './generate';
 import { STARTER_BLOCKS } from './starters';
+import { compileOrigin } from '../../../tools/compile-origin.mjs';
 
 const loop = (...s: N[]): N => ({ type: 'lab_loop', do: { DO: s } });
 const setup = (...s: N[]): N => ({ type: 'lab_setup', do: { DO: s } });
@@ -78,16 +79,16 @@ export const PROGRAMS: Record<string, ReturnType<typeof workspace>> = {
   ], ['times', 'x', 'level']),
 };
 
-const URL = (process.env.LAB_COMPILE_URL ?? 'http://127.0.0.1:8787') + '/lab/api';
+const COMPILE_ORIGIN = compileOrigin();
 let up = false;
 beforeAll(async () => {
-  try { up = (await fetch(`${URL}/health`, { signal: AbortSignal.timeout(1500) })).ok; } catch { up = false; }
+  try { up = (await fetch(new URL('/lab/api/health', COMPILE_ORIGIN), { signal: AbortSignal.timeout(1500), redirect: 'error' })).ok; } catch { up = false; }
   if (!up) console.warn('컴파일 서버가 꺼져 있어 실제 컴파일 검사는 건너뜁니다 (생성 코드 검사만 실행).');
 });
 
 async function compile(sketch: string) {
   for (let attempt = 0; attempt < 5; attempt++) {
-    const res = await fetch(`${URL}/compile`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sketch }) });
+    const res = await fetch(new URL('/lab/api/compile', COMPILE_ORIGIN), { method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sketch }) });
     const body = await res.json() as { ok: boolean; reason?: string; errors?: { line: number; message: string }[] };
     if (body.reason !== 'rate-limited' && body.reason !== 'busy') return body;
     await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));

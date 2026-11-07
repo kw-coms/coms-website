@@ -4,14 +4,12 @@
 // scene), and the scope time/div control writing the part's props.
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromeExecutable, compileOrigin, GL_ARGS, SHOTS } from './browser.mjs';
+import { chromeExecutable, compileOrigin, GL_ARGS, outDir } from './browser.mjs';
 
-const OUT = process.argv[2] ?? SHOTS;
-mkdirSync(OUT, { recursive: true });
+const OUT = outDir('shots-ui-v2', process.argv[2]);
 const COMPILE = compileOrigin();
-if (!(await fetch(`${COMPILE}/lab/api/health`).then((r) => r.ok, () => false))) { console.log(`FAIL compile service not reachable at ${COMPILE}`); process.exit(2); }
+if (!(await fetch(new URL('/lab/api/health', COMPILE), { redirect: 'error' }).then((r) => r.ok, () => false))) { console.log(`FAIL compile service not reachable at ${COMPILE}`); process.exit(2); }
 let dev, base = process.env.LAB_URL;
 if (!base) {
   const port = 5700 + Math.floor(Math.random() * 90);

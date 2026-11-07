@@ -17,8 +17,9 @@ let failed = false;
 for (const mission of MISSIONS) {
   const scene = mission.referenceScene;
   if (!scene.parts.some(part => part.kind === 'arduino-uno')) continue; // e.g. the 555 mission: no firmware
-  const response = await fetch(`${COMPILE}/lab/api/compile`, {
+  const response = await fetch(new URL('/lab/api/compile', COMPILE), {
     method: 'POST',
+    redirect: 'error',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sketch: scene.code }),
   });

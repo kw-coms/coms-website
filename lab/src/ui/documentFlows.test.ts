@@ -28,6 +28,40 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+describe('mission progress storage', () => {
+  it('keeps the fixed storage schema in sync with public mission IDs', async () => {
+    const m = await boot();
+    const { MISSIONS } = await import('../missions/catalog');
+    expect([...m.store.STORED_MISSION_IDS].sort()).toEqual(MISSIONS.map(mission => mission.id).sort());
+  });
+
+  it('persists only known mission IDs, completion status and timestamp', async () => {
+    const m = await boot();
+    const progress = { done: true, at: 1234,
+      checks: [{ id: '6', label: 'sample answer 1234', ok: true, message: 'secret result' }],
+      checker: [{ kind: 'expectSerial', includes: 'secret result' }],
+      referenceScene: { code: 'sample answer 1234' },
+    };
+    m.store.saveMissionProgress('keypad-password', progress);
+    expect(JSON.parse(mem.get(m.store.MISSIONS_KEY)!)).toEqual({
+      'keypad-password': { done: true, at: 1234 },
+    });
+    expect(() => m.store.saveMissionProgress('unknown', { done: true })).toThrow('존재하지 않는 미션');
+  });
+
+  it('drops legacy checker details and unknown IDs on load', async () => {
+    mem.set('coms-lab:missions', JSON.stringify({
+      'keypad-password': { done: true, at: 1234, checks: [{ label: 'sample answer 1234' }], referenceScene: { code: 'secret result' } },
+      unknown: { done: true, at: 1234, secret: 'secret result' },
+      'led-blink': { done: 'true', at: 1234 },
+    }));
+    const m = await boot();
+    expect(m.store.getState().missionProgress).toEqual({ 'keypad-password': { done: true, at: 1234 } });
+    m.store.saveMissionProgress('keypad-password', m.store.getState().missionProgress['keypad-password']!);
+    expect(JSON.parse(mem.get(m.store.MISSIONS_KEY)!)).toEqual({ 'keypad-password': { done: true, at: 1234 } });
+  });
+});
+
 describe('loadFromLocationHash', () => {
   it('removes #s= from the URL before decoding and loads the shared scene', async () => {
     const m = await boot();

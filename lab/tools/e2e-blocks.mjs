@@ -4,14 +4,12 @@
 // the three modes, the one-way switch, light/dark, keyboard and touch. Needs the compile service (LAB_COMPILE_URL, default 127.0.0.1:8787).
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromeExecutable, compileOrigin, GL_ARGS, SHOTS } from './browser.mjs';
+import { chromeExecutable, compileOrigin, GL_ARGS, outDir } from './browser.mjs';
 
-const OUT = process.argv[2] ?? SHOTS;
-mkdirSync(OUT, { recursive: true });
+const OUT = outDir('shots-blocks', process.argv[2]);
 const COMPILE = compileOrigin();
-if (!(await fetch(`${COMPILE}/lab/api/health`).then((r) => r.ok, () => false))) { console.log(`FAIL compile service not reachable at ${COMPILE}`); process.exit(2); }
+if (!(await fetch(new URL('/lab/api/health', COMPILE), { redirect: 'error' }).then((r) => r.ok, () => false))) { console.log(`FAIL compile service not reachable at ${COMPILE}`); process.exit(2); }
 const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 // dev server (has the window.__lab test hooks) for the behaviour checks; `vite preview` of the production build (run `npm run build` first)

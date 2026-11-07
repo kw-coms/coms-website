@@ -1,25 +1,37 @@
 // Shared by the browser e2e scripts: Chromium lookup (the per-OS Playwright cache) and the screenshot
-// directory (<tmpdir>/lab-shots).
-import { existsSync, mkdirSync, readdirSync } from 'node:fs';
-import { homedir, platform, tmpdir } from 'node:os';
-import { join } from 'node:path';
+// directory (contained in the lab directory, with no symlink traversal).
+import { existsSync, lstatSync, mkdirSync, readdirSync } from 'node:fs';
+import { homedir, platform } from 'node:os';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-/** The compile service is a local development container: loopback http only, rebuilt from validated parts. */
-export function compileOrigin(value = process.env.LAB_COMPILE_URL ?? 'http://127.0.0.1:8787') {
-  const url = new URL(value);
-  const host = url.hostname === 'localhost' ? 'localhost' : url.hostname === '127.0.0.1' ? '127.0.0.1' : '';
-  const port = Number(url.port || 80);
-  if (url.protocol !== 'http:' || !host || !Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error(`LAB_COMPILE_URL must be http://127.0.0.1:<port> or http://localhost:<port> (got ${value})`);
+export { compileOrigin } from './compile-origin.mjs';
+
+export const LAB_ROOT = fileURLToPath(new URL('../', import.meta.url));
+
+/** Resolve screenshot output below lab, rejecting escapes and every existing symlink. */
+export function outDir(defaultName, value = process.env.SHOTS_OUT ?? defaultName) {
+  const fail = () => { throw new Error('SHOTS_OUT은 lab 디렉터리 안의 경로여야 하며 심볼릭 링크를 사용할 수 없습니다.'); };
+  if (typeof value !== 'string' || !value.trim() || value.includes('\0')) fail();
+  const target = resolve(LAB_ROOT, value);
+  const within = relative(LAB_ROOT, target);
+  if (within.startsWith('..') || isAbsolute(within)) fail();
+  let current = resolve(LAB_ROOT);
+  const checkDirectory = path => {
+    const stat = lstatSync(path);
+    if (stat.isSymbolicLink() || !stat.isDirectory()) fail();
+  };
+  checkDirectory(current);
+  for (const component of within ? within.split(sep) : []) {
+    current = join(current, component);
+    try { mkdirSync(current); } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+    }
+    // lstat also rejects dangling links and links pointing back inside lab.
+    checkDirectory(current);
   }
-  return `http://${host}:${port}`;
+  return target;
 }
-
-// Fixed locations only: the screenshot directory and the browser lookup take no path from the environment
-// (they used to, and a path read from the environment into file-system calls is what CodeQL's
-// js/path-injection reports). To use another browser, install it into the default Playwright cache.
-export const SHOTS = join(tmpdir(), 'lab-shots');
-mkdirSync(SHOTS, { recursive: true });
 
 function cacheDir() {
   if (platform() === 'darwin') return join(homedir(), 'Library/Caches/ms-playwright');

@@ -2,11 +2,9 @@
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { chromeExecutable, GL_ARGS } from './browser.mjs';
+import { chromeExecutable, GL_ARGS, outDir } from './browser.mjs';
 
-const OUT = process.env.SHOTS_OUT ?? join(process.cwd(), 'shots-v2');
-import { mkdirSync } from 'node:fs';
-mkdirSync(OUT, { recursive: true });
+const OUT = outDir('shots-v2');
 let dev, base = process.env.LAB_URL;
 if (!base) {
   const port = 5400 + Math.floor(Math.random() * 90);

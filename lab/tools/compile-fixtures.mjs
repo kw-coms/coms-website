@@ -16,8 +16,9 @@ const { compiler } = JSON.parse(readFileSync(OUT, 'utf8'));
 const examples = {};
 let failed = false;
 for (const example of EXAMPLES) {
-  const response = await fetch(`${COMPILE}/lab/api/compile`, {
+  const response = await fetch(new URL('/lab/api/compile', COMPILE), {
     method: 'POST',
+    redirect: 'error',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sketch: example.scene.code }),
   });

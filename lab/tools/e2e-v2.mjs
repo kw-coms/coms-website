@@ -1,13 +1,11 @@
 // v2 browser e2e: node tools/e2e-v2.mjs  (needs the compile service at 127.0.0.1:8787; starts vite itself unless LAB_URL is set)
-// Screenshots go to SHOTS_OUT (default <cwd>/shots-v2).
+// Screenshots go to SHOTS_OUT (default <lab>/shots-v2).
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { chromeExecutable, compileOrigin, GL_ARGS } from './browser.mjs';
+import { chromeExecutable, compileOrigin, GL_ARGS, outDir } from './browser.mjs';
 
-const OUT = process.env.SHOTS_OUT ?? join(process.cwd(), 'shots-v2');
-mkdirSync(OUT, { recursive: true });
+const OUT = outDir('shots-v2');
 const COMPILE = compileOrigin();
 let dev, base = process.env.LAB_URL;
 if (!base) {
@@ -16,7 +14,7 @@ if (!base) {
   base = `http://localhost:${port}/lab/`;
   for (let i = 0; i < 80; i++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise((r) => setTimeout(r, 250)); }
 }
-if (!(await fetch(`${COMPILE}/lab/api/health`).then((r) => r.ok, () => false))) { console.log('FAIL compile service not reachable'); dev?.kill(); process.exit(2); }
+if (!(await fetch(new URL('/lab/api/health', COMPILE), { redirect: 'error' }).then((r) => r.ok, () => false))) { console.log('FAIL compile service not reachable'); dev?.kill(); process.exit(2); }
 const results = [];
 const check = (name, ok, extra = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'} ${name} ${extra}`); };
 const browser = await chromium.launch({ executablePath: chromeExecutable(), args: GL_ARGS });

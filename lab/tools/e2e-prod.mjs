@@ -12,6 +12,7 @@ import { chromium } from 'playwright-core';
 import { execSync } from 'node:child_process';
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromeExecutable, compileOrigin, GL_ARGS } from './browser.mjs';
@@ -23,13 +24,15 @@ const COMPILE = new URL(compileOrigin());
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
 
 if (!process.env.LAB_SKIP_BUILD) execSync('npm run build', { cwd: root, stdio: 'inherit' });
-const compileUp = await fetch(`${COMPILE.origin}/lab/api/health`).then((r) => r.ok, () => false);
+const compileUp = await fetch(new URL('/lab/api/health', COMPILE), { redirect: 'error' }).then((r) => r.ok, () => false);
 if (!compileUp) { console.log(`FAIL compile service not reachable at ${COMPILE.origin} (see docs/DEPLOY.md)`); process.exit(2); }
 
 const server = createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
-  if (url.pathname.startsWith('/lab/api/')) {
-    const up = httpRequest({ host: COMPILE.hostname, port: COMPILE.port, path: url.pathname + url.search, method: req.method, headers: { ...req.headers, host: COMPILE.host } }, (r) => {
+  if (url.pathname === '/lab/api/compile') {
+    const target = new URL('/lab/api/compile', COMPILE);
+    const request = COMPILE.protocol === 'https:' ? httpsRequest : httpRequest;
+    const up = request(target, { method: req.method, headers: { ...req.headers, host: target.host } }, (r) => {
       res.writeHead(r.statusCode ?? 502, r.headers);
       r.pipe(res);
     });

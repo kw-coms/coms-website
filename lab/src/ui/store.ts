@@ -166,10 +166,30 @@ const prefs = loadPrefs();
 const NOTICE_KEY = 'coms-lab:perf-notice';
 export const MISSIONS_KEY = 'coms-lab:missions';
 export const BEEP_MUTED_KEY = 'coms-lab:beep-muted';
+/** Fixed storage schema: never serialize an ID or checker object supplied by the mission catalog. */
+export const STORED_MISSION_IDS = [
+  'led-blink', 'traffic-light', 'button-toggle', 'pot-dimmer', 'distance-alarm',
+  'tmp36-serial', 'shift-chase', 'transistor-motor', 'keypad-password', 'timer-555',
+] as const;
+type StoredMissionProgress = Pick<MissionProgress, 'done' | 'at'>;
+
+/** Only completion state is durable; checker details and reference scenes stay in the catalog. */
+function storedMissionProgress(value: unknown): StoredMissionProgress | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const progress = value as Record<string, unknown>;
+  if (typeof progress.done !== 'boolean') return null;
+  return { done: progress.done,
+    ...(typeof progress.at === 'number' && Number.isFinite(progress.at) && progress.at >= 0 ? { at: progress.at } : {}) };
+}
+
 function loadMissionProgress(): Record<string, MissionProgress> {
   try {
     const v = JSON.parse(getItem(MISSIONS_KEY) ?? '{}');
-    return v && typeof v === 'object' ? v : {};
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return {};
+    return Object.fromEntries(STORED_MISSION_IDS.flatMap(id => {
+      const progress = Object.hasOwn(v, id) ? storedMissionProgress(v[id]) : null;
+      return progress ? [[id, progress]] : [];
+    }));
   } catch {
     return {};
   }
@@ -278,9 +298,15 @@ export function setMissionId(id: string | null) {
   set({ missionId: id });
 }
 export function saveMissionProgress(id: string, p: MissionProgress) {
-  const missionProgress = { ...state.missionProgress, [id]: p };
+  const canonicalId = STORED_MISSION_IDS.find(candidate => candidate === id);
+  if (!canonicalId) throw new Error('존재하지 않는 미션입니다.');
+  const missionProgress = { ...state.missionProgress, [canonicalId]: p };
   set({ missionProgress });
-  setItem(MISSIONS_KEY, JSON.stringify(missionProgress));
+  const stored = Object.fromEntries(STORED_MISSION_IDS.flatMap(missionId => {
+    const progress = storedMissionProgress(missionProgress[missionId]);
+    return progress ? [[missionId, progress]] : [];
+  }));
+  setItem(MISSIONS_KEY, JSON.stringify(stored));
 }
 
 // ---------- whole-document dirty state (scene + code vs the last loaded/exported baseline) ----------
