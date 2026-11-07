@@ -74,8 +74,11 @@ describe('v2 scene metadata', () => {
     const cycle: Record<string, unknown> = {}; cycle.self = cycle;
     expect(() => validateScene({ ...base(), blocks: cycle })).toThrow('블록');
     let deep: unknown = null;
-    for (let n = 0; n < 65; n++) deep = [deep];
-    expect(() => validateScene({ ...base(), blocks: deep })).toThrow('블록');
+    for (let n = 0; n < 1001; n++) deep = [deep]; // 1,001 levels: one past MAX_BLOCKS_JSON_DEPTH
+    expect(() => validateScene({ ...base(), blocks: deep })).toThrow('1,000단계');
+    let ok: unknown = null;
+    for (let n = 0; n < 999; n++) ok = [ok]; // still inside the limit: the depth check is what rejected the one above
+    expect(() => validateScene({ ...base(), blocks: ok })).toThrow('블록 구조'); // fails later, on shape, not on depth
     expect(() => validateScene({ ...base(), blocks: { value: Number.POSITIVE_INFINITY } })).toThrow('블록');
   });
   it('rejects hostile notes, modes and mission ids', () => {

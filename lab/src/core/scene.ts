@@ -55,28 +55,98 @@ function validBlocks(value: unknown): boolean {
   }
 }
 
-/** Shape check on top of validBlocks (which already bounded the depth, so this iterative walk is cheap): what Blockly's loader and the generator will touch. */
-function validBlockShape(state: unknown): boolean {
-  if (!isObject(state)) return false;
+/**
+ * The block types the toolbox offers (src/ui/blocks/defs.ts) and the generator handles (generate.ts HANDLED_TYPES);
+ * generate.test.ts fails if the three drift apart. Anything else is refused before Blockly sees it.
+ */
+export const ALLOWED_BLOCK_TYPES: ReadonlySet<string> = new Set(
+  ('controls_flow_statements controls_for controls_if controls_repeat_ext controls_whileUntil lab_analog_read lab_button lab_dht ' +
+  'lab_digital_read lab_digital_write lab_every lab_ir lab_keypad lab_lcd_clear lab_lcd_cursor lab_lcd_print lab_loop lab_map ' +
+  'lab_millis lab_no_tone lab_pixel_clear lab_pixel_color lab_pixel_rgb lab_pixel_show lab_pwm_write lab_seg_digit ' +
+  'lab_serial_available lab_serial_print lab_serial_println lab_serial_read lab_serial_read_int lab_servo_write lab_setup ' +
+  'lab_tmp36 lab_tone lab_tone_for lab_ultrasonic lab_wait logic_boolean logic_compare logic_negate logic_operation ' +
+  'math_arithmetic math_change math_constrain math_modulo math_number math_random_int math_round math_single ' +
+  'procedures_callnoreturn procedures_callreturn procedures_defnoreturn procedures_defreturn procedures_ifreturn ' +
+  'text text_join text_length variables_get variables_set').split(' '));
+
+/** Mutator sizes: Blockly allocates one input per item while loading, so these bound the work a crafted scene can ask for. */
+export const MAX_TEXT_JOIN_ITEMS = 64;
+export const MAX_ELSE_IFS = 32;
+export const MAX_PROC_PARAMS = 32;
+/** Sum of all mutator sizes in one workspace (real programs: a few dozen). */
+export const MAX_MUTATION_TOTAL = 2000;
+
+const isInt = (v: unknown, max: number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= max;
+const shortStr = (v: unknown): v is string => typeof v === 'string' && v.length <= 100;
+
+/** extraState of one block against its type's schema. Returns the mutator size, or -1 when invalid. */
+function mutationSize(type: string, es: unknown): number {
+  if (es === undefined) return 0;
+  switch (type) {
+    case 'controls_if': {
+      if (!isObject(es) || !hasOnlyKeys(es, ['elseIfCount', 'hasElse', 'elseif', 'else'])) return -1;
+      const n = es.elseIfCount ?? es.elseif ?? 0;
+      if (!isInt(n, MAX_ELSE_IFS) || (es.elseIfCount !== undefined && es.elseif !== undefined)) return -1;
+      return [es.hasElse, es.else].every(v => v === undefined || typeof v === 'boolean') ? n : -1;
+    }
+    case 'text_join':
+      return isObject(es) && hasOnlyKeys(es, ['itemCount']) && (es.itemCount === undefined || isInt(es.itemCount, MAX_TEXT_JOIN_ITEMS))
+        ? (es.itemCount as number | undefined ?? 0) : -1;
+    case 'procedures_defnoreturn':
+    case 'procedures_defreturn': {
+      if (!isObject(es) || !hasOnlyKeys(es, ['params', 'hasStatements']) ||
+          (es.hasStatements !== undefined && typeof es.hasStatements !== 'boolean')) return -1;
+      if (es.params === undefined) return 0;
+      return Array.isArray(es.params) && es.params.length <= MAX_PROC_PARAMS &&
+        es.params.every(p => isObject(p) && Object.values(p).every(shortStr) && hasOnlyKeys(p, ['name', 'id', 'argId', 'type']))
+        ? es.params.length : -1;
+    }
+    case 'procedures_callnoreturn':
+    case 'procedures_callreturn': {
+      if (!isObject(es) || !hasOnlyKeys(es, ['name', 'params']) || (es.name !== undefined && !shortStr(es.name))) return -1;
+      if (es.params === undefined) return 0;
+      return Array.isArray(es.params) && es.params.length <= MAX_PROC_PARAMS && es.params.every(shortStr) ? es.params.length : -1;
+    }
+    case 'procedures_ifreturn':
+      return typeof es === 'string' && /^<mutation value="[01]"><\/mutation>$/.test(es) ? 0 : -1;
+    default:
+      return -1; // every other block has no mutator
+  }
+}
+
+/**
+ * Shape check on top of validBlocks (which already bounded the depth, so this iterative walk is cheap): what Blockly's
+ * loader and the generator will touch. Returns a Korean reason, or null when the workspace is acceptable.
+ * BlocksEditor runs it again right before Blockly loads, so no path reaches the loader unchecked.
+ */
+export function blocksProblem(state: unknown): string | null {
+  const bad = '블록 구조가 올바르지 않습니다.';
+  if (!isObject(state)) return bad;
   const ws = state.blocks;
-  if (ws !== undefined && (!isObject(ws) || (ws.blocks !== undefined && !Array.isArray(ws.blocks)))) return false;
+  if (ws !== undefined && (!isObject(ws) || (ws.blocks !== undefined && !Array.isArray(ws.blocks)))) return bad;
   if (state.variables !== undefined && (!Array.isArray(state.variables) || state.variables.length > 1000 ||
-      !state.variables.every(v => isObject(v) && (v.id === undefined || typeof v.id === 'string') && (v.name === undefined || typeof v.name === 'string')))) return false;
+      !state.variables.every(v => isObject(v) && (v.id === undefined || typeof v.id === 'string') && (v.name === undefined || typeof v.name === 'string')))) return bad;
   const todo: unknown[] = isObject(ws) && Array.isArray(ws.blocks) ? [...ws.blocks] : [];
+  let mutations = 0;
   for (let n = 0; todo.length; n++) {
     const b = todo.pop();
-    // `in Object.prototype` rejects "constructor", "toString", "__proto__" ... as block types
-    if (n >= MAX_BLOCKS || !isObject(b) || typeof b.type !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(b.type) || b.type in Object.prototype) return false;
-    if (b.fields !== undefined && !isObject(b.fields)) return false;
-    if (b.inputs !== undefined && !isObject(b.inputs)) return false;
-    if (b.next !== undefined && !isObject(b.next)) return false;
+    if (n >= MAX_BLOCKS) return `블록은 ${MAX_BLOCKS.toLocaleString('ko-KR')}개 이하여야 합니다.`;
+    if (!isObject(b) || typeof b.type !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(b.type) || b.type in Object.prototype) return bad;
+    if (!ALLOWED_BLOCK_TYPES.has(b.type)) return `지원하지 않는 블록 종류입니다: ${b.type}`;
+    const size = mutationSize(b.type, b.extraState);
+    if (size < 0) return `블록 설정이 올바르지 않거나 너무 큽니다. (${b.type}: 문자열 항목 ${MAX_TEXT_JOIN_ITEMS}개, 그 외 가지·매개변수 ${MAX_ELSE_IFS}개 이하)`;
+    mutations += size;
+    if (mutations > MAX_MUTATION_TOTAL) return `블록 항목의 총합이 너무 큽니다. (${MAX_MUTATION_TOTAL.toLocaleString('ko-KR')}개 이하)`;
+    if (b.fields !== undefined && !isObject(b.fields)) return bad;
+    if (b.inputs !== undefined && !isObject(b.inputs)) return bad;
+    if (b.next !== undefined && !isObject(b.next)) return bad;
     const slots = [...Object.values((b.inputs ?? {}) as object), b.next].filter(slot => slot !== undefined);
     for (const slot of slots) {
-      if (!isObject(slot)) return false;
+      if (!isObject(slot)) return bad;
       for (const child of [slot.block, slot.shadow]) if (child !== undefined) todo.push(child);
     }
   }
-  return true;
+  return null;
 }
 
 /** Validate untrusted imported scenes before analysis or rendering. */
@@ -96,7 +166,10 @@ export function validateScene(value: unknown): Scene {
     invalid('장면 제목이 올바르지 않습니다.');
   }
   if (value.blocks !== undefined && !validBlocks(value.blocks)) invalid('블록 데이터는 올바른 JSON이며 256 KB 이하, 1,000단계 이하의 깊이이어야 합니다.');
-  if (value.blocks !== undefined && !validBlockShape(value.blocks)) invalid(`블록 구조가 올바르지 않습니다. 블록 종류는 문자열이어야 하고, 블록은 ${MAX_BLOCKS.toLocaleString('ko-KR')}개 이하여야 합니다.`);
+  if (value.blocks !== undefined) {
+    const problem = blocksProblem(value.blocks);
+    if (problem) invalid(problem);
+  }
   if (value.codeMode !== undefined && !['blocks', 'blocks+text', 'text'].includes(value.codeMode as string)) {
     invalid('코드 모드가 올바르지 않습니다.');
   }

@@ -6,6 +6,7 @@ import * as Blockly from 'blockly/core';
 import 'blockly/blocks';
 import * as Ko from 'blockly/msg/ko';
 import { COLOUR, CUSTOM_BLOCKS, TOOLBOX, type PinKind, PIN_VALUES } from './defs';
+import { blocksProblem } from '../../core/scene';
 import './blocks.css';
 
 Blockly.setLocale(Ko as unknown as Record<string, string>);
@@ -49,6 +50,23 @@ export interface BlocksEditorProps {
   onChange: (state: unknown) => void;
 }
 
+const START_WORKSPACE = () => ({ blocks: { languageVersion: 0, blocks: [
+  { type: 'lab_setup', x: 24, y: 24 }, { type: 'lab_loop', x: 24, y: 130 },
+] } });
+
+/**
+ * Load a workspace into Blockly. The state is untrusted (share links, opened files), and Blockly allocates one input per
+ * mutator item while loading, so it is checked again here: anything validateScene would refuse gives the start workspace.
+ * Returns the Korean reason when it refused, null otherwise.
+ */
+export function loadBlocks(w: Blockly.Workspace, s: unknown): string | null {
+  w.clear();
+  const problem = s && typeof s === 'object' ? blocksProblem(s) : null;
+  if (problem) console.warn('블록 불러오기를 건너뛰었어요:', problem);
+  Blockly.serialization.workspaces.load(s && typeof s === 'object' && !problem ? s as object : START_WORKSPACE(), w);
+  return problem;
+}
+
 export default function BlocksEditor({ state, dark, hints, readOnly, onChange }: BlocksEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const ws = useRef<Blockly.WorkspaceSvg | null>(null);
@@ -77,13 +95,7 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
     const load = (s: unknown) => {
       loading.current = true;
       try {
-        w.clear();
-        if (s && typeof s === 'object') Blockly.serialization.workspaces.load(s as object, w);
-        else {
-          Blockly.serialization.workspaces.load({ blocks: { languageVersion: 0, blocks: [
-            { type: 'lab_setup', x: 24, y: 24 }, { type: 'lab_loop', x: 24, y: 130 },
-          ] } }, w);
-        }
+        loadBlocks(w, s);
         mark();
       } catch (e) {
         console.error('블록 불러오기 실패', e);
