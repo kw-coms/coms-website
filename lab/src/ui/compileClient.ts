@@ -15,14 +15,30 @@ const UNAUTHORIZED_MSG = '로그인한 동아리원만 컴파일할 수 있어�
 // The site's access cookie lives only a short while; the refresh cookie (path /api/auth/refresh) is
 // not sent to /lab/api/*. Ask the site for a new access cookie, the way its own API client does:
 // a same-origin POST (the browser adds Origin, which the backend checks) with the cookies.
-async function refreshSession(fetchImpl: typeof fetch, signal: AbortSignal): Promise<boolean> {
-  try {
-    const res = await fetchImpl('/api/auth/refresh', { method: 'POST', credentials: 'include', signal });
-    return res.ok;
-  } catch (e) {
-    if (e instanceof DOMException && e.name === 'AbortError') throw e;
-    return false;
-  }
+//
+// The Lab is a separate build and cannot import the site's single-flight client (src/services/apiClient.ts).
+// Inside this page one refresh is shared by every caller; across tabs two refreshes can race, which is
+// harmless: the backend answers a parallel refresh of the same token with 204 and no cookies (RACE_LOSER,
+// AuthController) because the winner's Set-Cookie already landed in the shared cookie jar, and the retry
+// below then rides on those cookies.
+const REFRESH_TIMEOUT_MS = 15_000
+let refreshInFlight: Promise<boolean> | null = null
+function refreshSession(fetchImpl: typeof fetch, signal: AbortSignal): Promise<boolean> {
+  refreshInFlight ??= (async () => {
+    try {
+      // Its own deadline (not the compile's): a hung refresh must not hold the page for the compile's whole time.
+      const deadline = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(REFRESH_TIMEOUT_MS) : undefined
+      const combined = deadline && typeof AbortSignal.any === 'function' ? AbortSignal.any([signal, deadline]) : signal
+      const res = await fetchImpl('/api/auth/refresh', { method: 'POST', credentials: 'include', signal: combined });
+      return res.ok;
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') throw e;
+      return false;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  return refreshInFlight;
 }
 
 async function post(sketch: string, signal: AbortSignal, fetchImpl: typeof fetch): Promise<Response> {

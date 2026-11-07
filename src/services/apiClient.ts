@@ -62,6 +62,17 @@ async function tryRefreshToken(): Promise<RefreshOutcome> {
   return refreshInFlight
 }
 
+// For callers outside this client that hit a 401 on their own fetch (the study playground's /study/api/run):
+// the same single-flight refresh, generation guard and session-expiry notification as every other request.
+// Take the generation before sending, and after a 401 retry once when this returns true.
+export const sessionGeneration = () => refreshGeneration
+export async function renewSessionAfter401(generationBeforeRequest: number): Promise<boolean> {
+  if (refreshGeneration > generationBeforeRequest) return true // someone already renewed the cookie
+  const outcome = await tryRefreshToken()
+  if (outcome === 'rejected') notifySessionExpired()
+  return outcome === 'refreshed'
+}
+
 // Shared 401 recovery for request / requestNoContent / requestBlob, which all ran an identical
 // copy of this block.
 //

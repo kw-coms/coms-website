@@ -1,5 +1,7 @@
 // Calls POST /study/api/run (docs/study-runner-api.md) and turns every outcome into one result type.
 
+import { renewSessionAfter401, sessionGeneration } from '../../../services/apiClient'
+
 export type RunLang = 'c' | 'java' | 'python'
 
 export interface Diagnostic { line: number; column?: number; severity: 'error' | 'warning' | 'note' | string; message: string; hintKo?: string }
@@ -55,23 +57,44 @@ export function retryAfterSeconds(header: string | null, body: unknown, fallback
   return Math.min(Math.max(Math.ceil(value), 1), 60)
 }
 
+// AbortSignal.timeout / AbortSignal.any are missing in older Safari: fall back to a controller.
+function deadline(ms: number): AbortSignal {
+  if (typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(ms)
+  const controller = new AbortController()
+  setTimeout(() => controller.abort(new DOMException('timed out', 'TimeoutError')), ms)
+  return controller.signal
+}
+function either(user: AbortSignal | undefined, timeout: AbortSignal): AbortSignal {
+  if (!user) return timeout
+  if (typeof AbortSignal.any === 'function') return AbortSignal.any([user, timeout])
+  const controller = new AbortController()
+  if (user.aborted || timeout.aborted) controller.abort()
+  else for (const source of [user, timeout]) source.addEventListener('abort', () => controller.abort(), { once: true })
+  return controller.signal
+}
+
 export async function runRemote(lang: RunLang, code: string, stdin: string, signal?: AbortSignal): Promise<RunResult> {
   if (bytes(code) > MAX_CODE_BYTES) return { kind: 'rejected', messageKo: '코드가 너무 길어요. 64KB 이하로 줄여 주세요.' }
   if (bytes(stdin) > MAX_STDIN_BYTES) return { kind: 'rejected', messageKo: '입력이 너무 길어요. 16KB 이하로 줄여 주세요.' }
-  const timeout = AbortSignal.timeout(CLIENT_TIMEOUT_MS)
+  let timeout: AbortSignal | null = null
   try {
-    const post = () => fetch(RUN_URL, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lang, code, stdin }),
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-    })
+    // Every attempt gets its own deadline: the retry after a renewed session must not inherit what the first one used up.
+    const post = () => {
+      timeout = deadline(CLIENT_TIMEOUT_MS)
+      return fetch(RUN_URL, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lang, code, stdin }),
+        signal: either(signal, timeout),
+      })
+    }
+    const generation = sessionGeneration()
     let res = await post()
     if (res.status === 401) {
-      // The access cookie is short-lived; the site's own API client renews it the same way. Once, then ask to sign in.
-      const renewed = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include', signal: timeout }).then((r) => r.ok, () => false)
-      if (renewed) res = await post()
+      // The access cookie is short-lived: renew it through the site's own single-flight refresh (which also
+      // signs the page out when the session is really gone), retry once, then ask to sign in.
+      if (await renewSessionAfter401(generation)) res = await post()
     }
     if (res.status === 401 || res.status === 403) return { kind: 'login' }
     const data = (await res.json().catch(() => null)) as Record<string, unknown> | null
@@ -88,7 +111,7 @@ export async function runRemote(lang: RunLang, code: string, stdin: string, sign
     return { kind: 'output', output: asOutput(data) }
   } catch (e) {
     if (signal?.aborted) throw e
-    const timedOut = timeout.aborted
+    const timedOut = timeout?.aborted === true
     return { kind: 'network', messageKo: timedOut ? '실행 서버 응답이 너무 늦어요. 잠시 뒤에 다시 시도해 주세요.' : '네트워크에 연결할 수 없어요. 인터넷 연결을 확인해 주세요.' }
   }
 }
