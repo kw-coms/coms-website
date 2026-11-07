@@ -14,7 +14,7 @@
     "e2e:blocks": "node tools/e2e-blocks.mjs",
     "e2e:ui": "node tools/e2e-ui-v2.mjs",
     "e2e:prod": "node tools/e2e-prod.mjs",
-    "test:realtime": "LAB_REALTIME_TEST=1 vitest run --no-file-parallelism src/core/examples.e2e.test.ts src/core/engine-v2-realtime.test.ts"
+    "test:realtime": "LAB_REALTIME_TEST=1 vitest run --no-file-parallelism src/core/examples.e2e.test.ts src/core/engine-v2-realtime.test.ts src/ui/placement-performance.test.ts"
   },
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.3",

@@ -1,6 +1,6 @@
 import type { Analysis, PinRef, Scene, SimWarning } from './types';
 import { PARTS, breadboardGroups, partInternalConnections } from './parts';
-import { pinWorldPos } from './geometry';
+import { socketInsertions } from './socket-insertions';
 const key = (p: PinRef) => `${p.partId}:${p.pinId}`;
 /** Collapse ideal conductors only; resistors, diodes and active contacts remain branches. */
 export function analyze(scene: Scene): Analysis {
@@ -31,32 +31,15 @@ export function analyze(scene: Scene): Analysis {
     }
     for (const wire of scene.wires)
         join(key(wire.from), key(wire.to));
-    const insertions: Analysis['insertions'] = {};
-    const occupied = new Map<string, string>();
-    const sockets = scene.parts.filter(p => p.kind === 'arduino-uno' || p.kind.startsWith('breadboard-'))
-        .flatMap(part => PARTS[part.kind].pins.map(pin => ({ ref: { partId: part.id, pinId: pin.id }, pos: pinWorldPos(part, pin.id) })));
-    for (const part of scene.parts.filter(p => p.kind !== 'arduino-uno' && !p.kind.startsWith('breadboard-'))) {
-        for (const pin of PARTS[part.kind].pins) {
-            const pos = pinWorldPos(part, pin.id);
-            let best: typeof sockets[number] | undefined;
-            let nearest = 0.600000001;
-            for (const socket of sockets) {
-                const d = Math.hypot(pos[0] - socket.pos[0], pos[2] - socket.pos[2]);
-                if (d <= nearest && pos[1] >= socket.pos[1] - 1e-9) {
-                    best = socket;
-                    nearest = d;
-                }
-            }
-            if (!best)
-                continue;
-            const a = `${part.id}:${pin.id}`, b = key(best.ref);
-            insertions[a] = best.ref;
-            join(a, b);
-            if (occupied.has(b))
-                warnings.push({ id: `same-hole:${b}`, level: 'error', partId: part.id, message: '한 구멍에 두 부품의 핀이 꽂혀 있습니다.' });
-            else
-                occupied.set(b, a);
-        }
+    const insertions = socketInsertions(scene.parts);
+    const occupied = new Set<string>();
+    for (const [pin, socket] of Object.entries(insertions)) {
+        const target = key(socket);
+        join(pin, target);
+        if (occupied.has(target))
+            warnings.push({ id: `same-hole:${target}`, level: 'error', partId: pin.slice(0, pin.indexOf(':')), message: '한 구멍에 두 부품의 핀이 꽂혀 있습니다.' });
+        else
+            occupied.add(target);
     }
     const grouped = new Map<string, PinRef[]>();
     for (const [k, ref] of refs) {

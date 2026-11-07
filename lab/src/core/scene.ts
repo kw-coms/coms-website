@@ -1,5 +1,5 @@
 import { PARTS } from './parts';
-import { analyze } from './analyze';
+import { socketInsertions } from './socket-insertions';
 import type { PartInstance, PinRef, Scene } from './types';
 
 const WIRE_COLORS = new Set(['red', 'black', 'blue', 'green', 'yellow', 'orange', 'white', 'purple', 'gray']);
@@ -33,8 +33,7 @@ export function sameCircuit(previous: Circuit, next: Circuit, includeAcquisition
     return part.rotY !== after.rotY || part.pos.some((value, axis) => value !== after.pos[axis]);
   });
   if (!moved || !next.parts.some(part => part.kind === 'arduino-uno' || part.kind.startsWith('breadboard-'))) return true;
-  const insertions = (circuit: Circuit) => analyze({ ...circuit, version: 2, code: '' }).insertions;
-  return JSON.stringify(insertions(previous)) === JSON.stringify(insertions(next));
+  return JSON.stringify(socketInsertions(previous.parts)) === JSON.stringify(socketInsertions(next.parts));
 }
 
 /** Return affected instruments only when electrical identity is unchanged. */
