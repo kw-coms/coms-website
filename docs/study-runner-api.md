@@ -6,7 +6,7 @@ HTML/CSS/JS run client-side in the existing `/study-sandbox.html` iframe; Arduin
 ## Endpoint
 `POST /study/api/run` (same origin, behind the frontend nginx; members only via nginx `auth_request` → backend `/api/auth/me`).
 
-Request (JSON, ≤ 96 KB body):
+Request (JSON, ≤ 112 KiB body after escaping):
 ```json
 { "lang": "c" | "java" | "python", "code": "<source ≤ 64 KB>", "stdin": "<optional ≤ 16 KB>" }
 ```

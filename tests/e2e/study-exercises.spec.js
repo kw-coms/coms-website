@@ -2,6 +2,12 @@ import { expect, test } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { mockOptionalApis } from './visualSupport.js'
 
+test('fixture build includes sample exercises when requested', async ({ page }) => {
+  test.skip(process.env.STUDY_EXERCISE_FIXTURES !== '1', 'requires the opt-in study exercise fixtures')
+  await page.goto('/study/c/practice/sample-echo')
+  await expect(page.getByRole('heading', { name: '첫 인사 출력하기' })).toBeVisible()
+})
+
 // These examples are included only in a fixture build. Run with
 // STUDY_EXERCISE_FIXTURES=1 for both `npm run build` and `playwright test`.
 test.skip(process.env.STUDY_EXERCISE_FIXTURES !== '1', 'requires the opt-in study exercise fixtures')
@@ -86,6 +92,19 @@ test('web checks fail on starter CSS and pass after editing in the real sandbox'
   await page.locator('.ex-web').getByRole('button', { name: '제출', exact: true }).click()
   await expect(page.locator('.ex-web-results')).toContainText('통과')
   await expect(page.locator('.ex-web-results')).not.toContainText('실패')
+})
+
+test('shared web code stays idle until Run is clicked', async ({ page }) => {
+  await mockOptionalApis(page)
+  const files = { html: '<p id="shared-preview-marker">공유 실행 확인</p>', css: '', js: 'window.sharedCodeRan = true' }
+  const hash = `#pg=0.${Buffer.from(JSON.stringify(files)).toString('base64url')}`
+  await page.goto(`/study/web/practice/sample-web-heading${hash}`)
+  await expect(page.locator('.ex-web-shared')).toBeVisible()
+  await expect(page.locator('.ex-web-status')).toHaveText('공유된 코드는 실행 버튼을 눌러야 미리보기가 돼요')
+  await page.waitForTimeout(650)
+  await expect(page.locator('iframe.ex-web-preview')).not.toHaveAttribute('src', /study-sandbox/)
+  await page.locator('.ex-web').getByRole('button', { name: '실행', exact: true }).click()
+  await expect(page.locator('iframe.ex-web-preview').contentFrame().locator('#shared-preview-marker')).toHaveText('공유 실행 확인')
 })
 
 test('practice page fits a mobile viewport without horizontal scrolling', async ({ page }) => {

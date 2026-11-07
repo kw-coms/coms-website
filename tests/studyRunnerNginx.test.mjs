@@ -28,7 +28,7 @@ for (const part of [
   /limit_req zone=study_pre_ip burst=/, /limit_req zone=study_pre burst=/, /limit_conn study_pre_ip_conn /, /limit_conn study_pre_conn /,
   /auth_request \/lab\/_auth;/, /auth_request_set \$runner_client \$upstream_http_x_member_id;/,
   /proxy_set_header X-Runner-Client \$runner_client;/, /proxy_set_header Cookie "";/, /proxy_set_header Authorization "";/,
-  /client_max_body_size 100k/, /proxy_read_timeout 58s/,
+  /client_max_body_size 112k/, /proxy_read_timeout 58s/,
   /proxy_pass http:\/\/unix:\/run\/coms-study\/run\.sock:\/study\/api\/run;/,
   /security-headers-common\.conf/, /proxy_hide_header X-Content-Type-Options/,
 ]) assert.match(run, part)

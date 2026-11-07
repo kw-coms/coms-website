@@ -118,6 +118,11 @@ jobs:
       - name: Accessibility e2e
         run: npx playwright test --project=accessibility
 
+      - name: Study exercise browser suite and shipped web answers
+        run: |
+          STUDY_EXERCISE_FIXTURES=1 PWA_DISABLE=1 npm run build -- --configLoader runner
+          STUDY_EXERCISE_FIXTURES=1 npx playwright test --project=smoke tests/e2e/study-exercises.spec.js tests/e2e/study-exercises-web-answers.spec.js
+
   # Circuit Lab (lab/) is its own app with its own lockfile; the root jobs do not look at it. The
   # Arduino compiler service runs here without the toolchain; the full compile path is exercised by
   # the stack job below, through the real images.
@@ -213,7 +218,6 @@ jobs:
           RATE_LIMIT_PER_MIN: "1000"
         run: |
           set -euo pipefail
-          [ -f ../scripts/verify-exercises.mjs ] || exit 0
           docker compose -p studyrt -f docker-compose.yml up -d runner
           trap 'docker compose -p studyrt -f docker-compose.yml down -v' EXIT
           for attempt in $(seq 1 60); do

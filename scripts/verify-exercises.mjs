@@ -43,19 +43,8 @@ export function buildProgram(problem, lang, kind) {
   return harness.replace(markers[lang], () => code)
 }
 
-export function compare(actual, expected, mode = 'tokens') {
-  const normalize = text => text.replace(/\r\n?/g, '\n')
-  if (mode === 'lines') return normalize(actual).trimEnd() === normalize(expected).trimEnd()
-  const tokens = text => text.trim() ? text.trim().split(/\s+/u) : []
-  const a = tokens(actual), b = tokens(expected)
-  if (a.length !== b.length) return false
-  const number = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/
-  return a.every((value, i) => {
-    if (mode === 'tokens' || !number.test(value) || !number.test(b[i])) return value === b[i]
-    const x = Number(value), y = Number(b[i])
-    return Number.isFinite(x) && Number.isFinite(y) && Math.abs(x - y) <= mode.float * Math.max(1, Math.abs(y))
-  })
-}
+// Dynamic import runs after tsx registration; also works with Node type stripping.
+export const { matchesOutput: compare } = await import('../src/pages/study/exercises/compare.ts')
 
 function command(executable, args, cwd, stdin = '', timeout = 5000) {
   return new Promise(resolveResult => {

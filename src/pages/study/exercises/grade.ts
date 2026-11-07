@@ -1,3 +1,5 @@
+import { matchesOutput } from './compare'
+export { matchesOutput } from './compare'
 import { compareOutput, type DiffLine } from '../playground/compare'
 import type { Diagnostic } from '../playground/runner'
 import { runTests, type MultiRunOutput, type TestRun, type TestsResult } from './api'
@@ -51,27 +53,6 @@ export function mapDiagnostics(diagnostics: Diagnostic[], exercise: Exercise, la
     : { ...d, source: 'harness' })
 }
 
-/** The line comparator preserves internal blank lines while accepting CRLF and a final newline. */
-export function matchesOutput(actual: string, expected: string, mode: Exercise['compare'] = 'tokens'): boolean {
-  if (mode === 'lines') {
-    const normalize = (text: string) => text.replace(/\r\n?/g, '\n').replace(/\n$/, '').split('\n').map((line) => line.trim())
-    return JSON.stringify(normalize(actual)) === JSON.stringify(normalize(expected))
-  }
-  const tokens = (text: string) => text.trim().split(/\s+/).filter(Boolean)
-  const a = tokens(actual)
-  const b = tokens(expected)
-  if (a.length !== b.length) return false
-  return a.every((token, index) => {
-    if (typeof mode !== 'object') return token === b[index]
-    const left = Number(token)
-    const right = Number(b[index])
-    if (token !== '' && b[index] !== '' && Number.isFinite(left) && Number.isFinite(right)) {
-      return Math.abs(left - right) <= mode.float * Math.max(1, Math.abs(right))
-    }
-    return token === b[index]
-  })
-}
-
 function boundedDiff(actual: string, expected: string): DiffLine[] {
   // The playground uses an LCS matrix; cap displayed lines before building it for very tall output.
   const limit = 200
@@ -89,8 +70,8 @@ export function gradeOutput(exercise: Exercise, lang: ExLang, studentCode: strin
     const run: TestRun | undefined = output.results[index]
     const verdict: Verdict = !run || run.skipped ? 'skipped'
       : run.timedOut ? 'timeout'
-        : (run.exitCode !== 0 || run.signal) ? 'runtime'
-          : run.truncated ? 'truncated'
+        : run.truncated ? 'truncated'
+          : (run.exitCode !== 0 || run.signal) ? 'runtime'
             : matchesOutput(run.stdout, test.expected, exercise.compare) ? 'correct' : 'wrong'
     return {
       index, input: test.stdin, expected: test.expected, actual: run?.stdout ?? '', stderr: run?.stderr ?? '',

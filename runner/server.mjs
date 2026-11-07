@@ -8,7 +8,7 @@ import { basename, resolve as resolvePath, sep } from 'node:path';
 import { runCode, runnerHealthy } from './run.mjs';
 import { createRunQueue, createRateLimiter, createDenyList, createInflight, normalizeIp, QUEUE_TIMEOUT } from './limits.mjs';
 
-export const MAX_BODY_BYTES = 96 * 1024;
+export const MAX_BODY_BYTES = 112 * 1024;
 const MAX_CODE_BYTES = 64 * 1024;
 const MAX_STDIN_BYTES = 16 * 1024;
 const MAX_TESTS_BYTES = 32 * 1024;
@@ -68,7 +68,7 @@ function readJson(request) {
     request.on('data', chunk => {
       if (settled) return;
       size += chunk.length;
-      if (size > MAX_BODY_BYTES) fail('요청 본문은 96 KB 이하여야 해요.');
+      if (size > MAX_BODY_BYTES) fail('요청 본문은 112 KB 이하여야 해요.');
       else chunks.push(chunk);
     });
     request.on('end', () => {
@@ -122,7 +122,7 @@ export function createRunnerServer({
       // Cheap header checks first: a request that is refused here must not use up the member's run budget.
       const contentType = request.headers['content-type'] || '';
       if (!/^application\/json\s*(?:;\s*charset\s*=\s*utf-8\s*)?$/i.test(contentType) || request.headers['content-encoding']) return send(400, rejected('압축하지 않은 application/json 본문을 보내 주세요.'));
-      if (Number(request.headers['content-length']) > MAX_BODY_BYTES) return send(400, rejected('요청 본문은 96 KB 이하여야 해요.'));
+      if (Number(request.headers['content-length']) > MAX_BODY_BYTES) return send(400, rejected('요청 본문은 112 KB 이하여야 해요.'));
       if (!limiter.take(key)) {
         response.setHeader('Retry-After', '60');
         return send(429, { error: 'rate-limited', messageKo: '1분 동안의 실행 요청 한도를 넘었어요. 잠시 기다려 주세요.' });
