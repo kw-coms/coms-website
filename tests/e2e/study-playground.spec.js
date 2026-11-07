@@ -382,11 +382,11 @@ test('leaving a shared view uses the draft saved by another tab meanwhile, not t
 })
 
 // Every saved record of the C page (one localStorage record per block), as one string for substring checks.
-const draftsRaw = (page) => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('coms-study-playground:c:')).map((k) => localStorage.getItem(k)).join('\n') || null)
+const draftsRaw = (page) => page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('coms-study-playground:c:') && !k.endsWith(':seen')).map((k) => localStorage.getItem(k)).join('\n') || null)
 // The saved draft of block n (default 0) and its one-step backup, parsed from storage.
 async function drafts(page, n = 0) {
   return page.evaluate((i) => {
-    const k = Object.keys(localStorage).find((x) => x.startsWith(`coms-study-playground:c:${i}-`))
+    const k = Object.keys(localStorage).find((x) => x.startsWith(`coms-study-playground:c:${i}-`) && !x.endsWith(':seen'))
     const rec = k ? JSON.parse(localStorage.getItem(k)) : null
     return { primary: rec ? rec.code : null, backup: rec && rec.backup !== undefined ? rec.backup : null }
   }, n)
@@ -394,7 +394,7 @@ async function drafts(page, n = 0) {
 // Rewrites block 0's saved draft in storage as another tab would have, without going through this page's editor.
 async function saveElsewhere(page, from, to) {
   await page.evaluate(([f, t]) => {
-    const k = Object.keys(localStorage).find((x) => x.startsWith('coms-study-playground:c:0-'))
+    const k = Object.keys(localStorage).find((x) => x.startsWith('coms-study-playground:c:0-') && !x.endsWith(':seen'))
     const rec = JSON.parse(localStorage.getItem(k))
     localStorage.setItem(k, JSON.stringify({ ...rec, code: rec.code.replace(f, t), at: Date.now() }))
   }, [from, to])
@@ -438,7 +438,7 @@ test('restore is declined when another tab saved meanwhile; the pending edit is 
   await replaceCode(page, 0, MINE) // A
   await expect.poll(() => draftsRaw(page)).toContain('내코드')
   await page.evaluate(() => { // an older draft the reader could restore
-    const k = Object.keys(localStorage).find((x) => x.startsWith('coms-study-playground:c:0-'))
+    const k = Object.keys(localStorage).find((x) => x.startsWith('coms-study-playground:c:0-') && !x.endsWith(':seen'))
     const rec = JSON.parse(localStorage.getItem(k))
     localStorage.setItem(k, JSON.stringify({ ...rec, backup: '#include <stdio.h>\nint main(void) { puts("옛날코드"); return 0; }\n' }))
   })
@@ -614,6 +614,17 @@ test('a failed save shows one notice, it does not outlive the page, and a good s
   await replaceCode(page, 1, '// java 2\n')
   await flush()
   await expect(notice).toHaveCount(0)
+})
+
+test('an open page refreshes the liveness stamp of its blocks every 24 hours', async ({ page }) => {
+  await mockRun(page, () => ({ json: OK }))
+  await page.clock.install()
+  await openStudy(page, 'c')
+  const stamp = () => page.evaluate(() => Number(localStorage.getItem(Object.keys(localStorage).find((k) => k.startsWith('coms-study-playground:c:0-') && k.endsWith(':seen')))))
+  await expect.poll(stamp).toBeGreaterThan(0) // written on mount
+  const first = await stamp()
+  await page.clock.fastForward(24 * 60 * 60 * 1000 + 5000)
+  await expect.poll(stamp).toBeGreaterThanOrEqual(first + 24 * 60 * 60 * 1000)
 })
 
 test('a reader with no saved draft can leave a shared view for the original code', async ({ page, browser }) => {

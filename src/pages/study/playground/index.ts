@@ -156,7 +156,12 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     blocks.push(b)
     byStage.set(b.stage, b)
   })
+  // Liveness for the orphan prune of other tabs (possibly on a newer lesson version): on mount, when visible again, daily.
+  const touchAll = () => blocks.forEach((b) => store.touch(b.key))
+  touchAll()
   store.prune(blocks.map((b) => b.key))
+  const seenTimer = window.setInterval(touchAll, 24 * 60 * 60 * 1000)
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') touchAll() }, { signal })
 
   // ---------- toolbar ----------
   function renderBar(b: Block) {
@@ -772,6 +777,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
       b.stage.parentNode?.insertBefore(b.pre, b.stage)
       b.stage.remove()
     })
+    window.clearInterval(seenTimer)
     if (failureToast) { dismissToast(failureToast); failureToast = 0 } // the toast host outlives this page
     inerted.splice(0).forEach((n) => n.removeAttribute('inert'))
     document.documentElement.classList.remove('pg-lock')

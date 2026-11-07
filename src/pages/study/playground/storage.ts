@@ -6,10 +6,14 @@ type StorageLike = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 
 
 // One localStorage record per block (`<prefix><pageId>:<blockKey>`), so tabs editing different blocks never share a value.
 // The earlier page-wide `<prefix><pageId>` object never shipped (PR #520 is the first release): an intentional pre-release reset, no migration.
-const KEY_PREFIX = 'coms-study-playground:'// Block keys include a hash of the original code, so lesson revisions orphan records. Growth is bounded per page by
-// the revisions within ORPHAN_MAX_AGE_MS: each page prunes only its own old orphans on mount (see `prune`). A global
-// size cap was rejected because evicting by age across the whole prefix can delete other tabs' live drafts.
-const ORPHAN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+const KEY_PREFIX = 'coms-study-playground:'
+// Block keys include a hash of the original code, so lesson revisions orphan records. Each mounted block refreshes a
+// `<record key>:seen` timestamp (on mount, when the tab becomes visible, and daily while open), and a page prunes only
+// its own orphans whose record AND `seen` are both older than 30 days. A tab that stays open refreshes `seen` at least
+// daily, so a live tab's draft (even for an older lesson version) cannot be pruned, and growth is bounded per page by
+// 30 days of lesson revisions. A global size cap was rejected because it can delete other tabs' live drafts.
+const ORPHAN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000
+const SEEN = ':seen'
 
 export function fnv1a(text: string): string {
   let h = 0x811c9dc5
@@ -29,21 +33,34 @@ export function createStore(pageId: string, storage?: StorageLike | null) {
   const keyOf = (block: string) => pagePrefix + block
 
   return {
-    /** Deletes this page's records of blocks that no longer exist (not in `current`) and are older than 7 days; unparseable ones count as old. Never touches another page's keys. */
+    /** Marks a mounted block as alive. Writes only the timestamp (never reads the draft); a failure is ignored. */
+    touch(block: string, now = Date.now()): void {
+      try { handle()?.setItem(keyOf(block) + SEEN, String(now)) } catch { /* the draft does not depend on it */ }
+    },
+    /** Deletes this page's records (and their `seen` keys) of blocks not in `current` when both the record and `seen` are older than 30 days; unparseable and missing count as old. Never touches another page's keys or a current block's. */
     prune(current: string[], now = Date.now()): void {
       const st = handle()
       if (!st || typeof st.key !== 'function' || typeof st.length !== 'number') return
       try {
-        const live = new Set(current.map(keyOf))
-        const victims: string[] = []
+        const live = new Set(current)
+        const newest = new Map<string, number>() // block -> newest of its record `at` and `seen`
         for (let i = 0; i < st.length; i++) {
           const k = st.key(i)
-          if (!k || !k.startsWith(pagePrefix) || live.has(k)) continue
+          if (!k || !k.startsWith(pagePrefix)) continue
+          const isSeen = k.endsWith(SEEN)
+          const block = k.slice(pagePrefix.length, isSeen ? -SEEN.length : undefined)
           let at = -Infinity
-          try { const v = JSON.parse(st.getItem(k) ?? ''); if (v && typeof v.code === 'string' && typeof v.at === 'number') at = v.at } catch { /* unparseable: old */ }
-          if (now - at > ORPHAN_MAX_AGE_MS) victims.push(k)
+          try {
+            const raw = st.getItem(k) ?? ''
+            if (isSeen) { const n = Number(raw); if (raw !== '' && Number.isFinite(n)) at = n }
+            else { const v = JSON.parse(raw); if (v && typeof v.code === 'string' && typeof v.at === 'number') at = v.at }
+          } catch { /* unparseable: old */ }
+          newest.set(block, Math.max(newest.get(block) ?? -Infinity, at))
         }
-        victims.forEach((k) => st.removeItem?.(k))
+        for (const [block, at] of newest) {
+          if (live.has(block) || now - at <= ORPHAN_MAX_AGE_MS) continue
+          st.removeItem?.(keyOf(block)); st.removeItem?.(keyOf(block) + SEEN)
+        }
       } catch { /* pruning is best effort */ }
     },
     get(block: string): Saved | null {
