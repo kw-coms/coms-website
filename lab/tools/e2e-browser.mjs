@@ -1,6 +1,6 @@
 // Browser e2e: node tools/e2e-browser.mjs
 // Starts `vite` itself unless LAB_URL is set. Needs the real compile service (LAB_COMPILE_URL, default http://127.0.0.1:8787).
-// LAB_SOFTWARE=1 runs Chromium with --disable-gpu (SwiftShader) to exercise the low-quality path. LAB_SHOTS=dir for screenshots.
+// LAB_SOFTWARE=1 runs Chromium with --disable-gpu (SwiftShader) to exercise the low-quality path. Screenshots go to <tmpdir>/lab-shots.
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
