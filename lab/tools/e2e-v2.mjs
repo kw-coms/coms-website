@@ -3,7 +3,7 @@
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { chromeExecutable, compileOrigin, GL_ARGS, outDir } from './browser.mjs';
+import { chromeExecutable, compileOrigin, GL_ARGS, outDir, saveScreenshot } from './browser.mjs';
 
 const OUT = outDir('shots-v2');
 const COMPILE = compileOrigin();
@@ -26,7 +26,7 @@ page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
 page.on('dialog', (d) => d.accept().catch(() => {}));
 const lab = (f, a) => page.evaluate(f, a);
 const settle = (ms = 400) => page.waitForTimeout(ms);
-const shot = (n) => page.screenshot({ path: join(OUT, `${n}.png`) });
+const shot = (n) => saveScreenshot(page, join(OUT, `${n}.png`));
 const until = async (f, a, ms = 20000) => { const t = Date.now(); while (Date.now() - t < ms) { if (await lab(f, a)) return true; await settle(200); } return false; };
 
 try {

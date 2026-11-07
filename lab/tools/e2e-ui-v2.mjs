@@ -5,7 +5,7 @@
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { chromeExecutable, compileOrigin, GL_ARGS, outDir } from './browser.mjs';
+import { chromeExecutable, compileOrigin, GL_ARGS, outDir, saveScreenshot } from './browser.mjs';
 
 const OUT = outDir('shots-ui-v2', process.argv[2]);
 const COMPILE = compileOrigin();
@@ -35,7 +35,7 @@ async function clickGutter(line) {
   await page.mouse.click(gutter.x + gutter.width / 2, row.y + row.height / 2);
 }
 const settle = (ms = 400) => page.waitForTimeout(ms);
-const shot = (n) => page.screenshot({ path: join(OUT, `ui-v2-${n}.png`) });
+const shot = (n) => saveScreenshot(page, join(OUT, `ui-v2-${n}.png`));
 const until = async (f, a, ms = 30000) => { const t = Date.now(); while (Date.now() - t < ms) { if (await lab(f, a)) return true; await settle(150); } return false; };
 const st = () => lab(() => { const s = window.__lab.getState(); return { notes: s.hist.present.notes ?? [], mission: s.missionId, tab: s.sideTab, code: s.code, mode: s.hist.present.codeMode, bps: s.breakpoints, dbg: s.debug, toast: s.toast }; });
 /** A share token for any scene, built in the page with the app's own modules (hostile scenes are compressed by hand: encodeShare validates). */

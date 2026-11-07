@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
-import { compileOrigin } from './tools/compile-origin.mjs';
+import { compileOrigin } from './src/core/compile-origin.mjs';
 
 export default defineConfig({
   base: '/lab/',

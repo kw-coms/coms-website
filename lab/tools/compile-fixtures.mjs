@@ -2,8 +2,9 @@
 // src/core/__fixtures__/examples-hex.json (guarded by src/core/examples.e2e.test.ts).
 // Needs the service (LAB_COMPILE_URL, default http://127.0.0.1:8787), see docs/DEPLOY.md.
 import { createServer } from 'vite';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { compileOrigin } from './browser.mjs';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { compileOrigin, writeOutputFile } from './browser.mjs';
 
 const COMPILE = compileOrigin();
 const OUT = new URL('../src/core/__fixtures__/examples-hex.json', import.meta.url);
@@ -32,5 +33,5 @@ for (const example of EXAMPLES) {
   console.log(`ok   ${example.id} ${result.sizeBytes} bytes`);
 }
 if (failed) process.exit(1);
-writeFileSync(OUT, JSON.stringify({ compiler, examples }, null, 1) + '\n');
+await writeOutputFile(fileURLToPath(OUT), JSON.stringify({ compiler, examples }, null, 1) + '\n');
 console.log(`wrote ${Object.keys(examples).length} examples`);

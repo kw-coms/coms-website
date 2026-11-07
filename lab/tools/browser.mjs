@@ -1,8 +1,9 @@
 // Shared by the browser e2e scripts: Chromium lookup (the per-OS Playwright cache) and the screenshot
 // directory (contained in the lab directory, with no symlink traversal).
-import { existsSync, lstatSync, mkdirSync, readdirSync } from 'node:fs';
+import { constants, existsSync, lstatSync, mkdirSync, readdirSync } from 'node:fs';
+import { open } from 'node:fs/promises';
 import { homedir, platform } from 'node:os';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export { compileOrigin } from './compile-origin.mjs';
@@ -31,6 +32,38 @@ export function outDir(defaultName, value = process.env.SHOTS_OUT ?? defaultName
     checkDirectory(current);
   }
   return target;
+}
+
+/** Write an output file without following an existing symlink at the leaf. */
+export async function writeOutputFile(file, data) {
+  if (typeof file !== 'string' || !file || basename(file) === '.' || basename(file) === '..') {
+    throw new Error('출력 파일 경로가 올바르지 않습니다.');
+  }
+  const dir = outDir('unused', dirname(file));
+  const target = join(dir, basename(file));
+  if (typeof constants.O_NOFOLLOW !== 'number') throw new Error('이 환경은 심볼릭 링크를 막는 안전한 파일 쓰기를 지원하지 않습니다.');
+  try {
+    const existing = lstatSync(target);
+    if (existing.isSymbolicLink()) throw new Error('출력 파일에 심볼릭 링크를 사용할 수 없습니다.');
+    if (!existing.isFile()) throw new Error('출력 파일은 일반 파일이어야 합니다.');
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  let handle;
+  try {
+    handle = await open(target, constants.O_CREAT | constants.O_WRONLY | constants.O_TRUNC | constants.O_NOFOLLOW, 0o600);
+    await handle.writeFile(data);
+  } catch (error) {
+    if (error.code === 'ELOOP') throw new Error('출력 파일에 심볼릭 링크를 사용할 수 없습니다.');
+    throw error;
+  } finally {
+    await handle?.close();
+  }
+}
+
+/** Playwright's path option follows symlinks; capture to memory before safe writing. */
+export async function saveScreenshot(target, file) {
+  await writeOutputFile(file, await target.screenshot());
 }
 
 function cacheDir() {

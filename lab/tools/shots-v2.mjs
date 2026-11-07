@@ -2,7 +2,7 @@
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { chromeExecutable, GL_ARGS, outDir } from './browser.mjs';
+import { chromeExecutable, GL_ARGS, outDir, saveScreenshot } from './browser.mjs';
 
 const OUT = outDir('shots-v2');
 let dev, base = process.env.LAB_URL;
@@ -19,7 +19,7 @@ page.on('pageerror', (e) => errs.push(String(e)));
 page.on('console', (m) => m.type() === 'error' && errs.push(m.text()));
 page.on('dialog', (d) => d.accept().catch(() => {}));
 const lab = (f, a) => page.evaluate(f, a);
-const shot = (n) => page.screenshot({ path: join(OUT, `${n}.png`) });
+const shot = (n) => saveScreenshot(page, join(OUT, `${n}.png`));
 try {
   await page.goto(base, { waitUntil: 'networkidle' });
   await page.evaluate(() => localStorage.clear());

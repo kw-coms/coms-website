@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { workspace, type N } from './build';
 import { generate } from './generate';
 import { STARTER_BLOCKS } from './starters';
-import { compileOrigin } from '../../../tools/compile-origin.mjs';
+import { compileOrigin } from '../../core/compile-origin.mjs';
 
 const loop = (...s: N[]): N => ({ type: 'lab_loop', do: { DO: s } });
 const setup = (...s: N[]): N => ({ type: 'lab_setup', do: { DO: s } });

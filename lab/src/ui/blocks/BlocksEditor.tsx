@@ -102,13 +102,17 @@ function loadDeepBlocks(w: Blockly.Workspace, roots: Blockly.serialization.block
     building.clear();
   };
   const attachShadow = (connection: Blockly.Connection, state: State, obscured: boolean): void => {
+    const originalRespawn: unknown = Reflect.get(connection, 'respawnShadow_');
+    if (typeof originalRespawn !== 'function') {
+      console.warn('블록 그림자 복원 기능을 사용할 수 없어요.');
+      return;
+    }
     const { inputs: _inputs, next: _next, ...shallow } = state;
     void _inputs; void _next;
     connection.setShadowState(shallow);
     shadows.set(connection, state);
     if (!wrapped.has(connection)) {
       wrapped.add(connection);
-      const originalRespawn = Reflect.get(connection, 'respawnShadow_') as () => void;
       const originalGet = connection.getShadowState.bind(connection);
       // Blockly respawns from shadowState recursively. Keep its stored state
       // shallow and restore descendants through the same iterative loader.
@@ -116,7 +120,12 @@ function loadDeepBlocks(w: Blockly.Workspace, roots: Blockly.serialization.block
         originalRespawn.call(connection);
         const shadow = connection.targetBlock();
         const saved = shadows.get(connection);
-        if (shadow?.isShadow() && saved) { pending.push({ state: saved, loaded: shadow }); drain(); }
+        if (shadow?.isShadow() && saved) {
+          ready.delete(connection);
+          building.add(connection);
+          pending.push({ state: saved, loaded: shadow });
+          drain();
+        }
       });
       Reflect.set(connection, 'getShadowState', (current?: boolean) => {
         const saved = shadows.get(connection);

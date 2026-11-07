@@ -13,5 +13,8 @@ npm-debug.log*
 .serena/
 .ignore
 
-# screenshots written by tools/e2e-v2.mjs and tools/shots-v2.mjs
+# Screenshot outputs written by the browser tools
 shots-v2/
+shots-ui-v2/
+shots-blocks/
+shots-browser/

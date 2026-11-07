@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { compileOrigin } from '../../tools/compile-origin.mjs';
+import { compileOrigin } from './compile-origin.mjs';
 
 describe('local compiler origin', () => {
   it.each([

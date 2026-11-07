@@ -1,6 +1,6 @@
 // Hostile block workspaces (a small #s= link or imported file) against the real Blockly loader, run headless.
 // Blockly allocates one input per mutator item while loading, so a count of 1e9 would freeze the tab.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as Blockly from 'blockly/core';
 import 'blockly/blocks';
 import { ALLOWED_BLOCK_TYPES, blocksProblem, validateScene } from '../../core/scene';
@@ -104,6 +104,47 @@ describe('hostile block workspaces', () => {
     expect(leaf?.type).toBe('logic_boolean');
     expect(leaf?.getFieldValue('BOOL')).toBe('FALSE');
     ws.dispose();
+  });
+  it('saves an edit made after uncovering an initially covered deep shadow', () => {
+    let shadow: object = { type: 'logic_boolean', fields: { BOOL: 'TRUE' } };
+    for (let i = 0; i < 30; i++) shadow = { type: 'logic_negate', inputs: { BOOL: { shadow } } };
+    const initial = top({ type: 'lab_serial_print', inputs: { VALUE: {
+      shadow, block: { type: 'math_number', fields: { NUM: 1 } },
+    } } });
+    const ws = new Blockly.Workspace();
+    expect(loadBlocks(ws, initial)).toBeNull();
+    const value = ws.getTopBlocks(false).find(block => block.type === 'lab_serial_print')!.getInput('VALUE')!.connection!;
+    value.disconnect();
+    let leaf = value.targetBlock();
+    for (let i = 0; i < 30; i++) leaf = leaf?.getInput('BOOL')?.connection?.targetBlock() ?? null;
+    expect(leaf?.type).toBe('logic_boolean');
+    leaf!.setFieldValue('FALSE', 'BOOL');
+    const saved = Blockly.serialization.workspaces.save(ws);
+    const restored = new Blockly.Workspace();
+    expect(loadBlocks(restored, saved)).toBeNull();
+    const restoredValue = restored.getTopBlocks(false).find(block => block.type === 'lab_serial_print')!.getInput('VALUE')!.connection!;
+    let restoredLeaf = restoredValue.targetBlock();
+    for (let i = 0; i < 30; i++) restoredLeaf = restoredLeaf?.getInput('BOOL')?.connection?.targetBlock() ?? null;
+    expect(restoredLeaf?.getFieldValue('BOOL')).toBe('FALSE');
+    ws.dispose();
+    restored.dispose();
+  });
+  it('warns without wrapping when Blockly lacks the shadow respawn hook', () => {
+    let shadow: object = { type: 'logic_boolean', fields: { BOOL: 'TRUE' } };
+    for (let i = 0; i < 30; i++) shadow = { type: 'logic_negate', inputs: { BOOL: { shadow } } };
+    const original = Object.getOwnPropertyDescriptor(Blockly.Connection.prototype, 'respawnShadow_');
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ws = new Blockly.Workspace();
+    try {
+      Object.defineProperty(Blockly.Connection.prototype, 'respawnShadow_', { configurable: true, value: undefined });
+      expect(() => loadBlocks(ws, top({ type: 'lab_serial_print', inputs: { VALUE: { shadow } } }))).not.toThrow();
+      expect(warning).toHaveBeenCalledWith(expect.stringMatching(/그림자 복원/));
+    } finally {
+      if (original) Object.defineProperty(Blockly.Connection.prototype, 'respawnShadow_', original);
+      else Reflect.deleteProperty(Blockly.Connection.prototype, 'respawnShadow_');
+      warning.mockRestore();
+      ws.dispose();
+    }
   });
   it.each(hostile)('validateScene refuses %s with a Korean error, quickly', (_n, block) => {
     const t0 = Date.now();

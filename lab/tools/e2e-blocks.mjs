@@ -5,7 +5,7 @@
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { chromeExecutable, compileOrigin, GL_ARGS, outDir } from './browser.mjs';
+import { chromeExecutable, compileOrigin, GL_ARGS, outDir, saveScreenshot } from './browser.mjs';
 
 const OUT = outDir('shots-blocks', process.argv[2]);
 const COMPILE = compileOrigin();
@@ -37,7 +37,7 @@ page.on('pageerror', (e) => bad.push(String(e)));
 page.on('request', (r) => { requests.push(r.url()); const u = new URL(r.url()); if (!['localhost', '127.0.0.1'].includes(u.hostname) && u.protocol.startsWith('http')) external.push(r.url()); });
 const lab = (fn, arg) => page.evaluate(fn, arg);
 const settle = (ms = 400) => page.waitForTimeout(ms);
-const shot = (name) => page.screenshot({ path: join(OUT, `${name}.png`) });
+const shot = (name) => saveScreenshot(page, join(OUT, `${name}.png`));
 const st = () => lab(() => { const s = window.__lab.getState(); return { mode: s.hist.present.codeMode, blocks: s.hist.present.blocks, code: s.code }; });
 
 try {
@@ -175,7 +175,7 @@ try {
   await m.waitForSelector('.blocklySvg', { timeout: 30000 });
   await m.waitForTimeout(800);
   console.log('INFO mobile', await m.evaluate(() => { const b = document.querySelector('.side-body'); return [b?.getBoundingClientRect().height, getComputedStyle(b).height, b.matches('.sidepanel.sheet-open:has(.blocks-slot) .side-body'), window.matchMedia('(max-width: 768px)').matches, innerHeight, document.querySelector('.sidepanel')?.className, !!document.querySelector('.blocks-slot'), CSS.supports('selector(:has(a))'), [...document.styleSheets].flatMap((ss) => { try { return [...ss.cssRules].map((r) => r.cssText); } catch { return []; } }).filter((t) => t.includes('blocks-slot')).map((t) => t.slice(0, 160))]; }));
-  await m.screenshot({ path: join(OUT, '12-mobile.png') });
+  await saveScreenshot(m, join(OUT, '12-mobile.png'));
   // touch drag: open a category and drag a block into the loop with touch events through CDP
   const cdp = await mctx.newCDPSession(m);
   const touch = async (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
@@ -189,7 +189,7 @@ try {
   await m.waitForTimeout(600);
   const mcode = await m.evaluate(() => window.__lab.getState().code);
   check('touch: a block dragged with a finger lands in the loop', /void loop\(\) \{\n\s*digitalWrite\(13, HIGH\)/.test(mcode), mcode);
-  await m.screenshot({ path: join(OUT, '13-mobile-touch.png') });
+  await saveScreenshot(m, join(OUT, '13-mobile-touch.png'));
 
   // ---- production build under the Lab's real CSP: nothing blocked, nothing fetched from another origin ----
   const pbase = await serve(['preview'], p0 + 50);
@@ -213,12 +213,12 @@ try {
   await pp.waitForTimeout(800);
   await pp.locator('.blocklyToolboxCategory', { hasText: '입력' }).first().click();
   await pp.waitForTimeout(500);
-  await pp.screenshot({ path: join(OUT, '14-prod-csp.png') });
+  await saveScreenshot(pp, join(OUT, '14-prod-csp.png'));
   check('production build under the Lab CSP: Blocks mode works, no CSP violation', csp.length === 0 && (await pp.locator('.blocklyFlyout g.blocklyBlock').count()) > 3, csp.slice(0, 2).join(' | '));
   check('production build: no request leaves the origin', pext.length === 0, pext.join(' '));
 } catch (e) {
   check('blocks e2e', false, String(e).split('\n').slice(0, 2).join(' ') + ' @ ' + (String(e.stack).match(/e2e-blocks\.mjs:\d+/) ?? [''])[0]);
-  await page.screenshot({ path: join(OUT, 'zz-failure.png') }).catch(() => {});
+  await saveScreenshot(page, join(OUT, 'zz-failure.png')).catch(() => {});
 } finally {
   await browser.close();
   servers.forEach((x) => x.kill());
