@@ -7,11 +7,12 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "vitest run --exclude src/core/examples.e2e.test.ts && npm run test:realtime",
     "typecheck": "tsc -b --noEmit",
     "e2e:compile": "node tools/e2e-compile.mjs",
     "e2e:browser": "node tools/e2e-browser.mjs",
-    "e2e:prod": "node tools/e2e-prod.mjs"
+    "e2e:prod": "node tools/e2e-prod.mjs",
+    "test:realtime": "vitest run --no-file-parallelism src/core/examples.e2e.test.ts"
   },
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.3",

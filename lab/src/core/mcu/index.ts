@@ -10,11 +10,16 @@ import { DHT11Protocol, WS2812Protocol } from './protocols';
 import { installUnoEeprom, UnoEepromMemoryBackend } from './eeprom';
 
 export const MCU_HZ = 16_000_000;
+// Bound once: calling avr8js through the import binding in the stepping loop is a property lookup per
+// instruction under vitest's module transform (3x slower there; the browser bundle is unaffected).
+const execute = avrInstruction;
 const map: Record<string, ['B' | 'C' | 'D', number]> = {};
 for (let i = 0; i <= 7; i++) map[`D${i}`] = ['D', i];
 for (let i = 8; i <= 13; i++) map[`D${i}`] = ['B', i - 8];
 for (let i = 0; i <= 5; i++) map[`A${i}`] = ['C', i];
 export const UNO_PIN_MAP = map;
+const PORT_PINS: Record<'B' | 'C' | 'D', string[]> = { B: [], C: [], D: [] };
+for (const [name, [port]] of Object.entries(map)) PORT_PINS[port].push(name);
 
 /** Single strict parser shared with other AVR helpers; copy gives CPU an ArrayBuffer-backed program. */
 export function loadIntelHex(hex: string): Uint16Array<ArrayBuffer> {
@@ -69,8 +74,14 @@ export class Mcu {
     // ponytail: PINx is a whole-port register, so a read marks every pin of that port; bit-level needs instruction decode.
     for (const port of ['B', 'C', 'D'] as const) {
       const pinAddr = this.ports[port].portConfig.PIN;
+      const names = PORT_PINS[port];
+      let marked = false;
+      // Sketches poll PINx in tight loops (digitalRead): mark the port's pins once, then just read.
       this.cpu.readHooks[pinAddr] = addr => {
-        for (const [n, [p]] of Object.entries(map)) if (p === port) this.readPins.add(n);
+        if (!marked) {
+          for (const name of names) this.readPins.add(name);
+          marked = true;
+        }
         return this.cpu.data[addr]!;
       };
     }
@@ -154,9 +165,10 @@ export class Mcu {
   step(cycles: number): void {
     this.scheduleSerial();
     const target = this.cpu.cycles + cycles;
-    while (this.cpu.cycles < target) {
-      avrInstruction(this.cpu);
-      this.cpu.tick();
+    const cpu = this.cpu;
+    while (cpu.cycles < target) {
+      execute(cpu);
+      cpu.tick();
     }
     this.advanceProtocols();
   }
