@@ -183,13 +183,14 @@ services:
     tmpfs:
       # The only place the job uid can write besides /dev/shm and /dev/mqueue (wiped after every job).
       - /jobs:rw,exec,nosuid,nodev,size=64m,nr_inodes=4096,mode=1777
+      # POSIX shm: explicit and small (also counted in the 768m cgroup).
       - /dev/shm:rw,noexec,nosuid,nodev,size=8m,nr_inodes=1024,mode=1777
     cap_drop: [ALL]
     cap_add:
-      - SETUID
-      - SETGID
-      - KILL
-      - SYS_RESOURCE
+      - SETUID  # setpriv switches each job to uid 10100 (the server keeps uid 0)
+      - SETGID  # ... and gid 10100, clearing supplementary groups
+      - KILL  # server kills the job's process group on timeout / output flood
+      - SYS_RESOURCE  # only to pin oom_score_adj=1000 (+min) on jobs before they drop to uid 10100
     security_opt:
       - "no-new-privileges:true"
       # Docker 29.9.0's default profile minus the unconditional ptrace / process_vm_* rules, pinned in the
@@ -200,6 +201,8 @@ services:
     cpus: 1.0
     pids_limit: 256
     ipc: private
+    # IPC limits are namespaced, so a job cannot exhaust anything outside this container:
+    # SysV shm <= 16 MiB total (4096 pages), 4 MiB per segment, 64 segments; small queues/semaphores.
     sysctls:
       kernel.shmmax: "4194304"
       kernel.shmall: "4096"

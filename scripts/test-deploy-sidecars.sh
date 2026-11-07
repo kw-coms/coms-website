@@ -50,6 +50,11 @@ services:
       args:
         REL: ${COMS_IMAGE_TAG:-latest}
         FAIL: ${FAIL_LAB:-0}
+    healthcheck:
+      test: ["CMD-SHELL", "test \"${COMS_IMAGE_TAG:-x}\" != badlab"]
+      interval: 1s
+      timeout: 2s
+      retries: 1
   coms-study-runner:
     image: coms-study-runner:${COMS_IMAGE_TAG:-latest}
     container_name: coms-study-runner
@@ -58,12 +63,18 @@ services:
       args:
         REL: ${COMS_IMAGE_TAG:-latest}
         FAIL: ${FAIL_RUNNER:-0}
+    healthcheck:
+      test: ["CMD-SHELL", "test \"${COMS_IMAGE_TAG:-x}\" != badrun"]
+      interval: 1s
+      timeout: 2s
+      retries: 1
 YAML
 
 export COMPOSE="docker compose"
 export SIDECAR_COMPOSE_ARGS="-p sidecardeploytest -f $work/compose.yml"
 export SIDECAR_AVAILABLE_MB=4000
 export SIDECARS="$lab $runner"
+export SIDECAR_HEALTH_WAIT=25
 # shellcheck source=deploy-sidecars.sh
 . "$here/deploy-sidecars.sh"
 
@@ -81,6 +92,8 @@ check "rollback sits in the failure branch (after the health check, before the s
   "$([ "$(line '^\s+if ! site_is_healthy')" -lt "$(line '^\s+sidecars_rollback$')" ] && [ "$(line '^\s+sidecars_rollback$')" -lt "$(line '^\s+sidecars_start$')" ] && echo yes)" yes
 check "the sidecars are started only after the site's health check" \
   "$([ "$(line '^\s+if ! site_is_healthy')" -lt "$(line '^\s+sidecars_start$')" ] && echo yes)" yes
+check "the site's own images are built before any sidecar is touched" \
+  "$([ "$(line 'build coms-backend coms-frontend')" -lt "$(line '^\s+sidecars_build$')" ] && echo yes)" yes
 check "the site's services are started by name, never the sidecars" \
   "$(grep -E 'up -d --remove-orphans' "$deploy_yml" | grep -c -E 'coms-lab-compiler|coms-study-runner')" 0
 rollback_at=0; for i in "${!order[@]}"; do [ "${order[$i]}" = sidecars_rollback ] && rollback_at=$i; done
@@ -127,7 +140,7 @@ l3="$(image_id $lab r3)"
 check "the runner was not activated" "$(sc_get $runner ACTIVATED)" 0
 check "the compiler was" "$(sc_get $lab ACTIVATED)" 1
 state $lab "r3" "latest,previous,r3" "$l3" "$l2" "$l3"
-state $runner "r3 failed to start" "latest,previous,r2,r3" "$n2" "$n2" "$n2"
+state $runner "r3 failed to start (the failed image is dropped)" "latest,previous,r2" "$n2" "$n2" "$n2"
 unset -f sc_compose
 eval "$(declare -f orig_sc_compose | sed 's/^orig_sc_compose/sc_compose/')"
 
@@ -150,6 +163,16 @@ release r6
 l6="$(image_id $lab r6)"; n6="$(image_id $runner r6)"
 state $lab "r6" "latest,previous,r6" "$l6" "$l3" "$l6"
 state $runner "r6" "latest,previous,r6" "$n6" "$n4" "$n6"
+
+echo "== release badrun: the RUNNER starts but never becomes healthy -> not promoted, previous restored, image dropped"
+release badrun
+nbad="$(image_id $runner badrun)"
+l7="$(image_id $lab badrun)"
+check "runner not activated" "$(sc_get $runner ACTIVATED)" 0
+check "compiler activated" "$(sc_get $lab ACTIVATED)" 1
+state $runner "badrun unhealthy" "latest,previous,r6" "$n6" "$n6" "$n6"
+check "no leftover image for the unhealthy release" "$nbad" none
+state $lab "badrun (compiler is fine)" "badrun,latest,previous" "$l7" "$l6" "$l7"
 
 if [ "$fails" -ne 0 ]; then echo "$fails check(s) failed" >&2; exit 1; fi
 echo "all sidecar deploy checks passed"

@@ -297,6 +297,7 @@ jobs:
           curl -fsS -D - -o /dev/null "$site$(curl -fsS "$site/lab/" | grep -o '/lab/assets/[^"]*\.js' | head -n 1)" | tr -d '\r' | grep -qi "^cache-control: .*immutable"
           [ "$(curl -s -o /dev/null -w '%{http_code}' "$site/lab/api/unknown")" = 404 ]
           [ "$(curl -s -o /dev/null -w '%{http_code}' "$site/lab/api/compile")" = 405 ]
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Cookie: $(cat "$RUNNER_TEMP/member-cookies")" -H 'Sec-Fetch-Site: cross-site' -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")" = 403 ]
 
           # Not signed in: 401 JSON with the Korean message, and the compiler is never reached.
           body="$(curl -s -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")"
@@ -371,6 +372,10 @@ jobs:
           [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Cookie: token=forged.part.signature' -H 'X-Runner-Client: 2026000001' -H 'Content-Type: application/json' --data '{"lang":"c","code":"int main(){}"}' "$site/study/api/run")" = 401 ]
           [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Cookie: token=a=1; token=b' -H 'Content-Type: application/json' --data '{}' "$site/study/api/run")" = 400 ]
           [ "$(curl -s -o /dev/null -w '%{http_code}' "$site/study/api/run")" = 405 ]
+          # A request the browser labels cross-site never reaches the login check or the runner (valid session or not).
+          body="$(curl -s -w '\n%{http_code}' -X POST -H "Cookie: $cookies" -H 'Sec-Fetch-Site: cross-site' -H 'Content-Type: application/json' --data '{"lang":"python","code":"print(1)"}' "$site/study/api/run")"
+          [ "$(tail -n 1 <<< "$body")" = 403 ]
+          jq -e '.error == "rejected"' <<< "$(sed '$d' <<< "$body")" > /dev/null
           for path in health nothing-here; do
             [ "$(curl -s -o /dev/null -w '%{http_code}' "$site/study/api/$path")" = 404 ]
           done
@@ -393,6 +398,9 @@ jobs:
           # The container is the hardened one: pinned seccomp profile, no network, read-only root.
           [ "$(docker exec coms-study-runner awk '/^Seccomp:/ {print $2}' /proc/1/status)" = 2 ]
           [ "$(docker inspect -f '{{.HostConfig.NetworkMode}} {{.HostConfig.ReadonlyRootfs}}' coms-study-runner)" = "none true" ]
+          # Exactly the four capabilities the server needs (it is container-root; every job drops to uid 10100).
+          [ "$(docker inspect -f '{{range .HostConfig.CapAdd}}{{.}} {{end}}' coms-study-runner | tr ' ' '\n' | grep . | sort | paste -sd, -)" = "KILL,SETGID,SETUID,SYS_RESOURCE" ]
+          [ "$(docker inspect -f '{{json .HostConfig.CapDrop}}' coms-study-runner)" = '["ALL"]' ]
 
           # The runner's per-member limit (10 a minute) is the answer, in the contract's shape, once it is used up.
           limited=""

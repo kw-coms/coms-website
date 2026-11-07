@@ -10,6 +10,7 @@
 #   SIDECAR_COMPOSE_ARGS   compose arguments (default: --env-file .env -f docker-compose.yml)
 #   SIDECAR_MIN_AVAILABLE_MB   skip all sidecars below this much available RAM (default 1200)
 #   SIDECAR_AVAILABLE_MB       override the measured available RAM (tests)
+#   SIDECAR_HEALTH_WAIT        seconds to wait for a started sidecar to report healthy (default 90)
 # Per-service state (SC_<service>_<FIELD>, see sc_get/sc_set): BUILT (1 = NEW_TAG image exists),
 # PREVIOUS (1 = the running image was snapshotted as <service>:previous), ACTIVATED (1 = the NEW_TAG
 # image is the one running; only an activated release is promoted to `latest`).
@@ -75,15 +76,33 @@ sc_restore_previous() {
   fi
 }
 
-# After the site is healthy: start the new image. On failure fall back to the previous one.
+# A container that has a healthcheck must report healthy within SIDECAR_HEALTH_WAIT seconds; one without a
+# healthcheck counts as healthy as soon as it runs.
+sc_wait_healthy() {
+  local waited=0 status limit="${SIDECAR_HEALTH_WAIT:-90}"
+  while :; do
+    status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$1" 2>/dev/null || echo missing)"
+    case "$status" in
+      healthy|none) return 0 ;;
+      unhealthy|missing) return 1 ;;
+    esac
+    [ "$waited" -ge "$limit" ] && return 1
+    sleep 2
+    waited=$((waited + 2))
+  done
+}
+
+# After the site is healthy: start the new image and promote it only if it is up AND healthy. Otherwise fall
+# back to the previous one and drop the failed image.
 sc_start() {
   sc_set "$1" ACTIVATED 0
   [ "$(sc_get "$1" BUILT)" = 1 ] || return 0
-  if sc_compose up -d --no-build "$1"; then
+  if sc_compose up -d --no-build "$1" && sc_wait_healthy "$1"; then
     sc_set "$1" ACTIVATED 1
   else
-    sc_warn "$1" "the new container did not start; restoring the previous one. \`latest\` stays on the previous image."
+    sc_warn "$1" "the new container did not start or did not become healthy; restoring the previous one. \`latest\` stays on the previous image."
     sc_restore_previous "$1"
+    docker rmi "$1:$NEW_TAG" >/dev/null 2>&1 || true
   fi
 }
 
