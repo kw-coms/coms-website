@@ -5,6 +5,8 @@ type StorageLike = Pick<Storage, 'getItem' | 'setItem'>
 
 const KEY_PREFIX = 'coms-study-playground:'
 const MAX_ENTRIES = 80
+// The one-step backup of a block's previous draft lives next to it under this suffix.
+const BACKUP = '~prev'
 
 export function fnv1a(text: string): string {
   let h = 0x811c9dc5
@@ -40,6 +42,13 @@ export function createStore(pageId: string, storage?: StorageLike | null) {
     },
     set(block: string, code: string) { const data = read(); data[block] = { code, at: Date.now() }; write(data) },
     clear(block: string) { const data = read(); delete data[block]; write(data) },
+    /** The draft a block had before a shared code was saved over it ("이전 코드 복원"). */
+    getBackup(block: string): Saved | null {
+      const v = read()[block + BACKUP]
+      return v && typeof v.code === 'string' ? v : null
+    },
+    setBackup(block: string, code: string) { const data = read(); data[block + BACKUP] = { code, at: Date.now() }; write(data) },
+    clearBackup(block: string) { const data = read(); delete data[block + BACKUP]; write(data) },
   }
 }
 

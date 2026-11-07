@@ -104,6 +104,9 @@ class Block {
   countdown = 0
   busyTimer = 0
   current: string
+  /** A shared link's code is open as a temporary view: nothing is saved until the reader chooses to. */
+  shared = false
+  savedBeforeShare: string | null = null
   els: Record<string, HTMLElement> = {}
 
   constructor(readonly index: number, readonly pre: HTMLElement, readonly raw: string, decision: BlockDecision, saved: string | null, page: PageLang) {
@@ -153,7 +156,8 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     const left = h('div', 'pg-bar-left')
     const label = langLabel(b.lang)
     if (label) left.appendChild(h('span', 'pg-lang', label))
-    if (b.decision.run && b.edited) {
+    if (b.shared) left.appendChild(h('span', 'pg-badge', '공유받은 코드 · 저장 안 됨'))
+    else if (b.decision.run && b.edited) {
       if (b.editor) left.appendChild(h('span', 'pg-badge', '수정한 코드'))
       else left.appendChild(b.badge)
     }
@@ -169,6 +173,11 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
         run.title = 'Ctrl/Cmd + Enter'
         b.els.run = run
         right.appendChild(run)
+      }
+      if (!b.shared && store.getBackup(b.key)) {
+        const restore = btn('restore', '↶ 이전 코드 복원')
+        restore.title = '공유 코드로 저장하기 전의 내 코드를 되살려요'
+        right.appendChild(restore)
       }
       if (b.editor) {
         right.appendChild(btn('reset', '↺ 원래대로'))
@@ -229,7 +238,9 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
 
   function closeEditor(b: Block) {
     if (b.full) setFull(b, false)
-    if (b.editor) { b.current = b.editor.getValue(); b.editor.destroy(); b.editor = null }
+    if (b.shared) { b.shared = false; b.current = b.savedBeforeShare ?? b.initial } // closing a shared view drops it
+    else if (b.editor) b.current = b.editor.getValue()
+    if (b.editor) { b.editor.destroy(); b.editor = null }
     b.host?.remove()
     b.host = null
     b.loading = false
@@ -248,6 +259,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
   function persist(b: Block) {
     window.clearTimeout(b.saveTimer)
     b.saveTimer = 0
+    if (b.shared) return // a shared link's code stays a temporary view until "이 코드로 저장"
     if (b.edited) store.set(b.key, b.current)
     else store.clear(b.key)
   }
@@ -551,6 +563,58 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     }
   }
 
+  // ---------- shared link: a temporary view, never a silent overwrite ----------
+  function showSharedBanner(b: Block) {
+    const banner = h('div', 'pg-shared', undefined, { role: 'region', 'aria-label': '공유된 코드' })
+    banner.appendChild(h('p', null, '공유된 코드를 보고 있어요. 내 코드는 그대로 있고, 저장하기 전에는 바뀌지 않아요.'))
+    const actions = h('div', 'pg-shared-actions')
+    actions.append(
+      h('button', 'pg-btn', '내 코드로 돌아가기', { type: 'button', 'data-pg': 'shared-back' }),
+      h('button', 'pg-btn', '이 코드로 저장', { type: 'button', 'data-pg': 'shared-save' }),
+    )
+    banner.appendChild(actions)
+    b.host?.prepend(banner)
+  }
+  function dropShareHash() {
+    if (/^#pg=/.test(location.hash)) history.replaceState(history.state, '', `${location.pathname}${location.search}`)
+  }
+  function leaveShared(b: Block, save: boolean) {
+    if (!b.shared) return
+    const value = b.editor ? b.editor.getValue() : b.current
+    b.shared = false
+    b.host?.querySelector('.pg-shared')?.remove()
+    if (save) {
+      // One step back: the draft this replaces stays available as "이전 코드 복원".
+      if (b.savedBeforeShare !== null && b.savedBeforeShare !== value) store.setBackup(b.key, b.savedBeforeShare)
+      b.current = value
+      persist(b)
+      showToast('이 코드로 저장했어요. 이전 코드는 "이전 코드 복원"으로 되살릴 수 있어요.')
+    } else {
+      const own = b.savedBeforeShare ?? b.initial
+      b.current = own
+      b.editor?.setValue(own)
+      b.editor?.clearDiagnostics()
+      showToast('내 코드로 돌아왔어요.')
+    }
+    b.savedBeforeShare = null
+    dropShareHash()
+    renderBar(b)
+    b.editor?.focus()
+  }
+  function restoreBackup(b: Block) {
+    const backup = store.getBackup(b.key)
+    if (!backup) return
+    const now = b.editor ? b.editor.getValue() : b.current
+    if (now !== backup.code) store.setBackup(b.key, now) // swap: restoring can itself be undone once
+    else store.clearBackup(b.key)
+    b.current = backup.code
+    b.editor?.setValue(backup.code)
+    b.editor?.clearDiagnostics()
+    persist(b)
+    renderBar(b)
+    showToast('이전 코드를 되살렸어요.')
+  }
+
   async function onClick(ev: MouseEvent) {
     const target = (ev.target as Element | null)?.closest<HTMLElement>('[data-pg]')
     if (!target || !root.contains(target)) return
@@ -573,12 +637,15 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
         b.editor?.clearDiagnostics()
         b.current = b.initial
         window.clearTimeout(b.saveTimer)
-        store.clear(b.key)
+        if (!b.shared) store.clear(b.key) // in a shared view only the view changes; the saved draft stays
         renderBar(b)
         b.editor?.focus()
         showToast('원래 코드로 되돌렸어요.')
         break
       case 'share': await share(b); break
+      case 'shared-back': leaveShared(b, false); break
+      case 'shared-save': leaveShared(b, true); break
+      case 'restore': restoreBackup(b); break
       case 'full': setFull(b, !b.full); break
       case 'copy': {
         const ok = await copyText(b.editor ? b.editor.getValue() : b.decision.run ? b.initial : b.raw)
@@ -633,8 +700,15 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     const b = blocks[shared.index]
     if (b?.decision.run) {
       b.stage.scrollIntoView({ block: 'center' })
+      // Open it as a temporary view: the reader's saved draft of this block is not touched (nothing is persisted).
+      b.savedBeforeShare = store.get(b.key)?.code ?? null
+      b.shared = true
       void openEditor(b, shared.code).then((ok) => {
-        if (ok && !disposed) { persist(b); renderBar(b); showToast('공유받은 코드를 열었어요. ▶ 실행으로 확인해 보세요.') }
+        if (disposed) return
+        if (!ok) { b.shared = false; b.current = b.savedBeforeShare ?? b.initial; b.savedBeforeShare = null; return }
+        showSharedBanner(b)
+        renderBar(b)
+        showToast('공유받은 코드를 열었어요. ▶ 실행으로 확인해 보세요.')
       })
     }
   } else if (/^#code-\d+$/.test(location.hash)) {

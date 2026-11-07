@@ -56,6 +56,11 @@
 .study-page .pg-editor-hint { margin: 0; padding: 6px 14px 8px; font-size: 12px; line-height: 1.5; color: #8d97b3; border-top: 1px solid rgba(255, 255, 255, .06); }
 .study-page .pg-editor .cm-editor { --pg-editor-max: 70vh; }
 
+/* ---- a shared link's code: temporary view with its banner ---- */
+.study-page .pg-shared { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 8px 14px; background: rgba(125, 207, 255, .1); border-bottom: 1px solid rgba(125, 207, 255, .25); color: #cfe9ff; }
+.study-page .pg-shared p { margin: 0; font-size: 13px; line-height: 1.5; }
+.study-page .pg-shared-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
 /* ---- output panel ---- */
 .study-page .pg-out {
   background: var(--surface); color: var(--text);

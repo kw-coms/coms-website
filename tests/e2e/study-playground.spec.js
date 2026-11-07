@@ -253,6 +253,111 @@ test('share link reopens the edited code for someone else', async ({ page, brows
   await other.close()
 })
 
+// A shared link must never overwrite what the reader saved: it opens as a temporary view with a banner.
+async function makeShareUrl(browser, code) {
+  const other = await browser.newContext()
+  const p = await other.newPage()
+  await mockRun(p, () => ({ json: OK }))
+  await openStudy(p, 'c')
+  await openEditor(p, 0)
+  await replaceCode(p, 0, code)
+  await p.locator('#code-0').getByRole('button', { name: '공유 링크' }).click()
+  await expect.poll(() => p.evaluate(() => location.hash)).toMatch(/^#pg=0\./)
+  const url = p.url()
+  await other.close()
+  return url
+}
+const MINE = '#include <stdio.h>\nint main(void) { puts("내코드"); return 0; }\n'
+const THEIRS = '#include <stdio.h>\nint main(void) { puts("공유됨"); return 0; }\n'
+
+async function savedDraft(page, text) {
+  await page.goto('/study/c')
+  await expect(page.locator('.pg-stage').first()).toBeAttached()
+  await page.locator('#code-0 button.pg-badge').click()
+  await expect(editorOf(page, 0)).toContainText(text)
+}
+
+test('opening a share link keeps the reader\'s saved draft; leaving or reloading restores it untouched', async ({ page, context, browser }) => {
+  await mockRun(page, () => ({ json: OK }))
+  await openStudy(page, 'c')
+  await openEditor(page, 0)
+  await replaceCode(page, 0, MINE)
+  await page.waitForTimeout(600) // save is debounced
+  const url = await makeShareUrl(browser, THEIRS)
+
+  const shared = await context.newPage()
+  await mockRun(shared, () => ({ json: OK }))
+  await shared.goto(url)
+  await expect(shared.locator('#code-0 .cm-content')).toContainText('공유됨')
+  const banner = shared.locator('#code-0 .pg-shared')
+  await expect(banner).toContainText('공유된 코드를 보고 있어요')
+  await expect(shared.locator('#code-0 .pg-badge')).toContainText('저장 안 됨')
+  // Editing inside the temporary view is not saved either.
+  await replaceCode(shared, 0, THEIRS + '// 더 고침\n')
+  await shared.waitForTimeout(700)
+  expect(await shared.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toContain('내코드')
+  expect(await shared.evaluate(() => localStorage.getItem('coms-study-playground:c'))).not.toContain('공유됨')
+
+  // Reload (same link, then the plain page): the saved draft is intact.
+  await shared.reload()
+  await expect(shared.locator('#code-0 .pg-shared')).toBeVisible()
+  await savedDraft(shared, '내코드')
+  await expect(editorOf(shared, 0)).not.toContainText('공유됨')
+
+  // "내 코드로 돌아가기" in the shared view puts the reader's own code back and drops the hash.
+  const again = await context.newPage()
+  await mockRun(again, () => ({ json: OK }))
+  await again.goto(url)
+  await expect(again.locator('#code-0 .pg-shared')).toBeVisible()
+  await again.getByRole('button', { name: '내 코드로 돌아가기' }).click()
+  await expect(again.locator('#code-0 .pg-shared')).toHaveCount(0)
+  await expect(editorOf(again, 0)).toContainText('내코드')
+  await expect.poll(() => again.evaluate(() => location.hash)).toBe('')
+  await again.reload()
+  await expect(again.locator('#code-0 button.pg-badge')).toBeVisible()
+})
+
+test('"이 코드로 저장" replaces the draft and "이전 코드 복원" brings it back', async ({ page, context, browser }) => {
+  await mockRun(page, () => ({ json: OK }))
+  await openStudy(page, 'c')
+  await openEditor(page, 0)
+  await replaceCode(page, 0, MINE)
+  await page.waitForTimeout(600)
+  const url = await makeShareUrl(browser, THEIRS)
+
+  const shared = await context.newPage()
+  await mockRun(shared, () => ({ json: OK }))
+  await shared.goto(url)
+  await expect(shared.locator('#code-0 .pg-shared')).toBeVisible()
+  await expect(shared.locator('#code-0').getByRole('button', { name: /이전 코드 복원/ })).toHaveCount(0)
+  await shared.getByRole('button', { name: '이 코드로 저장' }).click()
+  await expect(shared.locator('#code-0 .pg-shared')).toHaveCount(0)
+  await expect(shared.locator('#code-0').getByRole('button', { name: /이전 코드 복원/ })).toBeVisible()
+
+  await shared.goto('/study/c')
+  await expect(shared.locator('#code-0 button.pg-badge')).toBeVisible()
+  await shared.locator('#code-0 button.pg-badge').click()
+  await expect(editorOf(shared, 0)).toContainText('공유됨')
+  await shared.locator('#code-0').getByRole('button', { name: /이전 코드 복원/ }).click()
+  await expect(editorOf(shared, 0)).toContainText('내코드')
+  await shared.reload()
+  await shared.locator('#code-0 button.pg-badge').click()
+  await expect(editorOf(shared, 0)).toContainText('내코드')
+  // The restore swapped: the shared code is now the one-step backup.
+  await shared.locator('#code-0').getByRole('button', { name: /이전 코드 복원/ }).click()
+  await expect(editorOf(shared, 0)).toContainText('공유됨')
+})
+
+test('a reader with no saved draft can leave a shared view for the original code', async ({ page, browser }) => {
+  const url = await makeShareUrl(browser, THEIRS)
+  await mockRun(page, () => ({ json: OK }))
+  await page.goto(url)
+  await expect(page.locator('#code-0 .pg-shared')).toBeVisible()
+  await page.getByRole('button', { name: '내 코드로 돌아가기' }).click()
+  await expect(editorOf(page, 0)).toContainText("Hello, COM's!")
+  expect(await page.evaluate(() => localStorage.getItem('coms-study-playground:c'))).toBeNull()
+})
+
 test('full screen mode is a modal dialog that Escape closes', async ({ page }) => {
   await mockRun(page, () => ({ json: OK }))
   await openStudy(page, 'c')

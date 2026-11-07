@@ -8,6 +8,7 @@ import { compareOutput, normalizeOutput } from '../src/pages/study/playground/co
 import { createStore, blockKey, encodeShareHash, decodeShareHash, SHARE_MAX_CHARS } from '../src/pages/study/playground/storage.ts'
 import { buildLabScene, encodeLabShare, labLink } from '../src/pages/study/playground/labShare.ts'
 import { runRemote, retryAfterSeconds } from '../src/pages/study/playground/runner.ts'
+import { setSessionExpiredHandler } from '../src/services/apiClient.ts'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -92,6 +93,20 @@ assert.equal(createStore('c', backing).get(key).code, 'edited', 'survives a new 
 assert.equal(createStore('java', backing).get(key), null, 'per page')
 store.clear(key)
 assert.equal(store.get(key), null)
+{
+  // The one-step backup of a draft that a shared code was saved over lives beside it and survives clear().
+  const backups = createStore('c', mem())
+  assert.equal(backups.getBackup(key), null)
+  backups.set(key, 'mine')
+  backups.setBackup(key, 'mine')
+  backups.set(key, 'shared')
+  assert.equal(backups.get(key).code, 'shared')
+  assert.equal(backups.getBackup(key).code, 'mine')
+  backups.clear(key)
+  assert.equal(backups.getBackup(key).code, 'mine', 'resetting a block keeps the backup')
+  backups.clearBackup(key)
+  assert.equal(backups.getBackup(key), null)
+}
 assert.notEqual(blockKey(3, 'a'), blockKey(3, 'b'), 'the key follows the original text')
 const blocked = createStore('c', { getItem() { throw new Error('blocked') }, setItem() { throw new Error('blocked') } })
 blocked.set('k', 'v')
@@ -158,8 +173,26 @@ assert.equal((await runRemote('python', 'x', '')).kind, 'login')
   assert.deepEqual(calls, ['/study/api/run', '/api/auth/refresh', '/study/api/run'])
   calls.length = 0
   globalThis.fetch = script(401, 401)
+  let expired = 0
+  setSessionExpiredHandler(() => { expired++ })
   assert.equal((await runRemote('c', 'x', '')).kind, 'login')
   assert.deepEqual(calls, ['/study/api/run', '/api/auth/refresh'])
+  assert.equal(expired, 1, 'a refused refresh signs the page out like any other request of the site')
+  setSessionExpiredHandler(null)
+  calls.length = 0
+  {
+    // Parallel runs that all get a 401 share ONE refresh (single-flight) and each retries once.
+    const seen = []
+    globalThis.fetch = async (url) => {
+      seen.push(url)
+      if (url === '/api/auth/refresh') { await new Promise((r) => setTimeout(r, 20)); return new Response(null, { status: 204 }) }
+      const retried = seen.filter((u) => u === '/study/api/run').length > 2
+      return new Response(retried ? JSON.stringify({ ok: true, stage: 'run', stdout: '', stderr: '', exitCode: 0, diagnostics: [] }) : '{}', { status: retried ? 200 : 401 })
+    }
+    const both = await Promise.all([runRemote('c', 'x', ''), runRemote('c', 'y', '')])
+    assert.deepEqual(both.map((r) => r.kind), ['output', 'output'])
+    assert.equal(seen.filter((u) => u === '/api/auth/refresh').length, 1)
+  }
   calls.length = 0
   globalThis.fetch = script(401, 204, 401)
   assert.equal((await runRemote('c', 'x', '')).kind, 'login')
@@ -185,6 +218,21 @@ globalThis.fetch = async (_u, init) => new Promise((_, rej) => init.signal.addEv
 const pending = runRemote('c', 'x', '', ctl.signal)
 ctl.abort()
 await assert.rejects(pending, 'an aborted run rejects (the caller ignores it)')
+{
+  // Older Safari has neither AbortSignal.any nor AbortSignal.timeout: the run must still work and still be abortable.
+  const { any, timeout } = AbortSignal
+  AbortSignal.any = undefined
+  AbortSignal.timeout = undefined
+  try {
+    globalThis.fetch = reply(200, { ok: true, stage: 'run', stdout: 'old\n', stderr: '', exitCode: 0, diagnostics: [] })
+    assert.equal((await runRemote('c', 'x', '', new AbortController().signal)).output.stdout, 'old\n')
+    globalThis.fetch = async (_u, init) => new Promise((_, rej) => init.signal.addEventListener('abort', () => rej(new DOMException('aborted', 'AbortError'))))
+    const c = new AbortController()
+    const pending = runRemote('c', 'x', '', c.signal)
+    c.abort()
+    await assert.rejects(pending)
+  } finally { AbortSignal.any = any; AbortSignal.timeout = timeout }
+}
 globalThis.fetch = realFetch
 assert.equal(retryAfterSeconds(null, null, 5), 5)
 assert.equal(retryAfterSeconds('999', null, 5), 60, 'capped at a minute')
