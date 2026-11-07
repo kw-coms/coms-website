@@ -1,5 +1,6 @@
-import type { SimFrame, SimInput, SimWarning, Wire } from '../core/types';
+import type { SimFrame, SimInput, SimWarning } from '../core/types';
 import { createSimulator } from './core';
+import { sameCircuit } from '../core/scene';
 import { compileSketch, CompileUnreachable } from './compileClient';
 import { createBeeper, continuityHolds } from './beep';
 import { clearSerial, pushSerial } from './serial';
@@ -65,17 +66,14 @@ sim.onFrame((f) => {
 
 // keep the simulator's circuit in step with the document
 let prev: unknown[] = [];
-/** Bend points are purely visual: dragging them must not rebuild the simulated circuit. */
-const sameCircuit = (a: Wire[], b: Wire[]) =>
-  a === b || (a.length === b.length && a.every((w, i) => { const v = b[i]!; return w.id === v.id && w.from === v.from && w.to === v.to; }));
 const syncScene = () => {
   const s = getState();
   const doc = s.hist.present;
   if (prev[0] === doc && prev[1] === s.code) return;
   const old = prev[0] as typeof doc | undefined;
-  const bendsOnly = !!old && old.parts === doc.parts && prev[1] === s.code && sameCircuit(old.wires, doc.wires);
+  const visualOnly = !!old && prev[1] === s.code && sameCircuit(old, doc);
   prev = [doc, s.code];
-  if (bendsOnly) return;
+  if (visualOnly) return;
   try {
     sim.setScene(scene(s));
   } catch (e) {

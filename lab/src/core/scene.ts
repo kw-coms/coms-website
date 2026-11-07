@@ -1,27 +1,48 @@
 import { PARTS } from './parts';
+import { analyze } from './analyze';
 import type { PartInstance, PinRef, Scene } from './types';
 
 const WIRE_COLORS = new Set(['red', 'black', 'blue', 'green', 'yellow', 'orange', 'white', 'purple', 'gray']);
 const FORBIDDEN_IDS = new Set(['__proto__', 'constructor', 'prototype']);
 
-/** Return affected instruments only if every part/wire change is acquisition-only.
- * Keep the existing conservative comparison for geometry, wiring and electrical props.
+type Circuit = Pick<Scene, 'parts' | 'wires'>;
+
+/** Shared host/engine identity: visual document fields never invalidate a circuit.
+ * The host includes acquisition props to deliver instrument edits; the engine excludes
+ * them to decide whether those edits require an electrical rebuild.
  */
-export function acquisitionOnlyChanges(previous: Scene, next: Scene): string[] | undefined {
-  if (previous.parts.length !== next.parts.length || JSON.stringify(previous.wires) !== JSON.stringify(next.wires)) return;
-  const changed: string[] = [];
-  for (let i = 0; i < next.parts.length; i++) {
-    const before = previous.parts[i]!;
+export function sameCircuit(previous: Circuit, next: Circuit, includeAcquisition = true): boolean {
+  if (previous.parts.length !== next.parts.length || previous.wires.length !== next.wires.length) return false;
+  const identity = (circuit: Circuit) => ({
+    parts: circuit.parts.map(part => ({
+      id: part.id, kind: part.kind,
+      props: Object.entries(part.props)
+        .filter(([key]) => includeAcquisition || !PARTS[part.kind].acquisitionOnlyProps.includes(key))
+        .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0),
+    })),
+    wires: circuit.wires.map(wire => ({
+      id: wire.id,
+      from: [wire.from.partId, wire.from.pinId],
+      to: [wire.to.partId, wire.to.pinId],
+    })),
+  });
+  if (JSON.stringify(identity(previous)) !== JSON.stringify(identity(next))) return false;
+  // Placement is electrical only when it changes a pin's insertion into a socket.
+  const moved = previous.parts.some((part, i) => {
     const after = next.parts[i]!;
-    if (JSON.stringify(before) === JSON.stringify(after)) continue;
-    const withoutAcquisition = (part: PartInstance) => ({
-      ...part,
-      props: Object.fromEntries(Object.entries(part.props).filter(([key]) => !PARTS[part.kind].acquisitionOnlyProps.includes(key))),
-    });
-    if (JSON.stringify(withoutAcquisition(before)) !== JSON.stringify(withoutAcquisition(after))) return;
-    changed.push(after.id);
-  }
-  return changed;
+    return part.rotY !== after.rotY || part.pos.some((value, axis) => value !== after.pos[axis]);
+  });
+  if (!moved || !next.parts.some(part => part.kind === 'arduino-uno' || part.kind.startsWith('breadboard-'))) return true;
+  const insertions = (circuit: Circuit) => analyze({ ...circuit, version: 2, code: '' }).insertions;
+  return JSON.stringify(insertions(previous)) === JSON.stringify(insertions(next));
+}
+
+/** Return affected instruments only when electrical identity is unchanged. */
+export function acquisitionOnlyChanges(previous: Scene, next: Scene): string[] | undefined {
+  if (!sameCircuit(previous, next, false)) return;
+  return next.parts.filter((part, i) => PARTS[part.kind].acquisitionOnlyProps.some(key =>
+    previous.parts[i]!.props[key] !== part.props[key],
+  )).map(part => part.id);
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

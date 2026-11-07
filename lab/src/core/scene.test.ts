@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { acquisitionOnlyChanges, validateScene } from './scene';
+import { acquisitionOnlyChanges, sameCircuit, validateScene } from './scene';
 import { encodeShare, decodeShare } from './share';
 import type { Scene } from './types';
+import { PARTS } from './parts';
 
 const scene = (code = ''): Scene => ({
   version: 1,
@@ -25,14 +26,57 @@ describe('acquisition-only scene changes', () => {
     expect(after.parts[0]!.props).toEqual({ timeDiv: 100, voltsDiv: 2 });
   });
 
-  it.each(['resistance', 'position', 'rotation', 'kind', 'id', 'addition', 'removal', 'wire', 'unknown prop'])
+  it('ignores wire styling, non-electrical placement and document metadata in both callers', () => {
+    const before = measured();
+    before.wires.push({ id: 'w', color: 'blue', from: { partId: 'scope', pinId: 'CH1' }, to: { partId: 'r', pinId: '1' } });
+    const after = structuredClone(before);
+    after.wires[0]!.color = 'red';
+    after.wires[0]!.bends = [[1, 2, 3]];
+    after.parts[0]!.pos = [20, 0, 10];
+    after.parts[0]!.rotY = 90;
+    after.title = 'Visual edits';
+    after.notes = [{ id: 'note', pos: [0, 0, 0], text: 'Label' }];
+    expect(sameCircuit(before, after)).toBe(true);
+    expect(acquisitionOnlyChanges(before, after)).toEqual([]);
+    after.parts[0]!.props.timeDiv = 200;
+    expect(sameCircuit(before, after)).toBe(false);
+    expect(acquisitionOnlyChanges(before, after)).toEqual(['scope']);
+  });
+
+  it.each(['part', 'pin', 'id'])('treats a wire %s change as electrical', field => {
+    const before = measured();
+    before.wires.push({ id: 'w', color: 'blue', from: { partId: 'scope', pinId: 'CH1' }, to: { partId: 'r', pinId: '1' } });
+    const after = structuredClone(before);
+    if (field === 'part') after.wires[0]!.to = { partId: 'scope', pinId: 'GND' };
+    if (field === 'pin') after.wires[0]!.to.pinId = '2';
+    if (field === 'id') after.wires[0]!.id = 'new-wire';
+    expect(sameCircuit(before, after)).toBe(false);
+    expect(acquisitionOnlyChanges(before, after)).toBeUndefined();
+  });
+
+  it('preserves placement-derived connections when comparing movement and rotation', () => {
+    const before = measured();
+    const hole = PARTS['breadboard-half'].pins.find(pin => pin.id === 'b12')!.pos;
+    const lead = PARTS.resistor.pins[0]!.pos;
+    before.parts[1]!.pos = [hole[0] - lead[0], 0, hole[2] - lead[2]];
+    before.parts.push({ id: 'board', kind: 'breadboard-half', pos: [0, 0, 0], rotY: 0, props: {} });
+    const shifted = structuredClone(before);
+    shifted.parts[1]!.pos[0] += .1;
+    expect(sameCircuit(before, shifted)).toBe(true);
+    shifted.parts[1]!.pos[0] += 100;
+    expect(sameCircuit(before, shifted)).toBe(false);
+    expect(acquisitionOnlyChanges(before, shifted)).toBeUndefined();
+    const rotated = structuredClone(before);
+    rotated.parts[1]!.rotY = 90;
+    expect(sameCircuit(before, rotated)).toBe(false);
+  });
+
+  it.each(['resistance', 'kind', 'id', 'addition', 'removal', 'wire', 'unknown prop'])
   ('rejects an acquisition edit mixed with %s changes', change => {
     const before = measured(), after = measured();
     after.parts[0]!.props.timeDiv = 200;
     switch (change) {
       case 'resistance': after.parts[1]!.props.ohms = 20000; break;
-      case 'position': after.parts[0]!.pos[0] = 1; break;
-      case 'rotation': after.parts[0]!.rotY = 90; break;
       case 'kind': after.parts[0]!.kind = 'logic-analyzer'; break;
       case 'id': after.parts[0]!.id = 'other'; break;
       case 'addition': after.parts.push({ ...after.parts[1]!, id: 'extra' }); break;

@@ -119,16 +119,12 @@ export class SimulationEngine {
 
   setScene(scene: Scene): Analysis {
     const next = structuredClone(validateScene(scene));
-    const unchanged = JSON.stringify(next.parts) === JSON.stringify(this.scene.parts)
-      && JSON.stringify(next.wires) === JSON.stringify(this.scene.wires);
-    const acquisitionChanges = unchanged ? undefined : acquisitionOnlyChanges(this.scene, next);
+    const acquisitionChanges = acquisitionOnlyChanges(this.scene, next);
     this.scene = next;
-    // Editing source must not reset protocol transactions or the running circuit.
-    if (unchanged) return this.analysis;
     if (acquisitionChanges !== undefined) {
       // No solve/reset: C/L history, behavioral devices, firmware and simulation time
       // belong to the circuit under measurement, not to an instrument's controls.
-      if (this.solution) this.instruments.reconfigure(acquisitionChanges, next, this.analysis,
+      if (this.solution && acquisitionChanges.length) this.instruments.reconfigure(acquisitionChanges, next, this.analysis,
         this.solution.netVolts, this.mcu.cpu.cycles / MCU_HZ * 1000);
       return this.analysis;
     }
