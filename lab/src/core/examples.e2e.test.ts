@@ -113,7 +113,7 @@ const checks: Record<string, (run: SketchRun) => void> = {
     }
   },
   ultrasonic: run => {
-    for (const distance of [5, 50, 100]) {
+    for (const distance of [5, 30, 50, 100, 120]) {
       run.input('sonar', 'distanceCm', distance);
       run.run(100);
       run.serial = '';

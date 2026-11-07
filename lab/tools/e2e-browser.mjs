@@ -254,7 +254,7 @@ try {
       const hc = await pid('hc-sr04');
       await page.getByRole('tab', { name: '코드', exact: true }).click();
       await page.getByRole('tab', { name: '시리얼 모니터' }).click();
-      const read = async (cm) => { await setIn(hc, 'distanceCm', cm); await lab(() => (window.__lab.serialClear?.(), 0)); await settle(1600); const t = await lab(() => window.__lab.serial()); const m = [...t.matchAll(/(\d+(?:\.\d+)?)/g)].map((x) => Number(x[1])); return m[m.length - 1]; };
+      const read = async (cm) => { await setIn(hc, 'distanceCm', cm); await lab(() => (window.__lab.serialClear?.(), 0)); await settle(1600); const raw = await lab(() => window.__lab.serial()); const t = raw.slice(0, raw.lastIndexOf('\n') + 1); /* complete lines only: the serial arrives one byte at a time (9600 baud), a sample can land inside "29.98" and read "2" */ const m = [...t.matchAll(/(\d+(?:\.\d+)?)/g)].map((x) => Number(x[1])); return m[m.length - 1]; };
       const a = await read(30), b = await read(120);
       check('ultrasonic: serial distance follows the sensor', Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - 30) < 8 && Math.abs(b - 120) < 15, `30->${a} 120->${b}`);
       // drag the obstacle block in the 3D view
