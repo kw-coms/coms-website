@@ -18,7 +18,7 @@
   --ok: #1f8a4c;
   --warn: #b5541a;
   --radius: 12px;
-  --study-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace;
+  --study-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'D2Coding', 'Noto Sans Mono', 'DejaVu Sans Mono', 'Liberation Mono', 'Courier New', monospace;
   padding-top: calc(var(--apple-nav-height, 44px) + env(safe-area-inset-top));
   background: var(--bg);
   color: var(--text);

@@ -4,7 +4,9 @@ import './setupDom.mjs'
 
 import assert from 'node:assert/strict'
 
-import { BUILT_IN_FONTS, injectBuiltinFontStylesheet } from '../src/services/fontPreferences.ts'
+import { readFileSync } from 'node:fs'
+
+import { BUILT_IN_FONTS, PRETENDARD_FALLBACK_FAMILIES, fontFamilyValue, injectBuiltinFontStylesheet } from '../src/services/fontPreferences.ts'
 
 const links = () => Array.from(document.head.querySelectorAll('link[id^="builtin-font-"]'))
 
@@ -46,5 +48,24 @@ for (const id of ['', null, undefined, 7, 'b:nope']) {
   injectBuiltinFontStylesheet(id)
 }
 assert.equal(links().length, 2, 'non-built-in ids must not inject a stylesheet')
+
+// ─── Pretendard's metric-matched stand-ins ───────────────────────────────────
+// The stack lives in three places (tokens.css for the first paint, fontPreferences.ts once React sets the variable,
+// font-fallback.css for the faces themselves); they must name the same families in the same order.
+const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
+const fallbackFamilies = PRETENDARD_FALLBACK_FAMILIES.split(',').map((name) => name.trim())
+assert.equal(fallbackFamilies.length, 5)
+const faceCss = read('../src/styles/font-fallback.css')
+for (const family of fallbackFamilies) {
+  const faces = faceCss.split('@font-face').filter((face) => face.includes(`font-family: ${family};`))
+  assert.equal(faces.length, family.includes('WenQuanYi') ? 1 : 2, `${family}: a regular and a bold face (WenQuanYi has no bold)`)
+  for (const face of faces) {
+    for (const descriptor of ['size-adjust', 'ascent-override', 'descent-override', 'line-gap-override', 'unicode-range']) assert.match(face, new RegExp(`${descriptor}:`), `${family} needs ${descriptor}`)
+    assert.doesNotMatch(face, /url\(/, `${family} must not download anything`)
+  }
+}
+assert.ok(read('../src/styles/tokens.css').includes(`--apple-font-family: 'Pretendard Variable', ${PRETENDARD_FALLBACK_FAMILIES}, -apple-system`), 'tokens.css first-paint stack')
+assert.ok(fontFamilyValue(BUILT_IN_FONTS[0]).startsWith(`"Pretendard Variable", ${PRETENDARD_FALLBACK_FAMILIES}, `), 'the applied Pretendard stack')
+assert.equal(fontFamilyValue(BUILT_IN_FONTS[1]).includes('Pretendard Fallback'), false, 'other fonts are left alone')
 
 console.log('fontPreferences tests passed')

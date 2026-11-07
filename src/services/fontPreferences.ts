@@ -1,5 +1,10 @@
 export const DEFAULT_FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Apple SD Gothic Neo', 'Segoe UI', 'Malgun Gothic', sans-serif"
 
+// Metric-matched local() stand-ins for Pretendard (declared in styles/font-fallback.css): drawn instead of the platform's
+// own Hangul/Latin face until the webfont arrives, so the swap does not reflow the page. Other fonts are left alone: they
+// are an opt-in choice, fetched only when picked, and have no measured stand-ins.
+export const PRETENDARD_FALLBACK_FAMILIES = "'Pretendard Fallback Latin', 'Pretendard Fallback Apple', 'Pretendard Fallback Noto', 'Pretendard Fallback Malgun', 'Pretendard Fallback WenQuanYi'"
+
 export const BUILT_IN_FONTS = [
   {
     id: 'b:pretendard',
@@ -78,7 +83,8 @@ export function buildFontFaceCss(fonts) {
 export function fontFamilyValue(font) {
   if (!font) return DEFAULT_FONT_FAMILY
   const family = sanitizeFontFamily(font.family || font.name)
-  return family ? `"${family}", ${DEFAULT_FONT_FAMILY}` : DEFAULT_FONT_FAMILY
+  if (!family) return DEFAULT_FONT_FAMILY
+  return family === 'Pretendard Variable' ? `"${family}", ${PRETENDARD_FALLBACK_FAMILIES}, ${DEFAULT_FONT_FAMILY}` : `"${family}", ${DEFAULT_FONT_FAMILY}`
 }
 
 // Injects the stylesheet for ONE built-in font — the one actually applied.

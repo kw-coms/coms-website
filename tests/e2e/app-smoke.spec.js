@@ -2232,23 +2232,63 @@ test('quick jump is offered beside the menu button on a phone', async ({ page })
   expect(overflow).toBeLessThanOrEqual(1)
 })
 
-test('header brand does not overlap the desktop nav at 1024 and 1280', async ({ page }) => {
-  await page.addInitScript(() => {
-    try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ }
-  })
-  await mockAdminApis(page)
-  for (const width of [1024, 1280]) {
-    await page.setViewportSize({ width, height: 800 })
-    await page.goto('/')
-    const brand = page.locator('header').getByRole('button', { name: '홈으로 이동' })
-    const firstItem = page.locator('header nav').first().getByRole('button').first()
-    await expect(firstItem).toBeVisible()
-    await page.evaluate(() => document.fonts.ready) // the site font (Pretendard, display: swap) has replaced the fallback
-    const brandBox = await brand.boundingBox()
-    const itemBox = await firstItem.boundingBox()
-    expect(brandBox.x + brandBox.width, `brand vs nav at ${width}px`).toBeLessThanOrEqual(itemBox.x)
+// The brand and the first nav item must keep a real gap at the tightest desktop widths with whichever face is drawn:
+// the site font (Pretendard, display: swap) at first paint, after it has arrived, or - when its request fails - the
+// metric-matched fallback for good. Nothing here waits for document.fonts.
+const HEADER_MIN_GAP = 12
+for (const siteFont of ['arriving', 'blocked']) {
+  for (const theme of ['light', 'dark']) {
+    test(`header brand keeps a gap to the desktop nav at 1024, 1152 and 1280, ${theme}, site font ${siteFont}`, async ({ page }) => {
+      await page.addInitScript((mode) => {
+        try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ }
+        try { localStorage.setItem('kwcoms-theme-mode:v2', mode) } catch { /* ignore */ }
+      }, theme)
+      await mockAdminApis(page)
+      if (siteFont === 'blocked') await page.route(/pretendard/i, (route) => route.abort())
+      for (const width of [1024, 1152, 1280]) {
+        await page.setViewportSize({ width, height: 800 })
+        await page.goto('/')
+        const brand = page.locator('header').getByRole('button', { name: '홈으로 이동' })
+        const firstItem = page.locator('header nav').first().getByRole('button').first()
+        await expect(firstItem).toBeVisible()
+        const gap = async () => {
+          const b = await brand.boundingBox()
+          return (await firstItem.boundingBox()).x - (b.x + b.width)
+        }
+        expect(await gap(), `brand vs nav at ${width}px, first paint`).toBeGreaterThanOrEqual(HEADER_MIN_GAP)
+        await page.waitForTimeout(800)
+        expect(await gap(), `brand vs nav at ${width}px, 800 ms later`).toBeGreaterThanOrEqual(HEADER_MIN_GAP)
+      }
+    })
   }
-})
+}
+
+// Layout shift while the site font arrives late (held 1.5 s, so it is still pending when a loaded CI machine shows the page): the fallback face is metric-matched to Pretendard, so the
+// swap must not reflow the page. Shifts caused by the reader's own input are excluded by the API (hadRecentInput).
+for (const path of ['/', '/study/arduino']) {
+  test(`the site font swapping in late shifts nothing on ${path}`, async ({ page }) => {
+    await page.addInitScript(() => {
+      try { sessionStorage.setItem('coms.intro.played:v1', '1') } catch { /* ignore */ }
+      window.__shifts = []
+      new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) if (!e.hadRecentInput) window.__shifts.push({ value: e.value, at: Math.round(e.startTime), sources: e.sources.map((s) => `${s.node?.nodeName}.${s.node?.className?.toString().slice(0, 30)}`) })
+      }).observe({ type: 'layout-shift', buffered: true })
+    })
+    await mockAdminApis(page)
+    await page.route(/pretendard/i, async (route) => { await new Promise((resolve) => setTimeout(resolve, 1500)); await route.continue() })
+    await page.goto(path)
+    // Shifts while the page itself is still arriving (lazy chunks, the footer) are not the font's; count from the first heading on,
+    // and make sure the site font was still pending then, or there would be no swap to measure.
+    await page.locator('h1').first().waitFor()
+    const seen = await page.evaluate(() => ({ at: performance.now(), loaded: [...document.fonts].some((f) => f.family.includes('Pretendard Variable') && f.status === 'loaded') }))
+    expect(seen.loaded, 'the site font must still be pending when the content shows').toBe(false)
+    await page.waitForFunction(() => [...document.fonts].some((f) => f.family.includes('Pretendard Variable') && f.status === 'loaded'))
+    await page.waitForTimeout(1000)
+    const shifts = (await page.evaluate(() => window.__shifts)).filter((s) => s.at >= seen.at)
+    const cls = shifts.reduce((sum, s) => sum + s.value, 0)
+    expect(cls, `layout shift: ${JSON.stringify(shifts)}`).toBeLessThan(0.02)
+  })
+}
 
 test('top navigation groups activity log and monthly calendar under Records and Tools', async ({ page }) => {
   await mockAdminApis(page)
@@ -4740,7 +4780,7 @@ test.describe('arduino study circuits', () => {
         await page.setViewportSize({ width: view.width, height: 800 })
         await page.goto('/study/arduino')
         await expect(page.locator('figure.circuit.is-live')).toHaveCount(14)
-        await page.evaluate(() => document.fonts.ready) // a late site-font swap reflows all prose (captions too); not what this measures
+        await page.evaluate(() => document.fonts.ready) // the fallback is metric-matched, not identical: a caption can still re-wrap once on the swap; not what this measures
         if (anchoring === 'no scroll anchoring') await page.addStyleTag({ content: 'html, body, * { overflow-anchor: none !important; }' })
         if (view.fontSize) await page.evaluate((fs) => { document.documentElement.style.fontSize = fs }, view.fontSize)
         await page.waitForTimeout(200)
@@ -4782,7 +4822,7 @@ test.describe('arduino study circuits', () => {
       const release = await holdCircuitChunk(page)
       await page.goto(how === 'deep link' ? '/study/arduino#mod-motor' : '/study/arduino')
       await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
-      await page.evaluate(() => document.fonts.ready) // a late site-font swap reflows all prose above; not what this measures
+      await page.evaluate(() => document.fonts.ready) // the fallback is metric-matched, not identical: a caption above can still re-wrap once on the swap; not what this measures
       await page.addStyleTag({ content: noAnchoring })
       // Chromium performs the #fragment scroll only once nothing is pending, i.e. after the held chunk; land on it as it would
       if (how === 'deep link') await page.evaluate(() => document.getElementById(location.hash.slice(1)).scrollIntoView())
@@ -4812,8 +4852,9 @@ test.describe('arduino study circuits', () => {
       test.setTimeout(120_000)
       await page.setViewportSize({ width: view.width, height: 800 })
       await page.addInitScript((fontSize) => {
-        // every height a figure's own rows (all of it but the prose caption) ever have, from the moment it is in the page;
-        // the caption reflows like every paragraph when the site font (Pretendard, display: swap) replaces the fallback
+        // every height a figure's own rows (all of it but the prose caption) ever have, from the moment it is in the page.
+        // The caption is left out: the fallback face is metric-matched to Pretendard, not identical, so when the site font
+        // arrives a caption can still re-wrap by a line where its text sits on a wrap point (joystick at 375px, 22.75px)
         const seen = new WeakSet()
         window.__figureHeights = {}
         const rows = (f) => f.getBoundingClientRect().height - f.querySelector('figcaption').getBoundingClientRect().height

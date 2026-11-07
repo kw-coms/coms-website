@@ -1,0 +1,144 @@
+/*
+ * Metric-matched stand-ins for Pretendard (`Pretendard Variable`, display: swap, arrives after the first paint).
+ *
+ * Why: until Pretendard has loaded, the browser draws text in whatever the stack names next, and every platform's own face is a
+ * different size - Linux's WenQuanYi Zen Hei sets Hangul 16% wider than Pretendard, Windows' Malgun Gothic 16% wider and with a
+ * 1.09 em ascent - so every paragraph rewrapped (and the header crowded) when the real font replaced it. These faces re-draw an
+ * already installed system font with Pretendard's advance widths and vertical metrics (`size-adjust`, `ascent-override`, ...), so
+ * the swap changes the letterforms only. Nothing is downloaded: `src` is `local()` only; a face whose font is not installed is
+ * skipped and the stack moves on. `unicode-range` splits Hangul from Latin, so each script is scaled by its own factor.
+ *
+ * How the numbers were derived (scripts/measure-font-fallback.py, fontTools; weighted by how often each character occurs in
+ * src/**.ts(x): 27,995 Hangul syllables, 1.24 M Latin letters/digits/spaces):
+ *
+ *   font (face)                        UPM   hhea asc/desc/gap          avg Hangul advance   avg Latin advance
+ *   Pretendard Variable, wght 400    2048   0.9521 / 0.2412 / 0        0.8643 em            0.4290 em   <- target
+ *   Pretendard Variable, wght 700    2048   (same)                     0.8643 em            0.4467 em   <- target (bold)
+ *   Apple SD Gothic Neo (macOS)      1000   0.9000 / 0.3000 / 0        0.8650 em            (Latin comes from Arial below)
+ *   Noto Sans (CJK) KR (Linux)       1000   1.1600 / 0.2880 / 0        0.9200 em            (Latin from Arial/Liberation below)
+ *   Malgun Gothic (Windows)          2048   1.0884 / 0.2417 / 0        1.0000 em            (Latin from Arial below)
+ *   WenQuanYi Zen Hei (Linux)        1024   0.9629 / 0.2969 / 0.0898   1.0000 em            (Latin from Arial/Liberation below)
+ *   Arial = Liberation Sans = Arimo  2048   0.9053 / 0.2119 / 0.0327    -                    0.4296 em (400)  0.4593 em (700)
+ *
+ *   size-adjust       = target average advance / fallback average advance
+ *   ascent-override   = Pretendard ascent  / size-adjust   (the override is a share of the size-adjusted font size, so the
+ *   descent-override  = Pretendard descent / size-adjust    final ascent is exactly Pretendard's 0.9521 em, descent 0.2412 em)
+ *   line-gap-override = 0                                   (Pretendard has none; WenQuanYi/Arial would add 9% / 3%)
+ *
+ *   Apple SD Gothic Neo  0.8643 / 0.8650 = 99.91%   ascent 95.30%   descent 24.14%
+ *   Noto Sans KR         0.8643 / 0.9200 = 93.94%   ascent 101.36%  descent 25.68%
+ *   Malgun, WenQuanYi    0.8643 / 1.0000 = 86.43%   ascent 110.17%  descent 27.91%
+ *   Latin 400            0.4290 / 0.4296 = 99.85%   ascent 95.36%   descent 24.16%
+ *   Latin 700            0.4467 / 0.4593 = 97.26%   ascent 97.90%   descent 24.80%
+ *
+ * Hangul advances do not vary with weight in any of these fonts, so one factor serves both; Latin does, hence two Latin faces.
+ * Every family has a regular face (weights up to 599) and a bold face (600+) so bold text is drawn with the system's real bold
+ * instead of a synthesised one. WenQuanYi has no bold, so it has a regular face only and the browser synthesises its bold, as it
+ * did with the platform's own fallback. Malgun and WenQuanYi are separate families because they differ in bold (and in order:
+ * Noto, which looks better, goes before WenQuanYi on a Linux that has both).
+ * Not measured here: Noto Sans CJK KR installed system-wide (the Linux image has WenQuanYi only) - its metrics are those of the
+ * Noto Sans KR files measured above (same design, same tables).
+ *
+ * The stack, in order (also in tokens.css and fontPreferences.ts - tests/fontPreferences.test.mjs keeps the three equal):
+ *   'Pretendard Variable', 'Pretendard Fallback Latin', 'Pretendard Fallback Apple', 'Pretendard Fallback Noto',
+ *   'Pretendard Fallback Malgun', 'Pretendard Fallback WenQuanYi', then the previous system stack.
+ */
+@font-face {
+	font-family: 'Pretendard Fallback Latin';
+	src: local('Arial'), local('ArialMT'), local('Helvetica'), local('Liberation Sans'), local('Arimo');
+	font-weight: 100 599;
+	size-adjust: 99.85%;
+	ascent-override: 95.36%;
+	descent-override: 24.16%;
+	line-gap-override: 0%;
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+	font-family: 'Pretendard Fallback Latin';
+	src: local('Arial Bold'), local('Arial-BoldMT'), local('Helvetica Bold'), local('Liberation Sans Bold'), local('Arimo Bold');
+	font-weight: 600 900;
+	size-adjust: 97.26%;
+	ascent-override: 97.90%;
+	descent-override: 24.80%;
+	line-gap-override: 0%;
+	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Hangul: macOS */
+@font-face {
+	font-family: 'Pretendard Fallback Apple';
+	src: local('Apple SD Gothic Neo'), local('AppleSDGothicNeo-Regular'), local('Apple SD Gothic Neo Regular');
+	font-weight: 100 599;
+	size-adjust: 99.91%;
+	ascent-override: 95.30%;
+	descent-override: 24.14%;
+	line-gap-override: 0%;
+	unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7FF;
+}
+@font-face {
+	font-family: 'Pretendard Fallback Apple';
+	src: local('Apple SD Gothic Neo Bold'), local('AppleSDGothicNeo-Bold');
+	font-weight: 600 900;
+	size-adjust: 99.91%;
+	ascent-override: 95.30%;
+	descent-override: 24.14%;
+	line-gap-override: 0%;
+	unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7FF;
+}
+
+/* Hangul: Noto Sans (CJK) KR, the usual Linux system face */
+@font-face {
+	font-family: 'Pretendard Fallback Noto';
+	src: local('Noto Sans CJK KR'), local('Noto Sans CJK KR Regular'), local('NotoSansCJKkr-Regular'), local('Noto Sans KR'), local('NotoSansKR-Regular');
+	font-weight: 100 599;
+	size-adjust: 93.94%;
+	ascent-override: 101.36%;
+	descent-override: 25.68%;
+	line-gap-override: 0%;
+	unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7FF;
+}
+@font-face {
+	font-family: 'Pretendard Fallback Noto';
+	src: local('Noto Sans CJK KR Bold'), local('NotoSansCJKkr-Bold'), local('Noto Sans KR Bold'), local('NotoSansKR-Bold');
+	font-weight: 600 900;
+	size-adjust: 93.94%;
+	ascent-override: 101.36%;
+	descent-override: 25.68%;
+	line-gap-override: 0%;
+	unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7FF;
+}
+
+/* Hangul: Malgun Gothic (Windows) - one em wide per syllable, 1.09 em ascent */
+@font-face {
+	font-family: 'Pretendard Fallback Malgun';
+	src: local('Malgun Gothic'), local('MalgunGothic'), local('Malgun Gothic Regular');
+	font-weight: 100 599;
+	size-adjust: 86.43%;
+	ascent-override: 110.17%;
+	descent-override: 27.91%;
+	line-gap-override: 0%;
+	unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7FF;
+}
+@font-face {
+	font-family: 'Pretendard Fallback Malgun';
+	src: local('Malgun Gothic Bold'), local('MalgunGothicBold'), local('Malgun Gothic-Bold');
+	font-weight: 600 900;
+	size-adjust: 86.43%;
+	ascent-override: 110.17%;
+	descent-override: 27.91%;
+	line-gap-override: 0%;
+	unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7FF;
+}
+
+/* Hangul: WenQuanYi Zen Hei (Linux without Noto) - one em wide per syllable. It has no bold, so there is only a regular face
+   (weights up to 599): bold text is synthesised from it, as it was with the platform's own fallback. */
+@font-face {
+	font-family: 'Pretendard Fallback WenQuanYi';
+	src: local('WenQuanYi Zen Hei'), local('WenQuanYi Zen Hei Regular');
+	font-weight: 100 599;
+	size-adjust: 86.43%;
+	ascent-override: 110.17%;
+	descent-override: 27.91%;
+	line-gap-override: 0%;
+	unicode-range: U+1100-11FF, U+3130-318F, U+A960-A97F, U+AC00-D7FF;
+}
