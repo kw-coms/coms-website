@@ -60,7 +60,9 @@ try {
   // SIGKILL the Node supervisor (tini's child) like the OOM killer would. `docker kill` is not used:
   // Docker treats it as a manual stop and skips the restart policy.
   const serverPid = exec('cat', '/proc/1/task/1/children').trim().split(/\s+/)[0];
-  exec('node', '-e', `process.kill(${serverPid}, 9)`);
+  // Detached (-d): the kill takes the container down, which can also kill this exec before it
+  // reports; a waiting exec then fails with 137 even though the kill worked.
+  sh('docker', ['exec', '-d', container, 'node', '-e', `process.kill(${serverPid}, 9)`]);
   long.kill();
   await until('restart', () => sh('docker', ['inspect', '-f', '{{.State.StartedAt}} {{.State.Health.Status}}', container]).trim() !== `${started} healthy` && sh('docker', ['inspect', '-f', '{{.State.Health.Status}}', container]).trim() === 'healthy', 240);
   const restarts = sh('docker', ['inspect', '-f', '{{.RestartCount}}', container]).trim();
