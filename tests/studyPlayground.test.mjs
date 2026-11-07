@@ -148,7 +148,6 @@ assert.equal(createStore('c', backing).get('k'), null, 'the old page-wide key is
   Object.defineProperty(flaky, 'length', { get: () => inner.m.size })
   const st = createStore('f', flaky)
   const b = { key: 'k', baseline: 'old', dirty: true }
-  st.pin('k') // mounted, as in the page
   assert.equal(saveBlock(st, b, 'new', 'init'), false)
   assert.deepEqual([b.baseline, b.dirty], ['old', true], 'a failed write keeps baseline and dirty')
   failing = false
@@ -163,24 +162,44 @@ assert.equal(createStore('c', backing).get('k'), null, 'the old page-wide key is
   assert.equal(restoreBlock(st, b, 'typing'), 'restored')
 }
 {
-  // Records are bounded: 1000 revisions of one block never leave more than 200, and the mounted block survives.
-  const m = mem(); const st = createStore('p', m)
-  st.put('0-current', { code: 'mine', at: 1 }); st.pin('0-current')
-  for (let i = 0; i < 1000; i++) st.put(`0-rev${i}`, { code: 'x', at: 100 + i })
-  assert.ok(m.m.size <= 200, `records: ${m.m.size}`)
-  assert.equal(st.get('0-current').code, 'mine')
-  assert.equal(st.get('0-rev999').code, 'x', 'the newest survive')
-  m.setItem('coms-study-playground:p:junk', '{nope'); st.put('0-more', { code: 'y', at: 5000 })
-  for (let i = 0; i < 300; i++) st.put(`0-b${i}`, { code: 'x', at: 6000 + i })
-  assert.equal(m.getItem('coms-study-playground:p:junk'), null, 'unparseable records go first')
-  // Quota path: a full storage evicts old records, then the write succeeds.
+  // Orphan prune: only this page's records, only blocks that no longer exist, only when older than 7 days.
+  const DAY = 24 * 60 * 60 * 1000, now = 100 * DAY
+  const m = mem()
+  const c = createStore('c', m), java = createStore('java', m)
+  c.put('0-current', { code: 'mine', at: 1 })          // mounted but ancient: survives
+  c.put('1-old', { code: 'x', at: now - 8 * DAY })     // orphan older than 7 days: removed
+  c.put('2-recent', { code: 'x', at: now - 6 * DAY })  // orphan newer than 7 days: survives
+  m.setItem('coms-study-playground:c:3-junk', '{nope') // unparseable counts as old
+  java.put('1-old', { code: 'other page', at: 1 })     // another page's ancient record: never touched
+  java.put('9-orphan', { code: 'other page', at: 1 })
+  c.prune(['0-current'], now)
+  assert.equal(c.get('0-current').code, 'mine')
+  assert.equal(c.get('1-old'), null)
+  assert.equal(c.get('2-recent').code, 'x')
+  assert.equal(m.getItem('coms-study-playground:c:3-junk'), null)
+  assert.equal(java.get('1-old').code, 'other page'); assert.equal(java.get('9-orphan').code, 'other page')
+  java.prune([], now) // the other page prunes its own orphans only
+  assert.equal(java.get('9-orphan'), null); assert.equal(c.get('2-recent').code, 'x')
+}
+{
+  // A full storage: nothing is evicted, the save fails, the edit stays pending.
   const inner = mem()
-  const tiny = { ...inner, setItem: (k, v) => { if (!inner.m.has(k) && inner.m.size >= 5) throw new DOMException('full', 'QuotaExceededError'); inner.setItem(k, v) } }
+  const tiny = { ...inner, setItem: (k, v) => { if (!inner.m.has(k) && inner.m.size >= 3) throw new DOMException('full', 'QuotaExceededError'); inner.setItem(k, v) } }
   Object.defineProperty(tiny, 'length', { get: () => inner.m.size })
   const q = createStore('q', tiny)
-  for (let i = 0; i < 5; i++) q.put(`b${i}`, { code: 'x', at: i + 1 })
-  assert.equal(q.put('fresh', { code: 'z', at: 99 }), true)
-  assert.equal(q.get('fresh').code, 'z')
+  for (let i = 0; i < 3; i++) q.put(`b${i}`, { code: 'x', at: 1 })
+  const b = { key: 'fresh', baseline: null, dirty: true }
+  assert.equal(saveBlock(q, b, 'z', 'init'), false)
+  assert.equal(inner.m.size, 3, 'no record was deleted'); assert.equal(b.dirty, true)
+  assert.equal(q.get('b0').code, 'x')
+}
+{
+  // A failed removal (unavailable or throwing) keeps baseline and dirty.
+  const b = { key: 'k', baseline: 'old', dirty: true }
+  for (const st of [createStore('r', null), createStore('r', { getItem: () => null, setItem() {} }), createStore('r', { getItem: () => null, setItem() {}, removeItem() { throw new Error('blocked') } })]) {
+    assert.equal(saveBlock(st, b, 'init', 'init'), false)
+    assert.deepEqual([b.baseline, b.dirty], ['old', true])
+  }
 }
 
 // ---------- 6. share link codec ----------

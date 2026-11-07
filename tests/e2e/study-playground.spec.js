@@ -577,6 +577,45 @@ test('closing a shared view while another tab saved a draft leaves that draft un
   await expect(editorOf(shared, 0)).toContainText('다른탭B')
 })
 
+test('a failed save shows one notice, it does not outlive the page, and a good save clears it', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__failWrites = false
+    const set = Storage.prototype.setItem
+    Storage.prototype.setItem = function (key, value) {
+      if (window.__failWrites && String(key).startsWith('coms-study-playground:')) throw new DOMException('full', 'QuotaExceededError')
+      return set.call(this, key, value)
+    }
+  })
+  await mockRun(page, () => ({ json: OK }))
+  const notice = page.locator('.coms-toast', { hasText: '저장하지 못했어요' })
+  const flush = () => page.evaluate(() => window.dispatchEvent(new Event('pagehide')))
+  await openStudy(page, 'c')
+  await openEditor(page, 0)
+  await page.evaluate(() => { window.__failWrites = true })
+  await replaceCode(page, 0, MINE)
+  await flush()
+  await expect(notice).toHaveCount(1)
+  await replaceCode(page, 0, MINE + '// 또\n')
+  await flush()
+  await expect(notice).toHaveCount(1) // one per failure streak
+
+  // Navigate away inside the app: the notice must not stay behind.
+  await page.evaluate(() => { history.pushState({}, '', '/study/java'); window.dispatchEvent(new PopStateEvent('popstate')) })
+  await expect(page.locator('.pg-stage').first()).toBeAttached()
+  await expect(page).toHaveURL(/\/study\/java$/)
+  await expect(notice).toHaveCount(0)
+
+  // A failure on the next page shows exactly one notice; a successful save clears it.
+  await openEditor(page, 1)
+  await replaceCode(page, 1, '// java\n')
+  await flush()
+  await expect(notice).toHaveCount(1)
+  await page.evaluate(() => { window.__failWrites = false })
+  await replaceCode(page, 1, '// java 2\n')
+  await flush()
+  await expect(notice).toHaveCount(0)
+})
+
 test('a reader with no saved draft can leave a shared view for the original code', async ({ page, browser }) => {
   const url = await makeShareUrl(browser, THEIRS)
   await mockRun(page, () => ({ json: OK }))

@@ -153,10 +153,10 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
     b.stage.prepend(b.bar)
     b.stage.id = b.anchor
     renderBar(b)
-    store.pin(b.key)
     blocks.push(b)
     byStage.set(b.stage, b)
   })
+  store.prune(blocks.map((b) => b.key))
 
   // ---------- toolbar ----------
   function renderBar(b: Block) {
@@ -772,6 +772,7 @@ export function initPlayground(root: HTMLElement, opts: PlaygroundOptions): () =
       b.stage.parentNode?.insertBefore(b.pre, b.stage)
       b.stage.remove()
     })
+    if (failureToast) { dismissToast(failureToast); failureToast = 0 } // the toast host outlives this page
     inerted.splice(0).forEach((n) => n.removeAttribute('inert'))
     document.documentElement.classList.remove('pg-lock')
   }

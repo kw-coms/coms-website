@@ -6,9 +6,10 @@ type StorageLike = Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 
 
 // One localStorage record per block (`<prefix><pageId>:<blockKey>`), so tabs editing different blocks never share a value.
 // The earlier page-wide `<prefix><pageId>` object never shipped (PR #520 is the first release): an intentional pre-release reset, no migration.
-const KEY_PREFIX = 'coms-study-playground:'
-/** Block keys include a hash of the original code, so lesson revisions orphan records: keep at most this many. */
-export const MAX_RECORDS = 200
+const KEY_PREFIX = 'coms-study-playground:'// Block keys include a hash of the original code, so lesson revisions orphan records. Growth is bounded per page by
+// the revisions within ORPHAN_MAX_AGE_MS: each page prunes only its own old orphans on mount (see `prune`). A global
+// size cap was rejected because evicting by age across the whole prefix can delete other tabs' live drafts.
+const ORPHAN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 export function fnv1a(text: string): string {
   let h = 0x811c9dc5
@@ -19,39 +20,32 @@ export function fnv1a(text: string): string {
 /** Stable id of a block: position + a hash of its original text, so an edited page invalidates old edits. */
 export const blockKey = (index: number, originalCode: string) => `${index}-${fnv1a(originalCode)}`
 
-const isQuota = (e: unknown) => e instanceof Error && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || (e as { code?: number }).code === 22 || (e as { code?: number }).code === 1014)
-
 export function createStore(pageId: string, storage?: StorageLike | null) {
   const handle = (): StorageLike | null => {
     if (storage !== undefined) return storage
     try { return window.localStorage } catch { return null }
   }
-  const keyOf = (block: string) => `${KEY_PREFIX}${pageId}:${block}`
-  const pinned = new Set<string>() // blocks mounted on this page are never evicted
-
-  /** Removes the oldest records beyond MAX_RECORDS (at least `atLeast` of them); unparseable records count as oldest. */
-  function evict(atLeast = 0): number {
-    const st = handle()
-    if (!st || typeof st.key !== 'function' || typeof st.length !== 'number') return 0
-    const entries: { key: string; at: number }[] = []
-    try {
-      for (let i = 0; i < st.length; i++) {
-        const k = st.key(i)
-        if (!k || !k.startsWith(KEY_PREFIX)) continue
-        let at = -1
-        try { const v = JSON.parse(st.getItem(k) ?? ''); if (v && typeof v.code === 'string' && typeof v.at === 'number') at = v.at } catch { /* unparseable: oldest */ }
-        entries.push({ key: k, at })
-      }
-      const count = Math.max(entries.length - MAX_RECORDS, atLeast)
-      const victims = entries.filter((e) => !pinned.has(e.key)).sort((x, y) => x.at - y.at).slice(0, count)
-      victims.forEach((v) => st.removeItem?.(v.key))
-      return victims.length
-    } catch { return 0 }
-  }
+  const pagePrefix = `${KEY_PREFIX}${pageId}:`
+  const keyOf = (block: string) => pagePrefix + block
 
   return {
-    /** Marks a block as mounted: its record is never evicted. */
-    pin(block: string) { pinned.add(keyOf(block)) },
+    /** Deletes this page's records of blocks that no longer exist (not in `current`) and are older than 7 days; unparseable ones count as old. Never touches another page's keys. */
+    prune(current: string[], now = Date.now()): void {
+      const st = handle()
+      if (!st || typeof st.key !== 'function' || typeof st.length !== 'number') return
+      try {
+        const live = new Set(current.map(keyOf))
+        const victims: string[] = []
+        for (let i = 0; i < st.length; i++) {
+          const k = st.key(i)
+          if (!k || !k.startsWith(pagePrefix) || live.has(k)) continue
+          let at = -Infinity
+          try { const v = JSON.parse(st.getItem(k) ?? ''); if (v && typeof v.code === 'string' && typeof v.at === 'number') at = v.at } catch { /* unparseable: old */ }
+          if (now - at > ORPHAN_MAX_AGE_MS) victims.push(k)
+        }
+        victims.forEach((k) => st.removeItem?.(k))
+      } catch { /* pruning is best effort */ }
+    },
     get(block: string): Saved | null {
       try {
         const raw = handle()?.getItem(keyOf(block))
@@ -60,21 +54,13 @@ export function createStore(pageId: string, storage?: StorageLike | null) {
         return { code: v.code, backup: typeof v.backup === 'string' ? v.backup : undefined, at: typeof v.at === 'number' ? v.at : 0 }
       } catch { return null }
     },
-    /** True when the record was written. On a full storage it evicts old records and retries once. */
+    /** True when the record was written. A full storage fails the write (nothing is evicted); the caller keeps the edit pending. */
     put(block: string, rec: Saved): boolean {
-      const st = handle()
-      if (!st) return false
-      const value = JSON.stringify(rec)
-      try { st.setItem(keyOf(block), value) } catch (e) {
-        if (!isQuota(e)) return false
-        evict(Math.max(1, Math.ceil(MAX_RECORDS / 10)))
-        try { st.setItem(keyOf(block), value) } catch { return false }
-      }
-      evict()
-      return true
+      try { const st = handle(); if (!st) return false; st.setItem(keyOf(block), JSON.stringify(rec)); return true } catch { return false }
     },
+    /** True when the record is gone; false when storage or removeItem is unavailable or throws. */
     remove(block: string): boolean {
-      try { handle()?.removeItem?.(keyOf(block)); return true } catch { return false }
+      try { const st = handle(); if (!st?.removeItem) return false; st.removeItem(keyOf(block)); return true } catch { return false }
     },
   }
 }
