@@ -291,6 +291,30 @@ describe('block-mode scenes never run hidden code, and mission scenes open on th
     m.actions.loadExample('button-led');
     expect(m.store.getState().missionId).toBeNull();
   });
+  it('#mission=<id> opens that mission, clears the hash, and asks first when work is unsaved', async () => {
+    const m = await boot();
+    const { MISSIONS } = await import('../missions');
+    loc.hash = `#mission=${MISSIONS[1]!.id}`;
+    await m.actions.loadFromLocationHash();
+    expect(replaceState).toHaveBeenCalledWith(null, '', '/lab/');
+    expect(m.store.getState()).toMatchObject({ missionId: MISSIONS[1]!.id, sideTab: 'missions' });
+    expect(confirmFn).not.toHaveBeenCalled();
+    m.store.setCode(m.store.getState().code + '\n// edit');
+    confirmFn.mockReturnValue(false);
+    loc.hash = `#mission=${MISSIONS[2]!.id}`;
+    await m.actions.loadFromLocationHash();
+    expect(confirmFn).toHaveBeenCalledTimes(1);
+    expect(m.store.getState().missionId).toBe(MISSIONS[1]!.id);
+  });
+  it('#mission=<unknown> only shows a Korean notice', async () => {
+    const m = await boot();
+    const before = m.store.getState().hist.present;
+    loc.hash = '#mission=no-such-mission';
+    await m.actions.loadFromLocationHash();
+    expect(m.store.getState().toast).toBe('그 미션을 찾을 수 없어요.');
+    expect(m.store.getState().hist.present).toBe(before);
+    expect(loc.hash).toBe('');
+  });
   it('the autosave restore keeps the mission', async () => {
     const m0 = await boot();
     const { MISSIONS } = await import('../missions');

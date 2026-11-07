@@ -128,6 +128,20 @@ try {
   await lab(() => window.__lab.loadScene(window.__lab.EXAMPLES[0].scene));
   check('loading another scene leaves the mission', (await st()).mission === null);
 
+  // ---- study-site link: /lab/#mission=<id> ----
+  await page.goto('about:blank');
+  await page.goto(`${base}#mission=${mission.id}`);
+  await page.waitForFunction(() => window.__lab?.EXAMPLES, null, { timeout: 30000 });
+  await settle(900);
+  const viaLink = await st();
+  check('#mission=<id> opens that mission in the Missions tab', viaLink.mission === mission.id && viaLink.tab === 'missions' && await page.getByRole('button', { name: '확인하기' }).isVisible());
+  check('the hash is cleared afterwards', (await lab(() => location.hash)) === '');
+  await page.goto('about:blank');
+  await page.goto(`${base}#mission=no-such-mission`);
+  await page.waitForFunction(() => window.__lab?.EXAMPLES, null, { timeout: 30000 });
+  await settle(600);
+  check('an unknown mission id only shows a Korean notice', /미션을 찾을 수 없어요/.test((await st()).toast ?? ''));
+
   // ---- hostile share links ----
   const bare = { version: 2, parts: [], wires: [], code: 'void setup(){}\nvoid loop(){}\n' };
   const t0 = Date.now();

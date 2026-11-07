@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { loadSharedScene, parseShareHash, shareHash } from './shareHash';
+import { loadSharedScene, parseMissionHash, parseShareHash, shareHash } from './shareHash';
 import type { Scene } from '../core/types';
 
 const scene: Scene = { version: 1, parts: [], wires: [], code: '' };
+
+describe('parseMissionHash', () => {
+  it('reads plain mission ids only', () => {
+    expect(parseMissionHash('#mission=button-toggle')).toBe('button-toggle');
+    expect(parseMissionHash('mission=a_1')).toBe('a_1');
+    for (const bad of ['', '#mission=', '#s=abc', '#mission=../x', '#mission=a b', `#mission=${'x'.repeat(65)}`]) expect(parseMissionHash(bad), bad).toBeNull();
+  });
+});
 
 describe('shareHash', () => {
   it('round-trips a token', () => {

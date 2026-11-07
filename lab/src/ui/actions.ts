@@ -1,6 +1,7 @@
 import { encodeShare, decodeShare, EXAMPLES, PARTS, validateScene } from './core';
 import { refs } from '../scene3d/sceneRefs';
-import { parseShareHash, shareHash } from './shareHash';
+import { MISSIONS } from '../missions';
+import { parseMissionHash, parseShareHash, shareHash } from './shareHash';
 import { BACKUP_KEY, getState, isDirty, loadScene, markClean, scene, set, THEME_KEY, toast } from './store';
 import { stop } from './simHost';
 import { getItem, setItem } from './storage';
@@ -80,8 +81,19 @@ export async function copyShareLink() {
   }
 }
 
+/** `#mission=<id>` (links from the study site): open that mission like the Missions tab does; an unknown id only gets a notice. */
+function openMissionFromHash(id: string) {
+  history.replaceState(null, '', location.pathname + location.search);
+  const m = MISSIONS.find((x) => x.id === id);
+  if (!m) return toast('그 미션을 찾을 수 없어요.');
+  if (!confirmReplace('미션 회로를 불러올까요?')) return;
+  replaceWith(structuredClone(m.starterScene)); // loadScene sets missionId and opens the Missions tab
+}
+
 /** Consume a #s=… share hash: remove it from the URL first (so a reload never restores a stale snapshot), then import. */
 export async function loadFromLocationHash() {
+  const missionId = parseMissionHash(location.hash);
+  if (missionId) return openMissionFromHash(missionId);
   const token = parseShareHash(location.hash);
   if (!token) return;
   history.replaceState(null, '', location.pathname + location.search);
