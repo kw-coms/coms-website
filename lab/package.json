@@ -11,6 +11,7 @@
     "typecheck": "tsc -b --noEmit",
     "e2e:compile": "node tools/e2e-compile.mjs",
     "e2e:browser": "node tools/e2e-browser.mjs",
+    "e2e:blocks": "node tools/e2e-blocks.mjs",
     "e2e:prod": "node tools/e2e-prod.mjs",
     "test:realtime": "vitest run --no-file-parallelism src/core/examples.e2e.test.ts"
   },
@@ -22,6 +23,7 @@
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.4.0",
     "avr8js": "^0.21.1",
+    "blockly": "^13.4.0",
     "codemirror": "^6.0.2",
     "lucide-react": "^0.542.0",
     "react": "^19.3.1",
