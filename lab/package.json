@@ -12,6 +12,7 @@
     "e2e:compile": "node tools/e2e-compile.mjs",
     "e2e:browser": "node tools/e2e-browser.mjs",
     "e2e:blocks": "node tools/e2e-blocks.mjs",
+    "e2e:ui": "node tools/e2e-ui-v2.mjs",
     "e2e:prod": "node tools/e2e-prod.mjs",
     "test:realtime": "vitest run --no-file-parallelism src/core/examples.e2e.test.ts"
   },

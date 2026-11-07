@@ -31,6 +31,8 @@ class BpHint extends GutterMarker {
 const bpGutter = gutter({
   class: 'cm-bp-gutter',
   lineMarker: (view, line) => (view.state.field(debugField).bps.includes(view.state.doc.lineAt(line.from).number) ? bpMarker : null),
+  // without this the dots only appear when the document or viewport changes, not when a breakpoint is toggled
+  lineMarkerChange: (update) => update.startState.field(debugField).bps !== update.state.field(debugField).bps,
   initialSpacer: () => new BpHint(),
   domEventHandlers: { mousedown: (view, line) => { toggleBreakpoint(view.state.doc.lineAt(line.from).number); return true; } },
 });
