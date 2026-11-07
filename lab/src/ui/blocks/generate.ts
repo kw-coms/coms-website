@@ -586,7 +586,7 @@ export function generate(state: unknown, opts: GenOptions = {}): GenResult {
     const s = (isBlock(state) ? state : {}) as { blocks?: { blocks?: unknown }; variables?: unknown };
     const tops = (isBlock(s.blocks) && Array.isArray(s.blocks.blocks) ? s.blocks.blocks : []).filter(isBlock) as B[];
     const varNames = new Map<string, string>();
-    if (Array.isArray(s.variables)) for (const v of s.variables) if (isBlock(v) && typeof v.id === 'string' && typeof v.name === 'string' && v.id && v.name) varNames.set(v.id, v.name);
+    if (Array.isArray(s.variables)) for (const v of s.variables as { id?: unknown; name?: unknown }[]) if (isBlock(v) && typeof v.id === 'string' && typeof v.name === 'string' && v.id && v.name) varNames.set(v.id, v.name);
     const first = run(tops, varNames, opts, { vars: new Map(), fnRet: new Map(), fnParams: new Map() });
     const second = run(tops, varNames, opts, first.ctx.next);
     return { code: second.code, warnings: second.ctx.warnings };
