@@ -85,16 +85,16 @@ for (const [name, sketch] of rejectedSketches) test(`HTTP rejects bypass without
   assert.doesNotMatch(JSON.stringify(result.body), /passwd|root:|FILE_CONTENT_SENTINEL|\/etc\//);
 });
 
-test('RATE_LIMIT_PER_MIN configures the handler per client IP', async () => {
+test('RATE_LIMIT_PER_MIN configures the handler per member', async () => {
   const previous = process.env.RATE_LIMIT_PER_MIN;
   process.env.RATE_LIMIT_PER_MIN = '2';
   try {
     const server = serverWith({ trustProxy: true });
-    const options = { body: '{broken', headers: { 'x-forwarded-for': '192.0.2.1' } };
+    const options = { body: '{broken', headers: { 'x-lab-client': '2026000001' } };
     assert.equal((await invoke(server, options)).status, 400);
     assert.equal((await invoke(server, options)).status, 400);
     assert.equal((await invoke(server, options)).status, 429);
-    assert.equal((await invoke(server, { ...options, headers: { 'x-forwarded-for': '192.0.2.2' } })).status, 400);
+    assert.equal((await invoke(server, { ...options, headers: { 'x-lab-client': '2026000002' } })).status, 400);
   } finally {
     if (previous === undefined) delete process.env.RATE_LIMIT_PER_MIN;
     else process.env.RATE_LIMIT_PER_MIN = previous;

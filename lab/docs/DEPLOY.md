@@ -55,12 +55,12 @@ Compose의 `coms-lab-compiler`는 `restart: unless-stopped`로 재시작하며 �
 | `/lab` | `/lab/`으로 301 (상대 `Location`, https 유지) |
 | `/lab/index.html`, `/lab/` 그 외 | Lab CSP(`security-headers-lab.conf`), `Cache-Control: no-cache`. 없는 경로(`/lab/anything`)는 `/lab/index.html`로 fallback |
 | `/lab/assets/*` | 해시 파일: `max-age=31536000, immutable`. 없으면 404 (앱 셸을 주지 않는다) |
-| `POST /lab/api/compile` | 세션별 `limit_req` 분당 10회(burst 10)·`limit_conn` 4(+ 쿠키 없는 요청용 공용 한도) → 429 JSON, `auth_request /lab/_auth` → 비로그인 401 JSON, 본문 100 KiB 제한, 소켓으로 프록시 (Cookie 제거, `X-Lab-Client`로 세션 키 전달, XFF 제거, 타임아웃 30초). 다른 메서드는 405 |
+| `POST /lab/api/compile` | 로그인 전 공용 `limit_req` 분당 120회(burst 40)·`limit_conn` 16(회원별 분당 10회는 컴파일러), 중복 `token` 쿠키 400·과대 `Cookie` 431 → 429 JSON, `auth_request /lab/_auth` → 비로그인 401 JSON, 본문 100 KiB 제한, 소켓으로 프록시 (Cookie 제거, `X-Lab-Client`에 백엔드가 알려 준 회원 ID, XFF 제거, 타임아웃 30초). 다른 메서드는 405 |
 | `GET /lab/api/health` | 컴파일러 프로세스 liveness. 컴파일러가 없으면 502. 로그인 불필요 |
 | 그 외 `/lab/api/*` | 404 |
 
 - `limit_req_zone` / `limit_conn_zone`은 이 파일이 http 블록 안에 include되므로 파일 맨 위(server 밖)에 선언한다. 호스트 nginx는 건드리지 않는다.
-- **한도는 주소가 아니라 로그인 세션 기준이다.** 호스트 nginx는 Docker bridge를 거쳐 오므로 `$remote_addr`는 모든 방문자에게 같은 게이트웨이 주소이고, 호스트 설정(`X-Real-IP` 등)은 이 저장소에서 확인할 수 없다. 그래서 `limit_req`/`limit_conn` 키는 세션 쿠키 `token`(JWT: header.payload.signature)의 **서명 앞 12자**(`$lab_client`)다. 세션을 구분하기엔 충분하고 위조에는 쓸 수 없다. 위조 쿠키는 새 버킷을 받지만 바로 뒤의 `auth_request`에서 걸러진다. 쿠키가 없는 요청(미로그인·만료)은 분당 60회의 공용 버킷(`lab_anon`)을 쓰고 모두 401이다. 액세스 토큰이 갱신되면 버킷도 새로 시작된다. 호스트 nginx 설정에 의존하는 부분은 없다.
+- **한도는 두 겹이고, 어느 것도 클라이언트 주소·쿠키·헤더에 의존하지 않는다.** 호스트 nginx는 Docker bridge를 거쳐 오므로 `$remote_addr`는 모든 방문자에게 같은 게이트웨이 주소이고, 호스트 설정(`X-Real-IP` 등)은 이 저장소에서 확인할 수 없다. (1) **로그인 전**: `limit_req`는 `auth_request`보다 먼저 실행되므로, 클라이언트가 늘릴 수 없는 키 하나(`$lab_global`)로 라우트 전체에 분당 120회(burst 40)·동시 16개를 건다. 위조 쿠키로 새 버킷을 만들 수 없고, 백엔드가 받는 인증 서브요청 수도 이 한도로 묶인다(대가: 폭주하면 정상 사용자도 일시적으로 429). 쿠키 `token`이 둘 이상이거나 `Cookie` 헤더가 4096자를 넘으면 인증 전에 400/431로 거절한다. (2) **로그인 후**: 백엔드 `GET /api/auth/me`가 인증된 본인의 학번을 `X-Member-Id` 응답 헤더로 돌려주고, nginx가 `auth_request_set $lab_member $upstream_http_x_member_id`로 받아 `X-Lab-Client: $lab_member`로 컴파일러에 전달한다(클라이언트가 보낸 값은 덮어쓴다). 컴파일러가 이 ID별로 분당 한도(`RATE_LIMIT_PER_MIN`, 기본 10)와 전역 실행/대기 큐(2+6)를 적용한다. 세션 토큰을 재발급해도 같은 회원은 같은 버킷이다. 호스트 nginx 설정에 의존하는 부분은 없다.
 - 헤더: `security-headers-common.conf`(사이트와 공통인 비-CSP 헤더) + 사이트용 CSP(`security-headers.conf`) 또는 Lab용 CSP(`security-headers-lab.conf`). `add_header`는 location에 하나라도 있으면 상속되지 않으므로 각 location이 둘 중 하나를 include한다.
 
 ## 4. 컴파일러 컨테이너와 외부 통신 차단
@@ -71,8 +71,8 @@ Compose의 `coms-lab-compiler`는 `restart: unless-stopped`로 재시작하며 �
 - 컴파일러는 `user: "10001:101"`로 실행한다. **101은 `nginx:alpine` 이미지의 `nginx` 그룹 GID**이고(`nginx:1.28-alpine`에서 `id nginx` = uid 101, gid 101), nginx worker가 이 그룹이다. 서버는 `umask 0117`로 소켓을 만들어 `0660 10001:101`이 된다.
 - 새 볼륨은 처음 마운트될 때 이미지의 해당 디렉터리 소유자·모드를 복사한다. 두 이미지(`Dockerfile.frontend`, `lab/compiler/Dockerfile`)가 `/run/coms-lab`을 **같은 `10001:101`, 0750**으로 만들어 두므로 어느 컨테이너가 먼저 볼륨을 만들어도 같다. 0750이라 nginx 그룹은 디렉터리를 읽고 통과만 할 수 있고 소켓을 지우거나 바꿀 수 없다.
 - 시작 시 기존 소켓에 연결해 `ECONNREFUSED`인 경우에만 inode를 재확인하고 삭제한다. 살아 있는 listener, 일반 파일·symlink, 권한 오류·연결 timeout은 거부한다. SIGKILL/OOM 이후 남은 소켓은 자동 복구된다. 같은 볼륨에 컴파일러 두 개를 동시에 띄우지 않는다. `PORT`를 통한 TCP 수신은 개발용 대안이며 프로덕션에는 사용하지 않는다.
-- `TRUST_PROXY=1`: nginx가 보내는 `X-Lab-Client`(위 서명 12자. 쿠키·토큰 자체는 컴파일러에 전달되지 않는다)를 컴파일러 자체의 클라이언트별 한도 키로 쓴다. 헤더가 없거나 형식이 다르면 `X-Forwarded-For`의 가장 오른쪽 주소, 그것도 없으면 소켓 주소를 쓴다. 전역 실행/대기 큐(2+6)는 그대로다.
-- `.env`에서 `LAB_RATE_LIMIT_PER_MIN`(기본 10)으로 컴파일러 자체의 IP별 분당 한도를 바꿀 수 있다. nginx 한도(분당 10, burst 10)는 별개다.
+- `TRUST_PROXY=1`: `X-Lab-Client`(nginx가 `/api/auth/me`의 `X-Member-Id`로 채움. 쿠키·토큰은 컴파일러에 전달되지 않는다)가 **필수**이며 컴파일러 자체의 회원별 한도 키다. 헤더가 없거나 형식(`[A-Za-z0-9_-]{1,64}`)이 다르면 로그인 검사를 통과하지 않은 요청으로 보고 401을 반환한다. `TRUST_PROXY` 없이(로컬 개발) 실행하면 소켓 주소를 키로 쓴다.
+- `.env`에서 `LAB_RATE_LIMIT_PER_MIN`(기본 10)으로 컴파일러의 회원별 분당 한도를 바꿀 수 있다.
 
 ## 5. 로그인 확인
 
@@ -92,8 +92,8 @@ Compose의 `coms-lab-compiler`는 `restart: unless-stopped`로 재시작하며 �
 - `__has_`로 시작하는 모든 식별자, `asm` 계열, `incbin`, `_Pragma`/`__pragma`, `##`, `%:`/`??=`/`??/`, `\\u`/`\\U` UCN, raw 문자열, 숫자 구분자와 접두 문자 리터럴을 거부한다. 전처리 지시문은 허용 헤더의 리터럴 `#include <name.h>`, `#define`, `#undef`, `#if`, `#ifdef`, `#ifndef`, `#elif`, `#else`, `#endif`, `#error`, `#warning`만 허용한다. `#pragma`의 모든 변형, `#line`, `#include_next`, `#import`, `#embed`, `#ident`, `#sccs`, `#assert`, 잘못된 null 지시문을 거부한다. 교육용 C++ 부분집합이며 조건부 컴파일로 비활성화된 코드도 검사한다.
 - shell 해석 없이 고정 argv로 `prlimit -- ... arduino-cli compile --fqbn arduino:avr:uno --jobs 1 --warnings all --build-property compiler.path=/opt/avr-limited/bin/ --build-path <tmp>/build --output-dir <tmp>/out sketch`를 실행한다. AVR wrapper는 도구 이름을 allowlist하고 원본 바이너리를 `exec`한다. 서버 환경은 상속하지 않는다: 고정 PATH, 요청별 HOME, `LANG=C`, 고정 Arduino DATA/USER 경로, 요청별 DOWNLOADS/CACHE, updater 비활성화만 자식에 전달한다.
 - 요청별 임시 폴더, 20초 제한, detached 프로세스 그룹 전체 SIGKILL, `finally` 삭제. 생성 HEX를 실행하거나 보드에 업로드하지 않는다.
-- 최대 2개 실행 + 6개 FIFO 대기, 초과 시 429 `busy`. IP별 고정 60초 창 기본 10회 (`RATE_LIMIT_PER_MIN`으로 양의 정수 설정), 초과 시 429 `rate-limited`. 요청 경로는 O(1) Map 조회/갱신이며 unref 타이머가 만료 항목을 정리한다. IPv6는 /64로 묶고 `::ffff:` IPv4 매핑은 IPv4로 정규화한다. 10,000 IP가 차도 만료 전 항목은 내보내지 않으며, 새 IP는 공유 overflow 버킷(같은 분당 한도) 하나로 합산 제한한다(IP 회전으로 카운터를 초기화할 수 없음). nginx 제한도 유지한다. 상태는 프로세스 메모리에 있으므로 재시작 시 초기화되며 다중 replica에 공유되지 않는다.
-- `TRUST_PROXY=1`일 때만 `X-Lab-Client`(8~64자 `[A-Za-z0-9_-]`)를 클라이언트 키로 신뢰한다. 없으면 X-Forwarded-For의 가장 오른쪽 주소, 그것도 없으면 소켓 주소다. 프로덕션은 TCP 포트를 열지 않는다.
+- 최대 2개 실행 + 6개 FIFO 대기, 초과 시 429 `busy`. 클라이언트(프로덕션: 회원 ID)별 고정 60초 창 기본 10회 (`RATE_LIMIT_PER_MIN`으로 양의 정수 설정), 초과 시 429 `rate-limited`. 요청 경로는 O(1) Map 조회/갱신이며 unref 타이머가 만료 항목을 정리한다. IPv6는 /64로 묶고 `::ffff:` IPv4 매핑은 IPv4로 정규화한다. 10,000 IP가 차도 만료 전 항목은 내보내지 않으며, 새 IP는 공유 overflow 버킷(같은 분당 한도) 하나로 합산 제한한다(IP 회전으로 카운터를 초기화할 수 없음). nginx 제한도 유지한다. 상태는 프로세스 메모리에 있으므로 재시작 시 초기화되며 다중 replica에 공유되지 않는다.
+- `TRUST_PROXY=1`이면 `X-Lab-Client`(회원 ID)가 유일한 클라이언트 키이고 없으면 401이다. 프로덕션은 TCP 포트를 열지 않는다.
 - GCC 진단은 작업 폴더의 정확한 `sketch.ino`와 유효한 사용자 코드 줄·열에서만 추출한다. 다른 파일의 note·출력·인용은 버리고, linker 실패는 고정 메시지와 line 0으로 반환한다. 절대 경로·임시 폴더 이름을 지우고 진단 30개 × 메시지 800자, 프로세스 출력 256 KiB, HEX 192 KiB로 제한한다. HEX 체크섬을 확인하고 bootloader HEX는 반환하지 않는다. `sizeBytes`는 HEX의 데이터 바이트 합계다.
 - 컴파일 문법 오류는 HTTP 200 / `ok:false, reason:compile`, 실행 시간 초과는 HTTP 504 / `reason:timeout`. health는 HTTP 서버 liveness만 증명하며 Arduino 설치·실제 컴파일 성공을 증명하지 않는다.
 

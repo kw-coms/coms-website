@@ -16,15 +16,15 @@ const block = (header) => {
 }
 
 // The zones are http-level; the compile route is members-only, POST-only, limited and socket-bound.
-assert.match(nginx, /^limit_req_zone \$lab_client zone=lab_compile:/m)
-assert.match(nginx, /^limit_conn_zone \$lab_client zone=lab_compile_conn:/m)
-// Limits key on the session cookie, never on an address the host proxy may or may not forward truthfully.
+// Pre-login limits are one shared bucket: nothing a client sends (cookies, headers, addresses) can multiply it.
+assert.match(nginx, /^limit_req_zone \$lab_global zone=lab_pre:/m)
+assert.match(nginx, /^limit_conn_zone \$lab_global zone=lab_pre_conn:/m)
+assert.match(nginx, /map \$host \$lab_global \{\s*default lab;/)
 assert.doesNotMatch(nginx, /^\s*(set_real_ip_from|real_ip_header)\b/m, 'no trust in a client address that the host config would have to supply')
-assert.match(nginx, /map \$cookie_token \$lab_client \{/)
-assert.doesNotMatch(nginx, /limit_(req|conn)_zone \$(binary_)?remote_addr[^\n]*lab_/)
+assert.doesNotMatch(nginx, /limit_(req|conn)_zone [^;]*(\$cookie_|\$http_|\$remote_addr|\$binary_remote_addr)/, 'no limit key a client can vary')
 const compile = block('location = /lab/api/compile {')
-for (const part of [/!= POST\) \{ return 405/, /auth_request \/lab\/_auth/, /limit_req zone=lab_compile/, /limit_conn lab_compile_conn/, /client_max_body_size 100k/,
-  /proxy_set_header Cookie ""/, /proxy_set_header X-Lab-Client \$lab_client;/, /proxy_set_header X-Forwarded-For ""/, /limit_req zone=lab_anon/, /proxy_pass http:\/\/unix:\/run\/coms-lab\/compile\.sock:\/lab\/api\/compile;/, /proxy_read_timeout 30s/]) {
+for (const part of [/!= POST\) \{ return 405/, /auth_request \/lab\/_auth/, /client_max_body_size 100k/,
+  /proxy_set_header Cookie ""/, /auth_request_set \$lab_member \$upstream_http_x_member_id;/, /proxy_set_header X-Lab-Client \$lab_member;/, /proxy_set_header X-Forwarded-For ""/, /limit_req zone=lab_pre burst=40/, /limit_conn lab_pre_conn 16/, /http_cookie ~ "\^\.\{4097,\}"\) \{ return 431/, /token=\[\^;\]\*;/, /proxy_pass http:\/\/unix:\/run\/coms-lab\/compile\.sock:\/lab\/api\/compile;/, /proxy_read_timeout 30s/]) {
   assert.match(compile, part)
 }
 // The compiler never receives the cookie, and every answer nginx writes itself carries nosniff + HSTS.

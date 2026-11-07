@@ -14,14 +14,15 @@ export function rateLimitPerMinute(value = process.env.RATE_LIMIT_PER_MIN) {
   if (!/^[1-9]\d*$/.test(String(value)) || !Number.isSafeInteger(Number(value))) throw new Error('RATE_LIMIT_PER_MIN must be a positive integer');
   return Number(value);
 }
-// Key of the per-client rate limit. Behind nginx every request reaches the compiler from the same
-// proxy, and the visitor's address is not reliably known there, so nginx sends X-Lab-Client: a short
-// fragment of the signed-in member's session token (never the token or the cookie itself). It is
-// believed only with TRUST_PROXY=1; otherwise (or when absent/malformed) the peer address is used.
+// Key of the per-client rate limit. Behind nginx the compiler cannot see who is calling, so nginx
+// sends X-Lab-Client: the member id the backend vouched for in its /api/auth/me answer (auth_request_set),
+// overwriting anything the client sent. With TRUST_PROXY=1 the header is required and is the only
+// source of the key: no valid header means the request did not pass nginx's login check (null).
+// Without TRUST_PROXY (local development) the peer address is used.
 export function rateKey(request, trustProxy = false) {
-  const client = request.headers['x-lab-client'];
-  if (trustProxy && typeof client === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(client)) return `client:${client}`;
-  return clientIp(request, trustProxy);
+  if (!trustProxy) return clientIp(request, false);
+  const member = request.headers['x-lab-client'];
+  return typeof member === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(member) ? `member:${member}` : null;
 }
 export function clientIp(request, trustProxy = false) {
   const forwarded = request.headers['x-forwarded-for'];
@@ -99,7 +100,9 @@ export function createCompileServer({
         response.setHeader('Allow', 'POST');
         return send(405, failure('rejected', 'POST 요청만 사용할 수 있어요.'));
       }
-      if (!limiter.take(rateKey(request, trustProxy))) {
+      const key = rateKey(request, trustProxy);
+      if (key === null) return send(401, failure('rejected', AUTH_MESSAGE));
+      if (!limiter.take(key)) {
         response.setHeader('Retry-After', '60');
         return send(429, failure('rate-limited', '1분 동안의 컴파일 요청 한도를 넘었어요. 잠시 기다려 주세요.'));
       }

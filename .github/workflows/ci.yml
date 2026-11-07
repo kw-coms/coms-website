@@ -252,6 +252,21 @@ jobs:
           grep -q '"hex":":' <<< "$result"
           echo "Blink compiled through /lab/api/compile"
 
+          # Forged session cookies are refused by the login check and cost the member nothing: the
+          # per-member budget (10 a minute, kept by the compiler under the id the backend returned)
+          # is untouched by them, a client-sent X-Lab-Client changes nothing, and the 11th real
+          # compile of this minute is 429.
+          for i in $(seq 1 15); do
+            [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Cookie: token=forged.part$i.signature$i" -H 'X-Lab-Client: 2026000001' -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")" = 401 ]
+          done
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Cookie: token=a=1; token=b" -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")" = 400 ]
+          for i in $(seq 2 10); do
+            curl -fsS -o /dev/null -X POST -H "Cookie: $cookies" -H 'X-Lab-Client: someone-else' -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile"
+          done
+          limited="$(curl -s -w '\n%{http_code}' -X POST -H "Cookie: $cookies" -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")"
+          [ "$(tail -n 1 <<< "$limited")" = 429 ]
+          grep -q '"reason":"rate-limited"' <<< "$limited"
+
           # The compiler is optional for the site: down means 502 for the Lab, nothing else.
           docker stop coms-lab-compiler > /dev/null
           [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Cookie: $cookies" -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")" = 502 ]
