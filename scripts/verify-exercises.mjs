@@ -3,7 +3,7 @@
 //        node scripts/verify-exercises.mjs --runner http://localhost:3000
 // The runner image has no node_modules. Problem files only use erasable types, so there
 // run it with `node --experimental-strip-types` (Node 22.6+; default from 23.6).
-import { readdir, mkdtemp, writeFile, rm } from 'node:fs/promises'
+import { readdir, readFile, mkdtemp, writeFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -45,6 +45,29 @@ export function buildProgram(problem, lang, kind) {
 
 // Dynamic import runs after tsx registration; also works with Node type stripping.
 export const { matchesOutput: compare } = await import('../src/pages/study/exercises/compare.ts')
+const { chapters } = await import('../src/pages/study/exercises/chapters.ts')
+
+export async function chapterMismatches(problems) {
+  const sections = {}
+  const mismatches = []
+  for (const [lang, allowed] of Object.entries(chapters)) {
+    const html = await readFile(join(root, 'src/pages/study/content', `${lang}.html`), 'utf8')
+    sections[lang] = new Set([...html.matchAll(/<section\b[^>]*\bid=["']([^"']+)["']/g)].map(match => match[1]))
+    for (const chapter of allowed) {
+      if (!sections[lang].has(chapter)) mismatches.push(`${lang}: allowlisted chapter ${chapter} has no section[id]`)
+    }
+  }
+  for (const problem of problems) {
+    const entries = typeof problem.chapter === 'string'
+      ? [['web', problem.chapter]]
+      : (problem.langs || []).map(lang => [lang, problem.chapter?.[lang]])
+    for (const [lang, chapter] of entries) {
+      if (!chapters[lang]?.includes(chapter)) mismatches.push(`${problem.id}/${lang}: chapter ${String(chapter)} is not in the chapter allowlist`)
+      else if (!sections[lang]?.has(chapter)) mismatches.push(`${problem.id}/${lang}: chapter ${chapter} has no section[id]`)
+    }
+  }
+  return mismatches
+}
 
 function command(executable, args, cwd, stdin = '', timeout = 5000) {
   return new Promise(resolveResult => {
@@ -129,7 +152,7 @@ export function runRemote(endpoint, lang, code, tests) {
 
 export function validateWeb(problem) {
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
-  if (!problem || typeof problem.chapter !== 'string' || !['html', 'css', 'js'].includes(problem.chapter)) throw new Error('Invalid web chapter')
+  if (!problem || typeof problem.chapter !== 'string' || !chapters.web.includes(problem.chapter)) throw new Error(`Invalid web chapter ${String(problem?.chapter)}`)
   for (const key of ['id', 'title', 'statement', 'explain']) if (typeof problem[key] !== 'string' || !problem[key].trim()) throw new Error(`Missing web ${key}`)
   if (!Number.isInteger(problem.level) || problem.level < 1 || problem.level > 5) throw new Error('Invalid web level')
   for (const key of ['topics', 'hints']) if (!Array.isArray(problem[key]) || !problem[key].length || problem[key].some(s => typeof s !== 'string' || !s.trim())) throw new Error(`Invalid web ${key}`)
@@ -156,6 +179,10 @@ async function main() {
   if (!problems.length) throw new Error('No matching problems')
   const rows = []
   let failures = 0, submissions = 0, casesPassed = 0, webCount = 0
+  for (const message of await chapterMismatches(problems)) {
+    failures++
+    rows.push({ id: 'chapter', lang: '', solution: `FAIL ${message}`, starter: 'NOT RUN' })
+  }
   for (const p of problems) {
     if (!('langs' in p)) {
       try { validateWeb(p); webCount++; rows.push({ id: p.id, lang: 'web', solution: 'SHAPE PASS', starter: 'NOT RUN' }) }

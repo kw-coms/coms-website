@@ -82,7 +82,7 @@ Response 200: `{ ok, stage, stderr (compile), diagnostics, timeMs, results: [{ s
 
 ## 9. Quality bar
 - Statements read like a good Korean textbook exercise: a short story/context, exact input/output format, constraints, 1–3 examples with explanations.
-- Levels ramp gently: each chapter has 2–4 problems from level 1 up; core set spans 입출력 → 조건 → 반복 → 배열/문자열 → 함수 → 재귀/정렬/탐색 → 작은 시뮬레이션.
+- Levels ramp gently: each chapter has at least 2 problems, starting at level 1; inline chapter cards show at most 4 (unsolved first, then by level) and link to the full list filtered by chapter; core set spans 입출력 → 조건 → 반복 → 배열/문자열 → 함수 → 재귀/정렬/탐색 → 작은 시뮬레이션.
 - Every reference solution passes every case in every language it lists; every starter fails at least one case (CI enforces both, §10).
 - Function-mode starters compile as-is (they return a placeholder value) so a beginner never starts from a compile error.
 

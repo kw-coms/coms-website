@@ -1,4 +1,5 @@
 import { exercisesFor } from './problems'
+import { selectInlineProblems } from './selection'
 import { readProgress } from './progress'
 import { chapterOf, problemStatus } from './navigation'
 
@@ -37,12 +38,15 @@ export function initExerciseLinks(root: HTMLElement, studyId: string, navigate: 
     heading.textContent = '이 장의 실습 문제'
     card.append(heading)
     const list = document.createElement('ul')
-    for (const p of matches) {
+    for (const p of selectInlineProblems(matches, progress)) {
       const li = document.createElement('li')
       li.append(link(`${p.title} · 난이도 ${p.level} ${'●'.repeat(p.level)} · ${problemStatus(progress[p.id])}`, `/study/${studyId}/practice/${p.id}`))
       list.append(li)
     }
     card.append(list)
+    if (matches.length > 4) {
+      card.append(link(`이 장 문제 전체 ${matches.length}개 →`, `/study/${studyId}/practice?chapter=${encodeURIComponent(section.id)}`))
+    }
     section.append(card)
     owned.push(card)
   }

@@ -4,7 +4,8 @@ import { readFile } from 'node:fs/promises'
 import http from 'node:http'
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
-import { loadProblems, buildProgram, compare, validateWeb, runRemote } from '../scripts/verify-exercises.mjs'
+import { loadProblems, buildProgram, compare, validateWeb, chapterMismatches, runRemote } from '../scripts/verify-exercises.mjs'
+import { chapters } from '../src/pages/study/exercises/chapters.ts'
 
 const problems = await loadProblems()
 const langs = ['c', 'java', 'python']
@@ -15,6 +16,32 @@ for (const lang of [...langs, 'web']) {
 }
 const nonempty = value => assert.ok(typeof value === 'string' && value.trim().length > 0, 'expected nonempty string')
 const rawTag = /<\/?[a-z][a-z0-9-]*(?:\s+[^<>]*|\s*\/?)>/i
+
+test('every allowlisted chapter exists on its study page', () => {
+  for (const [lang, allowed] of Object.entries(chapters)) {
+    assert.equal(new Set(allowed).size, allowed.length, `duplicate ${lang} chapter`)
+    for (const chapter of allowed) assert.ok(chapterIds[lang].has(chapter), `${lang}: allowlisted chapter ${chapter} has no section[id]`)
+  }
+})
+
+test('verifier reports chapters outside the allowlist', async () => {
+  const mismatches = await chapterMismatches([
+    { id: 'bad-web', chapter: 'missing' },
+    { id: 'bad-c', langs: ['c'], chapter: { c: 'missing' } },
+  ])
+  assert.ok(mismatches.some(message => message.includes('bad-web/web: chapter missing')))
+  assert.ok(mismatches.some(message => message.includes('bad-c/c: chapter missing')))
+})
+
+test('all problem chapters match the allowlist and a study page section', async () => {
+  assert.deepEqual(await chapterMismatches(problems), [])
+})
+
+test('web schema accepts the start and project chapters', () => {
+  const web = problems.find(problem => !('langs' in problem))
+  assert.ok(web)
+  for (const chapter of ['start', 'project']) assert.doesNotThrow(() => validateWeb({ ...web, chapter }))
+})
 
 function common(p) {
   for (const key of ['id', 'title', 'statement', 'explain']) nonempty(p[key])
@@ -38,6 +65,7 @@ for (const p of problems) {
     common(p)
     if (!('langs' in p)) {
       validateWeb(p)
+      assert.ok(chapters.web.includes(p.chapter), `unknown web chapter ${p.chapter}`)
       assert.ok(chapterIds.web.has(p.chapter), `unknown web chapter ${p.chapter}`)
       return
     }
@@ -58,6 +86,7 @@ for (const p of problems) {
     }
     assert.ok(cases.reduce((n, c) => n + Buffer.byteLength(c.stdin), 0) <= 32 * 1024)
     for (const lang of p.langs) {
+      assert.ok(chapters[lang].includes(p.chapter[lang]), `unknown ${lang} chapter ${p.chapter[lang]}`)
       assert.ok(chapterIds[lang].has(p.chapter[lang]), `unknown ${lang} chapter ${p.chapter[lang]}`)
       for (const kind of ['starter', 'solution']) {
         nonempty(p[kind]?.[lang])

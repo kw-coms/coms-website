@@ -1,12 +1,8 @@
 import type { Exercise, WebExercise, ExLang } from './types'
+import { chapters } from './chapters'
 
 export type Problem = Exercise | WebExercise
-export const chapters: Record<string, string[]> = {
-  c: ['start', 'anatomy', 'types', 'branch', 'loop', 'array', 'func', 'pointer', 'struct', 'project'],
-  java: ['start', 'anatomy', 'vars', 'input', 'flow', 'array', 'method', 'class', 'inherit', 'exception', 'project'],
-  python: ['start', 'values', 'cond', 'loop', 'data', 'str', 'func', 'module', 'error', 'class', 'project'],
-  web: ['start', 'html', 'css', 'js', 'project'],
-}
+export { chapters }
 export const chapterOf = (problem: Problem, studyId: string): string => typeof problem.chapter === 'string' ? problem.chapter : problem.chapter[studyId as ExLang] ?? ''
 export function problemStatus(entry?: { solved: boolean; tries: number; viewed?: boolean }): string {
   return entry?.solved ? '✓ 해결' : entry?.viewed ? '👀 답 확인' : entry?.tries ? '◐ 도전 중' : 'new'

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import NotFoundPage from '../../../components/NotFoundPage'
 import { findStudy } from '../studies'
 import { exercisesFor } from './problems'
@@ -13,7 +13,16 @@ export default function PracticeListPage() {
   const { id = '' } = useParams()
   const study = findStudy(id)
   const progress = useProgress()
-  const [chapter, setChapter] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const chapter = searchParams.get('chapter') ?? ''
+  const setChapter = (value: string) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      if (value) next.set('chapter', value)
+      else next.delete('chapter')
+      return next
+    })
+  }
   const [topic, setTopic] = useState('')
   const [level, setLevel] = useState('')
   const [status, setStatus] = useState('')
@@ -39,6 +48,7 @@ export default function PracticeListPage() {
         <label>난이도<select value={level} onChange={(e) => setLevel(e.target.value)}><option value="">전체 난이도</option>{[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}</select></label>
         <label>상태<select value={status} onChange={(e) => setStatus(e.target.value)}><option value="">전체 상태</option>{['new', '◐ 도전 중', '👀 답 확인', '✓ 해결'].map((s) => <option key={s}>{s}</option>)}</select></label>
       </div>
+      {chapter && <button type="button" className="ex-filter-chip" onClick={() => setChapter('')} aria-label={`장 필터 해제: ${chapter}`}>장: {chapter} ×</button>}
       <p role="status">{visible.length}개 문제</p>
       <ul className="ex-list">{visible.map((p) => <li key={p.id}><Link className="ex-row" to={`/study/${id}/practice/${p.id}`}><strong>{p.title}</strong><span aria-label={`난이도 ${p.level} / 5`}>{'●'.repeat(p.level)}{'○'.repeat(5 - p.level)}</span><span>{p.topics.join(' · ')}</span><span>{problemStatus(progress[p.id])}</span><span>{'langs' in p ? p.langs.join(' / ') : 'HTML / CSS / JS'}</span></Link></li>)}</ul>
       {visible.length === 0 && <p className="ex-empty">{problems.length ? '조건에 맞는 문제가 없어요. 필터를 바꿔 보세요.' : '실습 문제를 준비하고 있어요.'}</p>}
