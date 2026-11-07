@@ -515,4 +515,14 @@ export const activitySectionNavItems = [
     icon: Dices,
     accent: 'text-violet-500',
   },
+  // A separate app at /lab/ (its own page, not a route of this SPA): see isFullPageLink.
+  {
+    id: 'circuit-lab',
+    group: 'tools',
+    label: 'Circuit Lab',
+    hint: '아두이노 회로 시뮬레이터',
+    path: '/lab/',
+    icon: CircuitBoard,
+    accent: 'text-emerald-500',
+  },
 ]

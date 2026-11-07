@@ -92,6 +92,8 @@ const pwaPlugin = VitePWA({
       /\/(share|share-data|share-image)$/,
       // Demo sandbox for /study: a real document with its own CSP (nginx.frontend.conf), never the SPA shell.
       /^\/study-sandbox\.html$/,
+      // Circuit Lab (lab/): its own app, built into the same image under /lab/ (Dockerfile.frontend).
+      /^\/lab(\/|$)/,
       // Sibling apps the host nginx serves under sub-paths of this origin.
       // Without these the SW hijacks their navigations and renders the SPA 404.
       /^\/(foodclub|gameclub|BugSnap|LogDoctor|PRDoctor|worldcup|tier|team-randomizer|companion|phonemote)(\/|$)/,
@@ -106,7 +108,7 @@ const pwaPlugin = VitePWA({
       '**/Admin-*.js',
       '**/common-*.js', // highlight.js (its "common" language bundle)
       '**/vendor-sentry-*.js',
-      '**/study-content-*.js', // /study lesson markup (~525 KB for the five studies), fetched when one is opened
+      '**/study-content-*.js', // /study lesson markup (~525 KB for the five studies) and circuit drawings, fetched when a study is opened
       '**/study-editor-*.js', // CodeMirror of the /study playground (~350 KB), fetched when someone presses "직접 해보기"
     ],
     maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
@@ -139,10 +141,11 @@ export default defineConfig({
     sourcemap: sentryAuthToken ? 'hidden' : false,
     rollupOptions: {
       output: {
-        // The /study lesson fragments and the code editor of "직접 해보기" (CodeMirror + its language packs) get recognisable
-        // names so workbox's globIgnores can keep them out of the precache: they are fetched when a study page / an editor is opened.
+        // The /study lesson fragments (and the circuit-drawing chunk) and the code editor of "직접 해보기" (CodeMirror + its
+        // language packs) get recognisable names so workbox's globIgnores can keep them out of the precache: they are fetched
+        // when a study page / an editor is opened.
         chunkFileNames: (chunk) => {
-          if (chunk.moduleIds.some((id) => id.includes('/src/pages/study/content/'))) return 'assets/study-content-[name]-[hash].js'
+          if (chunk.moduleIds.some((id) => id.includes('/src/pages/study/content/') || id.includes('/src/pages/study/circuits/'))) return 'assets/study-content-[name]-[hash].js'
           if (chunk.moduleIds.some((id) => /\/node_modules\/(@codemirror|@lezer|crelt|style-mod|w3c-keyname)\/|\/src\/pages\/study\/playground\/editor\./.test(id))) return 'assets/study-editor-[name]-[hash].js'
           return 'assets/[name]-[hash].js'
         },

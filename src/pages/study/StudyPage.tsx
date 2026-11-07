@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import NotFoundPage from '../../components/NotFoundPage'
@@ -19,6 +19,8 @@ function StudyBody({ id }: { id: string }) {
   const navigate = useNavigate()
   const location = useLocation()
   const html = loaded?.id === id ? loaded.html : null
+  // A fresh { __html } object on every render makes React 19 assign innerHTML again, which would wipe what initStudyPage added (demos, circuits).
+  const markup = useMemo(() => (html ? { __html: html } : null), [html])
 
   useEffect(() => {
     let cancelled = false
@@ -45,9 +47,9 @@ function StudyBody({ id }: { id: string }) {
       <div className="study-back">
         <Link to="/study"><ArrowLeft size={14} aria-hidden="true" /> 스터디 목록</Link>
       </div>
-      {html ? (
+      {markup ? (
         // Trusted build-time constant (src/pages/study/content/*.html), not user content. React never re-renders it.
-        <div ref={layoutRef} className="study-layout" dangerouslySetInnerHTML={{ __html: html }} />
+        <div ref={layoutRef} className="study-layout" dangerouslySetInnerHTML={markup} />
       ) : (
         <p className="study-loading" role="status">{failed ? '자료를 불러오지 못했습니다. 새로고침해 주세요.' : '불러오는 중...'}</p>
       )}

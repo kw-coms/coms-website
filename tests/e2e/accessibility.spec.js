@@ -298,3 +298,25 @@ for (const theme of ['dark', 'light']) test(`study page (${theme}) with the play
   await page.locator('#code-5').scrollIntoViewIfNeeded()
   await assertNoSeriousViolations(page, '#code-5')
 })
+
+// The study pages are long, mostly static documents: tables and code blocks that scroll sideways must be keyboard
+// reachable, and link/chip colours must hold up in both themes.
+for (const theme of ['light', 'dark']) {
+  for (const viewport of [{ width: 1280, height: 900 }, { width: 320, height: 720 }]) {
+    test.describe(`study pages, ${theme} theme at ${viewport.width}px`, () => {
+      test.use({ viewport })
+      for (const route of ['/study/arduino', '/study/web']) {
+        test(`${route} has no serious accessibility violation or horizontal overflow`, async ({ page }) => {
+          await page.addInitScript((mode) => localStorage.setItem('kwcoms-theme-mode:v2', mode), theme)
+          await mockOptionalApis(page)
+          await page.goto(route)
+          await expect(page.locator('.study-main')).toBeVisible()
+          await page.waitForTimeout(600)
+          await assertNoSeriousViolations(page)
+          const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+          expect(overflow, `${route} overflows at ${viewport.width}px`).toBeLessThanOrEqual(1)
+        })
+      }
+    })
+  }
+}

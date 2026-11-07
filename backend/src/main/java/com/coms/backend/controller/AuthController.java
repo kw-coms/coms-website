@@ -181,7 +181,12 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<MemberResponse> me(Authentication authentication) {
-        return ResponseEntity.ok(authService.getMe(authentication.getName()));
+        // The member's own id on their own /me call. The frontend nginx reads it from its internal
+        // auth_request for Circuit Lab (/lab/api/compile) and hands it to the compiler as the key of the
+        // member's rate limit; it never comes from the client.
+        return ResponseEntity.ok()
+                .header("X-Member-Id", authentication.getName())
+                .body(authService.getMe(authentication.getName()));
     }
 
     @DeleteMapping("/me")

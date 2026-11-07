@@ -14,6 +14,7 @@ import { usePermissions } from '../contexts/usePermissions'
 import { canAccessOperationsPanel } from '../utils/roleAccess'
 import { useModalFocus } from '../hooks/useModalFocus'
 import { moveQuickIndex, quickDate, searchQuickItems, type QuickGroup, type QuickItem } from '../utils/quickSearch'
+import { isFullPageLink } from '../utils/fullPageLink'
 
 /**
  * Quick jump ("빠른 이동"): one box that goes to any page and, for a signed-in member, to a
@@ -109,7 +110,8 @@ export default function QuickSearchDialog({ onClose }: { onClose: () => void }) 
   const go = (item: QuickItem | undefined) => {
     if (!item) return
     onClose()
-    navigate(item.path)
+    if (isFullPageLink(item.path)) window.location.assign(item.path)
+    else navigate(item.path)
   }
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {

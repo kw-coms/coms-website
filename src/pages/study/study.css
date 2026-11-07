@@ -8,9 +8,11 @@
   --line: var(--app-hairline);
   --accent: var(--app-accent);
   --accent-soft: var(--app-accent-soft);
-  --html: #e2582b;
-  --css: #2f6fe0;
-  --js: #c99a00;
+  /* the site accent (user selectable) used as TEXT colour: darkened so every swatch stays >= 4.5:1 on the light surfaces */
+  --accent-text: color-mix(in srgb, var(--app-accent-text, #0071e3) 60%, #000);
+  --html: #b53b0c; /* darker than the brand tints so chips and headings reach 4.5:1 on the light surfaces */
+  --css: #2459c4;
+  --js: #7a5c00;
   --code-bg: #1e2230;
   --code-text: #e7e9ef;
   --ok: #1f8a4c;
@@ -26,6 +28,7 @@
   word-break: keep-all;
 }
 :root[data-theme-mode='dark'] .study-page {
+  --accent-text: color-mix(in srgb, var(--app-accent-text, #4da3ff) 70%, #fff); /* lightened for the dark surfaces */
   --html: #ff7a4d;
   --css: #6b9bff;
   --js: #f0c93a;
@@ -38,7 +41,9 @@
 .study-page *::after { box-sizing: border-box; }
 /* The fixed top bar covers the first ~nav-height px: anchors and scroll-spy stop below it. */
 .study-page [id] { scroll-margin-top: calc(var(--apple-nav-height, 44px) + env(safe-area-inset-top) + 16px); }
-.study-page a { color: var(--accent); }
+.study-page a { color: var(--accent-text); }
+/* a link inside running text must not rely on colour alone (WCAG 1.4.1) */
+.study-page :is(p, li, .tip, .note, .warn, summary, .ans) a { text-decoration: underline; text-underline-offset: 2px; }
 .study-page code,
 .study-page pre,
 .study-page textarea { font-family: var(--study-mono); }
@@ -116,7 +121,7 @@
   color: var(--text);
 }
 .study-page nav.toc li a.active {
-  color: var(--accent);
+  color: var(--accent-text);
   border-left-color: var(--accent);
   font-weight: 700;
 }
@@ -157,7 +162,7 @@
 .study-page .hero .eyebrow {
   font-size: 13px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-text);
   letter-spacing: .08em;
 }
 .study-page .hero h1 {
@@ -340,7 +345,7 @@
 .study-page .bm-margin {
   background: #f9cc9d55;
   border: 2px dashed #d88a3a;
-  color: #a35d16;
+  color: #7d4510;
 }
 .study-page .bm-border {
   background: #2a2a2a22;
@@ -349,7 +354,7 @@
 }
 .study-page .bm-padding {
   background: #b7e1a888;
-  color: #2f6b1d;
+  color: #214f12;
 }
 .study-page .bm-content {
   background: #8fb7f0;
@@ -377,7 +382,7 @@
   font-weight: 500;
 }
 .study-page details summary::marker {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .study-page details[open] summary {
   margin-bottom: 8px;
@@ -442,13 +447,13 @@
   color: #fff;
 }
 .study-page .tabs button[data-lang="html"].on {
-  box-shadow: inset 0 2px 0 var(--html);
+  box-shadow: inset 0 2px 0 #ff7a4d; /* the selected tab sits on the fixed dark bar: always the bright tint */
 }
 .study-page .tabs button[data-lang="css"].on {
-  box-shadow: inset 0 2px 0 var(--css);
+  box-shadow: inset 0 2px 0 #6b9bff;
 }
 .study-page .tabs button[data-lang="js"].on {
-  box-shadow: inset 0 2px 0 var(--js);
+  box-shadow: inset 0 2px 0 #f0c93a;
 }
 .study-page .tools {
   display: flex;
@@ -557,7 +562,7 @@
 /* Boxes drawn on --surface: the fixed colours below stay readable, the text ones need a dark twist. */
 :root[data-theme-mode='dark'] .study-page .bm-margin { background: #f9cc9d22; color: #e8b27a; }
 :root[data-theme-mode='dark'] .study-page .bm-border { background: #ffffff14; border-color: #8a8f9c; }
-:root[data-theme-mode='dark'] .study-page .bm-padding { background: #b7e1a833; color: #a6dc8f; }
+:root[data-theme-mode='dark'] .study-page .bm-padding { background: #b7e1a833; color: #c3ecb0; }
 :root[data-theme-mode='dark'] .study-page .demo iframe { background: #fff; }
 
 /* ---------- 공통 보강 (새 스터디 본문에서 쓰는 요소) ---------- */
@@ -567,7 +572,7 @@
 .study-page .study-loading { max-width: 1180px; margin: 0 auto; padding: 60px 24px; color: var(--muted); }
 
 /* plain .chip (no html/css/js modifier): neutral accent */
-.study-page .chip { color: var(--accent); }
+.study-page .chip { color: var(--accent-text); }
 .study-page .chip.html { color: var(--html); }
 .study-page .chip.css { color: var(--css); }
 .study-page .chip.js { color: var(--js); }
@@ -646,3 +651,132 @@
 .study-card-tags span { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 99px; background: var(--app-accent-soft); color: var(--app-accent-text); }
 .study-card-foot { margin-top: auto; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; font-weight: 700; color: var(--app-accent-text); }
 @media (prefers-reduced-motion: reduce) { .study-card { transition: none; } .study-card:hover { transform: none; } }
+
+/* ---------- 회로 그림 (circuits/): 약간 3D로 기울인 Tinkercad 스타일 SVG + 시뮬레이션 ----------
+   그림의 틀(버튼 줄, 그림 상자, 슬라이더, 상태 줄, 캡션 안내)은 content/arduino.html에 이미 들어 있고(circuits/chrome.ts로 생성),
+   모든 줄의 높이는 이 CSS와 그 마크업만으로 정해진다: 스크립트가 붙든, 시뮬레이션이 돌든, 평면/3D·저전력 모드가 바뀌든
+   그림 높이는 첫 화면부터 그대로라서 위쪽 그림 때문에 읽던 글이 밀리지 않는다(스크롤 앵커링이 없는 Safari 포함). */
+.study-page .circuit { margin: 22px auto; max-width: 760px; container-type: inline-size; }
+.study-page .circuit figcaption { margin-top: 10px; font-size: 13px; color: var(--muted); text-align: center; }
+.study-page .circuit .circuit-hint { display: block; margin-top: 2px; }
+.study-page .circuit:not(.is-live) .circuit-hint { visibility: hidden; } /* true only once the table is linked to the drawing */
+/* 버튼 줄: 좁은 그림은 두 줄, 넓은 그림은 한 줄 높이를 늘 차지한다(min-height: 글자만 키우는 설정에서는 잘리지 않고 늘어난다).
+   조립 순서를 켜면 단계 버튼들이 같은 자리에서 '조립 순서 보기'를 대신한다. */
+.study-page .circuit-bar { display: flex; flex-wrap: wrap; align-items: center; align-content: center; justify-content: center; gap: 8px; min-height: 76px; margin: 0 0 10px; }
+@container (min-width: 560px) { .study-page .circuit-bar { min-height: 34px; } }
+.study-page .circuit-stepper { display: flex; align-items: center; gap: 8px; }
+.study-page .circuit-stepper[hidden], .study-page .circuit .cb[hidden] { display: none; }
+.study-page .circuit .cb {
+  border: 1px solid var(--line); background: var(--surface); color: var(--text);
+  font: 600 13px var(--apple-font-family); padding: 6px 12px; border-radius: 99px; cursor: pointer; min-height: 34px;
+  white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+}
+.study-page .circuit .cb:hover:not(:disabled) { border-color: var(--accent); }
+.study-page .circuit .cb:focus-visible,
+.study-page .circuit-stage:focus-visible,
+.study-page .circuit-range input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.study-page .circuit .cb:disabled { opacity: .45; cursor: default; }
+.study-page .circuit .cb-play { background: var(--accent); border-color: var(--accent); color: #fff; }
+.study-page .circuit .cb-play[aria-pressed='true'] { background: var(--surface); color: var(--accent-text); }
+/* 스크립트가 아직 안 붙었거나 못 붙은 그림: 조작부가 눌리지 않는 상태임이 보이게(색 없는 재생 버튼) */
+.study-page .circuit:not(.is-live) .cb-play { background: var(--surface); border-color: var(--line); color: var(--muted); }
+.study-page .circuit-progress { min-width: 52px; text-align: center; font: 700 14px var(--study-mono); font-variant-numeric: tabular-nums; }
+
+.study-page .circuit-stage {
+  perspective: 1300px; perspective-origin: 50% 35%;
+  border-radius: 14px; padding: 14px 8px 20px; overflow: hidden;
+  background: linear-gradient(#eef2f8, #dde4ee);
+  border: 1px solid var(--line);
+  touch-action: pan-y; cursor: grab;
+}
+.study-page .circuit-stage.is-flat { cursor: default; } /* same padding as 3D: switching views never changes the height */
+.study-page .circuit-stage:active:not(.is-flat) { cursor: grabbing; }
+:root[data-theme-mode='dark'] .study-page .circuit-stage { background: linear-gradient(#232a3b, #151a27); }
+.study-page .circuit-plane {
+  /* the scene's viewBox (--w / --h, written into the page per figure): the box has its final size before the SVG exists */
+  margin: 0 auto; width: 100%; max-width: calc(var(--w) * 1.12px); aspect-ratio: var(--w) / var(--h); min-height: 0; border-radius: 10px;
+  background:
+    radial-gradient(circle, rgba(70, 90, 130, .22) 1px, transparent 1.4px) 0 0 / 18px 18px,
+    linear-gradient(#f9fbfd, #e9eef5);
+  box-shadow: 0 5px 0 #b9c3d2, 0 24px 34px -8px rgba(18, 28, 52, .45);
+  transform-origin: 50% 70%;
+  transition: transform .25s ease;
+}
+:root[data-theme-mode='dark'] .study-page .circuit-plane {
+  background:
+    radial-gradient(circle, rgba(160, 180, 220, .2) 1px, transparent 1.4px) 0 0 / 18px 18px,
+    linear-gradient(#2c344a, #202638);
+  box-shadow: 0 5px 0 #0c1019, 0 24px 34px -8px rgba(0, 0, 0, .7);
+}
+.study-page .circuit-stage.is-flat .circuit-plane { box-shadow: none; transition: none; }
+.study-page .circuit-svg { display: block; width: 100%; height: auto; stroke: none; color: inherit; user-select: none; -webkit-user-select: none; }
+
+.study-page .circuit-svg .cpart, .study-page .circuit-svg .cfx, .study-page .circuit-svg .cw { transition: opacity .25s ease, visibility .25s; }
+.study-page .circuit-svg .cstep-off { opacity: 0; visibility: hidden; pointer-events: none; }
+.study-page .circuit-svg .cw .wend { opacity: 0; stroke: #ffc400; }
+.study-page .circuit-svg .is-hl { filter: drop-shadow(0 0 5px #ffc400) drop-shadow(0 0 2px #ffc400); }
+.study-page .circuit-svg .cw.is-hl .wend { opacity: 1; }
+.study-page .circuit-svg .hit { outline: none; }
+.study-page .circuit-svg .hit:focus-visible { stroke: #ffc400; stroke-width: 3; }
+.study-page .circuit-svg .waves circle { opacity: 0; transform-box: fill-box; transform-origin: center; }
+.study-page .circuit-svg .waves.on circle { opacity: .75; animation: circuit-wave 1.3s ease-out infinite; }
+@keyframes circuit-wave { from { transform: scale(.55); opacity: .85; } to { transform: scale(1.7); opacity: 0; } }
+
+/* 슬라이더와 모드 버튼: 칸 수는 그림 폭(560px 기준)으로만 정해지고, 각 칸은 한 줄짜리 글(이름 | 값)과 슬라이더 한 줄이다.
+   글자 폭(나중에 바뀌는 웹폰트 등)은 줄 수를 바꾸지 못한다: 긴 이름은 줄바꿈 대신 말줄임. */
+.study-page .circuit-ctl { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px 18px; margin-top: 10px; }
+.study-page .circuit-ctl:empty { display: none; }
+.study-page .circuit-range { display: grid; grid-template-columns: minmax(0, 1fr) 56px; align-items: center; column-gap: 8px; font-size: 13px; font-weight: 600; }
+.study-page .circuit-range-label { grid-area: 1 / 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.study-page .circuit-range-out { grid-area: 1 / 2; text-align: right; white-space: nowrap; font: 700 13px var(--study-mono); font-variant-numeric: tabular-nums; }
+.study-page .circuit-range input { grid-area: 2 / 1 / 3 / 3; width: 100%; margin: 4px 0 0; accent-color: var(--accent); }
+.study-page .circuit-modes { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+@container (min-width: 560px) {
+  .study-page .circuit-ctl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* a slider left alone on its row sits in the middle, as wide as one column */
+  .study-page .circuit-range:last-of-type:nth-of-type(odd) { grid-column: 1 / -1; justify-self: center; width: calc(50% - 9px); }
+  .study-page .circuit-modes { flex-direction: row; justify-content: center; }
+}
+/* 상태 줄: 숨은 .circuit-status-size들(대기 안내 + 모든 실행 문구 틀, 숫자는 가장 넓게)이 높이를 정하고, 보이는 글(.circuit-status)은
+   그 상자를 채울 뿐 크기에 관여하지 않는다(contain: size). 어떤 문구로 바뀌어도 줄 높이는 그대로다. */
+.study-page .circuit-status-box {
+  display: grid; margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line);
+  font: 13px/1.5 var(--study-mono); text-align: center; word-break: keep-all;
+}
+.study-page .circuit-status-box > * { grid-area: 1 / 1; }
+.study-page .circuit-status-size { visibility: hidden; }
+.study-page .circuit-status { contain: size; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+/* 회로 코드나 그림을 불러오지 못한 그림(data-failed): 상태 줄 자리에 안내. 이 글도 자기 자리를 늘 차지하므로 높이는 그대로다. */
+.study-page .circuit-failed { visibility: hidden; display: flex; align-items: center; justify-content: center; }
+.study-page .circuit[data-failed] .circuit-failed { visibility: visible; }
+.study-page .circuit[data-failed] .circuit-status { visibility: hidden; }
+/* wiring table <-> drawing */
+.study-page tr.circuit-row { cursor: default; }
+.study-page tr.circuit-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.study-page tr.circuit-row-on > td, .study-page tr.circuit-row-on > th { background: rgba(255, 196, 0, .22); }
+.study-page tr.circuit-row-current > td { box-shadow: inset 3px 0 0 var(--accent); }
+@media (max-width: 520px) {
+  .study-page .circuit-stage { padding: 10px 4px 16px; border-radius: 10px; } /* flat and 3D alike */
+}
+@media (prefers-reduced-motion: reduce) {
+  .study-page .circuit-plane, .study-page .circuit-svg .cpart, .study-page .circuit-svg .cfx, .study-page .circuit-svg .cw { transition: none; }
+  .study-page .circuit-svg .waves.on circle { animation: none; transform: scale(1.1); opacity: .6; }
+}
+
+/* 회로 그림: 그래픽 가속이 없는 컴퓨터(<html data-perf="lite">)에서는 필터·그림자·연속 애니메이션을 끈다 */
+:root[data-perf='lite'] .study-page .circuit-plane { transition: none; box-shadow: none; }
+:root[data-perf='lite'] .study-page .circuit-svg [filter],
+:root[data-perf='lite'] .study-page .circuit-svg .is-hl { filter: none; }
+:root[data-perf='lite'] .study-page .circuit-svg :is(.cpart, .cfx).is-hl :is(rect, circle, ellipse, path):not([fill='none'], [fill='transparent']) { stroke: #ffc400; stroke-width: 2.6; }
+:root[data-perf='lite'] .study-page .circuit-svg .cw.is-hl .wire > path:nth-of-type(3) { stroke: #ffc400; stroke-width: 11; }
+:root[data-perf='lite'] .study-page .circuit-svg .cw.is-hl .wire > path:nth-of-type(4) { stroke-width: 4.2; }
+:root[data-perf='lite'] .study-page .circuit-svg [data-role^='rgb-glow'] { display: none; }
+:root[data-perf='lite'] .study-page .circuit-svg .cpart, :root[data-perf='lite'] .study-page .circuit-svg .cfx, :root[data-perf='lite'] .study-page .circuit-svg .cw { transition: none; }
+:root[data-perf='lite'] .study-page .circuit-svg .waves.on circle { animation: none; transform: scale(1.1); opacity: .6; }
+
+/* 한 번에 한 줄씩만 낭독되는 스크린 리더용 영역과, 화면 밖 회로의 자리표시 상자 */
+.study-page .circuit-live { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+.study-page .circuit { position: relative; }
+.study-page .circuit[data-offscreen] .circuit-svg .waves.on circle { animation-play-state: paused; }
+
+.study-page [data-scroll-region]:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
