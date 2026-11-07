@@ -35,6 +35,7 @@ coms-website/
 │       │   ├── security/         # JWT, 인증 필터
 │       │   └── config/           # 보안, 시간, Flyway 설정
 │       └── resources/db/migration/   # Flyway migration
+├── runner/                       # 스터디 코드 실행기(C·Java·Python 샌드박스 서비스, 직접 해보기가 호출)
 ├── lab/                          # COM's Circuit Lab (/lab/): 별도 Vite 앱과 Arduino 컴파일 서비스(lab/compiler)
 ├── tests/                        # 프론트엔드 단위 테스트(*.test.mjs)와 Playwright E2E(e2e/)
 ├── public/                       # 정적 파일, PWA manifest, 서비스 워커 푸시 핸들러
@@ -116,6 +117,33 @@ docker compose -f lab/compiler/docker-compose.dev.yml up --build -d   # 127.0.0.
 | `npm run e2e:browser`, `npm run e2e:prod` | 브라우저 e2e (자세한 사용법은 `lab/tools/`) |
 
 운영 배포(이미지 구성, nginx, 소켓, 한도)는 [lab/docs/DEPLOY.md](../lab/docs/DEPLOY.md)에 있습니다.
+
+### 6. 스터디 "직접 해보기"와 코드 실행기 (선택)
+
+`/study/c`, `/study/java`, `/study/python`의 코드 블록은 **직접 해보기**로 편집·실행할 수 있습니다. 화면(CodeMirror 편집기, 결과·진단 패널, 저장, 공유 링크)은 `src/pages/study/playground/`에 있고, C·Java·Python 실행은 `runner/`의 별도 서비스가 맡습니다. HTML/CSS/JS는 기존 `/study-sandbox.html` iframe에서, Arduino는 Circuit Lab에서 실행합니다. API 계약은 [study-runner-api.md](study-runner-api.md)이고, 보안 모델·자원 제한·테스트는 [runner/README.md](../runner/README.md)에 있습니다.
+
+실행기 없이도 화면 개발은 됩니다(`npm run dev`; 실행 요청은 로그인 안내나 연결 오류로 끝납니다). 실행까지 보려면 실행기를 Docker로 띄우고 개발 서버의 프록시로 연결합니다.
+
+```bash
+docker compose -f runner/docker-compose.dev.yml up --build -d   # 127.0.0.1:8788, 로컬 개발 전용(브리지 네트워크)
+```
+
+실행기는 TCP 포트가 없는 프로덕션 구성과 다릅니다(개발용은 IP 단위 제한, 인증 없음). 프로덕션 구성 전체를 로컬에서 보려면 아래 "Docker로 실행하기"의 Compose 스택을 쓰세요.
+
+**프로덕션 배포 동작**
+
+- `docker-compose.yml`의 `coms-study-runner`(이미지 `coms-study-runner:${COMS_IMAGE_TAG}`, 빌드 컨텍스트 `runner/`)가 `network_mode: none`, 읽기 전용 루트, 고정 seccomp 프로파일(`runner/seccomp.json`), `SETUID/SETGID/KILL/SYS_RESOURCE`만 남긴 capability, `/jobs` tmpfs로 실행합니다. 서버는 컨테이너 root이고 모든 작업은 uid 10100으로 강등해 실행합니다.
+- `coms-frontend`(nginx)와 `study-runner-socket` 볼륨(소켓 전용 tmpfs)을 공유해 `/study/api/run`을 유닉스 소켓으로 프록시합니다. 요청마다 `auth_request`가 백엔드 `/api/auth/me`로 로그인을 확인하고, 백엔드가 돌려준 `X-Member-Id`가 회원 키(`X-Runner-Client`)가 됩니다. 로그인 전에는 주소별·공용 한도가, 로그인 후에는 실행기가 회원별 한도(분당 10회)와 동시 1건 제한을 적용합니다. `/study/api/health`는 컨테이너 헬스체크 전용이라 밖에서는 404입니다.
+- 남용 이력(deny-list)은 디스크 볼륨 `coms-study-runner-state`에 있어 재시작해도 유지됩니다. 이 두 볼륨 이름은 프로덕션 전용이며, 테스트는 `RUNNER_SOCKET_VOLUME`/`RUNNER_STATE_VOLUME`으로 일회용 이름을 씁니다.
+- **실행기는 사이트를 실패시키거나 롤백시킬 수 없습니다.** `coms-frontend`와 서로 `depends_on`이 없고, 배포는 Circuit Lab 컴파일러와 같은 경고 전용 단계(`scripts/deploy-sidecars.sh`)로만 다룹니다: 서버 여유(`free -m`, `df -h /`) 출력과 메모리 확인(가용 1200 MB 미만이면 건너뜀) → 실행 중 이미지를 `coms-study-runner:previous`로 스냅샷 → 빌드 실패는 경고만 → 사이트 헬스 체크 통과 후에만 기동(실패하면 previous로 복원) → 실제로 기동한 릴리스만 `latest`로 승격. 실행기가 내려가 있으면 `/study/api/run`은 502이고 플레이그라운드가 연결 오류를 안내합니다. 테스트: `scripts/test-deploy-sidecars.sh`.
+- 호스트 nginx는 변경이 필요 없습니다(`/study/*`는 이미 프런트 컨테이너로 갑니다). 호스트 기본 `proxy_read_timeout`(60초)보다 짧게 프런트 nginx가 58초, 실행기가 약 55초 안에 끝냅니다.
+
+| 확인 | 명령 |
+| --- | --- |
+| 실행기 단위·HTTP·Compose 계약 | `node --test "runner/test/*.test.mjs"` |
+| 실제 툴체인과 공격 시나리오(프로덕션 제한의 컨테이너) | `runner/README.md`의 "프로덕션 Compose 파일 자체로 검증" |
+| 사이트 연결(nginx·Compose·배포) 계약 | `node --import tsx tests/studyRunnerNginx.test.mjs` |
+| 실제 스택에서 플레이그라운드 | 스택을 띄우고 `E2E_STACK=1 E2E_STACK_ADMIN_ID=… E2E_STACK_ADMIN_PASSWORD=… npx playwright test --project=stack` (CI의 "Production images build & boot" 잡이 같은 걸 실행) |
 
 ## 테스트와 빌드
 

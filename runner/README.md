@@ -1,6 +1,6 @@
 # COM'S 스터디 코드 실행기
 
-스터디 예제의 C, Java, Python 소스를 받아 컴파일·실행하고 표준 출력, 오류, 초보자용 진단을 JSON으로 돌려줍니다. API는 [`docs/study-runner-api.md`](../docs/study-runner-api.md)의 `POST /study/api/run`과 `GET /study/api/health`를 따릅니다. 인증은 이 서비스가 아니라 같은 출처의 nginx `auth_request` → 백엔드 `/api/auth/me`가 맡습니다. **인증된 회원만** 이 소켓에 접근하도록 nginx 위치 설정을 제한해야 합니다. HTML/CSS/JS는 기존 브라우저 샌드박스에서 실행합니다.
+스터디 예제의 C, Java, Python 소스를 받아 컴파일·실행하고 표준 출력, 오류, 초보자용 진단을 JSON으로 돌려줍니다. API는 [`docs/study-runner-api.md`](../docs/study-runner-api.md)의 `POST /study/api/run`과 `GET /study/api/health`를 따릅니다. 사이트 배포 방법(Compose 서비스, nginx 연결, 배포 단계, CI)은 [docs/DEVELOPMENT.md](../docs/DEVELOPMENT.md#6-스터디-직접-해보기와-코드-실행기-선택)에 있습니다. 인증은 이 서비스가 아니라 같은 출처의 nginx `auth_request` → 백엔드 `/api/auth/me`가 맡습니다. **인증된 회원만** 이 소켓에 접근하도록 nginx 위치 설정을 제한해야 합니다. HTML/CSS/JS는 기존 브라우저 샌드박스에서 실행합니다.
 
 ## 자원 제한
 
