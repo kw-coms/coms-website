@@ -59,7 +59,7 @@ dependencies {
 	// jsoup — lenient HTML parser used to extract OpenGraph/meta tags for link-preview
 	// cards. We fetch the remote HTML ourselves (with strict SSRF guards) and only hand
 	// the already-downloaded bytes to jsoup for parsing; jsoup never performs network I/O.
-	implementation 'org.jsoup:jsoup:1.23.2'
+	implementation 'org.jsoup:jsoup:1.24.1'
 
 	// JWT
 	implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
@@ -77,7 +77,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-flyway'
 
 	// OpenAPI / Swagger UI — springdoc 3.x supports Spring Boot 4 and includes patched UI assets.
-	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.1'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.2.0'
 
 	// Firebase Admin SDK — used by PushNotificationSender to send FCM push.
 	// Fully gated behind push.enabled + a valid credentials file; a no-op otherwise.
