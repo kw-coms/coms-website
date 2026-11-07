@@ -26,7 +26,8 @@ export type RunResult =
 export const RUN_URL = '/study/api/run'
 export const MAX_CODE_BYTES = 64 * 1024
 export const MAX_STDIN_BYTES = 16 * 1024
-const CLIENT_TIMEOUT_MS = 45_000
+// The runner answers within ~55 s (25 s queue + 15 s compile + 10 s run) and the host proxy cuts at 60 s.
+const CLIENT_TIMEOUT_MS = 58_000
 
 const bytes = (text: string) => new TextEncoder().encode(text).length
 
@@ -59,13 +60,19 @@ export async function runRemote(lang: RunLang, code: string, stdin: string, sign
   if (bytes(stdin) > MAX_STDIN_BYTES) return { kind: 'rejected', messageKo: '입력이 너무 길어요. 16KB 이하로 줄여 주세요.' }
   const timeout = AbortSignal.timeout(CLIENT_TIMEOUT_MS)
   try {
-    const res = await fetch(RUN_URL, {
+    const post = () => fetch(RUN_URL, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lang, code, stdin }),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
     })
+    let res = await post()
+    if (res.status === 401) {
+      // The access cookie is short-lived; the site's own API client renews it the same way. Once, then ask to sign in.
+      const renewed = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include', signal: timeout }).then((r) => r.ok, () => false)
+      if (renewed) res = await post()
+    }
     if (res.status === 401 || res.status === 403) return { kind: 'login' }
     const data = (await res.json().catch(() => null)) as Record<string, unknown> | null
     if (res.status === 429) {

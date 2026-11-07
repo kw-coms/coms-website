@@ -145,6 +145,26 @@ assert.equal(r.output.ok, false)
 assert.deepEqual(r.output.diagnostics.map((d) => d.line), [3], 'malformed diagnostics are dropped')
 globalThis.fetch = reply(401, {})
 assert.equal((await runRemote('python', 'x', '')).kind, 'login')
+{
+  // An expired access cookie: refresh once, retry once; a refused refresh asks to sign in without retrying.
+  const calls = []
+  const script = (...statuses) => async (url) => {
+    calls.push(url)
+    const status = statuses.shift()
+    return new Response(status === 200 ? JSON.stringify({ ok: true, stage: 'run', stdout: 'hi\n', stderr: '', exitCode: 0, diagnostics: [] }) : status === 204 ? null : '{}', { status })
+  }
+  globalThis.fetch = script(401, 204, 200)
+  assert.equal((await runRemote('c', 'x', '')).kind, 'output')
+  assert.deepEqual(calls, ['/study/api/run', '/api/auth/refresh', '/study/api/run'])
+  calls.length = 0
+  globalThis.fetch = script(401, 401)
+  assert.equal((await runRemote('c', 'x', '')).kind, 'login')
+  assert.deepEqual(calls, ['/study/api/run', '/api/auth/refresh'])
+  calls.length = 0
+  globalThis.fetch = script(401, 204, 401)
+  assert.equal((await runRemote('c', 'x', '')).kind, 'login')
+  assert.equal(calls.length, 3, 'no refresh loop')
+}
 globalThis.fetch = reply(429, { error: 'rate-limited', messageKo: '천천히' }, { 'Retry-After': '7' })
 r = await runRemote('python', 'x', '')
 assert.deepEqual([r.kind, r.messageKo, r.retryAfterSec], ['busy', '천천히', 7])

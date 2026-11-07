@@ -180,8 +180,19 @@ arduino#17	RUN	arduino			sketch-opens-in-lab	// HC-SR04 초음파 센서로 거�
 arduino#18	RUN	arduino			sketch-opens-in-lab	// 서보를 0도 -> 180도 -> 0도로 왕복시키기
 arduino#19	RUN	arduino			sketch-opens-in-lab	// 가변저항으로 서보 각도 조종하기
 arduino#20	RUN	arduino			sketch-opens-in-lab	// 피에조 부저로 도레미파솔 연주
-arduino#21	RUN	arduino			sketch-opens-in-lab	// 2단계: 20cm 안으로 들어오면 부저가 울린다
-arduino#22	RUN	arduino			sketch-opens-in-lab	// 거리 경보기: 가까울수록 빨리 삐삐
-arduino#23	---	arduino			not-a-complete-sketch	long freq = map((long)cm, NEAR_CM, FAR_CM, 2000,
-arduino#24	---	arduino			not-a-complete-sketch	for (int angle = 0; angle <= 180; angle += 10) {
-arduino#25	---	arduino			not-a-complete-sketch	float sum = 0;
+arduino#21	---	arduino			korean-placeholder-outside-strings	5V
+arduino#22	RUN	arduino			sketch-opens-in-lab	// 조도 센서(CDS) 값 읽기
+arduino#23	RUN	arduino			sketch-opens-in-lab	// 어두워지면 LED가 켜지는 야간등
+arduino#24	RUN	arduino			sketch-opens-in-lab	// RGB LED(공통 캐소드)로 색 섞기
+arduino#25	RUN	arduino			sketch-opens-in-lab	// 무지개처럼 색이 부드럽게 한 바퀴 도는 RGB LED
+arduino#26	RUN	arduino			sketch-opens-in-lab	// I2C 장치 주소 찾기
+arduino#27	RUN	arduino			sketch-opens-in-lab	// I2C LCD에 글자와 센서 값 표시하기
+arduino#28	RUN	arduino			sketch-opens-in-lab	// DHT11로 온도와 습도 읽기
+arduino#29	RUN	arduino			sketch-opens-in-lab	// DHT11 온습도를 LCD와 시리얼 모니터에 함께 표시
+arduino#30	RUN	arduino			sketch-opens-in-lab	// 조이스틱 모듈: 방향과 버튼 읽기
+arduino#31	RUN	arduino			sketch-opens-in-lab	// L9110S 모터 드라이버로 DC 모터 속도·방향 제어
+arduino#32	RUN	arduino			sketch-opens-in-lab	// 2단계: 20cm 안으로 들어오면 부저가 울린다
+arduino#33	RUN	arduino			sketch-opens-in-lab	// 거리 경보기: 가까울수록 빨리 삐삐
+arduino#34	---	arduino			not-a-complete-sketch	long freq = map((long)cm, NEAR_CM, FAR_CM, 2000,
+arduino#35	---	arduino			not-a-complete-sketch	for (int angle = 0; angle <= 180; angle += 10) {
+arduino#36	---	arduino			not-a-complete-sketch	float sum = 0;

@@ -116,8 +116,12 @@ export async function createEditor(opts: EditorOptions): Promise<PgEditor> {
     const rest = doc.sliceString(from, line.to)
     const word = /^[\w$]+|^\S/.exec(rest)
     const to = Math.max(from + (word ? word[0].length : 0), Math.min(from + 1, line.to))
+    // Compilers report "expected ';'" just past the end of the line (gcc: column = length + 1), which would be
+    // an empty range with nothing to underline: point at the last character of the line instead.
+    const end = to === from ? Math.min(line.to, from + 1) : to
+    const start = end === from && from > line.from ? from - 1 : from
     return {
-      from, to: to === from ? Math.min(line.to, from + 1) : to,
+      from: start, to: end,
       severity: d.severity === 'error' ? 'error' : d.severity === 'warning' ? 'warning' : 'info',
       message: d.hintKo ? `${d.message}\n힌트: ${d.hintKo}` : d.message,
     }
