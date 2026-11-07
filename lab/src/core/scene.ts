@@ -27,10 +27,17 @@ function invalid(message: string): never {
   throw new Error(message);
 }
 
+/**
+ * Blockly workspace JSON limits. A chain of N stacked blocks nests ~2N JSON levels (`next.block.next.block...`),
+ * so 1,000 levels allows ~450 stacked blocks; real programs have a few dozen blocks in total.
+ */
+export const MAX_BLOCKS = 5000;
+const MAX_BLOCKS_JSON_DEPTH = 1000;
+
 function validBlocks(value: unknown): boolean {
   const seen = new Set<object>();
   const visit = (entry: unknown, depth: number): boolean => {
-    if (depth > 64) return false;
+    if (depth > MAX_BLOCKS_JSON_DEPTH) return false;
     if (entry === null || typeof entry === 'string' || typeof entry === 'boolean') return true;
     if (typeof entry === 'number') return Number.isFinite(entry);
     if (typeof entry !== 'object' || seen.has(entry)) return false;
@@ -46,6 +53,30 @@ function validBlocks(value: unknown): boolean {
   } catch {
     return false;
   }
+}
+
+/** Shape check on top of validBlocks (which already bounded the depth, so this iterative walk is cheap): what Blockly's loader and the generator will touch. */
+function validBlockShape(state: unknown): boolean {
+  if (!isObject(state)) return false;
+  const ws = state.blocks;
+  if (ws !== undefined && (!isObject(ws) || (ws.blocks !== undefined && !Array.isArray(ws.blocks)))) return false;
+  if (state.variables !== undefined && (!Array.isArray(state.variables) || state.variables.length > 1000 ||
+      !state.variables.every(v => isObject(v) && (v.id === undefined || typeof v.id === 'string') && (v.name === undefined || typeof v.name === 'string')))) return false;
+  const todo: unknown[] = isObject(ws) && Array.isArray(ws.blocks) ? [...ws.blocks] : [];
+  for (let n = 0; todo.length; n++) {
+    const b = todo.pop();
+    // `in Object.prototype` rejects "constructor", "toString", "__proto__" ... as block types
+    if (n >= MAX_BLOCKS || !isObject(b) || typeof b.type !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(b.type) || b.type in Object.prototype) return false;
+    if (b.fields !== undefined && !isObject(b.fields)) return false;
+    if (b.inputs !== undefined && !isObject(b.inputs)) return false;
+    if (b.next !== undefined && !isObject(b.next)) return false;
+    const slots = [...Object.values((b.inputs ?? {}) as object), b.next].filter(slot => slot !== undefined);
+    for (const slot of slots) {
+      if (!isObject(slot)) return false;
+      for (const child of [slot.block, slot.shadow]) if (child !== undefined) todo.push(child);
+    }
+  }
+  return true;
 }
 
 /** Validate untrusted imported scenes before analysis or rendering. */
@@ -64,7 +95,8 @@ export function validateScene(value: unknown): Scene {
   if (value.title !== undefined && (typeof value.title !== 'string' || value.title.length > 200)) {
     invalid('장면 제목이 올바르지 않습니다.');
   }
-  if (value.blocks !== undefined && !validBlocks(value.blocks)) invalid('블록 데이터는 올바른 JSON이며 256 KB 이하이어야 합니다.');
+  if (value.blocks !== undefined && !validBlocks(value.blocks)) invalid('블록 데이터는 올바른 JSON이며 256 KB 이하, 1,000단계 이하의 깊이이어야 합니다.');
+  if (value.blocks !== undefined && !validBlockShape(value.blocks)) invalid(`블록 구조가 올바르지 않습니다. 블록 종류는 문자열이어야 하고, 블록은 ${MAX_BLOCKS.toLocaleString('ko-KR')}개 이하여야 합니다.`);
   if (value.codeMode !== undefined && !['blocks', 'blocks+text', 'text'].includes(value.codeMode as string)) {
     invalid('코드 모드가 올바르지 않습니다.');
   }

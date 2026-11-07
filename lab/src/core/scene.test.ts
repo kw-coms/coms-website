@@ -111,3 +111,40 @@ describe('hostile ids (share links and imported JSON)', () => {
     expect(Object.prototype).not.toHaveProperty('brightness');
   });
 });
+
+describe('validateScene: blocks shape', () => {
+  const sceneWith = (blocks: unknown) => ({ version: 2, parts: [], wires: [], code: '', blocks });
+  const ok = (type: string) => ({ blocks: { blocks: [{ type }] } });
+  const chain = (n: number, key: 'next' | 'inputs'): unknown => {
+    let b: unknown = { type: 'lab_serial_println' };
+    for (let i = 0; i < n; i++) b = key === 'next' ? { type: 'lab_serial_println', next: { block: b } } : { type: 'logic_negate', inputs: { BOOL: { block: b } } };
+    return { blocks: { blocks: [b] } };
+  };
+  it('accepts a normal workspace', () => {
+    expect(() => validateScene(sceneWith(ok('lab_loop')))).not.toThrow();
+    expect(() => validateScene(sceneWith(chain(100, 'next')))).not.toThrow();
+  });
+  it.each(['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf', 'bad type!', ''])('rejects block type %j', (type) => {
+    expect(() => validateScene(JSON.parse(JSON.stringify(sceneWith(ok(type)))))).toThrow(/블록/);
+  });
+  it('rejects non-string types and malformed shapes', () => {
+    for (const bad of [{ blocks: { blocks: [{ type: 5 }] } }, { blocks: { blocks: [{ type: null }] } }, { blocks: { blocks: [{}] } },
+      { blocks: { blocks: [7] } }, { blocks: { blocks: {} } }, { blocks: 'x' }, 'x', [],
+      { blocks: { blocks: [{ type: 'a', inputs: 'x' }] } }, { blocks: { blocks: [{ type: 'a', inputs: { DO: 3 } }] } },
+      { blocks: { blocks: [{ type: 'a', next: [] }] } }, { variables: 'x' }, { variables: [{ id: 5 }] }]) {
+      expect(() => validateScene(sceneWith(bad)), JSON.stringify(bad)).toThrow(/블록/);
+    }
+  });
+  it('rejects 10k-deep nesting quickly, both through next and through inputs', () => {
+    for (const key of ['next', 'inputs'] as const) {
+      const t0 = Date.now();
+      expect(() => validateScene(JSON.parse(JSON.stringify(sceneWith(chain(10_000, key)))))).toThrow(/블록/);
+      expect(Date.now() - t0).toBeLessThan(2000);
+    }
+  });
+  it('rejects too many blocks (wide) and too big payloads', () => {
+    const wide = { blocks: { blocks: Array.from({ length: 5001 }, () => ({ type: 'lab_loop' })) } };
+    expect(() => validateScene(sceneWith(wide))).toThrow(/블록/);
+    expect(() => validateScene(sceneWith({ blocks: { blocks: [{ type: 'a', fields: { T: 'x'.repeat(300_000) } }] } }))).toThrow(/블록/);
+  });
+});

@@ -1,6 +1,20 @@
 // Blockly workspace JSON -> readable Arduino C++. Works on the serialized state (no Blockly needed),
 // so it runs in the main bundle and in plain Node tests. Blockly stays a lazy chunk.
 
+import { MAX_BLOCKS } from '../../core/scene';
+
+// Scenes (shared links, imported files) are untrusted, so the block tree is too:
+//  - handler tables are read with own-property checks only ("constructor", "__proto__", "toString" are not blocks),
+//  - at most MAX_BLOCKS blocks (5,000, shared with validateScene) and MAX_DEPTH levels of nesting are visited,
+//    far above any real program (the biggest starter has ~60 blocks and ~8 levels),
+//  - generate() never throws: malformed JSON becomes warnings and an empty (still editable) program.
+const MAX_DEPTH = 100;
+const hasOwn = (o: object, k: unknown): k is string => typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k);
+/** Own-property table lookup; undefined for anything inherited or non-string. */
+const own = <T>(table: Record<string, T>, key: unknown): T | undefined => (hasOwn(table, key) ? table[key] : undefined);
+/** Small non-negative integer from untrusted JSON (item / branch counts), capped so a crafted 1e9 cannot spin the loops. */
+const count = (v: unknown, def: number): number => { const n = Math.trunc(Number(v ?? def)); return Number.isFinite(n) ? Math.min(Math.max(n, 0), 256) : def; };
+
 export interface GenOptions {
   /** LEDs on the NeoPixel strip (scene part prop `count`). */
   pixelCount?: number;
@@ -65,6 +79,9 @@ class Ctx {
   getVars = new Set<string>();
   paramVars = new Set<string>();
   loopDepth = 0;
+  depth = 0;
+  seen = 0;
+  tooBig = false;
   everyN = 0;
   usesRandom = false;
   serial = false;
@@ -125,23 +142,38 @@ class Ctx {
     const c = b.inputs?.[name]?.block;
     return c ? this.stack(c) : [];
   }
+  /** Budget for one more block: false (plus a warning) once the block count or nesting depth is exceeded. */
+  enter(): boolean {
+    if (this.depth >= MAX_DEPTH) { this.warn(`블록이 ${MAX_DEPTH}단계보다 깊게 겹쳐 있어서 그 아래는 건너뛰었어요.`); this.tooBig = true; return false; }
+    if (++this.seen > MAX_BLOCKS) { this.warn(`블록이 ${MAX_BLOCKS.toLocaleString('ko-KR')}개를 넘어서 나머지는 건너뛰었어요.`); this.tooBig = true; return false; }
+    return true;
+  }
   stack(b: B | undefined): string[] {
     const out: string[] = [];
-    for (let cur = b; cur; cur = cur.next?.block ?? cur.next?.shadow) {
-      if (cur.enabled === false) continue;
-      const h = S[cur.type];
-      if (!h) { this.warn(`지원하지 않는 블록이에요: ${cur.type}`); continue; }
-      out.push(...h(this, cur));
-    }
+    this.depth++;
+    try {
+      for (let cur = b; isBlock(cur); cur = cur.next?.block ?? cur.next?.shadow) {
+        if (!this.enter()) break;
+        if (cur.enabled === false) continue;
+        const h = own(S, cur.type);
+        if (!h) { this.warn(`지원하지 않는 블록이에요: ${safeName(cur.type)}`); continue; }
+        out.push(...h(this, cur));
+      }
+    } finally { this.depth--; }
     return out;
   }
   expr(b: B): E {
-    const h = X[b.type];
-    if (!h) { this.warn(`지원하지 않는 블록이에요: ${b.type}`); return lit(0); }
-    return h(this, b);
+    if (!isBlock(b) || !this.enter()) return lit(0);
+    const h = own(X, b.type);
+    if (!h) { this.warn(`지원하지 않는 블록이에요: ${safeName(b.type)}`); return lit(0); }
+    this.depth++;
+    try { return h(this, b); } finally { this.depth--; }
   }
   fnIdent(name: string) { return this.ident(name, 'fn'); }
 }
+
+const isBlock = (b: unknown): b is B => typeof b === 'object' && b !== null && !Array.isArray(b);
+const safeName = (t: unknown) => (typeof t === 'string' ? t.slice(0, 60) : '(이름 없음)');
 
 const ind = (lines: string[]) => lines.map((l) => (l ? `  ${l}` : l));
 const block = (head: string, body: string[], tail = '}') => [`${head} {`, ...ind(body), tail];
@@ -281,7 +313,7 @@ const S: Record<string, SH> = {
 
   controls_if: (g, b) => {
     const es = b.extraState ?? {};
-    const elifs = Number(es.elseIfCount ?? es.elseif ?? 0);
+    const elifs = count(es.elseIfCount ?? es.elseif, 0);
     const hasElse = Boolean(es.hasElse ?? es.else);
     const out: string[] = [];
     for (let i = 0; i <= elifs; i++) {
@@ -337,7 +369,7 @@ const S: Record<string, SH> = {
 function call(g: Ctx, b: B): string {
   const name = String(b.extraState?.name ?? b.fields?.NAME ?? '');
   const f = g.fnIdent(name);
-  const params = (b.extraState?.params as unknown[] | undefined) ?? [];
+  const params = Array.isArray(b.extraState?.params) ? (b.extraState.params as unknown[]) : [];
   const args = params.map((_, i) => {
     const e = g.val(b, `ARG${i}`);
     const ps = g.next.fnParams.get(f) ?? [];
@@ -356,7 +388,7 @@ const X: Record<string, XH> = {
   logic_boolean: (_g, b) => e(b.fields?.BOOL === 'FALSE' ? 'false' : 'true', 'bool'),
   text: (_g, b) => ({ ...e(cStr(String(b.fields?.TEXT ?? '')), 'String'), lit: true }),
   text_join: (g, b) => {
-    const n = Number(b.extraState?.itemCount ?? 2);
+    const n = count(b.extraState?.itemCount, 2);
     const parts: E[] = [];
     for (let i = 0; i < n; i++) { const p = g.input(b, `ADD${i}`); if (p) parts.push(p); }
     if (!parts.length) return { ...e('""', 'String'), lit: true };
@@ -370,7 +402,7 @@ const X: Record<string, XH> = {
     const op = g.field(b, 'OP', 'ADD');
     const a = g.val(b, 'A'), c = g.val(b, 'B');
     if (op === 'POWER') return e(`pow(${a.c}, ${c.c})`, 'float');
-    const sym = { ADD: '+', MINUS: '-', MULTIPLY: '*', DIVIDE: '/' }[op] ?? '+';
+    const sym = own({ ADD: '+', MINUS: '-', MULTIPLY: '*', DIVIDE: '/' }, op) ?? '+';
     const p = sym === '+' || sym === '-' ? ADD : MUL;
     if (sym === '/') {
       // integer / integer would cut off the decimals in C++; do the division with decimals
@@ -384,11 +416,11 @@ const X: Record<string, XH> = {
     const op = g.field(b, 'OP', 'ABS');
     if (op === 'NEG') return e(`-${wrap(x, UNARY, true)}`, num2(x.t, 'int'), UNARY);
     if (op === 'POW10') return e(`pow(10, ${x.c})`, 'float');
-    const fn = { ROOT: 'sqrt', ABS: 'abs', LN: 'log', LOG10: 'log10', EXP: 'exp' }[op] ?? 'abs';
+    const fn = own({ ROOT: 'sqrt', ABS: 'abs', LN: 'log', LOG10: 'log10', EXP: 'exp' }, op) ?? 'abs';
     return e(`${fn}(${x.c})`, fn === 'abs' ? num2(x.t, 'int') : 'float');
   },
   math_round: (g, b) => {
-    const fn = { ROUND: 'round', ROUNDUP: 'ceil', ROUNDDOWN: 'floor' }[g.field(b, 'OP', 'ROUND')] ?? 'round';
+    const fn = own({ ROUND: 'round', ROUNDUP: 'ceil', ROUNDDOWN: 'floor' }, g.field(b, 'OP', 'ROUND')) ?? 'round';
     return e(`(long)${fn}(${g.arg(b, 'NUM')})`, 'long', UNARY);
   },
   math_modulo: (g, b) => e(`${wrap(g.val(b, 'DIVIDEND'), MUL)} % ${wrap(g.val(b, 'DIVISOR', lit(1)), MUL, true)}`, 'int', MUL),
@@ -401,7 +433,7 @@ const X: Record<string, XH> = {
   lab_map: (g, b) => e(`map(${g.arg(b, 'VALUE')}, ${g.arg(b, 'FROM_LOW')}, ${g.arg(b, 'FROM_HIGH', lit(1023))}, ${g.arg(b, 'TO_LOW')}, ${g.arg(b, 'TO_HIGH', lit(255))})`, 'long'),
   logic_compare: (g, b) => {
     const op = g.field(b, 'OP', 'EQ');
-    const sym = { EQ: '==', NEQ: '!=', LT: '<', LTE: '<=', GT: '>', GTE: '>=' }[op] ?? '==';
+    const sym = own({ EQ: '==', NEQ: '!=', LT: '<', LTE: '<=', GT: '>', GTE: '>=' }, op) ?? '==';
     const p = op === 'EQ' || op === 'NEQ' ? EQ : REL;
     let a = g.val(b, 'A'), c = g.val(b, 'B');
     // a keypad / serial letter compared with a one-letter text: compare as a C++ char ('5'), not a string
@@ -457,10 +489,17 @@ const X: Record<string, XH> = {
 };
 
 // ---------- program assembly ----------
-function* walk(b: B | undefined): Generator<B> {
-  for (let cur = b; cur; cur = cur.next?.block ?? cur.next?.shadow) {
+/** Pre-order walk without recursion (nesting depth cannot overflow the stack), stopping after MAX_BLOCKS blocks. */
+function* walk(root: B | undefined): Generator<B> {
+  const todo: unknown[] = [root];
+  for (let n = 0; todo.length;) {
+    const cur = todo.pop();
+    if (!isBlock(cur)) continue;
+    if (++n > MAX_BLOCKS) return;
     yield cur;
-    for (const i of Object.values(cur.inputs ?? {})) { yield* walk(i.block); yield* walk(i.shadow); }
+    const kids: unknown[] = [];
+    if (isBlock(cur.inputs)) for (const i of Object.values(cur.inputs)) if (isBlock(i)) kids.push(i.block, i.shadow);
+    todo.push(isBlock(cur.next) ? cur.next.block ?? cur.next.shadow : undefined, ...kids.reverse());
   }
 }
 
@@ -477,7 +516,7 @@ function run(tops: B[], varNames: Map<string, string>, opts: GenOptions, known: 
     else if (b.type === 'variables_set' || b.type === 'math_change') g.setVars.add(g.varIdent(b));
     else if (b.type === 'procedures_defnoreturn' || b.type === 'procedures_defreturn') {
       g.fnIdent(String(b.fields?.NAME ?? 'fn'));
-      for (const p of (b.extraState?.params as { name?: string }[] | undefined) ?? []) if (p.name) g.paramVars.add(g.ident(p.name, 'var'));
+      for (const p of Array.isArray(b.extraState?.params) ? (b.extraState.params as { name?: string }[]) : []) if (p?.name && typeof p.name === 'string') g.paramVars.add(g.ident(p.name, 'var'));
     }
   }
   const setup: string[] = [], loop: string[] = [], fns: string[] = [], protos: string[] = [];
@@ -489,7 +528,7 @@ function run(tops: B[], varNames: Map<string, string>, opts: GenOptions, known: 
     else if (t.type === 'lab_loop') { loops++; loop.push(...g.body(t, 'DO')); }
     else if (t.type === 'procedures_defnoreturn' || t.type === 'procedures_defreturn') {
       const name = g.fnIdent(String(t.fields?.NAME ?? 'fn'));
-      const pnames = ((t.extraState?.params as { name?: string }[] | undefined) ?? []).map((p) => g.ident(p.name ?? 'p', 'var'));
+      const pnames = (Array.isArray(t.extraState?.params) ? (t.extraState.params as { name?: string }[]) : []).map((p) => g.ident(typeof p?.name === 'string' ? p.name : 'p', 'var'));
       const ptypes = pnames.map((_, i) => g.known.fnParams.get(name)?.[i] ?? 'int');
       const body = g.body(t, 'STACK');
       let ret = 'void';
@@ -503,7 +542,7 @@ function run(tops: B[], varNames: Map<string, string>, opts: GenOptions, known: 
       const sig = `${ret} ${name}(${pnames.map((p, i) => `${CTYPE[ptypes[i]!]} ${p}`).join(', ')})`;
       protos.push(`${sig};`);
       fns.push(...block(sig, body), '');
-    } else if (S[t.type]) orphans.push(t.type);
+    } else if (own(S, t.type)) orphans.push(t.type as string);
   }
   if (orphans.length) g.warn('"처음 한 번 실행" 이나 "계속 반복" 안에 들어 있지 않은 블록은 실행되지 않아요.');
   if (setups > 1) g.warn('"처음 한 번 실행" 블록이 여러 개예요. 모두 합쳐서 실행해요.');
@@ -539,14 +578,21 @@ function run(tops: B[], varNames: Map<string, string>, opts: GenOptions, known: 
   return { ctx: g, code: parts.map((p) => p.join('\n')).join('\n\n') + '\n' };
 }
 
+const EMPTY_PROGRAM = `${PROGRAM_HEADER}\n\nvoid setup() {\n  // 처음 한 번 실행할 블록이 없어요\n}\n\nvoid loop() {\n  // "계속 반복" 블록 안에 블록을 넣어 보세요\n}\n`;
+
+/** Never throws: a malformed or hostile workspace gives warnings and an empty program, so the code tab keeps working. */
 export function generate(state: unknown, opts: GenOptions = {}): GenResult {
-  const s = (state ?? {}) as { blocks?: { blocks?: B[] }; variables?: { id?: string; name?: string }[] };
-  const tops = Array.isArray(s.blocks?.blocks) ? s.blocks.blocks : [];
-  const varNames = new Map<string, string>();
-  for (const v of s.variables ?? []) if (v.id && v.name) varNames.set(v.id, v.name);
-  const first = run(tops, varNames, opts, { vars: new Map(), fnRet: new Map(), fnParams: new Map() });
-  const second = run(tops, varNames, opts, first.ctx.next);
-  return { code: second.code, warnings: second.ctx.warnings };
+  try {
+    const s = (isBlock(state) ? state : {}) as { blocks?: { blocks?: unknown }; variables?: unknown };
+    const tops = (isBlock(s.blocks) && Array.isArray(s.blocks.blocks) ? s.blocks.blocks : []).filter(isBlock) as B[];
+    const varNames = new Map<string, string>();
+    if (Array.isArray(s.variables)) for (const v of s.variables) if (isBlock(v) && typeof v.id === 'string' && typeof v.name === 'string' && v.id && v.name) varNames.set(v.id, v.name);
+    const first = run(tops, varNames, opts, { vars: new Map(), fnRet: new Map(), fnParams: new Map() });
+    const second = run(tops, varNames, opts, first.ctx.next);
+    return { code: second.code, warnings: second.ctx.warnings };
+  } catch {
+    return { code: EMPTY_PROGRAM, warnings: ['블록 데이터가 올바르지 않아서 코드를 만들지 못했어요. 블록을 다시 만들어 주세요.'] };
+  }
 }
 
 /** Block type names the generator can turn into code (tests compare this with defs.ts). */

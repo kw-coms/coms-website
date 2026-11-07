@@ -321,3 +321,60 @@ describe('starters', () => {
     expect(loopBody(code)).toMatch(/digitalWrite\(8, HIGH\);[^\n]*\n {2}delay\(500\);[^\n]*\n {2}digitalWrite\(8, LOW\);[^\n]*\n {2}delay\(500\);/);
   });
 });
+
+// ---- hostile / malformed workspaces (scenes come from untrusted share links and imported files) ----
+describe('generate() survives hostile block JSON', () => {
+  const PROTO = ['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf', 'isPrototypeOf'];
+  const wrapLoop = (inner: unknown) => ({ blocks: { blocks: [{ type: 'lab_loop', inputs: { DO: { block: inner } } }] } });
+
+  it.each(PROTO)('block type %s is just an unknown block', (type) => {
+    for (const r of [generate(wrapLoop({ type })), generate(wrapLoop({ type: 'lab_serial_print', inputs: { VALUE: { block: { type } } } }))]) {
+      expect(r.warnings.join('\n')).toContain('지원하지 않는 블록이에요');
+      expect(r.code).toContain('void loop()');
+      expect(r.code).not.toContain('function');
+    }
+  });
+  it('prototype names as operator / field values fall back to the default', () => {
+    const num = (n: number) => ({ block: { type: 'math_number', fields: { NUM: n } } });
+    for (const op of PROTO) {
+      const r = generate(wrapLoop({ type: 'lab_serial_print', inputs: { VALUE: { block: { type: 'math_arithmetic', fields: { OP: op }, inputs: { A: num(1), B: num(2) } } } } }));
+      expect(r.code).toContain('Serial.print(1 + 2)');
+      expect(r.code).not.toContain('function');
+    }
+  });
+  it('non-string types and non-object blocks give warnings, not exceptions', () => {
+    for (const type of [1, null, true, {}, [], undefined]) {
+      expect(() => generate(wrapLoop({ type }))).not.toThrow();
+      expect(generate(wrapLoop({ type })).warnings.length).toBeGreaterThan(0);
+    }
+    for (const junk of [null, 5, 'x', [], { blocks: 5 }, { blocks: { blocks: 'x' } }, { blocks: { blocks: [null, 1, 'a'] } }, { variables: [null, 1, { id: 5 }] }]) {
+      const r = generate(junk);
+      expect(r.code).toContain('void setup()');
+    }
+  });
+  it('absurd counts do not spin', () => {
+    const t0 = Date.now();
+    generate(wrapLoop({ type: 'controls_if', extraState: { elseIfCount: 1e9, hasElse: true } }));
+    generate(wrapLoop({ type: 'lab_serial_print', inputs: { VALUE: { block: { type: 'text_join', extraState: { itemCount: 1e9 } } } } }));
+    generate(wrapLoop({ type: 'procedures_callnoreturn', extraState: { name: 'f', params: 'not-an-array' } }));
+    expect(Date.now() - t0).toBeLessThan(2000);
+  });
+  it('10k-deep nesting is cut off with a Korean warning', () => {
+    let inner: unknown = { type: 'math_number', fields: { NUM: 1 } };
+    for (let i = 0; i < 10_000; i++) inner = { type: 'logic_negate', inputs: { BOOL: { block: inner } } };
+    const r = generate(wrapLoop({ type: 'lab_serial_print', inputs: { VALUE: { block: inner } } }));
+    expect(r.warnings.join('\n')).toContain('깊게 겹쳐');
+    let stack: unknown = { type: 'lab_serial_println' };
+    for (let i = 0; i < 10_000; i++) stack = { type: 'controls_if', inputs: { DO0: { block: stack } } };
+    expect(generate(wrapLoop(stack)).warnings.join('\n')).toContain('깊게 겹쳐');
+  });
+  it('a huge sibling chain stops at the block limit', () => {
+    let chain: unknown = undefined;
+    for (let i = 0; i < 50_000; i++) chain = { type: 'lab_serial_println', next: chain ? { block: chain } : undefined };
+    const t0 = Date.now();
+    const r = generate(wrapLoop(chain));
+    expect(r.warnings.join('\n')).toContain('개를 넘어서');
+    expect(r.code).toContain('void loop()');
+    expect(Date.now() - t0).toBeLessThan(5000);
+  });
+});
