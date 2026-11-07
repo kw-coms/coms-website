@@ -2243,6 +2243,7 @@ test('header brand does not overlap the desktop nav at 1024 and 1280', async ({ 
     const brand = page.locator('header').getByRole('button', { name: '홈으로 이동' })
     const firstItem = page.locator('header nav').first().getByRole('button').first()
     await expect(firstItem).toBeVisible()
+    await page.evaluate(() => document.fonts.ready) // the site font (Pretendard, display: swap) has replaced the fallback
     const brandBox = await brand.boundingBox()
     const itemBox = await firstItem.boundingBox()
     expect(brandBox.x + brandBox.width, `brand vs nav at ${width}px`).toBeLessThanOrEqual(itemBox.x)
@@ -4739,6 +4740,7 @@ test.describe('arduino study circuits', () => {
         await page.setViewportSize({ width: view.width, height: 800 })
         await page.goto('/study/arduino')
         await expect(page.locator('figure.circuit.is-live')).toHaveCount(14)
+        await page.evaluate(() => document.fonts.ready) // a late site-font swap reflows all prose (captions too); not what this measures
         if (anchoring === 'no scroll anchoring') await page.addStyleTag({ content: 'html, body, * { overflow-anchor: none !important; }' })
         if (view.fontSize) await page.evaluate((fs) => { document.documentElement.style.fontSize = fs }, view.fontSize)
         await page.waitForTimeout(200)
@@ -4780,6 +4782,7 @@ test.describe('arduino study circuits', () => {
       const release = await holdCircuitChunk(page)
       await page.goto(how === 'deep link' ? '/study/arduino#mod-motor' : '/study/arduino')
       await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
+      await page.evaluate(() => document.fonts.ready) // a late site-font swap reflows all prose above; not what this measures
       await page.addStyleTag({ content: noAnchoring })
       // Chromium performs the #fragment scroll only once nothing is pending, i.e. after the held chunk; land on it as it would
       if (how === 'deep link') await page.evaluate(() => document.getElementById(location.hash.slice(1)).scrollIntoView())
@@ -4809,10 +4812,12 @@ test.describe('arduino study circuits', () => {
       test.setTimeout(120_000)
       await page.setViewportSize({ width: view.width, height: 800 })
       await page.addInitScript((fontSize) => {
-        // every height any figure ever has, from the moment it is in the page
+        // every height a figure's own rows (all of it but the prose caption) ever have, from the moment it is in the page;
+        // the caption reflows like every paragraph when the site font (Pretendard, display: swap) replaces the fallback
         const seen = new WeakSet()
         window.__figureHeights = {}
-        const ro = new ResizeObserver((entries) => entries.forEach((e) => { (window.__figureHeights[e.target.dataset.circuit] ||= []).push(e.target.getBoundingClientRect().height) }))
+        const rows = (f) => f.getBoundingClientRect().height - f.querySelector('figcaption').getBoundingClientRect().height
+        const ro = new ResizeObserver((entries) => entries.forEach((e) => { (window.__figureHeights[e.target.dataset.circuit] ||= []).push(rows(e.target)) }))
         new MutationObserver(() => document.querySelectorAll('figure.circuit').forEach((f) => { if (!seen.has(f)) { seen.add(f); ro.observe(f) } }))
           .observe(document, { childList: true, subtree: true })
         if (fontSize) new MutationObserver((_m, o) => { if (document.documentElement) { document.documentElement.style.fontSize = fontSize; o.disconnect() } }).observe(document, { childList: true })
@@ -4820,8 +4825,10 @@ test.describe('arduino study circuits', () => {
       const release = await holdCircuitChunk(page)
       await page.goto('/study/arduino')
       await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
+      await page.evaluate(() => document.fonts.ready)
       await page.waitForTimeout(200)
       expect(await page.locator('figure.circuit.is-live').count(), 'no circuit code has run yet').toBe(0)
+      // whole figures, caption included, from here on (the site font has settled)
       const heights = () => page.evaluate(() => [...document.querySelectorAll('figure.circuit')].map((f) => f.getBoundingClientRect().height))
       const first = await heights()
       const same = async (state) => (await heights()).forEach((h, i) => expect(Math.abs(h - first[i]), `figure ${i}: static vs ${state}`).toBeLessThanOrEqual(1))
@@ -4889,7 +4896,7 @@ test.describe('arduino study circuits', () => {
       await same('sims stopped')
       const seen = await page.evaluate(() => window.__figureHeights)
       expect(Object.keys(seen)).toHaveLength(14)
-      for (const [id, hs] of Object.entries(seen)) expect(Math.max(...hs) - Math.min(...hs), `${id} changed height at some point: ${hs.map(Math.round).join(', ')}`).toBeLessThanOrEqual(1)
+      for (const [id, hs] of Object.entries(seen)) expect(Math.max(...hs) - Math.min(...hs), `${id}: its rows changed height at some point: ${hs.map(Math.round).join(', ')}`).toBeLessThanOrEqual(1)
     })
   }
 
@@ -4937,6 +4944,7 @@ test.describe('arduino study circuits', () => {
     await page.route('**/study-content-circuits-*.js', async (route) => { await gate; await route.abort() })
     await page.goto('/study/arduino')
     await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
+    await page.evaluate(() => document.fonts.ready) // the site font has replaced the fallback (captions reflow with it)
     const heights = () => page.evaluate(() => [...document.querySelectorAll('figure.circuit')].map((f) => f.getBoundingClientRect().height))
     const before = await heights()
     const fig = circuit(page, 'led-blink')
