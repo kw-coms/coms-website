@@ -1,19 +1,30 @@
 // Canvas drawing of the oscilloscope / logic analyzer screens, shared by the 3D instrument models and the side panels.
+import { CAPACITY } from '../../core/instruments';
 import type { LogicTrace, ScopeTrace } from '../../core/types';
 
 export interface ScopeSettings {
-  timePerDiv: number; // ms per division (10 divisions across)
+  /** ms per division the acquisition was asked for. The part's `timeDiv` prop, never UI-only state; the screen itself follows the trace (scopeSpanMs). */
+  timePerDiv: number;
   voltsPerDiv: [number, number];
-  trigger: number; // volts, rising edge on CH1
+  trigger: number; // volts, rising edge on CH1; the part's `trigger` prop
   run: boolean;
   cursors: boolean;
   c1: number; // cursor positions, 0..1 of the screen width
   c2: number;
 }
 export const DEFAULT_SCOPE: ScopeSettings = { timePerDiv: 1, voltsPerDiv: [1, 1], trigger: 1, run: true, cursors: false, c1: 0.3, c2: 0.7 };
-export const TIME_STEPS = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
+// below 0.1 ms/div the acquisition grid (1 µs minimum step, core/instruments.ts) cannot follow
+export const TIME_STEPS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
 export const VOLT_STEPS = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10];
 export const CH_COLORS = ['#ffd21f', '#3fe0ff'];
+
+/** Display settings of one scope: acquisition settings come from the part's props (so the simulator follows them), the rest from the UI state. */
+export function scopeSettings(props: Record<string, number | string | boolean>, ui?: Partial<ScopeSettings>): ScopeSettings {
+  const timeDiv = Number(props.timeDiv ?? DEFAULT_SCOPE.timePerDiv), trigger = Number(props.trigger ?? 2.5);
+  return { ...DEFAULT_SCOPE, ...ui, timePerDiv: Number.isFinite(timeDiv) ? timeDiv : DEFAULT_SCOPE.timePerDiv, trigger: Number.isFinite(trigger) ? trigger : 2.5 };
+}
+/** Time the 10-division screen really covers, from the trace's own sample spacing (a trace taken at an older setting keeps its own span). */
+export const scopeSpanMs = (t: ScopeTrace) => t.dtMs * (CAPACITY - 1);
 
 /** Snapshots kept while an instrument is stopped (RUN/STOP). */
 export const frozen = new Map<string, ScopeTrace | LogicTrace>();
@@ -32,13 +43,23 @@ export interface Window {
 /** Sample window for the chosen time base; starts at the last rising CH1 trigger crossing that still fills the screen. */
 export function scopeWindow(t: ScopeTrace, s: ScopeSettings): Window {
   const ch = t.channels[0] ?? [];
-  const need = Math.max(2, Math.round((10 * s.timePerDiv) / Math.max(1e-6, t.dtMs)));
+  const need = Math.max(2, CAPACITY - 1);
   const len = ch.length;
   let start = Math.max(0, len - need);
   for (let i = len - need; i >= 1; i--) {
     if (ch[i - 1]! < s.trigger && ch[i]! >= s.trigger) { start = i; break; }
   }
   return { start, count: Math.min(need, len - start) };
+}
+
+/** Cursor readout from real sample timestamps: a cursor at screen fraction f sits at sample round(f * span / dt) of the window. */
+export function scopeCursors(t: ScopeTrace, s: ScopeSettings): { dtMs: number; dv: number | null } {
+  const w = scopeWindow(t, s);
+  const index = (f: number) => Math.round((f * scopeSpanMs(t)) / Math.max(1e-9, t.dtMs));
+  const [i1, i2] = [index(s.c1), index(s.c2)];
+  const at = (i: number) => (i < w.count ? t.channels[0]?.[w.start + i] : undefined);
+  const [v1, v2] = [at(i1), at(i2)];
+  return { dtMs: Math.abs(i2 - i1) * t.dtMs, dv: v1 === undefined || v2 === undefined ? null : Math.abs(v2 - v1) };
 }
 
 export interface ScopeMeasure {
@@ -83,7 +104,7 @@ export function drawScope(c: CanvasRenderingContext2D, W: number, H: number, tra
     c.beginPath();
     const vd = s.voltsPerDiv[k] ?? 1;
     for (let i = 0; i < w.count; i++) {
-      const x = (i / Math.max(1, w.count - 1)) * W;
+      const x = ((i * trace.dtMs) / scopeSpanMs(trace)) * W; // sample timestamps, so a part-filled buffer is not stretched
       const y = H / 2 - ((ch[w.start + i] ?? 0) / vd) * gy;
       i ? c.lineTo(x, Math.max(-4, Math.min(H + 4, y))) : c.moveTo(x, y);
     }
@@ -99,7 +120,7 @@ export function drawScope(c: CanvasRenderingContext2D, W: number, H: number, tra
     c.setLineDash([]);
   }
   c.fillStyle = pal.text; c.font = `${small ? 12 : 13}px sans-serif`; c.textAlign = 'left';
-  c.fillText(`${fmtT(s.timePerDiv)}/div`, 6, H - 7);
+  c.fillText(`${fmtT(+(scopeSpanMs(trace) / 10).toPrecision(3))}/div`, 6, H - 7);
   c.textAlign = 'right';
   c.fillText(trace.triggered ? '트리거됨' : '자동', W - 6, H - 7);
 }

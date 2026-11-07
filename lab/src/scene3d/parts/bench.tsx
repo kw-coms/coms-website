@@ -4,7 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import type { CanvasTexture, MeshStandardMaterial } from 'three';
 import { frameRef } from '../../ui/simHost';
 import { getState } from '../../ui/store';
-import { DEFAULT_LOGIC, DEFAULT_SCOPE, drawLogic, drawScope, frozen, type ScopeSettings } from '../../ui/instruments/draw';
+import { DEFAULT_LOGIC, drawLogic, drawScope, frozen, scopeSettings, type ScopeSettings } from '../../ui/instruments/draw';
 import type { LogicTrace, PartKind, ScopeTrace } from '../../core/types';
 import { Cable, makeTexture, useOwned, vis, type PartProps } from './common';
 import { Box, Cyl, Legs, METAL, Silk, pinBox, pinsOf } from './kit';
@@ -110,16 +110,16 @@ export function PowerSupply({ part }: PartProps) {
 }
 
 const traceOf = (id: string): ScopeTrace | undefined => frameRef.current?.scopes?.[id];
-const scopeUi = (id: string): ScopeSettings => ({ ...DEFAULT_SCOPE, ...getState().instUi[id]?.scope } as ScopeSettings);
+const scopeUi = (part: PartProps['part']): ScopeSettings => scopeSettings(part.props, getState().instUi[part.id]?.scope);
 
 export function Oscilloscope({ part }: PartProps) {
   const tex = useScreen(
     512, 410,
     (c, w, h) => {
-      const ui = scopeUi(part.id);
+      const ui = scopeUi(part);
       drawScope(c, w, h, ui.run ? traceOf(part.id) : (frozen.get(part.id) as ScopeTrace | undefined) ?? traceOf(part.id), ui, undefined, true);
     },
-    () => { const t = traceOf(part.id); const ui = getState().instUi[part.id]?.scope; return `${t?.t0Ms}|${t?.channels[0]?.length}|${JSON.stringify(ui)}|${ui?.run}`; },
+    () => { const t = traceOf(part.id); const ui = getState().instUi[part.id]?.scope; return `${t?.t0Ms}|${t?.channels[0]?.length}|${JSON.stringify(ui)}|${ui?.run}|${part.props.timeDiv}|${part.props.trigger}`; },
   );
   const ps = pinsOf('oscilloscope');
   const b = pinBox('oscilloscope');

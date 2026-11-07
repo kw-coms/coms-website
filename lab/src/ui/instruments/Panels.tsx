@@ -3,10 +3,10 @@ import { ExternalLink, Pin, Pause, Play, Ruler } from 'lucide-react';
 import type { LogicTrace, PartInstance, ScopeTrace } from '../../core/types';
 import { PARTS } from '../core';
 import { onSimFrame, frameRef, setSimInput } from '../simHost';
-import { setInstUi, setScope, useStore } from '../store';
+import { setInstUi, setProp, setScope, useStore } from '../store';
 import { PropField } from '../components/Inspector';
 import {
-  CH_COLORS, DEFAULT_LOGIC, DEFAULT_SCOPE, SPAN_STEPS, TIME_STEPS, VOLT_STEPS, drawLogic, drawScope, fmtT, fmtV, frozen, logicStats, measureScope,
+  CH_COLORS, DEFAULT_LOGIC, SPAN_STEPS, TIME_STEPS, VOLT_STEPS, drawLogic, drawScope, fmtT, fmtV, frozen, logicStats, measureScope, scopeCursors, scopeSettings,
   type LogicSettings, type ScopeSettings,
 } from './draw';
 
@@ -42,7 +42,6 @@ function useCanvas(draw: (c: CanvasRenderingContext2D, w: number, h: number) => 
   return ref;
 }
 
-const scopeOf = (_id: string, ui?: Partial<ScopeSettings>): ScopeSettings => ({ ...DEFAULT_SCOPE, ...ui } as ScopeSettings);
 
 function Stepper({ label, value, steps, fmt, onChange }: { label: string; value: number; steps: number[]; fmt: (v: number) => string; onChange: (v: number) => void }) {
   const idx = Math.max(0, steps.findIndex((s) => s >= value));
@@ -58,7 +57,9 @@ function Stepper({ label, value, steps, fmt, onChange }: { label: string; value:
 export function ScopePanel({ part }: { part: PartInstance }) {
   useFrameTick();
   const ui = useStore((s) => s.instUi[part.id]?.scope);
-  const s = scopeOf(part.id, ui as Partial<ScopeSettings> | undefined);
+  // time/div and trigger are the part's props: the simulator acquires with them, so the panel only writes them there
+  const s = scopeSettings(part.props, ui as Partial<ScopeSettings> | undefined);
+  const [triggerDraft, setTriggerDraft] = useState<number | null>(null);
   const live = frameRef.current?.scopes?.[part.id];
   const shown: ScopeTrace | undefined = s.run ? live : ((frozen.get(part.id) as ScopeTrace | undefined) ?? live);
   const cv = useCanvas((c, w, h) => drawScope(c, w, h, shown, s), 1.25, [shown?.t0Ms, shown?.channels[0]?.length, JSON.stringify(s)]);
@@ -68,6 +69,10 @@ export function ScopePanel({ part }: { part: PartInstance }) {
     if (s.run && live) frozen.set(part.id, JSON.parse(JSON.stringify(live)));
     setScope(part.id, { run: !s.run });
   };
+  const commitTrigger = () => {
+    if (triggerDraft !== null) void setProp(part.id, 'trigger', triggerDraft);
+    setTriggerDraft(null);
+  };
   const pick = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!s.cursors) return;
     const r = e.currentTarget.getBoundingClientRect();
@@ -75,22 +80,20 @@ export function ScopePanel({ part }: { part: PartInstance }) {
     if (e.type === 'pointerdown') drag.current = Math.abs(f - s.c1) < Math.abs(f - s.c2) ? 'c1' : 'c2';
     if (drag.current) setScope(part.id, { [drag.current]: f });
   };
-  const dt = Math.abs(s.c2 - s.c1) * 10 * s.timePerDiv;
-  const volt = (f: number) => {
-    if (!shown) return 0;
-    const w = Math.max(1, Math.round((10 * s.timePerDiv) / Math.max(1e-6, shown.dtMs)));
-    const i = Math.min(shown.channels[0]!.length - 1, Math.max(0, shown.channels[0]!.length - w + Math.round(f * w)));
-    return shown.channels[0]?.[i] ?? 0;
-  };
+  const cur = shown ? scopeCursors(shown, s) : null;
+  const dt = cur?.dtMs ?? 0;
   return (
     <div className="inst-body">
       <canvas ref={cv} className="inst-screen" aria-label="오실로스코프 화면" onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); pick(e); }} onPointerMove={pick} onPointerUp={() => (drag.current = null)} />
       <div className="inst-grid">
-        <Stepper label="시간/칸" value={s.timePerDiv} steps={TIME_STEPS} fmt={fmtT} onChange={(v) => setScope(part.id, { timePerDiv: v })} />
+        <Stepper label="시간/칸" value={s.timePerDiv} steps={TIME_STEPS} fmt={fmtT} onChange={(v) => void setProp(part.id, 'timeDiv', v)} />
         <Stepper label="CH1 전압/칸" value={s.voltsPerDiv[0]} steps={VOLT_STEPS} fmt={fmtV} onChange={(v) => setScope(part.id, { voltsPerDiv: [v, s.voltsPerDiv[1]] })} />
         <Stepper label="CH2 전압/칸" value={s.voltsPerDiv[1]} steps={VOLT_STEPS} fmt={fmtV} onChange={(v) => setScope(part.id, { voltsPerDiv: [s.voltsPerDiv[0], v] })} />
-        <label className="inst-step wide"><span>트리거 레벨 <b className="val">{s.trigger.toFixed(2)}V</b></span>
-          <input type="range" min={-10} max={10} step={0.05} value={s.trigger} onChange={(e) => setScope(part.id, { trigger: Number(e.target.value) })} aria-label="트리거 레벨" />
+        <label className="inst-step wide"><span>트리거 레벨 <b className="val">{(triggerDraft ?? s.trigger).toFixed(2)}V</b></span>
+          {/* one history step per drag: the level is written to the part when the slider is released */}
+          <input type="range" min={-10} max={10} step={0.05} value={triggerDraft ?? s.trigger} aria-label="트리거 레벨"
+            onChange={(e) => setTriggerDraft(Number(e.target.value))}
+            onPointerUp={commitTrigger} onKeyUp={commitTrigger} onBlur={commitTrigger} />
         </label>
       </div>
       <div className="inst-actions">
@@ -101,7 +104,7 @@ export function ScopePanel({ part }: { part: PartInstance }) {
         <dt style={{ color: CH_COLORS[0] }}>CH1 Vpp</dt><dd>{m ? fmtV(m.vpp[0] ?? 0) : '-'}</dd>
         <dt style={{ color: CH_COLORS[1] }}>CH2 Vpp</dt><dd>{m ? fmtV(m.vpp[1] ?? 0) : '-'}</dd>
         <dt>주파수</dt><dd>{m && m.freq ? `${+m.freq.toFixed(m.freq < 100 ? 2 : 0)} Hz` : '-'}</dd>
-        {s.cursors && <><dt>Δt</dt><dd>{fmtT(+dt.toFixed(3))}{dt > 0 ? ` (${+(1000 / dt).toFixed(1)} Hz)` : ''}</dd><dt>ΔV(CH1)</dt><dd>{fmtV(Math.abs(volt(s.c2) - volt(s.c1)))}</dd></>}
+        {s.cursors && <><dt>Δt</dt><dd>{fmtT(+dt.toFixed(3))}{dt > 0 ? ` (${+(1000 / dt).toFixed(1)} Hz)` : ''}</dd><dt>ΔV(CH1)</dt><dd>{cur?.dv != null ? fmtV(cur.dv) : '-'}</dd></>}
       </dl>
     </div>
   );

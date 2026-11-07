@@ -1,6 +1,7 @@
 import type { Analysis, LogicTrace, Scene, ScopeTrace } from './types';
 
-const CAPACITY = 512;
+/** Samples per acquisition: a screen is CAPACITY - 1 sample intervals wide (10 divisions). */
+export const CAPACITY = 512;
 const PRETRIGGER = CAPACITY / 4;
 type Buffer = { scope: boolean; dt: number; next: number; lastTime: number; last: number[];
   t0: number; channels: number[][]; triggered: boolean; capture?: ScopeTrace };
