@@ -29,7 +29,7 @@ assert.match(nginx, /^limit_conn_zone \$binary_remote_addr zone=lab_pre_ip_conn:
 assert.match(nginx, /proxy_set_header X-Real-IP \$remote_addr;/, 'the host nginx line this relies on is quoted in the conf')
 assert.doesNotMatch(nginx, /limit_(req|conn)_zone [^;]*(\$cookie_|\$http_)/, 'no limit key taken straight from a client header or cookie')
 const compile = block('location = /lab/api/compile {')
-for (const part of [/!= POST\) \{ return 405/, /auth_request \/lab\/_auth/, /client_max_body_size 100k/,
+for (const part of [/!= POST\) \{ return 405/, /\$http_sec_fetch_site = cross-site\) \{ return 403 /, /auth_request \/lab\/_auth/, /client_max_body_size 100k/,
   /proxy_set_header Cookie ""/, /auth_request_set \$lab_member \$upstream_http_x_member_id;/, /proxy_set_header X-Lab-Client \$lab_member;/, /proxy_set_header X-Forwarded-For ""/, /limit_req zone=lab_pre_ip burst=15/, /limit_conn lab_pre_ip_conn 6/, /limit_req zone=lab_pre burst=200/, /limit_conn lab_pre_conn 64/, /http_cookie ~ "\^\.\{4097,\}"\) \{ return 431/, /token=\[\^;\]\*;/, /proxy_pass http:\/\/unix:\/run\/coms-lab\/compile\.sock:\/lab\/api\/compile;/, /proxy_read_timeout 55s/]) {
   assert.match(compile, part)
 }
@@ -77,15 +77,15 @@ assert.doesNotMatch(frontend.slice(frontend.indexOf('depends_on:')), /coms-lab-c
 assert.match(dockerfile, /COPY --from=lab-build \/lab\/dist \/usr\/share\/nginx\/html\/lab/)
 assert.match(viteConfig, /\/\^\\\/lab\(\\\/\|\$\)\//, 'navigateFallbackDenylist must keep the SPA shell off /lab/')
 
-// Deploy: the compiler can never fail or roll back the site. The site's services are started by name,
+// Deploy: the sidecars (compiler, study runner) can never fail or roll back the site. The site's services are started by name,
 // the compiler goes through the warn-only helpers, and it is never in the rollback or health path.
 const deploy = readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8')
 assert.match(deploy, /up -d --remove-orphans db db-backup coms-backend coms-frontend/)
 assert.doesNotMatch(deploy, /up -d --remove-orphans\s*$/m, 'a bare up -d would start the compiler and let its failure abort the deploy')
-for (const step of ['lab_diagnostics', 'lab_snapshot_previous', 'lab_build', 'lab_rollback', 'lab_start', 'lab_finalize_tags']) {
+for (const step of ['sidecars_diagnostics', 'sidecars_snapshot', 'sidecars_build', 'sidecars_rollback', 'sidecars_start', 'sidecars_finalize_tags']) {
   assert.match(deploy, new RegExp(`^\\s+${step}$`, 'm'), `deploy.yml must call ${step}`)
 }
-assert.ok(deploy.indexOf('lab_start') > deploy.indexOf('if ! site_is_healthy'), 'the compiler is replaced only after the site is healthy')
+assert.ok(deploy.indexOf('sidecars_start') > deploy.indexOf('if ! site_is_healthy'), 'the compiler is replaced only after the site is healthy')
 assert.doesNotMatch(deploy, /--no-build coms-backend coms-frontend coms-lab-compiler/)
 
 console.log('lab nginx / compose contract passed')

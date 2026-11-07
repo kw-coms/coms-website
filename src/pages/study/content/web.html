@@ -96,7 +96,7 @@
 <span class="c">   ↑ 속성 이름   ↑ 속성 값 (따옴표로 감쌈)</span></pre>
   <p>몇몇 태그는 감쌀 내용이 없어서 닫는 태그가 없습니다. 예: <code>&lt;img&gt;</code>(이미지), <code>&lt;br&gt;</code>(줄바꿈), <code>&lt;input&gt;</code>(입력칸).</p>
   <p>태그 안에 태그를 넣을 수도 있습니다(<b>중첩</b>). 이때는 <b>나중에 연 것을 먼저 닫아야</b> 합니다.</p>
-<pre class="code"><span class="c">&lt;!-- 올바름 --&gt;</span>
+<pre class="code" data-run="false"><span class="c">&lt;!-- 올바름 --&gt;</span>
 <span class="k">&lt;p&gt;</span>이건 <span class="k">&lt;strong&gt;</span>중요<span class="k">&lt;/strong&gt;</span>해요<span class="k">&lt;/p&gt;</span>
 
 <span class="c">&lt;!-- 틀림: 순서가 엇갈림 --&gt;</span>
@@ -143,7 +143,7 @@
   </div>
 
   <h3 id="html-link"><span class="num">1-4</span>링크와 이미지</h3>
-<pre class="code"><span class="k">&lt;a</span> <span class="p">href</span>=<span class="s">"이동할 주소"</span><span class="k">&gt;</span>클릭할 글자<span class="k">&lt;/a&gt;</span>
+<pre class="code" data-run="false"><span class="k">&lt;a</span> <span class="p">href</span>=<span class="s">"이동할 주소"</span><span class="k">&gt;</span>클릭할 글자<span class="k">&lt;/a&gt;</span>
 <span class="k">&lt;img</span> <span class="p">src</span>=<span class="s">"이미지 주소"</span> <span class="p">alt</span>=<span class="s">"이미지 설명"</span><span class="k">&gt;</span></pre>
   <ul>
     <li><code>href</code>: 이동할 주소. <code>target="_blank"</code>를 붙이면 새 탭에서 열립니다.</li>
@@ -290,7 +290,7 @@
   <span class="p">font-size</span>: <span class="s">40px</span>;   <span class="c">← 세미콜론(;)으로 하나씩 끝냄</span>
 }                   <span class="c">← 중괄호로 묶음</span></pre>
   <p>HTML에 CSS를 적용하는 방법은 세 가지인데, <b>3번(별도 파일)</b>을 쓰는 게 정석입니다.</p>
-<pre class="code"><span class="c">&lt;!-- 1. 태그에 직접 (inline) : 간단하지만 관리가 어려움 --&gt;</span>
+<pre class="code" data-run="false"><span class="c">&lt;!-- 1. 태그에 직접 (inline) : 간단하지만 관리가 어려움 --&gt;</span>
 <span class="k">&lt;h1</span> <span class="p">style</span>=<span class="s">"color: red;"</span><span class="k">&gt;</span>제목<span class="k">&lt;/h1&gt;</span>
 
 <span class="c">&lt;!-- 2. head 안에 style 태그 --&gt;</span>
@@ -526,7 +526,7 @@ p {
 
   <h3 id="js-start"><span class="num">3-1</span>연결 방법과 콘솔</h3>
   <p>JS 파일 <code>script.js</code>를 만들고, HTML의 <b><code>&lt;/body&gt;</code> 바로 위</b>에서 연결합니다.</p>
-<pre class="code"><span class="k">&lt;body&gt;</span>
+<pre class="code" data-run="false"><span class="k">&lt;body&gt;</span>
   <span class="k">&lt;h1&gt;</span>내 페이지<span class="k">&lt;/h1&gt;</span>
   <span class="c">... 내용 ...</span>
 
@@ -593,7 +593,7 @@ console.log(member.gen + "기");</textarea>
   <p>비교 연산자: <code>===</code>(같다), <code>!==</code>(다르다), <code>&gt;</code>, <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=</code>. 조건 여러 개를 묶을 땐 <code>&amp;&amp;</code>(그리고), <code>||</code>(또는).</p>
   <div class="warn"><b>= 와 === 는 다릅니다</b><code>=</code>는 값을 <b>넣는</b> 것(대입), <code>===</code>는 같은지 <b>비교</b>하는 것입니다. <code>==</code>(등호 두 개)도 있지만 <code>"5" == 5</code>가 true가 되는 등 헷갈리므로 항상 <code>===</code>를 쓰세요.</div>
   <p><b>반복문</b>: 같은 일을 여러 번 할 때 씁니다.</p>
-<pre class="code"><span class="k">for</span> (<span class="k">let</span> i = <span class="s">0</span>; i &lt; <span class="s">5</span>; i++) {   <span class="c">← i를 0부터 시작, 5보다 작은 동안, 1씩 증가</span>
+<pre class="code" data-run="false"><span class="k">for</span> (<span class="k">let</span> i = <span class="s">0</span>; i &lt; <span class="s">5</span>; i++) {   <span class="c">← i를 0부터 시작, 5보다 작은 동안, 1씩 증가</span>
   console.log(i);                 <span class="c">← 0, 1, 2, 3, 4 출력</span>
 }
 
@@ -917,7 +917,7 @@ addBtn.addEventListener("click", addTodo);</textarea>
   <h3>🚀 도전 과제</h3>
   <p>위 예제 상자에서 직접 코드를 고쳐서 기능을 추가해보세요. 막히면 힌트를 열어보세요.</p>
   <details><summary>도전 1. Enter 키를 눌러도 추가되게 하기</summary>입력칸에 <code>keydown</code> 이벤트를 달고, 눌린 키가 Enter인지 확인합니다.
-<pre class="code">input.addEventListener(<span class="s">"keydown"</span>, <span class="k">function</span> (event) {
+<pre class="code" data-run="false">input.addEventListener(<span class="s">"keydown"</span>, <span class="k">function</span> (event) {
   <span class="k">if</span> (event.key === <span class="s">"Enter"</span>) {
     addTodo();
   }

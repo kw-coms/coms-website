@@ -252,7 +252,8 @@
 .study-page pre.code {
   background: var(--code-bg);
   color: var(--code-text);
-  padding: 14px 18px;
+  /* 48px on top: the "직접 해보기" toolbar (playground/playground.css) is laid over this strip, so adding it moves nothing */
+  padding: 48px 18px 14px;
   border-radius: var(--radius);
   overflow-x: auto;
   font-size: 14px;

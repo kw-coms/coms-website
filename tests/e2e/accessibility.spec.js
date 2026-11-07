@@ -55,10 +55,9 @@ async function mockCommunity(page) {
   await page.route('**/api/community/posts/77/comments', (route) => route.fulfill({ status: 200, json: [] }))
 }
 
-async function assertNoSeriousViolations(page) {
-  const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa'])
-    .analyze()
+async function assertNoSeriousViolations(page, scope) {
+  const builder = new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa'])
+  const results = await (scope ? builder.include(scope) : builder).analyze()
   const blocking = results.violations.filter((violation) => BLOCKING_IMPACTS.includes(violation.impact))
   const summary = blocking.map((violation) => `${violation.id} (${violation.impact}): ${violation.nodes.length} node(s)`)
   expect(blocking, summary.join('\n')).toEqual([])
@@ -280,6 +279,25 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 320, height: 720 
     })
   })
 }
+
+for (const theme of ['dark', 'light']) test(`study page (${theme}) with the playground editor, output and diagnostics has no serious or critical accessibility violations`, async ({ page }) => {
+  await page.addInitScript((mode) => { try { localStorage.setItem('kwcoms-theme-mode:v2', mode) } catch { /* storage blocked */ } }, theme)
+  await mockOptionalApis(page)
+  await page.route('**/study/api/run', (route) => route.fulfill({
+    json: { ok: false, stage: 'compile', stdout: 'a\n', stderr: "Broken.java:3: error: ';' expected", exitCode: null, signal: null, timedOut: false, truncated: true, timeMs: 410,
+      diagnostics: [{ line: 3, column: 38, severity: 'error', message: "';' expected", hintKo: '문장 끝에 세미콜론(;)을 붙였는지 확인해 보세요.' }] },
+  }))
+  await page.goto('/study/java')
+  await expect(page.locator('.pg-stage').first()).toBeAttached()
+  // Scoped to the playground blocks: the lesson text around them has findings of its own (link contrast on dark).
+  await assertNoSeriousViolations(page, '.pg-stage')
+  await page.locator('#code-5').getByRole('button', { name: /직접 해보기/ }).click()
+  await expect(page.locator('#code-5 .cm-editor')).toBeVisible()
+  await page.locator('#code-5').getByRole('button', { name: /실행/ }).first().click()
+  await expect(page.locator('#code-5 .pg-diag')).toBeVisible()
+  await page.locator('#code-5').scrollIntoViewIfNeeded()
+  await assertNoSeriousViolations(page, '#code-5')
+})
 
 // The study pages are long, mostly static documents: tables and code blocks that scroll sideways must be keyboard
 // reachable, and link/chip colours must hold up in both themes.

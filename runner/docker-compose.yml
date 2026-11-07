@@ -1,0 +1,72 @@
+services:
+  runner:
+    build:
+      context: .
+    image: coms-study-runner:local
+    restart: unless-stopped
+    network_mode: none
+    # Server = container-root with ONLY SETUID/SETGID/KILL (below); jobs are exec'd as uid/gid 10100.
+    # The primary gid is nginx's so the 0660 socket (umask 0117) is reachable by nginx only.
+    user: "0:${NGINX_GID:?Set NGINX_GID to the nginx group ID}"
+    volumes:
+      - study-runner-socket:/run/coms-study
+      # Disk-backed so it survives process and container restarts (tmpfs mounts do not): abuse deny-list.
+      - study-runner-state:/var/lib/coms-study
+    read_only: true
+    tmpfs:
+      # The only place the job uid can write besides /dev/shm and /dev/mqueue (wiped after every job).
+      - /jobs:rw,exec,nosuid,nodev,size=64m,nr_inodes=4096,mode=1777
+      # POSIX shm: explicit and small (also counted in the 768m cgroup).
+      - /dev/shm:rw,noexec,nosuid,nodev,size=8m,nr_inodes=1024,mode=1777
+    cap_drop: [ALL]
+    cap_add:
+      - SETUID  # setpriv switches each job to uid 10100 (the server keeps uid 0)
+      - SETGID  # ... and gid 10100, clearing supplementary groups
+      - KILL    # server kills the job's process group on timeout / output flood
+      - SYS_RESOURCE  # only to pin oom_score_adj=1000 (+min) on jobs before they drop to uid 10100
+    security_opt:
+      - "no-new-privileges:true"
+      # Explicit profile (Docker's default minus ptrace/process_vm_*): never depend on the daemon default.
+      # A root compose that includes this file sets RUNNER_SECCOMP=./runner/seccomp.json.
+      - "seccomp=${RUNNER_SECCOMP:-./seccomp.json}"
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: 1.0
+    pids_limit: 256
+    ipc: private
+    # IPC limits are namespaced, so a job cannot exhaust anything outside this container:
+    # SysV shm <= 16 MiB total (4096 pages), 4 MiB per segment, 64 segments; small queues/semaphores.
+    sysctls:
+      kernel.shmmax: "4194304"
+      kernel.shmall: "4096"
+      kernel.shmmni: "64"
+      kernel.msgmax: "8192"
+      kernel.msgmnb: "16384"
+      kernel.msgmni: "32"
+      kernel.sem: "32 1024 32 64"
+      fs.mqueue.queues_max: "16"
+      fs.mqueue.msg_max: "10"
+      fs.mqueue.msgsize_max: "8192"
+    stop_grace_period: 25s
+    environment:
+      LISTEN_SOCKET: /run/coms-study/run.sock
+      DENYLIST_FILE: /var/lib/coms-study/denylist.json
+      RATE_LIMIT_PER_MIN: "${RATE_LIMIT_PER_MIN:-10}"
+      TRUST_PROXY: "1"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  study-runner-socket:
+    # Explicit production name; tests override it (RUNNER_SOCKET_VOLUME) so they can never touch it.
+    name: ${RUNNER_SOCKET_VOLUME:-coms-study-runner-socket}
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=1m,mode=0755"
+  study-runner-state:
+    # Plain disk-backed volume: a tmpfs-driver volume is emptied on every container stop/start.
+    name: ${RUNNER_STATE_VOLUME:-coms-study-runner-state}

@@ -1,0 +1,198 @@
+web#0	RUN	html			html-fragment+annotations-stripped	<p>안녕하세요</p>
+web#1	RUN	html			html-fragment+annotations-stripped	<a href="https://coms.kw.ac.kr">COM's 홈페이지</a>
+web#2	---	html			override:data-run=false	<!-- 올바름 -->
+web#3	RUN	html			full-document+annotations-stripped	<!DOCTYPE html>                 ← "이 파일은 HTML입니다
+web#4	---	html			override:data-run=false	<a href="이동할 주소">클릭할 글자</a>
+web#5	---	css			css-needs-html	h1 {                ← 선택자: 누구를? (모든 h1을)
+web#6	---	html			override:data-run=false	<!-- 1. 태그에 직접 (inline) : 간단하지만 관리가 어려움 -->
+web#7	---	css			css-needs-html	.card {
+web#8	---	css			css-needs-html	* { box-sizing: border-box; }   ← * 는 "모든 요소"
+web#9	---	html			override:data-run=false	<body>
+web#10	RUN	js			script+annotations-stripped	const school = "광운대";   ← const: 한 번 넣으면 바꿀 수 없음
+web#11	---	js			korean-placeholder-outside-strings	if (조건) {
+web#12	---	js			override:data-run=false	for (let i = 0; i < 5; i++) {   ← i를 0부터 시작, 5보다
+web#13	---	js			korean-placeholder-outside-strings	function 함수이름(매개변수) {   ← 만들기 (정의)
+web#14	---	js			korean-placeholder-outside-strings	요소.addEventListener("click", function () {
+web#15	---	js			override:data-run=false	input.addEventListener("keydown", function (even
+web#16	---	js			needs-dom (use the demo box above)	function updateRemain() {
+c#0	RUN	c			complete-program	#include <stdio.h>
+c#1	---	shell			shell-commands	# 컴파일: hello.c를 읽어서 hello라는 실행 파일을 만든다 (-o 는 출력 
+c#2	---	shell			shell-commands	gcc -std=c11 -Wall -Wextra hello.c -o hello
+c#3	RUN	c			complete-program	#include <stdio.h>   // printf 같은 입출력 함수를 쓰겠다는 선
+c#4	RUN	c			complete-program	#include <stdio.h>
+c#5	RUN	c			complete-program	#include <stdio.h>
+c#6	RUN	c			complete-program	#include <stdio.h>
+c#7	RUN	c			complete-program	#include <stdio.h>
+c#8	RUN	c		stdin	complete-program	#include <stdio.h>
+c#9	RUN	c		stdin	complete-program	#include <stdio.h>
+c#10	RUN	c			complete-program	#include <stdio.h>
+c#11	RUN	c			complete-program	#include <stdio.h>
+c#12	RUN	c		stdin	complete-program	#include <stdio.h>
+c#13	RUN	c		stdin	complete-program	#include <stdio.h>
+c#14	RUN	c			complete-program	#include <stdio.h>
+c#15	RUN	c			complete-program	#include <stdio.h>
+c#16	---	c			korean-placeholder-outside-strings	for (시작; 계속할 조건; 한 번 돌고 난 뒤) {
+c#17	RUN	c			complete-program	#include <stdio.h>
+c#18	RUN	c		stdin	complete-program	#include <stdio.h>
+c#19	RUN	c			complete-program	#include <stdio.h>
+c#20	RUN	c			complete-program	#include <stdio.h>
+c#21	RUN	c			complete-program	#include <stdio.h>
+c#22	RUN	c			complete-program	#include <stdio.h>
+c#23	RUN	c			complete-program	#include <stdio.h>
+c#24	RUN	c			complete-program	#include <stdio.h>
+c#25	RUN	c			complete-program	#include <stdio.h>
+c#26	RUN	c		stdin	complete-program	#include <stdio.h>
+c#27	RUN	c			complete-program	#include <stdio.h>
+c#28	---	c			korean-placeholder-outside-strings	반환형 함수이름(자료형 매개변수1, 자료형 매개변수2) {
+c#29	RUN	c			complete-program	#include <stdio.h>
+c#30	RUN	c			complete-program	#include <stdio.h>
+c#31	RUN	c			complete-program	#include <stdio.h>
+c#32	RUN	c			complete-program	#include <stdio.h>
+c#33	RUN	c			complete-program	#include <stdio.h>
+c#34	RUN	c			complete-program	#include <stdio.h>
+c#35	RUN	c			complete-program	#include <stdio.h>
+c#36	RUN	c			complete-program	#include <stdio.h>
+c#37	RUN	c			complete-program	#include <stdio.h>
+c#38	RUN	c			complete-program	#include <stdio.h>
+c#39	RUN	c		stdin	complete-program	#include <stdio.h>
+c#40	RUN	c		stdin	complete-program	#include <stdio.h>
+c#41	RUN	c		stdin	complete-program	#include <stdio.h>
+c#42	RUN	c			complete-program	#include <stdio.h>
+c#43	RUN	c		stdin	complete-program	#include <stdio.h>
+c#44	RUN	c		stdin	complete-program	#include <stdio.h>
+c#45	RUN	c			complete-program	#include <stdio.h>
+c#46	RUN	c		stdin	complete-program	#include <stdio.h>
+java#0	---	shell			shell-commands	java -version
+java#1	RUN	java			complete-program	public class Hello {
+java#2	---	shell			shell-commands	javac Hello.java
+java#3	RUN	java			complete-program+annotations-stripped	public class Hello {                            
+java#4	RUN	java			complete-program	// 한 줄 주석: 컴파일러가 무시합니다
+java#5	RUN	java			complete-program	public class Broken {
+java#6	RUN	java			complete-program	public class Typo {
+java#7	RUN	java			complete-program	public class Variables {
+java#8	RUN	java			complete-program	public class Casting {
+java#9	RUN	java		stdin	complete-program	import java.util.Scanner;
+java#10	RUN	java		stdin	complete-program	import java.util.Scanner;
+java#11	RUN	java		stdin	complete-program	import java.util.Scanner;
+java#12	RUN	java			complete-program	public class Grade {
+java#13	RUN	java			complete-program	public class Loops {
+java#14	RUN	java			complete-program	public class ArrayDemo {
+java#15	RUN	java			complete-program	public class OutOfBounds {
+java#16	RUN	java			complete-program	import java.util.ArrayList;
+java#17	---	java			no-main (add data-template="java-main" if the statements stand alone)	// 반환 타입  이름(매개변수) { 몸통 }
+java#18	RUN	java			complete-program	public class Methods {
+java#19	RUN	java			complete-program	public class Main {
+java#20	RUN	java			complete-program	public class Main {
+java#21	RUN	java			complete-program	public class Exceptions {
+java#22	RUN	java		stdin	complete-program	import java.util.Scanner;
+java#23	---	java			no-main (add data-template="java-main" if the statements stand alone)	public class Student {
+java#24	---	java			override:data-run=false	public class StudentTest {
+java#25	---	java			override:data-run=false	import java.util.ArrayList;
+java#26	---	java			override:data-run=false	import java.util.ArrayList;
+java#27	RUN	java			complete-program	public class Hello {
+java#28	RUN	java			complete-program	public class Npe {
+python#0	---	shell			shell-commands	python --version
+python#1	---	repl			repl-transcript	>>> 1 + 2
+python#2	RUN	python			script	print("안녕하세요, COM's!")
+python#3	---	shell			shell-commands	python hello.py
+python#4	RUN	python			script	print("안녕하세요")
+python#5	---	repl			repl-transcript	>>> type(10)
+python#6	RUN	python			script	name = "민수"
+python#7	---	repl			repl-transcript	>>> 7 / 2
+python#8	---	repl			repl-transcript	>>> "COM" + "'s"
+python#9	RUN	python		stdin	script	name = input("이름이 뭐예요? ")
+python#10	RUN	python		stdin	script	age = input("나이: ")
+python#11	---	repl			repl-transcript	>>> int("42") + 1
+python#12	---	repl			repl-transcript	>>> 5 > 3
+python#13	RUN	python		stdin	script	score = int(input("점수: "))
+python#14	RUN	python		stdin	script	n = int(input("정수: "))
+python#15	RUN	python			script	score = 105
+python#16	RUN	python			script	x = 3
+python#17	RUN	python			script	x = 5
+python#18	---	repl			repl-transcript	>>> list(range(5))
+python#19	RUN	python			script	for i in range(3):
+python#20	RUN	python			script	count = 3
+python#21	RUN	python			script	for i in range(1, 11):
+python#22	RUN	python		stdin	script	while True:
+python#23	RUN	python		stdin	script	dan = int(input("몇 단? "))
+python#24	RUN	python			script	total = 0
+python#25	RUN	python			script	for i in range(1, 5):
+python#26	---	repl			repl-transcript	>>> fruits = ["사과", "바나나", "포도"]
+python#27	---	repl			repl-transcript	>>> nums = [10, 20, 30, 40, 50]
+python#28	RUN	python			script	scores = [88, 92, 75]
+python#29	---	repl			repl-transcript	>>> point = (3, 4)
+python#30	---	repl			repl-transcript	>>> member = {"name": "민수", "age": 20}
+python#31	RUN	python			script	prices = {"아메리카노": 2500, "라떼": 3500, "모카": 4000}
+python#32	RUN	python			script	words = ["apple", "banana", "apple", "cherry", "
+python#33	---	repl			repl-transcript	>>> nums = [1, 2, 2, 3, 3, 3]
+python#34	RUN	python			script	name = "민수"
+python#35	---	repl			repl-transcript	>>> s = "Python"
+python#36	---	repl			repl-transcript	>>> "  hello  ".strip()
+python#37	---	repl			repl-transcript	>>> s = "abc"
+python#38	RUN	python		stdin	script	sentence = input("영어 문장: ")
+python#39	RUN	python			script	def greet(name):
+python#40	RUN	python			script	def add(a, b):
+python#41	---	repl			repl-transcript	>>> def show(x):
+python#42	RUN	python			script	def min_max(nums):
+python#43	RUN	python			script	def power(base, exp=2):
+python#44	RUN	python			script	def is_prime(n):
+python#45	RUN	python			script	def make_message():
+python#46	---	repl			repl-transcript	>>> import math
+python#47	RUN	python			script	import random
+python#48	RUN	python			script	with open("memo.txt", "w", encoding="utf-8") as 
+python#49	RUN	python			script	with open("memo.txt", encoding="utf-8") as f:
+python#50	RUN	python			script	with open("memo.txt", "a", encoding="utf-8") as 
+python#51	RUN	python			script	n = int("abc")
+python#52	RUN	python		stdin	script	try:
+python#53	RUN	python			script	try:
+python#54	RUN	python		stdin	script	while True:
+python#55	RUN	python		stdin	script	def ask_int(prompt):
+python#56	RUN	python			script	class Dog:
+python#57	RUN	python			script	class Cat:
+python#58	RUN	python			script	class Account:
+python#59	RUN	python		stdin	script	import random
+python#60	RUN	python			script	FILENAME = "words.txt"
+python#61	RUN	python		stdin	script	import random
+python#62	RUN	python		stdin	script	def delete_word(words):
+python#63	RUN	python			script	def same(a, b):
+python#64	RUN	python			script	def average(nums):
+python#65	---	repl			repl-transcript	>>> print(my_var)
+python#66	---	shell			shell-commands	pip install requests
+python#67	RUN	python			script	from flask import Flask
+arduino#0	RUN	arduino			sketch-opens-in-lab	// 보드에 달린 내장 LED(13번)를 1초 간격으로 깜빡입니다.
+arduino#1	RUN	arduino			sketch-opens-in-lab	void setup() {
+arduino#2	---	arduino			korean-placeholder-outside-strings	전압(V) = 전류(I) × 저항(R)      ←  I = V / R
+arduino#3	---	arduino			korean-placeholder-outside-strings	저항에 걸리는 전압 = 5V − 2V(LED) = 3V
+arduino#4	RUN	arduino			sketch-opens-in-lab	// 8번 핀에 연결한 외부 LED 깜빡이기
+arduino#5	---	arduino			not-a-complete-sketch	pinMode(2, INPUT_PULLUP);   // 2번 핀을 입력으로 + 내부 풀
+arduino#6	RUN	arduino			sketch-opens-in-lab	// 버튼을 누르고 있는 동안만 LED가 켜진다
+arduino#7	RUN	arduino			sketch-opens-in-lab	// 누를 때마다 LED 켜짐/꺼짐 전환 (delay로 만든 쉬운 버전)
+arduino#8	RUN	arduino			sketch-opens-in-lab	// 누를 때마다 LED 전환 (millis로 만든 디바운스 버전)
+arduino#9	RUN	arduino			sketch-opens-in-lab	int count = 0;
+arduino#10	RUN	arduino			sketch-opens-in-lab	// 버튼 상태가 "바뀔 때만" 알려주기
+arduino#11	RUN	arduino			sketch-opens-in-lab	// 시리얼 플로터용: "이름:값" 형태로 쉼표로 구분해 출력
+arduino#12	RUN	arduino			sketch-opens-in-lab	// 가변저항 값을 읽어 시리얼 모니터에 출력
+arduino#13	---	arduino			not-a-complete-sketch	int duty = map(raw, 0, 1023, 0, 255);
+arduino#14	RUN	arduino			sketch-opens-in-lab	// LED가 서서히 밝아졌다 어두워지기 (9번은 PWM 핀)
+arduino#15	RUN	arduino			sketch-opens-in-lab	// 가변저항을 돌려 LED 밝기 조절
+arduino#16	---	arduino			korean-placeholder-outside-strings	거리(cm) = 시간(µs) × 0.034 / 2
+arduino#17	RUN	arduino			sketch-opens-in-lab	// HC-SR04 초음파 센서로 거리(cm) 측정
+arduino#18	RUN	arduino			sketch-opens-in-lab	// 서보를 0도 -> 180도 -> 0도로 왕복시키기
+arduino#19	RUN	arduino			sketch-opens-in-lab	// 가변저항으로 서보 각도 조종하기
+arduino#20	RUN	arduino			sketch-opens-in-lab	// 피에조 부저로 도레미파솔 연주
+arduino#21	---	arduino			korean-placeholder-outside-strings	5V
+arduino#22	RUN	arduino			sketch-opens-in-lab	// 조도 센서(CDS) 값 읽기
+arduino#23	RUN	arduino			sketch-opens-in-lab	// 어두워지면 LED가 켜지는 야간등
+arduino#24	RUN	arduino			sketch-opens-in-lab	// RGB LED(공통 캐소드)로 색 섞기
+arduino#25	RUN	arduino			sketch-opens-in-lab	// 무지개처럼 색이 부드럽게 한 바퀴 도는 RGB LED
+arduino#26	RUN	arduino			sketch-opens-in-lab	// I2C 장치 주소 찾기
+arduino#27	RUN	arduino			sketch-opens-in-lab	// I2C LCD에 글자와 센서 값 표시하기
+arduino#28	RUN	arduino			sketch-opens-in-lab	// DHT11로 온도와 습도 읽기
+arduino#29	RUN	arduino			sketch-opens-in-lab	// DHT11 온습도를 LCD와 시리얼 모니터에 함께 표시
+arduino#30	RUN	arduino			sketch-opens-in-lab	// 조이스틱 모듈: 방향과 버튼 읽기
+arduino#31	RUN	arduino			sketch-opens-in-lab	// L9110S 모터 드라이버로 DC 모터 속도·방향 제어
+arduino#32	RUN	arduino			sketch-opens-in-lab	// 2단계: 20cm 안으로 들어오면 부저가 울린다
+arduino#33	RUN	arduino			sketch-opens-in-lab	// 거리 경보기: 가까울수록 빨리 삐삐
+arduino#34	---	arduino			not-a-complete-sketch	long freq = map((long)cm, NEAR_CM, FAR_CM, 2000,
+arduino#35	---	arduino			not-a-complete-sketch	for (int angle = 0; angle <= 180; angle += 10) {
+arduino#36	---	arduino			not-a-complete-sketch	float sum = 0;

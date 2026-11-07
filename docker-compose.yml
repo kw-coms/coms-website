@@ -156,6 +156,72 @@ services:
       TRUST_PROXY: "1"
       # Login is checked by nginx (auth_request); the container has no network and makes no calls itself.
 
+  # Runs the C / Java / Python programs of the study pages' "직접 해보기" playground. Untrusted code runs
+  # here, so the container has no network, a read-only root, a pinned seccomp profile and a small set of
+  # capabilities (SETUID/SETGID/KILL/SYS_RESOURCE: the server is container-root and runs every job as
+  # uid 10100 via setpriv). nginx in coms-frontend reaches it through a unix socket on the
+  # study-runner-socket volume, after checking the visitor's session with the backend. The full model,
+  # limits and tests: runner/README.md. The site does not depend on this service (and it does not depend
+  # on the site): if it is down, /study/api/run answers 502 and the rest of the site is unaffected.
+  coms-study-runner:
+    image: coms-study-runner:${COMS_IMAGE_TAG:-latest}
+    build:
+      context: ./runner
+    container_name: coms-study-runner
+    restart: unless-stopped
+    logging: *default-logging
+    network_mode: none
+    # Server = container-root with ONLY the capabilities below; jobs are exec'd as uid/gid 10100.
+    # The primary gid is 101 = the nginx group in nginx:alpine, so the 0660 socket (umask 0117) is
+    # reachable by the nginx workers and by nobody else.
+    user: "0:101"
+    volumes:
+      - study-runner-socket:/run/coms-study
+      # Disk-backed so it survives process and container restarts: the abuse deny-list.
+      - study-runner-state:/var/lib/coms-study
+    read_only: true
+    tmpfs:
+      # The only place the job uid can write besides /dev/shm and /dev/mqueue (wiped after every job).
+      - /jobs:rw,exec,nosuid,nodev,size=64m,nr_inodes=4096,mode=1777
+      # POSIX shm: explicit and small (also counted in the 768m cgroup).
+      - /dev/shm:rw,noexec,nosuid,nodev,size=8m,nr_inodes=1024,mode=1777
+    cap_drop: [ALL]
+    cap_add:
+      - SETUID  # setpriv switches each job to uid 10100 (the server keeps uid 0)
+      - SETGID  # ... and gid 10100, clearing supplementary groups
+      - KILL  # server kills the job's process group on timeout / output flood
+      - SYS_RESOURCE  # only to pin oom_score_adj=1000 (+min) on jobs before they drop to uid 10100
+    security_opt:
+      - "no-new-privileges:true"
+      # Docker 29.9.0's default profile minus the unconditional ptrace / process_vm_* rules, pinned in the
+      # repository (see runner/README.md). A relative path is resolved against this file's directory.
+      - "seccomp=./runner/seccomp.json"
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: 1.0
+    pids_limit: 256
+    ipc: private
+    # IPC limits are namespaced, so a job cannot exhaust anything outside this container:
+    # SysV shm <= 16 MiB total (4096 pages), 4 MiB per segment, 64 segments; small queues/semaphores.
+    sysctls:
+      kernel.shmmax: "4194304"
+      kernel.shmall: "4096"
+      kernel.shmmni: "64"
+      kernel.msgmax: "8192"
+      kernel.msgmnb: "16384"
+      kernel.msgmni: "32"
+      kernel.sem: "32 1024 32 64"
+      fs.mqueue.queues_max: "16"
+      fs.mqueue.msg_max: "10"
+      fs.mqueue.msgsize_max: "8192"
+    stop_grace_period: 25s
+    environment:
+      LISTEN_SOCKET: /run/coms-study/run.sock
+      DENYLIST_FILE: /var/lib/coms-study/denylist.json
+      RATE_LIMIT_PER_MIN: "${STUDY_RATE_LIMIT_PER_MIN:-10}"
+      # nginx sends X-Runner-Client (the member id the backend vouched for) and the runner requires it.
+      TRUST_PROXY: "1"
+
   coms-frontend:
     image: coms-frontend:${COMS_IMAGE_TAG:-latest}
     build:
@@ -186,6 +252,8 @@ services:
       # The compiler's unix socket (see coms-lab-compiler). Connecting needs write access to the
       # socket file, which the shared group gives; the directory itself stays read-only here.
       - lab-sock:/run/coms-lab:ro
+      # The study runner's unix socket (see coms-study-runner); read-only is enough to connect.
+      - study-runner-socket:/run/coms-study:ro
     healthcheck:
       # nginx:1.28-alpine has BusyBox wget but no curl. Use 127.0.0.1, not
       # localhost: in-container "localhost" resolution is unreliable (observed
@@ -203,3 +271,14 @@ volumes:
   pgdata:
   backend-uploads:
   lab-sock:
+  study-runner-socket:
+    # Explicit production names, so tests (runner/test/compose-e2e.mjs) can run against throw-away ones.
+    name: ${RUNNER_SOCKET_VOLUME:-coms-study-runner-socket}
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=1m,mode=0755"
+  study-runner-state:
+    # Plain disk-backed volume: a tmpfs-driver volume is emptied on every container stop/start.
+    name: ${RUNNER_STATE_VOLUME:-coms-study-runner-state}

@@ -92,6 +92,8 @@ const pwaPlugin = VitePWA({
       /\/(share|share-data|share-image)$/,
       // Demo sandbox for /study: a real document with its own CSP (nginx.frontend.conf), never the SPA shell.
       /^\/study-sandbox\.html$/,
+      // The code runner API of the study playground (fetch calls, never navigations; denied for completeness).
+      /^\/study\/api\//,
       // Circuit Lab (lab/): its own app, built into the same image under /lab/ (Dockerfile.frontend).
       /^\/lab(\/|$)/,
       // Sibling apps the host nginx serves under sub-paths of this origin.
@@ -109,6 +111,7 @@ const pwaPlugin = VitePWA({
       '**/common-*.js', // highlight.js (its "common" language bundle)
       '**/vendor-sentry-*.js',
       '**/study-content-*.js', // /study lesson markup (~525 KB for the five studies) and circuit drawings, fetched when a study is opened
+      '**/study-editor-*.js', // CodeMirror of the /study playground (~350 KB), fetched when someone presses "직접 해보기"
     ],
     maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
     runtimeCaching: [
@@ -140,8 +143,14 @@ export default defineConfig({
     sourcemap: sentryAuthToken ? 'hidden' : false,
     rollupOptions: {
       output: {
-        // The /study lesson fragments (and the circuit-drawing chunk) get a recognisable name so workbox's globIgnores can keep them out of the precache.
-        chunkFileNames: (chunk) => (chunk.moduleIds.some((id) => id.includes('/src/pages/study/content/') || id.includes('/src/pages/study/circuits/')) ? 'assets/study-content-[name]-[hash].js' : 'assets/[name]-[hash].js'),
+        // The /study lesson fragments (and the circuit-drawing chunk) and the code editor of "직접 해보기" (CodeMirror + its
+        // language packs) get recognisable names so workbox's globIgnores can keep them out of the precache: they are fetched
+        // when a study page / an editor is opened.
+        chunkFileNames: (chunk) => {
+          if (chunk.moduleIds.some((id) => id.includes('/src/pages/study/content/') || id.includes('/src/pages/study/circuits/'))) return 'assets/study-content-[name]-[hash].js'
+          if (chunk.moduleIds.some((id) => /\/node_modules\/(@codemirror|@lezer|crelt|style-mod|w3c-keyname)\/|\/src\/pages\/study\/playground\/editor\./.test(id))) return 'assets/study-editor-[name]-[hash].js'
+          return 'assets/[name]-[hash].js'
+        },
         // Split heavy vendors into their own long-cached chunks so they
         // parallelize and survive app-code redeploys. ponytail: coarse grouping
         // by package, finer splits only if a chunk actually gets too big.
@@ -171,6 +180,11 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      // The study playground's code runner (runner/docker-compose.dev.yml listens here; production reaches it through nginx).
+      '/study/api': {
+        target: 'http://127.0.0.1:8788',
         changeOrigin: true,
       }
     }

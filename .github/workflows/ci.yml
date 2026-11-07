@@ -159,10 +159,54 @@ jobs:
         working-directory: lab
         run: node --test "compiler/test/*.test.mjs"
 
-      # The compiler steps of the deploy (snapshot / start / restore / prune), read in the order
-      # deploy.yml calls them, over several releases with a stand-in image.
-      - name: Deploy script for the compiler
-        run: scripts/test-deploy-lab-compiler.sh
+      # The sidecar steps of the deploy (snapshot / start / restore / prune) for the compiler and the study
+      # runner, read in the order deploy.yml calls them, over several releases with a stand-in image.
+      - name: Deploy script for the optional services
+        run: scripts/test-deploy-sidecars.sh
+
+  # The study code runner (runner/) runs members' C / Java / Python programs. Its unit and HTTP tests, then the
+  # same container the compose file builds: the real compilers and the attack scenarios (privilege escalation,
+  # fork/memory/IPC bombs, cleanup, seccomp) run inside it with the production flags, and the compose-level
+  # checks (restart policy, deny-list, member key) start it the way the deploy does. Throw-away volume names.
+  runner:
+    name: Study code runner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Unit, HTTP and compose-contract tests
+        run: node --test "runner/test/*.test.mjs"
+
+      - name: Build the runner image
+        working-directory: runner
+        env:
+          NGINX_GID: "101"
+          RUNNER_SOCKET_VOLUME: ci-socket
+          RUNNER_STATE_VOLUME: ci-state
+        run: docker compose -p studyrt -f docker-compose.yml build
+
+      - name: Toolchains and attack scenarios in the production container
+        working-directory: runner
+        env:
+          NGINX_GID: "101"
+          RUNNER_SOCKET_VOLUME: ci-socket
+          RUNNER_STATE_VOLUME: ci-state
+        run: |
+          docker compose -p studyrt -f docker-compose.yml run --rm --no-deps \
+            -e RUNNER_TOOLCHAIN_TESTS=1 -e RUNNER_CONTAINER_ATTACK_TESTS=1 -e RUNNER_EXPECT_IPC_LIMITS=1 \
+            runner node test/toolchain.mjs
+          docker compose -p studyrt -f docker-compose.yml down -v
+
+      - name: Compose end to end (seccomp, member key, restart after a crash, deny-list)
+        working-directory: runner
+        run: node test/compose-e2e.mjs
 
   # The deploy builds both images on the server and starts them with this same compose file,
   # and nothing before it ever built them. Do it here first, on a throwaway database, so a
@@ -212,6 +256,25 @@ jobs:
       # coms-frontend serves /lab/ and sends /lab/api/compile to coms-lab-compiler over a unix socket,
       # after asking the backend whether the visitor is signed in. Everything here goes through the
       # frontend container, the way the host nginx reaches it in production.
+      # Both sidecar checks below (Circuit Lab, study runner) need a signed-in member. The database is empty,
+      # so the first admin is bootstrapped; its cookies and password stay in the runner's temp dir, never in the log.
+      - name: Sign in as a fresh admin
+        run: |
+          set -euo pipefail
+          umask 077
+          secret="$(grep '^BOOTSTRAP_SECRET=' .env | cut -d= -f2-)"
+          password="$(openssl rand -hex 16)Aa1!"
+          origin='Origin: https://coms.kw.ac.kr'
+          curl -fsS -o /dev/null -X POST http://127.0.0.1:8080/api/maintenance/bootstrap \
+            -H "$origin" -H "X-Bootstrap-Secret: $secret" -H 'Content-Type: application/json' \
+            --data "{\"studentId\":\"2026000001\",\"name\":\"CI Admin\",\"email\":\"ci-admin@example.com\",\"password\":\"$password\"}"
+          curl -fsS -D - -o /dev/null -X POST http://127.0.0.1:8080/api/auth/login \
+            -H "$origin" -H 'Content-Type: application/json' \
+            --data "{\"identifier\":\"2026000001\",\"password\":\"$password\",\"rememberMe\":false}" \
+            | tr -d '\r' | sed -n 's/^[Ss]et-[Cc]ookie: \([^;]*\);.*/\1/p' | paste -sd ';' - | sed 's/;/; /g' > "$RUNNER_TEMP/member-cookies"
+          printf '%s' "$password" > "$RUNNER_TEMP/admin-password"
+          [ -s "$RUNNER_TEMP/member-cookies" ]
+
       - name: Circuit Lab through the frontend container
         run: |
           set -euo pipefail
@@ -234,23 +297,15 @@ jobs:
           curl -fsS -D - -o /dev/null "$site$(curl -fsS "$site/lab/" | grep -o '/lab/assets/[^"]*\.js' | head -n 1)" | tr -d '\r' | grep -qi "^cache-control: .*immutable"
           [ "$(curl -s -o /dev/null -w '%{http_code}' "$site/lab/api/unknown")" = 404 ]
           [ "$(curl -s -o /dev/null -w '%{http_code}' "$site/lab/api/compile")" = 405 ]
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Cookie: $(cat "$RUNNER_TEMP/member-cookies")" -H 'Sec-Fetch-Site: cross-site' -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")" = 403 ]
 
           # Not signed in: 401 JSON with the Korean message, and the compiler is never reached.
           body="$(curl -s -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")"
           [ "$(tail -n 1 <<< "$body")" = 401 ]
           grep -q '로그인한 동아리원만' <<< "$body"
 
-          # Sign in as a fresh admin (the throwaway database is empty). The cookies are used below
-          # but never printed.
-          secret="$(grep '^BOOTSTRAP_SECRET=' .env | cut -d= -f2-)"
-          password="$(openssl rand -hex 16)Aa1!"
-          curl -fsS -o /dev/null -X POST http://127.0.0.1:8080/api/maintenance/bootstrap \
-            -H "$origin" -H "X-Bootstrap-Secret: $secret" -H 'Content-Type: application/json' \
-            --data "{\"studentId\":\"2026000001\",\"name\":\"CI Admin\",\"email\":\"ci-admin@example.com\",\"password\":\"$password\"}"
-          cookies="$(curl -fsS -D - -o /dev/null -X POST http://127.0.0.1:8080/api/auth/login \
-            -H "$origin" -H 'Content-Type: application/json' \
-            --data "{\"identifier\":\"2026000001\",\"password\":\"$password\",\"rememberMe\":false}" \
-            | tr -d '\r' | sed -n 's/^[Ss]et-[Cc]ookie: \([^;]*\);.*/\1/p' | paste -sd ';' - | sed 's/;/; /g')"
+          # The session made by the "Sign in" step above (never printed).
+          cookies="$(cat "$RUNNER_TEMP/member-cookies")"
           [ -n "$cookies" ]
 
           # Signed in: Blink compiles to a hex through the socket.
@@ -291,6 +346,116 @@ jobs:
           docker stop coms-lab-compiler > /dev/null
           [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Cookie: $cookies" -H 'Content-Type: application/json' --data "$sketch" "$site/lab/api/compile")" = 502 ]
           curl -fsS -o /dev/null "$site/"
+          curl -fsS "$site/actuator/health" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"'
+
+      # coms-frontend serves the playground's API: /study/api/run goes to coms-study-runner over a unix socket
+      # after the backend vouched for the session. A C, a Java and a Python program run in the real sandbox.
+      - name: Study code runner through the frontend container
+        run: |
+          set -euo pipefail
+          site=http://127.0.0.1:3000
+          cookies="$(cat "$RUNNER_TEMP/member-cookies")"
+          for attempt in $(seq 1 45); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' coms-study-runner)" = healthy ] && break
+            if [ "$attempt" -eq 45 ]; then echo "::error::coms-study-runner never became healthy."; docker logs --tail=50 coms-study-runner || true; exit 1; fi
+            sleep 2
+          done
+          # post <json> -> the body, then the status on the last line; status_of / body_of split them again.
+          post() { curl -s -w '\n%{http_code}' -X POST -H "Cookie: $cookies" -H 'Content-Type: application/json' --data "$1" "$site/study/api/run"; }
+          status_of() { tail -n 1 <<< "$1"; }
+          body_of() { sed '$d' <<< "$1"; }
+
+          # Not signed in, forged or duplicated session cookies, wrong method or path: JSON refusals from nginx.
+          body="$(curl -s -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"lang":"c","code":"int main(){}"}' "$site/study/api/run")"
+          [ "$(tail -n 1 <<< "$body")" = 401 ]
+          jq -e '.error == "unauthorized" and (.messageKo | length > 0)' <<< "$(sed '$d' <<< "$body")" > /dev/null
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Cookie: token=forged.part.signature' -H 'X-Runner-Client: 2026000001' -H 'Content-Type: application/json' --data '{"lang":"c","code":"int main(){}"}' "$site/study/api/run")" = 401 ]
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Cookie: token=a=1; token=b' -H 'Content-Type: application/json' --data '{}' "$site/study/api/run")" = 400 ]
+          [ "$(curl -s -o /dev/null -w '%{http_code}' "$site/study/api/run")" = 405 ]
+          # A request the browser labels cross-site never reaches the login check or the runner (valid session or not).
+          body="$(curl -s -w '\n%{http_code}' -X POST -H "Cookie: $cookies" -H 'Sec-Fetch-Site: cross-site' -H 'Content-Type: application/json' --data '{"lang":"python","code":"print(1)"}' "$site/study/api/run")"
+          [ "$(tail -n 1 <<< "$body")" = 403 ]
+          jq -e '.error == "rejected"' <<< "$(sed '$d' <<< "$body")" > /dev/null
+          for path in health nothing-here; do
+            [ "$(curl -s -o /dev/null -w '%{http_code}' "$site/study/api/$path")" = 404 ]
+          done
+          curl -s -D - -o /dev/null "$site/study/api/health" | tr -d '\r' | grep -qi '^x-content-type-options: nosniff'
+
+          # The three languages, each with the output the program must print.
+          out="$(post '{"lang":"c","code":"#include <stdio.h>\nint main(void) { printf(\"c-%d\\n\", 6 * 7); return 0; }"}')"
+          [ "$(status_of "$out")" = 200 ]; jq -e '.ok == true and .stdout == "c-42\n" and .exitCode == 0' <<< "$(body_of "$out")" > /dev/null
+          out="$(post '{"lang":"java","code":"import java.util.Scanner;\npublic class Main { public static void main(String[] a) { Scanner s = new Scanner(System.in); System.out.println(\"java-\" + s.nextLine()); } }","stdin":"ok\n"}')"
+          [ "$(status_of "$out")" = 200 ]; jq -e '.ok == true and .stdout == "java-ok\n"' <<< "$(body_of "$out")" > /dev/null
+          out="$(post '{"lang":"python","code":"print(\"py-\" + input())","stdin":"ok"}')"
+          [ "$(status_of "$out")" = 200 ]; jq -e '.ok == true and .stdout == "py-ok\n"' <<< "$(body_of "$out")" > /dev/null
+          # A compile error is a normal answer, with diagnostics (1-based line and column) and a Korean hint.
+          out="$(post '{"lang":"c","code":"#include <stdio.h>\nint main(void) {\n    printf(\"x\\n\")\n    return 0;\n}\n"}')"
+          [ "$(status_of "$out")" = 200 ]; jq -e '.ok == false and .stage == "compile" and .diagnostics[0].line == 3 and .diagnostics[0].column >= 1 and (.diagnostics[0].hintKo | length > 0)' <<< "$(body_of "$out")" > /dev/null
+          out="$(post '{"lang":"python","code":"print(1 / 0)"}')"
+          [ "$(status_of "$out")" = 200 ]; jq -e '.ok == true and .exitCode != 0 and (.stderr | contains("ZeroDivisionError"))' <<< "$(body_of "$out")" > /dev/null
+          echo "C, Java and Python ran through /study/api/run"
+
+          # The container is the hardened one: pinned seccomp profile, no network, read-only root.
+          [ "$(docker exec coms-study-runner awk '/^Seccomp:/ {print $2}' /proc/1/status)" = 2 ]
+          [ "$(docker inspect -f '{{.HostConfig.NetworkMode}} {{.HostConfig.ReadonlyRootfs}}' coms-study-runner)" = "none true" ]
+          docker inspect -f 'CapAdd={{json .HostConfig.CapAdd}} CapDrop={{json .HostConfig.CapDrop}}' coms-study-runner
+          # Exactly the four capabilities the server needs (it is container-root; every job drops to uid 10100).
+          [ "$(docker inspect -f '{{range .HostConfig.CapAdd}}{{.}} {{end}}' coms-study-runner | tr ' ' '\n' | sed 's/^CAP_//' | grep . | sort | paste -sd, -)" = "KILL,SETGID,SETUID,SYS_RESOURCE" ]
+          [ "$(docker inspect -f '{{range .HostConfig.CapDrop}}{{.}} {{end}}' coms-study-runner | sed 's/CAP_//g; s/ *$//')" = "ALL" ]
+
+          # The runner's per-member limit (10 a minute) is the answer, in the contract's shape, once it is used up.
+          limited=""
+          for i in $(seq 1 14); do
+            limited="$(curl -s -D - -X POST -H "Cookie: $cookies" -H 'Content-Type: application/json' --data '{"lang":"python","code":"print(1)"}' "$site/study/api/run" | tr -d '\r')"
+            grep -q '^HTTP/1.1 429' <<< "$limited" && break
+          done
+          grep -q '^HTTP/1.1 429' <<< "$limited"
+          grep -qi '^retry-after: ' <<< "$limited"
+          grep -q '"error":"rate-limited"' <<< "$limited"
+
+          # Before login the limit is per client address (X-Real-IP, which the host nginx overwrites).
+          codes=""
+          for i in $(seq 1 90); do
+            codes="$codes $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-Real-IP: 203.0.113.77' -H 'Content-Type: application/json' --data '{}' "$site/study/api/run")"
+          done
+          grep -q 429 <<< "$codes"
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'X-Real-IP: 203.0.113.78' -H 'Content-Type: application/json' --data '{}' "$site/study/api/run")" = 401 ]
+
+      - name: Set up Node.js for the stack e2e
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies for the stack e2e
+        run: npm ci
+
+      - name: Install Playwright browser for the stack e2e
+        run: npx playwright install --with-deps chromium
+
+      # "직접 해보기" in a real browser against the real frontend container, backend and runner (nothing mocked).
+      # The runner allows a member ten runs a minute and the step above used them up: start a fresh minute.
+      - name: Study playground on the real stack
+        env:
+          E2E_STACK: "1"
+          E2E_STACK_URL: http://127.0.0.1:3000
+          E2E_STACK_BACKEND: http://127.0.0.1:8080
+          E2E_STACK_ADMIN_ID: "2026000001"
+        run: |
+          sleep 62
+          E2E_STACK_ADMIN_PASSWORD="$(cat "$RUNNER_TEMP/admin-password")" npx playwright test --project=stack
+
+      # The runner is optional for the site: down means 502 for the playground and nothing else.
+      - name: The site survives a stopped study runner
+        run: |
+          set -euo pipefail
+          site=http://127.0.0.1:3000
+          cookies="$(cat "$RUNNER_TEMP/member-cookies")"
+          sleep 62
+          docker stop coms-study-runner > /dev/null
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H "Cookie: $cookies" -H 'Content-Type: application/json' --data '{"lang":"python","code":"print(1)"}' "$site/study/api/run")" = 502 ]
+          curl -fsS -o /dev/null "$site/study/c"
+          curl -fsS -o /dev/null "$site/lab/"
           curl -fsS "$site/actuator/health" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"'
 
       - name: Check that the image applied every migration
@@ -337,6 +502,7 @@ jobs:
           docker logs --tail=300 coms-backend || true
           docker logs --tail=100 coms-frontend || true
           docker logs --tail=100 coms-lab-compiler || true
+          docker logs --tail=100 coms-study-runner || true
 
   backend-e2e:
     name: Real-backend auth e2e
