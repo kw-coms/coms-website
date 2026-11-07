@@ -58,7 +58,7 @@ assert.equal(fallbackFamilies.length, 5)
 const faceCss = read('../src/styles/font-fallback.css')
 for (const family of fallbackFamilies) {
   const faces = faceCss.split('@font-face').filter((face) => face.includes(`font-family: ${family};`))
-  assert.equal(faces.length, family.includes('WenQuanYi') ? 1 : 2, `${family}: a regular and a bold face (WenQuanYi has no bold)`)
+  assert.equal(faces.length, family.includes('WenQuanYi') ? 1 : family.includes('Latin') ? 4 : 2, `${family}: a regular and a bold face (WenQuanYi has no bold; Latin has a spacing face for each)`)
   for (const face of faces) {
     for (const descriptor of ['size-adjust', 'ascent-override', 'descent-override', 'line-gap-override', 'unicode-range']) assert.match(face, new RegExp(`${descriptor}:`), `${family} needs ${descriptor}`)
     assert.doesNotMatch(face, /url\(/, `${family} must not download anything`)
@@ -70,9 +70,9 @@ assert.equal(fontFamilyValue(BUILT_IN_FONTS[1]).includes('Pretendard Fallback'),
 
 // The numbers in each face must follow from the measured table in font-fallback.css (target advance / fallback advance, target
 // metric / size-adjust), so a typo in one face fails here.
-const PRETENDARD = { ascent: 1950 / 2048, descent: 494 / 2048, hangul: 0.8643, latin400: 0.4250, latin700: 0.4414 }
+const PRETENDARD = { ascent: 1950 / 2048, descent: 494 / 2048, hangul: 0.8643 }
 const expected = {
-  Latin: [['100 599', PRETENDARD.latin400 / 0.4256], ['600 900', PRETENDARD.latin700 / 0.4537]],
+  Latin: [['100 599', 0.4990 / 0.4883], ['100 599', 0.2514 / 0.2778], ['600 900', 0.5308 / 0.5285], ['600 900', 0.2365 / 0.2790]], // letters+digits, then spaces+punctuation
   Apple: [['100 599', PRETENDARD.hangul / 0.8650], ['600 900', PRETENDARD.hangul / 0.8650]],
   Noto: [['100 599', PRETENDARD.hangul / 0.9200], ['600 900', PRETENDARD.hangul / 0.9200]],
   Malgun: [['100 599', PRETENDARD.hangul / 1.0], ['600 900', PRETENDARD.hangul / 1.0]],

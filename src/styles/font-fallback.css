@@ -9,18 +9,17 @@
  * skipped and the stack moves on. `unicode-range` splits Hangul from Latin, so each script is scaled by its own factor.
  *
  * How the numbers were derived (scripts/measure-font-fallback.py, fontTools; weighted by how often each character occurs in the
- * user-visible strings of src/**.ts(x) - string literals and JSX text, not identifiers or class names: 21,915 Hangul syllables,
- * 146,084 Latin letters/digits/spaces. Counting all source characters instead moved the Hangul figures not at all and the Latin
- * ones by under 1%, i.e. under 0.1 point of size-adjust):
+ * user-visible strings of src/**.ts(x) - string literals and JSX text, not identifiers or class names: 21,926 Hangul syllables,
+ * 102,531 Latin letters/digits, and the spaces and ' .,:;!' that fill Korean sentences):
  *
- *   font (face)                        UPM   hhea asc/desc/gap          avg Hangul advance   avg Latin advance
- *   Pretendard Variable, wght 400    2048   0.9521 / 0.2412 / 0        0.8643 em            0.4290 em   <- target
- *   Pretendard Variable, wght 700    2048   (same)                     0.8643 em            0.4414 em   <- target (bold)
+ *   font (face)                        UPM   hhea asc/desc/gap          avg Hangul advance   avg Latin letters+digits / spaces+punctuation
+ *   Pretendard Variable, wght 400    2048   0.9521 / 0.2412 / 0        0.8643 em            0.4990 em / 0.2514 em  <- target
+ *   Pretendard Variable, wght 700    2048   (same)                     0.8643 em            0.5308 em / 0.2365 em  <- target (bold)
  *   Apple SD Gothic Neo (macOS)      1000   0.9000 / 0.3000 / 0        0.8650 em            (Latin comes from Arial below)
  *   Noto Sans (CJK) KR (Linux)       1000   1.1600 / 0.2880 / 0        0.9200 em            (Latin from Arial/Liberation below)
  *   Malgun Gothic (Windows)          2048   1.0884 / 0.2417 / 0        1.0000 em            (Latin from Arial below)
  *   WenQuanYi Zen Hei (Linux)        1024   0.9629 / 0.2969 / 0.0898   1.0000 em            (Latin from Arial/Liberation below)
- *   Arial = Liberation Sans = Arimo  2048   0.9053 / 0.2119 / 0.0327    -                    0.4256 em (400)  0.4537 em (700)
+ *   Arial = Liberation Sans = Arimo  2048   0.9053 / 0.2119 / 0.0327    -                    0.4883 / 0.2778 em (400)  0.5285 / 0.2790 em (700)
  *
  *   size-adjust       = target average advance / fallback average advance
  *   ascent-override   = Pretendard ascent  / size-adjust   (the override is a share of the size-adjusted font size, so the
@@ -30,10 +29,17 @@
  *   Apple SD Gothic Neo  0.8643 / 0.8650 = 99.92%   ascent 95.29%   descent 24.14%
  *   Noto Sans KR         0.8643 / 0.9200 = 93.95%   ascent 101.35%  descent 25.68%
  *   Malgun, WenQuanYi    0.8643 / 1.0000 = 86.43%   ascent 110.16%  descent 27.91%
- *   Latin 400            0.4250 / 0.4256 = 99.86%   ascent 95.35%   descent 24.16%
- *   Latin 700            0.4414 / 0.4537 = 97.29%   ascent 97.87%   descent 24.79%
+ *   Latin 400            0.4990 / 0.4883 = 102.19%  ascent 93.17%   descent 23.60%
+ *   Latin 400 spacing    0.2514 / 0.2778 = 90.50%   ascent 105.21%  descent 26.65%
+ *   Latin 700            0.5308 / 0.5285 = 100.44%  ascent 94.80%   descent 24.02%
+ *   Latin 700 spacing    0.2365 / 0.2790 = 84.77%   ascent 112.33%  descent 28.46%
  *
- * Hangul advances do not vary with weight in any of these fonts, so one factor serves both; Latin does, hence two Latin faces.
+ * Hangul advances do not vary with weight in any of these fonts, so one factor serves both; Latin does, hence a regular and a bold Latin face.
+ * Spaces and ' .,:;!' have their own Latin face (U+0020-0021, 002C, 002E, 003A-003B, 00A0): Arial sets a space 10.7% wider than
+ * Pretendard, and a space is a third of the characters of a Korean sentence. With one factor for all of Latin, Korean paragraphs
+ * came out 0.75% wider on average (up to 2% for the paragraphs richest in spaces) and the ones that sat on a wrap point
+ * re-wrapped by a line when the real font arrived (a 28px move of everything below, observed on CI). Separate factors bring the
+ * mean to ~0.
  * Every family has a regular face (weights up to 599) and a bold face (600+) so bold text is drawn with the system's real bold
  * instead of a synthesised one. WenQuanYi has no bold, so it has a regular face only and the browser synthesises its bold, as it
  * did with the platform's own fallback. Malgun and WenQuanYi are separate families because they differ in bold (and in order:
@@ -49,25 +55,46 @@
  *   'Pretendard Variable', 'Pretendard Fallback Latin', 'Pretendard Fallback Apple', 'Pretendard Fallback Noto',
  *   'Pretendard Fallback Malgun', 'Pretendard Fallback WenQuanYi', then the previous system stack.
  */
+/* Latin letters, digits and symbols, then (own factor) spaces and the punctuation that fills Korean sentences */
 @font-face {
 	font-family: 'Pretendard Fallback Latin';
 	src: local('Arial'), local('ArialMT'), local('Helvetica'), local('Liberation Sans'), local('Arimo');
 	font-weight: 100 599;
-	size-adjust: 99.86%;
-	ascent-override: 95.35%;
-	descent-override: 24.16%;
+	size-adjust: 102.19%;
+	ascent-override: 93.17%;
+	descent-override: 23.60%;
 	line-gap-override: 0%;
-	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2190-21FF, U+2212, U+2215, U+FEFF, U+FFFD;
+	unicode-range: U+0022-002B, U+002D, U+002F-0039, U+003C-007E, U+00A1-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2190-21FF, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+	font-family: 'Pretendard Fallback Latin';
+	src: local('Arial'), local('ArialMT'), local('Helvetica'), local('Liberation Sans'), local('Arimo');
+	font-weight: 100 599;
+	size-adjust: 90.50%;
+	ascent-override: 105.21%;
+	descent-override: 26.65%;
+	line-gap-override: 0%;
+	unicode-range: U+0020-0021, U+002C, U+002E, U+003A-003B, U+00A0;
 }
 @font-face {
 	font-family: 'Pretendard Fallback Latin';
 	src: local('Arial Bold'), local('Arial-BoldMT'), local('Helvetica Bold'), local('Liberation Sans Bold'), local('Arimo Bold');
 	font-weight: 600 900;
-	size-adjust: 97.29%;
-	ascent-override: 97.87%;
-	descent-override: 24.79%;
+	size-adjust: 100.44%;
+	ascent-override: 94.80%;
+	descent-override: 24.02%;
 	line-gap-override: 0%;
-	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2190-21FF, U+2212, U+2215, U+FEFF, U+FFFD;
+	unicode-range: U+0022-002B, U+002D, U+002F-0039, U+003C-007E, U+00A1-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2190-21FF, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+	font-family: 'Pretendard Fallback Latin';
+	src: local('Arial Bold'), local('Arial-BoldMT'), local('Helvetica Bold'), local('Liberation Sans Bold'), local('Arimo Bold');
+	font-weight: 600 900;
+	size-adjust: 84.77%;
+	ascent-override: 112.33%;
+	descent-override: 28.46%;
+	line-gap-override: 0%;
+	unicode-range: U+0020-0021, U+002C, U+002E, U+003A-003B, U+00A0;
 }
 
 /* Hangul: macOS */

@@ -4,7 +4,7 @@
   python3 scripts/measure-font-fallback.py Pretendard=PretendardVariable.ttf@wght=400 Malgun=malgun.ttf WQY=wqy-zenhei.ttc#0
 
 Argument form: label=path[#ttc-index][@wght=N]. For every font it prints the unit-less hhea ascent/descent/lineGap and the
-average advance of the Hangul syllables and of the Latin letters/digits/spaces that occur in the user-visible strings of
+average advance of the Hangul syllables, of the Latin letters/digits, and of the spaces and punctuation ' .,:;!' that occur in the user-visible strings of
 src/**/*.ts(x) (string literals and JSX text with Hangul, or prose of several words), weighted by how often each occurs. A fallback's size-adjust is then target_avg / fallback_avg and its ascent/descent overrides are
 target_metric / size-adjust (the override percentages are relative to the already size-adjusted font).
 """
@@ -25,7 +25,9 @@ for m in literal.finditer(source):
         visible.append(t)
 text = '\n'.join(visible)
 hangul = collections.Counter(c for c in text if '\uac00' <= c <= '\ud7a3')
-latin = collections.Counter(c for c in text if c.isascii() and (c.isalnum() or c == ' '))
+SPACING = ' .,:;!'  # one third of every Korean sentence; Arial sets these ~9% wider than Pretendard, so they get their own face
+latin = collections.Counter(c for c in text if c.isascii() and (c.isalnum() or c in SPACING) and c not in SPACING)
+spacing = collections.Counter(c for c in text if c in SPACING)
 print(f"corpus: {sum(hangul.values())} Hangul syllables, {sum(latin.values())} Latin letters/digits/spaces in {len(visible)} visible strings")
 
 def load(spec):
@@ -52,4 +54,4 @@ for spec in sys.argv[1:]:
     label, font = load(spec)
     upm, hhea = font['head'].unitsPerEm, font['hhea']
     print(f"{label:14} ascent={hhea.ascent / upm:.4f} descent={-hhea.descent / upm:.4f} lineGap={hhea.lineGap / upm:.4f} "
-          f"hangul_avg={avg(font, hangul):.4f} latin_avg={avg(font, latin):.4f}")
+          f"hangul_avg={avg(font, hangul):.4f} latin_avg={avg(font, latin):.4f} spacing_avg={avg(font, spacing):.4f}")

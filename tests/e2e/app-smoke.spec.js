@@ -2238,7 +2238,10 @@ const holdSiteFont = async (page) => {
   await page.route(/pretendard.*\.woff2/i, async (route) => { await new Promise((resolve) => setTimeout(resolve, 1500)); await route.continue() })
 }
 const siteFontStatuses = (page) => page.evaluate(() => [...document.fonts].filter((f) => f.family.includes('Pretendard Variable')).map((f) => f.status))
-const siteFontLoaded = (page) => page.waitForFunction(() => [...document.fonts].some((f) => f.family.includes('Pretendard Variable') && f.status === 'loaded'))
+const siteFontLoaded = async (page) => {
+  await page.waitForFunction(() => [...document.fonts].some((f) => f.family.includes('Pretendard Variable') && f.status === 'loaded'))
+  await page.evaluate(() => document.fonts.ready) // and every other slice it has started
+}
 const expectSiteFontPending = async (page) => {
   await expect.poll(async () => (await siteFontStatuses(page)).length, { message: 'a Pretendard Variable FontFace is declared' }).toBeGreaterThan(0)
   const statuses = await siteFontStatuses(page)
@@ -4844,7 +4847,7 @@ test.describe('arduino study circuits', () => {
         await page.setViewportSize({ width: view.width, height: 800 })
         await page.goto('/study/arduino')
         await expect(page.locator('figure.circuit.is-live')).toHaveCount(14)
-        await page.evaluate(() => document.fonts.ready) // the fallback is metric-matched, not identical: a caption can still re-wrap once on the swap; not what this measures
+        await siteFontLoaded(page) // the swap (a caption can still re-wrap once on it) is not what this measures, so it lands first
         if (anchoring === 'no scroll anchoring') await page.addStyleTag({ content: 'html, body, * { overflow-anchor: none !important; }' })
         if (view.fontSize) await page.evaluate((fs) => { document.documentElement.style.fontSize = fs }, view.fontSize)
         await page.waitForTimeout(200)
@@ -4886,7 +4889,7 @@ test.describe('arduino study circuits', () => {
       const release = await holdCircuitChunk(page)
       await page.goto(how === 'deep link' ? '/study/arduino#mod-motor' : '/study/arduino')
       await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
-      await page.evaluate(() => document.fonts.ready) // the fallback is metric-matched, not identical: a caption above can still re-wrap once on the swap; not what this measures
+      await siteFontLoaded(page) // the swap (a paragraph above can still re-wrap once on it: 28px on CI) is not what this measures, so it lands first
       await page.addStyleTag({ content: noAnchoring })
       // Chromium performs the #fragment scroll only once nothing is pending, i.e. after the held chunk; land on it as it would
       if (how === 'deep link') await page.evaluate(() => document.getElementById(location.hash.slice(1)).scrollIntoView())
@@ -4931,7 +4934,7 @@ test.describe('arduino study circuits', () => {
       const release = await holdCircuitChunk(page)
       await page.goto('/study/arduino')
       await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
-      await page.evaluate(() => document.fonts.ready)
+      await siteFontLoaded(page)
       await page.waitForTimeout(200)
       expect(await page.locator('figure.circuit.is-live').count(), 'no circuit code has run yet').toBe(0)
       // whole figures, caption included, from here on (the site font has settled)
@@ -5050,7 +5053,7 @@ test.describe('arduino study circuits', () => {
     await page.route('**/study-content-circuits-*.js', async (route) => { await gate; await route.abort() })
     await page.goto('/study/arduino')
     await expect(page.locator('figure.circuit[data-circuit]')).toHaveCount(14)
-    await page.evaluate(() => document.fonts.ready) // the site font has replaced the fallback (captions reflow with it)
+    await siteFontLoaded(page) // the site font has replaced the fallback (captions reflow with it)
     const heights = () => page.evaluate(() => [...document.querySelectorAll('figure.circuit')].map((f) => f.getBoundingClientRect().height))
     const before = await heights()
     const fig = circuit(page, 'led-blink')
