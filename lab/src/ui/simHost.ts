@@ -28,6 +28,15 @@ sim.onFrame((f) => {
 });
 sim.onSerial(pushSerial);
 
+// debugger state from frames (paused line, globals): only the store re-renders when it actually changes
+let lastDebug = '';
+sim.onFrame((f) => {
+  const key = f.debug ? `${f.debug.paused}|${f.debug.line}|${f.debug.reason}|${JSON.stringify(f.debug.globals)}` : '';
+  if (key === lastDebug) return;
+  lastDebug = key;
+  set({ debug: f.debug ?? null });
+});
+
 /** The simulator failed (worker crash / bad command): leave the running state, say why in Korean, allow running again. */
 let lastFailure = '';
 function simFailed(raw: string) {
@@ -77,21 +86,39 @@ export function setSimInput(partId: string, key: SimInput['key'], value: number 
 
 const syncState = () => set({ simState: sim.state });
 let abort: AbortController | null = null;
+/** The loaded program was built with debug info (breakpoints only work then). */
+let compiledWithDebug = false;
+/** Sketch lines that have machine code (from the last debug build); null until a debug build exists. */
+let codeLines: number[] | null = null;
+/** Snap a requested line to the next line with code (like VS Code); null when no later line has code. */
+function snapLine(line: number): number | null {
+  if (!codeLines) return line;
+  return codeLines.find((l) => l >= line) ?? null;
+}
+function resnap() {
+  const cur = getState().breakpoints;
+  const next = [...new Set(cur.map(snapLine).filter((l): l is number => l !== null))].sort((a, b) => a - b);
+  if (next.join() !== cur.join()) {
+    set({ breakpoints: next });
+    toast('코드가 없는 줄의 중단점은 다음 코드 줄로 옮겼어요.');
+  }
+}
 
 export async function run() {
   const s = getState();
   if (s.compile.status === 'compiling') return;
-  if (sim.state === 'paused' && s.compile.compiledCode === s.code) {
+  if (sim.state === 'paused' && s.compile.compiledCode === s.code && (compiledWithDebug || !s.breakpoints.length)) {
     sim.start();
     return syncState();
   }
-  if (sim.state === 'running' && s.compile.compiledCode === s.code) return;
+  if (sim.state === 'running' && s.compile.compiledCode === s.code && (compiledWithDebug || !s.breakpoints.length)) return;
   lastFailure = '';
   abort = new AbortController();
   set({ compile: { status: 'compiling' } });
   const code = s.code;
   try {
-    const r = await compileSketch(code, abort.signal);
+    const debugging = getState().breakpoints.length > 0;
+    const r = await compileSketch(code, abort.signal, undefined, debugging);
     // decision: do not silently recompile (compile is rate limited and the user may still be typing); ask for a new run
     if (getState().code !== code) {
       set({ compile: { status: 'idle' } });
@@ -110,6 +137,10 @@ export async function run() {
     }
     clearSerial();
     sim.loadHex(r.hex);
+    compiledWithDebug = !!r.debug;
+    if (r.debug) { codeLines = [...new Set(r.debug.lines.map((l) => l.line))].sort((a, b) => a - b); resnap(); }
+    if (r.debug) sim.debug?.load(r.debug);
+    sim.debug?.setBreakpoints(getState().breakpoints);
     sim.start();
     set({ compile: { status: 'ok', compiledCode: code, errors: [] } });
     syncState();
@@ -129,7 +160,7 @@ export function pause() {
 export function stop() {
   cancelCompile();
   sim.stop();
-  set({ inputs: {}, simWarnings: [] });
+  set({ inputs: {}, simWarnings: [], debug: null });
   lastWarn = '';
   syncState();
 }
@@ -138,6 +169,31 @@ export function reset() {
   sim.reset();
   syncState();
 }
+// ---------- debugger ----------
+/** Toggle a breakpoint on a sketch line; takes effect immediately in a running debug session, else on the next 실행. */
+export function toggleBreakpoint(requested: number) {
+  const cur = getState().breakpoints;
+  let line = requested;
+  if (!cur.includes(requested)) {
+    const snapped = snapLine(requested);
+    if (snapped === null) return toast(`${requested}번 줄 뒤에는 실행되는 코드가 없어서 중단점을 찍을 수 없어요.`);
+    if (snapped !== requested) toast(`${requested}번 줄에는 코드가 없어 ${snapped}번 줄로 옮겼어요.`);
+    line = snapped;
+  }
+  const next = cur.includes(line) ? cur.filter((l) => l !== line) : [...cur, line].sort((a, b) => a - b);
+  set({ breakpoints: next });
+  sim.debug?.setBreakpoints(next);
+  if (next.length && sim.state !== 'idle' && !compiledWithDebug) toast('중단점은 다시 실행할 때 적용돼요. 정지 후 실행을 눌러 주세요.');
+}
+export function clearBreakpoints() {
+  set({ breakpoints: [] });
+  sim.debug?.setBreakpoints([]);
+}
+export const debugContinue = () => { sim.debug?.continue(); syncState(); };
+export const debugStepOver = () => sim.debug?.stepOver();
+export const debugStepInto = () => sim.debug?.stepInto();
+export const debugStepOut = () => sim.debug?.stepOut();
+
 export function setSpeed(v: number) {
   sim.setSpeed(v);
   set({ speed: v });

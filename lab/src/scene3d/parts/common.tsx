@@ -90,7 +90,7 @@ const METAL = '#b7bcc2';
 export function Legs({ kind, top = 4, radius = 0.32, color = METAL, only }: { kind: PartInstance['kind']; top?: number; radius?: number; color?: string; only?: string[] }) {
   return (
     <>
-      {PARTS[kind].pins.filter((p) => !only || only.includes(p.id)).map((p) => (
+      {(PARTS[kind]?.pins ?? []).filter((p) => !only || only.includes(p.id)).map((p) => (
         <mesh key={p.id} position={[p.pos[0], p.pos[1] + (top - 2.5) / 2, p.pos[2]]} castShadow>
           <cylinderGeometry args={[radius, radius, top + 2.5, 8]} />
           <meshStandardMaterial color={color} metalness={0.85} roughness={0.3} />

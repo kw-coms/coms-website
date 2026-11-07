@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type {
-  Analysis, CompilerMessage, PartInstance, PartKind, PinRef, RotY, Scene, SimFrame, SimWarning, Vec3, Wire, WireColor,
+  Analysis, CodeMode, CompilerMessage, DebugState, Note, PartInstance, PartKind, PinRef, RotY, Scene, SimFrame, SimWarning, Vec3, Wire, WireColor,
 } from '../core/types';
 import { EXAMPLES, PARTS, analyze, validateScene } from './core';
 import { commit, initHistory, redo as redoH, undo as undoH, type History } from './history';
@@ -11,7 +11,9 @@ export type Selection = { kind: 'part' | 'wire'; id: string } | null;
 export type SnapView = { ok: Vec3[]; bad: Vec3[] };
 export type Theme = 'light' | 'dark';
 export type SerialTab = 'serial' | 'plotter';
-export type SideTab = 'parts' | 'code' | 'props' | 'warnings' | 'bom';
+export type SideTab = 'parts' | 'code' | 'props' | 'warnings' | 'bom' | 'instruments' | 'missions';
+export type ScopeUi = { timePerDiv: number; voltsPerDiv: [number, number]; trigger: number; run: boolean; cursors: boolean; c1: number; c2: number };
+export type InstUi = { floating?: boolean; x?: number; y?: number; scope?: Partial<ScopeUi>; logic?: { spanMs?: number; run?: boolean } };
 export interface CtxMenu {
   x: number;
   y: number;
@@ -68,6 +70,27 @@ export interface State {
   qualityNotice: string | null;
   /** The autosave could not be read; a raw backup copy was kept (see BACKUP_KEY). */
   restoreNotice: boolean;
+  // ---- v2 ----
+  /** Sketch lines (1-based) with a debugger breakpoint. */
+  breakpoints: number[];
+  /** Latest debugger state from the simulator (paused line, globals). */
+  debug: DebugState | null;
+  /** Per-instrument panel UI state (scope knobs, floating window position). */
+  instUi: Record<string, InstUi>;
+  /** Part whose Korean info popup is open. */
+  info: PartKind | null;
+  /** The 2D schematic view replaces the 3D stage. */
+  schematic: boolean;
+  /** Mission being worked on (list when null) and saved progress. */
+  missionId: string | null;
+  missionProgress: Record<string, MissionProgress>;
+  /** Note being edited in place. */
+  editingNote: string | null;
+}
+export interface MissionProgress {
+  done: boolean;
+  checks?: { id?: string; label?: string; ok: boolean; message: string }[];
+  at?: number;
 }
 
 const BLANK_CODE = `void setup() {\n  pinMode(13, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(500);\n  digitalWrite(13, LOW);\n  delay(500);\n}\n`;
@@ -78,8 +101,14 @@ export const BACKUP_KEY = 'coms-lab:scene:v1:backup';
 export const MAX_CODE_BYTES = 64 * 1024;
 export const TUTORIAL_KEY = 'coms-lab:tutorial-done';
 
-const toScene = (doc: Doc, code: string): Scene => ({ ...doc, version: 1, code });
-const empty: Doc = { version: 1, parts: [], wires: [] } as unknown as Doc;
+const toScene = (doc: Doc, code: string): Scene => ({ ...doc, code });
+const empty: Doc = { version: 2, parts: [], wires: [] } as unknown as Doc;
+/** Everything of a Scene except its code lives in the history document. */
+const docOf = (s: Scene): Doc => {
+  const { code: _code, ...rest } = s;
+  void _code;
+  return rest as Doc;
+};
 
 function initialTheme(): Theme {
   const saved = getItem(THEME_KEY);
@@ -93,7 +122,7 @@ function startDoc(): { doc: Doc; code: string; restored: boolean; failed: boolea
   if (raw) {
     try {
       const s = validateScene(JSON.parse(raw));
-      return { doc: { version: 1, title: s.title, parts: s.parts, wires: s.wires } as Doc, code: s.code, restored: true, failed: false };
+      return { doc: docOf(s), code: s.code, restored: true, failed: false };
     } catch {
       // keep the raw data for the user, then start from the default example
       setItem(BACKUP_KEY, raw);
@@ -101,7 +130,7 @@ function startDoc(): { doc: Doc; code: string; restored: boolean; failed: boolea
     }
   }
   const ex = EXAMPLES[0];
-  if (ex) return { doc: { version: 1, title: ex.scene.title, parts: ex.scene.parts, wires: ex.scene.wires } as Doc, code: ex.scene.code, restored: false, failed };
+  if (ex) return { doc: docOf(validateScene(ex.scene)), code: ex.scene.code, restored: false, failed };
   return { doc: empty, code: BLANK_CODE, restored: false, failed };
 }
 
@@ -115,6 +144,15 @@ function loadPrefs(): Record<string, unknown> {
 }
 const prefs = loadPrefs();
 const NOTICE_KEY = 'coms-lab:perf-notice';
+export const MISSIONS_KEY = 'coms-lab:missions';
+function loadMissionProgress(): Record<string, MissionProgress> {
+  try {
+    const v = JSON.parse(getItem(MISSIONS_KEY) ?? '{}');
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+}
 const qualityMode = loadQualityMode();
 const softwareHint = qualityMode === 'auto' && detectSoftwareRendering();
 const first = startDoc();
@@ -152,6 +190,14 @@ let state: State = {
   qualityMode,
   quality: initialQuality(qualityMode, softwareHint),
   restoreNotice: first.failed,
+  breakpoints: [],
+  debug: null,
+  instUi: {},
+  info: null,
+  schematic: false,
+  missionId: null,
+  missionProgress: loadMissionProgress(),
+  editingNote: null,
   qualityNotice: qualityMode === 'auto' && softwareHint && getItem(NOTICE_KEY) !== '1' ? '그래픽 가속이 꺼져 있는 것 같아요. 부드럽게 쓰도록 화질을 낮췄어요. 위쪽 ⋯ 메뉴의 화질에서 바꿀 수 있어요.' : null,
 };
 
@@ -170,6 +216,45 @@ export const scene = (s: State = state): Scene => toScene(s.hist.present, s.code
 export const parts = (s: State = state) => s.hist.present.parts;
 export const wires = (s: State = state) => s.hist.present.wires;
 export const getPart = (id: string, s: State = state) => s.hist.present.parts.find((p) => p.id === id);
+
+// ---------- v2 document parts: notes, code mode, blocks, mission ----------
+export const notes = (s: State = state): Note[] => s.hist.present.notes ?? [];
+export function addNote(pos: Vec3, text = '메모', color: Note['color'] = 'yellow'): string {
+  const id = nextId('note-', notes());
+  void setDoc({ ...state.hist.present, version: 2, notes: [...notes(), { id, pos, text, color }] });
+  set({ editingNote: id });
+  return id;
+}
+export function updateNote(id: string, patch: Partial<Note>) {
+  void setDoc({ ...state.hist.present, notes: notes().map((n) => (n.id === id ? { ...n, ...patch, text: (patch.text ?? n.text).slice(0, 500) } : n)) });
+}
+export function deleteNote(id: string) {
+  void setDoc({ ...state.hist.present, notes: notes().filter((n) => n.id !== id) });
+  if (state.editingNote === id) set({ editingNote: null });
+}
+export const codeMode = (s: State = state): CodeMode => s.hist.present.codeMode ?? 'text';
+/** Hooks for the Blockly lane: the document owns the blocks JSON and the editor mode. */
+export function setBlocks(blocks: unknown, code?: string) {
+  void setDoc({ ...state.hist.present, version: 2, blocks });
+  if (code !== undefined) setCode(code);
+}
+export function setCodeMode(mode: CodeMode) {
+  void setDoc({ ...state.hist.present, version: 2, codeMode: mode });
+}
+export function setInstUi(id: string, patch: Partial<InstUi>) {
+  set({ instUi: { ...state.instUi, [id]: { ...state.instUi[id], ...patch } } });
+}
+export function setScope(id: string, patch: Partial<ScopeUi>) {
+  setInstUi(id, { scope: { ...state.instUi[id]?.scope, ...patch } });
+}
+export function setMissionId(id: string | null) {
+  set({ missionId: id });
+}
+export function saveMissionProgress(id: string, p: MissionProgress) {
+  const missionProgress = { ...state.missionProgress, [id]: p };
+  set({ missionProgress });
+  setItem(MISSIONS_KEY, JSON.stringify(missionProgress));
+}
 
 // ---------- whole-document dirty state (scene + code vs the last loaded/exported baseline) ----------
 const docKey = () => JSON.stringify(scene());
@@ -282,28 +367,38 @@ export function deleteBend(wireId: string, index: number) {
   const bends = w.bends.filter((_, i) => i !== index);
   updateWire(wireId, { bends: bends.length ? bends : undefined });
 }
-export function rotateSelection() {
+/** Quarter turns (CW seen from above) of a vector about the origin. */
+const turn = (dx: number, dz: number, k: number): [number, number] => {
+  let x = dx, z = dz;
+  for (let i = 0; i < k; i++) [x, z] = [z, -x];
+  return [x, z];
+};
+/** Rotate the selection by `quarters` × 90° (1 = clockwise, 3 or -1 = counter-clockwise, 2 = half turn). */
+export function rotateSelection(quarters = 1) {
   const ids = selectedPartIds();
   if (!ids.length) return;
+  const k = ((quarters % 4) + 4) % 4;
+  if (!k) return;
   const list = ids.map((id) => getPart(id)).filter((p): p is PartInstance => !!p);
+  const spin = (p: PartInstance) => ((p.rotY + 90 * k) % 360) as RotY;
   if (list.length === 1) {
     const b = list[0]!;
-    const rotated = { ...b, rotY: (((b.rotY + 90) % 360) as RotY) };
+    const rotated = { ...b, rotY: spin(b) };
     // a board carries the parts inserted into it: turn them about the board origin too
     const kidIds = new Set<string>();
     if (b.kind === 'arduino-uno' || b.kind.startsWith('breadboard'))
-      for (const [k, ref] of Object.entries(state.analysis.insertions)) if (ref.partId === b.id) kidIds.add(k.split(':')[0]!);
-    const kids = parts().filter((p) => kidIds.has(p.id) && p.id !== b.id).map((k) => {
-      const dx = k.pos[0] - b.pos[0], dz = k.pos[2] - b.pos[2];
-      return { ...k, rotY: (((k.rotY + 90) % 360) as RotY), pos: [b.pos[0] + dz, k.pos[1], b.pos[2] - dx] as Vec3 };
+      for (const [key, ref] of Object.entries(state.analysis.insertions)) if (ref.partId === b.id) kidIds.add(key.split(':')[0]!);
+    const kids = parts().filter((p) => kidIds.has(p.id) && p.id !== b.id).map((c) => {
+      const [x, z] = turn(c.pos[0] - b.pos[0], c.pos[2] - b.pos[2], k);
+      return { ...c, rotY: spin(c), pos: [b.pos[0] + x, c.pos[1], b.pos[2] + z] as Vec3 };
     });
     return void updateParts([rotated, ...kids]);
   }
-  // rotate a group 90° about its centre (CW seen from above, matching rotY)
+  // rotate a group about its centre
   const cx = list.reduce((a, p) => a + p.pos[0], 0) / list.length, cz = list.reduce((a, p) => a + p.pos[2], 0) / list.length;
   updateParts(list.map((p) => {
-    const dx = p.pos[0] - cx, dz = p.pos[2] - cz;
-    return { ...p, rotY: (((p.rotY + 90) % 360) as RotY), pos: [cx + dz, p.pos[1], cz - dx] as Vec3 };
+    const [x, z] = turn(p.pos[0] - cx, p.pos[2] - cz, k);
+    return { ...p, rotY: spin(p), pos: [cx + x, p.pos[1], cz + z] as Vec3 };
   }));
 }
 export function duplicateSelection() {
@@ -385,10 +480,10 @@ export function updateWire(id: string, patch: Partial<Wire>) {
 
 export function loadScene(s: Scene, opts: { keepSim?: boolean } = {}) {
   void opts;
-  const doc: Doc = { version: 1, title: s.title, parts: s.parts, wires: s.wires } as Doc;
+  const doc = docOf(s);
   set({
     hist: initHistory(doc), code: s.code, analysis: analyze(s), selection: null, multi: [], wireStart: null, draft: null, inputs: {},
-    compile: { status: 'idle' }, simWarnings: [], cameraResetTick: state.cameraResetTick + 1,
+    compile: { status: 'idle' }, simWarnings: [], cameraResetTick: state.cameraResetTick + 1, debug: null, instUi: {}, breakpoints: [], editingNote: null,
   });
   markClean();
 }
@@ -453,6 +548,10 @@ export function liveWire(id: string, patch: Partial<Wire>) {
   if (patch.bends && patch.bends.length > MAX_BENDS) return void toast(`전선 하나에는 꺾임점을 ${MAX_BENDS}개까지만 만들 수 있어요.`);
   const doc = state.hist.present;
   set({ hist: { ...state.hist, present: { ...doc, wires: doc.wires.map((w) => (w.id === id ? { ...w, ...patch } : w)) } } });
+}
+export function liveNote(id: string, pos: Vec3) {
+  const doc = state.hist.present;
+  set({ hist: { ...state.hist, present: { ...doc, notes: (doc.notes ?? []).map((n) => (n.id === id ? { ...n, pos } : n)) } } });
 }
 /** validateScene's per-wire bend limit. */
 const MAX_BENDS = 20;

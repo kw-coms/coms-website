@@ -5,7 +5,7 @@ import type { PartInstance, PinRef, Vec3 } from '../core/types';
 import { PARTS, pinWorldPos } from '../ui/core';
 import { setSimInput } from '../ui/simHost';
 import {
-  addWire, clearSelection, deleteBend, getPart, getState, liveEnd, liveStart, liveWire, selectedPartIds, selectPart, selectParts, set,
+  addWire, clearSelection, deleteBend, getPart, getState, liveEnd, liveNote, liveStart, liveWire, selectedPartIds, selectPart, selectParts, set,
 } from '../ui/store';
 import { focusParts } from './cameraFrame';
 import { commitMove, commitMoveGroup, groundPoint, isBoard, pickPin, placeAt, rayFromClient } from './placement';
@@ -15,6 +15,8 @@ interface Hit {
   partId?: string;
   wireId?: string;
   obstacleOf?: string;
+  simKey?: number;
+  noteId?: string;
   bend?: { wireId: string; index: number; ghost: boolean };
   distance: number;
   point: Vec3;
@@ -27,13 +29,16 @@ function pickObject(cx: number, cy: number): Hit | null {
   for (const h of hits) {
     let o: Object3D | null = h.object;
     if (!h.object.visible) continue;
+    let simKey: number | undefined;
     while (o) {
       const u = o.userData;
+      if (simKey === undefined && typeof u.simKey === 'number') simKey = u.simKey;
       const point: Vec3 = [h.point.x, h.point.y, h.point.z];
       if (u.bend) return { bend: u.bend, distance: h.distance, point };
+      if (u.noteId) return { noteId: u.noteId, distance: h.distance, point };
       if (u.wireId) return { wireId: u.wireId, distance: h.distance, point };
       if (u.obstacle) return { obstacleOf: u.obstacle, distance: h.distance, point };
-      if (u.partId) return { partId: u.partId, distance: h.distance, point };
+      if (u.partId) return { partId: u.partId, distance: h.distance, point, simKey };
       o = o.parent;
     }
   }
@@ -45,6 +50,7 @@ type Down =
   | { type: 'part'; x: number; y: number; part: PartInstance; grab: [number, number]; moved: boolean; group: PartInstance[] }
   | { type: 'input'; x: number; y: number; part: PartInstance; start: number }
   | { type: 'obstacle'; x: number; y: number; part: PartInstance; planeY: number }
+  | { type: 'note'; x: number; y: number; id: string; grab: [number, number]; startDoc: ReturnType<typeof liveStart>; moved: boolean }
   | { type: 'marquee'; x: number; y: number; additive: boolean }
   | { type: 'bend'; x: number; y: number; wireId: string; index: number; ghost: boolean; startDoc: ReturnType<typeof liveStart>; planeY: number; moved: boolean };
 
@@ -109,6 +115,16 @@ export function Interaction() {
         el.setPointerCapture(e.pointerId);
         return;
       }
+      if (obj?.noteId) {
+        const n = (st.hist.present.notes ?? []).find((q) => q.id === obj.noteId);
+        const g = groundPoint(e.clientX, e.clientY, n?.pos[1] ?? 0);
+        if (n && g) {
+          down = { type: 'note', ...base, id: n.id, grab: [g[0] - n.pos[0], g[2] - n.pos[2]], startDoc: liveStart(), moved: false };
+          setControls(false);
+          el.setPointerCapture(e.pointerId);
+          return;
+        }
+      }
       if (obj?.obstacleOf) {
         const part = getPart(obj.obstacleOf);
         if (part) {
@@ -136,7 +152,7 @@ export function Interaction() {
           return;
         }
         const inGroup = st.multi.includes(part.id);
-        const interactive = running() && !!PARTS[part.kind].inputs?.length;
+        const interactive = running() && !!PARTS[part.kind]?.inputs?.length;
         if (!inGroup) selectPart(part.id, false, !interactive);
         // simulation inputs take over the drag while running
         if (running()) {
@@ -151,6 +167,23 @@ export function Interaction() {
             down = { type: 'input', ...base, part, start: Number(st.inputs[part.id]?.position ?? 0.5) };
             setControls(false);
             el.setPointerCapture(e.pointerId);
+            return;
+          }
+          if (part.kind === 'keypad-4x4' && obj.simKey !== undefined) {
+            setSimInput(part.id, 'key', obj.simKey);
+            down = { type: 'input', ...base, part, start: 0 };
+            setControls(false);
+            el.setPointerCapture(e.pointerId);
+            return;
+          }
+          if (part.kind === 'dip-switch-4' && obj.simKey !== undefined) {
+            setSimInput(part.id, 'switches', Number(st.inputs[part.id]?.switches ?? 0) ^ (1 << obj.simKey));
+            down = { type: 'empty', ...base };
+            return;
+          }
+          if (part.kind === 'tilt-switch') {
+            setSimInput(part.id, 'tilt', Number(st.inputs[part.id]?.tilt ?? 0) ? 0 : 1);
+            down = { type: 'empty', ...base };
             return;
           }
           if (part.kind === 'slide-switch') {
@@ -226,6 +259,12 @@ export function Interaction() {
           set({ draft: { part: prim, hideId: prim.id, hideIds: grp.map((p) => p.id), extra: moved2.filter((p) => p.id !== prim.id), snap: placed.snap } });
         }
         el.style.cursor = 'grabbing';
+      } else if (down.type === 'note') {
+        if (!moved && !down.moved) return;
+        down.moved = true;
+        const n = (getState().hist.present.notes ?? []).find((q) => q.id === (down as { id: string }).id);
+        const g = n && groundPoint(e.clientX, e.clientY, n.pos[1]);
+        if (n && g) liveNote(n.id, [g[0] - down.grab[0], n.pos[1], g[2] - down.grab[1]]);
       } else if (down.type === 'obstacle') {
         const g = groundPoint(e.clientX, e.clientY, down.planeY);
         if (g) setSimInput(down.part.id, 'distanceCm', obstacleCm(getPart(down.part.id) ?? down.part, g));
@@ -270,8 +309,9 @@ export function Interaction() {
         else if (click && d.group.length > 1) selectPart(d.part.id);
       } else if (d.type === 'input') {
         if (d.part.kind === 'pushbutton') setSimInput(d.part.id, 'pressed', false);
+        if (d.part.kind === 'keypad-4x4') setSimInput(d.part.id, 'key', 0);
         if (d.part.kind === 'joystick') (setSimInput(d.part.id, 'x', 0.5), setSimInput(d.part.id, 'y', 0.5));
-      } else if (d.type === 'bend') {
+      } else if (d.type === 'bend' || d.type === 'note') {
         if (d.moved) liveEnd(d.startDoc);
       } else if (d.type === 'marquee') {
         const m = st.marquee;
@@ -302,6 +342,7 @@ export function Interaction() {
     const onDbl = (e: MouseEvent) => {
       const obj = pickObject(e.clientX, e.clientY);
       if (obj?.bend && !obj.bend.ghost) return deleteBend(obj.bend.wireId, obj.bend.index);
+      if (obj?.noteId) return set({ editingNote: obj.noteId });
       if (obj?.partId) focusParts([obj.partId]);
     };
 

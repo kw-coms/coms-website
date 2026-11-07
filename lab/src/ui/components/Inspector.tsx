@@ -1,17 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CircleAlert, Copy, Info, RotateCw, Trash2, TriangleAlert } from 'lucide-react';
+import { CircleAlert, Copy, Info, RotateCcw, RotateCw, Trash2, TriangleAlert } from 'lucide-react';
 import type { PartInstance, PropDef, SimInputDef } from '../../core/types';
 import { PARTS, resistorBands } from '../core';
+import { InstrumentCard, hasPanel } from '../instruments/Panels';
 import { fmtOhms } from '../format';
 import { setSimInput } from '../simHost';
 import {
-  deleteSelection, duplicateSelection, rotateSelection, selectPart, setProp, updateWire, useStore, WIRE_COLORS,
+  deleteSelection, duplicateSelection, rotateSelection, selectPart, set, setProp, updateWire, useStore, WIRE_COLORS,
 } from '../store';
 import { countByLevel, groupWarnings, LEVEL_LABEL, visibleWarnings } from '../warnings';
 
-const UNIT: Record<string, string> = { lux: 'lux', distanceCm: 'cm', temperature: '°C', humidity: '%' };
+const UNIT: Record<string, string> = { lux: 'lux', distanceCm: 'cm', temperature: '°C', humidity: '%', force: 'N', bend: '%' };
 
-function PropField({ part, def }: { part: PartInstance; def: PropDef }) {
+export function PropField({ part, def }: { part: PartInstance; def: PropDef }) {
   const value = part.props[def.key] ?? def.default;
   if (def.type === 'boolean')
     return <label className="row"><span>{def.label}</span><input type="checkbox" checked={!!value} onChange={(e) => setProp(part.id, def.key, e.target.checked)} /></label>;
@@ -79,6 +80,31 @@ function ResistorReadout({ ohms }: { ohms: number }) {
 function InputField({ part, def }: { part: PartInstance; def: SimInputDef }) {
   const val = useStore((s) => s.inputs[part.id]?.[def.key]);
   const running = useStore((s) => s.simState !== 'idle');
+  if (def.key === 'switches') {
+    const bits = Number(val ?? def.default ?? 0);
+    return (
+      <div className="row col"><span>{def.label}</span>
+        <div className="bit-row">
+          {[0, 1, 2, 3].map((i) => <label key={i} className="chk"><input type="checkbox" checked={!!((bits >> i) & 1)} disabled={!running} onChange={() => setSimInput(part.id, 'switches', bits ^ (1 << i))} /> {i + 1}</label>)}
+        </div>
+      </div>
+    );
+  }
+  if (def.key === 'key') {
+    const cur = Number(val ?? 0);
+    return (
+      <div className="keypad-grid" role="group" aria-label={def.label}>
+        {'123A456B789C*0#D'.split('').map((k, i) => (
+          <button key={k} type="button" disabled={!running} className={cur === i + 1 ? 'on' : ''}
+            onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); setSimInput(part.id, 'key', i + 1); }}
+            onPointerUp={() => setSimInput(part.id, 'key', 0)} onPointerCancel={() => setSimInput(part.id, 'key', 0)}>{k}</button>
+        ))}
+      </div>
+    );
+  }
+  if (def.key === 'tilt' || def.key === 'motion') {
+    return <label className="row"><span>{def.label}</span><input type="checkbox" checked={!!Number(val ?? def.default)} disabled={!running} onChange={(e) => setSimInput(part.id, def.key, e.target.checked ? 1 : 0)} /></label>;
+  }
   if (def.type === 'momentary')
     return (
       <button
@@ -115,10 +141,12 @@ function PartPanel({ part }: { part: PartInstance }) {
   const def = PARTS[part.kind];
   return (
     <>
-      <h3>{def.title}</h3>
+      <h3>{def.title} <button type="button" className="link-btn" onClick={() => set({ info: part.kind })} aria-label="부품 설명">설명 보기</button></h3>
       <p className="muted small">{part.id}</p>
       <div className="actions">
-        <button type="button" onClick={rotateSelection} title="회전 (R)"><RotateCw size={15} /> 회전</button>
+        <button type="button" onClick={() => rotateSelection()} title="시계 방향 회전 (R)"><RotateCw size={15} /> 회전</button>
+        <button type="button" onClick={() => rotateSelection(-1)} title="반시계 방향 회전 (Shift+R)"><RotateCcw size={15} /> 반대로</button>
+        <button type="button" onClick={() => rotateSelection(2)} title="180° 뒤집기">↻180°</button>
         <button type="button" onClick={duplicateSelection} title="복제 (Ctrl+D)"><Copy size={15} /> 복제</button>
         <button type="button" className="danger" onClick={deleteSelection} title="삭제 (Del)"><Trash2 size={15} /> 삭제</button>
       </div>
@@ -127,9 +155,10 @@ function PartPanel({ part }: { part: PartInstance }) {
       {!!def.inputs?.length && (
         <>
           <h4>조작 (실행 중)</h4>
-          {def.inputs.map((i) => <InputField key={i.key} part={part} def={i} />)}
+          {def.inputs.filter((i) => i.key !== 'irCode').map((i) => <InputField key={i.key} part={part} def={i} />)}
         </>
       )}
+      {hasPanel(part.kind) && <InstrumentCard part={part} />}
     </>
   );
 }
@@ -209,7 +238,9 @@ export function PropsPanel() {
         <h3>부품 {multi.length}개 선택됨</h3>
         <p className="muted small">끌어서 함께 옮기고, 아래 버튼으로 한꺼번에 돌리거나 지울 수 있어요.</p>
         <div className="actions">
-          <button type="button" onClick={rotateSelection} title="회전 (R)"><RotateCw size={15} /> 회전</button>
+          <button type="button" onClick={() => rotateSelection()} title="시계 방향 회전 (R)"><RotateCw size={15} /> 회전</button>
+        <button type="button" onClick={() => rotateSelection(-1)} title="반시계 방향 회전 (Shift+R)"><RotateCcw size={15} /> 반대로</button>
+        <button type="button" onClick={() => rotateSelection(2)} title="180° 뒤집기">↻180°</button>
           <button type="button" onClick={duplicateSelection} title="복제 (Ctrl+D)"><Copy size={15} /> 복제</button>
           <button type="button" className="danger" onClick={deleteSelection} title="삭제 (Del)"><Trash2 size={15} /> 삭제</button>
         </div>

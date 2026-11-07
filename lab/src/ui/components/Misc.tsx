@@ -107,7 +107,7 @@ export function ContextMenu() {
     <div className="ctx-menu" role="menu" aria-label="바로가기 메뉴" style={{ left: x, top: y }}>
       {t.kind === 'part' && (
         <>
-          <button role="menuitem" type="button" onClick={run(rotateSelection)}><RotateCw size={15} /> 회전 <kbd>R</kbd></button>
+          <button role="menuitem" type="button" onClick={run(() => rotateSelection())}><RotateCw size={15} /> 회전 <kbd>R</kbd></button>
           <button role="menuitem" type="button" onClick={run(duplicateSelection)}><Copy size={15} /> 복제 <kbd>Ctrl+D</kbd></button>
           <button role="menuitem" type="button" className="danger" onClick={run(deleteSelection)}><Trash2 size={15} /> 삭제 <kbd>Del</kbd></button>
         </>

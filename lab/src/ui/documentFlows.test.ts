@@ -13,7 +13,8 @@ async function boot(): Promise<Mods> {
   const [store, actions, core, share] = await Promise.all([import('./store'), import('./actions'), import('./core'), import('./shareHash')]);
   return { store, actions, core, share };
 }
-const example = (m: Mods, id: string) => m.core.EXAMPLES.find((e) => e.id === id)!.scene;
+/** The example as the app holds it after import: validateScene upgrades v1 scenes to v2. */
+const example = (m: Mods, id: string) => m.core.validateScene(m.core.EXAMPLES.find((e) => e.id === id)!.scene);
 
 beforeEach(() => {
   mem = new Map();

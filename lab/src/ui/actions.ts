@@ -1,4 +1,4 @@
-import { encodeShare, decodeShare, EXAMPLES, validateScene } from './core';
+import { encodeShare, decodeShare, EXAMPLES, PARTS, validateScene } from './core';
 import { refs } from '../scene3d/sceneRefs';
 import { parseShareHash, shareHash } from './shareHash';
 import { BACKUP_KEY, getState, isDirty, loadScene, markClean, scene, set, THEME_KEY, toast } from './store';
@@ -118,7 +118,7 @@ export function loadExample(id: string) {
   const ex = EXAMPLES.find((e) => e.id === id);
   if (!ex) return;
   if (!confirmReplace('예제를 불러올까요?')) return;
-  replaceWith(ex.scene);
+  replaceWith(validateScene(ex.scene));
   history.replaceState(null, '', location.pathname + location.search);
   set({ examplesOpen: false });
 }
@@ -127,4 +127,31 @@ export function toggleTheme() {
   const theme = getState().theme === 'dark' ? 'light' : 'dark';
   setItem(THEME_KEY, theme);
   set({ theme });
+}
+
+// ---------- exports ----------
+const csv = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+/** The sketch as an Arduino IDE file. */
+export function exportIno() {
+  const name = (scene().title ?? 'circuit-lab').replace(/[^\w가-힣-]+/g, '_') || 'sketch';
+  const url = URL.createObjectURL(new Blob([getState().code], { type: 'text/plain;charset=utf-8' }));
+  download(`${name}.ino`, url);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+/** Bill of materials as CSV (UTF-8 with BOM so Excel reads the Korean). */
+export function exportBom() {
+  const rows = new Map<string, { name: string; kind: string; value: string; ids: string[] }>();
+  for (const p of getState().hist.present.parts) {
+    const d = PARTS[p.kind];
+    if (!d) continue;
+    const value = d.props.map((q) => `${q.label}=${p.props[q.key] ?? q.default}${q.unit ?? ''}`).join(' ');
+    const key = `${p.kind}|${value}`;
+    const r = rows.get(key) ?? { name: d.title, kind: p.kind, value, ids: [] };
+    r.ids.push(p.id);
+    rows.set(key, r);
+  }
+  const lines = [['부품', '종류', '값', '수량', '부품 ID'].map(csv).join(','), ...[...rows.values()].map((r) => [r.name, r.kind, r.value, r.ids.length, r.ids.join(' ')].map(csv).join(','))];
+  const url = URL.createObjectURL(new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+  download('circuit-lab-bom.csv', url);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }

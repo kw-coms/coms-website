@@ -1,6 +1,8 @@
 import { useRef } from 'react';
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
-import { CodeEditor, SerialDock } from './Dock';
+import { CodeTab } from './CodeTab';
+import { InstrumentsTab } from '../instruments/Panels';
+import { MissionsTab } from '../missions/MissionsTab';
 import { BomPanel, PropsPanel, useWarnings, WarningsPanel } from './Inspector';
 import { Palette } from './Palette';
 import { countByLevel } from '../warnings';
@@ -24,6 +26,8 @@ export function SidePanel() {
     { id: 'code', label: '코드' },
     { id: 'props', label: '속성' },
     { id: 'warnings', label: '경고', count: warns.length },
+    { id: 'instruments', label: '계측' },
+    { id: 'missions', label: '미션' },
     { id: 'bom', label: '부품 목록' },
   ];
   const pick = (id: SideTab) => {
@@ -57,11 +61,12 @@ export function SidePanel() {
         </div>
         <div className="side-body">
           <div className="side-pane code-pane" hidden={tab !== 'code'} role="tabpanel" aria-label="코드">
-            <div className="code-top"><CodeEditor /></div>
-            <SerialDock />
+            <CodeTab />
           </div>
           <div className="side-pane scroll" hidden={tab !== 'props'} role="tabpanel" aria-label="속성"><PropsPanel /></div>
           <div className="side-pane scroll" hidden={tab !== 'warnings'} role="tabpanel" aria-label="경고"><WarningsPanel /></div>
+          <div className="side-pane scroll" hidden={tab !== 'instruments'} role="tabpanel" aria-label="계측"><InstrumentsTab /></div>
+          <div className="side-pane scroll" hidden={tab !== 'missions'} role="tabpanel" aria-label="미션"><MissionsTab /></div>
           <div className="side-pane scroll" hidden={tab !== 'bom'} role="tabpanel" aria-label="부품 목록"><BomPanel /></div>
           <div className="side-pane only-mobile-pane" hidden={tab !== 'parts'} role="tabpanel" aria-label="부품"><Palette inSheet /></div>
         </div>

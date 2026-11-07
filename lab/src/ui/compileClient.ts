@@ -25,12 +25,12 @@ async function refreshSession(fetchImpl: typeof fetch, signal: AbortSignal): Pro
   }
 }
 
-async function post(sketch: string, signal: AbortSignal, fetchImpl: typeof fetch): Promise<Response> {
+async function post(sketch: string, signal: AbortSignal, fetchImpl: typeof fetch, debug = false): Promise<Response> {
   try {
     return await fetchImpl('/lab/api/compile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sketch }),
+      body: JSON.stringify(debug ? { sketch, debug: true } : { sketch }),
       signal,
     });
   } catch (e) {
@@ -39,11 +39,12 @@ async function post(sketch: string, signal: AbortSignal, fetchImpl: typeof fetch
   }
 }
 
-export async function compileSketch(sketch: string, signal: AbortSignal, fetchImpl: typeof fetch = fetch): Promise<CompileResult> {
-  let res = await post(sketch, signal, fetchImpl);
+/** `debug` asks the service for a -g build and returns line/global tables for the debugger. */
+export async function compileSketch(sketch: string, signal: AbortSignal, fetchImpl: typeof fetch = fetch, debug = false): Promise<CompileResult> {
+  let res = await post(sketch, signal, fetchImpl, debug);
   if (res.status === 401) {
     // Once: refresh the session and retry. Still 401 means signed out (or the refresh cookie is gone too).
-    if (await refreshSession(fetchImpl, signal)) res = await post(sketch, signal, fetchImpl);
+    if (await refreshSession(fetchImpl, signal)) res = await post(sketch, signal, fetchImpl, debug);
     if (res.status === 401) {
       await res.body?.cancel();
       return { ok: false, reason: 'unauthorized', errors: [{ line: 0, severity: 'error', message: UNAUTHORIZED_MSG }] };

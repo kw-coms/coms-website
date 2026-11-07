@@ -226,7 +226,8 @@ export function Breadboard({ part }: PartProps) {
   const railInfo = useMemo(() => {
     const r = (prefix: string) => {
       const xs = holes.filter((h) => h.id.startsWith(prefix)).map((h) => h.pos);
-      return { x0: Math.min(...xs.map((p) => p[0])), x1: Math.max(...xs.map((p) => p[0])), z: xs[0]![2] };
+      if (!xs.length) return { x0: 0, x1: 0, z: 0, none: true as boolean };
+      return { x0: Math.min(...xs.map((p) => p[0])), x1: Math.max(...xs.map((p) => p[0])), z: xs[0]![2], none: false as boolean };
     };
     return { tp: r('tp'), tn: r('tn'), bp: r('bp'), bn: r('bn') };
   }, [holes]);
@@ -253,6 +254,7 @@ export function Breadboard({ part }: PartProps) {
       for (const [n, x] of cols) if (n === 1 || n % 5 === 0) (c.fillText(String(n), px(x), pz(zTop - 3.4)), c.fillText(String(n), px(x), pz(zBot + 3.4)));
       c.font = `bold ${2.6 * s}px sans-serif`;
       for (const [key, sign, color] of [['tp', '+', '#d33'], ['tn', '−', '#2563d9'], ['bp', '+', '#d33'], ['bn', '−', '#2563d9']] as const) {
+        if (railInfo[key].none) continue;
         c.fillStyle = color;
         c.fillText(sign, px(railInfo[key].x0 - 3.6), pz(railInfo[key].z));
       }
@@ -260,6 +262,7 @@ export function Breadboard({ part }: PartProps) {
   }, [part.kind, holes, W, D, railInfo]);
   const stripe = (key: 'tp' | 'tn' | 'bp' | 'bn', color: string, dz: number) => {
     const r = railInfo[key];
+    if (r.none) return null;
     return (
       <mesh key={key} position={[(r.x0 + r.x1) / 2, 0.03, r.z + dz]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[r.x1 - r.x0 + 3, 0.5]} />
