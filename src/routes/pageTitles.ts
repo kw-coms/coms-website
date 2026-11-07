@@ -22,6 +22,7 @@ const ROUTE_LABELS: Array<[pattern: RegExp, label: string | ((...groups: string[
   [/^\/gatherings(\/[^/]+)?$/, '모임 신청'],
   [/^\/projects$/, '프로젝트'],
   [/^\/study$/, '스터디'],
+  [/^\/study\/([^/]+)\/practice(?:\/[^/]+)?$/, (id) => { const study = findStudy(id); return study ? `${study.title} 실습 문제` : null }],
   [/^\/study\/([^/]+)$/, (id) => findStudy(id)?.title ?? null],
   [/^\/apps$/, 'Apps'],
   [/^\/draw$/, '뽑기'],

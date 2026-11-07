@@ -58,6 +58,8 @@ const MonthlyCalendarPage = lazy(() => import('./pages/home/detailPages').then((
 const AppsPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.AppsPage })))
 const StudyHubPage = lazy(() => import('./pages/study/StudyHubPage'))
 const StudyPage = lazy(() => import('./pages/study/StudyPage'))
+const PracticeListPage = lazy(() => import('./pages/study/exercises/PracticeListPage'))
+const ProblemPage = lazy(() => import('./pages/study/exercises/ProblemPage'))
 const ProjectsDetailPage = lazy(() => import('./pages/home/detailPages').then((m) => ({ default: m.ProjectsDetailPage })))
 
 const ComsIntro = lazy(() => import('./components/common/ComsIntro'))
@@ -179,6 +181,8 @@ function App() {
         <Route path="/projects" element={<ProjectsDetailPage />} />
         <Route path="/study" element={<StudyHubPage />} />
         <Route path="/study/:id" element={<StudyPage />} />
+        <Route path="/study/:id/practice" element={<PracticeListPage />} />
+        <Route path="/study/:id/practice/:problemId" element={<ProblemPage />} />
         <Route path="/apps" element={<AppsPage />} />
         <Route path="/draw" element={<DrawPage />} />
         <Route path="/sponsors" element={<SponsorsPage />} />
