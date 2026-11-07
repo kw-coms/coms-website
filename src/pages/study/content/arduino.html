@@ -2,7 +2,7 @@
 <nav class="toc" aria-label="목차">
   <div class="toc-title">COM's 아두이노 기초 스터디</div>
   <div class="progress"><div id="progress-bar"></div></div>
-  <div class="progress-label" id="progress-label">진도 0 / 7</div>
+  <div class="progress-label" id="progress-label">진도 0 / 8</div>
   <ol>
     <li><a href="#start">0. 시작하기</a></li>
     <li class="sub"><a href="#start-what">아두이노란?</a></li>
@@ -32,12 +32,20 @@
     <li class="sub"><a href="#sensor-us">초음파 센서 HC-SR04</a></li>
     <li class="sub"><a href="#sensor-servo">서보 모터</a></li>
     <li class="sub"><a href="#sensor-buzzer">피에조 부저</a></li>
-    <li><a href="#project">6. 실습: 거리 경보기</a></li>
+    <li><a href="#modules">6. 더 많은 부품과 모듈</a></li>
+    <li class="sub"><a href="#mod-lib">라이브러리 매니저</a></li>
+    <li class="sub"><a href="#mod-cds">조도 센서 (CDS)</a></li>
+    <li class="sub"><a href="#mod-rgb">RGB LED</a></li>
+    <li class="sub"><a href="#mod-lcd">I2C LCD 16x2</a></li>
+    <li class="sub"><a href="#mod-dht">DHT11 온습도 센서</a></li>
+    <li class="sub"><a href="#mod-joy">조이스틱 모듈</a></li>
+    <li class="sub"><a href="#mod-motor">DC 모터와 모터 드라이버</a></li>
+    <li><a href="#project">7. 실습: 거리 경보기</a></li>
     <li class="sub"><a href="#project-wire">배선</a></li>
     <li class="sub"><a href="#project-step">단계별로 만들기</a></li>
     <li class="sub"><a href="#project-final">완성 코드</a></li>
     <li class="sub"><a href="#project-challenge">도전 과제</a></li>
-    <li><a href="#next">7. 막힐 때 · 다음 단계</a></li>
+    <li><a href="#next">8. 막힐 때 · 다음 단계</a></li>
   </ol>
 </nav>
 
@@ -74,17 +82,25 @@
   <p>스터디 전체에서 쓰는 부품입니다. 동아리에서 키트를 빌려 쓰거나, 인터넷에서 "아두이노 UNO 스타터 키트"를 사면 대부분 들어 있어요.</p>
   <div class="table-wrap"><table class="ref">
     <tr><th>준비물</th><th>수량</th><th>어디에 쓰나요</th></tr>
-    <tr><td><b>Arduino UNO R3</b> (호환 보드 가능)</td><td>1</td><td>본체. 호환 보드는 USB 칩이 CH340인 경우가 많음(7장 참고)</td></tr>
+    <tr><td><b>Arduino UNO R3</b> (호환 보드 가능)</td><td>1</td><td>본체. 호환 보드는 USB 칩이 CH340인 경우가 많음(8장 참고)</td></tr>
     <tr><td><b>USB 케이블</b> (A-B형 또는 C타입)</td><td>1</td><td>PC 연결 + 전원 공급. <b>데이터 전송이 되는 케이블</b>이어야 함</td></tr>
     <tr><td><b>브레드보드</b></td><td>1</td><td>납땜 없이 부품을 꽂아 회로를 만드는 판</td></tr>
     <tr><td><b>점퍼선</b> (수-수)</td><td>10개 이상</td><td>부품 사이를 연결</td></tr>
     <tr><td><b>LED</b> (빨강 등)</td><td>2~3</td><td>빛을 내는 출력 부품</td></tr>
-    <tr><td><b>220Ω 저항</b></td><td>2~3</td><td>LED 보호 (색 띠: 빨-빨-갈)</td></tr>
+    <tr><td><b>220Ω 저항</b></td><td>5</td><td>LED 보호 (색 띠: 빨-빨-갈)</td></tr>
     <tr><td><b>택트 스위치</b></td><td>1</td><td>누르는 버튼 (다리 4개)</td></tr>
     <tr><td><b>10kΩ 가변저항</b></td><td>1</td><td>돌려서 값을 바꾸는 입력 부품</td></tr>
     <tr><td><b>피에조 부저</b></td><td>1</td><td>소리 출력. <b>패시브 부저</b> 기준(다리에 +/− 표시가 있으면 맞춰 꽂고, 없으면 방향 무관, 5장 참고)</td></tr>
     <tr><td><b>HC-SR04 초음파 센서</b></td><td>1</td><td>거리 측정</td></tr>
     <tr><td><b>SG90 서보 모터</b></td><td>1</td><td>각도를 정해 움직이는 작은 모터</td></tr>
+    <tr><td><b>조도 센서 (CDS 포토레지스터)</b></td><td>1</td><td>밝기 측정 (6장)</td></tr>
+    <tr><td><b>10kΩ 저항</b> (갈-검-주황)</td><td>1</td><td>조도 센서 분압용 (6장)</td></tr>
+    <tr><td><b>RGB LED</b> (공통 캐소드, 다리 4개)</td><td>1</td><td>빛의 삼원색 섞기 (6장)</td></tr>
+    <tr><td><b>I2C LCD 1602</b> (I2C 백팩 PCF8574 붙은 것)</td><td>1</td><td>글자 표시 화면 (6장)</td></tr>
+    <tr><td><b>DHT11 온습도 센서</b> (3핀 모듈형 추천)</td><td>1</td><td>온도·습도 측정 (6장)</td></tr>
+    <tr><td><b>조이스틱 모듈</b> (KY-023 등)</td><td>1</td><td>방향 입력 (6장)</td></tr>
+    <tr><td><b>L9110S 모터 드라이버 모듈</b></td><td>1</td><td>DC 모터 구동 (6장)</td></tr>
+    <tr><td><b>소형 DC 모터</b> (3~6V) + <b>건전지 케이스</b> (AA 4개, 약 6V)</td><td>1 / 1</td><td>모터와 외부 전원 (6장)</td></tr>
   </table></div>
   <div class="tip"><b>보드가 없어도 시작할 수 있어요</b><a href="https://wokwi.com" target="_blank" rel="noopener noreferrer">Wokwi</a>는 웹에서 아두이노 회로를 만들고 코드를 실행해 볼 수 있는 무료 시뮬레이터입니다. 가입 없이도 쓸 수 있고, UNO·LED·버튼·초음파 센서·서보 같은 부품이 모두 있어요. 이 글의 배선 표대로 연결하고 코드를 붙여넣으면 똑같이 동작합니다. 다만 진짜 부품을 만지며 실수해 보는 경험이 훨씬 오래 남으니, 가능하면 실물로 해보세요.</div>
 
@@ -117,7 +133,7 @@
   <span class="p">delay</span>(<span class="num">1000</span>);
 }</pre>
   <p>지금은 한 줄 한 줄을 다 이해하지 않아도 됩니다. 1장에서 하나씩 뜯어볼 거예요. 먼저 숫자 <code>1000</code>을 <code>200</code>으로 바꾸고 다시 업로드해서 깜빡임이 빨라지는지 확인해 보세요.</p>
-  <div class="warn"><b>업로드가 안 돼요?</b>빨간 글씨로 <code>not in sync</code>나 포트 오류가 나오면 보드·포트 선택, 케이블, 드라이버 문제일 가능성이 큽니다. 7장 "막힐 때"에 점검 순서를 정리해 두었으니 거기부터 확인하세요.</div>
+  <div class="warn"><b>업로드가 안 돼요?</b>빨간 글씨로 <code>not in sync</code>나 포트 오류가 나오면 보드·포트 선택, 케이블, 드라이버 문제일 가능성이 큽니다. 8장 "막힐 때"에 점검 순서를 정리해 두었으니 거기부터 확인하세요.</div>
 
   <div class="quiz">
     <h4>✅ 확인 문제</h4>
@@ -292,28 +308,13 @@
     <tr><td>저항 다른 다리</td><td>LED <b>긴 다리(+)</b></td><td>브레드보드에서 같은 세로줄에 꽂기</td></tr>
     <tr><td>LED <b>짧은 다리(−)</b></td><td>아두이노 <b>GND</b></td><td>점퍼선으로 연결</td></tr>
   </table></div>
-<figure class="figure">
-<svg viewBox="0 0 480 170" role="img" aria-label="회로도: 아두이노 D8에서 220옴 저항, LED 긴 다리, LED 짧은 다리를 거쳐 GND로 돌아오는 회로">
-<rect x="10" y="15" width="100" height="140" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
-<text x="50" y="92" font-size="16" font-weight="bold" text-anchor="middle" fill="currentColor">UNO</text>
-<text x="102" y="54" font-size="13" text-anchor="end" fill="currentColor">D8</text>
-<circle cx="110" cy="50" r="3.5" fill="currentColor"/>
-<text x="102" y="114" font-size="13" text-anchor="end" fill="currentColor">GND</text>
-<circle cx="110" cy="110" r="3.5" fill="currentColor"/>
-<g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
-<line x1="110" y1="50" x2="160" y2="50"/>
-<rect x="160" y="38" width="60" height="24"/>
-<line x1="220" y1="50" x2="262" y2="50"/>
-<polygon points="262,34 262,66 294,50"/>
-<line x1="294" y1="34" x2="294" y2="66"/>
-<polyline points="294,50 340,50 340,110 110,110"/>
-</g>
-<text x="190" y="30" font-size="13" text-anchor="middle" fill="currentColor">220Ω</text>
-<text x="262" y="24" font-size="13" text-anchor="middle" fill="currentColor">긴 다리(+)</text>
-<text x="346" y="40" font-size="13" fill="currentColor">짧은 다리(−)</text>
-<text x="278" y="88" font-size="13" text-anchor="middle" fill="currentColor">LED</text>
-</svg>
-<figcaption>D8 → 220Ω → LED → GND. 전류가 한 바퀴 돌아 GND로 돌아와야 LED가 켜집니다.</figcaption>
+<figure class="circuit" data-circuit="led-blink" aria-label="브레드보드 배선 그림: 아두이노 D8에서 점퍼선으로 13번 줄에 연결하고, 13번 줄에 꽂은 220옴 저항의 다른 다리는 17번 줄에서 LED 긴 다리(+)와 만납니다. LED 짧은 다리(−)는 18번 줄이고, 그 줄에서 점퍼선이 아두이노 GND로 돌아옵니다.">
+<div class="circuit-bar" role="group" aria-label="회로 그림 조작"><button type="button" class="cb cb-play" aria-pressed="false" disabled>▶ 시뮬레이션</button><button type="button" class="cb cb-view" disabled>평면으로 보기</button><button type="button" class="cb cb-steps" disabled>조립 순서 보기</button><div class="circuit-stepper" role="group" aria-label="조립 순서" hidden><button type="button" class="cb cb-prev" aria-label="이전 단계" disabled>◀</button><span class="circuit-progress" role="status" aria-live="polite"></span><button type="button" class="cb cb-next" aria-label="다음 단계" disabled>▶</button><button type="button" class="cb cb-all" disabled>전체 보기</button></div></div>
+<div class="circuit-stage"><div class="circuit-plane" style="--w: 500; --h: 600"></div></div>
+<div class="circuit-ctl"></div>
+<p class="circuit-status-box"><span class="circuit-status-size" aria-hidden="true">▶ 시뮬레이션을 누르면 스케치처럼 D8이 0.5초마다 HIGH/LOW로 바뀌고 LED가 깜빡입니다.</span><span class="circuit-status-size" aria-hidden="true">digitalWrite(0, LOW) → D0 = 0V, LED 꺼짐  (delay(000)마다 반복)</span><span class="circuit-status-size" aria-hidden="true">digitalWrite(0, HIGH) → D0 = 0V, LED 켜짐  (delay(000)마다 반복)</span><span class="circuit-status">▶ 시뮬레이션을 누르면 스케치처럼 D8이 0.5초마다 HIGH/LOW로 바뀌고 LED가 깜빡입니다.</span><span class="circuit-failed">그림을 불러오지 못했어요. 새로고침해 보세요.</span></p>
+<div class="circuit-live" role="status" aria-live="polite"></div>
+<figcaption>D8 → 220Ω → LED → GND. 전류가 한 바퀴 돌아 GND로 돌아와야 LED가 켜집니다. <span class="circuit-hint" id="circuit-hint-led-blink">위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.</span></figcaption>
 </figure>
   <p>배선을 마쳤으면 아래 스케치를 업로드합니다. 0장의 Blink와 거의 같지만, <b>핀 번호에 이름을 붙인 것</b>이 달라요.</p>
 <pre class="code"><span class="c">// 8번 핀에 연결한 외부 LED 깜빡이기</span>
@@ -372,27 +373,13 @@
     <tr><td>버튼 반대쪽 다리</td><td>아두이노 <b>GND</b></td><td>눌렀을 때 D2를 LOW로 만들어 줌</td></tr>
     <tr><td>LED 회로</td><td>1장과 같음 (D8 → 220Ω → LED → GND)</td><td>그대로 유지</td></tr>
   </table></div>
-<figure class="figure">
-<svg viewBox="0 0 480 170" role="img" aria-label="회로도: 아두이노 D2에서 택트 스위치를 거쳐 GND로 연결되는 회로">
-<rect x="10" y="15" width="100" height="140" rx="6" fill="none" stroke="currentColor" stroke-width="2"/>
-<text x="50" y="92" font-size="16" font-weight="bold" text-anchor="middle" fill="currentColor">UNO</text>
-<text x="102" y="54" font-size="13" text-anchor="end" fill="currentColor">D2</text>
-<circle cx="110" cy="50" r="3.5" fill="currentColor"/>
-<text x="102" y="114" font-size="13" text-anchor="end" fill="currentColor">GND</text>
-<circle cx="110" cy="110" r="3.5" fill="currentColor"/>
-<g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
-<line x1="110" y1="50" x2="200" y2="50"/>
-<line x1="200" y1="50" x2="270" y2="28"/>
-<line x1="280" y1="50" x2="340" y2="50"/>
-<polyline points="340,50 340,110 110,110"/>
-</g>
-<circle cx="200" cy="50" r="4" fill="currentColor"/>
-<circle cx="280" cy="50" r="4" fill="currentColor"/>
-<text x="240" y="78" font-size="13" text-anchor="middle" fill="currentColor">택트 스위치</text>
-<text x="240" y="96" font-size="13" text-anchor="middle" fill="currentColor">(누르면 연결)</text>
-<text x="350" y="40" font-size="13" fill="currentColor">누르면 D2가 LOW</text>
-</svg>
-<figcaption>버튼을 D2와 GND 사이에 연결합니다. 안 누르면 내부 풀업 저항이 D2를 HIGH로, 누르면 GND와 이어져 LOW가 됩니다.</figcaption>
+<figure class="circuit" data-circuit="button-led" aria-label="브레드보드 배선 그림: 택트 스위치가 가운데 홈을 가로질러 6번과 8번 줄에 꽂혀 있습니다. 6번 줄 위쪽은 점퍼선으로 D2에, 8번 줄 아래쪽은 점퍼선으로 GND에 연결됩니다. LED 회로는 1장과 같이 D8, 220옴 저항, LED, GND 순서입니다.">
+<div class="circuit-bar" role="group" aria-label="회로 그림 조작"><button type="button" class="cb cb-play" aria-pressed="false" disabled>▶ 시뮬레이션</button><button type="button" class="cb cb-view" disabled>평면으로 보기</button><button type="button" class="cb cb-steps" disabled>조립 순서 보기</button><div class="circuit-stepper" role="group" aria-label="조립 순서" hidden><button type="button" class="cb cb-prev" aria-label="이전 단계" disabled>◀</button><span class="circuit-progress" role="status" aria-live="polite"></span><button type="button" class="cb cb-next" aria-label="다음 단계" disabled>▶</button><button type="button" class="cb cb-all" disabled>전체 보기</button></div></div>
+<div class="circuit-stage"><div class="circuit-plane" style="--w: 500; --h: 600"></div></div>
+<div class="circuit-ctl"></div>
+<p class="circuit-status-box"><span class="circuit-status-size" aria-hidden="true">▶ 시뮬레이션을 누른 뒤 그림 속 버튼을 눌러 보세요. (마우스/터치로 누르고 있기, 또는 포커스 후 Space/Enter)</span><span class="circuit-status-size" aria-hidden="true">D0 = HIGH (안 눌림, 내부 풀업이 HIGH로 당김) → digitalWrite(0, LOW), LED 꺼짐</span><span class="circuit-status-size" aria-hidden="true">D0 = LOW (눌림 → GND와 연결) → digitalWrite(0, HIGH), LED 켜짐</span><span class="circuit-status">▶ 시뮬레이션을 누른 뒤 그림 속 버튼을 눌러 보세요. (마우스/터치로 누르고 있기, 또는 포커스 후 Space/Enter)</span><span class="circuit-failed">그림을 불러오지 못했어요. 새로고침해 보세요.</span></p>
+<div class="circuit-live" role="status" aria-live="polite"></div>
+<figcaption>버튼을 D2와 GND 사이에 연결합니다. 안 누르면 내부 풀업 저항이 D2를 HIGH로, 누르면 GND와 이어져 LOW가 됩니다. <span class="circuit-hint" id="circuit-hint-button-led">위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.</span></figcaption>
 </figure>
   <div class="note"><b>버튼 다리 고르는 법</b>택트 스위치의 같은 변에 있는 두 다리는 이미 연결되어 있습니다. 한쪽 변의 다리 하나를 D2로, <b>반대쪽 변</b>의 다리 하나를 GND로 연결해야 해요(표의 "한쪽 다리"와 "반대쪽 다리"가 이 뜻입니다). 같은 변의 두 다리를 쓰면 누르든 안 누르든 항상 연결된 상태가 됩니다.</div>
 <pre class="code"><span class="c">// 버튼을 누르고 있는 동안만 LED가 켜진다</span>
@@ -476,10 +463,10 @@
 }</pre>
   <ul>
     <li><code>unsigned long</code>은 0 이상의 큰 정수 자료형입니다. <code>millis()</code>의 값이 이 타입이라 시간을 담는 변수는 이걸 써야 해요. <code>int</code>에 담으면 약 32초 뒤에 넘쳐서 이상해집니다.</li>
-    <li><code>millis() - lastChangeTime</code>처럼 <b>현재 시각에서 기록해 둔 시각을 빼서</b> 경과 시간을 구하는 패턴은 6장 프로젝트에서도 다시 씁니다.</li>
+    <li><code>millis() - lastChangeTime</code>처럼 <b>현재 시각에서 기록해 둔 시각을 빼서</b> 경과 시간을 구하는 패턴은 7장 프로젝트에서도 다시 씁니다.</li>
     <li><code>ledOn ? HIGH : LOW</code>는 "ledOn이 참이면 HIGH, 아니면 LOW"를 한 줄로 쓰는 삼항 연산자입니다.</li>
   </ul>
-  <div class="tip"><b>어느 걸 쓸까?</b>지금은 방법 1로 충분합니다. 방법 2는 "기다리는 동안에도 다른 일을 하는" 코드를 만들 때 필수라서, 어렵게 느껴지면 일단 읽어만 두고 6장에서 다시 돌아와도 괜찮아요.</div>
+  <div class="tip"><b>어느 걸 쓸까?</b>지금은 방법 1로 충분합니다. 방법 2는 "기다리는 동안에도 다른 일을 하는" 코드를 만들 때 필수라서, 어렵게 느껴지면 일단 읽어만 두고 7장에서 다시 돌아와도 괜찮아요.</div>
 
   <div class="quiz">
     <h4>✅ 확인 문제</h4>
@@ -690,6 +677,14 @@ raw = 1023   volts = 5.00</pre>
     <tr><td>저항 다른 쪽 → LED 긴 다리(+)</td><td>같은 세로줄에 꽂기</td></tr>
     <tr><td>LED 짧은 다리(−)</td><td>아두이노 <b>GND</b></td></tr>
   </table></div>
+<figure class="circuit" data-circuit="pot-led" aria-label="브레드보드 배선 그림: 가변저항이 4, 5, 6번 줄에 꽂혀 있고 왼쪽 다리는 5V, 가운데 다리는 A0, 오른쪽 다리는 GND에 점퍼선으로 연결됩니다. D9에서 나온 점퍼선은 14번 줄의 220옴 저항을 지나 18번 줄의 LED 긴 다리(+)로 가고, LED 짧은 다리(−)는 점퍼선으로 GND에 연결됩니다.">
+<div class="circuit-bar" role="group" aria-label="회로 그림 조작"><button type="button" class="cb cb-play" aria-pressed="false" disabled>▶ 시뮬레이션</button><button type="button" class="cb cb-view" disabled>평면으로 보기</button><button type="button" class="cb cb-steps" disabled>조립 순서 보기</button><div class="circuit-stepper" role="group" aria-label="조립 순서" hidden><button type="button" class="cb cb-prev" aria-label="이전 단계" disabled>◀</button><span class="circuit-progress" role="status" aria-live="polite"></span><button type="button" class="cb cb-next" aria-label="다음 단계" disabled>▶</button><button type="button" class="cb cb-all" disabled>전체 보기</button></div></div>
+<div class="circuit-stage"><div class="circuit-plane" style="--w: 500; --h: 600"></div></div>
+<div class="circuit-ctl"><label class="circuit-range"><span class="circuit-range-label">가변저항 값 (analogRead)</span><input type="range" min="0" max="1023" step="1" value="512" disabled><output class="circuit-range-out">512</output></label></div>
+<p class="circuit-status-box"><span class="circuit-status-size" aria-hidden="true">▶ 시뮬레이션을 누른 뒤 가변저항 손잡이를 돌리거나 슬라이더를 움직여 보세요.</span><span class="circuit-status-size" aria-hidden="true">analogRead(A0) = 0000 (약 0000V) → map → analogWrite(0, 000) : LED 밝기 000%</span><span class="circuit-status">▶ 시뮬레이션을 누른 뒤 가변저항 손잡이를 돌리거나 슬라이더를 움직여 보세요.</span><span class="circuit-failed">그림을 불러오지 못했어요. 새로고침해 보세요.</span></p>
+<div class="circuit-live" role="status" aria-live="polite"></div>
+<figcaption>가변저항(5V / A0 / GND)과 LED 회로(D9 → 220Ω → LED → GND)를 한 브레드보드에 모은 모습입니다. <span class="circuit-hint" id="circuit-hint-pot-led">위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.</span></figcaption>
+</figure>
 <pre class="code"><span class="c">// 가변저항을 돌려 LED 밝기 조절</span>
 <span class="k">const</span> <span class="k">int</span> POT_PIN = <span class="k">A0</span>;
 <span class="k">const</span> <span class="k">int</span> LED_PIN = <span class="num">9</span>;     <span class="c">// ~ 표시가 있는 PWM 핀</span>
@@ -724,7 +719,7 @@ raw = 1023   volts = 5.00</pre>
 <!-- =============================== 5. 센서와 액추에이터 =============================== -->
 <section class="part" id="sensor" data-part="sensor">
   <h2>5. 센서와 액추에이터</h2>
-  <p class="lead">거리를 재는 초음파 센서, 각도를 정하는 서보 모터, 소리를 내는 부저를 하나씩 다룹니다. 이 셋이 6장 프로젝트의 재료예요.</p>
+  <p class="lead">거리를 재는 초음파 센서, 각도를 정하는 서보 모터, 소리를 내는 부저를 하나씩 다룹니다. 이 셋이 7장 프로젝트의 재료예요.</p>
 
   <h3 id="sensor-us"><span class="num">5-1</span>초음파 센서 HC-SR04</h3>
   <p>박쥐처럼 <b>사람 귀에 안 들리는 초음파(40kHz)를 쏘고, 물체에 부딪혀 돌아오는 시간</b>을 재서 거리를 계산하는 센서입니다. 측정 범위는 약 2cm ~ 400cm이고 5V로 동작해요.</p>
@@ -735,6 +730,14 @@ raw = 1023   volts = 5.00</pre>
     <tr><td><b>Echo</b></td><td>아두이노 <b>D6</b></td><td>돌아올 때까지의 시간을 HIGH 길이로 알려주는 출력</td></tr>
     <tr><td><b>GND</b></td><td>아두이노 <b>GND</b></td><td>접지</td></tr>
   </table></div>
+<figure class="circuit" data-circuit="ultrasonic" aria-label="HC-SR04 배선 그림: VCC는 아두이노 5V, Trig는 D7, Echo는 D6, GND는 아두이노 GND에 점퍼선으로 연결됩니다. 센서 앞에는 거리를 바꿔 볼 수 있는 물체가 있습니다.">
+<div class="circuit-bar" role="group" aria-label="회로 그림 조작"><button type="button" class="cb cb-play" aria-pressed="false" disabled>▶ 시뮬레이션</button><button type="button" class="cb cb-view" disabled>평면으로 보기</button><button type="button" class="cb cb-steps" disabled>조립 순서 보기</button><div class="circuit-stepper" role="group" aria-label="조립 순서" hidden><button type="button" class="cb cb-prev" aria-label="이전 단계" disabled>◀</button><span class="circuit-progress" role="status" aria-live="polite"></span><button type="button" class="cb cb-next" aria-label="다음 단계" disabled>▶</button><button type="button" class="cb cb-all" disabled>전체 보기</button></div></div>
+<div class="circuit-stage"><div class="circuit-plane" style="--w: 500; --h: 650"></div></div>
+<div class="circuit-ctl"><label class="circuit-range"><span class="circuit-range-label">물체까지 거리</span><input type="range" min="2" max="200" step="1" value="40" disabled><output class="circuit-range-out">40cm</output></label></div>
+<p class="circuit-status-box"><span class="circuit-status-size" aria-hidden="true">▶ 시뮬레이션을 누른 뒤 슬라이더로 물체의 거리를 바꿔 보세요.</span><span class="circuit-status-size" aria-hidden="true">Echo가 HIGH였던 시간 = 00000µs → 00000 × 00000 / 0 = 00000cm</span><span class="circuit-status">▶ 시뮬레이션을 누른 뒤 슬라이더로 물체의 거리를 바꿔 보세요.</span><span class="circuit-failed">그림을 불러오지 못했어요. 새로고침해 보세요.</span></p>
+<div class="circuit-live" role="status" aria-live="polite"></div>
+<figcaption>HC-SR04의 네 핀을 아두이노에 직접 연결합니다. 슬라이더로 물체까지의 거리를 바꾸면 Echo 시간과 계산 결과가 달라집니다. <span class="circuit-hint" id="circuit-hint-ultrasonic">위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.</span></figcaption>
+</figure>
   <p>동작 순서는 다음과 같습니다.</p>
   <ol>
     <li>Trig 핀을 <b>10µs(마이크로초) 동안 HIGH</b>로 만들면 센서가 초음파를 발사합니다.</li>
@@ -801,6 +804,14 @@ out of range
     <tr><td>빨강</td><td>아두이노 <b>5V</b></td><td>전원</td></tr>
     <tr><td>주황 (또는 노랑)</td><td>아두이노 <b>D9</b></td><td>각도 신호</td></tr>
   </table></div>
+<figure class="circuit" data-circuit="servo" aria-label="SG90 서보 배선 그림: 갈색 선은 아두이노 GND, 빨간 선은 5V, 주황 선은 D9에 연결됩니다.">
+<div class="circuit-bar" role="group" aria-label="회로 그림 조작"><button type="button" class="cb cb-play" aria-pressed="false" disabled>▶ 시뮬레이션</button><button type="button" class="cb cb-view" disabled>평면으로 보기</button><button type="button" class="cb cb-steps" disabled>조립 순서 보기</button><div class="circuit-stepper" role="group" aria-label="조립 순서" hidden><button type="button" class="cb cb-prev" aria-label="이전 단계" disabled>◀</button><span class="circuit-progress" role="status" aria-live="polite"></span><button type="button" class="cb cb-next" aria-label="다음 단계" disabled>▶</button><button type="button" class="cb cb-all" disabled>전체 보기</button></div></div>
+<div class="circuit-stage"><div class="circuit-plane" style="--w: 500; --h: 560"></div></div>
+<div class="circuit-ctl"><label class="circuit-range"><span class="circuit-range-label">각도</span><input type="range" min="0" max="180" step="1" value="90" disabled><output class="circuit-range-out">90°</output></label></div>
+<p class="circuit-status-box"><span class="circuit-status-size" aria-hidden="true">▶ 시뮬레이션을 누른 뒤 슬라이더로 각도를 바꿔 보세요.</span><span class="circuit-status-size" aria-hidden="true">myServo.write(000) → 서보 혼이 000°로 이동</span><span class="circuit-status">▶ 시뮬레이션을 누른 뒤 슬라이더로 각도를 바꿔 보세요.</span><span class="circuit-failed">그림을 불러오지 못했어요. 새로고침해 보세요.</span></p>
+<div class="circuit-live" role="status" aria-live="polite"></div>
+<figcaption>SG90의 갈색 선은 GND, 빨강은 5V, 주황은 D9(신호)입니다. 슬라이더로 각도를 바꾸면 혼이 그 각도로 돌아갑니다. <span class="circuit-hint" id="circuit-hint-servo">위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.</span></figcaption>
+</figure>
   <ul>
     <li><code>#include &lt;Servo.h&gt;</code> — 서보 제어 라이브러리를 가져옵니다. 아두이노 IDE에 기본으로 들어 있어서 따로 설치할 필요가 없어요.</li>
     <li><code>Servo myServo;</code> — 서보 하나를 담당하는 객체(변수)를 만듭니다. 서보가 여러 개면 이름을 달리해 여러 개 만들어요.</li>
@@ -845,7 +856,7 @@ out of range
   myServo.<span class="p">write</span>(angle);
   <span class="p">delay</span>(<span class="num">15</span>);
 }</pre>
-  <div class="warn"><b>서보를 쓸 때 알아둘 것</b>① <code>Servo</code> 라이브러리를 쓰면 UNO에서 <b>9번과 10번 핀의 <code>analogWrite</code>(PWM)가 동작하지 않습니다.</b> 서보와 PWM LED를 같이 쓸 때는 LED를 3, 5, 6, 11번에 연결하세요. ② 서보는 움직일 때 전류를 많이 씁니다. 작은 SG90 한 개를 가볍게 움직이는 건 USB 전원으로 되지만, 서보가 여러 개이거나 무거운 걸 움직이면 보드가 갑자기 리셋되거나 서보가 덜덜 떨릴 수 있어요. 그럴 땐 7장의 안전 수칙처럼 서보 전원을 따로 연결해야 합니다. ③ 각도의 끝(0도, 180도)에서 계속 "웅~" 소리가 나면 그 지점에서 기계적으로 막혀 있다는 뜻이니, 범위를 10~170도 정도로 줄여 주세요.</div>
+  <div class="warn"><b>서보를 쓸 때 알아둘 것</b>① <code>Servo</code> 라이브러리를 쓰면 UNO에서 <b>9번과 10번 핀의 <code>analogWrite</code>(PWM)가 동작하지 않습니다.</b> 서보와 PWM LED를 같이 쓸 때는 LED를 3, 5, 6, 11번에 연결하세요. ② 서보는 움직일 때 전류를 많이 씁니다. 작은 SG90 한 개를 가볍게 움직이는 건 USB 전원으로 되지만, 서보가 여러 개이거나 무거운 걸 움직이면 보드가 갑자기 리셋되거나 서보가 덜덜 떨릴 수 있어요. 그럴 땐 8장의 안전 수칙처럼 서보 전원을 따로 연결해야 합니다. ③ 각도의 끝(0도, 180도)에서 계속 "웅~" 소리가 나면 그 지점에서 기계적으로 막혀 있다는 뜻이니, 범위를 10~170도 정도로 줄여 주세요.</div>
 
   <h3 id="sensor-buzzer"><span class="num">5-3</span>피에조 부저: tone()과 noTone()</h3>
   <p>피에조 부저는 전기 신호의 <b>떨림 속도(주파수, 단위 Hz)</b>에 맞춰 떨면서 소리를 냅니다. 주파수가 높을수록 높은 음이에요. 부저에는 두 종류가 있습니다.</p>
@@ -858,6 +869,14 @@ out of range
     <tr><td><b>+</b> (긴 다리 또는 + 표시)</td><td>아두이노 <b>D8</b></td><td>신호</td></tr>
     <tr><td><b>−</b> (짧은 다리)</td><td>아두이노 <b>GND</b></td><td>접지</td></tr>
   </table></div>
+<figure class="circuit" data-circuit="buzzer" aria-label="피에조 부저 배선 그림: 부저의 + 다리는 아두이노 D8, − 다리는 GND에 연결됩니다.">
+<div class="circuit-bar" role="group" aria-label="회로 그림 조작"><button type="button" class="cb cb-play" aria-pressed="false" disabled>▶ 시뮬레이션</button><button type="button" class="cb cb-view" disabled>평면으로 보기</button><button type="button" class="cb cb-steps" disabled>조립 순서 보기</button><div class="circuit-stepper" role="group" aria-label="조립 순서" hidden><button type="button" class="cb cb-prev" aria-label="이전 단계" disabled>◀</button><span class="circuit-progress" role="status" aria-live="polite"></span><button type="button" class="cb cb-next" aria-label="다음 단계" disabled>▶</button><button type="button" class="cb cb-all" disabled>전체 보기</button></div></div>
+<div class="circuit-stage"><div class="circuit-plane" style="--w: 500; --h: 470"></div></div>
+<div class="circuit-ctl"></div>
+<p class="circuit-status-box"><span class="circuit-status-size" aria-hidden="true">▶ 시뮬레이션을 누르면 도레미파솔이 연주되는 동안 소리 파동이 표시됩니다. (실제 소리는 나지 않아요)</span><span class="circuit-status-size" aria-hidden="true">noTone(0) 후 delay(0000): 쉬는 중</span><span class="circuit-status-size" aria-hidden="true">delay(000) 중: 소리가 끝나고 다음 음을 기다림</span><span class="circuit-status-size" aria-hidden="true">tone(0, 000, 000) → 도 (000Hz)</span><span class="circuit-status-size" aria-hidden="true">tone(0, 000, 000) → 레 (000Hz)</span><span class="circuit-status-size" aria-hidden="true">tone(0, 000, 000) → 미 (000Hz)</span><span class="circuit-status-size" aria-hidden="true">tone(0, 000, 000) → 파 (000Hz)</span><span class="circuit-status-size" aria-hidden="true">tone(0, 000, 000) → 솔 (000Hz)</span><span class="circuit-status">▶ 시뮬레이션을 누르면 도레미파솔이 연주되는 동안 소리 파동이 표시됩니다. (실제 소리는 나지 않아요)</span><span class="circuit-failed">그림을 불러오지 못했어요. 새로고침해 보세요.</span></p>
+<div class="circuit-live" role="status" aria-live="polite"></div>
+<figcaption>패시브 부저의 +는 D8, −는 GND에 연결합니다. 시뮬레이션을 켜면 소리가 나는 동안 파동이 표시돼요. <span class="circuit-hint" id="circuit-hint-buzzer">위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.</span></figcaption>
+</figure>
   <ul>
     <li><code>tone(핀, 주파수)</code> — 해당 주파수로 소리를 계속 냅니다.</li>
     <li><code>tone(핀, 주파수, 길이ms)</code> — 지정한 시간만 낸 뒤 자동으로 멈춥니다. 이 함수는 <b>소리를 시작만 시키고 바로 다음 줄로 넘어가요.</b> 소리가 끝나길 기다리려면 <code>delay</code>를 따로 써야 합니다.</li>
@@ -898,12 +917,605 @@ out of range
   <label class="done-check"><input type="checkbox" data-done="sensor"> 5장 완료!</label>
 </section>
 
-<!-- =============================== 6. 종합 실습 =============================== -->
+<!-- =============================== 6. 더 많은 부품과 모듈 =============================== -->
+<section class="part" id="modules" data-part="modules">
+  <h2>6. 더 많은 부품과 모듈</h2>
+  <p class="lead">빛, 색, 글자, 온습도, 방향, 모터까지. 스타터 키트에 들어 있는 인기 부품들을 하나씩 아두이노에 연결해 봅니다.</p>
+  <p>5장까지 배운 <code>digitalRead</code>, <code>analogRead</code>, <code>analogWrite</code>, 시리얼 모니터면 이 장의 부품 대부분을 다룰 수 있어요. 새로운 건 <b>라이브러리</b>(남이 만든 코드 묶음)와 <b>I2C</b>(선 두 개로 통신하는 방식), 그리고 <b>모터는 핀에 바로 못 붙인다</b>는 사실입니다. 각 절은 서로 독립적이라 필요한 부품부터 골라 따라 해도 됩니다.</p>
+  <div class="note"><b>이 장의 핀 배치 요약</b>조도 센서 A0 / RGB LED D9·D10·D11 / LCD A4(SDA)·A5(SCL) / DHT11 D2 / 조이스틱 A0·A1·D7 / 모터 드라이버 D5·D6. 한 절을 끝내면 <b>USB를 뽑고 배선을 정리한 뒤</b> 다음 절로 넘어가세요. 같은 핀에 다른 부품이 남아 있으면 헷갈립니다.</div>
+
+  <h3 id="mod-lib"><span class="num">6-1</span>라이브러리 매니저</h3>
+  <p><b>라이브러리</b>는 "이 부품은 이렇게 쓰면 돼요" 하고 누군가 미리 만들어 둔 코드 묶음입니다. 5장의 <code>Servo.h</code>는 IDE에 처음부터 들어 있었지만, 이 장의 LCD와 DHT11 라이브러리는 직접 설치해야 해요. Arduino IDE 2에는 설치를 도와주는 <b>라이브러리 매니저</b>가 있습니다.</p>
+  <ol>
+    <li>메뉴 <b>스케치 → 라이브러리 포함하기 → 라이브러리 관리…</b>를 엽니다. (왼쪽 세로 막대의 책 모양 아이콘도 같은 화면이에요.)</li>
+    <li>위쪽 검색창에 라이브러리 이름을 입력합니다. 이 장에서는 아래 두 가지를 찾습니다.</li>
+    <li>이름과 <b>제작자(by …)</b>가 맞는 항목을 찾아 <b>설치(INSTALL)</b>를 누릅니다.</li>
+    <li>"의존하는 라이브러리도 설치할까요?"라는 창이 뜨면 <b>Install all</b>을 선택합니다.</li>
+  </ol>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>부품</th><th>검색어</th><th>고를 항목</th><th>코드에서</th></tr>
+    <tr><td>I2C LCD</td><td><code>LiquidCrystal I2C</code></td><td><b>LiquidCrystal I2C</b> by Frank de Brabander</td><td><code>#include &lt;LiquidCrystal_I2C.h&gt;</code></td></tr>
+    <tr><td>DHT11 온습도</td><td><code>DHT sensor library</code></td><td><b>DHT sensor library</b> by Adafruit (+ <b>Adafruit Unified Sensor</b>도 함께 설치)</td><td><code>#include &lt;DHT.h&gt;</code></td></tr>
+  </table></div>
+  <p>설치가 끝나면 코드 맨 위에 <code>#include &lt;라이브러리.h&gt;</code>를 적어 가져다 씁니다. 설치한 라이브러리의 <b>예제</b>는 <b>파일 → 예제</b> 메뉴 아래쪽, 라이브러리 이름으로 된 항목에 들어 있어요. 사용법이 헷갈리면 공식 예제를 열어 보는 게 가장 빠릅니다.</p>
+  <div class="warn"><b>같은 이름이 여러 개예요</b>"LiquidCrystal I2C"는 만든 사람이 다른 비슷한 라이브러리가 여럿 있고, 쓰는 함수가 조금씩 다릅니다. 이 글의 코드는 <b>Frank de Brabander</b> 버전 기준이에요. 설치 후 <code>fatal error: ... No such file or directory</code>가 나오면 라이브러리가 설치되지 않았거나 이름을 잘못 쓴 것입니다.</div>
+
+  <h3 id="mod-cds"><span class="num">6-2</span>조도 센서 (CDS 포토레지스터)</h3>
+  <p>CDS 조도 센서는 <b>빛을 받을수록 저항이 작아지는 저항</b>입니다. 밝은 곳에서는 수 kΩ, 어두운 곳에서는 수백 kΩ~MΩ까지 변해요. 방향(극성)이 없어서 어느 다리를 어디에 꽂아도 됩니다.</p>
+  <p>그런데 아두이노의 <code>analogRead</code>는 <b>저항이 아니라 전압</b>을 읽습니다. 저항이 변하는 부품을 그냥 핀에 연결해서는 아무것도 읽을 수 없어요. 그래서 고정 저항과 함께 <b>전압 분배 회로</b>(분압)를 만들어 "저항의 변화"를 "전압의 변화"로 바꿔 줍니다.</p>
+<pre class="code"><span class="c">  5V
+   │
+ [CDS]          ← 빛에 따라 저항이 변함
+   │
+   ├──────→ A0   ← 이 지점(분압점)의 전압을 읽는다
+   │
+ [10kΩ]         ← 고정 저항
+   │
+  GND
+
+A0 전압 = 5V × 10kΩ / (CDS 저항 + 10kΩ)
+
+밝음   CDS = 1kΩ   →  5 × 10 / 11  ≈ 4.5V   →  analogRead ≈ 930
+보통   CDS = 10kΩ  →  5 × 10 / 20  = 2.5V   →  analogRead ≈ 512
+어두움 CDS = 100kΩ →  5 × 10 / 110 ≈ 0.45V  →  analogRead ≈ 93</span></pre>
+  <p>CDS를 5V 쪽에 두면 <b>밝을수록 값이 커집니다.</b> 반대로 두면 밝을수록 작아져요. 실제 값은 센서마다 달라서 이 숫자는 어림값일 뿐이니, 먼저 시리얼 모니터로 내 센서의 값을 확인해야 합니다.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>부품 핀</th><th>연결할 곳</th><th>설명</th></tr>
+    <tr><td>CDS 한쪽 다리</td><td>아두이노 <b>5V</b></td><td>분압 회로의 위쪽</td></tr>
+    <tr><td>CDS 다른 쪽 다리</td><td>브레드보드 한 세로줄 (이 줄을 <b>분압점</b>이라 부름)</td><td>10kΩ 저항, A0 선과 같은 줄에 꽂기</td></tr>
+    <tr><td>10kΩ 저항 한쪽 다리</td><td>분압점 (CDS와 같은 세로줄)</td><td></td></tr>
+    <tr><td>10kΩ 저항 다른 쪽 다리</td><td>아두이노 <b>GND</b></td><td>분압 회로의 아래쪽</td></tr>
+    <tr><td>분압점 (점퍼선)</td><td>아두이노 <b>A0</b></td><td>전압을 읽는 선</td></tr>
+    <tr><td>LED 회로 (야간등용)</td><td>D8 → 220Ω → LED 긴 다리, 짧은 다리 → GND</td><td>1장과 같은 배선</td></tr>
+  </table></div>
+  <figure class="circuit" data-circuit="cds-night" aria-label="조도 센서 분압 회로 그림: 아두이노 5V가 CDS 한쪽 다리(4번 줄)에, CDS 다른 쪽 다리와 10킬로옴 저항이 6번 줄에서 만나 A0로 연결되고, 10킬로옴 저항의 다른 쪽(10번 줄)은 GND로 갑니다. LED 회로는 D8, 220옴 저항, LED, GND 순서입니다.">
+<div class="circuit-bar" role="group" aria-label="회로 그림 조작"><button type="button" class="cb cb-play" aria-pressed="false" disabled>▶ 시뮬레이션</button><button type="button" class="cb cb-view" disabled>평면으로 보기</button><button type="button" class="cb cb-steps" disabled>조립 순서 보기</button><div class="circuit-stepper" role="group" aria-label="조립 순서" hidden><button type="button" class="cb cb-prev" aria-label="이전 단계" disabled>◀</button><span class="circuit-progress" role="status" aria-live="polite"></span><button type="button" class="cb cb-next" aria-label="다음 단계" disabled>▶</button><button type="button" class="cb cb-all" disabled>전체 보기</button></div></div>
+<div class="circuit-stage"><div class="circuit-plane" style="--w: 500; --h: 600"></div></div>
+<div class="circuit-ctl"><label class="circuit-range"><span class="circuit-range-label">주변 밝기</span><input type="range" min="0" max="100" step="1" value="70" disabled><output class="circuit-range-out">70%</output></label></div>
+<p class="circuit-status-box"><span class="circuit-status-size" aria-hidden="true">▶ 시뮬레이션을 누른 뒤 슬라이더로 주변 밝기를 바꿔 보세요. 야간등 스케치처럼 analogRead가 300 아래로 내려가면 LED가 켜집니다.</span><span class="circuit-status-size" aria-hidden="true">light = 000  LED OFF   (CDS 약 00000kΩ, A0 약 0000V, 켜는 값 000 / 끄는 값 000)</span><span class="circuit-status-size" aria-hidden="true">light = 000  LED ON   (CDS 약 00000kΩ, A0 약 0000V, 켜는 값 000 / 끄는 값 000)</span><span class="circuit-status">▶ 시뮬레이션을 누른 뒤 슬라이더로 주변 밝기를 바꿔 보세요. 야간등 스케치처럼 analogRead가 300 아래로 내려가면 LED가 켜집니다.</span><span class="circuit-failed">그림을 불러오지 못했어요. 새로고침해 보세요.</span></p>
+<div class="circuit-live" role="status" aria-live="polite"></div>
+<figcaption>5V - CDS - (A0) - 10kΩ - GND 분압 회로와 D8 LED. 어두워지면 A0 전압이 내려갑니다. <span class="circuit-hint" id="circuit-hint-cds-night">위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.</span></figcaption></figure>
+  <p>먼저 값부터 읽어 봅니다. 센서를 손으로 덮었다 뗐다 하며 숫자가 어떻게 변하는지 보세요.</p>
+<pre class="code"><span class="c">// 조도 센서(CDS) 값 읽기</span>
+<span class="k">const</span> <span class="k">int</span> CDS_PIN = <span class="k">A0</span>;
+
+<span class="k">void</span> <span class="p">setup</span>() {
+  Serial.<span class="p">begin</span>(<span class="num">9600</span>);
+}
+
+<span class="k">void</span> <span class="p">loop</span>() {
+  <span class="k">int</span> raw = <span class="p">analogRead</span>(CDS_PIN);   <span class="c">// 0(어두움) ~ 1023(밝음)</span>
+  Serial.<span class="p">print</span>(<span class="s">"light = "</span>);
+  Serial.<span class="p">println</span>(raw);
+  <span class="p">delay</span>(<span class="num">300</span>);
+}</pre>
+<pre class="output">light = 742
+light = 738
+light = 215
+light = 88
+light = 731</pre>
+  <p>손으로 덮으면 값이 크게 떨어지는 걸 볼 수 있어요. 이제 이 값을 기준으로 <b>어두워지면 켜지는 야간등</b>을 만듭니다. 기준값(임계값)은 내 환경에서 읽은 "밝을 때"와 "어두울 때"의 중간쯤으로 정하세요.</p>
+<pre class="code"><span class="c">// 어두워지면 LED가 켜지는 야간등</span>
+<span class="k">const</span> <span class="k">int</span> CDS_PIN = <span class="k">A0</span>;
+<span class="k">const</span> <span class="k">int</span> LED_PIN = <span class="num">8</span>;
+<span class="k">const</span> <span class="k">int</span> DARK_ON  = <span class="num">300</span>;   <span class="c">// 이 값보다 어두우면 켠다</span>
+<span class="k">const</span> <span class="k">int</span> DARK_OFF = <span class="num">350</span>;   <span class="c">// 이 값보다 밝아지면 끈다 (켜는 값보다 조금 크게)</span>
+
+<span class="k">bool</span> ledOn = <span class="k">false</span>;
+
+<span class="k">void</span> <span class="p">setup</span>() {
+  <span class="p">pinMode</span>(LED_PIN, <span class="k">OUTPUT</span>);
+  Serial.<span class="p">begin</span>(<span class="num">9600</span>);
+}
+
+<span class="k">void</span> <span class="p">loop</span>() {
+  <span class="k">int</span> raw = <span class="p">analogRead</span>(CDS_PIN);
+
+  <span class="k">if</span> (!ledOn &amp;&amp; raw &lt; DARK_ON) {
+    ledOn = <span class="k">true</span>;
+  } <span class="k">else</span> <span class="k">if</span> (ledOn &amp;&amp; raw &gt; DARK_OFF) {
+    ledOn = <span class="k">false</span>;
+  }
+  <span class="p">digitalWrite</span>(LED_PIN, ledOn ? <span class="k">HIGH</span> : <span class="k">LOW</span>);
+
+  Serial.<span class="p">print</span>(<span class="s">"light = "</span>);
+  Serial.<span class="p">print</span>(raw);
+  Serial.<span class="p">println</span>(ledOn ? <span class="s">"  LED ON"</span> : <span class="s">"  LED OFF"</span>);
+  <span class="p">delay</span>(<span class="num">200</span>);
+}</pre>
+<pre class="output">light = 702  LED OFF
+light = 668  LED OFF
+light = 241  LED ON
+light = 322  LED ON
+light = 390  LED OFF</pre>
+  <div class="tip"><b>켜는 값과 끄는 값을 따로 두는 이유</b>기준값 하나로만 비교하면 딱 그 근처의 밝기에서 값이 ±몇 씩 흔들리면서 LED가 <b>깜빡깜빡</b>합니다. 위 코드처럼 켜는 값(300)과 끄는 값(350)에 여유를 두면(<b>히스테리시스</b>) 안정적으로 동작해요. 야간등의 LED 불빛이 센서에 들어가면 스스로 꺼지는 문제도 생기니, 센서와 LED는 서로 다른 방향으로 두세요.</div>
+
+  <h3 id="mod-rgb"><span class="num">6-3</span>RGB LED</h3>
+  <p>RGB LED는 <b>빨강(R), 초록(G), 파랑(B) LED 세 개를 한 몸체에 넣은</b> 부품입니다. 다리는 4개이고, 그중 하나는 세 LED가 함께 쓰는 <b>공통 다리</b>예요. 공통 다리가 어느 쪽에 연결되어 있느냐로 두 종류로 나뉩니다.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>종류</th><th>공통 다리</th><th>켜는 법</th></tr>
+    <tr><td><b>공통 캐소드</b> (이 글 기준)</td><td>GND(−)에 연결</td><td>색 핀을 HIGH(큰 값)로 하면 밝아짐</td></tr>
+    <tr><td>공통 애노드</td><td>5V(+)에 연결</td><td>색 핀을 <b>LOW(작은 값)</b>로 해야 밝아짐. 값이 반대</td></tr>
+  </table></div>
+  <p>5mm RGB LED는 보통 <b>가장 긴 다리가 공통 다리</b>이고, 평평하게 깎인 면 쪽부터 <b>R, 공통(가장 긴 다리), G, B</b> 순서인 경우가 많습니다. 제품마다 다를 수 있으니 아래 첫 스케치를 올려 색이 순서대로 나오는지 확인하세요. 색이 뒤바뀌어 나오면 다리를 옮겨 꽂으면 됩니다.</p>
+  <p>각 색 다리에는 LED 한 개씩이니 <b>저항도 세 개</b> 필요합니다. 공통 다리에 저항 하나만 달면 색마다 밝기가 달라지고 여러 색을 섞을 때 어두워져요.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>부품 핀</th><th>연결할 곳</th><th>설명</th></tr>
+    <tr><td>RGB LED <b>R</b>(빨강) 다리</td><td>220Ω 저항 → 아두이노 <b>D9</b></td><td>저항 한쪽은 LED 다리와 같은 세로줄, 다른 쪽에서 D9로 점퍼선</td></tr>
+    <tr><td>RGB LED <b>G</b>(초록) 다리</td><td>220Ω 저항 → 아두이노 <b>D10</b></td><td></td></tr>
+    <tr><td>RGB LED <b>B</b>(파랑) 다리</td><td>220Ω 저항 → 아두이노 <b>D11</b></td><td></td></tr>
+    <tr><td>RGB LED <b>공통</b>(가장 긴 다리)</td><td>아두이노 <b>GND</b></td><td>공통 애노드 제품이면 <b>5V</b>에 연결</td></tr>
+  </table></div>
+  <figure class="circuit" data-circuit="rgb-led" aria-label="RGB LED 배선 그림: D9, D10, D11이 각각 220옴 저항을 거쳐 RGB LED의 빨강, 초록, 파랑 다리에 연결되고, 가장 긴 공통 다리는 GND에 연결됩니다.">
+<div class="circuit-bar" role="group" aria-label="회로 그림 조작"><button type="button" class="cb cb-play" aria-pressed="false" disabled>▶ 시뮬레이션</button><button type="button" class="cb cb-view" disabled>평면으로 보기</button><button type="button" class="cb cb-steps" disabled>조립 순서 보기</button><div class="circuit-stepper" role="group" aria-label="조립 순서" hidden><button type="button" class="cb cb-prev" aria-label="이전 단계" disabled>◀</button><span class="circuit-progress" role="status" aria-live="polite"></span><button type="button" class="cb cb-next" aria-label="다음 단계" disabled>▶</button><button type="button" class="cb cb-all" disabled>전체 보기</button></div></div>
+<div class="circuit-stage"><div class="circuit-plane" style="--w: 500; --h: 600"></div></div>
+<div class="circuit-ctl"><label class="circuit-range"><span class="circuit-range-label">R (D9)</span><input type="range" min="0" max="255" step="1" value="255" disabled><output class="circuit-range-out">255</output></label><label class="circuit-range"><span class="circuit-range-label">G (D10)</span><input type="range" min="0" max="255" step="1" value="0" disabled><output class="circuit-range-out">0</output></label><label class="circuit-range"><span class="circuit-range-label">B (D11)</span><input type="range" min="0" max="255" step="1" value="0" disabled><output class="circuit-range-out">0</output></label><div class="circuit-modes"><button type="button" class="cb cb-mode" aria-pressed="false" disabled>색 섞기 스케치 재생</button><button type="button" class="cb cb-mode" aria-pressed="false" disabled>무지개 스케치 재생</button></div></div>
+<p class="circuit-status-box"><span class="circuit-status-size" aria-hidden="true">▶ 시뮬레이션을 누른 뒤 R·G·B 슬라이더(analogWrite 값)를 움직이거나, 스케치의 색 순환을 재생해 보세요.</span><span class="circuit-status-size" aria-hidden="true">analogWrite(0, 000) · analogWrite(00, 000) · analogWrite(00, 000) → rgb(000, 000, 000)</span><span class="circuit-status-size" aria-hidden="true">analogWrite(0, 0) · analogWrite(00, 0) · analogWrite(00, 000) → 파랑</span><span class="circuit-status-size" aria-hidden="true">analogWrite(0, 0) · analogWrite(00, 000) · analogWrite(00, 0) → 초록</span><span class="circuit-status-size" aria-hidden="true">analogWrite(0, 0) · analogWrite(00, 000) · analogWrite(00, 000) → 하늘색</span><span class="circuit-status-size" aria-hidden="true">analogWrite(0, 000) · analogWrite(00, 0) · analogWrite(00, 0) → 빨강</span><span class="circuit-status-size" aria-hidden="true">analogWrite(0, 000) · analogWrite(00, 0) · analogWrite(00, 000) → 보라</span><span class="circuit-status-size" aria-hidden="true">analogWrite(0, 000) · analogWrite(00, 000) · analogWrite(00, 0) → 노랑</span><span class="circuit-status-size" aria-hidden="true">analogWrite(0, 000) · analogWrite(00, 000) · analogWrite(00, 000) → 흰색</span><span class="circuit-status-size" aria-hidden="true">analogWrite(0, 000) · analogWrite(00, 00) · analogWrite(00, 0) → 주황</span><span class="circuit-status">▶ 시뮬레이션을 누른 뒤 R·G·B 슬라이더(analogWrite 값)를 움직이거나, 스케치의 색 순환을 재생해 보세요.</span><span class="circuit-failed">그림을 불러오지 못했어요. 새로고침해 보세요.</span></p>
+<div class="circuit-live" role="status" aria-live="polite"></div>
+<figcaption>D9 / D10 / D11 각각 220Ω을 거쳐 RGB LED의 R, G, B 다리로. 공통 다리는 GND. <span class="circuit-hint" id="circuit-hint-rgb-led">위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.</span></figcaption></figure>
+  <p>9, 10, 11번은 모두 PWM 핀(<code>~</code> 표시)이라서 <code>analogWrite</code>로 밝기를 0~255 사이에서 조절할 수 있습니다. 5장에서 "Servo를 쓰면 9, 10번 PWM이, <code>tone()</code>을 쓰면 3, 11번 PWM이 방해받는다"고 했는데, <b>이 스케치에는 Servo도 <code>tone()</code>도 없으므로 충돌하지 않습니다.</b> 서보나 부저를 함께 쓰는 작품에서는 핀을 다시 계획해야 해요.</p>
+  <p>빛의 삼원색은 섞을수록 밝아지는 <b>가산 혼합</b>입니다. 세 값을 조합하면 다양한 색이 나와요.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>색</th><th>R</th><th>G</th><th>B</th></tr>
+    <tr><td>빨강</td><td>255</td><td>0</td><td>0</td></tr>
+    <tr><td>노랑</td><td>255</td><td>255</td><td>0</td></tr>
+    <tr><td>하늘색</td><td>0</td><td>255</td><td>255</td></tr>
+    <tr><td>보라</td><td>255</td><td>0</td><td>255</td></tr>
+    <tr><td>주황</td><td>255</td><td>80</td><td>0</td></tr>
+    <tr><td>흰색</td><td>255</td><td>255</td><td>255</td></tr>
+  </table></div>
+<pre class="code"><span class="c">// RGB LED(공통 캐소드)로 색 섞기</span>
+<span class="k">const</span> <span class="k">int</span> R_PIN = <span class="num">9</span>;
+<span class="k">const</span> <span class="k">int</span> G_PIN = <span class="num">10</span>;
+<span class="k">const</span> <span class="k">int</span> B_PIN = <span class="num">11</span>;
+<span class="k">const</span> <span class="k">bool</span> COMMON_ANODE = <span class="k">false</span>;   <span class="c">// 공통 애노드 LED면 true</span>
+
+<span class="k">void</span> <span class="p">setColor</span>(<span class="k">int</span> r, <span class="k">int</span> g, <span class="k">int</span> b) {
+  <span class="k">if</span> (COMMON_ANODE) {              <span class="c">// 공통 애노드는 값이 반대 (255 = 꺼짐)</span>
+    r = <span class="num">255</span> - r;
+    g = <span class="num">255</span> - g;
+    b = <span class="num">255</span> - b;
+  }
+  <span class="p">analogWrite</span>(R_PIN, r);
+  <span class="p">analogWrite</span>(G_PIN, g);
+  <span class="p">analogWrite</span>(B_PIN, b);
+}
+
+<span class="k">void</span> <span class="p">setup</span>() {
+  <span class="p">pinMode</span>(R_PIN, <span class="k">OUTPUT</span>);
+  <span class="p">pinMode</span>(G_PIN, <span class="k">OUTPUT</span>);
+  <span class="p">pinMode</span>(B_PIN, <span class="k">OUTPUT</span>);
+}
+
+<span class="k">void</span> <span class="p">loop</span>() {
+  <span class="p">setColor</span>(<span class="num">255</span>, <span class="num">0</span>, <span class="num">0</span>);     <span class="p">delay</span>(<span class="num">800</span>);   <span class="c">// 빨강</span>
+  <span class="p">setColor</span>(<span class="num">0</span>, <span class="num">255</span>, <span class="num">0</span>);     <span class="p">delay</span>(<span class="num">800</span>);   <span class="c">// 초록</span>
+  <span class="p">setColor</span>(<span class="num">0</span>, <span class="num">0</span>, <span class="num">255</span>);     <span class="p">delay</span>(<span class="num">800</span>);   <span class="c">// 파랑</span>
+  <span class="p">setColor</span>(<span class="num">255</span>, <span class="num">255</span>, <span class="num">0</span>);   <span class="p">delay</span>(<span class="num">800</span>);   <span class="c">// 노랑 = 빨강 + 초록</span>
+  <span class="p">setColor</span>(<span class="num">0</span>, <span class="num">255</span>, <span class="num">255</span>);   <span class="p">delay</span>(<span class="num">800</span>);   <span class="c">// 하늘색 = 초록 + 파랑</span>
+  <span class="p">setColor</span>(<span class="num">255</span>, <span class="num">0</span>, <span class="num">255</span>);   <span class="p">delay</span>(<span class="num">800</span>);   <span class="c">// 보라 = 빨강 + 파랑</span>
+  <span class="p">setColor</span>(<span class="num">255</span>, <span class="num">255</span>, <span class="num">255</span>); <span class="p">delay</span>(<span class="num">800</span>);   <span class="c">// 흰색 (실제로는 살짝 푸르스름)</span>
+  <span class="p">setColor</span>(<span class="num">255</span>, <span class="num">80</span>, <span class="num">0</span>);    <span class="p">delay</span>(<span class="num">800</span>);   <span class="c">// 주황</span>
+}</pre>
+  <p>이제 색이 부드럽게 한 바퀴 도는 스케치입니다. <code>wheel(pos)</code>는 0~255의 숫자 하나를 받아 빨강 → 초록 → 파랑 → 빨강 순으로 색을 만들어 줍니다.</p>
+<pre class="code"><span class="c">// 무지개처럼 색이 부드럽게 한 바퀴 도는 RGB LED</span>
+<span class="k">const</span> <span class="k">int</span> R_PIN = <span class="num">9</span>;
+<span class="k">const</span> <span class="k">int</span> G_PIN = <span class="num">10</span>;
+<span class="k">const</span> <span class="k">int</span> B_PIN = <span class="num">11</span>;
+<span class="k">const</span> <span class="k">bool</span> COMMON_ANODE = <span class="k">false</span>;
+
+<span class="k">void</span> <span class="p">setColor</span>(<span class="k">int</span> r, <span class="k">int</span> g, <span class="k">int</span> b) {
+  <span class="k">if</span> (COMMON_ANODE) {
+    r = <span class="num">255</span> - r;
+    g = <span class="num">255</span> - g;
+    b = <span class="num">255</span> - b;
+  }
+  <span class="p">analogWrite</span>(R_PIN, r);
+  <span class="p">analogWrite</span>(G_PIN, g);
+  <span class="p">analogWrite</span>(B_PIN, b);
+}
+
+<span class="c">// pos: 0~255 -&gt; 빨강 -&gt; 초록 -&gt; 파랑 -&gt; 다시 빨강</span>
+<span class="k">void</span> <span class="p">wheel</span>(<span class="k">int</span> pos) {
+  <span class="k">if</span> (pos &lt; <span class="num">85</span>) {
+    <span class="p">setColor</span>(<span class="num">255</span> - pos * <span class="num">3</span>, pos * <span class="num">3</span>, <span class="num">0</span>);
+  } <span class="k">else</span> <span class="k">if</span> (pos &lt; <span class="num">170</span>) {
+    pos -= <span class="num">85</span>;
+    <span class="p">setColor</span>(<span class="num">0</span>, <span class="num">255</span> - pos * <span class="num">3</span>, pos * <span class="num">3</span>);
+  } <span class="k">else</span> {
+    pos -= <span class="num">170</span>;
+    <span class="p">setColor</span>(pos * <span class="num">3</span>, <span class="num">0</span>, <span class="num">255</span> - pos * <span class="num">3</span>);
+  }
+}
+
+<span class="k">void</span> <span class="p">setup</span>() {
+  <span class="p">pinMode</span>(R_PIN, <span class="k">OUTPUT</span>);
+  <span class="p">pinMode</span>(G_PIN, <span class="k">OUTPUT</span>);
+  <span class="p">pinMode</span>(B_PIN, <span class="k">OUTPUT</span>);
+}
+
+<span class="k">void</span> <span class="p">loop</span>() {
+  <span class="k">for</span> (<span class="k">int</span> pos = <span class="num">0</span>; pos &lt; <span class="num">256</span>; pos++) {
+    <span class="p">wheel</span>(pos);
+    <span class="p">delay</span>(<span class="num">20</span>);
+  }
+}</pre>
+  <div class="warn"><b>저항은 꼭 달기, 색마다 밝기가 달라요</b>저항 없이 연결하면 1장에서 본 것처럼 핀과 LED가 상할 수 있습니다. 220Ω이면 색당 약 9~14mA라 핀 하나당 권장 한도(약 20mA) 안이에요. 초록과 파랑은 빨강보다 켜질 때 전압이 높아(약 3V) 전류가 조금 작고 색 균형이 살짝 달라 보입니다. 흰색이 푸르스름하게 보이면 정상이에요.</div>
+
+  <h3 id="mod-lcd"><span class="num">6-4</span>I2C LCD 16x2</h3>
+  <p>LCD 1602는 <b>16칸 × 2줄</b>로 글자를 표시하는 화면입니다. 원래는 연결 선이 10개 이상 필요하지만, 뒤에 <b>I2C 백팩</b>(PCF8574 칩이 붙은 작은 기판)이 달린 제품을 쓰면 <b>전원 2개 + 신호 2개, 총 4개 선</b>이면 됩니다.</p>
+  <p><b>I2C</b>(아이스퀘어씨)는 선 두 개로 여러 장치와 통신하는 방식입니다. <b>SDA</b>는 데이터, <b>SCL</b>은 박자(클럭) 선이고, 장치마다 고유한 <b>주소</b>가 있어서 같은 두 선에 여러 장치를 매달 수 있어요. UNO에서는 <b>SDA = A4, SCL = A5</b>로 정해져 있습니다. (보드 위쪽 AREF 옆에 SDA·SCL이라고 인쇄된 핀도 같은 선입니다.)</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>LCD 백팩 핀</th><th>연결할 곳</th><th>설명</th></tr>
+    <tr><td>GND</td><td>아두이노 <b>GND</b></td><td>접지</td></tr>
+    <tr><td>VCC</td><td>아두이노 <b>5V</b></td><td>전원 (3.3V 아님)</td></tr>
+    <tr><td>SDA</td><td>아두이노 <b>A4</b></td><td>I2C 데이터</td></tr>
+    <tr><td>SCL</td><td>아두이노 <b>A5</b></td><td>I2C 클럭</td></tr>
+    <tr><td>(선택) 가변저항 가운데 다리</td><td>아두이노 <b>A0</b></td><td>아래 스케치에서 값을 표시할 때만. 양쪽 다리는 5V와 GND</td></tr>
+  </table></div>
+  <figure class="circuit" data-circuit="lcd-i2c" aria-label="I2C LCD 배선 그림: LCD의 GND와 VCC는 브레드보드 아래쪽 GND와 5V 레일로, SDA는 A4, SCL은 A5에 연결됩니다. 선택 부품인 가변저항은 양쪽 다리가 5V와 GND 레일에, 가운데 다리가 A0에 연결됩니다.">
+<div class="circuit-bar" role="group" aria-label="회로 그림 조작"><button type="button" class="cb cb-play" aria-pressed="false" disabled>▶ 시뮬레이션</button><button type="button" class="cb cb-view" disabled>평면으로 보기</button><button type="button" class="cb cb-steps" disabled>조립 순서 보기</button><div class="circuit-stepper" role="group" aria-label="조립 순서" hidden><button type="button" class="cb cb-prev" aria-label="이전 단계" disabled>◀</button><span class="circuit-progress" role="status" aria-live="polite"></span><button type="button" class="cb cb-next" aria-label="다음 단계" disabled>▶</button><button type="button" class="cb cb-all" disabled>전체 보기</button></div></div>
+<div class="circuit-stage"><div class="circuit-plane" style="--w: 740; --h: 600"></div></div>
+<div class="circuit-ctl"><label class="circuit-range"><span class="circuit-range-label">가변저항 값 (A0)</span><input type="range" min="0" max="1023" step="1" value="512" disabled><output class="circuit-range-out">512</output></label></div>
+<p class="circuit-status-box"><span class="circuit-status-size" aria-hidden="true">▶ 시뮬레이션을 누르면 LCD에 글자가 나타납니다. 가변저항 손잡이나 슬라이더로 둘째 줄의 A0 값을 바꿔 보세요.</span><span class="circuit-status-size" aria-hidden="true">lcd.print(&quot;Hello, COM's!&quot;) 첫 줄 / 둘째 줄: &quot;A0 = 0000&quot; (analogRead(A0) = 0000, 000초마다 갱신)</span><span class="circuit-status">▶ 시뮬레이션을 누르면 LCD에 글자가 나타납니다. 가변저항 손잡이나 슬라이더로 둘째 줄의 A0 값을 바꿔 보세요.</span><span class="circuit-failed">그림을 불러오지 못했어요. 새로고침해 보세요.</span></p>
+<div class="circuit-live" role="status" aria-live="polite"></div>
+<figcaption>I2C LCD의 GND, VCC, SDA, SCL을 GND, 5V, A4, A5에 연결. 선택으로 가변저항을 A0에 연결. <span class="circuit-hint" id="circuit-hint-lcd-i2c">위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.</span></figcaption></figure>
+  <p><b>1단계: 주소 찾기.</b> I2C 장치는 제품에 따라 주소가 <b>0x27</b> 또는 <b>0x3F</b>입니다(모듈 점퍼 설정에 따라 0x20~0x27, 0x38~0x3F 중 다른 값일 수도 있어요 — 스캐너로 확인). 주소가 틀리면 아무것도 안 나오므로, 먼저 아래 스캐너 스케치로 내 LCD의 주소를 확인하세요. (<code>Wire</code>는 I2C를 다루는 기본 라이브러리로, 설치가 필요 없어요.)</p>
+<pre class="code"><span class="c">// I2C 장치 주소 찾기</span>
+<span class="k">#include</span> &lt;Wire.h&gt;
+
+<span class="k">void</span> <span class="p">setup</span>() {
+  Wire.<span class="p">begin</span>();
+  Serial.<span class="p">begin</span>(<span class="num">9600</span>);
+}
+
+<span class="k">void</span> <span class="p">loop</span>() {
+  Serial.<span class="p">println</span>(<span class="s">"Scanning..."</span>);
+  <span class="k">int</span> found = <span class="num">0</span>;
+
+  <span class="k">for</span> (<span class="k">byte</span> addr = <span class="num">1</span>; addr &lt; <span class="num">127</span>; addr++) {
+    Wire.<span class="p">beginTransmission</span>(addr);
+    <span class="k">if</span> (Wire.<span class="p">endTransmission</span>() == <span class="num">0</span>) {      <span class="c">// 0 = 응답함</span>
+      Serial.<span class="p">print</span>(<span class="s">"I2C device found at address 0x"</span>);
+      <span class="k">if</span> (addr &lt; <span class="num">16</span>) {
+        Serial.<span class="p">print</span>(<span class="s">"0"</span>);
+      }
+      Serial.<span class="p">println</span>(addr, <span class="k">HEX</span>);
+      found++;
+    }
+  }
+
+  <span class="k">if</span> (found == <span class="num">0</span>) {
+    Serial.<span class="p">println</span>(<span class="s">"No I2C devices found"</span>);
+  } <span class="k">else</span> {
+    Serial.<span class="p">println</span>(<span class="s">"done"</span>);
+  }
+  <span class="p">delay</span>(<span class="num">3000</span>);
+}</pre>
+  <p>시리얼 모니터(9600 보드레이트)를 열면 3초마다 아래처럼 나옵니다.</p>
+<pre class="output">Scanning...
+I2C device found at address 0x27
+done</pre>
+  <p><b>2단계: 글자 표시하기.</b> 알아낸 주소를 <code>LiquidCrystal_I2C lcd(주소, 16, 2);</code>에 넣습니다. 0x3F가 나왔다면 <code>0x3F</code>로 바꾸세요.</p>
+<pre class="code"><span class="c">// I2C LCD에 글자와 센서 값 표시하기</span>
+<span class="k">#include</span> &lt;Wire.h&gt;
+<span class="k">#include</span> &lt;<span class="k">LiquidCrystal_I2C</span>.h&gt;
+
+<span class="k">LiquidCrystal_I2C</span> lcd(<span class="num">0x27</span>, <span class="num">16</span>, <span class="num">2</span>);   <span class="c">// (주소, 가로 16칸, 세로 2줄)</span>
+
+<span class="k">void</span> <span class="p">setup</span>() {
+  lcd.<span class="p">init</span>();         <span class="c">// LCD 초기화</span>
+  lcd.<span class="p">backlight</span>();    <span class="c">// 백라이트 켜기</span>
+  lcd.<span class="p">setCursor</span>(<span class="num">0</span>, <span class="num">0</span>);
+  lcd.<span class="p">print</span>(<span class="s">"Hello, COM's!"</span>);
+}
+
+<span class="k">void</span> <span class="p">loop</span>() {
+  <span class="k">int</span> raw = <span class="p">analogRead</span>(<span class="k">A0</span>);       <span class="c">// 가변저항을 A0에 연결했을 때</span>
+  lcd.<span class="p">setCursor</span>(<span class="num">0</span>, <span class="num">1</span>);            <span class="c">// (칸, 줄) = 둘째 줄 맨 왼쪽</span>
+  lcd.<span class="p">print</span>(<span class="s">"A0 = "</span>);
+  lcd.<span class="p">print</span>(raw);
+  lcd.<span class="p">print</span>(<span class="s">"    "</span>);              <span class="c">// 앞 값의 남은 글자를 공백으로 지우기</span>
+  <span class="p">delay</span>(<span class="num">200</span>);
+}</pre>
+  <ul>
+    <li>가변저항을 연결하지 않으면 A0가 아무 곳에도 이어지지 않은 상태라 두 번째 줄에는 아무 숫자나 나옵니다. 정상이에요.</li>
+    <li><code>lcd.init()</code>으로 LCD를 초기화하고 <code>lcd.backlight()</code>로 백라이트를 켭니다. 이 글은 Frank de Brabander 라이브러리의 <b><code>init()</code></b> 방식을 씁니다. 다른 I2C LCD 라이브러리는 <code>begin()</code>만 쓰기도 하니, 예제를 섞어 붙이지 마세요.</li>
+    <li><code>lcd.setCursor(칸, 줄)</code>은 글자를 쓸 위치입니다. <b>칸은 0~15, 줄은 0~1</b>이고 둘 다 <b>0부터</b> 셉니다. 그다음 <code>lcd.print()</code>는 <code>Serial.print()</code>와 똑같이 쓰면 돼요.</li>
+    <li><code>lcd.clear()</code>는 화면 전체를 지웁니다. 하지만 자주 부르면 화면이 깜빡이므로, 값이 바뀌는 곳만 위 코드처럼 <b>공백으로 덮어쓰기</b>하는 것이 보기 좋아요. 공백을 빼면 값이 <code>1000</code>에서 <code>99</code>로 줄 때 <code>990</code>처럼 앞 글자가 남습니다.</li>
+    <li>한글은 표시되지 않습니다. 영문, 숫자, 기호만 쓰세요.</li>
+  </ul>
+  <div class="warn"><b>켜졌는데 화면이 비어 있어요</b>① 백팩 뒷면의 파란 <b>가변저항(콘트라스트)</b>을 작은 드라이버로 천천히 돌려 보세요. 이게 안 맞으면 켜져 있어도 글자가 안 보이거나 네모 칸만 보입니다. ② 주소(0x27/0x3F)가 맞는지 스캐너로 확인. ③ SDA와 SCL을 서로 바꿔 꽂지 않았는지. ④ VCC에 5V를 연결했는지. ⑤ 백팩의 백라이트 점퍼가 빠져 있지 않은지.</div>
+
+  <h3 id="mod-dht"><span class="num">6-5</span>DHT11 온습도 센서</h3>
+  <p>DHT11은 <b>온도와 습도를 하나의 데이터 선으로 알려주는</b> 디지털 센서입니다. 센서 안에서 값을 계산해 보내 주므로 <code>analogRead</code>가 필요 없어요. 대신 정해진 통신 규칙이 있어서 <b>DHT sensor library</b>(Adafruit)를 사용합니다. <b>DHT sensor library</b>와 <b>Adafruit Unified Sensor</b>를 둘 다 설치했는지 6-1절에서 먼저 확인하세요.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>제품</th><th>측정 범위 / 오차</th><th>읽는 간격</th></tr>
+    <tr><td>DHT11</td><td>온도 0~50°C (±2°C), 습도 20~80% (±5%)</td><td>최대 약 1초에 1번. 안전하게 <b>2초 이상</b></td></tr>
+  </table></div>
+  <p>3핀 <b>모듈형</b> 제품은 풀업 저항이 기판에 이미 달려 있어서 그대로 연결하면 됩니다. 센서 단품(핀 4개, 그중 하나는 사용 안 함)이라면 DATA와 VCC 사이에 <b>10kΩ 풀업 저항</b>을 직접 달아야 해요. 이 글은 모듈형 기준입니다.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>DHT11 모듈 핀</th><th>연결할 곳</th><th>설명</th></tr>
+    <tr><td>S (또는 OUT, DATA)</td><td>아두이노 <b>D2</b></td><td>데이터</td></tr>
+    <tr><td>VCC (또는 +)</td><td>아두이노 <b>5V</b></td><td>전원</td></tr>
+    <tr><td>GND (또는 −)</td><td>아두이노 <b>GND</b></td><td>접지</td></tr>
+  </table></div>
+  <figure class="circuit" data-circuit="dht11" aria-label="DHT11 모듈 배선 그림: S는 D2, VCC는 5V, GND는 GND에 연결됩니다.">
+<div class="circuit-bar" role="group" aria-label="회로 그림 조작"><button type="button" class="cb cb-play" aria-pressed="false" disabled>▶ 시뮬레이션</button><button type="button" class="cb cb-view" disabled>평면으로 보기</button><button type="button" class="cb cb-steps" disabled>조립 순서 보기</button><div class="circuit-stepper" role="group" aria-label="조립 순서" hidden><button type="button" class="cb cb-prev" aria-label="이전 단계" disabled>◀</button><span class="circuit-progress" role="status" aria-live="polite"></span><button type="button" class="cb cb-next" aria-label="다음 단계" disabled>▶</button><button type="button" class="cb cb-all" disabled>전체 보기</button></div></div>
+<div class="circuit-stage"><div class="circuit-plane" style="--w: 500; --h: 520"></div></div>
+<div class="circuit-ctl"><label class="circuit-range"><span class="circuit-range-label">온도</span><input type="range" min="0" max="50" step="1" value="24" disabled><output class="circuit-range-out">24°C</output></label><label class="circuit-range"><span class="circuit-range-label">습도</span><input type="range" min="20" max="80" step="1" value="45" disabled><output class="circuit-range-out">45%</output></label><div class="circuit-modes"><button type="button" class="cb cb-mode" aria-pressed="false" disabled>읽기 실패 만들기 (NaN)</button></div></div>
+<p class="circuit-status-box"><span class="circuit-status-size" aria-hidden="true">▶ 시뮬레이션을 누른 뒤 슬라이더로 온도·습도를 바꿔 보세요. 스케치처럼 2초마다 한 번 읽어 시리얼에 출력합니다.</span><span class="circuit-status-size" aria-hidden="true">delay(0000) 중… 첫 측정까지 0초</span><span class="circuit-status-size" aria-hidden="true">DHT read failed  (isnan 검사에 걸려 return)</span><span class="circuit-status-size" aria-hidden="true">Temp: 0000 C   Humidity: 00 %</span><span class="circuit-status">▶ 시뮬레이션을 누른 뒤 슬라이더로 온도·습도를 바꿔 보세요. 스케치처럼 2초마다 한 번 읽어 시리얼에 출력합니다.</span><span class="circuit-failed">그림을 불러오지 못했어요. 새로고침해 보세요.</span></p>
+<div class="circuit-live" role="status" aria-live="polite"></div>
+<figcaption>DHT11 모듈의 S는 D2, VCC는 5V, GND는 GND에 연결. 모듈 기판에 풀업 저항 내장. <span class="circuit-hint" id="circuit-hint-dht11">위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.</span></figcaption></figure>
+  <div class="warn"><b>모듈마다 핀 순서가 달라요</b>어떤 모듈은 <code>S / VCC / GND</code>, 어떤 모듈은 <code>VCC / S / GND</code>, <code>GND / VCC / S</code> 순서입니다. <b>기판에 인쇄된 글자를 보고</b> 연결하세요. 전원을 반대로 꽂으면 센서가 뜨거워지며 망가질 수 있습니다.</div>
+<pre class="code"><span class="c">// DHT11로 온도와 습도 읽기</span>
+<span class="k">#include</span> &lt;<span class="k">DHT</span>.h&gt;
+
+<span class="k">const</span> <span class="k">int</span> DHT_PIN = <span class="num">2</span>;
+<span class="k">DHT</span> dht(DHT_PIN, <span class="k">DHT11</span>);
+
+<span class="k">void</span> <span class="p">setup</span>() {
+  Serial.<span class="p">begin</span>(<span class="num">9600</span>);
+  dht.<span class="p">begin</span>();
+}
+
+<span class="k">void</span> <span class="p">loop</span>() {
+  <span class="p">delay</span>(<span class="num">2000</span>);                          <span class="c">// DHT11은 1~2초에 한 번만 읽을 수 있다</span>
+
+  <span class="k">float</span> h = dht.<span class="p">readHumidity</span>();         <span class="c">// 습도 (%)</span>
+  <span class="k">float</span> t = dht.<span class="p">readTemperature</span>();      <span class="c">// 온도 (섭씨)</span>
+
+  <span class="k">if</span> (<span class="p">isnan</span>(h) || <span class="p">isnan</span>(t)) {           <span class="c">// 읽기 실패하면 NaN</span>
+    Serial.<span class="p">println</span>(<span class="s">"DHT read failed"</span>);
+    <span class="k">return</span>;
+  }
+
+  Serial.<span class="p">print</span>(<span class="s">"Temp: "</span>);
+  Serial.<span class="p">print</span>(t, <span class="num">1</span>);
+  Serial.<span class="p">print</span>(<span class="s">" C   Humidity: "</span>);
+  Serial.<span class="p">print</span>(h, <span class="num">0</span>);
+  Serial.<span class="p">println</span>(<span class="s">" %"</span>);
+}</pre>
+<pre class="output">Temp: 24.0 C   Humidity: 45 %
+Temp: 24.0 C   Humidity: 46 %
+DHT read failed
+Temp: 24.0 C   Humidity: 46 %</pre>
+  <ul>
+    <li><code>DHT dht(2, DHT11);</code> — 데이터 핀 번호와 센서 종류(<code>DHT11</code>)를 넣어 객체를 만듭니다. DHT22 센서라면 <code>DHT22</code>로 바꾸세요. <code>dht.begin();</code>은 <code>setup()</code>에서 한 번 부릅니다.</li>
+    <li><code>dht.readTemperature()</code>는 섭씨 온도를, <code>dht.readHumidity()</code>는 습도(%)를 <code>float</code>로 돌려줍니다. 화씨는 <code>dht.readTemperature(true)</code>.</li>
+    <li>읽기에 실패하면 <b><code>NaN</code></b>(숫자가 아님)을 돌려주므로 <code>isnan()</code>으로 꼭 검사하세요. 배선이 빠지거나 너무 자주 읽을 때 생깁니다. 검사 없이 <code>NaN</code>을 출력하면 <code>nan</code>이라는 글자가 나옵니다.</li>
+    <li>DHT11은 <b>정수 단위</b>에 가까운 값을 주는 센서라서 습도를 소수점으로 표시해도 의미가 없습니다. 위 코드는 습도를 <code>print(h, 0)</code>으로 정수만 표시했어요.</li>
+  </ul>
+  <p>이제 6-4절의 LCD를 같이 연결해, <b>컴퓨터 없이도 온습도를 보여주는 미니 기상대</b>를 만들어 봅니다. DHT11은 D2, LCD는 A4/A5를 쓰므로 서로 핀이 겹치지 않아요. LCD 배선(GND, 5V, A4, A5)은 6-4절 그대로입니다.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>부품 핀</th><th>연결할 곳</th><th>설명</th></tr>
+    <tr><td>DHT11 모듈 S / VCC / GND</td><td>D2 / 5V / GND</td><td>위의 DHT11 배선 그대로</td></tr>
+    <tr><td>LCD GND / VCC / SDA / SCL</td><td>GND / 5V / A4 / A5</td><td>6-4절 배선 그대로. 5V와 GND는 브레드보드 레일에서 나눠 쓰기</td></tr>
+  </table></div>
+  <figure class="circuit" data-circuit="dht11-lcd" aria-label="DHT11과 I2C LCD 배선 그림: DHT11이 브레드보드 6, 7, 8번 줄에 꽂혀 S는 D2에, VCC와 GND는 위쪽 5V·GND 레일에 연결됩니다. LCD의 GND, VCC는 같은 레일에, SDA는 A4, SCL은 A5에 연결됩니다.">
+<div class="circuit-bar" role="group" aria-label="회로 그림 조작"><button type="button" class="cb cb-play" aria-pressed="false" disabled>▶ 시뮬레이션</button><button type="button" class="cb cb-view" disabled>평면으로 보기</button><button type="button" class="cb cb-steps" disabled>조립 순서 보기</button><div class="circuit-stepper" role="group" aria-label="조립 순서" hidden><button type="button" class="cb cb-prev" aria-label="이전 단계" disabled>◀</button><span class="circuit-progress" role="status" aria-live="polite"></span><button type="button" class="cb cb-next" aria-label="다음 단계" disabled>▶</button><button type="button" class="cb cb-all" disabled>전체 보기</button></div></div>
+<div class="circuit-stage"><div class="circuit-plane" style="--w: 740; --h: 600"></div></div>
+<div class="circuit-ctl"><label class="circuit-range"><span class="circuit-range-label">온도</span><input type="range" min="0" max="50" step="1" value="24" disabled><output class="circuit-range-out">24°C</output></label><label class="circuit-range"><span class="circuit-range-label">습도</span><input type="range" min="20" max="80" step="1" value="45" disabled><output class="circuit-range-out">45%</output></label><div class="circuit-modes"><button type="button" class="cb cb-mode" aria-pressed="false" disabled>읽기 실패 만들기 (NaN)</button></div></div>
+<p class="circuit-status-box"><span class="circuit-status-size" aria-hidden="true">▶ 시뮬레이션을 누른 뒤 슬라이더로 온도·습도를 바꿔 보세요. 2초마다 읽어 LCD와 시리얼에 함께 표시합니다.</span><span class="circuit-status-size" aria-hidden="true">delay(0000) 중… 첫 측정까지 0초</span><span class="circuit-status-size" aria-hidden="true">DHT read failed  (isnan 검사에 걸려 return)</span><span class="circuit-status-size" aria-hidden="true">Serial: 0000 C, 00 %</span><span class="circuit-status">▶ 시뮬레이션을 누른 뒤 슬라이더로 온도·습도를 바꿔 보세요. 2초마다 읽어 LCD와 시리얼에 함께 표시합니다.</span><span class="circuit-failed">그림을 불러오지 못했어요. 새로고침해 보세요.</span></p>
+<div class="circuit-live" role="status" aria-live="polite"></div>
+<figcaption>DHT11(D2)과 I2C LCD(A4, A5)를 함께 연결한 미니 기상대. 5V와 GND는 레일로 공유. <span class="circuit-hint" id="circuit-hint-dht11-lcd">위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.</span></figcaption></figure>
+<pre class="code"><span class="c">// DHT11 온습도를 LCD와 시리얼 모니터에 함께 표시</span>
+<span class="k">#include</span> &lt;Wire.h&gt;
+<span class="k">#include</span> &lt;<span class="k">LiquidCrystal_I2C</span>.h&gt;
+<span class="k">#include</span> &lt;<span class="k">DHT</span>.h&gt;
+
+<span class="k">const</span> <span class="k">int</span> DHT_PIN = <span class="num">2</span>;
+<span class="k">DHT</span> dht(DHT_PIN, <span class="k">DHT11</span>);
+<span class="k">LiquidCrystal_I2C</span> lcd(<span class="num">0x27</span>, <span class="num">16</span>, <span class="num">2</span>);
+
+<span class="k">void</span> <span class="p">setup</span>() {
+  Serial.<span class="p">begin</span>(<span class="num">9600</span>);
+  dht.<span class="p">begin</span>();
+  lcd.<span class="p">init</span>();
+  lcd.<span class="p">backlight</span>();
+}
+
+<span class="k">void</span> <span class="p">loop</span>() {
+  <span class="p">delay</span>(<span class="num">2000</span>);
+
+  <span class="k">float</span> h = dht.<span class="p">readHumidity</span>();
+  <span class="k">float</span> t = dht.<span class="p">readTemperature</span>();
+
+  <span class="k">if</span> (<span class="p">isnan</span>(h) || <span class="p">isnan</span>(t)) {
+    Serial.<span class="p">println</span>(<span class="s">"DHT read failed"</span>);
+    lcd.<span class="p">setCursor</span>(<span class="num">0</span>, <span class="num">0</span>);
+    lcd.<span class="p">print</span>(<span class="s">"Sensor error    "</span>);
+    <span class="k">return</span>;
+  }
+
+  Serial.<span class="p">print</span>(t, <span class="num">1</span>);
+  Serial.<span class="p">print</span>(<span class="s">" C, "</span>);
+  Serial.<span class="p">print</span>(h, <span class="num">0</span>);
+  Serial.<span class="p">println</span>(<span class="s">" %"</span>);
+
+  lcd.<span class="p">setCursor</span>(<span class="num">0</span>, <span class="num">0</span>);
+  lcd.<span class="p">print</span>(<span class="s">"Temp: "</span>);
+  lcd.<span class="p">print</span>(t, <span class="num">1</span>);
+  lcd.<span class="p">print</span>((<span class="k">char</span>)<span class="num">223</span>);        <span class="c">// 도(°) 기호 (LCD 글자 ROM의 223번)</span>
+  lcd.<span class="p">print</span>(<span class="s">"C  "</span>);
+
+  lcd.<span class="p">setCursor</span>(<span class="num">0</span>, <span class="num">1</span>);
+  lcd.<span class="p">print</span>(<span class="s">"Humi: "</span>);
+  lcd.<span class="p">print</span>(h, <span class="num">0</span>);
+  lcd.<span class="p">print</span>(<span class="s">"%    "</span>);
+}</pre>
+<pre class="output">24.0 C, 45 %
+24.0 C, 46 %
+24.0 C, 46 %</pre>
+  <div class="tip"><b>손가락으로 따뜻하게 해 보세요</b>센서에 숨을 불거나 손으로 감싸면 몇 초 뒤에 온도와 습도가 오르는 게 보입니다. DHT11은 반응이 느려서 값이 바로 바뀌지 않아요. 또 <code>(char)223</code>은 LCD 글자표에 들어 있는 도(°) 기호를 찍는 코드입니다.</div>
+
+  <h3 id="mod-joy"><span class="num">6-6</span>조이스틱 모듈</h3>
+  <p>조이스틱 모듈(KY-023 등)은 사실 <b>가변저항 두 개(X축, Y축)와 버튼 하나</b>를 합친 부품입니다. 4장의 가변저항과 원리가 같아요. 스틱을 움직이면 각 축의 가운데 핀 전압이 0~5V 사이에서 변하고, 스틱을 누르면 버튼이 눌립니다.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>조이스틱 핀</th><th>연결할 곳</th><th>설명</th></tr>
+    <tr><td>GND</td><td>아두이노 <b>GND</b></td><td>접지</td></tr>
+    <tr><td>+5V (또는 VCC)</td><td>아두이노 <b>5V</b></td><td>전원</td></tr>
+    <tr><td>VRx</td><td>아두이노 <b>A0</b></td><td>좌우(X축) 값</td></tr>
+    <tr><td>VRy</td><td>아두이노 <b>A1</b></td><td>상하(Y축) 값</td></tr>
+    <tr><td>SW</td><td>아두이노 <b>D7</b></td><td>스틱을 누르는 버튼. <code>INPUT_PULLUP</code>으로 읽음</td></tr>
+  </table></div>
+  <figure class="circuit" data-circuit="joystick" aria-label="조이스틱 모듈 배선 그림: GND는 GND, +5V는 5V, VRx는 A0, VRy는 A1, SW는 D7에 연결됩니다.">
+<div class="circuit-bar" role="group" aria-label="회로 그림 조작"><button type="button" class="cb cb-play" aria-pressed="false" disabled>▶ 시뮬레이션</button><button type="button" class="cb cb-view" disabled>평면으로 보기</button><button type="button" class="cb cb-steps" disabled>조립 순서 보기</button><div class="circuit-stepper" role="group" aria-label="조립 순서" hidden><button type="button" class="cb cb-prev" aria-label="이전 단계" disabled>◀</button><span class="circuit-progress" role="status" aria-live="polite"></span><button type="button" class="cb cb-next" aria-label="다음 단계" disabled>▶</button><button type="button" class="cb cb-all" disabled>전체 보기</button></div></div>
+<div class="circuit-stage"><div class="circuit-plane" style="--w: 500; --h: 500"></div></div>
+<div class="circuit-ctl"><label class="circuit-range"><span class="circuit-range-label">X축 (A0)</span><input type="range" min="0" max="1023" step="1" value="512" disabled><output class="circuit-range-out">512</output></label><label class="circuit-range"><span class="circuit-range-label">Y축 (A1)</span><input type="range" min="0" max="1023" step="1" value="512" disabled><output class="circuit-range-out">512</output></label><div class="circuit-modes"><button type="button" class="cb cb-mode" aria-pressed="false" disabled>스틱 누르기 (SW)</button></div></div>
+<p class="circuit-status-box"><span class="circuit-status-size" aria-hidden="true">▶ 시뮬레이션을 누른 뒤 그림 속 스틱을 끌거나 슬라이더를 움직여 보세요. 스틱 누르기 버튼은 SW(D7)입니다.</span><span class="circuit-status-size" aria-hidden="true">X=000 Y=0000 vx=0000 SW=- -&gt; LEFT</span><span class="circuit-status-size" aria-hidden="true">X=000 Y=0000 vx=0000 SW=PRESSED -&gt; LEFT</span><span class="circuit-status-size" aria-hidden="true">X=000 Y=000 vx=000 SW=- -&gt; UP</span><span class="circuit-status-size" aria-hidden="true">X=000 Y=000 vx=000 SW=PRESSED -&gt; UP</span><span class="circuit-status-size" aria-hidden="true">X=000 Y=000 vx=000 SW=- -&gt; CENTER</span><span class="circuit-status-size" aria-hidden="true">X=000 Y=000 vx=000 SW=PRESSED -&gt; CENTER</span><span class="circuit-status-size" aria-hidden="true">X=000 Y=0000 vx=000 SW=- -&gt; DOWN</span><span class="circuit-status-size" aria-hidden="true">X=000 Y=0000 vx=000 SW=PRESSED -&gt; DOWN</span><span class="circuit-status-size" aria-hidden="true">X=0000 Y=0000 vx=000 SW=- -&gt; RIGHT</span><span class="circuit-status-size" aria-hidden="true">X=0000 Y=0000 vx=000 SW=PRESSED -&gt; RIGHT</span><span class="circuit-status">▶ 시뮬레이션을 누른 뒤 그림 속 스틱을 끌거나 슬라이더를 움직여 보세요. 스틱 누르기 버튼은 SW(D7)입니다.</span><span class="circuit-failed">그림을 불러오지 못했어요. 새로고침해 보세요.</span></p>
+<div class="circuit-live" role="status" aria-live="polite"></div>
+<figcaption>조이스틱의 VRx는 A0, VRy는 A1, SW는 D7. 전원은 5V와 GND. <span class="circuit-hint" id="circuit-hint-joystick">위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.</span></figcaption></figure>
+<pre class="code"><span class="c">// 조이스틱 모듈: 방향과 버튼 읽기</span>
+<span class="k">const</span> <span class="k">int</span> X_PIN = <span class="k">A0</span>;
+<span class="k">const</span> <span class="k">int</span> Y_PIN = <span class="k">A1</span>;
+<span class="k">const</span> <span class="k">int</span> SW_PIN = <span class="num">7</span>;
+
+<span class="k">void</span> <span class="p">setup</span>() {
+  <span class="p">pinMode</span>(SW_PIN, <span class="k">INPUT_PULLUP</span>);   <span class="c">// 버튼: 누르면 LOW</span>
+  Serial.<span class="p">begin</span>(<span class="num">9600</span>);
+}
+
+<span class="k">void</span> <span class="p">loop</span>() {
+  <span class="k">int</span> x = <span class="p">analogRead</span>(X_PIN);       <span class="c">// 가운데쯤 512</span>
+  <span class="k">int</span> y = <span class="p">analogRead</span>(Y_PIN);
+  <span class="k">bool</span> pressed = (<span class="p">digitalRead</span>(SW_PIN) == <span class="k">LOW</span>);
+
+  <span class="k">const</span> <span class="k">char</span>* dir = <span class="s">"CENTER"</span>;
+  <span class="k">if</span> (x &lt; <span class="num">300</span>) {
+    dir = <span class="s">"LEFT"</span>;
+  } <span class="k">else</span> <span class="k">if</span> (x &gt; <span class="num">700</span>) {
+    dir = <span class="s">"RIGHT"</span>;
+  } <span class="k">else</span> <span class="k">if</span> (y &lt; <span class="num">300</span>) {
+    dir = <span class="s">"UP"</span>;
+  } <span class="k">else</span> <span class="k">if</span> (y &gt; <span class="num">700</span>) {
+    dir = <span class="s">"DOWN"</span>;
+  }
+
+  <span class="k">int</span> vx = <span class="p">map</span>(x, <span class="num">0</span>, <span class="num">1023</span>, -<span class="num">100</span>, <span class="num">100</span>);   <span class="c">// -100 ~ +100 으로 바꿔 보기</span>
+
+  Serial.<span class="p">print</span>(<span class="s">"X="</span>);
+  Serial.<span class="p">print</span>(x);
+  Serial.<span class="p">print</span>(<span class="s">" Y="</span>);
+  Serial.<span class="p">print</span>(y);
+  Serial.<span class="p">print</span>(<span class="s">" vx="</span>);
+  Serial.<span class="p">print</span>(vx);
+  Serial.<span class="p">print</span>(<span class="s">" SW="</span>);
+  Serial.<span class="p">print</span>(pressed ? <span class="s">"PRESSED"</span> : <span class="s">"-"</span>);
+  Serial.<span class="p">print</span>(<span class="s">" -&gt; "</span>);
+  Serial.<span class="p">println</span>(dir);
+  <span class="p">delay</span>(<span class="num">150</span>);
+}</pre>
+<pre class="output">X=512 Y=509 vx=0 SW=- -> CENTER
+X=118 Y=511 vx=-77 SW=- -> LEFT
+X=1023 Y=508 vx=100 SW=- -> RIGHT
+X=514 Y=14 vx=0 SW=- -> UP
+X=513 Y=510 vx=0 SW=PRESSED -> CENTER</pre>
+  <ul>
+    <li>스틱을 놓았을 때 값은 <b>약 512</b>(0~1023의 가운데)이지만 모듈마다 ±수십 정도 다릅니다. 그래서 "정확히 512일 때만 중앙"이라고 하지 않고, <b>300 이하는 한쪽, 700 이상은 반대쪽</b>처럼 여유 있는 범위(<b>데드존</b>)로 판단합니다.</li>
+    <li>SW 버튼은 2장과 같아요. <code>INPUT_PULLUP</code>이므로 <b>누르면 LOW</b>입니다. 방향과 버튼은 따로 읽습니다.</li>
+    <li><code>map(x, 0, 1023, -100, 100)</code>은 값을 -100(왼쪽 끝)~+100(오른쪽 끝)으로 바꿔 줍니다. 가운데는 대략 0이에요. 이렇게 하면 모터 속도나 서보 각도에 쓰기 편합니다.</li>
+  </ul>
+  <div class="tip"><b>위/아래, 좌/우가 반대로 나와요</b>모듈을 놓는 방향이나 제품에 따라 UP과 DOWN, LEFT와 RIGHT가 뒤바뀌어 나올 수 있습니다. 고장이 아니에요. 코드의 <code>"LEFT"</code>와 <code>"RIGHT"</code>(또는 UP과 DOWN)를 서로 바꿔 쓰거나, 모듈을 돌려 놓으면 됩니다.</div>
+
+  <h3 id="mod-motor"><span class="num">6-7</span>DC 모터는 핀에 바로 연결하면 안 된다</h3>
+  <p>5장의 서보 모터는 아두이노 5V에 연결해도 괜찮았지만, 일반 <b>DC 모터</b>(장난감 자동차나 선풍기에 들어 있는 모터)는 <b>아두이노 핀에 직접 연결하면 안 됩니다.</b> 이유는 세 가지예요.</p>
+  <ul>
+    <li><b>전류가 너무 큽니다.</b> UNO의 핀 하나는 <b>최대 40mA</b>까지만 견디고(절대 한계), 안전하게 쓰려면 <b>약 20mA 이하</b>여야 합니다. 작은 DC 모터도 돌 때 <b>100~300mA</b>를 쓰고, 멈춰 버리면(<b>스톨</b>) 수백 mA~1A 이상이 흘러요. 핀이 바로 망가집니다.</li>
+    <li><b>역전압이 생깁니다.</b> 모터는 코일이라, 전원을 끊는 순간 반대 방향으로 높은 전압(<b>역기전력</b>)이 튀어나와 아두이노 칩을 상하게 할 수 있습니다.</li>
+    <li><b>전원이 부족합니다.</b> USB 전원은 약 500mA이고 칩 전체로도 합계 한도(약 200mA)가 있어서, 모터를 아두이노 5V로 돌리면 보드가 갑자기 리셋되거나 PC가 USB를 끊어 버릴 수 있어요.</li>
+  </ul>
+  <p>해결책은 <b>모터 드라이버</b>입니다. 아두이노는 작은 신호만 보내고, 큰 전류는 드라이버가 <b>별도 전원(건전지)</b>에서 끌어와 모터에 공급합니다. 이 글에서는 작고 저렴한 <b>L9110S 모터 드라이버 모듈</b>을 씁니다. 모터 두 개(A, B)를 제어할 수 있고, 이 절에서는 A 채널 하나만 씁니다. (키트에 L298N 모듈이 있다면 다른 부품이라 핀 이름이 다르니, 이 글은 L9110S 기준으로 따라 하세요.)</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>드라이버 핀</th><th>연결할 곳</th><th>설명</th></tr>
+    <tr><td>VCC</td><td><b>건전지 팩 (+)</b> (AA 4개, 약 6V)</td><td>모터용 <b>외부 전원</b>. 아두이노 5V에 연결하지 않기</td></tr>
+    <tr><td>GND</td><td><b>건전지 팩 (−)</b> 와 아두이노 <b>GND</b> 둘 다</td><td><b>공통 접지</b>. 브레드보드 GND 레일에 같이 꽂기</td></tr>
+    <tr><td>A-IA</td><td>아두이노 <b>D5</b></td><td>방향/속도 신호 1 (PWM)</td></tr>
+    <tr><td>A-IB</td><td>아두이노 <b>D6</b></td><td>방향/속도 신호 2 (PWM)</td></tr>
+    <tr><td>MOTOR-A 단자 2개</td><td>DC 모터의 두 선</td><td>극성 없음. 반대로 돌면 두 선을 서로 바꾸기</td></tr>
+  </table></div>
+  <figure class="circuit" data-circuit="dc-motor" aria-label="DC 모터 드라이버 배선 그림: 건전지 팩의 (+)는 L9110S 드라이버 VCC에, 건전지 (−)와 드라이버 GND와 아두이노 GND는 모두 브레드보드 GND 레일에 연결됩니다. D5는 A-IA, D6은 A-IB에, 모터의 두 선은 MOTOR-A 단자에 연결됩니다.">
+<div class="circuit-bar" role="group" aria-label="회로 그림 조작"><button type="button" class="cb cb-play" aria-pressed="false" disabled>▶ 시뮬레이션</button><button type="button" class="cb cb-view" disabled>평면으로 보기</button><button type="button" class="cb cb-steps" disabled>조립 순서 보기</button><div class="circuit-stepper" role="group" aria-label="조립 순서" hidden><button type="button" class="cb cb-prev" aria-label="이전 단계" disabled>◀</button><span class="circuit-progress" role="status" aria-live="polite"></span><button type="button" class="cb cb-next" aria-label="다음 단계" disabled>▶</button><button type="button" class="cb cb-all" disabled>전체 보기</button></div></div>
+<div class="circuit-stage"><div class="circuit-plane" style="--w: 660; --h: 800"></div></div>
+<div class="circuit-ctl"><label class="circuit-range"><span class="circuit-range-label">속도 setMotor(speed)</span><input type="range" min="-255" max="255" step="1" value="0" disabled><output class="circuit-range-out">0</output></label><div class="circuit-modes"><button type="button" class="cb cb-mode" aria-pressed="false" disabled>loop() 스케치 재생</button></div></div>
+<p class="circuit-status-box"><span class="circuit-status-size" aria-hidden="true">▶ 시뮬레이션을 누른 뒤 슬라이더로 setMotor 속도(−255~255)를 바꾸거나, 스케치의 loop()를 재생해 보세요.</span><span class="circuit-status-size" aria-hidden="true">setMotor(0000) → analogWrite(0, 0) · analogWrite(0, 000) : 역방향, 속도 000%</span><span class="circuit-status-size" aria-hidden="true">setMotor(000) → analogWrite(0, 00) · analogWrite(0, 00) : PWM 00는 너무 낮아 웅 소리만 나고 돌지 않음</span><span class="circuit-status-size" aria-hidden="true">setMotor(0) → analogWrite(0, 0) · analogWrite(0, 0) : 정지</span><span class="circuit-status-size" aria-hidden="true">setMotor(000) → analogWrite(0, 000) · analogWrite(0, 0) : 정방향, 속도 000%</span><span class="circuit-status">▶ 시뮬레이션을 누른 뒤 슬라이더로 setMotor 속도(−255~255)를 바꾸거나, 스케치의 loop()를 재생해 보세요.</span><span class="circuit-failed">그림을 불러오지 못했어요. 새로고침해 보세요.</span></p>
+<div class="circuit-live" role="status" aria-live="polite"></div>
+<figcaption>건전지 팩이 드라이버 VCC로 모터 전원을 공급하고, 건전지 GND와 아두이노 GND를 연결. D5와 D6이 A-IA, A-IB로. <span class="circuit-hint" id="circuit-hint-dc-motor">위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.</span></figcaption></figure>
+  <p>제어 방식은 간단해요. 두 신호 핀 <b>A-IA, A-IB 중 어느 쪽에 PWM을 주느냐</b>가 방향이고, PWM 값(0~255)이 속도입니다.</p>
+  <div class="table-wrap"><table class="ref">
+    <tr><th>A-IA (D5)</th><th>A-IB (D6)</th><th>동작</th></tr>
+    <tr><td>PWM (0~255)</td><td>LOW(0)</td><td>정방향, 속도 = PWM 값</td></tr>
+    <tr><td>LOW(0)</td><td>PWM (0~255)</td><td>역방향, 속도 = PWM 값</td></tr>
+    <tr><td>LOW</td><td>LOW</td><td>정지 (모터가 힘을 빼고 자연스럽게 멈춤)</td></tr>
+  </table></div>
+  <p>두 핀을 동시에 HIGH로 두는 조합은 모듈마다 동작이 달라서 쓰지 않는 것이 안전합니다. 5번과 6번은 PWM 핀(<code>~</code>)이고, 서보(9, 10번)와 <code>tone()</code>(3, 11번)에 영향받지 않는 핀이에요.</p>
+<pre class="code"><span class="c">// L9110S 모터 드라이버로 DC 모터 속도·방향 제어</span>
+<span class="k">const</span> <span class="k">int</span> A_IA = <span class="num">5</span>;   <span class="c">// PWM 핀</span>
+<span class="k">const</span> <span class="k">int</span> A_IB = <span class="num">6</span>;   <span class="c">// PWM 핀</span>
+
+<span class="c">// speed: -255(최대 역방향) ~ 0(정지) ~ +255(최대 정방향)</span>
+<span class="k">void</span> <span class="p">setMotor</span>(<span class="k">int</span> speed) {
+  speed = <span class="p">constrain</span>(speed, -<span class="num">255</span>, <span class="num">255</span>);
+  <span class="k">if</span> (speed &gt;= <span class="num">0</span>) {
+    <span class="p">analogWrite</span>(A_IA, speed);
+    <span class="p">analogWrite</span>(A_IB, <span class="num">0</span>);
+  } <span class="k">else</span> {
+    <span class="p">analogWrite</span>(A_IA, <span class="num">0</span>);
+    <span class="p">analogWrite</span>(A_IB, -speed);
+  }
+}
+
+<span class="k">void</span> <span class="p">setup</span>() {
+  <span class="p">pinMode</span>(A_IA, <span class="k">OUTPUT</span>);
+  <span class="p">pinMode</span>(A_IB, <span class="k">OUTPUT</span>);
+  <span class="p">setMotor</span>(<span class="num">0</span>);
+}
+
+<span class="k">void</span> <span class="p">loop</span>() {
+  <span class="k">for</span> (<span class="k">int</span> s = <span class="num">0</span>; s &lt;= <span class="num">255</span>; s += <span class="num">5</span>) {    <span class="c">// 서서히 빨라지기 (정방향)</span>
+    <span class="p">setMotor</span>(s);
+    <span class="p">delay</span>(<span class="num">40</span>);
+  }
+  <span class="p">delay</span>(<span class="num">1000</span>);
+  <span class="p">setMotor</span>(<span class="num">0</span>);                           <span class="c">// 방향을 바꾸기 전에 먼저 멈추기</span>
+  <span class="p">delay</span>(<span class="num">800</span>);
+
+  <span class="k">for</span> (<span class="k">int</span> s = <span class="num">0</span>; s &gt;= -<span class="num">255</span>; s -= <span class="num">5</span>) {   <span class="c">// 서서히 빨라지기 (역방향)</span>
+    <span class="p">setMotor</span>(s);
+    <span class="p">delay</span>(<span class="num">40</span>);
+  }
+  <span class="p">delay</span>(<span class="num">1000</span>);
+  <span class="p">setMotor</span>(<span class="num">0</span>);
+  <span class="p">delay</span>(<span class="num">2000</span>);
+}</pre>
+  <ul>
+    <li><code>setMotor(speed)</code>는 부호로 방향을, 크기로 속도를 정합니다. <code>constrain()</code>은 값이 -255~255를 벗어나지 않게 막아 줘요. <code>analogWrite(핀, 0)</code>은 그 핀을 LOW로 유지합니다.</li>
+    <li>작은 DC 모터는 PWM 값이 너무 낮으면(대략 60~100 이하) 힘이 부족해 <b>웅 소리만 나고 돌지 않습니다.</b> 이상하게 느려 보이는 게 아니라 정상이에요.</li>
+    <li>정방향에서 역방향으로 갈 때는 위 코드처럼 <b>먼저 멈췄다가</b> 바꾸세요. 달리다가 바로 반대로 돌리면 큰 전류가 흘러 드라이버와 건전지에 무리가 갑니다.</li>
+    <li>건전지는 드라이버 데이터시트 범위(L9110S는 약 2.5~12V) 안이면 됩니다. 모터의 정격 전압(3~6V 등)을 넘지 않는 팩을 고르세요. 새 알카라인 건전지 4개는 6.4V까지 나올 수 있어요.</li>
+    <li>L9110S 모듈은 제조사마다 핀 순서와 이름이 조금씩 다를 수 있습니다. 위 표의 순서가 아니라 <b>기판에 인쇄된 글자(VCC, GND, A-IA, A-IB 등)</b>를 보고 연결하세요.</li>
+  </ul>
+  <div class="warn"><b>안전 수칙 - 모터는 반드시 이 순서와 규칙으로</b>① <b>모터 + 드라이버를 아두이노 핀에 직접 연결 금지.</b> 모터 전원선은 드라이버를 통해서만 연결합니다. ② <b>모터 전원은 건전지 팩 같은 외부 전원</b>으로, 아두이노 5V 핀에서 가져오지 마세요. ③ 외부 전원의 <b>GND와 아두이노 GND는 반드시 연결(공통 접지)</b>하세요. 빠지면 신호 기준이 달라 모터가 제멋대로 움직이거나 아무 반응이 없습니다. ④ 배선은 <b>건전지를 빼고 USB도 뽑은 상태</b>에서 하고, 건전지 (+)와 (−)가 닿지 않게 주의하세요(단락되면 선이 뜨거워지고 건전지가 위험합니다). ⑤ 모터가 돌 때 <b>회전축과 날개에 손, 머리카락, 선이 닿지 않게</b> 하세요. ⑥ 모터가 막혀서 안 돌아가는데 계속 전원을 주면 모터와 드라이버가 뜨거워집니다. 바로 전원을 끄세요. ⑦ 리튬 폴리머(LiPo) 등 고용량 전지는 쓰지 말고 건전지로만 연습하세요.</div>
+
+  <div class="quiz">
+    <h4>✅ 확인 문제</h4>
+    <details><summary>Q1. CDS 조도 센서를 아두이노 A0에 바로 연결하지 않고 10kΩ 저항과 함께 분압 회로로 만드는 이유는?</summary><span class="ans">아날로그 핀은 저항이 아니라 전압을 읽기 때문입니다.</span> CDS는 밝기에 따라 저항이 변하는 부품이라서, 고정 저항과 직렬로 연결해 "저항의 변화"를 "A0 전압의 변화"로 바꿔 줘야 합니다.</details>
+    <details><summary>Q2. UNO에서 I2C 통신에 쓰는 SDA와 SCL은 각각 몇 번 핀이고, LCD가 안 나올 때 가장 먼저 확인할 두 가지는?</summary><span class="ans">SDA = A4, SCL = A5. 확인할 것은 I2C 주소(0x27 또는 0x3F)와 백팩의 콘트라스트 가변저항입니다.</span> 주소는 I2C 스캐너 스케치로 찾을 수 있습니다.</details>
+    <details><summary>Q3. DHT11을 읽을 때 <code>isnan()</code> 검사가 필요한 이유와, 읽는 간격은 어떻게 해야 할까요?</summary><span class="ans">읽기에 실패하면 NaN을 돌려주기 때문이고, 간격은 최소 1초 이상(안전하게 2초)으로 둡니다.</span> 너무 자주 읽거나 배선이 빠지면 실패하며, 검사하지 않으면 nan 같은 이상한 값이 나옵니다.</details>
+    <details><summary>Q4. 공통 캐소드 RGB LED에서 R 핀에 255, G 핀에 255, B 핀에 0을 주면 어떤 색일까요? 공통 애노드 제품이라면 코드를 어떻게 바꿔야 할까요?</summary><span class="ans">노랑(빨강 + 초록). 공통 애노드는 값을 반대로(255 - 값) 줘야 합니다.</span> 공통 애노드는 공통 다리가 5V라서 색 핀이 LOW일 때 켜지기 때문입니다.</details>
+    <details><summary>Q5. DC 모터를 아두이노 핀에 직접 연결하면 안 되는 대표 이유 두 가지와, 모터 드라이버를 쓸 때 꼭 연결해야 하는 선은?</summary><span class="ans">핀 허용 전류(권장 약 20mA, 절대 최대 40mA)보다 모터 전류가 훨씬 크고, 모터가 만드는 역전압이 칩을 상하게 하기 때문입니다. 외부 전원의 GND와 아두이노 GND를 연결(공통 접지)해야 합니다.</span> 모터 전원은 건전지 팩 등 외부 전원에서 드라이버로 공급합니다.</details>
+  </div>
+  <div class="tip"><b>🧩 6장 미니 과제</b>조이스틱의 X축 값을 <code>map()</code>으로 -255~255로 바꿔서 <code>setMotor()</code>에 넣으면 스틱으로 DC 모터의 속도와 방향을 조종할 수 있어요. 가운데 근처(±30)는 데드존으로 정지시키는 것도 잊지 마세요. (힌트: 조이스틱 A0, 모터 D5/D6 - 핀이 겹치지 않습니다.)</div>
+
+  <label class="done-check"><input type="checkbox" data-done="modules"> 6장 완료!</label>
+</section>
+
+<!-- =============================== 7. 종합 실습 =============================== -->
 <section class="part" id="project" data-part="project">
-  <h2>6. 실습: 거리 경보기</h2>
+  <h2>7. 실습: 거리 경보기</h2>
   <p class="lead">자동차 후방 경보처럼, 물체가 가까워질수록 부저가 더 빨리 "삐삐삐" 울리고 LED가 함께 깜빡이는 장치를 만듭니다. 지금까지 배운 내용이 거의 다 들어가요.</p>
 
-  <h3 id="project-wire"><span class="num">6-1</span>무엇을 만드나, 그리고 배선</h3>
+  <h3 id="project-wire"><span class="num">7-1</span>무엇을 만드나, 그리고 배선</h3>
   <p>동작 규칙은 세 구간입니다.</p>
   <div class="table-wrap"><table class="ref">
     <tr><th>거리</th><th>동작</th></tr>
@@ -923,9 +1535,17 @@ out of range
     <tr><td>LED <b>긴 다리(+)</b></td><td>220Ω 저항 → 아두이노 <b>D4</b></td><td>경고 표시등. 저항은 필수!</td></tr>
     <tr><td>LED <b>짧은 다리(−)</b></td><td>GND</td><td>접지</td></tr>
   </table></div>
+<figure class="circuit" data-circuit="alarm" aria-label="거리 경보기 배선 그림: 아두이노 5V와 GND는 브레드보드 위쪽 레일에 연결되고, HC-SR04의 VCC와 GND도 같은 레일에 꽂힙니다. Trig는 D7, Echo는 D6에 연결됩니다. 부저 +는 D8, 부저 −는 GND 레일입니다. LED는 D4에서 220옴 저항을 거쳐 긴 다리(+)에 연결되고 짧은 다리(−)는 GND 레일에 연결됩니다.">
+<div class="circuit-bar" role="group" aria-label="회로 그림 조작"><button type="button" class="cb cb-play" aria-pressed="false" disabled>▶ 시뮬레이션</button><button type="button" class="cb cb-view" disabled>평면으로 보기</button><button type="button" class="cb cb-steps" disabled>조립 순서 보기</button><div class="circuit-stepper" role="group" aria-label="조립 순서" hidden><button type="button" class="cb cb-prev" aria-label="이전 단계" disabled>◀</button><span class="circuit-progress" role="status" aria-live="polite"></span><button type="button" class="cb cb-next" aria-label="다음 단계" disabled>▶</button><button type="button" class="cb cb-all" disabled>전체 보기</button></div></div>
+<div class="circuit-stage"><div class="circuit-plane" style="--w: 740; --h: 600"></div></div>
+<div class="circuit-ctl"><label class="circuit-range"><span class="circuit-range-label">물체까지 거리</span><input type="range" min="2" max="200" step="1" value="60" disabled><output class="circuit-range-out">60cm</output></label></div>
+<p class="circuit-status-box"><span class="circuit-status-size" aria-hidden="true">▶ 시뮬레이션을 누른 뒤 슬라이더로 물체의 거리를 바꿔 보세요. 최종 스케치와 같은 구간·간격으로 동작합니다.</span><span class="circuit-status-size" aria-hidden="true">거리 00cm: 00cm 이내 → 경보! 부저가 계속 울리고 LED가 켜짐</span><span class="circuit-status-size" aria-hidden="true">거리 000cm: 삑 간격 000ms (map(000, 00, 000, 00, 000))</span><span class="circuit-status-size" aria-hidden="true">거리 000cm: 000cm보다 멀다 → 조용 (부저·LED 꺼짐)</span><span class="circuit-status">▶ 시뮬레이션을 누른 뒤 슬라이더로 물체의 거리를 바꿔 보세요. 최종 스케치와 같은 구간·간격으로 동작합니다.</span><span class="circuit-failed">그림을 불러오지 못했어요. 새로고침해 보세요.</span></p>
+<div class="circuit-live" role="status" aria-live="polite"></div>
+<figcaption>5V와 GND를 위쪽 레일에 모아 두고 센서·부저·LED가 나눠 씁니다. 슬라이더로 물체 거리를 바꾸면 최종 스케치와 같은 구간(조용 / 삑삑 / 경보)으로 동작해요. <span class="circuit-hint" id="circuit-hint-alarm">위 표의 줄에 마우스를 올리거나 포커스하면 그림에서 해당 선과 부품이 강조됩니다. 키보드는 Tab으로 표에 들어가 위·아래 방향키로 줄을 옮깁니다.</span></figcaption>
+</figure>
   <div class="note"><b>GND는 모두 하나로 모여요</b>UNO의 GND 핀은 여러 개지만 모두 같은 접지입니다. 아두이노 GND를 브레드보드 GND 레일에 한 줄로 이어 두고 부저, LED, 센서의 GND를 모두 그 레일에 꽂으세요. 5V도 마찬가지로 5V 레일 하나에서 나눠 씁니다.</div>
 
-  <h3 id="project-step"><span class="num">6-2</span>단계별로 쌓아 올리기</h3>
+  <h3 id="project-step"><span class="num">7-2</span>단계별로 쌓아 올리기</h3>
   <p>한 번에 다 만들면 어디가 문제인지 찾기 어렵습니다. <b>작은 동작 하나를 확인하고 → 다음 부품을 더하는</b> 순서로 갑니다. 이것이 하드웨어 프로젝트의 가장 좋은 습관이에요.</p>
   <p><b>1단계. 센서만 확인하기.</b> 위 배선 중 HC-SR04만 연결하고 5장의 거리 측정 스케치(<code>readDistanceCm</code>)를 그대로 올립니다. 시리얼 모니터에서 손을 가까이/멀리 했을 때 숫자가 변하면 통과. 값이 계속 <code>out of range</code>면 배선(Trig·Echo가 바뀌지 않았는지)을 먼저 확인하세요.</p>
   <p><b>2단계. 문턱값으로 부저 울리기.</b> 부저를 연결하고, 20cm 안으로 들어오면 울리는 가장 단순한 규칙부터 만듭니다.</p>
@@ -970,7 +1590,7 @@ out of range
   </ul>
   <p><b>3단계. 거리에 따라 간격 바꾸기 + LED.</b> 소리 간격을 거리에 비례하게 하려면 4장에서 배운 <code>map()</code>을 씁니다. 거리 10~100cm를 간격 80~800ms로 바꾸는 거예요. 그리고 "마지막으로 삑 한 시각"을 <code>millis()</code>로 기록해 두고, 그 뒤로 간격이 지났을 때만 다음 삑을 합니다(2장의 millis 패턴!). <code>delay(간격)</code>로 쉬면 쉬는 동안 거리를 못 재서 반응이 느려지기 때문이에요.</p>
 
-  <h3 id="project-final"><span class="num">6-3</span>완성 코드</h3>
+  <h3 id="project-final"><span class="num">7-3</span>완성 코드</h3>
   <p>LED를 연결하고 아래 최종 코드를 올립니다. 시리얼 모니터로 거리가 찍히는 것도 확인하세요.</p>
 <pre class="code"><span class="c">// 거리 경보기: 가까울수록 빨리 삐삐</span>
 <span class="k">const</span> <span class="k">int</span> TRIG_PIN   = <span class="num">7</span>;
@@ -1044,13 +1664,13 @@ out of range
   </ul>
   <div class="tip"><b>동작이 어색할 때</b>손을 대도 안 울리면 시리얼 모니터의 거리 값부터 보세요. 값이 -1.0만 나오면 센서 배선, 값은 잘 나오는데 소리가 안 나면 부저 쪽(핀 번호, 패시브/액티브 종류, 극성)이 원인입니다. 센서 문제인지 출력 문제인지 <b>나눠서 확인</b>하는 게 요령이에요.</div>
 
-  <h3 id="project-challenge"><span class="num">6-4</span>🚀 도전 과제</h3>
+  <h3 id="project-challenge"><span class="num">7-4</span>🚀 도전 과제</h3>
   <p>완성 코드를 고쳐서 기능을 추가해 보세요. 막히면 힌트를 열어보세요.</p>
   <details><summary>도전 1. 가까울수록 음도 높아지게 하기</summary>삑 소리의 주파수도 <code>map</code>으로 거리에 연결합니다. 가까울수록 큰 값이 되도록 출력 범위의 순서를 거꾸로 씁니다. 중간 구간의 <code>tone</code> 줄을 이렇게 바꿔 보세요.
 <pre class="code"><span class="k">long</span> freq = <span class="p">map</span>((<span class="k">long</span>)cm, NEAR_CM, FAR_CM, <span class="num">2000</span>, <span class="num">500</span>);   <span class="c">// 가까우면 2000Hz, 멀면 500Hz</span>
 <span class="p">tone</span>(BUZZER_PIN, freq, BEEP_MS);</pre></details>
   <details><summary>도전 2. 버튼으로 경보기 켜고 끄기</summary>2장의 토글 버튼을 추가합니다(D2 + GND, <code>INPUT_PULLUP</code>). 켜짐 상태를 저장하는 변수 <code>bool armed</code>를 두고, 버튼이 눌릴 때마다 뒤집은 뒤 <code>loop()</code> 맨 앞에서 <code>if (!armed) { noTone(BUZZER_PIN); digitalWrite(LED_PIN, LOW); delay(60); return; }</code>로 꺼진 상태를 처리하면 됩니다. 디바운스는 2장 millis 버전을 재사용하세요.</details>
-  <details><summary>도전 3. 서보를 달아 레이더 만들기</summary>서보 위에 센서를 붙이고(테이프로 충분), 서보를 0~180도로 10도씩 돌리며 각도마다 거리를 시리얼에 찍습니다. 서보는 D9, 부저는 D8이라 서로 방해하지 않아요(Servo는 타이머1, tone은 타이머2를 사용). 서보와 센서가 함께 있으면 전류가 커지니 보드가 리셋되면 7장의 안전 수칙을 보세요.
+  <details><summary>도전 3. 서보를 달아 레이더 만들기</summary>서보 위에 센서를 붙이고(테이프로 충분), 서보를 0~180도로 10도씩 돌리며 각도마다 거리를 시리얼에 찍습니다. 서보는 D9, 부저는 D8이라 서로 방해하지 않아요(Servo는 타이머1, tone은 타이머2를 사용). 서보와 센서가 함께 있으면 전류가 커지니 보드가 리셋되면 8장의 안전 수칙을 보세요.
 <pre class="code"><span class="k">for</span> (<span class="k">int</span> angle = <span class="num">0</span>; angle &lt;= <span class="num">180</span>; angle += <span class="num">10</span>) {
   myServo.<span class="p">write</span>(angle);
   <span class="p">delay</span>(<span class="num">300</span>);                       <span class="c">// 서보가 도착할 시간</span>
@@ -1080,12 +1700,12 @@ out of range
     <details><summary>Q4. 소리는 나는데 LED만 안 켜진다면 어디부터 확인할까요?</summary><span class="ans">LED 극성, 저항 연결, D4 선, LED_PIN 상수 값</span> — 출력 부분만 따로 보면 됩니다.</details>
   </div>
 
-  <label class="done-check"><input type="checkbox" data-done="project"> 6장 완료!</label>
+  <label class="done-check"><input type="checkbox" data-done="project"> 7장 완료!</label>
 </section>
 
-<!-- =============================== 7. 막힐 때 · 다음 단계 =============================== -->
+<!-- =============================== 8. 막힐 때 · 다음 단계 =============================== -->
 <section class="part" id="next">
-  <h2>7. 막힐 때 · 다음 단계</h2>
+  <h2>8. 막힐 때 · 다음 단계</h2>
 
   <h3 id="next-trouble">증상별 체크리스트</h3>
   <div class="table-wrap"><table class="ref">
@@ -1132,9 +1752,10 @@ out of range
 
   <h3>다음에 배우면 좋은 것</h3>
   <ol>
-    <li><b>LCD · OLED 화면 (I2C)</b> — 시리얼 모니터 대신 보드에 직접 글자와 그래프를 표시. 라이브러리 설치법도 함께 익힙니다.</li>
-    <li><b>온습도·조도·가스 센서</b> — DHT11, 포토레지스터 등. 이 글의 analogRead/digitalRead 패턴 그대로예요.</li>
-    <li><b>모터 드라이버 (L298N 등)와 DC 모터</b> — 바퀴 달린 자동차 만들기.</li>
+    <li><b>6장에서 다룬 부품을 응용해 보기</b> — 조이스틱으로 모터 조종하기, 온습도를 LCD에 표시하기, 어두워지면 RGB LED 색 바꾸기처럼 부품을 두세 개씩 섞어 보세요.</li>
+    <li><b>OLED 화면 (SSD1306, I2C)</b> — 글자뿐 아니라 그래프와 그림까지 그릴 수 있어요. 6장의 I2C 주소 찾기와 라이브러리 설치법을 그대로 씁니다.</li>
+    <li><b>가스·소리 센서</b> — 아날로그 출력이 있는 모듈은 이 글의 analogRead 패턴 그대로예요. 기준값을 정하는 방법은 조도 센서와 같습니다.</li>
+    <li><b>L298N 모터 드라이버로 모터 두 개 제어하기</b> — 바퀴 달린 자동차 만들기. 6장의 공통 접지와 외부 전원 규칙이 그대로 적용됩니다.</li>
     <li><b>millis로 여러 일 동시에 하기</b> — 상태(state) 변수로 LED 깜빡이기, 버튼 읽기, 센서 측정을 한꺼번에. 인터럽트도 이어서 배울 만합니다.</li>
     <li><b>ESP32 / Wi-Fi</b> — 같은 Arduino 코드로 인터넷에 연결되는 장치 만들기. 웹 스터디와 이어 붙이면 내 방 온도를 웹페이지로 보는 프로젝트도 가능해요.</li>
   </ol>
