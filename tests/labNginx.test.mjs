@@ -77,15 +77,15 @@ assert.doesNotMatch(frontend.slice(frontend.indexOf('depends_on:')), /coms-lab-c
 assert.match(dockerfile, /COPY --from=lab-build \/lab\/dist \/usr\/share\/nginx\/html\/lab/)
 assert.match(viteConfig, /\/\^\\\/lab\(\\\/\|\$\)\//, 'navigateFallbackDenylist must keep the SPA shell off /lab/')
 
-// Deploy: the compiler can never fail or roll back the site. The site's services are started by name,
+// Deploy: the sidecars (compiler, study runner) can never fail or roll back the site. The site's services are started by name,
 // the compiler goes through the warn-only helpers, and it is never in the rollback or health path.
 const deploy = readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8')
 assert.match(deploy, /up -d --remove-orphans db db-backup coms-backend coms-frontend/)
 assert.doesNotMatch(deploy, /up -d --remove-orphans\s*$/m, 'a bare up -d would start the compiler and let its failure abort the deploy')
-for (const step of ['lab_diagnostics', 'lab_snapshot_previous', 'lab_build', 'lab_rollback', 'lab_start', 'lab_finalize_tags']) {
+for (const step of ['sidecars_diagnostics', 'sidecars_snapshot', 'sidecars_build', 'sidecars_rollback', 'sidecars_start', 'sidecars_finalize_tags']) {
   assert.match(deploy, new RegExp(`^\\s+${step}$`, 'm'), `deploy.yml must call ${step}`)
 }
-assert.ok(deploy.indexOf('lab_start') > deploy.indexOf('if ! site_is_healthy'), 'the compiler is replaced only after the site is healthy')
+assert.ok(deploy.indexOf('sidecars_start') > deploy.indexOf('if ! site_is_healthy'), 'the compiler is replaced only after the site is healthy')
 assert.doesNotMatch(deploy, /--no-build coms-backend coms-frontend coms-lab-compiler/)
 
 console.log('lab nginx / compose contract passed')
