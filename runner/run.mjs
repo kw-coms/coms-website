@@ -96,14 +96,18 @@ export async function killJobProcesses() {
   // Reaping is done by the privileged supervisor itself (CAP_KILL): SIGKILL cannot be blocked, ignored or
   // stopped, so job processes (setsid/double-fork daemons, SIGSTOP-ing attackers) cannot interfere, and
   // nothing here blocks the event loop. Repeat until none remain: a dying process may still fork.
-  const deadline = performance.now() + 3000;
+  const deadline = performance.now() + 6000;
   while (true) {
-    const pids = await jobPids();
-    if (!pids.length) return;
-    for (const pid of pids) {
+    if (!(await jobPids()).length) return;
+    if (performance.now() >= deadline) throw new Error('Job processes did not terminate');
+    // Step 1: kill(-1, SIGKILL) as the job uid. The kernel walks the whole task list under tasklist_lock,
+    // so a fork-looping job cannot slip a new child past it. The helper itself can be SIGSTOPped by a job
+    // process, hence the short SIGKILL deadline; it is only an accelerator.
+    try { await asJob('/bin/sh', ['-c', 'kill -9 -1'], { timeoutMs: 150 }); } catch { /* exit 1: nothing left to kill, or the helper was stopped */ }
+    // Step 2: the supervisor's own scan + SIGKILL catches whatever step 1 missed (e.g. a stopped helper).
+    for (const pid of await jobPids()) {
       try { process.kill(pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
     }
-    if (performance.now() >= deadline) throw new Error('Job processes did not terminate');
     await new Promise(resolve => setTimeout(resolve, 10));
   }
 }
@@ -181,8 +185,9 @@ export function executeStage(command, args, {
     // choom runs first, while still root with CAP_SYS_RESOURCE: writing 1000 with that capability also pins
     // oom_score_adj_min, so the job (non-root after setpriv) can never lower it again. A memcg OOM
     // therefore always picks job processes, never the server. cwd is entered by `env -C` after the uid
-    // switch: the 0700 job dir is unreadable to the server.
-    const child = spawnImpl('/usr/bin/choom', ['-n', '1000', '--', '/usr/bin/setpriv', ...JOB_PRIV, '--', '/usr/bin/env', '-C', cwd,
+    // switch: the 0700 job dir is unreadable to the server. nice 19 (raising is unprivileged, lowering needs
+    // CAP_SYS_NICE) keeps CPU-hungry jobs from starving the supervisor's reaper and health endpoint.
+    const child = spawnImpl('/usr/bin/choom', ['-n', '1000', '--', '/usr/bin/setpriv', ...JOB_PRIV, '--', '/usr/bin/nice', '-n', '19', '/usr/bin/env', '-C', cwd,
       '/usr/bin/prlimit', ...stageLimits(lang, stage), '--', command, ...args], {
       cwd: '/', shell: false, detached: true, stdio: ['pipe', 'pipe', 'pipe'],
       env: { PATH: '/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8', HOME: cwd, TMPDIR: cwd },

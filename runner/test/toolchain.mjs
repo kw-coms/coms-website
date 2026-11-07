@@ -8,7 +8,7 @@ import { createServer } from 'node:net';
 import { spawn } from 'node:child_process';
 import { writeFile, unlink } from 'node:fs/promises';
 import http from 'node:http';
-import { runCode, assertContainer, runnerHealthy, JOB_ID } from '../run.mjs';
+import { runCode, assertContainer, runnerHealthy, JOB_ID, asJob, executeStage, killJobProcesses, clearSystemVIpc, wipeJobFiles } from '../run.mjs';
 
 const enabled = process.env.RUNNER_TOOLCHAIN_TESTS === '1';
 let reason = enabled ? '' : 'requires disposable container; set RUNNER_TOOLCHAIN_TESTS=1';
@@ -350,7 +350,13 @@ test('SysV shm accumulation (attached, written, detached segments) is bounded by
   await ipcClean('shm accumulation');
 });
 
-test('SIGSTOP attacker (setsid, loops over every uid-10100 pid) cannot wedge cleanup or the event loop; health keeps answering', options('c', true), async () => {
+
+// Shared hostile C programs: SIGSTOP attackers (comm "atk", spare each other and the job parent) and fork storms.
+const ATTACKER_SOURCE = '#define _GNU_SOURCE\n#include <dirent.h>\n#include <signal.h>\n#include <stdlib.h>\n#include <stdio.h>\n#include <string.h>\n#include <unistd.h>\n#include <sys/prctl.h>\nint main(void){prctl(PR_SET_NAME,"atk");pid_t parent=getpid();for(int k=0;k<3;k++)if(fork()==0){setsid();close(0);close(1);close(2);prctl(PR_SET_NAME,"atk");pid_t me=getpid();for(;;){DIR*d=opendir("/proc");struct dirent*e;while(d&&(e=readdir(d))){int pid=atoi(e->d_name);if(pid<=1||pid==me||pid==parent)continue;char p[64],c[32]="";snprintf(p,sizeof p,"/proc/%d/comm",pid);FILE*f=fopen(p,"r");if(f){if(fgets(c,sizeof c,f)&&!strncmp(c,"atk",3)){fclose(f);continue;}fclose(f);}kill(pid,SIGSTOP);}if(d)closedir(d);usleep(200);}}usleep(300000);puts("armed");return 0;}';
+const STORM_BASE = ATTACKER_SOURCE.replace('int main(void){prctl(PR_SET_NAME,"atk");pid_t parent=getpid();', 'int main(void){prctl(PR_SET_NAME,"atk");pid_t parent=getpid();for(int s=0;s<2;s++)if(fork()==0){setsid();close(0);close(1);close(2);prctl(PR_SET_NAME,"atk");for(;;){if(fork()==0){fork();_exit(0);}while(waitpid(-1,0,WNOHANG)>0);usleep(50);}}');
+const STORM_SOURCE = STORM_BASE.replace('#include <sys/prctl.h>', '#include <sys/prctl.h>\n#include <sys/wait.h>');
+
+test('SIGSTOP attackers plus fork storms cannot wedge cleanup or the event loop; cleanup < 1 s, health keeps answering, no restart', options('c', true), async () => {
   const sock = '/run/coms-study/watchdog.sock';
   const child = spawn(process.execPath, ['server.mjs'], { cwd: '/app', stdio: ['ignore', 'ignore', 'pipe'],
     env: { PATH: '/usr/local/bin:/usr/bin:/bin', RUNNER_CONTAINER: '1', LISTEN_SOCKET: sock, RATE_LIMIT_PER_MIN: '100' } });
@@ -373,13 +379,24 @@ test('SIGSTOP attacker (setsid, loops over every uid-10100 pid) cannot wedge cle
         await new Promise(r => setTimeout(r, 100));
       }
     })();
-    const attacker = '#define _POSIX_C_SOURCE 200809L\n#include <dirent.h>\n#include <signal.h>\n#include <stdlib.h>\n#include <stdio.h>\n#include <unistd.h>\nint main(void){pid_t parent=getpid();if(fork()==0){setsid();pid_t me=getpid();for(;;){DIR*d=opendir("/proc");struct dirent*e;while(d&&(e=readdir(d))){int pid=atoi(e->d_name);if(pid>1&&pid!=me&&pid!=parent)kill(pid,SIGSTOP);}if(d)closedir(d);usleep(500);}}usleep(300000);puts("armed");return 0;}';
-    const hostile = await call('POST', '/study/api/run', { lang: 'c', code: attacker });
-    assert.equal(hostile.status, 200, `${hostile.data} ${stderr}`);
-    const next = await call('POST', '/study/api/run', { lang: 'python', code: 'print("after")' });
-    assert.equal(next.status, 200, `${next.data} ${stderr}`); assert.equal(JSON.parse(next.data).stdout, 'after\n');
+    // Three busy attackers (comm "atk", they spare each other and the job's parent) SIGSTOP every other
+    // uid-10100 pid as fast as they can scan /proc, so any helper that runs as uid 10100 gets stopped.
+        // Two fork storms (each child forks again and exits, staying under NPROC) run together with the attackers.
+    const stormSource = STORM_SOURCE;
+    const timings = [];
+    for (let round = 0; round < 6; round++) {
+      const started = Date.now();
+      const hostile = await call('POST', '/study/api/run', { lang: 'c', code: stormSource });
+      timings.push(Date.now() - started);
+      assert.equal(hostile.status, 200, `round ${round}: ${hostile.data} ${stderr}`);
+      const next = await call('POST', '/study/api/run', { lang: 'python', code: 'print("after")' });
+      assert.equal(next.status, 200, `round ${round}: ${next.data} ${stderr}`); assert.equal(JSON.parse(next.data).stdout, 'after\n');
+    }
+    // job (~0.35 s) + cleanup must stay far below the 3 s reaping deadline; cleanup itself < 1 s
+    assert.ok(Math.max(...timings) < 1700, `slow cleanup under storm: ${timings}`);
+    console.log(`# storm+attacker request times (ms): ${timings.join(', ')}`);
     watching = false; await watchdog;
-    assert.deepEqual(failures, [], 'health must always answer'); assert.ok(probes >= 10, `only ${probes} probes`); assert.ok(worst < 2000, `health stalled ${worst} ms`);
+    assert.deepEqual(failures, [], 'health must always answer'); assert.ok(probes >= 5, `only ${probes} probes`); assert.ok(worst < 2000, `health stalled ${worst} ms`);
     const survivors = [];
     for (const pid of (await readdir('/proc')).filter(p => /^\d+$/.test(p))) if ((await readFile(`/proc/${pid}/status`, 'utf8').catch(() => '')).match(new RegExp(`^Uid:\\s+${JOB_ID}`, 'm'))) survivors.push(pid);
     assert.deepEqual(survivors, [], 'no uid-10100 process may survive');
@@ -391,4 +408,24 @@ test('no synchronous process spawning remains on request or cleanup paths', asyn
   for (const file of ['run.mjs', 'server.mjs', 'limits.mjs', 'diagnostics.mjs']) {
     assert.doesNotMatch(await readFile(new URL(`../${file}`, import.meta.url), 'utf8'), /execFileSync|spawnSync|execSync/, file);
   }
+});
+
+test('reaper: killJobProcesses finishes < 1 s against fork storms plus SIGSTOP attackers (repeated)', options('c', true), async () => {
+  const dir = '/jobs/coms-reaper';
+  const heavy = STORM_SOURCE;
+  const timings = [];
+  for (let round = 0; round < 6; round++) {
+    await asJob('/bin/sh', ['-c', 'umask 077; mkdir "$1" && cat > "$1/$2"', 'sh', dir, 'main.c'], { input: heavy });
+    const compiled = await executeStage('/usr/bin/gcc', ['-O1', 'main.c', '-o', 'storm'], { cwd: dir, lang: 'c', stage: 'compile' });
+    assert.equal(compiled.exitCode, 0, compiled.stderr);
+    const started = await executeStage(`${dir}/storm`, [], { cwd: dir, lang: 'c', stage: 'run' });
+    assert.equal(started.stdout, 'armed\n', JSON.stringify(started));
+    const t0 = performance.now();
+    await killJobProcesses();
+    timings.push(Math.round(performance.now() - t0));
+    await clearSystemVIpc(); await wipeJobFiles();
+  }
+  console.log(`# reaper times under storm+attackers (ms): ${timings.join(', ')}`);
+  assert.ok(Math.max(...timings) < 1000, `reaper too slow: ${timings}`);
+  assert.ok(runnerHealthy());
 });

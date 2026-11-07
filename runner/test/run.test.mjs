@@ -32,7 +32,7 @@ test('stage passes stdin exactly and launches prlimit without inherited environm
   assert.equal(call.command, '/usr/bin/choom'); assert.equal(call.options.shell, false);
   assert.deepEqual(call.args.slice(0, 4), ['-n', '1000', '--', '/usr/bin/setpriv']);
   assert.deepEqual(call.args.slice(4, 11), ['--reuid=10100', '--regid=10100', '--clear-groups', '--inh-caps=-all', '--ambient-caps=-all', '--no-new-privs', '--']);
-  assert.deepEqual(call.args.slice(11, 15), ['/usr/bin/env', '-C', '/tmp/work', '/usr/bin/prlimit']);
+  assert.deepEqual(call.args.slice(11, 18), ['/usr/bin/nice', '-n', '19', '/usr/bin/env', '-C', '/tmp/work', '/usr/bin/prlimit']);
   assert.deepEqual(call.args.slice(-3), ['--', '/usr/bin/gcc', 'main.c']);
   assert.equal(call.options.detached, true);
   assert.deepEqual(call.options.env, { PATH: '/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8', HOME: '/tmp/work', TMPDIR: '/tmp/work' });
