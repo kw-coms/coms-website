@@ -1,0 +1,43 @@
+services:
+  runner:
+    build:
+      context: .
+    image: coms-study-runner:local
+    restart: unless-stopped
+    network_mode: none
+    # Server = container-root with ONLY SETUID/SETGID/KILL (below); jobs are exec'd as uid/gid 10100.
+    # The primary gid is nginx's so the 0660 socket (umask 0117) is reachable by nginx only.
+    user: "0:${NGINX_GID:?Set NGINX_GID to the nginx group ID}"
+    volumes:
+      - study-runner-socket:/run/coms-study
+    read_only: true
+    tmpfs:
+      # The only place the job uid can write besides /dev/shm and /dev/mqueue (wiped after every job).
+      - /jobs:rw,exec,nosuid,nodev,size=64m,nr_inodes=4096,mode=0700,uid=10100,gid=10100
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID, KILL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: 1.0
+    pids_limit: 256
+    ipc: private
+    shm_size: 8m
+    stop_grace_period: 25s
+    environment:
+      LISTEN_SOCKET: /run/coms-study/run.sock
+      RATE_LIMIT_PER_MIN: "${RATE_LIMIT_PER_MIN:-10}"
+      TRUST_PROXY: "1"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  study-runner-socket:
+    name: coms-study-runner-socket
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=1m,mode=0755"

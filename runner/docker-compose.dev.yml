@@ -1,0 +1,31 @@
+# Trusted local development only: bridge networking and no nginx authentication.
+services:
+  runner:
+    build:
+      context: .
+    image: coms-study-runner:local
+    ports:
+      - "127.0.0.1:8788:8788"
+    user: "0:0"
+    read_only: true
+    tmpfs:
+      - /jobs:rw,exec,nosuid,nodev,size=64m,nr_inodes=4096,mode=0700,uid=10100,gid=10100
+    cap_drop: [ALL]
+    cap_add: [SETUID, SETGID, KILL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m
+    memswap_limit: 768m
+    cpus: 1.0
+    pids_limit: 256
+    ipc: private
+    shm_size: 8m
+    stop_grace_period: 25s
+    environment:
+      HOST: "0.0.0.0"
+      RATE_LIMIT_PER_MIN: "120"
+      TRUST_PROXY: "0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
