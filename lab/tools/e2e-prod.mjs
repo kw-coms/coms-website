@@ -14,12 +14,12 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer, request as httpRequest } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromeExecutable, GL_ARGS } from './browser.mjs';
+import { chromeExecutable, compileOrigin, GL_ARGS } from './browser.mjs';
 
 export const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self'";
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = join(root, 'dist');
-const COMPILE = new URL(process.env.LAB_COMPILE_URL ?? 'http://127.0.0.1:8787');
+const COMPILE = new URL(compileOrigin());
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.wasm': 'application/wasm' };
 
 if (!process.env.LAB_SKIP_BUILD) execSync('npm run build', { cwd: root, stdio: 'inherit' });

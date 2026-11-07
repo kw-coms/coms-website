@@ -3,8 +3,9 @@
 // Needs the service (LAB_COMPILE_URL, default http://127.0.0.1:8787), see docs/DEPLOY.md.
 import { createServer } from 'vite';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { compileOrigin } from './browser.mjs';
 
-const COMPILE = process.env.LAB_COMPILE_URL ?? 'http://127.0.0.1:8787';
+const COMPILE = compileOrigin();
 const OUT = new URL('../src/core/__fixtures__/examples-hex.json', import.meta.url);
 
 const vite = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });

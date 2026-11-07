@@ -4,13 +4,13 @@
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { chromeExecutable, GL_ARGS, SHOTS } from './browser.mjs';
+import { chromeExecutable, compileOrigin, GL_ARGS, SHOTS } from './browser.mjs';
 
 const exe = chromeExecutable();
 
 let dev;
 let base = process.env.LAB_URL;
-const COMPILE = process.env.LAB_COMPILE_URL ?? 'http://127.0.0.1:8787';
+const COMPILE = compileOrigin();
 if (!base) {
   const port = 5290 + Math.floor(Math.random() * 50);
   dev = spawn('npx', ['vite', '--port', String(port), '--strictPort'], { stdio: 'ignore', env: { ...process.env, LAB_COMPILE_URL: COMPILE } });
