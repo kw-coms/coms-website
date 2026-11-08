@@ -446,6 +446,7 @@ describe('a saved block program survives the editor chunk failing to load', () =
   afterEach(() => { vi.doUnmock('./blocks/blocklyRuntime'); });
 
   it('keeps SAVE_KEY and the backup untouched, turns autosave off, and a retry restores the program', async () => {
+    await new Promise((r) => setTimeout(r, 800)); // earlier tests' stores share this localStorage stub: let their pending autosaves land first
     const m0 = await boot();
     await withBlockly();
     const saved = JSON.stringify({ ...example(m0, 'external-blink'), codeMode: 'blocks', blocks: blockState, code: 'x' });
