@@ -14,6 +14,8 @@ async function boot(): Promise<Mods> {
   return { store, actions, core, share };
 }
 /** The example as the app holds it after import: validateScene upgrades v1 scenes to v2. */
+/** Blockly (the editor's chunk) is what canonicalizes block scenes; load it like an import or share link does. */
+const withBlockly = async () => (await import('./blocks/canon')).ensureCanon();
 const example = (m: Mods, id: string) => m.core.validateScene(m.core.EXAMPLES.find((e) => e.id === id)!.scene);
 
 beforeEach(() => {
@@ -256,6 +258,7 @@ describe('rotateSelection of a breadboard', () => {
 describe('block-mode scenes never run hidden code, and mission scenes open on their mission', () => {
   const HIDDEN = 'void setup() { pinMode(13, OUTPUT); }\nvoid loop() { digitalWrite(13, HIGH); /* HIDDEN */ }\n';
   const blockScene = async (m: Mods, codeMode: 'blocks' | 'blocks+text' | 'text', code = HIDDEN) => {
+    await withBlockly();
     const { STARTER_BLOCKS } = await import('./blocks/starters');
     return { ...example(m, 'external-blink'), codeMode, blocks: STARTER_BLOCKS['external-blink'], code } as Scene;
   };
@@ -275,6 +278,7 @@ describe('block-mode scenes never run hidden code, and mission scenes open on th
   });
   it('a block mode without blocks starts from the default program, not from the hidden code', async () => {
     const m = await boot();
+    await withBlockly();
     m.store.loadScene({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks: undefined, code: HIDDEN } as Scene);
     expect(m.store.getState().code).not.toContain('HIDDEN');
     expect(m.store.getState().hist.present.blocks).toBeTruthy();

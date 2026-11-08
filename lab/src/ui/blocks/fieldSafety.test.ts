@@ -34,16 +34,22 @@ describe('untrusted fields cannot inject source', () => {
     expect(result.code).toBe(run({ type, fields: { [field]: fallback } }).code);
     expect(result.warnings.join()).toMatch(/필드|값/);
   });
-  it.each(['x\nevil();', 'x*/evil();', 'x\\', 'x??/', 'x//evil();'])('normalizes hostile names: %j', name => {
-    const run = (n: string) => generate(workspace([
-      { type: 'procedures_defnoreturn', fields: { NAME: n } },
+  // Names are free text now (the editor lets a student type any of them): they may only ever appear inside one-line comments.
+  const inertNames = ['x\nevil();', 'x*/evil();', 'x\\', 'x??/', 'x//evil();', 'x\u2028evil();', 'x\u202eevil();'];
+  const insideComments = (code: string) => code.split('\n').every(line =>
+    !line.includes('evil') || (line.indexOf('//') >= 0 && line.indexOf('//') < line.indexOf('evil')));
+  it.each(inertNames)('hostile names stay inside one-line comments: %j', name => {
+    const { code } = generate(workspace([
+      { type: 'procedures_defnoreturn', fields: { NAME: name } },
       { type: 'lab_loop', do: { DO: [
-        { type: 'variables_set', fields: { VAR: { name: n } }, in: { VALUE: 1 } },
-        { type: 'procedures_callnoreturn', extra: { name: n, params: [] } },
+        { type: 'variables_set', fields: { VAR: { name } }, in: { VALUE: 1 } },
+        { type: 'procedures_callnoreturn', extra: { name, params: [] } },
       ] } },
     ]));
-    expect(run(name).code).toBe(run('이름 없음').code);
-    expect(run(name).warnings.join()).toMatch(/이름/);
+    expect(insideComments(code)).toBe(true);
+    expect(code).not.toMatch(/\\$|\?\?\//m);
+    expect(code).toMatch(/^void f_1\(\);$/m);
+    expect(code).toMatch(/^int v_1 = 0;/m);
   });
   it.each(['Infinity', '1e999', '0x10', '1;evil()', {}, true])('rejects invalid numbers %j', NUM => {
     const result = expr({ type: 'math_number', fields: { NUM } } as N);
@@ -112,16 +118,17 @@ it.each([['\0', '\\000'], ['\b', '\\010'], ['\x7f', '\\177'], ["'", "\\'"]])('ke
   expect(result.code).toContain(`(char)Serial.read() == '${escaped}'`);
 });
 
-it.each(['bad\nname', 'bad*/name', 'bad\\name', 'x'.repeat(41)])('normalizes workspace and parameter names byte-identically: %j', hostile => {
-  const run = (name: string) => generate({
-    variables: [{ id: 'v', name }],
+it.each(['bad\nevil()', 'bad*/evil()', 'bad\\name', 'x'.repeat(100)])('workspace and parameter names are only comment text: %j', hostile => {
+  const { code, warnings } = generate({
+    variables: [{ id: 'v', name: hostile }],
     blocks: { blocks: [
-      { type: 'procedures_defnoreturn', fields: { NAME: 'fnSafe' }, extraState: { params: [{ name, id: 'p' }] } },
+      { type: 'procedures_defnoreturn', fields: { NAME: 'fnSafe' }, extraState: { params: [{ name: hostile, id: 'p' }] } },
       { type: 'lab_loop', inputs: { DO: { block: { type: 'variables_set', fields: { VAR: { id: 'v' } }, inputs: { VALUE: { block: { type: 'math_number', fields: { NUM: 1 } } } } } } } },
     ] },
   });
-  expect(run(hostile).code).toBe(run('이름 없음').code);
-  expect(run(hostile).warnings.join()).toMatch(/이름/);
+  expect(warnings).toEqual([]);
+  expect(code.split('\n').every(line => !line.includes('evil') || (line.indexOf('//') >= 0 && line.indexOf('//') < line.indexOf('evil')))).toBe(true);
+  expect(code).toMatch(/^int v_\w+ = 1?0?;/m);
 });
 
 it.each([null, 42, true, { payload: 'evil();' }])('validates function-call and parameter metadata names %j', name => {

@@ -1,7 +1,6 @@
 import { lazy, Suspense, useMemo } from 'react';
 import { ArrowDownToLine, ArrowUpFromLine, ChevronsRight, Play, StepForward, Trash2 } from 'lucide-react';
 import type { CodeMode } from '../../core/types';
-import { generate } from '../blocks/generate';
 import { sceneContext } from '../blocks/context';
 import { clearBreakpoints, debugContinue, debugStepInto, debugStepOut, debugStepOver } from '../simHost';
 import { codeMode, setBlocks, useStore } from '../store';
@@ -59,7 +58,7 @@ function Blocks({ mode }: { mode: CodeMode }) {
     <Suspense fallback={<p className="muted pad">블록 편집기를 불러오는 중…</p>}>
       <BlocksEditor
         state={state} dark={dark} hints={ctx.hints} readOnly={false}
-        onChange={(next) => setBlocks(next, generate(next, ctx.opts).code)}
+        onChange={setBlocks}
       />
       {mode === 'blocks' && null}
     </Suspense>

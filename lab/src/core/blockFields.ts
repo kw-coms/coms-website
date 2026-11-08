@@ -44,13 +44,14 @@ for (const type of ['variables_get', 'variables_set', 'math_change', 'controls_f
 for (const type of ['procedures_defnoreturn', 'procedures_defreturn', 'procedures_callnoreturn', 'procedures_callreturn'])
   field(type, 'NAME', { kind: 'name', fallback: '이름 없음' });
 
-/** A name is safe to repeat in a C++ comment only when it cannot change comment structure. */
-export const isSafeOriginalName = (value: unknown): value is string =>
-  typeof value === 'string' && value.length <= 40 && !/[\u0000-\u001f\u007f-\u009f\u2028\u2029\\?]/.test(value) &&
-  !/\/\/|\/\*|\*\//.test(value);
-
-/** Safe fallback for names in generated comments and identifier mapping. */
-export const safeOriginalName = (value: string): string => isSafeOriginalName(value) ? value : '이름 없음';
+/** Longest TEXT field the importer accepts (the generated code has its own 64 KB cap). */
+export const MAX_TEXT_FIELD = 2000;
+/**
+ * Names (variables, functions, parameters) are free text the editor itself lets students type ("눌렸나?", "a\\b"), so import
+ * checks only type and length. What reaches generated code is neutralized there: comments by commentText, identifiers by
+ * being derived from a counter or a plain [A-Za-z0-9_] name, never from the raw text.
+ */
+export const isValidName = (value: unknown): value is string => typeof value === 'string' && value.length <= 100;
 
 /** Canonical decimal representation; only a finite decimal/exponent token produced by Number reaches C++. */
 function canonicalNumber(value: unknown): string | null {
@@ -73,18 +74,17 @@ export function readBlockField(type: string, name: string, value: unknown): { va
       ? { value: rule.fallback, valid: false } : { value: n, valid: true }; }
     case 'colour': return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
       ? { value, valid: true } : { value: rule.fallback, valid: false };
-    case 'text': return typeof value === 'string'
+    case 'text': return typeof value === 'string' && value.length <= MAX_TEXT_FIELD
       ? { value, valid: true } : { value: rule.fallback, valid: false };
-    case 'name': return isSafeOriginalName(value)
+    case 'name': return isValidName(value)
       ? { value, valid: true } : { value: rule.fallback, valid: false };
     case 'variable': {
       const nameValue = typeof value === 'string' ? value : value && typeof value === 'object' && !Array.isArray(value)
         ? (value as { name?: unknown }).name : undefined;
       const id = value && typeof value === 'object' && !Array.isArray(value) ? (value as { id?: unknown }).id : undefined;
-      const valid = (nameValue === undefined || isSafeOriginalName(nameValue)) &&
+      const valid = (nameValue === undefined || isValidName(nameValue)) &&
         (id === undefined || typeof id === 'string' && id.length <= 100) &&
-        (nameValue !== undefined || typeof id === 'string' && id.length > 0) &&
-        (typeof value === 'string' ? isSafeOriginalName(value) : true);
+        (nameValue !== undefined || typeof id === 'string' && id.length > 0);
       return valid ? { value: String(nameValue ?? id), valid: true } : { value: rule.fallback, valid: false };
     }
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blockFieldsProblem, readBlockField, safeOriginalName } from './blockFields';
+import { blockFieldsProblem, MAX_TEXT_FIELD, readBlockField } from './blockFields';
 import { blocksProblem, validateScene } from './scene';
 import { decodeShare } from './share';
 
@@ -32,14 +32,18 @@ describe('block field schema', () => {
     expect(readBlockField('math_number', 'NUM', '0x10').valid).toBe(false);
   });
 
-  it('uses the same name rule for variables, function names, and comments', () => {
-    for (const hostile of ['safe\nevil()', 'safe*/evil()', 'safe//evil()', 'safe?evil()', 'x'.repeat(41)]) {
-      expect(safeOriginalName(hostile)).toBe('이름 없음');
-      expect(readBlockField('variables_get', 'VAR', { id: 'id', name: hostile }).valid).toBe(false);
-      expect(readBlockField('procedures_defreturn', 'NAME', hostile).valid).toBe(false);
-      expect(blocksProblem({ ...workspace({ type: 'variables_get', fields: { VAR: { id: 'v' } } }), variables: [{ id: 'v', name: hostile }] })).toMatch(/블록/);
+  it('accepts every name the editor lets a student type, and bounds only type and length', () => {
+    for (const name of ['눌렸나?', 'a\\b', 'x//y', 'x'.repeat(100), 'safe*/evil()', 'safe\nevil()']) {
+      expect(readBlockField('variables_get', 'VAR', { id: 'id', name }).valid, name).toBe(true);
+      expect(readBlockField('procedures_defreturn', 'NAME', name).valid, name).toBe(true);
     }
-    expect(safeOriginalName('한글 변수')).toBe('한글 변수');
+    for (const bad of ['x'.repeat(101), 5, {}, null]) expect(readBlockField('procedures_defreturn', 'NAME', bad).valid).toBe(false);
+    expect(blocksProblem({ ...workspace({ type: 'variables_get', fields: { VAR: { id: 'v' } } }), variables: [{ id: 'v', name: 'x'.repeat(101) }] })).toMatch(/블록/);
+  });
+
+  it('caps a TEXT field', () => {
+    expect(readBlockField('text', 'TEXT', 'x'.repeat(MAX_TEXT_FIELD)).valid).toBe(true);
+    expect(readBlockField('text', 'TEXT', 'x'.repeat(MAX_TEXT_FIELD + 1)).valid).toBe(false);
   });
 
   it('rejects an injected field from a share link before loading blocks', async () => {

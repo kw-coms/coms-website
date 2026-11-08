@@ -233,9 +233,11 @@ describe('built-in blocks', () => {
     expect(code).toContain('for (int i = 0; i < 3; i++) {');
     expect(code).toContain('for (int j = 0; j < 2; j++) {');
   });
-  it('repeat never reuses a user variable name', () => {
+  it('repeat counters can never collide with a user variable: user names are prefixed', () => {
     const { code } = inLoop({ type: 'controls_repeat_ext', in: { TIMES: 3 }, do: { DO: [{ type: 'variables_set', fields: { VAR: 'i' }, in: { VALUE: 1 } }] } }, ['i']);
-    expect(code).toContain('for (int j = 0; j < 3; j++) {');
+    expect(code).toContain('for (int i = 0; i < 3; i++) {');
+    expect(code).toContain('int v_i = 0;');
+    expect(code).toContain('v_i = 1;');
   });
   it('while and until', () => {
     const c: N = { type: 'lab_button', fields: { PIN: '2', WIRING: 'PULLUP' } };
@@ -243,10 +245,10 @@ describe('built-in blocks', () => {
     expect(inLoop({ type: 'controls_whileUntil', fields: { MODE: 'UNTIL' }, in: { BOOL: c } }).code).toContain('while (!(digitalRead(2) == LOW)) {');
   });
   it('for counts up and down', () => {
-    expect(inLoop({ type: 'controls_for', fields: { VAR: 'n' }, in: { FROM: 1, TO: 10, BY: 1 } }).code).toContain('for (int n = 1; n <= 10; n++) {');
-    expect(inLoop({ type: 'controls_for', fields: { VAR: 'n' }, in: { FROM: 0, TO: 100, BY: 10 } }).code).toContain('for (int n = 0; n <= 100; n += 10) {');
-    expect(inLoop({ type: 'controls_for', fields: { VAR: 'n' }, in: { FROM: 10, TO: 0, BY: 1 } }).code).toContain('for (int n = 10; n >= 0; n--) {');
-    expect(inLoop({ type: 'controls_for', fields: { VAR: 'n' }, in: { FROM: 9, TO: 0, BY: -3 } }).code).toContain('n -= 3');
+    expect(inLoop({ type: 'controls_for', fields: { VAR: 'n' }, in: { FROM: 1, TO: 10, BY: 1 } }).code).toContain('for (int v_n = 1; v_n <= 10; v_n++) {');
+    expect(inLoop({ type: 'controls_for', fields: { VAR: 'n' }, in: { FROM: 0, TO: 100, BY: 10 } }).code).toContain('for (int v_n = 0; v_n <= 100; v_n += 10) {');
+    expect(inLoop({ type: 'controls_for', fields: { VAR: 'n' }, in: { FROM: 10, TO: 0, BY: 1 } }).code).toContain('for (int v_n = 10; v_n >= 0; v_n--) {');
+    expect(inLoop({ type: 'controls_for', fields: { VAR: 'n' }, in: { FROM: 9, TO: 0, BY: -3 } }).code).toContain('v_n -= 3');
   });
   it('break and continue', () => {
     const body = (flow: string) => inLoop({ type: 'controls_repeat_ext', in: { TIMES: 2 }, do: { DO: [{ type: 'controls_flow_statements', fields: { FLOW: flow } }] } }).code;
@@ -258,15 +260,15 @@ describe('built-in blocks', () => {
 describe('variables and functions', () => {
   it('declares globals with inferred types', () => {
     const { code } = inLoop({ type: 'variables_set', fields: { VAR: 'score' }, in: { VALUE: 3 } }, ['score']);
-    expect(code).toContain('int score = 0;');
-    expect(code).toContain('score = 3;');
-    expect(generate(workspace([loop({ type: 'variables_set', fields: { VAR: 'ratio' }, in: { VALUE: 0.5 } })])).code).toContain('float ratio = 0.0;');
-    expect(generate(workspace([loop({ type: 'variables_set', fields: { VAR: 'msg' }, in: { VALUE: '안녕' } })])).code).toContain('String msg = "";');
-    expect(generate(workspace([loop({ type: 'variables_set', fields: { VAR: 'on' }, in: { VALUE: { type: 'logic_boolean', fields: { BOOL: 'TRUE' } } } })])).code).toContain('bool on = false;');
+    expect(code).toContain('int v_score = 0;');
+    expect(code).toContain('v_score = 3;');
+    expect(generate(workspace([loop({ type: 'variables_set', fields: { VAR: 'ratio' }, in: { VALUE: 0.5 } })])).code).toContain('float v_ratio = 0.0;');
+    expect(generate(workspace([loop({ type: 'variables_set', fields: { VAR: 'msg' }, in: { VALUE: '안녕' } })])).code).toContain('String v_msg = "";');
+    expect(generate(workspace([loop({ type: 'variables_set', fields: { VAR: 'on' }, in: { VALUE: { type: 'logic_boolean', fields: { BOOL: 'TRUE' } } } })])).code).toContain('bool v_on = false;');
   });
   it('a variable set from a sensor takes the sensor type', () => {
     const { code } = inLoop({ type: 'variables_set', fields: { VAR: 'd' }, in: { VALUE: { type: 'lab_ultrasonic', fields: { TRIG: '7', ECHO: '6' } } } });
-    expect(code).toContain('long d = 0;');
+    expect(code).toContain('long v_d = 0;');
   });
   it('text join with a numeric variable, and a number stored in a String variable', () => {
     const { code } = gen([loop(
@@ -274,23 +276,23 @@ describe('variables and functions', () => {
       { type: 'variables_set', fields: { VAR: 'label' }, in: { VALUE: 'a' } },
       { type: 'variables_set', fields: { VAR: 'label' }, in: { VALUE: { type: 'variables_get', fields: { VAR: 'n' } } } },
     )]);
-    expect(code).toContain('String label = "";');
-    expect(code).toContain('label = String(n);');
+    expect(code).toContain('String v_label = "";');
+    expect(code).toContain('v_label = String(v_n);');
   });
   it('change by 1 becomes ++', () => {
-    expect(inLoop({ type: 'math_change', fields: { VAR: 'count' }, in: { DELTA: 1 } }).code).toMatch(/count\+\+;/);
-    expect(inLoop({ type: 'math_change', fields: { VAR: 'count' }, in: { DELTA: 5 } }).code).toMatch(/count \+= 5;/);
+    expect(inLoop({ type: 'math_change', fields: { VAR: 'count' }, in: { DELTA: 1 } }).code).toMatch(/v_count\+\+;/);
+    expect(inLoop({ type: 'math_change', fields: { VAR: 'count' }, in: { DELTA: 5 } }).code).toMatch(/v_count \+= 5;/);
   });
   it('a for counter is local, not a global', () => {
     const { code } = inLoop({ type: 'controls_for', fields: { VAR: 'k' }, in: { FROM: 1, TO: 3, BY: 1 }, do: { DO: [{ type: 'lab_serial_print', in: { VALUE: { type: 'variables_get', fields: { VAR: 'k' } } } }] } });
-    expect(code).not.toMatch(/^int k = 0;/m);
-    expect(code).toContain('Serial.print(k);');
+    expect(code).not.toMatch(/^int v_k = 0;/m);
+    expect(code).toContain('Serial.print(v_k);');
   });
-  it('Korean and reserved names become valid C++ names with the original in a comment', () => {
+  it('Korean names are numbered (v_1) with the original in a comment; Arduino names are plain after the prefix', () => {
     const { code } = inLoop({ type: 'math_change', fields: { VAR: '점수' }, in: { DELTA: 1 } });
-    expect(code).toContain('int var1 = 0;  // 변수 "점수"');
-    expect(code).toContain('var1++;');
-    expect(inLoop({ type: 'math_change', fields: { VAR: 'delay' }, in: { DELTA: 1 } }).code).toContain('int delay_ = 0;');
+    expect(code).toContain('int v_1 = 0;  // 변수 "점수"');
+    expect(code).toContain('v_1++;');
+    expect(inLoop({ type: 'math_change', fields: { VAR: 'delay' }, in: { DELTA: 1 } }).code).toContain('int v_delay = 0;');
   });
   it('procedures with and without a result', () => {
     const def: N = { type: 'procedures_defnoreturn', fields: { NAME: 'blinkTwice' }, do: { STACK: [{ type: 'lab_digital_write', fields: { PIN: '13', STATE: 'HIGH' } }] } };
@@ -299,13 +301,13 @@ describe('variables and functions', () => {
       { type: 'procedures_callnoreturn', extra: { name: 'blinkTwice', params: [] } },
       { type: 'lab_serial_println', in: { VALUE: { type: 'procedures_callreturn', extra: { name: 'double', params: ['x'] }, in: { ARG0: 21 } } } },
     )], ['x']);
-    expect(code).toContain('void blinkTwice();');
-    expect(code).toContain('void blinkTwice() {');
-    expect(code).toContain('int double_(int x);');
-    expect(code).toContain('return x * 2;');
-    expect(code).toContain('blinkTwice();');
-    expect(code).toContain('Serial.println(double_(21));');
-    expect(code).not.toMatch(/^int x = 0;/m);
+    expect(code).toContain('void f_blinkTwice();');
+    expect(code).toContain('void f_blinkTwice() {');
+    expect(code).toContain('int f_double(int v_x);');
+    expect(code).toContain('return v_x * 2;');
+    expect(code).toContain('f_blinkTwice();');
+    expect(code).toContain('Serial.println(f_double(21));');
+    expect(code).not.toMatch(/^int v_x = 0;/m);
   });
 });
 

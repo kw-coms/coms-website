@@ -5,10 +5,11 @@ import type {
 import { EXAMPLES, PARTS, analyze, validateScene } from './core';
 import { stringifyJsonBounded } from '../core/scene';
 import { commit, initHistory, redo as redoH, undo as undoH, type History } from './history';
-import { getItem, setItem } from './storage';
+import { getItem, setItem, SAVE_KEY } from './storage';
 import { DEFAULT_BLOCKS } from './blocks/starters';
 import { sceneContext } from './blocks/context';
 import { generate } from './blocks/generate';
+import { canonicalize, ensureCanon, isCanonical } from './blocks/canon';
 import { detectSoftwareRendering, initialQuality, loadQualityMode, saveQualityMode, type Quality, type QualityMode } from './quality';
 
 export type Selection = { kind: 'part' | 'wire'; id: string } | null;
@@ -102,7 +103,7 @@ export interface MissionProgress {
 }
 
 const BLANK_CODE = `void setup() {\n  pinMode(13, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(500);\n  digitalWrite(13, LOW);\n  delay(500);\n}\n`;
-export const SAVE_KEY = 'coms-lab:scene:v1';
+export { SAVE_KEY };
 export const THEME_KEY = 'coms-lab:theme';
 export const BACKUP_KEY = 'coms-lab:scene:v1:backup';
 /** Mirrors validateScene's code limit (64 KB); the editor refuses input past it. */
@@ -118,15 +119,26 @@ const docOf = (s: Scene): Doc => {
   return rest as Doc;
 };
 
+const encoder = new TextEncoder();
+const codeProblem = (code: string): string | null =>
+  encoder.encode(code).length > MAX_CODE_BYTES ? '블록으로 만든 코드가 64 KB를 넘어요. 블록을 줄이거나 글자를 짧게 해 주세요.' : null;
+
 /**
- * In a block mode the code is always exactly what the blocks generate (ModeBar keeps it so while the tab is open).
- * A scene file or share link can say otherwise, and its hidden `code` would run instead of the blocks the user sees,
- * so every way in (load, import, autosave restore) regenerates it here.
+ * Every way a scene gets in (load, import, share link, autosave restore) passes here. Its blocks become Blockly's own reading
+ * of them (canonicalize), because the editor shows that reading while the generator runs on this one; in a block mode the code
+ * is regenerated from them, since a scene file could otherwise carry hidden `code` that runs instead of the blocks the user sees.
+ * Throws the Korean reason when the blocks cannot be accepted or the code they make is too big.
  */
 function withGeneratedCode(s: Scene, analysis: Analysis): Scene {
-  if ((s.codeMode ?? 'text') === 'text') return s;
-  const blocks = s.blocks ?? DEFAULT_BLOCKS;
-  return { ...s, blocks, code: generate(blocks, sceneContext(s.parts, analysis).opts).code };
+  const mode = s.codeMode ?? 'text';
+  if (mode === 'text' && s.blocks === undefined) return s;
+  const c = canonicalize(s.blocks ?? DEFAULT_BLOCKS);
+  if (!c.ok) throw new Error(c.error);
+  if (mode === 'text') return { ...s, blocks: c.blocks };
+  const code = generate(c.blocks, sceneContext(s.parts, analysis).opts).code;
+  const tooBig = codeProblem(code);
+  if (tooBig) throw new Error(tooBig);
+  return { ...s, blocks: c.blocks, code };
 }
 
 function initialTheme(): Theme {
@@ -196,6 +208,8 @@ function loadMissionProgress(): Record<string, MissionProgress> {
 }
 const qualityMode = loadQualityMode();
 const softwareHint = qualityMode === 'auto' && detectSoftwareRendering();
+// A saved block program is canonicalized by Blockly on restore, so its chunk must be loaded before the first synchronous read.
+if ((getItem(SAVE_KEY) ?? '').includes('"blocks"')) await ensureCanon().catch(() => undefined);
 const first = startDoc();
 let state: State = {
   hist: initHistory(first.doc),
@@ -277,9 +291,12 @@ export function deleteNote(id: string) {
 }
 export const codeMode = (s: State = state): CodeMode => s.hist.present.codeMode ?? 'text';
 /** Hooks for the Blockly lane: the document owns the blocks JSON and the editor mode. */
-export function setBlocks(blocks: unknown, code?: string) {
-  void setDoc({ ...state.hist.present, version: 2, blocks });
-  if (code !== undefined) setCode(code);
+export function setBlocks(blocks: unknown) {
+  const c = canonicalize(blocks);
+  const code = c.ok ? generate(c.blocks, sceneContext(parts(), state.analysis).opts).code : '';
+  const error = c.ok ? codeProblem(code) : c.error;
+  if (error) return void toast(`적용하지 못했어요: ${error}`);
+  if (setDoc({ ...state.hist.present, version: 2, blocks: c.ok ? c.blocks : blocks }) === null) set({ code });
 }
 export function setCodeMode(mode: CodeMode) {
   void setDoc({ ...state.hist.present, version: 2, codeMode: mode });
@@ -328,6 +345,11 @@ function checkDoc(doc: Doc): string | null {
   }
 }
 function setDoc(doc: Doc, selection?: Selection): string | null {
+  if (doc.blocks !== undefined && doc.blocks !== state.hist.present.blocks && !isCanonical(doc.blocks)) {
+    const c = canonicalize(doc.blocks);
+    if (!c.ok) { toast(`적용하지 못했어요: ${c.error}`); return c.error; }
+    doc = { ...doc, blocks: c.blocks };
+  }
   const hist = commit(state.hist, doc);
   if (hist === state.hist) return null;
   const err = checkDoc(doc);

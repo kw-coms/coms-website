@@ -2,7 +2,7 @@
 // so it runs in the main bundle and in plain Node tests. Blockly stays a lazy chunk.
 
 import { MAX_BLOCKS } from '../../core/scene';
-import { readBlockField, safeOriginalName } from '../../core/blockFields';
+import { readBlockField } from '../../core/blockFields';
 
 // Scenes (shared links, imported files) are untrusted, so the block tree is too:
 //  - handler tables are read with own-property checks only ("constructor", "__proto__", "toString" are not blocks),
@@ -35,6 +35,7 @@ interface B {
   next?: { block?: B; shadow?: B };
   extraState?: Record<string, unknown>;
   enabled?: boolean;
+  disabledReasons?: unknown;
 }
 interface Known { vars: Map<string, Ty>; fnRet: Map<string, Ty | 'void'>; fnParams: Map<string, Ty[]> }
 
@@ -46,13 +47,11 @@ const wide = (a: Ty, b: Ty): Ty => (a === 'String' || b === 'String' ? 'String' 
 const num2 = (a: Ty, b: Ty): Ty => { const t = wide(a, b); return t === 'bool' || t === 'String' || t === 'char' ? 'int' : t; };
 const wrap = (e: E, p: number, right = false) => (e.p > p || (e.p === p && right) ? `(${e.c})` : e.c);
 
-const RESERVED = new Set(('setup loop delay millis micros pinMode digitalWrite digitalRead analogRead analogWrite tone noTone map abs min max round random ' +
-  'randomSeed Serial lcd int long float double char bool byte void if else for while do break continue return true false HIGH LOW INPUT OUTPUT ' +
-  'INPUT_PULLUP new delete class struct this const static switch case default word String Servo sq sqrt pow log exp constrain main auto short signed ' +
-  'unsigned template typename namespace using register volatile goto enum union sizeof typedef public private protected virtual friend operator ' +
-  'bit bitRead bitWrite cos sin tan floor ceil lowByte highByte pulseIn shiftOut shiftIn attachInterrupt isnan').split(' '));
-const OWN = /^(servo|strip|dht|lastRun)\d*$|^(SEG_DIGITS|showDigit|readKeypad|readIrCode|readUltrasonicCm)$|^A\d+$|^D\d+$/;
+// Every identifier made from a user name carries a prefix (v_ variables, f_ functions), so a student's name can never be an
+// Arduino / C++ / library symbol (yield, Wire, initVariant, sqrtf ...) and never collides with the generator's own names.
 const LOOP_VARS = ['i', 'j', 'k', 'l', 'm', 'n'];
+/** Blockly 13 saves a disabled block as disabledReasons; older files used enabled:false. Either one keeps a block from running. */
+const isDisabled = (b: B): boolean => b.enabled === false || (Array.isArray(b.disabledReasons) && b.disabledReasons.length > 0);
 
 function widenInto(m: Map<string, Ty>, key: string, t: Ty) {
   const old = m.get(key);
@@ -60,22 +59,26 @@ function widenInto(m: Map<string, Ty>, key: string, t: Ty) {
 }
 const lit = (n: number): E => ({ c: String(n), p: n < 0 ? UNARY : ATOM, t: Number.isInteger(n) ? (Math.abs(n) <= 32767 ? 'int' : 'long') : 'float', lit: true });
 const isLiteralNumber = (e: E) => e.lit && /^-?\d+(\.\d+)?$/.test(e.c);
+const encoder = new TextEncoder();
+/** Characters that read differently from how they compile: bidi controls, zero-width characters, line separators, lone surrogates. */
+const INVISIBLE = /[\u200b-\u200f\u202a-\u202e\u2060-\u2069\u061c\ufeff\u00ad\u2028\u2029\ud800-\udfff]/;
+const INVISIBLE_ALL = new RegExp(INVISIBLE.source, 'g');
+const octal = (ch: string) => Array.from(encoder.encode(ch), byte => '\\' + byte.toString(8).padStart(3, '0')).join('');
 /** Fixed-width octal escapes cannot absorb following digits (unlike \x escapes). */
 export const cStringLiteral = (s: string): string => '"' + Array.from(s, ch => {
-  if (ch === '\\') return '\\\\';
+  if (ch === '\\') return '\\134'; // octal, so a compiler's \u / \U universal-character-name check can never misread "C:\users"
   if (ch === '"') return '\\"';
   if (ch === '?') return '\\?'; // Disable C/C++ trigraphs before lexical analysis.
   if (ch === '\n') return '\\n';
   if (ch === '\r') return '\\r';
   if (ch === '\t') return '\\t';
   const n = ch.codePointAt(0)!;
-  if (n < 32 || (n >= 127 && n <= 159)) return Array.from(new TextEncoder().encode(ch),
-    byte => '\\' + byte.toString(8).padStart(3, '0')).join('');
+  if (n < 32 || (n >= 127 && n <= 159) || INVISIBLE.test(ch)) return octal(ch);
   return ch;
 }).join('') + '"';
 
 /** Comments must stay on one physical line, even after C++ preprocessing. */
-const commentText = (s: string): string => s.replace(/[\x00-\x1f\x7f-\x9f\u2028\u2029]/g, ' ')
+const commentText = (s: string): string => s.replace(/[\x00-\x1f\x7f-\x9f]/g, ' ').replace(INVISIBLE_ALL, ' ')
   .replace(/\\/g, '＼').replace(/\?/g, '？').replace(/\*\//g, '* /').replace(/\/\*/g, '/ *').replace(/\/\//g, '/ /');
 
 
@@ -91,7 +94,7 @@ class Ctx {
   next: Known = { vars: new Map(), fnRet: new Map(), fnParams: new Map() };
   idents = new Map<string, string>();
   taken = new Set<string>();
-  names: { orig: string; ident: string }[] = [];
+  names: { orig: string; ident: string; fn: boolean }[] = [];
   count = new Map<string, number>();
   varNames = new Map<string, string>(); // variable id -> original name
   forVars = new Set<string>();
@@ -120,32 +123,35 @@ class Ctx {
   warn(msg: string) { if (!this.warnings.includes(msg)) this.warnings.push(msg); }
   include(h: string) { this.includes.add(h); }
 
-  /** C identifier for a user name (variable / function). Korean names become var1, fn1... with a comment. */
-  ident(name: string, prefix: string): string {
-    const original = name;
-    name = safeOriginalName(name);
-    if (name !== original) this.warn('블록 이름이 올바르지 않아 안전한 기본 이름으로 바꿨어요.');
-    const got = this.idents.get(prefix + name);
+  /**
+   * C identifier for a user variable / function. `key` is the thing's identity (Blockly variable id, else the name lowercased
+   * the way Blockly compares names), so one thing always gets one identifier and different things always get different ones.
+   * The name only shapes the identifier when it is a plain ASCII word; otherwise it is numbered (v_1, f_2) and the original
+   * name goes into a comment. The prefix keeps it clear of every Arduino / C++ symbol.
+   */
+  ident(key: string, name: string, prefix: 'v_' | 'f_'): string {
+    const got = this.idents.get(prefix + key);
     if (got) return got;
-    let id = name;
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(id)) id = `${prefix}${(this.count.get(prefix) ?? 0) + 1}`, this.count.set(prefix, (this.count.get(prefix) ?? 0) + 1);
-    else if (RESERVED.has(id) || OWN.test(id)) id += '_';
+    let id = prefix + name;
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,59}$/.test(name)) { const n = (this.count.get(prefix) ?? 0) + 1; this.count.set(prefix, n); id = `${prefix}${n}`; }
     while (this.taken.has(id)) id += '_';
     this.taken.add(id);
-    this.idents.set(prefix + name, id);
-    this.names.push({ orig: name, ident: id });
+    this.idents.set(prefix + key, id);
+    this.names.push({ orig: name, ident: id, fn: prefix === 'f_' });
     return id;
   }
+  /** Variable by Blockly id (a field value {id}) or by name; `fallback` when neither is present. */
+  varNamed(id: string, name: string): string { return this.ident(id ? `id:${id}` : `n:${name.toLowerCase()}`, name, 'v_'); }
   varIdent(b: B, field = 'VAR'): string {
     const f = b.fields?.[field];
     const checked = readBlockField(b.type, field, f);
     if (!checked.valid) {
       this.warn('변수 이름 필드 값이 올바르지 않아 안전한 기본 이름으로 바꿨어요.');
-      return this.ident(checked.value, 'var');
+      return this.ident('invalid', '이름 없음', 'v_');
     }
-    const id = typeof f === 'object' && f ? safeText((f as { id?: unknown }).id) : safeText(f);
-    const name = (id && this.varNames.get(id)) || (typeof f === 'object' && f ? safeText((f as { name?: unknown }).name) : '') || id || 'x';
-    return this.ident(name, 'var');
+    const id = typeof f === 'object' && f ? safeText((f as { id?: unknown }).id) : '';
+    const name = (id && this.varNames.get(id)) || (typeof f === 'object' && f ? safeText((f as { name?: unknown }).name) : safeText(f)) || id || 'x';
+    return this.varNamed(id, name);
   }
   varType(ident: string): Ty { return this.known.vars.get(ident) ?? 'int'; }
 
@@ -165,6 +171,12 @@ class Ctx {
     if (!checked.valid) this.warn('블록 이름 값이 올바르지 않아 안전한 기본 이름으로 바꿨어요.');
     return checked.value;
   }
+  /** A procedure parameter is a variable: Blockly gives it an id that the body's variable blocks refer to. */
+  paramIdent(p: unknown): string {
+    const o = (p && typeof p === 'object' ? p : {}) as { id?: unknown; name?: unknown };
+    const id = typeof o.id === 'string' ? o.id : '';
+    return this.varNamed(id, (id && this.varNames.get(id)) || this.name(o.name));
+  }
   pin(b: B, name: string, mode?: string): string {
     const v = this.field(b, name);
     if (mode) this.setPin(v, mode);
@@ -174,7 +186,7 @@ class Ctx {
   input(b: B, name: string): E | undefined {
     const i = b.inputs?.[name];
     const c = i?.block ?? i?.shadow;
-    return c && c.enabled !== false ? this.expr(c) : undefined;
+    return c && !isDisabled(c) ? this.expr(c) : undefined;
   }
   val(b: B, name: string, def: E = lit(0), why = ''): E {
     const e = this.input(b, name);
@@ -199,7 +211,7 @@ class Ctx {
     try {
       for (let cur = b; isBlock(cur); cur = cur.next?.block ?? cur.next?.shadow) {
         if (!this.enter()) break;
-        if (cur.enabled === false) continue;
+        if (isDisabled(cur)) continue;
         const h = own(S, cur.type);
         if (!h) { this.warn(`지원하지 않는 블록이에요: ${safeName(cur.type)}`); continue; }
         out.push(...h(this, cur));
@@ -214,7 +226,7 @@ class Ctx {
     this.depth++;
     try { return h(this, b); } finally { this.depth--; }
   }
-  fnIdent(name: string) { return this.ident(name, 'fn'); }
+  fnIdent(name: string) { return this.ident(`n:${name.toLowerCase()}`, name, 'f_'); }
 }
 
 const isBlock = (b: unknown): b is B => typeof b === 'object' && b !== null && !Array.isArray(b);
@@ -555,25 +567,25 @@ export { PROGRAM_HEADER };
 function run(tops: B[], varNames: Map<string, string>, opts: GenOptions, known: Known): { ctx: Ctx; code: string } {
   const g = new Ctx(opts, known);
   g.varNames = varNames;
-  for (const n of varNames.values()) g.ident(n, 'var'); // reserve every variable name before picking loop counters
+  for (const [id, n] of varNames) g.varNamed(id, n); // reserve every variable before picking loop counters
   for (const t of tops) for (const b of walk(t)) {
     if (b.type === 'controls_for') g.forVars.add(g.varIdent(b));
     else if (b.type === 'variables_set' || b.type === 'math_change') g.setVars.add(g.varIdent(b));
     else if (b.type === 'procedures_defnoreturn' || b.type === 'procedures_defreturn') {
       g.fnIdent(g.field(b, 'NAME'));
-      for (const p of Array.isArray(b.extraState?.params) ? (b.extraState.params as { name?: unknown }[]) : []) g.paramVars.add(g.ident(g.name(p?.name), 'var'));
+      for (const p of Array.isArray(b.extraState?.params) ? (b.extraState.params as { name?: unknown }[]) : []) g.paramVars.add(g.paramIdent(p));
     }
   }
   const setup: string[] = [], loop: string[] = [], fns: string[] = [], protos: string[] = [];
   let setups = 0, loops = 0;
   const orphans: string[] = [];
   for (const t of tops) {
-    if (t.enabled === false) continue;
+    if (isDisabled(t)) continue;
     if (t.type === 'lab_setup') { setups++; setup.push(...g.body(t, 'DO')); }
     else if (t.type === 'lab_loop') { loops++; loop.push(...g.body(t, 'DO')); }
     else if (t.type === 'procedures_defnoreturn' || t.type === 'procedures_defreturn') {
       const name = g.fnIdent(g.field(t, 'NAME'));
-      const pnames = (Array.isArray(t.extraState?.params) ? (t.extraState.params as { name?: unknown }[]) : []).map((p) => g.ident(g.name(p?.name), 'var'));
+      const pnames = (Array.isArray(t.extraState?.params) ? (t.extraState.params as { name?: unknown }[]) : []).map((p) => g.paramIdent(p));
       const ptypes = pnames.map((_, i) => g.known.fnParams.get(name)?.[i] ?? 'int');
       const body = g.body(t, 'STACK');
       let ret = 'void';
@@ -600,9 +612,9 @@ function run(tops: B[], varNames: Map<string, string>, opts: GenOptions, known: 
     const t = g.known.vars.get(v) ?? 'int';
     const init = t === 'String' ? '""' : t === 'bool' ? 'false' : t === 'float' ? '0.0' : '0';
     const o = origOf.get(v);
-    return `${CTYPE[t]} ${v} = ${init};${o && o !== v ? `  // 변수 "${commentText(o)}"` : ''}`;
+    return `${CTYPE[t]} ${v} = ${init};${o && v !== `v_${o}` ? `  // 변수 "${commentText(o)}"` : ''}`;
   });
-  for (const n of g.names) if (n.ident.startsWith('fn') && /[^\x00-\x7f]/.test(n.orig)) g.globals.push(`// 함수 "${commentText(n.orig)}" = ${n.ident}`);
+  for (const n of g.names) if (n.fn && n.ident !== `f_${n.orig}`) g.globals.push(`// 함수 "${commentText(n.orig)}" = ${n.ident}`);
 
   const setupLines: string[] = [];
   if (g.serial) setupLines.push('Serial.begin(9600);  // 시리얼 통신 시작 (모니터와 같은 속도 9600)');

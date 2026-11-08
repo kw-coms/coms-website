@@ -3,28 +3,12 @@
 // node_modules/blockly/media into public/blockly-media (Blockly would otherwise load them from static.blockly.com).
 import { useEffect, useRef } from 'react';
 import * as Blockly from 'blockly/core';
-import 'blockly/blocks';
-import * as Ko from 'blockly/msg/ko';
-import { COLOUR, CUSTOM_BLOCKS, TOOLBOX, type PinKind, PIN_VALUES } from './defs';
-import { blocksProblem, stringifyJsonBounded } from '../../core/scene';
+import { COLOUR, TOOLBOX } from './defs';
+import { stringifyJsonBounded } from '../../core/scene';
+import { loadBlocks, setPinHints } from './blocklyRuntime';
 import './blocks.css';
 
-Blockly.setLocale(Ko as unknown as Record<string, string>);
-
-let pinHints: Record<string, string> = {};
-const pinOptions = (kind: PinKind): [string, string][] => PIN_VALUES[kind].map((v) => [pinHints[v] ? `${v} · ${pinHints[v]}` : v, v]);
-
-for (const def of CUSTOM_BLOCKS) {
-  Blockly.Blocks[def.type] = {
-    init(this: Blockly.Block) {
-      this.jsonInit(def);
-      for (const a of def.args0 ?? []) {
-        const kind = a.pinKind as PinKind | undefined;
-        if (kind) (this.getField(a.name as string) as Blockly.FieldDropdown).setOptions(() => pinOptions(kind));
-      }
-    },
-  };
-}
+export { loadBlocks };
 
 const classic = Blockly.Themes.Classic;
 const blockStyles = Object.fromEntries(
@@ -50,108 +34,6 @@ export interface BlocksEditorProps {
   onChange: (state: unknown) => void;
 }
 
-const START_WORKSPACE = () => ({ blocks: { languageVersion: 0, blocks: [
-  { type: 'lab_setup', x: 24, y: 24 }, { type: 'lab_loop', x: 24, y: 130 },
-] } });
-
-/**
- * Load a workspace into Blockly. The state is untrusted (share links, opened files), and Blockly allocates one input per
- * mutator item while loading, so it is checked again here: anything validateScene would refuse gives the start workspace.
- * Returns the Korean reason when it refused, null otherwise.
- */
-export function loadBlocks(w: Blockly.Workspace, s: unknown): string | null {
-  w.clear();
-  const problem = s && typeof s === 'object' ? blocksProblem(s) : null;
-  if (problem) console.warn('블록 불러오기를 건너뛰었어요:', problem);
-  const state = s && typeof s === 'object' && !problem ? s as object : START_WORKSPACE();
-  if (stringifyJsonBounded(state, 64, 256 * 1024) !== null) {
-    Blockly.serialization.workspaces.load(state, w);
-  } else {
-    // Blockly's deserializer recursively follows next/input blocks. A valid
-    // 450-block workspace can exceed the JS stack on smaller hosts.
-    const workspace = state as { blocks?: { blocks?: Blockly.serialization.blocks.State[] } };
-    const roots = workspace.blocks?.blocks ?? [];
-    Blockly.serialization.workspaces.load({ ...state, blocks: { ...workspace.blocks, blocks: [] } }, w);
-    loadDeepBlocks(w, roots);
-  }
-  return problem;
-}
-
-function loadDeepBlocks(w: Blockly.Workspace, roots: Blockly.serialization.blocks.State[]): void {
-  type State = Blockly.serialization.blocks.State;
-  type Task = { state: State; parent?: Blockly.Connection; loaded?: Blockly.Block };
-  const pending: Task[] = roots.map(root => ({ state: root })).reverse();
-  const shadows = new WeakMap<Blockly.Connection, State>();
-  const wrapped = new WeakSet<Blockly.Connection>();
-  const ready = new WeakSet<Blockly.Connection>();
-  const building = new Set<Blockly.Connection>();
-  const drain = (): void => {
-    while (pending.length) {
-      const { state, parent, loaded } = pending.pop()!;
-      const { inputs, next, ...shallow } = state;
-      const block = loaded ?? Blockly.serialization.blocks.appendInternal(shallow, w, { parentConnection: parent });
-      const connect = (connection: Blockly.Connection | null | undefined, slot: Blockly.serialization.blocks.ConnectionState) => {
-        if (!connection) throw new Error('블록 연결이 올바르지 않습니다.');
-        if (slot.shadow) attachShadow(connection, slot.shadow, !!slot.block);
-        if (slot.block) pending.push({ state: slot.block, parent: connection });
-      };
-      if (next) connect(block.nextConnection, next);
-      for (const [name, slot] of Object.entries(inputs ?? {}).reverse()) connect(block.getInput(name)?.connection, slot);
-    }
-    for (const connection of building) ready.add(connection);
-    building.clear();
-  };
-  const attachShadow = (connection: Blockly.Connection, state: State, obscured: boolean): void => {
-    const originalRespawn: unknown = Reflect.get(connection, 'respawnShadow_');
-    if (typeof originalRespawn !== 'function') {
-      console.warn('블록 그림자 복원 기능을 사용할 수 없어요.');
-      return;
-    }
-    const { inputs: _inputs, next: _next, ...shallow } = state;
-    void _inputs; void _next;
-    connection.setShadowState(shallow);
-    shadows.set(connection, state);
-    if (!wrapped.has(connection)) {
-      wrapped.add(connection);
-      const originalGet = connection.getShadowState.bind(connection);
-      // Blockly respawns from shadowState recursively. Keep its stored state
-      // shallow and restore descendants through the same iterative loader.
-      Reflect.set(connection, 'respawnShadow_', () => {
-        originalRespawn.call(connection);
-        const shadow = connection.targetBlock();
-        const saved = shadows.get(connection);
-        if (shadow?.isShadow() && saved) {
-          ready.delete(connection);
-          building.add(connection);
-          pending.push({ state: saved, loaded: shadow });
-          drain();
-        }
-      });
-      Reflect.set(connection, 'getShadowState', (current?: boolean) => {
-        const saved = shadows.get(connection);
-        if (!saved) return originalGet(current);
-        if (!current) {
-          const { inputs: _inputs, next: _next, ...shallowState } = saved;
-          void _inputs; void _next;
-          return shallowState; // Blockly's recursive respawn sees only one block.
-        }
-        const active = connection.targetBlock();
-        if (!active?.isShadow()) return saved;
-        if (!ready.has(connection)) return saved;
-        const latest = originalGet(true);
-        if (latest) shadows.set(connection, latest);
-        return latest;
-      });
-    }
-    const shadow = connection.targetBlock();
-    if (!obscured && shadow?.isShadow()) {
-      building.add(connection);
-      pending.push({ state, loaded: shadow });
-    }
-  };
-  drain();
-}
-
 export default function BlocksEditor({ state, dark, hints, readOnly, onChange }: BlocksEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const ws = useRef<Blockly.WorkspaceSvg | null>(null);
@@ -160,7 +42,7 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
   const loader = useRef<(s: unknown) => void>(() => {});
   const cb = useRef(onChange);
   cb.current = onChange;
-  pinHints = hints;
+  setPinHints(hints);
 
   useEffect(() => {
     const w = Blockly.inject(host.current!, {
