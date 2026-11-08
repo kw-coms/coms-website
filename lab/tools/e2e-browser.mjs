@@ -440,6 +440,9 @@ try {
     await dp.getByRole('radio', { name: '화질: 낮음' }).check();
     await dp.keyboard.press('Escape');
     check('quality popover: Esc closes and returns focus to the button', !(await aaBox.isVisible()) && (await dp.evaluate(() => document.activeElement?.className.includes('quality-btn'))));
+    await openQ(); // opened by a real mouse click: Tabbing out of the last control must still close it
+    await aaBox.focus(); await dp.keyboard.press('Tab'); await dp.waitForTimeout(200);
+    check('quality popover: Tab out of the last control closes it', !(await aaBox.isVisible()));
     await openQ();
     const live = () => dp.evaluate(() => window.__ctxs.filter((c) => !c.isContextLost()).length);
     const attr = () => dp.evaluate(() => { const c = window.__ctxs.filter((x) => !x.isContextLost()).at(-1); return c ? c.getContextAttributes().antialias : null; });
@@ -454,14 +457,24 @@ try {
       await dp.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.1, { steps: 12 }); await dp.mouse.up();
       await dp.waitForTimeout(1200); // damping settles
       await openQ(); // the drag outside closed the popover
-      const cam = () => dp.evaluate(() => window.__lab.camera());
-      const near = (a, b) => a && b && a.every((v, i) => Math.abs(v - b[i]) < 1);
+      const cam = () => dp.evaluate(() => window.__lab.cameraPose());
+      const near = (a, b) => a && b && a.pos.every((v, i) => Math.abs(v - b.pos[i]) < 1) && a.target.every((v, i) => Math.abs(v - b.target[i]) < 1) && Math.abs(a.zoom - b.zoom) < 0.01 * a.zoom;
+      const fmt = (c) => c && `${c.pos.map((v) => v.toFixed(1))} | ${c.target.map((v) => v.toFixed(1))} | z${c.zoom.toFixed(2)}`;
       const c0 = await cam();
       await aaBox.uncheck(); await dp.waitForTimeout(900);
       const c1 = await cam();
-      check('antialias: camera unchanged after toggling off', near(c0, c1), `${c0?.map((v) => v.toFixed(1))} -> ${c1?.map((v) => v.toFixed(1))}`);
+      check('antialias: camera position, target and zoom unchanged after toggling off', near(c0, c1), `${fmt(c0)} -> ${fmt(c1)}`);
       await aaBox.check(); await dp.waitForTimeout(900);
-      check('antialias: camera unchanged after toggling on', near(c0, await cam()));
+      check('antialias: camera unchanged after toggling on (second snapshot)', near(c0, await cam()));
+      // top (orthographic) view: zoom must survive too
+      await dp.evaluate(() => window.__lab.set({ view: 'top' })); await dp.waitForTimeout(1200);
+      await dp.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5); await dp.mouse.wheel(0, -300); await dp.waitForTimeout(900);
+      await openQ();
+      const t0 = await cam();
+      await aaBox.uncheck(); await dp.waitForTimeout(900);
+      check('antialias: top-view zoom and target unchanged after toggle', near(t0, await cam()) && t0.zoom > 0, fmt(t0));
+      await aaBox.check(); await dp.waitForTimeout(900);
+      await dp.evaluate(() => window.__lab.set({ view: 'persp' })); await dp.waitForTimeout(1200);
     }
     for (let i = 0; i < 4; i++) {
       await aaBox.uncheck(); await dp.waitForTimeout(700);

@@ -5,7 +5,7 @@ import {
 import { EXAMPLES } from '../core';
 import { copyShareLink, exportBom, exportIno, exportJson, importJson, loadExample, snapshotPng, toggleTheme } from '../actions';
 import { cancelCompile, pause, reset, run, setSpeed, stop } from '../simHost';
-import { addNote, canRedo, canUndo, redo, set, setAntialias, setQualityMode, undo, useStore } from '../store';
+import { addNote, canRedo, canUndo, dismissQualityNotice, getState, redo, set, setAntialias, setQualityMode, undo, useStore } from '../store';
 import { viewCenterGround } from '../../scene3d/placement';
 import type { Quality, QualityMode } from '../quality';
 
@@ -59,8 +59,8 @@ function QualityMenu({ inMenu }: { inMenu: boolean }) {
   );
   if (inMenu) return <div className="quality-flat">{body}</div>;
   return (
-    <div className="pop quality-pop" onPointerDown={() => { pointerIn.current = true; }} onBlur={(e) => { if (open && !pointerIn.current && !e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false); }}>
-      <button ref={btn} type="button" className={`tb quality-btn ${open ? 'on' : ''}`} aria-haspopup="dialog" aria-expanded={open} title="화질 (느린 컴퓨터에서는 낮춰 보세요)" onClick={() => { if (!open) set({ qualityNotice: null }); setOpen(!open); }}>
+    <div className="pop quality-pop" onPointerDown={() => { pointerIn.current = true; }} onPointerUp={() => { pointerIn.current = false; }} onBlur={(e) => { if (open && !pointerIn.current && !e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false); }}>
+      <button ref={btn} type="button" className={`tb quality-btn ${open ? 'on' : ''}`} aria-haspopup="dialog" aria-expanded={open} title="화질 (느린 컴퓨터에서는 낮춰 보세요)" onClick={() => { if (!open && getState().qualityNotice) dismissQualityNotice(); setOpen(!open); }}>
         화질: {qmode === 'auto' ? `자동 (${QUALITY_LABEL[qeff]})` : QUALITY_LABEL[qmode as Quality]}
         <ChevronDown size={14} />
       </button>

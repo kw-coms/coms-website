@@ -125,11 +125,10 @@ function Invalidator() {
 }
 
 /** Camera pose carried across an antialias remount of the Canvas, so the user's orbit and zoom are not reset. */
-let keptCamera: { pos: number[]; target: number[]; zoom: number; min: number; max: number; view: string; tick: number; at: number } | null = null;
-const KEEP_MS = 3000; // the remounting Canvas runs the camera effect several times (default camera, controls, makeDefault camera)
+let keptCamera: { pos: number[]; target: number[]; zoom: number; min: number; max: number; view: string; tick: number } | null = null;
 const snapshotCamera = () => {
   const { camera, controls } = refs;
-  keptCamera = camera && controls ? { pos: camera.position.toArray(), target: controls.target.toArray(), zoom: (camera as { zoom?: number }).zoom ?? 1, min: controls.minDistance, max: controls.maxDistance, view: getState().view, tick: getState().cameraResetTick, at: performance.now() } : null;
+  keptCamera = camera && controls ? { pos: camera.position.toArray(), target: controls.target.toArray(), zoom: (camera as { zoom?: number }).zoom ?? 1, min: controls.minDistance, max: controls.maxDistance, view: getState().view, tick: getState().cameraResetTick } : null;
 };
 
 function CameraRig() {
@@ -137,12 +136,14 @@ function CameraRig() {
   const tick = useStore((s) => s.cameraResetTick);
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
+  const invalidate = useThree((s) => s.invalidate);
   useEffect(() => {
     refs.camera = camera;
     refs.controls = controls;
     const k = keptCamera;
-    if (k && k.view === view && k.tick === tick && performance.now() - k.at < KEEP_MS) {
-      if (!controls) return; // restore once the controls exist
+    if (k && k.view === view && k.tick === tick) {
+      // the remounting Canvas runs this effect for its default camera first: restore only once the controls drive the final makeDefault camera
+      if (!controls || controls.object !== camera) return;
       camera.position.fromArray(k.pos);
       controls.target.fromArray(k.target);
       controls.minDistance = k.min;
@@ -150,13 +151,14 @@ function CameraRig() {
       if ((camera as { zoom?: number }).zoom !== undefined) (camera as { zoom: number }).zoom = k.zoom;
       camera.updateProjectionMatrix();
       controls.update();
-      refs.invalidate();
+      keptCamera = null;
+      invalidate();
     } else {
       keptCamera = null;
       scheduleFrame();
     }
     return () => { if (refs.camera === camera) { refs.camera = null; refs.controls = null; } };
-  }, [camera, controls, view, tick]);
+  }, [camera, controls, view, tick, invalidate]);
   return (
     <>
       {view === 'persp' ? (
