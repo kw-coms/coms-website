@@ -133,6 +133,7 @@ export default defineConfig({
   // sentryVitePlugin must come AFTER react/tailwind so it sees the final build output.
   plugins: [react(), tailwindcss(), pwaPlugin, publicPageHtmlPlugin, ...sentryPlugins, ...analyzePlugins],
   define: {
+    __STUDY_EXERCISE_FIXTURES__: JSON.stringify(process.env.STUDY_EXERCISE_FIXTURES === '1'),
     __APP_VERSION__: JSON.stringify(pkg.version || '0.0.0'),
   },
 

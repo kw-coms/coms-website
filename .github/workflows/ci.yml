@@ -118,6 +118,11 @@ jobs:
       - name: Accessibility e2e
         run: npx playwright test --project=accessibility
 
+      - name: Study exercise browser suite and shipped web answers
+        run: |
+          STUDY_EXERCISE_FIXTURES=1 PWA_DISABLE=1 npm run build -- --configLoader runner
+          STUDY_EXERCISE_FIXTURES=1 npx playwright test --project=smoke tests/e2e/study-exercises.spec.js tests/e2e/study-exercises-web-answers.spec.js
+
   # Circuit Lab (lab/) is its own app with its own lockfile; the root jobs do not look at it. The
   # Arduino compiler service runs here without the toolchain; the full compile path is exercised by
   # the stack job below, through the real images.
@@ -205,6 +210,26 @@ jobs:
             -e RUNNER_TOOLCHAIN_TESTS=1 -e RUNNER_CONTAINER_ATTACK_TESTS=1 -e RUNNER_EXPECT_IPC_LIMITS=1 \
             runner node test/toolchain.mjs
           docker compose -p studyrt -f docker-compose.yml down -v
+
+      - name: Verify exercise solutions against the real runner
+        working-directory: runner
+        env:
+          NGINX_GID: "101"
+          RUNNER_SOCKET_VOLUME: ci-socket
+          RUNNER_STATE_VOLUME: ci-state
+          RATE_LIMIT_PER_MIN: "1000"
+        run: |
+          set -euo pipefail
+          docker compose -p studyrt -f docker-compose.yml up -d runner
+          trap 'docker compose -p studyrt -f docker-compose.yml down -v' EXIT
+          for attempt in $(seq 1 60); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' studyrt-runner-1)" = healthy ] && break
+            if [ "$attempt" -eq 60 ]; then docker logs --tail=50 studyrt-runner-1; exit 1; fi
+            sleep 1
+          done
+          docker compose -p studyrt -f docker-compose.yml run --rm --no-deps \
+            --volume "$GITHUB_WORKSPACE:/repo:ro" --workdir /repo runner \
+            node --experimental-strip-types scripts/verify-exercises.mjs --runner unix:/run/coms-study/run.sock
 
       - name: Compose end to end (seccomp, member key, restart after a crash, deny-list)
         working-directory: runner

@@ -488,8 +488,10 @@ test('two tabs saving from the same baseline: one ends as the draft, the other a
   await replaceCode(other, 0, MINE.replace('내코드', '두번째'))
   await expect(editorOf(other, 0)).toContainText('두번째')
   // One after the other: firing both at the same instant would hit the accepted read-then-write window of localStorage.
-  await page.clock.runFor(1000)
-  await other.clock.runFor(1000)
+  // page.clock is the context's clock, so runFor() would advance both tabs at once; flush each tab by itself instead.
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')))
+  await expect.poll(() => draftsRaw(page)).toContain('첫번째') // A's own save landed before B starts
+  await other.evaluate(() => window.dispatchEvent(new Event('pagehide')))
   await expect.poll(async () => {
     const d = await drafts(page)
     return [d.primary, d.backup].filter(Boolean).join('|')

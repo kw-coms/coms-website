@@ -150,3 +150,137 @@ test('student stdout keeps slashes, dates and URLs; stderr still loses system pa
   assert.equal(r.stdout, text);
   assert.equal(r.stderr.split('\n')[0], '1/2 = 0.5'); assert.match(r.stderr, /^2024\/11\/07 and\/or http:\/\/x\.y\/z \[경로\]$/m); assert.doesNotMatch(r.stderr, /\/app/);
 });
+
+test('multi-case compiles once, preserves order, reaps processes then IPC between cases', async () => {
+  const events = [], calls = [];
+  let time = 0;
+  const r = await runCode({ lang: 'c', code: '', tests: ['first', 'second', 'third'] }, {
+    now: () => time,
+    executor: async (command, args, options) => {
+      calls.push(options); events.push(options.stage === 'compile' ? 'compile' : options.stdin);
+      time += options.stage === 'compile' ? 15000 : 100;
+      return { ...success, stdout: options.stdin, stderr: options.stage === 'compile' ? 'warning' : '' };
+    }, cleanup: async () => { events.push('kill'); }, clearIpc: async () => { events.push('ipc'); },
+  });
+  assert.deepEqual(events, ['compile', 'kill', 'first', 'kill', 'ipc', 'second', 'kill', 'ipc', 'third', 'kill']);
+  assert.deepEqual(r.results.map(x => x.stdout), ['first', 'second', 'third']);
+  assert.deepEqual(r.results.map(x => x.timeMs), [100, 100, 100]);
+  assert.equal(r.stderr, 'warning'); assert.equal(r.timeMs, 15300);
+  assert.deepEqual(Object.keys(r).sort(), ['diagnostics', 'ok', 'results', 'stage', 'stderr', 'timeMs']);
+  assert.equal(calls.filter(x => x.stage === 'compile').length, 1);
+  for (const options of calls.slice(1)) {
+    assert.equal(options.cpuLimit, 2); assert.equal(options.timeoutMs, 4000); assert.equal(options.maxOutputBytes, 8192);
+  }
+  assert.equal(new Set(calls.map(x => x.cwd)).size, 1);
+});
+
+test('shared run deadline includes cleanup, splits wall time and skips the suffix', async () => {
+  let time = 0;
+  const walls = [];
+  const r = await runCode({ lang: 'python', code: '', tests: ['1', '2', '3', '4', '5'] }, {
+    now: () => time, cleanup: async () => { time += 100; }, clearIpc: async () => { time += 100; },
+    executor: async (cmd, args, opt) => {
+      walls.push(opt.timeoutMs); time += opt.timeoutMs;
+      return { ...success, timedOut: true, exitCode: null, signal: 'SIGKILL' };
+    },
+  });
+  assert.deepEqual(walls, [4000, 4000, 1600]);
+  assert.deepEqual(r.results.slice(3), [{ skipped: true }, { skipped: true }]);
+  assert.ok(r.results.slice(0, 3).every(x => x.timedOut));
+});
+
+test('remaining cases are skipped when less than 250 ms of shared wall time remains', async () => {
+  let time = 0;
+  let runs = 0;
+  const r = await runCode({ lang: 'python', code: '', tests: ['first', 'second'] }, {
+    now: () => time,
+    executor: async () => { runs++; time += 9_751; return success; },
+    cleanup: async () => {}, clearIpc: async () => {},
+  });
+  assert.equal(runs, 1);
+  assert.equal(r.results[0].skipped, undefined);
+  assert.deepEqual(r.results[1], { skipped: true });
+});
+
+test('multi-case compile failure has no results and does not run any case', async () => {
+  let calls = 0;
+  const r = await runCode({ lang: 'c', code: '', tests: ['1', '2'] }, {
+    executor: async () => { calls++; return { ...success, exitCode: 1, stderr: 'main.c:1:2: error: bad' }; }, cleanup: async () => {},
+  });
+  assert.equal(calls, 1); assert.equal(r.ok, false); assert.equal(r.stage, 'compile');
+  assert.equal('results' in r, false); assert.equal(r.diagnostics[0].line, 1);
+});
+
+test('multi-case output caps apply after UTF8 decoding and redaction; single shape stays unchanged', async () => {
+  const r = await runCode({ lang: 'python', code: '', tests: [''] }, {
+    executor: async (cmd, args, opt) => ({ ...success, stdout: `${opt.cwd}/x /usr/bin/x ` + '한'.repeat(4000), stderr: '/usr '.repeat(4000) }), cleanup: async () => {},
+  });
+  const c = r.results[0];
+  assert.ok(Buffer.byteLength(c.stdout) <= 8192); assert.ok(Buffer.byteLength(c.stderr) <= 8192);
+  assert.match(c.stdout, /^x \/usr\/bin\/x /); assert.doesNotMatch(c.stderr, /\/usr/);
+  assert.equal(c.truncated, true); assert.equal(c.stdout.includes('\ufffd'), false);
+  const single = await runCode({ lang: 'python', code: '', stdin: '' }, { executor: async () => success, cleanup: async () => {} });
+  assert.deepEqual(Object.keys(single).sort(), ['diagnostics', 'exitCode', 'ok', 'signal', 'stage', 'stderr', 'stdout', 'timeMs', 'timedOut', 'truncated']);
+});
+
+test('per-case CPU override reaches prlimit and polling; per-case stream overflow kills', async () => {
+  for (const [lang, cpuLimit] of [['c', 2], ['java', 4]]) {
+    let poll;
+    const fake = fakeProcess(async c => { await poll(); finish(c, null, 'SIGKILL'); });
+    const r = await executeStage('program', [], { ...fake, cwd: '/tmp/work', lang, stage: 'run', cpuLimit,
+      cpuSeconds: async () => cpuLimit, setIntervalImpl: fn => { poll = fn; return 1; }, clearIntervalImpl() {} });
+    assert.ok(fake.calls[0].args.includes(`--cpu=${cpuLimit}:${cpuLimit + 1}`)); assert.equal(r.timedOut, true);
+  }
+  for (const stream of ['stdout', 'stderr']) {
+    const fake = fakeProcess(c => { c[stream].write(Buffer.alloc(8193, 255)); finish(c, null, 'SIGKILL'); });
+    const r = await executeStage('program', [], { ...fake, cwd: '/tmp/work', lang: 'python', stage: 'run', maxOutputBytes: 8192 });
+    assert.ok(Buffer.byteLength(r[stream]) <= 8192); assert.equal(r.truncated, true);
+    assert.ok(fake.calls.some(x => x.pid === -12345));
+  }
+});
+
+test('mid-loop process or IPC cleanup failure poisons runner even if final cleanup succeeds', async () => {
+  for (const failing of ['kill', 'ipc']) {
+    // Separate module state: poisoning must remain latched without affecting other tests.
+    const runner = await import(`../run.mjs?poison-${failing}`);
+    let ran = 0, kills = 0;
+    await assert.rejects(runner.runCode({ lang: 'python', code: '', tests: ['1', '2'] }, {
+      executor: async () => { ran++; return success; },
+      cleanup: async () => { if (++kills === 1 && failing === 'kill') throw new Error('kill failed'); },
+      clearIpc: async () => { if (failing === 'ipc') throw new Error('ipc failed'); },
+    }), /failed/);
+    assert.equal(ran, 1); assert.equal(kills, 2); assert.equal(runner.runnerHealthy(), false);
+  }
+});
+
+test('ten escaped-output cases keep the serialized response below 200 KB', async () => {
+  for (const output of ['\n'.repeat(8192), '\t'.repeat(8192), '"\\'.repeat(4096)]) {
+    const r = await runCode({ lang: 'python', code: '', tests: Array(10).fill('') }, {
+      executor: async () => ({ ...success, stdout: output, stderr: output }), cleanup: async () => {},
+    });
+    assert.equal(r.results.length, 10);
+    assert.ok(Buffer.byteLength(JSON.stringify(r)) <= 200_000);
+    assert.ok(r.results.every(x => x.truncated));
+  }
+});
+
+test('Java cases receive four CPU seconds while compilation keeps its original limits', async () => {
+  const calls = [];
+  await runCode({ lang: 'java', code: 'class Main {}', tests: ['', ''] }, {
+    executor: async (cmd, args, opt) => { calls.push(opt); return success; }, cleanup: async () => {},
+  });
+  assert.equal(calls[0].stage, 'compile'); assert.equal(calls[0].cpuLimit, undefined);
+  assert.ok(calls.slice(1).every(x => x.cpuLimit === 4 && x.timeoutMs <= 4000));
+  assert.ok(stageLimits('c', 'run').includes('--cpu=3:4'));
+  assert.ok(stageLimits('java', 'compile').includes('--cpu=10:11'));
+});
+
+test('compile diagnostics and escaped output together fit the multi-response bound', async () => {
+  const r = await runCode({ lang: 'c', code: '', tests: Array(10).fill('') }, {
+    executor: async (cmd, args, opt) => opt.stage === 'compile'
+      ? { ...success, stderr: "main.c:1:1: warning: expected ';'\n".repeat(100) }
+      : { ...success, stdout: '\n'.repeat(8192), stderr: '\n'.repeat(8192) }, cleanup: async () => {},
+  });
+  assert.ok(r.diagnostics.length > 0);
+  assert.ok(Buffer.byteLength(JSON.stringify(r)) <= 200_000);
+});

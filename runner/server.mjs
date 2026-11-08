@@ -8,9 +8,10 @@ import { basename, resolve as resolvePath, sep } from 'node:path';
 import { runCode, runnerHealthy } from './run.mjs';
 import { createRunQueue, createRateLimiter, createDenyList, createInflight, normalizeIp, QUEUE_TIMEOUT } from './limits.mjs';
 
-export const MAX_BODY_BYTES = 96 * 1024;
+export const MAX_BODY_BYTES = 112 * 1024;
 const MAX_CODE_BYTES = 64 * 1024;
 const MAX_STDIN_BYTES = 16 * 1024;
+const MAX_TESTS_BYTES = 32 * 1024;
 const rejected = messageKo => ({ error: 'rejected', messageKo });
 
 export function rateLimitPerMinute(value = process.env.RATE_LIMIT_PER_MIN) {
@@ -43,7 +44,15 @@ export function validateRequest(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return '요청 본문은 JSON 객체여야 해요.';
   if (!['c', 'java', 'python'].includes(body.lang)) return '지원하지 않는 언어예요.';
   if (typeof body.code !== 'string' || Buffer.byteLength(body.code, 'utf8') > MAX_CODE_BYTES) return '코드는 64 KB 이하의 문자열이어야 해요.';
+  if (Object.hasOwn(body, 'stdin') && Object.hasOwn(body, 'tests')) return '표준 입력과 테스트 입력은 함께 보낼 수 없어요.';
   if (body.stdin !== undefined && (typeof body.stdin !== 'string' || Buffer.byteLength(body.stdin, 'utf8') > MAX_STDIN_BYTES)) return '표준 입력은 16 KB 이하의 문자열이어야 해요.';
+  if (Object.hasOwn(body, 'tests')) {
+    if (!Array.isArray(body.tests) || body.tests.length < 1 || body.tests.length > 10 ||
+        Array.from(body.tests).some(value => typeof value !== 'string' || Buffer.byteLength(value, 'utf8') > MAX_STDIN_BYTES) ||
+        body.tests.reduce((total, value) => total + Buffer.byteLength(value, 'utf8'), 0) > MAX_TESTS_BYTES) {
+      return '테스트 입력은 1~10개의 문자열이어야 하고, 각 16 KB·전체 32 KB 이하여야 해요.';
+    }
+  }
   return null;
 }
 
@@ -59,7 +68,7 @@ function readJson(request) {
     request.on('data', chunk => {
       if (settled) return;
       size += chunk.length;
-      if (size > MAX_BODY_BYTES) fail('요청 본문은 96 KB 이하여야 해요.');
+      if (size > MAX_BODY_BYTES) fail('요청 본문은 112 KB 이하여야 해요.');
       else chunks.push(chunk);
     });
     request.on('end', () => {
@@ -113,7 +122,7 @@ export function createRunnerServer({
       // Cheap header checks first: a request that is refused here must not use up the member's run budget.
       const contentType = request.headers['content-type'] || '';
       if (!/^application\/json\s*(?:;\s*charset\s*=\s*utf-8\s*)?$/i.test(contentType) || request.headers['content-encoding']) return send(400, rejected('압축하지 않은 application/json 본문을 보내 주세요.'));
-      if (Number(request.headers['content-length']) > MAX_BODY_BYTES) return send(400, rejected('요청 본문은 96 KB 이하여야 해요.'));
+      if (Number(request.headers['content-length']) > MAX_BODY_BYTES) return send(400, rejected('요청 본문은 112 KB 이하여야 해요.'));
       if (!limiter.take(key)) {
         response.setHeader('Retry-After', '60');
         return send(429, { error: 'rate-limited', messageKo: '1분 동안의 실행 요청 한도를 넘었어요. 잠시 기다려 주세요.' });
@@ -129,7 +138,9 @@ export function createRunnerServer({
       const pending = queue.submit(async () => {
         if (response.destroyed) return null;
         inflight.begin({ clientKey: key, jobId: id, startedAt: Date.now() });
-        try { return await executor({ lang: body.lang, code: body.code, stdin: body.stdin ?? '' }); }
+        try { return await executor(Object.hasOwn(body, 'tests')
+          ? { lang: body.lang, code: body.code, tests: body.tests }
+          : { lang: body.lang, code: body.code, stdin: body.stdin ?? '' }); }
         finally { inflight.end(); }
       });
       if (!pending) { response.setHeader('Retry-After', '20'); return send(429, { error: 'busy', messageKo: '실행 대기열이 가득 찼어요. 잠시 후 다시 시도해 주세요.' }); }

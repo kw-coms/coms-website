@@ -33,6 +33,18 @@ describe('AVR UNO adapter', () => {
     expect(modes).toEqual(['output', 'input']);
   });
 
+  it('reports a pull-up PORT write once and ignores unchanged PORT writes', () => {
+    const mcu = new AvrMcu();
+    const modes: string[] = [];
+    mcu.onPinModeChange = (pin, mode) => {
+      if (pin === 'D4') modes.push(mode);
+    };
+    mcu.cpu.writeData(0x2b, 1 << 4);
+    mcu.cpu.writeData(0x2b, 1 << 4);
+    mcu.cpu.writeData(0x2b, 0);
+    expect(modes).toEqual(['input_pullup', 'input']);
+  });
+
   it('transmits an AVR USART byte', () => {
     const mcu = new AvrMcu();
     let output = '';
