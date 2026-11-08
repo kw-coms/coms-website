@@ -21,7 +21,7 @@ function hookScript(id: number) {
     "window.addEventListener('error',function(e){s('error',['오류: '+e.message+(e.lineno?' ('+e.lineno+'번째 줄 근처)':'')]);});" +
     "window.addEventListener('unhandledrejection',function(e){s('error',['오류: '+(e.reason&&e.reason.message||e.reason)]);});" +
     // The frame reports its content height so the parent can size it (see applyFrameSize); only the parent's own frame can send this.
-    "var d=document.documentElement,last=0,q=0;function z(){q=0;var h=Math.ceil(d.getBoundingClientRect().height);if(h===last)return;last=h;try{parent.postMessage({__demo:ID,type:'size',h:h},'*');}catch(e){}}" +
+    "var K=Math.random().toString(36).slice(2),d=document.documentElement,last=0,q=0;function z(){q=0;var h=Math.ceil(d.getBoundingClientRect().height);if(h===last)return;last=h;try{parent.postMessage({__demo:ID,type:'size',h:h,k:K},'*');}catch(e){}}" +
     "function r(){if(!q)q=requestAnimationFrame(z);}" +
     "if(window.ResizeObserver)new ResizeObserver(r).observe(d);window.addEventListener('load',z);setTimeout(z,300);setTimeout(z,1200);" +
     '})();</script>'
@@ -30,18 +30,8 @@ function hookScript(id: number) {
 export const FRAME_MIN = 64
 export const FRAME_MAX = 640
 
-// Content taller than its own frame by a fixed amount (min-height:100vh plus a body margin) has no fixed point and would grow
-// every round trip. A frame may be resized RESIZE_BURST times per second; the rest are dropped, so such a page stops after a few steps.
-const RESIZE_BURST = 4
-const recent = new WeakMap<object, number[]>()
-function allowResize(frame: object): boolean {
-  const now = Date.now()
-  const times = (recent.get(frame) ?? []).filter((t) => now - t < 1000)
-  if (times.length >= RESIZE_BURST) { recent.set(frame, times); return false }
-  times.push(now)
-  recent.set(frame, times)
-  return true
-}
+// Per frame and document (the hook's random key k): the last reported height and how much we last grew the frame.
+const sizing = new WeakMap<object, { k: unknown; prev: number; grew: number }>()
 
 /**
  * Sizes a result frame to its content from the `size` message of its console hook. The frame has an opaque
@@ -51,11 +41,20 @@ function allowResize(frame: object): boolean {
 export function applyFrameSize(frame: HTMLIFrameElement, e: MessageEvent, id: number): boolean {
   const d = e.data
   if (!d || d.__demo !== id || d.type !== 'size' || e.source !== frame.contentWindow || typeof d.h !== 'number' || !Number.isFinite(d.h)) return false
-  // Frames are border-box (see the CSS), so the border is added to the content height. Changes of 1px or less are
-  // ignored: content that follows its own frame (100vh, height:100%) must settle, not grow a pixel per round trip.
+  // Frames are border-box, so the border is added to the content height. Growth is always applied; shrinking only past 1px (no jitter).
+  // A report that grew by the amount we just grew the frame is the content following its own frame (100vh + margin: no fixed point), so skip it and the loop ends.
+  let st = sizing.get(frame)
+  if (!st || st.k !== d.k) sizing.set(frame, (st = { k: d.k, prev: -1, grew: 0 }))
+  const feedback = st.grew > 0 && d.h > st.prev && Math.abs(d.h - st.prev - st.grew) <= 1
+  st.prev = d.h
+  st.grew = 0
+  if (feedback) return true
   const next = Math.min(Math.max(Math.ceil(d.h) + frame.offsetHeight - frame.clientHeight, FRAME_MIN), FRAME_MAX)
-  if (Math.abs(next - frame.offsetHeight) <= 1 || !allowResize(frame)) return true
-  frame.style.height = `${next}px`
+  const cur = frame.offsetHeight
+  if (next > cur || cur - next > 1) {
+    frame.style.height = `${next}px`
+    if (next > cur) st.grew = next - cur
+  }
   return true
 }
 

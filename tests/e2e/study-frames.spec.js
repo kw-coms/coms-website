@@ -21,7 +21,7 @@ async function measure(handle) {
 /** Not clipped (or at the cap), and tall enough to read: at least min(content, 160). */
 function problem(m) {
   const clipped = m.scroll > m.viewport + 1 && m.height < CAP
-  const tiny = m.height < Math.min(m.content, 160) - 1 // a 1px difference is the resize dead band
+  const tiny = m.height < Math.min(m.content, 160)
   return clipped || tiny ? m : null
 }
 
@@ -94,8 +94,28 @@ test('content that follows its own frame height (min-height:100vh) settles inste
   await type('<style>html,body,p{margin:0}body{min-height:100vh;background:#eef}</style><p>안녕</p>')
   expect(await page.evaluate(() => window.__sizes.length)).toBeLessThanOrEqual(2)
   expect((await measure(preview)).height).toBeLessThan(300)
-  // the default 12px margin never reaches a fixed point: it must stop after a few steps, far below the cap
+  // the default 12px margin never reaches a fixed point: the frame is grown once, then the echo is recognised and the loop ends
   await type('<style>body{min-height:100vh}</style><p>안녕</p>')
-  expect(await page.evaluate(() => window.__sizes.length)).toBeLessThanOrEqual(6)
+  expect(await page.evaluate(() => window.__sizes.length)).toBeLessThanOrEqual(3)
   expect((await measure(preview)).height).toBeLessThan(CAP)
+})
+
+test('quick successive edits leave the frame as tall as the last content', async ({ page }) => {
+  await mockOptionalApis(page)
+  await page.goto('/study/web/practice/web-html-headings')
+  const editor = page.locator('.ex-web-editor .cm-content')
+  await expect(editor).toBeVisible()
+  await editor.click()
+  const tall = (n) => Array.from({ length: n }, (_, i) => `<p>줄 ${i + 1}</p>`).join('\n')
+  // tall, short, tall again, each well inside the 400ms preview debounce, then the tallest
+  for (const n of [14, 1, 10, 18]) {
+    await page.keyboard.press('ControlOrMeta+A')
+    await page.keyboard.insertText(tall(n))
+    await page.waitForTimeout(100)
+  }
+  const preview = await page.locator('iframe.ex-web-preview').elementHandle()
+  await expect.poll(async () => (await measure(preview)).content, { timeout: 5000 }).toBeGreaterThan(600)
+  await expect.poll(settled(preview), { timeout: 5000 }).toBeNull()
+  const m = await measure(preview)
+  expect(m.height).toBeGreaterThanOrEqual(Math.min(m.content, CAP))
 })
