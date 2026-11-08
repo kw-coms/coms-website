@@ -191,6 +191,7 @@ export const MAX_PROC_PARAMS = 32;
 export const MAX_MUTATION_TOTAL = 2000;
 
 const isInt = (v: unknown, max: number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= max;
+const MAX_FUNCTION_DEFS = 200;
 const shortStr = (v: unknown): v is string => typeof v === 'string' && v.length <= 100;
 
 /** extraState of one block against its type's schema. Returns the mutator size, or -1 when invalid. */
@@ -244,6 +245,7 @@ export function blocksProblem(state: unknown): string | null {
       !state.variables.every(v => isObject(v) && (v.id === undefined || typeof v.id === 'string') && (v.name === undefined || isValidName(v.name))))) return bad;
   const todo: unknown[] = isObject(ws) && Array.isArray(ws.blocks) ? [...ws.blocks] : [];
   let mutations = 0;
+  const defNames = new Set<string>();
   for (let n = 0; todo.length; n++) {
     const b = todo.pop();
     if (n >= MAX_BLOCKS) return `블록은 ${MAX_BLOCKS.toLocaleString('ko-KR')}개 이하여야 합니다.`;
@@ -258,6 +260,13 @@ export function blocksProblem(state: unknown): string | null {
     if (b.enabled !== undefined && typeof b.enabled !== 'boolean') return bad;
     if (b.disabledReasons !== undefined && (!Array.isArray(b.disabledReasons) || b.disabledReasons.length > 16 ||
         !b.disabledReasons.every(shortStr))) return bad;
+    if (b.type === 'procedures_defnoreturn' || b.type === 'procedures_defreturn') {
+      // Blockly renames a duplicate definition on load (quadratic per clash, cubic overall), and never saves two with one name.
+      const name = isObject(b.fields) && typeof b.fields.NAME === 'string' ? b.fields.NAME.trim().toLowerCase() : '';
+      if (defNames.has(name)) return '이름이 같은 함수 블록이 있어요. 함수 이름은 서로 달라야 합니다.';
+      defNames.add(name);
+      if (defNames.size > MAX_FUNCTION_DEFS) return `함수 블록은 ${MAX_FUNCTION_DEFS}개 이하여야 합니다.`;
+    }
     const fieldProblem = blockFieldsProblem(b.type, b.fields);
     if (fieldProblem) return fieldProblem;
     if (b.inputs !== undefined && !isObject(b.inputs)) return bad;

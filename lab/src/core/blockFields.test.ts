@@ -56,3 +56,21 @@ describe('block field schema', () => {
     await expect(decodeShare(token)).rejects.toThrow(/블록 필드/);
   });
 });
+
+describe('function definitions', () => {
+  const defs = (names: string[]) => ({ blocks: { languageVersion: 0, blocks: names.map(NAME => ({ type: 'procedures_defnoreturn', fields: { NAME } })) } });
+  it('rejects 1000 same-named definitions quickly (Blockly renames on load, which is cubic)', () => {
+    const started = performance.now();
+    expect(blocksProblem(defs(Array.from({ length: 1000 }, () => 'f')))).toMatch(/함수/);
+    expect(performance.now() - started).toBeLessThan(50);
+  });
+  it('compares names trimmed and case-insensitively; empty names share one key', () => {
+    expect(blocksProblem(defs(['Go', ' go ']))).toMatch(/함수/);
+    expect(blocksProblem(defs(['', '  ']))).toMatch(/함수/);
+    expect(blocksProblem(defs(['a', 'b']))).toBeNull();
+  });
+  it('caps definitions at 200', () => {
+    expect(blocksProblem(defs(Array.from({ length: 200 }, (_, i) => `f${i}`)))).toBeNull();
+    expect(blocksProblem(defs(Array.from({ length: 201 }, (_, i) => `f${i}`)))).toMatch(/200/);
+  });
+});
