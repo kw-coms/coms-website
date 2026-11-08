@@ -165,7 +165,7 @@ export function cloneJson<T>(value: T): T {
   return root as T;
 }
 
-/** Imports are bounded at 256 KB; Blockly's own save adds ids and coordinates, so canonical blocks may use up to 512 KB. */
+/** Untrusted blocks are bounded at 256 KB before Blockly loads them; Blockly's own save adds ids and coordinates, so canonical blocks may use up to 512 KB. */
 export const MAX_BLOCKS_BYTES = 256 * 1024;
 export const MAX_CANONICAL_BLOCKS_BYTES = 512 * 1024;
 function validBlocks(value: unknown, maxBytes = MAX_BLOCKS_BYTES): boolean {
@@ -284,7 +284,7 @@ export function blocksProblem(state: unknown, maxBytes = MAX_BLOCKS_BYTES): stri
 }
 
 /** Validate untrusted imported scenes before analysis or rendering. */
-export function validateScene(value: unknown, opts: { blocksBytes?: number } = {}): Scene {
+export function validateScene(value: unknown): Scene {
   if (!isObject(value) || !hasOnlyKeys(value, ['version', 'title', 'parts', 'wires', 'code', 'blocks', 'codeMode', 'notes', 'mission']) ||
       (value.version !== 1 && value.version !== 2) || !Array.isArray(value.parts) || !Array.isArray(value.wires) ||
       typeof value.code !== 'string') {
@@ -299,7 +299,9 @@ export function validateScene(value: unknown, opts: { blocksBytes?: number } = {
   if (value.title !== undefined && (typeof value.title !== 'string' || value.title.length > 200)) {
     invalid('장면 제목이 올바르지 않습니다.');
   }
-  const blocksBytes = opts.blocksBytes ?? MAX_BLOCKS_BYTES;
+  // Canonical size: the scene may hold Blockly's own save (ids and coordinates added). Untrusted blocks are held to the
+  // tighter MAX_BLOCKS_BYTES by canonicalizeBlocks before they ever become the scene's blocks.
+  const blocksBytes = MAX_CANONICAL_BLOCKS_BYTES;
   if (value.blocks !== undefined && !validBlocks(value.blocks, blocksBytes)) invalid(`블록 데이터는 올바른 JSON이며 ${blocksBytes / 1024} KB 이하, 1,000단계 이하의 깊이이어야 합니다.`);
   if (value.blocks !== undefined) {
     const problem = blocksProblem(value.blocks, blocksBytes);

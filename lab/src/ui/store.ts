@@ -3,13 +3,13 @@ import type {
   Analysis, CodeMode, CompilerMessage, DebugState, Note, PartInstance, PartKind, PinRef, RotY, Scene, SimFrame, SimWarning, Vec3, Wire, WireColor,
 } from '../core/types';
 import { EXAMPLES, PARTS, analyze, validateScene } from './core';
-import { MAX_CANONICAL_BLOCKS_BYTES, stringifyJsonBounded } from '../core/scene';
+import { stringifyJsonBounded } from '../core/scene';
 import { commit, initHistory, redo as redoH, undo as undoH, type History } from './history';
 import { getItem, setItem, SAVE_KEY } from './storage';
 import { DEFAULT_BLOCKS } from './blocks/starters';
 import { sceneContext } from './blocks/context';
 import { generate } from './blocks/generate';
-import { canonicalize, isCanonical, loadCanon } from './blocks/canon';
+import { canonicalize, isCanonical, trust } from './blocks/canon';
 import { detectSoftwareRendering, initialQuality, loadQualityMode, saveQualityMode, type Quality, type QualityMode } from './quality';
 
 export type Selection = { kind: 'part' | 'wire'; id: string } | null;
@@ -75,8 +75,6 @@ export interface State {
   qualityNotice: string | null;
   /** The autosave could not be read; a raw backup copy was kept (see BACKUP_KEY). */
   restoreNotice: boolean;
-  /** A saved block program could not be opened because Blockly did not load: the autosave is left alone and autosaving is off. */
-  restorePending: boolean;
   // ---- v2 ----
   /** Sketch lines (1-based) with a debugger breakpoint. */
   breakpoints: number[];
@@ -126,15 +124,16 @@ const codeProblem = (code: string): string | null =>
   encoder.encode(code).length > MAX_CODE_BYTES ? '블록으로 만든 코드가 64 KB를 넘어요. 블록을 줄이거나 글자를 짧게 해 주세요.' : null;
 
 /**
- * Every way a scene gets in (load, import, share link, autosave restore) passes here. Its blocks become Blockly's own reading
- * of them (canonicalize), because the editor shows that reading while the generator runs on this one; in a block mode the code
- * is regenerated from them, since a scene file could otherwise carry hidden `code` that runs instead of the blocks the user sees.
- * Throws the Korean reason when the blocks cannot be accepted or the code they make is too big.
+ * Every way a scene gets in (load, import, share link, autosave restore) passes here. Untrusted blocks (a file, a share link)
+ * become Blockly's own reading of them (canonicalize), because the editor shows that reading while the generator runs on this
+ * one; our own autosave and built-in programs are already that reading (`trusted`) and only get the cheap bound checks. In a
+ * block mode the code is regenerated from them, since a scene file could otherwise carry hidden `code` that runs instead of
+ * the blocks the user sees. Throws the Korean reason when the blocks cannot be accepted or the code they make is too big.
  */
-function withGeneratedCode(s: Scene, analysis: Analysis): Scene {
+function withGeneratedCode(s: Scene, analysis: Analysis, trusted = false): Scene {
   const mode = s.codeMode ?? 'text';
   if (mode === 'text' && s.blocks === undefined) return s;
-  const c = canonicalize(s.blocks ?? DEFAULT_BLOCKS);
+  const c = s.blocks === undefined ? trust(DEFAULT_BLOCKS) : trusted ? trust(s.blocks) : canonicalize(s.blocks);
   if (!c.ok) throw new Error(c.error);
   if (mode === 'text') return { ...s, blocks: c.blocks };
   const code = generate(c.blocks, sceneContext(s.parts, analysis).opts).code;
@@ -149,23 +148,28 @@ function initialTheme(): Theme {
   return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function startDoc(blocked: boolean): { doc: Doc; code: string; restored: boolean; failed: boolean; pending: boolean } {
+/** The autosave of a scene with blocks is wrapped with this marker: it says the blocks are Blockly's own save (see saveNow). */
+export const CANON_VERSION = 1;
+
+function startDoc(): { doc: Doc; code: string; restored: boolean; failed: boolean } {
   const raw = getItem(SAVE_KEY);
   let failed = false;
-  // Blockly did not load: the saved program is neither corrupt nor openable. Leave SAVE_KEY (and the backup) untouched.
-  if (raw && blocked) return { ...defaultDoc(), restored: false, failed: false, pending: true };
   if (raw) {
     try {
-      const parsed = validateScene(JSON.parse(raw), { blocksBytes: MAX_CANONICAL_BLOCKS_BYTES });
-      const s = withGeneratedCode(parsed, analyze(parsed));
-      return { doc: docOf(s), code: s.code, restored: true, failed: false, pending: false };
+      const saved = JSON.parse(raw) as { canonVersion?: unknown; scene?: unknown };
+      const marked = saved?.canonVersion === CANON_VERSION;
+      const parsed = validateScene(marked ? saved.scene : saved);
+      // blocks without our marker were never written by this app: they take the corrupt-autosave path below
+      if (!marked && parsed.blocks !== undefined) throw new Error('unmarked blocks');
+      const s = withGeneratedCode(parsed, analyze(parsed), marked);
+      return { doc: docOf(s), code: s.code, restored: true, failed: false };
     } catch {
       // keep the raw data for the user, then start from the default example
       setItem(BACKUP_KEY, raw);
       failed = true;
     }
   }
-  return { ...defaultDoc(), restored: false, failed, pending: false };
+  return { ...defaultDoc(), restored: false, failed };
 }
 function defaultDoc(): { doc: Doc; code: string } {
   const ex = EXAMPLES[0];
@@ -214,10 +218,7 @@ function loadMissionProgress(): Record<string, MissionProgress> {
 }
 const qualityMode = loadQualityMode();
 const softwareHint = qualityMode === 'auto' && detectSoftwareRendering();
-// A saved block program is canonicalized by Blockly on restore, so its chunk must be loaded before the first synchronous read.
-const savedBlocks = (getItem(SAVE_KEY) ?? '').includes('"blocks"');
-const first = startDoc(savedBlocks && !(await loadCanon()));
-let autosaveBlocked = first.pending;
+const first = startDoc();
 let state: State = {
   hist: initHistory(first.doc),
   code: first.code,
@@ -252,7 +253,6 @@ let state: State = {
   qualityMode,
   quality: initialQuality(qualityMode, softwareHint),
   restoreNotice: first.failed,
-  restorePending: first.pending,
   breakpoints: [],
   debug: null,
   debugTruncated: false,
@@ -300,7 +300,7 @@ export function deleteNote(id: string) {
 export const codeMode = (s: State = state): CodeMode => s.hist.present.codeMode ?? 'text';
 /** Hooks for the Blockly lane: the document owns the blocks JSON and the editor mode. */
 export function setBlocks(blocks: unknown) {
-  const c = canonicalize(blocks);
+  const c = trust(blocks); // the live editor's own save: what is displayed, so no round trip through Blockly
   if (!c.ok) return void toast(`적용하지 못했어요: ${c.error}`);
   const code = generate(c.blocks, sceneContext(parts(), state.analysis).opts).code;
   const tooBig = codeProblem(code);
@@ -347,7 +347,7 @@ export const isDirty = () => docKey() !== baseline;
 /** Transactional: the candidate scene must pass the core's validateScene (limits, prop ranges, ids) before anything changes. Returns the Korean error, or null on success. */
 function checkDoc(doc: Doc): string | null {
   try {
-    validateScene(toScene(doc, state.code), { blocksBytes: MAX_CANONICAL_BLOCKS_BYTES });
+    validateScene(toScene(doc, state.code));
     return null;
   } catch (e) {
     return e instanceof Error && e.message ? e.message : '회로가 허용 범위를 넘었어요.';
@@ -355,7 +355,7 @@ function checkDoc(doc: Doc): string | null {
 }
 function setDoc(doc: Doc, selection?: Selection): string | null {
   if (doc.blocks !== undefined && doc.blocks !== state.hist.present.blocks && !isCanonical(doc.blocks)) {
-    const c = canonicalize(doc.blocks);
+    const c = trust(doc.blocks);
     if (!c.ok) { toast(`적용하지 못했어요: ${c.error}`); return c.error; }
     doc = { ...doc, blocks: c.blocks };
   }
@@ -567,23 +567,6 @@ export function updateWire(id: string, patch: Partial<Wire>) {
 const loadListeners = new Set<() => void>();
 export const onSceneLoaded = (cb: () => void) => (loadListeners.add(cb), () => loadListeners.delete(cb));
 
-/** Retry button of the restore notice: load Blockly again, then open the saved program. Only a successful restore re-enables autosave. */
-export async function retryRestore(): Promise<void> {
-  if (!state.restorePending) return;
-  if (!(await loadCanon())) return toast('블록 편집기를 아직 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.');
-  const raw = getItem(SAVE_KEY);
-  try {
-    if (!raw) throw new Error('empty');
-    loadScene(validateScene(JSON.parse(raw), { blocksBytes: MAX_CANONICAL_BLOCKS_BYTES }));
-    baseline = ''; // like a startup restore: it exists nowhere else, so it counts as unsaved work
-  } catch {
-    if (raw) setItem(BACKUP_KEY, raw);
-    set({ restoreNotice: true });
-  }
-  autosaveBlocked = false;
-  set({ restorePending: false });
-}
-
 export function loadScene(input: Scene, opts: { keepSim?: boolean } = {}) {
   void opts;
   const analysis = analyze(input);
@@ -620,9 +603,10 @@ let saveWarned = false;
 function saveNow() {
   clearTimeout(saveTimer);
   saveTimer = undefined;
-  if (autosaveBlocked) return; // the saved program that could not be opened must not be overwritten by the example
   const json = serializeScene();
-  if (json !== null && setItem(SAVE_KEY, json)) saveWarned = false;
+  // blocks are marked as Blockly's own save so the next start can trust them without loading Blockly
+  const out = json !== null && state.hist.present.blocks !== undefined ? `{"canonVersion":${CANON_VERSION},"scene":${json}}` : json;
+  if (out !== null && setItem(SAVE_KEY, out)) saveWarned = false;
   else if (!saveWarned) {
     saveWarned = true;
     toast('자동 저장에 실패했어요. 저장 공간이 부족하거나 막혀 있을 수 있어요. 내보내기로 파일에 저장해 두세요.', 8000);

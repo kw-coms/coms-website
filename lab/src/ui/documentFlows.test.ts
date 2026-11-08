@@ -304,7 +304,7 @@ describe('block-mode scenes never run hidden code, and mission scenes open on th
   it('the autosave restore at startup also regenerates', async () => {
     const m0 = await boot();
     const s = await blockScene(m0, 'blocks');
-    mem.set(m0.store.SAVE_KEY, JSON.stringify(s));
+    mem.set(m0.store.SAVE_KEY, JSON.stringify({ canonVersion: m0.store.CANON_VERSION, scene: s }));
     const m = await boot();
     expect(m.store.getState().code).toBe(await generated(m, s));
   });
@@ -405,9 +405,6 @@ describe('canonical blocks in the document', () => {
     await withBlockly();
     expect(() => m.store.loadScene({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks: bad } as Scene)).toThrow(/[가-힣]/);
     expect(m.store.getState().hist.present).toBe(before);
-    m.store.setBlocks(bad);
-    expect(m.store.getState().toast).toMatch(/적용하지 못했어요/);
-    expect(m.store.getState().hist.present).toBe(before);
   });
 
   it('a text-mode scene that carries blocks is canonicalized too (switching to blocks later must not run another reading)', async () => {
@@ -441,40 +438,83 @@ describe('canonical blocks in the document', () => {
   });
 });
 
-describe('a saved block program survives the editor chunk failing to load', () => {
-  const blockState = { blocks: { languageVersion: 0, blocks: [{ type: 'lab_loop', inputs: { DO: { block: { type: 'lab_digital_write', fields: { PIN: '8', STATE: 'HIGH' } } } } }] } };
+
+describe('trust boundaries: Blockly only for what we did not write', () => {
+  const chunkFails = () => vi.doMock('./blocks/blocklyRuntime', () => { throw new Error('chunk failed'); });
   afterEach(() => { vi.doUnmock('./blocks/blocklyRuntime'); });
+  const blocks = { blocks: { languageVersion: 0, blocks: [{ type: 'lab_loop', inputs: { DO: { block: { type: 'lab_digital_write', fields: { PIN: '8', STATE: 'HIGH' } } } } }] } };
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  it('keeps SAVE_KEY and the backup untouched, turns autosave off, and a retry restores the program', async () => {
-    await new Promise((r) => setTimeout(r, 800)); // earlier tests' stores share this localStorage stub: let their pending autosaves land first
+  it('an autosave with the marker restores without loading Blockly, even if the chunk cannot load', async () => {
+    await wait(800); // earlier tests' stores share this localStorage stub: let their pending autosaves land first
     const m0 = await boot();
-    await withBlockly();
-    const saved = JSON.stringify({ ...example(m0, 'external-blink'), codeMode: 'blocks', blocks: blockState, code: 'x' });
+    const saved = JSON.stringify({ canonVersion: m0.store.CANON_VERSION, scene: { ...example(m0, 'external-blink'), codeMode: 'blocks', blocks, code: 'x' } });
     mem.set(m0.store.SAVE_KEY, saved);
-    vi.doMock('./blocks/blocklyRuntime', () => { throw new Error('chunk failed'); });
+    chunkFails();
     const m = await boot();
-    expect(m.store.getState().restorePending).toBe(true);
-    expect(m.store.getState().restoreNotice).toBe(false);
-    expect(mem.get(m.store.SAVE_KEY)).toBe(saved);
-    expect(mem.has(m.store.BACKUP_KEY)).toBe(false);
-
-    m.store.setCode('void setup() {}\nvoid loop() {}\n'); // an edit of the example must not overwrite the saved program
-    await new Promise((r) => setTimeout(r, 900));
-    expect(mem.get(m.store.SAVE_KEY)).toBe(saved);
-    expect(mem.has(m.store.BACKUP_KEY)).toBe(false);
-
-    await m.store.retryRestore(); // still failing: stays pending, nothing touched
-    expect(m.store.getState().restorePending).toBe(true);
-    expect(mem.get(m.store.SAVE_KEY)).toBe(saved);
-
-    vi.doUnmock('./blocks/blocklyRuntime');
-    await m.store.retryRestore();
-    expect(m.store.getState().restorePending).toBe(false);
     expect(m.store.getState().restoreNotice).toBe(false);
     expect(m.store.getState().hist.present.codeMode).toBe('blocks');
     expect(m.store.getState().code).toContain('digitalWrite(8, HIGH);');
-    m.store.setCode(m.store.getState().code + '// edit\n');
-    await new Promise((r) => setTimeout(r, 900));
-    expect(mem.get(m.store.SAVE_KEY)).not.toBe(saved); // autosave is back on
+  });
+
+  it('autosaves of block scenes carry the marker, text scenes stay plain', async () => {
+    await wait(800); // earlier tests' stores share this localStorage stub
+    const m = await boot();
+    await withBlockly();
+    m.store.loadScene({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks, code: 'x' } as Scene);
+    m.store.setCode(m.store.getState().code + '\n');
+    await wait(800);
+    expect(JSON.parse(mem.get(m.store.SAVE_KEY)!).canonVersion).toBe(m.store.CANON_VERSION);
+    const t = await boot();
+    t.store.loadScene(example(t, 'external-blink'));
+    t.store.setCode('void setup() {}\nvoid loop() {}\n');
+    await wait(800);
+    expect(JSON.parse(mem.get(t.store.SAVE_KEY)!).canonVersion).toBeUndefined();
+  });
+
+  it('a block autosave without the marker takes the corrupt-autosave path', async () => {
+    await wait(800); // earlier tests' stores share this localStorage stub: let their pending autosaves land first
+    const m0 = await boot();
+    await withBlockly();
+    const raw = JSON.stringify({ ...example(m0, 'external-blink'), codeMode: 'blocks', blocks, code: 'x' });
+    mem.set(m0.store.SAVE_KEY, raw);
+    const m = await boot(); // Blockly is loaded in this registry too: the marker, not availability, decides
+    expect(m.store.getState().restoreNotice).toBe(true);
+    expect(mem.get(m.store.BACKUP_KEY)).toBe(raw);
+    expect(m.store.getState().hist.present.codeMode).not.toBe('blocks');
+  });
+
+  it('a 300 KB Blockly save from the live editor is accepted without calling Blockly', async () => {
+    const m = await boot();
+    chunkFails(); // nothing can canonicalize: acceptance proves no round trip happened
+    const big = { blocks: { languageVersion: 0, blocks: Array.from({ length: 4500 }, (_, i) => ({ type: 'math_number', id: `b${i}`, x: 0, y: i, fields: { NUM: 1 } })) } };
+    expect(JSON.stringify(big).length).toBeGreaterThan(300 * 1024);
+    m.store.set({ toast: null });
+    m.store.setBlocks(big);
+    expect(m.store.getState().toast).toBeNull();
+    expect(m.store.getState().hist.present.blocks).toBe(big);
+  });
+
+  it('an import with blocks that cannot load Blockly says so in Korean and changes nothing', async () => {
+    const m = await boot();
+    chunkFails();
+    const before = m.store.getState().hist.present;
+    const s = { ...example(m, 'external-blink'), codeMode: 'blocks', blocks, code: 'x' };
+    await m.actions.importJson(new File([JSON.stringify(s)], 'c.json'));
+    expect(m.store.getState().toast).toMatch(/블록 편집기를 불러오지 못했어요/);
+    expect(m.store.getState().hist.present).toBe(before);
   }, 60000);
+
+  it('the chunk load is retried once, and bounded', async () => {
+    const { loadCanon } = await import('./blocks/canon');
+    let calls = 0;
+    expect(await loadCanon(1000, async () => { if (calls++ === 0) throw new Error('first try fails'); })).toBe(true);
+    expect(calls).toBe(2);
+    calls = 0;
+    expect(await loadCanon(1000, async () => { calls++; throw new Error('always'); })).toBe(false);
+    expect(calls).toBe(2);
+    const started = Date.now();
+    expect(await loadCanon(40, () => new Promise<void>(() => {}))).toBe(false); // a stalled chunk gives up
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
 });

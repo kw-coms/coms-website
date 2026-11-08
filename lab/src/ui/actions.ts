@@ -4,7 +4,7 @@ import { MISSIONS } from '../missions';
 import { parseMissionHash, parseShareHash, shareHash } from './shareHash';
 import { BACKUP_KEY, getState, isDirty, loadScene, markClean, scene, set, THEME_KEY, toast } from './store';
 import { stop } from './simHost';
-import { ensureCanon } from './blocks/canon';
+import { loadCanon } from './blocks/canon';
 import { getItem, setItem } from './storage';
 import type { Scene } from '../core/types';
 import { stringifyJsonBounded } from '../core/scene';
@@ -21,6 +21,11 @@ function downloadText(name: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
   download(name, url);
   setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/** An imported scene with blocks needs the Blockly chunk; when it cannot load, say so and change nothing. */
+async function needBlockly(s: Scene) {
+  if (s.blocks !== undefined && !(await loadCanon())) throw new Error('블록 편집기를 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.');
 }
 
 /** One gate for every action that replaces the whole document (example, import, share link). */
@@ -61,7 +66,7 @@ export async function importJson(file: File) {
       throw new Error('JSON 형식이 아니에요.');
     }
     const s = validateScene(json);
-    if (s.blocks !== undefined) await ensureCanon(); // loadScene runs the blocks through Blockly
+    await needBlockly(s); // loadScene runs untrusted blocks through Blockly
     if (!confirmReplace('불러올까요?')) return;
     replaceWith(s);
     toast('불러왔어요.');
@@ -105,7 +110,7 @@ export async function loadFromLocationHash() {
   history.replaceState(null, '', location.pathname + location.search);
   try {
     const s = await decodeShare(token);
-    if (s.blocks !== undefined) await ensureCanon();
+    await needBlockly(s);
     if (!confirmReplace('공유 링크의 회로를 불러올까요?')) return;
     replaceWith(s);
     toast('공유 링크의 회로를 불러왔어요.');

@@ -1,6 +1,8 @@
 // Door to the headless-Blockly canonicalizer (blocklyRuntime.ts) without pulling Blockly into the main bundle.
 // The store needs the answer synchronously, so the runtime registers itself here when its chunk loads:
 // the editor's lazy chunk does it, and ensureCanon() does it for flows that have no editor open (import, share link, autosave restore).
+import { blocksProblem, MAX_CANONICAL_BLOCKS_BYTES } from '../../core/scene';
+
 type Canon = { ok: true; blocks: object } | { ok: false; error: string };
 type Canonicalizer = (state: unknown) => Canon;
 
@@ -25,11 +27,11 @@ export async function ensureCanon(): Promise<void> { await import('./blocklyRunt
  * ensureCanon for the startup restore and its retry button: a bounded wait (a stalled chunk must not hang the app) and one
  * automatic retry (a stale chunk after a deploy, a dropped connection). Never throws: false means Blockly is not available.
  */
-export async function loadCanon(timeoutMs = 10_000): Promise<boolean> {
+export async function loadCanon(timeoutMs = 10_000, load: () => Promise<void> = ensureCanon): Promise<boolean> {
   for (let attempt = 0; attempt < 2; attempt++) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await Promise.race([ensureCanon(), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), timeoutMs); })]);
+      await Promise.race([load(), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), timeoutMs); })]);
       return true;
     } catch { /* retry once */ } finally { clearTimeout(timer); }
   }
@@ -42,6 +44,19 @@ export function canonicalize(state: unknown): Canon {
   const result = impl(state);
   if (result.ok) { deepFreeze(result.blocks); results.add(result.blocks); }
   return result;
+}
+/**
+ * Blocks that are already Blockly's own reading, so no round trip is needed: the live editor's save (it is what is displayed),
+ * our own autosave, and what ships in our code. Still bounded and allowlisted (blocksProblem, at the canonical size), then frozen
+ * and remembered exactly like a canonicalized result.
+ */
+export function trust(state: unknown): Canon {
+  if (!state || typeof state !== 'object' || Array.isArray(state)) return { ok: false, error: '블록 데이터가 올바르지 않아요.' };
+  const problem = blocksProblem(state, MAX_CANONICAL_BLOCKS_BYTES);
+  if (problem) return { ok: false, error: problem };
+  deepFreeze(state);
+  results.add(state);
+  return { ok: true, blocks: state };
 }
 /** True for an object that canonicalize() itself returned (nothing else is trusted to be Blockly's reading). */
 export const isCanonical = (blocks: unknown): boolean => typeof blocks === 'object' && blocks !== null && results.has(blocks);

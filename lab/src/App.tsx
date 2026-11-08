@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { Workspace } from './scene3d/Workspace';
-import { retryRestore } from './ui/store';
 import { dismissRestoreNotice, downloadBackup, importJson, loadFromLocationHash } from './ui/actions';
 import { ErrorBoundary } from './ui/components/ErrorBoundary';
 import { SidePanel } from './ui/components/SidePanel';
@@ -55,7 +54,6 @@ export function App() {
   const quality = useStore((s) => s.quality);
   const notice = useStore((s) => s.qualityNotice);
   const restore = useStore((s) => s.restoreNotice);
-  const pending = useStore((s) => s.restorePending);
   useShortcuts();
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -97,12 +95,6 @@ export function App() {
         </div>
         <SidePanel />
       </main>
-      {pending && (
-        <div className="perf-notice restore" role="alert">
-          <span>블록 편집기를 불러오지 못해 저장된 작업을 열지 못했어요. 저장된 작업은 그대로 남아 있고, 열 때까지 자동 저장은 꺼져 있어요.</span>
-          <button type="button" onClick={() => void retryRestore()}>다시 시도</button>
-        </div>
-      )}
       {restore && (
         <div className="perf-notice restore" role="alert">
           <span>저장된 작업을 불러오지 못해 백업해 두었어요. 예제 회로로 시작했어요.</span>
