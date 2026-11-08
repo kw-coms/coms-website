@@ -11,7 +11,7 @@ import { FloatingInstruments } from './ui/instruments/Panels';
 import { Schematic } from './ui/schematic/Schematic';
 import { onSimFrame } from './ui/simHost';
 import { useShortcuts } from './ui/shortcuts';
-import { dismissQualityNotice, pinHighQuality, useStore } from './ui/store';
+import { dismissQualityNotice, pinHighQuality, setAntialias, useStore } from './ui/store';
 
 /** Screen-reader (and test) readable summary of which LEDs the running circuit currently lights. */
 function LedStatus() {
@@ -53,6 +53,7 @@ export function App() {
   const sheet = useStore((s) => s.sheetOpen);
   const quality = useStore((s) => s.quality);
   const notice = useStore((s) => s.qualityNotice);
+  const aa = useStore((s) => s.antialias);
   const restore = useStore((s) => s.restoreNotice);
   useShortcuts();
   useLayoutEffect(() => {
@@ -104,8 +105,9 @@ export function App() {
       )}
       {notice && (
         <div className="perf-notice" role="status">
-          <span>{notice}</span>
+          <span>{notice}{aa && ' 안티앨리어싱을 끄면 더 부드러워져요.'}</span>
           <button type="button" onClick={pinHighQuality}>고화질로 고정</button>
+          {aa && <button type="button" onClick={() => setAntialias(false)}>안티앨리어싱 끄기</button>}
           <button type="button" onClick={dismissQualityNotice}>확인</button>
         </div>
       )}

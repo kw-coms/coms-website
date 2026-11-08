@@ -55,6 +55,12 @@ export function loadQualityMode(): QualityMode {
 }
 export const saveQualityMode = (m: QualityMode) => setItem(QUALITY_MODE_KEY, m);
 
+/** MSAA on/off. Default on; only an explicit '0' turns it off. WebGL fixes this at context creation, so the Canvas is remounted on change. */
+export const ANTIALIAS_KEY = 'coms-lab:antialias';
+export const loadAntialias = () => getItem(ANTIALIAS_KEY) !== '0';
+export const saveAntialias = (on: boolean) => setItem(ANTIALIAS_KEY, on ? '1' : '0');
+export const glOptions = (antialias: boolean) => ({ antialias, powerPreference: 'high-performance' as const });
+
 /** Initial effective level; `softwareHint` is the detection result (only used in auto). */
 export function initialQuality(mode: QualityMode, softwareHint: boolean): Quality {
   return mode === 'auto' ? (softwareHint ? 'low' : 'high') : mode;

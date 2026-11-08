@@ -97,7 +97,7 @@ function fly(to: { pos: Vector3; target: Vector3; zoom?: number }, animate: bool
   const p0 = cam.position.clone(), t0 = ctl ? ctl.target.clone() : to.target.clone(), z0 = cam.zoom;
   const t1 = performance.now();
   const step = () => {
-    if (id !== flight) return;
+    if (id !== flight || refs.camera !== cam) return; // superseded, or the Canvas was unmounted
     const k = Math.min(1, (performance.now() - t1) / 320);
     const e = 1 - (1 - k) ** 3;
     cam.position.lerpVectors(p0, to.pos, e);

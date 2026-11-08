@@ -393,6 +393,16 @@ try {
 
   await ctx.close();
   const dctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'dark' });
+  // records every WebGL context the page creates, to prove a toggle disposes the old one
+  await dctx.addInitScript(() => {
+    window.__ctxs = [];
+    const get = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
+      const c = get.call(this, type, ...rest);
+      if (c && /webgl/.test(type) && !window.__ctxs.includes(c)) window.__ctxs.push(c);
+      return c;
+    };
+  });
   const dp = await dctx.newPage();
   await dp.goto(base, { waitUntil: 'networkidle' });
   await dp.evaluate(() => { localStorage.setItem('coms-lab:tutorial-done', '1'); localStorage.setItem('coms-lab:perf-notice', '1'); });
@@ -405,6 +415,97 @@ try {
   await dp.waitForTimeout(2000);
   await saveScreenshot(dp, join(OUT, '12-low-quality.png'));
   check('low quality renders (screenshot saved)', (await dp.evaluate(() => window.__lab.getState().quality)) === 'low');
+  // ---- antialias setting: toggle recreates the GL context, keeps the scene, persists across reload ----
+  {
+    const aaBox = dp.getByRole('checkbox', { name: /안티앨리어싱/ });
+    const qBtn = dp.getByRole('button', { name: /^화질/ });
+    const openQ = async () => { if (!(await aaBox.isVisible())) await qBtn.click(); await aaBox.waitFor({ state: 'visible' }); };
+    // the control must carry a visible label and hint, inline (1440) and inside the narrow-width menu (900)
+    const labelled = async (tag) => {
+      const name = await aaBox.getAttribute('aria-label').catch(() => null);
+      const text = await dp.getByText('부드러운 가장자리 (안티앨리어싱)', { exact: false }).first().isVisible();
+      const hint = await dp.getByText('끄면 느린 컴퓨터에서 더 빨라져요', { exact: false }).first().isVisible();
+      const label = await aaBox.evaluate((el) => el.closest('label')?.textContent ?? '');
+      check(`antialias: visible label and hint at ${tag}`, text && hint && label.includes('부드러운 가장자리 (안티앨리어싱)') && (await aaBox.isVisible()), String(name));
+    };
+    const brandOneLine = () => dp.evaluate(() => document.querySelector('.brand').getBoundingClientRect().height <= 40);
+    check('toolbar: Circuit Lab stays on one line at 1440', await brandOneLine());
+    await openQ();
+    await labelled('1440');
+    // quality radios keep the select's behaviour
+    await dp.getByRole('radio', { name: '화질: 낮음' }).check();
+    check('quality radio: low applies and is saved', (await dp.evaluate(() => [window.__lab.getState().qualityMode, window.__lab.getState().quality, localStorage.getItem('coms-lab:quality')].join())) === 'low,low,low');
+    await dp.getByRole('radio', { name: /^화질: 자동/ }).check();
+    check('quality radio: auto applies', (await dp.evaluate(() => window.__lab.getState().qualityMode)) === 'auto');
+    await dp.getByRole('radio', { name: '화질: 낮음' }).check();
+    await dp.keyboard.press('Escape');
+    check('quality popover: Esc closes and returns focus to the button', !(await aaBox.isVisible()) && (await dp.evaluate(() => document.activeElement?.className.includes('quality-btn'))));
+    await openQ(); // opened by a real mouse click: Tabbing out of the last control must still close it
+    await aaBox.focus(); await dp.keyboard.press('Tab'); await dp.waitForTimeout(200);
+    check('quality popover: Tab out of the last control closes it', !(await aaBox.isVisible()));
+    await openQ();
+    const live = () => dp.evaluate(() => window.__ctxs.filter((c) => !c.isContextLost()).length);
+    const attr = () => dp.evaluate(() => { const c = window.__ctxs.filter((x) => !x.isContextLost()).at(-1); return c ? c.getContextAttributes().antialias : null; });
+    const parts = () => dp.evaluate(() => window.__lab.getState().hist.present.parts.length);
+    await dp.getByRole('button', { name: '확인', exact: true }).click({ timeout: 500 }).catch(() => {});
+    const n0 = await parts();
+    check('antialias: checkbox is on by default', await aaBox.isChecked() && (await attr()) === true);
+    // the user's orbit must survive the Canvas remount
+    {
+      const box = await dp.locator('canvas').boundingBox();
+      await dp.mouse.move(box.x + box.width * 0.1, box.y + box.height * 0.2); await dp.mouse.down();
+      await dp.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.1, { steps: 12 }); await dp.mouse.up();
+      await dp.waitForTimeout(1200); // damping settles
+      await openQ(); // the drag outside closed the popover
+      const cam = () => dp.evaluate(() => window.__lab.cameraPose());
+      const near = (a, b) => a && b && a.pos.every((v, i) => Math.abs(v - b.pos[i]) < 1) && a.target.every((v, i) => Math.abs(v - b.target[i]) < 1) && Math.abs(a.zoom - b.zoom) < 0.01 * a.zoom;
+      const fmt = (c) => c && `${c.pos.map((v) => v.toFixed(1))} | ${c.target.map((v) => v.toFixed(1))} | z${c.zoom.toFixed(2)}`;
+      const c0 = await cam();
+      await aaBox.uncheck(); await dp.waitForTimeout(900);
+      const c1 = await cam();
+      check('antialias: camera position, target and zoom unchanged after toggling off', near(c0, c1), `${fmt(c0)} -> ${fmt(c1)}`);
+      await aaBox.check(); await dp.waitForTimeout(900);
+      check('antialias: camera unchanged after toggling on (second snapshot)', near(c0, await cam()));
+      // top (orthographic) view: zoom must survive too
+      await dp.evaluate(() => window.__lab.set({ view: 'top' })); await dp.waitForTimeout(1200);
+      await dp.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5); await dp.mouse.wheel(0, -300); await dp.waitForTimeout(900);
+      await openQ();
+      const t0 = await cam();
+      await aaBox.uncheck(); await dp.waitForTimeout(900);
+      check('antialias: top-view zoom and target unchanged after toggle', near(t0, await cam()) && t0.zoom > 0, fmt(t0));
+      await aaBox.check(); await dp.waitForTimeout(900);
+      await dp.evaluate(() => window.__lab.set({ view: 'persp' })); await dp.waitForTimeout(1200);
+    }
+    for (let i = 0; i < 4; i++) {
+      await aaBox.uncheck(); await dp.waitForTimeout(700);
+      const offOk = (await attr()) === false && (await live()) === 1 && (await dp.locator('canvas').count()) === 1 && (await parts()) === n0;
+      check(`antialias: toggle off #${i + 1} recreates context, no leak, circuit kept`, offOk, `live=${await live()} parts=${await parts()}/${n0}`);
+      await aaBox.check(); await dp.waitForTimeout(700);
+      check(`antialias: toggle on #${i + 1} recreates context, no leak`, (await attr()) === true && (await live()) === 1, `live=${await live()}`);
+    }
+    await aaBox.uncheck(); await dp.waitForTimeout(500);
+    check('antialias: off is saved', (await dp.evaluate(() => localStorage.getItem('coms-lab:antialias'))) === '0');
+    await dp.reload({ waitUntil: 'networkidle' });
+    await dp.waitForTimeout(1500);
+    await openQ();
+    check('antialias: off survives reload and the scene renders', !(await aaBox.isChecked()) && (await attr()) === false && (await parts()) > 0 && (await dp.locator('canvas').boundingBox()).width > 100);
+    await saveScreenshot(dp, join(OUT, '14-antialias-off.png'));
+    await aaBox.check(); await dp.waitForTimeout(500);
+    await dp.setViewportSize({ width: 1100, height: 800 });
+    await dp.waitForTimeout(400);
+    // (the brand already wraps below ~1300px on main, so only overflow and button wrapping are asserted here)
+    check('toolbar: no overflow and no wrapped buttons at 1100', await dp.evaluate(() => { const t = document.querySelector('.toolbar'); return t.scrollWidth <= t.clientWidth && ![...t.querySelectorAll('.tb')].some((e) => e.getBoundingClientRect().height > 40); }));
+    check('quality popover: closes on resize', !(await aaBox.isVisible()));
+    await dp.setViewportSize({ width: 900, height: 800 });
+    await dp.waitForTimeout(500);
+    await dp.getByRole('button', { name: '더보기' }).click();
+    await aaBox.waitFor({ state: 'visible' });
+    await labelled('900');
+    await dp.setViewportSize({ width: 1440, height: 900 });
+    await dp.waitForTimeout(500);
+    await openQ();
+    check('antialias: back on', (await attr()) === true && (await dp.evaluate(() => localStorage.getItem('coms-lab:antialias'))) === '1');
+  }
   await dctx.close();
   const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
   const mp = await mctx.newPage();

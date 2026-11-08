@@ -19,6 +19,7 @@ import { DESK_Y, refs } from './sceneRefs';
 import { makeTexture } from './parts/common';
 import type { PartKind } from '../core/types';
 import { set } from '../ui/store';
+import { glOptions } from '../ui/quality';
 
 const DARK = { bg: '#141a21', fog: '#141a21' };
 const LIGHT = { bg: '#e6edf4', fog: '#e6edf4' };
@@ -123,16 +124,41 @@ function Invalidator() {
   return null;
 }
 
+/** Camera pose carried across an antialias remount of the Canvas, so the user's orbit and zoom are not reset. */
+let keptCamera: { pos: number[]; target: number[]; zoom: number; min: number; max: number; view: string; tick: number } | null = null;
+const snapshotCamera = () => {
+  const { camera, controls } = refs;
+  keptCamera = camera && controls ? { pos: camera.position.toArray(), target: controls.target.toArray(), zoom: (camera as { zoom?: number }).zoom ?? 1, min: controls.minDistance, max: controls.maxDistance, view: getState().view, tick: getState().cameraResetTick } : null;
+};
+
 function CameraRig() {
   const view = useStore((s) => s.view);
   const tick = useStore((s) => s.cameraResetTick);
   const camera = useThree((s) => s.camera);
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
+  const invalidate = useThree((s) => s.invalidate);
   useEffect(() => {
     refs.camera = camera;
     refs.controls = controls;
-    scheduleFrame();
-  }, [camera, controls, view, tick]);
+    const k = keptCamera;
+    if (k && k.view === view && k.tick === tick) {
+      // the remounting Canvas runs this effect for its default camera first: restore only once the controls drive the final makeDefault camera
+      if (!controls || controls.object !== camera) return;
+      camera.position.fromArray(k.pos);
+      controls.target.fromArray(k.target);
+      controls.minDistance = k.min;
+      controls.maxDistance = k.max;
+      if ((camera as { zoom?: number }).zoom !== undefined) (camera as { zoom: number }).zoom = k.zoom;
+      camera.updateProjectionMatrix();
+      controls.update();
+      keptCamera = null;
+      invalidate();
+    } else {
+      keptCamera = null;
+      scheduleFrame();
+    }
+    return () => { if (refs.camera === camera) { refs.camera = null; refs.controls = null; } };
+  }, [camera, controls, view, tick, invalidate]);
   return (
     <>
       {view === 'persp' ? (
@@ -252,6 +278,9 @@ function Marquee() {
 export function Workspace() {
   const wrap = useRef<HTMLDivElement>(null);
   const quality = useStore((s) => s.quality);
+  const antialias = useStore((s) => s.antialias);
+  const prevAa = useRef(antialias);
+  if (prevAa.current !== antialias) { prevAa.current = antialias; snapshotCamera(); } // the old Canvas is still mounted during this render
   const onDragOver = (e: DragEvent) => {
     if (!e.dataTransfer.types.includes('application/x-part-kind')) return;
     e.preventDefault();
@@ -274,7 +303,7 @@ export function Workspace() {
     <div ref={wrap} className="workspace" tabIndex={-1} onDragOver={onDragOver} onDrop={onDrop} onDragLeave={() => getState().draft && set({ draft: null })}>
       <Marquee />
       {/* Low keeps dpr 1 (native on 1x screens) to save fill cost: it trades retina sharpness for speed and is only meant for software or slow GPUs. */}
-      <Canvas frameloop="demand" shadows={quality === 'low' ? false : quality === 'high' ? 'soft' : true} dpr={quality === 'high' ? [1, 2] : quality === 'medium' ? [1, 1.5] : 1} gl={{ antialias: true, powerPreference: 'high-performance' }} aria-label="3D 작업대">
+      <Canvas key={antialias ? 'aa' : 'noaa'} frameloop="demand" shadows={quality === 'low' ? false : quality === 'high' ? 'soft' : true} dpr={quality === 'high' ? [1, 2] : quality === 'medium' ? [1, 1.5] : 1} gl={glOptions(antialias)} aria-label="3D 작업대">
         <Content />
       </Canvas>
     </div>
