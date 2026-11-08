@@ -122,21 +122,24 @@ export class Mcu {
     this.dhtSamples.clear();
     this.pixels.clear();
     for (const [port, configuration] of [['B', portBConfig], ['C', portCConfig], ['D', portDConfig]] as const) {
+      // Resolved once per reset: these hooks fire on every PORT/DDR write, so they must not rebuild map entries each time.
+      const portPins = Object.entries(map).filter(([, [mappedPort]]) => mappedPort === port);
       // pinMode(INPUT_PULLUP) on a reset pin only writes PORT (DDR stays 0): the pull-up must still reach the electrical solve at once,
       // otherwise the first digitalRead() sees a pre-pullup LOW and fires a phantom button press.
       const originalPort = this.cpu.writeHooks[configuration.PORT]!;
       this.cpu.writeHooks[configuration.PORT] = (value, oldValue, address, mask) => {
         const result = originalPort(value, oldValue, address, mask);
         const changed = value ^ oldValue;
-        for (const [name, [mappedPort, bit]] of Object.entries(map)) {
+        if (!changed) return result;
+        for (const [name, [mappedPort, bit]] of portPins) {
           // The net voltage from the last solve is stale (floating input) at the instant a pull-up is enabled; real silicon reads HIGH immediately, and the next solve replaces this with the real net voltage.
           if (mappedPort === port && changed & value & (1 << bit) && !(this.cpu.data[configuration.DDR]! & (1 << bit)) && !this.echoActive.has(name)) {
             this.lastInput.set(name, true);
             this.ports[port].setPin(bit, true);
           }
         }
-        if (changed && this.onPinModeChange) {
-          for (const [name, [mappedPort, bit]] of Object.entries(map)) {
+        if (this.onPinModeChange) {
+          for (const [name, [mappedPort, bit]] of portPins) {
             if (mappedPort !== port || !(changed & (1 << bit)) || this.cpu.data[configuration.DDR]! & (1 << bit)) continue;
             this.onPinModeChange(name, value & (1 << bit) ? 'input_pullup' : 'input');
           }
@@ -149,7 +152,7 @@ export class Mcu {
         const released = oldValue & ~value;
         const asserted = value & ~oldValue;
         if ((released || asserted) && this.onPinModeChange) {
-          for (const [name, [mappedPort, bit]] of Object.entries(map)) {
+          for (const [name, [mappedPort, bit]] of portPins) {
             if (mappedPort !== port || !((released | asserted) & (1 << bit))) continue;
             const mode = value & (1 << bit) ? 'output'
               : this.cpu.data[configuration.PORT]! & (1 << bit) ? 'input_pullup' : 'input';
@@ -157,7 +160,7 @@ export class Mcu {
           }
         }
         if (released || asserted) {
-          for (const [name, [mappedPort, bit]] of Object.entries(map)) {
+          for (const [name, [mappedPort, bit]] of portPins) {
             if (mappedPort !== port) continue;
             const protocol = this.dht.get(name);
             if (!protocol) continue;
