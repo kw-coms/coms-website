@@ -21,6 +21,21 @@ const results = new WeakSet<object>();
 export function registerCanonicalizer(fn: Canonicalizer): void { impl = fn; }
 export async function ensureCanon(): Promise<void> { await import('./blocklyRuntime'); }
 
+/**
+ * ensureCanon for the startup restore and its retry button: a bounded wait (a stalled chunk must not hang the app) and one
+ * automatic retry (a stale chunk after a deploy, a dropped connection). Never throws: false means Blockly is not available.
+ */
+export async function loadCanon(timeoutMs = 10_000): Promise<boolean> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([ensureCanon(), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('timeout')), timeoutMs); })]);
+      return true;
+    } catch { /* retry once */ } finally { clearTimeout(timer); }
+  }
+  return false;
+}
+
 /** Blockly's own reading of an untrusted workspace, or the Korean reason it cannot be accepted. Fails closed while the runtime is not loaded. */
 export function canonicalize(state: unknown): Canon {
   if (!impl) return { ok: false, error: '블록 편집기를 아직 불러오지 못했어요. 잠시 뒤에 다시 해 보세요.' };

@@ -9,7 +9,7 @@ import { getItem, setItem, SAVE_KEY } from './storage';
 import { DEFAULT_BLOCKS } from './blocks/starters';
 import { sceneContext } from './blocks/context';
 import { generate } from './blocks/generate';
-import { canonicalize, ensureCanon, isCanonical } from './blocks/canon';
+import { canonicalize, isCanonical, loadCanon } from './blocks/canon';
 import { detectSoftwareRendering, initialQuality, loadQualityMode, saveQualityMode, type Quality, type QualityMode } from './quality';
 
 export type Selection = { kind: 'part' | 'wire'; id: string } | null;
@@ -75,6 +75,8 @@ export interface State {
   qualityNotice: string | null;
   /** The autosave could not be read; a raw backup copy was kept (see BACKUP_KEY). */
   restoreNotice: boolean;
+  /** A saved block program could not be opened because Blockly did not load: the autosave is left alone and autosaving is off. */
+  restorePending: boolean;
   // ---- v2 ----
   /** Sketch lines (1-based) with a debugger breakpoint. */
   breakpoints: number[];
@@ -147,23 +149,27 @@ function initialTheme(): Theme {
   return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function startDoc(): { doc: Doc; code: string; restored: boolean; failed: boolean } {
+function startDoc(blocked: boolean): { doc: Doc; code: string; restored: boolean; failed: boolean; pending: boolean } {
   const raw = getItem(SAVE_KEY);
   let failed = false;
+  // Blockly did not load: the saved program is neither corrupt nor openable. Leave SAVE_KEY (and the backup) untouched.
+  if (raw && blocked) return { ...defaultDoc(), restored: false, failed: false, pending: true };
   if (raw) {
     try {
       const parsed = validateScene(JSON.parse(raw), { blocksBytes: MAX_CANONICAL_BLOCKS_BYTES });
       const s = withGeneratedCode(parsed, analyze(parsed));
-      return { doc: docOf(s), code: s.code, restored: true, failed: false };
+      return { doc: docOf(s), code: s.code, restored: true, failed: false, pending: false };
     } catch {
       // keep the raw data for the user, then start from the default example
       setItem(BACKUP_KEY, raw);
       failed = true;
     }
   }
+  return { ...defaultDoc(), restored: false, failed, pending: false };
+}
+function defaultDoc(): { doc: Doc; code: string } {
   const ex = EXAMPLES[0];
-  if (ex) return { doc: docOf(validateScene(ex.scene)), code: ex.scene.code, restored: false, failed };
-  return { doc: empty, code: BLANK_CODE, restored: false, failed };
+  return ex ? { doc: docOf(validateScene(ex.scene)), code: ex.scene.code } : { doc: empty, code: BLANK_CODE };
 }
 
 export const PREFS_KEY = 'coms-lab:prefs';
@@ -209,8 +215,9 @@ function loadMissionProgress(): Record<string, MissionProgress> {
 const qualityMode = loadQualityMode();
 const softwareHint = qualityMode === 'auto' && detectSoftwareRendering();
 // A saved block program is canonicalized by Blockly on restore, so its chunk must be loaded before the first synchronous read.
-if ((getItem(SAVE_KEY) ?? '').includes('"blocks"')) await ensureCanon().catch(() => undefined);
-const first = startDoc();
+const savedBlocks = (getItem(SAVE_KEY) ?? '').includes('"blocks"');
+const first = startDoc(savedBlocks && !(await loadCanon()));
+let autosaveBlocked = first.pending;
 let state: State = {
   hist: initHistory(first.doc),
   code: first.code,
@@ -245,6 +252,7 @@ let state: State = {
   qualityMode,
   quality: initialQuality(qualityMode, softwareHint),
   restoreNotice: first.failed,
+  restorePending: first.pending,
   breakpoints: [],
   debug: null,
   debugTruncated: false,
@@ -559,6 +567,23 @@ export function updateWire(id: string, patch: Partial<Wire>) {
 const loadListeners = new Set<() => void>();
 export const onSceneLoaded = (cb: () => void) => (loadListeners.add(cb), () => loadListeners.delete(cb));
 
+/** Retry button of the restore notice: load Blockly again, then open the saved program. Only a successful restore re-enables autosave. */
+export async function retryRestore(): Promise<void> {
+  if (!state.restorePending) return;
+  if (!(await loadCanon())) return toast('블록 편집기를 아직 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.');
+  const raw = getItem(SAVE_KEY);
+  try {
+    if (!raw) throw new Error('empty');
+    loadScene(validateScene(JSON.parse(raw), { blocksBytes: MAX_CANONICAL_BLOCKS_BYTES }));
+    baseline = ''; // like a startup restore: it exists nowhere else, so it counts as unsaved work
+  } catch {
+    if (raw) setItem(BACKUP_KEY, raw);
+    set({ restoreNotice: true });
+  }
+  autosaveBlocked = false;
+  set({ restorePending: false });
+}
+
 export function loadScene(input: Scene, opts: { keepSim?: boolean } = {}) {
   void opts;
   const analysis = analyze(input);
@@ -595,6 +620,7 @@ let saveWarned = false;
 function saveNow() {
   clearTimeout(saveTimer);
   saveTimer = undefined;
+  if (autosaveBlocked) return; // the saved program that could not be opened must not be overwritten by the example
   const json = serializeScene();
   if (json !== null && setItem(SAVE_KEY, json)) saveWarned = false;
   else if (!saveWarned) {

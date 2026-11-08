@@ -440,3 +440,40 @@ describe('canonical blocks in the document', () => {
     expect(() => m.core.validateScene({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks: raw })).toThrow(/블록 필드/);
   });
 });
+
+describe('a saved block program survives the editor chunk failing to load', () => {
+  const blockState = { blocks: { languageVersion: 0, blocks: [{ type: 'lab_loop', inputs: { DO: { block: { type: 'lab_digital_write', fields: { PIN: '8', STATE: 'HIGH' } } } } }] } };
+  afterEach(() => { vi.doUnmock('./blocks/blocklyRuntime'); });
+
+  it('keeps SAVE_KEY and the backup untouched, turns autosave off, and a retry restores the program', async () => {
+    const m0 = await boot();
+    await withBlockly();
+    const saved = JSON.stringify({ ...example(m0, 'external-blink'), codeMode: 'blocks', blocks: blockState, code: 'x' });
+    mem.set(m0.store.SAVE_KEY, saved);
+    vi.doMock('./blocks/blocklyRuntime', () => { throw new Error('chunk failed'); });
+    const m = await boot();
+    expect(m.store.getState().restorePending).toBe(true);
+    expect(m.store.getState().restoreNotice).toBe(false);
+    expect(mem.get(m.store.SAVE_KEY)).toBe(saved);
+    expect(mem.has(m.store.BACKUP_KEY)).toBe(false);
+
+    m.store.setCode('void setup() {}\nvoid loop() {}\n'); // an edit of the example must not overwrite the saved program
+    await new Promise((r) => setTimeout(r, 900));
+    expect(mem.get(m.store.SAVE_KEY)).toBe(saved);
+    expect(mem.has(m.store.BACKUP_KEY)).toBe(false);
+
+    await m.store.retryRestore(); // still failing: stays pending, nothing touched
+    expect(m.store.getState().restorePending).toBe(true);
+    expect(mem.get(m.store.SAVE_KEY)).toBe(saved);
+
+    vi.doUnmock('./blocks/blocklyRuntime');
+    await m.store.retryRestore();
+    expect(m.store.getState().restorePending).toBe(false);
+    expect(m.store.getState().restoreNotice).toBe(false);
+    expect(m.store.getState().hist.present.codeMode).toBe('blocks');
+    expect(m.store.getState().code).toContain('digitalWrite(8, HIGH);');
+    m.store.setCode(m.store.getState().code + '// edit\n');
+    await new Promise((r) => setTimeout(r, 900));
+    expect(mem.get(m.store.SAVE_KEY)).not.toBe(saved); // autosave is back on
+  }, 60000);
+});
