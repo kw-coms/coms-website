@@ -1,7 +1,7 @@
 // The blocks the student sees are exactly the code that runs: every scene goes through headless Blockly first.
 // Each mismatch between the raw JSON and Blockly's own reading of it is a hidden-code bug; here each one is either
 // rejected or settled so that generate(canonical) is the code for what Blockly displays.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as Blockly from 'blockly/core';
 import { blocksProblem } from '../../core/scene';
 import { canonicalizeBlocks, loadBlocks } from './blocklyRuntime';
@@ -163,15 +163,31 @@ describe('identifiers', () => {
 });
 
 describe('canonicalizing leaves the live editor alone', () => {
-  it('a load that throws does not leave Blockly events disabled', () => {
+  const leaky = ws([{ type: 'lab_loop', inputs: { DO: { block: { type: 'lab_millis' } } } }]); // a value block in a statement input
+  const liveListens = () => {
     const live = new Blockly.Workspace();
     let fired = 0;
     live.addChangeListener(() => { fired++; });
-    expect(Blockly.Events.isEnabled()).toBe(true);
-    expect(canonicalizeBlocks(ws([{ type: 'lab_loop', inputs: { NOPE: { block: { type: 'lab_millis' } } } }])).ok).toBe(false);
-    expect(Blockly.Events.isEnabled()).toBe(true);
     Blockly.serialization.blocks.append({ type: 'lab_millis' }, live);
-    return new Promise<void>(resolve => setTimeout(() => { expect(fired).toBeGreaterThan(0); live.dispose(); resolve(); }, 20));
+    return new Promise<number>(resolve => setTimeout(() => { live.dispose(); resolve(fired); }, 20));
+  };
+  it('a load that throws does not leave Blockly events disabled', async () => {
+    expect(Blockly.Events.isEnabled()).toBe(true);
+    expect(canonicalizeBlocks(leaky).ok).toBe(false);
+    expect(Blockly.Events.isEnabled()).toBe(true);
+    expect(Blockly.Events.getGroup()).toBeFalsy();
+    expect(await liveListens()).toBeGreaterThan(0);
+  });
+  it('restores the counter however many times it was disabled, and clears a leaked group', async () => {
+    const load = vi.spyOn(Blockly.serialization.workspaces, 'load').mockImplementation(() => {
+      Blockly.Events.disable(); Blockly.Events.disable(); Blockly.Events.disable();
+      Blockly.Events.setGroup('leaked');
+      throw new Error('boom');
+    });
+    try { expect(canonicalizeBlocks(ws([{ type: 'lab_loop' }])).ok).toBe(false); } finally { load.mockRestore(); }
+    expect(Blockly.Events.isEnabled()).toBe(true);
+    expect(Blockly.Events.getGroup()).toBeFalsy();
+    expect(await liveListens()).toBeGreaterThan(0);
   });
   it('does not enable events that were already off, and keeps the event group', () => {
     Blockly.Events.disable();
