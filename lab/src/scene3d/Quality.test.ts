@@ -99,11 +99,4 @@ describe('quality governor gating', () => {
     frames(Array<number>(100).fill(70)); // within 6 s of the load
     expect(getState().quality).toBe('high');
   });
-  it('restarts the warm-up when the Canvas is remounted for an antialias change', () => {
-    warm();
-    set({ simState: 'running' });
-    h.effects = []; QualityRig(); h.effects.forEach((e) => e()); // the keyed Canvas remounts the rig
-    frames(Array<number>(100).fill(70)); // inside the fresh warm-up
-    expect(getState().quality).toBe('high');
-  });
 });

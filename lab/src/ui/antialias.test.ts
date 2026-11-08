@@ -31,6 +31,12 @@ describe('antialias setting', () => {
     s.setAntialias(false);
     expect(s.getState().qualityNotice).toBeNull();
   });
+  it('acting on the notice stops it coming back after a reload', async () => {
+    const s = await import('./store');
+    s.set({ qualityNotice: 'slow' });
+    s.setAntialias(false);
+    expect(mem.get('coms-lab:perf-notice')).toBe('1');
+  });
   it('does not throw when storage is unavailable', async () => {
     const boom = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); }, removeItem: () => { throw new Error('blocked'); } };
     vi.stubGlobal('localStorage', boom);

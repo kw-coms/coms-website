@@ -447,6 +447,22 @@ try {
     await dp.getByRole('button', { name: '확인', exact: true }).click({ timeout: 500 }).catch(() => {});
     const n0 = await parts();
     check('antialias: checkbox is on by default', await aaBox.isChecked() && (await attr()) === true);
+    // the user's orbit must survive the Canvas remount
+    {
+      const box = await dp.locator('canvas').boundingBox();
+      await dp.mouse.move(box.x + box.width * 0.1, box.y + box.height * 0.2); await dp.mouse.down();
+      await dp.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.1, { steps: 12 }); await dp.mouse.up();
+      await dp.waitForTimeout(1200); // damping settles
+      await openQ(); // the drag outside closed the popover
+      const cam = () => dp.evaluate(() => window.__lab.camera());
+      const near = (a, b) => a && b && a.every((v, i) => Math.abs(v - b[i]) < 1);
+      const c0 = await cam();
+      await aaBox.uncheck(); await dp.waitForTimeout(900);
+      const c1 = await cam();
+      check('antialias: camera unchanged after toggling off', near(c0, c1), `${c0?.map((v) => v.toFixed(1))} -> ${c1?.map((v) => v.toFixed(1))}`);
+      await aaBox.check(); await dp.waitForTimeout(900);
+      check('antialias: camera unchanged after toggling on', near(c0, await cam()));
+    }
     for (let i = 0; i < 4; i++) {
       await aaBox.uncheck(); await dp.waitForTimeout(700);
       const offOk = (await attr()) === false && (await live()) === 1 && (await dp.locator('canvas').count()) === 1 && (await parts()) === n0;
@@ -462,6 +478,11 @@ try {
     check('antialias: off survives reload and the scene renders', !(await aaBox.isChecked()) && (await attr()) === false && (await parts()) > 0 && (await dp.locator('canvas').boundingBox()).width > 100);
     await saveScreenshot(dp, join(OUT, '14-antialias-off.png'));
     await aaBox.check(); await dp.waitForTimeout(500);
+    await dp.setViewportSize({ width: 1100, height: 800 });
+    await dp.waitForTimeout(400);
+    // (the brand already wraps below ~1300px on main, so only overflow and button wrapping are asserted here)
+    check('toolbar: no overflow and no wrapped buttons at 1100', await dp.evaluate(() => { const t = document.querySelector('.toolbar'); return t.scrollWidth <= t.clientWidth && ![...t.querySelectorAll('.tb')].some((e) => e.getBoundingClientRect().height > 40); }));
+    check('quality popover: closes on resize', !(await aaBox.isVisible()));
     await dp.setViewportSize({ width: 900, height: 800 });
     await dp.waitForTimeout(500);
     await dp.getByRole('button', { name: '더보기' }).click();

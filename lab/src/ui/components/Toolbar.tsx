@@ -25,15 +25,20 @@ function QualityMenu({ inMenu }: { inMenu: boolean }) {
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
   const pop = useRef<HTMLDivElement>(null);
+  const pointerIn = useRef(false);
   const name = useId();
   useEffect(() => {
     if (!open) return;
     pop.current?.querySelector<HTMLInputElement>('input[type=radio]:checked')?.focus();
     const close = (e: PointerEvent) => { if (!(e.target as HTMLElement).closest('.quality-pop')) setOpen(false); };
+    const up = () => { pointerIn.current = false; };
+    const shut = () => setOpen(false); // .tb-secondary hides below 1000px
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); btn.current?.focus(); } };
     window.addEventListener('pointerdown', close);
     window.addEventListener('keydown', esc);
-    return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', esc); };
+    window.addEventListener('pointerup', up);
+    window.addEventListener('resize', shut);
+    return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', esc); window.removeEventListener('pointerup', up); window.removeEventListener('resize', shut); };
   }, [open]);
   const choices: [QualityMode, string][] = [['auto', `자동${qmode === 'auto' ? ` (${QUALITY_LABEL[qeff]})` : ''}`], ['high', '높음'], ['medium', '보통'], ['low', '낮음']];
   const body = (
@@ -54,12 +59,12 @@ function QualityMenu({ inMenu }: { inMenu: boolean }) {
   );
   if (inMenu) return <div className="quality-flat">{body}</div>;
   return (
-    <div className="pop quality-pop">
-      <button ref={btn} type="button" className={`tb quality-btn ${open ? 'on' : ''}`} aria-haspopup="true" aria-expanded={open} title="화질 (느린 컴퓨터에서는 낮춰 보세요)" onClick={() => setOpen(!open)}>
+    <div className="pop quality-pop" onPointerDown={() => { pointerIn.current = true; }} onBlur={(e) => { if (open && !pointerIn.current && !e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false); }}>
+      <button ref={btn} type="button" className={`tb quality-btn ${open ? 'on' : ''}`} aria-haspopup="dialog" aria-expanded={open} title="화질 (느린 컴퓨터에서는 낮춰 보세요)" onClick={() => { if (!open) set({ qualityNotice: null }); setOpen(!open); }}>
         화질: {qmode === 'auto' ? `자동 (${QUALITY_LABEL[qeff]})` : QUALITY_LABEL[qmode as Quality]}
         <ChevronDown size={14} />
       </button>
-      {open && <div ref={pop} className="popover quality-popover" role="group" aria-label="화질 설정">{body}</div>}
+      {open && <div ref={pop} className="popover quality-popover" role="dialog" aria-label="화질 설정">{body}</div>}
     </div>
   );
 }

@@ -153,7 +153,6 @@ button { cursor: pointer; }
 .ctx-label { padding: 6px 10px 0; font-size: 12px; color: var(--muted); } .ctx-sw { margin: 8px 8px 10px; }
 .perf-notice { position: fixed; left: 50%; top: 58px; transform: translateX(-50%); z-index: 90; display: flex; gap: 12px; align-items: center; max-width: min(92vw, 560px); padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--accent); box-shadow: var(--shadow); font-size: 13px; }
 .perf-notice button { flex: none; height: 30px; padding: 0 12px; border-radius: 7px; border: 0; background: var(--accent); color: var(--accent-text); font-weight: 600; }
-.speed.quality select { max-width: 150px; }
 .quality-btn { border-color: var(--border); background: var(--surface-2); white-space: nowrap; }
 .quality-popover { width: 270px; display: flex; flex-direction: column; gap: 6px; padding: 10px; }
 .quality-choices { display: flex; flex-direction: column; gap: 2px; }

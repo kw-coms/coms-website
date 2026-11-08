@@ -81,6 +81,7 @@ export function Interaction() {
 
   useEffect(() => {
     Object.assign(refs, { gl, scene, camera, invalidate });
+    return () => { if (refs.gl === gl) Object.assign(refs, { gl: null, scene: null, camera: null, invalidate: () => {} }); };
   }, [gl, scene, camera, invalidate]);
 
   useEffect(() => {

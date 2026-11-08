@@ -124,6 +124,14 @@ function Invalidator() {
   return null;
 }
 
+/** Camera pose carried across an antialias remount of the Canvas, so the user's orbit and zoom are not reset. */
+let keptCamera: { pos: number[]; target: number[]; zoom: number; min: number; max: number; view: string; tick: number; at: number } | null = null;
+const KEEP_MS = 3000; // the remounting Canvas runs the camera effect several times (default camera, controls, makeDefault camera)
+const snapshotCamera = () => {
+  const { camera, controls } = refs;
+  keptCamera = camera && controls ? { pos: camera.position.toArray(), target: controls.target.toArray(), zoom: (camera as { zoom?: number }).zoom ?? 1, min: controls.minDistance, max: controls.maxDistance, view: getState().view, tick: getState().cameraResetTick, at: performance.now() } : null;
+};
+
 function CameraRig() {
   const view = useStore((s) => s.view);
   const tick = useStore((s) => s.cameraResetTick);
@@ -132,7 +140,22 @@ function CameraRig() {
   useEffect(() => {
     refs.camera = camera;
     refs.controls = controls;
-    scheduleFrame();
+    const k = keptCamera;
+    if (k && k.view === view && k.tick === tick && performance.now() - k.at < KEEP_MS) {
+      if (!controls) return; // restore once the controls exist
+      camera.position.fromArray(k.pos);
+      controls.target.fromArray(k.target);
+      controls.minDistance = k.min;
+      controls.maxDistance = k.max;
+      if ((camera as { zoom?: number }).zoom !== undefined) (camera as { zoom: number }).zoom = k.zoom;
+      camera.updateProjectionMatrix();
+      controls.update();
+      refs.invalidate();
+    } else {
+      keptCamera = null;
+      scheduleFrame();
+    }
+    return () => { if (refs.camera === camera) { refs.camera = null; refs.controls = null; } };
   }, [camera, controls, view, tick]);
   return (
     <>
@@ -254,6 +277,8 @@ export function Workspace() {
   const wrap = useRef<HTMLDivElement>(null);
   const quality = useStore((s) => s.quality);
   const antialias = useStore((s) => s.antialias);
+  const prevAa = useRef(antialias);
+  if (prevAa.current !== antialias) { prevAa.current = antialias; snapshotCamera(); } // the old Canvas is still mounted during this render
   const onDragOver = (e: DragEvent) => {
     if (!e.dataTransfer.types.includes('application/x-part-kind')) return;
     e.preventDefault();
