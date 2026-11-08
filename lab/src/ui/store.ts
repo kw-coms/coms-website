@@ -293,10 +293,11 @@ export const codeMode = (s: State = state): CodeMode => s.hist.present.codeMode 
 /** Hooks for the Blockly lane: the document owns the blocks JSON and the editor mode. */
 export function setBlocks(blocks: unknown) {
   const c = canonicalize(blocks);
-  const code = c.ok ? generate(c.blocks, sceneContext(parts(), state.analysis).opts).code : '';
-  const error = c.ok ? codeProblem(code) : c.error;
-  if (error) return void toast(`적용하지 못했어요: ${error}`);
-  if (setDoc({ ...state.hist.present, version: 2, blocks: c.ok ? c.blocks : blocks }) === null) set({ code });
+  if (!c.ok) return void toast(`적용하지 못했어요: ${c.error}`);
+  const code = generate(c.blocks, sceneContext(parts(), state.analysis).opts).code;
+  const tooBig = codeProblem(code);
+  if (tooBig) return void toast(`적용하지 못했어요: ${tooBig}`);
+  if (setDoc({ ...state.hist.present, version: 2, blocks: c.blocks }) === null) set({ code });
 }
 export function setCodeMode(mode: CodeMode) {
   void setDoc({ ...state.hist.present, version: 2, codeMode: mode });
@@ -378,7 +379,7 @@ export const canUndo = (s: State) => s.hist.past.length > 0;
 export const canRedo = (s: State) => s.hist.future.length > 0;
 
 export function setCode(code: string) {
-  if (code.length * 3 > MAX_CODE_BYTES && new TextEncoder().encode(code).length > MAX_CODE_BYTES) return toast('코드는 64 KB 이하여야 해요.');
+  if (code.length * 3 > MAX_CODE_BYTES && encoder.encode(code).length > MAX_CODE_BYTES) return toast('코드는 64 KB 이하여야 해요.');
   set({ code });
 }
 
