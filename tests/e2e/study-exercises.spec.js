@@ -141,9 +141,11 @@ test('inline chapter cards cap at four and open a persistent removable chapter f
   for (const card of await cards.all()) {
     expect(await card.locator('li').count()).toBeLessThanOrEqual(4)
   }
+  const { violations } = await new AxeBuilder({ page }).include('.ex-cta').include('.ex-inline').withTags(['wcag2a', 'wcag2aa']).analyze()
+  expect(violations).toEqual([])
   const loopCard = page.locator('section#loop .ex-inline')
   await expect(loopCard.locator('li')).toHaveCount(4)
-  const fullList = loopCard.getByRole('link', { name: `이 장 문제 전체 ${chapterHrefs.length}개 →`, exact: true })
+  const fullList = loopCard.getByRole('link', { name: `이 장 문제 전체 ${chapterHrefs.length}개 보기`, exact: true })
   await expect(fullList).toHaveAttribute('href', '/study/c/practice?chapter=loop')
   await fullList.click()
   await expect(page).toHaveURL(/\/study\/c\/practice\?chapter=loop$/)
