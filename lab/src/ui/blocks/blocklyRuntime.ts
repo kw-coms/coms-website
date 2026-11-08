@@ -4,7 +4,7 @@ import * as Blockly from 'blockly/core';
 import 'blockly/blocks';
 import * as Ko from 'blockly/msg/ko';
 import { CUSTOM_BLOCKS, type PinKind, PIN_VALUES } from './defs';
-import { blocksProblem, stringifyJsonBounded } from '../../core/scene';
+import { blocksProblem, MAX_CANONICAL_BLOCKS_BYTES, stringifyJsonBounded } from '../../core/scene';
 import { registerCanonicalizer } from './canon';
 
 Blockly.setLocale(Ko as unknown as Record<string, string>);
@@ -156,6 +156,8 @@ export function canonicalizeBlocks(state: unknown): Canon {
   if (!state || typeof state !== 'object' || Array.isArray(state)) return { ok: false, error: '블록 데이터가 올바르지 않아요.' };
   const problem = blocksProblem(state);
   if (problem) return { ok: false, error: problem };
+  // Blockly's event counter is global: a load that throws midway must not leave the live editor's events disabled.
+  const eventsWereOn = Blockly.Events.isEnabled(), group = Blockly.Events.getGroup();
   const w = new Blockly.Workspace();
   try {
     loadBlocks(w, state);
@@ -164,14 +166,16 @@ export function canonicalizeBlocks(state: unknown): Canon {
     if (before.length !== after.length || before.some((t, i) => t !== after[i])) {
       return { ok: false, error: '블록을 그대로 불러올 수 없어요. 파일이 손상되었거나 다른 버전에서 만든 것 같아요.' };
     }
-    const again = blocksProblem(saved);
+    // the save adds an id and coordinates to every block, so this re-check has more room than the import bound
+    const again = blocksProblem(saved, MAX_CANONICAL_BLOCKS_BYTES);
     if (again) return { ok: false, error: again };
-    if (stringifyJsonBounded(saved, 1000, 256 * 1024) === null) return { ok: false, error: '블록 데이터가 너무 커요.' };
     return { ok: true, blocks: saved };
   } catch {
     return { ok: false, error: '블록을 불러오지 못했어요. 블록 데이터가 올바르지 않아요.' };
   } finally {
     w.dispose();
+    if (eventsWereOn) for (let i = 0; !Blockly.Events.isEnabled() && i < 100; i++) Blockly.Events.enable();
+    Blockly.Events.setGroup(group || false);
   }
 }
 

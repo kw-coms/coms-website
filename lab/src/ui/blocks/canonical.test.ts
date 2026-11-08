@@ -160,3 +160,39 @@ describe('identifiers', () => {
     expect(new Set([...code.matchAll(/^int (v_\w+) = 0;/gm)].map(m => m[1])).size).toBe(2);
   });
 });
+
+describe('canonicalizing leaves the live editor alone', () => {
+  it('a load that throws does not leave Blockly events disabled', () => {
+    const live = new Blockly.Workspace();
+    let fired = 0;
+    live.addChangeListener(() => { fired++; });
+    expect(Blockly.Events.isEnabled()).toBe(true);
+    expect(canonicalizeBlocks(ws([{ type: 'lab_loop', inputs: { NOPE: { block: { type: 'lab_millis' } } } }])).ok).toBe(false);
+    expect(Blockly.Events.isEnabled()).toBe(true);
+    Blockly.serialization.blocks.append({ type: 'lab_millis' }, live);
+    Blockly.Events.fireNow_?.();
+    return new Promise<void>(resolve => setTimeout(() => { expect(fired).toBeGreaterThan(0); live.dispose(); resolve(); }, 20));
+  });
+  it('does not enable events that were already off, and keeps the event group', () => {
+    Blockly.Events.disable();
+    Blockly.Events.setGroup('keep');
+    canonicalizeBlocks(ws([{ type: 'lab_loop' }]));
+    expect(Blockly.Events.isEnabled()).toBe(false);
+    expect(Blockly.Events.getGroup()).toBe('keep');
+    Blockly.Events.enable();
+    Blockly.Events.setGroup(false);
+  });
+});
+
+describe('size bounds', () => {
+  it('a valid import under 256 KB still canonicalizes when the save adds ids and coordinates', () => {
+    const state = ws(Array.from({ length: 4500 }, () => ({ type: 'math_number', fields: { NUM: 1 } })));
+    expect(JSON.stringify(state).length).toBeLessThan(256 * 1024);
+    const r = canonicalizeBlocks(state);
+    expect(r.ok).toBe(true);
+    expect(JSON.stringify(r.ok && r.blocks).length).toBeGreaterThan(256 * 1024);
+  });
+  it('the pre-load bound stays 256 KB', () => {
+    expect(canonicalizeBlocks(ws(Array.from({ length: 6000 }, () => ({ type: 'math_number', fields: { NUM: 1 } })))).ok).toBe(false);
+  });
+});

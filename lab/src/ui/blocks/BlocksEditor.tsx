@@ -4,7 +4,7 @@
 import { useEffect, useRef } from 'react';
 import * as Blockly from 'blockly/core';
 import { COLOUR, TOOLBOX } from './defs';
-import { stringifyJsonBounded } from '../../core/scene';
+import { MAX_CANONICAL_BLOCKS_BYTES, stringifyJsonBounded } from '../../core/scene';
 import { loadBlocks, setPinHints } from './blocklyRuntime';
 import './blocks.css';
 
@@ -70,7 +70,7 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
       } finally { loading.current = false; }
     };
     load(state);
-    last.current = stringifyJsonBounded(state ?? null, 1000, 256 * 1024) ?? '';
+    last.current = stringifyJsonBounded(state ?? null, 1000, MAX_CANONICAL_BLOCKS_BYTES) ?? '';
     let timer = 0;
     w.addChangeListener((ev: Blockly.Events.Abstract) => {
       if (loading.current || ev.isUiEvent) return;
@@ -78,7 +78,7 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         const s = Blockly.serialization.workspaces.save(w);
-        last.current = stringifyJsonBounded(s, 1000, 256 * 1024) ?? '';
+        last.current = stringifyJsonBounded(s, 1000, MAX_CANONICAL_BLOCKS_BYTES) ?? '';
         cb.current(s);
       }, 300);
     });
@@ -93,7 +93,7 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
 
   // the document changed from outside (undo, another example, opened file): reload the workspace
   useEffect(() => {
-    const key = stringifyJsonBounded(state ?? null, 1000, 256 * 1024) ?? '';
+    const key = stringifyJsonBounded(state ?? null, 1000, MAX_CANONICAL_BLOCKS_BYTES) ?? '';
     if (key === last.current || !ws.current) return;
     last.current = key;
     loader.current(state);

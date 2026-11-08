@@ -3,7 +3,7 @@ import type {
   Analysis, CodeMode, CompilerMessage, DebugState, Note, PartInstance, PartKind, PinRef, RotY, Scene, SimFrame, SimWarning, Vec3, Wire, WireColor,
 } from '../core/types';
 import { EXAMPLES, PARTS, analyze, validateScene } from './core';
-import { stringifyJsonBounded } from '../core/scene';
+import { MAX_CANONICAL_BLOCKS_BYTES, stringifyJsonBounded } from '../core/scene';
 import { commit, initHistory, redo as redoH, undo as undoH, type History } from './history';
 import { getItem, setItem, SAVE_KEY } from './storage';
 import { DEFAULT_BLOCKS } from './blocks/starters';
@@ -152,7 +152,7 @@ function startDoc(): { doc: Doc; code: string; restored: boolean; failed: boolea
   let failed = false;
   if (raw) {
     try {
-      const parsed = validateScene(JSON.parse(raw));
+      const parsed = validateScene(JSON.parse(raw), { blocksBytes: MAX_CANONICAL_BLOCKS_BYTES });
       const s = withGeneratedCode(parsed, analyze(parsed));
       return { doc: docOf(s), code: s.code, restored: true, failed: false };
     } catch {
@@ -339,7 +339,7 @@ export const isDirty = () => docKey() !== baseline;
 /** Transactional: the candidate scene must pass the core's validateScene (limits, prop ranges, ids) before anything changes. Returns the Korean error, or null on success. */
 function checkDoc(doc: Doc): string | null {
   try {
-    validateScene(toScene(doc, state.code));
+    validateScene(toScene(doc, state.code), { blocksBytes: MAX_CANONICAL_BLOCKS_BYTES });
     return null;
   } catch (e) {
     return e instanceof Error && e.message ? e.message : '회로가 허용 범위를 넘었어요.';

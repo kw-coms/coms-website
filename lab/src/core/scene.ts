@@ -165,8 +165,11 @@ export function cloneJson<T>(value: T): T {
   return root as T;
 }
 
-function validBlocks(value: unknown): boolean {
-  return stringifyJsonBounded(value, MAX_BLOCKS_JSON_DEPTH, 256 * 1024) !== null;
+/** Imports are bounded at 256 KB; Blockly's own save adds ids and coordinates, so canonical blocks may use up to 512 KB. */
+export const MAX_BLOCKS_BYTES = 256 * 1024;
+export const MAX_CANONICAL_BLOCKS_BYTES = 512 * 1024;
+function validBlocks(value: unknown, maxBytes = MAX_BLOCKS_BYTES): boolean {
+  return stringifyJsonBounded(value, MAX_BLOCKS_JSON_DEPTH, maxBytes) !== null;
 }
 
 /**
@@ -235,9 +238,9 @@ function mutationSize(type: string, es: unknown): number {
  * loader and the generator will touch. Returns a Korean reason, or null when the workspace is acceptable.
  * BlocksEditor runs it again right before Blockly loads, so no path reaches the loader unchecked.
  */
-export function blocksProblem(state: unknown): string | null {
+export function blocksProblem(state: unknown, maxBytes = MAX_BLOCKS_BYTES): string | null {
   const bad = '블록 구조가 올바르지 않습니다.';
-  if (!validBlocks(state)) return '블록 데이터는 올바른 JSON이며 256 KB 이하, 1,000단계 이하의 깊이이어야 합니다.';
+  if (!validBlocks(state, maxBytes)) return `블록 데이터는 올바른 JSON이며 ${maxBytes / 1024} KB 이하, 1,000단계 이하의 깊이이어야 합니다.`;
   if (!isObject(state)) return bad;
   const ws = state.blocks;
   if (ws !== undefined && (!isObject(ws) || (ws.blocks !== undefined && !Array.isArray(ws.blocks)))) return bad;
@@ -281,7 +284,7 @@ export function blocksProblem(state: unknown): string | null {
 }
 
 /** Validate untrusted imported scenes before analysis or rendering. */
-export function validateScene(value: unknown): Scene {
+export function validateScene(value: unknown, opts: { blocksBytes?: number } = {}): Scene {
   if (!isObject(value) || !hasOnlyKeys(value, ['version', 'title', 'parts', 'wires', 'code', 'blocks', 'codeMode', 'notes', 'mission']) ||
       (value.version !== 1 && value.version !== 2) || !Array.isArray(value.parts) || !Array.isArray(value.wires) ||
       typeof value.code !== 'string') {
@@ -296,9 +299,10 @@ export function validateScene(value: unknown): Scene {
   if (value.title !== undefined && (typeof value.title !== 'string' || value.title.length > 200)) {
     invalid('장면 제목이 올바르지 않습니다.');
   }
-  if (value.blocks !== undefined && !validBlocks(value.blocks)) invalid('블록 데이터는 올바른 JSON이며 256 KB 이하, 1,000단계 이하의 깊이이어야 합니다.');
+  const blocksBytes = opts.blocksBytes ?? MAX_BLOCKS_BYTES;
+  if (value.blocks !== undefined && !validBlocks(value.blocks, blocksBytes)) invalid(`블록 데이터는 올바른 JSON이며 ${blocksBytes / 1024} KB 이하, 1,000단계 이하의 깊이이어야 합니다.`);
   if (value.blocks !== undefined) {
-    const problem = blocksProblem(value.blocks);
+    const problem = blocksProblem(value.blocks, blocksBytes);
     if (problem) invalid(problem);
   }
   if (value.codeMode !== undefined && !['blocks', 'blocks+text', 'text'].includes(value.codeMode as string)) {
