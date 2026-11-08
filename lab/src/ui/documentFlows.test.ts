@@ -472,17 +472,79 @@ describe('trust boundaries: Blockly only for what we did not write', () => {
     expect(JSON.parse(mem.get(t.store.SAVE_KEY)!).canonVersion).toBeUndefined();
   });
 
-  it('a block autosave without the marker takes the corrupt-autosave path', async () => {
-    await wait(800); // earlier tests' stores share this localStorage stub: let their pending autosaves land first
+  const until = async (ok: () => boolean) => { for (let i = 0; i < 200 && !ok(); i++) await wait(50); };
+  const unmarked = async () => {
     const m0 = await boot();
     await withBlockly();
     const raw = JSON.stringify({ ...example(m0, 'external-blink'), codeMode: 'blocks', blocks, code: 'x' });
     mem.set(m0.store.SAVE_KEY, raw);
-    const m = await boot(); // Blockly is loaded in this registry too: the marker, not availability, decides
+    return { raw, m0 };
+  };
+
+  it('an unmarked block autosave (saved by an earlier build) migrates like an import and gets the marker', async () => {
+    await wait(800); // earlier tests' stores share this localStorage stub: let their pending autosaves land first
+    const { raw } = await unmarked();
+    const m = await boot();
+    await until(() => m.store.getState().hist.present.codeMode === 'blocks');
+    expect(m.store.getState().restoreNotice).toBe(false);
+    expect(m.store.getState().code).toContain('digitalWrite(8, HIGH);');
+    await wait(800);
+    const saved = JSON.parse(mem.get(m.store.SAVE_KEY)!);
+    expect(saved.canonVersion).toBe(m.store.CANON_VERSION);
+    expect(mem.has(m.store.BACKUP_KEY)).toBe(false);
+    void raw;
+  }, 60000);
+
+  it('when Blockly cannot load, the raw data is kept in the backup, the notice shows and the default stays', async () => {
+    await wait(800);
+    const { raw } = await unmarked();
+    chunkFails();
+    const m = await boot();
+    await until(() => m.store.getState().restoreNotice);
     expect(m.store.getState().restoreNotice).toBe(true);
     expect(mem.get(m.store.BACKUP_KEY)).toBe(raw);
     expect(m.store.getState().hist.present.codeMode).not.toBe('blocks');
-  });
+  }, 60000);
+
+  it('a newer backup never silently replaces an older, different one', async () => {
+    await wait(800);
+    const { raw } = await unmarked();
+    mem.set('coms-lab:scene:v1:backup', 'OLDER');
+    chunkFails();
+    const m = await boot();
+    await until(() => m.store.getState().restoreNotice);
+    expect(mem.get(m.store.BACKUP_KEY)).toBe(raw);
+    expect(mem.get(m.store.BACKUP_PREV_KEY)).toBe('OLDER');
+  }, 60000);
+
+  it('the backup / autosave wrapper imports: unwrapped, still canonicalized, large files allowed', async () => {
+    const m = await boot();
+    await withBlockly();
+    const scene = { ...example(m, 'external-blink'), codeMode: 'blocks', blocks, code: 'x' };
+    const pretty = JSON.stringify({ canonVersion: m.store.CANON_VERSION, scene }, null, 2);
+    await m.actions.importJson(new File([pretty], 'circuit-lab-backup.json'));
+    expect(m.store.getState().hist.present.codeMode).toBe('blocks');
+    expect(m.store.getState().code).toContain('digitalWrite(8, HIGH);');
+    const pad = { ...scene, title: 'x'.repeat(150), notes: undefined };
+    const big = JSON.stringify({ ...pad, blocks: { blocks: { languageVersion: 0, blocks: Array.from({ length: 2500 }, (_, i) => ({ type: 'math_number', id: `b${i}`, x: 0, y: i, fields: { NUM: 1 } })) } } }, null, 2);
+    expect(big.length).toBeGreaterThan(400_000);
+    m.store.set({ toast: null });
+    await m.actions.importJson(new File([big], 'big.json'));
+    expect(m.store.getState().toast).not.toMatch(/너무 커요/);
+  }, 60000);
+
+  it('a refused scene does not stop the running simulation', async () => {
+    const stop = vi.fn();
+    vi.doMock('./simHost', async (orig) => ({ ...(await orig<object>()), stop }));
+    const m = await boot();
+    await withBlockly();
+    const bad = { blocks: { languageVersion: 0, blocks: [{ type: 'lab_loop', inputs: { NOPE: { block: { type: 'lab_millis' } } } }] } };
+    await m.actions.importJson(new File([JSON.stringify({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks: bad, code: 'x' })], 'c.json'));
+    expect(stop).not.toHaveBeenCalled();
+    await m.actions.importJson(new File([JSON.stringify({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks, code: 'x' })], 'c.json'));
+    expect(stop).toHaveBeenCalled();
+    vi.doUnmock('./simHost');
+  }, 60000);
 
   it('a 300 KB Blockly save from the live editor is accepted without calling Blockly', async () => {
     const m = await boot();

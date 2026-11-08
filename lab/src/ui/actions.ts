@@ -2,7 +2,7 @@ import { encodeShare, decodeShare, EXAMPLES, PARTS, validateScene } from './core
 import { refs } from '../scene3d/sceneRefs';
 import { MISSIONS } from '../missions';
 import { parseMissionHash, parseShareHash, shareHash } from './shareHash';
-import { BACKUP_KEY, getState, isDirty, loadScene, markClean, scene, set, THEME_KEY, toast } from './store';
+import { BACKUP_KEY, BACKUP_PREV_KEY, CANON_VERSION, getState, isDirty, loadScene, markClean, scene, set, THEME_KEY, toast } from './store';
 import { stop } from './simHost';
 import { loadCanon } from './blocks/canon';
 import { getItem, setItem } from './storage';
@@ -23,6 +23,9 @@ function downloadText(name: string, text: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+/** A canonical 512 KB block tree plus the rest of a scene, pretty-printed. */
+const MAX_IMPORT_BYTES = 1_500_000;
+
 /** An imported scene with blocks needs the Blockly chunk; when it cannot load, say so and change nothing. */
 async function needBlockly(s: Scene) {
   if (s.blocks !== undefined && !(await loadCanon())) throw new Error('블록 편집기를 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요.');
@@ -34,8 +37,7 @@ export const confirmReplace = (what: string) =>
 
 /** Stop the simulator and replace the document. */
 function replaceWith(s: Scene) {
-  stop();
-  loadScene(s);
+  loadScene(s, { beforeApply: stop }); // a scene that is refused leaves the running simulation alone
 }
 
 export function exportJson() {
@@ -49,8 +51,10 @@ export function exportJson() {
 /** Download the raw copy of an autosave that failed validation at startup. */
 export function downloadBackup() {
   const raw = getItem(BACKUP_KEY);
-  if (raw) downloadText('circuit-lab-backup.json', raw);
-  else toast('백업 데이터를 찾지 못했어요.');
+  if (!raw) return void toast('백업 데이터를 찾지 못했어요.');
+  downloadText('circuit-lab-backup.json', raw);
+  const prev = getItem(BACKUP_PREV_KEY); // an older, different backup that a newer one replaced
+  if (prev) setTimeout(() => downloadText('circuit-lab-backup-earlier.json', prev), 300);
 }
 export const dismissRestoreNotice = () => set({ restoreNotice: false });
 
@@ -58,13 +62,16 @@ const errMsg = (e: unknown) => (e instanceof Error && e.message && !/^[\x00-\x7f
 
 export async function importJson(file: File) {
   try {
-    if (file.size > 400_000) throw new Error('파일이 너무 커요.');
+    if (file.size > MAX_IMPORT_BYTES) throw new Error('파일이 너무 커요.');
     let json: unknown;
     try {
       json = JSON.parse(await file.text());
     } catch {
       throw new Error('JSON 형식이 아니에요.');
     }
+    // the backup / autosave wrapper: unwrap it, the scene inside is still untrusted and canonicalized below
+    const wrapped = json as { canonVersion?: unknown; scene?: unknown } | null;
+    if (wrapped && typeof wrapped === 'object' && Object.keys(wrapped).length === 2 && wrapped.canonVersion === CANON_VERSION && 'scene' in wrapped) json = wrapped.scene;
     const s = validateScene(json);
     await needBlockly(s); // loadScene runs untrusted blocks through Blockly
     if (!confirmReplace('불러올까요?')) return;
