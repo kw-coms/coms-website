@@ -45,7 +45,7 @@ try {
   await page.waitForFunction(() => window.__lab?.EXAMPLES, null, { timeout: 30000 });
   check('Blockly is not downloaded before Blocks mode is opened', !requests.some((u) => /BlocksEditor/.test(u)));
   // the builtin-blink circuit (UNO "L" LED on pin 13), empty block program
-  await lab(() => { const ex = window.__lab.EXAMPLES.find((e) => e.id === 'builtin-blink').scene; window.__lab.loadScene({ ...ex, version: 2, codeMode: 'blocks', blocks: undefined }); });
+  await lab(async () => { await window.__lab.ensureCanon(); const ex = window.__lab.EXAMPLES.find((e) => e.id === 'builtin-blink').scene; window.__lab.loadScene({ ...ex, version: 2, codeMode: 'blocks', blocks: undefined }); });
   await page.getByRole('button', { name: '확인', exact: true }).click({ timeout: 8000 }).catch(() => {}); // the quality toast covers the panel tabs once the panel is wide
   await lab(() => window.__lab.set({ sideTab: 'code', sideOpen: true }));
   await page.waitForSelector('.blocklySvg', { timeout: 30000 });
@@ -170,7 +170,7 @@ try {
   const m = await mctx.newPage();
   await m.goto(base);
   await m.waitForFunction(() => window.__lab?.EXAMPLES, null, { timeout: 30000 });
-  await m.evaluate(() => { const ex = window.__lab.EXAMPLES.find((e) => e.id === 'builtin-blink').scene; window.__lab.loadScene({ ...ex, version: 2, codeMode: 'blocks', blocks: undefined }); });
+  await m.evaluate(async () => { await window.__lab.ensureCanon(); const ex = window.__lab.EXAMPLES.find((e) => e.id === 'builtin-blink').scene; window.__lab.loadScene({ ...ex, version: 2, codeMode: 'blocks', blocks: undefined }); });
   await m.getByRole('tab', { name: '코드', exact: true }).click();
   await m.waitForSelector('.blocklySvg', { timeout: 30000 });
   await m.waitForTimeout(800);
