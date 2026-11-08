@@ -75,6 +75,11 @@ describe('quality governor gating', () => {
     frames(Array<number>(100).fill(150));
     expect(getState().quality).toBe('medium');
   });
+  it('never steps down on 150 ms frames while idle and not orbiting (typing or idle)', () => {
+    warm();
+    frames(Array<number>(300).fill(150));
+    expect(getState().quality).toBe('high');
+  });
   it('never steps down on idle-like gaps (over 250 ms) while running', () => {
     warm();
     set({ simState: 'running' });
