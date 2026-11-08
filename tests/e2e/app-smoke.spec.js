@@ -2448,6 +2448,58 @@ test('Tools menu opens Circuit Lab with a full page load, not a router navigatio
   await labRequest
 })
 
+// Lab is a top-level item next to Study (not only inside Tools), at desktop and mobile widths.
+for (const width of [1280, 1440]) {
+  test(`header shows Lab next to Study on one line at ${width}px`, async ({ page }) => {
+    await mockAdminApis(page)
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/')
+    const nav = page.locator('header nav').first()
+    const lab = nav.getByRole('button', { name: 'Lab', exact: true })
+    await expect(lab).toBeVisible()
+    const [studyBox, labBox] = await Promise.all([nav.getByRole('button', { name: 'Study', exact: true }).boundingBox(), lab.boundingBox()])
+    expect(Math.abs(studyBox.y - labBox.y)).toBeLessThan(4)
+    expect(labBox.x).toBeGreaterThan(studyBox.x)
+    const navBox = await nav.boundingBox()
+    expect(navBox.height).toBeLessThan(60)
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+    const labRequest = page.waitForRequest((request) => request.isNavigationRequest() && new URL(request.url()).pathname === '/lab/')
+    await lab.click()
+    await labRequest
+  })
+}
+
+test('mobile menu lists Lab at 375px without horizontal overflow and opens it with a full page load', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.setViewportSize({ width: 375, height: 812 })
+  await page.goto('/')
+  await page.getByLabel('메뉴 열기').click()
+  const mobileMenu = page.getByRole('navigation', { name: '모바일 메뉴' })
+  await expect(mobileMenu.getByRole('button', { name: /^Lab/ })).toBeVisible()
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+  const labRequest = page.waitForRequest((request) => request.isNavigationRequest() && new URL(request.url()).pathname === '/lab/')
+  await mobileMenu.getByRole('button', { name: /^Lab/ }).click()
+  await labRequest
+})
+
+test('study hub has a Circuit Lab card and the Arduino page a banner, both plain links to /lab/', async ({ page }) => {
+  await mockAdminApis(page)
+  for (const width of [1440, 375]) {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/study')
+    const card = page.locator('a[href="/lab/"]')
+    await expect(card).toBeVisible()
+    await expect(card).toHaveAttribute('href', '/lab/')
+    await expect(card).toContainText('브라우저에서 아두이노 회로를 만들고 코드를 바로 돌려 보세요')
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+    await page.goto('/study/arduino')
+    const banner = page.getByRole('link', { name: /Circuit Lab에서 열기/ })
+    await expect(banner).toBeVisible()
+    await expect(banner).toHaveAttribute('href', '/lab/')
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+  }
+})
+
 test('community list stays dense but readable on mobile', async ({ page }) => {
   await mockAdminApis(page)
   await page.route('**/api/community/posts{,?*}', (route) => route.fulfill({

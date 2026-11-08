@@ -263,9 +263,16 @@ export default function HomeView() {
                 )}
                 <div className="mx-auto mt-5 flex max-w-[21rem] flex-wrap justify-center gap-2 sm:max-w-3xl">
                   {experiencePills.map((pill) => (
+                    pill === 'Arduino' ? (
+                      // Opens the Circuit Lab, a separate app at /lab/ (a real page load).
+                      <a key={pill} href="/lab/" className="rounded-full bg-white/70 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-accent-text)] shadow-[0_1px_2px_rgba(0,0,0,0.05)] hover:underline sm:px-3 sm:text-xs">
+                        {pill} ↗
+                      </a>
+                    ) : (
                     <span key={pill} className="rounded-full bg-white/70 px-2.5 py-1.5 text-[11px] font-semibold text-[var(--app-muted)] shadow-[0_1px_2px_rgba(0,0,0,0.05)] sm:px-3 sm:text-xs">
                       {pill}
                     </span>
+                    )
                   ))}
                 </div>
                 <div className="apple-hero-metrics mx-auto mt-7 hidden max-w-3xl grid-cols-3 sm:grid">

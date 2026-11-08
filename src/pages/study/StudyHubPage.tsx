@@ -42,6 +42,25 @@ export default function StudyHubPage() {
               </li>
             )
           })}
+          <li>
+            {/* /lab/ is a separate app, not a router page: a plain link makes the browser load it. */}
+            <a href="/lab/" className="study-card study-card-lab">
+              <svg className="study-lab-art" viewBox="0 0 240 80" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 40h30M50 26v28M62 32v16M62 40h28" />
+              <path d="M90 40l6-10 10 20 10-20 10 20 6-10h18" />
+              <path d="M150 40h14M164 26l22 14-22 14zM186 26v28M186 40h34" />
+              <path d="M20 40v26h200V40" />
+              <path d="M196 18l8-8M206 24l8-8" />
+    </svg>
+              <span className="study-card-sub">Arduino 시뮬레이터</span>
+              <span className="study-card-title">Circuit Lab</span>
+              <span className="study-card-desc">브라우저에서 아두이노 회로를 만들고 코드를 바로 돌려 보세요</span>
+              <span className="study-card-foot">
+                <span>Circuit Lab 열기</span>
+                <ArrowRight size={15} aria-hidden="true" />
+              </span>
+            </a>
+          </li>
         </ul>
       </div>
     </div>

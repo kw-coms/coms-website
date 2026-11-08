@@ -86,7 +86,7 @@ export default function GlobalNavigation() {
   const activeKey = getActiveNavKey(location.pathname)
   const mobileTabs = MOBILE_TAB_IDS.flatMap((id) => tabs.filter((tab) => tab.id === id))
   const showMobileTabs = mobileTabs.some((tab) => tab.id === activeKey)
-  const primaryNavItems = tabs.map((tab) => ({ ...tab, path: getTabRoute(tab.id) }))
+  const primaryNavItems = tabs.map((tab) => ({ ...tab, path: 'path' in tab ? tab.path : getTabRoute(tab.id) }))
   const noticesNavItem = navExtraItems.find((item) => item.id === 'notices')
   const memberNavItems = navExtraItems.filter((item) => item.id !== 'notices')
 

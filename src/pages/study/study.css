@@ -780,3 +780,17 @@
 .study-page .circuit[data-offscreen] .circuit-svg .waves.on circle { animation-play-state: paused; }
 
 .study-page [data-scroll-region]:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+
+/* Circuit Lab: card on the hub and banner on the Arduino page (a link to the separate /lab/ app). */
+.study-lab-art { width: 100%; max-width: 240px; height: 64px; color: var(--app-accent-text); }
+.study-card-lab .study-lab-art { margin-bottom: 6px; }
+.study-lab-cta {
+  display: flex; align-items: center; gap: 16px;
+  max-width: 1132px; margin: 12px 24px 0; padding: 14px 20px; border-radius: 14px;
+  background: var(--app-accent-soft); border: 1px solid var(--app-accent);
+  color: var(--app-text); text-decoration: none;
+}
+@media (min-width: 1180px) { .study-lab-cta { margin-left: auto; margin-right: auto; } }
+.study-lab-cta-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; font-size: 13.5px; color: var(--app-muted); }
+.study-lab-cta-text strong { font-size: 16px; font-weight: 800; color: var(--app-text); }
+.study-lab-cta:hover, .study-lab-cta:focus-visible { box-shadow: 0 8px 22px rgba(0,0,0,.1); }
