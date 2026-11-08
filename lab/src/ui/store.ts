@@ -5,7 +5,7 @@ import type {
 import { EXAMPLES, PARTS, analyze, validateScene } from './core';
 import { stringifyJsonBounded } from '../core/scene';
 import { commit, initHistory, redo as redoH, undo as undoH, type History } from './history';
-import { getItem, setItem, SAVE_KEY } from './storage';
+import { getItem, removeItem, setItem, SAVE_KEY } from './storage';
 import { DEFAULT_BLOCKS } from './blocks/starters';
 import { sceneContext } from './blocks/context';
 import { generate } from './blocks/generate';
@@ -160,6 +160,18 @@ function backupRaw(raw: string) {
   setItem(BACKUP_KEY, raw);
 }
 
+let undoEagerBackup: (() => void) | undefined;
+/** backupRaw that can be undone exactly: the backup keys return to what they held before. */
+function eagerBackup(raw: string): () => void {
+  const before = [getItem(BACKUP_KEY), getItem(BACKUP_PREV_KEY)] as const;
+  backupRaw(raw);
+  return () => {
+    for (const [key, value] of [[BACKUP_KEY, before[0]], [BACKUP_PREV_KEY, before[1]]] as const) {
+      if (value === null) removeItem(key); else setItem(key, value);
+    }
+  };
+}
+
 function startDoc(): { doc: Doc; code: string; restored: boolean; failed: boolean; migrate?: string } {
   const raw = getItem(SAVE_KEY);
   let failed = false;
@@ -170,7 +182,12 @@ function startDoc(): { doc: Doc; code: string; restored: boolean; failed: boolea
       const parsed = validateScene(marked ? saved.scene : saved);
       // Blocks without our marker were saved by an earlier build: they are untrusted like an import, and Blockly (async)
       // canonicalizes them right after startup (migrateUnmarked). Until then the default document stands in.
-      if (!marked && parsed.blocks !== undefined) return { ...defaultDoc(), restored: false, failed: false, migrate: raw };
+      if (!marked && parsed.blocks !== undefined) {
+        // The default document stands in for up to ~20 s while Blockly loads, and SAVE_KEY holds the only copy of the student's
+        // program: copy it to the backup first (migrateUnmarked rolls that back on success) and keep autosave off until it settles.
+        undoEagerBackup = eagerBackup(raw);
+        return { ...defaultDoc(), restored: false, failed: false, migrate: raw };
+      }
       const s = withGeneratedCode(parsed, analyze(parsed), marked);
       return { doc: docOf(s), code: s.code, restored: true, failed: false };
     } catch {
@@ -612,9 +629,11 @@ export function inputValue(s: State, partId: string, key: string, fallback: numb
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let lastSaved: unknown[] = [];
 let saveWarned = false;
+let migrating = false; // an unmarked autosave is still being migrated: SAVE_KEY must stay as it is until it settles
 function saveNow() {
   clearTimeout(saveTimer);
   saveTimer = undefined;
+  if (migrating) return;
   const json = serializeScene();
   // blocks are marked as Blockly's own save so the next start can trust them without loading Blockly
   const out = json !== null && state.hist.present.blocks !== undefined ? `{"canonVersion":${CANON_VERSION},"scene":${json}}` : json;
@@ -700,13 +719,19 @@ async function migrateUnmarked(raw: string) {
   try {
     const parsed = validateScene(JSON.parse(raw));
     if (!(await loadCanon())) throw new Error('chunk');
-    if (state.hist.present !== docOfStart) throw new Error('edited'); // the user already moved on: do not replace their work
+    // the user already moved on (document or code edited): do not replace their work
+    if (state.hist.present !== docOfStart || state.code !== codeOfStart) throw new Error('edited');
     loadScene(parsed);
     baseline = ''; // like any restore: it exists nowhere else, so it counts as unsaved work
+    undoEagerBackup?.(); // migrated: the autosave now holds it (with the marker), so the safety copy is not a "backup" any more
   } catch {
     backupRaw(raw);
     set({ restoreNotice: true });
+  } finally {
+    migrating = false;
+    saveTimer = setTimeout(saveNow, 600); // whatever changed while autosave was held goes out now
   }
 }
 const docOfStart = state.hist.present;
-if (first.migrate) void migrateUnmarked(first.migrate);
+const codeOfStart = state.code;
+if (first.migrate) { migrating = true; void migrateUnmarked(first.migrate); }

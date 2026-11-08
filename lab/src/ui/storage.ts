@@ -7,6 +7,13 @@ export function getItem(key: string): string | null {
     return null;
   }
 }
+export function removeItem(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* blocked storage */
+  }
+}
 export function setItem(key: string, value: string): boolean {
   try {
     localStorage.setItem(key, value);

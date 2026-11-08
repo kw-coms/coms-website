@@ -441,7 +441,7 @@ describe('canonical blocks in the document', () => {
 
 describe('trust boundaries: Blockly only for what we did not write', () => {
   const chunkFails = () => vi.doMock('./blocks/blocklyRuntime', () => { throw new Error('chunk failed'); });
-  afterEach(() => { vi.doUnmock('./blocks/blocklyRuntime'); });
+  afterEach(() => { vi.doUnmock('./blocks/blocklyRuntime'); vi.unstubAllGlobals(); });
   const blocks = { blocks: { languageVersion: 0, blocks: [{ type: 'lab_loop', inputs: { DO: { block: { type: 'lab_digital_write', fields: { PIN: '8', STATE: 'HIGH' } } } } }] } };
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -493,6 +493,43 @@ describe('trust boundaries: Blockly only for what we did not write', () => {
     expect(saved.canonVersion).toBe(m.store.CANON_VERSION);
     expect(mem.has(m.store.BACKUP_KEY)).toBe(false);
     void raw;
+  }, 60000);
+
+  it('while a migration waits for a Blockly chunk that never arrives, an edit and pagehide cannot overwrite the saved program', async () => {
+    await wait(800);
+    const { raw } = await unmarked();
+    const handlers: Record<string, () => void> = {};
+    vi.stubGlobal('window', { addEventListener: (ev: string, fn: () => void) => { handlers[ev] = fn; } });
+    vi.doMock('./blocks/blocklyRuntime', async () => { await new Promise(() => {}); }); // the chunk never settles
+    const m = await boot();
+    expect(mem.get(m.store.BACKUP_KEY)).toBe(raw); // copied eagerly, before anything else
+    m.store.setCode('void setup() {}\nvoid loop() {}\n');
+    await wait(700);
+    handlers.pagehide?.();
+    expect(mem.get(m.store.SAVE_KEY)).toBe(raw);
+    expect(mem.get(m.store.BACKUP_KEY)).toBe(raw);
+  }, 60000);
+
+  it('after a successful migration the eager safety copy is rolled back', async () => {
+    await wait(800);
+    const { raw } = await unmarked();
+    mem.set('coms-lab:scene:v1:backup', 'OLDER');
+    const m = await boot();
+    expect(mem.get(m.store.BACKUP_KEY)).toBe(raw);
+    await until(() => m.store.getState().hist.present.codeMode === 'blocks');
+    await wait(100);
+    expect(mem.get(m.store.BACKUP_KEY)).toBe('OLDER');
+    expect(mem.has(m.store.BACKUP_PREV_KEY)).toBe(false);
+  }, 60000);
+
+  it('a code edit made while the migration waits is not silently replaced', async () => {
+    await wait(800);
+    const { raw } = await unmarked();
+    const m = await boot();
+    m.store.setCode('void setup() {}\nvoid loop() { /* mine */ }\n');
+    await until(() => m.store.getState().restoreNotice);
+    expect(m.store.getState().code).toContain('mine');
+    expect(mem.get(m.store.BACKUP_KEY)).toBe(raw);
   }, 60000);
 
   it('when Blockly cannot load, the raw data is kept in the backup, the notice shows and the default stays', async () => {
