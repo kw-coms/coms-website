@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { MeshLambertMaterial, type Material, type Mesh, type MeshStandardMaterial, type Object3D } from 'three';
 import { createGovernor, WARMUP_MS } from '../ui/quality';
-import { getState, stepQuality, subscribe, useStore } from '../ui/store';
+import { getState, onSceneLoaded, stepQuality, subscribe, useStore } from '../ui/store';
 
 type StdLike = MeshStandardMaterial & { userData: { dynamic?: boolean; lite?: Material } };
 
@@ -42,6 +42,8 @@ export function applyLite(root: Object3D, on: boolean) {
   releaseLites(live);
 }
 
+const SLOW_CAP_MS = 250;
+
 /**
  * Quality plumbing inside the Canvas: applies lite materials, and watches frame times so auto mode steps down
  * (and, cautiously, back up) without flapping. Only back-to-back frames count, idle gaps are ignored.
@@ -60,8 +62,10 @@ export function QualityRig() {
     run();
     // parts/wires mounted later must be converted too
     let prev = getState().hist.present;
-    const off = subscribe(() => { const cur = getState().hist.present; if (cur !== prev) { prev = cur; warmUntil.current = performance.now() + WARMUP_MS; if (getState().quality === 'low') run(); } });
-    return () => { off(); applyLite(scene, false); };
+    const off = subscribe(() => { const cur = getState().hist.present; if (cur !== prev) { prev = cur; if (getState().quality === 'low') run(); } });
+    // a scene replacement (load or example switch) recompiles shaders and rebuilds shadow maps: restart the warm-up, plain edits do not
+    const offLoad = onSceneLoaded(() => { warmUntil.current = performance.now() + WARMUP_MS; });
+    return () => { off(); offLoad(); applyLite(scene, false); };
   }, [scene, invalidate, quality]);
   useEffect(() => { gov.current.reset(); warmUntil.current = performance.now() + WARMUP_MS; }, [quality]);
   // remember whether the user is orbiting: only continuous frames say anything about GPU speed
@@ -80,8 +84,9 @@ export function QualityRig() {
     if (now < warmUntil.current) { last.current = 0; gov.current.reset(); return; }
     const dt = last.current ? now - last.current : 0;
     last.current = now;
-    if (dt > 100) gov.current.reset();
-    if (dt > 100 || dt < 1) return;
+    // 100-250 ms gaps are slow frames (a GPU under ~10 fps must still be able to step down); longer gaps are idle, not GPU speed
+    if (dt > SLOW_CAP_MS) { gov.current.reset(); return; }
+    if (dt < 1) return;
     const r = gov.current.push(dt);
     if (r) stepQuality(r);
   });

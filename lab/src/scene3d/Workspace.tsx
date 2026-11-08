@@ -273,6 +273,7 @@ export function Workspace() {
   return (
     <div ref={wrap} className="workspace" tabIndex={-1} onDragOver={onDragOver} onDrop={onDrop} onDragLeave={() => getState().draft && set({ draft: null })}>
       <Marquee />
+      {/* Low keeps dpr 1 (native on 1x screens) to save fill cost: it trades retina sharpness for speed and is only meant for software or slow GPUs. */}
       <Canvas frameloop="demand" shadows={quality === 'low' ? false : quality === 'high' ? 'soft' : true} dpr={quality === 'high' ? [1, 2] : quality === 'medium' ? [1, 1.5] : 1} gl={{ antialias: true, powerPreference: 'high-performance' }} aria-label="3D 작업대">
         <Content />
       </Canvas>

@@ -290,7 +290,7 @@ let state: State = {
   missionId: first.doc.mission ?? null,
   missionProgress: loadMissionProgress(),
   editingNote: null,
-  qualityNotice: qualityMode === 'auto' && softwareHint && getItem(NOTICE_KEY) !== '1' ? '그래픽 가속이 꺼져 있는 것 같아요(소프트웨어 렌더링 감지). 부드럽게 쓰도록 그림자·반사를 줄였어요. 위쪽 ⋯ 메뉴의 화질에서 바꿀 수 있어요.' : null,
+  qualityNotice: qualityMode === 'auto' && softwareHint && getItem(NOTICE_KEY) !== '1' ? '그래픽 가속이 꺼져 있는 것 같아요(소프트웨어 렌더링 감지). 부드럽게 쓰도록 그림자·반사를 줄였어요. 고화질로 고정하면 저장되며, 위쪽 ⋯ 메뉴의 화질에서 언제든 바꿀 수 있어요.' : null,
 };
 
 const listeners = new Set<() => void>();
@@ -697,7 +697,7 @@ export function setQualityMode(mode: QualityMode) {
   saveQualityMode(mode);
   set({ qualityMode: mode, quality: initialQuality(mode, mode === 'auto' && detectSoftwareRendering()), qualityNotice: null });
 }
-/** One-click escape from an auto downgrade: pin high quality (saved for this user). */
+/** One-click escape from an auto downgrade: pin high quality (saved for this user, changeable from the quality menu). */
 export const pinHighQuality = () => setQualityMode('high');
 /** Runtime step from the frame-time governor (auto mode only). */
 export function stepQuality(dir: 'down' | 'up') {
@@ -705,7 +705,7 @@ export function stepQuality(dir: 'down' | 'up') {
   const order: Quality[] = ['low', 'medium', 'high'];
   const i = order.indexOf(state.quality) + (dir === 'up' ? 1 : -1);
   if (i < 0 || i > 2) return;
-  set({ quality: order[i]!, ...(dir === 'down' && i === 0 && getItem(NOTICE_KEY) !== '1' ? { qualityNotice: '화면이 잠시 느려져서 화질(그림자·반사)을 낮췄어요. 해상도는 그대로예요. 이 컴퓨터가 충분히 빠르다면 고화질로 고정할 수 있어요.' } : {}) });
+  set({ quality: order[i]!, ...(dir === 'down' && i === 0 && getItem(NOTICE_KEY) !== '1' ? { qualityNotice: '화면이 잠시 느려져서 화질(그림자·반사)을 낮췄어요. 해상도는 그대로예요. 이 컴퓨터가 충분히 빠르다면 고화질로 고정할 수 있어요. 고정하면 저장되며, 위쪽 ⋯ 메뉴의 화질에서 언제든 바꿀 수 있어요.' } : {}) });
 }
 export function dismissQualityNotice() {
   setItem(NOTICE_KEY, '1');

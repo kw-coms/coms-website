@@ -105,7 +105,7 @@ export function App() {
       {notice && (
         <div className="perf-notice" role="status">
           <span>{notice}</span>
-          <button type="button" onClick={pinHighQuality}>고화질로 보기</button>
+          <button type="button" onClick={pinHighQuality}>고화질로 고정</button>
           <button type="button" onClick={dismissQualityNotice}>확인</button>
         </div>
       )}
