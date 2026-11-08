@@ -19,6 +19,7 @@ import { DESK_Y, refs } from './sceneRefs';
 import { makeTexture } from './parts/common';
 import type { PartKind } from '../core/types';
 import { set } from '../ui/store';
+import { glOptions } from '../ui/quality';
 
 const DARK = { bg: '#141a21', fog: '#141a21' };
 const LIGHT = { bg: '#e6edf4', fog: '#e6edf4' };
@@ -252,6 +253,7 @@ function Marquee() {
 export function Workspace() {
   const wrap = useRef<HTMLDivElement>(null);
   const quality = useStore((s) => s.quality);
+  const antialias = useStore((s) => s.antialias);
   const onDragOver = (e: DragEvent) => {
     if (!e.dataTransfer.types.includes('application/x-part-kind')) return;
     e.preventDefault();
@@ -274,7 +276,7 @@ export function Workspace() {
     <div ref={wrap} className="workspace" tabIndex={-1} onDragOver={onDragOver} onDrop={onDrop} onDragLeave={() => getState().draft && set({ draft: null })}>
       <Marquee />
       {/* Low keeps dpr 1 (native on 1x screens) to save fill cost: it trades retina sharpness for speed and is only meant for software or slow GPUs. */}
-      <Canvas frameloop="demand" shadows={quality === 'low' ? false : quality === 'high' ? 'soft' : true} dpr={quality === 'high' ? [1, 2] : quality === 'medium' ? [1, 1.5] : 1} gl={{ antialias: true, powerPreference: 'high-performance' }} aria-label="3D 작업대">
+      <Canvas key={antialias ? 'aa' : 'noaa'} frameloop="demand" shadows={quality === 'low' ? false : quality === 'high' ? 'soft' : true} dpr={quality === 'high' ? [1, 2] : quality === 'medium' ? [1, 1.5] : 1} gl={glOptions(antialias)} aria-label="3D 작업대">
         <Content />
       </Canvas>
     </div>

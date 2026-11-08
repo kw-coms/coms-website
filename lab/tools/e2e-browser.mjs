@@ -393,6 +393,16 @@ try {
 
   await ctx.close();
   const dctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'dark' });
+  // records every WebGL context the page creates, to prove a toggle disposes the old one
+  await dctx.addInitScript(() => {
+    window.__ctxs = [];
+    const get = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
+      const c = get.call(this, type, ...rest);
+      if (c && /webgl/.test(type) && !window.__ctxs.includes(c)) window.__ctxs.push(c);
+      return c;
+    };
+  });
   const dp = await dctx.newPage();
   await dp.goto(base, { waitUntil: 'networkidle' });
   await dp.evaluate(() => { localStorage.setItem('coms-lab:tutorial-done', '1'); localStorage.setItem('coms-lab:perf-notice', '1'); });
@@ -405,6 +415,31 @@ try {
   await dp.waitForTimeout(2000);
   await saveScreenshot(dp, join(OUT, '12-low-quality.png'));
   check('low quality renders (screenshot saved)', (await dp.evaluate(() => window.__lab.getState().quality)) === 'low');
+  // ---- antialias setting: toggle recreates the GL context, keeps the scene, persists across reload ----
+  {
+    const aaBox = dp.getByRole('checkbox', { name: /안티앨리어싱/ });
+    const live = () => dp.evaluate(() => window.__ctxs.filter((c) => !c.isContextLost()).length);
+    const attr = () => dp.evaluate(() => { const c = window.__ctxs.filter((x) => !x.isContextLost()).at(-1); return c ? c.getContextAttributes().antialias : null; });
+    const parts = () => dp.evaluate(() => window.__lab.getState().hist.present.parts.length);
+    await dp.getByRole('button', { name: '확인', exact: true }).click({ timeout: 500 }).catch(() => {});
+    const n0 = await parts();
+    check('antialias: checkbox is on by default', await aaBox.isChecked() && (await attr()) === true);
+    for (let i = 0; i < 4; i++) {
+      await aaBox.uncheck(); await dp.waitForTimeout(700);
+      const offOk = (await attr()) === false && (await live()) === 1 && (await dp.locator('canvas').count()) === 1 && (await parts()) === n0;
+      check(`antialias: toggle off #${i + 1} recreates context, no leak, circuit kept`, offOk, `live=${await live()} parts=${await parts()}/${n0}`);
+      await aaBox.check(); await dp.waitForTimeout(700);
+      check(`antialias: toggle on #${i + 1} recreates context, no leak`, (await attr()) === true && (await live()) === 1, `live=${await live()}`);
+    }
+    await aaBox.uncheck(); await dp.waitForTimeout(500);
+    check('antialias: off is saved', (await dp.evaluate(() => localStorage.getItem('coms-lab:antialias'))) === '0');
+    await dp.reload({ waitUntil: 'networkidle' });
+    await dp.waitForTimeout(1500);
+    check('antialias: off survives reload and the scene renders', !(await aaBox.isChecked()) && (await attr()) === false && (await parts()) > 0 && (await dp.locator('canvas').boundingBox()).width > 100);
+    await saveScreenshot(dp, join(OUT, '14-antialias-off.png'));
+    await aaBox.check(); await dp.waitForTimeout(500);
+    check('antialias: back on', (await attr()) === true && (await dp.evaluate(() => localStorage.getItem('coms-lab:antialias'))) === '1');
+  }
   await dctx.close();
   const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
   const mp = await mctx.newPage();

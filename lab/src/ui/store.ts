@@ -10,7 +10,7 @@ import { DEFAULT_BLOCKS } from './blocks/starters';
 import { sceneContext } from './blocks/context';
 import { generate } from './blocks/generate';
 import { canonicalize, isCanonical, loadCanon, trust } from './blocks/canon';
-import { detectSoftwareRendering, initialQuality, loadQualityMode, saveQualityMode, type Quality, type QualityMode } from './quality';
+import { detectSoftwareRendering, initialQuality, loadAntialias, loadQualityMode, saveAntialias, saveQualityMode, type Quality, type QualityMode } from './quality';
 
 export type Selection = { kind: 'part' | 'wire'; id: string } | null;
 export type SnapView = { ok: Vec3[]; bad: Vec3[] };
@@ -71,6 +71,8 @@ export interface State {
   cameraResetTick: number;
   qualityMode: QualityMode;
   quality: Quality;
+  /** Canvas MSAA (persisted). Changing it recreates the GL context. */
+  antialias: boolean;
   /** Message shown once when auto-quality fell back to low (acceleration seems off). */
   qualityNotice: string | null;
   /** The autosave could not be read; a raw backup copy was kept (see BACKUP_KEY). */
@@ -279,6 +281,7 @@ let state: State = {
   cameraResetTick: 0,
   qualityMode,
   quality: initialQuality(qualityMode, softwareHint),
+  antialias: loadAntialias(),
   restoreNotice: first.failed,
   breakpoints: [],
   debug: null,
@@ -699,6 +702,10 @@ export function setQualityMode(mode: QualityMode) {
 }
 /** One-click escape from an auto downgrade: pin high quality (saved for this user, changeable from the quality menu). */
 export const pinHighQuality = () => setQualityMode('high');
+export function setAntialias(on: boolean) {
+  saveAntialias(on);
+  set({ antialias: on, qualityNotice: null });
+}
 /** Runtime step from the frame-time governor (auto mode only). */
 export function stepQuality(dir: 'down' | 'up') {
   if (state.qualityMode !== 'auto') return;

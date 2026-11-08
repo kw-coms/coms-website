@@ -5,7 +5,7 @@ import {
 import { EXAMPLES } from '../core';
 import { copyShareLink, exportBom, exportIno, exportJson, importJson, loadExample, snapshotPng, toggleTheme } from '../actions';
 import { cancelCompile, pause, reset, run, setSpeed, stop } from '../simHost';
-import { addNote, canRedo, canUndo, redo, set, setQualityMode, undo, useStore } from '../store';
+import { addNote, canRedo, canUndo, redo, set, setAntialias, setQualityMode, undo, useStore } from '../store';
 import { viewCenterGround } from '../../scene3d/placement';
 import type { QualityMode } from '../quality';
 
@@ -26,6 +26,7 @@ export function Toolbar() {
   const redoable = useStore(canRedo);
   const qmode = useStore((s) => s.qualityMode);
   const qeff = useStore((s) => s.quality);
+  const aa = useStore((s) => s.antialias);
   const exOpen = useStore((s) => s.examplesOpen);
   const schematic = useStore((s) => s.schematic);
   const file = useRef<HTMLInputElement>(null);
@@ -64,6 +65,10 @@ export function Toolbar() {
           <option value="medium">화질: 보통</option>
           <option value="low">화질: 낮음</option>
         </select>
+      </label>
+      <label className="aa-toggle" title="부드러운 가장자리 (안티앨리어싱): 끄면 느린 컴퓨터에서 더 빨라져요">
+        <input type="checkbox" checked={aa} onChange={(e) => setAntialias(e.target.checked)} aria-label="부드러운 가장자리 (안티앨리어싱)" />
+        <span className="tb-more-text">부드러운 가장자리 (안티앨리어싱)<small>끄면 느린 컴퓨터에서 더 빨라져요</small></span>
       </label>
       <div className="tb-group" role="group" aria-label="편집">
         <Btn label="실행 취소 (Ctrl+Z)" onClick={undo} disabled={!undoable}><Undo2 size={18} /> <span className="tb-more-text">실행 취소</span></Btn>

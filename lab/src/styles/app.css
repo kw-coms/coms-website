@@ -38,7 +38,7 @@ button { cursor: pointer; }
 .pop-item:hover { background: var(--surface-2); } .pop-item small { color: var(--muted); }
 
 .main { display: flex; min-height: 0; min-width: 0; position: relative; }
-.tb-secondary { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+.tb-secondary { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .tb-more { display: none; margin-left: auto; }
 .tb-more-text { display: none; }
 .more-pop { left: auto; right: 0; width: 230px; display: flex; flex-direction: column; gap: 4px; padding: 8px; }
@@ -154,6 +154,10 @@ button { cursor: pointer; }
 .perf-notice { position: fixed; left: 50%; top: 58px; transform: translateX(-50%); z-index: 90; display: flex; gap: 12px; align-items: center; max-width: min(92vw, 560px); padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--accent); box-shadow: var(--shadow); font-size: 13px; }
 .perf-notice button { flex: none; height: 30px; padding: 0 12px; border-radius: 7px; border: 0; background: var(--accent); color: var(--accent-text); font-weight: 600; }
 .speed.quality select { max-width: 150px; }
+.aa-toggle { display: inline-flex; align-items: center; gap: 6px; margin-left: -4px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.aa-toggle small { display: block; color: var(--muted); font-size: 11px; }
+.more-pop .aa-toggle { white-space: normal; padding: 4px 6px; margin-left: 0; }
+.aa-toggle input { width: 16px; height: 16px; flex: none; accent-color: var(--accent); }
 
 @media (max-width: 1100px) { .palette:not(.folded):not(.in-sheet) { width: 190px; } .tb-text { display: none; } .sidepanel { --side-w: min(var(--side-w), 46vw); } }
 @media (max-width: 1000px) {
