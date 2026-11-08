@@ -115,7 +115,8 @@ test('community composer uploads an inline image and deletes the saved post', as
   await expect(page.getByRole('heading', { name: '이미지 업로드 삭제 테스트' })).toBeVisible()
   await expect(page.getByRole('img', { name: 'inline.gif' })).toBeVisible()
 
-  await page.getByRole('button', { name: '삭제' }).click()
+  // exact: the page also has a "내 삭제 기록" button once its data loads.
+  await page.getByRole('button', { name: '삭제', exact: true }).click()
 
   await expect.poll(() => deletePayload).toEqual({ reason: '작성자 요청 정리' })
   await expect(page).toHaveURL(/\/community$/)
