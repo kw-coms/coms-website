@@ -61,8 +61,10 @@ const lit = (n: number): E => ({ c: String(n), p: n < 0 ? UNARY : ATOM, t: Numbe
 const isLiteralNumber = (e: E) => e.lit && /^-?\d+(\.\d+)?$/.test(e.c);
 const encoder = new TextEncoder();
 /** Characters that read differently from how they compile: bidi controls, zero-width characters, line separators, lone surrogates. */
-// u flag: \p{Cs} is a lone surrogate only; the two halves of an emoji are one code point and stay as they are.
-const INVISIBLE = /[\u200b-\u200f\u202a-\u202e\u2060-\u2069\u061c\ufeff\u00ad\u2028\u2029\p{Cs}]/u;
+// u flag: the halves of an emoji are one code point and stay as they are, while \p{Cs} is a lone surrogate only.
+// Format (Cf: bidi controls, zero-width, joiners, tag characters U+E0000-E007F), private-use, unassigned, line/paragraph
+// separators and the supplementary variation selectors are all invisible or reorder text, so they are escaped / blanked.
+const INVISIBLE = /[\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}\u200b-\u200f\u202a-\u202e\u2060-\u2069\u061c\ufeff\u00ad\u{E0100}-\u{E01EF}]/u;
 const INVISIBLE_ALL = new RegExp(INVISIBLE.source, 'gu');
 const octal = (ch: string) => Array.from(encoder.encode(ch), byte => '\\' + byte.toString(8).padStart(3, '0')).join('');
 /** Fixed-width octal escapes cannot absorb following digits (unlike \x escapes). */
