@@ -343,8 +343,8 @@ export default function GlobalNavigation() {
             <button
               type="button"
               onClick={() => goPageTop('/settings')}
-              className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] text-[11px] font-bold text-[var(--app-text)] transition hover:bg-black/5 xl:size-auto xl:max-w-[7rem] 2xl:max-w-[9rem] xl:border-transparent xl:bg-transparent xl:px-2.5 xl:py-1 xl:text-xs xl:font-semibold xl:text-[var(--app-muted)] xl:hover:text-[var(--app-text)]"
-              title="계정 설정"
+              className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] text-[11px] font-bold text-[var(--app-text)] transition hover:bg-black/5 xl:size-auto xl:max-w-[5.5rem] 2xl:max-w-[9rem] xl:border-transparent xl:bg-transparent xl:px-2.5 xl:py-1 xl:text-xs xl:font-semibold xl:text-[var(--app-muted)] xl:hover:text-[var(--app-text)]"
+              title={`${user.name} · 계정 설정`}
             >
               <span className="xl:hidden" aria-hidden="true">{user.name?.[0] ?? '?'}</span>
               <span className="sr-only xl:not-sr-only xl:truncate">{user.name}</span>
