@@ -6,6 +6,7 @@ import * as Blockly from 'blockly/core';
 import { COLOUR, TOOLBOX } from './defs';
 import { MAX_CANONICAL_BLOCKS_BYTES, stringifyJsonBounded } from '../../core/scene';
 import { loadBlocks, setPinHints } from './blocklyRuntime';
+import { createSaveScheduler } from './saveScheduler';
 import './blocks.css';
 
 export { loadBlocks };
@@ -40,7 +41,7 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
   const last = useRef('');
   const loading = useRef(false);
   // a refused or failed load shows a stand-in workspace: it must never be saved over the program the store holds
-  const refused = useRef(false);
+  const saver = useRef<ReturnType<typeof createSaveScheduler> | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const loader = useRef<(s: unknown) => void>(() => {});
   const cb = useRef(onChange);
@@ -66,33 +67,33 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
       loading.current = true;
       try {
         const problem = loadBlocks(w, s, MAX_CANONICAL_BLOCKS_BYTES);
-        refused.current = problem !== null;
+        saver.current?.setBlocked(problem !== null);
         setNotice(problem ? `저장된 블록을 열지 못해서 빈 작업 영역을 보여 주고 있어요. 고쳐도 저장되지 않아요. (${problem})` : null);
         mark();
       } catch (e) {
         console.error('블록 불러오기 실패', e);
         w.clear();
-        refused.current = true;
+        saver.current?.setBlocked(true);
         setNotice('블록을 불러오지 못해서 빈 작업 영역을 보여 주고 있어요. 고쳐도 저장되지 않아요.');
       } finally { loading.current = false; }
     };
+    const scheduler = createSaveScheduler(() => {
+      const s = Blockly.serialization.workspaces.save(w);
+      last.current = stringifyJsonBounded(s, 1000, MAX_CANONICAL_BLOCKS_BYTES) ?? '';
+      cb.current(s);
+    });
+    saver.current = scheduler;
     load(state);
     last.current = stringifyJsonBounded(state ?? null, 1000, MAX_CANONICAL_BLOCKS_BYTES) ?? '';
-    let timer = 0;
     w.addChangeListener((ev: Blockly.Events.Abstract) => {
-      if (loading.current || ev.isUiEvent || refused.current) return;
+      if (loading.current || ev.isUiEvent) return;
       mark();
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        const s = Blockly.serialization.workspaces.save(w);
-        last.current = stringifyJsonBounded(s, 1000, MAX_CANONICAL_BLOCKS_BYTES) ?? '';
-        cb.current(s);
-      }, 300);
+      scheduler.schedule();
     });
     const ro = new ResizeObserver(() => Blockly.svgResize(w));
     ro.observe(host.current!);
     loader.current = load;
-    return () => { window.clearTimeout(timer); ro.disconnect(); w.dispose(); ws.current = null; };
+    return () => { scheduler.cancel(); saver.current = null; ro.disconnect(); w.dispose(); ws.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!readOnly]);
 
