@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import * as Blockly from 'blockly/core';
 import { blocksProblem } from '../../core/scene';
 import { canonicalizeBlocks, loadBlocks } from './blocklyRuntime';
+import { canonicalize, isCanonical } from './canon';
 import { generate } from './generate';
 import { STARTER_BLOCKS } from './starters';
 import { workspace } from './build';
@@ -170,7 +171,6 @@ describe('canonicalizing leaves the live editor alone', () => {
     expect(canonicalizeBlocks(ws([{ type: 'lab_loop', inputs: { NOPE: { block: { type: 'lab_millis' } } } }])).ok).toBe(false);
     expect(Blockly.Events.isEnabled()).toBe(true);
     Blockly.serialization.blocks.append({ type: 'lab_millis' }, live);
-    Blockly.Events.fireNow_?.();
     return new Promise<void>(resolve => setTimeout(() => { expect(fired).toBeGreaterThan(0); live.dispose(); resolve(); }, 20));
   });
   it('does not enable events that were already off, and keeps the event group', () => {
@@ -195,4 +195,11 @@ describe('size bounds', () => {
   it('the pre-load bound stays 256 KB', () => {
     expect(canonicalizeBlocks(ws(Array.from({ length: 6000 }, () => ({ type: 'math_number', fields: { NUM: 1 } })))).ok).toBe(false);
   });
+});
+
+it('a canonical tree is deep-frozen, so identity can be trusted', () => {
+  const r = canonicalize(STARTER_BLOCKS['button-led']); // the store's door; it freezes and remembers what it returned
+  expect(r.ok && Object.isFrozen(r.blocks) && isCanonical(r.blocks)).toBe(true);
+  const top = (r.ok ? (r.blocks as { blocks: { blocks: object[] } }).blocks.blocks[0] : null)!;
+  expect(Object.isFrozen(top)).toBe(true);
 });

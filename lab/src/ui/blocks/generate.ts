@@ -2,7 +2,7 @@
 // so it runs in the main bundle and in plain Node tests. Blockly stays a lazy chunk.
 
 import { MAX_BLOCKS } from '../../core/scene';
-import { readBlockField } from '../../core/blockFields';
+import { hasFieldRule, readBlockField } from '../../core/blockFields';
 
 // Scenes (shared links, imported files) are untrusted, so the block tree is too:
 //  - handler tables are read with own-property checks only ("constructor", "__proto__", "toString" are not blocks),
@@ -61,8 +61,9 @@ const lit = (n: number): E => ({ c: String(n), p: n < 0 ? UNARY : ATOM, t: Numbe
 const isLiteralNumber = (e: E) => e.lit && /^-?\d+(\.\d+)?$/.test(e.c);
 const encoder = new TextEncoder();
 /** Characters that read differently from how they compile: bidi controls, zero-width characters, line separators, lone surrogates. */
-const INVISIBLE = /[\u200b-\u200f\u202a-\u202e\u2060-\u2069\u061c\ufeff\u00ad\u2028\u2029\ud800-\udfff]/;
-const INVISIBLE_ALL = new RegExp(INVISIBLE.source, 'g');
+// u flag: \p{Cs} is a lone surrogate only; the two halves of an emoji are one code point and stay as they are.
+const INVISIBLE = /[\u200b-\u200f\u202a-\u202e\u2060-\u2069\u061c\ufeff\u00ad\u2028\u2029\p{Cs}]/u;
+const INVISIBLE_ALL = new RegExp(INVISIBLE.source, 'gu');
 const octal = (ch: string) => Array.from(encoder.encode(ch), byte => '\\' + byte.toString(8).padStart(3, '0')).join('');
 /** Fixed-width octal escapes cannot absorb following digits (unlike \x escapes). */
 export const cStringLiteral = (s: string): string => '"' + Array.from(s, ch => {
@@ -162,6 +163,9 @@ class Ctx {
   }
 
   field(b: B, name: string): string {
+    // The handler tables name their fields in code, so a missing rule is a bug here, not hostile input: fail loudly (generate()
+    // turns it into the "could not generate" warning, and the tests see it) instead of silently emitting ''.
+    if (!hasFieldRule(b.type, name)) throw new Error(`no field rule for ${b.type}.${name}`);
     const result = readBlockField(b.type, name, b.fields?.[name]);
     if (!result.valid) this.warn(`블록 ${safeName(b.type)}의 ${name} 필드 값(이름 포함)이 올바르지 않아 기본값으로 바꿨어요.`);
     return result.value;

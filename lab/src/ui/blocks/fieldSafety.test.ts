@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { generate, cStringLiteral } from './generate';
 import { CUSTOM_BLOCKS } from './defs';
-import { readBlockField } from '../../core/blockFields';
+import { hasFieldRule, readBlockField } from '../../core/blockFields';
 import { workspace, type N } from './build';
 
 const codeFor = (node: N) => generate(workspace([{ type: 'lab_loop', do: { DO: [node] } }]));
@@ -154,7 +154,7 @@ describe('every field the generator reads has a validation rule', () => {
     handlers.forEach((h, i) => {
       const body = source.slice(h.index!, handlers[i + 1]?.index ?? source.indexOf('\nfunction call('));
       for (const m of body.matchAll(/g\.(?:field|pin)\(b, '(\w+)'/g)) {
-        if (!readBlockField(h[1]!, m[1]!, undefined).valid) missing.push(`${h[1]}.${m[1]}`);
+        if (!hasFieldRule(h[1]!, m[1]!)) missing.push(`${h[1]}.${m[1]}`);
       }
     });
     expect(missing).toEqual([]);
@@ -174,6 +174,11 @@ describe('cStringLiteral hides nothing a reader cannot see', () => {
   });
   it('writes a backslash as octal so "C:\\users" can never read as a universal character name', () => {
     expect(cStringLiteral('C:\\users\\u00e9')).toBe('"C:\\134users\\134u00e9"');
+  });
+  it('keeps an emoji intact in literals and comments', () => {
+    expect(cStringLiteral('a😀b')).toBe('"a😀b"');
+    const { code } = codeFor({ type: 'lab_every', in: { MS: { type: 'text', fields: { TEXT: '😀' } } } });
+    expect(code).toContain('😀');
   });
   it('blanks the same characters in comments', () => {
     const { code } = codeFor({ type: 'lab_every', in: { MS: { type: 'text', fields: { TEXT: 'a\u202eb\u200bc\u2028d' } } } });

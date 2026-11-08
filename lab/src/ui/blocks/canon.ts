@@ -4,6 +4,17 @@
 type Canon = { ok: true; blocks: object } | { ok: false; error: string };
 type Canonicalizer = (state: unknown) => Canon;
 
+/** Iterative (the tree can be deep): isCanonical trusts object identity, so nothing may mutate a canonical tree afterwards. */
+function deepFreeze(root: object): void {
+  const todo: unknown[] = [root];
+  while (todo.length) {
+    const o = todo.pop();
+    if (typeof o !== 'object' || o === null || Object.isFrozen(o)) continue;
+    Object.freeze(o);
+    todo.push(...Object.values(o));
+  }
+}
+
 let impl: Canonicalizer | null = null;
 const results = new WeakSet<object>();
 
@@ -14,7 +25,7 @@ export async function ensureCanon(): Promise<void> { await import('./blocklyRunt
 export function canonicalize(state: unknown): Canon {
   if (!impl) return { ok: false, error: '블록 편집기를 아직 불러오지 못했어요. 잠시 뒤에 다시 해 보세요.' };
   const result = impl(state);
-  if (result.ok) results.add(result.blocks);
+  if (result.ok) { deepFreeze(result.blocks); results.add(result.blocks); }
   return result;
 }
 /** True for an object that canonicalize() itself returned (nothing else is trusted to be Blockly's reading). */

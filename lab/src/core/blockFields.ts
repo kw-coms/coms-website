@@ -62,6 +62,10 @@ function canonicalNumber(value: unknown): string | null {
   return Number.isFinite(number) ? String(Object.is(number, -0) ? 0 : number) : null;
 }
 
+/** True when the importer and generator know this field. */
+export const hasFieldRule = (type: string, name: string): boolean =>
+  Object.prototype.hasOwnProperty.call(rules, type) && rules[type]![name] !== undefined;
+
 /** The generator uses the fallback; import validation rejects the same invalid value. */
 export function readBlockField(type: string, name: string, value: unknown): { value: string; valid: boolean } {
   const rule = Object.prototype.hasOwnProperty.call(rules, type) ? rules[type]![name] : undefined;
