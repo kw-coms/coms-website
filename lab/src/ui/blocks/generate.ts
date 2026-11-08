@@ -64,7 +64,7 @@ const encoder = new TextEncoder();
 // u flag: the halves of an emoji are one code point and stay as they are, while \p{Cs} is a lone surrogate only.
 // Format (Cf: bidi controls, zero-width, joiners, tag characters U+E0000-E007F), private-use, unassigned, line/paragraph
 // separators and the supplementary variation selectors are all invisible or reorder text, so they are escaped / blanked.
-const INVISIBLE = /[\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}\u200b-\u200f\u202a-\u202e\u2060-\u2069\u061c\ufeff\u00ad\u{E0100}-\u{E01EF}]/u;
+const INVISIBLE = /[\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Zl}\p{Zp}\u200b-\u200f\u202a-\u202e\u2060-\u2069\u061c\ufeff\u00ad\uFE00-\uFE0E\u{E0100}-\u{E01EF}]/u; // FE00-FE0E: variation selectors (FE0F, the emoji one, stays)
 const INVISIBLE_ALL = new RegExp(INVISIBLE.source, 'gu');
 const octal = (ch: string) => Array.from(encoder.encode(ch), byte => '\\' + byte.toString(8).padStart(3, '0')).join('');
 /** Fixed-width octal escapes cannot absorb following digits (unlike \x escapes). */

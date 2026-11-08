@@ -175,17 +175,23 @@ describe('cStringLiteral hides nothing a reader cannot see', () => {
   it('writes a backslash as octal so "C:\\users" can never read as a universal character name', () => {
     expect(cStringLiteral('C:\\users\\u00e9')).toBe('"C:\\134users\\134u00e9"');
   });
-  it.each([['a tag character', '\u{E0041}'], ['a variation selector supplement', '\u{E0100}'], ['both', 'x\u{E0041}y\u{E0100}z']])('escapes %s in literals and blanks it in comments', (_n, text) => {
+  it.each([['a tag character', '\u{E0041}'], ['a variation selector supplement', '\u{E0100}'], ['a variation selector', '\uFE01'], ['both', 'x\u{E0041}y\u{E0100}z']])('escapes %s in literals and blanks it in comments', (_n, text) => {
     const literal = cStringLiteral(text);
-    expect(literal).not.toMatch(/[\u{E0000}-\u{E01EF}]/u);
+    expect(literal).not.toMatch(/[\uFE00-\uFE0E\u{E0000}-\u{E01EF}]/u);
     expect(decodeLiteral(literal)).toBe(text);
     const { code } = codeFor({ type: 'lab_every', in: { MS: { type: 'text', fields: { TEXT: text } } } });
-    expect(code).not.toMatch(/[\u{E0000}-\u{E01EF}]/u);
+    expect(code).not.toMatch(/[\uFE00-\uFE0E\u{E0000}-\u{E01EF}]/u);
   });
   it('a ZWJ family emoji round-trips byte-identically in literals', () => {
     const family = '👨\u200d👩\u200d👧';
     expect(decodeLiteral(cStringLiteral(family))).toBe(family);
     expect(decodeLiteral(cStringLiteral('a😀b'))).toBe('a😀b');
+  });
+  it('keeps the emoji presentation selector: ❤️ stays intact in literals and comments', () => {
+    expect(decodeLiteral(cStringLiteral('❤\uFE0F'))).toBe('❤\uFE0F');
+    expect(cStringLiteral('❤\uFE0F')).toContain('\uFE0F');
+    const { code } = codeFor({ type: 'lab_every', in: { MS: { type: 'text', fields: { TEXT: '❤\uFE0F' } } } });
+    expect(code).toContain('❤\uFE0F');
   });
   it('keeps an emoji intact in literals and comments', () => {
     expect(cStringLiteral('a😀b')).toBe('"a😀b"');
