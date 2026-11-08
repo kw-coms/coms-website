@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Info, PanelLeftClose, PanelLeftOpen, Search } from 'lucide-react';
 import type { PartCategory, PartKind } from '../../core/types';
 import { PARTS } from '../core';
@@ -13,6 +13,12 @@ export const ORDER: PartCategory[] = ['보드', '전원', '기본', '입력', '�
 export function Palette({ inSheet = false }: { inSheet?: boolean }) {
   const [q, setQ] = useState('');
   const [hover, setHover] = useState<{ kind: PartKind; y: number } | null>(null);
+  useEffect(() => {
+    if (!hover) return;
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setHover(null);
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [hover]);
   const folded = useStore((s) => s.paletteCollapsed) && !inSheet;
   const groups = useMemo(() => {
     const needle = q.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -52,6 +58,7 @@ export function Palette({ inSheet = false }: { inSheet?: boolean }) {
                       data-kind={k}
                       title={folded ? PARTS[k].title : undefined}
                       aria-label={PARTS[k].title}
+                      aria-describedby={hover?.kind === k ? 'part-card' : undefined}
                       onMouseEnter={(e) => !inSheet && setHover({ kind: k, y: e.currentTarget.getBoundingClientRect().top })}
                       onFocus={(e) => !inSheet && setHover({ kind: k, y: e.currentTarget.getBoundingClientRect().top })}
                       onBlur={() => setHover(null)}

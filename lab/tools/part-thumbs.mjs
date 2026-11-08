@@ -15,6 +15,7 @@ if (!base) {
     try { if ((await fetch(base)).ok) break; } catch { /* retry */ }
     await new Promise((r) => setTimeout(r, 250));
   }
+  if (!(await fetch(base).then((r) => r.ok, () => false))) { console.error(`FAIL dev server did not start at ${base}`); dev.kill(); process.exit(2); }
 }
 const browser = await chromium.launch({ executablePath: chromeExecutable(), args: GL_ARGS });
 let failed = 0;

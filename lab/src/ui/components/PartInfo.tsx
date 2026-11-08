@@ -9,8 +9,8 @@ import { set, useStore } from '../store';
 const ROLE: Record<string, string> = { digital: '디지털', analog: '아날로그', power: '전원', gnd: 'GND', passive: '단자', hole: '구멍' };
 
 /** The part's pre-rendered 3D picture; static file, so it also works in the no-GPU light mode. */
-export function PartThumb({ kind, large = false }: { kind: PartKind; large?: boolean }) {
-  return <img src={thumbUrl(kind, large)} alt={PARTS[kind]?.title ?? kind} width={large ? 360 : 160} height={large ? 270 : 120} loading="lazy" decoding="async" draggable={false} />;
+export function PartThumb({ kind, large = false, alt }: { kind: PartKind; large?: boolean; alt?: string }) {
+  return <img src={thumbUrl(kind, large)} alt={alt ?? PARTS[kind]?.title ?? kind} width={large ? 360 : 160} height={large ? 270 : 120} loading="lazy" decoding="async" draggable={false} />;
 }
 
 /** Short hover card shown beside the palette. */
@@ -20,8 +20,8 @@ export function PartCard({ kind, y }: { kind: PartKind; y: number }) {
   const many = d.pins.length > 24;
   const pins = many ? `${d.pins.length}개 구멍` : `핀 ${d.pins.length}개`;
   return (
-    <div className="part-card" role="tooltip" style={{ top: Math.max(8, Math.min(y - 40, window.innerHeight - 430)) }}>
-      <PartThumb kind={kind} large />
+    <div className="part-card" id="part-card" role="tooltip" style={{ top: Math.max(8, Math.min(y - 40, window.innerHeight - 430)) }}>
+      <PartThumb kind={kind} large alt="" />
       <strong>{d.title}</strong>
       <span className="muted small">{d.category} · {pins}</span>
       <p>{info.what}</p>
@@ -45,7 +45,7 @@ export function PartInfoDialog() {
         <button type="button" className="info-x" aria-label="닫기" onClick={close}><X size={18} /></button>
         <h2>{d.title}</h2>
         <p className="muted small">{d.category} · {kind}</p>
-        <div className="info-pic"><PartThumb kind={kind} large /></div>
+        <div className="info-pic"><PartThumb kind={kind} large alt="" /></div>
         <h4>이게 뭐예요?</h4>
         <p>{info.what}</p>
         {!!pins.length && (
