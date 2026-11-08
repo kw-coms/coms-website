@@ -5,10 +5,11 @@ import type {
 import { EXAMPLES, PARTS, analyze, validateScene } from './core';
 import { stringifyJsonBounded } from '../core/scene';
 import { commit, initHistory, redo as redoH, undo as undoH, type History } from './history';
-import { getItem, setItem } from './storage';
+import { getItem, removeItem, setItem, SAVE_KEY } from './storage';
 import { DEFAULT_BLOCKS } from './blocks/starters';
 import { sceneContext } from './blocks/context';
 import { generate } from './blocks/generate';
+import { canonicalize, isCanonical, loadCanon, trust } from './blocks/canon';
 import { detectSoftwareRendering, initialQuality, loadQualityMode, saveQualityMode, type Quality, type QualityMode } from './quality';
 
 export type Selection = { kind: 'part' | 'wire'; id: string } | null;
@@ -102,9 +103,11 @@ export interface MissionProgress {
 }
 
 const BLANK_CODE = `void setup() {\n  pinMode(13, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(500);\n  digitalWrite(13, LOW);\n  delay(500);\n}\n`;
-export const SAVE_KEY = 'coms-lab:scene:v1';
+export { SAVE_KEY };
 export const THEME_KEY = 'coms-lab:theme';
 export const BACKUP_KEY = 'coms-lab:scene:v1:backup';
+/** The backup that BACKUP_KEY held before a newer one replaced it (never lose the older one silently). */
+export const BACKUP_PREV_KEY = 'coms-lab:scene:v1:backup-prev';
 /** Mirrors validateScene's code limit (64 KB); the editor refuses input past it. */
 export const MAX_CODE_BYTES = 64 * 1024;
 export const TUTORIAL_KEY = 'coms-lab:tutorial-done';
@@ -118,15 +121,27 @@ const docOf = (s: Scene): Doc => {
   return rest as Doc;
 };
 
+const encoder = new TextEncoder();
+const codeProblem = (code: string): string | null =>
+  encoder.encode(code).length > MAX_CODE_BYTES ? '블록으로 만든 코드가 64 KB를 넘어요. 블록을 줄이거나 글자를 짧게 해 주세요.' : null;
+
 /**
- * In a block mode the code is always exactly what the blocks generate (ModeBar keeps it so while the tab is open).
- * A scene file or share link can say otherwise, and its hidden `code` would run instead of the blocks the user sees,
- * so every way in (load, import, autosave restore) regenerates it here.
+ * Every way a scene gets in (load, import, share link, autosave restore) passes here. Untrusted blocks (a file, a share link)
+ * become Blockly's own reading of them (canonicalize), because the editor shows that reading while the generator runs on this
+ * one; our own autosave and built-in programs are already that reading (`trusted`) and only get the cheap bound checks. In a
+ * block mode the code is regenerated from them, since a scene file could otherwise carry hidden `code` that runs instead of
+ * the blocks the user sees. Throws the Korean reason when the blocks cannot be accepted or the code they make is too big.
  */
-function withGeneratedCode(s: Scene, analysis: Analysis): Scene {
-  if ((s.codeMode ?? 'text') === 'text') return s;
-  const blocks = s.blocks ?? DEFAULT_BLOCKS;
-  return { ...s, blocks, code: generate(blocks, sceneContext(s.parts, analysis).opts).code };
+function withGeneratedCode(s: Scene, analysis: Analysis, trusted = false): Scene {
+  const mode = s.codeMode ?? 'text';
+  if (mode === 'text' && s.blocks === undefined) return s;
+  const c = s.blocks === undefined ? trust(DEFAULT_BLOCKS) : trusted ? trust(s.blocks) : canonicalize(s.blocks);
+  if (!c.ok) throw new Error(c.error);
+  if (mode === 'text') return { ...s, blocks: c.blocks };
+  const code = generate(c.blocks, sceneContext(s.parts, analysis).opts).code;
+  const tooBig = codeProblem(code);
+  if (tooBig) throw new Error(tooBig);
+  return { ...s, blocks: c.blocks, code };
 }
 
 function initialTheme(): Theme {
@@ -135,23 +150,57 @@ function initialTheme(): Theme {
   return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function startDoc(): { doc: Doc; code: string; restored: boolean; failed: boolean } {
+/** The autosave of a scene with blocks is wrapped with this marker: it says the blocks are Blockly's own save (see saveNow). */
+export const CANON_VERSION = 1;
+
+/** Keep the raw data of an autosave we could not open, without silently replacing an older, different backup. */
+function backupRaw(raw: string) {
+  const old = getItem(BACKUP_KEY);
+  if (old && old !== raw) setItem(BACKUP_PREV_KEY, old);
+  setItem(BACKUP_KEY, raw);
+}
+
+let undoEagerBackup: (() => void) | undefined;
+/** backupRaw that can be undone exactly: the backup keys return to what they held before. */
+function eagerBackup(raw: string): () => void {
+  const before = [getItem(BACKUP_KEY), getItem(BACKUP_PREV_KEY)] as const;
+  backupRaw(raw);
+  return () => {
+    for (const [key, value] of [[BACKUP_KEY, before[0]], [BACKUP_PREV_KEY, before[1]]] as const) {
+      if (value === null) removeItem(key); else setItem(key, value);
+    }
+  };
+}
+
+function startDoc(): { doc: Doc; code: string; restored: boolean; failed: boolean; migrate?: string } {
   const raw = getItem(SAVE_KEY);
   let failed = false;
   if (raw) {
     try {
-      const parsed = validateScene(JSON.parse(raw));
-      const s = withGeneratedCode(parsed, analyze(parsed));
+      const saved = JSON.parse(raw) as { canonVersion?: unknown; scene?: unknown };
+      const marked = saved?.canonVersion === CANON_VERSION;
+      const parsed = validateScene(marked ? saved.scene : saved);
+      // Blocks without our marker were saved by an earlier build: they are untrusted like an import, and Blockly (async)
+      // canonicalizes them right after startup (migrateUnmarked). Until then the default document stands in.
+      if (!marked && parsed.blocks !== undefined) {
+        // The default document stands in for up to ~20 s while Blockly loads, and SAVE_KEY holds the only copy of the student's
+        // program: copy it to the backup first (migrateUnmarked rolls that back on success) and keep autosave off until it settles.
+        undoEagerBackup = eagerBackup(raw);
+        return { ...defaultDoc(), restored: false, failed: false, migrate: raw };
+      }
+      const s = withGeneratedCode(parsed, analyze(parsed), marked);
       return { doc: docOf(s), code: s.code, restored: true, failed: false };
     } catch {
       // keep the raw data for the user, then start from the default example
-      setItem(BACKUP_KEY, raw);
+      backupRaw(raw);
       failed = true;
     }
   }
+  return { ...defaultDoc(), restored: false, failed };
+}
+function defaultDoc(): { doc: Doc; code: string } {
   const ex = EXAMPLES[0];
-  if (ex) return { doc: docOf(validateScene(ex.scene)), code: ex.scene.code, restored: false, failed };
-  return { doc: empty, code: BLANK_CODE, restored: false, failed };
+  return ex ? { doc: docOf(validateScene(ex.scene)), code: ex.scene.code } : { doc: empty, code: BLANK_CODE };
 }
 
 export const PREFS_KEY = 'coms-lab:prefs';
@@ -277,9 +326,13 @@ export function deleteNote(id: string) {
 }
 export const codeMode = (s: State = state): CodeMode => s.hist.present.codeMode ?? 'text';
 /** Hooks for the Blockly lane: the document owns the blocks JSON and the editor mode. */
-export function setBlocks(blocks: unknown, code?: string) {
-  void setDoc({ ...state.hist.present, version: 2, blocks });
-  if (code !== undefined) setCode(code);
+export function setBlocks(blocks: unknown) {
+  const c = trust(blocks); // the live editor's own save: what is displayed, so no round trip through Blockly
+  if (!c.ok) return void toast(`적용하지 못했어요: ${c.error}`);
+  const code = generate(c.blocks, sceneContext(parts(), state.analysis).opts).code;
+  const tooBig = codeProblem(code);
+  if (tooBig) return void toast(`적용하지 못했어요: ${tooBig}`);
+  if (setDoc({ ...state.hist.present, version: 2, blocks: c.blocks }) === null) set({ code });
 }
 export function setCodeMode(mode: CodeMode) {
   void setDoc({ ...state.hist.present, version: 2, codeMode: mode });
@@ -328,6 +381,12 @@ function checkDoc(doc: Doc): string | null {
   }
 }
 function setDoc(doc: Doc, selection?: Selection): string | null {
+  // Fail closed: blocks reach the document only through canonicalize (untrusted) or trust (setBlocks, the live editor).
+  if (doc.blocks !== undefined && doc.blocks !== state.hist.present.blocks && !isCanonical(doc.blocks)) {
+    const error = '블록이 확인되지 않은 경로로 들어왔어요.';
+    toast(`적용하지 못했어요: ${error}`);
+    return error;
+  }
   const hist = commit(state.hist, doc);
   if (hist === state.hist) return null;
   const err = checkDoc(doc);
@@ -356,7 +415,7 @@ export const canUndo = (s: State) => s.hist.past.length > 0;
 export const canRedo = (s: State) => s.hist.future.length > 0;
 
 export function setCode(code: string) {
-  if (code.length * 3 > MAX_CODE_BYTES && new TextEncoder().encode(code).length > MAX_CODE_BYTES) return toast('코드는 64 KB 이하여야 해요.');
+  if (code.length * 3 > MAX_CODE_BYTES && encoder.encode(code).length > MAX_CODE_BYTES) return toast('코드는 64 KB 이하여야 해요.');
   set({ code });
 }
 
@@ -536,10 +595,11 @@ export function updateWire(id: string, patch: Partial<Wire>) {
 const loadListeners = new Set<() => void>();
 export const onSceneLoaded = (cb: () => void) => (loadListeners.add(cb), () => loadListeners.delete(cb));
 
-export function loadScene(input: Scene, opts: { keepSim?: boolean } = {}) {
-  void opts;
+/** `beforeApply` runs once the scene is accepted and before anything changes (a refused scene must not stop the simulator). */
+export function loadScene(input: Scene, opts: { beforeApply?: () => void } = {}) {
   const analysis = analyze(input);
   const s = withGeneratedCode(input, analysis);
+  opts.beforeApply?.();
   const doc = docOf(s);
   set({
     hist: initHistory(doc), code: s.code, analysis, selection: null, multi: [], wireStart: null, draft: null, inputs: {},
@@ -569,11 +629,15 @@ export function inputValue(s: State, partId: string, key: string, fallback: numb
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let lastSaved: unknown[] = [];
 let saveWarned = false;
+let migrating = false; // an unmarked autosave is still being migrated: SAVE_KEY must stay as it is until it settles
 function saveNow() {
   clearTimeout(saveTimer);
   saveTimer = undefined;
+  if (migrating) return;
   const json = serializeScene();
-  if (json !== null && setItem(SAVE_KEY, json)) saveWarned = false;
+  // blocks are marked as Blockly's own save so the next start can trust them without loading Blockly
+  const out = json !== null && state.hist.present.blocks !== undefined ? `{"canonVersion":${CANON_VERSION},"scene":${json}}` : json;
+  if (out !== null && setItem(SAVE_KEY, out)) saveWarned = false;
   else if (!saveWarned) {
     saveWarned = true;
     toast('자동 저장에 실패했어요. 저장 공간이 부족하거나 막혀 있을 수 있어요. 내보내기로 파일에 저장해 두세요.', 8000);
@@ -645,3 +709,29 @@ export function dismissQualityNotice() {
   setItem(NOTICE_KEY, '1');
   set({ qualityNotice: null });
 }
+
+/**
+ * An autosave with blocks but no marker comes from an earlier build (block mode shipped before the marker). It is treated as an
+ * import: Blockly canonicalizes it, and autosave then writes it with the marker. When Blockly cannot load or refuses it, the
+ * raw data goes to the backup with the usual notice and the default document stays.
+ */
+async function migrateUnmarked(raw: string) {
+  try {
+    const parsed = validateScene(JSON.parse(raw));
+    if (!(await loadCanon())) throw new Error('chunk');
+    // the user already moved on (document or code edited): do not replace their work
+    if (state.hist.present !== docOfStart || state.code !== codeOfStart) throw new Error('edited');
+    loadScene(parsed);
+    baseline = ''; // like any restore: it exists nowhere else, so it counts as unsaved work
+    undoEagerBackup?.(); // migrated: the autosave now holds it (with the marker), so the safety copy is not a "backup" any more
+  } catch {
+    backupRaw(raw);
+    set({ restoreNotice: true });
+  } finally {
+    migrating = false;
+    saveTimer = setTimeout(saveNow, 600); // whatever changed while autosave was held goes out now
+  }
+}
+const docOfStart = state.hist.present;
+const codeOfStart = state.code;
+if (first.migrate) { migrating = true; void migrateUnmarked(first.migrate); }

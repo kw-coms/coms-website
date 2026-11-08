@@ -1,30 +1,15 @@
 // The Blockly workspace. Loaded lazily (see CodeTab.tsx): Blockly is only downloaded when Blocks mode opens.
 // No network requests: no sounds, and the few images Blockly needs (toolbox/zoom icons, cursors) are copied from
 // node_modules/blockly/media into public/blockly-media (Blockly would otherwise load them from static.blockly.com).
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Blockly from 'blockly/core';
-import 'blockly/blocks';
-import * as Ko from 'blockly/msg/ko';
-import { COLOUR, CUSTOM_BLOCKS, TOOLBOX, type PinKind, PIN_VALUES } from './defs';
-import { blocksProblem, stringifyJsonBounded } from '../../core/scene';
+import { COLOUR, TOOLBOX } from './defs';
+import { MAX_CANONICAL_BLOCKS_BYTES, stringifyJsonBounded } from '../../core/scene';
+import { loadBlocks, setPinHints } from './blocklyRuntime';
+import { createSaveScheduler } from './saveScheduler';
 import './blocks.css';
 
-Blockly.setLocale(Ko as unknown as Record<string, string>);
-
-let pinHints: Record<string, string> = {};
-const pinOptions = (kind: PinKind): [string, string][] => PIN_VALUES[kind].map((v) => [pinHints[v] ? `${v} · ${pinHints[v]}` : v, v]);
-
-for (const def of CUSTOM_BLOCKS) {
-  Blockly.Blocks[def.type] = {
-    init(this: Blockly.Block) {
-      this.jsonInit(def);
-      for (const a of def.args0 ?? []) {
-        const kind = a.pinKind as PinKind | undefined;
-        if (kind) (this.getField(a.name as string) as Blockly.FieldDropdown).setOptions(() => pinOptions(kind));
-      }
-    },
-  };
-}
+export { loadBlocks };
 
 const classic = Blockly.Themes.Classic;
 const blockStyles = Object.fromEntries(
@@ -50,117 +35,18 @@ export interface BlocksEditorProps {
   onChange: (state: unknown) => void;
 }
 
-const START_WORKSPACE = () => ({ blocks: { languageVersion: 0, blocks: [
-  { type: 'lab_setup', x: 24, y: 24 }, { type: 'lab_loop', x: 24, y: 130 },
-] } });
-
-/**
- * Load a workspace into Blockly. The state is untrusted (share links, opened files), and Blockly allocates one input per
- * mutator item while loading, so it is checked again here: anything validateScene would refuse gives the start workspace.
- * Returns the Korean reason when it refused, null otherwise.
- */
-export function loadBlocks(w: Blockly.Workspace, s: unknown): string | null {
-  w.clear();
-  const problem = s && typeof s === 'object' ? blocksProblem(s) : null;
-  if (problem) console.warn('블록 불러오기를 건너뛰었어요:', problem);
-  const state = s && typeof s === 'object' && !problem ? s as object : START_WORKSPACE();
-  if (stringifyJsonBounded(state, 64, 256 * 1024) !== null) {
-    Blockly.serialization.workspaces.load(state, w);
-  } else {
-    // Blockly's deserializer recursively follows next/input blocks. A valid
-    // 450-block workspace can exceed the JS stack on smaller hosts.
-    const workspace = state as { blocks?: { blocks?: Blockly.serialization.blocks.State[] } };
-    const roots = workspace.blocks?.blocks ?? [];
-    Blockly.serialization.workspaces.load({ ...state, blocks: { ...workspace.blocks, blocks: [] } }, w);
-    loadDeepBlocks(w, roots);
-  }
-  return problem;
-}
-
-function loadDeepBlocks(w: Blockly.Workspace, roots: Blockly.serialization.blocks.State[]): void {
-  type State = Blockly.serialization.blocks.State;
-  type Task = { state: State; parent?: Blockly.Connection; loaded?: Blockly.Block };
-  const pending: Task[] = roots.map(root => ({ state: root })).reverse();
-  const shadows = new WeakMap<Blockly.Connection, State>();
-  const wrapped = new WeakSet<Blockly.Connection>();
-  const ready = new WeakSet<Blockly.Connection>();
-  const building = new Set<Blockly.Connection>();
-  const drain = (): void => {
-    while (pending.length) {
-      const { state, parent, loaded } = pending.pop()!;
-      const { inputs, next, ...shallow } = state;
-      const block = loaded ?? Blockly.serialization.blocks.appendInternal(shallow, w, { parentConnection: parent });
-      const connect = (connection: Blockly.Connection | null | undefined, slot: Blockly.serialization.blocks.ConnectionState) => {
-        if (!connection) throw new Error('블록 연결이 올바르지 않습니다.');
-        if (slot.shadow) attachShadow(connection, slot.shadow, !!slot.block);
-        if (slot.block) pending.push({ state: slot.block, parent: connection });
-      };
-      if (next) connect(block.nextConnection, next);
-      for (const [name, slot] of Object.entries(inputs ?? {}).reverse()) connect(block.getInput(name)?.connection, slot);
-    }
-    for (const connection of building) ready.add(connection);
-    building.clear();
-  };
-  const attachShadow = (connection: Blockly.Connection, state: State, obscured: boolean): void => {
-    const originalRespawn: unknown = Reflect.get(connection, 'respawnShadow_');
-    if (typeof originalRespawn !== 'function') {
-      console.warn('블록 그림자 복원 기능을 사용할 수 없어요.');
-      return;
-    }
-    const { inputs: _inputs, next: _next, ...shallow } = state;
-    void _inputs; void _next;
-    connection.setShadowState(shallow);
-    shadows.set(connection, state);
-    if (!wrapped.has(connection)) {
-      wrapped.add(connection);
-      const originalGet = connection.getShadowState.bind(connection);
-      // Blockly respawns from shadowState recursively. Keep its stored state
-      // shallow and restore descendants through the same iterative loader.
-      Reflect.set(connection, 'respawnShadow_', () => {
-        originalRespawn.call(connection);
-        const shadow = connection.targetBlock();
-        const saved = shadows.get(connection);
-        if (shadow?.isShadow() && saved) {
-          ready.delete(connection);
-          building.add(connection);
-          pending.push({ state: saved, loaded: shadow });
-          drain();
-        }
-      });
-      Reflect.set(connection, 'getShadowState', (current?: boolean) => {
-        const saved = shadows.get(connection);
-        if (!saved) return originalGet(current);
-        if (!current) {
-          const { inputs: _inputs, next: _next, ...shallowState } = saved;
-          void _inputs; void _next;
-          return shallowState; // Blockly's recursive respawn sees only one block.
-        }
-        const active = connection.targetBlock();
-        if (!active?.isShadow()) return saved;
-        if (!ready.has(connection)) return saved;
-        const latest = originalGet(true);
-        if (latest) shadows.set(connection, latest);
-        return latest;
-      });
-    }
-    const shadow = connection.targetBlock();
-    if (!obscured && shadow?.isShadow()) {
-      building.add(connection);
-      pending.push({ state, loaded: shadow });
-    }
-  };
-  drain();
-}
-
 export default function BlocksEditor({ state, dark, hints, readOnly, onChange }: BlocksEditorProps) {
   const host = useRef<HTMLDivElement>(null);
   const ws = useRef<Blockly.WorkspaceSvg | null>(null);
   const last = useRef('');
   const loading = useRef(false);
+  // a refused or failed load shows a stand-in workspace: it must never be saved over the program the store holds
+  const saver = useRef<ReturnType<typeof createSaveScheduler> | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const loader = useRef<(s: unknown) => void>(() => {});
   const cb = useRef(onChange);
   cb.current = onChange;
-  pinHints = hints;
+  setPinHints(hints);
 
   useEffect(() => {
     const w = Blockly.inject(host.current!, {
@@ -180,30 +66,34 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
     const load = (s: unknown) => {
       loading.current = true;
       try {
-        loadBlocks(w, s);
+        const problem = loadBlocks(w, s, MAX_CANONICAL_BLOCKS_BYTES);
+        saver.current?.setBlocked(problem !== null);
+        setNotice(problem ? `저장된 블록을 열지 못해서 빈 작업 영역을 보여 주고 있어요. 고쳐도 저장되지 않아요. (${problem})` : null);
         mark();
       } catch (e) {
         console.error('블록 불러오기 실패', e);
         w.clear();
+        saver.current?.setBlocked(true);
+        setNotice('블록을 불러오지 못해서 빈 작업 영역을 보여 주고 있어요. 고쳐도 저장되지 않아요.');
       } finally { loading.current = false; }
     };
+    const scheduler = createSaveScheduler(() => {
+      const s = Blockly.serialization.workspaces.save(w);
+      last.current = stringifyJsonBounded(s, 1000, MAX_CANONICAL_BLOCKS_BYTES) ?? '';
+      cb.current(s);
+    });
+    saver.current = scheduler;
     load(state);
-    last.current = stringifyJsonBounded(state ?? null, 1000, 256 * 1024) ?? '';
-    let timer = 0;
+    last.current = stringifyJsonBounded(state ?? null, 1000, MAX_CANONICAL_BLOCKS_BYTES) ?? '';
     w.addChangeListener((ev: Blockly.Events.Abstract) => {
       if (loading.current || ev.isUiEvent) return;
       mark();
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        const s = Blockly.serialization.workspaces.save(w);
-        last.current = stringifyJsonBounded(s, 1000, 256 * 1024) ?? '';
-        cb.current(s);
-      }, 300);
+      scheduler.schedule();
     });
     const ro = new ResizeObserver(() => Blockly.svgResize(w));
     ro.observe(host.current!);
     loader.current = load;
-    return () => { window.clearTimeout(timer); ro.disconnect(); w.dispose(); ws.current = null; };
+    return () => { scheduler.cancel(); saver.current = null; ro.disconnect(); w.dispose(); ws.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!readOnly]);
 
@@ -211,11 +101,16 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
 
   // the document changed from outside (undo, another example, opened file): reload the workspace
   useEffect(() => {
-    const key = stringifyJsonBounded(state ?? null, 1000, 256 * 1024) ?? '';
+    const key = stringifyJsonBounded(state ?? null, 1000, MAX_CANONICAL_BLOCKS_BYTES) ?? '';
     if (key === last.current || !ws.current) return;
     last.current = key;
     loader.current(state);
   }, [state]);
 
-  return <div className="blocks-host" ref={host} role="application" aria-label="블록 코딩 작업 영역. 탭으로 들어가 방향키로 블록을 옮겨 다닐 수 있어요." />;
+  return (
+    <>
+      {notice && <p className="blocks-warn" role="alert">{notice}</p>}
+      <div className="blocks-host" ref={host} role="application" aria-label="블록 코딩 작업 영역. 탭으로 들어가 방향키로 블록을 옮겨 다닐 수 있어요." />
+    </>
+  );
 }

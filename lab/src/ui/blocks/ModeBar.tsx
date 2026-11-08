@@ -7,7 +7,7 @@ import type { CodeMode } from '../../core';
 import { EXAMPLES } from '../core';
 import { getState, set, setBlocks, setCode, setCodeMode, useStore } from '../store';
 import { sceneContext } from './context';
-import { generate, isGeneratedCode } from './generate';
+import { generate } from './generate';
 import { DEFAULT_BLOCKS, STARTER_BLOCKS } from './starters';
 import './blocks.css';
 
@@ -35,16 +35,16 @@ export function ModeBar() {
   // in a block mode the code is always exactly what the blocks generate
   useEffect(() => {
     if (!inBlocks) return;
-    if (!blocks) setBlocks(DEFAULT_BLOCKS, generate(DEFAULT_BLOCKS, opts).code);
+    if (!blocks) setBlocks(DEFAULT_BLOCKS);
     else if (gen && gen.code !== code) setCode(gen.code);
-  }, [inBlocks, blocks, gen, code, opts]);
+  }, [inBlocks, blocks, gen, code]);
 
-  const generated = !!blocks && isGeneratedCode(blocks, code, opts);
+  const generated = !!gen && gen.code === code; // gen is memoized by blocks identity: no second generation per render
   const example = EXAMPLES.find((e) => e.scene.code === code);
   const starter = example && STARTER_BLOCKS[example.id];
 
   const startBlocks = (to: CodeMode, state: unknown) => {
-    setBlocks(state, generate(state, opts).code);
+    setBlocks(state);
     setCodeMode(to);
     setAsk(null);
   };

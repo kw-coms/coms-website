@@ -14,6 +14,8 @@ async function boot(): Promise<Mods> {
   return { store, actions, core, share };
 }
 /** The example as the app holds it after import: validateScene upgrades v1 scenes to v2. */
+/** Blockly (the editor's chunk) is what canonicalizes block scenes; load it like an import or share link does. */
+const withBlockly = async () => (await import('./blocks/canon')).ensureCanon();
 const example = (m: Mods, id: string) => m.core.validateScene(m.core.EXAMPLES.find((e) => e.id === id)!.scene);
 
 beforeEach(() => {
@@ -256,6 +258,7 @@ describe('rotateSelection of a breadboard', () => {
 describe('block-mode scenes never run hidden code, and mission scenes open on their mission', () => {
   const HIDDEN = 'void setup() { pinMode(13, OUTPUT); }\nvoid loop() { digitalWrite(13, HIGH); /* HIDDEN */ }\n';
   const blockScene = async (m: Mods, codeMode: 'blocks' | 'blocks+text' | 'text', code = HIDDEN) => {
+    await withBlockly();
     const { STARTER_BLOCKS } = await import('./blocks/starters');
     return { ...example(m, 'external-blink'), codeMode, blocks: STARTER_BLOCKS['external-blink'], code } as Scene;
   };
@@ -275,6 +278,7 @@ describe('block-mode scenes never run hidden code, and mission scenes open on th
   });
   it('a block mode without blocks starts from the default program, not from the hidden code', async () => {
     const m = await boot();
+    await withBlockly();
     m.store.loadScene({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks: undefined, code: HIDDEN } as Scene);
     expect(m.store.getState().code).not.toContain('HIDDEN');
     expect(m.store.getState().hist.present.blocks).toBeTruthy();
@@ -300,7 +304,7 @@ describe('block-mode scenes never run hidden code, and mission scenes open on th
   it('the autosave restore at startup also regenerates', async () => {
     const m0 = await boot();
     const s = await blockScene(m0, 'blocks');
-    mem.set(m0.store.SAVE_KEY, JSON.stringify(s));
+    mem.set(m0.store.SAVE_KEY, JSON.stringify({ canonVersion: m0.store.CANON_VERSION, scene: s }));
     const m = await boot();
     expect(m.store.getState().code).toBe(await generated(m, s));
   });
@@ -354,5 +358,262 @@ describe('block-mode scenes never run hidden code, and mission scenes open on th
     const { MISSIONS } = await import('../missions');
     mem.set(m0.store.SAVE_KEY, JSON.stringify(MISSIONS[0]!.starterScene));
     expect((await boot()).store.getState().missionId).toBe(MISSIONS[0]!.id);
+  });
+});
+
+describe('canonical blocks in the document', () => {
+  const loopOf = (...stack: unknown[]) => {
+    const blocks = stack as { next?: unknown }[];
+    for (let i = blocks.length - 2; i >= 0; i--) blocks[i]!.next = { block: blocks[i + 1] };
+    return { type: 'lab_loop', inputs: { DO: { block: blocks[0] } } };
+  };
+  const state = (variables: { id: string; name: string }[], ...stack: unknown[]) =>
+    ({ blocks: { languageVersion: 0, blocks: [loopOf(...stack)] }, variables });
+  const set = (id: string, v: number) => ({ type: 'variables_set', fields: { VAR: { id } }, inputs: { VALUE: { block: { type: 'math_number', fields: { NUM: v } } } } });
+  const scene = async (m: Mods, blocks: unknown, codeMode: 'blocks' | 'text' = 'blocks') => {
+    await withBlockly();
+    return { ...example(m, 'external-blink'), codeMode, blocks, code: 'void setup() {}\nvoid loop() { /* HIDDEN */ }\n' } as Scene;
+  };
+
+  it('renaming a variable to 점수? in the editor is accepted and runs the new name', async () => {
+    const m = await boot();
+    await m.actions.importJson(new File([JSON.stringify(await scene(m, state([{ id: 'a', name: 'score' }], set('a', 1))))], 'c.json'));
+    expect(m.store.getState().code).toContain('v_score = 1;');
+    m.store.set({ toast: null });
+    m.store.setBlocks(state([{ id: 'a', name: '점수?' }], set('a', 1))); // what BlocksEditor reports after a rename
+    expect(m.store.getState().toast).toBeNull();
+    expect(m.store.getState().code).toContain('v_1 = 1;');
+    expect(m.store.getState().code).toContain('// 변수 "점수？"');
+    expect(m.store.getState().code).not.toContain('v_score');
+    expect(JSON.stringify(m.store.getState().hist.present.blocks)).toContain('점수?');
+  });
+
+  it('a scene whose raw JSON and Blockly reading disagree runs the Blockly reading', async () => {
+    const m = await boot();
+    const raw = { blocks: { languageVersion: 0, blocks: [loopOf({ type: 'variables_set', fields: { VAR: 'foo' }, inputs: { VALUE: { block: { type: 'math_number', fields: { NUM: 1 } } } } })] } };
+    m.store.loadScene(await scene(m, raw));
+    const stored = JSON.stringify(m.store.getState().hist.present.blocks);
+    expect(stored).toContain('"variables"');
+    expect(m.store.getState().code).not.toMatch(/\bfoo\b/);
+    expect(m.store.getState().code).not.toContain('HIDDEN');
+  });
+
+  it('refuses, with a Korean reason and without touching the document, what Blockly cannot read', async () => {
+    const m = await boot();
+    const before = m.store.getState().hist.present;
+    const bad = { blocks: { languageVersion: 0, blocks: [{ type: 'lab_loop', inputs: { NOPE: { block: { type: 'lab_millis' } } } }] } };
+    await withBlockly();
+    expect(() => m.store.loadScene({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks: bad } as Scene)).toThrow(/[가-힣]/);
+    expect(m.store.getState().hist.present).toBe(before);
+  });
+
+  it('a text-mode scene that carries blocks is canonicalized too (switching to blocks later must not run another reading)', async () => {
+    const m = await boot();
+    const raw = state([], { type: 'lab_digital_write' });
+    m.store.loadScene(await scene(m, raw, 'text'));
+    expect(JSON.stringify(m.store.getState().hist.present.blocks)).toContain('"PIN":"2"');
+    expect(m.store.getState().code).toContain('HIDDEN'); // text mode keeps its own code
+  });
+
+  it('fails closed before Blockly is loaded', async () => {
+    const m = await boot();
+    const s = { ...example(m, 'external-blink'), codeMode: 'blocks', blocks: state([], set('a', 1)), code: 'x' } as Scene;
+    expect(() => m.store.loadScene(s)).toThrow(/불러오지 못했어요/);
+  });
+
+  it('code generated from the blocks may not pass the 64 KB code limit', async () => {
+    const m = await boot();
+    const big = Array.from({ length: 24 }, () => ({ type: 'lab_serial_print', inputs: { VALUE: { block: { type: 'text', fields: { TEXT: '"'.repeat(2000) } } } } }));
+    const raw = { blocks: { languageVersion: 0, blocks: [loopOf(...big)] } };
+    await withBlockly();
+    expect(() => m.store.loadScene({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks: raw } as Scene)).toThrow(/64 KB/);
+    m.store.setBlocks(raw);
+    expect(m.store.getState().toast).toMatch(/64 KB/);
+  });
+
+  it('a huge TEXT is refused at import', async () => {
+    const m = await boot();
+    const raw = state([], { type: 'lab_serial_print', inputs: { VALUE: { block: { type: 'text', fields: { TEXT: 'x'.repeat(2001) } } } } });
+    expect(() => m.core.validateScene({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks: raw })).toThrow(/블록 필드/);
+  });
+});
+
+
+describe('trust boundaries: Blockly only for what we did not write', () => {
+  const chunkFails = () => vi.doMock('./blocks/blocklyRuntime', () => { throw new Error('chunk failed'); });
+  afterEach(() => { vi.doUnmock('./blocks/blocklyRuntime'); vi.unstubAllGlobals(); });
+  const blocks = { blocks: { languageVersion: 0, blocks: [{ type: 'lab_loop', inputs: { DO: { block: { type: 'lab_digital_write', fields: { PIN: '8', STATE: 'HIGH' } } } } }] } };
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it('an autosave with the marker restores without loading Blockly, even if the chunk cannot load', async () => {
+    await wait(800); // earlier tests' stores share this localStorage stub: let their pending autosaves land first
+    const m0 = await boot();
+    const saved = JSON.stringify({ canonVersion: m0.store.CANON_VERSION, scene: { ...example(m0, 'external-blink'), codeMode: 'blocks', blocks, code: 'x' } });
+    mem.set(m0.store.SAVE_KEY, saved);
+    chunkFails();
+    const m = await boot();
+    expect(m.store.getState().restoreNotice).toBe(false);
+    expect(m.store.getState().hist.present.codeMode).toBe('blocks');
+    expect(m.store.getState().code).toContain('digitalWrite(8, HIGH);');
+  });
+
+  it('autosaves of block scenes carry the marker, text scenes stay plain', async () => {
+    await wait(800); // earlier tests' stores share this localStorage stub
+    const m = await boot();
+    await withBlockly();
+    m.store.loadScene({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks, code: 'x' } as Scene);
+    m.store.setCode(m.store.getState().code + '\n');
+    await wait(800);
+    expect(JSON.parse(mem.get(m.store.SAVE_KEY)!).canonVersion).toBe(m.store.CANON_VERSION);
+    const t = await boot();
+    t.store.loadScene(example(t, 'external-blink'));
+    t.store.setCode('void setup() {}\nvoid loop() {}\n');
+    await wait(800);
+    expect(JSON.parse(mem.get(t.store.SAVE_KEY)!).canonVersion).toBeUndefined();
+  });
+
+  const until = async (ok: () => boolean) => { for (let i = 0; i < 200 && !ok(); i++) await wait(50); };
+  const unmarked = async () => {
+    const m0 = await boot();
+    await withBlockly();
+    const raw = JSON.stringify({ ...example(m0, 'external-blink'), codeMode: 'blocks', blocks, code: 'x' });
+    mem.set(m0.store.SAVE_KEY, raw);
+    return { raw, m0 };
+  };
+
+  it('an unmarked block autosave (saved by an earlier build) migrates like an import and gets the marker', async () => {
+    await wait(800); // earlier tests' stores share this localStorage stub: let their pending autosaves land first
+    const { raw } = await unmarked();
+    const m = await boot();
+    await until(() => m.store.getState().hist.present.codeMode === 'blocks');
+    expect(m.store.getState().restoreNotice).toBe(false);
+    expect(m.store.getState().code).toContain('digitalWrite(8, HIGH);');
+    await wait(800);
+    const saved = JSON.parse(mem.get(m.store.SAVE_KEY)!);
+    expect(saved.canonVersion).toBe(m.store.CANON_VERSION);
+    expect(mem.has(m.store.BACKUP_KEY)).toBe(false);
+    void raw;
+  }, 60000);
+
+  it('while a migration waits for a Blockly chunk that never arrives, an edit and pagehide cannot overwrite the saved program', async () => {
+    await wait(800);
+    const { raw } = await unmarked();
+    const handlers: Record<string, () => void> = {};
+    vi.stubGlobal('window', { addEventListener: (ev: string, fn: () => void) => { handlers[ev] = fn; } });
+    vi.doMock('./blocks/blocklyRuntime', async () => { await new Promise(() => {}); }); // the chunk never settles
+    const m = await boot();
+    expect(mem.get(m.store.BACKUP_KEY)).toBe(raw); // copied eagerly, before anything else
+    m.store.setCode('void setup() {}\nvoid loop() {}\n');
+    await wait(700);
+    handlers.pagehide?.();
+    expect(mem.get(m.store.SAVE_KEY)).toBe(raw);
+    expect(mem.get(m.store.BACKUP_KEY)).toBe(raw);
+  }, 60000);
+
+  it('after a successful migration the eager safety copy is rolled back', async () => {
+    await wait(800);
+    const { raw } = await unmarked();
+    mem.set('coms-lab:scene:v1:backup', 'OLDER');
+    const m = await boot();
+    expect(mem.get(m.store.BACKUP_KEY)).toBe(raw);
+    await until(() => m.store.getState().hist.present.codeMode === 'blocks');
+    await wait(100);
+    expect(mem.get(m.store.BACKUP_KEY)).toBe('OLDER');
+    expect(mem.has(m.store.BACKUP_PREV_KEY)).toBe(false);
+  }, 60000);
+
+  it('a code edit made while the migration waits is not silently replaced', async () => {
+    await wait(800);
+    const { raw } = await unmarked();
+    const m = await boot();
+    m.store.setCode('void setup() {}\nvoid loop() { /* mine */ }\n');
+    await until(() => m.store.getState().restoreNotice);
+    expect(m.store.getState().code).toContain('mine');
+    expect(mem.get(m.store.BACKUP_KEY)).toBe(raw);
+  }, 60000);
+
+  it('when Blockly cannot load, the raw data is kept in the backup, the notice shows and the default stays', async () => {
+    await wait(800);
+    const { raw } = await unmarked();
+    chunkFails();
+    const m = await boot();
+    await until(() => m.store.getState().restoreNotice);
+    expect(m.store.getState().restoreNotice).toBe(true);
+    expect(mem.get(m.store.BACKUP_KEY)).toBe(raw);
+    expect(m.store.getState().hist.present.codeMode).not.toBe('blocks');
+  }, 60000);
+
+  it('a newer backup never silently replaces an older, different one', async () => {
+    await wait(800);
+    const { raw } = await unmarked();
+    mem.set('coms-lab:scene:v1:backup', 'OLDER');
+    chunkFails();
+    const m = await boot();
+    await until(() => m.store.getState().restoreNotice);
+    expect(mem.get(m.store.BACKUP_KEY)).toBe(raw);
+    expect(mem.get(m.store.BACKUP_PREV_KEY)).toBe('OLDER');
+  }, 60000);
+
+  it('the backup / autosave wrapper imports: unwrapped, still canonicalized, large files allowed', async () => {
+    const m = await boot();
+    await withBlockly();
+    const scene = { ...example(m, 'external-blink'), codeMode: 'blocks', blocks, code: 'x' };
+    const pretty = JSON.stringify({ canonVersion: m.store.CANON_VERSION, scene }, null, 2);
+    await m.actions.importJson(new File([pretty], 'circuit-lab-backup.json'));
+    expect(m.store.getState().hist.present.codeMode).toBe('blocks');
+    expect(m.store.getState().code).toContain('digitalWrite(8, HIGH);');
+    const pad = { ...scene, title: 'x'.repeat(150), notes: undefined };
+    const big = JSON.stringify({ ...pad, blocks: { blocks: { languageVersion: 0, blocks: Array.from({ length: 2500 }, (_, i) => ({ type: 'math_number', id: `b${i}`, x: 0, y: i, fields: { NUM: 1 } })) } } }, null, 2);
+    expect(big.length).toBeGreaterThan(400_000);
+    m.store.set({ toast: null });
+    await m.actions.importJson(new File([big], 'big.json'));
+    expect(m.store.getState().toast).not.toMatch(/너무 커요/);
+  }, 60000);
+
+  it('a refused scene does not stop the running simulation', async () => {
+    const stop = vi.fn();
+    vi.doMock('./simHost', async (orig) => ({ ...(await orig<object>()), stop }));
+    const m = await boot();
+    await withBlockly();
+    const bad = { blocks: { languageVersion: 0, blocks: [{ type: 'lab_loop', inputs: { NOPE: { block: { type: 'lab_millis' } } } }] } };
+    await m.actions.importJson(new File([JSON.stringify({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks: bad, code: 'x' })], 'c.json'));
+    expect(stop).not.toHaveBeenCalled();
+    await m.actions.importJson(new File([JSON.stringify({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks, code: 'x' })], 'c.json'));
+    expect(stop).toHaveBeenCalled();
+    vi.doUnmock('./simHost');
+  }, 60000);
+
+  it('a 300 KB Blockly save from the live editor is accepted without calling Blockly', async () => {
+    const m = await boot();
+    chunkFails(); // nothing can canonicalize: acceptance proves no round trip happened
+    const big = { blocks: { languageVersion: 0, blocks: Array.from({ length: 4500 }, (_, i) => ({ type: 'math_number', id: `b${i}`, x: 0, y: i, fields: { NUM: 1 } })) } };
+    expect(JSON.stringify(big).length).toBeGreaterThan(300 * 1024);
+    m.store.set({ toast: null });
+    m.store.setBlocks(big);
+    expect(m.store.getState().toast).toBeNull();
+    expect(m.store.getState().hist.present.blocks).toBe(big);
+  });
+
+  it('an import with blocks that cannot load Blockly says so in Korean and changes nothing', async () => {
+    const m = await boot();
+    chunkFails();
+    const before = m.store.getState().hist.present;
+    const s = { ...example(m, 'external-blink'), codeMode: 'blocks', blocks, code: 'x' };
+    await m.actions.importJson(new File([JSON.stringify(s)], 'c.json'));
+    expect(m.store.getState().toast).toMatch(/블록 편집기를 불러오지 못했어요/);
+    expect(m.store.getState().hist.present).toBe(before);
+  }, 60000);
+
+  it('the chunk load is retried once, and bounded', async () => {
+    const { loadCanon } = await import('./blocks/canon');
+    let calls = 0;
+    expect(await loadCanon(1000, async () => { if (calls++ === 0) throw new Error('first try fails'); })).toBe(true);
+    expect(calls).toBe(2);
+    calls = 0;
+    expect(await loadCanon(1000, async () => { calls++; throw new Error('always'); })).toBe(false);
+    expect(calls).toBe(2);
+    const started = Date.now();
+    expect(await loadCanon(40, () => new Promise<void>(() => {}))).toBe(false); // a stalled chunk gives up
+    expect(Date.now() - started).toBeLessThan(2000);
   });
 });

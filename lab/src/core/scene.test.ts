@@ -149,7 +149,7 @@ describe('v2 scene metadata', () => {
     expect(await decodeShare(await encodeShare(v2))).toEqual(v2);
   });
   it('rejects oversized, cyclic, deep, and non-JSON blocks', () => {
-    expect(() => validateScene({ ...base(), blocks: { text: '한'.repeat(88_000) } })).toThrow('256 KB');
+    expect(() => validateScene({ ...base(), blocks: { text: '한'.repeat(180_000) } })).toThrow('512 KB');
     const cycle: Record<string, unknown> = {}; cycle.self = cycle;
     expect(() => validateScene({ ...base(), blocks: cycle })).toThrow('블록');
     let deep: unknown = null;

@@ -1,4 +1,5 @@
 import { PARTS } from './parts';
+import { blockFieldsProblem, isValidName } from './blockFields';
 import { socketInsertions } from './socket-insertions';
 import type { PartInstance, PinRef, Scene } from './types';
 
@@ -164,8 +165,11 @@ export function cloneJson<T>(value: T): T {
   return root as T;
 }
 
-function validBlocks(value: unknown): boolean {
-  return stringifyJsonBounded(value, MAX_BLOCKS_JSON_DEPTH, 256 * 1024) !== null;
+/** Untrusted blocks are bounded at 256 KB before Blockly loads them; Blockly's own save adds ids and coordinates, so canonical blocks may use up to 512 KB. */
+export const MAX_BLOCKS_BYTES = 256 * 1024;
+export const MAX_CANONICAL_BLOCKS_BYTES = 512 * 1024;
+function validBlocks(value: unknown, maxBytes = MAX_BLOCKS_BYTES): boolean {
+  return stringifyJsonBounded(value, MAX_BLOCKS_JSON_DEPTH, maxBytes) !== null;
 }
 
 /**
@@ -190,6 +194,7 @@ export const MAX_PROC_PARAMS = 32;
 export const MAX_MUTATION_TOTAL = 2000;
 
 const isInt = (v: unknown, max: number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= max;
+const MAX_FUNCTION_DEFS = 200;
 const shortStr = (v: unknown): v is string => typeof v === 'string' && v.length <= 100;
 
 /** extraState of one block against its type's schema. Returns the mutator size, or -1 when invalid. */
@@ -211,12 +216,13 @@ function mutationSize(type: string, es: unknown): number {
           (es.hasStatements !== undefined && typeof es.hasStatements !== 'boolean')) return -1;
       if (es.params === undefined) return 0;
       return Array.isArray(es.params) && es.params.length <= MAX_PROC_PARAMS &&
-        es.params.every(p => isObject(p) && Object.values(p).every(shortStr) && hasOnlyKeys(p, ['name', 'id', 'argId', 'type']))
+        es.params.every(p => isObject(p) && Object.values(p).every(shortStr) && hasOnlyKeys(p, ['name', 'id', 'argId', 'type']) &&
+          (p.name === undefined || isValidName(p.name)))
         ? es.params.length : -1;
     }
     case 'procedures_callnoreturn':
     case 'procedures_callreturn': {
-      if (!isObject(es) || !hasOnlyKeys(es, ['name', 'params']) || (es.name !== undefined && !shortStr(es.name))) return -1;
+      if (!isObject(es) || !hasOnlyKeys(es, ['name', 'params']) || (es.name !== undefined && !isValidName(es.name))) return -1;
       if (es.params === undefined) return 0;
       return Array.isArray(es.params) && es.params.length <= MAX_PROC_PARAMS && es.params.every(shortStr) ? es.params.length : -1;
     }
@@ -232,16 +238,17 @@ function mutationSize(type: string, es: unknown): number {
  * loader and the generator will touch. Returns a Korean reason, or null when the workspace is acceptable.
  * BlocksEditor runs it again right before Blockly loads, so no path reaches the loader unchecked.
  */
-export function blocksProblem(state: unknown): string | null {
+export function blocksProblem(state: unknown, maxBytes = MAX_BLOCKS_BYTES): string | null {
   const bad = '블록 구조가 올바르지 않습니다.';
-  if (!validBlocks(state)) return '블록 데이터는 올바른 JSON이며 256 KB 이하, 1,000단계 이하의 깊이이어야 합니다.';
+  if (!validBlocks(state, maxBytes)) return `블록 데이터는 올바른 JSON이며 ${maxBytes / 1024} KB 이하, 1,000단계 이하의 깊이이어야 합니다.`;
   if (!isObject(state)) return bad;
   const ws = state.blocks;
   if (ws !== undefined && (!isObject(ws) || (ws.blocks !== undefined && !Array.isArray(ws.blocks)))) return bad;
   if (state.variables !== undefined && (!Array.isArray(state.variables) || state.variables.length > 1000 ||
-      !state.variables.every(v => isObject(v) && (v.id === undefined || typeof v.id === 'string') && (v.name === undefined || typeof v.name === 'string')))) return bad;
+      !state.variables.every(v => isObject(v) && (v.id === undefined || typeof v.id === 'string') && (v.name === undefined || isValidName(v.name))))) return bad;
   const todo: unknown[] = isObject(ws) && Array.isArray(ws.blocks) ? [...ws.blocks] : [];
   let mutations = 0;
+  const defNames = new Set<string>();
   for (let n = 0; todo.length; n++) {
     const b = todo.pop();
     if (n >= MAX_BLOCKS) return `블록은 ${MAX_BLOCKS.toLocaleString('ko-KR')}개 이하여야 합니다.`;
@@ -252,6 +259,19 @@ export function blocksProblem(state: unknown): string | null {
     mutations += size;
     if (mutations > MAX_MUTATION_TOTAL) return `블록 항목의 총합이 너무 큽니다. (${MAX_MUTATION_TOTAL.toLocaleString('ko-KR')}개 이하)`;
     if (b.fields !== undefined && !isObject(b.fields)) return bad;
+    // Blockly 13 saves a disabled block as disabledReasons (older files: enabled:false); the generator honours both.
+    if (b.enabled !== undefined && typeof b.enabled !== 'boolean') return bad;
+    if (b.disabledReasons !== undefined && (!Array.isArray(b.disabledReasons) || b.disabledReasons.length > 16 ||
+        !b.disabledReasons.every(shortStr))) return bad;
+    if (b.type === 'procedures_defnoreturn' || b.type === 'procedures_defreturn') {
+      // Blockly renames a duplicate definition on load (quadratic per clash, cubic overall), and never saves two with one name.
+      const name = isObject(b.fields) && typeof b.fields.NAME === 'string' ? b.fields.NAME.trim().toLowerCase() : '';
+      if (defNames.has(name)) return '이름이 같은 함수 블록이 있어요. 함수 이름은 서로 달라야 합니다.';
+      defNames.add(name);
+      if (defNames.size > MAX_FUNCTION_DEFS) return `함수 블록은 ${MAX_FUNCTION_DEFS}개 이하여야 합니다.`;
+    }
+    const fieldProblem = blockFieldsProblem(b.type, b.fields);
+    if (fieldProblem) return fieldProblem;
     if (b.inputs !== undefined && !isObject(b.inputs)) return bad;
     if (b.next !== undefined && !isObject(b.next)) return bad;
     const slots = [...Object.values((b.inputs ?? {}) as object), b.next].filter(slot => slot !== undefined);
@@ -279,9 +299,12 @@ export function validateScene(value: unknown): Scene {
   if (value.title !== undefined && (typeof value.title !== 'string' || value.title.length > 200)) {
     invalid('장면 제목이 올바르지 않습니다.');
   }
-  if (value.blocks !== undefined && !validBlocks(value.blocks)) invalid('블록 데이터는 올바른 JSON이며 256 KB 이하, 1,000단계 이하의 깊이이어야 합니다.');
+  // Canonical size: the scene may hold Blockly's own save (ids and coordinates added). Untrusted blocks are held to the
+  // tighter MAX_BLOCKS_BYTES by canonicalizeBlocks before they ever become the scene's blocks.
+  const blocksBytes = MAX_CANONICAL_BLOCKS_BYTES;
+  if (value.blocks !== undefined && !validBlocks(value.blocks, blocksBytes)) invalid(`블록 데이터는 올바른 JSON이며 ${blocksBytes / 1024} KB 이하, 1,000단계 이하의 깊이이어야 합니다.`);
   if (value.blocks !== undefined) {
-    const problem = blocksProblem(value.blocks);
+    const problem = blocksProblem(value.blocks, blocksBytes);
     if (problem) invalid(problem);
   }
   if (value.codeMode !== undefined && !['blocks', 'blocks+text', 'text'].includes(value.codeMode as string)) {
