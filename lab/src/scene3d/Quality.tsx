@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { MeshLambertMaterial, type Material, type Mesh, type MeshStandardMaterial, type Object3D } from 'three';
-import { createGovernor } from '../ui/quality';
+import { createGovernor, WARMUP_MS } from '../ui/quality';
 import { getState, stepQuality, subscribe, useStore } from '../ui/store';
 
 type StdLike = MeshStandardMaterial & { userData: { dynamic?: boolean; lite?: Material } };
@@ -50,21 +50,21 @@ export function QualityRig() {
   const scene = useThree((s) => s.scene);
   const invalidate = useThree((s) => s.invalidate);
   const quality = useStore((s) => s.quality);
-  const setDpr = useThree((s) => s.setDpr);
   const controls = useThree((s) => s.controls) as { addEventListener?: (t: string, f: () => void) => void; removeEventListener?: (t: string, f: () => void) => void } | null;
   const gov = useRef(createGovernor());
   const last = useRef(0);
   const orbiting = useRef(false);
+  const warmUntil = useRef(performance.now() + WARMUP_MS);
   useEffect(() => {
     const run = () => requestAnimationFrame(() => { applyLite(scene, getState().quality === 'low'); invalidate(); });
     run();
     // parts/wires mounted later must be converted too
     let prev = getState().hist.present;
-    const off = subscribe(() => { const cur = getState().hist.present; if (cur !== prev) { prev = cur; if (getState().quality === 'low') run(); } });
+    const off = subscribe(() => { const cur = getState().hist.present; if (cur !== prev) { prev = cur; warmUntil.current = performance.now() + WARMUP_MS; if (getState().quality === 'low') run(); } });
     return () => { off(); applyLite(scene, false); };
   }, [scene, invalidate, quality]);
-  useEffect(() => { gov.current.reset(); }, [quality]);
-  // while the user orbits/zooms, render at lower resolution (restored on release)
+  useEffect(() => { gov.current.reset(); warmUntil.current = performance.now() + WARMUP_MS; }, [quality]);
+  // remember whether the user is orbiting: only continuous frames say anything about GPU speed
   useEffect(() => {
     if (!controls?.addEventListener) return;
     const on = () => { orbiting.current = true; };
@@ -73,19 +73,11 @@ export function QualityRig() {
     controls.addEventListener('end', off);
     return () => { controls.removeEventListener?.('start', on); controls.removeEventListener?.('end', off); orbiting.current = false; };
   }, [controls]);
-  useEffect(() => {
-    if (quality === 'high' || !controls?.addEventListener) return;
-    const base = quality === 'low' ? 0.75 : Math.min(1.5, window.devicePixelRatio || 1);
-    const start = () => setDpr(quality === 'low' ? 0.5 : 0.75);
-    const end = () => { setDpr(base); invalidate(); };
-    controls.addEventListener('start', start);
-    controls.addEventListener('end', end);
-    return () => { controls.removeEventListener?.('start', start); controls.removeEventListener?.('end', end); setDpr(base); };
-  }, [controls, quality, setDpr, invalidate]);
   useFrame(() => {
     // demand rendering: only frames driven continuously (a running simulation or an orbit drag) say anything about GPU speed
     if (!orbiting.current && getState().simState !== 'running') { last.current = 0; return; }
     const now = performance.now();
+    if (now < warmUntil.current) { last.current = 0; gov.current.reset(); return; }
     const dt = last.current ? now - last.current : 0;
     last.current = now;
     if (dt > 100) gov.current.reset();

@@ -27,6 +27,7 @@ import { QualityRig } from './Quality';
 import { getState, set } from '../ui/store';
 
 let t = 0;
+const warm = () => { t += 7000; }; // past the warm-up window
 const frames = (gaps: number[]) => { for (const g of gaps) { t += g; h.frame!(); } };
 
 beforeEach(() => {
@@ -39,17 +40,24 @@ beforeEach(() => {
 });
 
 describe('quality governor gating', () => {
-  const slow = Array<number>(61).fill(70);
+  const slow = Array<number>(121).fill(70);
   it('ignores slow frames while neither orbiting nor simulating', () => {
     frames(slow);
     expect(getState().quality).toBe('high');
   });
   it('steps down on slow back-to-back frames while the simulation runs', () => {
+    warm();
     set({ simState: 'running' });
     frames(slow);
     expect(getState().quality).toBe('medium');
   });
+  it('ignores slow frames during the warm-up after load', () => {
+    set({ simState: 'running' });
+    frames(Array<number>(60).fill(70)); // ~4.2 s of slow frames right after mount
+    expect(getState().quality).toBe('high');
+  });
   it('steps down on slow back-to-back frames while orbiting', () => {
+    warm();
     h.listeners.start!();
     frames(slow);
     expect(getState().quality).toBe('medium');
@@ -61,6 +69,7 @@ describe('quality governor gating', () => {
     expect(getState().quality).toBe('high');
   });
   it('never steps down on a typing-like sequence of 100-200 ms gaps while running', () => {
+    warm();
     set({ simState: 'running' });
     frames(Array.from({ length: 300 }, (_, i) => 101 + (i * 37) % 100));
     expect(getState().quality).toBe('high');
