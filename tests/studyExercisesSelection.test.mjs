@@ -37,9 +37,9 @@ test('inline DOM caps chapter problems, links the full count and cleans up owned
   for (const section of root.querySelectorAll('section')) {
     const matches = exercisesFor('c').filter(p => chapterOf(p, 'c') === section.id)
     assert.equal(section.querySelectorAll('li').length, Math.min(4, matches.length))
-    const full = section.querySelector('aside > a')
+    const full = section.querySelector('.ex-inline-more')
     if (matches.length > 4) {
-      assert.equal(full.textContent, `이 장 문제 전체 ${matches.length}개 →`)
+      assert.equal(full.textContent, `전체 ${matches.length}개 →`)
       assert.equal(full.getAttribute('href'), `/study/c/practice?chapter=${section.id}`)
       full.dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, cancelable: true }))
       assert.equal(paths.at(-1), `/study/c/practice?chapter=${section.id}`)
