@@ -9,6 +9,7 @@ import {
   Rocket,
   Sparkles,
   Dices,
+  FlaskConical,
 } from 'lucide-react'
 import { ActivityCategory } from '../contract/enums'
 import { enumLabels } from '../contract/labels'
@@ -18,6 +19,8 @@ export const tabs = [
   { id: 'about', label: 'About', hint: '정체성', icon: Binary, accent: 'text-cyan-500' },
   { id: 'activities', label: 'Activities', hint: '세미나·스터디', icon: Sparkles, accent: 'text-rose-500' },
   { id: 'study', label: 'Study', hint: '스터디 자료', icon: BookOpen, accent: 'text-emerald-500' },
+  // A separate app at /lab/, not a router page: `path` overrides the /<id> route (see isFullPageLink).
+  { id: 'lab', label: 'Lab', hint: '회로 시뮬레이터', path: '/lab/', icon: FlaskConical, accent: 'text-emerald-500' },
   { id: 'projects', label: 'Projects', hint: '실전 제작', icon: CircuitBoard, accent: 'text-violet-500' },
   { id: 'recruit', label: 'Recruit', hint: '지원 안내', icon: Rocket, accent: 'text-sky-500' },
 ]

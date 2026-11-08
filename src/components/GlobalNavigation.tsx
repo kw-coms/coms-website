@@ -86,7 +86,7 @@ export default function GlobalNavigation() {
   const activeKey = getActiveNavKey(location.pathname)
   const mobileTabs = MOBILE_TAB_IDS.flatMap((id) => tabs.filter((tab) => tab.id === id))
   const showMobileTabs = mobileTabs.some((tab) => tab.id === activeKey)
-  const primaryNavItems = tabs.map((tab) => ({ ...tab, path: getTabRoute(tab.id) }))
+  const primaryNavItems = tabs.map((tab) => ({ ...tab, path: 'path' in tab ? tab.path : getTabRoute(tab.id) }))
   const noticesNavItem = navExtraItems.find((item) => item.id === 'notices')
   const memberNavItems = navExtraItems.filter((item) => item.id !== 'notices')
 
@@ -242,10 +242,10 @@ export default function GlobalNavigation() {
           <span className="whitespace-nowrap text-sm font-bold text-[var(--app-text)]">KW COM&apos;s</span>
         </button>
 
-        {/* Tight below 2xl (gap-1 and no button padding at lg, gap-3 at xl): with the Records and Tools buttons and the
+        {/* Tight below 2xl (gap-1 and no button padding at lg, gap-1.5 at xl: with the Lab item, gap-2 pushed a 20-character name 4px out of the bar at 1280px): with the Records and Tools buttons and the
             quick-jump button in the account cluster, wider gaps no longer fitted at 1024px and
             1280px and the brand was painted over. */}
-        <nav className="hidden items-center lg:flex lg:gap-1 xl:gap-2 2xl:gap-5">
+        <nav className="hidden items-center lg:flex lg:gap-1 xl:gap-1.5 2xl:gap-5">
           {primaryNavItems.map((item) => (
             <button
               key={item.id}
@@ -343,8 +343,8 @@ export default function GlobalNavigation() {
             <button
               type="button"
               onClick={() => goPageTop('/settings')}
-              className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] text-[11px] font-bold text-[var(--app-text)] transition hover:bg-black/5 xl:size-auto xl:max-w-[7rem] 2xl:max-w-[9rem] xl:border-transparent xl:bg-transparent xl:px-2.5 xl:py-1 xl:text-xs xl:font-semibold xl:text-[var(--app-muted)] xl:hover:text-[var(--app-text)]"
-              title="계정 설정"
+              className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] text-[11px] font-bold text-[var(--app-text)] transition hover:bg-black/5 xl:size-auto xl:max-w-[5.5rem] 2xl:max-w-[9rem] xl:border-transparent xl:bg-transparent xl:px-2.5 xl:py-1 xl:text-xs xl:font-semibold xl:text-[var(--app-muted)] xl:hover:text-[var(--app-text)]"
+              title={`${user.name} · 계정 설정`}
             >
               <span className="xl:hidden" aria-hidden="true">{user.name?.[0] ?? '?'}</span>
               <span className="sr-only xl:not-sr-only xl:truncate">{user.name}</span>
@@ -518,7 +518,7 @@ export default function GlobalNavigation() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => closeAndGo(getTabRoute(tab.id))}
+                onClick={() => closeAndGo('path' in tab ? tab.path : getTabRoute(tab.id))}
                 className={`apple-mobile-tab ${active ? 'apple-mobile-tab-active' : ''}`}
               >
                 {tab.label}
