@@ -1,19 +1,68 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
-  BookOpen, Camera, Download, Focus, Grid3x3, Loader2, Moon, Pause, Play, Redo2, RotateCcw, Share2, Square, Sun, Tag, Undo2, Upload, Box, Ellipsis, FileCode2, FileSpreadsheet, StickyNote, Workflow,
+  BookOpen, Camera, Download, Focus, Grid3x3, Loader2, Moon, Pause, Play, Redo2, RotateCcw, Share2, Square, Sun, Tag, Undo2, Upload, Box, ChevronDown, Ellipsis, FileCode2, FileSpreadsheet, StickyNote, Workflow,
 } from 'lucide-react';
 import { EXAMPLES } from '../core';
 import { copyShareLink, exportBom, exportIno, exportJson, importJson, loadExample, snapshotPng, toggleTheme } from '../actions';
 import { cancelCompile, pause, reset, run, setSpeed, stop } from '../simHost';
 import { addNote, canRedo, canUndo, redo, set, setAntialias, setQualityMode, undo, useStore } from '../store';
 import { viewCenterGround } from '../../scene3d/placement';
-import type { QualityMode } from '../quality';
+import type { Quality, QualityMode } from '../quality';
 
 const Btn = ({ label, onClick, children, active, disabled, className = '' }: { label: string; onClick: () => void; children: React.ReactNode; active?: boolean; disabled?: boolean; className?: string }) => (
   <button type="button" className={`tb ${active ? 'on' : ''} ${className}`} onClick={onClick} aria-label={label} title={label} aria-pressed={active} disabled={disabled}>
     {children}
   </button>
 );
+
+const QUALITY_LABEL: Record<Quality, string> = { high: '높음', medium: '보통', low: '낮음' };
+
+/** Quality choices (radio group) plus the antialias checkbox. Inline it is a button + popover; inside the narrow-width "더보기" menu it is laid out flat. */
+function QualityMenu({ inMenu }: { inMenu: boolean }) {
+  const qmode = useStore((s) => s.qualityMode);
+  const qeff = useStore((s) => s.quality);
+  const aa = useStore((s) => s.antialias);
+  const [open, setOpen] = useState(false);
+  const btn = useRef<HTMLButtonElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  const name = useId();
+  useEffect(() => {
+    if (!open) return;
+    pop.current?.querySelector<HTMLInputElement>('input[type=radio]:checked')?.focus();
+    const close = (e: PointerEvent) => { if (!(e.target as HTMLElement).closest('.quality-pop')) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); btn.current?.focus(); } };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('keydown', esc);
+    return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', esc); };
+  }, [open]);
+  const choices: [QualityMode, string][] = [['auto', `자동${qmode === 'auto' ? ` (${QUALITY_LABEL[qeff]})` : ''}`], ['high', '높음'], ['medium', '보통'], ['low', '낮음']];
+  const body = (
+    <>
+      <div role="radiogroup" aria-label="화질" className="quality-choices">
+        {choices.map(([v, t]) => (
+          <label key={v} className="quality-choice">
+            <input type="radio" name={name} value={v} checked={qmode === v} onChange={() => setQualityMode(v)} />
+            <span>화질: {t}</span>
+          </label>
+        ))}
+      </div>
+      <label className="aa-toggle">
+        <input type="checkbox" checked={aa} onChange={(e) => setAntialias(e.target.checked)} />
+        <span>부드러운 가장자리 (안티앨리어싱)<small>끄면 느린 컴퓨터에서 더 빨라져요</small></span>
+      </label>
+    </>
+  );
+  if (inMenu) return <div className="quality-flat">{body}</div>;
+  return (
+    <div className="pop quality-pop">
+      <button ref={btn} type="button" className={`tb quality-btn ${open ? 'on' : ''}`} aria-haspopup="true" aria-expanded={open} title="화질 (느린 컴퓨터에서는 낮춰 보세요)" onClick={() => setOpen(!open)}>
+        화질: {qmode === 'auto' ? `자동 (${QUALITY_LABEL[qeff]})` : QUALITY_LABEL[qmode as Quality]}
+        <ChevronDown size={14} />
+      </button>
+      {open && <div ref={pop} className="popover quality-popover" role="group" aria-label="화질 설정">{body}</div>}
+    </div>
+  );
+}
 
 export function Toolbar() {
   const simState = useStore((s) => s.simState);
@@ -24,9 +73,6 @@ export function Toolbar() {
   const theme = useStore((s) => s.theme);
   const undoable = useStore(canUndo);
   const redoable = useStore(canRedo);
-  const qmode = useStore((s) => s.qualityMode);
-  const qeff = useStore((s) => s.quality);
-  const aa = useStore((s) => s.antialias);
   const exOpen = useStore((s) => s.examplesOpen);
   const schematic = useStore((s) => s.schematic);
   const file = useRef<HTMLInputElement>(null);
@@ -49,7 +95,7 @@ export function Toolbar() {
     return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('keydown', esc); };
   }, [exOpen]);
 
-  const secondary = (
+  const secondaryOf = (inMenu: boolean) => (
     <>
       <label className="speed" title="시뮬레이션 속도">
         <span className="sr">속도</span>
@@ -57,19 +103,7 @@ export function Toolbar() {
           {[0.25, 0.5, 1, 1.5, 2].map((v) => <option key={v} value={v}>×{v}</option>)}
         </select>
       </label>
-      <label className="speed quality" title="화질 (느린 컴퓨터에서는 낮춰 보세요)">
-        <span className="tb-more-text">화질</span>
-        <select value={qmode} onChange={(e) => setQualityMode(e.target.value as QualityMode)} aria-label="화질">
-          <option value="auto">화질: 자동{qmode === 'auto' ? ` (${{ high: '높음', medium: '보통', low: '낮음' }[qeff]})` : ''}</option>
-          <option value="high">화질: 높음</option>
-          <option value="medium">화질: 보통</option>
-          <option value="low">화질: 낮음</option>
-        </select>
-      </label>
-      <label className="aa-toggle" title="부드러운 가장자리 (안티앨리어싱): 끄면 느린 컴퓨터에서 더 빨라져요">
-        <input type="checkbox" checked={aa} onChange={(e) => setAntialias(e.target.checked)} aria-label="부드러운 가장자리 (안티앨리어싱)" />
-        <span className="tb-more-text">부드러운 가장자리 (안티앨리어싱)<small>끄면 느린 컴퓨터에서 더 빨라져요</small></span>
-      </label>
+      <QualityMenu inMenu={inMenu} />
       <div className="tb-group" role="group" aria-label="편집">
         <Btn label="실행 취소 (Ctrl+Z)" onClick={undo} disabled={!undoable}><Undo2 size={18} /> <span className="tb-more-text">실행 취소</span></Btn>
         <Btn label="다시 실행 (Ctrl+Shift+Z)" onClick={redo} disabled={!redoable}><Redo2 size={18} /> <span className="tb-more-text">다시 실행</span></Btn>
@@ -126,10 +160,10 @@ export function Toolbar() {
         <Btn label="정지" onClick={stop} disabled={simState === 'idle' && !compiling}><Square size={16} /></Btn>
         <Btn label="리셋" onClick={reset} disabled={simState === 'idle'}><RotateCcw size={18} /></Btn>
       </div>
-      <div className="tb-secondary">{secondary}</div>
+      <div className="tb-secondary">{secondaryOf(false)}</div>
       <div className="tb-more pop">
         <Btn label="더보기" onClick={() => setMore(!more)} active={more}><Ellipsis size={18} /></Btn>
-        {more && <div className="popover more-pop" role="group" aria-label="더보기 메뉴" onClick={(e) => (e.target as HTMLElement).closest('button') && setMore(false)}>{secondary}</div>}
+        {more && <div className="popover more-pop" role="group" aria-label="더보기 메뉴" onClick={(e) => (e.target as HTMLElement).closest('button') && setMore(false)}>{secondaryOf(true)}</div>}
       </div>
       <input ref={file} type="file" accept="application/json,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void importJson(f); e.target.value = ''; }} />
     </header>

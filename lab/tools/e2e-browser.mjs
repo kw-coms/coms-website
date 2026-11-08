@@ -418,6 +418,29 @@ try {
   // ---- antialias setting: toggle recreates the GL context, keeps the scene, persists across reload ----
   {
     const aaBox = dp.getByRole('checkbox', { name: /안티앨리어싱/ });
+    const qBtn = dp.getByRole('button', { name: /^화질/ });
+    const openQ = async () => { if (!(await aaBox.isVisible())) await qBtn.click(); await aaBox.waitFor({ state: 'visible' }); };
+    // the control must carry a visible label and hint, inline (1440) and inside the narrow-width menu (900)
+    const labelled = async (tag) => {
+      const name = await aaBox.getAttribute('aria-label').catch(() => null);
+      const text = await dp.getByText('부드러운 가장자리 (안티앨리어싱)', { exact: false }).first().isVisible();
+      const hint = await dp.getByText('끄면 느린 컴퓨터에서 더 빨라져요', { exact: false }).first().isVisible();
+      const label = await aaBox.evaluate((el) => el.closest('label')?.textContent ?? '');
+      check(`antialias: visible label and hint at ${tag}`, text && hint && label.includes('부드러운 가장자리 (안티앨리어싱)') && (await aaBox.isVisible()), String(name));
+    };
+    const brandOneLine = () => dp.evaluate(() => document.querySelector('.brand').getBoundingClientRect().height <= 40);
+    check('toolbar: Circuit Lab stays on one line at 1440', await brandOneLine());
+    await openQ();
+    await labelled('1440');
+    // quality radios keep the select's behaviour
+    await dp.getByRole('radio', { name: '화질: 낮음' }).check();
+    check('quality radio: low applies and is saved', (await dp.evaluate(() => [window.__lab.getState().qualityMode, window.__lab.getState().quality, localStorage.getItem('coms-lab:quality')].join())) === 'low,low,low');
+    await dp.getByRole('radio', { name: /^화질: 자동/ }).check();
+    check('quality radio: auto applies', (await dp.evaluate(() => window.__lab.getState().qualityMode)) === 'auto');
+    await dp.getByRole('radio', { name: '화질: 낮음' }).check();
+    await dp.keyboard.press('Escape');
+    check('quality popover: Esc closes and returns focus to the button', !(await aaBox.isVisible()) && (await dp.evaluate(() => document.activeElement?.className.includes('quality-btn'))));
+    await openQ();
     const live = () => dp.evaluate(() => window.__ctxs.filter((c) => !c.isContextLost()).length);
     const attr = () => dp.evaluate(() => { const c = window.__ctxs.filter((x) => !x.isContextLost()).at(-1); return c ? c.getContextAttributes().antialias : null; });
     const parts = () => dp.evaluate(() => window.__lab.getState().hist.present.parts.length);
@@ -435,9 +458,18 @@ try {
     check('antialias: off is saved', (await dp.evaluate(() => localStorage.getItem('coms-lab:antialias'))) === '0');
     await dp.reload({ waitUntil: 'networkidle' });
     await dp.waitForTimeout(1500);
+    await openQ();
     check('antialias: off survives reload and the scene renders', !(await aaBox.isChecked()) && (await attr()) === false && (await parts()) > 0 && (await dp.locator('canvas').boundingBox()).width > 100);
     await saveScreenshot(dp, join(OUT, '14-antialias-off.png'));
     await aaBox.check(); await dp.waitForTimeout(500);
+    await dp.setViewportSize({ width: 900, height: 800 });
+    await dp.waitForTimeout(500);
+    await dp.getByRole('button', { name: '더보기' }).click();
+    await aaBox.waitFor({ state: 'visible' });
+    await labelled('900');
+    await dp.setViewportSize({ width: 1440, height: 900 });
+    await dp.waitForTimeout(500);
+    await openQ();
     check('antialias: back on', (await attr()) === true && (await dp.evaluate(() => localStorage.getItem('coms-lab:antialias'))) === '1');
   }
   await dctx.close();
