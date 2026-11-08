@@ -72,10 +72,10 @@
 .ex-page .ex-error, .ex-page .ex-stderr { color: var(--warn); }
 .ex-page .ex-diff-del { background: color-mix(in srgb, #c02e24 12%, var(--surface)); }
 .ex-page .ex-diff-add { background: color-mix(in srgb, #16863c 12%, var(--surface)); }
-.ex-page iframe { width: 100%; min-height: 280px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
+.ex-page iframe { box-sizing: border-box; width: 100%; min-height: 280px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
 /* Practice block inside a hub card (StudyHubPage). Its links sit above the card's stretched title link; the fixed
    min-height holds the same room while the lazy chunk loads and for every card state, so nothing shifts and cards stay level. */
-.ex-hub-summary { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-height: 96px; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--app-hairline); font-size: 13px; color: var(--app-text); }
+.ex-hub-summary { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-height: 96px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--app-hairline); font-size: 13px; color: var(--app-text); }
 .ex-hub-summary a { position: relative; z-index: 1; max-width: 100%; }
 .ex-hub-count { font-size: 13.5px; font-weight: 800; color: var(--app-accent-text); text-decoration: none; }
 .ex-hub-count:hover { text-decoration: underline; text-underline-offset: 3px; }

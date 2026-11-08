@@ -21,13 +21,27 @@ function hookScript(id: number) {
     "window.addEventListener('error',function(e){s('error',['오류: '+e.message+(e.lineno?' ('+e.lineno+'번째 줄 근처)':'')]);});" +
     "window.addEventListener('unhandledrejection',function(e){s('error',['오류: '+(e.reason&&e.reason.message||e.reason)]);});" +
     // The frame reports its content height so the parent can size it (see applyFrameSize); only the parent's own frame can send this.
-    "var d=document.documentElement,last=0;function z(){var h=Math.ceil(d.getBoundingClientRect().height);if(h===last)return;last=h;try{parent.postMessage({__demo:ID,type:'size',h:h},'*');}catch(e){}}" +
-    "if(window.ResizeObserver)new ResizeObserver(z).observe(d);window.addEventListener('load',z);setTimeout(z,300);setTimeout(z,1200);" +
+    "var d=document.documentElement,last=0,q=0;function z(){q=0;var h=Math.ceil(d.getBoundingClientRect().height);if(h===last)return;last=h;try{parent.postMessage({__demo:ID,type:'size',h:h},'*');}catch(e){}}" +
+    "function r(){if(!q)q=requestAnimationFrame(z);}" +
+    "if(window.ResizeObserver)new ResizeObserver(r).observe(d);window.addEventListener('load',z);setTimeout(z,300);setTimeout(z,1200);" +
     '})();</script>'
 }
 
 export const FRAME_MIN = 64
 export const FRAME_MAX = 640
+
+// Content taller than its own frame by a fixed amount (min-height:100vh plus a body margin) has no fixed point and would grow
+// every round trip. A frame may be resized RESIZE_BURST times per second; the rest are dropped, so such a page stops after a few steps.
+const RESIZE_BURST = 4
+const recent = new WeakMap<object, number[]>()
+function allowResize(frame: object): boolean {
+  const now = Date.now()
+  const times = (recent.get(frame) ?? []).filter((t) => now - t < 1000)
+  if (times.length >= RESIZE_BURST) { recent.set(frame, times); return false }
+  times.push(now)
+  recent.set(frame, times)
+  return true
+}
 
 /**
  * Sizes a result frame to its content from the `size` message of its console hook. The frame has an opaque
@@ -37,7 +51,11 @@ export const FRAME_MAX = 640
 export function applyFrameSize(frame: HTMLIFrameElement, e: MessageEvent, id: number): boolean {
   const d = e.data
   if (!d || d.__demo !== id || d.type !== 'size' || e.source !== frame.contentWindow || typeof d.h !== 'number' || !Number.isFinite(d.h)) return false
-  frame.style.height = `${Math.min(Math.max(Math.ceil(d.h) + 1, FRAME_MIN), FRAME_MAX)}px`
+  // Frames are border-box (see the CSS), so the border is added to the content height. Changes of 1px or less are
+  // ignored: content that follows its own frame (100vh, height:100%) must settle, not grow a pixel per round trip.
+  const next = Math.min(Math.max(Math.ceil(d.h) + frame.offsetHeight - frame.clientHeight, FRAME_MIN), FRAME_MAX)
+  if (Math.abs(next - frame.offsetHeight) <= 1 || !allowResize(frame)) return true
+  frame.style.height = `${next}px`
   return true
 }
 

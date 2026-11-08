@@ -21,7 +21,7 @@ async function measure(handle) {
 /** Not clipped (or at the cap), and tall enough to read: at least min(content, 160). */
 function problem(m) {
   const clipped = m.scroll > m.viewport + 1 && m.height < CAP
-  const tiny = m.height < Math.min(m.content, 160)
+  const tiny = m.height < Math.min(m.content, 160) - 1 // a 1px difference is the resize dead band
   return clipped || tiny ? m : null
 }
 
@@ -40,7 +40,9 @@ for (const width of [1440, 375]) {
     const demos = page.locator('.study-page .demo')
     await expect(demos.locator('iframe').first()).toBeAttached()
     const count = await demos.count()
-    expect(count).toBeGreaterThan(15)
+    // one frame per demo box the page has (the markup carries data-height on each), not a magic number
+    expect(count).toBe(await page.locator('.study-page .demo[data-height]').count())
+    expect(count).toBeGreaterThan(0)
     for (let i = 0; i < count; i++) {
       const demo = demos.nth(i)
       await demo.scrollIntoViewIfNeeded()
@@ -69,4 +71,31 @@ test('playground output frames and the practice preview grow with tall content',
   await stage.getByRole('button', { name: /실행/ }).first().click()
   const out = await stage.locator('iframe.pg-frame').elementHandle()
   await expect.poll(settled(out), { timeout: 5000 }).toBeNull()
+})
+
+test('content that follows its own frame height (min-height:100vh) settles instead of ramping', async ({ page }) => {
+  await mockOptionalApis(page)
+  await page.addInitScript(() => {
+    window.__sizes = []
+    window.addEventListener('message', (e) => { if (e.data && e.data.type === 'size') window.__sizes.push(e.data.h) })
+  })
+  await page.goto('/study/web/practice/web-html-headings')
+  const editor = page.locator('.ex-web-editor .cm-content')
+  await expect(editor).toBeVisible()
+  const preview = await page.locator('iframe.ex-web-preview').elementHandle()
+  const type = async (code) => {
+    await editor.click()
+    await page.keyboard.press('ControlOrMeta+A')
+    await page.keyboard.insertText(code)
+    await page.evaluate(() => { window.__sizes.length = 0 })
+    await page.waitForTimeout(1500)
+  }
+  // no margin: the content equals the frame, a fixed point, so it takes at most 2 reports and the frame stays put
+  await type('<style>html,body,p{margin:0}body{min-height:100vh;background:#eef}</style><p>안녕</p>')
+  expect(await page.evaluate(() => window.__sizes.length)).toBeLessThanOrEqual(2)
+  expect((await measure(preview)).height).toBeLessThan(300)
+  // the default 12px margin never reaches a fixed point: it must stop after a few steps, far below the cap
+  await type('<style>body{min-height:100vh}</style><p>안녕</p>')
+  expect(await page.evaluate(() => window.__sizes.length)).toBeLessThanOrEqual(6)
+  expect((await measure(preview)).height).toBeLessThan(CAP)
 })
