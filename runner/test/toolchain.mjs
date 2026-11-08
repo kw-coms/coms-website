@@ -26,6 +26,7 @@ if (enabled) {
 const tools = { c: '/usr/bin/gcc', java: '/opt/java/openjdk/bin/javac', python: '/usr/local/bin/python3' };
 const options = (lang, attack = false) => ({ skip: reason || (!existsSync(tools[lang]) && `${lang} toolchain missing`) || (attack && process.env.RUNNER_CONTAINER_ATTACK_TESTS !== '1' && 'set RUNNER_CONTAINER_ATTACK_TESTS=1') });
 const run = (lang, code, stdin = '') => runCode({ lang, code, stdin });
+const runCases = (lang, code, tests) => runCode({ lang, code, tests });
 
 for (const [lang, code] of [
   ['c', '#include <stdio.h>\nint main(void) { char b[100]; fgets(b,sizeof b,stdin); printf("hello %s",b); }'],
@@ -38,6 +39,64 @@ for (const [lang, code] of [
     assert.equal(r.stdout, 'hello COMS\n');
   });
 }
+
+for (const [lang, code] of [
+  ['c', '#include <stdio.h>\nint main(void){int n;if(scanf("%d",&n)!=1)return 1;printf("%d\\n",n*2);return 0;}'],
+  ['java', 'import java.util.Scanner; public class Main { public static void main(String[] a) { System.out.println(new Scanner(System.in).nextInt()*2); } }'],
+  ['python', 'print(int(input())*2)'],
+]) {
+  test(`${lang}: three ordered cases return separate results`, options(lang), async () => {
+    const r = await runCases(lang, code, ['1\n', '7\n', '21\n']);
+    assert.equal(r.ok, true, JSON.stringify(r));
+    assert.equal(r.stage, 'run');
+    assert.deepEqual(r.results.map(x => x.stdout), ['2\n', '14\n', '42\n']);
+    assert.ok(r.results.every(x => x.exitCode === 0 && !x.skipped && !x.timedOut), JSON.stringify(r));
+  });
+}
+
+test('C: a detached sleeping child is gone before the next case', options('c', true), async () => {
+  const code = '#define _POSIX_C_SOURCE 200809L\n#include <unistd.h>\n#include <signal.h>\n#include <errno.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <dirent.h>\n#include <string.h>\nint main(void){int n;if(scanf("%d",&n)!=1)return 2;if(n==1){int ready[2];if(pipe(ready)<0)return 3;pid_t p=fork();if(p<0)return 4;if(p==0){close(ready[0]);if(setsid()<0)_exit(5);if(write(ready[1],"R",1)!=1)_exit(6);close(ready[1]);close(0);close(1);close(2);sleep(60);_exit(0);}close(ready[1]);char marker;if(read(ready[0],&marker,1)!=1)return 7;close(ready[0]);FILE*f=fopen("child.pid","w");if(!f)return 4;fprintf(f,"%d",p);fclose(f);puts("spawned");return 0;}int old=0;FILE*f=fopen("child.pid","r");if(!f||fscanf(f,"%d",&old)!=1)return 5;fclose(f);if(kill(old,0)==0||errno!=ESRCH)return 6;DIR*d=opendir("/proc");if(!d)return 7;struct dirent*e;int extra=0;while((e=readdir(d))){if(e->d_name[0]<\'0\'||e->d_name[0]>\'9\')continue;char path[64],line[256];snprintf(path,sizeof path,"/proc/%s/status",e->d_name);FILE*s=fopen(path,"r");if(!s)continue;while(fgets(line,sizeof line,s))if(!strncmp(line,"Uid:",4)){unsigned uid;if(sscanf(line+4,"%u",&uid)==1&&uid==getuid()&&atoi(e->d_name)!=getpid())extra++;break;}fclose(s);}closedir(d);printf("extra=%d\\n",extra);return extra?8:0;}';
+  const r = await runCases('c', code, ['1\n', '2\n']);
+  assert.deepEqual(r.results.map(x => x.stdout), ['spawned\n', 'extra=0\n'], JSON.stringify(r));
+  assert.ok(r.results.every(x => x.exitCode === 0), JSON.stringify(r));
+});
+
+test('C: CPU spin times out and the later case runs or is budget-skipped', options('c', true), async () => {
+  const times = [];
+  for (let i = 0; i < 3; i++) {
+    const r = await runCases('c', '#include <stdio.h>\nint main(void){int n;if(scanf("%d",&n)!=1)return 1;if(n==1)for(;;){}puts("later");}', ['1\n', '2\n']);
+    assert.equal(r.results[0].timedOut, true, JSON.stringify(r));
+    assert.equal(r.results.length, 2);
+    times.push(r.results[0].timeMs);
+    if (r.results[1].skipped) {
+      assert.deepEqual(r.results[1], { skipped: true });
+      assert.ok(r.timeMs >= 10_000, `case skipped before budget expired: ${JSON.stringify(r)}`);
+    } else { assert.equal(r.results[1].stdout, 'later\n', JSON.stringify(r)); assert.equal(r.results[1].exitCode, 0); }
+  }
+  console.log(`# C CPU-spin first-case times (ms): ${times.join(', ')}`);
+  assert.ok(times.sort((a, b) => a - b)[1] <= 4500, `median first-case time exceeded 4 s wall + scheduling margin: ${times}`);
+  assert.ok(runnerHealthy());
+});
+
+test('C: System V IPC from one case is removed before the next', options('c', true), async () => {
+  const code = '#include <sys/ipc.h>\n#include <sys/shm.h>\n#include <sys/msg.h>\n#include <sys/sem.h>\n#include <stdio.h>\nint main(void){int n;if(scanf("%d",&n)!=1)return 1;if(n==1){if(shmget(12341,4096,IPC_CREAT|0600)<0||msgget(12342,IPC_CREAT|0600)<0||semget(12343,1,IPC_CREAT|0600)<0)return 2;puts("created");}else{if(shmget(12341,4096,0600)>=0||msgget(12342,0600)>=0||semget(12343,1,0600)>=0)return 3;puts("clean");}return 0;}';
+  const r = await runCases('c', code, ['1\n', '2\n']);
+  assert.deepEqual(r.results.map(x => x.stdout), ['created\n', 'clean\n'], JSON.stringify(r));
+  assert.ok(r.results.every(x => x.exitCode === 0), JSON.stringify(r));
+});
+
+test('Java: ten trivial cases finish within the shared run budget', options('java'), async () => {
+  const code = 'public class Main { public static void main(String[] a) { System.out.println("ok"); } }';
+  const measured = [];
+  for (let i = 0; i < 3; i++) {
+    const r = await runCases('java', code, Array(10).fill(''));
+    measured.push(r.timeMs);
+    assert.equal(r.results.length, 10, JSON.stringify(r));
+    assert.ok(r.results.every(x => x.stdout === 'ok\n' && x.exitCode === 0 && !x.skipped), JSON.stringify(r));
+  }
+  console.log(`# Java 10-case request times (ms): ${measured.join(', ')}`);
+  assert.ok(measured.sort((a, b) => a - b)[1] < 10_000, `median request time exceeds budget: ${measured}`);
+});
 
 test('C: real compiler error with source diagnostic', options('c'), async () => {
   const r = await run('c', 'int main(void) { return unknown; }');

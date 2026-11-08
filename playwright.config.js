@@ -91,7 +91,7 @@ export default defineConfig({
       : []),
     {
       name: 'smoke',
-      testMatch: [/app-smoke\.spec\.js/, /community-flows\.spec\.js/, /study-playground\.spec\.js/],
+      testMatch: [/app-smoke\.spec\.js/, /community-flows\.spec\.js/, /study-playground\.spec\.js/, /study-exercises\.spec\.js/, /study-exercises-web-answers\.spec\.js/],
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1280, height: 900 },
