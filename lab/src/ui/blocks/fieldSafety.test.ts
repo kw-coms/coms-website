@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { generate, cStringLiteral } from './generate';
 import { CUSTOM_BLOCKS } from './defs';
@@ -140,4 +141,42 @@ it.each([null, 42, true, { payload: 'evil();' }])('validates function-call and p
   ] } });
   expect(run(name).code).toBe(run('이름 없음').code);
   expect(run(name).warnings.join()).toMatch(/이름/);
+});
+
+describe('every field the generator reads has a validation rule', () => {
+  // g.field(b, 'X') / g.pin(b, 'X') inside the handler tables must have a rule in blockFields.ts, or the field would reach
+  // generated code unvalidated (readBlockField reports an unknown field as invalid and the generator falls back with a warning).
+  const source = readFileSync(new URL('./generate.ts', import.meta.url), 'utf8');
+  const handlers = [...source.matchAll(/^  (\w+): \(g(?:, b)?\) =>/gm)];
+  it('finds the handlers', () => expect(handlers.length).toBeGreaterThan(40));
+  it('has a rule for each g.field / g.pin name, per block type', () => {
+    const missing: string[] = [];
+    handlers.forEach((h, i) => {
+      const body = source.slice(h.index!, handlers[i + 1]?.index ?? source.indexOf('\nfunction call('));
+      for (const m of body.matchAll(/g\.(?:field|pin)\(b, '(\w+)'/g)) {
+        if (!readBlockField(h[1]!, m[1]!, undefined).valid) missing.push(`${h[1]}.${m[1]}`);
+      }
+    });
+    expect(missing).toEqual([]);
+  });
+});
+
+describe('cStringLiteral hides nothing a reader cannot see', () => {
+  it.each([
+    ['bidi controls', '\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069\u200e\u200f\u061c'],
+    ['zero-width characters', 'a\u200b\u200c\u200d\u2060\ufeffb'],
+    ['line separators', 'a\u2028b\u2029c'],
+    ['a lone surrogate', 'a\ud800b\udfffc'],
+  ])('escapes %s', (_name, text) => {
+    const literal = cStringLiteral(text);
+    expect(literal).not.toMatch(/[\u200b-\u200f\u202a-\u202e\u2060-\u2069\u061c\ufeff\u2028\u2029\ud800-\udfff]/);
+    expect(literal).toMatch(/^"(?:\\[0-7]{3}|[a-c])+"$/);
+  });
+  it('writes a backslash as octal so "C:\\users" can never read as a universal character name', () => {
+    expect(cStringLiteral('C:\\users\\u00e9')).toBe('"C:\\134users\\134u00e9"');
+  });
+  it('blanks the same characters in comments', () => {
+    const { code } = codeFor({ type: 'lab_every', in: { MS: { type: 'text', fields: { TEXT: 'a\u202eb\u200bc\u2028d' } } } });
+    expect(code).not.toMatch(/[\u200b-\u200f\u202a-\u202e\u2060-\u2069\u061c\ufeff\u2028\u2029]/);
+  });
 });

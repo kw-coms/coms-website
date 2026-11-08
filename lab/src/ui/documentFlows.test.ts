@@ -360,3 +360,83 @@ describe('block-mode scenes never run hidden code, and mission scenes open on th
     expect((await boot()).store.getState().missionId).toBe(MISSIONS[0]!.id);
   });
 });
+
+describe('canonical blocks in the document', () => {
+  const loopOf = (...stack: unknown[]) => {
+    const blocks = stack as { next?: unknown }[];
+    for (let i = blocks.length - 2; i >= 0; i--) blocks[i]!.next = { block: blocks[i + 1] };
+    return { type: 'lab_loop', inputs: { DO: { block: blocks[0] } } };
+  };
+  const state = (variables: { id: string; name: string }[], ...stack: unknown[]) =>
+    ({ blocks: { languageVersion: 0, blocks: [loopOf(...stack)] }, variables });
+  const set = (id: string, v: number) => ({ type: 'variables_set', fields: { VAR: { id } }, inputs: { VALUE: { block: { type: 'math_number', fields: { NUM: v } } } } });
+  const scene = async (m: Mods, blocks: unknown, codeMode: 'blocks' | 'text' = 'blocks') => {
+    await withBlockly();
+    return { ...example(m, 'external-blink'), codeMode, blocks, code: 'void setup() {}\nvoid loop() { /* HIDDEN */ }\n' } as Scene;
+  };
+
+  it('renaming a variable to 점수? in the editor is accepted and runs the new name', async () => {
+    const m = await boot();
+    await m.actions.importJson(new File([JSON.stringify(await scene(m, state([{ id: 'a', name: 'score' }], set('a', 1))))], 'c.json'));
+    expect(m.store.getState().code).toContain('v_score = 1;');
+    m.store.set({ toast: null });
+    m.store.setBlocks(state([{ id: 'a', name: '점수?' }], set('a', 1))); // what BlocksEditor reports after a rename
+    expect(m.store.getState().toast).toBeNull();
+    expect(m.store.getState().code).toContain('v_1 = 1;');
+    expect(m.store.getState().code).toContain('// 변수 "점수？"');
+    expect(m.store.getState().code).not.toContain('v_score');
+    expect(JSON.stringify(m.store.getState().hist.present.blocks)).toContain('점수?');
+  });
+
+  it('a scene whose raw JSON and Blockly reading disagree runs the Blockly reading', async () => {
+    const m = await boot();
+    const raw = { blocks: { languageVersion: 0, blocks: [loopOf({ type: 'variables_set', fields: { VAR: 'foo' }, inputs: { VALUE: { block: { type: 'math_number', fields: { NUM: 1 } } } } })] } };
+    m.store.loadScene(await scene(m, raw));
+    const stored = JSON.stringify(m.store.getState().hist.present.blocks);
+    expect(stored).toContain('"variables"');
+    expect(m.store.getState().code).not.toMatch(/\bfoo\b/);
+    expect(m.store.getState().code).not.toContain('HIDDEN');
+  });
+
+  it('refuses, with a Korean reason and without touching the document, what Blockly cannot read', async () => {
+    const m = await boot();
+    const before = m.store.getState().hist.present;
+    const bad = { blocks: { languageVersion: 0, blocks: [{ type: 'lab_loop', inputs: { NOPE: { block: { type: 'lab_millis' } } } }] } };
+    await withBlockly();
+    expect(() => m.store.loadScene({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks: bad } as Scene)).toThrow(/[가-힣]/);
+    expect(m.store.getState().hist.present).toBe(before);
+    m.store.setBlocks(bad);
+    expect(m.store.getState().toast).toMatch(/적용하지 못했어요/);
+    expect(m.store.getState().hist.present).toBe(before);
+  });
+
+  it('a text-mode scene that carries blocks is canonicalized too (switching to blocks later must not run another reading)', async () => {
+    const m = await boot();
+    const raw = state([], { type: 'lab_digital_write' });
+    m.store.loadScene(await scene(m, raw, 'text'));
+    expect(JSON.stringify(m.store.getState().hist.present.blocks)).toContain('"PIN":"2"');
+    expect(m.store.getState().code).toContain('HIDDEN'); // text mode keeps its own code
+  });
+
+  it('fails closed before Blockly is loaded', async () => {
+    const m = await boot();
+    const s = { ...example(m, 'external-blink'), codeMode: 'blocks', blocks: state([], set('a', 1)), code: 'x' } as Scene;
+    expect(() => m.store.loadScene(s)).toThrow(/불러오지 못했어요/);
+  });
+
+  it('code generated from the blocks may not pass the 64 KB code limit', async () => {
+    const m = await boot();
+    const big = Array.from({ length: 24 }, () => ({ type: 'lab_serial_print', inputs: { VALUE: { block: { type: 'text', fields: { TEXT: '"'.repeat(2000) } } } } }));
+    const raw = { blocks: { languageVersion: 0, blocks: [loopOf(...big)] } };
+    await withBlockly();
+    expect(() => m.store.loadScene({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks: raw } as Scene)).toThrow(/64 KB/);
+    m.store.setBlocks(raw);
+    expect(m.store.getState().toast).toMatch(/64 KB/);
+  });
+
+  it('a huge TEXT is refused at import', async () => {
+    const m = await boot();
+    const raw = state([], { type: 'lab_serial_print', inputs: { VALUE: { block: { type: 'text', fields: { TEXT: 'x'.repeat(2001) } } } } });
+    expect(() => m.core.validateScene({ ...example(m, 'external-blink'), codeMode: 'blocks', blocks: raw })).toThrow(/블록 필드/);
+  });
+});
