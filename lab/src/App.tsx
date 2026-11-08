@@ -11,7 +11,7 @@ import { FloatingInstruments } from './ui/instruments/Panels';
 import { Schematic } from './ui/schematic/Schematic';
 import { onSimFrame } from './ui/simHost';
 import { useShortcuts } from './ui/shortcuts';
-import { dismissQualityNotice, useStore } from './ui/store';
+import { dismissQualityNotice, pinHighQuality, useStore } from './ui/store';
 
 /** Screen-reader (and test) readable summary of which LEDs the running circuit currently lights. */
 function LedStatus() {
@@ -105,6 +105,7 @@ export function App() {
       {notice && (
         <div className="perf-notice" role="status">
           <span>{notice}</span>
+          <button type="button" onClick={pinHighQuality}>고화질로 고정</button>
           <button type="button" onClick={dismissQualityNotice}>확인</button>
         </div>
       )}

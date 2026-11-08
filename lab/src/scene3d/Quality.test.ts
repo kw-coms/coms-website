@@ -24,9 +24,11 @@ vi.mock('../ui/store', async (orig) => {
 });
 
 import { QualityRig } from './Quality';
-import { getState, set } from '../ui/store';
+import { getState, loadScene, set } from '../ui/store';
+import { EXAMPLES } from '../core';
 
 let t = 0;
+const warm = () => { t += 7000; }; // past the warm-up window
 const frames = (gaps: number[]) => { for (const g of gaps) { t += g; h.frame!(); } };
 
 beforeEach(() => {
@@ -39,17 +41,24 @@ beforeEach(() => {
 });
 
 describe('quality governor gating', () => {
-  const slow = Array<number>(61).fill(70);
+  const slow = Array<number>(121).fill(70);
   it('ignores slow frames while neither orbiting nor simulating', () => {
     frames(slow);
     expect(getState().quality).toBe('high');
   });
   it('steps down on slow back-to-back frames while the simulation runs', () => {
+    warm();
     set({ simState: 'running' });
     frames(slow);
     expect(getState().quality).toBe('medium');
   });
+  it('ignores slow frames during the warm-up after load', () => {
+    set({ simState: 'running' });
+    frames(Array<number>(60).fill(70)); // ~4.2 s of slow frames right after mount
+    expect(getState().quality).toBe('high');
+  });
   it('steps down on slow back-to-back frames while orbiting', () => {
+    warm();
     h.listeners.start!();
     frames(slow);
     expect(getState().quality).toBe('medium');
@@ -60,9 +69,34 @@ describe('quality governor gating', () => {
     frames(slow);
     expect(getState().quality).toBe('high');
   });
-  it('never steps down on a typing-like sequence of 100-200 ms gaps while running', () => {
+  it('steps down on a sustained 150 ms frame time while running (a GPU under 10 fps)', () => {
+    warm();
     set({ simState: 'running' });
-    frames(Array.from({ length: 300 }, (_, i) => 101 + (i * 37) % 100));
+    frames(Array<number>(100).fill(150));
+    expect(getState().quality).toBe('medium');
+  });
+  it('never steps down on 150 ms frames while idle and not orbiting (typing or idle)', () => {
+    warm();
+    frames(Array<number>(300).fill(150));
+    expect(getState().quality).toBe('high');
+  });
+  it('never steps down on idle-like gaps (over 250 ms) while running', () => {
+    warm();
+    set({ simState: 'running' });
+    frames(Array.from({ length: 300 }, (_, i) => 300 + (i * 37) % 400));
+    expect(getState().quality).toBe('high');
+  });
+  it('restarts the warm-up on a scene replacement but not on a plain edit', () => {
+    warm();
+    set({ simState: 'running' });
+    set({ hist: { ...getState().hist, present: { ...getState().hist.present } } }); // an edit
+    frames(slow);
+    expect(getState().quality).toBe('medium');
+    set({ quality: 'high' });
+    h.effects = []; QualityRig(); h.effects.forEach((e) => e()); // fresh rig, as after a quality change
+    warm();
+    loadScene(EXAMPLES[0]!.scene);
+    frames(Array<number>(100).fill(70)); // within 6 s of the load
     expect(getState().quality).toBe('high');
   });
 });
