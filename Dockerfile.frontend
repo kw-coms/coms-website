@@ -58,9 +58,11 @@ RUN npm ci
 
 COPY lab/index.html lab/vite.config.ts lab/tsconfig*.json ./
 COPY lab/src ./src
+# Static files Vite copies into dist as-is: part thumbnails (parts/) and Blockly sprites/sounds (blockly-media/).
+COPY lab/public ./public
 
-# base is /lab/ (lab/vite.config.ts); `tsc -b` type-checks first.
-RUN npm run build
+# base is /lab/ (lab/vite.config.ts); `tsc -b` type-checks first. The test fails the image if public/ is dropped again.
+RUN npm run build && test -d dist/parts && test -d dist/blockly-media
 
 
 # 1.28 is the maintained stable line; the 1.27 mainline no longer gets security fixes.
