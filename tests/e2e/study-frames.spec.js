@@ -1,0 +1,72 @@
+import { expect, test } from '@playwright/test'
+import { mockOptionalApis } from './visualSupport.js'
+
+// Result frames of the web study (live examples, "직접 해보기" output, the practice preview) must be as tall as
+// their content, up to the 640px cap where they scroll inside. The frames have an opaque origin, so Playwright
+// measures them through contentFrame().
+const CAP = 640
+
+async function measure(handle) {
+  const box = await handle.boundingBox()
+  const inner = await (await handle.contentFrame()).evaluate(() => ({
+    scroll: document.documentElement.scrollHeight,
+    viewport: innerHeight,
+    content: Math.ceil(document.documentElement.getBoundingClientRect().height),
+    // the sandbox shell has no <style>; a document the page posted into it always has one (see buildDoc)
+    loaded: !!document.querySelector('head style'),
+  }))
+  return { height: Math.round(box.height), ...inner }
+}
+
+/** Not clipped (or at the cap), and tall enough to read: at least min(content, 160). */
+function problem(m) {
+  const clipped = m.scroll > m.viewport + 1 && m.height < CAP
+  const tiny = m.height < Math.min(m.content, 160)
+  return clipped || tiny ? m : null
+}
+
+/** Poll function: null once the frame shows its document and fits it. */
+const settled = (handle) => async () => {
+  // the frame may be between two documents (document.write): treat that as not loaded
+  const m = await measure(handle).catch(() => null)
+  return m?.loaded ? problem(m) : 'not loaded yet'
+}
+
+for (const width of [1440, 375]) {
+  test(`every live example frame of the web study fits its content (${width}px)`, async ({ page }) => {
+    await mockOptionalApis(page)
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/study/web')
+    const demos = page.locator('.study-page .demo')
+    await expect(demos.locator('iframe').first()).toBeAttached()
+    const count = await demos.count()
+    expect(count).toBeGreaterThan(15)
+    for (let i = 0; i < count; i++) {
+      const demo = demos.nth(i)
+      await demo.scrollIntoViewIfNeeded()
+      const frame = await demo.locator('iframe').elementHandle()
+      await expect.poll(settled(frame), { message: `demo #${i}`, timeout: 4000 }).toBeNull()
+    }
+  })
+}
+
+test('playground output frames and the practice preview grow with tall content', async ({ page }) => {
+  await mockOptionalApis(page)
+  await page.goto('/study/web/practice/web-html-headings')
+  const editor = page.locator('.ex-web-editor .cm-content')
+  await expect(editor).toBeVisible()
+  await editor.click()
+  await page.keyboard.press('ControlOrMeta+A')
+  await page.keyboard.insertText(Array.from({ length: 14 }, (_, i) => `<p>줄 ${i + 1}</p>`).join('\n'))
+  const preview = await page.locator('iframe.ex-web-preview').elementHandle()
+  await expect.poll(async () => (await measure(preview)).content, { message: 'preview shows the new code', timeout: 5000 }).toBeGreaterThan(300)
+  await expect.poll(settled(preview), { timeout: 5000 }).toBeNull()
+
+  await page.goto('/study/web')
+  const stage = page.locator('.pg-stage').filter({ has: page.getByRole('button', { name: /직접 해보기/ }) }).first()
+  await stage.scrollIntoViewIfNeeded()
+  await stage.getByRole('button', { name: /직접 해보기/ }).click()
+  await stage.getByRole('button', { name: /실행/ }).first().click()
+  const out = await stage.locator('iframe.pg-frame').elementHandle()
+  await expect.poll(settled(out), { timeout: 5000 }).toBeNull()
+})

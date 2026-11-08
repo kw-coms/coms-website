@@ -20,7 +20,25 @@ function hookScript(id: number) {
     "['log','info','warn','error'].forEach(function(t){var o=console[t];console[t]=function(){s(t,arguments);if(o)o.apply(console,arguments);};});" +
     "window.addEventListener('error',function(e){s('error',['오류: '+e.message+(e.lineno?' ('+e.lineno+'번째 줄 근처)':'')]);});" +
     "window.addEventListener('unhandledrejection',function(e){s('error',['오류: '+(e.reason&&e.reason.message||e.reason)]);});" +
+    // The frame reports its content height so the parent can size it (see applyFrameSize); only the parent's own frame can send this.
+    "var d=document.documentElement,last=0;function z(){var h=Math.ceil(d.getBoundingClientRect().height);if(h===last)return;last=h;try{parent.postMessage({__demo:ID,type:'size',h:h},'*');}catch(e){}}" +
+    "if(window.ResizeObserver)new ResizeObserver(z).observe(d);window.addEventListener('load',z);setTimeout(z,300);setTimeout(z,1200);" +
     '})();</script>'
+}
+
+export const FRAME_MIN = 64
+export const FRAME_MAX = 640
+
+/**
+ * Sizes a result frame to its content from the `size` message of its console hook. The frame has an opaque
+ * origin, so the message is trusted only from that very frame (source check) with the id the parent gave it.
+ * Taller output scrolls inside the frame at FRAME_MAX. Returns true when the message was a size report.
+ */
+export function applyFrameSize(frame: HTMLIFrameElement, e: MessageEvent, id: number): boolean {
+  const d = e.data
+  if (!d || d.__demo !== id || d.type !== 'size' || e.source !== frame.contentWindow || typeof d.h !== 'number' || !Number.isFinite(d.h)) return false
+  frame.style.height = `${Math.min(Math.max(Math.ceil(d.h) + 1, FRAME_MIN), FRAME_MAX)}px`
+  return true
 }
 
 export function buildDoc(code: Code, id: number) {
@@ -195,7 +213,8 @@ export function initStudyPage(root: HTMLElement, progressKey: string): () => voi
     const data = e.data
     if (!data || typeof data.__demo !== 'number') return
     const d = demos[data.__demo]
-    if (!d || !d.console || e.source !== d.frame.contentWindow) return
+    if (!d || e.source !== d.frame.contentWindow) return
+    if (applyFrameSize(d.frame, e, data.__demo) || !d.console) return
     d.console.querySelector('.empty')?.remove()
     const type = data.type === 'warn' ? 'warn' : data.type === 'error' ? 'error' : ''
     d.console.appendChild(el('div', `line ${type}`.trim(), String(data.msg)))
