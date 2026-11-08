@@ -242,10 +242,10 @@ export default function GlobalNavigation() {
           <span className="whitespace-nowrap text-sm font-bold text-[var(--app-text)]">KW COM&apos;s</span>
         </button>
 
-        {/* Tight below 2xl (gap-1 and no button padding at lg, gap-3 at xl): with the Records and Tools buttons and the
+        {/* Tight below 2xl (gap-1 and no button padding at lg, gap-1.5 at xl: with the Lab item, gap-2 pushed a 20-character name 4px out of the bar at 1280px): with the Records and Tools buttons and the
             quick-jump button in the account cluster, wider gaps no longer fitted at 1024px and
             1280px and the brand was painted over. */}
-        <nav className="hidden items-center lg:flex lg:gap-1 xl:gap-2 2xl:gap-5">
+        <nav className="hidden items-center lg:flex lg:gap-1 xl:gap-1.5 2xl:gap-5">
           {primaryNavItems.map((item) => (
             <button
               key={item.id}
