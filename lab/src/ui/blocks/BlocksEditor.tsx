@@ -1,7 +1,7 @@
 // The Blockly workspace. Loaded lazily (see CodeTab.tsx): Blockly is only downloaded when Blocks mode opens.
 // No network requests: no sounds, and the few images Blockly needs (toolbox/zoom icons, cursors) are copied from
 // node_modules/blockly/media into public/blockly-media (Blockly would otherwise load them from static.blockly.com).
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Blockly from 'blockly/core';
 import { COLOUR, TOOLBOX } from './defs';
 import { MAX_CANONICAL_BLOCKS_BYTES, stringifyJsonBounded } from '../../core/scene';
@@ -39,6 +39,9 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
   const ws = useRef<Blockly.WorkspaceSvg | null>(null);
   const last = useRef('');
   const loading = useRef(false);
+  // a refused or failed load shows a stand-in workspace: it must never be saved over the program the store holds
+  const refused = useRef(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const loader = useRef<(s: unknown) => void>(() => {});
   const cb = useRef(onChange);
   cb.current = onChange;
@@ -62,18 +65,22 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
     const load = (s: unknown) => {
       loading.current = true;
       try {
-        loadBlocks(w, s);
+        const problem = loadBlocks(w, s, MAX_CANONICAL_BLOCKS_BYTES);
+        refused.current = problem !== null;
+        setNotice(problem ? `저장된 블록을 열지 못해서 빈 작업 영역을 보여 주고 있어요. 고쳐도 저장되지 않아요. (${problem})` : null);
         mark();
       } catch (e) {
         console.error('블록 불러오기 실패', e);
         w.clear();
+        refused.current = true;
+        setNotice('블록을 불러오지 못해서 빈 작업 영역을 보여 주고 있어요. 고쳐도 저장되지 않아요.');
       } finally { loading.current = false; }
     };
     load(state);
     last.current = stringifyJsonBounded(state ?? null, 1000, MAX_CANONICAL_BLOCKS_BYTES) ?? '';
     let timer = 0;
     w.addChangeListener((ev: Blockly.Events.Abstract) => {
-      if (loading.current || ev.isUiEvent) return;
+      if (loading.current || ev.isUiEvent || refused.current) return;
       mark();
       window.clearTimeout(timer);
       timer = window.setTimeout(() => {
@@ -99,5 +106,10 @@ export default function BlocksEditor({ state, dark, hints, readOnly, onChange }:
     loader.current(state);
   }, [state]);
 
-  return <div className="blocks-host" ref={host} role="application" aria-label="블록 코딩 작업 영역. 탭으로 들어가 방향키로 블록을 옮겨 다닐 수 있어요." />;
+  return (
+    <>
+      {notice && <p className="blocks-warn" role="alert">{notice}</p>}
+      <div className="blocks-host" ref={host} role="application" aria-label="블록 코딩 작업 영역. 탭으로 들어가 방향키로 블록을 옮겨 다닐 수 있어요." />
+    </>
+  );
 }

@@ -219,3 +219,21 @@ it('a canonical tree is deep-frozen, so identity can be trusted', () => {
   const top = (r.ok ? (r.blocks as { blocks: { blocks: object[] } }).blocks.blocks[0] : null)!;
   expect(Object.isFrozen(top)).toBe(true);
 });
+
+describe('the visible editor loads what the store holds', () => {
+  const big = ws(Array.from({ length: 4500 }, (_, i) => ({ type: 'math_number', id: `b${i}`, x: 0, y: i, fields: { NUM: 1 } })));
+  it('a 300 KB canonical tree loads with its real blocks when given the canonical bound', () => {
+    expect(JSON.stringify(big).length).toBeGreaterThan(300 * 1024);
+    const w = new Blockly.Workspace();
+    expect(loadBlocks(w, big, 512 * 1024)).toBeNull();
+    expect(w.getAllBlocks(false)).toHaveLength(4500);
+    w.dispose();
+  });
+  it('the default (import) bound refuses it, and says so instead of silently showing the start workspace', () => {
+    const w = new Blockly.Workspace();
+    const problem = loadBlocks(w, big);
+    expect(problem).toMatch(/256 KB/);
+    expect(w.getAllBlocks(false).map(b => b.type)).toEqual(['lab_setup', 'lab_loop']); // the stand-in the editor must not save
+    w.dispose();
+  });
+});

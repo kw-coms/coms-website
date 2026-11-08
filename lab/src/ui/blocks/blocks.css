@@ -14,3 +14,4 @@
 .blocks-warn { margin: 0; padding: 4px 10px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); background: var(--surface-2); }
 /* phone: the bottom sheet is short, give a block program most of the screen */
 @media (max-width: 768px) { .mode-seg button { min-height: 40px; padding: 6px 14px; } .sidepanel.sheet-open:has(.blocks-slot) .side-body { flex: none; height: 74vh; } }
+.blocks-slot > .blocks-warn { position: absolute; z-index: 5; top: 0; left: 0; right: 0; margin: 0; padding: 6px 10px; background: var(--surface, #fff); border-bottom: 1px solid var(--border); }

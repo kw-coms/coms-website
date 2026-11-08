@@ -32,11 +32,13 @@ const START_WORKSPACE = () => ({ blocks: { languageVersion: 0, blocks: [
 /**
  * Load a workspace into Blockly. The state is untrusted (share links, opened files), and Blockly allocates one input per
  * mutator item while loading, so it is checked again here: anything validateScene would refuse gives the start workspace.
+ * `maxBytes` is the size bound of the caller: the headless canonicalizer keeps the 256 KB import bound, the visible editor
+ * shows what the store holds, which may be a canonical tree of up to 512 KB.
  * Returns the Korean reason when it refused, null otherwise.
  */
-export function loadBlocks(w: Blockly.Workspace, s: unknown): string | null {
+export function loadBlocks(w: Blockly.Workspace, s: unknown, maxBytes?: number): string | null {
   w.clear();
-  const problem = s && typeof s === 'object' ? blocksProblem(s) : null;
+  const problem = s && typeof s === 'object' ? blocksProblem(s, maxBytes) : null;
   if (problem) console.warn('블록 불러오기를 건너뛰었어요:', problem);
   const state = s && typeof s === 'object' && !problem ? s as object : START_WORKSPACE();
   if (stringifyJsonBounded(state, 64, 256 * 1024) !== null) {
