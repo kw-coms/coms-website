@@ -1,35 +1,24 @@
-import { useMemo, useState } from 'react';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import {
-  Activity, AudioWaveform, Battery, BatteryCharging, Binary, Cable, CircleDot, Cog, Cpu, Disc3, Droplets, Eye, Fan, Flame, Gauge, Grid3x3, Hash, Info,
-  Joystick, Keyboard, Lightbulb, Magnet, Monitor, Palette as PaletteIcon, PlugZap, Radar, Radio, Rainbow, Search, SlidersHorizontal, Sun, Thermometer,
-  Timer, ToggleLeft, Vibrate, Volume2, Waves, Zap, Router, Layers, Scale, Hand,
-} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Info, PanelLeftClose, PanelLeftOpen, Search } from 'lucide-react';
 import type { PartCategory, PartKind } from '../../core/types';
 import { PARTS } from '../core';
 import { addAtCenter } from '../../scene3d/placement';
 import { setDragKind } from '../../scene3d/Workspace';
 import { searchText } from '../partInfo';
 import { set, useStore } from '../store';
-import { PartCard } from './PartInfo';
+import { PartCard, PartThumb } from './PartInfo';
 
-type Icon = React.ComponentType<{ size?: number }>;
-const ICONS: Partial<Record<PartKind, Icon>> = {
-  'arduino-uno': Cpu, 'breadboard-half': Grid3x3, 'breadboard-full': Grid3x3, 'breadboard-mini': Grid3x3, led: Lightbulb, 'rgb-led': PaletteIcon, resistor: Zap,
-  pushbutton: CircleDot, 'slide-switch': ToggleLeft, potentiometer: SlidersHorizontal, photoresistor: Sun, buzzer: Volume2, servo: Cog,
-  'hc-sr04': Radar, 'lcd1602-i2c': Monitor, 'lcd1602-parallel': Monitor, multimeter: Gauge, dht11: Thermometer, tmp36: Thermometer, joystick: Joystick, 'seven-segment': Hash,
-  'seven-segment-4digit': Hash, 'neopixel-strip': Rainbow, 'neopixel-ring': Rainbow, l9110s: Waves, 'dc-motor': Fan, gearmotor: Cog, 'vibration-motor': Vibrate,
-  'battery-9v': Battery, 'battery-aa-pack': BatteryCharging, 'coin-cell-3v': Disc3, 'power-supply': PlugZap,
-  'capacitor-ceramic': Layers, 'capacitor-electrolytic': Layers, diode: Zap, zener: Zap, inductor: Waves, 'dip-switch-4': ToggleLeft, 'keypad-4x4': Keyboard, 'tilt-switch': Scale,
-  pir: Eye, 'flex-sensor': Activity, 'force-sensor': Hand, 'soil-moisture': Droplets, 'gas-sensor': Flame, 'ir-receiver': Radio, 'light-bulb': Lightbulb,
-  'relay-spdt': Magnet, 'timer-555': Timer, oscilloscope: AudioWaveform, 'function-generator': AudioWaveform, 'logic-analyzer': Binary,
-};
-const CATEGORY_ICON: Record<PartCategory, Icon> = { 보드: Cpu, 전원: BatteryCharging, 기본: Zap, 입력: CircleDot, 출력: Volume2, 센서: Radar, 디스플레이: Monitor, 반도체: Router, IC: Cable, 측정: Gauge };
 export const ORDER: PartCategory[] = ['보드', '전원', '기본', '입력', '출력', '센서', '디스플레이', '반도체', 'IC', '측정'];
 
 export function Palette({ inSheet = false }: { inSheet?: boolean }) {
   const [q, setQ] = useState('');
   const [hover, setHover] = useState<{ kind: PartKind; y: number } | null>(null);
+  useEffect(() => {
+    if (!hover) return;
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setHover(null);
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [hover]);
   const folded = useStore((s) => s.paletteCollapsed) && !inSheet;
   const groups = useMemo(() => {
     const needle = q.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -60,7 +49,6 @@ export function Palette({ inSheet = false }: { inSheet?: boolean }) {
             {!folded && <h3>{g.c}</h3>}
             <ul>
               {g.items.map((k) => {
-                const Icon = ICONS[k] ?? CATEGORY_ICON[PARTS[k].category] ?? Cpu;
                 return (
                   <li key={k} className="part-row">
                     <button
@@ -70,12 +58,15 @@ export function Palette({ inSheet = false }: { inSheet?: boolean }) {
                       data-kind={k}
                       title={folded ? PARTS[k].title : undefined}
                       aria-label={PARTS[k].title}
+                      aria-describedby={hover?.kind === k ? 'part-card' : undefined}
                       onMouseEnter={(e) => !inSheet && setHover({ kind: k, y: e.currentTarget.getBoundingClientRect().top })}
+                      onFocus={(e) => !inSheet && setHover({ kind: k, y: e.currentTarget.getBoundingClientRect().top })}
+                      onBlur={() => setHover(null)}
                       onDragStart={(e) => { e.dataTransfer.setData('application/x-part-kind', k); e.dataTransfer.effectAllowed = 'copy'; setDragKind(k); setHover(null); }}
                       onDragEnd={() => setDragKind(null)}
                       onClick={() => addAtCenter(k)}
                     >
-                      <span className="part-icon"><Icon size={18} /></span>
+                      <span className="part-thumb"><PartThumb kind={k} /></span>
                       {!folded && <span>{PARTS[k].title}</span>}
                     </button>
                     {!folded && <button type="button" className="part-info-btn" aria-label={`${PARTS[k].title} 설명`} title="설명 보기" onClick={() => set({ info: k })}><Info size={15} /></button>}

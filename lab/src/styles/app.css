@@ -61,7 +61,9 @@ button { cursor: pointer; }
 .palette ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 .part-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; cursor: grab; }
 .part-item:hover { background: var(--surface-2); border-color: var(--border); }
-.part-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 16%, var(--surface-2)); color: var(--accent-2); flex: none; }
+.part-thumb { display: grid; place-items: center; width: 56px; height: 42px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); border: 1px solid var(--border); overflow: hidden; flex: none; }
+.part-thumb img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.palette.folded .part-thumb { width: 40px; height: 30px; }
 
 .stage { position: relative; min-width: 0; min-height: 0; flex: 1; }
 .workspace { position: absolute; inset: 0; outline: none; touch-action: none; }
@@ -191,6 +193,8 @@ button { cursor: pointer; }
 .part-info-btn:hover { background: var(--surface-2); color: var(--accent-2); }
 .part-card { position: fixed; left: 226px; z-index: 60; width: 260px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 3px; pointer-events: none; }
 .part-card p { margin: 4px 0 2px; font-size: 13px; }
+.part-card img { display: block; width: 100%; aspect-ratio: 4 / 3; border-radius: 8px; background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); margin-bottom: 4px; }
+.info-pic img { display: block; width: min(100%, 360px); aspect-ratio: 4 / 3; margin: 8px auto 0; border-radius: 10px; background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); border: 1px solid var(--border); }
 .info-card { position: relative; width: min(560px, 100%); max-height: 86vh; overflow: auto; }
 .info-card h4 { margin: 14px 0 4px; font-size: 12px; color: var(--muted); }
 .info-card p, .info-card ul { margin: 0; font-size: 14px; } .info-card ul { padding-left: 18px; }
