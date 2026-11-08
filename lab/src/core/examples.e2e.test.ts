@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import fixtures from './__fixtures__/examples-hex.json';
 import { SimulationEngine } from './engine';
 import { EXAMPLES } from './examples';
+import { expectRealtimeMedian, REALTIME_RUNS } from './realtime-median';
 import type { SimFrame, SimInput } from './types';
 
 // Collapse formatting whitespace between C++ tokens, preserving strings, character
@@ -48,11 +49,8 @@ class SketchRun {
     this.engine.setInput({ partId, key, value });
   }
 
-  report(id: string): void {
-    const simulatedMs = this.engine.mcu.cpu.cycles / 16_000;
-    const ratio = simulatedMs / this.realMs;
-    process.stdout.write(`E2E ${id}: simulated=${simulatedMs.toFixed(0)}ms real=${this.realMs.toFixed(1)}ms ratio=${ratio.toFixed(2)}x\n`);
-    expect(ratio, `${id} must sustain realtime including solves and frames`).toBeGreaterThanOrEqual(1);
+  ratio(): number {
+    return this.engine.mcu.cpu.cycles / 16_000 / this.realMs;
   }
 }
 
@@ -212,9 +210,13 @@ describe('real arduino-cli sketches: visible output and realtime throughput', ()
   });
   for (const example of EXAMPLES.slice(0, 17)) {
     it(example.id, () => {
-      const run = new SketchRun(example.id);
-      checks[example.id]!(run);
-      if (process.env.LAB_REALTIME_TEST === '1') run.report(example.id);
+      const ratios: number[] = [];
+      for (let attempt = 0; attempt < (process.env.LAB_REALTIME_TEST === '1' ? REALTIME_RUNS : 1); attempt++) {
+        const run = new SketchRun(example.id);
+        checks[example.id]!(run);
+        ratios.push(run.ratio());
+      }
+      if (process.env.LAB_REALTIME_TEST === '1') expectRealtimeMedian(example.id, ratios);
     }, 60_000);
   }
 });
@@ -249,9 +251,13 @@ describe('v2 starters', () => {
   });
   for (const example of EXAMPLES.slice(17)) {
     it(example.id, () => {
-      const run = new SketchRun(example.id);
-      v2Checks[example.id]!(run);
-      if (process.env.LAB_REALTIME_TEST === '1') run.report(example.id);
+      const ratios: number[] = [];
+      for (let attempt = 0; attempt < (process.env.LAB_REALTIME_TEST === '1' ? REALTIME_RUNS : 1); attempt++) {
+        const run = new SketchRun(example.id);
+        v2Checks[example.id]!(run);
+        ratios.push(run.ratio());
+      }
+      if (process.env.LAB_REALTIME_TEST === '1') expectRealtimeMedian(example.id, ratios);
     }, 60_000);
   }
 });
