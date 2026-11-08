@@ -794,3 +794,4 @@
 .study-lab-cta-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; font-size: 13.5px; color: var(--app-muted); }
 .study-lab-cta-text strong { font-size: 16px; font-weight: 800; color: var(--app-text); }
 .study-lab-cta:hover, .study-lab-cta:focus-visible { box-shadow: 0 8px 22px rgba(0,0,0,.1); }
+.study-lab-cta:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }

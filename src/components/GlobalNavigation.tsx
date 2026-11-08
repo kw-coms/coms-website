@@ -518,7 +518,7 @@ export default function GlobalNavigation() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => closeAndGo(getTabRoute(tab.id))}
+                onClick={() => closeAndGo('path' in tab ? tab.path : getTabRoute(tab.id))}
                 className={`apple-mobile-tab ${active ? 'apple-mobile-tab-active' : ''}`}
               >
                 {tab.label}

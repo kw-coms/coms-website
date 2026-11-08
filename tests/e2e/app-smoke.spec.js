@@ -2448,26 +2448,61 @@ test('Tools menu opens Circuit Lab with a full page load, not a router navigatio
   await labRequest
 })
 
-// Lab is a top-level item next to Study (not only inside Tools), at desktop and mobile widths.
-for (const width of [1280, 1440]) {
-  test(`header shows Lab next to Study on one line at ${width}px`, async ({ page }) => {
+// Lab is a top-level item next to Study (not only inside Tools). At every desktop width the nav must fit:
+// brand, nav items and the account cluster do not overlap, nothing is clipped and nothing wraps.
+for (const width of [1024, 1100, 1280, 1440]) {
+  test(`header shows Lab next to Study and the nav fits at ${width}px`, async ({ page }) => {
     await mockAdminApis(page)
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/')
+    const bar = page.locator('header > div').first()
     const nav = page.locator('header nav').first()
     const lab = nav.getByRole('button', { name: 'Lab', exact: true })
     await expect(lab).toBeVisible()
-    const [studyBox, labBox] = await Promise.all([nav.getByRole('button', { name: 'Study', exact: true }).boundingBox(), lab.boundingBox()])
-    expect(Math.abs(studyBox.y - labBox.y)).toBeLessThan(4)
-    expect(labBox.x).toBeGreaterThan(studyBox.x)
-    const navBox = await nav.boundingBox()
-    expect(navBox.height).toBeLessThan(60)
+    const boxes = await Promise.all([
+      bar.locator('> button').first().boundingBox(),
+      nav.boundingBox(),
+      bar.locator(':scope > div.lg\\:justify-self-end').boundingBox(),
+      nav.getByRole('button', { name: 'Study', exact: true }).boundingBox(),
+      lab.boundingBox(),
+    ])
+    const [brand, navBox, cluster, study, labBox] = boxes
+    const items = await nav.locator(':scope > button, :scope > div').evaluateAll((els) => els.map((el) => {
+      const r = el.getBoundingClientRect()
+      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, mid: (r.top + r.bottom) / 2, clipped: el.scrollWidth > el.clientWidth + 1 }
+    }))
+    const first = items[0]
+    const last = items[items.length - 1]
+    expect(brand.x + brand.width, 'brand ends before the first nav item').toBeLessThanOrEqual(first.left)
+    expect(last.right, 'last nav item ends before the account cluster').toBeLessThanOrEqual(cluster.x)
+    for (const item of items) {
+      expect(item.left).toBeGreaterThanOrEqual(0)
+      expect(item.right).toBeLessThanOrEqual(width)
+      expect(item.clipped).toBe(false)
+      // one line: every item sits on the same row as the first one
+      expect(Math.abs(item.mid - first.mid)).toBeLessThan(4)
+      expect(item.bottom - item.top).toBeLessThan(48)
+    }
+    expect(Math.abs(study.y - labBox.y)).toBeLessThan(4)
+    expect(labBox.x).toBeGreaterThan(study.x)
+    expect(cluster.x + cluster.width).toBeLessThanOrEqual(width)
+    expect(navBox.height).toBeLessThan(48)
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
     const labRequest = page.waitForRequest((request) => request.isNavigationRequest() && new URL(request.url()).pathname === '/lab/')
     await lab.click()
     await labRequest
   })
 }
+
+test('home hero Arduino pill is a link to /lab/ with a real page load', async ({ page }) => {
+  await mockAdminApis(page)
+  await page.goto('/')
+  const pill = page.getByRole('link', { name: 'Arduino — Circuit Lab 열기' })
+  await expect(pill).toHaveAttribute('href', '/lab/')
+  const labRequest = page.waitForRequest((request) => request.isNavigationRequest() && new URL(request.url()).pathname === '/lab/')
+  await pill.click()
+  await labRequest
+})
 
 test('mobile menu lists Lab at 375px without horizontal overflow and opens it with a full page load', async ({ page }) => {
   await mockAdminApis(page)
@@ -2476,6 +2511,11 @@ test('mobile menu lists Lab at 375px without horizontal overflow and opens it wi
   await page.getByLabel('메뉴 열기').click()
   const mobileMenu = page.getByRole('navigation', { name: '모바일 메뉴' })
   await expect(mobileMenu.getByRole('button', { name: /^Lab/ })).toBeVisible()
+  const [panelBox, labItemBox] = await Promise.all([mobileMenu.boundingBox(), mobileMenu.getByRole('button', { name: /^Lab/ }).boundingBox()])
+  expect(labItemBox.x).toBeGreaterThanOrEqual(panelBox.x)
+  expect(labItemBox.x + labItemBox.width).toBeLessThanOrEqual(panelBox.x + panelBox.width + 1)
+  expect(labItemBox.y).toBeGreaterThanOrEqual(panelBox.y)
+  expect(labItemBox.y + labItemBox.height).toBeLessThanOrEqual(panelBox.y + panelBox.height + 1)
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
   const labRequest = page.waitForRequest((request) => request.isNavigationRequest() && new URL(request.url()).pathname === '/lab/')
   await mobileMenu.getByRole('button', { name: /^Lab/ }).click()
