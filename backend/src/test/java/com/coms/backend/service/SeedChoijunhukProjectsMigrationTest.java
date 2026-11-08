@@ -23,13 +23,16 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Runs the real V54 / V59 / V80 / V104 scripts through Flyway on H2 (PostgreSQL mode). The older
+ * Runs the real V54 / V59 / V80 / V104 / V105 scripts through Flyway on H2 (PostgreSQL mode). The older
  * migrations cannot run on H2 as a whole (PostgreSQL-only syntax), so only the ones that create and
  * alter club_projects / app_catalog_entries are used; V104 is then applied by Flyway on top of
- * whatever rows a test has put there.
+ * whatever rows a test has put there. V105 (unlist Magic Survival Lab) is applied separately, so the
+ * V104 tests keep seeing the 11 rows V104 inserts.
  */
 class SeedChoijunhukProjectsMigrationTest {
     private static final String V104 = "V104__seed_choijunhuk_projects.sql";
+    private static final String V105 = "V105__unlist_magic_survival_lab.sql";
+    private static final String MSL_LINK = "https://choijunhuk.github.io/magic-survival-lab/";
     private static final List<String> TABLE_MIGRATIONS = List.of(
             "V54__club_projects.sql", "V59__app_catalog.sql", "V80__club_project_author_nullable.sql");
     private static final AtomicInteger DB_SEQ = new AtomicInteger();
@@ -200,6 +203,92 @@ class SeedChoijunhukProjectsMigrationTest {
         }
     }
 
+    @Test
+    void v105RemovesOnlyMagicSurvivalLabFromBothTables() throws Exception {
+        try (var db = newDb()) {
+            db.loadProductionFixture();
+            db.applyV104();
+            assertThat(db.titles("club_projects")).contains("Magic Survival Lab");
+            assertThat(db.titles("app_catalog_entries")).contains("Magic Survival Lab");
+            db.statement.execute("INSERT INTO club_project_files (club_project_id, stored_name, original_name, mime_type)"
+                    + " SELECT id, 's', 'o', 'image/png' FROM club_projects WHERE title = 'Magic Survival Lab'");
+
+            db.applyV105();
+
+            assertThat(db.titles("club_projects")).doesNotContain("Magic Survival Lab");
+            assertThat(db.titles("app_catalog_entries")).doesNotContain("Magic Survival Lab");
+            assertThat(db.count("club_projects")).isEqualTo(16 + 10);
+            assertThat(db.count("app_catalog_entries")).isEqualTo(6 + 10);
+            assertThat(db.count("club_project_files")).isZero();
+            // The other ten seeded projects (KW Algorithm Lab was never seeded on the fixture) stay in both tables.
+            List<String> kept = SEEDED_TITLES.stream()
+                    .filter(t -> !t.equals("Magic Survival Lab") && !t.equals("KW Algorithm Lab")).toList();
+            assertThat(db.titles("club_projects")).containsAll(kept);
+            assertThat(db.titles("app_catalog_entries")).containsAll(kept);
+            assertThat(db.count("club_projects WHERE made_by = '최준혁' AND position >= 16")).isEqualTo(10);
+            assertThat(db.count("app_catalog_entries WHERE sort_order >= 6")).isEqualTo(10);
+        }
+    }
+
+    @Test
+    void v105LeavesRowsAnAdminHasEditedSinceV104() throws Exception {
+        try (var db = newDb()) {
+            db.loadProductionFixture();
+            db.applyV104();
+            db.statement.execute("UPDATE club_projects SET link_url = 'https://example.com/msl' WHERE title = 'Magic Survival Lab'");
+            db.statement.execute("UPDATE app_catalog_entries SET href = 'https://example.com/msl' WHERE title = 'Magic Survival Lab'");
+
+            db.applyV105();
+
+            assertThat(db.count("club_projects WHERE title = 'Magic Survival Lab'")).isEqualTo(1);
+            assertThat(db.count("app_catalog_entries WHERE title = 'Magic Survival Lab'")).isEqualTo(1);
+            assertThat(db.count("club_projects")).isEqualTo(16 + 11);
+            assertThat(db.count("app_catalog_entries")).isEqualTo(6 + 11);
+        }
+    }
+
+    @Test
+    void v105LeavesAClubRowWhoseAuthorWasChangedAndAnUnrelatedSameTitleRow() throws Exception {
+        try (var db = newDb()) {
+            db.insertManualRow("club_projects", "Magic Survival Lab", "https://example.com/other");
+            db.statement.execute("UPDATE club_projects SET made_by = 'someone else'");
+            db.insertClub("Magic Survival Lab", MSL_LINK, 1);
+            db.statement.execute("UPDATE club_projects SET made_by = 'someone else' WHERE position = 1");
+
+            db.statement.execute(resource(V105));
+
+            assertThat(db.count("club_projects WHERE title = 'Magic Survival Lab'")).isEqualTo(2);
+        }
+    }
+
+    @Test
+    void v105IsANoOpWhenTheRowsAreAlreadyGone() throws Exception {
+        try (var db = newDb()) {
+            db.loadProductionFixture();
+            db.applyV104();
+            db.statement.execute("DELETE FROM club_projects WHERE title = 'Magic Survival Lab'");
+            db.statement.execute("DELETE FROM app_catalog_entries WHERE title = 'Magic Survival Lab'");
+
+            db.applyV105();
+            db.statement.execute(resource(V105));
+
+            assertThat(db.count("club_projects")).isEqualTo(16 + 10);
+            assertThat(db.count("app_catalog_entries")).isEqualTo(6 + 10);
+        }
+    }
+
+    @Test
+    void v105OnTheProductionFixtureWithoutV104TouchesNothing() throws Exception {
+        try (var db = newDb()) {
+            db.loadProductionFixture();
+
+            db.statement.execute(resource(V105));
+
+            assertThat(db.count("club_projects")).isEqualTo(16);
+            assertThat(db.count("app_catalog_entries")).isEqualTo(6);
+        }
+    }
+
     private Db newDb() throws Exception {
         String url = "jdbc:h2:mem:seed_choijunhuk_" + DB_SEQ.incrementAndGet() + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1";
         Path directory = Files.createDirectories(migrationDirectory.resolve("db" + DB_SEQ.get()));
@@ -207,12 +296,15 @@ class SeedChoijunhukProjectsMigrationTest {
             Files.writeString(directory.resolve(name), resource(name));
         }
         Files.writeString(directory.resolve(V104), sql());
+        Files.writeString(directory.resolve(V105), resource(V105));
         Flyway flyway = Flyway.configure().dataSource(url, "sa", "")
+                .locations("filesystem:" + directory).target("104").load();
+        Flyway withV105 = Flyway.configure().dataSource(url, "sa", "")
                 .locations("filesystem:" + directory).load();
         Flyway tablesOnly = Flyway.configure().dataSource(url, "sa", "")
                 .locations("filesystem:" + directory).target("80").load();
         tablesOnly.migrate();
-        return new Db(url, flyway);
+        return new Db(url, flyway, withV105);
     }
 
     private static String sql() throws Exception {
@@ -231,11 +323,13 @@ class SeedChoijunhukProjectsMigrationTest {
         final Connection connection;
         final Statement statement;
         private final Flyway flyway;
+        private final Flyway withV105;
 
-        Db(String url, Flyway flyway) throws Exception {
+        Db(String url, Flyway flyway, Flyway withV105) throws Exception {
             this.connection = DriverManager.getConnection(url, "sa", "");
             this.statement = connection.createStatement();
             this.flyway = flyway;
+            this.withV105 = withV105;
             statement.execute("DELETE FROM club_projects");
             statement.execute("DELETE FROM app_catalog_entries");
         }
@@ -259,7 +353,7 @@ class SeedChoijunhukProjectsMigrationTest {
             }
         }
 
-        private void insertClub(String title, String link, int position) throws Exception {
+        void insertClub(String title, String link, int position) throws Exception {
             try (var insert = connection.prepareStatement(
                     "INSERT INTO club_projects (category, title, made_by, link_url, position) VALUES ('WEBSITE', ?, '최준혁', ?, ?)")) {
                 insert.setString(1, title);
@@ -281,6 +375,10 @@ class SeedChoijunhukProjectsMigrationTest {
 
         void applyV104() {
             assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
+        }
+
+        void applyV105() {
+            assertThat(withV105.migrate().migrationsExecuted).isEqualTo(1);
         }
 
         int count(String fromAndWhere) throws Exception {
