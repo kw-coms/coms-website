@@ -41,6 +41,14 @@ for (const part of ['location ^~ /lab/api/ {', 'location @lab_unauthorized {', '
 assert.match(commonHeaders, /X-Content-Type-Options "nosniff"/)
 assert.match(commonHeaders, /Strict-Transport-Security/)
 assert.match(block('location = /lab/_auth {'), /^\s+internal;/m, 'the auth subrequest must not be reachable from outside')
+// Unhashed lab/public files: copied into the image, and a missing one is a 404, never the app shell.
+assert.match(dockerfile, /^COPY lab\/public \.\/public$/m)
+for (const dir of ['parts', 'blockly-media']) {
+  const b = block(`location ^~ /lab/${dir}/ {`)
+  assert.match(b, /try_files \$uri =404;/, `/lab/${dir}/ must 404 on a missing file`)
+  assert.match(b, /security-headers-lab\.conf/)
+  assert.doesNotMatch(b, /immutable/, `/lab/${dir}/ files are not content-hashed`)
+}
 assert.match(block('location ^~ /lab/api/ {'), /return 404/, 'unlisted /lab/api paths do not exist')
 
 // Order does not matter between exact and ^~ locations, but the SPA fallback must stay last.
