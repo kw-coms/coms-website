@@ -173,6 +173,10 @@ try {
       return { over: bar.scrollWidth - bar.clientWidth, barH: bar.getBoundingClientRect().height, tall: vis.filter((e) => e.getBoundingClientRect().height > 40).map((e) => e.textContent), n: vis.length, docOver: document.documentElement.scrollWidth - innerWidth, offscreen: vis.filter((e) => e.getBoundingClientRect().right > innerWidth + 1).length };
     });
     check(`toolbar at ${w}px: no wrapped button, no overflow`, m.over <= 1 && m.tall.length === 0 && m.barH < 56 && m.docOver <= 0 && m.offscreen === 0, JSON.stringify(m));
+    if (w === 1440 || w === 1280) {
+      const t = await p.evaluate(() => { const e = document.querySelector('.run-btn .tb-text'); return { shown: !!e && e.offsetParent !== null, text: e?.textContent?.trim() }; });
+      check(`Run button keeps its text label at ${w}px`, t.shown && t.text === '실행', JSON.stringify(t));
+    }
     await c.close();
   }
   const longNotice = '그래픽 가속이 꺼져 있는 것 같아요(소프트웨어 렌더링 감지). 부드럽게 쓰도록 그림자·반사를 줄였어요. 고화질로 고정하면 저장되며, 위쪽 화질 메뉴에서 언제든 바꿀 수 있어요.';
