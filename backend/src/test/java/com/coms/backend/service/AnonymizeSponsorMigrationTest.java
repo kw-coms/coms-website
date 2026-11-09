@@ -22,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AnonymizeSponsorMigrationTest {
     private static final String V88 = "V88__sponsors.sql";
     private static final String V106 = "V106__anonymize_sponsor.sql";
+    private static final String V107 = "V107__sponsor_name_for_members.sql";
 
     @TempDir
     Path migrationDirectory;
@@ -52,6 +53,34 @@ class AnonymizeSponsorMigrationTest {
             statement.execute(v106);
             assertThat(count(statement, "updated_at <> TIMESTAMP '2000-01-01 00:00:00'")).as("rerun touches no row").isZero();
             assertThat(count(statement, "anonymous = TRUE")).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void v107UndoesV106ForThatRowOnlyAndKeepsOtherAnonymousSponsors() throws Exception {
+        String url = "jdbc:h2:mem:sponsor_name_for_members;MODE=PostgreSQL;DB_CLOSE_DELAY=-1";
+        Files.writeString(migrationDirectory.resolve(V88), resource(V88));
+        Flyway.configure().dataSource(url, "sa", "").locations("filesystem:" + migrationDirectory).load().migrate();
+
+        try (Connection connection = DriverManager.getConnection(url, "sa", "");
+             Statement statement = connection.createStatement()) {
+            statement.execute("INSERT INTO sponsors (id, name, since_date) VALUES (1, '테스트 후원자', DATE '2026-09-04')");
+            // Anonymous by the sponsor's own request: wrong id / wrong date must stay anonymous.
+            statement.execute("INSERT INTO sponsors (id, name, since_date, anonymous) VALUES (2, '본인 익명', DATE '2026-09-04', TRUE)");
+            statement.execute("INSERT INTO sponsors (id, name, since_date, anonymous) VALUES (3, '날짜 다름', DATE '2025-01-01', TRUE)");
+            statement.execute(resource(V106));
+            assertThat(count(statement, "id = 1 AND anonymous = TRUE")).isEqualTo(1);
+
+            String v107 = resource(V107);
+            statement.execute(v107);
+
+            assertThat(count(statement, "id = 1 AND anonymous = FALSE")).isEqualTo(1);
+            assertThat(count(statement, "id IN (2, 3) AND anonymous = TRUE")).isEqualTo(2);
+            assertThat(count(statement, "1 = 1")).isEqualTo(3);
+
+            statement.execute("UPDATE sponsors SET updated_at = TIMESTAMP '2000-01-01 00:00:00'");
+            statement.execute(v107);
+            assertThat(count(statement, "updated_at <> TIMESTAMP '2000-01-01 00:00:00'")).as("rerun touches no row").isZero();
         }
     }
 

@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ExternalLink, HeartHandshake, Mail } from 'lucide-react'
+import { useAuth } from '../contexts/useAuth'
 import { queryKeys } from '../services/queryKeys'
 import { getSponsorPage, listSponsors, sponsorImageSrc } from '../services/sponsorApi'
 import {
@@ -22,9 +23,9 @@ import '../styles/site-pages.css'
 const readable = (color: string) => `color-mix(in srgb, ${color} 30%, var(--app-text))`
 
 /**
- * 후원자 공개 페이지. Logged-out visitors see exactly what members see: the API
- * behind it is permitAll and the payload already omits the 금액 메모 and anonymises
- * the sponsors who asked for it.
+ * 후원자 공개 페이지. The API behind it is permitAll but viewer-aware: logged-out
+ * visitors get every sponsor as an anonymous placeholder, members get real names (except
+ * sponsors who asked to be anonymous), and the payload never carries the 금액 메모.
  *
  * <p>The admin-chosen accent colour is injected as a scoped CSS custom property, never
  * as raw CSS text, and only after {@code normalizeAccentColor} has confirmed it is a #hex.
@@ -32,7 +33,14 @@ const readable = (color: string) => `color-mix(in srgb, ${color} 30%, var(--app-
  * only ever fills shapes and borders, text stays on theme tokens.
  */
 export default function Sponsors() {
-  const listQuery = useQuery({ queryKey: queryKeys.sponsors.list(), queryFn: listSponsors })
+  const { user, loading: authLoading } = useAuth()
+  // The API masks names for guests, so the list is keyed by viewer (login/logout refetches) and
+  // waits for /auth/me so a logged-in member's first load is not a guest fetch.
+  const listQuery = useQuery({
+    queryKey: queryKeys.sponsors.list(user?.studentId ?? 'guest'),
+    queryFn: listSponsors,
+    enabled: !authLoading,
+  })
   const pageQuery = useQuery({ queryKey: queryKeys.sponsors.page(), queryFn: getSponsorPage })
 
   const settings = pageQuery.data?.settings ?? defaultSponsorPageSettings
@@ -45,7 +53,7 @@ export default function Sponsors() {
     '--sponsor-accent-text': accent === 'var(--app-accent)' ? 'var(--app-accent-text)' : readable(accent),
   } as CSSProperties
 
-  if (listQuery.isLoading || pageQuery.isLoading) {
+  if (authLoading || listQuery.isLoading || pageQuery.isLoading) {
     return (
       <SkeletonGroup label="후원자 정보를 불러오는 중">
         <div className="space-y-4">

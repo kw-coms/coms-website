@@ -23,6 +23,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
@@ -84,6 +90,29 @@ class SponsorSecurityIntegrationTest {
     }
 
     @Test
+    void listIsMaskedForGuestsRevealedForMembersAndNeverSharedCached() throws Exception {
+        sponsorService.create(sponsor("실명후원", null, false, true, null));
+        sponsorService.create(sponsor("본인익명", null, true, true, null));
+
+        mockMvc.perform(get("/api/sponsors"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "private, no-store"))
+                .andExpect(header().stringValues("Vary", hasItem("Cookie")))
+                .andExpect(jsonPath("$[0].sponsors[0].name").value("익명 후원자"))
+                .andExpect(jsonPath("$[0].sponsors[1].name").value("익명 후원자"))
+                .andExpect(jsonPath("$[0].sponsors[0].id").value(nullValue()))
+                .andExpect(content().string(not(containsString("실명후원"))));
+
+        mockMvc.perform(get("/api/sponsors").cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", "private, no-store"))
+                .andExpect(header().stringValues("Vary", hasItem("Cookie")))
+                .andExpect(jsonPath("$[0].sponsors[?(@.name == '실명후원')].id").isNotEmpty())
+                // A sponsor who asked to be anonymous stays a placeholder even for members.
+                .andExpect(content().string(not(containsString("본인익명"))));
+    }
+
+    @Test
     void publicImagesOnlyServeTheBannerAndCurrentIdentifiedSponsorLogos() throws Exception {
         Long hidden = upload("hidden.png");
         Long anonymous = upload("anonymous.png");
@@ -100,9 +129,14 @@ class SponsorSecurityIntegrationTest {
         mockMvc.perform(get("/api/sponsors/images/{id}", hidden)).andExpect(status().isNotFound());
         mockMvc.perform(get("/api/sponsors/images/{id}", anonymous)).andExpect(status().isNotFound());
         mockMvc.perform(get("/api/sponsors/images/{id}", expired)).andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/sponsors/images/{id}", current))
+        // Logos identify the sponsor, so only members get them (guests see placeholders); banner stays public.
+        mockMvc.perform(get("/api/sponsors/images/{id}", current)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/sponsors/images/{id}", hidden).cookie(userCookie)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/sponsors/images/{id}", anonymous).cookie(userCookie)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/sponsors/images/{id}", expired).cookie(userCookie)).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/sponsors/images/{id}", current).cookie(userCookie))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Cache-Control", "public, max-age=86400"));
+                .andExpect(header().string("Cache-Control", "private, max-age=3600"));
         mockMvc.perform(get("/api/sponsors/images/{id}", banner))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "public, max-age=86400"));

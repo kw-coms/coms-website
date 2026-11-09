@@ -9,6 +9,8 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,8 +37,12 @@ public class SponsorController {
     }
 
     @GetMapping
-    public ResponseEntity<List<SponsorTierResponse>> list() {
-        return ResponseEntity.ok(sponsorService.publicList());
+    public ResponseEntity<List<SponsorTierResponse>> list(Authentication authentication) {
+        // The body depends on who asks (members see names, guests see placeholders), so no shared cache.
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CACHE_CONTROL, "private, no-store")
+                .header(HttpHeaders.VARY, "Cookie")
+                .body(sponsorService.publicList(isMember(authentication)));
     }
 
     @GetMapping("/page")
@@ -45,21 +51,29 @@ public class SponsorController {
     }
 
     /**
-     * Only the current banner and publicly visible, identified sponsors' logos are readable.
+     * Only the current banner (anyone) and publicly visible, identified sponsors' logos (members
+     * only; a logo would identify the sponsor a guest sees as a placeholder) are readable.
      * The mime is the sniffed one recorded at upload, never the client-declared content type.
      */
     @GetMapping("/images/{id}")
-    public ResponseEntity<Resource> image(@PathVariable Long id) {
-        SponsorImage meta = sponsorService.publicImageMeta(id);
+    public ResponseEntity<Resource> image(@PathVariable Long id, Authentication authentication) {
+        SponsorImage meta = sponsorService.publicImageMeta(id, isMember(authentication));
         Resource resource = sponsorService.loadImage(meta);
         String filename = meta.getOriginalName() == null || meta.getOriginalName().isBlank()
                 ? "sponsor-image"
                 : meta.getOriginalName();
         return ResponseEntity.ok()
-                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=86400")
+                .header(HttpHeaders.CACHE_CONTROL,
+                        sponsorService.isBannerImage(id) ? "public, max-age=86400" : "private, max-age=3600")
+                .header(HttpHeaders.VARY, "Cookie")
                 .contentType(MediaType.parseMediaType(meta.getMime()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
                         .filename(filename, StandardCharsets.UTF_8).build().toString())
                 .body(resource);
+    }
+
+    private static boolean isMember(Authentication authentication) {
+        return authentication != null && authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken);
     }
 }

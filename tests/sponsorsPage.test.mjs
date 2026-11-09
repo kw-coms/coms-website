@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 
+import { queryKeys } from '../src/services/queryKeys.ts'
 import {
   ANONYMOUS_SPONSOR_NAME,
   DEFAULT_SPONSOR_ACCENT,
@@ -100,5 +101,9 @@ assert.equal(settings.accentColor, DEFAULT_SPONSOR_ACCENT)
 assert.equal(settings.howToSection.title, '후원 안내')
 assert.equal(normalizeSponsorPageSettings({ layout: 'list' }).layout, 'list')
 assert.equal(normalizeSponsorPageSettings(null).thankYouMessage.length > 0, true)
+
+// --- 목록 캐시 키는 보는 사람마다 다르다(로그인/로그아웃 시 다시 가져온다) ------------------
+assert.notDeepEqual(queryKeys.sponsors.list('guest'), queryKeys.sponsors.list('2023000002'))
+assert.deepEqual(queryKeys.sponsors.list('guest'), queryKeys.sponsors.list('guest'))
 
 console.log('sponsorsPage tests passed')
