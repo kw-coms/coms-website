@@ -5,6 +5,7 @@ import PageShell from '../components/PageShell'
 import { scrollToTopInstant } from '../utils/themeColors'
 import { canAccessOperationsPanel } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
+import MembersGate from '../components/MembersGate'
 
 export function ScrollToTop() {
   const { pathname } = useLocation()
@@ -26,10 +27,11 @@ export function RequireAuth({ children }: PropsWithChildren) {
       </div>
     </PageShell>
   )
-  // Auth could not be confirmed (not logged in, or a transient error): send the
-  // user to the login screen rather than a dead-end "retry" error. Carry `from`
-  // so they return here after logging in.
-  if (authError || !user) return <Navigate to="/login" state={{ from: location, authIssue: Boolean(authError) }} replace />
+  // Auth could not be confirmed (a transient error): send the user to the login screen
+  // rather than a dead-end "retry" error. Carry `from` so they return here after logging in.
+  if (authError) return <Navigate to="/login" state={{ from: location, authIssue: true }} replace />
+  // A guest gets a guide screen, not a redirect. The page itself is not mounted, so its API calls never fire.
+  if (!user) return <PageShell><MembersGate /></PageShell>
   return children
 }
 

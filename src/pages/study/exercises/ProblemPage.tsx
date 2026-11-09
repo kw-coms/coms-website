@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useAuth } from '../../../contexts/useAuth'
+import MembersGate from '../../../components/MembersGate'
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import NotFoundPage from '../../../components/NotFoundPage'
 import { createEditor, type PgEditor } from '../playground/editor'
@@ -231,7 +233,16 @@ function ProblemBody({ studyId, problem }: { studyId: string; problem: Exercise 
 
 export default function ProblemPage() {
   const { id, problemId } = useParams()
+  const { user, loading } = useAuth()
   const problem = findExercise(problemId ?? '')
   if (!id || !problem || !exercisesFor(id).some((item) => item.id === problem.id)) return <NotFoundPage />
+  if (loading) return <main className="study-page ex-page"><p className="study-loading" role="status">불러오는 중...</p></main>
+  // ponytail: UI-only gate. Problem statements and starter code are still in the public JS bundle (problems/*).
+  // Upgrade path: serve problems from an authenticated API.
+  if (!user) return <main className="study-page ex-page">
+    <nav className="ex-back"><Link to={`/study/${id}/practice`}>← 실습 문제 목록</Link></nav>
+    <header className="ex-head"><div><h1>{problem.title}</h1></div></header>
+    <MembersGate title="문제 풀이는 동아리원만 할 수 있어요">문제 설명과 코드 편집기는 로그인한 동아리원에게만 열려요.</MembersGate>
+  </main>
   return <ProblemBody key={problem.id} studyId={id} problem={problem} />
 }

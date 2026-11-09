@@ -16,6 +16,7 @@ import { useModalFocus } from '../hooks/useModalFocus'
 import { moveQuickIndex, quickDate, searchQuickItems, type QuickGroup, type QuickItem } from '../utils/quickSearch'
 import { isFullPageLink } from '../utils/fullPageLink'
 import { startSiteTour } from './tour/tourState'
+import MemberLock from './MemberLock'
 
 /**
  * Quick jump ("빠른 이동"): one box that goes to any page and, for a signed-in member, to a
@@ -24,6 +25,9 @@ import { startSiteTour } from './tour/tourState'
  */
 
 type PageItem = QuickItem & { icon?: LucideIcon }
+
+/** Page ids whose route needs a login: they get the lock mark for a guest. */
+const memberPaths = new Set([...navExtraItems, ...activitySectionNavItems].filter((item) => 'auth' in item && item.auth).map((item) => `page:${item.path}`))
 
 /** A command, not a page: it has no path and starts the site tour. */
 const TOUR_COMMAND_ID = 'command:tour'
@@ -181,7 +185,7 @@ export default function QuickSearchDialog({ onClose }: { onClose: () => void }) 
                     onClick={() => go(item)}
                   >
                     <span className="coms-quick-icon" aria-hidden="true"><Icon size={15} /></span>
-                    <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                    <span className="min-w-0 flex-1 truncate">{item.title}{memberPaths.has(item.id) && <> <MemberLock /></>}</span>
                     {item.hint && <span className="coms-quick-hint">{item.hint}</span>}
                     <CornerDownLeft size={13} aria-hidden="true" className="coms-quick-enter" />
                   </div>

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockOptionalApis } from './visualSupport.js'
+import { asMember, mockOptionalApis } from './visualSupport.js'
 
 // Result frames of the web study (live examples, "직접 해보기" output, the practice preview) must be as tall as
 // their content, up to the 640px cap where they scroll inside. The frames have an opaque origin, so Playwright
@@ -48,6 +48,7 @@ const settled = (handle) => async () => {
 for (const width of [1440, 375]) {
   test(`every live example frame of the web study fits its content (${width}px)`, async ({ page }) => {
     await mockOptionalApis(page)
+    await asMember(page)
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/study/web')
     const demos = page.locator('.study-page .demo')
@@ -70,6 +71,7 @@ const tall = (n) => Array.from({ length: n }, (_, i) => `<p>줄 ${i + 1}</p>`).j
 /** The practice page of a web problem, with its editor, its preview frame and a size-report log on window.__sizes. */
 async function openPractice(page) {
   await mockOptionalApis(page)
+  await asMember(page)
   await page.addInitScript(() => {
     window.__sizes = []
     window.addEventListener('message', (e) => { if (e.data && e.data.type === 'size') window.__sizes.push(e.data.h) })
@@ -96,6 +98,7 @@ test('the practice preview grows with tall content', async ({ page }) => {
 
 test('a playground output frame fits its content', async ({ page }) => {
   await mockOptionalApis(page)
+  await asMember(page)
   await page.goto('/study/web')
   // The edit button reads 직접 해보기 and becomes 편집 닫기 once pressed (the stage toolbar re-renders), so match
   // either label. No stage is in edit mode on load (asserted below), so the first match is the same stage before
@@ -138,6 +141,7 @@ test('content that follows its own frame height with the default margin grows to
 
 test('quick successive edits leave the frame as tall as the last content', async ({ page }) => {
   await mockOptionalApis(page)
+  await asMember(page)
   await page.goto('/study/web/practice/web-html-headings')
   const editor = page.locator('.ex-web-editor .cm-content')
   await expect(editor).toBeVisible()

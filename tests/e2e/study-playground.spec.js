@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { mockOptionalApis } from './visualSupport.js'
+import { asMember, mockOptionalApis } from './visualSupport.js'
 
 // "직접 해보기" on the study pages. /study/api/run is mocked (the real runner is a separate service);
 // HTML/JS blocks run through the real /study-sandbox.html iframe.
@@ -8,6 +8,7 @@ const OK = { ok: true, stage: 'run', stdout: "Hello, COM's!\n", stderr: '', exit
 
 async function mockRun(page, respond) {
   await mockOptionalApis(page)
+  await asMember(page)
   const calls = []
   await page.route('**/study/api/run', async (route) => {
     const body = route.request().postDataJSON()
@@ -150,6 +151,8 @@ test('stdin box appears for programs that read input and is sent to the runner',
 
 test('401 asks for a login and the link returns to the same block', async ({ page }) => {
   await mockRun(page, () => ({ status: 401, json: { message: 'Unauthorized' } }))
+  // The member's session is still good (refresh works) while the runner still answers 401: the old "ask to sign in" path.
+  await page.route('**/api/auth/refresh', (route) => route.fulfill({ status: 204 }))
   await openStudy(page, 'c')
   await openEditor(page, 0)
   await runBtn(page, 0).click()
@@ -157,6 +160,17 @@ test('401 asks for a login and the link returns to the same block', async ({ pag
   await expect(alert).toContainText('로그인한 동아리원만 실행할 수 있어요')
   await alert.getByRole('link', { name: '로그인하러 가기' }).click()
   await expect(page).toHaveURL(/\/login$/)
+})
+
+test('a session that really ended swaps the lesson for the members-only guide', async ({ page }) => {
+  // Refresh answers 401 (mockOptionalApis), so the 401 from the runner signs the page out.
+  await mockRun(page, () => ({ status: 401, json: { message: 'Unauthorized' } }))
+  await openStudy(page, 'c')
+  await openEditor(page, 0)
+  await runBtn(page, 0).click()
+  await expect(page.locator('[data-members-gate]')).toBeVisible()
+  await expect(page.locator('.study-layout')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '로그인', exact: true })).toHaveAttribute('href', '/login')
 })
 
 test('429 shows a friendly message with a countdown, then runs again', async ({ page }) => {
@@ -176,6 +190,7 @@ test('429 shows a friendly message with a countdown, then runs again', async ({ 
 test('network failure and a rejected request show messages', async ({ page }) => {
   let mode = 'down'
   await mockOptionalApis(page)
+  await asMember(page)
   await page.route('**/study/api/run', (route) => (mode === 'down' ? route.abort('connectionrefused') : route.fulfill({ status: 400, json: { error: 'rejected', messageKo: '코드가 너무 길어요.' } })))
   await openStudy(page, 'c')
   await openEditor(page, 0)

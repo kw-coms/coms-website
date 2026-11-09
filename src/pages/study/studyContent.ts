@@ -10,3 +10,9 @@ export function loadStudyHtml(id: string): Promise<string> {
   const load = fragments.get(`./content/${id}.html`)
   return load ? load() : Promise.reject(new Error(`no content for study ${id}`))
 }
+
+/** Top-level chapter titles from a study's table of contents (its `.toc` list, entries without `.sub`). Parsed detached: nothing is put in the page. */
+export async function loadStudyChapters(id: string): Promise<string[]> {
+  const doc = new DOMParser().parseFromString(await loadStudyHtml(id), 'text/html')
+  return [...doc.querySelectorAll('.toc li:not(.sub) a')].map((a) => a.textContent?.trim() ?? '').filter(Boolean)
+}

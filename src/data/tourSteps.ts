@@ -37,7 +37,7 @@ const GUEST_STEPS: TourStep[] = [
     id: 'study-lab',
     icon: BookOpen,
     title: '읽고, 풀고, 만들어 봐요',
-    body: 'Study에서 강의를 읽고 실습 문제를 풀어 볼 수 있어요. 코드 실행은 로그인 후 쓸 수 있어요. Lab에서는 아두이노 회로를 만들어 코드를 바로 돌려 볼 수 있어요.',
+    body: 'Study에서는 과목과 장 제목을 둘러볼 수 있어요. 강의 본문과 실습 문제는 로그인한 동아리원에게 열려요. Lab은 누구나 열어 아두이노 회로를 만들어 볼 수 있고, 코드 컴파일은 로그인한 동아리원만 할 수 있어요.',
     targets: [nav('study'), nav('lab')],
   },
   {
@@ -58,7 +58,7 @@ const GUEST_STEPS: TourStep[] = [
     id: 'login',
     icon: LogIn,
     title: '이미 동아리원이라면',
-    body: "공지사항, 커뮤니티, 자료실, Records는 회원 전용이에요. 가입하고 로그인하면 열려요. 이 안내는 화면 맨 아래 '튜토리얼 시작'에서 다시 볼 수 있어요.",
+    body: "공지사항, 커뮤니티, 자료실, Records, Gather·Meet·Attendance는 회원 전용이라 메뉴에 자물쇠가 붙어 있어요. 눌러 보면 안내 화면이 열리고, 가입하고 로그인하면 쓸 수 있어요. 이 안내는 화면 맨 아래 '튜토리얼 시작'에서 다시 볼 수 있어요.",
     targets: ['[data-tour="login"]'],
   },
 ]
