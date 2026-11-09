@@ -51,4 +51,22 @@ test.describe('/activities timeline', () => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
     expect(overflow).toBeLessThanOrEqual(1)
   })
+
+  // The hackathon status and progress come from the clock, not from stored text.
+  const hackathonAt = [
+    ['before the opening', '2026-11-08T17:00:00+09:00', '예정', '0'],
+    ['mid-run', '2026-11-11T23:00:00+09:00', '진행 중', '77'],
+    ['after the deadline', '2026-11-15T05:00:00+09:00', '완료', '154'],
+  ]
+  for (const [label, at, badge, elapsed] of hackathonAt) {
+    test(`hackathon is ${badge} ${label}`, async ({ page }) => {
+      await page.clock.setFixedTime(new Date(at))
+      await page.goto('/activities')
+      const card = page.locator('#timeline .act-live')
+      await expect(card.locator('.act-status')).toHaveText(badge)
+      const bar = card.getByRole('progressbar', { name: '해커톤 경과 시간' })
+      await expect(bar).toHaveAttribute('aria-valuenow', elapsed)
+      await expect(bar).toHaveAttribute('aria-valuemax', '154')
+    })
+  }
 })

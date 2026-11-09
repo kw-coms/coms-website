@@ -2,7 +2,7 @@
 // Every fact below comes from the club's own decks (개강총회, 창립제, 해커톤) and recruiting posters. A date that the
 // sources do not give is left out (dateLabel carries the semester only) rather than guessed.
 
-export type TimelineStatus = 'done' | 'live' | 'planned'
+export type TimelineStatus = 'done' | 'live' | 'confirmed' | 'planned'
 export type TimelineTerm = 'spring' | 'fall' | 'upcoming'
 
 export interface TimelinePhoto {
@@ -153,11 +153,11 @@ export const timelineEvents: TimelineEvent[] = [
     start: '2026-09-07',
     status: 'done',
     kind: '행사',
-    summary: '임원진 소개와 지난 학기 돌아보기, 이번 학기 운영 방향과 스터디·소모임 안내로 2학기를 열었습니다.',
+    summary: '개강총회 자료는 이번 학기 임원진, 지난 학기 활동, 이번 학기 운영 방향, 스터디 운영 안내, 소모임 안내를 차례로 다룹니다.',
     facts: [
       '80주년기념관 202호',
-      '동아리방 이용 규칙 개정안과 준회원제 도입을 안건으로 올렸습니다.',
-      'COM’s 문제 공모전을 안내했습니다. 제출 마감은 9월 10일입니다.',
+      '안건: 동아리방 이용 규칙 개정안, 준회원제 도입',
+      'COM’s 문제 공모전: 제출 마감 9월 10일',
     ],
     photoId: 'fall-opening',
   },
@@ -168,7 +168,7 @@ export const timelineEvents: TimelineEvent[] = [
     dateLabel: '2026 2학기',
     status: 'done',
     kind: '행사',
-    summary: '2학기 친목 활동으로 MT를 다녀왔습니다.',
+    summary: '2학기 친목 활동으로 꼽힌 MT입니다. 날짜는 확인하지 못했습니다.',
     photoId: 'fall-mt',
   },
   {
@@ -176,9 +176,9 @@ export const timelineEvents: TimelineEvent[] = [
     term: 'fall',
     title: '고급 C 프로그래밍 · 블록체인 스터디',
     dateLabel: '2026 2학기',
-    status: 'live',
+    status: 'confirmed',
     kind: '스터디',
-    summary: '개강총회에서 스터디장 소개 발표와 함께 확정된 두 스터디가 이번 학기 활동으로 운영되고 있습니다.',
+    summary: '이번 학기 스터디로 확정된 두 스터디입니다.',
   },
   {
     id: 'fall-founding',
@@ -188,7 +188,7 @@ export const timelineEvents: TimelineEvent[] = [
     start: '2026-11-07',
     status: 'done',
     kind: '행사',
-    summary: '1969년에 시작해 57년을 이어온 광운대학교 중앙 컴퓨터 학술동아리의 창립을 기념했습니다. 선배님들을 모시고 테이블별 교류와 부원 질문 시간을 가졌습니다.',
+    summary: '광운대학교 중앙 컴퓨터 학술동아리는 1969년에 창립해 57년을 이어왔습니다. 진행 순서에는 선배님 소개, 테이블별 선후배 교류, 부원 질문이 있습니다.',
     facts: ['2026.11.07 (토) 18:00', '80주년기념관 303호'],
     photoId: 'founding-group',
   },
@@ -201,10 +201,10 @@ export const timelineEvents: TimelineEvent[] = [
     end: '2026-11-15T04:00:00+09:00',
     status: 'live',
     kind: '해커톤',
-    summary: '11월 8일 개회식에서 주제 ‘전쟁’이 공개됐습니다. 전쟁이 일어났을 때 사람들에게 필요한 서비스를 새로 만들어, 11월 15일 새벽 4시까지 제출합니다.',
+    summary: '주제는 ‘전쟁’입니다. 전쟁이 일어났을 때 사람들에게 무엇이 필요한지 찾아, 그 문제를 해결하는 서비스를 만듭니다. 제출 마감은 11월 15일 새벽 4시입니다.',
     facts: [
       '4팀 참가, 개회식부터 제출 마감까지 154시간',
-      '평가는 졸업생 평가 50점과 회장 평가 50점을 합쳐 100점 만점',
+      '평가: 졸업생 평가 50점 + 회장 평가 50점, 합계 100점',
     ],
   },
 
@@ -213,10 +213,10 @@ export const timelineEvents: TimelineEvent[] = [
     id: 'next-hackathon-result',
     term: 'upcoming',
     title: '해커톤 결과 · 시상 공지',
-    dateLabel: '제출 마감 이후',
+    dateLabel: '평가 완료 후',
     status: 'planned',
     kind: '해커톤',
-    summary: '제출이 끝나면 평가를 거쳐 결과와 시상을 공지합니다.',
+    summary: '평가가 끝나면 결과와 시상을 공지합니다.',
   },
   {
     id: 'next-study',
@@ -278,6 +278,7 @@ export function resolveStatus(event: TimelineEvent, now: number): TimelineStatus
 export const statusLabel: Record<TimelineStatus, string> = {
   done: '완료',
   live: '진행 중',
+  confirmed: '확정',
   planned: '예정',
 }
 

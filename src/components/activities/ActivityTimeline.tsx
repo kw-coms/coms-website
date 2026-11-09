@@ -175,22 +175,20 @@ function Hackathon({ event, status, now }: { event: TimelineEvent; status: Timel
   return (
     <article className="act-live">
       <EventBody event={event} status={status}>
-        {status === 'live' && (
-          <div className="act-progress">
-            <div
-              className="act-progress-track"
-              role="progressbar"
-              aria-label="해커톤 경과 시간"
-              aria-valuemin={0}
-              aria-valuemax={total}
-              aria-valuenow={elapsed}
-              aria-valuetext={`${total}시간 중 ${elapsed}시간 경과`}
-            >
-              <span style={{ width: `${pct}%` }} />
-            </div>
-            <p className="act-progress-label"><b>{elapsed}</b> / {total}시간 경과</p>
+        <div className="act-progress">
+          <div
+            className="act-progress-track"
+            role="progressbar"
+            aria-label="해커톤 경과 시간"
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-valuenow={elapsed}
+            aria-valuetext={`${total}시간 중 ${elapsed}시간 경과`}
+          >
+            <span style={{ width: `${pct}%` }} />
           </div>
-        )}
+          <p className="act-progress-label"><b>{elapsed}</b> / {total}시간 경과</p>
+        </div>
       </EventBody>
     </article>
   )
@@ -246,7 +244,7 @@ function Lightbox({ dialogRef, openId, setOpenId }: { dialogRef: React.RefObject
     >
       {photo && sources && (
         <figure className="act-lightbox-figure">
-          <img src={sources.src} srcSet={sources.srcSet} sizes="96vw" width={photo.width} height={photo.height} alt={photo.alt} decoding="async" />
+          <img key={photo.id} src={sources.src} srcSet={sources.srcSet} sizes="96vw" width={photo.width} height={photo.height} alt={photo.alt} decoding="async" />
           <figcaption>
             <span>{photo.caption ?? photo.alt}</span>
             <span className="act-lightbox-count" aria-live="polite">{index + 1} / {timelinePhotos.length}</span>
@@ -279,6 +277,7 @@ export default function ActivityTimeline() {
 
   const spring = useMemo(() => timelineEvents.filter((e) => e.term === 'spring'), [])
   const fall = useMemo(() => timelineEvents.filter((e) => e.term === 'fall'), [])
+  const fallLive = fall.some((e) => resolveStatus(e, now) === 'live')
   const upcoming = useMemo(() => timelineEvents.filter((e) => e.term === 'upcoming'), [])
 
   return (
@@ -287,11 +286,11 @@ export default function ActivityTimeline() {
         <header className="act-head">
           <div>
             <h2 id="act-timeline-title" className="act-title">2026년, COM’s가 한 일</h2>
-            <p className="act-lede">1학기에 했던 활동, 지금 진행 중인 2학기 활동, 앞으로 예정된 일정을 시간 순서로 모았습니다.</p>
+            <p className="act-lede">1학기에 했던 활동, 2학기 활동, 앞으로 예정된 일정을 시간 순서로 모았습니다.</p>
           </div>
           <nav className="act-jump" aria-label="타임라인 구간 바로가기">
             <a href="#act-spring"><b>{spring.length}</b><span>2026 1학기 · 완료</span></a>
-            <a href="#act-fall"><b>{fall.length}</b><span>2026 2학기 · 진행 중</span></a>
+            <a href="#act-fall"><b>{fall.length}</b><span>2026 2학기{fallLive ? ' · 진행 중' : ''}</span></a>
             <a href="#act-upcoming"><b>{upcoming.length}</b><span>예정</span></a>
           </nav>
         </header>
@@ -315,7 +314,7 @@ export default function ActivityTimeline() {
         <section className="act-term" id="act-fall" aria-labelledby="act-fall-title">
           <div className="act-term-head">
             <h3 id="act-fall-title" className="act-term-title">2026 2학기</h3>
-            <StatusBadge status="live" />
+            {fallLive && <StatusBadge status="live" />}
           </div>
           <FallSpine events={fall} now={now} onOpen={open} />
         </section>

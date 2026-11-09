@@ -145,6 +145,11 @@
 	animation: act-pulse 1.8s ease-in-out infinite;
 }
 
+.act-status[data-status='confirmed'] {
+	border-color: var(--app-accent-border);
+	color: var(--app-accent-text);
+}
+
 .act-status[data-status='planned'] {
 	border-style: dashed;
 	color: var(--app-text);
@@ -420,7 +425,8 @@
 		box-shadow: 0 0 0 4px var(--app-bg);
 	}
 
-	.act-row[data-status='live']::before {
+	.act-row[data-status='live']::before,
+	.act-row[data-status='confirmed']::before {
 		background: var(--app-accent);
 	}
 
