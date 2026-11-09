@@ -89,7 +89,7 @@
 }
 .study-page .progress {
   height: 6px;
-  background: var(--line);
+  background: color-mix(in srgb, var(--app-text) 10%, transparent);
   border-radius: 99px;
   overflow: hidden;
   margin: 8px 0 4px;
@@ -97,7 +97,8 @@
 .study-page .progress > div {
   height: 100%;
   width: 0;
-  background: var(--ok);
+  background: var(--app-accent);
+  border-radius: 99px;
   transition: width .3s;
 }
 .study-page .progress-label {

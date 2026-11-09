@@ -12,6 +12,7 @@ import { exercisesFor, findExercise } from './problems'
 import { flushSaves, markOpened, markViewed, readProgress, recordAttempt, saveCode, scheduleSaveCode, useProgress } from './progress'
 import { type ExLang, type Exercise, type WebExercise } from './types'
 import WebWorkspace from './WebWorkspace'
+import Dots from './Dots'
 import '../study.css'
 import './exercises.css'
 
@@ -200,7 +201,7 @@ function ProblemBody({ studyId, problem }: { studyId: string; problem: Exercise 
 
   return <main className="study-page ex-page">
     <nav className="ex-back"><Link to={`/study/${studyId}/practice`}>← 실습 문제 목록</Link></nav>
-    <header className="ex-head"><div><p className="ex-eyebrow">실습 문제 · {LEVEL_NAME[problem.level - 1]}</p><h1>{problem.title}</h1><div className="ex-meta"><span aria-label={`난이도 ${problem.level}단계`}>{'●'.repeat(problem.level)}{'○'.repeat(5 - problem.level)}</span>{problem.topics.map((topic) => <span key={topic}>{topic}</span>)}</div></div></header>
+    <header className="ex-head"><div><p className="ex-eyebrow">실습 문제 · {LEVEL_NAME[problem.level - 1]}</p><h1>{problem.title}</h1><div className="ex-meta"><Dots level={problem.level} />{problem.topics.map((topic) => <span key={topic}>{topic}</span>)}</div></div></header>
     <div className="ex-columns">
       <section className="ex-panel ex-statement" aria-label="문제 설명">
         <MiniMarkdown text={problem.statement} />
@@ -215,7 +216,7 @@ function ProblemBody({ studyId, problem }: { studyId: string; problem: Exercise 
           {shared && lang === sharedLang && <div className="ex-shared" role="region" aria-label="공유된 코드"><p>공유된 코드를 보고 있어요. 내 코드는 그대로 보관됩니다.</p><button type="button" onClick={() => leaveShared(false)}>내 코드로 돌아가기</button><button type="button" onClick={() => leaveShared(true)}>이 코드로 저장</button></div>}
           <CodePane key={lang} lang={lang} initial={currentCode} editorRef={editorRef} onChange={updateCode} onRun={() => void run()} onSubmit={() => void submit()} />
           <label className="ex-stdin">직접 실행 입력 (stdin)<textarea value={stdin} onChange={(event) => setStdin(event.target.value)} rows={3} /></label>
-          <div className="ex-actions"><button type="button" onClick={() => void run()} disabled={busy || countdown > 0}>실행</button><button type="button" onClick={() => void submit()} disabled={busy || countdown > 0}>제출</button><button type="button" onClick={reset} disabled={busy}>초기화</button><button type="button" onClick={share}>내 풀이 공유</button></div>
+          <div className="ex-actions"><button type="button" onClick={() => void run()} disabled={busy || countdown > 0}>실행</button><button type="button" className="ex-primary" onClick={() => void submit()} disabled={busy || countdown > 0}>제출</button><span className="ex-actions-gap" aria-hidden="true" /><button type="button" className="ex-quiet" onClick={reset} disabled={busy}>초기화</button><button type="button" className="ex-quiet" onClick={share}>내 풀이 공유</button></div>
           <p className="ex-shortcuts">⌘/Ctrl+Enter 실행 · ⌘/Ctrl+Shift+Enter 제출</p>
           {busy && <p role="status">{runningKind === 'grade' ? '채점 중...' : '실행 중...'}</p>}
           {message && <div className="ex-busy" role={needsLogin ? 'alert' : 'status'}><p>{message}{countdown > 0 && ` ${countdown}초 후 다시 시도할 수 있어요.`}</p>{needsLogin && <button type="button" onClick={login}>로그인하러 가기</button>}</div>}
