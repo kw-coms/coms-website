@@ -20,7 +20,12 @@ button { cursor: pointer; }
 .app { height: 100%; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr); }
 .toolbar { display: flex; flex-wrap: nowrap; gap: 6px 14px; align-items: center; padding: 6px 12px; background: var(--surface); border-bottom: 1px solid var(--border); z-index: 30; }
 .brand { white-space: nowrap; flex: none; display: flex; align-items: center; gap: 8px; font-size: 15px; }
-.brand-dot { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #ffe28a, var(--accent)); box-shadow: 0 0 10px var(--accent); }
+.brand { gap: 6px; }
+.brand-home { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 8px; margin-left: -8px; border-radius: 8px; color: var(--muted); font-weight: 600; text-decoration: none; }
+.brand-home:hover { background: var(--surface-2); color: var(--accent-2); }
+.coms-mark { flex: none; color: var(--text); } .brand-home:hover .coms-mark { color: var(--accent-2); }
+.brand-sep { color: var(--border); font-weight: 300; font-size: 18px; }
+a.home-item { text-decoration: none; color: inherit; }
 .tb-group { display: flex; align-items: center; gap: 4px; padding-left: 14px; border-left: 1px solid var(--border); }
 .brand + .tb-group { border-left: 0; padding-left: 0; }
 .tb { white-space: nowrap; flex: none; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 9px; border: 1px solid transparent; border-radius: 8px; background: transparent; }
@@ -43,7 +48,7 @@ button { cursor: pointer; }
 .tb-more-text { display: none; }
 .more-pop { left: auto; right: 0; width: 230px; display: flex; flex-direction: column; gap: 4px; padding: 8px; }
 .more-pop .tb-group { flex-direction: column; align-items: stretch; border-left: 0; padding-left: 0; border-top: 1px solid var(--border); padding-top: 4px; }
-.more-pop .tb { justify-content: flex-start; width: 100%; } .more-pop .tb-text { display: inline; } .more-pop .tb-more-text { display: inline; }
+.more-pop a.tb { box-sizing: border-box; } .more-pop .tb { justify-content: flex-start; width: 100%; } .more-pop .tb-text { display: inline; } .more-pop .tb-more-text { display: inline; }
 .more-pop .speed select { width: 100%; }
 .panel { background: var(--surface); min-height: 0; display: flex; flex-direction: column; }
 .palette { border-right: 1px solid var(--border); width: 220px; flex: none; position: relative; transition: width 0.15s; }
@@ -168,17 +173,19 @@ button { cursor: pointer; }
 .quality-choice input, .aa-toggle input { width: 16px; height: 16px; flex: none; accent-color: var(--accent); margin-top: 1px; }
 
 @media (max-width: 1500px) { .tb-secondary .tb-text { display: none; } }
+@media (max-width: 1600px) { .toolbar { gap: 6px 8px; } .tb-secondary { gap: 8px; } }
+@media (max-width: 1360px) { .brand-home-text { display: none; } .brand-home { padding: 0 6px; margin-left: -4px; } }
 @media (max-width: 1360px) and (min-width: 1001px) {
   .toolbar { gap: 6px; padding: 6px 8px; } .tb-secondary { gap: 6px; } .tb-group { padding-left: 6px; gap: 2px; } .tb { padding: 0 6px; gap: 4px; }
   .quality-btn .q-text { display: none; } .speed select { padding: 0 2px; }
 }
-@media (max-width: 1100px) { .tb-text { display: none; } .toolbar { gap: 4px; } .tb-secondary { gap: 4px; } .tb-group { padding-left: 4px; } .quality-btn svg { display: none; } .palette:not(.folded):not(.in-sheet) { width: 190px; } .sidepanel { --side-w: min(var(--side-w), 46vw); } }
+@media (max-width: 1100px) { .brand-sep { display: none; } .tb-text { display: none; } .toolbar { gap: 4px; } .tb-secondary { gap: 4px; } .tb-group { padding-left: 4px; } .quality-btn svg { display: none; } .palette:not(.folded):not(.in-sheet) { width: 190px; } .sidepanel { --side-w: min(var(--side-w), 46vw); } }
 @media (max-width: 1000px) {
   .tb-secondary { display: none; } .tb-more { display: block; }
 }
 @media (max-width: 768px) {
   body { overflow: hidden; }
-  .toolbar { gap: 2px; padding: 4px 6px; } .brand strong { display: none; } .brand { margin-right: 2px; }
+  .toolbar { gap: 2px; padding: 4px 6px; } .brand strong, .brand-sep, .brand-home-text { display: none; } .brand { margin-right: 2px; } .brand-home { margin-left: 0; padding: 0 7px; }
   .tb-group { padding-left: 2px; border-left: 0; gap: 1px; } .tb { padding: 0 8px; }
   .toolbar .tb-group.run .tb-text { display: none; } .run-btn.go { padding: 0 11px; }
   .more-pop { position: fixed; top: 46px; right: 6px; left: auto; width: min(260px, calc(100vw - 12px)); }
