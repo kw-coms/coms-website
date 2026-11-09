@@ -15,6 +15,19 @@ const Btn = ({ label, onClick, children, active, disabled, className = '' }: { l
   </button>
 );
 
+const HOME_LABEL = "COM's 홈으로 (사이트로 돌아가기)";
+
+/** The COM's mark (same artwork as the site header's logo), inlined so Lab needs no extra asset or CSP entry. Black in the source; currentColor follows the theme. */
+function ComsMark({ size = 20 }: { size?: number }) {
+  return (
+    <svg className="coms-mark" width={size} height={size * 368 / 333} viewBox="0 0 333 368" aria-hidden="true" focusable="false">
+      <path d="M162.5 322.483V367.071L0.5 276.903V96.0713L162.5 181.571V224.071L34.7598 153.541V252.627L162.5 322.483Z" fill="currentColor" stroke="currentColor"/>
+      <path d="M202.605 347.571L169.503 367.071L169.503 181.571L332 96.5713L331.5 276.571L298.398 294.571V150.467L266.802 167.619V312.071L233 331.071C233 283.373 232.697 187.417 232.697 186.241C232.697 185.065 212.635 196.859 202.605 202.903V347.571Z" fill="currentColor" stroke="currentColor"/>
+      <path d="M166.242 0.133789L328.742 90.1338L329.555 90.584L328.731 91.0146L166.231 176.015L165.999 176.136L165.767 176.014L3.7666 90.5137L2.94824 90.0811L3.75781 89.6338L165.758 0.133789L166 0L166.242 0.133789ZM164.816 40.2002L76.3164 89.2002L75.5039 89.6504L76.3271 90.0811L129.827 118.081L130.068 118.207L130.305 118.072L201.555 77.7129L219.555 88.1338L150.311 127.703L149.521 128.154L150.324 128.58L167.324 137.58L167.566 137.707L167.804 137.573L254.804 88.5732L255.589 88.1318L254.799 87.6992L201.799 58.6992L201.556 58.5664L201.314 58.7012L130.057 98.5654L111.091 88.1338L145.302 69.0742L180.302 49.5742L181.079 49.1416L180.305 48.7031L165.305 40.2031L165.062 40.0645L164.816 40.2002Z" fill="currentColor"/>
+    </svg>
+  );
+}
+
 const QUALITY_LABEL: Record<Quality, string> = { high: '높음', medium: '보통', low: '낮음' };
 
 /** Quality choices (radio group) plus the antialias checkbox. Inline it is a button + popover; inside the narrow-width "더보기" menu it is laid out flat. */
@@ -102,6 +115,9 @@ export function Toolbar() {
 
   const secondaryOf = (inMenu: boolean) => (
     <>
+      {inMenu && (
+        <a className="tb home-item" href="/" title={HOME_LABEL}><ComsMark size={16} /> <span className="tb-more-text">COM's 홈으로</span></a>
+      )}
       <label className="speed" title="시뮬레이션 속도">
         <span className="sr">속도</span>
         <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))} aria-label="시뮬레이션 속도">
@@ -134,9 +150,14 @@ export function Toolbar() {
   );
   return (
     <header className="toolbar" role="toolbar" aria-label="도구 모음">
-      <div className="brand" aria-label="COM's Circuit Lab">
-        <span className="brand-dot" />
-        <strong>Circuit Lab</strong>
+      <div className="brand">
+        {/* plain link = full page load to the site; store.ts flushes a pending autosave on pagehide, and Lab has no beforeunload prompt, so this behaves like any navigation */}
+        <a className="brand-home" href="/" aria-label={HOME_LABEL} title={HOME_LABEL}>
+          <ComsMark />
+          <span className="brand-home-text">COM's</span>
+        </a>
+        <span className="brand-sep" aria-hidden="true">/</span>
+        <strong aria-current="page">Circuit Lab</strong>
       </div>
       <div className="tb-group">
         <div className="pop">
