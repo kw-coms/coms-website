@@ -27,9 +27,23 @@ function savedDone(progressKey: string) {
   }
 }
 
+/** Problem id prefix -> studies it belongs to (the shared "core-" problems are offered in three). Kept here so the hub can tell, without loading the problem lists, which cards will show a resume link. */
+const ID_PREFIX_STUDIES: Array<[string, string[]]> = [['web-', ['web']], ['c-', ['c']], ['java-', ['java']], ['py-', ['python']], ['core-', ['c', 'java', 'python']]]
+
+/** Studies with a last-worked-on problem in saved progress; the Arduino card never has one. */
+function studiesWithResume() {
+  const ids = new Set<string>()
+  for (const [id, entry] of Object.entries(readProgress())) {
+    if (!(entry.lastAt > 0)) continue
+    for (const [prefix, studies] of ID_PREFIX_STUDIES) if (id.startsWith(prefix)) studies.forEach((study) => ids.add(study))
+  }
+  return ids
+}
+
 export default function StudyHubPage() {
-  // Saved practice progress decides, before the lazy summary arrives, how much room each card reserves for it.
-  const hasProgress = Object.keys(readProgress()).length > 0
+  // Decided before the lazy summaries arrive, so each card reserves its "이어서 풀기" row only when it will be shown.
+  const resumable = studiesWithResume()
+  const hasProgress = resumable.size > 0
   return (
     <div className="study-hub">
       <div className="study-hub-inner">
@@ -49,14 +63,14 @@ export default function StudyHubPage() {
                 <span className="study-card-head">
                   <span className="study-tile" aria-hidden="true">{GLYPHS[study.id]}</span>
                   <span className="study-card-titles">
-                    <Link to={`/study/${study.id}`} className="study-card-title study-card-link">{study.title}</Link>
+                    <h2 className="study-card-title"><Link to={`/study/${study.id}`} className="study-card-link">{study.title}</Link></h2>
                     <span className="study-card-sub">{study.subtitle}</span>
                   </span>
                 </span>
                 <ArrowRight className="study-card-go" size={16} aria-hidden="true" />
                 <span className="study-card-desc">{study.description}</span>
                 {done > 0 && <span className="study-card-done">강의 {done}개 완료</span>}
-                <Suspense fallback={<div className="ex-hub-summary" data-reserve={hasProgress || undefined} aria-hidden="true" />}><StudyPracticeSummary studyId={study.id} reserveResume={hasProgress} /></Suspense>
+                <Suspense fallback={<div className="ex-hub-summary" data-reserve={resumable.has(study.id) || undefined} aria-hidden="true" />}><StudyPracticeSummary studyId={study.id} reserveResume={resumable.has(study.id)} /></Suspense>
               </li>
             )
           })}
@@ -67,7 +81,7 @@ export default function StudyHubPage() {
                 <span className="study-card-head">
                   <span className="study-tile study-tile-lab" aria-hidden="true"><Zap size={22} strokeWidth={2} /></span>
                   <span className="study-card-titles">
-                    <span className="study-card-title">Circuit Lab</span>
+                    <h2 className="study-card-title">Circuit Lab</h2>
                     <span className="study-card-sub">Arduino 시뮬레이터</span>
                   </span>
                 </span>
