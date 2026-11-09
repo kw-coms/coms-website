@@ -107,6 +107,8 @@ export interface MissionProgress {
 const BLANK_CODE = `void setup() {\n  pinMode(13, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(500);\n  digitalWrite(13, LOW);\n  delay(500);\n}\n`;
 export { SAVE_KEY };
 export const THEME_KEY = 'coms-lab:theme';
+/** The main site's theme key (same origin); read-only here. */
+export const SITE_THEME_KEY = 'kwcoms-theme-mode:v2';
 export const BACKUP_KEY = 'coms-lab:scene:v1:backup';
 /** The backup that BACKUP_KEY held before a newer one replaced it (never lose the older one silently). */
 export const BACKUP_PREV_KEY = 'coms-lab:scene:v1:backup-prev';
@@ -149,7 +151,8 @@ function withGeneratedCode(s: Scene, analysis: Analysis, trusted = false): Scene
 function initialTheme(): Theme {
   const saved = getItem(THEME_KEY);
   if (saved === 'light' || saved === 'dark') return saved;
-  return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  // same rule as the site's getStoredThemeMode(): anything but 'light' (including no key) is dark. Keep in sync with the inline script in index.html.
+  return getItem(SITE_THEME_KEY) === 'light' ? 'light' : 'dark';
 }
 
 /** The autosave of a scene with blocks is wrapped with this marker: it says the blocks are Blockly's own save (see saveNow). */

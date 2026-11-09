@@ -60,8 +60,8 @@ function QualityMenu({ inMenu }: { inMenu: boolean }) {
   if (inMenu) return <div className="quality-flat">{body}</div>;
   return (
     <div className="pop quality-pop" onPointerDown={() => { pointerIn.current = true; }} onPointerUp={() => { pointerIn.current = false; }} onBlur={(e) => { if (open && !pointerIn.current && !e.currentTarget.contains(e.relatedTarget as Node | null)) setOpen(false); }}>
-      <button ref={btn} type="button" className={`tb quality-btn ${open ? 'on' : ''}`} aria-haspopup="dialog" aria-expanded={open} title="화질 (느린 컴퓨터에서는 낮춰 보세요)" onClick={() => { if (!open && getState().qualityNotice) dismissQualityNotice(); setOpen(!open); }}>
-        화질: {qmode === 'auto' ? `자동 (${QUALITY_LABEL[qeff]})` : QUALITY_LABEL[qmode as Quality]}
+      <button ref={btn} type="button" className={`tb quality-btn ${open ? 'on' : ''}`} aria-haspopup="dialog" aria-expanded={open} title="화질 (느린 컴퓨터에서는 낮춰 보세요)" aria-label={`화질: ${qmode === 'auto' ? `자동 (${QUALITY_LABEL[qeff]})` : QUALITY_LABEL[qmode as Quality]}`} onClick={() => { if (!open && getState().qualityNotice) dismissQualityNotice(); setOpen(!open); }}>
+        <span className="q-text">화질: </span>{qmode === 'auto' ? `자동 (${QUALITY_LABEL[qeff]})` : QUALITY_LABEL[qmode as Quality]}
         <ChevronDown size={14} />
       </button>
       {open && <div ref={pop} className="popover quality-popover" role="dialog" aria-label="화질 설정">{body}</div>}

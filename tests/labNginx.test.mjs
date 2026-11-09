@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 
 const nginx = readFileSync(new URL('../nginx.frontend.conf', import.meta.url), 'utf8')
@@ -55,7 +56,14 @@ assert.match(block('location ^~ /lab/api/ {'), /return 404/, 'unlisted /lab/api 
 assert.ok(nginx.indexOf('location ^~ /lab/ {') < nginx.indexOf('location / {'))
 
 // Lab CSP: own-origin only, plus the three documented exceptions. The site CSP never applies to /lab/.
-assert.match(labHeaders, /default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self'/)
+assert.match(labHeaders, /default-src 'self'; script-src 'self' 'sha256-8xDRk9gr3sQy5WMIOWqklueBzDSb7\+cGGnIyWIc5xb4='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self'/)
+// The CSP hash must be the hash of the one inline script in lab/index.html, so editing the script without re-hashing fails here, not in the browser.
+const labHtml = readFileSync(new URL('../lab/index.html', import.meta.url), 'utf8')
+const inlineScripts = [...labHtml.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
+assert.equal(inlineScripts.length, 1, 'lab/index.html has exactly one inline script')
+const inlineHash = `'sha256-${createHash('sha256').update(inlineScripts[0][1]).digest('base64')}'`
+const scriptSrc = labHeaders.match(/Content-Security-Policy "[^"]*?script-src ([^;"]*)/)?.[1].split(' ')
+assert.ok(scriptSrc?.includes(inlineHash), `script-src must contain ${inlineHash} (hash of the inline script in lab/index.html)`)
 assert.match(labHeaders, /frame-ancestors 'none'/)
 assert.doesNotMatch(labHeaders, /https:/)
 for (const header of [siteHeaders, labHeaders]) assert.match(header, /include \/etc\/nginx\/security-headers-common\.conf;/)
