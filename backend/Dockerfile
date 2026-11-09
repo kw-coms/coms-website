@@ -8,9 +8,9 @@ COPY gradle ./gradle
 RUN chmod +x ./gradlew
 
 RUN --mount=type=cache,id=coms-backend-gradle,target=/root/.gradle,sharing=locked \
-    for attempt in 1 2 3; do \
+    for attempt in 1 2 3 4 5; do \
       if ./gradlew --version --no-daemon; then exit 0; fi; \
-      sleep $((attempt * 5)); \
+      sleep $((attempt * 15)); \
     done; \
     exit 1
 
