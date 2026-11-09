@@ -297,8 +297,7 @@
 
 .theme-home .bg-white,
 .apple-route .bg-white,
-.theme-popover .bg-white,
-.appearance-panel .bg-white {
+.theme-popover .bg-white {
 	background-color: var(--app-surface) !important;
 }
 
@@ -307,8 +306,7 @@
 .theme-home .bg-\[\#fafafa\],
 .apple-route .bg-\[\#fafafa\],
 .theme-home .bg-\[\#f5f5f5\],
-.apple-route .bg-\[\#f5f5f5\],
-.appearance-panel .bg-\[\#f5f5f7\] {
+.apple-route .bg-\[\#f5f5f5\] {
 	background-color: var(--app-surface-soft) !important;
 }
 
@@ -318,8 +316,7 @@
 }
 
 .theme-home .bg-white\/88,
-.apple-route .bg-white\/88,
-.appearance-panel.bg-white\/88 {
+.apple-route .bg-white\/88 {
 	background-color: color-mix(in srgb, var(--app-surface) 88%, transparent) !important;
 }
 
@@ -714,29 +711,25 @@
 }
 
 .appearance-mode-toggle,
-.appearance-color-row > label,
-.appearance-color-row > button {
+.appearance-color-actions > label,
+.appearance-color-actions > button {
 	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48);
 }
 
 :root[data-theme-mode='dark'] .appearance-mode-toggle,
-:root[data-theme-mode='dark'] .appearance-color-row > label,
-:root[data-theme-mode='dark'] .appearance-color-row > button {
+:root[data-theme-mode='dark'] .appearance-color-actions > label,
+:root[data-theme-mode='dark'] .appearance-color-actions > button {
 	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.appearance-panel .text-\[\#1d1d1f\],
 .theme-popover .text-\[var\(--theme-body-dark\)\] {
 	color: var(--app-text) !important;
 }
 
-.appearance-panel .text-\[\#6e6e73\],
-.appearance-panel .text-\[\#86868b\],
 .theme-popover .text-\[var\(--theme-body-muted\)\] {
 	color: var(--app-muted) !important;
 }
 
-.appearance-panel .border-black\/10,
 .theme-popover .border-black\/10,
 .theme-popover .border-black\/8 {
 	border-color: var(--app-hairline) !important;
