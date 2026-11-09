@@ -97,9 +97,14 @@ test('the practice preview grows with tall content', async ({ page }) => {
 test('a playground output frame fits its content', async ({ page }) => {
   await mockOptionalApis(page)
   await page.goto('/study/web')
-  const stage = page.locator('.pg-stage').filter({ has: page.getByRole('button', { name: /직접 해보기/ }) }).first()
+  // The edit button reads 직접 해보기 and becomes 편집 닫기 once pressed (the stage toolbar re-renders), so match
+  // either label. No stage is in edit mode on load (asserted below), so the first match is the same stage before
+  // and after the click, and plain locators re-resolve after the re-render.
+  await expect(page.getByRole('button', { name: /편집 닫기/ })).toHaveCount(0)
+  const stage = page.locator('.pg-stage').filter({ has: page.getByRole('button', { name: /직접 해보기|편집 닫기/ }) }).first()
   await stage.scrollIntoViewIfNeeded()
   await stage.getByRole('button', { name: /직접 해보기/ }).click()
+  await expect(stage.getByRole('button', { name: /편집 닫기/ })).toBeVisible()
   await stage.getByRole('button', { name: /실행/ }).first().click()
   const out = await stage.locator('iframe.pg-frame').elementHandle()
   await expect.poll(settled(out), { timeout: 5000 }).toBeNull()
