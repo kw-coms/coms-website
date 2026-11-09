@@ -7,7 +7,7 @@ export type TimelineTerm = 'spring' | 'fall' | 'upcoming'
 
 export interface TimelinePhoto {
   id: string
-  /** File stem under /activities/2026/ (`<stem>-1600.webp` and `<stem>-800.webp`). */
+  /** File stem under /member-media/activities/2026/ (members only, served by nginx; not in the repo) (`<stem>-1600.webp` and `<stem>-800.webp`). */
   stem: string
   /** Pixel size of the large file (fixes the aspect ratio before the image loads). */
   width: number
@@ -284,7 +284,7 @@ export const statusLabel: Record<TimelineStatus, string> = {
 
 export function photoSrc(p: TimelinePhoto) {
   return {
-    src: `/activities/2026/${p.stem}-1600.webp`,
-    srcSet: `/activities/2026/${p.stem}-800.webp ${p.smallWidth}w, /activities/2026/${p.stem}-1600.webp ${p.width}w`,
+    src: `/member-media/activities/2026/${p.stem}-1600.webp`,
+    srcSet: `/member-media/activities/2026/${p.stem}-800.webp ${p.smallWidth}w, /member-media/activities/2026/${p.stem}-1600.webp ${p.width}w`,
   }
 }

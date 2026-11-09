@@ -105,3 +105,15 @@ assert.ok(deploy.indexOf('sidecars_start') > deploy.indexOf('if ! site_is_health
 assert.doesNotMatch(deploy, /--no-build coms-backend coms-frontend coms-lab-compiler/)
 
 console.log('lab nginx / compose contract passed')
+
+// Members-only photos: they are served from a read-only host mount (not the repo/image), behind the same session check.
+const memberMedia = block('location ^~ /member-media/ {')
+for (const part of [/auth_request \/lab\/_auth;/, /alias \/usr\/share\/nginx\/member-media\/;/, /try_files \$uri =404;/,
+  /add_header Cache-Control "private, max-age=3600";/, /add_header X-Robots-Tag "noindex";/, /security-headers-common\.conf/]) {
+  assert.match(memberMedia, part)
+}
+assert.doesNotMatch(memberMedia, /autoindex\s+on/, 'no directory listing')
+assert.doesNotMatch(memberMedia, /Cache-Control[^\n]*public/, 'a shared cache must never keep a member photo')
+assert.match(compose, /- \$\{COMS_MEMBER_MEDIA_DIR:-\.\/member-media\}:\/usr\/share\/nginx\/member-media:ro/)
+assert.match(readFileSync(new URL('../.gitignore', import.meta.url), 'utf8'), /^member-media\/$/m, 'photos stay out of the public repo')
+assert.match(readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8'), /git clean -fdx [^\n]*-e member-media\//, 'the deploy must not delete the uploaded photos')

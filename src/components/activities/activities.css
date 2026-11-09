@@ -285,6 +285,44 @@
 	outline-offset: -3px;
 }
 
+/* Guest placeholder: same box as a photo (ratio and row rules come from .act-photo), nothing to zoom */
+.act-photo-locked {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.6rem;
+	padding: 1rem;
+	border: 1px dashed var(--app-hairline);
+	cursor: default;
+	text-align: center;
+}
+
+.act-photo-locked p {
+	max-width: 16rem;
+	color: var(--app-muted);
+	font-size: 0.875rem;
+	line-height: 1.5;
+	word-break: keep-all;
+}
+
+.act-photo-locked a {
+	color: var(--app-text);
+	font-size: 0.875rem;
+	font-weight: 700;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+.act-photo-locked a:hover {
+	color: var(--app-accent);
+}
+
+.act-photo-locked a:focus-visible {
+	outline: 3px solid var(--app-accent);
+	outline-offset: 2px;
+}
+
 .act-photo-zoom {
 	position: absolute;
 	right: 0.6rem;

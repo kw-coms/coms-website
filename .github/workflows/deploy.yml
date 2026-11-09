@@ -191,7 +191,9 @@ jobs:
 
             # Keep only persistent secrets/data; remove every other untracked or ignored build artifact.
             # secrets/ holds the optional Firebase service-account file mounted by docker-compose.yml.
-            git clean -fdx -e .env -e backend-data/ -e backend/uploads/ -e uploads/ -e secrets/
+            # member-media/ holds the members-only photos mounted into coms-frontend (git-ignored, so
+            # `git clean -x` would delete them on every deploy).
+            git clean -fdx -e .env -e backend-data/ -e backend/uploads/ -e uploads/ -e secrets/ -e member-media/
 
             NEW_TAG="$(git rev-parse --short=12 HEAD)"
             export COMS_IMAGE_TAG="$NEW_TAG"
