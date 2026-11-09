@@ -4,6 +4,7 @@ import { ExternalLink, HeartHandshake, Mail } from 'lucide-react'
 import { queryKeys } from '../services/queryKeys'
 import { getSponsorPage, listSponsors, sponsorImageSrc } from '../services/sponsorApi'
 import {
+  DEFAULT_SPONSOR_ACCENT,
   defaultSponsorPageSettings,
   sponsorDisplayName,
   sponsorInitial,
@@ -16,6 +17,10 @@ import { renderRichBody } from '../components/richEditor/renderRichBody'
 import { Skeleton, SkeletonGroup } from '../components/common/Skeleton'
 import ErrorState from '../components/common/ErrorState'
 import { isSafeUrl } from '../utils/sanitizeHtml'
+import '../styles/site-pages.css'
+
+/** Text in an admin-chosen colour is pulled 70% toward the theme's text colour so it keeps AA contrast on either background. */
+const readable = (color: string) => `color-mix(in srgb, ${color} 30%, var(--app-text))`
 
 /**
  * 후원자 공개 페이지. Logged-out visitors see exactly what members see: the API
@@ -24,6 +29,8 @@ import { isSafeUrl } from '../utils/sanitizeHtml'
  *
  * <p>The admin-chosen accent colour is injected as a scoped CSS custom property, never
  * as raw CSS text, and only after {@code normalizeAccentColor} has confirmed it is a #hex.
+ * The default accent is the site's own (so every accent colour works); a colour the admin picked
+ * only ever fills shapes and borders, text stays on theme tokens.
  */
 export default function Sponsors() {
   const listQuery = useQuery({ queryKey: queryKeys.sponsors.list(), queryFn: listSponsors })
@@ -33,7 +40,11 @@ export default function Sponsors() {
   const groups = visibleSponsorGroups(listQuery.data)
   const sponsorCount = groups.reduce((total, group) => total + group.sponsors.length, 0)
   const bannerUrl = sponsorImageSrc(pageQuery.data?.bannerImageUrl)
-  const accentStyle = { '--sponsor-accent': settings.accentColor } as CSSProperties
+  const accent = settings.accentColor === DEFAULT_SPONSOR_ACCENT ? 'var(--app-accent)' : settings.accentColor
+  const accentStyle = {
+    '--sponsor-accent': accent,
+    '--sponsor-accent-text': accent === 'var(--app-accent)' ? 'var(--app-accent-text)' : readable(accent),
+  } as CSSProperties
 
   if (listQuery.isLoading || pageQuery.isLoading) {
     return (
@@ -57,7 +68,7 @@ export default function Sponsors() {
   }
 
   return (
-    <div className="space-y-10 pb-10" style={accentStyle}>
+    <div className="space-y-10 pb-10 pt-2" style={accentStyle}>
       <SponsorHero
         title={settings.heroTitle}
         subtitle={settings.heroSubtitle}
@@ -93,7 +104,8 @@ export default function Sponsors() {
       <HowToSection howTo={settings.howToSection} />
 
       {settings.thankYouMessage && (
-        <p className="text-center text-sm font-semibold leading-7 text-[var(--app-muted)]">
+        <p className="mx-auto flex max-w-xl items-center justify-center gap-3 rounded-2xl border border-[var(--app-hairline)] bg-[color-mix(in_srgb,var(--sponsor-accent)_8%,var(--app-surface))] px-5 py-4 text-center text-[15px] font-semibold leading-7 text-[var(--app-text)]">
+          <HeartHandshake size={18} className="shrink-0 text-[var(--sponsor-accent-text)]" aria-hidden="true" />
           {settings.thankYouMessage}
         </p>
       )}
@@ -108,45 +120,23 @@ function SponsorHero({ title, subtitle, bannerUrl, counts }: {
   counts: { sponsors: number; tiers: number } | null
 }) {
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-[var(--app-hairline)] bg-[var(--app-surface)]">
-      {bannerUrl ? (
-        <>
-          <img src={bannerUrl} alt="" aria-hidden="true" className="absolute inset-0 size-full object-cover" />
-          <div className="absolute inset-0 bg-linear-to-b from-black/25 via-black/45 to-black/70" />
-        </>
-      ) : (
-        <div
-          className="absolute inset-0 opacity-90"
-          style={{
-            backgroundImage:
-              'linear-gradient(135deg, color-mix(in srgb, var(--sponsor-accent) 82%, #000000) 0%, color-mix(in srgb, var(--sponsor-accent) 42%, #ffffff) 100%)',
-          }}
-        />
-      )}
-      <div className="relative z-10 px-6 py-14 text-center sm:px-10 sm:py-20">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
-          <HeartHandshake size={13} aria-hidden="true" />
-          Sponsors
-        </span>
-        <h1 className="mt-4 text-3xl font-black leading-tight text-white sm:text-5xl">{title}</h1>
-        <p className="mx-auto mt-4 max-w-2xl text-sm font-semibold leading-7 text-white/85 sm:text-base">{subtitle}</p>
+    <header>
+      <div className="site-head">
+        <div>
+          <h1>{title}</h1>
+          <p className="site-head-lead">{subtitle}</p>
+        </div>
         {counts && (
-          <dl className="mt-7 flex flex-wrap items-center justify-center gap-2">
-            <HeroCount label="총 후원자 수" value={`${counts.sponsors.toLocaleString('ko-KR')}명`} />
-            <HeroCount label="후원 등급" value={`${counts.tiers}개`} />
+          <dl className="site-stats">
+            <div><dt>총 후원자 수</dt><dd>{counts.sponsors.toLocaleString('ko-KR')}명</dd></div>
+            <div><dt>후원 등급</dt><dd>{counts.tiers}개</dd></div>
           </dl>
         )}
       </div>
-    </section>
-  )
-}
-
-function HeroCount({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-full bg-white/15 px-4 py-2 text-white backdrop-blur-sm">
-      <dt className="text-[11px] font-semibold text-white/75">{label}</dt>
-      <dd className="text-sm font-black">{value}</dd>
-    </div>
+      {bannerUrl && (
+        <img src={bannerUrl} alt="" aria-hidden="true" className="mt-8 aspect-[16/5] w-full rounded-3xl border border-[var(--app-hairline)] object-cover" />
+      )}
+    </header>
   )
 }
 
@@ -156,14 +146,17 @@ function TierSection({ group, layout, showTierLabels }: {
   showTierLabels: boolean
 }) {
   const tierColor = group.color || 'var(--sponsor-accent)'
+  // One or two sponsors would sit alone in a wide empty grid: keep the admin's layout, but size the
+  // columns to the count and centre them.
+  const sparse = layout === 'grid' && group.sponsors.length < 3
   return (
     <section>
       {showTierLabels && group.name && (
-        <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className={`mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 ${sparse ? 'justify-center text-center' : ''}`}>
           <span
             className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-black"
             style={{
-              color: tierColor,
+              color: readable(tierColor),
               borderColor: `color-mix(in srgb, ${tierColor} 45%, transparent)`,
               backgroundColor: `color-mix(in srgb, ${tierColor} 12%, transparent)`,
             }}
@@ -172,11 +165,14 @@ function TierSection({ group, layout, showTierLabels }: {
             {group.name}
           </span>
           {group.description && (
-            <p className="text-xs font-semibold text-[var(--app-muted)]">{group.description}</p>
+            <p className="text-[13px] font-semibold text-[var(--app-muted)]">{group.description}</p>
           )}
         </div>
       )}
-      <ul className={layout === 'list' ? 'flex flex-col gap-3' : 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3'}>
+      <ul
+        className={layout === 'list' ? 'flex flex-col gap-3' : sparse ? 'grid gap-3 sm:justify-center sm:[grid-template-columns:repeat(var(--n),minmax(0,22rem))]' : 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3'}
+        style={sparse ? ({ '--n': group.sponsors.length } as CSSProperties) : undefined}
+      >
         {group.sponsors.map((sponsor, index) => (
           <li key={sponsor.anonymous ? `anon-${index}` : sponsor.id}>
             <SponsorCard sponsor={sponsor} tierColor={tierColor} layout={layout} />
@@ -199,7 +195,7 @@ function SponsorCard({ sponsor, tierColor, layout }: {
   const href = !sponsor.anonymous && sponsor.linkUrl && isSafeUrl(sponsor.linkUrl) ? sponsor.linkUrl : ''
 
   return (
-    <article className={`flex h-full gap-4 rounded-2xl border border-[var(--app-hairline)] bg-[var(--app-surface)] p-4 transition hover:border-[color-mix(in_srgb,var(--sponsor-accent)_40%,transparent)] ${layout === 'list' ? 'items-center' : 'flex-col items-start sm:p-5'}`}>
+    <article className={`flex h-full gap-4 rounded-2xl border border-[var(--app-hairline)] bg-[var(--app-surface)] p-4 transition hover:border-[color-mix(in_srgb,var(--sponsor-accent)_50%,var(--app-hairline))] ${layout === 'list' ? 'items-center' : 'flex-col items-start sm:p-5'}`}>
       <div className={layout === 'list' ? 'shrink-0' : ''}>
         {logoUrl ? (
           <img
@@ -213,7 +209,7 @@ function SponsorCard({ sponsor, tierColor, layout }: {
             aria-hidden="true"
             className="flex size-14 items-center justify-center rounded-xl text-xl font-black"
             style={{
-              color: tierColor,
+              color: readable(tierColor),
               backgroundColor: `color-mix(in srgb, ${tierColor} 14%, transparent)`,
             }}
           >
@@ -229,13 +225,13 @@ function SponsorCard({ sponsor, tierColor, layout }: {
           </p>
         )}
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-          {period && <span className="text-[11px] font-semibold text-[var(--app-subtle)]">{period}</span>}
+          {period && <span className="text-xs font-semibold text-[var(--app-subtle)]">{period}</span>}
           {href && (
             <a
               href={href}
               target="_blank"
               rel="noreferrer noopener"
-              className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--sponsor-accent)] hover:underline"
+              className="inline-flex items-center gap-1 text-xs font-bold text-[var(--sponsor-accent-text)] underline-offset-2 hover:underline"
             >
               바로가기
               <ExternalLink size={11} aria-hidden="true" />
@@ -271,9 +267,9 @@ function HowToSection({ howTo }: { howTo: { title: string; bodyHtml: string; con
         {howTo.contactEmail && (
           <a
             href={`mailto:${howTo.contactEmail}`}
-            className="inline-flex items-center gap-1.5 rounded-full bg-[var(--sponsor-accent)] px-4 py-2 text-xs font-bold text-white transition hover:opacity-90"
+            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--sponsor-accent)] bg-[color-mix(in_srgb,var(--sponsor-accent)_16%,transparent)] px-4 py-2 text-xs font-bold text-[var(--app-text)] transition hover:bg-[color-mix(in_srgb,var(--sponsor-accent)_26%,transparent)]"
           >
-            <Mail size={13} aria-hidden="true" />
+            <Mail size={13} className="text-[var(--sponsor-accent-text)]" aria-hidden="true" />
             {howTo.contactEmail}
           </a>
         )}

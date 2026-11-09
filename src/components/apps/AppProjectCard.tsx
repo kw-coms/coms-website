@@ -1,5 +1,6 @@
 import { ArrowUpRight, Download, FileText } from 'lucide-react'
 import { buildProjectStatusBadges } from '../../utils/appProjectStatus'
+import '../../styles/site-pages.css'
 import { projectFileHref, safeProjectLinkUrl } from '../../utils/appProjectUrls'
 
 const STATUS_TONE_CLASS = {
@@ -18,6 +19,12 @@ function formatFileSize(bytes) {
   if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)}MB`
   if (n >= 1024) return `${Math.round(n / 1024)}KB`
   return `${n}B`
+}
+
+/** The host only ("coms.kw.ac.kr"): the path is noise on a card, the link itself is the card. */
+function hostOf(url) {
+  if (typeof url !== 'string') return ''
+  return url.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/^www\./i, '').split(/[/?#]/)[0]
 }
 
 function fileLabel(file) {
@@ -40,6 +47,7 @@ export default function AppProjectCard({
   showStatusBadges = false,
   linkState = null,
   interactive = true,
+  showAuthor = true,
   className = '',
   testId,
 }: {
@@ -48,6 +56,8 @@ export default function AppProjectCard({
   /** What the server's last look at the link found; see linkStateOf. */
   linkState?: 'UP' | 'DOWN' | 'UNKNOWN' | null
   interactive?: boolean
+  /** False where one author is said once for the whole page instead of on every card. */
+  showAuthor?: boolean
   className?: string
   testId?: string
 }) {
@@ -66,25 +76,57 @@ export default function AppProjectCard({
   // can be minutes old), but a visitor should not find out from an error page.
   const notAnswering = hasLink && linkState === 'DOWN' && !showStatusBadges
 
+  const title = project?.title || '입력 중인 Apps 항목'
+  const host = hostOf(project?.displayUrl)
+  const open = hasLink && (
+    wholeCardLink ? (
+      <span className="app-card-open">
+        열기
+        <ArrowUpRight size={15} aria-hidden="true" />
+      </span>
+    ) : (
+      <a
+        href={linkHref || undefined}
+        target="_blank"
+        rel="noreferrer"
+        aria-label={`${title} 열기`}
+        className="app-card-open"
+      >
+        열기
+        <ArrowUpRight size={15} aria-hidden="true" />
+      </a>
+    )
+  )
+
   return (
     <CardTag
       {...cardProps}
       data-testid={testId}
-      className={`apple-product-panel group flex min-h-64 flex-col px-6 py-6 text-left no-underline transition hover:-translate-y-0.5 ${className}`}
+      className={`apple-product-panel app-card group text-left no-underline transition hover:-translate-y-0.5 ${className}`}
     >
-      {project?.eyebrow && <p className="text-sm font-semibold text-[var(--app-accent-text)]">{project.eyebrow}</p>}
-      <h3 className="mt-3 text-2xl font-semibold leading-tight text-[#1d1d1f]">{project?.title || '입력 중인 Apps 항목'}</h3>
-      {project?.description && (
-        <p className="mt-3 flex-1 text-sm font-medium leading-6 text-[#6e6e73]">{project.description}</p>
-      )}
-      {project?.madeBy && (
-        <p className={`text-xs font-semibold text-[var(--app-subtle)] ${project?.description ? 'mt-4' : 'mt-3 flex-1'}`}>
-          만든 사람: {project.madeBy}
-        </p>
+      <span className="app-card-tile" aria-hidden="true">{Array.from(title)[0]?.toUpperCase()}</span>
+      <div className="app-card-head">
+        {project?.eyebrow && <p className="app-card-eyebrow">{project.eyebrow}</p>}
+        <h3 className="app-card-title">{title}</h3>
+      </div>
+      {open}
+      {project?.description && <p className="app-card-desc">{project.description}</p>}
+      {(host || notAnswering || (showAuthor && project?.madeBy)) && (
+        <div className="app-card-foot">
+          {notAnswering && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-hairline-strong)] px-2.5 py-0.5 text-xs font-bold text-[var(--app-text)]">
+              <span className="size-1.5 rounded-full bg-[var(--app-danger)]" aria-hidden="true" />
+              지금 응답 없음
+            </span>
+          )}
+          {host && <span className="app-card-host">{host}</span>}
+          {showAuthor && project?.madeBy && <span>만든 사람: {project.madeBy}</span>}
+        </div>
       )}
 
+      <div className="app-card-more">
       {badges.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-1.5" aria-label="앱 상태">
+        <div className="mt-3 flex flex-wrap gap-1.5" aria-label="앱 상태">
           {badges.map((badge) => (
             <span
               key={badge.key}
@@ -96,36 +138,8 @@ export default function AppProjectCard({
         </div>
       )}
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        {notAnswering && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-hairline-strong)] px-2.5 py-1 text-xs font-bold text-[var(--app-text)]">
-            <span className="size-1.5 rounded-full bg-[var(--app-danger)]" aria-hidden="true" />
-            지금 응답 없음
-          </span>
-        )}
-        {hasLink && (
-          wholeCardLink ? (
-            <span className="inline-flex items-center gap-2 text-sm font-bold text-[var(--app-accent-text)]">
-              열기
-              <ArrowUpRight size={15} aria-hidden="true" />
-            </span>
-          ) : (
-            <a
-              href={linkHref || undefined}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={`${project?.title || '앱'} 열기`}
-              className="inline-flex items-center gap-2 text-sm font-bold text-[var(--app-accent-text)] no-underline"
-            >
-              열기
-              <ArrowUpRight size={15} aria-hidden="true" />
-            </a>
-          )
-        )}
-      </div>
-
       {files.length > 0 && (
-        <div className="mt-4 grid gap-2" aria-label="배포 파일">
+        <div className="mt-3 grid gap-2" aria-label="배포 파일">
           {files.map((file) => {
             const size = formatFileSize(file.fileSize)
             const href = projectFileHref(file.url)
@@ -133,7 +147,7 @@ export default function AppProjectCard({
               <a
                 key={file.id || file.originalName || file.url}
                 href={href}
-                className="flex min-w-0 items-center gap-2 rounded-lg border border-[#d2d2d7] bg-white/72 px-3 py-2 text-xs font-bold text-[#1d1d1f] no-underline transition hover:border-[var(--app-accent-text)] hover:text-[var(--app-accent-text)]"
+                className="flex min-w-0 items-center gap-2 rounded-lg border border-[var(--app-hairline-strong)] bg-[var(--app-surface-soft)] px-3 py-2 text-xs font-bold text-[var(--app-text)] no-underline transition hover:border-[var(--app-accent-text)] hover:text-[var(--app-accent-text)]"
                 onClick={(event) => {
                   event.stopPropagation()
                   if (href === '#') event.preventDefault()
@@ -150,12 +164,7 @@ export default function AppProjectCard({
         </div>
       )}
 
-      {project?.displayUrl && (
-        <span className="mt-3 truncate rounded-full bg-[#f5f5f7] px-3 py-1.5 text-xs font-semibold text-[var(--app-subtle)]">
-          {project.displayUrl}
-        </span>
-      )}
-
+      </div>
     </CardTag>
   )
 }

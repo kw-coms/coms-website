@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { LayoutGrid } from 'lucide-react'
 import { listClubProjects, listClubProjectCategories, listClubProjectLinkStatuses } from '../../services/clubProjectApi'
 import { linkStateOf } from '../../utils/appProjectStatus'
 import AppProjectCard from '../apps/AppProjectCard'
+import '../../styles/site-pages.css'
 
 function groupByCategory(projects, categories) {
   const order = categories.length > 0 ? categories : []
@@ -33,6 +33,7 @@ function CompanionServicesSection() {
   const [categories, setCategories] = useState([])
   const [loadState, setLoadState] = useState('loading')
   const [linkStatuses, setLinkStatuses] = useState([])
+  const [filter, setFilter] = useState('all')
 
   useEffect(() => {
     let mounted = true
@@ -60,42 +61,67 @@ function CompanionServicesSection() {
   }, [])
 
   const groups = groupByCategory(projects, categories)
+  // One author for every project is said once, in the page head, instead of on each card.
+  const authors = new Set(projects.map((project) => (project.madeBy || '').trim()))
+  const soleAuthor = authors.size === 1 ? [...authors][0] : ''
+  const shown = filter === 'all' ? groups : groups.filter((group) => group.key === filter)
 
   return (
-    <section className="coms-sec coms-sec-top">
-      <div className="mx-auto max-w-7xl">
-        <div className="max-w-2xl">
-          <span className="coms-icon coms-board-icon" aria-hidden="true"><LayoutGrid size={22} strokeWidth={2} /></span>
-          <p className="apple-eyebrow">Service launcher</p>
-          <h1 className="apple-display mt-3 text-4xl sm:text-5xl">COM&apos;s Apps</h1>
-          <p className="apple-copy mt-4 text-lg">
-            동아리 부원들이 직접 만든 웹사이트·앱·게임 프로젝트를 한곳에 모았습니다. 카테고리별로 살펴보고, 링크로 바로 열거나 배포 파일을 내려받아 사용해 보세요.
-          </p>
+    <div className="site-page">
+      <div className="site-page-inner">
+        <div className="site-head">
+          <div>
+            <h1>COM&apos;s Apps</h1>
+            <p className="site-head-lead">
+              동아리 부원들이 직접 만든 웹사이트·앱·게임 프로젝트를 한곳에 모았습니다. 링크로 바로 열거나 배포 파일을 내려받아 사용해 보세요.
+            </p>
+          </div>
+          {groups.length > 0 && (
+            <dl className="site-stats">
+              <div><dt>프로젝트</dt><dd>{projects.length}</dd></div>
+              <div><dt>카테고리</dt><dd>{groups.length}</dd></div>
+              {soleAuthor && <div><dt>만든 사람</dt><dd>{soleAuthor}</dd></div>}
+            </dl>
+          )}
         </div>
 
         {loadState === 'error' ? (
-          <p className="mt-8 text-sm font-medium text-[#b3261e]">프로젝트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
+          <p className="mt-8 text-sm font-medium text-[color-mix(in_srgb,var(--app-danger)_65%,var(--app-text))]">프로젝트를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</p>
         ) : groups.length === 0 ? (
-          <p className="mt-8 text-sm font-medium text-[#6e6e73]">등록된 프로젝트가 아직 없습니다.</p>
+          <p className="mt-8 text-sm font-medium text-[var(--app-muted)]">등록된 프로젝트가 아직 없습니다.</p>
         ) : (
-          <div className="mt-10 space-y-12">
-            {groups.map((group) => (
-              <div key={group.key}>
-                <div className="flex items-baseline gap-3">
-                  <h3 className="text-2xl font-bold text-[#1d1d1f]">{group.name}</h3>
-                  <span className="text-sm font-semibold text-[var(--app-subtle)]">{group.projects.length}개</span>
-                </div>
-                <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {group.projects.map((project) => (
-                    <AppProjectCard key={project.id} project={project} linkState={linkStateOf(project, linkStatuses)} />
-                  ))}
-                </div>
+          <>
+            {groups.length > 1 && (
+              <div className="apps-filter" role="group" aria-label="카테고리 필터">
+                <button type="button" className="apps-chip" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>
+                  전체 <span>{projects.length}</span>
+                </button>
+                {groups.map((group) => (
+                  <button key={group.key} type="button" className="apps-chip" aria-pressed={filter === group.key} onClick={() => setFilter(group.key)}>
+                    {group.name} <span>{group.projects.length}</span>
+                  </button>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+            <div className="mt-8">
+              {shown.map((group) => (
+                <section key={group.key} className="apps-group">
+                  <div className="apps-group-head">
+                    <h3>{group.name}</h3>
+                    <span>{group.projects.length}개</span>
+                  </div>
+                  <div className="apps-grid">
+                    {group.projects.map((project) => (
+                      <AppProjectCard key={project.id} project={project} showAuthor={!soleAuthor} linkState={linkStateOf(project, linkStatuses)} />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </>
         )}
       </div>
-    </section>
+    </div>
   )
 }
 
