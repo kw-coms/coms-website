@@ -20,7 +20,7 @@ RUN set -eu; \
       arm64) archive=Linux_ARM64; sha=1e69e077479f300614d4551334e0a33f08ee40b04315d83b8e7e0e94f0d0ee62 ;; \
       *) echo 'Only linux/amd64 and linux/arm64 are supported' >&2; exit 1 ;; \
     esac; \
-    curl -fsSL "https://github.com/arduino/arduino-cli/releases/download/v1.5.1/arduino-cli_1.5.1_${archive}.tar.gz" -o /tmp/cli.tar.gz; \
+    curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 --retry-max-time 120 "https://github.com/arduino/arduino-cli/releases/download/v1.5.1/arduino-cli_1.5.1_${archive}.tar.gz" -o /tmp/cli.tar.gz; \
     echo "$sha  /tmp/cli.tar.gz" | sha256sum -c -; \
     tar -xzf /tmp/cli.tar.gz -C /usr/local/bin arduino-cli; \
     rm /tmp/cli.tar.gz

@@ -6,7 +6,20 @@ import { mockOptionalApis } from './visualSupport.js'
 // measures them through contentFrame().
 const CAP = 640
 
+/**
+ * The frame's size and its document's, or null when it cannot be read right now. An edit or a run reloads the frame
+ * (a fresh document is posted into the sandbox page), and evaluating inside it then fails with "Execution context was
+ * destroyed"; that is a moment to retry, not a failure, so every caller reads this through expect.poll.
+ */
 async function measure(handle) {
+  try {
+    return await read(handle)
+  } catch {
+    return null
+  }
+}
+
+async function read(handle) {
   const box = await handle.boundingBox()
   const inner = await (await handle.contentFrame()).evaluate(() => ({
     scroll: document.documentElement.scrollHeight,
@@ -27,8 +40,8 @@ function problem(m) {
 
 /** Poll function: null once the frame shows its document and fits it. */
 const settled = (handle) => async () => {
-  // the frame may be between two documents (document.write): treat that as not loaded
-  const m = await measure(handle).catch(() => null)
+  // the frame may be between two documents: treat that as not loaded
+  const m = await measure(handle)
   return m?.loaded ? problem(m) : 'not loaded yet'
 }
 
@@ -61,7 +74,7 @@ test('playground output frames and the practice preview grow with tall content',
   await page.keyboard.press('ControlOrMeta+A')
   await page.keyboard.insertText(Array.from({ length: 14 }, (_, i) => `<p>줄 ${i + 1}</p>`).join('\n'))
   const preview = await page.locator('iframe.ex-web-preview').elementHandle()
-  await expect.poll(async () => (await measure(preview)).content, { message: 'preview shows the new code', timeout: 5000 }).toBeGreaterThan(300)
+  await expect.poll(async () => { const m = await measure(preview); return m?.loaded ? m.content : 0 }, { message: 'preview shows the new code', timeout: 5000 }).toBeGreaterThan(300)
   await expect.poll(settled(preview), { timeout: 5000 }).toBeNull()
 
   await page.goto('/study/web')
@@ -95,16 +108,16 @@ test('content that follows its own frame height (min-height:100vh) grows to the 
   // no margin: the content equals the frame, a fixed point, so it takes at most 2 reports and the frame stays put
   await type('<style>html,body,p{margin:0}body{min-height:100vh;background:#eef}</style><p>안녕</p>')
   expect(await page.evaluate(() => window.__sizes.length)).toBeLessThanOrEqual(2)
-  expect((await measure(preview)).height).toBeLessThan(300)
+  await expect.poll(async () => (await measure(preview))?.height ?? Infinity, { timeout: 5000 }).toBeLessThan(300)
   // the default 12px margin never reaches a fixed point: the frame grows to the cap, stops there, and the reports end
   const t0 = Date.now()
   await type('<style>body{min-height:100vh}</style><p>안녕</p>', 0)
-  await expect.poll(async () => (await measure(preview)).height, { timeout: 10_000 }).toBe(CAP)
+  await expect.poll(async () => (await measure(preview))?.height, { timeout: 10_000 }).toBe(CAP)
   console.log(`100vh ramp to the cap: ${Date.now() - t0}ms, ${await page.evaluate(() => window.__sizes.length)} reports`)
   await page.evaluate(() => { window.__sizes.length = 0 })
   await page.waitForTimeout(1000)
   expect(await page.evaluate(() => window.__sizes.length)).toBe(0)
-  expect((await measure(preview)).height).toBe(CAP)
+  await expect.poll(async () => (await measure(preview))?.height, { timeout: 5000 }).toBe(CAP)
 })
 
 test('quick successive edits leave the frame as tall as the last content', async ({ page }) => {
@@ -121,8 +134,7 @@ test('quick successive edits leave the frame as tall as the last content', async
     await page.waitForTimeout(100)
   }
   const preview = await page.locator('iframe.ex-web-preview').elementHandle()
-  await expect.poll(async () => (await measure(preview)).content, { timeout: 5000 }).toBeGreaterThan(600)
+  await expect.poll(async () => { const m = await measure(preview); return m?.loaded ? m.content : 0 }, { timeout: 5000 }).toBeGreaterThan(600)
   await expect.poll(settled(preview), { timeout: 5000 }).toBeNull()
-  const m = await measure(preview)
-  expect(m.height).toBeGreaterThanOrEqual(Math.min(m.content, CAP))
+  await expect.poll(async () => { const m = await measure(preview); return !!m && m.height >= Math.min(m.content, CAP) }, { timeout: 5000 }).toBe(true)
 })
