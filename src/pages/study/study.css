@@ -628,168 +628,117 @@
 /* ---------- /study 허브 ---------- */
 .study-hub {
   min-height: 100vh;
-  padding: calc(var(--apple-nav-height, 44px) + env(safe-area-inset-top) + 40px) 24px 80px;
-  background: var(--app-bg);
+  padding: calc(var(--apple-nav-height, 44px) + env(safe-area-inset-top) + 48px) 24px 96px;
+  background:
+    radial-gradient(60rem 26rem at 50% -8rem, color-mix(in srgb, var(--app-accent) 14%, transparent), transparent 70%),
+    linear-gradient(180deg, transparent, var(--app-bg) 34rem),
+    radial-gradient(circle, color-mix(in srgb, var(--app-text) 13%, transparent) 1px, transparent 1.4px) 0 0 / 23px 23px,
+    var(--app-bg);
   color: var(--app-text);
 }
-.study-hub-inner { max-width: 1040px; margin: 0 auto; }
-.study-hub-eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .08em; color: var(--app-accent-text); margin: 0; }
-.study-hub h1 { font-size: clamp(30px, 5vw, 44px); line-height: 1.25; font-weight: 900; margin: 6px 0 12px; }
-.study-hub-lead { color: var(--app-muted); margin: 0 0 28px; }
-.study-hub-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.study-hub-inner { max-width: 1080px; margin: 0 auto; }
+
+/* Head: title and lead on the left, real totals (and a way back to the last problem) on the right. */
+.study-hub-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 24px 48px; align-items: end; margin-bottom: 36px; }
+.study-hub h1 { font-size: clamp(34px, 5.4vw, 52px); line-height: 1.15; font-weight: 900; letter-spacing: -.02em; margin: 0 0 12px; }
+.study-hub-lead { color: var(--app-muted); font-size: 16px; line-height: 1.6; margin: 0; max-width: 32em; text-wrap: pretty; }
+.study-overview { display: flex; flex-direction: column; gap: 10px; min-height: 82px; justify-content: flex-end; }
+.study-overview[data-reserve] { min-height: 132px; }
+.study-overview-stats { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; border: 1px solid var(--app-hairline); border-radius: 16px; background: color-mix(in srgb, var(--app-surface) 86%, transparent); backdrop-filter: blur(6px); }
+.study-overview-stats > div { display: flex; flex-direction: column-reverse; gap: 2px; padding: 14px 16px; min-width: 0; }
+.study-overview-stats > div + div { border-left: 1px solid var(--app-hairline); }
+.study-overview-stats dt { font-size: 12.5px; font-weight: 600; color: var(--app-muted); }
+.study-overview-stats dd { margin: 0; font-size: 26px; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.study-overview-resume { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: 12px; background: var(--app-accent-soft); color: var(--app-text); font-size: 13.5px; text-decoration: none; transition: background-color .15s; }
+.study-overview-resume svg { flex: none; color: var(--app-accent-text); }
+.study-overview-resume span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.study-overview-resume b { font-weight: 800; margin-right: 4px; }
+.study-overview-resume:hover { background: var(--app-accent-border); }
+.study-overview-resume:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+
+/* Five subject cards on a 6-column grid (3 + 2 wide), then the Circuit Lab banner across the whole row. */
+.study-hub-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
+.study-hub-grid > li { grid-column: span 2; min-width: 0; }
+.study-hub-grid > li:nth-child(n+4):nth-child(-n+5) { grid-column: span 3; }
+.study-hub-grid > li.study-hub-lab { grid-column: 1 / -1; }
 .study-card {
-  position: relative; display: flex; flex-direction: column; gap: 6px; height: 100%;
-  padding: 20px; border-radius: 16px;
+  position: relative; display: flex; flex-direction: column; gap: 12px; height: 100%;
+  padding: 20px; border-radius: 18px;
   background: var(--app-surface); border: 1px solid var(--app-hairline);
   color: inherit; text-decoration: none;
-  transition: transform .15s, box-shadow .15s, border-color .15s;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
+.study-card-head { display: flex; align-items: center; gap: 14px; padding-right: 36px; min-width: 0; }
+.study-card-titles { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.study-tile {
+  flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px;
+  background: var(--app-accent-soft); color: color-mix(in srgb, var(--app-accent-text) 60%, var(--app-text));
+  box-shadow: inset 0 0 0 1px var(--app-accent-border);
+}
+.study-glyph-text { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 15px; font-weight: 800; letter-spacing: -.02em; }
+.study-glyph-big { font-size: 24px; font-family: var(--apple-font-family); font-weight: 900; }
 /* The card is a plain box with several links (nested <a> is invalid): the title link stretches over all of it. */
 .study-card-link { color: inherit; text-decoration: none; }
 .study-card-link::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
 .study-card-link:focus-visible { outline: none; }
-.study-card:has(.study-card-link:focus-visible) { outline: 2px solid var(--app-accent); outline-offset: 2px; }
-.study-card:hover, .study-card:focus-visible, .study-card:has(.study-card-link:focus-visible) { transform: translateY(-2px); border-color: var(--app-accent); box-shadow: 0 12px 30px rgba(0,0,0,.1); }
-.study-card-sub { font-size: 12.5px; font-weight: 700; color: var(--app-accent-text); }
-.study-card-title { font-size: 22px; font-weight: 900; line-height: 1.3; }
-.study-card-desc { color: var(--app-muted); font-size: 14.5px; line-height: 1.6; }
-.study-card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
-.study-card-tags span { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 99px; background: var(--app-accent-soft); color: var(--app-accent-text); }
-.study-card-foot { padding-top: 12px; display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; font-weight: 700; color: var(--app-accent-text); }
-@media (prefers-reduced-motion: reduce) { .study-card { transition: none; } .study-card:hover { transform: none; } }
+.study-card:has(.study-card-link:focus-visible), .study-card:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 3px; }
+.study-card-go { position: absolute; top: 24px; right: 20px; box-sizing: content-box; padding: 6px; border-radius: 99px; color: var(--app-subtle); transition: transform .18s ease, color .18s ease, background-color .18s ease; }
+.study-card:hover, .study-card:has(.study-card-link:focus-visible), .study-card:focus-visible { transform: translateY(-3px); border-color: var(--app-accent-border); box-shadow: 0 14px 32px rgba(0,0,0,.12); }
+.study-card:hover .study-card-go, .study-card:has(.study-card-link:focus-visible) .study-card-go { transform: translateX(2px); color: var(--app-accent-text); background: var(--app-accent-soft); }
+.study-card-sub { font-size: 13px; font-weight: 500; color: var(--app-subtle); }
+.study-card-title { font-size: 21px; font-weight: 800; line-height: 1.3; letter-spacing: -.01em; }
+.study-card-desc { color: var(--app-muted); font-size: 14.5px; line-height: 1.6; text-wrap: pretty; }
+.study-card-done { font-size: 12.5px; font-weight: 600; color: var(--app-muted); }
 
-/* ---------- 회로 그림 (circuits/): 약간 3D로 기울인 Tinkercad 스타일 SVG + 시뮬레이션 ----------
-   그림의 틀(버튼 줄, 그림 상자, 슬라이더, 상태 줄, 캡션 안내)은 content/arduino.html에 이미 들어 있고(circuits/chrome.ts로 생성),
-   모든 줄의 높이는 이 CSS와 그 마크업만으로 정해진다: 스크립트가 붙든, 시뮬레이션이 돌든, 평면/3D·저전력 모드가 바뀌든
-   그림 높이는 첫 화면부터 그대로라서 위쪽 그림 때문에 읽던 글이 밀리지 않는다(스크롤 앵커링이 없는 Safari 포함). */
-.study-page .circuit { margin: 22px auto; max-width: 760px; container-type: inline-size; }
-.study-page .circuit figcaption { margin-top: 10px; font-size: 13px; color: var(--muted); text-align: center; }
-.study-page .circuit .circuit-hint { display: block; margin-top: 2px; }
-.study-page .circuit:not(.is-live) .circuit-hint { visibility: hidden; } /* true only once the table is linked to the drawing */
-/* 버튼 줄: 좁은 그림은 두 줄, 넓은 그림은 한 줄 높이를 늘 차지한다(min-height: 글자만 키우는 설정에서는 잘리지 않고 늘어난다).
-   조립 순서를 켜면 단계 버튼들이 같은 자리에서 '조립 순서 보기'를 대신한다. */
-.study-page .circuit-bar { display: flex; flex-wrap: wrap; align-items: center; align-content: center; justify-content: center; gap: 8px; min-height: 76px; margin: 0 0 10px; }
-@container (min-width: 560px) { .study-page .circuit-bar { min-height: 34px; } }
-.study-page .circuit-stepper { display: flex; align-items: center; gap: 8px; }
-.study-page .circuit-stepper[hidden], .study-page .circuit .cb[hidden] { display: none; }
-.study-page .circuit .cb {
-  border: 1px solid var(--line); background: var(--surface); color: var(--text);
-  font: 600 13px var(--apple-font-family); padding: 6px 12px; border-radius: 99px; cursor: pointer; min-height: 34px;
-  white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
-}
-.study-page .circuit .cb:hover:not(:disabled) { border-color: var(--accent); }
-.study-page .circuit .cb:focus-visible,
-.study-page .circuit-stage:focus-visible,
-.study-page .circuit-range input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.study-page .circuit .cb:disabled { opacity: .45; cursor: default; }
-.study-page .circuit .cb-play { background: var(--accent); border-color: var(--accent); color: #fff; }
-.study-page .circuit .cb-play[aria-pressed='true'] { background: var(--surface); color: var(--accent-text); }
-/* 스크립트가 아직 안 붙었거나 못 붙은 그림: 조작부가 눌리지 않는 상태임이 보이게(색 없는 재생 버튼) */
-.study-page .circuit:not(.is-live) .cb-play { background: var(--surface); border-color: var(--line); color: var(--muted); }
-.study-page .circuit-progress { min-width: 52px; text-align: center; font: 700 14px var(--study-mono); font-variant-numeric: tabular-nums; }
-
-.study-page .circuit-stage {
-  perspective: 1300px; perspective-origin: 50% 35%;
-  border-radius: 14px; padding: 14px 8px 20px; overflow: hidden;
-  background: linear-gradient(#eef2f8, #dde4ee);
-  border: 1px solid var(--line);
-  touch-action: pan-y; cursor: grab;
-}
-.study-page .circuit-stage.is-flat { cursor: default; } /* same padding as 3D: switching views never changes the height */
-.study-page .circuit-stage:active:not(.is-flat) { cursor: grabbing; }
-:root[data-theme-mode='dark'] .study-page .circuit-stage { background: linear-gradient(#232a3b, #151a27); }
-.study-page .circuit-plane {
-  /* the scene's viewBox (--w / --h, written into the page per figure): the box has its final size before the SVG exists */
-  margin: 0 auto; width: 100%; max-width: calc(var(--w) * 1.12px); aspect-ratio: var(--w) / var(--h); min-height: 0; border-radius: 10px;
+/* Circuit Lab: a featured banner, copy on the left, the circuit it builds on the right. */
+.study-card-lab {
+  flex-direction: row; align-items: center; justify-content: space-between; gap: 32px; padding: 28px 32px; overflow: hidden;
   background:
-    radial-gradient(circle, rgba(70, 90, 130, .22) 1px, transparent 1.4px) 0 0 / 18px 18px,
-    linear-gradient(#f9fbfd, #e9eef5);
-  box-shadow: 0 5px 0 #b9c3d2, 0 24px 34px -8px rgba(18, 28, 52, .45);
-  transform-origin: 50% 70%;
-  transition: transform .25s ease;
+    radial-gradient(34rem 16rem at 88% 50%, color-mix(in srgb, var(--app-accent) 16%, transparent), transparent 72%),
+    radial-gradient(circle, color-mix(in srgb, var(--app-text) 11%, transparent) 1px, transparent 1.4px) 0 0 / 23px 23px,
+    var(--app-surface);
+  border-color: var(--app-accent-border);
 }
-:root[data-theme-mode='dark'] .study-page .circuit-plane {
-  background:
-    radial-gradient(circle, rgba(160, 180, 220, .2) 1px, transparent 1.4px) 0 0 / 18px 18px,
-    linear-gradient(#2c344a, #202638);
-  box-shadow: 0 5px 0 #0c1019, 0 24px 34px -8px rgba(0, 0, 0, .7);
-}
-.study-page .circuit-stage.is-flat .circuit-plane { box-shadow: none; transition: none; }
-.study-page .circuit-svg { display: block; width: 100%; height: auto; stroke: none; color: inherit; user-select: none; -webkit-user-select: none; }
+.study-lab-copy { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; max-width: 440px; }
+.study-lab-copy .study-card-head { padding-right: 0; }
+.study-lab-copy .study-card-title { font-size: 26px; }
+.study-tile-lab { background: var(--app-accent-soft); }
+.study-lab-open { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px; border-radius: 99px; background: var(--app-text); color: var(--app-bg); font-size: 14px; font-weight: 700; transition: transform .18s ease; }
+.study-card-lab:hover .study-lab-open, .study-card-lab:focus-visible .study-lab-open { transform: translateX(2px); }
+.study-lab-art { flex: none; width: min(400px, 48%); height: auto; color: var(--app-accent-text); }
+.study-lab-part { fill: var(--app-surface); }
+.study-lab-glow { fill: var(--app-accent); opacity: .16; }
+.study-lab-flow { opacity: .85; animation: study-lab-flow 1.6s linear infinite; }
+@keyframes study-lab-flow { to { stroke-dashoffset: -28; } }
 
-.study-page .circuit-svg .cpart, .study-page .circuit-svg .cfx, .study-page .circuit-svg .cw { transition: opacity .25s ease, visibility .25s; }
-.study-page .circuit-svg .cstep-off { opacity: 0; visibility: hidden; pointer-events: none; }
-.study-page .circuit-svg .cw .wend { opacity: 0; stroke: #ffc400; }
-.study-page .circuit-svg .is-hl { filter: drop-shadow(0 0 5px #ffc400) drop-shadow(0 0 2px #ffc400); }
-.study-page .circuit-svg .cw.is-hl .wend { opacity: 1; }
-.study-page .circuit-svg .hit { outline: none; }
-.study-page .circuit-svg .hit:focus-visible { stroke: #ffc400; stroke-width: 3; }
-.study-page .circuit-svg .waves circle { opacity: 0; transform-box: fill-box; transform-origin: center; }
-.study-page .circuit-svg .waves.on circle { opacity: .75; animation: circuit-wave 1.3s ease-out infinite; }
-@keyframes circuit-wave { from { transform: scale(.55); opacity: .85; } to { transform: scale(1.7); opacity: 0; } }
-
-/* 슬라이더와 모드 버튼: 칸 수는 그림 폭(560px 기준)으로만 정해지고, 각 칸은 한 줄짜리 글(이름 | 값)과 슬라이더 한 줄이다.
-   글자 폭(나중에 바뀌는 웹폰트 등)은 줄 수를 바꾸지 못한다: 긴 이름은 줄바꿈 대신 말줄임. */
-.study-page .circuit-ctl { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px 18px; margin-top: 10px; }
-.study-page .circuit-ctl:empty { display: none; }
-.study-page .circuit-range { display: grid; grid-template-columns: minmax(0, 1fr) 56px; align-items: center; column-gap: 8px; font-size: 13px; font-weight: 600; }
-.study-page .circuit-range-label { grid-area: 1 / 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.study-page .circuit-range-out { grid-area: 1 / 2; text-align: right; white-space: nowrap; font: 700 13px var(--study-mono); font-variant-numeric: tabular-nums; }
-.study-page .circuit-range input { grid-area: 2 / 1 / 3 / 3; width: 100%; margin: 4px 0 0; accent-color: var(--accent); }
-.study-page .circuit-modes { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-@container (min-width: 560px) {
-  .study-page .circuit-ctl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  /* a slider left alone on its row sits in the middle, as wide as one column */
-  .study-page .circuit-range:last-of-type:nth-of-type(odd) { grid-column: 1 / -1; justify-self: center; width: calc(50% - 9px); }
-  .study-page .circuit-modes { flex-direction: row; justify-content: center; }
+@media (max-width: 899px) {
+  .study-hub-head { grid-template-columns: 1fr; align-items: start; margin-bottom: 28px; }
+  .study-hub-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .study-hub-grid > li, .study-hub-grid > li:nth-child(n+4):nth-child(-n+5) { grid-column: span 1; }
+  .study-hub-grid > li:nth-child(5), .study-hub-grid > li.study-hub-lab { grid-column: 1 / -1; }
 }
-/* 상태 줄: 숨은 .circuit-status-size들(대기 안내 + 모든 실행 문구 틀, 숫자는 가장 넓게)이 높이를 정하고, 보이는 글(.circuit-status)은
-   그 상자를 채울 뿐 크기에 관여하지 않는다(contain: size). 어떤 문구로 바뀌어도 줄 높이는 그대로다. */
-.study-page .circuit-status-box {
-  display: grid; margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line);
-  font: 13px/1.5 var(--study-mono); text-align: center; word-break: keep-all;
-}
-.study-page .circuit-status-box > * { grid-area: 1 / 1; }
-.study-page .circuit-status-size { visibility: hidden; }
-.study-page .circuit-status { contain: size; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-/* 회로 코드나 그림을 불러오지 못한 그림(data-failed): 상태 줄 자리에 안내. 이 글도 자기 자리를 늘 차지하므로 높이는 그대로다. */
-.study-page .circuit-failed { visibility: hidden; display: flex; align-items: center; justify-content: center; }
-.study-page .circuit[data-failed] .circuit-failed { visibility: visible; }
-.study-page .circuit[data-failed] .circuit-status { visibility: hidden; }
-/* wiring table <-> drawing */
-.study-page tr.circuit-row { cursor: default; }
-.study-page tr.circuit-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.study-page tr.circuit-row-on > td, .study-page tr.circuit-row-on > th { background: rgba(255, 196, 0, .22); }
-.study-page tr.circuit-row-current > td { box-shadow: inset 3px 0 0 var(--accent); }
-@media (max-width: 520px) {
-  .study-page .circuit-stage { padding: 10px 4px 16px; border-radius: 10px; } /* flat and 3D alike */
+@media (max-width: 640px) {
+  .study-hub { padding: calc(var(--apple-nav-height, 44px) + env(safe-area-inset-top) + 28px) 16px 64px; }
+  .study-hub-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .study-hub-grid > li, .study-hub-grid > li:nth-child(5), .study-hub-grid > li.study-hub-lab { grid-column: 1; }
+  .study-overview-stats > div { padding: 12px; }
+  .study-overview-stats dd { font-size: 22px; }
+  .study-card { padding: 18px; }
+  .study-card-lab { flex-direction: column; align-items: stretch; gap: 16px; padding: 20px; }
+  .study-lab-art { width: 100%; max-width: 300px; align-self: center; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .study-page .circuit-plane, .study-page .circuit-svg .cpart, .study-page .circuit-svg .cfx, .study-page .circuit-svg .cw { transition: none; }
-  .study-page .circuit-svg .waves.on circle { animation: none; transform: scale(1.1); opacity: .6; }
+  .study-card, .study-card-go, .study-lab-open { transition: none; }
+  .study-card:hover, .study-card:has(.study-card-link:focus-visible), .study-card:focus-visible, .study-card:hover .study-card-go, .study-card-lab:hover .study-lab-open { transform: none; }
+  .study-lab-flow { animation: none; }
 }
 
-/* 회로 그림: 그래픽 가속이 없는 컴퓨터(<html data-perf="lite">)에서는 필터·그림자·연속 애니메이션을 끈다 */
-:root[data-perf='lite'] .study-page .circuit-plane { transition: none; box-shadow: none; }
-:root[data-perf='lite'] .study-page .circuit-svg [filter],
-:root[data-perf='lite'] .study-page .circuit-svg .is-hl { filter: none; }
-:root[data-perf='lite'] .study-page .circuit-svg :is(.cpart, .cfx).is-hl :is(rect, circle, ellipse, path):not([fill='none'], [fill='transparent']) { stroke: #ffc400; stroke-width: 2.6; }
-:root[data-perf='lite'] .study-page .circuit-svg .cw.is-hl .wire > path:nth-of-type(3) { stroke: #ffc400; stroke-width: 11; }
-:root[data-perf='lite'] .study-page .circuit-svg .cw.is-hl .wire > path:nth-of-type(4) { stroke-width: 4.2; }
-:root[data-perf='lite'] .study-page .circuit-svg [data-role^='rgb-glow'] { display: none; }
-:root[data-perf='lite'] .study-page .circuit-svg .cpart, :root[data-perf='lite'] .study-page .circuit-svg .cfx, :root[data-perf='lite'] .study-page .circuit-svg .cw { transition: none; }
-:root[data-perf='lite'] .study-page .circuit-svg .waves.on circle { animation: none; transform: scale(1.1); opacity: .6; }
-
-/* 한 번에 한 줄씩만 낭독되는 스크린 리더용 영역과, 화면 밖 회로의 자리표시 상자 */
-.study-page .circuit-live { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 .study-page .circuit { position: relative; }
 .study-page .circuit[data-offscreen] .circuit-svg .waves.on circle { animation-play-state: paused; }
 
 .study-page [data-scroll-region]:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 
 /* Circuit Lab: card on the hub and banner on the Arduino page (a link to the separate /lab/ app). */
-.study-lab-art { width: 100%; max-width: 240px; height: 64px; color: var(--app-accent-text); }
-.study-card-lab .study-lab-art { margin-bottom: 6px; }
 .study-lab-cta {
   display: flex; align-items: center; gap: 16px;
   max-width: 1132px; margin: 12px 24px 0; padding: 14px 20px; border-radius: 14px;

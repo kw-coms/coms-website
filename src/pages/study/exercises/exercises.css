@@ -75,16 +75,20 @@
 .ex-page iframe { box-sizing: border-box; width: 100%; min-height: 280px; background: #fff; border: 1px solid var(--line); border-radius: 8px; }
 /* Practice block inside a hub card (StudyHubPage). Its links sit above the card's stretched title link; the fixed
    min-height holds the same room while the lazy chunk loads and for every card state, so nothing shifts and cards stay level. */
-.ex-hub-summary { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-height: 96px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--app-hairline); font-size: 13px; color: var(--app-text); }
+.ex-hub-summary { display: flex; flex-direction: column; justify-content: flex-start; gap: 10px; margin-top: auto; min-height: 32px; }
+.ex-hub-summary[data-reserve] { min-height: 70px; }
 .ex-hub-summary a { position: relative; z-index: 1; max-width: 100%; }
-.ex-hub-count { font-size: 13.5px; font-weight: 800; color: var(--app-accent-text); text-decoration: none; }
-.ex-hub-count:hover { text-decoration: underline; text-underline-offset: 3px; }
-.ex-hub-bar { display: block; width: 100%; height: 6px; border-radius: 99px; background: var(--app-accent-soft); overflow: hidden; }
+.ex-hub-row { display: flex; align-items: center; gap: 12px; min-height: 32px; }
+.ex-hub-count { display: inline-flex; align-items: center; gap: 6px; flex: none; height: 32px; padding: 0 12px; border-radius: 99px; border: 1px solid var(--app-hairline); background: var(--app-surface-soft); color: var(--app-text); font-size: 13px; font-weight: 700; text-decoration: none; transition: border-color .15s, background-color .15s; }
+.ex-hub-count svg { color: var(--app-accent-text); }
+.ex-hub-count:hover { border-color: var(--app-accent-border); background: var(--app-accent-soft); }
+.ex-hub-bar { display: block; flex: 1; min-width: 40px; max-width: 120px; height: 5px; border-radius: 99px; background: var(--app-hairline); overflow: hidden; }
 .ex-hub-bar i { display: block; height: 100%; border-radius: inherit; background: var(--app-accent); }
-.ex-hub-resume { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 4px 12px; border-radius: 99px; background: var(--app-accent-soft); color: var(--app-accent-text); font-size: 12.5px; font-weight: 700; text-decoration: none; }
-.ex-hub-resume:hover { background: var(--app-accent-border); }
-.ex-hub-count:focus-visible, .ex-hub-resume:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
-.ex-hub-empty { padding: 4px 0; font-size: 12.5px; color: var(--app-muted); }
+.ex-hub-resume { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; font-size: 12.5px; font-weight: 600; color: var(--app-muted); text-decoration: none; }
+.ex-hub-resume span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ex-hub-resume svg { flex: none; color: var(--app-accent-text); }
+.ex-hub-resume:hover { color: var(--app-text); text-decoration: underline; text-underline-offset: 3px; }
+.ex-hub-count:focus-visible, .ex-hub-resume:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; border-radius: 99px; }
 @media (max-width: 900px) { .ex-columns { grid-template-columns: minmax(0, 1fr); } .ex-row { grid-template-columns: minmax(0, 1fr) auto; } .ex-row strong { grid-column: 1 / -1; } }
 @media (max-width: 500px) { .ex-container, .ex-page > .ex-head, .ex-page > nav { padding: 16px; } .ex-columns { padding: 0 12px; gap: 16px; } .ex-panel { padding: 14px; } .ex-row { padding: 14px; } }
 :root[data-perf='lite'] .ex-page *, :root[data-perf='lite'] .ex-inline * { backdrop-filter: none; box-shadow: none; }
