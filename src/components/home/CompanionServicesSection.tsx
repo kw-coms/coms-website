@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { listClubProjects, listClubProjectCategories, listClubProjectLinkStatuses } from '../../services/clubProjectApi'
 import { linkStateOf } from '../../utils/appProjectStatus'
+import { useAuth } from '../../contexts/useAuth'
 import AppProjectCard from '../apps/AppProjectCard'
 import '../../styles/site-pages.css'
 
@@ -29,6 +30,7 @@ function groupByCategory(projects, categories) {
 }
 
 function CompanionServicesSection() {
+  const { user } = useAuth()
   const [projects, setProjects] = useState([])
   const [categories, setCategories] = useState([])
   const [loadState, setLoadState] = useState('loading')
@@ -52,13 +54,20 @@ function CompanionServicesSection() {
         setCategories([])
         setLoadState('error')
       })
-    // Which links answered the server's last look. The page does not wait for it and does
-    // without it: a failure here only means no app is marked.
+    return () => { mounted = false }
+  }, [])
+
+  // Which links answered the server's last look. Members only: guests are not asked and see no
+  // status dots. The page does not wait for it and does without it: a failure here only means
+  // no app is marked.
+  useEffect(() => {
+    if (!user) return undefined
+    let mounted = true
     listClubProjectLinkStatuses()
       .then((statuses) => { if (mounted) setLinkStatuses(statuses) })
       .catch(() => {})
     return () => { mounted = false }
-  }, [])
+  }, [user])
 
   const groups = groupByCategory(projects, categories)
   // One author for every project is said once, in the page head, instead of on each card.
@@ -112,7 +121,7 @@ function CompanionServicesSection() {
                   </div>
                   <div className="apps-grid">
                     {group.projects.map((project) => (
-                      <AppProjectCard key={project.id} project={project} showAuthor={!soleAuthor} linkState={linkStateOf(project, linkStatuses)} />
+                      <AppProjectCard key={project.id} project={project} showAuthor={!soleAuthor} linkState={linkStateOf(project, user ? linkStatuses : [])} />
                     ))}
                   </div>
                 </section>

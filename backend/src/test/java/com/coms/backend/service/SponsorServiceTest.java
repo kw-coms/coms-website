@@ -48,6 +48,7 @@ class SponsorServiceTest {
 
     @Autowired
     private SponsorService sponsorService;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbc;
     @Autowired private MemberRepository memberRepository;
     @Autowired private RichBodyMediaService richBodyMediaService;
     @Autowired private RichBodyMediaRepository richBodyMediaRepository;
@@ -99,6 +100,25 @@ class SponsorServiceTest {
                 assertThat(sponsor.linkUrl()).isNull();
                 assertThat(sponsor.description()).isNull();
             });
+        });
+    }
+
+    @Test
+    void sponsorAnonymizedByV106NoLongerExposesItsNamePublicly() throws Exception {
+        Long tierId = tier("실버");
+        jdbc.update("INSERT INTO sponsors (id, name, tier_id, description, since_date, anonymous, visible, sort_order)"
+                + " VALUES (1, '테스트 후원자', ?, '테스트 소개', DATE '2026-09-04', FALSE, TRUE, 0)", tierId);
+
+        try (var input = SponsorServiceTest.class.getResourceAsStream("/db/migration/V106__anonymize_sponsor.sql")) {
+            jdbc.execute(new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+        }
+
+        var sponsors = sponsorService.publicList().stream().flatMap(group -> group.sponsors().stream()).toList();
+        assertThat(sponsors).singleElement().satisfies(sponsor -> {
+            assertThat(sponsor.name()).isEqualTo("익명 후원자");
+            assertThat(sponsor.anonymous()).isTrue();
+            assertThat(sponsor.description()).isNull();
+            assertThat(sponsor.id()).isNull();
         });
     }
 
