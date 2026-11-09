@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { ArrowRight, ChevronLeft, ChevronRight, Maximize2, X } from 'lucide-react'
 import {
   foundingExtraPhotoIds,
@@ -13,6 +13,7 @@ import {
   timelinePhotos,
 } from '../../data/activityTimeline'
 import type { TimelineEvent, TimelinePhoto, TimelineStatus } from '../../data/activityTimeline'
+import { useAuth } from '../../contexts/useAuth'
 import './activities.css'
 
 const photoById = new Map(timelinePhotos.map((p) => [p.id, p]))
@@ -39,6 +40,22 @@ function StatusBadge({ status }: { status: TimelineStatus }) {
 }
 
 function PhotoButton({ photo, onOpen, sizes, className = '' }: { photo: TimelinePhoto; onOpen: OpenPhoto; sizes: string; className?: string }) {
+  const { user, loading } = useAuth()
+  const location = useLocation()
+  // The photos show members' faces and nginx only serves them to a signed-in session. A guest gets no
+  // <img> at all, so no photo URL is requested (nothing 401s); the slot keeps its ratio.
+  if (!user) {
+    return (
+      <div className={`act-photo act-photo-locked ${className}`} aria-busy={loading || undefined}>
+        {!loading && (
+          <>
+            <p>로그인하면 활동 사진을 볼 수 있어요</p>
+            <Link to="/login" state={{ from: location }}>로그인</Link>
+          </>
+        )}
+      </div>
+    )
+  }
   const { src, srcSet } = photoSrc(photo)
   return (
     <button type="button" className={`act-photo ${className}`} onClick={() => onOpen(photo.id)} aria-label={`${photo.caption ?? photo.alt} 사진 크게 보기`}>

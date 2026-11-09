@@ -259,6 +259,11 @@ jobs:
           # The deploy creates the backup directory as the deploy user before starting the stack.
           mkdir -p ../coms-backups
           chmod 700 ../coms-backups
+          # A stand-in photo for the members-only /member-media/ check below (the real ones live on the server).
+          mkdir -p member-media/activities/2026
+          echo ci > member-media/activities/2026/ci-fixture.webp
+          # umask 077 above would leave these 700/600, unreadable to nginx's workers in the container.
+          chmod -R a+rX member-media
 
       - name: Build and start the stack the way the deploy does
         run: docker compose --env-file .env -f docker-compose.yml up -d --build --remove-orphans
@@ -301,6 +306,24 @@ jobs:
             | tr -d '\r' | sed -n 's/^[Ss]et-[Cc]ookie: \([^;]*\);.*/\1/p' | paste -sd ';' - | sed 's/;/; /g' > "$RUNNER_TEMP/member-cookies"
           printf '%s' "$password" > "$RUNNER_TEMP/admin-password"
           [ -s "$RUNNER_TEMP/member-cookies" ]
+
+      # /member-media/ serves the members-only photos behind the same session check as the Lab. Proven here
+      # against real nginx and the real backend: a guest is refused (not served, not 404, not the SPA shell).
+      - name: Members-only photos through the frontend container
+        run: |
+          set -euo pipefail
+          site=http://127.0.0.1:3000
+          cookies="$(cat "$RUNNER_TEMP/member-cookies")"
+          [ -n "$cookies" ]
+          url="$site/member-media/activities/2026"
+          [ "$(curl -s -o /dev/null -w '%{http_code}' "$url/does-not-matter.webp")" = 401 ]
+          [ "$(curl -s -o /dev/null -w '%{http_code}' "$url/ci-fixture.webp")" = 401 ]
+          # Signed in: the file is served as private, always-revalidated, noindex; a missing file is 404.
+          headers="$(curl -s -D - -o /dev/null -H "Cookie: $cookies" "$url/ci-fixture.webp" | tr -d '\r')"
+          head -n 1 <<< "$headers" | grep -q ' 200'
+          grep -qi '^cache-control: private, no-cache' <<< "$headers"
+          grep -qi '^x-robots-tag: noindex' <<< "$headers"
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -H "Cookie: $cookies" "$url/does-not-matter.webp")" = 404 ]
 
       - name: Circuit Lab through the frontend container
         run: |

@@ -45,3 +45,5 @@ uploads/
 .tools/
 # Server-only credential files (e.g. the Firebase service account mounted by docker-compose.yml)
 secrets/
+# Members-only photos, uploaded to the server by hand and mounted into coms-frontend (never commit)
+member-media/

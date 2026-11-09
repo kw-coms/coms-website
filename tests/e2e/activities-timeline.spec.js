@@ -1,9 +1,46 @@
 import { expect, test } from '@playwright/test'
-import { mockOptionalApis } from './visualSupport.js'
+import { mockAdminApis, mockOptionalApis } from './visualSupport.js'
+
+// The dev server has no /member-media files (nginx serves them to signed-in members only), so members get a tiny 800x1 image (a w-descriptor srcset scales naturalWidth, a 1x1 would read as 0 wide).
+const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAyAAAAABCAAAAAADA5W6AAAAEElEQVR4nGNoGAWjYBTgBADvwJAQO9LiUwAAAABJRU5ErkJggg==', 'base64')
+const PHOTO_COUNT = 13
+
+async function signInAsMember(page) {
+  await mockAdminApis(page)
+  await page.route('**/member-media/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: PIXEL }))
+}
+
+test.describe('/activities timeline, guest', () => {
+  test('shows locked placeholders and requests no photo', async ({ page }) => {
+    const photoRequests = []
+    page.on('request', (request) => { if (request.url().includes('/member-media/')) photoRequests.push(request.url()) })
+    await mockOptionalApis(page)
+    await page.goto('/activities')
+    const timeline = page.locator('#timeline')
+    await expect(timeline.getByText('로그인하면 활동 사진을 볼 수 있어요')).toHaveCount(PHOTO_COUNT)
+    await expect(timeline.getByText('로그인하면 활동 사진을 볼 수 있어요').first()).toBeVisible()
+    await expect(page.locator('img[src*="member-media"]')).toHaveCount(0)
+    await expect(page.locator('[srcset*="member-media"]')).toHaveCount(0)
+    await expect(timeline.locator('.act-photo')).toHaveCount(PHOTO_COUNT)
+    // No photo is a button, so nothing opens the lightbox.
+    await expect(timeline.locator('button.act-photo')).toHaveCount(0)
+    await expect(page.getByRole('dialog', { name: '활동 사진 크게 보기' })).toBeHidden()
+    expect(photoRequests).toEqual([])
+  })
+
+  test('the placeholder links to /login', async ({ page }) => {
+    await mockOptionalApis(page)
+    await page.goto('/activities')
+    const link = page.locator('#timeline .act-photo-locked').first().getByRole('link', { name: '로그인' })
+    await link.scrollIntoViewIfNeeded()
+    await link.click()
+    await expect(page).toHaveURL(/\/login$/)
+  })
+})
 
 test.describe('/activities timeline', () => {
   test.beforeEach(async ({ page }) => {
-    await mockOptionalApis(page)
+    await signInAsMember(page)
   })
 
   test('renders the semester sections, loads every photo and has alt text', async ({ page }) => {
@@ -17,6 +54,8 @@ test.describe('/activities timeline', () => {
     await expect(timeline.getByRole('link', { name: /지원 안내 보기/ })).toHaveAttribute('href', '/recruit')
 
     const images = timeline.locator('img')
+    await expect(images).toHaveCount(PHOTO_COUNT)
+    await expect(page.locator('.act-photo-locked')).toHaveCount(0)
     const count = await images.count()
     expect(count).toBeGreaterThanOrEqual(12)
     for (let i = 0; i < count; i += 1) {
