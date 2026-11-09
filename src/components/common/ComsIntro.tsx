@@ -409,6 +409,7 @@ export default function ComsIntro() {
   return (
     <div
       ref={overlayRef}
+      data-coms-intro=""
       onClick={() => skipRef.current()}
       // Covered until the page is released so it never shows before the first frame (black
       // for the full form, the page colour for the calm one); from then on the canvas alone

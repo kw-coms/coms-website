@@ -15,6 +15,7 @@ import { canAccessOperationsPanel } from '../utils/roleAccess'
 import { useModalFocus } from '../hooks/useModalFocus'
 import { moveQuickIndex, quickDate, searchQuickItems, type QuickGroup, type QuickItem } from '../utils/quickSearch'
 import { isFullPageLink } from '../utils/fullPageLink'
+import { startSiteTour } from './tour/tourState'
 
 /**
  * Quick jump ("빠른 이동"): one box that goes to any page and, for a signed-in member, to a
@@ -23,6 +24,9 @@ import { isFullPageLink } from '../utils/fullPageLink'
  */
 
 type PageItem = QuickItem & { icon?: LucideIcon }
+
+/** A command, not a page: it has no path and starts the site tour. */
+const TOUR_COMMAND_ID = 'command:tour'
 
 const GROUP_ICONS: Record<QuickGroup, LucideIcon> = {
   page: Compass,
@@ -58,6 +62,7 @@ function buildPages(signedIn: boolean, operations: boolean): PageItem[] {
   } else {
     pages.push(page('/login', '', 'login sign in'), page('/signup', '', 'signup join 가입'))
   }
+  pages.push({ id: TOUR_COMMAND_ID, group: 'page', title: '튜토리얼 시작', hint: '사이트 둘러보기', path: '', keywords: 'tutorial tour guide 투어 안내 도움말 처음' })
   return pages
 }
 
@@ -111,6 +116,10 @@ export default function QuickSearchDialog({ onClose }: { onClose: () => void }) 
   const go = (item: QuickItem | undefined) => {
     if (!item) return
     onClose()
+    if (item.id === TOUR_COMMAND_ID) {
+      startSiteTour()
+      return
+    }
     if (isFullPageLink(item.path)) window.location.assign(item.path)
     else navigate(item.path)
   }

@@ -9,6 +9,7 @@ import {
   LogOut,
   Menu,
   Megaphone,
+  Compass,
   Search,
   Wrench,
   Sparkles,
@@ -26,6 +27,7 @@ import { scrollToTopInstant } from '../utils/themeColors'
 import { isFullPageLink } from '../utils/fullPageLink'
 import NotificationButton from './NotificationButton'
 import { openQuickSearch } from '../utils/quickSearch'
+import { startSiteTour } from './tour/tourState'
 import { ROLE_LABELS, canAccessOperationsPanel } from '../utils/roleAccess'
 import { usePermissions } from '../contexts/usePermissions'
 
@@ -250,6 +252,7 @@ export default function GlobalNavigation() {
             <button
               key={item.id}
               type="button"
+              data-tour={`nav-${item.id}`}
               onClick={() => goNavItem(item)}
               className={`${navClass(item.id)} disabled:cursor-wait disabled:opacity-60`}
             >
@@ -260,6 +263,7 @@ export default function GlobalNavigation() {
           {noticesNavItem && (
             <button
               type="button"
+              data-tour="nav-notices"
               onClick={() => goNavItem(noticesNavItem)}
               className={navClass(noticesNavItem.id)}
             >
@@ -276,6 +280,7 @@ export default function GlobalNavigation() {
                 <button
                   ref={(node) => { groupToggleRefs.current[group.id] = node }}
                   type="button"
+                  data-tour={`nav-${group.id}`}
                   onClick={() => setOpenGroup(open ? null : group.id)}
                   className={`${navClass(group.id, groupActive)} inline-flex items-center gap-1`}
                   data-active={groupActive ? 'true' : undefined}
@@ -320,6 +325,7 @@ export default function GlobalNavigation() {
             <button
               key={item.id}
               type="button"
+              data-tour={`nav-${item.id}`}
               onClick={() => goNavItem(item)}
               disabled={item.auth && authLoading}
               className={`${navClass(item.id)} disabled:cursor-wait`}
@@ -343,6 +349,7 @@ export default function GlobalNavigation() {
             <button
               type="button"
               onClick={() => goPageTop('/settings')}
+              data-tour="account"
               className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] text-[11px] font-bold text-[var(--app-text)] transition hover:bg-black/5 xl:size-auto xl:max-w-[5.5rem] 2xl:max-w-[9rem] xl:border-transparent xl:bg-transparent xl:px-2.5 xl:py-1 xl:text-xs xl:font-semibold xl:text-[var(--app-muted)] xl:hover:text-[var(--app-text)]"
               title={`${user.name} · 계정 설정`}
             >
@@ -367,6 +374,7 @@ export default function GlobalNavigation() {
             <button
               type="button"
               onClick={() => goPageTop('/login')}
+              data-tour="login"
               disabled={authLoading}
               className="inline-flex shrink-0 whitespace-nowrap rounded-full bg-[var(--app-accent)] px-4 py-1 text-xs font-semibold text-white transition hover:bg-[var(--app-accent-hover)] disabled:cursor-wait disabled:opacity-70"
             >
@@ -479,6 +487,15 @@ export default function GlobalNavigation() {
               <Grid3x3 size={15} className="text-sky-500" />
               <span>Apps</span>
               <span className="ml-auto text-xs text-[var(--app-muted)]">서비스</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMobileMenuOpen(false); setMobileOpenGroups([]); startSiteTour() }}
+              className="apple-mobile-menu-item"
+            >
+              <Compass size={15} className="text-sky-500" />
+              <span>튜토리얼 시작</span>
+              <span className="ml-auto text-xs text-[var(--app-muted)]">사이트 둘러보기</span>
             </button>
             {!user && (
               <button type="button" onClick={() => closeAndGo('/login')} disabled={authLoading} className="apple-mobile-menu-item apple-mobile-menu-item-accent disabled:opacity-50">
