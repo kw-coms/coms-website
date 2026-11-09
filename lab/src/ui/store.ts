@@ -151,9 +151,8 @@ function withGeneratedCode(s: Scene, analysis: Analysis, trusted = false): Scene
 function initialTheme(): Theme {
   const saved = getItem(THEME_KEY);
   if (saved === 'light' || saved === 'dark') return saved;
-  const site = getItem(SITE_THEME_KEY);
-  if (site === 'light' || site === 'dark') return site;
-  return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  // same rule as the site's getStoredThemeMode(): anything but 'light' (including no key) is dark. Keep in sync with the inline script in index.html.
+  return getItem(SITE_THEME_KEY) === 'light' ? 'light' : 'dark';
 }
 
 /** The autosave of a scene with blocks is wrapped with this marker: it says the blocks are Blockly's own save (see saveNow). */

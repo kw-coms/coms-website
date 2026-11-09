@@ -151,7 +151,9 @@ button { cursor: pointer; }
 .ctx-menu > button:hover { background: var(--surface-2); } .ctx-menu .danger { color: var(--danger); }
 .ctx-menu kbd { margin-left: auto; font: 11px ui-monospace, Menlo, monospace; color: var(--muted); }
 .ctx-label { padding: 6px 10px 0; font-size: 12px; color: var(--muted); } .ctx-sw { margin: 8px 8px 10px; }
-.perf-notice { position: fixed; left: 50%; top: 58px; transform: translateX(-50%); z-index: 90; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; width: max-content; max-width: min(calc(100vw - 16px), 560px); padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--accent); box-shadow: var(--shadow); font-size: 13px; line-height: 1.5; }
+.notices { position: fixed; left: 50%; top: 58px; transform: translateX(-50%); z-index: 90; display: flex; flex-direction: column; align-items: center; gap: 8px; width: max-content; max-width: min(calc(100vw - 16px), 560px); pointer-events: none; }
+.notices:empty { display: none; }
+.perf-notice { pointer-events: auto; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; width: 100%; padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--accent); box-shadow: var(--shadow); font-size: 13px; line-height: 1.5; }
 .perf-notice > span { flex: 1 1 100%; min-width: 0; }
 .perf-notice button:last-child { margin-left: auto; }
 .perf-notice button { flex: none; height: 30px; padding: 0 12px; border-radius: 7px; border: 0; background: var(--accent); color: var(--accent-text); font-weight: 600; }
@@ -181,7 +183,7 @@ button { cursor: pointer; }
   .toolbar .tb-group.run .tb-text { display: none; } .run-btn.go { padding: 0 11px; }
   .more-pop { position: fixed; top: 46px; right: 6px; left: auto; width: min(260px, calc(100vw - 12px)); }
   .main { flex-direction: column; }
-  .perf-notice { left: 8px; right: 8px; top: auto; bottom: 64px; transform: none; width: auto; max-width: none; }
+  .notices { left: 8px; right: 8px; top: auto; bottom: calc(64px + env(safe-area-inset-bottom)); transform: none; width: auto; max-width: none; align-items: stretch; }
   .perf-notice button { flex: 1 1 auto; height: 36px; } .perf-notice button:last-child { margin-left: 0; }
   .main > .palette { display: none; }
   .stage { flex: 1 1 0; min-height: 0; }

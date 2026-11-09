@@ -97,6 +97,7 @@ export function App() {
         </div>
         <SidePanel />
       </main>
+      <div className="notices">
       {restore && !tutorial && (
         <div className="perf-notice restore" role="alert">
           <span>저장된 작업을 불러오지 못해 백업해 두었어요. 예제 회로로 시작했어요.</span>
@@ -112,6 +113,7 @@ export function App() {
           <button type="button" onClick={dismissQualityNotice}>확인</button>
         </div>
       )}
+      </div>
       <FloatingInstruments />
       <PartInfoDialog />
       <Tutorial />

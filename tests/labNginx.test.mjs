@@ -55,7 +55,7 @@ assert.match(block('location ^~ /lab/api/ {'), /return 404/, 'unlisted /lab/api 
 assert.ok(nginx.indexOf('location ^~ /lab/ {') < nginx.indexOf('location / {'))
 
 // Lab CSP: own-origin only, plus the three documented exceptions. The site CSP never applies to /lab/.
-assert.match(labHeaders, /default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self'/)
+assert.match(labHeaders, /default-src 'self'; script-src 'self' 'sha256-8xDRk9gr3sQy5WMIOWqklueBzDSb7\+cGGnIyWIc5xb4='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self'/)
 assert.match(labHeaders, /frame-ancestors 'none'/)
 assert.doesNotMatch(labHeaders, /https:/)
 for (const header of [siteHeaders, labHeaders]) assert.match(header, /include \/etc\/nginx\/security-headers-common\.conf;/)

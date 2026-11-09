@@ -198,6 +198,16 @@ try {
     await c.close();
   }
   {
+    // a real first visit: skip the tutorial by its button, then the notices show, stacked
+    const { c, p } = await fresh(1440, 900);
+    await p.evaluate((t) => window.__lab.set({ qualityNotice: t, restoreNotice: true }), longNotice);
+    await p.getByRole('button', { name: '건너뛰기' }).click();
+    await p.waitForTimeout(300);
+    const v = await p.evaluate(() => [...document.querySelectorAll('.perf-notice')].map((e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, vis: r.height > 0 }; }));
+    check('after 건너뛰기 the quality notice is visible and stacks under the restore alert', v.length === 2 && v.every((x) => x.vis) && v[1].top >= v[0].bottom, JSON.stringify(v));
+    await c.close();
+  }
+  {
     const siteDark = () => { try { localStorage.setItem('kwcoms-theme-mode:v2', 'dark'); localStorage.setItem('coms-lab:tutorial-done', '1'); } catch { /* no storage */ } };
     const a = await fresh(1440, 900, siteDark, 'light');
     check('site theme dark + no Lab key: Lab opens dark', (await a.p.evaluate(() => document.documentElement.dataset.theme)) === 'dark');
@@ -206,8 +216,14 @@ try {
     check("Lab's own saved theme wins over the site's", (await b.p.evaluate(() => document.documentElement.dataset.theme)) === 'light');
     await b.c.close();
     const d = await fresh(1440, 900, skipTutorial, 'dark');
-    check('no keys at all: follows prefers-color-scheme', (await d.p.evaluate(() => document.documentElement.dataset.theme)) === 'dark');
+    check('no keys at all: dark, like the site (OS preference is ignored)', (await d.p.evaluate(() => document.documentElement.dataset.theme)) === 'dark');
     await d.c.close();
+    const e = await fresh(1440, 900, () => { try { localStorage.setItem('kwcoms-theme-mode:v2', 'light'); localStorage.setItem('coms-lab:tutorial-done', '1'); } catch { /* no storage */ } }, 'dark');
+    check('site theme light + dark OS + no Lab key: Lab opens light', (await e.p.evaluate(() => document.documentElement.dataset.theme)) === 'light');
+    await e.c.close();
+    const f = await fresh(1440, 900, skipTutorial, 'light');
+    check('no keys + light OS: still dark', (await f.p.evaluate(() => document.documentElement.dataset.theme)) === 'dark');
+    await f.c.close();
   }
   check('no console errors / AudioContext warnings', errs.length === 0, errs.slice(0, 3).join(' | '));
 } catch (e) {
