@@ -97,16 +97,13 @@ test('the practice preview grows with tall content', async ({ page }) => {
 test('a playground output frame fits its content', async ({ page }) => {
   await mockOptionalApis(page)
   await page.goto('/study/web')
-  // Pin the stage by index: clicking 직접 해보기 removes that button, so a has-button filter stops matching afterwards.
-  const stages = page.locator('.pg-stage')
-  await expect(stages.filter({ has: page.getByRole('button', { name: /직접 해보기/ }) }).first()).toBeVisible()
-  const index = await stages.evaluateAll((els) => els.findIndex((el) => [...el.querySelectorAll('button')].some((b) => /직접 해보기/.test(b.textContent || ''))))
-  expect(index).toBeGreaterThanOrEqual(0)
-  const stage = stages.nth(index)
+  const stage = page.locator('.pg-stage').filter({ has: page.getByRole('button', { name: /직접 해보기/ }) }).first()
   await stage.scrollIntoViewIfNeeded()
+  // Pin this exact stage: clicking 직접 해보기 removes that button, so the filtered locator stops matching afterwards.
+  const stageEl = await stage.elementHandle()
   await stage.getByRole('button', { name: /직접 해보기/ }).click()
-  await stage.getByRole('button', { name: /실행/ }).first().click()
-  const out = await stage.locator('iframe.pg-frame').elementHandle()
+  await (await stageEl.waitForSelector('role=button[name=/실행/]')).click()
+  const out = await stageEl.waitForSelector('iframe.pg-frame')
   await expect.poll(settled(out), { timeout: 5000 }).toBeNull()
 })
 
