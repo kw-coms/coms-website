@@ -2427,7 +2427,9 @@ test('Records and Tools toggles show the active underline on their pages', async
   const sponsorsOffset = await offset(sponsors, sponsors.locator('span').last(), sponsors)
   expect(Math.abs(recordsOffset)).toBeLessThanOrEqual(1)
   expect(Math.abs(recordsOffset - sponsorsOffset)).toBeLessThanOrEqual(1)
-  await page.screenshot({ path: '/private/tmp/claude-501/-Users-choi-Documents-project/d4bfde10-af0c-4ffc-9df2-e765aade3c1b/scratchpad/nav-records-active.png', clip: { x: 0, y: 0, width: 1280, height: 80 } })
+  // ...and at the same height as Sponsors' underline (it now hangs from the label span, not the button).
+  const [recordsLine, sponsorsLine] = [await underline('Records').boundingBox(), await sponsors.locator('span').last().boundingBox()]
+  expect(Math.abs(recordsLine.y - sponsorsLine.y)).toBeLessThanOrEqual(1)
 })
 
 test('top navigation groups activity log and monthly calendar under Records and Tools', async ({ page }) => {
