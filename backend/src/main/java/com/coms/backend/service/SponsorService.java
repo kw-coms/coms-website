@@ -109,13 +109,17 @@ public class SponsorService {
     /**
      * Tiers in {@code sortOrder} order, each carrying its publicly visible sponsors ordered by
      * {@code sortOrder} then name. Tiers with no visible sponsor are dropped, and sponsors with
-     * no tier are collected into a trailing tier-less group (id {@code null}).
+     * no tier are collected into a trailing tier-less group (id {@code null}). Only members see
+     * identified sponsors; guests get the anonymous placeholder for every sponsor.
      */
     @Transactional(readOnly = true)
-    public List<SponsorTierResponse> publicList() {
+    public List<SponsorTierResponse> publicList(boolean member) {
         LocalDate today = today();
         Map<Long, List<Sponsor>> byTier = sponsorRepository.findAllByOrderBySortOrderAscNameAscIdAsc().stream()
                 .filter(sponsor -> sponsor.isPubliclyVisible(today))
+                // Guests only see placeholders, so the name order must not leak through the ranking.
+                .sorted(member ? (a, b) -> 0 : java.util.Comparator.comparingInt(Sponsor::getSortOrder)
+                        .thenComparing(Sponsor::getId))
                 .collect(Collectors.groupingBy(
                         sponsor -> sponsor.getTierId() == null ? 0L : sponsor.getTierId(),
                         java.util.LinkedHashMap::new,
@@ -131,14 +135,14 @@ public class SponsorService {
                     tier.getColor(),
                     tier.getDescription(),
                     tier.getSortOrder(),
-                    sponsors.stream().map(this::toPublic).toList()
+                    sponsors.stream().map(sponsor -> toPublic(sponsor, member)).toList()
             ));
         }
         List<Sponsor> untiered = byTier.getOrDefault(0L, List.of());
         if (!untiered.isEmpty()) {
             groups.add(new SponsorTierResponse(
                     null, "", null, null, Integer.MAX_VALUE,
-                    untiered.stream().map(this::toPublic).toList()
+                    untiered.stream().map(sponsor -> toPublic(sponsor, member)).toList()
             ));
         }
         return groups;
@@ -379,10 +383,19 @@ public class SponsorService {
     }
 
     @Transactional(readOnly = true)
-    public SponsorImage publicImageMeta(Long id) {
+    public SponsorImage publicImageMeta(Long id, boolean member) {
         Long bannerImageId = readSettings().bannerImageId();
+        // A logo identifies its sponsor, so guests (who only see placeholders) get the banner alone.
+        if (!member && !id.equals(bannerImageId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         return imageRepository.findPublicById(id, bannerImageId, today())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isBannerImage(Long id) {
+        return id.equals(readSettings().bannerImageId());
     }
 
     @Transactional(readOnly = true)
@@ -495,10 +508,10 @@ public class SponsorService {
         }
     }
 
-    private SponsorResponse toPublic(Sponsor sponsor) {
-        if (sponsor.isAnonymous()) {
-            // No name, no logo, no outbound link — an anonymous sponsor is only ever a
-            // placeholder card, and the tier/period are the only details that survive.
+    private SponsorResponse toPublic(Sponsor sponsor, boolean member) {
+        if (!member || sponsor.isAnonymous()) {
+            // No name, no logo, no outbound link — guests (and everyone, for a sponsor who asked
+            // to be anonymous) only ever get a placeholder card; tier/period are all that survive.
             return new SponsorResponse(
                     null, ANONYMOUS_NAME, sponsor.getTierId(), null, null,
                     null, sponsor.getSinceDate(), sponsor.getUntilDate(), true);

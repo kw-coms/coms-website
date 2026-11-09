@@ -86,7 +86,7 @@ class SponsorServiceTest {
         sponsorService.create(sponsor("익명 스폰서", tierId, b -> b.amountNote("300,000원").anonymous(true)));
         sponsorService.create(sponsor("공개 스폰서", tierId, b -> b.amountNote("500,000원")));
 
-        List<SponsorTierResponse> groups = sponsorService.publicList();
+        List<SponsorTierResponse> groups = sponsorService.publicList(true);
         String json = objectMapper.writeValueAsString(groups);
 
         assertThat(json).doesNotContain("amountNote", "300,000원", "500,000원");
@@ -104,6 +104,44 @@ class SponsorServiceTest {
     }
 
     @Test
+    void guestsOnlyGetPlaceholdersWhileMembersGetRealFields() throws Exception {
+        Long tierId = tier("골드");
+        sponsorService.create(sponsor("공개 스폰서", tierId, b -> b.linkUrl("https://example.com")));
+
+        var guest = sponsorService.publicList(false).stream().flatMap(g -> g.sponsors().stream()).toList();
+        assertThat(guest).singleElement().satisfies(sponsor -> {
+            assertThat(sponsor.name()).isEqualTo("익명 후원자");
+            assertThat(sponsor.id()).isNull();
+            assertThat(sponsor.logoUrl()).isNull();
+            assertThat(sponsor.linkUrl()).isNull();
+            assertThat(sponsor.description()).isNull();
+            assertThat(sponsor.tierId()).isEqualTo(tierId);
+        });
+        assertThat(objectMapper.writeValueAsString(sponsorService.publicList(false))).doesNotContain("공개 스폰서", "example.com");
+
+        var member = sponsorService.publicList(true).stream().flatMap(g -> g.sponsors().stream()).toList();
+        assertThat(member).singleElement().satisfies(sponsor -> {
+            assertThat(sponsor.name()).isEqualTo("공개 스폰서");
+            assertThat(sponsor.id()).isNotNull();
+            assertThat(sponsor.linkUrl()).isEqualTo("https://example.com");
+        });
+    }
+
+    @Test
+    void guestOrderFollowsIdWhileMemberOrderFollowsName() {
+        Long tierId = tier("골드");
+        // Lower id has the later name; sinceDate survives masking, so it identifies each placeholder.
+        sponsorService.create(sponsor("나", tierId, b -> b.sinceDate(LocalDate.of(2020, 1, 1))));
+        sponsorService.create(sponsor("가", tierId, b -> b.sinceDate(LocalDate.of(2021, 1, 1))));
+        jdbc.update("UPDATE sponsors SET sort_order = 0");
+
+        assertThat(sponsorService.publicList(true).get(0).sponsors()).extracting("sinceDate")
+                .containsExactly(LocalDate.of(2021, 1, 1), LocalDate.of(2020, 1, 1));
+        assertThat(sponsorService.publicList(false).get(0).sponsors()).extracting("sinceDate")
+                .containsExactly(LocalDate.of(2020, 1, 1), LocalDate.of(2021, 1, 1));
+    }
+
+    @Test
     void sponsorAnonymizedByV106NoLongerExposesItsNamePublicly() throws Exception {
         Long tierId = tier("실버");
         jdbc.update("INSERT INTO sponsors (id, name, tier_id, description, since_date, anonymous, visible, sort_order)"
@@ -113,7 +151,7 @@ class SponsorServiceTest {
             jdbc.execute(new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
         }
 
-        var sponsors = sponsorService.publicList().stream().flatMap(group -> group.sponsors().stream()).toList();
+        var sponsors = sponsorService.publicList(true).stream().flatMap(group -> group.sponsors().stream()).toList();
         assertThat(sponsors).singleElement().satisfies(sponsor -> {
             assertThat(sponsor.name()).isEqualTo("익명 후원자");
             assertThat(sponsor.anonymous()).isTrue();
@@ -147,7 +185,7 @@ class SponsorServiceTest {
         sponsorService.create(sponsor("만료 후원", tierId, b -> b.untilDate(LocalDate.now().minusDays(1))));
         sponsorService.create(sponsor("숨김 후원", tierId, b -> b.visible(false)));
 
-        assertThat(sponsorService.publicList())
+        assertThat(sponsorService.publicList(true))
                 .flatExtracting(SponsorTierResponse::sponsors)
                 .extracting("name")
                 .containsExactly("현재 후원");
@@ -207,7 +245,7 @@ class SponsorServiceTest {
 
         assertThat(sponsorService.adminList()).extracting(SponsorAdminResponse::id)
                 .containsExactly(third, first, second);
-        assertThat(sponsorService.publicList())
+        assertThat(sponsorService.publicList(true))
                 .flatExtracting(SponsorTierResponse::sponsors)
                 .extracting("name")
                 .containsExactly("다", "가", "나");
@@ -324,6 +362,7 @@ class SponsorServiceTest {
         private Long logoImageId;
         private String linkUrl;
         private String amountNote;
+        private LocalDate sinceDate;
         private LocalDate untilDate;
         private Boolean anonymous;
         private Boolean visible;
@@ -331,12 +370,13 @@ class SponsorServiceTest {
         Draft logoImageId(Long value) { this.logoImageId = value; return this; }
         Draft linkUrl(String value) { this.linkUrl = value; return this; }
         Draft amountNote(String value) { this.amountNote = value; return this; }
+        Draft sinceDate(LocalDate value) { this.sinceDate = value; return this; }
         Draft untilDate(LocalDate value) { this.untilDate = value; return this; }
         Draft anonymous(boolean value) { this.anonymous = value; return this; }
         Draft visible(boolean value) { this.visible = value; return this; }
 
         SponsorRequest toRequest(String name, Long tierId) {
-            return new SponsorRequest(name, tierId, logoImageId, linkUrl, null, amountNote, null, untilDate, anonymous, visible, null);
+            return new SponsorRequest(name, tierId, logoImageId, linkUrl, null, amountNote, sinceDate, untilDate, anonymous, visible, null);
         }
     }
 }

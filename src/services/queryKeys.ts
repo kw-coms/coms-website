@@ -22,7 +22,8 @@ export const queryKeys = {
   },
   sponsors: {
     all: ['sponsors'],
-    list: () => [...queryKeys.sponsors.all, 'list'],
+    // The list differs per viewer (members see names, guests see placeholders), so the viewer is part of the key.
+    list: (viewer: string) => [...queryKeys.sponsors.all, 'list', viewer],
     page: () => [...queryKeys.sponsors.all, 'page'],
   },
 }
