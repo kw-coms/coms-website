@@ -3840,7 +3840,7 @@ test('apps page cards keep one size whatever the text length or section count', 
       // One size across the whole page, sections included: the file row is reserved page-wide.
       const boxes = await page.locator('.app-card').evaluateAll((els) => els.map((el) => {
         const r = el.getBoundingClientRect()
-        return { w: r.width, h: r.height, grid: 0 }
+        return { w: r.width, h: r.height }
       }))
       for (const box of boxes) {
         expect(Math.abs(box.w - boxes[0].w)).toBeLessThanOrEqual(1)
