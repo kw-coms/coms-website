@@ -215,29 +215,81 @@
 }
 
 /* ---- Footer ---------------------------------------------------------------- */
-/* The wordmark, very large and only outlined, sinking into the foot of every page, over the
-   same dot grid the home screen is drawn on.
-   The footer must stay an ordinary block: no position, mask, opacity or transform on it or on
-   the wordmark. It comes after the page in the document, so anything that put it on its own
-   layer would paint it over the page's dialogs (and take their clicks) wherever they overlap. */
+/* A compact footer: note, one "화면 설정" control, link directory. The settings open in a popover
+   (desktop) or a bottom sheet (phones) instead of sitting in the page; the dot grid stays.
+   The footer must stay an ordinary block: no position, mask, opacity or transform on it. It comes
+   after the page in the document, so anything that put it on its own layer would paint it over the
+   page's dialogs (and take their clicks) wherever they overlap. Only the open popover is positioned. */
 .apple-footer-surface {
-	overflow: hidden;
 	background-image:
 		linear-gradient(180deg, var(--app-surface-soft) 30%, transparent 100%),
 		radial-gradient(circle, color-mix(in srgb, var(--app-text) 14%, transparent) 1px, transparent 1.4px);
 	background-size: auto, 23px 23px;
 }
 
-.coms-footer-mark {
-	margin: 1.75rem auto -0.42em;
-	color: transparent;
-	font-size: clamp(4.5rem, 21vw, 17rem);
-	font-weight: 800;
-	line-height: 0.8;
-	letter-spacing: -0.04em;
-	text-align: center;
-	white-space: nowrap;
-	-webkit-text-stroke: 1px color-mix(in srgb, var(--app-text) 24%, transparent);
-	pointer-events: none;
-	user-select: none;
+.coms-footer-link {
+	display: inline-flex;
+	align-items: center;
+	min-height: 1.75rem;
+}
+
+@media (pointer: coarse), (max-width: 639px) {
+	.coms-footer-link {
+		min-height: 44px;
+	}
+}
+
+.appearance-backdrop {
+	display: none;
+}
+
+.appearance-popover {
+	position: absolute;
+	right: 0;
+	bottom: calc(100% + 0.5rem);
+	z-index: 60;
+	width: 22rem;
+	max-width: calc(100vw - 2.5rem);
+	max-height: var(--appearance-max-h, 80vh);
+	overflow-y: auto;
+	padding: 1rem;
+	border: 1px solid var(--app-hairline-strong);
+	border-radius: 1.25rem;
+	background: var(--app-surface-elevated);
+	box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+	animation: appearance-pop 140ms ease-out;
+}
+
+@media (max-width: 639px) {
+	.appearance-backdrop {
+		display: block;
+		position: fixed;
+		inset: 0;
+		z-index: 59;
+		background: color-mix(in srgb, #000 55%, transparent);
+	}
+
+	.appearance-popover {
+		position: fixed;
+		inset: auto 0 0 0;
+		width: auto;
+		max-width: none;
+		max-height: 85dvh;
+		padding: 1rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+		border-width: 1px 0 0;
+		border-radius: 1.5rem 1.5rem 0 0;
+		animation: appearance-sheet 200ms ease-out;
+	}
+}
+
+@keyframes appearance-pop {
+	from { opacity: 0; transform: translateY(6px); }
+}
+
+@keyframes appearance-sheet {
+	from { transform: translateY(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.appearance-popover { animation: none; }
 }

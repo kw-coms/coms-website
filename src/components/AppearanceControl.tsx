@@ -1,4 +1,5 @@
-import { Moon, Sun } from 'lucide-react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { Check, ChevronUp, Moon, Sun, X } from 'lucide-react'
 import { accentSwatches, footerLinkGroups } from '../data/homeContent'
 import { DEFAULT_ACCENT, normalizeHex } from '../utils/themeColors'
 import { setPerfPreference, usePerfState, type PerfPreference } from '../utils/perfMode'
@@ -8,6 +9,8 @@ const PERF_CHOICES: { value: PerfPreference; label: string }[] = [
   { value: 'lite', label: '가볍게' },
   { value: 'full', label: '화려하게' },
 ]
+
+export const OPEN_APPEARANCE_EVENT = 'coms:open-appearance'
 
 export default function AppearanceControl({
   accentColor,
@@ -34,158 +37,286 @@ export default function AppearanceControl({
   const isDark = themeMode === 'dark'
   const fontSelectValue = selectedFontId ? String(selectedFontId) : ''
   const perf = usePerfState()
+  const [open, setOpen] = useState(false)
+  const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined)
+  const dialogId = useId()
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const focusPerfRef = useRef(false)
+
+  const close = useCallback((returnFocus: boolean) => {
+    setOpen(false)
+    if (returnFocus) buttonRef.current?.focus()
+  }, [])
+
+  // Lets the "settings" button of the low-power notice open the panel from anywhere on the page.
+  useEffect(() => {
+    const openFromOutside = () => { focusPerfRef.current = true; setOpen(true) }
+    window.addEventListener(OPEN_APPEARANCE_EVENT, openFromOutside)
+    return () => window.removeEventListener(OPEN_APPEARANCE_EVENT, openFromOutside)
+  }, [])
+
+  useEffect(() => {
+    if (!open) return undefined
+    const dialog = dialogRef.current
+    if (focusPerfRef.current) {
+      focusPerfRef.current = false
+      dialog?.querySelector<HTMLElement>('[data-perf-choice][tabindex="0"]')?.focus()
+    } else {
+      dialog?.focus()
+    }
+    // On desktop the popover opens upward from the footer: keep it inside the viewport.
+    const fit = () => {
+      const top = buttonRef.current?.getBoundingClientRect().top ?? 0
+      setMaxHeight(Math.max(240, Math.floor(top - 16)))
+    }
+    fit()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        close(true)
+        return
+      }
+      // The bottom sheet covers the page, so Tab stays inside it. The desktop popover lets Tab leave.
+      if (event.key !== 'Tab' || !window.matchMedia('(max-width: 639px)').matches || !dialog) return
+      const focusable = [...dialog.querySelectorAll<HTMLElement>('button, select, input, [tabindex="0"]')].filter((el) => !el.hasAttribute('disabled') && el.tabIndex >= 0)
+      if (!focusable.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (dialog?.contains(target) || buttonRef.current?.contains(target)) return
+      close(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('pointerdown', onPointerDown)
+    window.addEventListener('resize', fit)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('pointerdown', onPointerDown)
+      window.removeEventListener('resize', fit)
+    }
+  }, [open, close])
+
+  const groupLabel = 'text-xs font-semibold text-[var(--app-text)]'
+  const chip = 'inline-flex min-h-11 items-center justify-center rounded-full px-3.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 sm:min-h-9'
+  const segment = 'inline-flex items-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] p-1'
+  const segmentOn = 'bg-[var(--app-text)] text-[var(--app-surface)]'
+  const segmentOff = 'text-[var(--app-muted)] hover:text-[var(--app-text)]'
+  const ModeIcon = isDark ? Moon : Sun
 
   return (
-    <footer className="appearance-control apple-footer-surface border-t border-[var(--app-hairline)] bg-[var(--app-surface-soft)] px-5 py-8 text-[var(--app-muted)]">
+    <footer className="appearance-control apple-footer-surface border-t border-[var(--app-hairline)] bg-[var(--app-surface-soft)] px-5 pb-6 pt-6 text-[var(--app-muted)]">
       <div className="mx-auto w-full max-w-5xl">
-        <div className="apple-footer-note border-b border-[var(--app-hairline)] pb-5 text-xs leading-5">
-          <p>KW COM&apos;s는 광운대학교 학생들이 함께 공부하고 프로젝트를 만드는 중앙 컴퓨터 학술동아리입니다.</p>
-          <p className="mt-2">활동 안내와 모집 일정은 공지사항을 통해 순차적으로 공개됩니다.</p>
-        </div>
-
-        <div className="appearance-panel grid gap-4 border-b border-[var(--app-hairline)] py-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--app-subtle)]">Appearance</p>
-            <h2 className="mt-1 text-sm font-semibold text-[var(--app-text)]">화면 설정</h2>
+        <div className="appearance-panel flex flex-col gap-4 border-b border-[var(--app-hairline)] pb-5 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
+          <div className="apple-footer-note min-w-0 max-w-xl text-xs leading-5">
+            <p>KW COM&apos;s는 광운대학교 학생들이 함께 공부하고 프로젝트를 만드는 중앙 컴퓨터 학술동아리입니다.</p>
+            <p className="mt-1">활동 안내와 모집 일정은 공지사항을 통해 순차적으로 공개됩니다.</p>
           </div>
 
-          <div className="appearance-actions flex min-w-0 flex-col gap-3 lg:items-end">
+          <div className="appearance-actions relative flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
-              className="appearance-mode-toggle inline-flex min-h-9 w-full items-center justify-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)] sm:w-auto"
+              className="appearance-mode-toggle inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 sm:size-9"
               aria-label={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
+              title={isDark ? '라이트 모드로 전환' : '다크 모드로 전환'}
             >
-              <span className="grid size-6 place-items-center rounded-full bg-[var(--app-surface-soft)] text-[var(--app-text)]">
-                {isDark ? <Sun size={14} /> : <Moon size={14} />}
-              </span>
-              {isDark ? '라이트 모드' : '다크 모드'}
+              {isDark ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}
+            </button>
+            <button
+              ref={buttonRef}
+              type="button"
+              onClick={() => setOpen((value) => !value)}
+              aria-expanded={open}
+              aria-controls={dialogId}
+              aria-haspopup="dialog"
+              className="appearance-trigger inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-4 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 sm:min-h-9 sm:flex-none"
+            >
+              <ModeIcon size={14} aria-hidden="true" />
+              <span className="size-3.5 rounded-full border border-[var(--app-hairline-strong)]" style={{ backgroundColor: accent }} aria-hidden="true" />
+              화면 설정
+              <ChevronUp size={14} aria-hidden="true" className={`transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
 
-            <div className="appearance-perf-row flex flex-wrap items-center gap-2 lg:justify-end">
-              <span id="perf-choice-label" className="mr-1 text-xs font-semibold text-[var(--app-muted)]">화면 효과</span>
-              <div
-                role="radiogroup"
-                aria-labelledby="perf-choice-label"
-                className="inline-flex items-center gap-1 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] p-1"
-                onKeyDown={(event) => {
-                  const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
-                  if (!step) return
-                  event.preventDefault()
-                  const index = PERF_CHOICES.findIndex((choice) => choice.value === perf.preference)
-                  const next = PERF_CHOICES[(index + step + PERF_CHOICES.length) % PERF_CHOICES.length]
-                  setPerfPreference(next.value)
-                  event.currentTarget.querySelector<HTMLElement>(`[data-perf-choice="${next.value}"]`)?.focus()
-                }}
-              >
-                {PERF_CHOICES.map((choice) => {
-                  const active = perf.preference === choice.value
-                  return (
+            {open && (
+              <>
+                <div className="appearance-backdrop" aria-hidden="true" />
+                <div
+                  ref={dialogRef}
+                  id={dialogId}
+                  role="dialog"
+                  aria-label="화면 설정"
+                  tabIndex={-1}
+                  className="appearance-popover text-[var(--app-text)] focus:outline-none"
+                  style={maxHeight ? { '--appearance-max-h': `${maxHeight}px` } as React.CSSProperties : undefined}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-sm font-semibold">화면 설정</h2>
                     <button
-                      key={choice.value}
                       type="button"
-                      role="radio"
-                      aria-checked={active}
-                      tabIndex={active ? 0 : -1}
-                      data-perf-choice={choice.value}
-                      onClick={() => setPerfPreference(choice.value)}
-                      className={`min-h-9 rounded-full px-3 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 ${active ? 'bg-[var(--app-text)] text-[var(--app-surface)]' : 'text-[var(--app-muted)] hover:text-[var(--app-text)]'}`}
+                      onClick={() => close(true)}
+                      className="grid size-11 place-items-center rounded-full text-[var(--app-muted)] transition hover:bg-[var(--app-surface-soft)] hover:text-[var(--app-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 sm:size-8"
+                      aria-label="화면 설정 닫기"
                     >
-                      {choice.label}
+                      <X size={16} aria-hidden="true" />
                     </button>
-                  )
-                })}
-              </div>
-              <span className="text-[11px] text-[var(--app-subtle)]">
-                {perf.preference === 'auto' ? (perf.mode === 'lite' ? '지금은 가벼운 화면' : '지금은 화려한 화면') : ''}
-              </span>
-            </div>
+                  </div>
 
-            {activeFonts.length > 0 && (
-              <div className="appearance-font-row flex flex-wrap items-center gap-2 lg:justify-end" aria-label="폰트 설정">
-                <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">폰트</span>
-                <span className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-muted)]">
-                  {fontSelectionLocked ? '내 계정에 저장됨' : '이 브라우저에 임시 적용'}
-                </span>
-                {fontSelectionLocked ? (
-                  <button
-                    type="button"
-                    onClick={onOpenAccountSettings}
-                    className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface-elevated)] hover:text-[var(--app-text)] focus:outline-none focus:ring-2 focus:ring-[var(--app-accent)]/30"
-                  >
-                    계정 설정에서 폰트 변경
-                  </button>
-                ) : (
-                  <select
-                    value={fontSelectValue}
-                    onChange={(event) => onFontChange?.(event.target.value)}
-                    className="min-h-9 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] outline-none transition focus:ring-2 focus:ring-[var(--app-accent)]/30"
-                    aria-label="사이트 폰트 선택"
-                  >
-                    <option value="">기본 폰트</option>
-                    {activeFonts.map((font) => (
-                      <option key={font.id} value={font.id}>{font.name}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
+                  <div className="mt-3 divide-y divide-[var(--app-hairline)]">
+                    <div role="group" aria-labelledby={`${dialogId}-mode`} className="flex flex-wrap items-center justify-between gap-2 pb-3">
+                      <span id={`${dialogId}-mode`} className={groupLabel}>테마</span>
+                      <div className={segment}>
+                        {[{ value: 'light', label: '라이트', Icon: Sun }, { value: 'dark', label: '다크', Icon: Moon }].map(({ value, label, Icon }) => {
+                          const active = (value === 'dark') === isDark
+                          return (
+                            <button key={value} type="button" aria-pressed={active} onClick={() => setThemeMode(value)} className={`${chip} gap-1.5 ${active ? segmentOn : segmentOff}`}>
+                              <Icon size={13} aria-hidden="true" />
+                              {label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    <div role="group" aria-labelledby="perf-choice-label" className="py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span id="perf-choice-label" className={groupLabel}>화면 효과</span>
+                        <div
+                          role="radiogroup"
+                          aria-labelledby="perf-choice-label"
+                          className={segment}
+                          onKeyDown={(event) => {
+                            const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
+                            if (!step) return
+                            event.preventDefault()
+                            const index = PERF_CHOICES.findIndex((choice) => choice.value === perf.preference)
+                            const next = PERF_CHOICES[(index + step + PERF_CHOICES.length) % PERF_CHOICES.length]
+                            setPerfPreference(next.value)
+                            event.currentTarget.querySelector<HTMLElement>(`[data-perf-choice="${next.value}"]`)?.focus()
+                          }}
+                        >
+                          {PERF_CHOICES.map((choice) => {
+                            const active = perf.preference === choice.value
+                            return (
+                              <button
+                                key={choice.value}
+                                type="button"
+                                role="radio"
+                                aria-checked={active}
+                                tabIndex={active ? 0 : -1}
+                                data-perf-choice={choice.value}
+                                onClick={() => setPerfPreference(choice.value)}
+                                className={`${chip} ${active ? segmentOn : segmentOff}`}
+                              >
+                                {choice.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                      {perf.preference === 'auto' && (
+                        <p className="mt-1.5 text-[11px] text-[var(--app-subtle)]">{perf.mode === 'lite' ? '지금은 가벼운 화면' : '지금은 화려한 화면'}</p>
+                      )}
+                    </div>
+
+                    {activeFonts.length > 0 && (
+                      <div className="appearance-font-row py-3" role="group" aria-label="폰트 설정">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className={groupLabel}>폰트</span>
+                          <span className="rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--app-muted)]">
+                            {fontSelectionLocked ? '내 계정에 저장됨' : '이 브라우저에 임시 적용'}
+                          </span>
+                        </div>
+                        {fontSelectionLocked ? (
+                          <button
+                            type="button"
+                            onClick={() => { close(false); onOpenAccountSettings?.() }}
+                            className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface-elevated)] hover:text-[var(--app-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 sm:min-h-9"
+                          >
+                            계정 설정에서 폰트 변경
+                          </button>
+                        ) : (
+                          <select
+                            value={fontSelectValue}
+                            onChange={(event) => onFontChange?.(event.target.value)}
+                            className="mt-2 min-h-11 w-full rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 sm:min-h-9"
+                            aria-label="사이트 폰트 선택"
+                          >
+                            <option value="">기본 폰트</option>
+                            {activeFonts.map((font) => (
+                              <option key={font.id} value={font.id}>{font.name}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    )}
+
+                    <div role="group" aria-labelledby={`${dialogId}-color`} className="appearance-color-row pt-3">
+                      <span id={`${dialogId}-color`} className={groupLabel}>강조 색상</span>
+                      <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-2">
+                        {accentSwatches.map((swatch) => {
+                          const active = accent === swatch.value
+                          return (
+                            <button
+                              key={swatch.value}
+                              type="button"
+                              onClick={() => setAccentColor(swatch.value)}
+                              className={`relative grid size-11 min-h-11 min-w-11 place-items-center rounded-full border border-[var(--app-hairline-strong)] transition hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-text)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--app-surface-elevated)] sm:size-8 sm:min-h-8 sm:min-w-8 ${active ? 'ring-2 ring-[var(--app-text)] ring-offset-2 ring-offset-[var(--app-surface-elevated)]' : ''}`}
+                              style={{ backgroundColor: swatch.value }}
+                              aria-label={`${swatch.name} 색상 선택`}
+                              aria-pressed={active}
+                              title={swatch.name}
+                            >
+                              {active && <Check size={14} strokeWidth={3} className="text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" aria-hidden="true" />}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)] focus-within:ring-2 focus-within:ring-[var(--app-accent)]/40 sm:min-h-9">
+                          직접 선택
+                          <span className="relative grid size-5 overflow-hidden rounded-full border border-[var(--app-hairline)] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]" style={{ backgroundColor: accent }}>
+                            <input
+                              type="color"
+                              value={accent}
+                              onChange={(event) => setAccentColor(event.target.value)}
+                              className="absolute -inset-2 h-10 w-10 cursor-pointer opacity-0"
+                              aria-label="커스텀 색상 선택"
+                            />
+                          </span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setAccentColor(DEFAULT_ACCENT)}
+                          className="min-h-11 rounded-full border border-[var(--app-hairline)] bg-transparent px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface)] hover:text-[var(--app-text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent)]/40 sm:min-h-9"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
-
-            <div className="appearance-color-row flex flex-wrap items-center gap-2 lg:justify-end">
-              <span className="mr-1 text-xs font-semibold text-[var(--app-muted)]">색상</span>
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] p-1.5">
-                {accentSwatches.map((swatch) => {
-                  const active = accent === swatch.value
-                  return (
-                    <button
-                      key={swatch.value}
-                      type="button"
-                      onClick={() => setAccentColor(swatch.value)}
-                      className={`relative grid size-11 min-h-11 min-w-11 place-items-center rounded-full transition hover:scale-105 sm:size-8 sm:min-h-8 sm:min-w-8 ${active ? 'ring-2 ring-[var(--app-text)] ring-offset-2 ring-offset-[var(--app-surface)]' : ''}`}
-                      style={{ backgroundColor: swatch.value }}
-                      aria-label={`${swatch.name} 색상 선택`}
-                      title={swatch.name}
-                    >
-                      {active && <span className="size-2.5 rounded-full bg-[var(--app-surface)] shadow-[0_1px_4px_rgba(0,0,0,0.28)] sm:size-2" />}
-                    </button>
-                  )
-                })}
-              </div>
-              <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border border-[var(--app-hairline)] bg-[var(--app-surface)] px-3 text-xs font-semibold text-[var(--app-text)] transition hover:bg-[var(--app-surface-elevated)]">
-                직접 선택
-                <span className="relative grid size-5 overflow-hidden rounded-full border border-[var(--app-hairline)] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]" style={{ backgroundColor: accent }}>
-                  <input
-                    type="color"
-                    value={accent}
-                    onChange={(event) => setAccentColor(event.target.value)}
-                    className="absolute -inset-2 h-10 w-10 cursor-pointer opacity-0"
-                    aria-label="커스텀 색상 선택"
-                  />
-                </span>
-              </label>
-              <button
-                type="button"
-                onClick={() => setAccentColor(DEFAULT_ACCENT)}
-                className="min-h-9 rounded-full border border-[var(--app-hairline)] bg-transparent px-3 text-xs font-semibold text-[var(--app-muted)] transition hover:bg-[var(--app-surface)] hover:text-[var(--app-text)]"
-              >
-                Reset
-              </button>
-            </div>
           </div>
         </div>
 
-        <div className="apple-footer-directory grid gap-x-10 gap-y-6 border-b border-[var(--app-hairline)] py-5 text-xs sm:grid-cols-3">
+        <div className="apple-footer-directory grid grid-cols-3 gap-x-4 gap-y-4 border-b border-[var(--app-hairline)] py-4 text-xs sm:gap-x-10">
           {footerLinkGroups.map((group) => (
             <div key={group.title}>
               <h3 className="font-semibold text-[var(--app-text)]">{group.title}</h3>
-              <ul className="mt-2 space-y-2">
+              <ul className="mt-1">
                 {group.links.map((link) => (
                   <li key={link.label}>
                     <a
                       href={link.href}
                       target={link.external ? '_blank' : undefined}
                       rel={link.external ? 'noreferrer' : undefined}
-                      className="text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
+                      className="coms-footer-link text-[var(--app-muted)] transition hover:text-[var(--app-text)]"
                     >
                       {link.label}
                     </a>
@@ -196,16 +327,15 @@ export default function AppearanceControl({
           ))}
         </div>
 
-        <div className="apple-footer-bottom flex flex-col gap-3 pt-4 text-xs sm:flex-row sm:items-center sm:justify-between">
+        <div className="apple-footer-bottom flex flex-col gap-1 pt-3 text-xs sm:flex-row sm:items-center sm:justify-between">
           <p>Copyright © {new Date().getFullYear()} KW COM&apos;s. All rights reserved.</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            <a href="/notices" className="hover:text-[var(--app-text)]">Notices</a>
-            <a href="/community" className="hover:text-[var(--app-text)]">Community</a>
-            <a href="mailto:kwcoms69@gmail.com" className="hover:text-[var(--app-text)]">Contact</a>
+          <div className="flex flex-wrap gap-x-4">
+            <a href="/notices" className="coms-footer-link hover:text-[var(--app-text)]">Notices</a>
+            <a href="/community" className="coms-footer-link hover:text-[var(--app-text)]">Community</a>
+            <a href="mailto:kwcoms69@gmail.com" className="coms-footer-link hover:text-[var(--app-text)]">Contact</a>
           </div>
         </div>
       </div>
-      <div className="coms-footer-mark" aria-hidden="true">COM&apos;s</div>
     </footer>
   )
 }

@@ -1,3 +1,4 @@
+import { OPEN_APPEARANCE_EVENT } from './AppearanceControl'
 import { dismissPerfNotice, usePerfState } from '../utils/perfMode'
 
 // Shown once when "auto" turned the lite look on. The live region is always mounted: a region
@@ -10,7 +11,8 @@ export default function PerfNotice() {
     dismissPerfNotice()
     const panel = document.querySelector('.appearance-control')
     panel?.scrollIntoView({ block: 'center' })
-    panel?.querySelector<HTMLElement>('[data-perf-choice][tabindex="0"]')?.focus({ preventScroll: true })
+    // The settings live in the footer's popover: open it, and it focuses the screen-effects choice.
+    window.dispatchEvent(new Event(OPEN_APPEARANCE_EVENT))
   }
 
   return (
