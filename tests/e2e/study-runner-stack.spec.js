@@ -124,6 +124,18 @@ test('Python: input() reads the input box; an exception shows the traceback', as
   await expect(page.locator(`#code-${n} .pg-out`)).toContainText('ZeroDivisionError', { timeout: 30_000 })
 })
 
+// A session that ends mid-lesson, against the real stack: the runner answers 401, the refresh fails
+// (no cookies left), the page signs out and the lesson gives way to the members-only guide.
+test('session ends mid-lesson: running code swaps the lesson for the members-only guide', async ({ page, context }) => {
+  await openEditor(page, 'c', 0)
+  await context.clearCookies()
+  await runBtn(page, 0).click()
+  const gate = page.locator('[data-members-gate]')
+  await expect(gate).toBeVisible({ timeout: 15_000 })
+  await expect(gate.getByRole('link', { name: '로그인' })).toHaveAttribute('href', '/login')
+  await expect(page.locator('.pg-stage')).toHaveCount(0)
+})
+
 // Lessons are for signed-in members: a signed-out visitor gets the chapter titles and the members-only
 // guide (with a login link), and no runnable code block at all.
 test('signed out: the lesson shows the members-only guide and no runnable code', async ({ page, context }) => {

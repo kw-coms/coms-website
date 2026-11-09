@@ -215,7 +215,7 @@ test('keeps the last 5 runs of a block', async ({ page }) => {
   await expect(page.locator('#code-0 .pg-stdout')).toHaveText('run 2\n')
 })
 
-test('HTML/JS blocks run in the real sandbox iframe and show console output without a login', async ({ page }) => {
+test('HTML/JS blocks run in the real sandbox iframe and show console output without the server runner', async ({ page }) => {
   const calls = await mockRun(page, () => ({ json: OK }))
   await openStudy(page, 'web')
   // block 10: JS ("const school ... let score ..."), edited to log
