@@ -72,6 +72,7 @@ export default function TourOverlay({ kind, onClose }: { kind: TourKind; onClose
   const titleId = useId()
   const bodyId = useId()
   const cardRef = useRef<HTMLDivElement>(null)
+  const primaryRef = useRef<HTMLButtonElement>(null)
   const frameRef = useRef(0)
   const indexRef = useRef(0)
   const scrolledRef = useRef(false)
@@ -154,10 +155,14 @@ export default function TourOverlay({ kind, onClose }: { kind: TourKind; onClose
     }
   }, [])
 
-  // A step change can leave focus on a button that has just been disabled: keep it in the card.
+  // A step change can leave focus on a button that has just been disabled (이전 on step 1). The browser
+  // blurs it at its own time, before or after this effect, so check both cases and move to 다음/완료.
   useEffect(() => {
     const card = cardRef.current
-    if (card && !card.contains(document.activeElement)) card.focus({ preventScroll: true })
+    const active = document.activeElement
+    if (card && (!card.contains(active) || active?.matches(':disabled'))) {
+      ;(primaryRef.current ?? card).focus({ preventScroll: true })
+    }
   }, [index])
 
   useEffect(() => {
@@ -231,7 +236,7 @@ export default function TourOverlay({ kind, onClose }: { kind: TourKind; onClose
           <button type="button" className="coms-tour-btn" disabled={index === 0} onClick={() => setIndex(index - 1)}>
             <ChevronLeft size={15} aria-hidden="true" />이전
           </button>
-          <button type="button" className="coms-tour-btn coms-tour-btn-primary" onClick={() => (last ? close() : setIndex(index + 1))}>
+          <button ref={primaryRef} type="button" className="coms-tour-btn coms-tour-btn-primary" onClick={() => (last ? close() : setIndex(index + 1))}>
             {last ? <>완료<Check size={15} aria-hidden="true" /></> : <>다음<ChevronRight size={15} aria-hidden="true" /></>}
           </button>
         </div>
