@@ -110,13 +110,16 @@ console.log('lab nginx / compose contract passed')
 const memberMedia = block('location ^~ /member-media/ {')
 for (const part of [/auth_request \/lab\/_auth;/, /alias \/usr\/share\/nginx\/member-media\/;/, /try_files \$uri =404;/,
   /add_header Cache-Control "private, no-cache" always;/, /add_header X-Robots-Tag "noindex" always;/,
-  /limit_req zone=lab_pre_ip burst=60 nodelay;/, /limit_req zone=lab_pre burst=300 nodelay;/, /limit_req_status 429;/, /security-headers-common\.conf/]) {
+  /limit_req zone=member_media_ip burst=200 nodelay;/, /limit_req zone=member_media burst=600 nodelay;/, /limit_req_status 429;/, /security-headers-common\.conf/]) {
   assert.match(memberMedia, part)
 }
 assert.doesNotMatch(memberMedia, /autoindex\s+on/, 'no directory listing')
-assert.ok(memberMedia.indexOf('limit_req zone=lab_pre_ip') < memberMedia.indexOf('auth_request'), 'rate-limit before the auth subrequest')
+assert.ok(memberMedia.indexOf('limit_req zone=member_media_ip') < memberMedia.indexOf('auth_request'), 'rate-limit before the auth subrequest')
 assert.doesNotMatch(memberMedia, /Cache-Control[^\n]*public/, 'a shared cache must never keep a member photo')
 assert.match(compose, /- \$\{COMS_MEMBER_MEDIA_DIR:-\.\/member-media\}:\/usr\/share\/nginx\/member-media:ro/)
 assert.match(readFileSync(new URL('../.gitignore', import.meta.url), 'utf8'), /^member-media\/$/m, 'photos stay out of the public repo')
 assert.match(readFileSync(new URL('../.github/workflows/deploy.yml', import.meta.url), 'utf8'), /MEDIA_KEEP="member-media\/"[\s\S]*git clean -fdx [^\n]*-e "\$MEDIA_KEEP"/, 'the deploy must not delete the uploaded photos')
 assert.match(readFileSync(new URL('../.dockerignore', import.meta.url), 'utf8'), /^member-media$/m, 'photos stay out of the image build context')
+assert.match(nginx, /^limit_req_zone \$binary_remote_addr zone=member_media_ip:10m rate=600r\/m;/m)
+assert.match(nginx, /^limit_req_zone \$member_media_global zone=member_media:64k rate=3000r\/m;/m)
+assert.doesNotMatch(memberMedia, /zone=lab_pre/, 'photos must not spend the Lab compile budget')
