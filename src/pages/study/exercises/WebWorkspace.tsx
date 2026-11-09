@@ -33,6 +33,7 @@ export default function WebWorkspace({ exercise, onSolved }: { exercise: WebExer
   const [tab, setTab] = useState<Tab>('html')
   const [results, setResults] = useState<WebCheckResult[] | null>(null)
   const [busy, setBusy] = useState(false)
+  const [ran, setRan] = useState(false)
   const busyRef = useRef(false)
   const gradeAbort = useRef<AbortController | null>(null)
   const [message, setMessage] = useState(shared ? '공유된 코드는 실행 버튼을 눌러야 미리보기가 돼요' : '')
@@ -88,12 +89,14 @@ export default function WebWorkspace({ exercise, onSolved }: { exercise: WebExer
   function preview() {
     if (busyRef.current || !frameRef.current) return
     loadWebPreview(frameRef.current, filesRef.current)
+    setRan(true)
     setMessage('미리보기를 새로 고쳤어요.')
   }
 
   async function submit() {
     const frame = frameRef.current
     if (busyRef.current || !frame) return
+    setRan(true)
     const id = ++runId.current
     busyRef.current = true
     setBusy(true)
@@ -155,13 +158,17 @@ export default function WebWorkspace({ exercise, onSolved }: { exercise: WebExer
     <p className="ex-web-hint">Ctrl/⌘+Enter 미리보기 · Ctrl/⌘+Shift+Enter 제출 · Esc 다음 Tab으로 편집기 나가기</p>
     <div className="ex-web-actions">
       <button type="button" onClick={preview} disabled={busy}>실행</button>
-      <button type="button" onClick={() => void submit()} disabled={busy}>제출</button>
-      <button type="button" onClick={reset} disabled={busy}>초기화</button>
-      <button type="button" onClick={() => void share()}>내 코드 공유</button>
+      <button type="button" className="ex-primary" onClick={() => void submit()} disabled={busy}>제출</button>
+      <span className="ex-actions-gap" aria-hidden="true" />
+      <button type="button" className="ex-quiet" onClick={reset} disabled={busy}>초기화</button>
+      <button type="button" className="ex-quiet" onClick={() => void share()}>내 코드 공유</button>
     </div>
     <div role="status" aria-live="polite" className="ex-web-status">{message}</div>
     <h3>미리보기</h3>
-    <iframe className="ex-web-preview" ref={frameRef} sandbox="allow-scripts allow-modals" title="웹 문제 미리보기" />
+    <div className="ex-preview-wrap">
+      <iframe className="ex-web-preview" ref={frameRef} sandbox="allow-scripts allow-modals" title="웹 문제 미리보기" />
+      {!ran && <p className="ex-preview-empty">실행하면 결과가 여기에 보여요</p>}
+    </div>
     {results && <section className="ex-web-results" aria-label="채점 결과">
       <h3 tabIndex={-1}>{message}</h3>
       <ol>{results.map((item, index) => <li key={`${item.name}-${index}`} className={item.passed ? 'is-pass' : 'is-fail'}>
